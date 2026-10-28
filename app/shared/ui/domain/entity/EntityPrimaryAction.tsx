@@ -8,6 +8,7 @@ export function EntityPrimaryAction({
   href,
   external = false,
   openLabel,
+  pressed,
   disabled = false,
   current = false,
   className,
@@ -52,6 +53,7 @@ export function EntityPrimaryAction({
         {...shared}
         type="button"
         disabled={disabled}
+        aria-pressed={pressed}
         onClick={onOpen}
         data-slot="entity-primary"
       >

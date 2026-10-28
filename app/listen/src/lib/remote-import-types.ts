@@ -1,0 +1,16 @@
+export type RemoteImportStatus =
+  | "idle"
+  | "requesting"
+  | "requested"
+  | "awaiting_approval"
+  | "approved"
+  | "reserving"
+  | "downloading"
+  | "verifying"
+  | "importing"
+  | "completed"
+  | "cancelled"
+  | "failed"
+  | "cleaned"
+  | "offline"
+  | "forbidden";

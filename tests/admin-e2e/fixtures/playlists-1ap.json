@@ -1,0 +1,109 @@
+{
+  "items": [
+    {
+      "id": 11,
+      "name": "Costa de noche",
+      "description": "Selección editorial de muestra.",
+      "cover_data_url": null,
+      "artwork_tracks": [],
+      "generation_mode": "static",
+      "is_curated": true,
+      "is_active": true,
+      "featured_rank": 1,
+      "category": "editorial",
+      "follower_count": 3,
+      "track_count": 12,
+      "total_duration": 3120,
+      "generation_status": null,
+      "last_generated_at": null
+    },
+    {
+      "id": 12,
+      "name": "Ambient en marcha",
+      "description": "Selección editorial de muestra.",
+      "cover_data_url": "data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" width=\"160\" height=\"160\"%3E%3Crect width=\"160\" height=\"160\" fill=\"%2313343d\"/%3E%3C/svg%3E",
+      "artwork_tracks": [],
+      "generation_mode": "smart",
+      "is_curated": true,
+      "is_active": true,
+      "featured_rank": 1,
+      "category": "genre",
+      "follower_count": 3,
+      "track_count": 12,
+      "total_duration": 3120,
+      "generation_status": "running",
+      "last_generated_at": "2026-10-18T10:00:00Z"
+    },
+    {
+      "id": 13,
+      "name": "Archivo pausado",
+      "description": "Selección editorial de muestra.",
+      "cover_data_url": null,
+      "artwork_tracks": [],
+      "generation_mode": "static",
+      "is_curated": false,
+      "is_active": false,
+      "featured_rank": null,
+      "category": null,
+      "follower_count": 3,
+      "track_count": 12,
+      "total_duration": 3120,
+      "generation_status": null,
+      "last_generated_at": null
+    },
+    {
+      "id": 14,
+      "name": "Pendiente de generación",
+      "description": "Selección editorial de muestra.",
+      "cover_data_url": null,
+      "artwork_tracks": [
+        {
+          "artist": "Costa Norte",
+          "album": "Luz",
+          "album_id": 68
+        },
+        {
+          "artist": "Bruma",
+          "album": "Niebla",
+          "album_id": 69
+        }
+      ],
+      "generation_mode": "smart",
+      "is_curated": true,
+      "is_active": true,
+      "featured_rank": 1,
+      "category": "editorial",
+      "follower_count": 3,
+      "track_count": 12,
+      "total_duration": 3120,
+      "generation_status": "queued",
+      "last_generated_at": null
+    },
+    {
+      "id": 15,
+      "name": "Revisión pendiente",
+      "description": "Selección editorial de muestra.",
+      "cover_data_url": null,
+      "artwork_tracks": [],
+      "generation_mode": "smart",
+      "is_curated": true,
+      "is_active": true,
+      "featured_rank": 1,
+      "category": "editorial",
+      "follower_count": 3,
+      "track_count": 12,
+      "total_duration": 3120,
+      "generation_status": "failed",
+      "last_generated_at": null
+    }
+  ],
+  "filterOptions": {
+    "genres": ["Ambient", "Rock"],
+    "formats": ["flac", "mp3"],
+    "keys": ["Am", "C"],
+    "artists": ["Costa Norte", "Bruma"],
+    "scales": ["major", "minor"],
+    "year_range": ["1980", "2026"],
+    "bpm_range": [60, 200]
+  }
+}

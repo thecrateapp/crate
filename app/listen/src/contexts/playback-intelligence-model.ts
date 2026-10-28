@@ -1,6 +1,6 @@
 import type { MutableRefObject } from "react";
 
-import type { PlaySource, Track } from "@/contexts/player-types";
+import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 import { getTrackCacheKey } from "@/contexts/player-utils";
 
 export const RADIO_REFILL_THRESHOLD = 3;
@@ -31,6 +31,7 @@ export interface PlaybackIntelligenceActions {
 }
 
 export interface PlaybackIntelligenceOptions {
+  repeat: RepeatMode;
   queue: Track[];
   currentIndex: number;
   isPlaying: boolean;

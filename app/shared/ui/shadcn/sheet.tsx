@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { XIcon } from "@crate/ui/icons";
 import { Dialog as SheetPrimitive } from "radix-ui";
 
 import { cn } from "@crate/ui/lib/cn";
+import { OverlayCloseButton } from "./overlay-close-button";
 
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
@@ -35,10 +35,7 @@ function SheetOverlay({
   return (
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
-      className={cn(
-        "fixed inset-0 z-app-modal bg-surface-canvas/65 backdrop-blur-sm data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
-        className,
-      )}
+      className={cn("crate-overlay-scrim fixed inset-0 z-app-modal", className)}
       {...props}
     />
   );
@@ -59,8 +56,11 @@ function SheetContent({
       <SheetOverlay />
       <SheetPrimitive.Content
         data-slot="sheet-content"
+        data-has-close={showCloseButton || undefined}
+        data-overlay-kind="sheet"
+        data-side={side}
         className={cn(
-          "fixed z-app-modal flex flex-col gap-4 bg-modal-surface shadow-sheet backdrop-blur-xl transition ease-in-out data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:animate-in data-[state=open]:duration-500",
+          "crate-overlay-panel fixed z-app-modal flex flex-col gap-4",
           side === "right" &&
             "inset-y-0 right-0 h-full w-3/4 border-l border-border-quiet data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm",
           side === "left" &&
@@ -73,11 +73,13 @@ function SheetContent({
         )}
         {...props}
       >
+        {side === "bottom" ? (
+          <div className="crate-overlay-grabber mx-auto mt-3" />
+        ) : null}
         {children}
         {showCloseButton && (
-          <SheetPrimitive.Close className="absolute top-4 right-4 flex size-10 items-center justify-center text-text-primary/45 transition-colors hover:text-text-primary focus-visible:text-text-primary focus-visible:outline-none disabled:pointer-events-none">
-            <XIcon className="size-6" />
-            <span className="sr-only">Close</span>
+          <SheetPrimitive.Close asChild>
+            <OverlayCloseButton className="absolute top-4 right-4" />
           </SheetPrimitive.Close>
         )}
       </SheetPrimitive.Content>
@@ -99,7 +101,10 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sheet-footer"
-      className={cn("mt-auto flex flex-col gap-2 p-4", className)}
+      className={cn(
+        "crate-overlay-footer mt-auto flex flex-col gap-2 p-4",
+        className,
+      )}
       {...props}
     />
   );
@@ -112,7 +117,7 @@ function SheetTitle({
   return (
     <SheetPrimitive.Title
       data-slot="sheet-title"
-      className={cn("font-semibold text-text-primary", className)}
+      className={cn("crate-overlay-title", className)}
       {...props}
     />
   );
@@ -125,7 +130,7 @@ function SheetDescription({
   return (
     <SheetPrimitive.Description
       data-slot="sheet-description"
-      className={cn("text-sm text-text-muted", className)}
+      className={cn("crate-overlay-body", className)}
       {...props}
     />
   );

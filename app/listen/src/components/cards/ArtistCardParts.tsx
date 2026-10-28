@@ -267,11 +267,9 @@ export function ArtistCardArtwork({
           aria-hidden="true"
           data-testid="artist-artwork-placeholder"
           data-placeholder-style="flat-disc"
-          className="grid size-full place-items-center rounded-full bg-surface-elevated"
+          className="crate-artist-initials grid size-full place-items-center rounded-full bg-surface-placeholder"
         >
-          <span className="text-sm font-semibold text-text-primary/75">
-            {monogram}
-          </span>
+          <span className="crate-media-initials">{monogram}</span>
         </div>
       }
       imageProps={{ loading: "lazy", decoding: "async" }}

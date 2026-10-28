@@ -13,6 +13,8 @@ import type {
   EngineEventName,
   EnginePositionEvent,
   EngineState,
+  EngineMixState,
+  EngineMixStateChangedEvent,
   EngineTransitionEvent,
   NativeEventMetadata,
 } from "@/lib/playback-engine";
@@ -206,6 +208,8 @@ export interface UseNativePlaybackEventBridgeParams {
   ) => boolean;
   scheduleNativeBufferingWatchdog: () => void;
   setCrossfadeTransition: (transition: CrossfadeTransition | null) => void;
+  applyNativeMixState?: (event: EngineMixStateChangedEvent) => void;
+  setMixState?: (state: EngineMixState | null) => void;
 }
 
 export function useNativePlaybackEventBridge({
@@ -228,6 +232,8 @@ export function useNativePlaybackEventBridge({
   retryNativePlaybackAfterAuthError,
   scheduleNativeBufferingWatchdog,
   setCrossfadeTransition,
+  applyNativeMixState,
+  setMixState,
 }: UseNativePlaybackEventBridgeParams) {
   const { t } = useTranslation();
   const tRef = useRef(t);
@@ -239,6 +245,12 @@ export function useNativePlaybackEventBridge({
   > | null>(null);
   const handleNativeEvent = useCallback(
     <K extends EngineEventName>(eventName: K, payload: EngineEventMap[K]) => {
+      if (
+        setMixState &&
+        androidNativeEngine.isCurrentQueueRevision &&
+        !androidNativeEngine.isCurrentQueueRevision(payload.revision)
+      )
+        return;
       if (eventName === "positionChanged") {
         applyNativePosition(payload as EnginePositionEvent);
         return;
@@ -249,6 +261,10 @@ export function useNativePlaybackEventBridge({
       }
       if (eventName === "stateChanged") {
         applyNativeState(payload as EngineState);
+        return;
+      }
+      if (eventName === "mixStateChanged") {
+        applyNativeMixState?.(payload as EngineMixStateChangedEvent);
         return;
       }
       if (eventName === "trackChanged") {
@@ -295,6 +311,8 @@ export function useNativePlaybackEventBridge({
           crossfadeTimerRef.current = null;
         }
         setCrossfadeTransition(null);
+        // Actual technique is authoritative in mixStateChanged/snapshots. An
+        // ended/cancelled visual transition may follow a newer Gapless reading.
         return;
       }
       if (eventName === "bufferingChanged") {
@@ -315,6 +333,7 @@ export function useNativePlaybackEventBridge({
         return;
       }
       if (eventName === "queueEnded") {
+        setMixState?.(null);
         const endedTrack = queueRef.current[currentIndexRef.current];
         clearNativeBufferingWatchdog();
         flushCurrentPlayEvent("completed", endedTrack);
@@ -348,6 +367,7 @@ export function useNativePlaybackEventBridge({
         return;
       }
       if (eventName === "error") {
+        setMixState?.(null);
         const nativeError = payload as EngineEventMap["error"];
         const summary = nativePlaybackErrorMessage(nativeError);
         persistNativePlaybackDiagnostic({
@@ -388,12 +408,15 @@ export function useNativePlaybackEventBridge({
       retryNativePlaybackAfterAuthError,
       scheduleNativeBufferingWatchdog,
       setCrossfadeTransition,
+      applyNativeMixState,
+      setMixState,
     ],
   );
 
   const reconcileNativePlayback = useCallback(
     (options: PlaybackStateOptions = {}) => {
       if (!shouldUseAndroidNativePlayer()) return;
+      setMixState?.(null);
       void androidNativeEngine.getState().then((state) => {
         // getState() itself swallows native-bridge failures and resolves
         // null rather than rejecting — nothing else surfaces that, so
@@ -410,7 +433,7 @@ export function useNativePlaybackEventBridge({
         applyNativeState(state, options);
       });
     },
-    [applyNativeState],
+    [applyNativeState, setMixState],
   );
 
   const onNativePosition = useEffectEvent(
@@ -462,6 +485,10 @@ export function useNativePlaybackEventBridge({
       stateChanged: (event) => {
         if (disposed) return;
         onNativeState(event);
+      },
+      mixStateChanged: (event) => {
+        if (disposed) return;
+        onNativeEvent("mixStateChanged", event);
       },
       trackChanged: (event) => {
         if (disposed) return;

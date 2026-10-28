@@ -1,17 +1,21 @@
+import type { PlayerProgressValue } from "./player-progress-context";
+export {
+  PlayerProgressContext,
+  type PlayerProgressValue,
+} from "./player-progress-context";
 import { createContext } from "react";
 
-import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
+import type {
+  CrossfadeTransition,
+  PlaySource,
+  RepeatMode,
+  Track,
+} from "@/contexts/player-types";
+export type { CrossfadeTransition } from "./player-types";
 import type { PlayerQueueSnapshot } from "@/contexts/player-session";
 import type { ConnectedPlaybackInstance } from "@/hooks/use-crate-connect-ws";
 import type { RemotePlaybackState } from "@/lib/remote-playback-state";
-
-export interface CrossfadeTransition {
-  outgoing: Track;
-  incoming: Track;
-  durationMs: number;
-  startedAt: number;
-  outgoingDurationSeconds: number;
-}
+import type { EngineMixState } from "@/lib/playback-engine";
 
 export interface PlayerStateValue {
   isPlaying: boolean;
@@ -19,11 +23,8 @@ export interface PlayerStateValue {
   volume: number;
   analyserVersion: number;
   crossfadeTransition: CrossfadeTransition | null;
-}
-
-export interface PlayerProgressValue {
-  currentTime: number;
-  duration: number;
+  mixState?: EngineMixState | null;
+  nativeMixAvailable?: boolean;
 }
 
 export interface JamTransportControls {
@@ -100,12 +101,7 @@ export interface PlayerConnectValue {
   requestTransfer: (targetInstanceId: string) => boolean;
   sendRemoteCommand: (
     type:
-      | "pause"
-      | "resume"
-      | "seek"
-      | "next_track"
-      | "previous_track"
-      | "volume",
+      "pause" | "resume" | "seek" | "next_track" | "previous_track" | "volume",
     payload?: Record<string, unknown>,
   ) => boolean;
   serverClockOffsetMs: number;
@@ -117,9 +113,6 @@ export type PlayerContextValue = PlayerStateValue &
   PlayerActionsValue;
 
 export const PlayerStateContext = createContext<PlayerStateValue | null>(null);
-export const PlayerProgressContext = createContext<PlayerProgressValue | null>(
-  null,
-);
 export const PlayerActionsContext = createContext<PlayerActionsValue | null>(
   null,
 );

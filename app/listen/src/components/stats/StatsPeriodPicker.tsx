@@ -3,8 +3,8 @@ import { useTranslation } from "react-i18next";
 
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 
-import type { StatsSelection } from "@/components/stats/stats-model";
-import type { StatsSelectionOption } from "@/pages/stats-page-model";
+import type { StatsSelection } from "./stats-types";
+import type { StatsSelectionOption } from "../../pages/stats-page-model";
 
 export function StatsPeriodPicker({
   options,
@@ -36,8 +36,7 @@ export function StatsPeriodPicker({
       as="radio"
       label={t("stats.window.label")}
       fullWidth
-      className="border-border-quiet bg-surface-canvas/25 lg:inline-flex lg:w-auto lg:self-end"
-      itemClassName="font-semibold data-[state=inactive]:text-text-muted data-[state=inactive]:hover:bg-text-primary/5 data-[state=inactive]:hover:text-text-primary"
+      className="lg:inline-flex lg:w-auto lg:self-end"
     />
   );
 }

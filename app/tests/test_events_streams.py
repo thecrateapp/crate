@@ -299,6 +299,10 @@ def test_admin_logs_stream_cleans_up_redis_on_pubsub_error(monkeypatch):
 def test_tasks_stream_coalesces_signals_into_one_shared_refresh(monkeypatch):
     from crate.api import tasks
 
+    clock = iter([0.0, 3.0, 3.0])
+    monkeypatch.setattr(
+        tasks, "time", types.SimpleNamespace(monotonic=lambda: next(clock, 3.0))
+    )
     fake_pubsub = _FakePubSub([{"type": "message", "data": "tick"} for _ in range(5)])
     _install_fake_async_redis(monkeypatch, fake_pubsub)
     calls = []
@@ -325,6 +329,56 @@ def test_tasks_stream_coalesces_signals_into_one_shared_refresh(monkeypatch):
         "max_age_seconds": tasks.TASKS_STREAM_REFRESH_SECONDS,
     }
     assert len(calls) == 2
+
+
+def test_tasks_stream_emits_task_transitions_before_the_coalesced_snapshot(monkeypatch):
+    from crate.api import tasks
+
+    clock = iter([0.0, 3.0, 3.0])
+    monkeypatch.setattr(
+        tasks, "time", types.SimpleNamespace(monotonic=lambda: next(clock, 3.0))
+    )
+    transition = {
+        "id": "task-42",
+        "type": "scan",
+        "status": "running",
+        "pool": "default",
+        "created_at": "2026-10-22T10:00:00+00:00",
+        "started_at": "2026-10-22T10:00:01+00:00",
+        "updated_at": "2026-10-22T10:00:01+00:00",
+    }
+    fake_pubsub = _FakePubSub(
+        [
+            {
+                "type": "message",
+                "data": json.dumps({"kind": "task_transition", "task": transition}),
+            }
+        ]
+    )
+    _install_fake_async_redis(monkeypatch, fake_pubsub)
+    snapshots = []
+
+    def _surface(limit=100, fresh=False, max_age_seconds=30):
+        assert fake_pubsub.subscribed == [tasks.TASKS_SURFACE_STREAM_CHANNEL]
+        snapshots.append((limit, fresh, max_age_seconds))
+        return {"snapshot": len(snapshots)}
+
+    monkeypatch.setattr(tasks, "get_cached_tasks_surface", _surface)
+
+    async def _collect():
+        stream = tasks._tasks_stream(25)
+        initial = await anext(stream)
+        lifecycle = await anext(stream)
+        reconciled = await anext(stream)
+        await stream.aclose()
+        return initial, lifecycle, reconciled
+
+    initial, lifecycle, reconciled = asyncio.run(_collect())
+
+    assert initial == 'data: {"snapshot": 1}\n\n'
+    assert lifecycle == f"event: task_transition\ndata: {json.dumps(transition)}\n\n"
+    assert reconciled == 'data: {"snapshot": 2}\n\n'
+    assert snapshots[1] == (25, False, tasks.TASKS_STREAM_REFRESH_SECONDS)
 
 
 def _task_stream_items(monkeypatch, *, generic: bool):

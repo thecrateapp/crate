@@ -13,6 +13,7 @@ from crate.db.repositories.task_control import (
     record_task_provenance,
     request_cancellation,
 )
+from crate.db.repositories.tasks_shared import _register_task_transition_signal
 from crate.db.tx import optional_scope, register_after_commit, transaction_scope
 
 
@@ -112,6 +113,17 @@ def create_task(
                 "updated_at": now,
             },
         )
+        _register_task_transition_signal(
+            s,
+            {
+                "id": task_id,
+                "type": task_type,
+                "status": "pending",
+                "pool": pool,
+                "created_at": now,
+                "updated_at": now,
+            },
+        )
 
         record_task_provenance(
             task_id,
@@ -133,6 +145,42 @@ def create_task(
             register_after_commit(s, lambda: dispatch_task_fn(task_type, task_id))
 
     return task_id
+
+
+def _dedup_lock_key(task_type: str, dedup_identity: str) -> str:
+    return f"{task_type}:{dedup_identity}"
+
+
+def release_task_dedup_key(task_id: str, *, session=None) -> bool:
+    """Stop an active task from suppressing new tasks with its dedup key.
+
+    ``create_task_dedup`` skips a new task while one with the same key is
+    pending or running. A handler that reads state which may change while it
+    runs calls this before reading: the key is cleared under the advisory
+    lock ``create_task_dedup`` holds until its caller commits, so writers
+    that were deduplicated against this task have committed before it reads,
+    and later writers enqueue a new task instead of being swallowed.
+    """
+    with optional_scope(session) as current:
+        row = (
+            current.execute(
+                text("SELECT type, dedup_key FROM tasks WHERE id = :id"),
+                {"id": task_id},
+            )
+            .mappings()
+            .first()
+        )
+        if not row or not row["dedup_key"]:
+            return False
+        current.execute(
+            text("SELECT pg_advisory_xact_lock(hashtext(:dedup_lock_key))"),
+            {"dedup_lock_key": _dedup_lock_key(row["type"], row["dedup_key"])},
+        )
+        current.execute(
+            text("UPDATE tasks SET dedup_key = NULL WHERE id = :id"),
+            {"id": task_id},
+        )
+    return True
 
 
 def create_task_dedup(
@@ -158,7 +206,7 @@ def create_task_dedup(
     params_json = dumps_fn(payload, sort_keys=True)
     explicit_dedup_key = dedup_key.strip()
     dedup_identity = explicit_dedup_key or params_json
-    dedup_lock_key = f"{task_type}:{dedup_identity}"
+    dedup_lock_key = _dedup_lock_key(task_type, dedup_identity)
     task_id = new_task_id()
     now = utc_now_iso()
 
@@ -253,6 +301,17 @@ def create_task_dedup(
                 )
             return None
 
+        _register_task_transition_signal(
+            current,
+            {
+                "id": task_id,
+                "type": task_type,
+                "status": "pending",
+                "pool": pool,
+                "created_at": now,
+                "updated_at": now,
+            },
+        )
         record_task_provenance(
             task_id,
             origin=origin,
@@ -312,4 +371,5 @@ __all__ = [
     "create_task",
     "create_task_dedup",
     "find_active_task_by_type_params",
+    "release_task_dedup_key",
 ]

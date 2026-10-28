@@ -1,0 +1,211 @@
+---
+const you = { x: 96, y: 236 };
+const agent = { x: 300, y: 72 };
+const installer = { x: 504, y: 236 };
+const page = { x: 300, y: 384 };
+
+const curve = (a: { x: number; y: number }, b: { x: number; y: number }, bend: number) => {
+  const mx = (a.x + b.x) / 2;
+  const my = (a.y + b.y) / 2;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const length = Math.hypot(dx, dy);
+  const cx = mx + (-dy / length) * bend;
+  const cy = my + (dx / length) * bend;
+  return `M${a.x} ${a.y} Q${cx.toFixed(1)} ${cy.toFixed(1)} ${b.x} ${b.y}`;
+};
+
+const asks = curve(you, agent, 18);
+const tools = curve(agent, installer, 18);
+const keys = curve(you, page, -18);
+const checks = curve(page, installer, -18);
+const secret = `${keys} ${checks.replace(/^M\S+ \S+/, "")}`.replace(/\s+/g, " ");
+const gate = (agent.y + page.y) / 2;
+---
+
+<figure
+  class="map"
+  data-reveal
+  aria-label="You answer the agent's questions. The agent drives crate mcp. You type keys on a private page on 127.0.0.1, which the installer checks; the agent only learns whether each key was accepted."
+>
+  <header class="viz-bar">
+    <p class="viz-label"><b>crate mcp</b> who sees what</p>
+    <p class="viz-label">stdio · 127.0.0.1</p>
+  </header>
+  <svg viewBox="0 0 600 440" aria-hidden="true">
+    <circle class="orbit" cx="300" cy="228" r="150"></circle>
+    <path class="edge" d={asks}></path>
+    <path class="edge" d={tools}></path>
+    <path class="edge secret" d={keys}></path>
+    <path class="edge secret" d={checks}></path>
+    <path class="blocked" d={`M${agent.x} ${agent.y + 14} V${gate - 16} M${agent.x} ${gate + 16} V${page.y - 14}`}></path>
+    <g class="gate" transform={`translate(${agent.x} ${gate})`}>
+      <path d="M-10 -9 H10 M-10 9 H10"></path>
+    </g>
+    <circle class="pulse" r="3" style={`offset-path: path("${secret}")`}></circle>
+
+    <text class="edge-label outer" x="184" y="136" text-anchor="end">asks you in plain words</text>
+    <text class="edge-label outer" x="416" y="136">MCP · stdio · 12 tools</text>
+    <text class="edge-label outer accent" x="184" y="340" text-anchor="end">you type the keys</text>
+    <text class="edge-label outer accent" x="416" y="340">checked with the provider</text>
+    <text class="edge-label" x={agent.x + 18} y={gate - 2}>accepted or not</text>
+    <text class="edge-label second" x={agent.x + 18} y={gate + 13}>never the value</text>
+
+    <g class="node hollow" transform={`translate(${you.x} ${you.y})`}>
+      <circle r="7"></circle>
+      <text class="name" y="30" text-anchor="middle">You</text>
+    </g>
+    <g class="node" transform={`translate(${agent.x} ${agent.y})`}>
+      <circle r="7"></circle>
+      <text class="name" y="-22" text-anchor="middle">Agent</text>
+      <text class="sub above" y="-40" text-anchor="middle">Claude Code · Codex</text>
+    </g>
+    <g class="node" transform={`translate(${installer.x} ${installer.y})`}>
+      <circle r="7"></circle>
+      <text class="name" y="30" text-anchor="middle">Installer</text>
+      <text class="sub" y="47" text-anchor="middle">crate mcp</text>
+    </g>
+    <g class="node hollow" transform={`translate(${page.x} ${page.y})`}>
+      <circle r="7"></circle>
+      <text class="name" y="30" text-anchor="middle">Private page</text>
+      <text class="sub" y="47" text-anchor="middle">127.0.0.1 · 30 min link</text>
+    </g>
+  </svg>
+</figure>
+
+<style>
+  .map {
+    margin: 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    margin-top: 12px;
+    overflow: visible;
+  }
+
+  .orbit {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.05);
+  }
+
+  .edge {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.22);
+    stroke-width: 1;
+  }
+
+  .edge.secret {
+    stroke: rgba(103, 232, 249, 0.6);
+    stroke-width: 1.25;
+  }
+
+  .blocked {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.22);
+    stroke-dasharray: 2 5;
+  }
+
+  .gate path {
+    fill: none;
+    stroke: var(--amber);
+    stroke-width: 1.25;
+  }
+
+  .edge-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    fill: var(--fg-3);
+  }
+
+  .edge-label.accent {
+    fill: var(--cyan-hi);
+  }
+
+  .node circle {
+    fill: rgba(241, 245, 249, 0.55);
+    stroke: none;
+  }
+
+  .node.hollow circle {
+    fill: var(--bg);
+    stroke: var(--cyan-hi);
+    stroke-width: 2;
+    filter: drop-shadow(0 0 6px rgba(103, 232, 249, 0.55));
+  }
+
+  .name {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    fill: var(--fg);
+  }
+
+  .sub {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    fill: var(--fg-3);
+  }
+
+  .pulse {
+    fill: var(--cyan-hi);
+    opacity: 0;
+    filter: drop-shadow(0 0 5px rgba(103, 232, 249, 0.9));
+  }
+
+  @supports (offset-path: path("M0 0")) {
+    .map:global(.is-in) .pulse {
+      animation: travel 4.2s var(--ease-in-out) 0.6s infinite;
+    }
+  }
+
+  @keyframes travel {
+    0% {
+      offset-distance: 0%;
+      opacity: 0;
+    }
+    8%,
+    88% {
+      opacity: 1;
+    }
+    100% {
+      offset-distance: 100%;
+      opacity: 0;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .outer {
+      display: none;
+    }
+    .edge-label {
+      font-size: 17px;
+    }
+    .name {
+      font-size: 19px;
+    }
+    .sub {
+      font-size: 16px;
+      transform: translateY(7px);
+    }
+    .sub.above {
+      transform: translateY(-9px);
+    }
+    .second {
+      transform: translateY(8px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .map:global(.is-in) .pulse {
+      animation: none;
+    }
+  }
+</style>

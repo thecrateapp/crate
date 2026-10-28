@@ -11,15 +11,15 @@ describe("Spinner", () => {
   it("applies default size", () => {
     const { container } = render(<Spinner />);
     const svg = container.querySelector("svg");
-    expect(svg).toHaveAttribute("width", "18");
-    expect(svg).toHaveAttribute("height", "18");
+    expect(svg).toHaveStyle({ fontSize: "18px" });
+    expect(svg).toHaveAttribute("width", "1em");
   });
 
   it("applies custom size", () => {
     const { container } = render(<Spinner size={24} />);
     const svg = container.querySelector("svg");
-    expect(svg).toHaveAttribute("width", "24");
-    expect(svg).toHaveAttribute("height", "24");
+    expect(svg).toHaveStyle({ fontSize: "24px" });
+    expect(svg).toHaveAttribute("width", "1em");
   });
 
   it("includes animate-spin class", () => {

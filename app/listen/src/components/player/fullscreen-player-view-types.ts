@@ -4,6 +4,7 @@ import type { TFunction } from "i18next";
 import type { CrossfadeTransition } from "@/contexts/player-context";
 import type { RepeatMode, Track } from "@/contexts/player-types";
 import type { PlayerSurfaceMode } from "@/lib/player-visualizer-prefs";
+import type { PlayerMixPresentation } from "./player-mix-presentation";
 import type {
   FSPanel,
   FullscreenLyrics,
@@ -19,6 +20,7 @@ export type ViewState = {
   jamQueueLocked: boolean;
   jamTransportDisabled: boolean;
   liked: boolean;
+  likeStateAvailable?: boolean;
   repeat: RepeatMode;
   showEqualizer: boolean;
   shuffle: boolean;
@@ -27,6 +29,7 @@ export type ViewState = {
 };
 
 export type ViewPlayer = {
+  mix?: PlayerMixPresentation | null;
   currentTrack: Track;
   crossfadeProgress: number;
   crossfadeTransition: CrossfadeTransition | null;
@@ -56,6 +59,7 @@ export type ViewRefs = {
 };
 
 export type ViewActions = {
+  onEscape?: (event: KeyboardEvent) => void;
   closeWithFeedback: () => void;
   cycleRepeatWithFeedback: () => void;
   goNextWithFeedback: () => void;
@@ -79,12 +83,16 @@ export type ViewActions = {
 };
 
 export type FullscreenPlayerViewProps = {
+  open?: boolean;
   t: TFunction;
   state: ViewState;
   player: ViewPlayer;
   refs: ViewRefs;
   actions: ViewActions;
   lyrics: FullscreenLyrics | null;
+  lyricsLoading?: boolean;
+  lyricsError?: boolean;
+  onRetryLyrics?: () => void;
   activeLyricIndex: number;
   playerTabBottomClearance: string;
   scrollTabBottomClearance: string;

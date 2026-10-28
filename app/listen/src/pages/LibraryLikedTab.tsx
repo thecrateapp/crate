@@ -1,14 +1,7 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FilterBar } from "@crate/ui/domain/filters";
-import { EmptyState, LoadingState } from "@crate/ui/domain/states";
-import {
-  TrackList,
-  type TrackListVirtualListProps,
-} from "@crate/ui/domain/tracks";
-import { CRATE_ICON_SIZE, Play } from "@crate/ui/icons";
-import { SearchInput } from "@crate/ui/primitives/SearchInput";
-import { Button } from "@crate/ui/shadcn/button";
+import { EmptyState, ErrorState, LoadingState } from "@crate/ui/domain/states";
+import { type TrackListVirtualListProps } from "@crate/ui/domain/tracks";
 
 import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { WindowVirtualList } from "@/components/ui/WindowVirtualList";
@@ -18,11 +11,8 @@ import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
 import { toTrackRowData } from "@/lib/track-row-data";
 
-import { CollectionSortDropdown } from "./LibraryCollectionSortDropdown";
-import { likedSortOptions, type LikedSort } from "./library-collection-model";
-
-const LIKED_FILTER_INPUT_CLASS_NAME =
-  "h-10 rounded-lg border-transparent bg-text-primary/5 pl-9 shadow-none backdrop-blur-none md:text-base focus-visible:bg-text-primary/8";
+import { LibraryLikedView } from "./LibraryLikedView";
+import { type LikedSort } from "./library-collection-model";
 
 function LikedTracksVirtualList({
   itemKey,
@@ -40,7 +30,13 @@ function LikedTracksVirtualList({
 
 export function LibraryLikedTab() {
   const { t } = useTranslation();
-  const { likedTracks: tracks, loading } = useLikedTracks();
+  const {
+    likedTracks: tracks,
+    loading,
+    hasLoaded,
+    error,
+    refetch,
+  } = useLikedTracks();
   const { playAll } = usePlayerActions();
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<LikedSort>("recent");
@@ -80,20 +76,32 @@ export function LibraryLikedTab() {
     [filtered],
   );
 
-  if (loading) return <LoadingState label={t("common.loadingShort")} />;
+  if (loading && hasLoaded !== true)
+    return <LoadingState label={t("common.loadingShort")} />;
+  const readError = error ? (
+    <ErrorState
+      message={t("library.liked.loadFailed")}
+      retryLabel={t("common.retry")}
+      onRetry={refetch}
+    />
+  ) : null;
+  if (readError && !hasLoaded) return readError;
   if (!tracks || tracks.length === 0) {
     return (
-      <EmptyState
-        variant="dashed"
-        title={t("library.liked.emptyTitle")}
-        description={t("library.liked.empty")}
-      />
+      <>
+        {readError}
+        <EmptyState
+          variant="dashed"
+          title={t("library.liked.emptyTitle")}
+          description={t("library.liked.empty")}
+        />
+      </>
     );
   }
 
   function handlePlayAll() {
-    const list = filtered.length ? filtered : tracks;
-    const playerTracks: Track[] = list.map((track) =>
+    if (filtered.length === 0) return;
+    const playerTracks: Track[] = filtered.map((track) =>
       toPlayableTrack(
         {
           ...track,
@@ -124,39 +132,15 @@ export function LibraryLikedTab() {
   }
 
   return (
-    <div className="space-y-3">
-      <FilterBar
-        leading={
-          <Button
-            onClick={handlePlayAll}
-            className="rounded-lg px-4 has-[>svg]:px-4"
-          >
-            <Play size={CRATE_ICON_SIZE.sm} fill="currentColor" />
-            {filtered.length < tracks.length
-              ? t("library.liked.playFiltered", { count: filtered.length })
-              : t("library.liked.playAll")}
-          </Button>
-        }
-        search={
-          <SearchInput
-            value={search}
-            onValueChange={setSearch}
-            label={t("library.liked.filterPlaceholder")}
-            clearLabel={t("search.clear")}
-            placeholder={t("library.liked.filterPlaceholder")}
-            className={LIKED_FILTER_INPUT_CLASS_NAME}
-          />
-        }
-        sort={
-          <CollectionSortDropdown
-            label={t("library.sort.likedTracks")}
-            value={sort}
-            options={likedSortOptions}
-            onChange={setSort}
-          />
-        }
-      />
-      <TrackList
+    <>
+      {readError}
+      <LibraryLikedView
+        search={search}
+        onSearch={setSearch}
+        sort={sort}
+        onSort={setSort}
+        totalCount={tracks.length}
+        onPlay={handlePlayAll}
         items={trackRows}
         virtualList={LikedTracksVirtualList}
         itemKey={(row, index) =>
@@ -190,6 +174,6 @@ export function LibraryLikedTab() {
           />
         )}
       />
-    </div>
+    </>
   );
 }

@@ -23,7 +23,7 @@ export function useAlbumData() {
   }>();
   const routeGlobalAlbumUid = globalAlbumUidFromRouteRef(routeGlobalAlbumRef);
   const routeAlbumId = albumIdParam ? Number(albumIdParam) : undefined;
-  const { data, loading, error } = useApi<AlbumData>(
+  const { data, loading, error, status, refetch } = useApi<AlbumData>(
     buildAlbumRequestPath({
       routeAlbumId,
       routeAlbumSlug,
@@ -46,6 +46,8 @@ export function useAlbumData() {
     ...derived,
     data,
     error,
+    status,
+    refetch,
     isDesktop,
     loading,
     locationPath: location.pathname,

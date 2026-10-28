@@ -10,9 +10,8 @@ export function SearchArtistResults({ artists }: { artists: SearchArtist[] }) {
   const { t } = useTranslation();
 
   return (
-    <section>
+    <section className="space-y-3">
       <SectionHeader
-        className="mb-3"
         title={t("search.artistsCount", { count: artists.length })}
       />
       <MediaGrid density="compact">

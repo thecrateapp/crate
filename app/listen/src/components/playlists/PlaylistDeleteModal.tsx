@@ -18,6 +18,7 @@ export function PlaylistDeleteModal({
 }) {
   return (
     <ConfirmDialog
+      eyebrow={t("actions.confirmation.eyebrow")}
       open={open}
       tone="danger"
       pending={deleting}

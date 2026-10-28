@@ -22,9 +22,15 @@ describe("upcoming model", () => {
       city: "Chicago",
       country: "USA",
       country_code: "US",
+      artist_genre_profile: [
+        { name: "Post-punk", share: 0.75, source: "tags" },
+      ],
     });
 
     expect(item.event_key).toBe("show-high-vis-99");
+    expect(item.genre_profile).toEqual([
+      { name: "Post-punk", share: 0.75, source: "tags" },
+    ]);
     expect(itemKey(item, 0)).toBe("show-high-vis-99");
   });
 

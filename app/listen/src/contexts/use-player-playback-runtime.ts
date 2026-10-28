@@ -69,6 +69,7 @@ export function usePlayerPlaybackRuntime({
     commitIsBuffering,
     setAnalyserVersion,
     setCrossfadeTransition,
+    setMixState,
     setRecentlyPlayed,
     setPlaybackDeliveryPolicy,
     setInfinitePlaybackEnabled,
@@ -222,6 +223,7 @@ export function usePlayerPlaybackRuntime({
 
   const { continueInfinitePlayback, resetPlaybackIntelligence } =
     usePlaybackIntelligence({
+      repeat,
       queue,
       currentIndex,
       isPlaying,
@@ -269,6 +271,7 @@ export function usePlayerPlaybackRuntime({
     repeatRef,
     rotateTrackerSession,
     setCrossfadeTransition,
+    setMixState,
     shuffleRef,
   });
 

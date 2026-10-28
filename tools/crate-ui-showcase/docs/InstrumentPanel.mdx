@@ -1,0 +1,35 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/InstrumentPanel.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">InstrumentPanel</DocHeading>
+<EntryDetails id="primitives-instrumentpanel" review="1AT approved" />
+<DocHeading as="h2">Contract</DocHeading>
+
+Ruled unfilled figure or section, shared label, metadata, status, description and actions.
+
+A top quiet1px rule,22px top inset and20px header-to-content space; ruled=false removes only the rule. Figure is default; section is explicit. MonoLabel owns the uppercase caption and headingLevel optionally promotes it to h2/h3. The visible label names the container even without a heading; summary retains the explicit accessible-name override. Description is associated with the panel, remains outside status announcements and uses Roboto14/20. Metadata stays contextual and status alone is polite. Actions are injected controls, not MonoLabel content; text/measurement changes do not announce as status. Neither an all-purpose filled panel nor a replacement for every card.
+
+`label.tone="accent"` delegates the complete section-heading foreground to MonoLabel. Description, metadata, status and actions retain their own colors and semantics; the default heading tone remains subtle. Settings uses this variant without caller color overrides.
+
+The approved persistent mockup and confirmed amendments are the reference. Scene layout never repairs component internals.
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Section} />
+
+<Canvas of={Stories.AccentHeading} />
+
+<Canvas of={Stories.Unruled} />
+
+<Canvas of={Stories.Actions} />
+
+<Canvas of={Stories.FragmentActions} />
+
+<Canvas of={Stories.LongContent} />
+
+<Controls of={Stories.Base} />
+
+The actions slot owns wrapping and 8 px gaps, including sibling buttons passed as a fragment. No caller grouping repair is required.

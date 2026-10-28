@@ -1,4 +1,5 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
+import { useState } from "react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -12,6 +13,7 @@ vi.mock("@/lib/api", () => ({
 }));
 
 import { AccessTokensSection } from "@/components/settings/AccessTokensSection";
+import { SettingsPanelActivity } from "@/components/settings/settings-panel-activity";
 import { SERVER_STORE_EVENT } from "@/lib/server-store";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
@@ -278,4 +280,34 @@ describe("AccessTokensSection", () => {
       expect(screen.queryByText(SECRET)).not.toBeInTheDocument(),
     );
   });
+
+  it.each(["rotate", "revoke"] as const)(
+    "dismisses an unsubmitted %s confirmation when Connections hides and does not restore it on return",
+    async (kind) => {
+      const user = setupUser();
+      apiMock.mockResolvedValueOnce([EXISTING_TOKEN]);
+      let setActive!: (active: boolean) => void;
+      function SettingsPanel() {
+        const [active, updateActive] = useState(true);
+        setActive = updateActive;
+        return (
+          <SettingsPanelActivity value={active}>
+            <AccessTokensSection />
+          </SettingsPanelActivity>
+        );
+      }
+      renderWithListenProviders(<SettingsPanel />, { locale: "en" });
+      await user.click(
+        await screen.findByRole("button", {
+          name: `${kind === "rotate" ? "Rotate" : "Revoke"} Studio laptop`,
+        }),
+      );
+      expect(screen.getByRole("alertdialog")).toBeVisible();
+      act(() => setActive(false));
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+      act(() => setActive(true));
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      expect(apiMock.mock.calls).toEqual([["/api/auth/access-tokens"]]);
+    },
+  );
 });

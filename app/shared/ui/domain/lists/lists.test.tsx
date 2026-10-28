@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Disc, Music } from "@crate/ui/icons";
 
@@ -49,6 +49,23 @@ describe("lists", () => {
       expect(getByTestId("media-grid")).toHaveClass(className);
     });
 
+    it("keeps comfortable media at the V2 two-to-five column scale", () => {
+      render(
+        <MediaGrid density="comfortable">
+          <div>Album</div>
+        </MediaGrid>,
+      );
+      const grid = screen.getByTestId("media-grid");
+      expect(grid).toHaveClass(
+        "grid-cols-2",
+        "sm:grid-cols-3",
+        "md:grid-cols-4",
+        "lg:grid-cols-5",
+        "gap-4",
+      );
+      expect(grid.className).not.toMatch(/(?:xl|2xl):grid-cols-[678]/);
+    });
+
     it("applies a custom min item width", () => {
       const { container } = render(
         <MediaGrid minItemWidth={200}>
@@ -59,7 +76,7 @@ describe("lists", () => {
       const grid = container.firstChild as HTMLElement;
       expect(grid).toHaveStyle("--media-grid-min: 200px");
       expect(grid).toHaveStyle(
-        "grid-template-columns: repeat(auto-fill, minmax(var(--media-grid-min), 1fr))",
+        "grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--media-grid-min)), 1fr))",
       );
       expect(grid).not.toHaveAttribute("data-density");
     });
@@ -202,7 +219,7 @@ describe("lists", () => {
   });
 
   describe("EmptyState", () => {
-    it("renders title, message, and default icon", () => {
+    it("renders the default inline state with title and message, without an icon", () => {
       const { getByText, getByTestId, container } = render(
         <EmptyState
           title="No music"
@@ -213,21 +230,21 @@ describe("lists", () => {
       expect(getByTestId("empty-state")).toBeInTheDocument();
       expect(getByText("No music")).toBeInTheDocument();
       expect(getByText("Add some tracks to get started.")).toBeInTheDocument();
-      expect(container.querySelector("svg")).toBeInTheDocument();
+      expect(container.querySelector("svg")).not.toBeInTheDocument();
     });
 
-    it("renders a custom icon", () => {
+    it("accepts the retired icon prop without restoring an icon tile", () => {
       const { container } = render(
         <EmptyState icon={Disc} title="No albums" />,
       );
 
-      expect(container.querySelector("svg")).toBeInTheDocument();
+      expect(container.querySelector("svg")).not.toBeInTheDocument();
     });
 
     it("does not render title or message when omitted", () => {
       const { container } = render(<EmptyState icon={Music} />);
 
-      expect(container.querySelector("svg")).toBeInTheDocument();
+      expect(container.querySelector("svg")).not.toBeInTheDocument();
       expect(container.textContent).toBe("");
     });
 
@@ -259,7 +276,8 @@ describe("lists", () => {
         />,
       );
 
-      expect(getByTestId("empty-state")).toHaveClass("border-dashed");
+      expect(getByTestId("empty-state")).not.toHaveClass("border-dashed");
+      expect(getByRole("status", { name: "No crates" })).toBeInTheDocument();
       expect(
         getByRole("heading", { level: 2, name: "No crates" }),
       ).toBeInTheDocument();
@@ -273,4 +291,34 @@ describe("lists", () => {
       expect(container.querySelector("svg")).not.toBeInTheDocument();
     });
   });
+});
+
+it("keeps native rail labelling and ignores invalid custom minimum widths", () => {
+  const view = render(
+    <>
+      <MediaRail aria-label="Native rail">
+        <span>Album</span>
+      </MediaRail>
+      <MediaGrid minItemWidth={NaN}>
+        <span>Grid item</span>
+      </MediaGrid>
+    </>,
+  );
+  expect(screen.getByRole("region", { name: "Native rail" })).toBeVisible();
+  expect(screen.getByTestId("media-grid")).toHaveAttribute(
+    "data-density",
+    "default",
+  );
+  expect(screen.getByTestId("media-grid")).not.toHaveStyle(
+    "grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--media-grid-min)), 1fr))",
+  );
+  view.rerender(
+    <MediaRail labelledBy="heading" aria-describedby="hint">
+      <h2 id="heading">Albums</h2>
+    </MediaRail>,
+  );
+  expect(screen.getByRole("region", { name: "Albums" })).toHaveAttribute(
+    "aria-describedby",
+    "hint",
+  );
 });

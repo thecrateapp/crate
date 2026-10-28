@@ -1,3 +1,5 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { useId, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
@@ -17,7 +19,7 @@ import { CopyButton } from "@/components/admin/CopyButton";
 import { RelativeTime } from "@/components/admin/RelativeTime";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { TechnicalDetails } from "@/components/admin/TechnicalDetails";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { useNow } from "@/hooks/use-now";
 import { api } from "@/lib/api";
 import {
@@ -43,6 +45,7 @@ import { humanizeKey } from "@/lib/humanize";
 import { ConnectionSnippets } from "./ConnectionSnippets";
 import { PermissionPicker } from "./PermissionPicker";
 import { useCursorList } from "./use-cursor-list";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 const base = "/api/admin/agent-integrations";
 const ACCESS_CHANGE_NOTE =
@@ -112,9 +115,9 @@ function SheetSection({
   return (
     <section aria-labelledby={headingId} className="space-y-3 py-5 first:pt-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 id={headingId} className="text-sm font-semibold text-foreground">
+        <MonoLabel as="h3" tone="accent" id={headingId}>
           {title}
-        </h3>
+        </MonoLabel>
         {action}
       </div>
       {children}
@@ -130,9 +133,7 @@ function GrantedPermissions({
   catalog: AgentCatalog;
 }) {
   if (grants.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">No permissions granted.</p>
-    );
+    return <EmptyState title="No permissions granted" />;
   }
   const byScope = new Map(catalog.scopes.map((scope) => [scope.scope, scope]));
   const knownGroups = new Set(catalog.scope_groups.map((group) => group.id));
@@ -157,16 +158,16 @@ function GrantedPermissions({
     <div className="space-y-3">
       {groups.map((group) => (
         <div key={group.id} className="space-y-1.5">
-          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            {group.label}
-          </p>
+          <MonoLabel tone="accent">{group.label}</MonoLabel>
           <ul className="space-y-1">
             {group.scopes.map((scope) => (
               <li
                 key={scope.scope}
                 className="flex flex-wrap items-center gap-2 text-sm"
               >
-                <span title={scope.scope}>{scope.label}</span>
+                <TooltipHint content={scope.scope}>
+                  <span tabIndex={0}>{scope.label}</span>
+                </TooltipHint>
                 {scope.access === "change" ? (
                   <StatusBadge tone="warning">Can change</StatusBadge>
                 ) : null}
@@ -177,9 +178,7 @@ function GrantedPermissions({
       ))}
       {other.length > 0 ? (
         <div className="space-y-1.5">
-          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            Other
-          </p>
+          <MonoLabel tone="accent">Other</MonoLabel>
           <ul className="space-y-1">
             {other.map((grant) => {
               const scope = byScope.get(grant);
@@ -188,9 +187,11 @@ function GrantedPermissions({
                   key={grant}
                   className="flex flex-wrap items-center gap-2 text-sm"
                 >
-                  <span title={grant}>
-                    {scope?.label ?? "Unknown permission"}
-                  </span>
+                  <TooltipHint content={grant}>
+                    <span tabIndex={0}>
+                      {scope?.label ?? "Unknown permission"}
+                    </span>
+                  </TooltipHint>
                   {!scope || scope.access === "change" ? (
                     <StatusBadge tone="warning">Can change</StatusBadge>
                   ) : null}
@@ -217,7 +218,7 @@ function TokenReveal({
 }) {
   return (
     <div className="space-y-3 rounded-md border border-border p-3">
-      <p className="text-sm text-destructive">
+      <p className="text-sm text-state-warning-text">
         This token is shown only once. Copy it now.
       </p>
       <div className="flex items-center gap-2">
@@ -278,7 +279,7 @@ function ActivityRow({
     typeof evidence.before === "boolean" && typeof evidence.after === "boolean";
 
   return (
-    <li className="space-y-1 rounded-md border border-white/10 p-3 text-sm">
+    <li className="space-y-1 rounded-md border border-border-quiet p-3 text-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p className="font-medium text-foreground">
           {activityText({
@@ -596,7 +597,7 @@ export function ConnectionSheet({
         <div className="px-4 pb-6">
           {conflict ? (
             <div className="mb-5 space-y-2 rounded-md border border-border p-3">
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className="text-sm text-state-warning-text">
                 {CONFLICT_TEXT}
               </p>
               <Button
@@ -616,7 +617,7 @@ export function ConnectionSheet({
             </p>
           ) : null}
 
-          <div className="divide-y divide-white/8">
+          <div className="divide-y divide-border-quiet">
             <SheetSection
               title="Permissions"
               action={
@@ -643,7 +644,7 @@ export function ConnectionSheet({
                     disabled={policyLocked}
                   />
                   {formError ? (
-                    <p role="alert" className="text-sm text-destructive">
+                    <p role="alert" className="text-sm text-state-warning-text">
                       {formError}
                     </p>
                   ) : null}
@@ -702,7 +703,7 @@ export function ConnectionSheet({
                     {activeCredentials.map((credential) => (
                       <li
                         key={credential.credential_id}
-                        className="flex flex-col gap-2 rounded-md border border-white/10 p-3 sm:flex-row sm:items-center sm:justify-between"
+                        className="flex flex-col gap-2 rounded-md border border-border-quiet p-3 sm:flex-row sm:items-center sm:justify-between"
                       >
                         <p className="text-sm">
                           {Date.parse(credential.expires_at) <= now
@@ -725,7 +726,7 @@ export function ConnectionSheet({
                           <Button
                             type="button"
                             size="sm"
-                            variant="danger-soft"
+                            variant="outline"
                             disabled={busy}
                             onClick={() =>
                               confirmRevoke(credential.credential_id)
@@ -769,7 +770,7 @@ export function ConnectionSheet({
                     {authorizations.map((authorization) => (
                       <li
                         key={authorization.authorization_id}
-                        className="flex flex-col gap-2 rounded-md border border-white/10 p-3 sm:flex-row sm:items-center sm:justify-between"
+                        className="flex flex-col gap-2 rounded-md border border-border-quiet p-3 sm:flex-row sm:items-center sm:justify-between"
                       >
                         <p className="min-w-0 text-sm [overflow-wrap:anywhere]">
                           {`User #${authorization.user_id} · ${authorization.client_id}`}
@@ -780,7 +781,7 @@ export function ConnectionSheet({
                           <Button
                             type="button"
                             size="sm"
-                            variant="danger-soft"
+                            variant="outline"
                             disabled={busy}
                             onClick={() =>
                               confirmDisconnect(authorization.authorization_id)
@@ -815,7 +816,7 @@ export function ConnectionSheet({
                 ) : null}
                 {activity.error ? (
                   <div className="flex flex-wrap items-center gap-3">
-                    <p className="text-sm text-destructive">
+                    <p className="text-sm text-state-warning-text">
                       {apiErrorText(
                         activity.error,
                         "The activity could not be loaded.",
@@ -872,7 +873,7 @@ export function ConnectionSheet({
               <Button
                 type="button"
                 size="sm"
-                variant={policy.enabled ? "danger-soft" : "outline"}
+                variant="outline"
                 disabled={policyLocked}
                 onClick={confirmToggleEnabled}
               >
@@ -894,7 +895,7 @@ export function ConnectionSheet({
           title={confirmation?.title ?? ""}
           description={confirmation?.description ?? ""}
           confirmLabel={confirmation?.confirmLabel}
-          variant={confirmation?.destructive ? "destructive" : "default"}
+          tone={confirmation?.destructive ? "danger" : "default"}
           onConfirm={() => {
             const pending = confirmation;
             setConfirmation(null);

@@ -10,7 +10,19 @@ ProposalAction = Literal[
     "create_node",
     "alias_existing",
     "delete_marginal",
+    "classify_facet",
     "needs_review",
+]
+GenreFacetDimension = Literal[
+    "era",
+    "instrumentation",
+    "language",
+    "mood",
+    "origin",
+    "rhythm",
+    "scene",
+    "sound",
+    "vocals",
 ]
 
 
@@ -19,6 +31,11 @@ class GenreTaxonomyRelationSuggestion(BaseModel):
     target_slugs: list[str] = Field(default_factory=list, max_length=8)
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
     reasoning: str = Field(default="", max_length=220)
+
+
+class GenreTaxonomyFacetSuggestion(BaseModel):
+    dimension: GenreFacetDimension
+    name: str = Field(min_length=1, max_length=64)
 
 
 class GenreTaxonomyNodeProposalResponse(BaseModel):
@@ -46,6 +63,22 @@ class GenreTaxonomyNodeProposalResponse(BaseModel):
     )
     aliases: list[str] = Field(default_factory=list, max_length=12)
     relations: list[GenreTaxonomyRelationSuggestion] = Field(default_factory=list)
+    facets: list[GenreTaxonomyFacetSuggestion] = Field(
+        default_factory=list, max_length=32
+    )
+    eq_gains: list[float] = Field(
+        default_factory=list,
+        max_length=10,
+        description=(
+            "Suggested 10-band EQ gains in dB, ordered 32, 64, 125, 250, 500, "
+            "1000, 2000, 4000, 8000, 16000 Hz. Each value must be between -12 and +12."
+        ),
+    )
+    eq_reasoning: str = Field(
+        default="",
+        max_length=420,
+        description="Brief explanation of the proposed tonal curve, no marketing language.",
+    )
     reasoning: str = Field(default="", max_length=420)
 
 
@@ -55,6 +88,9 @@ Use only target slugs explicitly listed by the user.
 Do not invent slugs.
 Prefer specific parent genres over broad top-level buckets.
 Descriptions must be factual, concise, and useful inside a music app.
+Propose a conservative EQ curve that suits the genre rather than mastering a specific album.
+Return exactly ten EQ gains in dB, in this order: 32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000 Hz.
+Keep each gain within -12 to +12 dB, use small intentional adjustments, and explain the tonal intent briefly.
 No markdown, no hype, no jokes."""
 
 
@@ -80,13 +116,24 @@ def build_genre_taxonomy_node_proposal_prompt(
         f"Source kind: {source_kind}.",
         "Return a full replacement suggestion for each relation type you are confident about.",
         "Relation types: parent, related, influenced_by, fusion_of.",
-        "Set recommended_action to one of: create_node, alias_existing, delete_marginal, needs_review.",
+        "Set recommended_action to one of: create_node, alias_existing, delete_marginal, classify_facet, needs_review.",
     ]
+    if source_kind != "raw_genre":
+        parts.append(
+            "This is an existing taxonomy node. Never use classify_facet; its "
+            "facets are edited separately from the raw-tag classification flow."
+        )
     if source_kind == "raw_genre":
         parts.append(
             "This is an unmapped raw library tag, not a curated taxonomy node yet. "
-            "Use the local evidence to decide whether it deserves a canonical node "
-            "or should be merged away."
+            "Use the local evidence to decide whether it is a musical genre, a "
+            "non-genre descriptor that belongs in a facet, or should be merged away."
+        )
+        parts.append(
+            "Use classify_facet for non-genre descriptors such as an era, "
+            "instrumentation, language, mood, origin, rhythm, scene, sound, or vocal "
+            "character. For this action return one or more facets as dimension/name "
+            "pairs; do not return aliases, relations, a genre description, or EQ gains."
         )
         parts.append(
             "Prefer alias_existing when the tag is a spelling variant, overly broad, "
@@ -98,9 +145,23 @@ def build_genre_taxonomy_node_proposal_prompt(
             "recommended_target_slug when possible."
         )
         parts.append(
-            "Only use create_node when the tag represents a meaningful genre/scene "
-            "with enough evidence to justify expanding the taxonomy."
+            "Only use create_node when the tag represents a meaningful musical "
+            "genre with enough evidence to justify expanding the taxonomy. Do not "
+            "classify a non-genre descriptor as a genre just because it co-occurs "
+            "with genres."
         )
+        parts.append(
+            "For create_node proposals, include the genre description, aliases, "
+            "genre relations, and exactly ten EQ gains. For classify_facet, omit "
+            "those genre-only fields and leave EQ gains empty. Alias and marginal "
+            "tag decisions do not need EQ gains."
+        )
+    parts.append(
+        "For taxonomy_node proposals, return a complete EQ suggestion even when "
+        "the node currently inherits its preset; it will be reviewed before "
+        "saving. Return exactly ten gains in dB ordered 32, 64, 125, 250, 500, "
+        "1000, 2000, 4000, 8000 and 16000 Hz."
+    )
     if artist_count is not None or album_count is not None:
         parts.append(
             f"Local evidence size: {artist_count or 0} artists, {album_count or 0} albums."

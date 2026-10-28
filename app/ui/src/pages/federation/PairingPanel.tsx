@@ -1,14 +1,11 @@
+import { FormField } from "@crate/ui/primitives/FormField";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
 import { Button } from "@crate/ui/shadcn/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@crate/ui/shadcn/card";
+import { Card, CardContent, CardHeader } from "@crate/ui/shadcn/card";
 import { Input } from "@crate/ui/shadcn/input";
 
 export function PairingPanel({
@@ -46,44 +43,66 @@ export function PairingPanel({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Pairing</CardTitle>
+        <MonoLabel as="h3" tone="accent">
+          Pairing
+        </MonoLabel>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex gap-2">
-          <Input
-            aria-label="Probe URL"
-            value={probeUrl}
-            onChange={(event) => setProbeUrl(event.target.value)}
-            placeholder="https://node.example"
-          />
-          <Button
-            variant="secondary"
-            disabled={busy || !probeUrl}
-            onClick={() => void run("probe")}
-          >
-            Probe
-          </Button>
-        </div>
+        <FormField label="Probe URL">
+          {(control) => (
+            <div
+              data-slot="pairing-input-row"
+              className="grid grid-cols-[minmax(0,1fr)_5rem] gap-2 items-end"
+            >
+              <Input
+                {...control}
+                aria-label="Probe URL"
+                value={probeUrl}
+                onChange={(event) => setProbeUrl(event.target.value)}
+                placeholder="https://node.example"
+                className="min-w-0"
+              />
+              <Button
+                variant="secondary"
+                disabled={busy || !probeUrl}
+                onClick={() => void run("probe")}
+                className="w-full"
+              >
+                Probe
+              </Button>
+            </div>
+          )}
+        </FormField>
         {probe ? (
-          <pre className="max-h-40 overflow-auto text-xs text-white/55">
+          <pre className="max-h-40 overflow-auto rounded-md border border-border-quiet bg-card p-3 font-mono text-xs text-text-secondary">
             {JSON.stringify(probe, null, 2)}
           </pre>
         ) : null}
         {canManage ? (
-          <div className="flex gap-2">
-            <Input
-              aria-label="Pairing URL"
-              value={pairingUrl}
-              onChange={(event) => setPairingUrl(event.target.value)}
-              placeholder="https://node.example"
-            />
-            <Button
-              disabled={busy || !pairingUrl}
-              onClick={() => void run("pair")}
-            >
-              Pair
-            </Button>
-          </div>
+          <FormField label="Pairing URL">
+            {(control) => (
+              <div
+                data-slot="pairing-input-row"
+                className="grid grid-cols-[minmax(0,1fr)_5rem] gap-2 items-end"
+              >
+                <Input
+                  {...control}
+                  aria-label="Pairing URL"
+                  value={pairingUrl}
+                  onChange={(event) => setPairingUrl(event.target.value)}
+                  placeholder="https://node.example"
+                  className="min-w-0"
+                />
+                <Button
+                  disabled={busy || !pairingUrl}
+                  onClick={() => void run("pair")}
+                  className="w-full"
+                >
+                  Pair
+                </Button>
+              </div>
+            )}
+          </FormField>
         ) : null}
       </CardContent>
     </Card>

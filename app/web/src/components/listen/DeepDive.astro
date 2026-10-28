@@ -1,0 +1,193 @@
+---
+import type { Step } from "../../lib/chapters";
+
+interface Props {
+  name: "radio" | "paths";
+  steps: Step[];
+  seedLabel?: string;
+}
+
+const { name, steps, seedLabel } = Astro.props;
+---
+
+<div class="dive" data-dive={name} data-seed-label={seedLabel}>
+  <div class="dive-visual" aria-hidden="true">
+    <canvas class="dive-canvas"></canvas>
+    <svg class="dive-svg"></svg>
+    <slot />
+  </div>
+  <ol class="dive-steps">
+    {
+      steps.map((step, index) => (
+        <li class="dive-step">
+          <div class="dive-card">
+            <p class="eyebrow">
+              <b>{String(index + 1).padStart(2, "0")}</b> / {String(steps.length).padStart(2, "0")}
+            </p>
+            <h3>{step.title}</h3>
+            <p class="body">{step.body}</p>
+          </div>
+        </li>
+      ))
+    }
+  </ol>
+</div>
+
+<style>
+  .dive {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 0 clamp(24px, 5vw, 80px);
+    padding-bottom: 10vh;
+  }
+
+  .dive-visual {
+    grid-column: 2;
+    grid-row: 1;
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100dvh;
+    min-height: 560px;
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dive-canvas,
+  .dive-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .dive-canvas {
+    opacity: 0;
+    transition: opacity 1s var(--ease-out);
+    mask-image: radial-gradient(ellipse 72% 70% at 50% 50%, #000 52%, transparent 100%);
+  }
+
+  .has-gl .dive-canvas {
+    opacity: 1;
+  }
+
+  .dive-svg {
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .dive-steps {
+    grid-column: 1;
+    grid-row: 1;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .dive-step {
+    min-height: 72vh;
+    display: flex;
+    align-items: center;
+  }
+
+  .dive-card {
+    display: grid;
+    gap: 14px;
+    transition: opacity 0.5s var(--ease-snap);
+  }
+
+  :global(:where(html.js)) .dive-card {
+    opacity: 0.32;
+  }
+
+  .is-active .dive-card {
+    opacity: 1;
+  }
+
+  .no-gl .dive-card {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dive-card {
+      opacity: 1;
+    }
+  }
+
+  h3 {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.8rem, 3vw, 2.8rem);
+    letter-spacing: -0.035em;
+    line-height: 1;
+  }
+
+  .body {
+    margin: 0;
+    max-width: 40ch;
+    font-size: clamp(1rem, 1.15vw, 1.12rem);
+    line-height: 1.7;
+    color: var(--fg-2);
+  }
+
+  :global(.mono-panel) {
+    position: absolute;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--fg-2);
+    text-shadow:
+      0 0 6px var(--bg),
+      0 0 14px var(--bg);
+    pointer-events: none;
+  }
+
+  :global(.mono-panel b) {
+    color: var(--cyan-hi);
+    font-weight: 400;
+  }
+
+  .dive :global([data-fade]) {
+    opacity: 0;
+  }
+
+  .no-gl :global([data-fade]) {
+    opacity: 1;
+  }
+
+  @media (max-width: 760px) {
+    .dive {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .dive-visual {
+      grid-column: 1;
+      height: 54svh;
+      min-height: 400px;
+    }
+    .dive-steps {
+      grid-column: 1;
+      grid-row: 2;
+      position: relative;
+      z-index: 1;
+    }
+    .dive-step {
+      min-height: 80svh;
+      align-items: flex-end;
+    }
+    :global(:where(html.js)) .dive-card {
+      opacity: 0;
+    }
+    .dive-card {
+      width: 100%;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(10, 10, 15, 0.9);
+    }
+  }
+</style>

@@ -1,13 +1,26 @@
 /**
  * @vitest-environment jsdom
  */
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
 
+beforeEach(() => {
+  vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+  Element.prototype.scrollIntoView = () => {};
+});
+
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   window.history.pushState(null, "", "/");
 });
 
@@ -17,7 +30,7 @@ describe("docs app", () => {
     render(<App />);
     expect(
       await screen.findByRole("heading", {
-        name: "Hermes operator candidate and rollout",
+        name: "Crate Operator candidate and rollout",
         level: 1,
       }),
     ).toBeTruthy();
@@ -31,6 +44,44 @@ describe("docs app", () => {
         name: "Version transition, health and rollback",
       }),
     ).toBeTruthy();
+  });
+
+  it("publishes the Crate Agent and Crate Operator Telegram guide", async () => {
+    window.history.pushState(null, "", "/operations/crate-agent");
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Crate Agent and Crate Operator over Telegram",
+        level: 1,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Create the Telegram bot" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Approvals in Telegram" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Troubleshooting" }),
+    ).toBeTruthy();
+  });
+
+  it("publishes the 2.7 to 3.0 upgrade guide", async () => {
+    window.history.pushState(null, "", "/operations/upgrade-v2-to-v3");
+    render(<App />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Upgrade from 2.7 to 3.0",
+        level: 1,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Upgrade a home install" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Move the agent pilots" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Roll back" })).toBeTruthy();
   });
 
   it("publishes independent operator delivery and human callback boundaries", async () => {
@@ -228,5 +279,111 @@ describe("docs app", () => {
     render(<App />);
 
     expect(screen.getByText("Crate Documentation")).toBeTruthy();
+  });
+
+  it("links the site navigation back to cratemusic.app with Docs current", () => {
+    render(<App />);
+
+    const primary = screen.getByRole("navigation", { name: "Primary" });
+    expect(
+      within(primary)
+        .getByRole("link", { name: "Listen" })
+        .getAttribute("href"),
+    ).toBe("https://cratemusic.app/listen");
+    expect(
+      within(primary)
+        .getByRole("link", { name: "Docs" })
+        .getAttribute("aria-current"),
+    ).toBe("true");
+  });
+
+  it("marks the current document in the sidebar", async () => {
+    window.history.pushState(null, "", "/federation/federation-overview");
+    render(<App />);
+
+    const index = screen.getByRole("navigation", { name: "Documentation" });
+    expect(
+      within(index)
+        .getByRole("link", { name: "Federation overview" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
+    await screen.findByRole("heading", {
+      name: /federation overview/i,
+      level: 1,
+    });
+  });
+
+  it("filters the documentation index from the search box", () => {
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText("Search documentation"), {
+      target: { value: "zzz-no-match" },
+    });
+    expect(screen.getByText(/no documents match/i)).toBeTruthy();
+  });
+
+  it("opens the mobile menu as a dialog and closes it with Escape", () => {
+    render(<App />);
+
+    const toggle = screen.getByRole("button", { name: "Menu" });
+    fireEvent.click(toggle);
+    const dialog = screen.getByRole("dialog", { name: "Menu" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(document.activeElement).toBe(
+      within(dialog).getByRole("button", { name: "Close" }),
+    );
+    expect(document.documentElement.classList.contains("menu-open")).toBe(true);
+
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(toggle);
+    expect(document.documentElement.classList.contains("menu-open")).toBe(
+      false,
+    );
+  });
+
+  it("scrolls the sidebar to the current document when it is out of view", () => {
+    vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockImplementation(
+      function (this: HTMLElement) {
+        return this.getAttribute("aria-current") === "page" ? 1200 : 0;
+      },
+    );
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(30);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(600);
+    window.history.pushState(null, "", "/federation/federation-overview");
+    const { container } = render(<App />);
+
+    expect(container.querySelector<HTMLElement>(".sidebar")?.scrollTop).toBe(
+      1000,
+    );
+  });
+
+  it("scrolls to the top when navigating to another document", () => {
+    const scrollTo = vi.fn();
+    vi.spyOn(window, "scrollTo").mockImplementation(scrollTo);
+    window.history.pushState(null, "", "/start/quickstart");
+    render(<App />);
+    expect(scrollTo).not.toHaveBeenCalled();
+
+    const index = screen.getByRole("navigation", { name: "Documentation" });
+    fireEvent.click(
+      within(index).getByRole("link", { name: "Development setup" }),
+    );
+    expect(scrollTo).toHaveBeenCalledWith(0, 0);
+  });
+
+  it("scrolls a deep link to its anchor once the document has loaded", async () => {
+    const scrolled: string[] = [];
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this.id);
+    };
+    window.history.pushState(
+      null,
+      "",
+      "/federation/federation-overview#architecture",
+    );
+    render(<App />);
+
+    await waitFor(() => expect(scrolled).toEqual(["architecture"]));
   });
 });

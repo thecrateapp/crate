@@ -51,19 +51,24 @@ def find_missing_albums(
                         }
                     )
 
+    return compare_missing_albums(canonical_artist_name, local_albums)
+
+
+def compare_missing_albums(artist_name: str, local_albums: list[dict]) -> dict:
+    """Compare an album inventory with MusicBrainz without reading audio files."""
     if not local_albums:
         return {
-            "artist": canonical_artist_name,
+            "artist": artist_name,
             "local": [],
             "missing": [],
             "error": "No local albums",
         }
 
     # Try to find artist on MusicBrainz
-    mb_artist = _find_mb_artist(canonical_artist_name)
+    mb_artist = _find_mb_artist(artist_name)
     if not mb_artist:
         return {
-            "artist": canonical_artist_name,
+            "artist": artist_name,
             "local": local_albums,
             "missing": [],
             "error": "Artist not found on MB",
@@ -92,7 +97,7 @@ def find_missing_albums(
         missing.append(mb_album)
 
     return {
-        "artist": canonical_artist_name,
+        "artist": artist_name,
         "mb_artist_id": mb_artist["id"],
         "mb_artist_name": mb_artist["name"],
         "local_count": len(local_albums),

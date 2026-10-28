@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from sqlalchemy import text
 
 from crate.db.tx import transaction_scope
@@ -40,7 +42,8 @@ def claim_scrobble_dispatch(event_id: int) -> tuple[str, dict | None]:
                               AND dispatch.locked_at < NOW() - INTERVAL '5 minutes'
                           )
                       )
-                    RETURNING event.user_id,
+                    RETURNING dispatch.provider_results,
+                              event.user_id,
                               event.artist,
                               event.title,
                               event.album,
@@ -66,7 +69,11 @@ def claim_scrobble_dispatch(event_id: int) -> tuple[str, dict | None]:
 
 
 def finish_scrobble_dispatch(
-    event_id: int, status: str, *, error: str | None = None
+    event_id: int,
+    status: str,
+    *,
+    error: str | None = None,
+    provider_results: dict | None = None,
 ) -> None:
     with transaction_scope() as session:
         session.execute(
@@ -75,6 +82,9 @@ def finish_scrobble_dispatch(
                 UPDATE user_scrobble_dispatches
                 SET status = :status,
                     last_error = :error,
+                    provider_results = COALESCE(
+                        CAST(:provider_results AS jsonb), provider_results
+                    ),
                     locked_at = NULL,
                     updated_at = NOW(),
                     completed_at = CASE
@@ -85,7 +95,16 @@ def finish_scrobble_dispatch(
                   AND status = 'processing'
                 """
             ),
-            {"event_id": event_id, "status": status, "error": error},
+            {
+                "event_id": event_id,
+                "status": status,
+                "error": error,
+                "provider_results": (
+                    json.dumps(provider_results)
+                    if provider_results is not None
+                    else None
+                ),
+            },
         )
 
 

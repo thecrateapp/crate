@@ -1,181 +1,50 @@
-import { useState, useEffect, useRef, useMemo } from "react";
-import { CRATE_ICON_SIZE, X, Loader2 } from "@crate/ui/icons";
-import { IconButton } from "@crate/ui/primitives/IconButton";
+import { CRATE_ICON_SIZE, X } from "@crate/ui/icons";
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useTranslation } from "react-i18next";
-import { usePlayerActions, usePlayerProgress } from "@/contexts/PlayerContext";
-import { api } from "@/lib/api";
-
-interface LyricLine {
-  time: number;
-  text: string;
-}
-
-interface LyricsData {
-  synced: LyricLine[] | null;
-  plain: string | null;
-}
-
-function parseSyncedLyrics(lrc: string): LyricLine[] {
-  const lines: LyricLine[] = [];
-  for (const line of lrc.split("\n")) {
-    const match = line.match(/^\[(\d{2}):(\d{2})\.(\d{2,3})\]\s*(.*)/);
-    if (match) {
-      const min = parseInt(match[1]!);
-      const sec = parseInt(match[2]!);
-      const ms = parseInt(match[3]!.padEnd(3, "0"));
-      const time = min * 60 + sec + ms / 1000;
-      const text = match[4]!.trim();
-      if (text) lines.push({ time, text });
-    }
-  }
-  return lines;
-}
-
-interface LyricsPanelProps {
+import { usePlayerActions } from "@/contexts/PlayerContext";
+import { useLyrics } from "./extended/use-lyrics";
+import { PlayerLyricsContent } from "./PlayerLyricsContent";
+export function LyricsPanel({
+  open,
+  onClose,
+}: {
   open: boolean;
   onClose: () => void;
-}
-
-export function LyricsPanel({ open, onClose }: LyricsPanelProps) {
+}) {
   const { t } = useTranslation();
-  const { currentTime } = usePlayerProgress();
   const { currentTrack, seek } = usePlayerActions();
-  const [lyrics, setLyrics] = useState<LyricsData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const activeRef = useRef<HTMLButtonElement | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  // Fetch lyrics when track changes
-  useEffect(() => {
-    if (!open || !currentTrack) return;
-    setLyrics(null);
-    setLoading(true);
-
-    api<{ syncedLyrics: string | null; plainLyrics: string | null }>(
-      `/api/lyrics?artist=${encodeURIComponent(
-        currentTrack.artist,
-      )}&title=${encodeURIComponent(currentTrack.title)}`,
-    )
-      .then((data) => {
-        if (!data) {
-          setLyrics({ synced: null, plain: null });
-          return;
-        }
-        const synced = data.syncedLyrics
-          ? parseSyncedLyrics(data.syncedLyrics)
-          : null;
-        const plain = data.plainLyrics || null;
-        setLyrics({ synced, plain });
-      })
-      .catch(() => setLyrics({ synced: null, plain: null }))
-      .finally(() => setLoading(false));
-  }, [currentTrack?.artist, currentTrack?.id, currentTrack?.title, open]);
-
-  // Find active line index
-  const activeIndex = useMemo(() => {
-    if (!lyrics?.synced) return -1;
-    for (let i = lyrics.synced.length - 1; i >= 0; i--) {
-      if (currentTime >= lyrics.synced[i]!.time) return i;
-    }
-    return -1;
-  }, [currentTime, lyrics?.synced]);
-
-  // Auto-scroll only when active line changes (not every currentTime tick)
-  useEffect(() => {
-    if (activeRef.current && containerRef.current) {
-      activeRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  }, [activeIndex]);
-
+  const { lyrics, loading, error, retry } = useLyrics(
+    open ? currentTrack : null,
+  );
   if (!open) return null;
-
   return (
-    <div className="listen-glass-panel listen-glass-panel--dock z-app-player-drawer fixed right-0 top-0 bottom-(--listen-desktop-player-clearance) flex w-[480px] flex-col overflow-hidden border-l border-border-quiet">
-      <div className="lyrics-ambient-glow pointer-events-none absolute inset-x-0 top-0 h-40 blur-3xl" />
-      {/* Header */}
-      <div className="relative flex items-center justify-between border-b border-border-quiet px-4 py-3">
-        <h2 className="text-sm font-bold text-text-primary">
-          {t("player.lyrics")}
-        </h2>
-        <IconButton
-          onClick={onClose}
-          label={t("player.lyrics.close")}
-          className="size-10 text-text-muted hover:translate-y-0 hover:drop-shadow-none hover:text-text-primary"
-        >
-          <X size={CRATE_ICON_SIZE.xl} className="size-6" />
-        </IconButton>
+    <div className="z-app-player-drawer fixed right-0 top-0 bottom-(--listen-desktop-player-clearance) flex w-[480px] max-w-full flex-col overflow-hidden border-l border-border-quiet bg-surface-canvas">
+      <div className="flex items-center justify-between border-b border-border-quiet px-4 py-3">
+        <MonoLabel as="h2">{t("player.lyrics")}</MonoLabel>
+        <ActionButton label={t("player.lyrics.close")} onClick={onClose}>
+          <X size={CRATE_ICON_SIZE.lg} />
+        </ActionButton>
       </div>
-
-      {/* Track info */}
-      {currentTrack && (
-        <div className="relative border-b border-border-quiet px-4 py-3">
+      {currentTrack ? (
+        <div className="border-b border-border-quiet px-4 py-3">
           <p className="truncate text-caption font-medium text-text-primary">
             {currentTrack.title}
           </p>
-          <p className="truncate text-xs text-text-muted">
+          <p className="truncate font-mono text-xs text-text-muted">
             {currentTrack.artist}
           </p>
         </div>
-      )}
-
-      {/* Lyrics content */}
-      <div
-        ref={containerRef}
-        className="relative flex-1 overflow-y-auto lyrics-mask"
-      >
-        {loading && (
-          <div className="flex items-center justify-center py-16">
-            <Loader2
-              size={CRATE_ICON_SIZE.lg}
-              className="animate-spin text-accent-action"
-            />
-          </div>
-        )}
-
-        {!loading && !lyrics?.synced && !lyrics?.plain && (
-          <div className="px-4 py-16 text-center text-sm text-text-faint">
-            {t("player.lyrics.empty")}
-          </div>
-        )}
-
-        {/* Synced lyrics */}
-        {lyrics?.synced && (
-          <div
-            className="space-y-1 px-3"
-            style={{ paddingTop: "38vh", paddingBottom: "38vh" }}
-          >
-            {lyrics.synced.map((line, i) => {
-              const isActive = i === activeIndex;
-              const isPast = i < activeIndex;
-              return (
-                <button
-                  key={[line.time, line.text].join(":")}
-                  type="button"
-                  ref={isActive ? activeRef : null}
-                  onClick={() => seek(line.time)}
-                  className={`relative z-20 w-full rounded-md px-2 py-1 text-left transition-[color,background-color,font-size] duration-500 ${
-                    isActive
-                      ? "lyrics-active-line bg-accent-action/10 text-[17px] font-semibold text-accent-action"
-                      : isPast
-                        ? "text-[0.875rem] text-text-faint"
-                        : "text-[0.875rem] text-text-secondary"
-                  }`}
-                >
-                  {line.text}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Plain lyrics (no sync) */}
-        {!lyrics?.synced && lyrics?.plain && (
-          <div className="px-4 py-8">
-            <pre className="whitespace-pre-wrap font-sans text-[0.875rem] leading-relaxed text-text-muted">
-              {lyrics.plain}
-            </pre>
-          </div>
-        )}
+      ) : null}
+      <div className="flex min-h-0 flex-1 px-4">
+        <PlayerLyricsContent
+          lyrics={lyrics}
+          loading={loading}
+          error={error}
+          onRetry={retry}
+          presentation="drawer"
+          onSeek={seek}
+        />
       </div>
     </div>
   );

@@ -110,7 +110,6 @@ export function AutoDjOptions({
         <Checkbox
           checked={roomAutoDjVoting}
           onCheckedChange={(checked) => setRoomAutoDjVoting(checked === true)}
-          className="size-4"
         />
       </label>
     </>

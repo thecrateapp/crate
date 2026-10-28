@@ -1,0 +1,19 @@
+import { Meta, Canvas } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/VtNavLink.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">VtNavLink</DocHeading>
+<EntryDetails
+  id="primitives-vtnavlink"
+  review="Web closure · awaiting review"
+/>
+
+<DocHeading as="h2">Contract</DocHeading>
+
+Native router link with active aria-current and supported view transitions. Modified clicks and prevented clicks retain native authority. Unsupported browsers and transparent Linux chrome navigate immediately; the fixture uses only a MemoryRouter, without real history or native operations.
+
+The approved mockup and Diego's later amendments are the visual reference. This entry documents actual existing components; native device, assistive technology and complete consumer certification remain separate. No production requests, credentials or persistent preference writes occur here.
+
+<Canvas of={Stories.Base} />

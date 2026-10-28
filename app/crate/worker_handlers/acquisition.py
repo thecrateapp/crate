@@ -1589,13 +1589,6 @@ def _register_new_release(
             "album": title,
         },
     )
-    try:
-        from crate.telegram import notify_new_release
-
-        notify_new_release(artist_name, title, year)
-    except Exception:
-        pass
-
     if auto_download and tidal_data["tidal_url"] and not is_future:
         mark_release_downloading(release_id)
         task_params = build_tidal_download_params(
@@ -2733,7 +2726,11 @@ def _handle_remux_m4a_dash(task_id: str, params: dict, config: dict) -> dict:
 
 
 def _handle_import_queue_item(task_id: str, params: dict, config: dict) -> dict:
-    from crate.db.import_queue_read_models import mark_import_queue_item_imported
+    from crate.db.import_queue_read_models import (
+        mark_import_queue_item_imported,
+        mark_import_queue_item_importing,
+        mark_import_queue_item_pending,
+    )
     from crate.importer import ImportQueue
 
     source_path = str(params.get("source_path") or "").strip()
@@ -2743,11 +2740,20 @@ def _handle_import_queue_item(task_id: str, params: dict, config: dict) -> dict:
     queue = ImportQueue(config)
     artist = str(params.get("artist") or "")
     album = str(params.get("album") or "")
+    if not mark_import_queue_item_importing(source_path, task_id=task_id):
+        return {"status": "skipped", "reason": "not_pending"}
     emit_task_event(
         task_id, "info", {"message": f"Importing staged album from {source_path}"}
     )
-    result = queue.import_item(source_path, artist, album)
+    try:
+        result = queue.import_item(source_path, artist, album)
+    except BaseException as error:
+        mark_import_queue_item_pending(
+            source_path, error=str(error) or type(error).__name__
+        )
+        raise
     if result.get("error"):
+        mark_import_queue_item_pending(source_path, error=str(result["error"]))
         emit_task_event(
             task_id, "error", {"message": result["error"], "source_path": source_path}
         )
@@ -2784,6 +2790,8 @@ def _handle_import_queue_all(task_id: str, params: dict, config: dict) -> dict:
     from crate.db.import_queue_read_models import (
         list_import_queue_items,
         mark_import_queue_item_imported,
+        mark_import_queue_item_importing,
+        mark_import_queue_item_pending,
     )
     from crate.importer import ImportQueue
 
@@ -2806,18 +2814,61 @@ def _handle_import_queue_all(task_id: str, params: dict, config: dict) -> dict:
 
         item_artist = str(item.get("artist") or "")
         item_album = str(item.get("album") or "")
-        result = queue.import_item(item["source_path"], item_artist, item_album)
-        result["source"] = item.get("source")
-        result["source_path"] = item["source_path"]
+        source_path = item["source_path"]
+        source = item.get("source")
+        if not mark_import_queue_item_importing(
+            source_path,
+            task_id=task_id,
+            source=source,
+        ):
+            progress.done = index
+            progress.item = entity_label(artist=item_artist, album=item_album)
+            emit_progress(task_id, progress)
+            continue
+        try:
+            result = queue.import_item(source_path, item_artist, item_album)
+        except Exception as error:
+            mark_import_queue_item_pending(
+                source_path,
+                source=source,
+                error=str(error),
+            )
+            failed += 1
+            emit_task_event(
+                task_id,
+                "error",
+                {
+                    "message": str(error),
+                    "source_path": source_path,
+                },
+            )
+            progress.done = index
+            progress.item = entity_label(artist=item_artist, album=item_album)
+            emit_progress(task_id, progress)
+            continue
+        except BaseException as error:
+            mark_import_queue_item_pending(
+                source_path,
+                source=source,
+                error=str(error) or type(error).__name__,
+            )
+            raise
+        result["source"] = source
+        result["source_path"] = source_path
         results.append(result)
         if result.get("error"):
+            mark_import_queue_item_pending(
+                source_path,
+                source=source,
+                error=str(result["error"]),
+            )
             failed += 1
             emit_task_event(
                 task_id,
                 "error",
                 {
                     "message": result["error"],
-                    "source_path": item["source_path"],
+                    "source_path": source_path,
                 },
             )
         else:
@@ -2825,7 +2876,7 @@ def _handle_import_queue_all(task_id: str, params: dict, config: dict) -> dict:
             mark_import_queue_item_imported(
                 item["source_path"],
                 result=result,
-                source=item.get("source"),
+                source=source,
             )
             emit_item_event(
                 task_id,

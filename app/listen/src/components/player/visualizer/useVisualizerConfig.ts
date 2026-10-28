@@ -2,11 +2,11 @@ import { useMemo, type MutableRefObject } from "react";
 
 import type { CrossfadeTransition } from "@/contexts/PlayerContext";
 import type { Track } from "@/contexts/player-types";
-import { clamp } from "@/lib/utils";
 import {
-  type PlayerSurfaceMode,
-  type VisualizerSettingsPreference,
-} from "@/lib/player-visualizer-prefs";
+  resolveVisualizerSettings,
+  type VisualizerPanelState,
+} from "./visualizer-settings";
+import { type PlayerSurfaceMode } from "@/lib/player-visualizer-prefs";
 import type { MusicVisualizer } from "./MusicVisualizer";
 import {
   useTrackVisualizerProfile,
@@ -24,19 +24,9 @@ const ZERO_VIZ_DELTA = {
   octaves: 0,
 } as const;
 
-export interface VisualizerConfigState {
-  surfaceMode: PlayerSurfaceMode;
-  vizEnabled: boolean;
-  useAlbumPalette: boolean;
-  trackAdaptiveViz: boolean;
-  vizConfig: VisualizerSettingsPreference;
-  effectiveVizConfig: VisualizerSettingsPreference;
+export interface VisualizerConfigState extends VisualizerPanelState {
   trackVizProfile: VisualizerTrackProfile;
   setSurfaceMode: (mode: PlayerSurfaceMode) => void;
-  toggleAlbumPalette: () => void;
-  toggleTrackAdaptive: () => void;
-  updateConfig: (next: VisualizerSettingsPreference) => void;
-  resetConfig: () => void;
 }
 
 export function useVisualizerConfig(
@@ -71,21 +61,7 @@ export function useVisualizerConfig(
     ? trackVizProfile.settingsDelta
     : ZERO_VIZ_DELTA;
   const effectiveVizConfig = useMemo(
-    () => ({
-      separation: clamp(
-        vizConfig.separation + effectiveVizDelta.separation,
-        0,
-        0.5,
-      ),
-      glow: clamp(vizConfig.glow + effectiveVizDelta.glow, 0, 15),
-      scale: clamp(vizConfig.scale + effectiveVizDelta.scale, 0.2, 3),
-      persistence: clamp(
-        vizConfig.persistence + effectiveVizDelta.persistence,
-        0,
-        2,
-      ),
-      octaves: clamp(vizConfig.octaves + effectiveVizDelta.octaves, 1, 5),
-    }),
+    () => resolveVisualizerSettings(vizConfig, effectiveVizDelta),
     [effectiveVizDelta, vizConfig],
   );
 

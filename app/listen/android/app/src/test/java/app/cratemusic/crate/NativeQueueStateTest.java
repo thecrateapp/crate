@@ -165,6 +165,21 @@ public class NativeQueueStateTest {
     }
 
     @Test
+    public void telemetryBufferDropsOldCheckpointsBeforeTrackChanges() {
+        NativePlaybackTelemetry telemetry = new NativePlaybackTelemetry(3);
+
+        telemetry.emit("trackChanged", new JSObject());
+        telemetry.emit("playEventCheckpoint", new JSObject());
+        telemetry.emit("playEventCheckpoint", new JSObject());
+        telemetry.emit("trackChanged", new JSObject());
+
+        assertEquals(
+            Arrays.asList("trackChanged", "playEventCheckpoint", "trackChanged"),
+            telemetry.bufferedEventNames()
+        );
+    }
+
+    @Test
     public void mergingPlansReplacesTheSameEdgeAndKeepsTheRest() {
         NativeQueueState state = new NativeQueueState();
         state.replace(

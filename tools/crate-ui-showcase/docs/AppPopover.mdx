@@ -1,0 +1,17 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/AppPopover.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">AppPopover</DocHeading>
+<EntryDetails id="primitives-apppopover" review="Visual review approved · 1AX" />
+<DocHeading as="h2">Contract</DocHeading>
+
+This is a surface, not a controller: callers own portal, anchor geometry, roles, keyboard and dismissal. Dropdown, popover and context use the existing semantic z-index tokens. AppMenuButton supplies the canonical menu-row geometry; native attributes and refs remain intact. Do not repair layers or typography in consumers. Listen injects managed artwork and translations into its API-free search presentation; the same view appears in both review hosts with results, recents, loading, empty and error states. Combobox navigation retains input focus and scrolls the active option into view.
+
+The approved mockup and Diego's confirmed adjustments remain the visual reference. Documented,
+adopted and validated are separate statuses; broader native/AT/canonical QA remains pending.
+
+<Canvas of={Stories.Base} />
+<Controls of={Stories.Base} />

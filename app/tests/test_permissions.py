@@ -2369,12 +2369,12 @@ def test_import_queue_allows_librarian_without_admin_access(monkeypatch):
 
     monkeypatch.setattr(
         "crate.api.imports.list_import_queue_items",
-        lambda status: [{"status": status}],
+        lambda status, limit: [{"status": status, "limit": limit}],
     )
 
     response = api_imports_pending(_request_for("librarian"))  # type: ignore[arg-type]
 
-    assert response == [{"status": "pending"}]
+    assert response == [{"status": "pending", "limit": 1000}]
 
 
 def test_import_queue_rejects_regular_user():

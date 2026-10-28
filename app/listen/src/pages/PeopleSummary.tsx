@@ -1,81 +1,58 @@
 import type { TFunction } from "i18next";
-import { Link } from "react-router";
 import { PageHeader } from "@crate/ui/domain/navigation";
-
-import type { AuthUser } from "@/contexts/auth-context";
-import type { SocialSummary } from "@/pages/people-types";
+import type { ReactNode } from "react";
+import { EntityAvatar } from "@crate/ui/domain/entity";
+import { UserRowView } from "../components/social/UserRowView";
+import { ProfileMetric } from "../components/social/ProfileMetric";
+import type { PeopleViewer, SocialSummary } from "./people-types";
 
 export function PeopleSummary({
   data,
   t,
   user,
+  avatar,
 }: {
+  avatar?: ReactNode;
   data: SocialSummary | null | undefined;
   t: TFunction;
-  user: AuthUser | null;
+  user: PeopleViewer | null;
 }) {
-  const username = user?.username;
-  const ownProfileHref = username ? `/users/${username}` : "/settings";
-  const ownFollowersHref = username
-    ? `/users/${username}/followers`
-    : "/people";
-  const ownFollowingHref = username
-    ? `/users/${username}/following`
-    : "/people";
-
+  const username = data?.profile.username || user?.username;
+  const profile = username
+    ? `/users/${encodeURIComponent(username)}`
+    : "/settings?tab=account";
+  const name =
+    data?.profile.display_name || user?.name || t("people.fallback.you");
   return (
-    <div>
+    <div className="grid gap-6">
       <PageHeader title={t("people.title")} subtitle={t("people.subtitle")} />
-
-      <div className="mt-5 grid gap-3 sm:grid-cols-4">
-        <Link
-          to={ownProfileHref}
-          className="rounded-xl border border-accent-action/15 bg-accent-action/5 p-4 transition-colors hover:bg-accent-action/10"
-        >
-          <div className="text-xs uppercase tracking-wide text-text-accent/70">
-            {t("people.summary.yourProfile")}
-          </div>
-          <div className="mt-2 text-lg font-semibold text-text-primary">
-            {data?.profile.display_name ||
-              user?.name ||
-              user?.email ||
-              t("people.fallback.you")}
-          </div>
-          <div className="mt-1 text-sm text-text-muted">
-            {data?.profile.username
-              ? `@${data.profile.username}`
-              : t("people.summary.setUsername")}
-          </div>
-        </Link>
-        <Link
-          to={ownFollowersHref}
-          className="rounded-xl border border-border-quiet bg-text-primary/[0.03] p-4 transition-colors hover:bg-text-primary/[0.05]"
-        >
-          <div className="text-xs uppercase tracking-wide text-text-muted">
-            {t("people.followers")}
-          </div>
-          <div className="mt-2 text-2xl font-semibold text-text-primary">
-            {data?.followers_count ?? "—"}
-          </div>
-        </Link>
-        <Link
-          to={ownFollowingHref}
-          className="rounded-xl border border-border-quiet bg-text-primary/[0.03] p-4 transition-colors hover:bg-text-primary/[0.05]"
-        >
-          <div className="text-xs uppercase tracking-wide text-text-muted">
-            {t("people.following")}
-          </div>
-          <div className="mt-2 text-2xl font-semibold text-text-primary">
-            {data?.following_count ?? "—"}
-          </div>
-        </Link>
-        <div className="rounded-xl border border-border-quiet bg-text-primary/[0.03] p-4">
-          <div className="text-xs uppercase tracking-wide text-text-muted">
-            {t("people.friends")}
-          </div>
-          <div className="mt-2 text-2xl font-semibold text-text-primary">
-            {data?.friends_count ?? "—"}
-          </div>
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-6">
+        <div className="min-w-0 flex-1">
+          <UserRowView
+            title={name}
+            subtitle={
+              username ? `@${username}` : t("people.summary.setUsername")
+            }
+            meta={t("people.summary.yourProfile")}
+            href={profile}
+            leading={avatar ?? <EntityAvatar name={name} alt="" size="lg" />}
+          />
+        </div>
+        <div className="grid grid-cols-3 gap-6">
+          <ProfileMetric
+            label={t("people.followers")}
+            value={data?.followers_count ?? "—"}
+            to={username ? `${profile}/followers` : "/people"}
+          />
+          <ProfileMetric
+            label={t("people.following")}
+            value={data?.following_count ?? "—"}
+            to={username ? `${profile}/following` : "/people"}
+          />
+          <ProfileMetric
+            label={t("people.friends")}
+            value={data?.friends_count ?? "—"}
+          />
         </div>
       </div>
     </div>

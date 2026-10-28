@@ -1,0 +1,30 @@
+---
+import Explore from "../components/Explore.astro";
+import GetCrate from "../components/GetCrate.astro";
+import Hero from "../components/Hero.astro";
+import InsideCrate from "../components/InsideCrate.astro";
+import Statement from "../components/Statement.astro";
+import Base from "../layouts/Base.astro";
+---
+
+<Base
+  title="Crate — not a streaming service"
+  description="Crate is free, open-source, self-hosted music software. Own your music. Support your artists. Refuse the middleman."
+>
+  <Hero />
+  <Statement />
+  <GetCrate />
+  <InsideCrate />
+  <Explore />
+</Base>
+
+<script>
+  import { mountOnPage } from "../scripts/motion/page";
+  import { initTextMotion } from "../scripts/motion/text-motion";
+  import { initViz } from "../scripts/viz";
+
+  mountOnPage(".hero-pin", () => {
+    const cleanups = [initTextMotion(".statement [data-split]"), initViz()];
+    return () => cleanups.forEach((cleanup) => cleanup());
+  });
+</script>

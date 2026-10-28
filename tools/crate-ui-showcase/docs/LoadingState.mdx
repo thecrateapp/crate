@@ -1,0 +1,25 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/LoadingState.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">LoadingState</DocHeading>
+<EntryDetails
+  id="domain-states-loadingstate"
+  review="Loading amendment · awaiting1BEreview"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+Section loading uses a compact MonoLabel and indeterminate hairline by default: it never invents an unrelated table. Search panels use `fullWidth` to stretch the beam across the available content area; captions identify mixed music or the requested entity type. Route geometry stays fixed. For a known final layout, inject its actual Card/Grid/TableSkeleton; placeholder geometry is hidden from assistive technology and the parent owns the single status announcement. Route/page/screen indicators appear only after 200 ms; short loads show no flash. The route mark remains the approved 120 px hairline and caption. Labels are app-translated; no marketing phrases, backend polls or fake counts are introduced.
+
+The approved mockup and Diego's confirmed adjustments remain the visual reference. Documented,
+adopted and validated are separate statuses; broader native/AT/canonical QA remains pending.
+
+<Canvas of={Stories.Base} />
+<Controls of={Stories.Base} />
+
+<Canvas of={Stories.Route} />
+<Canvas of={Stories.Page} />
+<Canvas of={Stories.FullWidth} />
+<Canvas of={Stories.Collection} />

@@ -1,0 +1,280 @@
+---
+import { EXAMPLE_FINDINGS, HEALTH_CHECKS, RISK_LABELS } from "../../content/admin/viz";
+
+const auto = HEALTH_CHECKS.filter((check) => !check.confirm).length;
+const confirm = HEALTH_CHECKS.length - auto;
+const found = HEALTH_CHECKS.reduce((sum, check) => sum + (EXAMPLE_FINDINGS[check.id] ?? 0), 0);
+const fixed = HEALTH_CHECKS.filter((check) => !check.confirm).reduce((sum, check) => sum + (EXAMPLE_FINDINGS[check.id] ?? 0), 0);
+const level = { safe: 1, caution: 2, destructive: 3 } as const;
+---
+
+<figure
+  class="scan"
+  data-viz="health"
+  data-reveal
+  data-found={found}
+  data-fixed={fixed}
+  aria-label={`${HEALTH_CHECKS.length} health checks. ${auto} fix on their own, ${confirm} ask for confirmation first.`}
+>
+  <header class="viz-bar" data-enter>
+    <p class="viz-label"><b>Health</b> example scan</p>
+    <p class="viz-label scan-status" data-scan-status aria-live="polite">{found} issues · {fixed} fixed · {found - fixed} waiting</p>
+  </header>
+
+  <dl class="scan-totals">
+    <div data-enter style="--d:60ms">
+      <dt class="viz-label">Checks</dt>
+      <dd>{HEALTH_CHECKS.length}</dd>
+    </div>
+    <div data-enter style="--d:120ms">
+      <dt class="viz-label">Fix on their own</dt>
+      <dd>{auto}</dd>
+    </div>
+    <div data-enter style="--d:180ms">
+      <dt class="viz-label">Ask first</dt>
+      <dd>{confirm}</dd>
+    </div>
+  </dl>
+
+  <ol class="scan-list">
+    {
+      HEALTH_CHECKS.map((check, index) => {
+        const count = EXAMPLE_FINDINGS[check.id] ?? 0;
+        const result = count === 0 ? "clean" : check.confirm ? `${count} waiting` : `${count} fixed`;
+        return (
+          <li
+            data-check={check.id}
+            data-findings={count}
+            data-confirm={check.confirm ? "" : undefined}
+            data-state={count === 0 ? "clean" : check.confirm ? "waiting" : "fixed"}
+            style={`--i:${index}`}
+          >
+            <span class="n">{String(index + 1).padStart(2, "0")}</span>
+            <span class="name">
+              <b>{check.label}</b>
+              <small>{check.description}</small>
+            </span>
+            <span class="scope">{check.scope}</span>
+            <span class="risk" title={RISK_LABELS[check.risk]}>
+              <i class:list={["meter", `l${level[check.risk]}`]} aria-hidden="true">
+                <s />
+                <s />
+                <s />
+              </i>
+              {RISK_LABELS[check.risk]}
+            </span>
+            <span class:list={["badge", check.confirm ? "confirm" : "auto"]}>{check.confirm ? "confirm" : "auto"}</span>
+            <output class="result">{result}</output>
+          </li>
+        );
+      })
+    }
+  </ol>
+  <p class="viz-label scan-foot">Files a fix removes go to <b>Library Trash</b>, never straight to deletion.</p>
+</figure>
+
+<style>
+  .scan {
+    margin: 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .scan-status {
+    color: var(--fg-2);
+  }
+
+  .scan-totals {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+    margin: 5vh 0 4vh;
+  }
+
+  .scan-totals div {
+    display: grid;
+    gap: 10px;
+  }
+
+  .scan-totals dd {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(2.8rem, 5.6vw, 5.4rem);
+    line-height: 0.85;
+    letter-spacing: -0.05em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .scan-list {
+    position: relative;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--line);
+  }
+
+  .scan-list li {
+    position: relative;
+    display: grid;
+    grid-template-columns: 2.4ch minmax(0, 1fr) 11ch 16ch 9ch 12ch;
+    gap: 14px;
+    align-items: center;
+    padding: 9px 0;
+    border-bottom: 1px solid rgba(241, 245, 249, 0.06);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    color: var(--fg-3);
+    transition: color 0.3s var(--ease-snap);
+  }
+
+  .scan-list li::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 -12px;
+    width: 2px;
+    background: var(--cyan-hi);
+    transform: scaleY(0);
+    transition: transform 0.25s var(--ease-snap);
+  }
+
+  .scan-list li:global(.is-scanning)::before {
+    transform: scaleY(1);
+  }
+
+  .scan-list li:global(.is-scanning) {
+    background: linear-gradient(90deg, rgba(6, 182, 212, 0.08), transparent 70%);
+  }
+
+  .name {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .name b {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0;
+    color: var(--fg);
+  }
+
+  .name small {
+    overflow: hidden;
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .scope {
+    text-transform: uppercase;
+  }
+
+  .risk {
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .meter {
+    display: inline-flex;
+    gap: 2px;
+  }
+
+  .meter s {
+    width: 4px;
+    height: 10px;
+    border-radius: 1px;
+    background: rgba(241, 245, 249, 0.14);
+  }
+
+  .meter.l1 s:nth-child(-n + 1),
+  .meter.l2 s:nth-child(-n + 2),
+  .meter.l3 s:nth-child(-n + 3) {
+    background: var(--fg-2);
+  }
+
+  .badge {
+    justify-self: start;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(103, 232, 249, 0.45);
+    color: var(--cyan-hi);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 9.5px;
+  }
+
+  .badge.confirm {
+    border-color: rgba(251, 191, 36, 0.45);
+    color: var(--amber);
+  }
+
+  .result {
+    justify-self: end;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.3s var(--ease-snap);
+  }
+
+  li[data-state="fixed"] .result {
+    color: var(--cyan-hi);
+  }
+
+  li[data-state="waiting"] .result {
+    color: var(--amber);
+  }
+
+  li[data-state="pending"] .result {
+    color: transparent;
+  }
+
+  li[data-state="found"] .result {
+    color: var(--fg);
+  }
+
+  .scan-foot {
+    margin-top: 18px;
+    text-transform: none;
+    letter-spacing: 0.04em;
+    font-size: 11.5px;
+  }
+
+  .scan-foot b {
+    color: var(--fg);
+    font-weight: 400;
+  }
+
+  @media (max-width: 1000px) {
+    .scan-list li {
+      grid-template-columns: 2.4ch minmax(0, 1fr) 9ch 12ch;
+    }
+    .scope,
+    .risk {
+      display: none;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .scan-list li {
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 10px;
+    }
+    .n,
+    .name small {
+      display: none;
+    }
+    .name b {
+      font-size: 13px;
+    }
+    .scan-totals dd {
+      font-size: 2.6rem;
+    }
+  }
+</style>

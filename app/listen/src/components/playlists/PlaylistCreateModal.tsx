@@ -1,19 +1,16 @@
 import {
   useCallback,
+  useId,
   useEffect,
   useReducer,
   useRef,
+  useState,
   type ChangeEvent,
   type FormEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { type DragEndEvent } from "@dnd-kit/core";
-import {
-  AppModal,
-  ModalBody,
-  ModalFooter,
-} from "@crate/ui/primitives/AppModal";
-import { Button } from "@crate/ui/shadcn/button";
+import { CollectionEditorDialog } from "../collections/CollectionEditorDialog";
 import { api } from "@/lib/api";
 import {
   fileToDataUrl,
@@ -35,6 +32,7 @@ import {
 interface PlaylistCreateModalProps {
   open: boolean;
   mode?: "create" | "edit";
+  editorIdentity?: string | number;
   initialName?: string;
   initialDescription?: string;
   initialCoverDataUrl?: string | null;
@@ -57,6 +55,7 @@ interface PlaylistCreateModalProps {
 export function PlaylistCreateModal({
   open,
   mode = "create",
+  editorIdentity,
   initialName = "",
   initialDescription = "",
   initialCoverDataUrl = null,
@@ -69,6 +68,7 @@ export function PlaylistCreateModal({
   onSubmit,
 }: PlaylistCreateModalProps) {
   const { t } = useTranslation();
+  const formId = useId();
   const [state, dispatch] = useReducer(
     playlistComposerReducer,
     initialPlaylistComposerState,
@@ -89,9 +89,19 @@ export function PlaylistCreateModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const descriptionInputRef = useRef<HTMLTextAreaElement>(null);
+  const initializedSession = useRef<{ identity: string | number } | null>(null);
+  const [searchError, setSearchError] = useState(false);
+  const [searchAttempt, setSearchAttempt] = useState(0);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      initializedSession.current = null;
+      return;
+    }
+    const identity = editorIdentity ?? mode;
+    if (initializedSession.current?.identity === identity) return;
+    initializedSession.current = { identity };
+    setSearchError(false);
     dispatch({
       type: "reset",
       initialName,
@@ -108,6 +118,8 @@ export function PlaylistCreateModal({
     initialName,
     initialTracks,
     initialVisibility,
+    editorIdentity,
+    mode,
     open,
   ]);
 
@@ -129,6 +141,7 @@ export function PlaylistCreateModal({
   useEffect(() => {
     if (!open) return undefined;
     const query = search.trim();
+    setSearchError(false);
     if (query.length < 2) {
       dispatch({ type: "set-results", value: [] });
       dispatch({ type: "set-searching", value: false });
@@ -136,8 +149,8 @@ export function PlaylistCreateModal({
     }
 
     let cancelled = false;
+    dispatch({ type: "set-searching", value: true });
     const timer = window.setTimeout(async () => {
-      dispatch({ type: "set-searching", value: true });
       try {
         const response = await api<{ tracks: SearchTrackResult[] }>(
           `/api/catalog/search?q=${encodeURIComponent(query)}&limit=20`,
@@ -147,7 +160,7 @@ export function PlaylistCreateModal({
         }
       } catch {
         if (!cancelled) {
-          dispatch({ type: "set-results", value: [] });
+          setSearchError(true);
         }
       } finally {
         if (!cancelled) {
@@ -160,7 +173,7 @@ export function PlaylistCreateModal({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [open, search]);
+  }, [open, search, searchAttempt]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
@@ -188,11 +201,14 @@ export function PlaylistCreateModal({
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
+    const session = initializedSession.current;
     try {
       const dataUrl = await fileToDataUrl(file);
-      dispatch({ type: "set-cover", value: dataUrl });
+      if (session === initializedSession.current)
+        dispatch({ type: "set-cover", value: dataUrl });
     } catch {
-      dispatch({ type: "set-cover", value: null });
+      if (session === initializedSession.current)
+        dispatch({ type: "set-cover", value: null });
     } finally {
       event.target.value = "";
     }
@@ -221,81 +237,59 @@ export function PlaylistCreateModal({
   }
 
   return (
-    <AppModal
+    <CollectionEditorDialog
       open={open}
-      onClose={() => {
-        if (!submitting) onClose();
-      }}
       title={modalTitle}
       description={modalSubtitle}
+      formId={formId}
+      submitLabel={submitLabel}
+      cancelLabel={t("common.cancel")}
       closeLabel={t("common.close")}
-      closeDisabled={submitting}
-      headerClassName="bg-transparent"
-      maxWidthClassName="sm:max-w-3xl"
-      panelClassName="listen-glass-panel flex flex-col border-border-quiet"
-      closeOnEscape={!submitting}
-      closeOnOverlay={!submitting}
+      pending={submitting}
+      submitDisabled={!name.trim()}
+      onCancel={onClose}
     >
-      <form onSubmit={handleSubmit} className="flex min-h-0 flex-col">
-        <ModalBody className="space-y-5 p-5 ">
-          <PlaylistIdentitySection
-            state={{
-              name,
-              description,
-              coverDataUrl,
-              visibility,
-              isCollaborative,
-              tracks,
-              titleEditing,
-              descriptionEditing,
-            }}
-            refs={{
-              fileInputRef,
-              titleInputRef,
-              descriptionInputRef,
-            }}
-            dispatch={dispatch}
-            handleFileChange={handleFileChange}
-            canManageSettings={canManageSettings}
-            t={t}
-          />
+      <form id={formId} onSubmit={handleSubmit} className="space-y-5">
+        <PlaylistIdentitySection
+          state={{
+            name,
+            description,
+            coverDataUrl,
+            visibility,
+            isCollaborative,
+            tracks,
+            titleEditing,
+            descriptionEditing,
+          }}
+          refs={{
+            fileInputRef,
+            titleInputRef,
+            descriptionInputRef,
+          }}
+          dispatch={dispatch}
+          handleFileChange={handleFileChange}
+          canManageSettings={canManageSettings}
+          t={t}
+        />
 
-          <PlaylistTrackSearch
-            search={search}
-            searching={searching}
-            results={results}
-            t={t}
-            onSearchChange={(value) => dispatch({ type: "set-search", value })}
-            onAddTrack={(track) => addTrack(toComposerTrack(track))}
-          />
+        <PlaylistTrackSearch
+          search={search}
+          searching={searching}
+          results={results}
+          error={searchError ? t("search.errors.tryAgain") : undefined}
+          onRetry={() => setSearchAttempt((attempt) => attempt + 1)}
+          t={t}
+          onSearchChange={(value) => dispatch({ type: "set-search", value })}
+          onAddTrack={(track) => addTrack(toComposerTrack(track))}
+        />
 
-          <PlaylistTrackList
-            tracks={tracks}
-            t={t}
-            onDragEnd={handleDragEnd}
-            onRemove={removeTrack}
-          />
-        </ModalBody>
-
-        <ModalFooter className="flex items-center justify-end gap-3 bg-transparent px-5 py-4">
-          <Button
-            variant="ghost"
-            className="rounded-lg"
-            onClick={onClose}
-            disabled={submitting}
-          >
-            {t("common.cancel")}
-          </Button>
-          <Button
-            type="submit"
-            className="rounded-lg"
-            loading={submitting}
-            disabled={!name.trim()}
-          >
-            {submitLabel}
-          </Button>
-        </ModalFooter>
+        <PlaylistTrackList
+          tracks={tracks}
+          t={t}
+          onDragEnd={handleDragEnd}
+          onRemove={removeTrack}
+        />
       </form>
-    </AppModal>
+    </CollectionEditorDialog>
   );
 }

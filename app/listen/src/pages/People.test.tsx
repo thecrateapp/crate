@@ -62,3 +62,18 @@ describe("People", () => {
     expect(screen.queryByText("Sesiones Jam")).toBeNull();
   });
 });
+
+it("offers read retry without presenting unknown summary totals as zero", () => {
+  const retry = vi.fn();
+  vi.mocked(useApi).mockReturnValue({
+    data: null,
+    loading: false,
+    error: "offline",
+    refetch: retry,
+  });
+  renderWithListenProviders(<People />);
+  expect(screen.getByRole("alert")).toBeVisible();
+  screen.getByRole("button", { name: "Retry" }).click();
+  expect(retry).toHaveBeenCalledOnce();
+  expect(screen.queryByText("0")).toBeNull();
+});

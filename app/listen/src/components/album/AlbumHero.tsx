@@ -1,15 +1,18 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
 
 import { CRATE_ICON_SIZE, Clock, Disc } from "@crate/ui/icons";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
-import { PageHero } from "@crate/ui/domain/hero";
+
+import { AlbumHeroFrame } from "./AlbumHeroFrame";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
+import { EntityAvatar } from "@crate/ui/domain/entity/EntityAvatar";
 import type { GenreProfileItem } from "@crate/ui/domain/genres/GenrePill";
 
 import { AlbumHeroContributor } from "@/components/album/AlbumHeroContributor";
 import { ReleaseCountdown } from "@/components/album/ReleaseCountdown";
 import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
+import { CrateImage } from "@/components/artwork/CrateImage";
 import { QualityBadge } from "@/components/player/bar/QualityBadge";
 import type { QualityBadge as QualityBadgeData } from "@/components/player/bar/player-bar-utils";
 import type { OfflineItemState } from "@/lib/offline";
@@ -63,13 +66,7 @@ export function AlbumHero({
   const hasCover = Boolean(data.has_cover || data.cover_url);
 
   return (
-    <PageHero
-      variant="media"
-      className="h-auto min-h-hero-2xl sm:h-hero-lg sm:min-h-0 lg:h-hero-xl"
-      contentClassName="translate-y-[var(--album-mobile-info-y)] pb-[calc(var(--album-mobile-action-overlap)+var(--album-mobile-info-action-gap))] pt-[var(--listen-mobile-page-top)] sm:translate-y-0 sm:pb-6"
-      artworkClassName="block w-[200px] self-center bg-transparent shadow-none ring-0 sm:w-[240px] sm:self-auto sm:bg-text-primary/5 sm:shadow-2xl sm:ring-1 lg:w-[280px]"
-      titleClassName="max-w-4xl text-2xl"
-      actionsClassName="-mt-[var(--album-mobile-action-overlap)] pt-0 sm:mt-0"
+    <AlbumHeroFrame
       background={
         hasCover
           ? {
@@ -118,9 +115,9 @@ export function AlbumHero({
         isPreRelease || canPersistAlbum ? (
           <>
             {isPreRelease ? (
-              <CrateBadge size="md" icon={Clock}>
+              <InfoBadge icon={Clock}>
                 {t("radar.release.preRelease")}
-              </CrateBadge>
+              </InfoBadge>
             ) : null}
             {canPersistAlbum ? <OfflineBadge state={offlineState} /> : null}
           </>
@@ -133,12 +130,19 @@ export function AlbumHero({
           className="link-meta inline-flex items-center gap-2 self-start text-sm"
           onClick={onArtistNavigate}
         >
-          <ArtworkSurface
-            source={artistPhotoUrl}
-            alt={data.artist}
-            fallback={null}
-            className="size-6 shrink-0 rounded-full bg-text-primary/5"
-            imageClassName="object-cover"
+          <EntityAvatar
+            src={artistPhotoUrl}
+            name={data.artist}
+            alt=""
+            size="xs"
+            renderImage={(image) => (
+              <CrateImage
+                src={image.src}
+                alt={image.alt}
+                className={image.className}
+                onError={image.onError}
+              />
+            )}
           />
           {data.artist}
         </button>
@@ -194,6 +198,6 @@ export function AlbumHero({
           onGenreSelect={onGenreSelect}
         />
       </div>
-    </PageHero>
+    </AlbumHeroFrame>
   );
 }

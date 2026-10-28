@@ -1,3 +1,4 @@
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { CrateLoader } from "@/components/ui/CrateLoader";
 import { PlaylistContent } from "@/pages/PlaylistContent";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,13 +12,16 @@ export function Playlist() {
     return <CrateLoader label={page.t("playlist.loading")} />;
   }
 
-  if (!page.data) {
+  if (!page.data && page.error && page.status !== 404)
     return (
-      <div className="flex items-center justify-center py-16">
-        <p className="text-sm text-text-muted">{page.t("playlist.notFound")}</p>
-      </div>
+      <ErrorState
+        message={page.t("playlist.toasts.loadFailed")}
+        retryLabel={page.t("common.retry")}
+        onRetry={page.refetch}
+      />
     );
-  }
+  if (!page.data)
+    return <ErrorState kind="notFound" title={page.t("playlist.notFound")} />;
 
   return <PlaylistContent page={{ ...page, data: page.data }} user={user} />;
 }

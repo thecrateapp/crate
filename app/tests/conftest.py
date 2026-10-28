@@ -315,7 +315,7 @@ def pg_database_factory():
 
 
 @pytest.fixture
-def test_app():
+def test_app(monkeypatch):
     """Provide a FastAPI TestClient with mocked DB layer."""
     from unittest.mock import patch
 
@@ -339,6 +339,10 @@ def test_app():
             "name": "Test Admin",
         }
 
+    monkeypatch.setattr(
+        "crate.api.auth.AuthMiddleware.resolve_user", _fake_resolve_user
+    )
+
     with (
         patch("crate.api._deps.load_config", return_value=mock_config),
         patch("crate.db.init_db"),
@@ -351,7 +355,6 @@ def test_app():
             "crate.api.catalog.get_catalog_state",
             return_value={"status": "ready"},
         ),
-        patch("crate.api.auth.AuthMiddleware.resolve_user", _fake_resolve_user),
     ):
         from crate.api import create_app
 

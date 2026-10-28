@@ -1,6 +1,7 @@
 """Pure, bounded operational observations. Stored evidence is not a live probe."""
 
 import json
+import math
 import re
 from uuid import UUID
 
@@ -203,6 +204,67 @@ def _runtime(records, name, failure=None):
     return result
 
 
+def _health(records, failure):
+    record = records.get("health")
+    payload = (record or {}).get("payload")
+    payload = payload if isinstance(payload, dict) else {}
+    score, raw_breaches = payload.get("score"), payload.get("breaches")
+    breaches = raw_breaches if isinstance(raw_breaches, list) else []
+    valid = (
+        type(score) is int
+        and 0 <= score <= 100
+        and isinstance(raw_breaches, list)
+        and len(breaches) <= 10
+        and all(
+            isinstance(item, dict)
+            and isinstance(item.get("name"), str)
+            and item.get("severity") in {"warning", "critical"}
+            for item in breaches
+        )
+    )
+    selected = (
+        {
+            "score": score,
+            "breaches": [
+                {
+                    "name": item["name"][:80],
+                    "severity": item["severity"],
+                    **{
+                        key: item[key]
+                        for key in ("value", "threshold")
+                        if type(item.get(key)) in {int, float}
+                        and math.isfinite(item[key])
+                    },
+                }
+                for item in breaches
+            ],
+        }
+        if valid
+        else None
+    )
+    result = _source("health", record, selected, failure, fresh=300)
+    if record and payload and not valid and not failure:
+        result["reason"] = "Stored health fields have invalid producer types or bounds"
+    return result
+
+
+def _sample(name, evidence, key, failure, interpretation):
+    rows = evidence.get(key) or []
+    result = _source(
+        name,
+        {"observed_at": evidence.get("queried_at")},
+        {"rows": rows[:20]},
+        failure,
+    )
+    result.update(
+        returned_count=min(len(rows), 20),
+        truncated=len(rows) > 20,
+        coverage="partial",
+        interpretation=interpretation,
+    )
+    return result
+
+
 def _result(name, sources, *, data=None, queried_at=None):
     states = [source["availability"] for source in sources.values()]
     state = (
@@ -395,7 +457,7 @@ def _pipeline_sources(records, pipeline, failure):
 
 def get_observability_summary():
     """Declare independent source coverage for each closed pipeline/subsystem."""
-    evidence, failure = _load()
+    evidence, failure = _load(alerts=True)
     records = _records(evidence)
     data = {
         name: {
@@ -412,6 +474,21 @@ def get_observability_summary():
         name: _runtime(records, name, failure)
         for name in ("worker_live", "analysis_status", "imports_pending")
     }
+    sources["health"] = _health(records, failure)
+    sources["failed_tasks"] = _sample(
+        "tasks:failed:24h:sample",
+        evidence,
+        "failed_tasks",
+        failure,
+        "Newest 20 failed tasks updated within 24 hours, excluding cancellations. Error text is omitted; empty sample is not pipeline health.",
+    )
+    sources["new_releases"] = _sample(
+        "new_releases:7d:sample",
+        evidence,
+        "new_releases",
+        failure,
+        "Newest 20 releases detected for library artists within 7 days.",
+    )
     result = _result(
         "observability_summary",
         sources,

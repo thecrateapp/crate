@@ -1,6 +1,9 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 
-import { subscribeCastPlaybackState } from "@/lib/cast-sender";
+import {
+  isCastSessionActive,
+  subscribeCastPlaybackState,
+} from "@/lib/cast-sender";
 
 interface UseCastPlaybackRuntimeOptions {
   commitCurrentIndex: (index: number) => void;
@@ -18,10 +21,12 @@ export function useCastPlaybackRuntime({
   commitIsBuffering,
   commitIsPlaying,
   setVolumeState,
-}: UseCastPlaybackRuntimeOptions): void {
+}: UseCastPlaybackRuntimeOptions): boolean {
+  const [active, setActive] = useState(isCastSessionActive);
   useEffect(
     () =>
       subscribeCastPlaybackState((state) => {
+        setActive(state.active);
         if (!state.active) return;
         if (state.currentIndex !== undefined) {
           commitCurrentIndex(state.currentIndex);
@@ -41,4 +46,5 @@ export function useCastPlaybackRuntime({
       setVolumeState,
     ],
   );
+  return active;
 }

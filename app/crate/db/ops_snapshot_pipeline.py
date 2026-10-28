@@ -44,6 +44,7 @@ def _empty_analysis_payload() -> dict[str, Any]:
         "fingerprint_strategy": "unknown",
         "last_analyzed": {},
         "last_bliss": {},
+        "last_fingerprinted": {},
         "stale": True,
         "unavailable": True,
     }

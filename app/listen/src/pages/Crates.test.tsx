@@ -94,6 +94,23 @@ describe("Collection Crates", () => {
     }));
   });
 
+  it.each(["/api/me/crates", "/api/me/crates/followed"])(
+    "keeps %s failures retryable instead of claiming empty data",
+    (failedUrl) => {
+      const retry = vi.fn();
+      mocks.useApi.mockImplementation((url: string) => ({
+        data: null,
+        loading: false,
+        error: url === failedUrl ? new Error("Read failed") : null,
+        refetch: retry,
+      }));
+      renderWithListenProviders(<Crates />);
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+      expect(retry).toHaveBeenCalled();
+    },
+  );
+
   it("shows crates owned by the listener and crates shared with them", () => {
     mocks.crates = [
       ownedCrate("Year-end records", "owner"),
@@ -365,8 +382,7 @@ describe("Collection Crates", () => {
       screen.getByRole("textbox", { name: "Name" }),
       "Unranked favorites",
     );
-    await user.click(screen.getByRole("combobox", { name: "Ordering" }));
-    await user.click(screen.getByRole("option", { name: "No order" }));
+    chooseField("Ordering", "No order");
     await user.click(screen.getByRole("button", { name: "Create Crate" }));
 
     await waitFor(() => {
@@ -393,7 +409,7 @@ describe("Collection Crates", () => {
     openCrateEditor();
 
     expect(screen.getByTestId("crate-form")).toBeInTheDocument();
-    expect(screen.getByLabelText("Visibility")).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "Visibility" })).toBeVisible();
     expect(
       screen.getByRole("checkbox", { name: "Allow collaboration" }),
     ).toBeVisible();
@@ -412,7 +428,9 @@ describe("Collection Crates", () => {
     renderCrates();
     openCrateEditor();
 
-    expect(screen.queryByLabelText("Visibility")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("combobox", { name: "Visibility" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Create collaboration invite" }),
     ).not.toBeInTheDocument();
@@ -510,3 +528,8 @@ describe("Collection Crates", () => {
     });
   });
 });
+
+function chooseField(name: string, value: string) {
+  fireEvent.click(screen.getByRole("combobox", { name }));
+  fireEvent.click(screen.getByRole("option", { name: value }));
+}

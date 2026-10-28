@@ -18,8 +18,13 @@ describe("Listen layout policy", () => {
   it("derives desktop dock panel clearance from the floating player bar geometry", () => {
     const read = (path: string) =>
       readFileSync(resolve(process.cwd(), path), "utf8");
-    const listenStyles = read("src/index.css");
-    const playerBar = read("src/components/player/bar/PlayerBarView.tsx");
+    const listenStyles = read("src/components/layout/listen-shell-metrics.css");
+    expect(read("src/index.css")).toContain(
+      '@import "./components/layout/listen-shell-metrics.css"',
+    );
+    const playerBarView = read("src/components/player/bar/PlayerBarView.tsx");
+    const playerBar = read("src/components/player/bar/PlayerBarFrame.tsx");
+    expect(playerBarView).toContain("<PlayerBarFrame");
 
     expect(listenStyles).toMatch(
       /--listen-desktop-player-clearance:\s*calc\(\s*var\(--listen-desktop-player-height\)\s*\+\s*var\(--listen-desktop-player-bottom-offset\)/s,
@@ -27,8 +32,11 @@ describe("Listen layout policy", () => {
     expect(playerBar).toContain("md:h-(--listen-desktop-player-height)");
     expect(playerBar).toContain('"var(--listen-desktop-player-bottom-offset)"');
 
+    expect(read("src/components/player/QueuePanel.tsx")).toContain(
+      "<PlayerQueueFrame",
+    );
     for (const panel of [
-      "src/components/player/QueuePanel.tsx",
+      "src/components/player/PlayerQueueFrame.tsx",
       "src/components/player/LyricsPanel.tsx",
     ]) {
       const source = read(panel);

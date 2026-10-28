@@ -3,15 +3,26 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests/admin-e2e",
   outputDir: "./test-results/admin-e2e",
+  globalSetup: "./tests/visual/capture-setup.ts",
+  updateSnapshots: "none",
+  snapshotPathTemplate: "{testDir}/{testFilePath}-snapshots/{arg}{ext}",
   reporter: [
     ["list"],
     ["html", { outputFolder: "playwright-report/admin-e2e", open: "never" }],
   ],
   timeout: 45_000,
-  expect: { timeout: 15_000 },
+  expect: {
+    timeout: 15_000,
+    toHaveScreenshot: {
+      animations: "disabled",
+      caret: "hide",
+      maxDiffPixels: 250,
+    },
+  },
   use: {
     baseURL: "http://127.0.0.1:4175",
     browserName: "chromium",
+    channel: process.env.PLAYWRIGHT_CHANNEL,
     colorScheme: "dark",
     locale: "en-US",
     serviceWorkers: "block",

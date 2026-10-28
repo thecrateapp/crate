@@ -47,9 +47,8 @@ describe("android native engine flags", () => {
 
   it("uses the native player by default on Android native runtime", async () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
-    const { shouldUseAndroidNativePlayer } = await import(
-      "@/lib/android-native-engine"
-    );
+    const { shouldUseAndroidNativePlayer } =
+      await import("@/lib/android-native-engine");
 
     expect(shouldUseAndroidNativePlayer()).toBe(true);
   });
@@ -70,9 +69,8 @@ describe("android native engine flags", () => {
 
   it("ignores the flag outside Android native runtime", async () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: false }));
-    const { shouldUseAndroidNativePlayer } = await import(
-      "@/lib/android-native-engine"
-    );
+    const { shouldUseAndroidNativePlayer } =
+      await import("@/lib/android-native-engine");
 
     expect(shouldUseAndroidNativePlayer()).toBe(false);
   });
@@ -81,9 +79,8 @@ describe("android native engine flags", () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
     localStorage.setItem("listen-player-crossfade-seconds", "4");
     localStorage.setItem("crate-native-player-crossfade-enabled", "true");
-    const { shouldUseAndroidNativePlayer } = await import(
-      "@/lib/android-native-engine"
-    );
+    const { shouldUseAndroidNativePlayer } =
+      await import("@/lib/android-native-engine");
 
     expect(shouldUseAndroidNativePlayer()).toBe(true);
     expect(
@@ -262,6 +259,7 @@ describe("android native engine flags", () => {
       androidNativeCrossfade: true,
       androidBeatmatch: false,
       androidBassHandoff: false,
+      androidLongBeatmatch: false,
     });
 
     await vi.waitFor(() =>
@@ -448,6 +446,7 @@ describe("android native engine flags", () => {
       androidNativeCrossfade: true,
       androidBeatmatch: false,
       androidBassHandoff: false,
+      androidLongBeatmatch: false,
     });
     await vi.waitFor(() =>
       expect(nativePlaybackMock.setTransitionPlans).toHaveBeenCalledTimes(1),
@@ -549,6 +548,7 @@ describe("android native engine flags", () => {
       androidNativeCrossfade: true,
       androidBeatmatch: false,
       androidBassHandoff: false,
+      androidLongBeatmatch: false,
     });
     await engine.loadQueue(queue);
     expect(nativePlaybackMock.setQueue).toHaveBeenLastCalledWith(
@@ -585,6 +585,7 @@ describe("android native engine flags", () => {
       androidNativeCrossfade: true,
       androidBeatmatch: false,
       androidBassHandoff: false,
+      androidLongBeatmatch: false,
     });
     const engine = new nativeEngineModule.AndroidNativeEngine();
     await engine.loadQueue({
@@ -692,7 +693,7 @@ describe("android native engine flags", () => {
 
     await vi.advanceTimersByTimeAsync(150);
     expect(nativePlaybackMock.getState).toHaveBeenCalledTimes(2);
-    await expect(loadPromise).resolves.toEqual(state);
+    await expect(loadPromise).resolves.toEqual({ ...state, mixState: null });
     expect(nativePlaybackMock.addListener).not.toHaveBeenCalled();
     vi.useRealTimers();
   });
@@ -763,7 +764,7 @@ describe("android native engine flags", () => {
     expect(nativePlaybackMock.getState).toHaveBeenCalledTimes(3);
     signalReady();
 
-    await expect(statePromise).resolves.toEqual(state);
+    await expect(statePromise).resolves.toEqual({ ...state, mixState: null });
     expect(nativePlaybackMock.getState).toHaveBeenCalledTimes(4);
     vi.useRealTimers();
   });
@@ -785,6 +786,7 @@ describe("android native engine flags", () => {
       preferredDurationMs: 12000,
       allowBeatmatch: false,
       allowBassHandoff: false,
+      allowLongBeatmatch: false,
       delivery: "balanced",
       descriptor: null,
     };
@@ -826,6 +828,7 @@ describe("android native engine flags", () => {
           preferredDurationMs: 12000,
           allowBeatmatch: false,
           allowBassHandoff: false,
+          allowLongBeatmatch: false,
           delivery: "balanced",
           refill: false,
         }),
@@ -837,14 +840,14 @@ describe("android native engine flags", () => {
 
     it("follows Smart Mix mode changes in the continuation context", async () => {
       vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
-      const { continuationWithModes } = await import(
-        "@/lib/android-native-engine"
-      );
+      const { continuationWithModes } =
+        await import("@/lib/android-native-engine");
       const capabilities = {
         available: true,
         androidNativeCrossfade: true,
         androidBeatmatch: true,
         androidBassHandoff: true,
+        androidLongBeatmatch: false,
       };
 
       expect(continuationWithModes(undefined, capabilities)).toBeNull();
@@ -853,12 +856,14 @@ describe("android native engine flags", () => {
           ...capabilities,
           androidBeatmatch: false,
           androidBassHandoff: false,
+          androidLongBeatmatch: false,
         }),
       ).toBeNull();
       expect(continuationWithModes(context, capabilities)).toEqual({
         ...context,
         allowBeatmatch: true,
         allowBassHandoff: true,
+        allowLongBeatmatch: false,
       });
     });
 
@@ -871,6 +876,83 @@ describe("android native engine flags", () => {
         }),
       );
       expect(continuationTokenMock).not.toHaveBeenCalled();
+    });
+
+    it("keeps native refill for an infinite queue even without crossfade", async () => {
+      vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+      nativePlaybackMock.getState.mockResolvedValue(state);
+      nativePlaybackMock.setQueue.mockResolvedValue(state);
+      continuationTokenMock.mockResolvedValue({
+        token: "crv_radio",
+        expiresAtMs: 1_800_000_000_000,
+        apiBase: "https://api.example",
+      });
+      const nativeEngineModule = await import("@/lib/android-native-engine");
+      const engine = new nativeEngineModule.AndroidNativeEngine();
+      const descriptor = {
+        kind: "shaped_radio" as const,
+        sessionId: "radio-1",
+      };
+
+      await engine.loadQueue({
+        revision: "queue-rev-1",
+        tracks: [],
+        currentIndex: 0,
+        positionMs: 0,
+        autoplay: false,
+        repeat: "off",
+        crossfadeMs: 0,
+        volume: 1,
+        continuation: { ...context, descriptor },
+      });
+
+      await vi.waitFor(() =>
+        expect(nativePlaybackMock.setContinuation).toHaveBeenCalledWith(
+          expect.objectContaining({ token: "crv_radio", refill: true }),
+        ),
+      );
+      expect(nativePlaybackMock.setContinuation).not.toHaveBeenCalledWith({
+        token: "",
+      });
+    });
+
+    it("reconfigures native continuation when crossfade is switched on", async () => {
+      vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
+      nativePlaybackMock.getState.mockResolvedValue(state);
+      nativePlaybackMock.setQueue.mockResolvedValue(state);
+      nativePlaybackMock.setCrossfadeMs.mockResolvedValue(state);
+      continuationTokenMock.mockResolvedValue({
+        token: "crv_queue",
+        expiresAtMs: 1_800_000_000_000,
+        apiBase: "https://api.example",
+      });
+      const nativeEngineModule = await import("@/lib/android-native-engine");
+      const engine = new nativeEngineModule.AndroidNativeEngine();
+
+      await engine.loadQueue({
+        revision: "queue-rev-1",
+        tracks: [],
+        currentIndex: 0,
+        positionMs: 0,
+        autoplay: false,
+        repeat: "off",
+        crossfadeMs: 0,
+        volume: 1,
+        continuation: context,
+      });
+      await vi.waitFor(() =>
+        expect(nativePlaybackMock.setContinuation).toHaveBeenCalledWith({
+          token: "",
+        }),
+      );
+
+      await engine.setCrossfadeMs(6000);
+
+      await vi.waitFor(() =>
+        expect(nativePlaybackMock.setContinuation).toHaveBeenLastCalledWith(
+          expect.objectContaining({ token: "crv_queue", refill: false }),
+        ),
+      );
     });
 
     it("asks native to refill when the queue has a continuation descriptor", async () => {

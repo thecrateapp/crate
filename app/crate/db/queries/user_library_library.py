@@ -88,9 +88,13 @@ def get_liked_tracks(user_id: int, limit: int = 100) -> list[dict]:
                             global_album.public_slug AS album_slug,
                             COALESCE(global_album.has_cover, false) AS has_cover,
                             COALESCE(local_track.duration, track.duration_seconds, 0) AS duration,
-                            local_track.bpm,
-                            local_track.audio_key,
-                            local_track.audio_scale,
+                            COALESCE(local_track.format, qs.source_payload_json->>'format') AS format,
+                            COALESCE(local_track.bitrate, NULLIF(qs.source_payload_json->>'bitrate', '')::integer) AS bitrate,
+                            COALESCE(local_track.sample_rate, NULLIF(qs.source_payload_json->>'sample_rate', '')::integer) AS sample_rate,
+                            COALESCE(local_track.bit_depth, NULLIF(qs.source_payload_json->>'bit_depth', '')::integer) AS bit_depth,
+                            COALESCE(local_track.bpm, NULLIF(qs.source_payload_json->>'bpm', '')::double precision) AS bpm,
+                            COALESCE(local_track.audio_key, qs.source_payload_json->>'audio_key') AS audio_key,
+                            COALESCE(local_track.audio_scale, qs.source_payload_json->>'audio_scale') AS audio_scale,
                             local_track.energy,
                             local_track.danceability,
                             local_track.valence,
@@ -103,6 +107,13 @@ def get_liked_tracks(user_id: int, limit: int = 100) -> list[dict]:
                           ON track.global_track_uid = liked.global_track_uid
                         LEFT JOIN library_tracks local_track
                           ON local_track.id = track.local_track_id
+                        LEFT JOIN LATERAL (
+                            SELECT source_payload_json FROM global_catalog_sources source
+                            WHERE source.entity_type='track' AND source.global_entity_uid=track.global_track_uid
+                              AND NOT source.source_stale AND source.source_deleted_at IS NULL
+                            ORDER BY (source.source_kind='local') DESC, source.preferred_for_playback DESC,
+                                     source.preferred_for_display DESC, source.updated_at DESC LIMIT 1
+                        ) qs ON true
                         LEFT JOIN global_catalog_albums global_album
                           ON global_album.global_album_uid = track.global_album_uid
                         LEFT JOIN global_catalog_artists global_artist
@@ -126,6 +137,10 @@ def get_liked_tracks(user_id: int, limit: int = 100) -> list[dict]:
                             local_album.slug AS album_slug,
                             COALESCE(local_album.has_cover, 0) > 0 AS has_cover,
                             local_track.duration,
+                            local_track.format,
+                            local_track.bitrate,
+                            local_track.sample_rate,
+                            local_track.bit_depth,
                             local_track.bpm,
                             local_track.audio_key,
                             local_track.audio_scale,

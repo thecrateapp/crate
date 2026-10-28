@@ -1,7 +1,7 @@
 import { cn } from "@crate/ui/lib/cn";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
-import { SpinningDisc } from "@/components/player/SpinningDisc";
+import { LiveSpinningDisc } from "./LiveSpinningDisc";
 import type {
   ExtendedPlayerViewActions,
   ExtendedPlayerViewRefs,
@@ -28,7 +28,7 @@ function ExtendedPlayerCover({
       className="relative z-0 aspect-square w-[72%] max-w-[500px] shrink-0"
     >
       {isCdMode ? (
-        <SpinningDisc
+        <LiveSpinningDisc
           albumCover={currentTrack.albumCover}
           className="w-full"
           crossfadeIncomingCover={crossfadeTransition?.incoming.albumCover}
@@ -59,24 +59,28 @@ function ExtendedPlayerCoverArt({
 
   return (
     <>
-      <div className="absolute inset-6 rounded-xl bg-accent-action/10 opacity-70 blur-3xl" />
-      <div className="absolute inset-2 rounded-xl border border-border-quiet bg-surface-quiet-subtle" />
       {crossfadeTransition ? (
         <>
           {crossfadeTransition.outgoing.albumCover ? (
             <CrateImage
               src={crossfadeTransition.outgoing.albumCover}
               alt=""
-              className="absolute inset-0 size-full rounded-xl object-cover shadow-player-artwork-layered"
-              style={{ ...imageStyle, opacity: 1 - state.crossfadeProgress }}
+              className="absolute inset-0 size-full rounded-xl object-cover "
+              style={{
+                ...imageStyle,
+                opacity: `calc(1 - var(--listen-crossfade-progress, ${state.crossfadeProgress}))`,
+              }}
             />
           ) : null}
           {crossfadeTransition.incoming.albumCover ? (
             <CrateImage
               src={crossfadeTransition.incoming.albumCover}
               alt=""
-              className="absolute inset-0 size-full rounded-xl object-cover shadow-player-artwork-layered"
-              style={{ ...imageStyle, opacity: state.crossfadeProgress }}
+              className="absolute inset-0 size-full rounded-xl object-cover "
+              style={{
+                ...imageStyle,
+                opacity: `var(--listen-crossfade-progress, ${state.crossfadeProgress})`,
+              }}
             />
           ) : null}
         </>
@@ -84,11 +88,11 @@ function ExtendedPlayerCoverArt({
         <CrateImage
           src={currentTrack.albumCover}
           alt=""
-          className="absolute inset-0 size-full rounded-xl object-cover shadow-player-artwork-layered"
+          className="absolute inset-0 size-full rounded-xl object-cover "
           style={imageStyle}
         />
       ) : (
-        <div className="absolute inset-0 rounded-xl bg-surface-quiet-subtle shadow-player-artwork" />
+        <div className="absolute inset-0 rounded-xl bg-surface-quiet-subtle" />
       )}
     </>
   );

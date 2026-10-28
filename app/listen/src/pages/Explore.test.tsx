@@ -133,10 +133,11 @@ describe("Explore", () => {
     expect(
       screen
         .getByText("Start from a track, artist, album or genre.")
-        .closest("button"),
-    ).toHaveClass("explore-feature-card");
-    expect(screen.getByText("Mathcore").closest("article")).toHaveClass(
-      "explore-genre-card",
+        .closest('[data-slot="card"]'),
+    ).toHaveAttribute("data-slot", "card");
+    expect(screen.getByText("Mathcore").closest("article")).toHaveAttribute(
+      "data-slot",
+      "card",
     );
     expect(screen.getByText("Mathcore").closest("button")).toBeInTheDocument();
     expect(
@@ -402,7 +403,7 @@ describe("Explore", () => {
     ).toHaveTextContent("Play");
     expect(
       screen.getByRole("button", { name: "Play genre radio" }),
-    ).toHaveClass("explore-genre-primary-action");
+    ).toBeEnabled();
     expect(
       screen.getByRole("button", { name: "Open next genre show in Radar" }),
     ).toHaveTextContent("Next show");

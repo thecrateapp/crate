@@ -1,5 +1,7 @@
-import { CRATE_ICON_SIZE, Loader2, Search, X } from "@crate/ui/icons";
-import { IconButton } from "@crate/ui/primitives/IconButton";
+import { useId } from "react";
+import { CRATE_ICON_SIZE, Search } from "@crate/ui/icons";
+import { Button } from "@crate/ui/shadcn/button";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
@@ -26,7 +28,13 @@ type TopBarSearchInputProps = {
     containerRef: { current: HTMLDivElement | null };
     dropdownRef: { current: HTMLDivElement | null };
     inputRef: { current: HTMLInputElement | null };
-    dropdownStyle: { left: number; top: number; width: number } | null;
+    triggerRef: { current: HTMLButtonElement | null };
+    dropdownStyle: {
+      left: number;
+      top: number;
+      width: number;
+      maxHeight: number;
+    } | null;
   };
   actions: {
     openSearch: (withDropdown?: boolean) => void;
@@ -34,6 +42,7 @@ type TopBarSearchInputProps = {
     scheduleCollapseIfIdle: (nextShowDropdown?: boolean) => void;
     collapseOnFocusExit: (nextFocus: EventTarget | null) => void;
     setQuery: (value: string) => void;
+    setComposing: (value: boolean) => void;
     setResults: (value: TopBarSearchItem[]) => void;
     setCompletedQuery: (value: string | null) => void;
     setSearchError: (value: string | null) => void;
@@ -158,26 +167,44 @@ function TopBarSearchContainer({
   navigate,
   t,
 }: TopBarSearchLayoutProps) {
-  const { results, searchError, activeIdx, recents, searchOpen } = state;
+  const {
+    results,
+    searchError,
+    activeIdx,
+    recents,
+    searchOpen,
+    query,
+    loading,
+  } = state;
   const { canHover } = environment;
-  const { containerRef, dropdownRef, inputRef, dropdownStyle } = refs;
+  const { containerRef, dropdownRef, inputRef, triggerRef, dropdownStyle } =
+    refs;
   const {
     openSearch,
+    focusInputSoon,
     scheduleCollapseIfIdle,
+    collapseOnFocusExit,
     setQuery,
+    setResults,
     setCompletedQuery,
     setSearchError,
     setShowDropdown,
     setExpanded,
+    setComposing,
   } = actions;
   const { handleKeyDown, selectItem, selectRecent } = handlers;
+  const listboxId = useId();
+  const visible = Boolean(
+    dropdownStyle && (visibility.showResults || visibility.showRecents),
+  );
+  const count = trimmedQuery ? results.length : recents.length;
 
   return (
     <div
       ref={containerRef}
       className={cn(
         "group relative flex-1 shrink-0 overflow-visible md:flex-none md:origin-right",
-        "transition-[width,transform] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
+        "transition-[width] duration-200 ease-snap motion-reduce:transition-none",
         searchOpen
           ? "w-[min(22rem,calc(100vw-8.75rem))] sm:w-[min(24rem,calc(100vw-9.25rem))] md:w-[440px] lg:w-[500px]"
           : "w-[7.25rem] sm:w-[8rem] md:w-11",
@@ -189,16 +216,62 @@ function TopBarSearchContainer({
         if (canHover) scheduleCollapseIfIdle();
       }}
     >
-      <TopBarSearchControls
-        state={state}
-        environment={environment}
-        inputRef={inputRef}
-        actions={actions}
-        t={t}
-        handlers={{ handleKeyDown }}
-      />
+      <div data-state={searchOpen ? "open" : "closed"}>
+        <Button
+          ref={triggerRef}
+          variant="ghost"
+          className="crate-focus-inset"
+          aria-label={t("search.label")}
+          aria-expanded={searchOpen}
+          hidden={searchOpen}
+          onClick={() => {
+            openSearch(true);
+            focusInputSoon();
+          }}
+        >
+          <Search aria-hidden="true" size={CRATE_ICON_SIZE.md} />
+          <span className="md:hidden">{t("search.label")}</span>
+        </Button>
+        <div hidden={!searchOpen}>
+          <SearchInput
+            ref={inputRef}
+            className="crate-focus-inset"
+            value={query}
+            label={t("search.label")}
+            placeholder={t("search.placeholder")}
+            clearLabel={t("search.clear")}
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={visible}
+            aria-controls={visible ? listboxId : undefined}
+            aria-busy={loading}
+            aria-activedescendant={
+              visible && activeIdx >= 0 && activeIdx < count
+                ? `${listboxId}-${activeIdx}`
+                : undefined
+            }
+            onValueChange={(next) => {
+              openSearch(true);
+              setQuery(next);
+            }}
+            onCompositionStart={() => setComposing(true)}
+            onCompositionEnd={() => setComposing(false)}
+            onFocus={() => openSearch(true)}
+            onBlur={(event) => collapseOnFocusExit(event.relatedTarget)}
+            onKeyDown={handleKeyDown}
+            onClear={() => {
+              setResults([]);
+              setCompletedQuery(null);
+              setSearchError(null);
+              setShowDropdown(true);
+            }}
+          />
+        </div>
+      </div>
       {dropdownStyle && (visibility.showResults || visibility.showRecents) ? (
         <TopBarSearchDropdown
+          listboxId={listboxId}
+          loading={loading}
           dropdownRef={dropdownRef}
           dropdownStyle={dropdownStyle}
           visibility={visibility}
@@ -219,133 +292,6 @@ function TopBarSearchContainer({
           }}
         />
       ) : null}
-    </div>
-  );
-}
-
-function TopBarSearchControls({
-  state,
-  environment,
-  inputRef,
-  actions,
-  t,
-  handlers,
-}: {
-  state: TopBarSearchInputProps["state"];
-  environment: TopBarSearchInputProps["environment"];
-  inputRef: TopBarSearchInputProps["refs"]["inputRef"];
-  actions: TopBarSearchInputProps["actions"];
-  t: TopBarSearchInputProps["t"];
-  handlers: Pick<TopBarSearchInputProps["handlers"], "handleKeyDown">;
-}) {
-  const { query, loading, searchOpen } = state;
-  const { isDesktop } = environment;
-  const {
-    openSearch,
-    focusInputSoon,
-    collapseOnFocusExit,
-    setQuery,
-    setResults,
-    setCompletedQuery,
-    setSearchError,
-    setShowDropdown,
-  } = actions;
-
-  return (
-    <div
-      data-state={searchOpen ? "open" : "closed"}
-      className={cn(
-        "relative overflow-visible rounded-xl focus-within:shadow-focus transition-[background-color,border-color,box-shadow,transform] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
-        isDesktop
-          ? searchOpen
-            ? "border border-text-primary/8 bg-surface-canvas/68 shadow-glass-hover"
-            : "border-0 bg-transparent shadow-none backdrop-blur-0"
-          : "listen-glass-panel listen-search-glass",
-        searchOpen ? "md:scale-x-[1.01]" : "md:scale-x-100",
-      )}
-    >
-      <div className="relative flex items-center overflow-hidden rounded-xl">
-        <button
-          type="button"
-          aria-label={t("search.label")}
-          aria-expanded={searchOpen}
-          data-state={searchOpen ? "open" : "closed"}
-          onFocus={() => openSearch(true)}
-          onBlur={(event) => collapseOnFocusExit(event.relatedTarget)}
-          onClick={() => {
-            openSearch(true);
-            focusInputSoon();
-          }}
-          className={cn(
-            "absolute left-0 top-0 z-10 flex h-12 touch-manipulation items-center rounded-xl border-0 bg-transparent shadow-none backdrop-blur-0 transition-[color,transform,opacity,width,padding] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none md:h-11 md:w-11 md:justify-center md:px-0",
-            searchOpen
-              ? "w-12 justify-center px-0 text-text-primary/42"
-              : "w-full justify-start gap-2 px-4 text-text-primary/72 group-hover:scale-[1.03] group-hover:text-text-primary/88",
-          )}
-        >
-          <Search size={CRATE_ICON_SIZE.md} />
-          <span
-            className={cn(
-              "text-sm font-semibold tracking-[-0.01em] transition-[opacity,transform] duration-300 md:hidden",
-              searchOpen
-                ? "pointer-events-none -translate-x-1 opacity-0"
-                : "translate-x-0 opacity-100",
-            )}
-          >
-            {t("search.label")}
-          </span>
-        </button>
-        {loading && searchOpen ? (
-          <Loader2
-            size={CRATE_ICON_SIZE.sm}
-            className="absolute right-4 animate-spin text-text-primary/40"
-          />
-        ) : null}
-        {!loading && query && searchOpen ? (
-          <IconButton
-            label={t("search.clear")}
-            size="lg"
-            onClick={() => {
-              setQuery("");
-              setResults([]);
-              setCompletedQuery(null);
-              setSearchError(null);
-              setShowDropdown(true);
-              focusInputSoon();
-            }}
-            className="absolute right-3 z-20 size-9 touch-manipulation text-text-primary/30 hover:text-text-primary/65"
-          >
-            <X size={CRATE_ICON_SIZE.lg} />
-          </IconButton>
-        ) : null}
-        <input
-          ref={inputRef}
-          type="text"
-          value={query}
-          tabIndex={searchOpen ? 0 : -1}
-          aria-hidden={!searchOpen}
-          onChange={(e) => {
-            openSearch(true);
-            setQuery(e.target.value);
-          }}
-          onFocus={() => {
-            openSearch(true);
-          }}
-          onBlur={(event) => {
-            collapseOnFocusExit(event.relatedTarget);
-          }}
-          onKeyDown={handlers.handleKeyDown}
-          placeholder={t("search.placeholder")}
-          className={cn(
-            "h-12 w-full rounded-xl border-0 bg-transparent pl-12 text-[16px] text-text-primary outline-none md:h-11 md:pl-11 md:text-body",
-            "transition-[opacity,transform,box-shadow,padding] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none",
-            "placeholder:text-text-primary/40",
-            searchOpen
-              ? "pointer-events-auto translate-x-0 scale-100 pr-11 opacity-100"
-              : "pointer-events-none translate-x-3 scale-[0.985] pr-4 opacity-0",
-          )}
-        />
-      </div>
     </div>
   );
 }

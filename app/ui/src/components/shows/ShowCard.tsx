@@ -1,13 +1,15 @@
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import type { ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
-import { ExternalLink, MapPin, Ticket, X } from "lucide-react";
+import { ExternalLink, X, UserRound, CRATE_ICON_SIZE } from "@crate/ui/icons";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { MediaCover } from "@crate/ui/domain/media/MediaCover";
+import { GenrePillRow } from "@crate/ui/domain/genres/GenrePill";
+import {
+  ActionButton,
+  ActionGroup,
+  ActionLink,
+} from "@crate/ui/primitives/ActionGroup";
 
 import {
   artistBackgroundApiUrl,
@@ -15,6 +17,7 @@ import {
   artistPhotoApiUrl,
 } from "@/lib/library-routes";
 import { cn } from "@/lib/utils";
+import { OpsSurface } from "@/components/admin/ops-surfaces";
 
 const COLLAPSED_HEIGHT = 88;
 
@@ -256,8 +259,8 @@ function normalizeShow(show: ShowCardInput): NormalizedShow {
 function CompactCard({ show }: { show: ShowEvent }) {
   const normalized = normalizeShow(show);
   return (
-    <div className="flex min-w-0 cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs transition-colors hover:bg-white/5">
-      <div className="h-[18px] w-[18px] flex-shrink-0 overflow-hidden rounded-sm bg-white/5">
+    <div className="flex min-w-0 cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs transition-colors ">
+      <div className="crate-media-thumbnail size-12 flex-shrink-0 overflow-hidden rounded-sm bg-white/5">
         {normalized.artistPhotoUrl ? (
           <img
             src={normalized.artistPhotoUrl}
@@ -309,11 +312,13 @@ function CollapsedShowCard({ show }: { show: NormalizedShow }) {
       </div>
 
       <div className="min-w-0 flex-1 px-3 py-2.5">
-        <div className="truncate text-[13px] font-semibold text-foreground">
+        <div
+          data-slot="entity-title"
+          className="font-display truncate text-[13px] font-semibold text-foreground"
+        >
           {show.primaryArtist?.name ?? show.title}
         </div>
         <div className="mt-1 flex items-center gap-1 text-[11px] text-white/40">
-          <MapPin size={10} className="flex-shrink-0 text-primary/60" />
           <span className="truncate">{show.venue}</span>
           {show.city ? (
             <>
@@ -335,13 +340,13 @@ function CollapsedShowCard({ show }: { show: NormalizedShow }) {
       </div>
 
       <div className="flex flex-shrink-0 flex-col items-center justify-center px-2">
-        <span className="text-[8px] font-bold leading-none tracking-[0.12em] text-primary/55">
+        <span className="font-mono text-[8px] font-normal leading-none tracking-[0.12em] text-primary/55">
           {monthLabel}
         </span>
-        <span className="text-[20px] font-black leading-tight text-primary">
+        <span className="font-mono text-[20px] font-normal leading-tight text-primary">
           {dayLabel}
         </span>
-        <span className="text-[8px] font-medium leading-none text-white/40">
+        <span className="font-mono text-[8px] font-normal leading-none text-white/40">
           {weekdayLabel}
         </span>
       </div>
@@ -354,49 +359,19 @@ function CollapsedShowCard({ show }: { show: NormalizedShow }) {
             rel="noopener noreferrer"
             onClick={(event) => event.stopPropagation()}
             title="Open tickets"
-            className="flex h-8 w-8 items-center justify-center rounded-md text-white/30 transition-colors hover:bg-white/8 hover:text-white/70"
+            className="flex h-11 w-11 items-center justify-center rounded-md text-white/30 transition-colors hover:bg-white/8 hover:text-white/70"
           >
-            <ExternalLink size={15} />
+            <ExternalLink
+              data-admin-ux="show-tickets-external"
+              aria-hidden="true"
+              size={15}
+            />
           </a>
         ) : (
           <div className="h-8 w-8" />
         )}
       </div>
     </div>
-  );
-}
-
-function ActionButton({
-  href,
-  label,
-  icon,
-  tone = "neutral",
-}: {
-  href?: string;
-  label: string;
-  icon: ReactNode;
-  tone?: "neutral" | "primary";
-}) {
-  if (!href) return null;
-
-  return (
-    <a
-      href={href}
-      target={href.startsWith("http") ? "_blank" : undefined}
-      rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
-      className={cn(
-        "flex flex-1 items-center justify-center gap-1.5 rounded-md border py-2.5 text-[11px] font-semibold transition-colors",
-        tone === "primary"
-          ? "border-primary/20 bg-primary/10 text-primary hover:bg-primary/18"
-          : "border-white/10 text-muted-foreground hover:border-primary/20 hover:text-primary",
-      )}
-    >
-      {icon}
-      {label}
-      {href.startsWith("http") ? (
-        <span className="h-[5px] w-[5px] rounded-full bg-green-400" />
-      ) : null}
-    </a>
   );
 }
 
@@ -414,9 +389,7 @@ function ExpandedShowCardBody({
   const { dateLabel, timeLabel } = formatDateParts(
     show.date,
     show.time,
-  ) as ReturnType<typeof formatDateParts> & {
-    timeLabel?: string;
-  };
+  ) as ReturnType<typeof formatDateParts> & { timeLabel?: string };
   const support = show.lineupArtists.slice(1);
   const locationLabel = [show.city, show.region, show.country]
     .filter(Boolean)
@@ -425,129 +398,87 @@ function ExpandedShowCardBody({
     .filter(Boolean)
     .join(" · ");
   const artistHref = getArtistLink(show.primaryArtist);
+  const name = show.primaryArtist?.name ?? show.title;
 
   return (
-    <div className="relative flex h-full flex-col">
-      <div className="absolute inset-0 overflow-hidden">
-        {show.backgroundUrl ? (
-          <img
-            src={show.backgroundUrl}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover brightness-[0.4] saturate-[0.7]"
-            onError={(event) => {
-              (event.target as HTMLImageElement).style.display = "none";
-            }}
-          />
-        ) : null}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/65 to-transparent" />
-      </div>
-
-      <div className="relative h-[136px] flex-shrink-0">
+    <article
+      className="flex min-w-0 flex-col gap-4 p-4"
+      aria-label={`${name} show preview`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <MonoLabel as="div" tone="accent" meta={[dateLabel, timeLabel]} />
         {closeable ? (
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute left-2.5 top-2.5 z-10 flex h-7 w-7 items-center justify-center rounded-md bg-black/40 text-white/60 backdrop-blur-sm transition-colors hover:text-white"
-            aria-label="Close show details"
-          >
-            <X size={14} />
-          </button>
+          <ActionGroup label="Close show preview">
+            <ActionButton label="Close show details" onClick={onClose}>
+              <X
+                data-admin-ux="show-close"
+                aria-hidden="true"
+                size={CRATE_ICON_SIZE.md}
+              />
+            </ActionButton>
+          </ActionGroup>
         ) : null}
-
-        <div className="absolute right-3 top-2.5 z-10 text-right">
-          <div className="text-[10px] font-bold tracking-wide text-primary/70">
-            {dateLabel}
-          </div>
-          {timeLabel ? (
-            <div className="text-[10px] text-white/40">{timeLabel}</div>
+      </div>
+      <div className="flex min-w-0 items-center gap-3">
+        <MediaCover
+          src={show.coverUrl || show.artistPhotoUrl || show.backgroundUrl}
+          alt={name}
+          size={64}
+        />
+        <div className="min-w-0">
+          <h3 className="break-words font-display text-2xl font-bold leading-tight text-text-primary">
+            {artistHref ? (
+              <Link to={artistHref} className="hover:text-accent-action-hi">
+                {name}
+              </Link>
+            ) : (
+              name
+            )}
+          </h3>
+          {support.length > 0 ? (
+            <p className="m-0 mt-1 text-sm text-text-muted">
+              With{" "}
+              {support
+                .slice(0, 4)
+                .map((artist) => artist.name)
+                .join(" · ")}
+              {support.length > 4 ? ` +${support.length - 4}` : ""}
+            </p>
           ) : null}
         </div>
-
-        <div className="absolute bottom-3 left-3 right-3 z-10">
-          <div className="flex items-center gap-2">
-            {show.artistPhotoUrl ? (
-              <img
-                src={show.artistPhotoUrl}
-                alt=""
-                className="h-9 w-9 flex-shrink-0 rounded-full object-cover ring-2 ring-primary/25"
-                onError={(event) => {
-                  (event.target as HTMLImageElement).style.display = "none";
-                }}
-              />
-            ) : null}
-            <div className="min-w-0">
-              {artistHref ? (
-                <Link
-                  to={artistHref}
-                  className="block truncate text-sm font-bold text-white transition-colors hover:text-primary"
-                >
-                  {show.primaryArtist?.name ?? show.title}
-                </Link>
-              ) : (
-                <div className="truncate text-sm font-bold text-white">
-                  {show.primaryArtist?.name ?? show.title}
-                </div>
-              )}
-              {support.length > 0 ? (
-                <div className="truncate text-[10px] text-white/40">
-                  w/{" "}
-                  {support
-                    .slice(0, 4)
-                    .map((artist) => artist.name)
-                    .join(" · ")}
-                  {support.length > 4 ? ` +${support.length - 4}` : ""}
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </div>
       </div>
-
-      <div className="relative flex-1 px-3 pb-3 pt-2.5">
-        <div className="flex items-start gap-2 text-[11px] text-muted-foreground">
-          <MapPin size={11} className="mt-0.5 flex-shrink-0 text-primary/60" />
-          <div className="min-w-0">
-            <span className="font-medium text-white/70">{show.venue}</span>
-            {addressLabel ? (
-              <span className="text-white/40"> · {addressLabel}</span>
-            ) : null}
-            {locationLabel ? (
-              <div className="text-white/40">{locationLabel}</div>
-            ) : null}
-          </div>
-        </div>
-
-        {show.genres.length > 0 ? (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {show.genres.slice(0, 3).map((genre) => (
-              <span
-                key={genre}
-                className="rounded-full border border-white/10 px-1.5 py-0.5 text-[9px] text-white/40"
-              >
-                {genre}
-              </span>
-            ))}
-          </div>
+      <MonoLabel as="div" meta={[show.venue, addressLabel, locationLabel]} />
+      <GenrePillRow
+        items={show.genres.map((genre) => ({ name: genre }))}
+        max={3}
+      />
+      <ActionGroup label="Show preview actions">
+        {artistHref ? (
+          <ActionLink href={artistHref} label="Open artist">
+            <UserRound
+              data-admin-ux="show-preview-open-artist"
+              aria-hidden="true"
+              size={CRATE_ICON_SIZE.md}
+            />
+          </ActionLink>
         ) : null}
-
-        <div className="mt-3 flex gap-2">
-          <ActionButton
-            href={artistHref}
-            label="Open Artist"
-            icon={<MapPin size={13} />}
-          />
-          <ActionButton
+        {show.url ? (
+          <ActionLink
             href={show.url}
-            label="Get Tickets"
-            icon={<Ticket size={13} />}
-            tone="primary"
-          />
-        </div>
-        {actions ? (
-          <div className="mt-2 flex flex-wrap gap-2">{actions}</div>
+            label="Get tickets"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <ExternalLink
+              data-admin-ux="show-preview-tickets"
+              aria-hidden="true"
+              size={CRATE_ICON_SIZE.md}
+            />
+          </ActionLink>
         ) : null}
-      </div>
-    </div>
+      </ActionGroup>
+      {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+    </article>
   );
 }
 
@@ -587,14 +518,11 @@ export function ShowCard({
 
   if (!isInteractive) {
     return (
-      <div
-        className={cn(
-          "relative w-[340px] overflow-hidden rounded-md border border-white/[0.06] bg-panel-surface shadow-[0_20px_48px_rgba(0,0,0,0.28)]",
-          className,
-        )}
+      <OpsSurface
+        className={cn("relative w-[340px] overflow-hidden", className)}
       >
         <ExpandedShowCardBody show={normalized} />
-      </div>
+      </OpsSurface>
     );
   }
 
@@ -605,12 +533,12 @@ export function ShowCard({
     : COLLAPSED_HEIGHT;
 
   return (
-    <div
+    <OpsSurface
       className={cn(
-        "relative w-full overflow-hidden rounded-md border",
+        "relative w-full overflow-hidden transition-[height,border-color] duration-300 ease-out",
         expanded
-          ? "border-primary/20 shadow-[0_12px_40px_rgba(6,182,212,0.10)] transition-[height,border-color,box-shadow] duration-400 ease-out"
-          : "border-white/[0.06] bg-white/[0.02] transition-[height,border-color] duration-300 ease-out hover:border-primary/15 hover:bg-white/[0.03]",
+          ? "border-accent-action-hi/40"
+          : "hover:border-accent-action-hi/40",
         className,
       )}
       style={{ height: cardHeight }}
@@ -632,9 +560,6 @@ export function ShowCard({
     >
       <div ref={contentRef}>
         {!expanded ? (
-          <div className="absolute inset-0 bg-raised-surface" />
-        ) : null}
-        {!expanded ? (
           <CollapsedShowCard show={normalized} />
         ) : (
           <ExpandedShowCardBody
@@ -645,6 +570,6 @@ export function ShowCard({
           />
         )}
       </div>
-    </div>
+    </OpsSurface>
   );
 }

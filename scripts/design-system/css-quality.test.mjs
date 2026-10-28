@@ -32,6 +32,10 @@ test("keeps shared Jam and Radio inputs visibly focused", () => {
     new URL("app/shared/ui/tokens/recipes.css", ROOT),
     "utf8",
   );
+  const interactive = readFileSync(
+    new URL("app/shared/ui/tokens/interactive.css", ROOT),
+    "utf8",
+  );
 
   const jamFocus = recipes.match(
     /\.jam-input:focus,[\s\S]*?\.jam-select-trigger:focus\s*\{([^}]*)\}/,
@@ -40,6 +44,12 @@ test("keeps shared Jam and Radio inputs visibly focused", () => {
     /\.radio-seed-input:focus\s*\{([^}]*)\}/,
   )?.[1];
 
-  assert.match(jamFocus ?? "", /box-shadow:\s*var\(--focus-shadow\)/);
-  assert.match(radioFocus ?? "", /box-shadow:\s*var\(--focus-shadow\)/);
+  assert.match(
+    interactive,
+    /:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--focus-ring\);/,
+  );
+  for (const focus of [jamFocus, radioFocus]) {
+    assert.match(focus ?? "", /border-color:/);
+    assert.doesNotMatch(focus ?? "", /outline:\s*none|box-shadow:/);
+  }
 });

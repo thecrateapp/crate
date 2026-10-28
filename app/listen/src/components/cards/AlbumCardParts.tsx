@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import {
   useCallback,
   useEffect,
@@ -7,6 +8,7 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
+import { MediaCover } from "@crate/ui/domain/media/MediaCover";
 import { useTranslation } from "react-i18next";
 import { CRATE_ICON_SIZE, Clock, Disc3 } from "@crate/ui/icons";
 
@@ -37,7 +39,6 @@ import {
 import { toPlayableTrack } from "@/lib/playable-track";
 import { cn } from "@/lib/utils";
 import { albumApiPath, albumPagePath } from "@/lib/library-routes";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export interface AlbumCardProps {
   artist: string;
@@ -90,7 +91,7 @@ function albumOfflineMeta(
   if (state === "ready") {
     return record?.trackCount
       ? t("common.offlineCount", { count: record.trackCount })
-      : getOfflineStateLabel(state) ?? "";
+      : (getOfflineStateLabel(state) ?? "");
   }
   if (isOfflineBusy(state) && record?.trackCount) {
     return t("common.offlineProgress", {
@@ -198,20 +199,24 @@ export function AlbumCardArtwork({
   iconSize?: number;
 }) {
   return (
-    <ArtworkSurface
-      source={{
-        ...coverArtwork,
-        sizes: coverArtwork.srcSet ? coverSizes : undefined,
-      }}
+    <MediaCover
+      src={coverArtwork.src}
       alt={album}
+      iconSize={iconSize}
       className={className}
-      fallback={
-        <div className="grid size-full place-items-center bg-surface-elevated text-text-primary/35">
-          <Disc3 size={iconSize} />
-        </div>
-      }
-      imageProps={{ loading: "lazy", decoding: "async" }}
-      imageClassName="object-cover"
+      renderImage={(image) => (
+        <ArtworkSurface
+          source={{
+            ...coverArtwork,
+            sizes: coverArtwork.srcSet ? coverSizes : undefined,
+          }}
+          alt={image.alt}
+          className="size-full"
+          fallback={image.fallback}
+          imageProps={{ loading: "lazy", decoding: "async" }}
+          imageClassName={image.className}
+        />
+      )}
     />
   );
 }
@@ -232,13 +237,13 @@ export function AlbumCardArtworkBadges({
         className="absolute left-2 top-2 z-10"
       />
       {isPreRelease ? (
-        <CrateBadge
+        <InfoBadge
           surface="overlay"
           icon={Clock}
           className="absolute bottom-2 left-2 z-10"
         >
           {t("radar.release.preRelease")}
-        </CrateBadge>
+        </InfoBadge>
       ) : null}
     </>
   );

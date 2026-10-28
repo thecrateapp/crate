@@ -4,15 +4,13 @@ import { notify } from "@crate/ui/lib/notify";
 
 import { CRATE_ICON_SIZE, Shield } from "@crate/ui/icons";
 
-import { ConnectDevicesSection } from "@/components/settings/ConnectDevicesSection";
 import {
   AccountProfileForm,
   ConnectedAccounts,
   PasswordChangeForm,
 } from "@/components/settings/AccountSectionForms";
 import { AccountPulseListingField } from "@/components/settings/AccountPulseListingField";
-import { AccountTimezoneField } from "@/components/settings/AccountTimezoneField";
-import { Section } from "@/components/settings/SettingsPrimitives";
+import { AccountSettingsView } from "./AccountSettingsView";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { beginNativeOAuthLink } from "@/lib/capacitor-oauth";
@@ -28,7 +26,7 @@ interface AuthPublicConfig {
   invite_only?: boolean;
 }
 
-export function AccountSection() {
+export function AccountSection({ ruled }: { ruled?: boolean } = {}) {
   const { t } = useTranslation();
   const { user, refetch } = useAuth();
   const [name, setName] = useState(user?.name || "");
@@ -242,11 +240,9 @@ export function AccountSection() {
   );
 
   return (
-    <Section
-      title={t("settings.account.title")}
-      description={t("settings.account.description")}
-    >
-      <div className="space-y-4">
+    <AccountSettingsView
+      ruled={ruled}
+      profile={
         <AccountProfileForm
           name={name}
           username={username}
@@ -266,8 +262,13 @@ export function AccountSection() {
           setInstagram={setInstagram}
           onSave={handleSaveName}
         />
-        <AccountTimezoneField />
-        <AccountPulseListingField />
+      }
+      listening={
+        <>
+          <AccountPulseListingField />
+        </>
+      }
+      providers={
         <ConnectedAccounts
           providers={socialProviders}
           linkedProviders={linkedProviders}
@@ -276,26 +277,29 @@ export function AccountSection() {
           onLink={handleLinkProvider}
           onUnlink={handleUnlinkProvider}
         />
-        <ConnectDevicesSection />
-        {authConfig.invite_only ? (
-          <div className="flex items-start gap-3 rounded-xl border border-accent-action/20 bg-accent-action/10 px-4 py-3 text-sm text-accent-action">
-            <Shield size={CRATE_ICON_SIZE.sm} className="mt-0.5 shrink-0" />
-            <div>{t("settings.account.inviteOnlyNotice")}</div>
-          </div>
-        ) : null}
-        <PasswordChangeForm
-          showPassword={showPassword}
-          setShowPassword={setShowPassword}
-          currentPassword={currentPassword}
-          newPassword={newPassword}
-          confirmPassword={confirmPassword}
-          setCurrentPassword={setCurrentPassword}
-          setNewPassword={setNewPassword}
-          setConfirmPassword={setConfirmPassword}
-          saving={saving}
-          onChangePassword={handleChangePassword}
-        />
-      </div>
-    </Section>
+      }
+      security={
+        <>
+          {authConfig.invite_only ? (
+            <div className="flex items-start gap-3 rounded-xl border border-accent-action/20 bg-accent-action/10 px-4 py-3 text-sm text-accent-action">
+              <Shield size={CRATE_ICON_SIZE.sm} className="mt-0.5 shrink-0" />
+              <div>{t("settings.account.inviteOnlyNotice")}</div>
+            </div>
+          ) : null}
+          <PasswordChangeForm
+            showPassword={showPassword}
+            setShowPassword={setShowPassword}
+            currentPassword={currentPassword}
+            newPassword={newPassword}
+            confirmPassword={confirmPassword}
+            setCurrentPassword={setCurrentPassword}
+            setNewPassword={setNewPassword}
+            setConfirmPassword={setConfirmPassword}
+            saving={saving}
+            onChangePassword={handleChangePassword}
+          />
+        </>
+      }
+    />
   );
 }

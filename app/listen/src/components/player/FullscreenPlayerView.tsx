@@ -1,5 +1,10 @@
+import { useModalFocus } from "@crate/ui/lib/use-modal-focus";
 import { EqualizerPanel } from "@/components/player/EqualizerPanel";
-import { FullscreenPlayerHeader } from "@/components/player/FullscreenPlayerHeader";
+import { PlayerPanels } from "./PlayerPanels";
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+import { ChevronDown, CRATE_ICON_SIZE } from "@crate/ui/icons";
+import { AppPopover } from "@crate/ui/primitives/AppPopover";
+import { triggerHaptic } from "@/lib/haptics";
 import {
   FullscreenPlayerInfoTab,
   FullscreenPlayerLyricsTab,
@@ -9,11 +14,15 @@ import {
 import type { FullscreenPlayerViewProps } from "@/components/player/fullscreen-player-view-types";
 export function FullscreenPlayerView({
   t,
+  open = true,
   state,
   player,
   refs,
   actions,
   lyrics,
+  lyricsLoading,
+  lyricsError,
+  onRetryLyrics,
   activeLyricIndex,
   playerTabBottomClearance,
   scrollTabBottomClearance,
@@ -21,9 +30,27 @@ export function FullscreenPlayerView({
   setShowEqualizer,
   markArtistPhotoFailed,
 }: FullscreenPlayerViewProps) {
+  useModalFocus({
+    active: open,
+    panelRef: refs.fsRootRef,
+    onEscape: actions.onEscape,
+    isolate: true,
+    restoreFocusTarget: () =>
+      document.querySelector<HTMLElement>(
+        '[data-player-surface-launcher="fullscreen"]',
+      ),
+  });
   return (
     <div
       ref={refs.fsRootRef}
+      role="dialog"
+      aria-label={t("player.queue.nowPlaying")}
+      aria-modal="true"
+      aria-hidden={!open}
+      inert={!open}
+      tabIndex={-1}
+      data-app-modal-panel="true"
+      data-modal-depth={-1}
       className={`fullscreen-player-surface fixed inset-0 z-fullscreen-player flex flex-col ease-out ${
         state.animating ? "opacity-100" : "opacity-0 translate-y-full"
       }`}
@@ -46,16 +73,10 @@ export function FullscreenPlayerView({
       >
         <div className="fullscreen-player-handle h-1 w-10 rounded-full" />
       </div>
-      <FullscreenPlayerHeader
-        activePanel={state.activePanel}
-        onClose={actions.closeWithFeedback}
-        onSelectPanel={(panel) => onSelectPanel(panel)}
-        t={t}
-      />
       {state.allowMobileEqualizer && state.showEqualizer ? (
-        <div
+        <AppPopover
           ref={refs.equalizerRef}
-          className="listen-mobile-eq-glass absolute left-4 right-4 z-40 overflow-y-auto rounded-xl p-4 animate-fade-slide-up"
+          className="absolute left-4 right-4 z-app-player-popover overflow-y-auto rounded-xl p-4 animate-fade-slide-up"
           style={{
             top: "var(--listen-mobile-fullscreen-eq-top)",
             maxHeight:
@@ -63,43 +84,82 @@ export function FullscreenPlayerView({
           }}
         >
           <EqualizerPanel onClose={() => setShowEqualizer(false)} />
-        </div>
+        </AppPopover>
       ) : null}
-      {state.activePanel === null ? (
-        <FullscreenPlayerPlayerTab
-          state={state}
-          player={player}
-          refs={refs}
-          actions={actions}
-          t={t}
-          playerTabBottomClearance={playerTabBottomClearance}
-          markArtistPhotoFailed={markArtistPhotoFailed}
-        />
-      ) : null}
-      {state.activePanel === "queue" ? (
-        <FullscreenPlayerQueueTab
-          player={player}
-          t={t}
-          jumpTo={actions.jumpTo}
-          locked={state.jamQueueLocked}
-          scrollTabBottomClearance={scrollTabBottomClearance}
-        />
-      ) : null}
-      {state.activePanel === "lyrics" ? (
-        <FullscreenPlayerLyricsTab
-          activeLyricIndex={activeLyricIndex}
-          lyrics={lyrics}
-          refs={refs}
-          seek={actions.seek}
-          t={t}
-          scrollTabBottomClearance={scrollTabBottomClearance}
-        />
-      ) : null}
-      {state.activePanel === "info" ? (
-        <FullscreenPlayerInfoTab
-          scrollTabBottomClearance={scrollTabBottomClearance}
-        />
-      ) : null}
+      <PlayerPanels
+        value={state.activePanel ?? "player"}
+        label={t("player.tabsLabel")}
+        onValueChange={(value) => {
+          triggerHaptic("selection");
+          onSelectPanel(
+            value === "player" ? null : (value as "queue" | "lyrics" | "info"),
+          );
+        }}
+        leading={
+          <ActionButton
+            label={t("player.close")}
+            onClick={actions.closeWithFeedback}
+          >
+            <ChevronDown size={CRATE_ICON_SIZE.xl} />
+          </ActionButton>
+        }
+        items={[
+          {
+            value: "player",
+            label: t("player.queue.nowPlaying"),
+            content: (
+              <FullscreenPlayerPlayerTab
+                state={state}
+                player={player}
+                refs={refs}
+                actions={actions}
+                t={t}
+                playerTabBottomClearance={playerTabBottomClearance}
+                markArtistPhotoFailed={markArtistPhotoFailed}
+              />
+            ),
+          },
+          {
+            value: "queue",
+            label: t("player.queue"),
+            content: (
+              <FullscreenPlayerQueueTab
+                player={player}
+                t={t}
+                jumpTo={actions.jumpTo}
+                locked={state.jamQueueLocked}
+                scrollTabBottomClearance={scrollTabBottomClearance}
+              />
+            ),
+          },
+          {
+            value: "lyrics",
+            label: t("player.lyrics"),
+            content: (
+              <FullscreenPlayerLyricsTab
+                activeLyricIndex={activeLyricIndex}
+                lyrics={lyrics}
+                lyricsLoading={lyricsLoading}
+                lyricsError={lyricsError}
+                onRetryLyrics={onRetryLyrics}
+                refs={refs}
+                seek={actions.seek}
+                t={t}
+                scrollTabBottomClearance={scrollTabBottomClearance}
+              />
+            ),
+          },
+          {
+            value: "info",
+            label: t("player.info"),
+            content: (
+              <FullscreenPlayerInfoTab
+                scrollTabBottomClearance={scrollTabBottomClearance}
+              />
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }

@@ -103,12 +103,36 @@ describe("RadioPage", () => {
     });
 
     expect(await screen.findByText("Converge")).toBeInTheDocument();
-    expect(container.firstElementChild).toHaveClass("radio-page");
-    expect(container.querySelector(".radio-page-hero")).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-testid="page-header"]'),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Converge/i }).closest("article"),
-    ).toHaveClass("home-radio-card");
-    expect(screen.getByRole("searchbox")).toHaveClass("radio-seed-input");
+    ).toHaveAttribute("data-slot", "entity-card");
+    expect(
+      screen.getByRole("searchbox").closest('[data-slot="catalog-search"]'),
+    ).toBeInTheDocument();
+  });
+
+  it("uses the shared header and a labelled seed form before station rails", async () => {
+    const { container } = renderWithListenProviders(<RadioPage />);
+    await screen.findByText("Converge");
+    expect(
+      screen
+        .getByRole("heading", { name: "Radio" })
+        .closest('[data-testid="page-header"]'),
+    ).toBeInTheDocument();
+    const input = screen.getByRole("searchbox");
+    expect(input.closest('[data-slot="form-field"]')).toHaveAttribute(
+      "data-layout",
+      "stacked",
+    );
+    expect(container.querySelector(".radio-page-hero-glow")).toBeNull();
+    expect(screen.getByText("44 plays")).toHaveClass("font-mono", "uppercase");
+    expect(
+      input.compareDocumentPosition(screen.getByText("Artist Stations")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("localizes radio chrome", async () => {

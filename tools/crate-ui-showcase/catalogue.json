@@ -1,0 +1,1960 @@
+{
+  "version": 1,
+  "baseline": "1AQ · 2026-10-19 · working-tree baseline before further component migrations",
+  "entries": [
+    {
+      "id": "fundamentals",
+      "name": "Foundations",
+      "purpose": "Tokens, one identity and design roles; actual CSS values.",
+      "coverage": "documented",
+      "adoption": "Partial; consumer audit and phase validation pending",
+      "storyId": "system-foundations",
+      "story": "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Fundamentals.mdx",
+      "sources": [
+        "app/shared/fonts/roboto.css",
+        "app/shared/fonts/ibm-plex-sans.css",
+        "app/shared/fonts/jetbrains-mono.css",
+        "app/shared/ui/icons/actions.tsx",
+        "app/shared/ui/icons/base.tsx",
+        "app/shared/ui/icons/bot.tsx",
+        "app/shared/ui/icons/index.tsx",
+        "app/shared/ui/icons/media.tsx",
+        "app/shared/ui/icons/navigation.tsx",
+        "app/shared/ui/icons/people.tsx",
+        "app/shared/ui/icons/status.tsx",
+        "app/shared/ui/icons/system.tsx",
+        "app/shared/ui/icons/toolbox.tsx",
+        "app/shared/ui/icons/translation.tsx",
+        "app/shared/ui/tokens/animations.css",
+        "app/shared/ui/tokens/colors.css",
+        "app/shared/ui/tokens/index.css",
+        "app/shared/ui/tokens/interactive.css",
+        "app/shared/ui/tokens/metrics.css",
+        "app/shared/ui/tokens/product.css",
+        "app/shared/ui/tokens/radius.css",
+        "app/shared/ui/tokens/recipes.css",
+        "app/shared/ui/tokens/semantic.css",
+        "app/shared/ui/tokens/surfaces.css",
+        "app/shared/ui/tokens/themes.css",
+        "app/shared/ui/tokens/typography.css",
+        "app/shared/ui/tokens/z-index.css",
+        "app/shared/fonts/bricolage-grotesque.css",
+        "app/shared/fonts/poppins.css"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/fonts/roboto.css": "35db9bdbbf44ff112136713f55314e5792d707f7abf3bc4de1f13b8ff241e991",
+        "app/shared/fonts/ibm-plex-sans.css": "d83c31dc3db48bac0f17dd3c44d78404e15656345bbc88e46ee80f813447af52",
+        "app/shared/fonts/jetbrains-mono.css": "03d8e43bde9a8a9fc21310d2f6a1676a236c0cd6b2402b856d9527a42fa0c0af",
+        "app/shared/ui/icons/actions.tsx": "1de13f101244d99d1e8596688c1b3199a0eb2e4b51cbc50a1145ec35b6c00008",
+        "app/shared/ui/icons/base.tsx": "e275dc16b7fa8f2b2f05ce74e4c0593bc713b4b11703bcb43b7017e20eb9536e",
+        "app/shared/ui/icons/bot.tsx": "109ce723bd9115d78af06cde375e654c3f745ada2db55c305b8fd2e6fb04bf5b",
+        "app/shared/ui/icons/index.tsx": "c941f7edf354605366329168920540feb46d9e74a07d7bc23f91b160c4a6957a",
+        "app/shared/ui/icons/media.tsx": "4864889d6c3e8b1ba22b50a4b913f769f7def2c7432a171ef8bb10b404632bc9",
+        "app/shared/ui/icons/navigation.tsx": "114e260df40ed2c875e4cd68ccd50952c0f466d9548a9b7c5d211654d2fb9c6a",
+        "app/shared/ui/icons/people.tsx": "ce97e7bdaa81f3d3fdbe0ed2f86a7e9949b3d66b2d36c96425ccee4a4df2a563",
+        "app/shared/ui/icons/status.tsx": "fdfd553a284008cfa0ebba1e55d002dc2ada37bb489e0e51dcdcd74265a36e5e",
+        "app/shared/ui/icons/system.tsx": "20905cda8ba015c8226a6aa2054498d76e14597aca80482bc1013a0104dbfd17",
+        "app/shared/ui/icons/toolbox.tsx": "b793d9e34476a05180b0039f45d764387622022edbc33658a492c51165e19f42",
+        "app/shared/ui/icons/translation.tsx": "c717ccbeb754dd40c7e774f7e0279a54562d31fd0ee96a2cb22954acfa8850ce",
+        "app/shared/ui/tokens/animations.css": "aec5fc762a96b85c70edd9ad835b55597b001d46abbd3b498fdad2db33d60cfa",
+        "app/shared/ui/tokens/colors.css": "6fbc24a733b64f5ae4288679fd9e2329c8c72bb8aaf8e582487685aa5f53b965",
+        "app/shared/ui/tokens/index.css": "f8d2752d17d286f270fdaa2a21cd2f5111e39620f3207ced101a4269629a2c79",
+        "app/shared/ui/tokens/interactive.css": "0ae7c11bd1321cd83065f39b354aa753232f8d39d24e2df59973bc81ba627e94",
+        "app/shared/ui/tokens/metrics.css": "8a0ba360b0a7f57cda363ed27f9a4de036fa983645627eca123e9f88bcabcf44",
+        "app/shared/ui/tokens/product.css": "ae227ee09af662d574acfc0d022b8bf6ae462187da8f2d6b72370820d9449c73",
+        "app/shared/ui/tokens/radius.css": "70190253b3790eae1332dd78e3427765fb23ad8c544b0b13f8d6737d9d2999ea",
+        "app/shared/ui/tokens/recipes.css": "f8bcc13503fc5353d4ed6502370c95407ff40abbd1198801d205bb97d873ccf1",
+        "app/shared/ui/tokens/semantic.css": "f48ce59523a65c6ad48bacfeeed35743d777026d36c7862c60dcb94a2fb49276",
+        "app/shared/ui/tokens/surfaces.css": "001f243989d839c91d430e6bd9302b9f5f02e4964bc0537ba9d937cea2ee224d",
+        "app/shared/ui/tokens/themes.css": "32e91043130325ed786f6806b0953dd678253a21a1a6dddb627a002c8cdfd977",
+        "app/shared/ui/tokens/typography.css": "f8e1546208fd2daf1f0d9d1b34f059cefd92506f50a63997b6b8b342d9d29fb3",
+        "app/shared/ui/tokens/z-index.css": "6eabb7a2757ecf11bc8266ca27af019c8df51a5214fb272478dec3402b8e374b",
+        "app/shared/fonts/bricolage-grotesque.css": "5cfda59257c0eca03472772615ee85dae2f4858d21aa3550330e4b87c92206dc",
+        "app/shared/fonts/poppins.css": "bc790b9ed88994d48fc29294710f4ba039e335be463b8898fc7ab8ae3e7347da",
+        "tools/crate-ui-showcase/stories/Fundamentals.stories.tsx": "3131334f88e1f879f7817b1cddfe1a4ca46a8d08d30c75ff7fbb91cabd403735",
+        "tools/crate-ui-showcase/docs/Fundamentals.mdx": "9093c2c34fa14b5feb03617f62a4dd7d1ce8244c174a35059a67d5bfc56b4d3c"
+      },
+      "category": "Foundations"
+    },
+    {
+      "id": "mono-label",
+      "name": "MonoLabel",
+      "purpose": "Mono 400, uppercase labels; separate label, eyebrow and metadata roles.",
+      "coverage": "documented",
+      "adoption": "Partial; consumer audit and phase validation pending",
+      "storyId": "components-monolabel",
+      "story": "tools/crate-ui-showcase/stories/MonoLabel.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/MonoLabel.mdx",
+      "sources": [
+        "app/shared/ui/primitives/MonoLabel.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/MonoLabel.tsx": "ce043985f3e2687183f9f511e8833e3f104ba8df4cf0eeb90d8cf88859176248",
+        "tools/crate-ui-showcase/stories/MonoLabel.stories.tsx": "1c28cb1dd0a869737446fddab0c99c4a7348f305680dbabe0f34de8ecd34615b",
+        "tools/crate-ui-showcase/docs/MonoLabel.mdx": "9780ffe838d86653362876621267082b02760e6107208d1f7e3a42bd8a82cc75"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "status-dot",
+      "name": "StatusDot",
+      "purpose": "State with text or an accessible title; optional motion-aware pulse.",
+      "coverage": "documented",
+      "adoption": "Partial; consumer audit and phase validation pending",
+      "storyId": "components-statusdot",
+      "story": "tools/crate-ui-showcase/stories/StatusDot.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/StatusDot.mdx",
+      "sources": [
+        "app/shared/ui/primitives/StatusDot.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/StatusDot.tsx": "48c74a2a86d06524890fdad7aa92907da17763dee3b3a2dfe4911b5ad523f9cf",
+        "tools/crate-ui-showcase/stories/StatusDot.stories.tsx": "af224301204a4795850a9eb90e8c3487ea5fe9d333bd24f18a93aec795f8e892",
+        "tools/crate-ui-showcase/docs/StatusDot.mdx": "079e2efd39615b8fc7a5aa972c7dfdfe243b73f5eb0b3e1bbbf1989f8db1bc7b"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "stat-number",
+      "name": "StatNumber",
+      "purpose": "Display numerals for highlighted metrics, with units and labels.",
+      "coverage": "documented",
+      "adoption": "Partial; consumer audit and phase validation pending",
+      "storyId": "components-statnumber",
+      "story": "tools/crate-ui-showcase/stories/StatNumber.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/StatNumber.mdx",
+      "sources": [
+        "app/shared/ui/primitives/StatNumber.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/StatNumber.tsx": "62d516e2398ac10bf46fac849456a7fb5f5d29b600d2c4bdb380653b00c3c6d2",
+        "tools/crate-ui-showcase/stories/StatNumber.stories.tsx": "67c16f820394562530aff6aed8e636ef4ea463df30c961b1de3a39b77a5e4ba7",
+        "tools/crate-ui-showcase/docs/StatNumber.mdx": "7632d9fac28d2a066151520e19fd9f03676a35ccf7245b7e5bd0181949867764"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "hairline-row",
+      "name": "HairlineList / HairlineRow",
+      "purpose": "Hairline list rows; active emphasis, optional index and trailing content.",
+      "coverage": "documented",
+      "adoption": "Shared geometry reconciled; Listen expanded setlist is the current production consumer; Admin adoption pending",
+      "storyId": "components-hairlinerow",
+      "story": "tools/crate-ui-showcase/stories/HairlineRow.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/HairlineRow.mdx",
+      "sources": [
+        "app/shared/ui/primitives/HairlineList.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/HairlineList.tsx": "33baf1cff73ec18212bc6e3f118c9e74ae88eebcee815d5432453b3ce182b97d",
+        "tools/crate-ui-showcase/stories/HairlineRow.stories.tsx": "7ebe8d2733d438172cc31afef048565a0b8c7c569a1c8e85e107cc26f3653cea",
+        "tools/crate-ui-showcase/docs/HairlineRow.mdx": "fa5ba2a00582aec163c403edee2cf95d627bdc38909dc4ea3943505198788be8"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "info-badge",
+      "name": "InfoBadge / OfflineBadge",
+      "purpose": "Static metadata, state and inline counters; includes OfflineBadge.",
+      "coverage": "documented",
+      "adoption": "Partial; consumer audit and phase validation pending",
+      "storyId": "components-infobadge",
+      "story": "tools/crate-ui-showcase/stories/InfoBadge.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/InfoBadge.mdx",
+      "sources": [
+        "app/shared/ui/primitives/InfoBadge.tsx",
+        "app/shared/ui/domain/offline/OfflineBadge.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/InfoBadge.tsx": "c6590b3688ea8792f14cd6bda7183432fc7511ade864d6c505e268f8206a462f",
+        "app/shared/ui/domain/offline/OfflineBadge.tsx": "a78f0d4da39ebd543fc0bad3adaba47ebe6a2a7b34cff166b3051525dc464c18",
+        "tools/crate-ui-showcase/stories/InfoBadge.stories.tsx": "12c52bcd19c3e701f4b3daf85f2d1e648f6cb1cba4b890ce65baef58411a1c49",
+        "tools/crate-ui-showcase/docs/InfoBadge.mdx": "c0ad8f113f111268467a0e6794008e6055843d364aad8e5d1b9bc091c78b2450"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "filter-chip",
+      "name": "FilterChip",
+      "purpose": "Toggle filters or explicit actions; 12 px text and 32 / 44 px minimum targets.",
+      "coverage": "documented",
+      "adoption": "Partial; consumer audit and phase validation pending",
+      "storyId": "components-filterchip",
+      "story": "tools/crate-ui-showcase/stories/FilterChip.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/FilterChip.mdx",
+      "sources": [
+        "app/shared/ui/primitives/FilterChip.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/FilterChip.tsx": "86c5dba3f2b120a9af83955107334b2884e74ebe1d54a2f68061310aa14cc017",
+        "tools/crate-ui-showcase/stories/FilterChip.stories.tsx": "c27b8cf5ccdeeafbc218e88247963798407ad4a26320e8e33ef894e2d00a62b7",
+        "tools/crate-ui-showcase/docs/FilterChip.mdx": "1c7c603e3111d81256a62f4945a5cb87774fd7dcab397092d3b0f33fec5b555c"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "segmented-control",
+      "name": "SegmentedControl",
+      "purpose": "Exclusive selection with keyboard navigation; radio and tab contracts.",
+      "coverage": "documented",
+      "adoption": "Partial; consumer audit and phase validation pending",
+      "storyId": "components-segmentedcontrol",
+      "story": "tools/crate-ui-showcase/stories/SegmentedControl.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/SegmentedControl.mdx",
+      "sources": [
+        "app/shared/ui/primitives/SegmentedControl.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/SegmentedControl.tsx": "dff469b97db4ffbefed556bad121078adff5e7e33ed0e8923d521640916bd9af",
+        "tools/crate-ui-showcase/stories/SegmentedControl.stories.tsx": "ac29972fa006ca9df6e85c3b0ba389a5061a89e0311eb0b93f4dde5cd7b6c9a8",
+        "tools/crate-ui-showcase/docs/SegmentedControl.mdx": "f61fbb7494689b15826cbab324fd183662b54f554be5743a84079c823d5fcc9e"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "genre-pill",
+      "name": "GenrePill",
+      "purpose": "Music genre, optional percentage and provenance, independent select and remove actions.",
+      "coverage": "documented",
+      "adoption": "Partial; consumer audit and phase validation pending",
+      "storyId": "components-genrepill",
+      "story": "tools/crate-ui-showcase/stories/GenrePill.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/GenrePill.mdx",
+      "sources": [
+        "app/shared/ui/domain/genres/GenrePill.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/genres/GenrePill.tsx": "14157d29ac4772da51d757916af4de54f776adc0f6623282ac655cef295f0838",
+        "tools/crate-ui-showcase/stories/GenrePill.stories.tsx": "5e225db11fee150b12772c13ae3490154bab0f8e0bf23e0d51c40d7edb1a606e",
+        "tools/crate-ui-showcase/docs/GenrePill.mdx": "528768e56ede4fdda422bed72b8febfcee9902fc4fc8da98fb8f61259edde7a3"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "badge-compatibility",
+      "name": "Badge compatibility",
+      "purpose": "Compatibility adapters; new consumers use InfoBadge or FilterChip by role.",
+      "coverage": "documented",
+      "adoption": "Partial; consumer audit and phase validation pending",
+      "storyId": "components-badge-compatibility",
+      "story": "tools/crate-ui-showcase/stories/Compatibility.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Compatibility.mdx",
+      "sources": [
+        "app/shared/ui/primitives/CrateBadge.tsx",
+        "app/shared/ui/shadcn/badge.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/CrateBadge.tsx": "5c134170783a5126445239d7c00eb76ee10bcd992d8b3d4a5ce8b026e9ef4aef",
+        "app/shared/ui/shadcn/badge.tsx": "f0fcb7983395f6d4e0b9e84a8975a0e9a5a677723503d40095d640eb2ab90cd6",
+        "tools/crate-ui-showcase/stories/Compatibility.stories.tsx": "1f3119a1410139d180c0fe22b8a34eb5999162b6846b7f9c386f9e86bb2a4ccd",
+        "tools/crate-ui-showcase/docs/Compatibility.mdx": "147d96345bae6d801170dc6218721d6dbdb458f42f9e0d37c3918ce79485f9a9"
+      },
+      "category": "Compatibility"
+    },
+    {
+      "id": "composites-adminselect",
+      "name": "AdminSelect",
+      "purpose": "Shared AdminSelect form component; contract, states and keyboard examples.",
+      "coverage": "documented",
+      "adoption": "Both apps have existing consumers; consumer/platform validation remains scoped",
+      "storyId": "components-adminselect",
+      "story": "tools/crate-ui-showcase/stories/AdminSelect.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/AdminSelect.mdx",
+      "sources": [
+        "app/shared/ui/composites/AdminSelect.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/composites/AdminSelect.tsx": "8681d2582336753b2742bb92d606fb6c769320b5bf44abccb92ac5cd3a7f5e4f",
+        "tools/crate-ui-showcase/stories/AdminSelect.stories.tsx": "da878e3ce6675fb917d9512182818a4fb7d99eaa85ffbab6d233ea6feaa9ff74",
+        "tools/crate-ui-showcase/docs/AdminSelect.mdx": "514079fdb7b57c9b61cbc0cafd8cd5f2bfa3778cc9309a89b405aa1ea27f1e9c"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "composites-cardskeleton",
+      "name": "CardSkeleton",
+      "purpose": "A named summary placeholder with two neutral blocks and stable reserved metric geometry.",
+      "coverage": "documented",
+      "adoption": "Shared Admin and Listen loading consumers;1BEreconciliation",
+      "storyId": "components-cardskeleton",
+      "story": "tools/crate-ui-showcase/stories/CardSkeleton.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/CardSkeleton.mdx",
+      "sources": [
+        "app/shared/ui/composites/CardSkeleton.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/composites/CardSkeleton.tsx": "0f40fa6b1fac063326342171f323beb94f63dbef24745066bc061677f5c0ed28",
+        "tools/crate-ui-showcase/stories/CardSkeleton.stories.tsx": "31e2ce7b10623adc4c4c7734378fec34bc00aea783bfd3b45c88e2e42f2aa374",
+        "tools/crate-ui-showcase/docs/CardSkeleton.mdx": "7de55799e7196f9a7103d15be10e9936665fbc53cc89c3a5377ae0b31e92b298"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "composites-confirmdialog",
+      "name": "ConfirmDialog",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "documented",
+      "adoption": "Existing Listen consumer or internal dependency; contract completed in web closure; broader native/AT validation remains separate",
+      "storyId": "components-confirmdialog",
+      "story": "tools/crate-ui-showcase/stories/ConfirmDialog.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/ConfirmDialog.mdx",
+      "sources": [
+        "app/shared/ui/composites/ConfirmDialog.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/composites/ConfirmDialog.tsx": "81cafd9567109558e1ef71443217354d26623311eb7de3c9e8c5e7b7590dc6a1",
+        "tools/crate-ui-showcase/stories/ConfirmDialog.stories.tsx": "b6c520f1c0b1bf48218632b58ba0505b2c3839646cf4051ffc88d18f5d4250de",
+        "tools/crate-ui-showcase/docs/ConfirmDialog.mdx": "890a18bbbbe07e26d05b97edf348a55b27db810eca955ea75465789d5a04ec02"
+      },
+      "category": "Overlays"
+    },
+    {
+      "id": "composites-gridskeleton",
+      "name": "GridSkeleton",
+      "purpose": "Media placeholders share actual MediaGrid and MediaRail columns, artwork shape and text slots.",
+      "coverage": "documented",
+      "adoption": "Shared Admin and Listen loading consumers;1BEreconciliation",
+      "storyId": "components-gridskeleton",
+      "story": "tools/crate-ui-showcase/stories/GridSkeleton.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/GridSkeleton.mdx",
+      "sources": [
+        "app/shared/ui/composites/GridSkeleton.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/composites/GridSkeleton.tsx": "2b5caf2baab70084a52791b4af0c0a76a5315b73880da5e8ef0bfe0222e29f42",
+        "tools/crate-ui-showcase/stories/GridSkeleton.stories.tsx": "c1f112ff4f7397fcbf9015304956b68095a57a51b5b2b9126b273e4960f37787",
+        "tools/crate-ui-showcase/docs/GridSkeleton.mdx": "525ae2f6a2f92516117182f12e5c0e3ca003be4426edbac6296024ca502204d8"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "composites-tableskeleton",
+      "name": "TableSkeleton",
+      "purpose": "A named fixed-column table placeholder. Header and row cells contain neutral text-sized blocks, never dash data.",
+      "coverage": "documented",
+      "adoption": "Shared Admin and Listen loading consumers;1BEreconciliation",
+      "storyId": "components-tableskeleton",
+      "story": "tools/crate-ui-showcase/stories/TableSkeleton.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/TableSkeleton.mdx",
+      "sources": [
+        "app/shared/ui/composites/TableSkeleton.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/composites/TableSkeleton.tsx": "8167f6d50724984379b03f1acf20e8ef000073647a01aedd9bab3f1b81d53f44",
+        "tools/crate-ui-showcase/stories/TableSkeleton.stories.tsx": "8b3535e8d052e1d18e979b4ba8a3f8b9ad55d3283dfafa88afcc1a991b805d71",
+        "tools/crate-ui-showcase/docs/TableSkeleton.mdx": "1b0e04e0497695a549ca1eff40a59f3f11bebf2973a88d047bebf953bd19ae07"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "domain-artistbioprofile",
+      "name": "ArtistBioProfile",
+      "purpose": "Existing shared editorial profile for Listen biography and Admin research preview; injected labels, artwork, callbacks and data.",
+      "coverage": "documented",
+      "adoption": "Listen ArtistBioModal; Admin ArtistBioResearchDialog.",
+      "storyId": "components-artistbioprofile",
+      "story": "tools/crate-ui-showcase/stories/ArtistBioProfile.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/ArtistBioProfile.mdx",
+      "sources": [
+        "app/shared/ui/domain/ArtistBioProfile.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/ArtistBioProfile.tsx": "3f7589e63acd4d1ad9e67aaed1d211de0cf6c108ebf6390e8107294d631d19e5",
+        "tools/crate-ui-showcase/stories/ArtistBioProfile.stories.tsx": "566cfde3d971f7b9b67a5dbb665cb5517dfc4c40f026861a57943567b06d1d49",
+        "tools/crate-ui-showcase/docs/ArtistBioProfile.mdx": "533d1c28eae9cf7d46384350b7b85969b0703ed56f28616cfa49772cd8170665"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "domain-artistbiotext",
+      "name": "ArtistBioText",
+      "purpose": "Shared biography text and safe external links, preserving punctuation and URL-aware truncation.",
+      "coverage": "documented",
+      "adoption": "Listen artist hero/profile; Admin artist About/Overview.",
+      "storyId": "components-artistbiotext",
+      "story": "tools/crate-ui-showcase/stories/ArtistBioText.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/ArtistBioText.mdx",
+      "sources": [
+        "app/shared/ui/domain/ArtistBioText.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/ArtistBioText.tsx": "9bb1a935c8ef9a7314f20bf40c85390a94a03b1821ec5c28c5ecda2d1e0d5ae0",
+        "tools/crate-ui-showcase/stories/ArtistBioText.stories.tsx": "69c80e05da87e3e39257ec92e94a72f649e9c81bd5fe650af39b872bc75b4de5",
+        "tools/crate-ui-showcase/docs/ArtistBioText.mdx": "4a4bd28678564006ae28c00866d380bceab108e89f5fd315ca1f5fab1f0866e0"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "domain-artistheroframe",
+      "name": "ArtistHeroFrame",
+      "purpose": "Shared artwork/fade canvas with desktop/mobile bounds, not a page/data controller.",
+      "coverage": "documented",
+      "adoption": "Listen home/artist hero; Admin HeroCompositionCanvas.",
+      "storyId": "components-artistheroframe",
+      "story": "tools/crate-ui-showcase/stories/ArtistHeroFrame.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/ArtistHeroFrame.mdx",
+      "sources": [
+        "app/shared/ui/domain/ArtistHeroFrame.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/ArtistHeroFrame.tsx": "62ea5350816b48658f1455ebeb376640a97a6c38a909aeceac060bb351db4cc0",
+        "tools/crate-ui-showcase/stories/ArtistHeroFrame.stories.tsx": "e19668b8242d840244bbe8f0f247fc63d7a0ea0c162416f3096446514b96c9a8",
+        "tools/crate-ui-showcase/docs/ArtistHeroFrame.mdx": "503c3c353f5f514a6f6ab16019204095e21f6227af508fed1b0f13931150c93e"
+      },
+      "category": "Layout"
+    },
+    {
+      "id": "domain-artistheropresentation",
+      "name": "ArtistHeroPresentation",
+      "purpose": "Editorial home hero copy/action layout over ArtistHeroFrame, with injected slots.",
+      "coverage": "documented",
+      "adoption": "Listen HomeCanonicalHero; Admin ArtistHeroArtworkEditor. Artist detail uses PageHero via ArtistHeroView.",
+      "storyId": "components-artistheropresentation",
+      "story": "tools/crate-ui-showcase/stories/ArtistHeroPresentation.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/ArtistHeroPresentation.mdx",
+      "sources": [
+        "app/shared/ui/domain/ArtistHeroPresentation.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/ArtistHeroPresentation.tsx": "65f7642cad4b5289449a83cbc779ed42a24c558d1351ca2a80e016c0c9cce503",
+        "tools/crate-ui-showcase/stories/ArtistHeroPresentation.stories.tsx": "9d3925e7cc7a6ea92ed2d26c469a3c935c5f9ce65047ed13bd56dcadb544b144",
+        "tools/crate-ui-showcase/docs/ArtistHeroPresentation.mdx": "e71cf478bb0009fe06eb56c2aa628b7af34eb792d79f65b73560925c49d91410"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "domain-actions-contextmenu",
+      "name": "ContextMenu",
+      "purpose": "Controlled desktop context menu and touch action sheet with shared headers, keyboard navigation and input-capability detection.",
+      "coverage": "documented",
+      "adoption": "Listen entity/track and all artist/album/playlist/crate/genre hero menus use the canonical solid surface (1BE). Adapter regressions and both review hosts covered. Admin domain-menu adoption and native/AT phase QA pending.",
+      "storyId": "components-contextmenu",
+      "story": "tools/crate-ui-showcase/stories/ContextMenu.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/ContextMenu.mdx",
+      "sources": [
+        "app/shared/ui/domain/actions/ContextMenu.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/actions/ContextMenu.tsx": "a63424d23931a04c4b895106efebaf70795df1ca505a5776c489abe54465f083",
+        "tools/crate-ui-showcase/stories/ContextMenu.stories.tsx": "070e1c69d1e0ff827748ef30f93c9a58d8546b8e5c0a4ee5ef6cb36997fd3379",
+        "tools/crate-ui-showcase/docs/ContextMenu.mdx": "a3bda4651cda00bb522ae8485dd1c5f3ce154dadcaf84ac9ea53648e4b2edb4c"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "domain-actions-itemactionmenu",
+      "name": "ItemActionMenu",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "documented",
+      "adoption": "Existing Listen consumer or internal dependency; contract completed in web closure; broader native/AT validation remains separate",
+      "storyId": "components-entitymenus",
+      "story": "tools/crate-ui-showcase/stories/EntityMenus.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/EntityMenus.mdx",
+      "sources": [
+        "app/shared/ui/domain/actions/ItemActionMenu.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/actions/ItemActionMenu.tsx": "d711bf068f5b27bd7d5e4fc029e89bc70c8d5b787709b8f0e387bd7ea421c9ec",
+        "tools/crate-ui-showcase/stories/EntityMenus.stories.tsx": "7380fa7f454952882853e1c33647e277ced02f34fa6178c14b4d42f73f8b319f",
+        "tools/crate-ui-showcase/docs/EntityMenus.mdx": "d7eb4ceecd501caa90be0a75ddb8d38fe5ec915d7a53b790b6bfcd1a2ea3bed9"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "domain-actions-mobileactionsheet",
+      "name": "MobileActionSheet",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "documented",
+      "adoption": "Existing Listen consumer or internal dependency; contract completed in web closure; broader native/AT validation remains separate",
+      "storyId": "components-entitymenus",
+      "story": "tools/crate-ui-showcase/stories/EntityMenus.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/EntityMenus.mdx",
+      "sources": [
+        "app/shared/ui/domain/actions/MobileActionSheet.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/actions/MobileActionSheet.tsx": "37158444437ae7d218173e8637521a30a46bfff599b6ffa86776bd748bb1a024",
+        "tools/crate-ui-showcase/stories/EntityMenus.stories.tsx": "7380fa7f454952882853e1c33647e277ced02f34fa6178c14b4d42f73f8b319f",
+        "tools/crate-ui-showcase/docs/EntityMenus.mdx": "d7eb4ceecd501caa90be0a75ddb8d38fe5ec915d7a53b790b6bfcd1a2ea3bed9"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "domain-auth-oauthbuttons",
+      "name": "OAuthButtons",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "documented",
+      "adoption": "Existing Listen consumer or internal dependency; contract completed in web closure; broader native/AT validation remains separate",
+      "storyId": "components-oauthbuttons",
+      "story": "tools/crate-ui-showcase/stories/OAuthButtons.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/OAuthButtons.mdx",
+      "sources": [
+        "app/shared/ui/domain/auth/OAuthButtons.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/auth/OAuthButtons.tsx": "7f403f12a1376634c040b2bfc87651dcd93facd91664e1ed7c7c1c92b43d38c7",
+        "tools/crate-ui-showcase/stories/OAuthButtons.stories.tsx": "33eec0ecfa1a176285d6fb7d66d843d90581e70d7cf1c0a48952067d8ec5d58b",
+        "tools/crate-ui-showcase/docs/OAuthButtons.mdx": "bd19b1570142cc88877e9ec118fb7c919dd74c8218a14654e2c9a02b28096a83"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "domain-brand-bandcamplogo",
+      "name": "BandcampLogo",
+      "purpose": "Canonical Bandcamp brand asset with explicit decorative use.",
+      "coverage": "documented",
+      "adoption": "Initial Listen consumers and existing Admin consumers preserved; broader adoption/native QA pending (1AV)",
+      "storyId": "components-bandcamplogo",
+      "story": "tools/crate-ui-showcase/stories/BandcampLogo.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/BandcampLogo.mdx",
+      "sources": [
+        "app/shared/ui/domain/brand/BandcampLogo.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/brand/BandcampLogo.tsx": "41c859cd455ac6d5bb841d9024623e06cc35baacdaa85c8929300f590c5dc06d",
+        "tools/crate-ui-showcase/stories/BandcampLogo.stories.tsx": "624ae3b6456f9fe7b04e8021f12667afce4cb39a1fa8e85e3da27e11ac1307d5",
+        "tools/crate-ui-showcase/docs/BandcampLogo.mdx": "02620c262e2708b65aed92b5392d56ad2dd8675b83e8cd8653035b6c4ecfb3ff"
+      },
+      "category": "Foundations"
+    },
+    {
+      "id": "domain-brand-crateloader",
+      "name": "CrateLoader",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "documented",
+      "adoption": "Existing Listen consumer or internal dependency; contract completed in web closure; broader native/AT validation remains separate",
+      "storyId": "components-crateloader",
+      "story": "tools/crate-ui-showcase/stories/CrateLoader.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/CrateLoader.mdx",
+      "sources": [
+        "app/shared/ui/domain/brand/CrateLoader.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/brand/CrateLoader.tsx": "9cec84ba332cced0d409b0d414d8df151cab5aedb77d7999e0cbd94a88bff45b",
+        "tools/crate-ui-showcase/stories/CrateLoader.stories.tsx": "ba16b50ad469165f83e0976b39fa1b0e2bcbbf0b5353e87eb3cf7bb9eca5b387",
+        "tools/crate-ui-showcase/docs/CrateLoader.mdx": "3671b67117a038ba8abccd39f3a9f58e780ded396f418c4656edd647e26746d8"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "domain-brand-cratelogo",
+      "name": "CrateLogo",
+      "purpose": "Canonical Crate brand mark with instance-safe SVG gradients.",
+      "coverage": "documented",
+      "adoption": "Initial Listen consumers and existing Admin consumers preserved; broader adoption/native QA pending (1AV)",
+      "storyId": "components-cratelogo",
+      "story": "tools/crate-ui-showcase/stories/CrateLogo.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/CrateLogo.mdx",
+      "sources": [
+        "app/shared/ui/domain/brand/CrateLogo.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/brand/CrateLogo.tsx": "d1df52b02027639e4e8bb14db0a6d0055e16d61c9e157df2e80eee970c69367d",
+        "tools/crate-ui-showcase/stories/CrateLogo.stories.tsx": "47dc0aea176fd2c318a460f88bb5165f5dd844eb5ae16302041e34e7bca753c9",
+        "tools/crate-ui-showcase/docs/CrateLogo.mdx": "c9c45fc19bd50d332ad90ceb64759da7194e1f0d6458f1a322efb599c944357f"
+      },
+      "category": "Foundations"
+    },
+    {
+      "id": "domain-entity-entityavatar",
+      "name": "EntityAvatar",
+      "purpose": "Avatar identity with optional state ring and independently named badge.",
+      "coverage": "documented",
+      "adoption": "Initial Listen consumers and existing Admin consumers preserved; broader adoption/native QA pending (1AV)",
+      "storyId": "components-entityavatar",
+      "story": "tools/crate-ui-showcase/stories/EntityAvatar.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/EntityAvatar.mdx",
+      "sources": [
+        "app/shared/ui/domain/entity/EntityAvatar.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/entity/EntityAvatar.tsx": "e594ba287fc9634dfef8588c491c75b0e3d45cad581198ed907882ee3ba178e1",
+        "tools/crate-ui-showcase/stories/EntityAvatar.stories.tsx": "296c676cfb699318e6b7d1e2ae8165bf5d2db70d16b08973b927625028160539",
+        "tools/crate-ui-showcase/docs/EntityAvatar.mdx": "69a9f7656ddaf5bae4aa8e1d2209d8367ed1610c2d795d81bfe96a013f467d63"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "domain-entity-entitycard",
+      "name": "EntityCard",
+      "purpose": "Media identity with independent navigation, overlay and menu.",
+      "coverage": "documented",
+      "adoption": "Listen and Admin artist/album entities; native destinations and explicit callback selection. Wider route/AT QA remains scoped.",
+      "storyId": "components-entitycard",
+      "story": "tools/crate-ui-showcase/stories/EntityCard.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/EntityCard.mdx",
+      "sources": [
+        "app/shared/ui/domain/entity/EntityCard.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/entity/EntityCard.tsx": "06c2033d8b03616d77a09b7ca8a1ec3a1cffa0cd7ba29b25cd8bb203d2d17e36",
+        "tools/crate-ui-showcase/stories/EntityCard.stories.tsx": "5a63d7406c7872773ca2d7ca7f59fc509aa3d0f278761c47acf2da2d6db9f900",
+        "tools/crate-ui-showcase/docs/EntityCard.mdx": "5a20e8146005777b6f5db6d4975b62c655ab9f4dd8e243cb2f42a378ad0e3034"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "domain-entity-entityprimaryaction",
+      "name": "EntityPrimaryAction",
+      "purpose": "Semantic adapter for native entity destinations and callbacks.",
+      "coverage": "documented",
+      "adoption": "Listen and Admin artist/album entities; native destinations and explicit callback selection. Wider route/AT QA remains scoped.",
+      "storyId": "components-entityprimaryaction",
+      "story": "tools/crate-ui-showcase/stories/EntityPrimaryAction.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/EntityPrimaryAction.mdx",
+      "sources": [
+        "app/shared/ui/domain/entity/EntityPrimaryAction.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/entity/EntityPrimaryAction.tsx": "9f8a8ed53201fa312c97839bb64e5cbf3f12b374c669a99b0b1b1d19c94273d4",
+        "tools/crate-ui-showcase/stories/EntityPrimaryAction.stories.tsx": "bb304baad1a7e035d2ffa0fcb3b91061b763d27bab7dd45cf8c9a8a197ee318a",
+        "tools/crate-ui-showcase/docs/EntityPrimaryAction.mdx": "247d75045079f8e0cf1f72b851a743d1e6f53a7499f9552baf7e6470fa6fae6f"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "domain-entity-entityrow",
+      "name": "EntityRow",
+      "purpose": "Entity list identity with separate trailing actions.",
+      "coverage": "documented",
+      "adoption": "Listen and Admin artist/album entities; native destinations and explicit callback selection. Wider route/AT QA remains scoped.",
+      "storyId": "components-entityrow",
+      "story": "tools/crate-ui-showcase/stories/EntityRow.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/EntityRow.mdx",
+      "sources": [
+        "app/shared/ui/domain/entity/EntityRow.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/entity/EntityRow.tsx": "66ad258a7badbdddf5747d104f8670df3ddbae7c5ab8284673f42ded0d5ae36a",
+        "tools/crate-ui-showcase/stories/EntityRow.stories.tsx": "153ae42c11f6fce538e8c01c0746c3221371c4fbe7547af7ab4f463bbc9df1a3",
+        "tools/crate-ui-showcase/docs/EntityRow.mdx": "c66a387391afcba301be60d19c5f19f50afd862d4eb51c14723498d3dd2933fd"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "domain-entity-useentitymenu",
+      "name": "useEntityMenu",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "documented",
+      "adoption": "Existing Listen consumer or internal dependency; contract completed in web closure; broader native/AT validation remains separate",
+      "storyId": "components-entitymenus",
+      "story": "tools/crate-ui-showcase/stories/EntityMenus.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/EntityMenus.mdx",
+      "sources": [
+        "app/shared/ui/domain/entity/useEntityMenu.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/entity/useEntityMenu.tsx": "37b351b8fe5d716643cc7d6e6bfda63aa52173fcd228d920ed51455c57db99e2",
+        "tools/crate-ui-showcase/stories/EntityMenus.stories.tsx": "7380fa7f454952882853e1c33647e277ced02f34fa6178c14b4d42f73f8b319f",
+        "tools/crate-ui-showcase/docs/EntityMenus.mdx": "d7eb4ceecd501caa90be0a75ddb8d38fe5ec915d7a53b790b6bfcd1a2ea3bed9"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "domain-filters-filterbar",
+      "name": "FilterBar",
+      "purpose": "Responsive filter composition with optional caption-aware bottom alignment.",
+      "coverage": "documented",
+      "adoption": "Listen liked collection opts into bottom alignment; existing consumers retain default center alignment",
+      "storyId": "components-filterbar",
+      "story": "tools/crate-ui-showcase/stories/FilterBar.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/FilterBar.mdx",
+      "sources": [
+        "app/shared/ui/domain/filters/FilterBar.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/filters/FilterBar.tsx": "d1e1187be06b63a79a486b9f7385af7748af463d85ca81d9fe93d3328affe191",
+        "tools/crate-ui-showcase/stories/FilterBar.stories.tsx": "8507b99445b34ee74e81a2abafc515f3052df560539ace71373dcf66e7a074c1",
+        "tools/crate-ui-showcase/docs/FilterBar.mdx": "cf9c3b2031cc5ffd39f5a8ec766fbf375bda073dc3d76b423100f7fbc84763ed"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "domain-hero-heroactionbar",
+      "name": "HeroActionBar",
+      "purpose": "Playback primary actions, contextual secondary controls and optional menu.",
+      "coverage": "documented",
+      "adoption": "Partial; 1AU reference consumers only, broader adoption and platform QA pending",
+      "storyId": "components-heroactionbar",
+      "story": "tools/crate-ui-showcase/stories/HeroActionBar.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/HeroActionBar.mdx",
+      "sources": [
+        "app/shared/ui/domain/hero/HeroActionBar.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/hero/HeroActionBar.tsx": "fc4c5b94428fde13b09911de7346c5a76b766eb5de37e58a23cffa574f4f4cbb",
+        "tools/crate-ui-showcase/stories/HeroActionBar.stories.tsx": "257fc4a5f6fe7b1d8bae249c89b74e2d89cf1ef3dc5b0948bf5e7da0f0041c28",
+        "tools/crate-ui-showcase/docs/HeroActionBar.mdx": "2aa834213445371f5a639331c508dc0292a0ff61f52841ab5004972ee12ddb3b"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "domain-hero-pagehero",
+      "name": "PageHero",
+      "purpose": "Media, artist, editorial and card hero identity with injected artwork/actions.",
+      "coverage": "documented",
+      "adoption": "Partial; 1AU reference consumers only, broader adoption and platform QA pending",
+      "storyId": "components-pagehero",
+      "story": "tools/crate-ui-showcase/stories/PageHero.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/PageHero.mdx",
+      "sources": [
+        "app/shared/ui/domain/hero/PageHero.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/hero/PageHero.tsx": "aa57915ab95ae58645fac9c02d5c684e630159d6d5f3ab1262a3743fb3740e7e",
+        "tools/crate-ui-showcase/stories/PageHero.stories.tsx": "d38c9d7e81898c3e8fd7e450575076acc149606aa9a0dae34ebc95b1fee21fc4",
+        "tools/crate-ui-showcase/docs/PageHero.mdx": "8c0f61b28a7a8e76e810aa39472b20e8c9cf42d7d90ffd3d20396c0ea7a9c46b"
+      },
+      "category": "Layout"
+    },
+    {
+      "id": "domain-lists-emptystate",
+      "name": "EmptyState",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "documented",
+      "adoption": "Existing Listen consumer or internal dependency; contract completed in web closure; broader native/AT validation remains separate",
+      "storyId": "components-emptystate",
+      "story": "tools/crate-ui-showcase/stories/EmptyState.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/EmptyState.mdx",
+      "sources": [
+        "app/shared/ui/domain/lists/EmptyState.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/lists/EmptyState.tsx": "f988e92499164aa02ab5a46f08c84b0934fc91aef4d36873d8acadd782c5097d",
+        "tools/crate-ui-showcase/stories/EmptyState.stories.tsx": "54c2634a1b609313c9bae83514d774a480168cf2e753cf2ea0411e16c7372e82",
+        "tools/crate-ui-showcase/docs/EmptyState.mdx": "94693118a8cd0354fe8ab1ed9a641223091b1a74267e7e4dba5618e201acba63"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "domain-lists-mediagrid",
+      "name": "MediaGrid",
+      "purpose": "Responsive geometry for loaded media and reserved skeletons.",
+      "coverage": "documented",
+      "adoption": "Initial Listen consumers; no direct Admin imports of existing module; wider adoption/QA pending (1AW)",
+      "storyId": "components-mediagrid",
+      "story": "tools/crate-ui-showcase/stories/MediaGrid.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/MediaGrid.mdx",
+      "sources": [
+        "app/shared/ui/domain/lists/MediaGrid.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/lists/MediaGrid.tsx": "eccf83128ff9d39df54e876fbd03ca90903293894f4fd78fb1b95955e8fd5fc5",
+        "tools/crate-ui-showcase/stories/MediaGrid.stories.tsx": "e0065c9085f94cde858b4796de0894dca7e1eb87ba30c94cc5c842bfa4332f22",
+        "tools/crate-ui-showcase/docs/MediaGrid.mdx": "2ea5e73514e9e2c8481cd3385f7473fa231212d063b273452879d513600a8bc3"
+      },
+      "category": "Layout"
+    },
+    {
+      "id": "domain-lists-mediarail",
+      "name": "MediaRail",
+      "purpose": "Scrollable media sequence with content and column fits.",
+      "coverage": "documented",
+      "adoption": "Initial Listen consumers; no direct Admin imports of existing module; wider adoption/QA pending (1AW)",
+      "storyId": "components-mediarail",
+      "story": "tools/crate-ui-showcase/stories/MediaRail.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/MediaRail.mdx",
+      "sources": [
+        "app/shared/ui/domain/lists/MediaRail.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/lists/MediaRail.tsx": "5112502d1eb28fb1e25482bc540548725e25de34df91c0518382c5a76705b191",
+        "tools/crate-ui-showcase/stories/MediaRail.stories.tsx": "507258c8ecbadb2c7854e70ff9ac40f8590741c40ffa714f9c64add404f0cefd",
+        "tools/crate-ui-showcase/docs/MediaRail.mdx": "742a86cc9b518d672e4415dcc77f52862dc59cb18b6438bb0d6b561ab5a92ebf"
+      },
+      "category": "Layout"
+    },
+    {
+      "id": "domain-lists-sectionheader",
+      "name": "SectionHeader",
+      "purpose": "Content-section heading, optional context/count and text action.",
+      "coverage": "documented",
+      "adoption": "Partial; 1AU reference consumers only, broader adoption and platform QA pending",
+      "storyId": "components-sectionheader",
+      "story": "tools/crate-ui-showcase/stories/SectionHeader.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/SectionHeader.mdx",
+      "sources": [
+        "app/shared/ui/domain/lists/SectionHeader.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/lists/SectionHeader.tsx": "a823275b7ece209edaa1c12c8f0d6d03662ee8596e765f9b4418318d6fbde62a",
+        "tools/crate-ui-showcase/stories/SectionHeader.stories.tsx": "7286d1e658f150989ad476d877ec0801cb6273cecd9b5bfcd7197e9bfbce5425",
+        "tools/crate-ui-showcase/docs/SectionHeader.mdx": "16c994b80828f525bed044c13dc577dc170480e29b8cf35caf909161eac2dc77"
+      },
+      "category": "Layout"
+    },
+    {
+      "id": "domain-media-mediacover",
+      "name": "MediaCover",
+      "purpose": "Media image frame, technical fallback and optional managed image renderer.",
+      "coverage": "documented",
+      "adoption": "Shared48px minimum; Listen managed transport preserved and legacy music thumbnails in both apps aligned (1AW). Broader frame adoption/native QA pending.",
+      "storyId": "components-mediacover",
+      "story": "tools/crate-ui-showcase/stories/MediaCover.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/MediaCover.mdx",
+      "sources": [
+        "app/shared/ui/domain/media/MediaCover.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/media/MediaCover.tsx": "7c0e60fcbb0f0a3826f0ccbbf245a1e7712093c323c9d989c9739e73c78c9492",
+        "tools/crate-ui-showcase/stories/MediaCover.stories.tsx": "06775dc68a8e18501c05252c2ad3bb6d2ecbf13f3e3aa276c0ff84226ce23da6",
+        "tools/crate-ui-showcase/docs/MediaCover.mdx": "11a581c3a0e0c2e3daa1478810a88755ff7dad52e433e79586f5ccf41dcb277d"
+      },
+      "category": "Media"
+    },
+    {
+      "id": "domain-media-playbutton",
+      "name": "PlayButton",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "documented",
+      "adoption": "Existing Listen consumer or internal dependency; contract completed in web closure; broader native/AT validation remains separate",
+      "storyId": "components-playbutton",
+      "story": "tools/crate-ui-showcase/stories/PlayButton.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/PlayButton.mdx",
+      "sources": [
+        "app/shared/ui/domain/media/PlayButton.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/media/PlayButton.tsx": "e805efb1c7ac0b2bcc5d8f6b7530ec267aea1e4dac611e74bc3e28a2ccb1ac40",
+        "tools/crate-ui-showcase/stories/PlayButton.stories.tsx": "2a6799a08ccded59eb4941ff5931a277c49d2481a717aca9362746ee2ba95c8f",
+        "tools/crate-ui-showcase/docs/PlayButton.mdx": "ab69c1b26045bca78c7a685f86c12c217590c8384e1c6af5163d4c57f97187a7"
+      },
+      "category": "Media"
+    },
+    {
+      "id": "domain-navigation-backlink",
+      "name": "BackLink",
+      "purpose": "Native router navigation or callback Back control with preserved labels.",
+      "coverage": "documented",
+      "adoption": "Partial; 1AU reference consumers only, broader adoption and platform QA pending",
+      "storyId": "components-backlink",
+      "story": "tools/crate-ui-showcase/stories/BackLink.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/BackLink.mdx",
+      "sources": [
+        "app/shared/ui/domain/navigation/BackLink.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/navigation/BackLink.tsx": "ff7f5fb182bc4648501693a31f81067f8bd897b10b8de96aed712ab3ce0c8be7",
+        "tools/crate-ui-showcase/stories/BackLink.stories.tsx": "2f21da1d2ee3cb3926083db104f3b7c7b897ff76fdf19b6e185280f4b2f20d00",
+        "tools/crate-ui-showcase/docs/BackLink.mdx": "8d9b4f43935f6125268bd1bda98140b971153dc070d75bd8a89622f26853b9ac"
+      },
+      "category": "Navigation"
+    },
+    {
+      "id": "domain-navigation-pageheader",
+      "name": "PageHeader",
+      "purpose": "Ordinary page identity and shared container-aware header layout.",
+      "coverage": "documented",
+      "adoption": "Partial; 1AU reference consumers only, broader adoption and platform QA pending",
+      "storyId": "components-pageheader",
+      "story": "tools/crate-ui-showcase/stories/PageHeader.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/PageHeader.mdx",
+      "sources": [
+        "app/shared/ui/domain/navigation/PageHeader.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/navigation/PageHeader.tsx": "9474c48aa80b7cc6dd5641e99a8e84311b1bf6ca49f28e0522c6c73f6d35e68f",
+        "tools/crate-ui-showcase/stories/PageHeader.stories.tsx": "52db7c47c382316cd9678b900c11fc206a86983bb325d9620737206b27844ddd",
+        "tools/crate-ui-showcase/docs/PageHeader.mdx": "3e2e39800c6bfdc6480d8fdc2702d1956922c766bdb468e500fec4b7f880ee76"
+      },
+      "category": "Layout"
+    },
+    {
+      "id": "domain-navigation-searchbar",
+      "name": "SearchBar",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/navigation/SearchBar.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/navigation/SearchBar.tsx": "5ec43c77c0826ab0aba7c365437fcf4d5dcecdf814d5487081a1880886cd1707"
+      },
+      "category": "Navigation"
+    },
+    {
+      "id": "domain-player-eqbands",
+      "name": "EqBands",
+      "purpose": "Shared ten-band EQ instrument with compact mono gains, synchronized curve/handles and separate input/commit callbacks.",
+      "coverage": "documented",
+      "adoption": "Listen EQ and existing Admin GenreEqEditor; presentation reconciled in1BE.",
+      "storyId": "components-eqbands",
+      "story": "tools/crate-ui-showcase/stories/EqBands.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/EqBands.mdx",
+      "sources": [
+        "app/shared/ui/domain/player/EqBands.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/player/EqBands.tsx": "5dd1dda576174ff47d123a9a8ed5df9ce2bb099690a50ce499a8937522d5e7d0",
+        "tools/crate-ui-showcase/stories/EqBands.stories.tsx": "046b74d2018a20c40f72d39e15f756a1c4e9970b4ab5492361180855eac60676",
+        "tools/crate-ui-showcase/docs/EqBands.mdx": "1519a772633ed3734d52bf3136044b67b399c118a71ebd38931cdd95196056b0"
+      },
+      "category": "Media"
+    },
+    {
+      "id": "domain-playlists-playlistartwork",
+      "name": "PlaylistArtwork",
+      "purpose": "Playlist cover, unique-source collage and deterministic generated artwork.",
+      "coverage": "documented",
+      "adoption": "Initial Listen consumers and existing Admin consumers preserved; broader adoption/native QA pending (1AV)",
+      "storyId": "components-playlistartwork",
+      "story": "tools/crate-ui-showcase/stories/PlaylistArtwork.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/PlaylistArtwork.mdx",
+      "sources": [
+        "app/shared/ui/domain/playlists/PlaylistArtwork.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/playlists/PlaylistArtwork.tsx": "ab21047751ccd8641ec25385fa72062b17cd24b7f4f4ba6529ccc5363cac1b7e",
+        "tools/crate-ui-showcase/stories/PlaylistArtwork.stories.tsx": "655eaf43b3f26156faa6062b5b3ebc9e7cfd4d88bb627eddc8f9d6b35c666d0e",
+        "tools/crate-ui-showcase/docs/PlaylistArtwork.mdx": "6c5694d029ae1426002bcabeca4936b2e9575561a38be064f3c85b75db90389d"
+      },
+      "category": "Media"
+    },
+    {
+      "id": "domain-states-loadingstate",
+      "name": "LoadingState",
+      "purpose": "Reserved section geometry and delayed route loading feedback.",
+      "coverage": "documented",
+      "adoption": "Existing Listen and Admin consumers; focused1AX reconciliation, broader route/native/AT QA pending.",
+      "storyId": "components-loadingstate",
+      "story": "tools/crate-ui-showcase/stories/LoadingState.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/LoadingState.mdx",
+      "sources": [
+        "app/shared/ui/domain/states/LoadingState.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/states/LoadingState.tsx": "4901e202a0dc208ed99b2fcdcdf882578e796129c5d3c9ab7b6d03785caff54c",
+        "tools/crate-ui-showcase/stories/LoadingState.stories.tsx": "0ad31fe4ab8578d4521becb12cf31016b8e80980fb73e5f9b4f7e0c07143d9a7",
+        "tools/crate-ui-showcase/docs/LoadingState.mdx": "c0518620777c5bf88ddf70c7c0c3f7dcbd5672dbe125c6d8d65a42e9bd3004ef"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "domain-tracks-tracklist",
+      "name": "TrackList",
+      "purpose": "Stable-key track collection with injected virtualization.",
+      "coverage": "documented",
+      "adoption": "Initial Listen consumers; no direct Admin imports of existing module; wider adoption/QA pending (1AW)",
+      "storyId": "components-tracklist",
+      "story": "tools/crate-ui-showcase/stories/TrackList.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/TrackList.mdx",
+      "sources": [
+        "app/shared/ui/domain/tracks/TrackList.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/tracks/TrackList.tsx": "b42f47c80ffbc139a05a22971fcdb0ba38e431cfe14899626292e1388da3dda7",
+        "tools/crate-ui-showcase/stories/TrackList.stories.tsx": "ac0e0452eb56fbcb220b718a22088e3b112697216923ab6da2a231cae7dc9368",
+        "tools/crate-ui-showcase/docs/TrackList.mdx": "fb0aacd254daa883a5afc259edd9d922b0c19ca825b78159fe2af8bbddb85f8e"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "domain-user-usermenu",
+      "name": "UserMenu",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/domain/user/UserMenu.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/user/UserMenu.tsx": "155f5da051a5ce5f97ff2db837c5f6292b1c9b155bb646b4f8485a11515a31e5"
+      },
+      "category": "Navigation"
+    },
+    {
+      "id": "primitives-actioniconbutton",
+      "name": "ActionIconButton",
+      "purpose": "Compatibility controls used by existing entity rows and artwork cards.",
+      "coverage": "documented",
+      "adoption": "Legacy row/card callers remain in both apps; conversion is consumer-by-consumer with no new copies.",
+      "storyId": "components-actioniconbutton",
+      "story": "tools/crate-ui-showcase/stories/ActionIconButton.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/ActionIconButton.mdx",
+      "sources": [
+        "app/shared/ui/primitives/ActionIconButton.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/ActionIconButton.tsx": "87b775ae04bf9fb5deea8e1c039adc51a3fc52e4ffd36750317548a48088dd6c",
+        "tools/crate-ui-showcase/stories/ActionIconButton.stories.tsx": "7cbf47778c776971593a740546a9f59127b95b6fe6de34b9b020ba515e88c7c9",
+        "tools/crate-ui-showcase/docs/ActionIconButton.mdx": "50106dd84b00f5c5ecb09cb35e6b557480202d0ef03382a350340cbec305c678"
+      },
+      "category": "Compatibility"
+    },
+    {
+      "id": "primitives-apperrorboundary",
+      "name": "AppErrorBoundary",
+      "purpose": "Render failure reporting with canonical error presentation and reset.",
+      "coverage": "documented",
+      "adoption": "Existing Listen and Admin consumers; focused1AX reconciliation, broader route/native/AT QA pending.",
+      "storyId": "components-apperrorboundary",
+      "story": "tools/crate-ui-showcase/stories/AppErrorBoundary.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/AppErrorBoundary.mdx",
+      "sources": [
+        "app/shared/ui/primitives/AppErrorBoundary.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/AppErrorBoundary.tsx": "634d14c0bf2d571b86721b456417c42646311d2e06dffc40df47f9dcd133b096",
+        "tools/crate-ui-showcase/stories/AppErrorBoundary.stories.tsx": "00e2db2ffbe19fbeaf336a4316674ebbafc194f12fa8b90e56ea8cb4ec2b09e4",
+        "tools/crate-ui-showcase/docs/AppErrorBoundary.mdx": "03f7947952bc136a82e99ebc92518f84bbd7058108b621601ad112d5a56a65fb"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "primitives-appmodal",
+      "name": "AppModal",
+      "purpose": "A shared modal facade with native labels, focus, scroll ownership and mobile drag.",
+      "coverage": "documented",
+      "adoption": "Existing Listen and Admin consumers; focused1AX reconciliation, broader route/native/AT QA pending.",
+      "storyId": "components-appmodal",
+      "story": "tools/crate-ui-showcase/stories/AppModal.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/AppModal.mdx",
+      "sources": [
+        "app/shared/ui/primitives/AppModal.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/AppModal.tsx": "4dbee270e9e64a72a4832dd56e913f778410d50d2031f0fae19f7caf4384a3a4",
+        "tools/crate-ui-showcase/stories/AppModal.stories.tsx": "d9d6908f2734b735bc53f00774b46a2c27bc62b6c2dce3d5b215a77d29b742ac",
+        "tools/crate-ui-showcase/docs/AppModal.mdx": "fb5cfd2e3410b005f1ffce9a949100ccef85f06a3a8fb0695e03a8c920c43ea4"
+      },
+      "category": "Overlays"
+    },
+    {
+      "id": "primitives-apppopover",
+      "name": "AppPopover",
+      "purpose": "The shared solid floating surface and menu-row recipe.",
+      "coverage": "documented",
+      "adoption": "Existing Listen and Admin consumers; focused1AX reconciliation, broader route/native/AT QA pending.",
+      "storyId": "components-apppopover",
+      "story": "tools/crate-ui-showcase/stories/AppPopover.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/AppPopover.mdx",
+      "sources": [
+        "app/shared/ui/primitives/AppPopover.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/AppPopover.tsx": "bfa0ca2e9f19093db1ab499f3c7203201e41611d4b8d418136f4c15079dae97f",
+        "tools/crate-ui-showcase/stories/AppPopover.stories.tsx": "82437e3d079ed83e705c1b9fecef976049a04b34ea1b25df6937cf250a2f10c4",
+        "tools/crate-ui-showcase/docs/AppPopover.mdx": "3910b4b966fb5119bb246b6ff83d22afde115645fafe67798b8e83eb4f9c6fb9"
+      },
+      "category": "Overlays"
+    },
+    {
+      "id": "primitives-avatar",
+      "name": "Avatar",
+      "purpose": "Person identity with a fixed frame, image renderer and initials fallback.",
+      "coverage": "documented",
+      "adoption": "Initial Listen consumers and existing Admin consumers preserved; broader adoption/native QA pending (1AV)",
+      "storyId": "components-avatar",
+      "story": "tools/crate-ui-showcase/stories/Avatar.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Avatar.mdx",
+      "sources": [
+        "app/shared/ui/primitives/Avatar.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/Avatar.tsx": "1edb4c976ea474b00bf490cfc717bb532d98e60e72929c0a6d48ddb0d06905bc",
+        "tools/crate-ui-showcase/stories/Avatar.stories.tsx": "4e5498d54e8b83a2564d56a2085e3cc4c6fd7bf33440fb359661bed9bb4d7fcc",
+        "tools/crate-ui-showcase/docs/Avatar.mdx": "79713de10362840d5e6f4c75460f2e5a7d0ea56a8add502270caae509f952c44"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "primitives-checkbox",
+      "name": "Checkbox",
+      "purpose": "Shared Checkbox form component; contract, states and keyboard examples.",
+      "coverage": "documented",
+      "adoption": "Both apps have existing consumers; consumer/platform validation remains scoped",
+      "storyId": "components-checkbox",
+      "story": "tools/crate-ui-showcase/stories/Checkbox.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Checkbox.mdx",
+      "sources": [
+        "app/shared/ui/primitives/Checkbox.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/Checkbox.tsx": "03bc2f309205498755dc2af7f81e23dcbe267f1755b1b0229a670c6fa0fbf416",
+        "tools/crate-ui-showcase/stories/Checkbox.stories.tsx": "fd50b9cd8856f3f9a687eb0eca05264d9ee42bc3c1a9652f5fc28668e29b4496",
+        "tools/crate-ui-showcase/docs/Checkbox.mdx": "0ab70ef9270c04f69cffb0df0fc803b75ba3ccf542ab0c45e1e87207ea8ae2bf"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "primitives-errorstate",
+      "name": "ErrorState",
+      "purpose": "Shared compact and page error, unavailable and missing states.",
+      "coverage": "documented",
+      "adoption": "Existing Listen and Admin consumers; focused1AX reconciliation, broader route/native/AT QA pending.",
+      "storyId": "components-errorstate",
+      "story": "tools/crate-ui-showcase/stories/ErrorState.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/ErrorState.mdx",
+      "sources": [
+        "app/shared/ui/primitives/ErrorState.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/ErrorState.tsx": "91510d21eb0d4369010bae9d171d70292d6027017bb8fb07793fb7066f831b4a",
+        "tools/crate-ui-showcase/stories/ErrorState.stories.tsx": "5845cc60ae75f5f318c68602d48ec4b53883f47bfce38508f1cf4268b999c108",
+        "tools/crate-ui-showcase/docs/ErrorState.mdx": "fc29205aa1dd6291277a4d64abf9f3be5fbfcdba7780235c4c1ba58ee5cc7b3c"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "primitives-followheartbutton",
+      "name": "FollowHeartButton",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "documented",
+      "adoption": "Existing Listen consumer or internal dependency; contract completed in web closure; broader native/AT validation remains separate",
+      "storyId": "components-followheartbutton",
+      "story": "tools/crate-ui-showcase/stories/FollowHeartButton.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/FollowHeartButton.mdx",
+      "sources": [
+        "app/shared/ui/primitives/FollowHeartButton.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/FollowHeartButton.tsx": "f71187ddb4ddf18871abf0234b4bd5acaa7b9c5d0f2d84fef9bbb38a168ac888",
+        "tools/crate-ui-showcase/stories/FollowHeartButton.stories.tsx": "7612fcbfa5539879225c843f93bb85c100a63e6098e918db7d41bdd39c9c2ea4",
+        "tools/crate-ui-showcase/docs/FollowHeartButton.mdx": "f2bbb18418999d9438b93db8d901f0d97b21aba64e9ba3076b8ef26db59df4d4"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "primitives-formfield",
+      "name": "FormField",
+      "purpose": "Field caption, control association, help, error and stacked/inline layout.",
+      "coverage": "documented",
+      "adoption": "Listen forms and Admin playlist identity fields; full page adoption remains pending",
+      "storyId": "components-formfield",
+      "story": "tools/crate-ui-showcase/stories/FormField.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/FormField.mdx",
+      "sources": [
+        "app/shared/ui/primitives/FormField.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/FormField.tsx": "51219738a5841395e79e9152fe3be4d419aa6c5b05f79baa78bccc463b1deced",
+        "tools/crate-ui-showcase/stories/FormField.stories.tsx": "d8d83921dff37e4e94fd92b81a89593ef12bb3866252f2aa9a8618769befeacc",
+        "tools/crate-ui-showcase/docs/FormField.mdx": "c57c007f82c5fc69cec7e8eebd2b3e4446f62c0798a7b7ddba7d6e7e88c43a59"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "primitives-iconbutton",
+      "name": "IconButton",
+      "purpose": "Compact round controls with semantic default/primary/danger tones, icon-only accessible label and native title.",
+      "coverage": "documented",
+      "adoption": "Existing compact controls in both apps; real coarse target validated in the isolated scene. No broad consumer restyle.",
+      "storyId": "components-iconbutton",
+      "story": "tools/crate-ui-showcase/stories/IconButton.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/IconButton.mdx",
+      "sources": [
+        "app/shared/ui/primitives/IconButton.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/IconButton.tsx": "0648e313d1be64b9ec4885554f72aba2799b2c39f7b60570d063dbc1cea0671b",
+        "tools/crate-ui-showcase/stories/IconButton.stories.tsx": "fa5b753316190d36e8fc82f2c64c7d39d9517a57490e1116cc66beebd0e18d31",
+        "tools/crate-ui-showcase/docs/IconButton.mdx": "13bae5520b262156c59ba493d09dd3a03ccdd949703029a69f3f8b02e444762a"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "primitives-imagelightbox",
+      "name": "ImageLightbox",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/ImageLightbox.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/ImageLightbox.tsx": "025fb97ea116368e428f04b2840aa8f575c1426cb82e17e601f04e185edf0284"
+      },
+      "category": "Overlays"
+    },
+    {
+      "id": "primitives-instrumentpanel",
+      "name": "InstrumentPanel",
+      "purpose": "Ruled unfilled figure or section, shared label, metadata, status, description and actions.",
+      "coverage": "documented",
+      "adoption": "Card is the existing object foundation; InstrumentPanel used by Listen Section and Admin OpsPanel. Wider page adoption remains scoped.",
+      "storyId": "components-instrumentpanel",
+      "story": "tools/crate-ui-showcase/stories/InstrumentPanel.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/InstrumentPanel.mdx",
+      "sources": [
+        "app/shared/ui/primitives/InstrumentPanel.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/InstrumentPanel.tsx": "005183206ff20fdceea32d5399203fe2901ea96d1bc4148a24b701cfbf9e5e09",
+        "tools/crate-ui-showcase/stories/InstrumentPanel.stories.tsx": "36a17d80daaa2948fe2fed7838ef9cafeecf57c0db15d06d96bbb69a839105be",
+        "tools/crate-ui-showcase/docs/InstrumentPanel.mdx": "77571727a0b3cf83ef12e806dbb89f6a7a6cf058131c14b56ec79c6f7f7ca934"
+      },
+      "category": "Layout"
+    },
+    {
+      "id": "primitives-meter",
+      "name": "Meter",
+      "purpose": "Readonly ranged quantity with MonoLabel caption, bounded track and an unbroken formatted reading.",
+      "coverage": "documented",
+      "adoption": "Listen Offline/Stats and Admin SystemHealth; visual amendment awaiting review",
+      "storyId": "components-meter",
+      "story": "tools/crate-ui-showcase/stories/Meter.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Meter.mdx",
+      "sources": [
+        "app/shared/ui/primitives/Meter.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/Meter.tsx": "370101f0ea9726aa05de69d9c1fd2f0bf8ed93453e42ea39e77d9dcfbc64f69e",
+        "tools/crate-ui-showcase/stories/Meter.stories.tsx": "249188680dbac43dbda995806f18b0dcdde7a01adcdb0ff0fcb70a2d204d99e8",
+        "tools/crate-ui-showcase/docs/Meter.mdx": "ec739f09da9d137832d057e97e66c8863224317166eb8522cf0f91aa9340a7a1"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "primitives-progresshairline",
+      "name": "ProgressHairline",
+      "purpose": "Named one-pixel ratio progress with bounded values and visibility/motion-gated indeterminate feedback.",
+      "coverage": "documented",
+      "adoption": "Existing Listen consumer or internal dependency; contract completed in web closure; broader native/AT validation remains separate",
+      "storyId": "components-progresshairline",
+      "story": "tools/crate-ui-showcase/stories/ProgressHairline.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/ProgressHairline.mdx",
+      "sources": [
+        "app/shared/ui/primitives/ProgressHairline.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/ProgressHairline.tsx": "1522d9187914b9338a119b59588dc731d0e9077b4cc3c3170c5b44c048947639",
+        "tools/crate-ui-showcase/stories/ProgressHairline.stories.tsx": "c5b9a8736a0371f2cd439eea491da318b1d106d9b97b2f9575096bd3a75ffcf4",
+        "tools/crate-ui-showcase/docs/ProgressHairline.mdx": "ed725457173efd3102b02c59446dcc4d9cc91372784bab5e326d2566367d3131"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "primitives-pullindicator",
+      "name": "PullIndicator",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "documented",
+      "adoption": "Existing Listen consumer or internal dependency; contract completed in web closure; broader native/AT validation remains separate",
+      "storyId": "components-pullindicator",
+      "story": "tools/crate-ui-showcase/stories/PullIndicator.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/PullIndicator.mdx",
+      "sources": [
+        "app/shared/ui/primitives/PullIndicator.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/PullIndicator.tsx": "0194384bbf1b1048981be52fc979db1f4d7df8cfaab6bf8fa897c8be9157692d",
+        "tools/crate-ui-showcase/stories/PullIndicator.stories.tsx": "5c7a30eed0e02c0570ef502021a87f8a1b44b181c40f49cfb8605aaeab9b5c13",
+        "tools/crate-ui-showcase/docs/PullIndicator.mdx": "cb830a7e074692cfcedac3135c6082e99a77e585830a2053dc57ba3335c899f1"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "primitives-qrcodeimage",
+      "name": "QrCodeImage",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/QrCodeImage.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/QrCodeImage.tsx": "b03cc9ff44cac888772168dc32ce7988a95a70076304871f5aec917988b22b42"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "primitives-radiogroup",
+      "name": "RadioGroup",
+      "purpose": "Shared RadioGroup form component; contract, states and keyboard examples.",
+      "coverage": "documented",
+      "adoption": "Existing Listen consumers; direct Admin adoption pending",
+      "storyId": "components-radiogroup",
+      "story": "tools/crate-ui-showcase/stories/RadioGroup.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/RadioGroup.mdx",
+      "sources": [
+        "app/shared/ui/primitives/RadioGroup.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/RadioGroup.tsx": "25ea47560430742f51ab7aed77d51d4b135001f8dddd40aa26e26997916c4c4f",
+        "tools/crate-ui-showcase/stories/RadioGroup.stories.tsx": "b6bda01d491dbd1b29a4b90cf0e654d02b8d24e91a2fa2864ec2725d697432d9",
+        "tools/crate-ui-showcase/docs/RadioGroup.mdx": "40baefb61d35586f73db0686e6c878f6223a52dd8150a3ac7d97c505f6358422"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "primitives-readout",
+      "name": "Readout",
+      "purpose": "Contextual Mono reading with a separate committed announcement.",
+      "coverage": "documented",
+      "adoption": "Both apps have existing consumers; consumer/platform validation remains scoped",
+      "storyId": "components-readout",
+      "story": "tools/crate-ui-showcase/stories/Readout.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Readout.mdx",
+      "sources": [
+        "app/shared/ui/primitives/Readout.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/Readout.tsx": "877a73be30722a3096f74460d86485949807626dddf57ce07b0b14c20ff60a9f",
+        "tools/crate-ui-showcase/stories/Readout.stories.tsx": "4f9a168ec50ded5ca454e6669b3bed177d788ecf6ea78c04d71185d22ec0670b",
+        "tools/crate-ui-showcase/docs/Readout.mdx": "65e695b1809c729070e2306be2934e744d2006ebca1815adaedd273ec950035c"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "primitives-searchinput",
+      "name": "SearchInput",
+      "purpose": "Shared SearchInput form component; contract, states and keyboard examples.",
+      "coverage": "documented",
+      "adoption": "Both apps have existing consumers; consumer/platform validation remains scoped",
+      "storyId": "components-searchinput",
+      "story": "tools/crate-ui-showcase/stories/SearchInput.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/SearchInput.mdx",
+      "sources": [
+        "app/shared/ui/primitives/SearchInput.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/SearchInput.tsx": "1364ee39f4e2e9ce2329a2a7aeb3e8d9d245a9d774e956e35572c34593217a66",
+        "tools/crate-ui-showcase/stories/SearchInput.stories.tsx": "eaf42c873df434baa911eabd627c379523fa513821e819839fb055c00fe53005",
+        "tools/crate-ui-showcase/docs/SearchInput.mdx": "593c0c43eaa3b31bbecc22b8ad4b3dfb20390c49abe0a11a78ad5f24ae709316"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "primitives-skiplink",
+      "name": "SkipLink",
+      "purpose": "The first keyboard stop into the app main landmark.",
+      "coverage": "documented",
+      "adoption": "Existing Listen and Admin consumers; focused1AX reconciliation, broader route/native/AT QA pending.",
+      "storyId": "components-skiplink",
+      "story": "tools/crate-ui-showcase/stories/SkipLink.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/SkipLink.mdx",
+      "sources": [
+        "app/shared/ui/primitives/SkipLink.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/SkipLink.tsx": "1da215bcfa8015b04bab0968ef8dbd9876684a44e0c59224c1db4c3c4d6c7e5a",
+        "tools/crate-ui-showcase/stories/SkipLink.stories.tsx": "616c994f2f7028f2d929d668b6bc34c3239a10a0c5628642d759f8ac6697a22c",
+        "tools/crate-ui-showcase/docs/SkipLink.mdx": "4f86b57309ad96c340c189cd07eeb78287fc862953019ebe0d86f771f3eae088"
+      },
+      "category": "Navigation"
+    },
+    {
+      "id": "primitives-spinner",
+      "name": "Spinner",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/Spinner.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/Spinner.tsx": "392a91bd66b079bbd63681ddb487e288abd613d13eaff68c3347e5d006443973"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "primitives-starrating",
+      "name": "StarRating",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/primitives/StarRating.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/StarRating.tsx": "0e3857752a818b31338e83b734e8f332637503b0d83ff0439df205950ffd7984"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "primitives-switch",
+      "name": "Switch",
+      "purpose": "Shared Switch form component; contract, states and keyboard examples.",
+      "coverage": "documented",
+      "adoption": "Both apps have existing consumers; consumer/platform validation remains scoped",
+      "storyId": "components-switch",
+      "story": "tools/crate-ui-showcase/stories/Switch.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Switch.mdx",
+      "sources": [
+        "app/shared/ui/primitives/Switch.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/Switch.tsx": "5492add00fc089bfa8f92b0f32b4dc65c4d6e083064671f86285713ee25d1f9b",
+        "tools/crate-ui-showcase/stories/Switch.stories.tsx": "d62bcec0b12e968f9f349e78c8e66fec662246320d7ff0a4a164dcac2cc254aa",
+        "tools/crate-ui-showcase/docs/Switch.mdx": "b302c51f4fd0d894e92f586b5ae25b685a8b456a2762ee147664e534878171e3"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "primitives-vtnavlink",
+      "name": "VtNavLink",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "documented",
+      "adoption": "Existing Listen consumer or internal dependency; contract completed in web closure; broader native/AT validation remains separate",
+      "storyId": "components-vtnavlink",
+      "story": "tools/crate-ui-showcase/stories/VtNavLink.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/VtNavLink.mdx",
+      "sources": [
+        "app/shared/ui/primitives/VtNavLink.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/VtNavLink.tsx": "f00774a4abefb0429396cedf6a44e691baf4484733fa2613485892310d6b0449",
+        "tools/crate-ui-showcase/stories/VtNavLink.stories.tsx": "01d804a2ad0fd5126c398568cf3a461b3cc24774cf86452ac762fd028041b06b",
+        "tools/crate-ui-showcase/docs/VtNavLink.mdx": "a2c1aa54432ad6ad7f2981cbe08e782e8e37540add914bd043a6fdf6e4a8bb9d"
+      },
+      "category": "Navigation"
+    },
+    {
+      "id": "shadcn-alert-dialog",
+      "name": "alert-dialog",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/alert-dialog.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/alert-dialog.tsx": "137c968dad89d882a02582b0a868c3d7b31ba19b9c9fe42978f82ac9a13d6ec6"
+      },
+      "category": "Overlays"
+    },
+    {
+      "id": "shadcn-button",
+      "name": "Button",
+      "purpose": "Text actions, explicit confirmation and semantic native links.",
+      "coverage": "documented",
+      "adoption": "Existing foundation in both apps; disabled/link and coarse-target contracts validated in affected consumers. Broader page QA remains pending.",
+      "storyId": "components-button",
+      "story": "tools/crate-ui-showcase/stories/Button.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Button.mdx",
+      "sources": [
+        "app/shared/ui/shadcn/button.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/button.tsx": "88d84480c1d35e271d578359f35a9b856978aab3b14e2c52bd8303a53bdcd776",
+        "tools/crate-ui-showcase/stories/Button.stories.tsx": "ee5f574a9acb915b8cf05153c7e4e3ea526464f359b6393fe5411f828b20a5ac",
+        "tools/crate-ui-showcase/docs/Button.mdx": "20c76aa5eb1559fea73b9aa196d89ea63f91c107aa199e9f6118df938d767c6b"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "shadcn-card",
+      "name": "Card",
+      "purpose": "Standalone object, solid surface and complete native card slots.",
+      "coverage": "documented",
+      "adoption": "Card is the existing object foundation; InstrumentPanel used by Listen Section and Admin OpsPanel. Wider page adoption remains scoped.",
+      "storyId": "components-card",
+      "story": "tools/crate-ui-showcase/stories/Card.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Card.mdx",
+      "sources": [
+        "app/shared/ui/shadcn/card.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/card.tsx": "9d3427f06657fc9edcbb058cea1073eb60fb5b15637ba9ee1a37633131a87896",
+        "tools/crate-ui-showcase/stories/Card.stories.tsx": "56fcde94f7b0f072fef249f7177a51be0351a42107eba67f08fd7642ff7c4400",
+        "tools/crate-ui-showcase/docs/Card.mdx": "6010780dd42f74b2bb4090998c4c247f15cff9b3b4772440cf7c2f85be93e5df"
+      },
+      "category": "Layout"
+    },
+    {
+      "id": "shadcn-context-menu",
+      "name": "context-menu",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/context-menu.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/context-menu.tsx": "dcd1c0f58dd99aa4116d2afdfb00e7de796e80a31abaf3e49783d3cb70893d65"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "shadcn-dialog",
+      "name": "dialog",
+      "purpose": "Radix dialog on the shared overlay recipe with a size scale from sm to 3xl.",
+      "coverage": "documented",
+      "adoption": "Admin dialogs (22 call sites) choose a size; Listen uses AppModal",
+      "storyId": "components-dialog",
+      "story": "tools/crate-ui-showcase/stories/Dialog.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Dialog.mdx",
+      "sources": [
+        "app/shared/ui/shadcn/dialog.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/dialog.tsx": "dacbbe371422a037b461f828818801433656987086356a14062d77fc166ca28b",
+        "tools/crate-ui-showcase/stories/Dialog.stories.tsx": "f7c5bcb5b43f9babf676e335f4b85c8f9411b5e5a5142d122d95c0f1a697eff4",
+        "tools/crate-ui-showcase/docs/Dialog.mdx": "bfc2b61c5d69d19a196d132e3c49e01bf39c01a4206e8f067fea5d2e3d1ac1e5"
+      },
+      "category": "Overlays"
+    },
+    {
+      "id": "shadcn-dropdown-menu",
+      "name": "dropdown-menu",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/dropdown-menu.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/dropdown-menu.tsx": "af0580f335f81f07039f41811d388bed80854fa786e26de53f42775287c201dd"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "shadcn-input",
+      "name": "Input",
+      "purpose": "Shared Input form component; contract, states and keyboard examples.",
+      "coverage": "documented",
+      "adoption": "Both apps have existing consumers; consumer/platform validation remains scoped",
+      "storyId": "components-input",
+      "story": "tools/crate-ui-showcase/stories/Input.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Input.mdx",
+      "sources": [
+        "app/shared/ui/shadcn/input.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/input.tsx": "0d737c667aa74218feec48ed0d0eeab51c7837a8e100f6a4a51488bfc6d7fcda",
+        "tools/crate-ui-showcase/stories/Input.stories.tsx": "cd1f45b1440a588c2fe953ee4ea018c48fc3cd4f97c53e8097756d9c0a759c81",
+        "tools/crate-ui-showcase/docs/Input.mdx": "cf2767cabc9bbdc3c46ffba063e26f7ff2876a107ea75f052be3197dea53bff7"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "shadcn-overlay-close-button",
+      "name": "overlay-close-button",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "documented",
+      "adoption": "Existing Listen consumer or internal dependency; contract completed in web closure; broader native/AT validation remains separate",
+      "storyId": "components-overlayclosebutton",
+      "story": "tools/crate-ui-showcase/stories/OverlayCloseButton.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/OverlayCloseButton.mdx",
+      "sources": [
+        "app/shared/ui/shadcn/overlay-close-button.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/overlay-close-button.tsx": "70b2c93d2d3c6c9006e0909fbc6b4a59e7335c06dadd8b0688779ee5439588dc",
+        "tools/crate-ui-showcase/stories/OverlayCloseButton.stories.tsx": "d1a726c5edfa6d20871c3eef99ab199c07078e65989586797224ef57788de7a4",
+        "tools/crate-ui-showcase/docs/OverlayCloseButton.mdx": "021787445766638bf1a4d30413835b972d150b6877590d8ff516737e8939b757"
+      },
+      "category": "Actions"
+    },
+    {
+      "id": "shadcn-popover",
+      "name": "popover",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/popover.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/popover.tsx": "4773a27453e4129c3203f5ae2b1beb47ee4594b28c75443371b660bc92900ee8"
+      },
+      "category": "Overlays"
+    },
+    {
+      "id": "shadcn-progress",
+      "name": "Progress",
+      "purpose": "Radix numeric progress facade with native range/state semantics and a one-pixel default rail.",
+      "coverage": "documented",
+      "adoption": "Existing facade used by both apps; contract documented, wider consumer scale/geometry audit remains separate",
+      "storyId": "components-progress",
+      "story": "tools/crate-ui-showcase/stories/Progress.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Progress.mdx",
+      "sources": [
+        "app/shared/ui/shadcn/progress.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/progress.tsx": "e86c589123477c5849f6baeeb110e42830fd5a1c0bbf55c103a5ef873222bed8",
+        "tools/crate-ui-showcase/stories/Progress.stories.tsx": "2bcab167cb68c11a5aa5fd98aa5aeb9ff0954f4488f4f87ac4a4aa7b3becb648",
+        "tools/crate-ui-showcase/docs/Progress.mdx": "9e2bc5b408e7938f3c5508541f774d0dcd3d6442419be367e6848b702a411d67"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "shadcn-scroll-area",
+      "name": "scroll-area",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/scroll-area.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/scroll-area.tsx": "dcb32083e8000c31f1dde685f7b62c41f4eb2a7a5918749774593f5eeaced676"
+      },
+      "category": "Layout"
+    },
+    {
+      "id": "shadcn-select",
+      "name": "Select",
+      "purpose": "Shared Select form component; contract, states and keyboard examples.",
+      "coverage": "documented",
+      "adoption": "Both apps have existing consumers; consumer/platform validation remains scoped",
+      "storyId": "components-select",
+      "story": "tools/crate-ui-showcase/stories/Select.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Select.mdx",
+      "sources": [
+        "app/shared/ui/shadcn/select.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/select.tsx": "ceed0ae676420f8b4000f71b7b43c9a43799339dd0cc4e3d8ebe4559bc0b58f0",
+        "tools/crate-ui-showcase/stories/Select.stories.tsx": "5004dc42f52345f342a701de3cf57efc0ab83a929fb8e3d47748fc2ffdc3f38a",
+        "tools/crate-ui-showcase/docs/Select.mdx": "b6fad9a3e4b67f37b676572dd1f7c13268d903339dd849949d9594a1993ef310"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "shadcn-separator",
+      "name": "Separator",
+      "purpose": "One-pixel horizontal or vertical rule, decorative by default with explicit semantic mode.",
+      "coverage": "documented",
+      "adoption": "Card is the existing object foundation; InstrumentPanel used by Listen Section and Admin OpsPanel. Wider page adoption remains scoped.",
+      "storyId": "components-separator",
+      "story": "tools/crate-ui-showcase/stories/Separator.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Separator.mdx",
+      "sources": [
+        "app/shared/ui/shadcn/separator.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/separator.tsx": "1a3f00e6a66e2ff70aec58fcb8c8a5e274bb8d733b57c712d82a29fd15b68c72",
+        "tools/crate-ui-showcase/stories/Separator.stories.tsx": "58f2f69b34fd22a3e8db21081371352410a99ed695f960fdf6f30864af390196",
+        "tools/crate-ui-showcase/docs/Separator.mdx": "5535fe6b616de2f09cb518c0781057a249e337449259ce1e296b8961d2a926da"
+      },
+      "category": "Layout"
+    },
+    {
+      "id": "shadcn-sheet",
+      "name": "sheet",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/sheet.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/sheet.tsx": "0ee9560fbcfdf8a8ea38efe17c75f955e40d99cc920a7ea463de16c52fe31f3b"
+      },
+      "category": "Overlays"
+    },
+    {
+      "id": "shadcn-skeleton",
+      "name": "skeleton",
+      "purpose": "A decorative, static neutral block. Callers reserve real dimensions; no fabricated text or shimmer.",
+      "coverage": "documented",
+      "adoption": "Shared Admin and Listen loading consumers;1BEreconciliation",
+      "storyId": "components-skeleton",
+      "story": "tools/crate-ui-showcase/stories/Skeleton.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Skeleton.mdx",
+      "sources": [
+        "app/shared/ui/shadcn/skeleton.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/skeleton.tsx": "eedfaf6612ffc9f63bc07d060648d4307787374df7cd202bde5b31e9716a2cd5",
+        "tools/crate-ui-showcase/stories/Skeleton.stories.tsx": "37cf270f9ed67e80c945ebaa8751c4c8504dc7b4d5476967df7cb87c7cbe3a97",
+        "tools/crate-ui-showcase/docs/Skeleton.mdx": "bf8bb2bf301effa5a7270ddcfd0182648ac20b7ffaeb11941ac73d73ea4dfe4e"
+      },
+      "category": "Feedback"
+    },
+    {
+      "id": "shadcn-table",
+      "name": "table",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "pending",
+      "adoption": "Pending audit",
+      "storyId": null,
+      "story": null,
+      "docs": null,
+      "sources": [
+        "app/shared/ui/shadcn/table.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/table.tsx": "9ee0c610820b269fa9add6b825089a2ec37cfefdb314fc63839407b8293f55d2"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "shadcn-tabs",
+      "name": "Tabs",
+      "purpose": "Text panel navigation with native ARIA/keyboard and app-owned URL state.",
+      "coverage": "documented",
+      "adoption": "Existing both-app consumers; URL page adoption remains phased after 1AX",
+      "storyId": "components-tabs",
+      "story": "tools/crate-ui-showcase/stories/Tabs.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Tabs.mdx",
+      "sources": [
+        "app/shared/ui/shadcn/tabs.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/tabs.tsx": "1e3ffa9f591b72805e6551682b4a9869f946c1dd354652a4e763ff8b8e067f5f",
+        "tools/crate-ui-showcase/stories/Tabs.stories.tsx": "353bf6d63cd9585681e5d0b44a321801b8df6583adf91563ac18b6094338f71c",
+        "tools/crate-ui-showcase/docs/Tabs.mdx": "d2f82a923cbc9f4a1f8d7b5f8fde08a00ec806e052eacbc13415f918d6c38ccb"
+      },
+      "category": "Navigation"
+    },
+    {
+      "id": "shadcn-textarea",
+      "name": "Textarea",
+      "purpose": "Shared Textarea form component; contract, states and keyboard examples.",
+      "coverage": "documented",
+      "adoption": "Both apps have existing consumers; consumer/platform validation remains scoped",
+      "storyId": "components-textarea",
+      "story": "tools/crate-ui-showcase/stories/Textarea.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Textarea.mdx",
+      "sources": [
+        "app/shared/ui/shadcn/textarea.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/textarea.tsx": "571349b93fc16a84cd266ca5330f4665cf59e885f6409e90fcd0c50a925b8909",
+        "tools/crate-ui-showcase/stories/Textarea.stories.tsx": "cace2303feab2e7c21deb1ad7ac063c3f1e602bd8d1a09ccdd10d854465f19da",
+        "tools/crate-ui-showcase/docs/Textarea.mdx": "b636df94ebae9c366eb821b23a915529f15b8a5b3a0f826f20853aa510a50930"
+      },
+      "category": "Forms"
+    },
+    {
+      "id": "shadcn-tooltip",
+      "name": "tooltip",
+      "purpose": "Existing component: contract and adoption pending reconciliation.",
+      "coverage": "documented",
+      "adoption": "Existing Listen consumer or internal dependency; contract completed in web closure; broader native/AT validation remains separate",
+      "storyId": "components-tooltip",
+      "story": "tools/crate-ui-showcase/stories/Tooltip.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Tooltip.mdx",
+      "sources": [
+        "app/shared/ui/shadcn/tooltip.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/shadcn/tooltip.tsx": "0de57d086e4d183d349d47fd1924d9827b0438dbc77857f44a0c0ebbbde91083",
+        "tools/crate-ui-showcase/stories/Tooltip.stories.tsx": "42dba3e82806dd355f96ccbffa8af8b47c2c55692201a217bbb64245398de2a3",
+        "tools/crate-ui-showcase/docs/Tooltip.mdx": "1ae3f22539cd0173bdc1cd314ea7ffdf36a4b0390cb95ec505bf32bcf2a1590d"
+      },
+      "category": "Overlays"
+    },
+    {
+      "id": "slider",
+      "name": "Slider",
+      "purpose": "General native numeric range with the shared thin rail and form target.",
+      "category": "Forms",
+      "coverage": "documented",
+      "adoption": "Admin processing threshold and Listen settings ranges; specialized player/EQ controls remain separate",
+      "storyId": "components-slider",
+      "story": "tools/crate-ui-showcase/stories/Slider.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/Slider.mdx",
+      "sources": [
+        "app/shared/ui/primitives/Slider.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/primitives/Slider.tsx": "4a9191416f323f49132012745499cca868e8ca6ee80fe93a908956b4dfecc88c",
+        "tools/crate-ui-showcase/stories/Slider.stories.tsx": "6abf79cdd2552c32659d128f210499957f18692002100981c07202dac97f96bc",
+        "tools/crate-ui-showcase/docs/Slider.mdx": "056d8845c80ebb1c81499c07cd9c940bbf70e74eb5c57b0b748c5a78b937437d"
+      }
+    },
+    {
+      "id": "action-group",
+      "sources": [
+        "app/shared/ui/primitives/ActionGroup.tsx"
+      ],
+      "fingerprints": {
+        "app/shared/ui/primitives/ActionGroup.tsx": "748ddda142a5e1ea1a1d775946a670bc37c371e9e37efc3783274e353870a3dd",
+        "tools/crate-ui-showcase/stories/ActionGroup.stories.tsx": "329c10c619dc296a64b5a77812d6b89eda7405273acedefd9cfeed263498eb9c",
+        "tools/crate-ui-showcase/docs/ActionGroup.mdx": "bdea7d524c8024b074e1368412f9ba451c832f475df29b01f2c665351f8f7718"
+      },
+      "name": "ActionGroup",
+      "purpose": "ActionButton and ActionLink compose Button ghost/icon-lg and Tooltip:44px square,4px corners,no normal border,20px glyph, upper-right alignment with8px group gaps.",
+      "coverage": "documented",
+      "adoption": "Shared actions adopted by Admin PageHeader and Listen Servers; broader page adoption remains scoped.",
+      "storyId": "components-actiongroup",
+      "story": "tools/crate-ui-showcase/stories/ActionGroup.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/ActionGroup.mdx",
+      "knownIssues": [],
+      "category": "Actions"
+    },
+    {
+      "id": "domain-shows-upcomingdatestamp",
+      "name": "UpcomingDateStamp",
+      "purpose": "Localized local-calendar date stamp with semantic time and explicit missing/invalid omission.",
+      "coverage": "documented",
+      "adoption": "Used by Admin Upcoming/NewReleases and Listen upcoming views; documented contract, consumer/native QA remains separate",
+      "storyId": "components-upcomingdatestamp",
+      "story": "tools/crate-ui-showcase/stories/UpcomingDateStamp.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/UpcomingDateStamp.mdx",
+      "sources": [
+        "app/shared/ui/domain/shows/UpcomingDateStamp.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/shows/UpcomingDateStamp.tsx": "8b981dcbce6fe5ae815a4afa05b3c830b2e7e0f01da0621b7f29d4321b504448",
+        "tools/crate-ui-showcase/stories/UpcomingDateStamp.stories.tsx": "db77964eb2fa42a628f79893283adbdfc181ca8d3aebf4953b6010dc19effd54",
+        "tools/crate-ui-showcase/docs/UpcomingDateStamp.mdx": "2ca59a255e274cdf903257c7533dbee8c1cd3adfea05ae40736f8730915a9c9d"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "domain-shows-setlistfrequency",
+      "name": "SetlistFrequency",
+      "purpose": "Probable-setlist song frequency: 1px rail, fixed-slot percentage, plays and optional last-played date.",
+      "coverage": "documented",
+      "adoption": "Used by Admin artist Probable Setlist and the Listen probable setlist modal",
+      "storyId": "components-setlistfrequency",
+      "story": "tools/crate-ui-showcase/stories/SetlistFrequency.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/SetlistFrequency.mdx",
+      "sources": [
+        "app/shared/ui/domain/shows/SetlistFrequency.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/shows/SetlistFrequency.tsx": "5d8e0649c840b4c7525e64833f6c620d8a963461e46369f0607ca95f9906b39c",
+        "tools/crate-ui-showcase/stories/SetlistFrequency.stories.tsx": "0b4d62f635144180685df6205c4b8ca5a8be1de30704e952cefba2340b6311e1",
+        "tools/crate-ui-showcase/docs/SetlistFrequency.mdx": "fb96b7ba84fae3396ccae17b78e6a81260e38a6fe77c1c35aec7b098d5f7737c"
+      },
+      "category": "Data Display"
+    },
+    {
+      "id": "domain-shows-upcomingeventrow",
+      "name": "UpcomingEventRow",
+      "purpose": "Shared upcoming identity row with native toggle/link/read-only modes and independent fixed date/action lanes.",
+      "coverage": "documented",
+      "adoption": "Used by Admin Upcoming/NewReleases and Listen upcoming views; documented contract, consumer/native QA remains separate",
+      "storyId": "components-upcomingeventrow",
+      "story": "tools/crate-ui-showcase/stories/UpcomingEventRow.stories.tsx",
+      "docs": "tools/crate-ui-showcase/docs/UpcomingEventRow.mdx",
+      "sources": [
+        "app/shared/ui/domain/shows/UpcomingEventRow.tsx"
+      ],
+      "knownIssues": [],
+      "fingerprints": {
+        "app/shared/ui/domain/shows/UpcomingEventRow.tsx": "8a8eb3609cd08d23969b218bd3d88c7cfbb4ea585bbd765d27f6ca43e10911e7",
+        "tools/crate-ui-showcase/stories/UpcomingEventRow.stories.tsx": "fdbcb5b35b91c513a1490ea4fca5640cbe0375954253f81f0355031a240a964c",
+        "tools/crate-ui-showcase/docs/UpcomingEventRow.mdx": "64c55a300bdabc7e8bc339ba4ab4544a593a50135c05f66d4fa4b4b712c9bce9"
+      },
+      "category": "Data Display"
+    }
+  ]
+}

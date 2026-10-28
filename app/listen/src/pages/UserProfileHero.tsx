@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { useTranslation } from "react-i18next";
 import {
   BarChart3,
   CRATE_ICON_SIZE,
@@ -6,13 +7,17 @@ import {
   UserRoundCheck,
   UserCheck,
 } from "@crate/ui/icons";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
+import { PageHeader } from "@crate/ui/domain/navigation";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { Button } from "@crate/ui/shadcn/button";
-import { useTranslation } from "react-i18next";
-
-import { UserProfileAvatar } from "./UserProfileAvatar";
+import { Card, CardContent } from "@crate/ui/shadcn/card";
+import type { ReactNode } from "react";
 import { formatJoinedDate, type PublicProfile } from "./user-profile-model";
-import { ProfileRelationshipStats } from "./UserProfileRelationships";
+import {
+  ProfileAffinity,
+  ProfileRelationshipStats,
+} from "./UserProfileRelationships";
 import { ProfileTasteSummary } from "./UserProfileTaste";
 
 export function UserProfileHero({
@@ -23,41 +28,9 @@ export function UserProfileHero({
   busy,
   onFollowToggle,
   locale,
+  avatar,
 }: {
-  data: PublicProfile;
-  displayName: string;
-  isOwnProfile: boolean;
-  username?: string;
-  busy: boolean;
-  onFollowToggle: () => void;
-  locale: string;
-}) {
-  return (
-    <div className="user-profile-hero rounded-panel p-5 sm:p-6">
-      <UserProfileHeader
-        data={data}
-        displayName={displayName}
-        isOwnProfile={isOwnProfile}
-        username={username}
-        busy={busy}
-        onFollowToggle={onFollowToggle}
-        locale={locale}
-      />
-      <ProfileRelationshipStats data={data} />
-      <ProfileTasteSummary data={data} />
-    </div>
-  );
-}
-
-function UserProfileHeader({
-  data,
-  displayName,
-  isOwnProfile,
-  username,
-  busy,
-  onFollowToggle,
-  locale,
-}: {
+  avatar: ReactNode;
   data: PublicProfile;
   displayName: string;
   isOwnProfile: boolean;
@@ -67,100 +40,76 @@ function UserProfileHeader({
   locale: string;
 }) {
   const { t } = useTranslation();
-  const joinedDate =
+  const handle = data.username || username;
+  const joined =
     formatJoinedDate(data.joined_at, locale) ?? t("userProfile.recently");
   return (
-    <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-      <div className="flex items-start gap-4">
-        <UserProfileAvatar
-          name={displayName}
-          avatar={data.avatar}
-          userId={data.id}
+    <Card as="section" aria-label={displayName}>
+      <CardContent className="grid gap-6">
+        <PageHeader
+          title={displayName}
+          actions={<ProfileAffinity data={data} />}
+          subtitle={data.bio}
+          artwork={avatar}
+          eyebrow={
+            data.relationship_state.is_friend && !isOwnProfile ? (
+              <InfoBadge icon={UserCheck}>{t("people.friends")}</InfoBadge>
+            ) : undefined
+          }
+          meta={
+            <div className="grid gap-2">
+              <span className="text-sm text-text-muted">
+                {data.username ? `@${data.username}` : t("people.noUsername")}
+              </span>
+              <MonoLabel>{t("userProfile.joined", { date: joined })}</MonoLabel>
+            </div>
+          }
         />
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="truncate text-3xl font-bold text-text-primary">
-              {displayName}
-            </h1>
-            {data.relationship_state.is_friend && !isOwnProfile ? (
-              <CrateBadge size="md" icon={UserCheck}>
-                {t("people.friends")}
-              </CrateBadge>
-            ) : null}
-          </div>
-          <div className="mt-1 text-sm text-text-muted">
-            {data.username ? "@" + data.username : t("people.noUsername")} ·{" "}
-            {t("userProfile.joined", { date: joinedDate })}
-          </div>
-          {data.bio ? (
-            <p className="user-profile-copy mt-3 max-w-2xl text-sm leading-6">
-              {data.bio}
-            </p>
-          ) : null}
-        </div>
-      </div>
-      <UserProfileActions
-        data={data}
-        isOwnProfile={isOwnProfile}
-        username={username}
-        busy={busy}
-        onFollowToggle={onFollowToggle}
-      />
-    </div>
-  );
-}
-
-function UserProfileActions({
-  data,
-  isOwnProfile,
-  username,
-  busy,
-  onFollowToggle,
-}: {
-  data: PublicProfile;
-  isOwnProfile: boolean;
-  username?: string;
-  busy: boolean;
-  onFollowToggle: () => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Link
-        to={
-          isOwnProfile
-            ? "/stats"
-            : "/users/" + (data.username || username) + "/stats"
-        }
-        className="inline-flex items-center gap-2 rounded-lg border border-accent-action/25 bg-accent-action/10 px-4 py-2.5 text-sm font-semibold text-accent-action transition-colors hover:bg-accent-action/15"
-      >
-        <BarChart3 size={CRATE_ICON_SIZE.sm} />
-        {t("userProfile.actions.viewListeningDna")}
-      </Link>
-      {!isOwnProfile ? (
-        <Button
-          variant={data.relationship_state.following ? "outline" : "default"}
-          loading={busy}
-          onClick={onFollowToggle}
-          className="rounded-lg px-4 has-[>svg]:px-4"
-        >
-          {busy ? null : data.relationship_state.following ? (
-            <UserRoundCheck size={CRATE_ICON_SIZE.sm} />
+        <div className="flex flex-wrap items-center gap-3">
+          <Button asChild variant="outline">
+            <Link
+              to={
+                isOwnProfile
+                  ? "/stats"
+                  : handle
+                    ? `/users/${encodeURIComponent(handle)}/stats`
+                    : "/people"
+              }
+            >
+              <BarChart3 size={CRATE_ICON_SIZE.sm} />
+              {t("userProfile.actions.viewListeningDna")}
+            </Link>
+          </Button>
+          {isOwnProfile ? (
+            <Button asChild variant="outline">
+              <Link to="/settings?tab=account">
+                {t("userProfile.actions.editAccount")}
+              </Link>
+            </Button>
           ) : (
-            <UserPlus size={CRATE_ICON_SIZE.sm} />
+            <Button
+              variant={
+                data.relationship_state.following ? "outline" : "default"
+              }
+              loading={busy}
+              onClick={onFollowToggle}
+            >
+              {busy ? null : data.relationship_state.following ? (
+                <UserRoundCheck size={CRATE_ICON_SIZE.sm} />
+              ) : (
+                <UserPlus size={CRATE_ICON_SIZE.sm} />
+              )}
+              {t(
+                data.relationship_state.following
+                  ? "common.following"
+                  : "common.follow",
+              )}
+            </Button>
           )}
-          {data.relationship_state.following
-            ? t("common.following")
-            : t("common.follow")}
-        </Button>
-      ) : (
-        <Link
-          to="/settings"
-          className="inline-flex items-center gap-2 rounded-lg border border-border-quiet/15 bg-text-primary/5 px-4 py-2.5 text-sm font-medium text-text-primary transition-colors hover:bg-text-primary/10"
-        >
-          {t("userProfile.actions.editAccount")}
-        </Link>
-      )}
-    </div>
+        </div>
+        <ProfileRelationshipStats data={data} />
+        <ProfileTasteSummary data={data} />
+      </CardContent>
+    </Card>
   );
 }

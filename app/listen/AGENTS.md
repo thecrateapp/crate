@@ -4,6 +4,10 @@ Scoped rules for the consumer listening app (`crate-listen`: web PWA + Capacitor
 
 `app/listen-desktop` (Tauri) aliases `@` to `app/listen/src` and reuses this code. Every change here also ships to desktop: run its typecheck and tests too.
 
+V3 shares one identity, tokens, primitives, recipes and interaction rules with the other app.
+Only domain components/workflows differ; do not add app-specific foundation variants. Bootstrap
+uses `@crate/ui/lib/crate-identity` and `@crate/ui/lib/interface-preferences`.
+
 ## Directory map (`src/`)
 
 ```
@@ -28,7 +32,7 @@ test/             renderWithListenProviders, gesture helpers
   - `usePlayerActions()`: queue, current track, and stable callbacks (`play`, `playAll`, `next`, `seek`, ...). Default choice for anything that triggers playback.
   - `usePlayerState()`: `isPlaying`, `isBuffering`, `volume`, `analyserVersion`, `crossfadeTransition`.
   - `usePlayerProgress()`: `currentTime`, `duration`; changes every tick.
-  - `usePlayer()` merges all three and re-renders on every progress tick. Only full player surfaces use it (`ExtendedPlayer`, `FullscreenPlayer`, `usePlayerBarController`). Do not add it anywhere else.
+  - `usePlayer()` merges all three and re-renders on every progress tick. Player controllers use `usePlayerState` + `usePlayerActions` and a stable `usePlayerClock` ref; only small progress/disc/lyric leaves subscribe to ticks. Do not add aggregate subscribers to lists, controllers or pages.
 - Engines: `lib/playback-engine.ts` interface, `lib/playback-engine-factory.ts` picks `androidNativeEngine` (`lib/android-native-engine.ts`) or `GaplessWebEngine` (`lib/gapless-web-engine.ts`) -> `lib/gapless-player.ts` (module singleton wrapping Gapless-5), split into `gapless-player-{controls,queue,volume,equalizer,audio-recovery}.ts`.
 - Mobile audio (`lib/mobile-audio-mode.ts`): on iOS/Android runtimes the stable pipeline uses HTML5 audio with WebAudio off (1 decoded track) unless the user enabled "enhanced audio" at startup. `canUseWebAudioEffects` gates EQ/visualizer. Never assume an `AudioContext`/`AnalyserNode` exists.
 - Audio recovery (`gapless-player-audio-recovery.ts`) rebuilds the Tauri output after sleep/long absence; detection uses `document.documentElement.dataset.listenRuntime === "tauri"` (set by `app/listen-desktop/src/lib/tauri-init.ts`).
@@ -56,9 +60,9 @@ test/             renderWithListenProviders, gesture helpers
 - Toasts: `notify` from `@crate/ui/lib/notify`. Importing `sonner` directly fails `toast-policy.test.ts`.
 - Icons: `@crate/ui/icons`, sized with `CRATE_ICON_SIZE`. `lucide-react` is not a Listen dependency (bundle test enforces it).
 - Prefer `@crate/ui` primitives over raw `<button>`/`<input>` (budgeted in `component-policy.test.ts`; raw buttons need an explicit `type`). Do not redefine a `@crate/ui` component name locally.
-- No arbitrary radius/z-index/shadow/text-size values beyond the budget (`design-token-policy.test.ts`, `radius-policy.test.ts`). Genre chips go through `GenrePill`; every other badge goes through `CrateBadge` (`@crate/ui/primitives/CrateBadge`): rectangular, white text, sentence case, the tone colors only the icon (`badge-policy.test.ts`).
-- Charts: Nivo only. Exception: the Stats signal tape, heatmap and decade bars (`components/stats/`) are hand-built SVG/CSS because they animate per bar and must match the Crate Digging canvas card; do not add new custom charts elsewhere.
-- Stats (`pages/Stats.tsx`, `pages/StatsDigging.tsx`, `components/stats/`) read one `/api/me/stats/dashboard` payload per period plus `/api/me/stats/today`. Motion is CSS-only (`stats-reveal`, keyframes in `recipes.css`) with reduced-motion fallbacks.
+- No arbitrary radius/z-index/shadow/text-size values beyond the budget (`design-token-policy.test.ts`, `radius-policy.test.ts`). Genre chips go through `GenrePill` (12px,32/44px targets). Informative metadata/status/counters use `InfoBadge` (`@crate/ui/primitives/InfoBadge`): Mono12/16,24px high, capsule, semantic tone variants. Filters use `FilterChip` (12px,32/44px targets); exclusive radio/tabs keep `SegmentedControl`. The old CrateBadge/CrateChip/CratePill imports are compatibility adapters to these recipes. Preserve artwork overlay surfaces and the player queue counter’s separate14px/8px contract (`badge-policy.test.ts`).
+- Charts: Statistical charts (bar, line, pie, scatter, heatmap, radar) use Nivo with the app's token-resolved theme. Instruments (EQ curve, genre wheel, readouts, rails, lanes, gauges, maps, mood map, heatmap band, ticket, crossfade strip, orbit, topology) are hand-built SVG, HTML/CSS, Canvas 2D or WebGL2, following `docs/plans/2026-10-14-crate-v3-design-system.md` §3.5. No new chart libraries; recharts stays out. Precedent: `EqBands` and the Stats signal tape, heatmap and decade bars (`components/stats/`), hand-built SVG/CSS because they animate per bar and must match the Crate Digging canvas card.
+- Stats (`pages/Stats.tsx`, `pages/StatsDigging.tsx`, `components/stats/`) read one `/api/me/stats/dashboard` payload per period plus `/api/me/stats/today`. Motion is CSS-only (`stats-reveal`, keyframes in `recipes.css`) with reduced-motion fallbacks. The explorer (`components/stats/explorer/`) replaces the signal tape on `/stats`; `TapeBars` stays for the Home mini tape. It reads `/api/me/stats/range`, `/api/users/{u}/stats/range` or `/api/stats/range` (400-day bound, `limit` 1-20, `available=false` while instance rollups backfill). `useStatsRange` caches per account and server and clears on the `history` invalidation. The dashboard snapshot key starts with `v3` in Python and Go and must stay byte-identical. Stats pure views take links and images as props so the showcase mounts them without `library-routes`. Unknown audio is null and renders through Meter's null contract, never as 0.
 
 ## i18n (hard rule)
 
@@ -110,3 +114,205 @@ npm run test:listen-visual                       # Playwright, playwright.listen
 - Capacitor builds use `vite build --mode capacitor`; Capacitor plugins must be guarded by runtime flags so web and Tauri do not crash.
 - Service worker registers only on web (`shouldRegisterServiceWorker`).
 - Shared code in `app/shared/web` is also tested by Listen's Vitest config; breaking it breaks both apps.
+
+## Player reconciliation — local 1AZ
+
+PlayerBarFrame owns solid dock chrome and the 82px fine-pointer geometry; bar time/seek is one
+horizontal row. Coarse desktop/tablet uses104px via the shared Shell metric so two44px targets do
+not overlap or clip; clearances follow the same variable. PlayerStage keeps shorter viewports
+scrollable. Conventional player actions use ActionButton; specialized play aura/ring/disc and
+beam/head remain content effects. PlayerPanels uses actual text Tabs and associated panels.
+
+PlayerClock exposes latest progress to controller/event readers without tick subscriptions.
+Time/seek and CD leaves subscribe separately; SyncedLyrics keeps static rows and a small clock
+leaf changes active state/underline/line scrolling. Crossfade layers read one app-local CSS clock;
+they never animate independent positions/opacity clocks through large React trees. The bar canvas
+owns sampling and drawing in one loop through useAudioVisualizer manual mode; stable/native
+pipelines without an analyser show none. Preserve remote authority, Jam locks, authenticated
+artwork recovery and lazy player chunks. Both review hosts reuse these actual player views;
+app-local player components belong to Listen/Player, with no invented Admin consumer.
+
+
+## Album/access reconciliation — local 1BA
+
+AuthFrame/CredentialsForm, ServerSetupView and AuthCallbackView compose canonical shared forms
+without local label, size or glass overrides; pages own cookie/native secure session, invite,
+probe and deep-link behavior. AlbumHeroFrame preserves the tested mobile/native placement and
+measured offsets; its poster is content without a decorative chrome shadow. AlbumActionsView
+and AlbumSelectionToolbar share actual production/review actions. Countdown uses the solid
+surface and MonoLabel/StatNumber. Album queue conversion preserves the API length_sec as duration;
+read failures keep retry instead of claiming not-found. Artist entry sections use SectionHeader,
+MediaGrid and TrackList. OfflineLibraryView only receives verified groups; its progress/ring
+leaves own clock subscriptions. No app-local auth/storage/engine behavior moves to shared UI.
+
+TrackRowContent owns reserved quality/BPM/key/duration/action columns through the shared recipe;
+missing values keep their slots. Use the actual Listen QualityBadge in hero, row and player
+(Solar soundwave, tier colors, InfoBadge anatomy); never derive a track's quality from an album.
+The artist Top Tracks API must preserve per-track depth/rate/bitrate in the existing batch read.
+Show items retain optional genre_profile. Artist pages pass their already loaded canonical
+profile to that artist's shows; GenrePillRow preserves its percentages/source, including0%.
+Name-only show responses do not acquire synthetic percentages or per-row API fetches.
+
+Diego's expanded show card is the composition reference for the next Listen migrations: strong
+display title, uppercase contextual labels, real GenrePill profiles, clear content regions and
+deliberate spacing. Month/group captions use FormField kind="group": the bottom separator stays
+inside the caption and the first item begins8px below it. UpcomingMonthGroupView owns that frame.
+
+Compact artist identity beside a name uses EntityAvatar: xs24px in AlbumHero and inline28px
+in PlayerTrackIdentity, preserving V2. CrateImage retains credential recovery and only final
+errors reach the shared fallback. Adjacent artist text names the action; the avatar is decorative.
+Standalone track/album/artist list thumbnails retain48px, including circular artist media.
+Do not apply crate-media-thumbnail to compact identity avatars or override Avatar dimensions.
+
+Diego's1BA track-row amendment restores enabled fine-pointer hover illumination. TrackRowView
+and HairlineRow share crate-row-highlight for the8%-to-transparent selected/current surface;
+selected tracks get the2px marker without becoming the current track. SuggestedTab composes
+TrackList/SuggestedTrackRow -> actual TrackRow, with existing data/callbacks and no extra fetches.
+Collection children use the same listen-nav-item recipe as first-level navigation (44px),
+including collapsed popovers and mobile sheets; HairlineRow is a text-list role, not navigation.
+
+SpinningDisc uses one compositor transform animation at120deg/s, with a single RAF fallback;
+ordinary coarse media-clock corrections must not reset its visible phase. Pause, buffering,
+hidden/reduced motion and jog freeze/capture that phase; jog starts from the visible rotation
+and resumes without snapping to the audio-clock angle. Large seeks may reposition it. Keep
+artwork authentication in SpinningDiscArtwork and audio authority in the player controller.
+SpinningDiscFrame is the actual visual frame used in production and the isolated review.
+PlayerSurfaceModeSwitch uses unboxed44px ActionButton radios: active accent, other glyphs primary
+white, tooltip only, arrow/Home/End navigation. Preserve each renderer's visualizer capability
+gate and existing preference/haptic callbacks. Expanded Collection stays open on its routes;
+collapsed popovers and mobile sheets retain their normal dismissal/focus behavior.
+
+Image scale follows V2 by role, with Diego's confirmed48px thumbnail minimum and compact-artist
+24/28px exceptions. ArtistAlbumGroupFrame uses MediaGrid comfortable:2/3/4/5 columns,16px gap,
+no additional columns above1024px; compact density is not the discography default. Do not shrink
+image roles as a side effect of adopting a shared frame. ModalBody is a full-width layout/scroll
+region; do not reintroduce the60ch cap or repair it in ArtistBioProfile callers.
+Fullscreen EQ access follows renderer capability, independently of whether the effect is on.
+Opening the existing EQ panel does not enable processing or alter preferences. The desktop
+header has no added Now Playing caption. Both fullscreen lyrics renderers use the flat
+PlayerLyricsSurface; keep timed text, seek, masks and scroll behavior without a colored backdrop.
+
+## Home/Library — local1BB first batch
+
+HomeGreeting composes PageHeader; HeroActions keeps Button and ActionButton/FollowHeartButton
+contracts without local visual skins. LibrarySection composes SectionHeader. Contributions and
+Bandcamp imports share LibraryContributionRow plus managed ContributionArtwork56px; icon actions
+retain short tooltips, contextual accessible names and the existing withdrawal confirmation.
+StatNumber receives actual counts including0. Read failures without cached data use ErrorState
+and existing refetch; never silently turn a failed source into empty/zero. CrateIndexGrid keeps
+V2 2/3/6 columns and20px gap. Details/editors/coverflow/card variants remain the next1BB batch.
+ArtistCard contextual subtitles/counts, scalar metadata and PlaylistCard count slots use actual
+MonoLabel; the component forces uppercase. Titles, artist names, summaries and descriptions keep
+their case. Home history and replay metric captions use the same role. Do not globally uppercase
+EntityCard/EntityRow subtitles: they also carry identity and prose.
+
+## Secondary action captions — 1BC
+
+Hero secondary actions use actual MonoLabel as="span" with inherited color for the text below
+the glyph, including the injected Follow/Add/Share/Bandcamp slots on Album/Artist/Crate. Ordinary
+Button text and primary Play/Shuffle are unchanged. HeroActionBar owns generated captions/More;
+app adapters retain callbacks/media/menu/permission authority. Apply this to future equivalents.
+
+## Sharing and imports — local1BD
+
+ShareSheetView composes AppModal/EntityRow/MediaCover with actual MonoLabel action captions.
+ShareSheet retains native/canvas/font/capability/cancellation/storage authority; busy sharing
+blocks dismissal and duplicate actions. BandcampPageView uses the actual EntityCard for tiles: upper-left artwork menu, full-width
+identity and canonical album spacing without a bordered row beneath the cover. Import/Open live
+in that menu; tapping the card opens Bandcamp through the app adapter. Purchases lead the larger region as an EntityCard grid; Radar follows as EntityRow items with56px
+managed artwork and direct actions, including Open on Bandcamp. Keep import permission guards.
+The same order applies on narrow screens; Wishlist retains its grid. Original guards/FLAC payloads and menus remain. Failed uncached reads offer retry; cached content remains usable.
+
+UploadView owns the real drop target: decorative CrateLogo, centered canonical picker Button,
+hidden native Input, grouped8px caption spacing and format hint. Dropping stages files only;
+explicit Import starts the existing multipart/chunked flow. Empty/text drops keep the queue,
+active uploads reject replacements, and confirmed bytes alone drive determinate progress.
+The page retains request/error/task authority. RemoteImportView uses caption/ProgressHairline/
+ConfirmDialog; unknown download progress is indeterminate, never a fabricated percentage.
+Contributions use the album-style EntityCard grid and specific contextual actions; withdrawal retains explicit confirmation.
+The small review/English stories import these actual views, not production adapters or copies.
+
+Diego’s Upload amendment removes the entire What happens next section; do not reintroduce
+processing/enrichment/attribution instructions into this end-user view or its stories.
+
+### Contributions and Bandcamp navigation amendment
+
+Collection now has six sections: Artists, Crates, Playlists, Albums, Liked and Contributions.
+Bandcamp is removed from both sidebar children and Collection tabs; /bandcamp is the single
+canonical view, reachable through the existing Settings connection link while its future main
+navigation placement is undecided. Old /library?tab=bandcamp and /collection/bandcamp URLs
+replace-redirect to it, preserving unrelated query/hash/state. The obsolete LibraryBandcampTab
+controller/purchases composition is removed, so it cannot diverge into a second live screen.
+
+Contributions use LibraryContributionCard: actual EntityCard in the default MediaGrid, matching
+Albums. The adapter reuses AlbumCard artwork/model/playback helpers and the lazy AlbumCardMenu;
+Export and Remove contribution are specific menu entries, with withdrawal still confirmed.
+Source metadata stays below title/artist as actual uppercase MonoLabel, without a chip or border:
+Upload uses subtle gray with a 12px Solar upload icon; Bandcamp uses accent with its 12px brand
+mark. Icons are decorative and inherit the caption color. Missing local album IDs keep navigation, playback and
+export unavailable while allowing withdrawal. The current review uses the actual card view and
+pure contribution action builder with local callbacks; it never starts real playback.
+
+Upload receipts/toasts and withdrawal notices use end-user copy without task IDs. Receipts
+show file counts; withdrawal identifies the album and does not claim the background operation
+has already completed. Failed withdrawal keeps its confirmation open with a friendly error.
+All seven catalogs cover the messages; internal task IDs remain in response types only.
+
+## Offline surfaces — 1BD
+
+OfflineLibraryView preserves verified-only playback and the small clock leaves. Saved duration
+and quality reach the actual TrackRowContent/QualityBadge; missing fields stay empty, names
+retain case, and media fallbacks remain48px. Offline cover sidecars are stored once per album/manifest cover in the same profile as audio;
+CrateImage resolves local artwork before remote/responsive sources, and queue records retain
+canonical paths rather than object URLs. Original audio is not rewritten. Old downloads backfill
+on online sync/resume; unavailable artwork keeps the fallback without invalidating audio.
+OfflineSection owns context, quota and sync/clear authority. OfflineDownloadsView shows existing
+snapshot states through localized StatusDot, actual EntityRow/MonoLabel and count-based
+ProgressHairline. Unknown totals remain indeterminate; Total size means the manifest size, not
+bytes transferred. Unsupported/readOnly/busy/empty gates disable management. No fictitious
+per-item cancel/retry actions or raw filesystem errors. English Listen/Offline and Reviews/1BD/
+Offline reuse the exact scene as review-1bd-offline.html; no scene API/audio/storage writes.
+
+Offline artwork uses the existing Cache Storage on web and staged/verified native asset pipeline
+under offline-media (including iOS backup exclusion and Tauri identity-scoped cancellation).
+Images are640px and bounded to2MiB; both web and native decode the staged image before publication.
+Reject invalid/HTML payloads; evict an already persisted corrupt image so a later sync can repair it.
+Artwork notifications target only their profile/asset; no-op pruning and unrelated cover writes
+must not revoke mounted leases. Profile changes/clear invalidate leases; unmount revokes object URLs. Shared covers
+survive until the last offline reference is removed. Settings/library pure views receive the
+actual managed renderer from their adapter; review fixtures use local deterministic images.
+
+### Settings leading rule amendment —1BD
+
+Settings Section forwards InstrumentPanel's existing optional `ruled` prop (default true).
+Settings composes its first visible section with `ruled={false}` under each tab; internal
+section dividers remain. When Connect is release-gated off, OpenSubsonic becomes the unruled
+first section. Do not hide these rules with CSS selectors or change InstrumentPanel's default.
+The Storybook/standalone Settings scene uses the same props and preserves separators inside
+Account and Connections. Browser checks measure the border in all five tabs and both Connect
+feature states at375/1200px.
+
+
+## Stats and Crate Digging presentation —1BE
+
+Stats views keep controller scope/period/snapshot/privacy authority and injected media/player/menu
+adapters. Initial loading/error/empty are distinct; a cached dashboard stays visible while refreshing.
+Unknown sound analysis is null, not a confirmed zero; Meter keeps real zero rails empty. Headline,
+editorial/collection captions and ordinary readings use MonoLabel/StatNumber; existing signal,
+heatmap/decade instruments and larger Digging editorial values keep their approved geometry.
+Pure views and the actual Digging chapter/share-summary builder feed English Storybook and the
+small1BEreview with local artwork/actions. The story contains focus/Tab, restores its launcher and
+background scroll, and retains chapter timing/hold/keyboard/motion behavior. Real sharing stays
+in the authenticated adapter.
+
+CatalogSearch section loading names a single requested kind (albums/artists/tracks/genres), or
+Finding your music... for mixed kinds, also used by global search. LoadingState fullWidth owns
+panel-wide beams; do not stretch internal classes from callers. Cached results remain visible while
+searching. The specialized global combobox/recents/IME/debounce/navigation authority is unchanged.
+
+Cold Stats snapshots (`snapshot.pending` with version0 and zero plays) remain loading until a
+versioned reading arrives. A versioned empty cache and populated stale cache remain usable.
+StatsPageView owns32px region gaps; StatsEditorialStack owns16px artist/highlights spacing and
+StatsListeningView owns its heading/card spacing. Production/review reuse these owners; do not
+add old per-section margins. Digging/AppModal share acquireBodyScrollLock, including out-of-order
+navigation teardown while a global ShareSheet is open; neither restores scroll before the last owner.

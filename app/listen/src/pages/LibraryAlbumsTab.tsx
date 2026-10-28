@@ -1,3 +1,6 @@
+import { FormField } from "@crate/ui/primitives/FormField";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { GridSkeleton } from "@crate/ui/composites/GridSkeleton";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
@@ -18,9 +21,12 @@ import {
 
 export function LibraryAlbumsTab() {
   const { t } = useTranslation();
-  const { data: albums, loading } = useApi<SavedAlbum[]>(
-    "/api/catalog/me/albums",
-  );
+  const {
+    data: albums,
+    loading,
+    error,
+    refetch,
+  } = useApi<SavedAlbum[]>("/api/catalog/me/albums");
   const isDesktop = useIsDesktop();
   const [sort, setSort] = useState<AlbumSort>("recent");
 
@@ -43,7 +49,43 @@ export function LibraryAlbumsTab() {
     });
   }, [albums, sort]);
 
-  if (loading) return <LoadingState label={t("common.loadingShort")} />;
+  if (loading)
+    return (
+      <LoadingState label={t("common.loadingShort")}>
+        <div className="space-y-4">
+          {!isDesktop ? (
+            <div
+              data-slot="library-sort-placeholder"
+              aria-hidden="true"
+              inert
+              className="max-w-xs"
+            >
+              <FormField kind="group" label={t("library.sort.label")}>
+                {(group) => (
+                  <div {...group} role="group">
+                    <CollectionSortDropdown
+                      label={t("library.sort.albums")}
+                      value={sort}
+                      options={albumSortOptions}
+                      onChange={setSort}
+                    />
+                  </div>
+                )}
+              </FormField>
+            </div>
+          ) : null}
+          <GridSkeleton density="default" variant="album" />
+        </div>
+      </LoadingState>
+    );
+  if (error && !albums)
+    return (
+      <ErrorState
+        message={error}
+        onRetry={refetch}
+        retryLabel={t("common.retry")}
+      />
+    );
   if (!albums || albums.length === 0) {
     return (
       <EmptyState
@@ -62,19 +104,22 @@ export function LibraryAlbumsTab() {
   return (
     <div className="space-y-4">
       {!isDesktop ? (
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-xs font-bold uppercase tracking-kicker text-text-primary/40">
-            {t("library.sort.label")}
-          </span>
-          <CollectionSortDropdown
-            label={t("library.sort.albums")}
-            value={sort}
-            options={albumSortOptions}
-            onChange={setSort}
-          />
+        <div className="max-w-xs">
+          <FormField kind="group" label={t("library.sort.label")}>
+            {(group) => (
+              <div {...group} role="group">
+                <CollectionSortDropdown
+                  label={t("library.sort.albums")}
+                  value={sort}
+                  options={albumSortOptions}
+                  onChange={setSort}
+                />
+              </div>
+            )}
+          </FormField>
         </div>
       ) : null}
-      <MediaGrid>
+      <MediaGrid aria-label={t("nav.collection.albums")}>
         {sortedAlbums.map((album) => (
           <AlbumCard
             key={album.global_album_uid ?? album.id}

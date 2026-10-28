@@ -1,5 +1,6 @@
 import { Fragment, useId, type ReactNode } from "react";
 
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { cn } from "@crate/ui/lib/cn";
 
 export type PageHeroVariant = "media" | "artist" | "editorial" | "card";
@@ -32,13 +33,29 @@ export interface PageHeroProps {
   contentClassName?: string;
   artworkClassName?: string;
   titleClassName?: string;
+  titleSize?: "default" | "compact";
+  height?: "default" | "content";
+  /** none aligns content and actions with a parent that already pads the page. */
+  inset?: "default" | "none";
+  /** Cancels the Listen page gutter so the hero reaches the viewport edges. */
+  bleed?: boolean;
+  /** Album artwork scale: lg in Listen (200/240/280px), md in Admin (144/192/224px). */
+  artworkSize?: "default" | "lg" | "md";
+  /** none drops the frame when the artwork brings its own. */
+  artworkFrame?: "default" | "none";
   actionsClassName?: string;
 }
 
+const ARTWORK_SIZE_CLASS_NAME = {
+  default: undefined,
+  lg: "block w-[200px] self-center sm:w-[240px] sm:self-auto lg:w-[280px]",
+  md: "block size-36 sm:size-48 lg:size-56",
+} as const;
+
 const ROOT_CLASS_NAME: Record<PageHeroVariant, string> = {
-  media: "relative h-hero-md overflow-hidden lg:h-hero-xl",
-  artist: "relative h-hero-md overflow-hidden sm:h-hero-sm",
-  editorial: "relative h-hero-md overflow-hidden sm:h-hero-sm",
+  media: "relative flex min-h-hero-md overflow-hidden lg:min-h-hero-xl",
+  artist: "relative flex min-h-hero-md overflow-hidden sm:min-h-hero-sm",
+  editorial: "relative flex min-h-hero-md overflow-hidden sm:min-h-hero-sm",
   card: "relative overflow-hidden rounded-xl p-5 sm:p-6",
 };
 
@@ -63,7 +80,7 @@ const TITLE_CLASS_NAME: Record<PageHeroVariant, string> = {
   media: "text-3xl font-bold text-text-primary sm:text-4xl",
   artist: "text-3xl font-bold text-text-primary sm:text-4xl",
   editorial:
-    "text-4xl font-black leading-none tracking-tight text-text-primary sm:text-6xl",
+    "text-4xl font-extrabold leading-none tracking-tight text-text-primary sm:text-6xl",
   card: "text-3xl font-bold leading-tight text-text-primary",
 };
 
@@ -180,6 +197,12 @@ export function PageHero({
   contentClassName,
   artworkClassName,
   titleClassName,
+  titleSize = "default",
+  height = "default",
+  inset = "default",
+  bleed = false,
+  artworkSize = "default",
+  artworkFrame = "default",
   actionsClassName,
 }: PageHeroProps) {
   const generatedId = useId();
@@ -196,16 +219,33 @@ export function PageHero({
         isCard ? "flex-1" : "max-w-3xl pb-1",
       )}
     >
-      {eyebrow ? (
-        <div className="mb-2 flex flex-wrap items-center gap-2">{eyebrow}</div>
+      {eyebrow !== null &&
+      eyebrow !== undefined &&
+      eyebrow !== false &&
+      eyebrow !== "" ? (
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          {typeof eyebrow === "string" || typeof eyebrow === "number" ? (
+            <MonoLabel>{eyebrow}</MonoLabel>
+          ) : (
+            eyebrow
+          )}
+        </div>
       ) : null}
       <h1
         id={titleId}
-        className={cn("break-words", TITLE_CLASS_NAME[variant], titleClassName)}
+        className={cn(
+          "min-w-0 wrap-anywhere font-display",
+          TITLE_CLASS_NAME[variant],
+          titleSize === "compact" && "text-2xl sm:text-4xl",
+          titleClassName,
+        )}
       >
         {title}
       </h1>
-      {subtitle ? (
+      {subtitle !== null &&
+      subtitle !== undefined &&
+      subtitle !== false &&
+      subtitle !== "" ? (
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-text-muted">
           {subtitle}
         </div>
@@ -236,7 +276,12 @@ export function PageHero({
   const artworkNode =
     artwork && variant !== "editorial" ? (
       <div
-        className={cn(ARTWORK_CLASS_NAME[variant], artworkClassName)}
+        className={cn(
+          ARTWORK_CLASS_NAME[variant],
+          ARTWORK_SIZE_CLASS_NAME[artworkSize],
+          artworkFrame === "none" && "bg-transparent shadow-none ring-0",
+          artworkClassName,
+        )}
         data-testid="page-hero-artwork"
       >
         {artwork}
@@ -250,6 +295,7 @@ export function PageHero({
         className={cn(ROOT_CLASS_NAME.card, className)}
         data-testid="page-hero"
         data-variant={variant}
+        data-height={height}
       >
         {background ? <HeroBackground background={background} /> : null}
         <div
@@ -276,15 +322,21 @@ export function PageHero({
   }
 
   return (
-    <div data-testid="page-hero" data-variant={variant}>
+    <div data-testid="page-hero" data-variant={variant} data-height={height}>
       <section
         aria-labelledby={titleId}
-        className={cn(ROOT_CLASS_NAME[variant], className)}
+        className={cn(
+          ROOT_CLASS_NAME[variant],
+          height === "content" && "h-auto min-h-0 lg:min-h-0",
+          bleed && "-mx-4 -mt-4 sm:-mx-6 sm:-mt-6 lg:-mt-8",
+          className,
+        )}
       >
         {background ? <HeroBackground background={background} /> : null}
         <div
           className={cn(
-            "relative mx-auto flex size-full max-w-content items-end px-4 pb-6 pt-[var(--listen-mobile-page-top,0px)] sm:px-6 sm:pt-0",
+            "relative flex w-full self-stretch items-end pb-6 pt-[var(--listen-mobile-page-top,0px)] sm:pt-0",
+            inset === "default" && "mx-auto max-w-content px-4 sm:px-6",
             contentClassName,
           )}
         >
@@ -295,7 +347,13 @@ export function PageHero({
         </div>
       </section>
       {actions ? (
-        <div className={cn("relative z-10 p-4 sm:px-6", actionsClassName)}>
+        <div
+          className={cn(
+            "relative z-10",
+            bleed ? "mt-6 py-1" : inset === "none" ? "py-4" : "p-4 sm:px-6",
+            actionsClassName,
+          )}
+        >
           {actions}
         </div>
       ) : null}

@@ -13,6 +13,7 @@ export interface AlbumPlaybackTrack {
   global_track_uid?: string;
   global_uid?: string;
   filename: string;
+  length_sec?: number;
   format: string;
   bitrate: number | null;
   sample_rate?: number | null;
@@ -88,6 +89,7 @@ export function buildAlbumPlayerTracks(data: AlbumPlaybackData): Track[] {
           global_album_uid: globalAlbumUid,
           entity_uid: track.entity_uid,
           title: track.tags.title || track.filename,
+          duration: track.length_sec,
           artist: data.artist,
           artist_id: data.artist_id,
           artist_entity_uid: data.artist_entity_uid,
@@ -143,6 +145,7 @@ export function buildAlbumQualityBadges(
             track.globalTrackUid ?? track.global_track_uid ?? track.global_uid,
           entity_uid: track.entity_uid,
           title: track.tags.title || track.filename,
+          duration: track.length_sec,
           artist: "",
           path: track.path,
           format: track.format || undefined,

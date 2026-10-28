@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 
 export function PanelState({
   loading,
@@ -9,11 +10,12 @@ export function PanelState({
   error: unknown;
   children: ReactNode;
 }) {
-  if (loading)
-    return <p className="text-sm text-white/45">Loading federation data…</p>;
+  if (loading) return <LoadingState label="Loading federation data" />;
   if (error)
     return (
-      <p className="text-sm text-red-400">Federation data is unavailable.</p>
+      <p role="alert" className="text-sm text-state-warning-text">
+        Federation data is unavailable.
+      </p>
     );
   return children;
 }

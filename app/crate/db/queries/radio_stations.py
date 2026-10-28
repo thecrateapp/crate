@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import re
 from decimal import Decimal
 
+from sqlalchemy import text
+
 from crate.db.home_context import get_cached_home_context, merged_artists_from_context
-from crate.db.queries.genres_taxonomy import get_genre_taxonomy_cover_path
 from crate.db.repositories.global_user_library import list_global_collection_artists
+from crate.db.tx import read_scope
 from crate.genre_covers import genre_cover_public_url
 from crate.genre_taxonomy import get_genre_display_name, resolve_genre_slug
 
@@ -56,22 +59,64 @@ def _artist_station(row: dict) -> dict | None:
     }
 
 
-def _genre_station(row: dict) -> dict | None:
-    genre_name = (row.get("genre_name") or row.get("name") or "").strip()
-    if not genre_name:
-        return None
+_GENRE_TAG_SEPARATOR = re.compile(r"\s*[,;]\s*")
 
-    genre_slug = resolve_genre_slug(genre_name)
-    if not genre_slug:
-        return None
 
+def _genre_slugs(row: dict) -> list[str]:
+    genre_tag = (row.get("genre_name") or row.get("name") or "").strip()
+    slugs: list[str] = []
+    for part in _GENRE_TAG_SEPARATOR.split(genre_tag):
+        slug = resolve_genre_slug(part) if part else None
+        if slug and slug not in slugs:
+            slugs.append(slug)
+    return slugs
+
+
+def get_genre_radio_representatives(slugs: list[str]) -> dict[str, dict]:
+    if not slugs:
+        return {}
+    with read_scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    """
+                    WITH wanted AS (
+                        SELECT unnest(CAST(:slugs AS text[])) AS slug
+                    )
+                    SELECT DISTINCT ON (wanted.slug)
+                        wanted.slug,
+                        node.cover_path,
+                        album.id AS album_id,
+                        album.entity_uid::text AS album_entity_uid,
+                        album.slug AS album_slug,
+                        album.name AS album_name
+                    FROM wanted
+                    JOIN genres ON genres.slug = wanted.slug
+                    JOIN artist_genres ON artist_genres.genre_id = genres.id
+                    LEFT JOIN genre_taxonomy_nodes node ON node.slug = wanted.slug
+                    LEFT JOIN library_albums album
+                      ON album.artist = artist_genres.artist_name
+                     AND album.has_cover > 0
+                    ORDER BY
+                        wanted.slug,
+                        album.id IS NULL,
+                        artist_genres.weight DESC,
+                        album.id
+                    """
+                ),
+                {"slugs": slugs},
+            )
+            .mappings()
+            .all()
+        )
+    return {str(row["slug"]): dict(row) for row in rows}
+
+
+def _genre_station(
+    genre_slug: str, play_count: int, minutes_listened: int, representative: dict
+) -> dict:
     display_name = get_genre_display_name(genre_slug)
-    cover_url = (
-        genre_cover_public_url(genre_slug)
-        if get_genre_taxonomy_cover_path(genre_slug)
-        else None
-    )
-    return {
+    station = {
         "type": "genre",
         "seed_type": "genre",
         "seed_value": genre_slug,
@@ -79,12 +124,26 @@ def _genre_station(row: dict) -> dict | None:
         "seed_subtitle": "Genre",
         "genre_slug": genre_slug,
         "genre_name": display_name,
-        "cover_url": cover_url,
+        "cover_url": (
+            genre_cover_public_url(genre_slug)
+            if representative.get("cover_path")
+            else None
+        ),
         "title": f"{display_name} Radio",
         "subtitle": "",
-        "play_count": _int_value(row.get("play_count")),
-        "minutes_listened": _int_value(row.get("minutes_listened")),
+        "play_count": play_count,
+        "minutes_listened": minutes_listened,
     }
+    if not station["cover_url"] and representative.get("album_id") is not None:
+        station.update(
+            {
+                "album_id": representative["album_id"],
+                "album_entity_uid": representative.get("album_entity_uid"),
+                "album_slug": representative.get("album_slug"),
+                "album_name": representative.get("album_name"),
+            }
+        )
+    return station
 
 
 def _build_artist_stations(context: dict, *, limit: int) -> list[dict]:
@@ -119,17 +178,24 @@ def _build_artist_stations(context: dict, *, limit: int) -> list[dict]:
 
 
 def _build_genre_stations(context: dict, *, limit: int) -> list[dict]:
-    stations: list[dict] = []
-    seen: set[str] = set()
+    listening: dict[str, list[int]] = {}
     for row in context.get("top_genres") or []:
-        station = _genre_station(row)
-        if not station:
+        for genre_slug in _genre_slugs(row):
+            totals = listening.setdefault(genre_slug, [0, 0])
+            totals[0] += _int_value(row.get("play_count"))
+            totals[1] += _int_value(row.get("minutes_listened"))
+    ranked = sorted(listening.items(), key=lambda item: (-item[1][0], -item[1][1]))
+    representatives = get_genre_radio_representatives(
+        [genre_slug for genre_slug, _ in ranked]
+    )
+    stations: list[dict] = []
+    for genre_slug, (play_count, minutes_listened) in ranked:
+        representative = representatives.get(genre_slug)
+        if representative is None:
             continue
-        genre_slug = station["genre_slug"]
-        if genre_slug in seen:
-            continue
-        seen.add(genre_slug)
-        stations.append(station)
+        stations.append(
+            _genre_station(genre_slug, play_count, minutes_listened, representative)
+        )
         if len(stations) >= limit:
             break
     return stations

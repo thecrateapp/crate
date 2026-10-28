@@ -105,12 +105,25 @@ describe("ShareSheetHost", () => {
     expect(screen.getByText("Telegram")).toBeInTheDocument();
     expect(screen.getByText("Instagram Story")).toBeInTheDocument();
     expect(screen.getByText("Square post")).toBeInTheDocument();
-    expect(screen.getByText("C").parentElement).toHaveClass(
-      "shadow-share-preview",
+    expect(screen.getByText("Share album")).toHaveClass(
+      "crate-mono-label",
+      "uppercase",
     );
-    expect(
-      screen.getByText("WhatsApp").closest("button")?.querySelector("span"),
-    ).toHaveClass("shadow-share-action-icon");
+    expect(screen.getByText("WhatsApp")).toHaveClass(
+      "crate-mono-label",
+      "uppercase",
+    );
+    expect(screen.getByText("WhatsApp").closest("article")).toHaveAttribute(
+      "data-slot",
+      "entity-row",
+    );
+    expect(screen.getByRole("heading", { name: "Jane Doe" })).toHaveClass(
+      "font-display",
+    );
+    expect(screen.getByTestId("media-cover-fallback")).toHaveAttribute(
+      "data-min-size",
+      "48",
+    );
 
     await user.click(screen.getByText("Telegram"));
     expect(openExternalUrl).toHaveBeenCalledWith(
@@ -402,7 +415,10 @@ describe("ShareSheetHost", () => {
 
     const squareButton = screen.getByText("Square post").closest("button");
     expect(squareButton).toBeDisabled();
-    expect(squareButton).toHaveAttribute("aria-busy", "true");
+    expect(squareButton?.closest("article")).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
     expect(
       screen.getByText("Instagram Story").closest("button"),
     ).toBeDisabled();

@@ -22,6 +22,41 @@ def _top_track_row(**overrides):
     return row
 
 
+def test_top_tracks_preserve_each_tracks_source_quality_without_album_inference():
+    from crate.api.browse_artist import _build_artist_top_tracks_payload
+    from crate.api.schemas.browse import ArtistTopTrackResponse
+
+    rows = [
+        _top_track_row(
+            id=1, title="CD source", bit_depth=16, sample_rate=44100, bitrate=744000
+        ),
+        _top_track_row(
+            id=2,
+            title="Hi-res source",
+            bit_depth=24,
+            sample_rate=96000,
+            bitrate=2400000,
+        ),
+        _top_track_row(id=3, title="Unknown source"),
+    ]
+    payload = _build_artist_top_tracks_payload(
+        "Example Artist",
+        count=3,
+        lastfm_top=[{"title": row["title"]} for row in rows],
+        local_tracks=rows,
+    )
+    serialized = [
+        ArtistTopTrackResponse.model_validate(row).model_dump() for row in payload
+    ]
+    assert [
+        (row["bit_depth"], row["sample_rate"], row["bitrate"]) for row in serialized
+    ] == [
+        (16, 44100, 744000),
+        (24, 96000, 2400000),
+        (None, None, None),
+    ]
+
+
 def test_top_tracks_fall_back_to_persisted_rank_signals_not_recent_album_order():
     from crate.api.browse_artist import _build_artist_top_tracks_payload
 

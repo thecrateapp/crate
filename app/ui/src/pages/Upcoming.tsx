@@ -1,19 +1,37 @@
-import { AddShowButton } from "@/components/shows/AddShowButton";
-import { MergeShowsButton } from "@/components/shows/MergeShowsButton";
-import { MergeShowsSheet } from "@/components/shows/MergeShowsSheet";
+import { OpsPageHero, OpsSurface } from "@/components/admin/ops-surfaces";
+import { Calendar, ListOrdered as HeaderList } from "@crate/ui/icons";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
+import {
+  CalendarSync as HeaderCalendarSync,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  X,
+} from "lucide-react";
 import {
   useState,
   useEffect,
   useEffectEvent,
   useMemo,
+  useRef,
   type ReactNode,
 } from "react";
-import { Link, useSearchParams } from "react-router";
+import { useSearchParams } from "react-router";
+import { AddShowButton } from "@/components/shows/AddShowButton";
+import { MergeShowsButton } from "@/components/shows/MergeShowsButton";
+import { MergeShowsSheet } from "@/components/shows/MergeShowsSheet";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { AdminSelect } from "@/components/ui/AdminSelect";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
+import { ListPagination } from "@/components/admin/ListPagination";
+
 import { Button } from "@crate/ui/shadcn/button";
-import { Input } from "@crate/ui/shadcn/input";
 import {
   Popover,
   PopoverContent,
@@ -21,9 +39,10 @@ import {
 } from "@crate/ui/shadcn/popover";
 import { ShowCard } from "@/components/shows/ShowCard";
 import { api } from "@/lib/api";
+import { waitForTask } from "@/lib/tasks";
 import { useAuth } from "@/contexts/AuthContext";
-import { albumPagePath, artistPagePath } from "@/lib/library-routes";
 import { cn } from "@/lib/utils";
+import "./upcoming-show-ticket.css";
 import {
   buildUpcomingCityOptions,
   buildUpcomingGenreOptions,
@@ -31,27 +50,15 @@ import {
   sameShowIds,
 } from "./upcoming-filters";
 import { toast } from "sonner";
-import {
-  Loader2,
-  Download,
-  X,
-  RefreshCw,
-  Disc3,
-  Calendar,
-  Ticket,
-  Sparkles,
-  List,
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  Check,
-  Clock,
-  Merge,
-  Search,
-  Trash2,
-} from "lucide-react";
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
+import {
+  ShowManagementRow,
+  upcomingItemFromCachedShow,
+  type CachedShowEvent,
+  type UpcomingItem,
+} from "@/components/shows/ShowManagementRow";
 
 function groupByMonth(list: UpcomingItem[]): [string, UpcomingItem[]][] {
   const groups = new Map<string, UpcomingItem[]>();
@@ -74,48 +81,17 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-interface UpcomingItem {
-  type: "release" | "show";
-  /** The canonical show ID, on show items only. */
-  show_id?: number;
-  date: string;
-  time?: string;
-  artist: string;
-  artist_id?: number;
-  artist_slug?: string;
-  title: string;
-  album_id?: number;
-  album_slug?: string;
-  subtitle: string;
-  cover_url: string | null;
-  status: string;
-  is_upcoming: boolean;
-  tidal_url?: string;
-  release_id?: number;
-  url?: string;
-  venue?: string;
-  address_line1?: string;
-  city?: string;
-  region?: string;
-  postal_code?: string;
-  country?: string;
-  country_code?: string;
-  latitude?: number;
-  longitude?: number;
-  lineup?: string[];
-  lineup_artists?: UpcomingArtistRef[];
-  genres?: string[];
-}
-
-interface UpcomingArtistRef {
-  name: string;
-  id?: number;
-  slug?: string;
+interface SetlistCoverage {
+  artist_count: number;
+  fresh: number;
+  stale: number;
+  missing: number;
+  unknown: number;
+  queued?: number | null;
 }
 
 type ViewMode = "list" | "calendar";
-type TypeFilter = "all" | "releases" | "shows";
-
+const SHOWS_PAGE_SIZE = 20;
 const NOT_LISTED_TEXT = "That show isn't in the upcoming list.";
 
 /** The DOM id a linked show scrolls to. */
@@ -128,84 +104,35 @@ function showAnchorId(showId: number): string {
  * exact twins (two saved shows with the same details) stay apart.
  */
 function itemKey(item: UpcomingItem): string {
-  if (item.type === "show" && item.show_id != null)
-    return `show-${item.show_id}`;
-  return `${item.type}-${item.artist}-${
-    item.release_id ?? item.url ?? item.venue ?? item.title
-  }-${item.date}`;
-}
-
-function buildArtistRef(
-  name?: string,
-  id?: number,
-  slug?: string,
-): UpcomingArtistRef | null {
-  if (!name) return null;
-  return { name, id, slug };
-}
-
-function getPrimaryArtist(item: UpcomingItem): UpcomingArtistRef | null {
-  return buildArtistRef(item.artist, item.artist_id, item.artist_slug);
-}
-
-function getArtistHref(artist: UpcomingArtistRef | null | undefined) {
-  if (!artist || artist.id == null) return undefined;
-  return artistPagePath({
-    artistId: artist.id,
-    artistSlug: artist.slug,
-    artistName: artist.name,
-  });
-}
-
-function getReleaseAlbumHref(item: UpcomingItem) {
-  if (item.type !== "release") return undefined;
-  if (item.album_id == null && !item.album_slug) return undefined;
-  return albumPagePath({
-    albumId: item.album_id,
-    albumSlug: item.album_slug,
-    albumName: item.title,
-    artistSlug: item.artist_slug,
-    artistName: item.artist,
-  });
-}
-
-function ArtistTextLink({
-  artist,
-  className,
-  children,
-}: {
-  artist: UpcomingArtistRef | null | undefined;
-  className?: string;
-  children?: ReactNode;
-}) {
-  const href = getArtistHref(artist);
-  const content = children ?? artist?.name ?? "";
-  if (href) {
-    return (
-      <Link to={href} className={className}>
-        {content}
-      </Link>
-    );
-  }
-  return <span className={className}>{content}</span>;
+  return item.show_id != null
+    ? `show-${item.show_id}`
+    : `show-${item.artist}-${item.venue ?? item.title}-${item.date}`;
 }
 
 export function Upcoming() {
-  const { isAdmin, hasCapability, hasAnyCapability } = useAuth();
+  const { hasCapability } = useAuth();
   const canCurateShows = hasCapability("curation.shows.write");
-  const canCurateReleases = hasCapability("curation.releases.write");
-  const canAcquireReleases = hasAnyCapability([
-    "curation.releases.write",
-    "library.tidal.manage",
-  ]);
+  const canRefreshSetlists = hasCapability("library.metadata.write");
   const [items, setItems] = useState<UpcomingItem[]>([]);
+  const [setlistCoverage, setSetlistCoverage] = useState<SetlistCoverage>({
+    artist_count: 0,
+    fresh: 0,
+    stale: 0,
+    missing: 0,
+    unknown: 0,
+  });
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<TypeFilter>("all");
+  const [loadError, setLoadError] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const readGeneration = useRef(0);
+  const syncWait = useRef<AbortController | null>(null);
   const [genreFilter, setGenreFilter] = useState("");
   const [cityFilter, setCityFilter] = useState("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [view, setView] = useState<ViewMode>("list");
   const [syncing, setSyncing] = useState(false);
+  const [refreshingSetlists, setRefreshingSetlists] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [calMonth, setCalMonth] = useState(() => {
     const now = new Date();
@@ -222,46 +149,71 @@ export function Upcoming() {
   const [mergeIds, setMergeIds] = useState<readonly number[] | null>(null);
 
   async function fetchItems() {
+    const request = ++readGeneration.current;
+    setLoadError(false);
+    setLoading(!hasLoaded);
     try {
-      const data = await api<{ items: UpcomingItem[] }>("/api/upcoming");
-      setItems(data.items || []);
+      const data = await api<{
+        events: CachedShowEvent[];
+        setlist_coverage?: SetlistCoverage;
+      }>("/api/shows/cached?limit=5000");
+      if (request !== readGeneration.current) return;
+      setItems((data.events || []).map(upcomingItemFromCachedShow));
+      setSetlistCoverage(
+        data.setlist_coverage || {
+          artist_count: 0,
+          fresh: 0,
+          stale: 0,
+          missing: 0,
+          unknown: 0,
+        },
+      );
+      setHasLoaded(true);
     } catch {
-      /* */
+      if (request === readGeneration.current) setLoadError(true);
     } finally {
-      setLoading(false);
+      if (request === readGeneration.current) setLoading(false);
     }
   }
 
   useEffect(() => {
-    fetchItems();
+    void fetchItems();
+    return () => {
+      readGeneration.current += 1;
+      syncWait.current?.abort();
+    };
   }, []);
 
   const availableGenres = useMemo(() => {
-    return buildUpcomingGenreOptions(items, { type: filter, search });
-  }, [items, filter, search]);
+    return buildUpcomingGenreOptions(items, { type: "shows", search });
+  }, [items, search]);
 
   const availableCities = useMemo(() => {
-    return buildUpcomingCityOptions(items, { type: filter });
-  }, [items, filter]);
+    return buildUpcomingCityOptions(items, { type: "shows" });
+  }, [items]);
 
   // Reset genre/city filter if the selected value is no longer available
   useEffect(() => {
-    if (genreFilter && !availableGenres.some(([g]) => g === genreFilter))
+    if (genreFilter && !availableGenres.some(([g]) => g === genreFilter)) {
       setGenreFilter("");
+      setPage(1);
+    }
   }, [genreFilter, availableGenres]);
   useEffect(() => {
-    if (cityFilter && !availableCities.some(([c]) => c === cityFilter))
+    if (cityFilter && !availableCities.some(([c]) => c === cityFilter)) {
       setCityFilter("");
+      setPage(1);
+    }
   }, [cityFilter, availableCities]);
 
   const filtered = useMemo(() => {
     return filterUpcomingItems(items, {
-      type: filter,
+      type: "shows",
       search,
       genre: genreFilter,
       city: cityFilter,
     });
-  }, [items, filter, search, genreFilter, cityFilter]);
+  }, [items, search, genreFilter, cityFilter]);
 
   const openLinkedShow = useEffectEvent((raw: string) => {
     const next = new URLSearchParams(searchParams);
@@ -276,20 +228,31 @@ export function Upcoming() {
       return;
     }
     setLinkNotice("");
-    const type = filter === "releases" ? "shows" : filter;
-    setFilter(type);
-    if (
-      !filterUpcomingItems([item], {
-        type,
+    const isInCurrentResults =
+      filterUpcomingItems([item], {
+        type: "shows",
         search,
         genre: genreFilter,
         city: cityFilter,
-      }).length
-    ) {
+      }).length > 0;
+    const targetItems = isInCurrentResults
+      ? filtered
+      : filterUpcomingItems(items, {
+          type: "shows",
+          search: "",
+          genre: "",
+          city: "",
+        });
+    const targetIndex = targetItems.findIndex(
+      (candidate) => itemKey(candidate) === itemKey(item),
+    );
+    if (!isInCurrentResults) {
       setSearch("");
       setGenreFilter("");
       setCityFilter("");
     }
+    if (targetIndex >= 0)
+      setPage(Math.floor(targetIndex / SHOWS_PAGE_SIZE) + 1);
     setView("list");
     setExpandedId(itemKey(item));
     setScrollTo(showId);
@@ -299,74 +262,66 @@ export function Upcoming() {
   }, [loading, linkedShowId]);
   useEffect(() => {
     if (scrollTo === null) return;
-    document
-      .getElementById(showAnchorId(scrollTo))
-      ?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    const anchor = document.getElementById(showAnchorId(scrollTo));
+    if (!anchor) return;
+    anchor.scrollIntoView?.({ block: "center", behavior: "smooth" });
     setScrollTo(null);
-  }, [scrollTo]);
+  }, [scrollTo, page]);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const upcoming = filtered.filter(
-    (i) => i.is_upcoming || (i.date && i.date >= today),
+  const pageCount = Math.max(1, Math.ceil(filtered.length / SHOWS_PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const upcoming = filtered.slice(
+    (currentPage - 1) * SHOWS_PAGE_SIZE,
+    currentPage * SHOWS_PAGE_SIZE,
   );
-  const past = filtered.filter(
-    (i) => !i.is_upcoming && (!i.date || i.date < today),
-  );
-
-  async function downloadRelease(id: number) {
-    try {
-      await api(`/api/acquisition/new-releases/${id}/download`, "POST");
-      toast.success("Download started");
-      setItems((prev) =>
-        prev.map((i) =>
-          i.release_id === id ? { ...i, status: "downloading" } : i,
-        ),
-      );
-    } catch {
-      toast.error("Download failed");
-    }
-  }
-
-  async function dismissRelease(id: number) {
-    try {
-      await api(`/api/acquisition/new-releases/${id}/dismiss`, "POST");
-      setItems((prev) => prev.filter((i) => i.release_id !== id));
-    } catch {
-      toast.error("Dismiss failed");
-    }
-  }
 
   async function syncShows() {
+    const controller = new AbortController();
+    syncWait.current = controller;
     setSyncing(true);
     try {
-      await api("/api/tasks/sync-shows", "POST");
-      toast.success("Show sync started");
-      setTimeout(() => {
-        setSyncing(false);
-        fetchItems();
-      }, 10000);
-    } catch {
-      setSyncing(false);
-      toast.error("Failed to sync shows");
+      const { task_id } = await api<{ task_id: string }>(
+        "/api/tasks/sync-shows",
+        "POST",
+      );
+      if (!task_id) throw new Error("Show sync returned no task identifier");
+      toast.success("Show sync queued");
+      const task = await waitForTask(task_id, 300000, controller.signal);
+      if (task.status !== "completed")
+        throw new Error(task.error || `Show sync ${task.status}`);
+      toast.success("Show sync completed");
+      await fetchItems();
+    } catch (error) {
+      if (!controller.signal.aborted)
+        toast.error(
+          error instanceof Error ? error.message : "Failed to sync shows",
+        );
+    } finally {
+      if (!controller.signal.aborted) setSyncing(false);
     }
   }
 
-  async function clearCaches() {
+  async function refreshStaleSetlists() {
+    setRefreshingSetlists(true);
     try {
-      await api("/api/tasks/clean/completed", "POST");
-      toast.success("Caches cleared");
-      fetchItems();
+      const result = await api<SetlistCoverage>(
+        "/api/shows/probable-setlists/refresh",
+        "POST",
+      );
+      setSetlistCoverage(result);
+      if ((result.queued || 0) > 0) {
+        toast.success(`Queued ${result.queued} probable setlist refreshes`);
+      } else {
+        toast.success("All probable setlists are up to date");
+      }
     } catch {
-      toast.error("Failed to clear");
+      toast.error("Could not refresh probable setlists");
+    } finally {
+      setRefreshingSetlists(false);
     }
   }
 
-  const releaseCount = items.filter(
-    (i) => i.type === "release" && i.is_upcoming,
-  ).length;
   const showCount = items.filter((i) => i.type === "show").length;
-  const releaseDownload = canAcquireReleases ? downloadRelease : undefined;
-  const releaseDismiss = canCurateReleases ? dismissRelease : undefined;
   const showActions = canCurateShows
     ? (item: UpcomingItem) =>
         item.show_id ? (
@@ -380,97 +335,181 @@ export function Upcoming() {
               setMergeOpen(true);
             }}
           >
-            <Merge size={14} className="mr-1" />
             Merge duplicates
           </Button>
         ) : null
     : undefined;
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-md border border-white/10 bg-panel-surface/95 p-4 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl md:p-5">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/12 text-primary shadow-[0_18px_40px_rgba(6,182,212,0.14)]">
-                <Calendar size={22} />
-              </div>
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-white">
-                  Upcoming
-                </h1>
-                <p className="text-sm text-white/55">
-                  Release radar and live dates, with quick triage for what lands
-                  next in Crate.
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <CrateChip active>{releaseCount} releases</CrateChip>
-              <CrateChip className="border-amber-500/25 bg-amber-500/10 text-amber-200">
-                {showCount} shows
-              </CrateChip>
-              <CrateChip icon={Clock}>{upcoming.length} upcoming</CrateChip>
-              {past.length > 0 && <CrateChip>{past.length} archived</CrateChip>}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.04] p-1">
-              <CratePill
-                active={view === "list"}
-                onClick={() => setView("list")}
-                icon={List}
-              >
-                List
-              </CratePill>
-              <CratePill
-                active={view === "calendar"}
-                onClick={() => setView("calendar")}
-                icon={CalendarDays}
-              >
-                Calendar
-              </CratePill>
-            </div>
+    <div className="min-w-0 space-y-6">
+      <OpsPageHero
+        title="Show Management"
+        description="Keep the live calendar clean and check that every billed artist has a recent probable setlist."
+        compactActions
+        actions={
+          <PageHeaderActions label="Show management actions">
             <AddShowButton onSaved={() => void fetchItems()} />
             <MergeShowsButton onMerged={() => void fetchItems()} />
             {canCurateShows ? (
-              <Button size="sm" onClick={syncShows} disabled={syncing}>
-                <RefreshCw
-                  size={14}
-                  className={cn("mr-1", syncing && "animate-spin")}
-                />
-                Sync shows
-              </Button>
+              <PageHeaderAction
+                label="Sync shows"
+                onClick={syncShows}
+                disabled={syncing}
+                aria-busy={syncing}
+              >
+                {syncing ? (
+                  <Loader2
+                    data-admin-ux="upcoming-sync"
+                    aria-hidden="true"
+                    size={14}
+                    className="animate-spin"
+                  />
+                ) : null}
+                {!syncing ? (
+                  <HeaderCalendarSync
+                    data-admin-ux="header-sync-shows"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
             ) : null}
-            {isAdmin ? (
-              <ActionIconButton onClick={clearCaches} title="Clear caches">
-                <Trash2 size={15} />
-              </ActionIconButton>
+            {canRefreshSetlists ? (
+              <PageHeaderAction
+                label={
+                  refreshingSetlists
+                    ? "Refreshing setlists…"
+                    : "Refresh setlists"
+                }
+                onClick={refreshStaleSetlists}
+                disabled={
+                  refreshingSetlists ||
+                  setlistCoverage.stale +
+                    setlistCoverage.missing +
+                    setlistCoverage.unknown ===
+                    0
+                }
+                aria-busy={refreshingSetlists}
+              >
+                {refreshingSetlists ? (
+                  <Loader2
+                    data-admin-ux="upcoming-refresh-setlists-loading"
+                    aria-hidden="true"
+                    size={14}
+                    className="animate-spin"
+                  />
+                ) : (
+                  <HeaderCalendarSync
+                    data-admin-ux="upcoming-refresh-setlists"
+                    aria-hidden="true"
+                  />
+                )}
+              </PageHeaderAction>
             ) : null}
-          </div>
-        </div>
-
-        <div className="mt-5 rounded-md border border-white/8 bg-white/[0.03] p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative min-w-[240px] flex-1">
-              <Search
-                size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
+            <PageHeaderAction
+              label="List view"
+              aria-pressed={view === "list"}
+              onClick={() => setView("list")}
+            >
+              <HeaderList
+                data-admin-ux="upcoming-view-list"
+                aria-hidden="true"
               />
-              <Input
-                type="text"
+            </PageHeaderAction>
+            <PageHeaderAction
+              label="Calendar view"
+              aria-pressed={view === "calendar"}
+              onClick={() => setView("calendar")}
+            >
+              <Calendar
+                data-admin-ux="upcoming-view-calendar"
+                aria-hidden="true"
+              />
+            </PageHeaderAction>
+          </PageHeaderActions>
+        }
+      >
+        {hasLoaded ? (
+          <>
+            <InfoBadge active>{showCount} shows</InfoBadge>
+            <InfoBadge>{setlistCoverage.artist_count} billed artists</InfoBadge>
+            <InfoBadge
+              tone="success"
+              title="Generated within the freshness window: 7 days, or 24 hours during an active tour."
+            >
+              {setlistCoverage.fresh} recent
+            </InfoBadge>
+            {setlistCoverage.stale > 0 ? (
+              <InfoBadge tone="warning">
+                {setlistCoverage.stale} outdated
+              </InfoBadge>
+            ) : null}
+            {setlistCoverage.missing > 0 ? (
+              <InfoBadge tone="neutral">
+                {setlistCoverage.missing} missing
+              </InfoBadge>
+            ) : null}
+            {setlistCoverage.unknown > 0 ? (
+              <InfoBadge tone="info">
+                {setlistCoverage.unknown} without date
+              </InfoBadge>
+            ) : null}
+            {setlistCoverage.queued != null ? (
+              <InfoBadge tone="info">
+                {setlistCoverage.queued} refreshes queued
+              </InfoBadge>
+            ) : null}
+          </>
+        ) : (
+          <InfoBadge>
+            {loading ? "Loading shows" : "Show data unavailable"}
+          </InfoBadge>
+        )}
+      </OpsPageHero>
+
+      {loadError ? (
+        <ErrorState
+          title="Shows unavailable"
+          message={
+            hasLoaded
+              ? "The latest shows could not be loaded. The last successful calendar remains visible."
+              : "The show calendar could not be loaded. Try again."
+          }
+          onRetry={() => void fetchItems()}
+        />
+      ) : null}
+
+      <OpsSurface className="p-3">
+        <div className="flex flex-wrap items-start gap-4">
+          <div className="min-w-0 flex-1 basis-60">
+            <label
+              htmlFor="upcoming-artist"
+              className="crate-form-field min-w-0"
+            >
+              <MonoLabel as="span">Artist</MonoLabel>
+              <SearchInput
+                id="upcoming-artist"
+                label="Artist"
                 placeholder="Filter by artist..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-10 rounded-md border-white/10 bg-white/[0.04] pl-9"
+                onValueChange={(value) => {
+                  setSearch(value);
+                  setPage(1);
+                }}
               />
-            </div>
+            </label>
+          </div>
 
-            {availableGenres.length > 0 && (
+          {availableGenres.length > 0 && (
+            <div className="crate-form-field">
+              <MonoLabel as="span" data-slot="form-field-label">
+                Genre
+              </MonoLabel>
               <AdminSelect
                 value={genreFilter}
-                onChange={setGenreFilter}
+                onChange={(value) => {
+                  setGenreFilter(value);
+                  setPage(1);
+                }}
                 options={availableGenres.map(([name, count]) => ({
                   value: name,
                   label: name,
@@ -480,12 +519,20 @@ export function Upcoming() {
                 searchable
                 searchPlaceholder="Search genres..."
               />
-            )}
+            </div>
+          )}
 
-            {availableCities.length > 0 && (
+          {availableCities.length > 0 && (
+            <div className="crate-form-field">
+              <MonoLabel as="span" data-slot="form-field-label">
+                City
+              </MonoLabel>
               <AdminSelect
                 value={cityFilter}
-                onChange={setCityFilter}
+                onChange={(value) => {
+                  setCityFilter(value);
+                  setPage(1);
+                }}
                 options={availableCities.map(([name, count]) => ({
                   value: name,
                   label: name,
@@ -495,106 +542,92 @@ export function Upcoming() {
                 searchable
                 searchPlaceholder="Search cities..."
               />
-            )}
-          </div>
-
-          {/* Always mounted, so a screen reader hears the notice arrive. */}
-          <div className={cn("flex items-center gap-2", linkNotice && "mt-3")}>
-            <p role="status" className="text-sm text-white/70 empty:sr-only">
-              {linkNotice}
-            </p>
-            {linkNotice ? (
-              <ActionIconButton
-                onClick={() => setLinkNotice("")}
-                title="Dismiss"
-                aria-label="Dismiss"
-              >
-                <X size={14} />
-              </ActionIconButton>
-            ) : null}
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {(["all", "releases", "shows"] as const).map((f) => (
-              <CratePill
-                key={f}
-                active={filter === f}
-                icon={
-                  f === "releases" ? Disc3 : f === "shows" ? Ticket : undefined
-                }
-                onClick={() => {
-                  setFilter(f);
-                  if (f !== "shows") {
-                    setGenreFilter("");
-                    setCityFilter("");
-                  }
-                }}
-              >
-                {f === "all" ? "All items" : f}
-              </CratePill>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
-      </section>
+
+        {/* Always mounted, so a screen reader hears the notice arrive. */}
+        <div className={cn("flex items-center gap-2", linkNotice && "mt-3")}>
+          <p
+            role="status"
+            aria-label="Show link status"
+            className="text-sm text-text-muted empty:sr-only"
+          >
+            {linkNotice}
+          </p>
+          {linkNotice ? (
+            <ActionIconButton
+              onClick={() => setLinkNotice("")}
+              title="Dismiss"
+              aria-label="Dismiss"
+            >
+              <X data-admin-ux="upcoming-dismiss-notice" size={14} />
+            </ActionIconButton>
+          ) : null}
+        </div>
+      </OpsSurface>
 
       {loading && (
-        <div className="flex items-center justify-center py-24">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <div
+          role="status"
+          aria-label="Loading shows"
+          className="flex items-center justify-center py-24"
+        >
+          <Loader2
+            data-admin-ux="upcoming-loading"
+            aria-hidden="true"
+            className="h-6 w-6 animate-spin text-accent-action-hi"
+          />
         </div>
       )}
 
-      {!loading && items.length === 0 && (
-        <div className="rounded-md border border-white/10 bg-panel-surface px-6 py-24 text-center shadow-[0_28px_80px_rgba(0,0,0,0.24)]">
-          <Calendar
-            size={48}
-            className="text-primary mx-auto mb-3 opacity-30"
-          />
-          <div className="text-lg font-semibold">Nothing upcoming</div>
-          <div className="text-sm text-muted-foreground mt-1">
-            Check for new releases or sync shows
-          </div>
-        </div>
+      {!loading && !loadError && items.length === 0 && (
+        <OpsSurface role="status" className="px-6 py-24 text-center">
+          <h2 className="font-display text-lg font-semibold text-text-primary">
+            No upcoming shows
+          </h2>
+          <p className="mt-1 text-sm text-text-muted">
+            Add a show manually or sync the artists’ upcoming dates.
+          </p>
+        </OpsSurface>
       )}
+
+      {!loading && items.length > 0 && filtered.length === 0 ? (
+        <OpsSurface role="status" className="px-6 py-16 text-center">
+          <h2 className="font-display text-lg font-semibold text-text-primary">
+            No shows match these filters
+          </h2>
+          <p className="mt-1 text-sm text-text-muted">
+            Clear the artist, genre, or city filters to see the full calendar.
+          </p>
+        </OpsSurface>
+      ) : null}
 
       {/* List View */}
       {!loading && view === "list" && (
         <div className="space-y-8">
           {upcoming.length > 0 && (
             <section>
-              <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.24em] text-primary/90">
-                <Sparkles size={14} /> Coming Up
-              </h2>
+              <MonoLabel as="h2" tone="accent" className="mb-4">
+                Show calendar
+              </MonoLabel>
               {groupByMonth(upcoming).map(([month, monthItems]) => (
                 <MonthGroup
                   key={month}
                   month={month}
                   items={monthItems}
-                  onDownload={releaseDownload}
-                  onDismiss={releaseDismiss}
                   expandedId={expandedId}
                   onToggleExpand={setExpandedId}
                   showActions={showActions}
                 />
               ))}
-            </section>
-          )}
-          {past.length > 0 && (
-            <section>
-              <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.24em] text-white/45">
-                Recently Released
-              </h2>
-              {groupByMonth(past).map(([month, monthItems]) => (
-                <MonthGroup
-                  key={month}
-                  month={month}
-                  items={monthItems}
-                  onDownload={releaseDownload}
-                  onDismiss={releaseDismiss}
-                  expandedId={expandedId}
-                  onToggleExpand={setExpandedId}
-                  showActions={showActions}
-                />
-              ))}
+              <ListPagination
+                label="shows"
+                itemCount={filtered.length}
+                page={currentPage}
+                pageSize={SHOWS_PAGE_SIZE}
+                onPageChange={setPage}
+              />
             </section>
           )}
         </div>
@@ -608,9 +641,12 @@ export function Upcoming() {
           onMonthChange={(dir) =>
             setCalMonth((m) => new Date(m.getFullYear(), m.getMonth() + dir, 1))
           }
-          onDownload={releaseDownload}
-          onDismiss={releaseDismiss}
           onShowClick={(item) => {
+            const itemIndex = filtered.findIndex(
+              (candidate) => itemKey(candidate) === itemKey(item),
+            );
+            if (itemIndex >= 0)
+              setPage(Math.floor(itemIndex / SHOWS_PAGE_SIZE) + 1);
             setView("list");
             setExpandedId(itemKey(item));
           }}
@@ -634,16 +670,12 @@ export function Upcoming() {
 function MonthGroup({
   month,
   items,
-  onDownload,
-  onDismiss,
   expandedId,
   onToggleExpand,
   showActions,
 }: {
   month: string;
   items: UpcomingItem[];
-  onDownload?: (id: number) => void;
-  onDismiss?: (id: number) => void;
   expandedId: string | null;
   onToggleExpand: (id: string | null) => void;
   showActions?: (item: UpcomingItem) => ReactNode;
@@ -658,11 +690,11 @@ function MonthGroup({
 
   return (
     <div className="mb-6">
-      <div className="mb-3 flex items-center gap-2 border-b border-white/8 pb-2">
-        <div className="text-xs font-medium uppercase tracking-[0.22em] text-white/35">
+      <div className="mb-3 flex items-center gap-2 border-b border-border-quiet pb-2">
+        <MonoLabel as="div" size="eyebrow">
           {label}
-        </div>
-        <CrateChip>{items.length} items</CrateChip>
+        </MonoLabel>
+        <InfoBadge>{items.length} shows</InfoBadge>
       </div>
       <div className="space-y-2">
         {items.map((item) => {
@@ -673,20 +705,12 @@ function MonthGroup({
               key={key}
               id={item.show_id ? showAnchorId(item.show_id) : undefined}
             >
-              {item.type === "show" ? (
-                <ShowCard
-                  show={item}
-                  expanded={isExpanded}
-                  onToggle={() => onToggleExpand(isExpanded ? null : key)}
-                  actions={isExpanded ? showActions?.(item) : undefined}
-                />
-              ) : (
-                <EventCard
-                  item={item}
-                  onDownload={onDownload}
-                  onDismiss={onDismiss}
-                />
-              )}
+              <ShowManagementRow
+                item={item}
+                expanded={isExpanded}
+                onToggle={() => onToggleExpand(isExpanded ? null : key)}
+                actions={isExpanded ? showActions?.(item) : undefined}
+              />
             </div>
           );
         })}
@@ -695,182 +719,17 @@ function MonthGroup({
   );
 }
 
-// ── EventCard ──
-
-function EventCard({
-  item,
-  onDownload,
-  onDismiss,
-  onClick,
-}: {
-  item: UpcomingItem;
-  onDownload?: (id: number) => void;
-  onDismiss?: (id: number) => void;
-  onClick?: () => void;
-}) {
-  const primaryArtist = getPrimaryArtist(item);
-  const dateObj = item.date ? new Date(item.date + "T12:00:00") : null;
-  const dateStr = dateObj
-    ? dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-    : "";
-  const timeStr = item.time ? item.time.slice(0, 5) : "";
-  const albumHref = getReleaseAlbumHref(item);
-
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      className={cn(
-        "group relative overflow-hidden rounded-md border p-3.5 transition-[background-color,border-color,box-shadow] duration-200",
-        "bg-white/[0.04] shadow-[0_18px_48px_rgba(0,0,0,0.22)] backdrop-blur-xl hover:bg-white/[0.07]",
-        item.tidal_url
-          ? "border-primary/25 shadow-[0_0_22px_rgba(6,182,212,0.15)]"
-          : "border-white/10 hover:border-white/20",
-      )}
-      onClick={onClick}
-      onKeyDown={(event) => {
-        if (event.target !== event.currentTarget) return;
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onClick?.();
-        }
-      }}
-    >
-      <div
-        className={cn(
-          "pointer-events-none absolute inset-0 opacity-70 transition-opacity group-hover:opacity-100",
-          "bg-[radial-gradient(circle_at_top_left,rgba(6,182,212,0.14),transparent_48%)]",
-        )}
-      />
-      <div className="relative flex items-center gap-4">
-        {/* Thumbnail */}
-        <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-md bg-secondary/60 shadow-[0_16px_36px_rgba(0,0,0,0.22)]">
-          {item.cover_url ? (
-            <img
-              src={item.cover_url}
-              alt=""
-              className="w-full h-full object-cover"
-            />
-          ) : null}
-          {item.status === "downloading" && (
-            <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-              <Loader2 size={16} className="text-primary animate-spin" />
-            </div>
-          )}
-          {item.status === "downloaded" && (
-            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-              <Check size={16} className="text-green-400" />
-            </div>
-          )}
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            {albumHref ? (
-              <Link
-                to={albumHref}
-                className="truncate text-sm font-medium text-white transition-colors hover:text-primary"
-              >
-                {item.title}
-              </Link>
-            ) : (
-              <span className="truncate text-sm font-medium text-white">
-                {item.title}
-              </span>
-            )}
-            {item.tidal_url && <CrateChip active>Lossless</CrateChip>}
-          </div>
-          <div className="mt-1 flex items-center gap-1.5 truncate text-xs text-white/55">
-            <ArtistTextLink
-              artist={primaryArtist}
-              className="hover:text-foreground transition-colors"
-            >
-              {item.artist}
-            </ArtistTextLink>
-            <span className="text-muted-foreground/40">&middot;</span>
-            <span>{item.subtitle}</span>
-          </div>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <CrateChip>{item.status}</CrateChip>
-            {item.is_upcoming && <CrateChip active>Upcoming</CrateChip>}
-            {timeStr && <CrateChip icon={Clock}>{timeStr}</CrateChip>}
-          </div>
-        </div>
-
-        {/* Date */}
-        <div
-          className={cn(
-            "flex-shrink-0 rounded-md border px-3 py-2 text-right shadow-[0_14px_34px_rgba(0,0,0,0.18)]",
-            "border-primary/20 bg-primary/10 text-primary",
-          )}
-        >
-          <div className="text-xs font-semibold">{dateStr}</div>
-          {timeStr && (
-            <div className="text-[10px] text-white/45">{timeStr}</div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          {albumHref ? (
-            <Link
-              to={albumHref}
-              className="inline-flex h-9 items-center rounded-md border border-primary/20 bg-primary/10 px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
-              onClick={(event) => event.stopPropagation()}
-            >
-              Open album
-            </Link>
-          ) : null}
-          {item.status === "detected" &&
-            item.tidal_url &&
-            onDownload &&
-            item.release_id && (
-              <ActionIconButton
-                tone="primary"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDownload(item.release_id!);
-                }}
-                title="Download release"
-              >
-                <Download size={16} />
-              </ActionIconButton>
-            )}
-          {onDismiss && item.release_id && item.status === "detected" && (
-            <ActionIconButton
-              tone="danger"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDismiss(item.release_id!);
-              }}
-              title="Dismiss release"
-            >
-              <X size={14} />
-            </ActionIconButton>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Show Detail Panel (inline expansion) ──
-
 // ── Calendar View ──
 
 function CalendarView({
   items,
   month,
   onMonthChange,
-  onDownload,
-  onDismiss,
   onShowClick,
 }: {
   items: UpcomingItem[];
   month: Date;
   onMonthChange: (dir: number) => void;
-  onDownload?: (id: number) => void;
-  onDismiss?: (id: number) => void;
   onShowClick: (item: UpcomingItem) => void;
 }) {
   const year = month.getFullYear();
@@ -900,92 +759,101 @@ function CalendarView({
   }, [items, year, m]);
 
   return (
-    <div className="rounded-md border border-white/10 bg-panel-surface p-4 shadow-[0_28px_80px_rgba(0,0,0,0.24)]">
+    <OpsSurface className="p-4">
       {/* Month navigation */}
       <div className="flex items-center justify-between mb-4">
-        <ActionIconButton
-          onClick={() => onMonthChange(-1)}
-          title="Previous month"
-        >
-          <ChevronLeft size={16} />
-        </ActionIconButton>
-        <span className="text-sm font-semibold text-white/85">
+        <ActionButton label="Previous month" onClick={() => onMonthChange(-1)}>
+          <ChevronLeft
+            data-admin-ux="upcoming-previous"
+            aria-hidden="true"
+            size={16}
+          />
+        </ActionButton>
+        <MonoLabel as="h2" tone="accent" className="text-center">
           {month.toLocaleDateString("en-US", {
             month: "long",
             year: "numeric",
           })}
-        </span>
-        <ActionIconButton onClick={() => onMonthChange(1)} title="Next month">
-          <ChevronRight size={16} />
-        </ActionIconButton>
+        </MonoLabel>
+        <ActionButton label="Next month" onClick={() => onMonthChange(1)}>
+          <ChevronRight
+            data-admin-ux="upcoming-next"
+            aria-hidden="true"
+            size={16}
+          />
+        </ActionButton>
       </div>
 
-      {/* Day headers */}
-      <div className="grid grid-cols-7 gap-px mb-1">
-        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-          <div
-            key={d}
-            className="py-1 text-center text-[10px] uppercase tracking-[0.2em] text-white/30"
-          >
-            {d}
-          </div>
-        ))}
-      </div>
-
-      {/* Calendar grid */}
-      <div className="grid grid-cols-7 gap-px">
-        {Array.from({ length: startOffset }, (_, slot) => `empty-${slot}`).map(
-          (key) => (
-            <div
-              key={key}
-              className="min-h-[92px] rounded-md border border-white/5 bg-white/[0.02]"
-            />
-          ),
-        )}
-        {Array.from({ length: daysInMonth }, (_, i) => {
-          const day = i + 1;
-          const dayItems = byDay.get(day) || [];
-          const isToday = day === todayDay;
-          return (
-            <div
-              key={day}
-              className={cn(
-                "min-h-[92px] rounded-md border p-2 shadow-[0_12px_32px_rgba(0,0,0,0.16)]",
-                isToday
-                  ? "border-primary/30 bg-primary/8"
-                  : "border-white/6 bg-white/[0.03]",
-                dayItems.length > 0 && "bg-white/[0.05]",
-              )}
-            >
-              <div
-                className={cn(
-                  "mb-1 text-[10px]",
-                  isToday ? "text-primary" : "text-white/35",
-                )}
+      <div className="overflow-x-auto">
+        <div className="min-w-[630px]">
+          {/* Day headers */}
+          <div className="grid grid-cols-7 gap-px mb-1">
+            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+              <MonoLabel
+                key={d}
+                as="div"
+                size="eyebrow"
+                className="py-1 text-center"
               >
-                {day}
-              </div>
-              <div className="space-y-0.5">
-                {dayItems.slice(0, 3).map((item) => (
-                  <CalendarPill
-                    key={itemKey(item)}
-                    item={item}
-                    onDownload={onDownload}
-                    onDismiss={onDismiss}
-                    onShowClick={() => onShowClick(item)}
-                  />
-                ))}
-                {dayItems.length > 3 && (
-                  <div className="text-[9px] text-muted-foreground/40">
-                    +{dayItems.length - 3} more
+                {d}
+              </MonoLabel>
+            ))}
+          </div>
+
+          {/* Calendar grid */}
+          <div className="grid grid-cols-7 gap-px">
+            {Array.from(
+              { length: startOffset },
+              (_, slot) => `empty-${slot}`,
+            ).map((key) => (
+              <div
+                key={key}
+                className="min-h-[92px] rounded-md border border-border-quiet bg-surface-canvas"
+              />
+            ))}
+            {Array.from({ length: daysInMonth }, (_, i) => {
+              const day = i + 1;
+              const dayItems = byDay.get(day) || [];
+              const isToday = day === todayDay;
+              return (
+                <div
+                  key={day}
+                  className={cn(
+                    "min-h-[92px] rounded-md border border-border-quiet bg-surface-canvas p-2",
+                    isToday
+                      ? "border-accent-action-hi bg-accent-action/10"
+                      : dayItems.length > 0 && "border-accent-action-hi/30",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "mb-1 font-mono font-normal text-[10px]",
+                      isToday ? "text-accent-action-hi" : "text-text-muted",
+                    )}
+                  >
+                    {day}
                   </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+                  <div className="space-y-0.5">
+                    {dayItems.slice(0, 3).map((item) => (
+                      <CalendarPill
+                        key={itemKey(item)}
+                        item={item}
+                        onShowClick={() => onShowClick(item)}
+                      />
+                    ))}
+                    {dayItems.length > 3 && (
+                      <div className="text-[9px] text-muted-foreground/40">
+                        +{dayItems.length - 3} more
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
-    </div>
+    </OpsSurface>
   );
 }
 
@@ -993,159 +861,41 @@ function CalendarView({
 
 function CalendarPill({
   item,
-  onDownload,
-  onDismiss,
   onShowClick,
 }: {
   item: UpcomingItem;
-  onDownload?: (id: number) => void;
-  onDismiss?: (id: number) => void;
   onShowClick: () => void;
 }) {
-  const isShow = item.type === "show";
-
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button
           className={cn(
-            "w-full truncate rounded-md px-2 py-1 text-left text-[10px] transition-colors",
-            isShow
-              ? "bg-amber-500/15 text-amber-200 hover:bg-amber-500/25"
-              : "bg-primary/15 text-cyan-200 hover:bg-primary/25",
+            "min-h-11 w-full truncate rounded-md px-2 py-1 text-left text-[10px] transition-colors",
+            "bg-accent-action/15 text-accent-action-hi hover:bg-accent-action/25",
           )}
         >
           {item.artist}
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-[340px] p-0" align="start">
-        {isShow ? (
-          <div>
-            <div className="p-3">
-              <ShowCard show={item} className="w-full" />
-            </div>
-            <div className="px-3 pb-3">
-              <button
-                onClick={onShowClick}
-                className="w-full text-center text-xs text-amber-400 hover:text-amber-300 transition-colors py-1.5 rounded-md bg-amber-500/5 hover:bg-amber-500/10"
-              >
-                View full details
-              </button>
-            </div>
+      <PopoverContent
+        className="w-[340px] max-w-[calc(100vw-2rem)] p-0"
+        align="start"
+      >
+        <div>
+          <div className="p-3">
+            <ShowCard show={item} className="w-full" />
           </div>
-        ) : (
-          <ReleasePopoverContent
-            item={item}
-            onDownload={onDownload}
-            onDismiss={onDismiss}
-          />
-        )}
+          <div className="px-3 pb-3">
+            <button
+              onClick={onShowClick}
+              className="min-h-11 w-full rounded-md bg-accent-action/5 py-1.5 text-center text-xs text-accent-action-hi transition-colors hover:bg-accent-action/10"
+            >
+              View full details
+            </button>
+          </div>
+        </div>
       </PopoverContent>
     </Popover>
-  );
-}
-
-// ── Release Popover Content ──
-
-function ReleasePopoverContent({
-  item,
-  onDownload,
-  onDismiss,
-}: {
-  item: UpcomingItem;
-  onDownload?: (id: number) => void;
-  onDismiss?: (id: number) => void;
-}) {
-  const dateObj = item.date ? new Date(item.date + "T12:00:00") : null;
-  const dateStr = dateObj
-    ? dateObj.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "";
-  const albumHref = getReleaseAlbumHref(item);
-
-  return (
-    <div className="overflow-hidden rounded-md bg-transparent">
-      <div className="flex gap-3 p-3">
-        {/* Album cover */}
-        <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0 bg-secondary">
-          {item.cover_url ? (
-            <img
-              src={item.cover_url}
-              alt=""
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Disc3 size={20} className="text-muted-foreground/30" />
-            </div>
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          {albumHref ? (
-            <Link
-              to={albumHref}
-              className="font-bold text-sm truncate block hover:text-foreground transition-colors"
-            >
-              {item.title}
-            </Link>
-          ) : (
-            <div className="font-bold text-sm truncate">{item.title}</div>
-          )}
-          <ArtistTextLink
-            artist={getPrimaryArtist(item)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {item.artist}
-          </ArtistTextLink>
-          <div className="flex items-center gap-1.5 mt-1">
-            {item.subtitle && <CrateChip>{item.subtitle}</CrateChip>}
-            {item.tidal_url && <CrateChip active>LOSSLESS</CrateChip>}
-          </div>
-        </div>
-      </div>
-
-      <div className="px-3 pb-3">
-        <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-          <Calendar size={11} /> {dateStr}
-        </div>
-
-        {item.status === "detected" &&
-          item.release_id &&
-          (onDownload || onDismiss) && (
-            <div className="flex gap-2">
-              {item.tidal_url && onDownload && (
-                <button
-                  onClick={() => onDownload(item.release_id!)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-xs font-medium"
-                >
-                  <Download size={12} /> Download
-                </button>
-              )}
-              {onDismiss ? (
-                <button
-                  onClick={() => onDismiss(item.release_id!)}
-                  className="px-3 py-1.5 rounded-md bg-white/5 text-muted-foreground hover:bg-white/10 transition-colors text-xs"
-                >
-                  Dismiss
-                </button>
-              ) : null}
-            </div>
-          )}
-        {item.status === "downloaded" && (
-          <CrateChip className="border-green-500/25 bg-green-500/10 text-green-300">
-            Downloaded
-          </CrateChip>
-        )}
-        {item.status === "downloading" && (
-          <div className="flex items-center gap-1.5 text-xs text-primary">
-            <Loader2 size={12} className="animate-spin" /> Downloading...
-          </div>
-        )}
-      </div>
-    </div>
   );
 }

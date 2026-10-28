@@ -1,0 +1,86 @@
+{
+  "events": [
+    {
+      "id": "501",
+      "show_id": 501,
+      "artist_name": "Costa Norte",
+      "artist_id": 23,
+      "artist_slug": "costa-norte",
+      "date": "2026-10-24",
+      "local_time": "21:00:00",
+      "venue": "Sala Puerto",
+      "address_line1": "Calle Muestra 1",
+      "city": "Valencia",
+      "region": "Valencia",
+      "postal_code": "46001",
+      "country": "Spain",
+      "country_code": "ES",
+      "url": "https://example.invalid/tickets/1",
+      "image_url": null,
+      "lineup": ["Costa Norte", "Bruma"],
+      "artist_genres": ["Ambient", "Electronic"],
+      "probable_setlist_status": "fresh",
+      "probable_setlist_generated_at": "2026-10-17T09:00:00Z",
+      "probable_setlist_song_count": 14,
+      "probable_setlist_source_show_count": 8,
+      "probable_setlist_mode": "recent",
+      "probable_setlist_tour_name": null,
+      "lineup_artists": [
+        {
+          "name": "Costa Norte",
+          "id": 23,
+          "slug": "costa-norte",
+          "probable_setlist_status": "fresh",
+          "probable_setlist_generated_at": "2026-10-17T09:00:00Z",
+          "probable_setlist_song_count": 14,
+          "probable_setlist_source_show_count": 8,
+          "probable_setlist_mode": "recent",
+          "probable_setlist_tour_name": null
+        },
+        {
+          "name": "Bruma",
+          "probable_setlist_status": "missing",
+          "probable_setlist_generated_at": null,
+          "probable_setlist_song_count": 0,
+          "probable_setlist_source_show_count": null,
+          "probable_setlist_mode": null,
+          "probable_setlist_tour_name": null
+        }
+      ]
+    },
+    {
+      "id": "502",
+      "show_id": 502,
+      "artist_name": "Luz Polar",
+      "artist_id": null,
+      "artist_slug": null,
+      "date": "2026-11-04",
+      "local_time": null,
+      "venue": "Sala Centro",
+      "city": "Madrid",
+      "region": "Madrid",
+      "country": "Spain",
+      "country_code": "ES",
+      "url": null,
+      "image_url": null,
+      "lineup": ["Luz Polar"],
+      "artist_genres": ["Rock"],
+      "probable_setlist_status": "missing",
+      "probable_setlist_song_count": 0,
+      "lineup_artists": [
+        {
+          "name": "Luz Polar",
+          "probable_setlist_status": "missing",
+          "probable_setlist_song_count": 0
+        }
+      ]
+    }
+  ],
+  "setlist_coverage": {
+    "artist_count": 3,
+    "fresh": 1,
+    "stale": 0,
+    "missing": 2,
+    "unknown": 0
+  }
+}

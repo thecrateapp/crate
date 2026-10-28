@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { CRATE_ICON_SIZE, Moon } from "@crate/ui/icons";
-import { Button } from "@crate/ui/shadcn/button";
+import { SleepTimerView } from "./SleepTimerView";
 
 import { Section } from "@/components/settings/SettingsPrimitives";
 import { usePlayerActions } from "@/contexts/PlayerContext";
@@ -38,44 +37,23 @@ export function SleepTimerSection() {
       title={t("settings.sleep.title")}
       description={t("settings.sleep.subtitle")}
     >
-      <div className="flex flex-wrap gap-2">
-        {SLEEP_MODES.map(({ mode, labelKey }) => (
-          <button
-            key={mode}
-            type="button"
-            aria-pressed={timer.mode === mode}
-            onClick={() => startSleepTimer(mode, pause)}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-              timer.mode === mode
-                ? "bg-accent-action text-accent-action-foreground"
-                : "bg-text-primary/5 text-text-primary/60 hover:bg-text-primary/10"
-            }`}
-          >
-            {t(labelKey)}
-          </button>
-        ))}
-      </div>
-      {timer.active && timer.remainingSeconds > 0 ? (
-        <div className="flex items-center justify-between rounded-lg border border-accent-action/20 bg-accent-action/5 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Moon size={CRATE_ICON_SIZE.sm} className="text-accent-action" />
-            <span className="text-sm text-text-primary">
-              {t("settings.sleep.pausingIn")}{" "}
-              <span className="font-mono font-semibold text-accent-action">
-                {formatRemaining(timer.remainingSeconds)}
-              </span>
-            </span>
-          </div>
-          <Button
-            variant="danger-soft"
-            shape="pill"
-            onClick={cancelSleepTimer}
-            className="h-auto border-0 bg-state-danger/15 px-3 py-1.5 text-xs text-state-danger hover:bg-state-danger/25 has-[>svg]:px-3"
-          >
-            {t("common.cancel")}
-          </Button>
-        </div>
-      ) : null}
+      <SleepTimerView
+        label={t("settings.sleep.title")}
+        value={timer.mode ?? ""}
+        options={SLEEP_MODES.map((item) => ({
+          value: item.mode,
+          label: t(item.labelKey),
+        }))}
+        onChange={(value) => startSleepTimer(value as SleepTimerMode, pause)}
+        active={timer.active}
+        remaining={
+          timer.active && timer.remainingSeconds > 0
+            ? `${t("settings.sleep.pausingIn")} ${formatRemaining(timer.remainingSeconds)}`
+            : undefined
+        }
+        cancelLabel={t("common.cancel")}
+        onCancel={cancelSleepTimer}
+      />
     </Section>
   );
 }

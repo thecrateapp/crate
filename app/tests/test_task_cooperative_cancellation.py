@@ -3,16 +3,16 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from threading import Barrier
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 from sqlalchemy import text
 
 from crate.agent_diagnostics import DiagnosticError
 from crate.db.queries.tasks import get_task
+from crate.db.repositories.agent_task_control import check_task_authority
 from crate.db.repositories.tasks import create_task, start_task, update_task
 from crate.db.repositories.tasks_updates import fail_or_retry_task
-from crate.db.repositories.agent_task_control import check_task_authority
 from crate.db.tx import transaction_scope
 
 
@@ -64,9 +64,15 @@ def test_running_request_preserves_runtime_until_acknowledgement(controls):
     assert row["cancellation_acknowledged_at"] is None
 
     effects = {"execution": {"status": "partial", "applied": 2, "remaining": 3}}
-    acknowledged = controls.acknowledge_cancellation(task_id, effects)
+    with patch(
+        "crate.db.repositories.tasks_shared._publish_task_transition_signal"
+    ) as publish_transition:
+        acknowledged = controls.acknowledge_cancellation(task_id, effects)
 
     assert acknowledged is not None
+    assert [call.args[0]["status"] for call in publish_transition.call_args_list] == [
+        "cancelled"
+    ]
     row = _row(task_id)
     assert row["status"] == "cancelled"
     assert row["result"]["execution"]["status"] == "partial"
@@ -137,6 +143,33 @@ def test_finalization_cannot_be_cancelled_or_partially_propagated(
     assert _row(parent)["cancellation_requested_at"] is None
     assert _row(pending_child)["status"] == "pending"
     assert _row(pending_child)["cancellation_requested_at"] is None
+
+
+def test_completed_siblings_publish_parent_finalizing_transition(controls, monkeypatch):
+    from crate.db.repositories.tasks_maintenance import check_siblings_complete
+
+    transitions = []
+    monkeypatch.setattr(
+        "crate.db.repositories.tasks_shared._publish_task_transition_signal",
+        transitions.append,
+    )
+    parent = _task()
+    child = _task(parent_task_id=parent)
+    start_task(parent)
+    update_task(parent, status="delegated")
+    start_task(child)
+    update_task(child, status="completed")
+    transitions.clear()
+
+    result = check_siblings_complete(parent)
+
+    assert result["all_done"] is True
+    assert _row(parent)["status"] == "completing"
+    assert len(transitions) == 1
+    assert transitions[0]["id"] == parent
+    assert transitions[0]["status"] == "completing"
+    assert transitions[0]["type"] == "compute_analytics"
+    assert transitions[0]["pool"] == _row(parent)["pool"]
 
 
 @pytest.mark.parametrize("status", ["completed", "failed", "cancelled"])

@@ -1,12 +1,13 @@
 import { useTranslation } from "react-i18next";
-import { PageHeader } from "@crate/ui/domain/navigation";
+import { SettingsPageView, SETTINGS_TABS } from "./SettingsPageView";
+import { CRATE_CONNECT_FEATURE_ENABLED } from "@/lib/crate-connect";
+import { useTabParam } from "@/hooks/use-tab-param";
+import { ConnectDevicesSection } from "@/components/settings/ConnectDevicesSection";
 
 import { AccessTokensSection } from "@/components/settings/AccessTokensSection";
 import { AccountSection } from "@/components/settings/AccountSection";
 import { BandcampSection } from "@/components/settings/BandcampSection";
-import { LISTEN_APPEARANCE_SETTINGS_ENABLED } from "@/app-shell/feature-flags";
 import { LanguageSection } from "@/components/settings/LanguageSection";
-import { LinksSection } from "@/components/settings/LinksSection";
 import { OpenSubsonicCredentialsSection } from "@/components/settings/OpenSubsonicCredentialsSection";
 import { OfflineSection } from "@/components/settings/OfflineSection";
 import { PlaybackSection } from "@/components/settings/PlaybackSection";
@@ -14,32 +15,46 @@ import { ScrobbleSection } from "@/components/settings/ScrobbleSection";
 import { ShowsLocationSection } from "@/components/settings/ShowsLocationSection";
 import { SleepTimerSection } from "@/components/settings/SleepTimerSection";
 import { ServersSection } from "@/components/settings/ServersSection";
-import { ThemeSkinSection } from "@/components/settings/ThemeSkinSection";
+import { InterfacePreferencesSection } from "@/components/settings/InterfacePreferencesSection";
 
 export function Settings() {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
+
+  const [tab, setTab] = useTabParam(SETTINGS_TABS, "preferences");
 
   return (
-    <div className="space-y-8">
-      <PageHeader
-        className="settings-header"
-        title={t("settings.title")}
-        subtitle={t("settings.subtitle")}
-      />
-
-      {LISTEN_APPEARANCE_SETTINGS_ENABLED ? <ThemeSkinSection /> : null}
-      <LanguageSection i18n={i18n} />
-      <PlaybackSection />
-      <OfflineSection />
-      <ServersSection />
-      <ShowsLocationSection />
-      <SleepTimerSection />
-      <AccountSection />
-      <OpenSubsonicCredentialsSection />
-      <AccessTokensSection />
-      <ScrobbleSection />
-      <BandcampSection />
-      <LinksSection />
-    </div>
+    <SettingsPageView
+      value={tab}
+      onValueChange={setTab}
+      panels={{
+        preferences: (
+          <>
+            <InterfacePreferencesSection ruled={false} />
+            <LanguageSection i18n={i18n} />
+            <ShowsLocationSection />
+          </>
+        ),
+        playback: (
+          <>
+            <PlaybackSection ruled={false} />
+            <SleepTimerSection />
+          </>
+        ),
+        account: <AccountSection ruled={false} />,
+        connections: (
+          <>
+            <ConnectDevicesSection ruled={false} />
+            <OpenSubsonicCredentialsSection
+              ruled={CRATE_CONNECT_FEATURE_ENABLED}
+            />
+            <AccessTokensSection />
+            <ScrobbleSection />
+            <BandcampSection />
+            <ServersSection />
+          </>
+        ),
+        offline: <OfflineSection ruled={false} />,
+      }}
+    />
   );
 }

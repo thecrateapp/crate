@@ -138,6 +138,55 @@ describe("PageHero", () => {
       ),
     ).toBeInTheDocument();
   });
+
+  it("drops the page inset when the parent already pads the page", () => {
+    render(
+      <PageHero
+        title="Album"
+        inset="none"
+        actions={<button type="button">Play</button>}
+      />,
+    );
+    const content = screen.getByRole("heading", { name: "Album" })
+      .parentElement!.parentElement!.parentElement!;
+    expect(content).not.toHaveClass("max-w-content", "px-4");
+    expect(
+      screen.getByRole("button", { name: "Play" }).parentElement,
+    ).toHaveClass("py-4");
+    expect(
+      screen.getByRole("button", { name: "Play" }).parentElement,
+    ).not.toHaveClass("p-4");
+  });
+
+  it("bleeds past the Listen page gutter", () => {
+    render(<PageHero variant="editorial" title="Shoegaze" bleed />);
+    expect(screen.getByRole("region", { name: "Shoegaze" })).toHaveClass(
+      "-mx-4",
+      "-mt-4",
+      "sm:-mx-6",
+    );
+  });
+
+  it.each([
+    ["lg", "w-[200px]", "lg:w-[280px]"],
+    ["md", "size-36", "lg:size-56"],
+  ] as const)(
+    "sizes album artwork at the %s scale",
+    (artworkSize, base, large) => {
+      render(
+        <PageHero
+          title="Album"
+          artwork={<img alt="" />}
+          artworkSize={artworkSize}
+          artworkFrame="none"
+        />,
+      );
+      const artwork = screen.getByTestId("page-hero-artwork");
+      expect(artwork).toHaveClass("block", base, large);
+      expect(artwork).toHaveClass("shadow-none", "ring-0");
+      expect(artwork).not.toHaveClass("hidden");
+    },
+  );
 });
 
 describe("HeroActionBar", () => {
@@ -166,25 +215,6 @@ describe("HeroActionBar", () => {
     expect(onRadio).toHaveBeenCalledTimes(1);
   });
 
-  it("offsets the focus ring on the accent primary action only", () => {
-    render(
-      <HeroActionBar
-        primaryActions={[
-          { key: "play", label: "Play" },
-          { key: "shuffle", label: "Shuffle", tone: "neutral" },
-        ]}
-      />,
-    );
-
-    expect(screen.getByRole("button", { name: "Play" })).toHaveClass(
-      "focus-visible:outline-offset-2",
-      "focus-visible:outline-focus-ring",
-    );
-    expect(screen.getByRole("button", { name: "Shuffle" })).toHaveClass(
-      "focus-visible:shadow-focus",
-    );
-  });
-
   it("marks loading primary actions busy", () => {
     render(
       <HeroActionBar
@@ -195,6 +225,31 @@ describe("HeroActionBar", () => {
     const button = screen.getByRole("button", { name: "Play" });
     expect(button).toHaveAttribute("aria-busy", "true");
     expect(button).toBeDisabled();
+  });
+
+  it("spaces mobile secondary captions evenly without breaking words", () => {
+    render(
+      <HeroActionBar
+        primaryActions={[{ key: "play", label: "Play" }]}
+        secondaryActions={[{ key: "setlist", label: "Setlist" }]}
+        menu={{
+          actions: [{ key: "share", label: "Share", onSelect: vi.fn() }],
+        }}
+        moreLabel="More"
+      />,
+    );
+    for (const label of ["Setlist", "More"]) {
+      const text = screen.getByText(label);
+      expect(text).toHaveClass("crate-mono-label");
+      expect(text).not.toHaveClass("wrap-anywhere");
+      expect(text).not.toHaveClass("max-w-full");
+    }
+    const setlist = screen.getByRole("button", { name: "Setlist" });
+    expect(setlist).toHaveClass("min-w-11", "px-0", "md:min-w-14");
+    expect(setlist.parentElement).toHaveClass(
+      "grid-cols-[repeat(5,auto)]",
+      "justify-between",
+    );
   });
 
   it("exposes labelled action groups only when labels are provided", () => {
@@ -314,4 +369,39 @@ describe("HeroActionBar", () => {
       screen.queryByRole("button", { name: "More" }),
     ).not.toBeInTheDocument();
   });
+});
+
+it("omits an empty hero action bar including menus with no actionable entries", () => {
+  const { rerender } = render(<HeroActionBar />);
+  expect(screen.queryByTestId("hero-action-bar")).not.toBeInTheDocument();
+  rerender(
+    <HeroActionBar
+      menu={{
+        actions: [
+          { key: "divider", type: "divider" },
+          { key: "label", type: "label", label: "Details" },
+        ],
+      }}
+    />,
+  );
+  expect(screen.queryByTestId("hero-action-bar")).not.toBeInTheDocument();
+});
+
+it("keeps zero-valued hero context visible alongside its heading", () => {
+  render(<PageHero title="Pending imports" eyebrow={0} subtitle={0} />);
+  expect(screen.getAllByText("0")).toHaveLength(2);
+});
+
+it("uses MonoLabel for secondary captions without changing primary action text", () => {
+  render(
+    <HeroActionBar
+      primaryActions={[{ key: "play", label: "Play" }]}
+      secondaryActions={[{ key: "share", label: "Share" }]}
+    />,
+  );
+  expect(screen.getByText("Share")).toHaveClass("font-mono", "uppercase");
+  expect(screen.getByRole("button", { name: "Play" })).not.toHaveClass(
+    "font-mono",
+    "uppercase",
+  );
 });

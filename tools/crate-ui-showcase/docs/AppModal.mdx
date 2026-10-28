@@ -1,0 +1,42 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/AppModal.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">AppModal</DocHeading>
+<EntryDetails id="primitives-appmodal" review="Visual review approved · 1AX" />
+<DocHeading as="h2">Contract</DocHeading>
+
+The existing 1N solid surface, header, body, footer and close control remain. Size, labels, mobile safe area and close gates belong to the facade. Nested Select/Tooltip portals remain above the panel and own their dismissal. Only the top custom modal handles Escape/Tab; locking modals and full-screen stories share the reference-counted `acquireBodyScrollLock` lifecycle. The document stays locked until the last owner closes, including navigation that unmounts a story before its global share modal. Releasing an owner twice is harmless. Focus returns to the owning trigger when it remains connected. Apps keep workflow, capability and busy state. Editable playlist fields use canonical controls; readonly fields retain FormField body typography and content-sized text, so long names/descriptions reserve their full height.
+
+The approved mockup and Diego's confirmed adjustments remain the visual reference. Documented,
+adopted and validated are separate statuses; broader native/AT/canonical QA remains pending.
+
+ModalBody is the full-width content/scroll region, not a60ch prose column. Its width follows
+the panel minus the panel border; children use the available width minus body padding. This
+preserves the V2 artist biography at both desktop and mobile widths without a caller override.
+The biography sample composes the actual ArtistBioProfile with the same AppModal as Listen.
+
+The panel is a flex column capped at 92vh, and ModalBody is its flexible, scrollable region
+(`min-h-0 flex-1`), so header and footer stay visible while long content scrolls. Callers never
+add `flex`, `flex-col`, `min-h-0` or `overflow-hidden` to the panel or body.
+
+Width comes only from `size`, which maps to the shared `crate-overlay-panel[data-overlay-size]`
+recipe: sm 420px, md 560px, lg 760px (default), xl 896px, 2xl 1024px and 3xl 1280px. The recipe is
+unlayered, so width utilities on the panel have no effect; there is no width escape hatch.
+
+ModalFooter owns its action row: 20px inline and 16px block padding (matching the header), right
+alignment, wrapping and an 8px gap between actions. Callers pass only the actions; they never add
+layout or padding classes to the footer.
+
+<Canvas of={Stories.Base} />
+<Controls of={Stories.Base} />
+
+<Canvas of={Stories.FullWidthBiography} />
+
+## Shared focus lifecycle · 24 October review
+
+`useModalFocus` is the same lifecycle used by AppModal and Listen's specialized player surfaces. It enters the active panel, wraps Tab only in the top layer, respects a portalled child's Escape/Tab ownership and restores the opening trigger. A specialized fullscreen surface can additionally isolate its background branches without replacing its layout or transition. A resolver supports a launcher that is recreated after closing; a non-modal workspace may keep the player dock accessible while open. Closed animated player surfaces remain mounted but are inert and hidden from assistive technology during their exit.
+
+The Base story's nested dialog and portalled Select/Tooltip exercise the unchanged facade. The shared focus tests cover the specialized scope with a nested AppModal and focus return. Listen's player tests cover prepared/closed exclusion, fullscreen naming and isolation, boundary Tab wrapping, the recreated launcher and nested Escape priority. Real browser/native keyboard and touch animation checks remain consumer responsibilities; no playback is needed for those focus checks.

@@ -111,4 +111,12 @@ describe("Avatar", () => {
     const { container } = render(<Avatar name="A" />);
     expect(container.firstElementChild).toHaveClass("size-10", "rounded-full");
   });
+
+  it("supports the V2 inline artist size without inheriting media thumbnail minimums", () => {
+    const { container } = render(<Avatar name="Artist" size="inline" />);
+    expect(container.firstElementChild).toHaveClass("size-7", "rounded-full");
+    expect(container.firstElementChild).not.toHaveClass(
+      "crate-media-thumbnail",
+    );
+  });
 });

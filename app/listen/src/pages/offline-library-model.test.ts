@@ -105,3 +105,28 @@ describe("buildOfflineLibraryGroups", () => {
     ).toEqual([]);
   });
 });
+
+it("preserves a stable canonical cover path for offline player queues, never a persisted blob URL", () => {
+  const groups = buildOfflineLibraryGroups([
+    {
+      key: "album:7",
+      kind: "album",
+      entityId: "7",
+      title: "Album",
+      state: "ready",
+      trackCount: 1,
+      readyTrackCount: 1,
+      tracks: [
+        {
+          entity_uid: "track-7",
+          album_id: 7,
+          title: "Song",
+          artist: "Artist",
+          stream_url: "/stream",
+          download_url: "/download",
+        },
+      ],
+    },
+  ]);
+  expect(groups[0]?.tracks[0]?.albumCover).toMatch(/^\/api\/albums\/7\/cover/);
+});

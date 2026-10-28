@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@crate/ui/shadcn/button";
-import { Loader2 } from "lucide-react";
+import { ArtistDetailSection } from "./ArtistDetailSection";
 import { toast } from "sonner";
 import { ImageCropUpload } from "@/components/ImageCropUpload";
 import {
@@ -67,42 +67,37 @@ export function ArtistArtworkSection({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold text-foreground">Artwork</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage each artist image by its intended surface and aspect ratio.
-          </p>
-        </div>
-        {canEdit ? (
-          <Button
-            variant="outline"
-            disabled={backfilling}
-            onClick={() => void backfillEligibleArtists()}
-          >
-            {backfilling ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : null}
-            Backfill eligible artists
-          </Button>
-        ) : null}
-      </div>
-
-      <ArtistArtworkGallery
-        artistId={artistId}
-        artistName={artistName}
-        canEdit={canEdit}
-        onChanged={() => setRefresh((value) => value + 1)}
-        onHeroChanged={(composition) =>
-          setHeroReload((current) => ({
-            token: (current?.token ?? 0) + 1,
-            composition,
-          }))
+    <div className="space-y-8">
+      <ArtistDetailSection
+        title="Artwork"
+        description="Manage each artist image by its intended surface and aspect ratio."
+        actions={
+          canEdit ? (
+            <Button
+              variant="outline"
+              loading={backfilling}
+              onClick={() => void backfillEligibleArtists()}
+            >
+              Backfill eligible artists
+            </Button>
+          ) : undefined
         }
-      />
+      >
+        <ArtistArtworkGallery
+          artistId={artistId}
+          artistName={artistName}
+          canEdit={canEdit}
+          onChanged={() => setRefresh((value) => value + 1)}
+          onHeroChanged={(composition) =>
+            setHeroReload((current) => ({
+              token: (current?.token ?? 0) + 1,
+              composition,
+            }))
+          }
+        />
+      </ArtistDetailSection>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-8 md:grid-cols-2">
         <ArtworkCard
           title="Avatar"
           description="Square artist identity used in cards, rows and search."
@@ -161,12 +156,13 @@ function ArtworkCard({
   onUploaded: () => void;
 }) {
   return (
-    <section className="rounded-md border border-border bg-card/55 p-4">
-      <div className="mb-3">
-        <h3 className="font-medium text-foreground">{title}</h3>
-        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
-      </div>
-      <div className="group/cover relative overflow-hidden rounded-md border border-border bg-black/40">
+    <ArtistDetailSection
+      headingLevel={3}
+      title={title}
+      ruled
+      description={description}
+    >
+      <div className="group/cover relative overflow-hidden rounded-md border border-border-quiet bg-surface-control">
         <img
           src={imageUrl}
           alt={`${title} artwork`}
@@ -178,10 +174,10 @@ function ArtworkCard({
             aspect={aspect}
             onUploaded={onUploaded}
             label={`Replace ${title.toLowerCase()}`}
-            className="absolute bottom-2 right-2 z-10 inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-black/70 px-3 py-2 text-xs font-medium text-white/80 hover:bg-black/85 hover:text-white"
+            className="absolute bottom-2 right-2 z-10"
           />
         ) : null}
       </div>
-    </section>
+    </ArtistDetailSection>
   );
 }

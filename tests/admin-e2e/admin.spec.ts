@@ -23,7 +23,9 @@ test("opens the command palette as a centered modal over the whole app", async (
     width: viewport.width,
     height: viewport.height,
   });
-  await expect(overlay).toHaveCSS("backdrop-filter", /blur/);
+  await expect(overlay).toHaveCSS("backdrop-filter", "none");
+  await expect(dialog).toHaveCSS("background-color", "rgb(17, 18, 24)");
+  await expect(dialog).toHaveCSS("border-top-left-radius", "14px");
 });
 
 test("finds catalog actions by name and queues them", async ({
@@ -56,7 +58,21 @@ test("sends the catalog body and reports when the backend skips the task", async
   });
   await openAdminPage("/");
   await page.keyboard.press("ControlOrMeta+k");
+  const searchResponse = page.waitForResponse(
+    (response) => {
+      const url = new URL(response.url());
+      return (
+        response.request().method() === "GET" &&
+        url.pathname === "/api/search" &&
+        url.searchParams.get("q") === "lyrics"
+      );
+    },
+    { timeout: 5_000 },
+  );
   await page.getByPlaceholder("Type a command or search...").fill("lyrics");
+  const response = await searchResponse;
+  expect(response.ok()).toBe(true);
+  await response.finished();
 
   await page.getByRole("option", { name: "Sync Missing Lyrics" }).click();
 
@@ -83,10 +99,7 @@ test("runs a schedule now from Settings with its catalog label", async ({
     status: "queued",
   });
   await openAdminPage("/settings");
-  await page
-    .getByRole("button", { name: /Schedules/ })
-    .first()
-    .click();
+  await page.getByRole("tab", { name: "Schedules", exact: true }).click();
 
   await page
     .getByRole("button", { name: "Run Duplicate Track Cleanup now" })
@@ -106,8 +119,18 @@ test("shows catalog labels on the tasks page", async ({
 }) => {
   await openAdminPage("/tasks");
 
-  await expect(page.getByText("Artist Enrichment").first()).toBeVisible();
-  await expect(page.getByText("enrich_artists", { exact: true })).toHaveCount(
+  const desk = page.getByRole("tabpanel", {
+    name: "Active & queued",
+    exact: true,
+  });
+  await expect(desk.getByText("Artist Enrichment").first()).toBeVisible();
+  await expect(desk.getByText("enrich_artists", { exact: true })).toHaveCount(
     0,
   );
+  await expect(
+    page.getByRole("button", {
+      name: "Open Artist Enrichment task details · running",
+      exact: true,
+    }),
+  ).toBeVisible();
 });

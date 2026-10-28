@@ -17,6 +17,7 @@ from crate.db.tracklist_engine import (
 )
 from crate.db.tx import read_scope
 from crate.genre_taxonomy import get_related_genre_terms
+from crate.smart_mix.versions import ANALYZER_VERSION, PROFILE_SCHEMA_VERSION
 from crate.track_versions import dedupe_track_variants
 
 
@@ -44,6 +45,7 @@ def execute_smart_rules(rules: dict, *, count_only: bool = False) -> list[dict] 
     max_per_artist = _positive_int(rules.get("max_per_artist"), default=2)
     max_per_album = _positive_int(rules.get("max_per_album"), default=2)
     expand_related_genres = bool(rules.get("expand_related_genres", has_genre_rule))
+    require_full_mix_profile = rules.get("require_full_mix_profile") is True
 
     single_genre_values = _single_genre_contains_values(rule_list)
     if single_genre_values is not None:
@@ -58,9 +60,11 @@ def execute_smart_rules(rules: dict, *, count_only: bool = False) -> list[dict] 
             max_per_artist=max_per_artist,
             max_per_album=max_per_album,
             expand_related_genres=expand_related_genres,
+            require_full_mix_profile=require_full_mix_profile,
         )
 
     where, params, genre_score_exprs = build_rule_conditions(rule_list, match_mode)
+    where = _with_full_mix_profile(where, params, required=require_full_mix_profile)
 
     with read_scope() as session:
         if count_only:
@@ -113,6 +117,9 @@ def execute_smart_rules(rules: dict, *, count_only: bool = False) -> list[dict] 
                 expanded_where, expanded_params, expanded_genre_score_exprs = (
                     build_rule_conditions(expanded_rules, match_mode)
                 )
+                expanded_where = _with_full_mix_profile(
+                    expanded_where, expanded_params, required=require_full_mix_profile
+                )
                 expanded_sort_clause = _with_genre_relevance_sort(
                     SORT_MAP.get(sort, "RANDOM()"),
                     expanded_genre_score_exprs,
@@ -152,10 +159,15 @@ def _execute_single_genre_rules(
     max_per_artist: int,
     max_per_album: int,
     expand_related_genres: bool,
+    require_full_mix_profile: bool,
 ) -> list[dict] | int:
     with read_scope() as session:
         if count_only:
-            return _count_single_genre_rule_rows(session, values=values)
+            return _count_single_genre_rule_rows(
+                session,
+                values=values,
+                require_full_mix_profile=require_full_mix_profile,
+            )
 
         fetch_limit = _smart_fetch_limit(
             limit,
@@ -168,6 +180,7 @@ def _execute_single_genre_rules(
             values=values,
             sort_clause=SORT_MAP.get(sort, "RANDOM()"),
             limit=fetch_limit,
+            require_full_mix_profile=require_full_mix_profile,
         )
 
     results = [dict(row) for row in rows]
@@ -185,6 +198,7 @@ def _execute_single_genre_rules(
                         values=expanded_values,
                         sort_clause=SORT_MAP.get(sort, "RANDOM()"),
                         limit=max(fetch_limit, _diverse_fetch_limit(limit, 1)),
+                        require_full_mix_profile=require_full_mix_profile,
                     )
                 results = _merge_smart_rows(
                     results, [dict(row) for row in expanded_rows]
@@ -199,6 +213,23 @@ def _execute_single_genre_rules(
         )
 
     return results[:limit]
+
+
+def _with_full_mix_profile(where: str, params: dict, *, required: bool) -> str:
+    if not required:
+        return where
+    params["mix_profile_version"] = PROFILE_SCHEMA_VERSION
+    params["mix_analyzer_version"] = ANALYZER_VERSION
+    # Same current-profile contract as Analysis/backfill. EXISTS cannot duplicate
+    # tracks and stays outside the rule group's all/any boolean expression.
+    return f"""({where}) AND EXISTS (
+        SELECT 1 FROM track_mix_profiles mix_profile
+        WHERE mix_profile.track_id = t.id
+          AND mix_profile.quality = 'full'
+          AND mix_profile.profile_version = :mix_profile_version
+          AND mix_profile.analyzer_version = :mix_analyzer_version
+          AND mix_profile.source_stale_at IS NULL
+    )"""
 
 
 def _positive_int(value: object, *, default: int) -> int:
@@ -341,20 +372,29 @@ def _single_genre_from_join_sql(*, least_played: bool = False) -> str:
     """ + (LEAST_PLAYED_JOIN if least_played else "")
 
 
-def _single_genre_where_sql(track_match_sql: str) -> str:
-    return f"""
-        WHERE (t.entity_uid IS NOT NULL OR t.storage_id IS NOT NULL)
+def _single_genre_where_sql(
+    track_match_sql: str, params: dict, *, require_full_mix_profile: bool
+) -> str:
+    where = f"""(t.entity_uid IS NOT NULL OR t.storage_id IS NOT NULL)
           AND (
               {track_match_sql}
               OR album_genre_matches.album_id IS NOT NULL
               OR artist_genre_matches.artist_name IS NOT NULL
           )
     """
+    return "WHERE " + _with_full_mix_profile(
+        where, params, required=require_full_mix_profile
+    )
 
 
-def _count_single_genre_rule_rows(session, *, values: list[str]) -> int:
+def _count_single_genre_rule_rows(
+    session, *, values: list[str], require_full_mix_profile: bool
+) -> int:
     genre_match_sql, track_match_sql, _score_sql, params = _single_genre_match_sql(
         values
+    )
+    where = _single_genre_where_sql(
+        track_match_sql, params, require_full_mix_profile=require_full_mix_profile
     )
     row = (
         session.execute(
@@ -363,7 +403,7 @@ def _count_single_genre_rule_rows(session, *, values: list[str]) -> int:
             {_single_genre_ctes(genre_match_sql)}
             SELECT COUNT(*) AS cnt
             {_single_genre_from_join_sql()}
-            {_single_genre_where_sql(track_match_sql)}
+            {where}
             """
             ),
             params,
@@ -380,9 +420,13 @@ def _fetch_single_genre_rule_rows(
     values: list[str],
     sort_clause: str,
     limit: int,
+    require_full_mix_profile: bool,
 ):
     genre_match_sql, track_match_sql, score_sql, params = _single_genre_match_sql(
         values
+    )
+    where = _single_genre_where_sql(
+        track_match_sql, params, require_full_mix_profile=require_full_mix_profile
     )
     query_params = {**params, "lim": limit}
     return (
@@ -398,7 +442,7 @@ def _fetch_single_genre_rule_rows(
                    a_artist.id AS artist_id, a_artist.slug AS artist_slug,
                    {score_sql} AS genre_relevance_score
             {_single_genre_from_join_sql(least_played="play_stats." in sort_clause)}
-            {_single_genre_where_sql(track_match_sql)}
+            {where}
             ORDER BY genre_relevance_score DESC, {sort_clause}
             LIMIT :lim
             """

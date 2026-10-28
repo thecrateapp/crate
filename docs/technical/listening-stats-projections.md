@@ -47,6 +47,24 @@ minutes come from `played_seconds`, and completions and skips are separate metri
 Rule: anything that writes `user_play_events` must call `mark_listening_day_dirty` in the same
 transaction, or the projections drift until the next full rebuild.
 
+## Instance rollups (migration `135`)
+
+`instance_track_daily` is `user_track_daily` summed across users per user-local day, with
+`listener_count`; `instance_entity_firsts` keeps the first day anyone played an artist, album or
+track. `crate/db/jobs/instance_listening_rollups.py` owns the writes:
+
+- The runner enqueues them in the refresh transaction: an incremental refresh queues
+  `rebuild_instance_listening_days` (dedup `instance-listening-days:<sha1 of the days>`); a full
+  user rebuild queues `backfill_instance_listening_rollups` (dedup `instance-listening-backfill`).
+  Batch rebuilds of several users queue one backfill after the loop, and a hard user delete
+  queues it in the delete transaction.
+- A day task rebuilds those days and refreshes firsts for its keys plus every key on those days,
+  so a task shared by several listeners stays complete. It releases its dedup key before reading,
+  so a refresh that commits while it runs enqueues a new task instead of being swallowed.
+- API startup queues the backfill while `instance_listening_rollups_incomplete`
+  (`crate/db/queries/instance_listening_status.py`, a read-only probe) is true: listening exists
+  but the rollups miss its earliest day.
+
 ## Dashboard contract v2
 
 `GET /api/me/stats/dashboard` serves the persisted `stats:dashboard` snapshot (stale-first, cold
@@ -72,6 +90,56 @@ The v2 fields are additive to the v1 payload and pinned by
 instance-wide Crate Pulse dashboard (`stats:dashboard:instance`), which the projector schedules
 with a 300 s debounce and the worker builds. `GET /api/stats/dashboard` only reads that snapshot.
 
+### Dashboard contract v3
+
+v3 adds fields to v2 without removing any. The snapshot subject keys carry the `v3` prefix:
+`v3:user:{id}:{period}:{month|default}:{tracks}:{artists}:{albums}:{genres}:{replay}` for users
+and `v3:instance:{period}:...` for Crate Pulse. Python (`stats_dashboard_subject_key`) and the Go
+read plane (`statsDashboardSubjectKey`) must produce the same bytes. The API and the prewarm use
+the 12/10/14/10/36 limits.
+
+- `snapshot`: `scope`, `subject_key`, `version`, `built_at`, `source_seq`, `stale_after`,
+  `stale`, `pending` and `generation_ms`.
+  - A cold payload has `version: 0` and `pending: true`. Listen refetches every 1.5 s, up to 40
+    times (about a minute), until a versioned reading arrives.
+  - `built_at` and `stale_after` are ISO 8601 timestamps with a timezone. FastAPI emits
+    microseconds and `Z`. The read plane emits RFC 3339 with trailing zeros trimmed, and omits
+    `pending`.
+- `overview.previous`: the comparable previous window (`start`, `end`, `minutes_listened`,
+  `play_count`, `active_days`, `artist_count`). It is `null` when the period has none, for
+  example all time. The headline deltas compare against it.
+- `is_new` on `top_tracks`, `top_artists` and `top_albums` items: the item's first-ever play falls
+  inside the period. User dashboards read `user_entity_firsts` and Crate Pulse reads
+  `instance_entity_firsts`, in one batched lookup (`queries/user_stats_new_flags.py`).
+- `story.audio_profile_previous`: the audio profile of the previous window, or `null` when there
+  is none. Unknown energy, valence, danceability or BPM is `null`, never `0`.
+- `heatmap.night_hours`: the hours counted as night (22 to 5).
+- `heatmap.listener_count`: distinct listeners in the period. It is set on Crate Pulse only.
+- `heatmap.hidden_reason` (PD43): below three listeners the instance builder stores
+  `"few_listeners"` with an all-zero grid, `peak: null` and `night_share: null`, so individual
+  habits never leave the snapshot.
+- `music_age.newest_album`: the newest release heard in the period.
+- `music_age.share_this_year`: the share of minutes from releases dated in the year of the
+  period's last day (`min(end - 1 day, today)`). Listen names that year in the copy.
+- `genre_trend`: up to six entries plus an optional entry with `faller: true`. The faller is the
+  biggest drop (at most -0.5 points) among the remaining current genres and the genres heard only
+  in the previous window. Both windows are read in full, so deltas compare real shares.
+
+The explorer reads a separate range endpoint, never the snapshot:
+`GET /api/me/stats/range`, `/api/users/{u}/stats/range` and `/api/stats/range`
+(`queries/user_library_stats_range.py`).
+
+- Parameters: `start` and `end` are inclusive local days, and `limit` is 1-20 (default 3).
+- A stretch that is inverted, ends after the subject's today, or spans more than 400 days
+  returns 422.
+- Today is the subject's local day for users and UTC for the instance.
+- Each request opens one read scope. That scope covers the profile lookup, the timezone and the
+  CTE over `user_track_daily` or `instance_track_daily`.
+- The response holds `start`, `end`, `available`, `top_artists` (with `share`), `top_albums`,
+  `top_tracks` and `discoveries`.
+- The instance answers `available: false` with empty lists until the rollups cover history. Listen
+  shows that answer but does not cache it.
+
 ## Live today counter
 
 `record_play_event` registers an after-commit callback that increments the Redis hash
@@ -81,8 +149,9 @@ dashboard snapshot.
 
 ## Listen surfaces
 
-- `/stats`: period picker, signal tape (custom SVG), headline numbers, artist of the period,
-  highlights, heatmap, genre trend, music age and discoveries.
+- `/stats`: period picker, the stats explorer (range window over the tape, backed by
+  `/api/me/stats/range`, `/api/users/{u}/stats/range` and `/api/stats/range`), headline numbers,
+  artist of the period, highlights, heatmap band, genre trend, music age and movement.
 - `/stats/digging`: full-screen story chapters built from the same payload. The share action
   renders a 1080x1920 canvas card (`drawDiggingStoryCard`) for Instagram stories.
 

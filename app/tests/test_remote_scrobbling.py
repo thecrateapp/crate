@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 from sqlalchemy import text
 
 from crate.db.tx import read_scope
+from crate.scrobble import ScrobbleResult
 
 
 def _play_event_payload(**overrides):
@@ -71,6 +73,7 @@ def test_play_event_uses_signed_playback_provenance(test_app):
         "signed-session",
         user_id=1,
         global_track_uid="11111111-1111-4111-8111-111111111111",
+        played_at=datetime(2026, 7, 14, 10, 0, tzinfo=timezone.utc),
     )
     assert record.call_args.kwargs["content_origin"] == "remote"
     assert (
@@ -130,7 +133,10 @@ def test_opted_in_remote_play_scrobbles_only_once(pg_db):
         source_node_uid="22222222-2222-4222-8222-222222222222",
     )
 
-    with patch("crate.scrobble.scrobble_play_event") as scrobble:
+    with patch(
+        "crate.scrobble.scrobble_play_event",
+        return_value={"lastfm": ScrobbleResult("accepted")},
+    ) as scrobble:
         assert dispatch_scrobble_play_event(event_id) == "completed"
         assert dispatch_scrobble_play_event(event_id) == "completed"
 
@@ -140,4 +146,174 @@ def test_opted_in_remote_play_scrobbles_only_once(pg_db):
         track="0151",
         album="Blending",
         timestamp=1784023200,
+        done=frozenset(),
     )
+
+
+def _local_event(client_event_id: str = "evt-local-dispatch") -> int:
+    from crate.db.repositories.user_library import record_play_event
+
+    return record_play_event(
+        1,
+        client_event_id=client_event_id,
+        title="Vals de los Ciegos",
+        artist="Viva Belgrado",
+        album="Bellavista",
+        started_at="2026-10-24T10:00:00+00:00",
+        ended_at="2026-10-24T10:04:00+00:00",
+        played_seconds=240,
+        track_duration_seconds=240,
+    )
+
+
+def _dispatch_row(event_id: int) -> dict:
+    with read_scope() as session:
+        return dict(
+            session.execute(
+                text(
+                    "SELECT status, attempts, last_error, provider_results "
+                    "FROM user_scrobble_dispatches WHERE event_id = :id"
+                ),
+                {"id": event_id},
+            )
+            .mappings()
+            .one()
+        )
+
+
+def test_a_rejected_scrobble_is_not_reported_as_completed(pg_db):
+    from crate.scrobble import dispatch_scrobble_play_event
+
+    event_id = _local_event()
+    with patch(
+        "crate.scrobble.scrobble_play_event",
+        return_value={"lastfm": ScrobbleResult("failed", "lastfm error 9")},
+    ):
+        assert dispatch_scrobble_play_event(event_id) == "failed"
+
+    row = _dispatch_row(event_id)
+    assert row["status"] == "failed"
+    assert row["last_error"] == "lastfm: failed (lastfm error 9)"
+    assert row["provider_results"]["lastfm"]["outcome"] == "failed"
+
+
+def test_an_ignored_scrobble_is_skipped_and_never_resent(pg_db):
+    from crate.scrobble import dispatch_scrobble_play_event
+
+    event_id = _local_event()
+    with patch(
+        "crate.scrobble.scrobble_play_event",
+        return_value={"lastfm": ScrobbleResult("ignored", "lastfm ignored 3")},
+    ) as scrobble:
+        assert dispatch_scrobble_play_event(event_id) == "skipped"
+        assert dispatch_scrobble_play_event(event_id) == "skipped"
+
+    scrobble.assert_called_once()
+    assert _dispatch_row(event_id)["status"] == "skipped"
+
+
+def test_a_retry_only_resends_providers_without_a_final_answer(pg_db):
+    import pytest
+
+    from crate.scrobble import ScrobbleRetryError, dispatch_scrobble_play_event
+
+    event_id = _local_event()
+    with patch(
+        "crate.scrobble.scrobble_play_event",
+        side_effect=[
+            {
+                "lastfm": ScrobbleResult("accepted"),
+                "listenbrainz": ScrobbleResult("retryable", "http 503"),
+            },
+            {"listenbrainz": ScrobbleResult("accepted")},
+        ],
+    ) as scrobble:
+        with pytest.raises(ScrobbleRetryError):
+            dispatch_scrobble_play_event(event_id)
+        assert _dispatch_row(event_id)["status"] == "failed"
+
+        assert dispatch_scrobble_play_event(event_id) == "completed"
+
+    assert scrobble.call_args_list[1].kwargs["done"] == frozenset({"lastfm"})
+    row = _dispatch_row(event_id)
+    assert row["status"] == "completed"
+    assert row["attempts"] == 2
+    assert {
+        provider: result["outcome"]
+        for provider, result in row["provider_results"].items()
+    } == {"lastfm": "accepted", "listenbrainz": "accepted"}
+
+
+def test_a_user_without_linked_providers_is_skipped(pg_db):
+    from crate.scrobble import dispatch_scrobble_play_event
+
+    event_id = _local_event()
+    with patch("crate.scrobble.scrobble_play_event", return_value={}):
+        assert dispatch_scrobble_play_event(event_id) == "skipped"
+
+
+def test_an_invalid_lastfm_session_asks_the_user_to_reconnect(pg_db, monkeypatch):
+    from crate.db.repositories.auth_identities import (
+        get_user_external_identity,
+        upsert_user_external_identity,
+    )
+    from crate.scrobble import scrobble_play_event
+
+    upsert_user_external_identity(
+        1,
+        "lastfm",
+        external_user_id="crate-test",
+        external_username="crate-test",
+        status="linked",
+        metadata={"session_key": "stored-session"},
+    )
+    monkeypatch.setenv("LASTFM_APIKEY", "api-key")
+    monkeypatch.setenv("LASTFM_API_SECRET", "api-secret")
+    monkeypatch.setattr(
+        "crate.scrobble.lastfm_scrobble",
+        lambda **_kwargs: ScrobbleResult("failed", "lastfm error 9"),
+    )
+
+    results = scrobble_play_event(1, artist="Repion", track="Mar de fondo")
+
+    assert results["lastfm"].outcome == "failed"
+    identity = get_user_external_identity(1, "lastfm")
+    assert identity["status"] == "error"
+    assert "reconnect" in identity["last_error"]
+
+
+def test_an_unfinished_play_long_enough_for_lastfm_queues_a_scrobble(pg_db):
+    from crate.db.repositories.user_library import record_play_event
+
+    with (
+        patch("crate.actors.scrobble_play_event_actor.send") as send,
+        patch(
+            "crate.db.repositories.user_library_playback_writes._schedule_stats_refresh"
+        ),
+    ):
+        eligible = record_play_event(
+            1,
+            client_event_id="evt-android-half",
+            title="Mar de fondo",
+            artist="Repion",
+            started_at="2026-10-25T16:40:00+00:00",
+            ended_at="2026-10-25T16:42:00+00:00",
+            played_seconds=120,
+            track_duration_seconds=200,
+            completion_ratio=0.6,
+            was_skipped=True,
+        )
+        record_play_event(
+            1,
+            client_event_id="evt-android-short",
+            title="Mar de fondo",
+            artist="Repion",
+            started_at="2026-10-25T16:45:00+00:00",
+            ended_at="2026-10-25T16:45:20+00:00",
+            played_seconds=20,
+            track_duration_seconds=200,
+            completion_ratio=0.1,
+            was_skipped=True,
+        )
+
+    send.assert_called_once_with(eligible)

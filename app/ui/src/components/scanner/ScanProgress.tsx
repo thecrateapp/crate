@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Check, Circle, Loader2 } from "lucide-react";
-import { Progress } from "@crate/ui/shadcn/progress";
-import { Badge } from "@crate/ui/shadcn/badge";
+import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
+import { InfoBadge, type InfoBadgeTone } from "@crate/ui/primitives/InfoBadge";
 import { cn } from "@/lib/utils";
 
 export interface ScanProgressData {
@@ -32,12 +32,8 @@ const ALL_SCANNERS = [
   "incomplete",
 ];
 
-const ISSUE_COLORS: Record<string, string> = {
-  nested_library: "text-red-400 border-red-400/40",
-  duplicate_album: "text-orange-400 border-orange-400/40",
-  bad_naming: "text-yellow-400 border-yellow-400/40",
-  mergeable_album: "text-orange-400 border-orange-400/40",
-  incomplete_album: "text-blue-400 border-blue-400/40",
+const ISSUE_TONES: Record<string, InfoBadgeTone> = {
+  incomplete_album: "accent",
 };
 
 const ISSUE_LABELS: Record<string, string> = {
@@ -56,7 +52,7 @@ export function ScanProgress({ progress }: ScanProgressProps) {
   const percent =
     progress.artists_total > 0
       ? Math.round((progress.artists_done / progress.artists_total) * 100)
-      : 0;
+      : undefined;
 
   const [startedAt] = useState(Date.now);
   const [now, setNow] = useState(Date.now);
@@ -79,10 +75,14 @@ export function ScanProgress({ progress }: ScanProgressProps) {
     <div className="space-y-4">
       {/* Progress bar */}
       <div>
-        <Progress value={percent} className="h-2.5" />
+        <ProgressHairline
+          label="Library scan"
+          value={percent === undefined ? undefined : percent / 100}
+          valueText={`${progress.artists_done}/${progress.artists_total}`}
+        />
         <p className="text-sm text-muted-foreground mt-1.5">
-          Scanning artist {progress.artists_done}/{progress.artists_total} (
-          {percent}%)
+          Scanning artist {progress.artists_done}/{progress.artists_total}
+          {percent === undefined ? "" : ` (${percent}%)`}
         </p>
       </div>
 
@@ -97,9 +97,9 @@ export function ScanProgress({ progress }: ScanProgressProps) {
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-[color,background-color,border-color]",
                 isDone &&
-                  "border-l-2 border-l-green-500 border-green-500/30 text-green-400 bg-green-500/5",
+                  "border-l-2 border-l-accent-action border-accent-action/30 text-accent-action-hi bg-accent-action/5",
                 isRunning &&
-                  "border-l-2 border-l-blue-500 border-blue-500/30 text-blue-400 bg-blue-500/5",
+                  "border-l-2 border-l-accent-action border-accent-action/30 text-accent-action-hi bg-accent-action/5",
                 !isDone && !isRunning && "border-border text-muted-foreground",
               )}
             >
@@ -120,24 +120,19 @@ export function ScanProgress({ progress }: ScanProgressProps) {
       {/* Issue counters */}
       <div className="flex gap-2 flex-wrap">
         {Object.entries(progress.issues_by_type).map(([type, count]) => (
-          <Badge
+          <InfoBadge
             key={type}
-            variant="outline"
-            className={cn(
-              "text-xs",
-              count > 0
-                ? ISSUE_COLORS[type] ?? "text-orange-400 border-orange-400/40"
-                : "text-muted-foreground border-border",
-            )}
+
+            tone={count > 0 ? (ISSUE_TONES[type] ?? "warning") : "neutral"}
           >
             {ISSUE_LABELS[type] ?? type.replace(/_/g, " ")}: {count}
-          </Badge>
+          </InfoBadge>
         ))}
       </div>
 
       {/* Time estimate */}
       <p className="text-xs text-muted-foreground">
-        {percent >= 90
+        {percent !== undefined && percent >= 90
           ? "Almost done..."
           : remainingMin > 0
             ? `~${remainingMin} min remaining`

@@ -1,7 +1,8 @@
+import type { TrackMediaMetadata } from "@/lib/track-media-metadata";
 import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
 import type { Track } from "@/contexts/PlayerContext";
 
-export interface CuratedPlaylistTrack {
+export interface CuratedPlaylistTrack extends TrackMediaMetadata {
   id: number;
   playlist_id: number;
   track_id?: number;

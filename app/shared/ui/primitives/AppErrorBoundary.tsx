@@ -1,4 +1,5 @@
 import React, { type ReactNode } from "react";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
 
 interface AppErrorBoundaryProps {
   children: ReactNode;
@@ -19,17 +20,15 @@ function DefaultFallback({
   onReset: () => void;
 }) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-surface-canvas text-text-primary">
-      <p className="text-lg font-medium">Something went wrong</p>
-      <p className="max-w-md text-center text-sm text-text-muted">
-        {error.message}
-      </p>
-      <button
-        onClick={onReset}
-        className="mt-2 rounded-lg bg-accent-action px-4 py-2 text-sm text-accent-action-foreground"
-      >
-        Go home
-      </button>
+    <div className="flex min-h-dvh items-center justify-center bg-surface-canvas p-6 text-text-primary">
+      <ErrorState
+        variant="page"
+        title="Something went wrong"
+        titleAs="h1"
+        message={error.message}
+        onRetry={onReset}
+        retryLabel="Go home"
+      />
     </div>
   );
 }

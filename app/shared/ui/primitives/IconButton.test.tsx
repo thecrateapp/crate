@@ -12,7 +12,7 @@ describe("IconButton", () => {
       </IconButton>,
     );
     const button = screen.getByRole("button", { name: "Shuffle" });
-    expect(button).toHaveAttribute("title", "Shuffle");
+    expect(button).not.toHaveAttribute("title");
     expect(button).toHaveAttribute("type", "button");
   });
 
@@ -22,10 +22,7 @@ describe("IconButton", () => {
         <svg />
       </IconButton>,
     );
-    expect(screen.getByRole("button")).toHaveAttribute(
-      "title",
-      "Shuffle queue",
-    );
+    expect(screen.getByRole("button")).not.toHaveAttribute("title");
   });
 
   it("applies sizes and the coarse-pointer hit area", () => {
@@ -42,8 +39,8 @@ describe("IconButton", () => {
     const small = screen.getByRole("button", { name: "Small" });
     expect(small).toHaveClass(
       "size-8",
-      "after:size-11",
-      "pointer-fine:after:hidden",
+      "pointer-coarse:min-h-11",
+      "pointer-coarse:min-w-11",
     );
     expect(screen.getByRole("button", { name: "Large" })).toHaveClass(
       "size-11",
@@ -57,7 +54,11 @@ describe("IconButton", () => {
       </IconButton>,
     );
     const button = screen.getByRole("button");
-    expect(button).toHaveClass("size-10", "focus-visible:shadow-focus");
+    expect(button).toHaveClass("size-10");
+    expect(button).not.toHaveClass(
+      "outline-none",
+      "focus-visible:shadow-focus",
+    );
     expect(button).toHaveAttribute("data-size", "md");
   });
 
@@ -69,7 +70,7 @@ describe("IconButton", () => {
     );
     expect(screen.getByRole("button")).toHaveClass(
       "text-state-danger",
-      "bg-surface-icon-control",
+      "bg-surface-object",
     );
   });
 

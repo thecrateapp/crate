@@ -68,7 +68,7 @@ export function useTrackActionEntries(
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { play, playAll, addToQueue, playNext } = usePlayerActions();
-  const { isLiked, toggleTrackLike } = useLikedTracks();
+  const { isLiked, toggleTrackLike, hasLoaded } = useLikedTracks();
   const {
     supported: offlineSupported,
     getTrackState,
@@ -160,10 +160,15 @@ export function useTrackActionEntries(
       { type: "divider", key: "divider-playback" },
       action({
         key: "like",
-        label: liked ? t("actions.track.unlike") : t("actions.track.like"),
+        label:
+          hasLoaded === false
+            ? t("library.liked.stateUnavailable")
+            : liked
+              ? t("actions.track.unlike")
+              : t("actions.track.like"),
         icon: liked ? HeartBold : Heart,
         active: liked,
-        disabled: !hasTrackRef,
+        disabled: !hasTrackRef || hasLoaded === false,
         onSelect: async () => {
           await toggleTrackLike(
             libraryTrackId,
@@ -369,6 +374,7 @@ export function useTrackActionEntries(
     input.playlistOptions,
     input.track,
     liked,
+    hasLoaded,
     libraryTrackId,
     hasTrackRef,
     hasLocalTrackRef,

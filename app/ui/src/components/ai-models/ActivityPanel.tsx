@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { Activity as ActivityIcon } from "lucide-react";
 
 import { Button } from "@crate/ui/shadcn/button";
 import {
@@ -132,7 +131,6 @@ export function ActivityPanel({
 
   return (
     <OpsPanel
-      icon={ActivityIcon}
       title="Activity"
       description="Calls Crate made to models in the last 90 days."
     >
@@ -246,7 +244,7 @@ export function ActivityPanel({
           <p className="text-sm text-white/50">Loading activity…</p>
         ) : null}
         {failed ? (
-          <p role="alert" className="text-sm text-amber-100">
+          <p role="alert" className="text-sm text-state-warning-text">
             {LOAD_ERROR}
           </p>
         ) : null}

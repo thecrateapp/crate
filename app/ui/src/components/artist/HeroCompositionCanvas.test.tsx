@@ -5,10 +5,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HeroCompositionCanvas } from "./HeroCompositionCanvas";
 import type { HeroRecipe } from "./hero-composition-geometry";
-import {
-  DEFAULT_APPEARANCE_PREFERENCES,
-  resolveAppearance,
-} from "@crate/ui/lib/appearance-resolver";
 
 const transformerForceUpdate = vi.hoisted(() => vi.fn());
 
@@ -138,13 +134,13 @@ describe("HeroCompositionCanvas", () => {
     const { container } = render(<Harness />);
 
     expect(await screen.findByTestId("konva-stage")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Crop" })).toHaveAttribute(
-      "aria-pressed",
+    expect(screen.getByRole("radio", { name: "Crop" })).toHaveAttribute(
+      "aria-checked",
       "true",
     );
     expect(container.querySelectorAll('input[type="range"]')).toHaveLength(0);
 
-    await user.click(screen.getByRole("button", { name: "Fill" }));
+    await user.click(screen.getByRole("radio", { name: "Fill" }));
     await user.click(screen.getByRole("button", { name: "Zoom in" }));
     await user.click(screen.getByRole("button", { name: "Flip" }));
     await user.click(screen.getByRole("button", { name: "Rotate clockwise" }));
@@ -191,7 +187,7 @@ describe("HeroCompositionCanvas", () => {
     render(<Harness />);
 
     await screen.findByTestId("konva-stage");
-    await user.click(screen.getByRole("button", { name: "Fill" }));
+    await user.click(screen.getByRole("radio", { name: "Fill" }));
 
     const subject = screen.getByTestId("konva-image-fill-subject");
     const initialWidth = subject.getAttribute("data-width");
@@ -208,7 +204,7 @@ describe("HeroCompositionCanvas", () => {
     render(<Harness />);
 
     await screen.findByTestId("konva-stage");
-    await user.click(screen.getByRole("button", { name: "Fill" }));
+    await user.click(screen.getByRole("radio", { name: "Fill" }));
     const callsBeforeZoom = transformerForceUpdate.mock.calls.length;
 
     await user.click(screen.getByRole("button", { name: "Zoom in" }));
@@ -223,7 +219,7 @@ describe("HeroCompositionCanvas", () => {
     render(<Harness />);
 
     await screen.findByTestId("konva-stage");
-    await user.click(screen.getByRole("button", { name: "Fill" }));
+    await user.click(screen.getByRole("radio", { name: "Fill" }));
 
     expect(screen.queryByTestId("konva-image-fill-background")).toBeNull();
     expect(screen.getByTestId("konva-image-fill-subject")).toHaveAttribute(
@@ -265,16 +261,8 @@ describe("HeroCompositionCanvas", () => {
     expect(screen.queryByText(/Fill preview/)).toBeNull();
   });
 
-  it("keeps the Konva artboard transparent inside its own appearance scope", async () => {
+  it("keeps the Konva artboard transparent without a separate visual identity", async () => {
     localStorage.setItem("crate.listen.appearance.v2", "unchanged");
-    const appearance = resolveAppearance(
-      {
-        ...DEFAULT_APPEARANCE_PREFERENCES,
-        mode: "light",
-        preset: "crateRed",
-      },
-      { prefersColorSchemeDark: false, prefersReducedMotion: false },
-    );
 
     const onRecipeChange = vi.fn();
     const mobileRecipe: HeroRecipe = {
@@ -288,17 +276,16 @@ describe("HeroCompositionCanvas", () => {
         composition="mobile"
         aspect={4 / 5}
         recipe={mobileRecipe}
-        appearance={appearance}
         onRecipeChange={onRecipeChange}
       />,
     );
 
     expect(await screen.findByTestId("konva-stage")).toBeInTheDocument();
-    const themeScope = screen.getByTestId("hero-composition-theme-scope");
-    expect(themeScope).toHaveAttribute("data-crate-skin", "crateRed");
-    expect(themeScope).toHaveAttribute("data-crate-mode", "light");
-    expect(themeScope).toHaveClass("min-w-0");
-    expect(themeScope).not.toHaveClass("contents");
+    const preview = screen.getByTestId("hero-composition-preview");
+    expect(preview).not.toHaveAttribute("data-crate-skin");
+    expect(preview).not.toHaveAttribute("data-crate-mode");
+    expect(preview).toHaveClass("min-w-0");
+    expect(preview).not.toHaveClass("contents");
     expect(screen.getByTestId("hero-composition-canvas")).toHaveClass(
       "bg-transparent",
     );
@@ -310,10 +297,6 @@ describe("HeroCompositionCanvas", () => {
         composition="mobile"
         aspect={4 / 5}
         recipe={mobileRecipe}
-        appearance={resolveAppearance(
-          { ...DEFAULT_APPEARANCE_PREFERENCES, mode: "dark" },
-          { prefersColorSchemeDark: true, prefersReducedMotion: false },
-        )}
         onRecipeChange={onRecipeChange}
       />,
     );
@@ -415,7 +398,7 @@ describe("HeroCompositionCanvas", () => {
     render(<Harness />);
 
     await screen.findByTestId("konva-stage");
-    await user.click(screen.getByRole("button", { name: "Fill" }));
+    await user.click(screen.getByRole("radio", { name: "Fill" }));
 
     expect(screen.getByTestId("desktop-hero-artwork-mask")).toHaveStyle({
       maskImage: "none",

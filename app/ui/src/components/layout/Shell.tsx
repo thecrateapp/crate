@@ -1,3 +1,7 @@
+import { SkipLink } from "@crate/ui/primitives/SkipLink";
+import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+import { Search as SearchIcon } from "@crate/ui/icons";
 import {
   useState,
   useCallback,
@@ -5,8 +9,8 @@ import {
   useEffect,
   type CSSProperties,
 } from "react";
-import { Outlet, useLocation, useNavigate } from "react-router";
 import { ChevronLeft, ChevronRight, Menu } from "lucide-react";
+import { Outlet, useLocation, useNavigate } from "react-router";
 import { VisuallyHidden } from "radix-ui";
 
 import { Button } from "@crate/ui/shadcn/button";
@@ -17,11 +21,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@crate/ui/shadcn/dialog";
-import { Sheet, SheetContent, SheetTitle } from "@crate/ui/shadcn/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetTrigger,
+} from "@crate/ui/shadcn/sheet";
 import { useKeyboard } from "@/hooks/use-keyboard";
 import { useNotifications } from "@/hooks/use-notifications";
 
 import { CommandPalette } from "./CommandPalette";
+import { HeaderUserMenu } from "./HeaderUserMenu";
 import { SearchBar } from "./SearchBar";
 import {
   Sidebar,
@@ -35,7 +45,10 @@ import {
 export function Shell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const helpOpenerRef = useRef<HTMLElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarExpanded, setSidebarExpanded] = useState(
@@ -43,8 +56,22 @@ export function Shell() {
   );
 
   const focusSearch = useCallback(() => {
-    searchInputRef.current?.focus();
+    if (window.matchMedia("(max-width: 767px)").matches) {
+      setMobileSearchOpen(true);
+    } else {
+      searchInputRef.current?.focus();
+    }
   }, []);
+
+  useEffect(() => {
+    if (!mobileSearchOpen) return;
+    const frame = requestAnimationFrame(() =>
+      mobileSearchInputRef.current?.focus(),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [mobileSearchOpen]);
+
+  useEffect(() => setMobileSearchOpen(false), [location.pathname]);
 
   const blurSearch = useCallback(() => {
     if (document.activeElement instanceof HTMLElement) {
@@ -53,8 +80,13 @@ export function Shell() {
   }, []);
 
   const showHelp = useCallback(() => {
+    if (helpOpen) return;
+    helpOpenerRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     setHelpOpen(true);
-  }, []);
+  }, [helpOpen]);
 
   useKeyboard({
     onFocusSearch: focusSearch,
@@ -77,12 +109,8 @@ export function Shell() {
     };
   }, []);
 
-  const overlayHeader =
-    /^\/artists\/[^/]+\/[^/]+$/.test(location.pathname) ||
-    /^\/albums\/[^/]+\/[^/]+$/.test(location.pathname);
-  const sidebarWidthClass = sidebarExpanded ? "md:ml-60" : "md:ml-[4.5rem]";
-  const sidebarLeftClass = sidebarExpanded ? "left-60" : "left-[4.5rem]";
-  const desktopHeaderOffsetClass = overlayHeader ? "md:pt-0" : "md:pt-24";
+  const sidebarWidthClass = sidebarExpanded ? "md:ml-60" : "md:ml-36";
+  const sidebarLeftClass = sidebarExpanded ? "left-60" : "left-36";
   const shellStyle = {
     "--sidebar-w": sidebarExpanded
       ? `${SIDEBAR_EXPANDED_WIDTH}px`
@@ -97,23 +125,37 @@ export function Shell() {
       className="min-h-screen bg-app-surface text-foreground [--app-header-h:calc(4rem+1px)] [--sidebar-w:0px]"
       style={shellStyle}
     >
+      <SkipLink targetId="admin-main-content">Skip to main content</SkipLink>
       <div className="hidden md:block">
         <Sidebar />
       </div>
 
-      <div className="z-app-header fixed inset-x-0 top-0 flex items-center gap-3 border-b border-white/6 bg-app-surface/75 px-4 py-3 backdrop-blur-xl md:hidden">
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Open navigation"
-          onClick={() => setMobileOpen(true)}
-        >
-          <Menu size={20} />
-        </Button>
-        <div className="text-sm font-bold text-white">Crate Admin</div>
-      </div>
-
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <div
+          data-admin-ux="mobile-shell-header"
+          className="z-app-header fixed inset-x-0 top-0 flex items-center gap-3 border-b border-white/6 bg-app-surface px-4 py-3 md:hidden"
+        >
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label="Open navigation">
+              <Menu
+                size={20}
+                data-admin-ux="mobile-navigation"
+                aria-hidden="true"
+              />
+            </Button>
+          </SheetTrigger>
+          <div className="text-sm font-bold text-white">Crate Admin</div>
+          <div className="pointer-events-auto ml-auto flex items-center gap-1">
+            <ActionButton
+              label="Search library"
+              onClick={() => setMobileSearchOpen(true)}
+            >
+              <SearchIcon data-admin-ux="mobile-search" aria-hidden="true" />
+            </ActionButton>
+            <HeaderUserMenu />
+          </div>
+        </div>
+
         <SheetContent
           side="left"
           className="w-[240px] p-0"
@@ -122,37 +164,52 @@ export function Shell() {
           <VisuallyHidden.Root>
             <SheetTitle>Navigation</SheetTitle>
           </VisuallyHidden.Root>
-          <Sidebar onNavigate={() => setMobileOpen(false)} />
+          <Sidebar
+            presentation="drawer"
+            onNavigate={() => setMobileOpen(false)}
+          />
         </SheetContent>
       </Sheet>
 
       <div
-        className={`z-app-header fixed top-0 right-0 hidden border-b border-white/6 bg-app-surface/68 backdrop-blur-xl transition-[left] duration-200 md:block ${sidebarLeftClass}`}
+        data-admin-ux="desktop-shell-header"
+        className={`z-app-header fixed top-0 right-0 hidden border-b border-white/6 bg-app-surface transition-[left] duration-200 md:block ${sidebarLeftClass}`}
       >
         <div className="flex h-16 w-full items-center gap-4 px-4 pointer-events-none">
           <div className="pointer-events-auto flex shrink-0 items-center gap-2">
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="flex h-10 w-10 items-center justify-center rounded-md bg-black/30 text-white/60 shadow-[0_6px_20px_rgba(0,0,0,0.18)] backdrop-blur-sm transition-colors hover:bg-black/50 hover:text-white"
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-md p-0 text-sm text-text-muted transition-colors hover:bg-surface-control hover:text-text-primary"
               aria-label="Go back"
             >
-              <ChevronLeft size={16} />
+              <ChevronLeft
+                size={16}
+                data-admin-ux="history-back"
+                aria-hidden="true"
+              />
             </button>
             <button
               type="button"
               onClick={() => navigate(1)}
-              className="flex h-10 w-10 items-center justify-center rounded-md bg-black/30 text-white/60 shadow-[0_6px_20px_rgba(0,0,0,0.18)] backdrop-blur-sm transition-colors hover:bg-black/50 hover:text-white"
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-md p-0 text-sm text-text-muted transition-colors hover:bg-surface-control hover:text-text-primary"
               aria-label="Go forward"
             >
-              <ChevronRight size={16} />
+              <ChevronRight
+                size={16}
+                data-admin-ux="history-forward"
+                aria-hidden="true"
+              />
             </button>
           </div>
 
           <div className="hidden flex-1 lg:block" />
 
-          <div className="pointer-events-auto flex min-w-0 flex-1 items-center gap-3 md:flex-none md:gap-4">
-            <SearchBar inputRef={searchInputRef} />
+          <div className="pointer-events-auto flex min-w-0 flex-1 items-center gap-3 md:gap-4 lg:w-[560px] lg:flex-none">
+            <div className="min-w-0 flex-1">
+              <SearchBar inputRef={searchInputRef} />
+            </div>
+            <HeaderUserMenu />
           </div>
         </div>
       </div>
@@ -164,16 +221,14 @@ export function Shell() {
           TEST_GAP: jsdom has no layout engine, so sticky behaviour cannot be
           asserted in Vitest; verified in Chrome at 390 and 1440 px. */}
       <main
+        id="admin-main-content"
+        tabIndex={-1}
         className={`overflow-x-hidden supports-[overflow:clip]:overflow-x-clip transition-[margin-left] duration-200 ${sidebarWidthClass}`}
       >
         <div
-          className={`mx-auto w-full max-w-[1880px] px-4 py-4 pt-20 md:py-6 ${
-            overlayHeader
-              ? "md:px-0"
-              : sidebarExpanded
-                ? "md:px-6 lg:px-8"
-                : "md:px-10 lg:px-12"
-          } ${desktopHeaderOffsetClass}`}
+          className={`mx-auto w-full max-w-[1880px] px-4 py-4 pt-20 md:py-6 md:pt-24 ${
+            sidebarExpanded ? "md:px-6 lg:px-8" : "md:px-10 lg:px-12"
+          }`}
         >
           <div key={location.pathname} className="animate-page-in">
             <Outlet />
@@ -183,10 +238,36 @@ export function Shell() {
 
       <CommandPalette />
 
+      <AppModal
+        open={mobileSearchOpen}
+        onClose={() => setMobileSearchOpen(false)}
+        title="Search library"
+        description="Find artists, albums and tracks in your library."
+        closeLabel="Close library search"
+      >
+        <ModalBody>
+          <SearchBar
+            inputRef={mobileSearchInputRef}
+            onNavigate={() => setMobileSearchOpen(false)}
+          />
+        </ModalBody>
+      </AppModal>
+
       <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent
+          data-admin-ux="help-close"
+          className="[&_[data-slot=dialog-close]]:min-h-11 [&_[data-slot=dialog-close]]:min-w-11"
+          size="sm"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            if (helpOpenerRef.current?.isConnected)
+              helpOpenerRef.current.focus();
+          }}
+        >
           <DialogHeader>
-            <DialogTitle>Keyboard Shortcuts</DialogTitle>
+            <DialogTitle className="font-display">
+              Keyboard Shortcuts
+            </DialogTitle>
             <DialogDescription>
               Navigate the admin console quickly with your keyboard.
             </DialogDescription>

@@ -1,4 +1,6 @@
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { AppModal } from "@crate/ui/primitives/AppModal";
+import { useState } from "react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -23,6 +25,10 @@ vi.mock("@crate/ui/lib/notify", () => ({
   },
 }));
 
+const likesReadState = vi.hoisted(() => ({ hasLoaded: true }));
+afterEach(() => {
+  likesReadState.hasLoaded = true;
+});
 const apiMock = vi.hoisted(() => vi.fn(() => Promise.resolve({})));
 
 const resolvedArtistMock = vi.hoisted(() => ({
@@ -114,7 +120,8 @@ vi.mock("@/components/player/bar/PlayerSeekBar", () => ({
   ),
 }));
 
-vi.mock("@/components/player/bar/player-bar-utils", () => ({
+vi.mock("@/components/player/bar/player-bar-utils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./bar/player-bar-utils")>()),
   formatPlayerTime: (t: number) =>
     `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`,
 }));
@@ -142,6 +149,7 @@ vi.mock("@/hooks/use-crossfade-progress", () => ({
 
 vi.mock("@/contexts/LikedTracksContext", () => ({
   useLikedTracks: () => ({
+    hasLoaded: likesReadState.hasLoaded,
     isLiked: vi.fn(() => false),
     toggleTrackLike: vi.fn(() => Promise.resolve(true)),
   }),
@@ -150,14 +158,6 @@ vi.mock("@/contexts/LikedTracksContext", () => ({
 vi.mock("@crate/ui/lib/use-dismissible-layer", () => ({
   useDismissibleLayer: vi.fn(),
 }));
-
-vi.mock("@crate/ui/lib/use-escape-key", () => ({
-  useEscapeKey: vi.fn(),
-}));
-
-const { useEscapeKey: mockUseEscapeKey } = await import(
-  "@crate/ui/lib/use-escape-key"
-);
 
 vi.mock("@/lib/mobile-audio-mode", () => ({
   canUseWebAudioEffects: true,
@@ -271,6 +271,49 @@ describe("FullscreenPlayer", () => {
   // Rendering states
   // ════════════════════════════════════════════════════════════════════
   describe("rendering states", () => {
+    it("shows only the actual native technique on the time row and sends the same tone to the disc", async () => {
+      const track = makeTrack({ bpm: 126 });
+      renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
+        playerActions: {
+          currentTrack: track,
+          queue: [track, makeQueueTrack()],
+          currentIndex: 0,
+        },
+        playerState: {
+          isPlaying: true,
+          nativeMixAvailable: true,
+          mixState: {
+            revision: "q1",
+            executionId: 9,
+            mode: "beatmatch",
+            phase: "mixing",
+            bassHandoff: true,
+            outgoingTrackId: track.id,
+            incomingTrackId: "q0",
+          },
+        },
+      });
+      const indicator = await screen.findByRole("status", {
+        name: "Transition",
+      });
+      expect(indicator).toHaveTextContent("Beatmatch");
+      expect(
+        indicator.compareDocumentPosition(screen.getByTestId("seek-bar")) &
+          Node.DOCUMENT_POSITION_PRECEDING,
+      ).toBeTruthy();
+      expect(indicator).toHaveClass("absolute", "top-0", "inset-x-12");
+      expect(
+        JSON.parse(
+          screen.getByTestId("spinning-disc").getAttribute("data-props")!,
+        ).mixTone,
+      ).toBe("beatmatch");
+      expect(
+        JSON.parse(
+          screen.getByTestId("spinning-disc").getAttribute("data-props")!,
+        ).mixBpm,
+      ).toBe(126);
+    });
+
     it("renders nothing when open is false", () => {
       const track = makeTrack();
       const { container } = renderWithListenProviders(
@@ -378,11 +421,11 @@ describe("FullscreenPlayer", () => {
         container.querySelector(".fullscreen-player-handle"),
       ).toBeInTheDocument();
 
-      await user.click(screen.getByLabelText("Show album cover"));
+      await user.click(screen.getByLabelText("Cover mode"));
 
       await waitFor(() => {
         expect(
-          container.querySelector(".fullscreen-player-artwork-placeholder"),
+          container.querySelector(".bg-surface-placeholder"),
         ).toBeInTheDocument();
         expect(
           container.querySelector(".fullscreen-player-artwork-icon"),
@@ -484,8 +527,7 @@ describe("FullscreenPlayer", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText("1:00")).toBeInTheDocument();
-        expect(screen.getByText("-3:00")).toBeInTheDocument();
+        expect(screen.getByTestId("seek-bar")).toBeInTheDocument();
       });
     });
 
@@ -506,7 +548,7 @@ describe("FullscreenPlayer", () => {
       });
 
       // Click surface mode toggle to switch to cover mode
-      await user.click(screen.getByLabelText("Show album cover"));
+      await user.click(screen.getByLabelText("Cover mode"));
 
       // SpinningDisc should be gone, replaced by cover image
       await waitFor(() => {
@@ -774,9 +816,7 @@ describe("FullscreenPlayer", () => {
       await user.click(screen.getByLabelText("Equalizer"));
       const equalizerPanel = screen.getByTestId("equalizer-panel");
       expect(equalizerPanel).toBeInTheDocument();
-      expect(equalizerPanel.parentElement).toHaveClass(
-        "listen-mobile-eq-glass",
-      );
+      expect(equalizerPanel.parentElement).toHaveClass("bg-surface-popover");
 
       await user.click(screen.getByLabelText("Equalizer"));
       await waitFor(() => {
@@ -784,7 +824,7 @@ describe("FullscreenPlayer", () => {
       });
     });
 
-    it("hides the mobile Equalizer access when it is globally disabled", async () => {
+    it("keeps mobile Equalizer access while the effect is off without enabling it", async () => {
       localStorage.setItem("listen-eq-enabled", "false");
       const track = makeTrack();
 
@@ -797,7 +837,8 @@ describe("FullscreenPlayer", () => {
       });
 
       await waitFor(() => {
-        expect(screen.queryByLabelText("Equalizer")).not.toBeInTheDocument();
+        expect(screen.getByLabelText("Equalizer")).toBeInTheDocument();
+        expect(localStorage.getItem("listen-eq-enabled")).toBe("false");
       });
     });
 
@@ -874,7 +915,7 @@ describe("FullscreenPlayer", () => {
         }),
       });
 
-      const queueSwitch = await screen.findByRole("button", { name: "Queue" });
+      const queueSwitch = await screen.findByRole("tab", { name: "Queue" });
 
       await user.click(queueSwitch);
 
@@ -908,7 +949,9 @@ describe("FullscreenPlayer", () => {
       await user.click(screen.getByText("Lyrics"));
 
       await waitFor(() => {
-        expect(screen.getByText("Loading lyrics...")).toBeInTheDocument();
+        expect(
+          screen.getByRole("status", { name: "Loading lyrics..." }),
+        ).toBeInTheDocument();
       });
 
       apiResolve!({ syncedLyrics: null, plainLyrics: "Hello world" });
@@ -950,23 +993,23 @@ describe("FullscreenPlayer", () => {
         }),
       });
 
-      const queueSwitch = await screen.findByRole("button", { name: "Queue" });
-      expect(queueSwitch).toHaveAttribute("aria-pressed", "false");
+      const queueSwitch = await screen.findByRole("tab", { name: "Queue" });
+      expect(queueSwitch).toHaveAttribute("aria-selected", "false");
 
       await user.click(queueSwitch);
 
       await waitFor(() => {
         expect(screen.getByText("Nothing queued")).toBeInTheDocument();
       });
-      expect(queueSwitch).toHaveAttribute("aria-pressed", "true");
+      expect(queueSwitch).toHaveAttribute("aria-selected", "true");
 
-      await user.click(queueSwitch);
+      await user.click(screen.getByRole("tab", { name: "Now Playing" }));
 
       await waitFor(() => {
         expect(screen.queryByText("Nothing queued")).not.toBeInTheDocument();
         expect(screen.getByTestId("seek-bar")).toBeInTheDocument();
       });
-      expect(queueSwitch).toHaveAttribute("aria-pressed", "false");
+      expect(queueSwitch).toHaveAttribute("aria-selected", "false");
     });
 
     it("uses semantic tokens for active panel and transport states", async () => {
@@ -987,31 +1030,12 @@ describe("FullscreenPlayer", () => {
         name: "Disable shuffle",
       });
       const repeat = screen.getByRole("button", { name: "Repeat: one" });
-      expect(shuffle).toHaveClass(
-        "text-accent-action",
-        "drop-shadow-accent-action",
-      );
-      expect(repeat).toHaveClass(
-        "text-accent-action",
-        "drop-shadow-accent-action",
-      );
-
-      const queueSwitch = screen.getByRole("button", { name: "Queue" });
-      expect(queueSwitch).toHaveClass(
-        "text-text-muted",
-        "active:text-text-secondary",
-      );
-
+      expect(shuffle).toHaveAttribute("aria-pressed", "true");
+      expect(repeat).toHaveAttribute("aria-pressed", "true");
+      const queueSwitch = screen.getByRole("tab", { name: "Queue" });
+      expect(queueSwitch).toHaveAttribute("aria-selected", "false");
       await user.click(queueSwitch);
-
-      expect(queueSwitch).toHaveClass(
-        "text-accent-action",
-        "drop-shadow-accent-action-icon",
-      );
-      expect(queueSwitch.querySelector('[aria-hidden="true"]')).toHaveClass(
-        "bg-accent-action",
-        "shadow-accent-action-indicator-active",
-      );
+      expect(queueSwitch).toHaveAttribute("aria-selected", "true");
     });
   });
 
@@ -1044,14 +1068,6 @@ describe("FullscreenPlayer", () => {
       const track = makeTrack();
       const onClose = vi.fn();
 
-      // Capture the escape handler registered by useEscapeKey
-      let capturedHandler: ((e: KeyboardEvent) => void) | null = null;
-      vi.mocked(mockUseEscapeKey).mockImplementation(
-        (_active: boolean, onEscape: (e: KeyboardEvent) => void) => {
-          capturedHandler = onEscape;
-        },
-      );
-
       renderWithListenProviders(<FullscreenPlayer open onClose={onClose} />, {
         playerActions: createMockPlayerActions({
           currentTrack: track,
@@ -1061,13 +1077,15 @@ describe("FullscreenPlayer", () => {
       });
 
       await waitFor(() => {
-        expect(capturedHandler).not.toBeNull();
+        expect(
+          screen.getByRole("dialog", { name: "Now Playing" }),
+        ).toBeInTheDocument();
       });
 
       const event = new KeyboardEvent("keydown", { key: "Escape" });
       vi.spyOn(event, "preventDefault");
       vi.spyOn(event, "stopImmediatePropagation");
-      capturedHandler!(event);
+      fireEvent(window, event);
 
       expect(event.preventDefault).toHaveBeenCalled();
       expect(event.stopImmediatePropagation).toHaveBeenCalled();
@@ -1078,15 +1096,6 @@ describe("FullscreenPlayer", () => {
       const track = makeTrack();
       const onClose = vi.fn();
       const user = userEvent.setup();
-
-      // For this test we use real useEscapeKey mock with full implementation
-      // We need to control the escape callback sequence
-      let capturedHandler: ((e: KeyboardEvent) => void) | null = null;
-      vi.mocked(mockUseEscapeKey).mockImplementation(
-        (_active: boolean, onEscape: (e: KeyboardEvent) => void) => {
-          capturedHandler = onEscape;
-        },
-      );
 
       renderWithListenProviders(<FullscreenPlayer open onClose={onClose} />, {
         playerActions: createMockPlayerActions({
@@ -1108,7 +1117,7 @@ describe("FullscreenPlayer", () => {
 
       // Now escape should return to player tab, not close
       const event = new KeyboardEvent("keydown", { key: "Escape" });
-      capturedHandler!(event);
+      fireEvent(window, event);
 
       // onClose should NOT have been called
       expect(onClose).not.toHaveBeenCalled();
@@ -1317,11 +1326,13 @@ describe("FullscreenPlayer", () => {
       await user.click(screen.getByText("Lyrics"));
 
       await waitFor(() => {
-        expect(screen.getByText("Loading lyrics...")).toBeInTheDocument();
+        expect(
+          screen.getByRole("status", { name: "Loading lyrics..." }),
+        ).toBeInTheDocument();
       });
     });
 
-    it('shows "No lyrics available" when API resolves with no lyrics', async () => {
+    it('shows "No lyrics found" when API resolves with no lyrics', async () => {
       apiMock.mockReset();
       apiMock.mockImplementation(() => Promise.resolve({}));
 
@@ -1343,7 +1354,7 @@ describe("FullscreenPlayer", () => {
       await user.click(screen.getByText("Lyrics"));
 
       await waitFor(() => {
-        expect(screen.getByText("No lyrics available")).toBeInTheDocument();
+        expect(screen.getByText("No lyrics found")).toBeInTheDocument();
       });
     });
 
@@ -1372,7 +1383,7 @@ describe("FullscreenPlayer", () => {
         }),
       });
 
-      await user.click(await screen.findByRole("button", { name: "Lyrics" }));
+      await user.click(await screen.findByRole("tab", { name: "Lyrics" }));
 
       const activeLine = await screen.findByRole("button", {
         name: "Picking petals",
@@ -1381,15 +1392,15 @@ describe("FullscreenPlayer", () => {
         name: "Do you love me? Do you love me not?",
       });
 
-      expect(activeLine).toHaveClass(
-        "text-[1.9rem]",
-        "font-extrabold",
-        "text-text-primary",
-        "lyrics-active-line",
-      );
-      expect(activeLine.className).not.toContain("rgba(");
-      expect(nextLine).toHaveClass("text-[1.55rem]");
-      expect(nextLine.className).toContain("blur-[0.35px]");
+      expect(activeLine).toHaveAttribute("aria-current", "true");
+      expect(activeLine).toHaveClass("listen-lyric-line");
+      expect(nextLine).toHaveAttribute("data-state", "future");
+      expect(
+        activeLine.closest('[data-slot="player-lyrics-surface"]'),
+      ).toBeInTheDocument();
+      expect(
+        document.querySelector(".lyrics-fullscreen-backdrop"),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -1414,7 +1425,7 @@ describe("FullscreenPlayer", () => {
       });
     });
 
-    it("renders three panel switches and no player tab", async () => {
+    it("renders associated text tabs including now playing", async () => {
       const track = makeTrack();
       renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
         playerActions: createMockPlayerActions({
@@ -1428,16 +1439,16 @@ describe("FullscreenPlayer", () => {
         expect(
           screen.queryByRole("button", { name: "Player" }),
         ).not.toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "Queue" })).toHaveAttribute(
-          "aria-pressed",
+        expect(screen.getByRole("tab", { name: "Queue" })).toHaveAttribute(
+          "aria-selected",
           "false",
         );
-        expect(screen.getByRole("button", { name: "Lyrics" })).toHaveAttribute(
-          "aria-pressed",
+        expect(screen.getByRole("tab", { name: "Lyrics" })).toHaveAttribute(
+          "aria-selected",
           "false",
         );
-        expect(screen.getByRole("button", { name: "Info" })).toHaveAttribute(
-          "aria-pressed",
+        expect(screen.getByRole("tab", { name: "Info" })).toHaveAttribute(
+          "aria-selected",
           "false",
         );
       });
@@ -1454,7 +1465,7 @@ describe("FullscreenPlayer", () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Show album cover")).toBeInTheDocument();
+        expect(screen.getByLabelText("Cover mode")).toBeInTheDocument();
       });
     });
 
@@ -1475,42 +1486,26 @@ describe("FullscreenPlayer", () => {
       });
 
       const like = screen.getByLabelText("Like track");
-      expect(like).toHaveClass(
-        "border-border-subtle",
-        "bg-surface-control",
-        "active:bg-surface-control-hover",
-      );
+      expect(like).toHaveClass("size-11", "hover:text-accent-action-hi");
+      expect(like.className).not.toMatch(/(?:^|\s)(?:border|bg-|active:bg-)/);
       expect(like).toHaveAttribute("aria-pressed", "false");
       expect(screen.getByTestId("fullscreen-like-heart")).toBeInTheDocument();
 
       for (const button of [
         screen.getByLabelText("Equalizer"),
-        screen.getByLabelText("Show album cover"),
+        screen.getByLabelText("Cover mode"),
       ]) {
-        expect(button).toHaveClass(
-          "border-border-subtle",
-          "bg-surface-control",
-          "text-text-secondary",
-          "active:bg-surface-control-hover",
-          "active:text-text-primary",
-        );
+        expect(button).toHaveAttribute("data-size", "icon-lg");
         expect(button.className).not.toContain("white/");
       }
 
       const equalizer = screen.getByLabelText("Equalizer");
       await user.click(equalizer);
-      expect(equalizer).toHaveClass(
-        "text-accent-action",
-        "drop-shadow-accent-action",
-      );
+      expect(equalizer).toHaveAttribute("aria-pressed", "true");
 
-      expect(screen.getByTestId("player-track-menu")).toHaveClass(
-        "border-border-subtle",
-        "bg-surface-control",
-        "text-text-secondary",
-        "active:bg-surface-control-hover",
-        "active:text-text-primary",
-      );
+      const more = screen.getByTestId("player-track-menu");
+      expect(more).toHaveClass("size-11", "hover:text-accent-action-hi");
+      expect(more.className).not.toMatch(/(?:^|\s)(?:border|bg-|active:bg-)/);
     });
   });
 
@@ -1584,4 +1579,107 @@ describe("FullscreenPlayer", () => {
       // listener plugin, not available in jsdom.
     });
   });
+});
+
+it("isolates fullscreen, contains keyboard focus and restores its recreated dock launcher", async () => {
+  const user = userEvent.setup();
+  const track = makeTrack();
+  function PlayerHarness() {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <main>
+          <button>Background action</button>
+        </main>
+        {!open ? (
+          <button
+            data-player-surface-launcher="fullscreen"
+            onClick={() => setOpen(true)}
+          >
+            Open fullscreen player
+          </button>
+        ) : null}
+        <FullscreenPlayer open={open} onClose={() => setOpen(false)} />
+      </>
+    );
+  }
+  renderWithListenProviders(<PlayerHarness />, {
+    playerActions: createMockPlayerActions({
+      currentTrack: track,
+      queue: [track],
+      currentIndex: 0,
+    }),
+  });
+  await user.click(
+    screen.getByRole("button", { name: "Open fullscreen player" }),
+  );
+  const dialog = await screen.findByRole("dialog", { name: "Now Playing" });
+  expect(dialog).toHaveAttribute("aria-modal", "true");
+  const close = within(dialog).getByRole("button", { name: "Close player" });
+  await waitFor(() => expect(close).toHaveFocus());
+  expect(
+    screen
+      .getByRole("button", { name: "Background action", hidden: true })
+      .closest("[inert]"),
+  ).not.toBeNull();
+  await user.tab({ shift: true });
+  expect(dialog).toContainElement(document.activeElement as HTMLElement);
+  expect(close).not.toHaveFocus();
+  await user.tab();
+  expect(close).toHaveFocus();
+  await user.click(close);
+  expect(
+    screen.getByRole("button", { name: "Open fullscreen player" }),
+  ).toHaveFocus();
+  expect(
+    screen
+      .getByRole("button", { name: "Background action" })
+      .closest("[inert]"),
+  ).toBeNull();
+  expect(dialog).toHaveAttribute("inert");
+  expect(dialog).toHaveAttribute("aria-hidden", "true");
+});
+
+it("gives a portalled dialog priority over the fullscreen player Escape handler", async () => {
+  const closePlayer = vi.fn();
+  const closeDialog = vi.fn();
+  const track = makeTrack();
+  renderWithListenProviders(
+    <>
+      <FullscreenPlayer open onClose={closePlayer} />
+      <AppModal open onClose={closeDialog} title="Track actions">
+        <button>Dialog action</button>
+      </AppModal>
+    </>,
+    {
+      playerActions: createMockPlayerActions({
+        currentTrack: track,
+        queue: [track],
+      }),
+    },
+  );
+  const child = await screen.findByRole("dialog", { name: "Track actions" });
+  await waitFor(() =>
+    expect(child).toContainElement(document.activeElement as HTMLElement),
+  );
+  fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+  expect(closeDialog).toHaveBeenCalledOnce();
+  expect(closePlayer).not.toHaveBeenCalled();
+});
+
+it("disables the fullscreen heart until liked state has a confirmed read", async () => {
+  likesReadState.hasLoaded = false;
+  const track = makeTrack();
+  renderWithListenProviders(<FullscreenPlayer open onClose={vi.fn()} />, {
+    playerActions: createMockPlayerActions({
+      currentTrack: track,
+      queue: [track],
+    }),
+  });
+  expect(
+    await screen.findByRole("button", { name: "Liked status unavailable" }),
+  ).toBeDisabled();
+  expect(
+    screen.queryByRole("button", { name: "Like track" }),
+  ).not.toBeInTheDocument();
 });

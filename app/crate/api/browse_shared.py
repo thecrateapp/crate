@@ -10,7 +10,8 @@ from crate.api._deps import (
     safe_path,
 )
 from crate.audio import get_audio_files, read_tags
-from crate.db.repositories.library import get_library_album, get_library_track_count
+from crate.db.repositories.library import get_library_album
+from crate.db.repositories.library_stats_reads import has_library_catalog_data
 
 import re as _re
 
@@ -84,7 +85,7 @@ def build_genre_profile(
 
 
 def has_library_data() -> bool:
-    return get_library_track_count() > 0
+    return has_library_catalog_data()
 
 
 def fs_build_artists_list() -> list[dict]:

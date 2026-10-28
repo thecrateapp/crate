@@ -193,7 +193,7 @@ def config_file(tmp_path):
 
 def test_config_secrets_and_check_cli_are_offline(tmp_path, monkeypatch):
     path, config = config_file(tmp_path)
-    assert len(load_config(path)["parsed_rules"]) == 10
+    assert len(load_config(path)["parsed_rules"]) == 13
     assert read_secret(config["mcp_token_file"]).startswith("synthetic-")
     from deploy.operator import server
 

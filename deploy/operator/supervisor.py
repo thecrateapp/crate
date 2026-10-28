@@ -16,7 +16,10 @@ TOOLS = {
     "get_pipeline_status",
     "get_smart_mix_status",
 }
-KINDS = {"availability", "high", "low", "drift", "progress", "stuck"}
+KINDS = {"availability", "high", "low", "drift", "progress", "stuck", "digest"}
+DIGEST_SEEN = 200
+DIGEST_GROUPS = 20
+DIGEST_ROWS = 5
 IDENTIFIER = re.compile(r"[a-zA-Z0-9_.-]{1,80}\Z")
 JOB_FIELDS = (
     "id",
@@ -71,6 +74,10 @@ class Rule:
     fresh_seconds: int = 180
     trigger_samples: int = 2
     recovery_samples: int = 2
+    cooldown_seconds: int = 0
+    detail_field: tuple = ()
+    group_field: tuple = ()
+    row_fields: tuple = ()
 
     def __post_init__(self):
         if not IDENTIFIER.fullmatch(self.id) or not IDENTIFIER.fullmatch(
@@ -85,7 +92,18 @@ class Rule:
             or not 1 <= self.recovery_samples <= 20
         ):
             raise ValueError("Invalid freshness or hysteresis bound")
-        for path in (self.source_path, self.field, self.active_field):
+        if (
+            type(self.cooldown_seconds) is not int
+            or not 0 <= self.cooldown_seconds <= 86400
+        ):
+            raise ValueError("Invalid cooldown bound")
+        for path in (
+            self.source_path,
+            self.field,
+            self.active_field,
+            self.detail_field,
+            self.group_field,
+        ):
             if (
                 not isinstance(path, (list, tuple))
                 or len(path) > 10
@@ -96,6 +114,20 @@ class Rule:
             raise ValueError("Metric rule requires an exact field")
         if self.kind == "progress" and not self.active_field:
             raise ValueError("Progress requires a persisted active/backlog count field")
+        if self.kind == "digest":
+            if (
+                not isinstance(self.row_fields, (list, tuple))
+                or not 1 <= len(self.row_fields) <= 12
+                or "id" not in self.row_fields
+                or any(
+                    not isinstance(key, str) or not IDENTIFIER.fullmatch(key)
+                    for key in self.row_fields
+                )
+                or self.detail_field
+            ):
+                raise ValueError("Digest requires bounded row fields including id")
+        elif self.row_fields or self.group_field:
+            raise ValueError("Row and group fields are only valid for digests")
         for number in (self.threshold, self.clear_threshold, self.critical):
             if number is not None and (
                 type(number) not in {int, float} or not math.isfinite(number)
@@ -195,8 +227,7 @@ def _stuck_sample(rule, rows, memory, observed):
     return None
 
 
-def _evaluate(rule, source, memory, now):
-    valid, observed = _valid(source, rule, now)
+def _evidence(source, valid, observed, now):
     evidence = {
         "source": str(source.get("source", "missing"))[:128],
         "observed_at": source.get("observed_at")[:80]
@@ -219,6 +250,33 @@ def _evaluate(rule, source, memory, now):
         else None
     )
     evidence["age_seconds"] = now - observed if observed is not None else None
+    return evidence
+
+
+def _detail(value):
+    try:
+        raw = json.dumps(value, sort_keys=True, allow_nan=False)
+    except (TypeError, ValueError):
+        return None
+    return value if len(raw) <= 1000 else None
+
+
+def _row(rule, row):
+    return {
+        key: row[key][:128] if isinstance(row[key], str) else row[key]
+        for key in rule.row_fields
+        if key in row
+        and (
+            isinstance(row[key], (str, bool))
+            or row[key] is None
+            or (type(row[key]) in {int, float} and math.isfinite(row[key]))
+        )
+    }
+
+
+def _evaluate(rule, source, memory, now):
+    valid, observed = _valid(source, rule, now)
+    evidence = _evidence(source, valid, observed, now)
     if rule.kind == "availability":
         return (
             not valid,
@@ -256,6 +314,8 @@ def _evaluate(rule, source, memory, now):
         evidence["valid"] = False
         return None, "warning", evidence, observed
     evidence["value"] = value
+    if rule.detail_field:
+        evidence["detail"] = _detail(path_value(source.get("data"), rule.detail_field))
     severity = (
         "critical"
         if rule.critical is not None
@@ -352,6 +412,9 @@ class Supervisor:
                 )
                 source = source if isinstance(source, dict) else {}
                 memory = data["rules"].setdefault(key, {"bad": 0, "good": 0})
+                if rule.kind == "digest":
+                    coverage[key] = self._digest(data, rule, key, source, memory, now)
+                    continue
                 # Never process regressing source time (including progress baseline).
                 observed = timestamp(source.get("observed_at"))
                 if observed is not None and observed < memory.get(
@@ -370,6 +433,11 @@ class Supervisor:
                     incident["evidence"] = (
                         incident["evidence"] + [{"polled_at": now, **evidence}]
                     )[-LIMITS["evidence"] :]
+                    if (
+                        incident.get("deferred")
+                        and now - incident["notified_at"] >= rule.cooldown_seconds
+                    ):
+                        self._deliver(data, incident, incident.pop("deferred"), now)
                 if duplicate:
                     continue
                 if observed is not None and evidence["valid"]:
@@ -403,9 +471,12 @@ class Supervisor:
                             )[-LIMITS["evidence"] :],
                             "silence": (incident or {}).get("silence"),
                             "ack": None,
+                            "notified_at": (incident or {}).get("notified_at"),
                         }
                         data["incidents"][key] = incident
-                        self._notify(data, incident, "opened", now)
+                        self._notify(
+                            data, incident, "opened", now, rule.cooldown_seconds
+                        )
                     elif severity == "critical" and incident["severity"] != "critical":
                         incident.update(
                             severity="critical",
@@ -414,7 +485,9 @@ class Supervisor:
                             updated_at=now,
                             revision=incident["revision"] + 1,
                         )
-                        self._notify(data, incident, "escalated", now)
+                        self._notify(
+                            data, incident, "escalated", now, rule.cooldown_seconds
+                        )
                 elif not result and memory["good"] >= rule.recovery_samples:
                     if incident and incident["state"] != "resolved":
                         incident.update(
@@ -422,7 +495,9 @@ class Supervisor:
                             updated_at=now,
                             revision=incident["revision"] + 1,
                         )
-                        self._notify(data, incident, "resolved", now)
+                        self._notify(
+                            data, incident, "resolved", now, rule.cooldown_seconds
+                        )
                     if rule.kind == "stuck":
                         # A transient breach can recover before incident admission.
                         # Clear its proven identities in the same atomic transaction,
@@ -465,7 +540,7 @@ class Supervisor:
                 coverage_gaps=gaps,
             )
 
-    def _notify(self, data, incident, transition, now):
+    def _notify(self, data, incident, transition, now, cooldown=0):
         event(
             data,
             "incident_" + transition,
@@ -476,6 +551,15 @@ class Supervisor:
             },
             now,
         )
+        last = incident.get("notified_at")
+        if transition == "opened" and last is not None and now - last < cooldown:
+            incident["deferred"] = transition
+            return
+        if incident.pop("deferred", None) and transition == "resolved":
+            return
+        self._deliver(data, incident, transition, now)
+
+    def _deliver(self, data, incident, transition, now):
         if (incident.get("silence") or {}).get("expires_at", 0) <= now:
             enqueue(
                 data,
@@ -483,6 +567,82 @@ class Supervisor:
                 now,
                 incident=incident["key"],
             )
+            incident["notified_at"] = now
+
+    def _digest(self, data, rule, key, source, memory, now):
+        valid, observed = _valid(source, rule, now)
+        evidence = _evidence(source, valid, observed, now)
+        rows = path_value(source.get("data"), rule.field) if valid else None
+        if valid and not isinstance(rows, list):
+            evidence["valid"] = False
+        if (
+            isinstance(rows, list)
+            and valid
+            and observed > memory.get("last_source", float("-inf"))
+        ):
+            memory["last_source"] = observed
+            sample = [
+                _row(rule, row)
+                for row in rows[:20]
+                if isinstance(row, dict)
+                and type(row.get("id")) in {str, int}
+                and len(str(row["id"])) <= 128
+            ]
+            seen = memory.get("seen")
+            fresh = (
+                []
+                if seen is None
+                else [row for row in sample if str(row["id"]) not in seen]
+            )
+            memory["seen"] = list(
+                dict.fromkeys([str(row["id"]) for row in sample] + (seen or []))
+            )[:DIGEST_SEEN]
+            lower_bound = bool(source.get("truncated")) and len(fresh) == len(sample)
+            groups = memory.setdefault("groups", {})
+            for row in reversed(fresh):
+                name = path_value(row, rule.group_field) if rule.group_field else "all"
+                name = "unknown" if name is None else str(name)[:80]
+                if name not in groups and len(groups) >= DIGEST_GROUPS:
+                    name = "other"
+                group = groups.setdefault(
+                    name,
+                    {"count": 0, "rows": [], "notified_at": None, "lower_bound": False},
+                )
+                group["count"] += 1
+                group["rows"] = (group["rows"] + [row])[-DIGEST_ROWS:]
+                group["lower_bound"] = group["lower_bound"] or lower_bound
+            evidence.update(new_rows=len(fresh), baseline=seen is None)
+        groups = memory.get("groups", {})
+        for name, group in sorted(groups.items()):
+            last = group["notified_at"]
+            if not group["count"] or (
+                last is not None and now - last < rule.cooldown_seconds
+            ):
+                continue
+            summary = {
+                "group": name,
+                "count": group["count"],
+                "count_is_lower_bound": group["lower_bound"],
+                "latest": group["rows"],
+            }
+            enqueue(data, f"{key} new; {json.dumps(summary, sort_keys=True)}", now)
+            event(
+                data,
+                "digest_notified",
+                {"key": key, "group": name, "count": group["count"]},
+                now,
+            )
+            group.update(count=0, rows=[], lower_bound=False, notified_at=now)
+        memory["groups"] = {
+            name: group
+            for name, group in groups.items()
+            if group["count"]
+            or (
+                group["notified_at"] is not None
+                and now - group["notified_at"] < rule.cooldown_seconds
+            )
+        }
+        return evidence
 
     def _expire(self, data, now):
         for incident in data["incidents"].values():

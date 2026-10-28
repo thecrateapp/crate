@@ -74,32 +74,40 @@ export function buildExternalLinks(
   const musicbrainz = enrichment?.musicbrainz;
 
   if (spotify?.url)
-    links.push({ label: "Spotify", url: spotify.url, color: "text-green-400" });
+    links.push({
+      label: "Spotify",
+      url: spotify.url,
+      color: "text-text-secondary",
+    });
   if (lastfm?.url)
-    links.push({ label: "Last.fm", url: lastfm.url, color: "text-red-400" });
+    links.push({
+      label: "Last.fm",
+      url: lastfm.url,
+      color: "text-text-secondary",
+    });
   if (musicbrainz?.urls?.wikipedia)
     links.push({
       label: "Wikipedia",
       url: musicbrainz.urls.wikipedia,
-      color: "text-white/60",
+      color: "text-text-secondary",
     });
   if (musicbrainz?.urls?.official)
     links.push({
       label: "Official",
       url: musicbrainz.urls.official,
-      color: "text-blue-400",
+      color: "text-text-secondary",
     });
   if (musicbrainz?.urls?.instagram)
     links.push({
       label: "Instagram",
       url: musicbrainz.urls.instagram,
-      color: "text-pink-400",
+      color: "text-text-secondary",
     });
   if (musicbrainz?.urls?.spotify && !spotify?.url) {
     links.push({
       label: "Spotify",
       url: musicbrainz.urls.spotify,
-      color: "text-green-400",
+      color: "text-text-secondary",
     });
   }
 
@@ -120,7 +128,6 @@ export function buildArtistTabs(
     { key: "similar", label: "Similar Artists" },
     { key: "stats", label: "Stats" },
     { key: "artwork", label: "Artwork" },
-    { key: "about", label: "About" },
   ];
 }
 

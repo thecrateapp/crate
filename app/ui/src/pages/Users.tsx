@@ -1,6 +1,21 @@
+import { InfoBadge, type InfoBadgeTone } from "@crate/ui/primitives/InfoBadge";
+import { FilterChip } from "@crate/ui/primitives/FilterChip";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { OpsPageHero } from "@/components/admin/ops-surfaces";
 import {
-  lazy,
-  Suspense,
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
+import {
+  MailPlus as HeaderMailPlus,
+  UserPlus as HeaderUserPlus,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Search,
+} from "lucide-react";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
+import {
   useCallback,
   useEffect,
   useMemo,
@@ -9,29 +24,7 @@ import {
   type FormEvent,
 } from "react";
 import { Link, useSearchParams } from "react-router";
-import {
-  Activity,
-  ChevronLeft,
-  ChevronRight,
-  Copy,
-  Headphones,
-  Info,
-  Key,
-  Loader2,
-  Mail,
-  Monitor,
-  Music,
-  Plus,
-  Search,
-  Send,
-  ShieldCheck,
-  Trash2,
-  UserRound,
-} from "lucide-react";
 
-const UserMap = lazy(() =>
-  import("@/components/users/UserMap").then((m) => ({ default: m.UserMap })),
-);
 import { toast } from "sonner";
 
 import {
@@ -43,7 +36,6 @@ import {
 } from "@crate/ui/shadcn/card";
 import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
-import { Badge } from "@crate/ui/shadcn/badge";
 import {
   Dialog,
   DialogContent,
@@ -51,9 +43,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@crate/ui/shadcn/dialog";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { AdminSelect } from "@/components/ui/AdminSelect";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
+
 import { useAuth } from "@/contexts/AuthContext";
 import { api, ApiError } from "@/lib/api";
 import { albumPagePath, artistPagePath } from "@/lib/library-routes";
@@ -140,12 +132,7 @@ interface UserSession {
   device_model?: string | null;
   device_fingerprint?: string | null;
   activity_state?:
-    | "active"
-    | "recent"
-    | "history"
-    | "expired"
-    | "revoked"
-    | null;
+    "active" | "recent" | "history" | "expired" | "revoked" | null;
   is_active?: boolean | null;
   is_recent?: boolean | null;
 }
@@ -244,19 +231,14 @@ function RolePicker({
       {ROLE_OPTIONS.map((option) => {
         const active = value.includes(option.value);
         return (
-          <button
+          <FilterChip
             key={option.value}
-            type="button"
             disabled={disabled}
+            active={active}
             onClick={() => onChange(toggleRole(value, option.value))}
-            className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
-              active
-                ? "border-cyan-400/35 bg-cyan-400/12 text-cyan-200"
-                : "border-white/10 bg-white/[0.03] text-white/50 hover:border-white/20 hover:text-white/80"
-            } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
           >
             {option.label}
-          </button>
+          </FilterChip>
         );
       })}
     </div>
@@ -283,7 +265,7 @@ function UserAvatar({
   user: { name?: string | null; email?: string | null; avatar?: string | null };
   size?: "sm" | "md";
 }) {
-  const dim = size === "md" ? "h-12 w-12 text-sm" : "h-9 w-9 text-xs";
+  const dim = size === "md" ? "h-18 w-18 text-lg" : "h-14 w-14 text-base";
   const initial = (user.name || user.email || "?").charAt(0).toUpperCase();
 
   if (user.avatar) {
@@ -298,7 +280,7 @@ function UserAvatar({
 
   return (
     <div
-      className={`${dim} rounded-md border border-white/10 bg-white/[0.04] flex items-center justify-center shrink-0 font-medium text-white/60`}
+      className={`${dim} rounded-md border border-border-quiet bg-raised-surface flex items-center justify-center shrink-0 font-medium text-text-secondary`}
     >
       {initial}
     </div>
@@ -364,16 +346,15 @@ function activityLabel(status: string) {
 }
 
 function activityBadgeClass(status: string) {
-  if (status === "inactive") return "border-amber-400/25 text-amber-300";
-  if (status === "never_active") return "border-white/10 text-white/45";
-  return "border-green-400/20 text-green-300";
+  if (status === "inactive") return "border-border-quiet text-text-subtle";
+  if (status === "never_active") return "border-border-quiet text-text-subtle";
+  return "border-accent-action/20 text-accent-action-hi";
 }
 
-function statusBadgeClass(status: string) {
-  if (status === "active") return "border-green-400/20 text-green-300";
-  if (status === "suspended") return "border-amber-400/25 text-amber-300";
-  if (status === "deleted") return "border-red-400/25 text-red-300";
-  return "border-white/10 text-white/55";
+function statusBadgeTone(status: string): InfoBadgeTone {
+  if (status === "active") return "accent";
+  if (status === "suspended") return "warning";
+  return "neutral";
 }
 
 function statusLabel(status: string) {
@@ -456,31 +437,31 @@ function getSessionStatus(session: UserSession) {
       return {
         key: "revoked",
         label: "Revoked",
-        className: "border-white/12 bg-transparent text-white/60",
+        tone: "neutral" as const,
       };
     case "expired":
       return {
         key: "expired",
         label: "Expired",
-        className: "border-amber-500/25 bg-amber-500/10 text-amber-200",
+        tone: "warning" as const,
       };
     case "active":
       return {
         key: "active",
         label: "Active now",
-        className: "border-green-500/25 bg-green-500/10 text-green-300",
+        tone: "accent" as const,
       };
     case "recent":
       return {
         key: "recent",
         label: "Recent",
-        className: "border-cyan-400/25 bg-cyan-400/10 text-cyan-200",
+        tone: "accent" as const,
       };
     default:
       return {
         key: "history",
         label: "History",
-        className: "border-white/8 bg-black/15 text-white/45",
+        tone: "neutral" as const,
       };
   }
 }
@@ -570,7 +551,6 @@ function listenRegisterUrl(inviteToken: string) {
 
 function UserPresence({
   user,
-  compact = false,
 }: {
   user: Pick<
     UserRecord,
@@ -581,44 +561,27 @@ function UserPresence({
     | "last_seen_at"
     | "current_track"
   >;
-  compact?: boolean;
 }) {
-  const baseClass = compact ? "text-[11px]" : "text-xs";
-
   return (
     <div className="flex flex-wrap gap-2">
-      <CrateChip
-        icon={Activity}
-        className={
-          user.online_now
-            ? "border-green-500/25 bg-green-500/10 text-green-300"
-            : "border-white/10 bg-white/[0.04] text-white/55"
-        }
-      >
+      <InfoBadge tone={user.online_now ? "accent" : "neutral"}>
         {user.online_now
           ? "Active now"
           : user.last_seen_at
             ? `Last seen ${formatRelativeTimestamp(user.last_seen_at)}`
             : "Offline"}
-      </CrateChip>
-      <CrateChip
-        icon={Headphones}
-        className={
-          user.listening_now
-            ? "border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
-            : "border-white/10 bg-white/[0.04] text-white/55"
-        }
-      >
+      </InfoBadge>
+      <InfoBadge tone={user.listening_now ? "accent" : "neutral"}>
         {user.listening_now ? "Listening now" : "Not playing"}
-      </CrateChip>
-      <CrateChip icon={Monitor} className={baseClass}>
+      </InfoBadge>
+      <InfoBadge>
         {user.active_devices ?? 0} device
         {(user.active_devices ?? 0) === 1 ? "" : "s"}
-      </CrateChip>
-      <CrateChip icon={ShieldCheck} className={baseClass}>
+      </InfoBadge>
+      <InfoBadge>
         {user.active_sessions ?? 0} active session
         {(user.active_sessions ?? 0) === 1 ? "" : "s"}
-      </CrateChip>
+      </InfoBadge>
     </div>
   );
 }
@@ -644,14 +607,13 @@ function CurrentTrackLine({ track }: { track?: CurrentTrack | null }) {
       : null;
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 text-sm text-white/65">
-      <Music size={14} className="text-cyan-300" />
-      <span className="text-white/82">{track.title}</span>
+    <div className="flex flex-wrap items-center gap-1.5 text-sm text-text-secondary">
+      <span className="text-text-primary">{track.title}</span>
       {track.artist ? (
         <>
-          <span className="text-white/28">by</span>
+          <span className="text-text-subtle">by</span>
           {artistHref ? (
-            <Link to={artistHref} className="hover:text-white">
+            <Link to={artistHref} className="hover:text-text-primary">
               {track.artist}
             </Link>
           ) : (
@@ -661,9 +623,9 @@ function CurrentTrackLine({ track }: { track?: CurrentTrack | null }) {
       ) : null}
       {track.album ? (
         <>
-          <span className="text-white/28">on</span>
+          <span className="text-text-subtle">on</span>
           {albumHref ? (
-            <Link to={albumHref} className="hover:text-white">
+            <Link to={albumHref} className="hover:text-text-primary">
               {track.album}
             </Link>
           ) : (
@@ -699,6 +661,7 @@ export function Users() {
   const { user: currentUser, hasCapability } = useAuth();
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<UserRecord | null>(null);
@@ -707,7 +670,6 @@ export function Users() {
   const [filter, setFilter] = useState<UserFilter>("all");
   const [page, setPage] = useState(1);
   const [searchParams, setSearchParams] = useSearchParams();
-  const canViewUserMap = hasCapability("users.view");
   const canCreateUsers =
     hasCapability("users.create") || hasCapability("users.manage");
   const canManageStatus =
@@ -736,20 +698,21 @@ export function Users() {
     setInspectParam(user.id);
   }
 
-  function inspectMapUser(userId: number) {
-    const target = users.find((user) => user.id === userId);
-    if (target) openUserDetail(target);
-  }
-
   async function fetchUsers() {
     try {
       const data = await api<UserRecord[]>("/api/auth/users");
       setUsers(Array.isArray(data) ? data : []);
+      setLoadError(false);
     } catch {
-      toast.error("Failed to load users");
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
+  }
+
+  async function retryUsers() {
+    setLoading(true);
+    await fetchUsers();
   }
 
   useEffect(() => {
@@ -780,16 +743,10 @@ export function Users() {
 
   async function handleDelete() {
     if (!deleteTarget || !canDeleteUsers) return;
-    try {
-      await api(`/api/auth/users/${deleteTarget.id}`, "DELETE");
-      toast.success("User deleted");
-      setDeleteTarget(null);
-      await fetchUsers();
-    } catch (err) {
-      toast.error(
-        err instanceof ApiError ? err.message : "Failed to delete user",
-      );
-    }
+    await api(`/api/auth/users/${deleteTarget.id}`, "DELETE");
+    toast.success("User deleted");
+    setDeleteTarget(null);
+    await fetchUsers();
   }
 
   const counts = useMemo(
@@ -852,93 +809,99 @@ export function Users() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      <div
+        role="status"
+        aria-label="Loading users"
+        className="flex items-center justify-center py-24"
+      >
+        <Loader2
+          data-admin-ux="users-list-loading"
+          aria-hidden="true"
+          className="h-6 w-6 animate-spin text-primary"
+        />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="space-y-6">
+        <OpsPageHero
+          title="Users"
+          description="Account access, presence and listening activity."
+        />
+        <Card>
+          <CardContent className="flex flex-col items-start gap-4 py-8">
+            <div>
+              <MonoLabel as="h2" tone="accent">
+                Users unavailable
+              </MonoLabel>
+              <p role="alert" className="mt-2 text-sm text-text-muted">
+                The user directory could not be loaded. Your filters and access
+                settings have not changed.
+              </p>
+            </div>
+            <Button variant="outline" onClick={retryUsers}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <section className="rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/12 text-primary shadow-[0_18px_40px_rgba(6,182,212,0.14)]">
-                <UserRound size={22} />
-              </div>
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-white">
-                  Users
-                </h1>
-                <p className="text-sm text-white/55">
-                  Presence, linked identities, active devices and recent
-                  listening activity across the system.
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <CrateChip icon={UserRound}>{counts.total} total users</CrateChip>
-              <CrateChip
-                icon={Activity}
-                className={
-                  counts.online > 0
-                    ? "border-green-500/25 bg-green-500/10 text-green-300"
-                    : undefined
-                }
-              >
-                {counts.online} active now
-              </CrateChip>
-              <CrateChip
-                icon={Headphones}
-                className={
-                  counts.listening > 0
-                    ? "border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
-                    : undefined
-                }
-              >
-                {counts.listening} listening
-              </CrateChip>
-              <CrateChip icon={Monitor}>
-                {counts.devices} active devices
-              </CrateChip>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
+      <OpsPageHero
+        title="Users"
+        description="Presence, linked identities, active devices and recent listening activity across the system."
+        compactActions
+        actions={
+          <PageHeaderActions>
             {canCreateUsers ? (
               <>
-                <Button
-                  size="sm"
-                  variant="outline"
+                <PageHeaderAction
+                  label="Invite user"
                   onClick={() => setInviteOpen(true)}
                 >
-                  <Send size={16} className="mr-2" />
-                  Invite user
-                </Button>
-                <Button size="sm" onClick={() => setAddOpen(true)}>
-                  <Plus size={16} className="mr-2" />
-                  Add user
-                </Button>
+                  <HeaderMailPlus
+                    data-admin-ux="header-invite-user"
+                    aria-hidden="true"
+                  />
+                </PageHeaderAction>
+                <PageHeaderAction
+                  label="Add user"
+                  onClick={() => setAddOpen(true)}
+                >
+                  <HeaderUserPlus
+                    data-admin-ux="header-add-user"
+                    aria-hidden="true"
+                  />
+                </PageHeaderAction>
               </>
             ) : null}
-          </div>
-        </div>
-      </section>
+          </PageHeaderActions>
+        }
+      >
+        <InfoBadge>{counts.total} total users</InfoBadge>
+        <InfoBadge tone={counts.online > 0 ? "accent" : undefined}>
+          {counts.online} active now
+        </InfoBadge>
+        <InfoBadge tone={counts.listening > 0 ? "accent" : undefined}>
+          {counts.listening} listening
+        </InfoBadge>
+        <InfoBadge>{counts.devices} active devices</InfoBadge>
+      </OpsPageHero>
 
-      {canViewUserMap ? (
-        <Suspense fallback={null}>
-          <UserMap onInspectUser={(user) => inspectMapUser(user.id)} />
-        </Suspense>
-      ) : null}
-
-      <Card className="border-white/10 bg-panel-surface shadow-[0_24px_70px_rgba(0,0,0,0.2)]">
+      <Card>
         <CardContent className="space-y-4 pt-6">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="relative w-full max-w-md">
               <Search
+                data-admin-ux="users-search"
+                aria-hidden="true"
                 size={14}
-                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/35"
+                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-text-subtle"
               />
               <Input
                 value={query}
@@ -946,11 +909,15 @@ export function Users() {
                   setQuery(event.target.value);
                   setPage(1);
                 }}
+                aria-label="Search users"
                 placeholder="Search users..."
                 className="pl-10"
               />
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div
+              aria-label="Filter users"
+              className="flex max-w-full flex-nowrap gap-2 overflow-x-auto pb-1 lg:flex-wrap"
+            >
               {[
                 { key: "all", label: "All", count: users.length },
                 {
@@ -993,8 +960,9 @@ export function Users() {
                   ).length,
                 },
               ].map((item) => (
-                <CratePill
+                <FilterChip
                   key={item.key}
+                  className="shrink-0 whitespace-nowrap"
                   active={filter === item.key}
                   onClick={() => {
                     setFilter(item.key as UserFilter);
@@ -1002,195 +970,143 @@ export function Users() {
                   }}
                 >
                   {item.label} {item.count}
-                </CratePill>
+                </FilterChip>
               ))}
             </div>
           </div>
 
-          <div className="text-sm text-white/45">
+          <div className="text-sm text-text-muted">
             Showing {showingStart}-{showingEnd} of {filteredUsers.length} users
           </div>
 
-          <div className="space-y-3">
-            {paginatedUsers.map((user) => (
+          <div role="table" aria-label="Users" className="min-w-0 text-sm">
+            <div role="rowgroup">
               <div
-                key={user.id}
-                className="rounded-md border border-white/8 bg-black/15 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]"
+                role="row"
+                className="hidden grid-cols-[minmax(0,2.2fr)_minmax(7.5rem,.8fr)_minmax(12rem,1.2fr)_auto] gap-4 border-b border-border-quiet py-3 font-mono text-[10px] uppercase tracking-[0.12em] text-text-subtle lg:grid"
               >
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                  <div className="min-w-0 flex-1 space-y-3">
-                    <div className="flex items-start gap-3">
-                      <UserAvatar user={user} size="md" />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-lg font-semibold tracking-tight text-white">
-                            {user.name || user.email}
-                          </h2>
-                          {rolesForUser(user).map((role) => (
-                            <Badge
-                              key={role}
-                              variant={
-                                role === "admin" || role === "owner"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                            >
-                              {roleLabel(role)}
-                            </Badge>
-                          ))}
-                          <Badge
-                            variant="outline"
-                            className={statusBadgeClass(userStatus(user))}
-                          >
-                            {statusLabel(userStatus(user))}
-                          </Badge>
-                          {userActivityStatus(user) !== "active" ? (
-                            <Badge
-                              variant="outline"
-                              className={activityBadgeClass(
-                                userActivityStatus(user),
-                              )}
-                            >
-                              {activityLabel(userActivityStatus(user))}
-                            </Badge>
-                          ) : null}
-                          {user.username ? (
-                            <Badge variant="outline">@{user.username}</Badge>
-                          ) : null}
-                        </div>
-                        <div className="mt-1 flex items-center gap-2 text-sm text-white/45">
-                          <Mail size={13} />
-                          <span className="truncate">{user.email}</span>
-                        </div>
-                      </div>
+                <span role="columnheader">User</span>
+                <span role="columnheader">Status</span>
+                <span role="columnheader">Presence</span>
+                <span role="columnheader" className="text-right">
+                  Actions
+                </span>
+              </div>
+            </div>
+            <div role="rowgroup" className="border-t border-border-quiet">
+              {paginatedUsers.map((user) => (
+                <div
+                  key={user.id}
+                  role="row"
+                  className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-3 border-b border-border-quiet-subtle py-4 last:border-b-0 lg:grid-cols-[minmax(0,2.2fr)_minmax(7.5rem,.8fr)_minmax(12rem,1.2fr)_auto] lg:items-center lg:gap-4"
+                >
+                  <div role="cell" className="flex min-w-0 items-start gap-3">
+                    <div className="shrink-0">
+                      <UserAvatar user={user} />
                     </div>
-
-                    <UserPresence user={user} />
-
-                    {user.listening_now && user.current_track ? (
-                      <CurrentTrackLine track={user.current_track} />
-                    ) : null}
-
-                    <div className="flex flex-wrap gap-2">
-                      {(user.connected_accounts || []).map((account) => (
-                        <CrateChip
-                          key={`${user.id}-${account.provider}`}
-                          className="text-[11px]"
-                        >
-                          {account.provider}
-                          {account.external_username
-                            ? ` · ${account.external_username}`
-                            : ""}
-                        </CrateChip>
-                      ))}
-                      {(user.connected_accounts || []).length === 0 ? (
-                        <CrateChip className="text-[11px] text-white/45">
-                          No linked providers
-                        </CrateChip>
-                      ) : null}
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-md border border-white/8 bg-black/15 p-3">
-                        <div className="text-[11px] uppercase tracking-[0.12em] text-white/28">
-                          Presence
-                        </div>
-                        <div className="mt-1 text-sm text-white/78">
-                          {(user.active_devices ?? 0) > 0
-                            ? `${user.active_devices} active device${
-                                (user.active_devices ?? 0) === 1 ? "" : "s"
-                              }`
-                            : user.last_seen_at
-                              ? `Seen ${formatRelativeTimestamp(
-                                  user.last_seen_at,
-                                )}`
-                              : "No activity yet"}
-                        </div>
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="crate-form-field">
+                        <h2 className="break-words font-display text-base font-semibold text-text-primary">
+                          {user.name || user.email}
+                        </h2>
+                        <span className="break-all text-xs text-text-muted">
+                          {user.email}
+                        </span>
                       </div>
-                      <div className="rounded-md border border-white/8 bg-black/15 p-3">
-                        <div className="text-[11px] uppercase tracking-[0.12em] text-white/28">
-                          Playback
-                        </div>
-                        <div className="mt-1 text-sm text-white/78">
-                          {user.current_track?.title
-                            ? `${user.current_track.title}${
-                                user.current_track.artist
-                                  ? ` · ${user.current_track.artist}`
-                                  : ""
-                              }`
-                            : user.last_played_at
-                              ? `Last play ${formatRelativeTimestamp(
-                                  user.last_played_at,
-                                )}`
-                              : "No play signal"}
-                        </div>
-                      </div>
-                      <div className="rounded-md border border-white/8 bg-black/15 p-3">
-                        <div className="text-[11px] uppercase tracking-[0.12em] text-white/28">
-                          Identity
-                        </div>
-                        <div className="mt-1 text-sm text-white/78">
-                          {authModeSummary(user)}
-                        </div>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                        {rolesForUser(user).map((role) => (
+                          <InfoBadge key={role}>{roleLabel(role)}</InfoBadge>
+                        ))}
+                        {user.username ? (
+                          <span className="break-all font-mono text-[10px] text-text-subtle">
+                            @{user.username}
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                   </div>
-
-                  <div className="flex min-w-[220px] flex-col gap-3 xl:items-end">
-                    <div className="grid grid-cols-2 gap-3 text-sm text-white/45 xl:text-right">
-                      <div>
-                        <div className="text-[11px] uppercase tracking-[0.12em] text-white/28">
-                          Last seen
-                        </div>
-                        <div className="mt-1 text-white/75">
-                          {formatRelativeTimestamp(user.last_seen_at)}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-[11px] uppercase tracking-[0.12em] text-white/28">
-                          Last login
-                        </div>
-                        <div className="mt-1 text-white/75">
-                          {formatRelativeTimestamp(user.last_login)}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 xl:justify-end">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openUserDetail(user)}
+                  <div
+                    role="cell"
+                    className="flex flex-col items-end gap-1.5 lg:items-start"
+                  >
+                    <MonoLabel as="span" className="lg:hidden">
+                      Status
+                    </MonoLabel>
+                    <InfoBadge tone={statusBadgeTone(userStatus(user))}>
+                      {statusLabel(userStatus(user))}
+                    </InfoBadge>
+                    {userActivityStatus(user) !== "active" ? (
+                      <span
+                        className={`text-xs ${activityBadgeClass(userActivityStatus(user))}`}
                       >
-                        <Info size={14} className="mr-2" />
-                        Inspect
-                      </Button>
-                      {canDeleteUsers ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="border-red-500/25 text-red-300 hover:bg-red-500/10 hover:text-red-200"
-                          onClick={() => setDeleteTarget(user)}
-                          disabled={userStatus(user) === "deleted"}
-                        >
-                          <Trash2 size={14} className="mr-2" />
-                          Delete
-                        </Button>
-                      ) : null}
+                        {activityLabel(userActivityStatus(user))}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div role="cell" className="col-span-2 min-w-0 lg:col-span-1">
+                    <MonoLabel as="span" className="lg:hidden">
+                      Presence
+                    </MonoLabel>
+                    <div className="mt-1.5 space-y-1.5 lg:mt-0">
+                      <span className="flex items-center gap-2 text-text-primary">
+                        <span
+                          aria-hidden="true"
+                          className={`h-1 w-1 shrink-0 rounded-full ${user.listening_now || user.online_now ? "bg-accent-action-hi" : "bg-text-subtle"}`}
+                        />
+                        {user.listening_now
+                          ? "Listening now"
+                          : user.online_now
+                            ? "Active now"
+                            : "Offline"}
+                      </span>
+                      <div className="font-mono text-[10px] text-text-subtle">
+                        Devices {user.active_devices ?? 0} · Sessions{" "}
+                        {user.active_sessions ?? 0}
+                      </div>
+                      <div className="text-xs text-text-muted">
+                        Seen {formatRelativeTimestamp(user.last_seen_at)}
+                      </div>
                     </div>
+                  </div>
+                  <div
+                    role="cell"
+                    className="col-span-2 flex flex-wrap justify-end gap-2 lg:col-span-1"
+                  >
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openUserDetail(user)}
+                    >
+                      Inspect
+                    </Button>
+                    {canDeleteUsers ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDeleteTarget(user)}
+                        disabled={userStatus(user) === "deleted"}
+                      >
+                        Delete
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
-              </div>
-            ))}
-
-            {filteredUsers.length === 0 ? (
-              <div className="rounded-md border border-dashed border-white/10 bg-black/15 px-6 py-10 text-center text-sm text-white/45">
-                No users match the current search or filter.
-              </div>
-            ) : null}
+              ))}
+              {filteredUsers.length === 0 ? (
+                <div
+                  role="row"
+                  className="py-10 text-center text-sm text-text-muted"
+                >
+                  <span role="cell">
+                    No users match the current search or filter.
+                  </span>
+                </div>
+              ) : null}
+            </div>
           </div>
 
           {filteredUsers.length > 0 && pageCount > 1 ? (
-            <div className="flex items-center justify-between gap-3 border-t border-white/8 pt-4">
+            <div className="flex items-center justify-between gap-3 border-t border-border-quiet pt-4">
               <Button
                 size="sm"
                 variant="outline"
@@ -1198,10 +1114,15 @@ export function Users() {
                 disabled={page === 1}
                 onClick={() => setPage((current) => Math.max(1, current - 1))}
               >
-                <ChevronLeft size={15} className="mr-1" />
+                <ChevronLeft
+                  data-admin-ux="users-previous"
+                  aria-hidden="true"
+                  size={15}
+                  className="mr-1"
+                />
                 Previous
               </Button>
-              <span className="text-xs text-white/45">
+              <span className="text-xs text-text-muted">
                 Page {page} of {pageCount}
               </span>
               <Button
@@ -1214,7 +1135,12 @@ export function Users() {
                 }
               >
                 Next
-                <ChevronRight size={15} className="ml-1" />
+                <ChevronRight
+                  data-admin-ux="users-next"
+                  aria-hidden="true"
+                  size={15}
+                  className="ml-1"
+                />
               </Button>
             </div>
           ) : null}
@@ -1232,6 +1158,7 @@ export function Users() {
       ) : null}
 
       <UserDetailDialog
+        key={detailTarget?.id ?? "closed"}
         user={detailTarget}
         onOpenChange={(open) => {
           if (!open) {
@@ -1256,8 +1183,17 @@ export function Users() {
           deleteTarget?.name || deleteTarget?.email
         }? Open sessions will be revoked and owned contributions may be queued for cleanup.`}
         confirmLabel="Delete"
-        variant="destructive"
+        tone="danger"
         onConfirm={handleDelete}
+        onError={(err) =>
+          toast.error(
+            err instanceof ApiError ? err.message : "Failed to delete user",
+          )
+        }
+        eyebrow="Confirm action"
+        consequence={`${
+          deleteTarget?.name || deleteTarget?.email || "User"
+        } · soft-deletes the account · revokes open sessions`}
       />
     </div>
   );
@@ -1283,6 +1219,7 @@ function UserDetailDialog({
   const { user: currentUser, refetch } = useAuth();
   const open = !!user;
   const [detail, setDetail] = useState<UserDetail | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
   const detailRequestRef = useRef(0);
   const [loadingRequest, setLoadingRequest] = useState<number | null>(null);
   const loading = loadingRequest !== null;
@@ -1300,6 +1237,7 @@ function UserDetailDialog({
     async (userId: number, signal?: AbortSignal) => {
       const requestId = ++detailRequestRef.current;
       setLoadingRequest(requestId);
+      setDetailError(null);
       try {
         const data = await api<UserDetail>(
           `/api/auth/users/${userId}`,
@@ -1307,11 +1245,12 @@ function UserDetailDialog({
           undefined,
           { signal },
         );
-        if (signal?.aborted) return;
+        if (signal?.aborted || requestId !== detailRequestRef.current) return;
         setDetail(data);
       } catch (err) {
         if (
           signal?.aborted ||
+          requestId !== detailRequestRef.current ||
           (err instanceof DOMException && err.name === "AbortError")
         ) {
           return;
@@ -1319,6 +1258,7 @@ function UserDetailDialog({
         toast.error(
           err instanceof ApiError ? err.message : "Failed to load user detail",
         );
+        setDetailError("User detail could not be loaded. Try again.");
         setDetail(null);
       } finally {
         setLoadingRequest((activeRequest) =>
@@ -1494,9 +1434,12 @@ function UserDetailDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden sm:max-w-6xl">
+        <DialogContent
+          className="flex max-h-[90vh] flex-col overflow-hidden"
+          size="3xl"
+        >
           <DialogHeader>
-            <DialogTitle>User Detail</DialogTitle>
+            <DialogTitle className="font-display">User Detail</DialogTitle>
             <DialogDescription>
               Inspect real-time presence, what the user is currently hearing,
               and filter session history by meaningful recency.
@@ -1504,178 +1447,211 @@ function UserDetailDialog({
           </DialogHeader>
 
           {loading ? (
-            <div className="flex items-center justify-center py-12 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" />
+            <div
+              role="status"
+              aria-label="Loading user detail"
+              className="flex items-center justify-center py-12 text-muted-foreground"
+            >
+              <Loader2
+                data-admin-ux="users-detail-loading"
+                aria-hidden="true"
+                className="h-5 w-5 animate-spin"
+              />
             </div>
+          ) : detailError ? (
+            <ErrorState
+              title="User detail unavailable"
+              message={detailError}
+              onRetry={() => {
+                if (user) void fetchDetail(user.id);
+              }}
+            />
           ) : detail ? (
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
               <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr_1fr]">
-                <Card className="border-white/10 bg-panel-surface">
+                <Card>
                   <CardContent className="pt-6">
                     <div className="flex items-start gap-4">
                       <UserAvatar user={detail} size="md" />
-                      <div className="min-w-0 flex-1">
+                      <div className="crate-form-field min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-xl font-semibold tracking-tight text-white">
+                          <h3 className="font-display text-xl font-semibold tracking-tight text-text-primary">
                             {detail.name || detail.email}
                           </h3>
                           {rolesForUser(detail).map((role) => (
-                            <Badge
+                            <InfoBadge
                               key={role}
-                              variant={
+                              tone={
                                 role === "admin" || role === "owner"
-                                  ? "default"
-                                  : "secondary"
+                                  ? "accent"
+                                  : "neutral"
                               }
                             >
                               {roleLabel(role)}
-                            </Badge>
+                            </InfoBadge>
                           ))}
-                          <Badge
-                            variant="outline"
-                            className={statusBadgeClass(userStatus(detail))}
-                          >
+                          <InfoBadge tone={statusBadgeTone(userStatus(detail))}>
                             {statusLabel(userStatus(detail))}
-                          </Badge>
+                          </InfoBadge>
                           {detail.username ? (
-                            <Badge variant="outline">@{detail.username}</Badge>
+                            <InfoBadge>@{detail.username}</InfoBadge>
                           ) : null}
                         </div>
-                        <div className="mt-1 text-sm text-white/45">
+                        <div className="break-all text-sm text-text-muted">
                           {detail.email}
                         </div>
                       </div>
                     </div>
                     {detail.bio ? (
-                      <p className="mt-4 text-sm leading-relaxed text-white/58">
+                      <p className="mt-4 text-sm leading-relaxed text-text-muted">
                         {detail.bio}
                       </p>
                     ) : null}
-                    <div className="mt-4 rounded-md border border-white/8 bg-black/15 p-3">
-                      <div className="text-[11px] uppercase tracking-[0.12em] text-white/30">
-                        Roles
-                      </div>
-                      {canAssignRoles ? (
-                        <div className="mt-3 space-y-3">
-                          <RolePicker
-                            value={roleDraft}
-                            onChange={setRoleDraft}
-                            disabled={roleSaving}
-                          />
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={
-                              roleSaving ||
-                              sameRoleSet(roleDraft, rolesForUser(detail))
-                            }
-                            onClick={handleRoleSave}
-                          >
-                            {roleSaving ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              "Save roles"
-                            )}
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="mt-2 flex flex-wrap gap-2 text-sm text-white/70">
-                          {rolesForUser(detail).map((role) => (
-                            <CrateChip key={role}>{roleLabel(role)}</CrateChip>
-                          ))}
-                        </div>
-                      )}
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {(detail.capabilities || [])
-                          .slice(0, 8)
-                          .map((capability) => (
-                            <CrateChip
-                              key={capability}
-                              className="text-[10px] text-white/55"
-                            >
-                              {capability}
-                            </CrateChip>
-                          ))}
-                        {(detail.capabilities?.length ?? 0) > 8 ? (
-                          <CrateChip className="text-[10px] text-white/40">
-                            +{(detail.capabilities?.length ?? 0) - 8} more
-                          </CrateChip>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="mt-4 rounded-md border border-white/8 bg-black/15 p-3">
-                      <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.12em] text-white/30">
-                        <ShieldCheck size={13} />
-                        Account status
-                      </div>
-                      {canManageStatus ? (
-                        <div className="mt-3 space-y-3">
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                            <AdminSelect
-                              value={statusDraft}
-                              onChange={setStatusDraft}
-                              options={STATUS_OPTIONS}
-                              placeholder="Account status"
-                              allowClear={false}
-                              disabled={statusSaving}
-                              triggerClassName="h-11 w-full max-w-none sm:w-48"
-                              menuClassName="w-[220px]"
+                    <div className="mt-4 rounded-md border border-border-quiet bg-card p-3">
+                      <div className="crate-form-field">
+                        <MonoLabel as="div" size="eyebrow">
+                          Roles
+                        </MonoLabel>
+                        {canAssignRoles ? (
+                          <div className="space-y-3">
+                            <RolePicker
+                              value={roleDraft}
+                              onChange={setRoleDraft}
+                              disabled={roleSaving}
                             />
                             <Button
                               size="sm"
                               variant="outline"
                               disabled={
-                                statusSaving ||
-                                statusDraft === userStatus(detail)
+                                roleSaving ||
+                                sameRoleSet(roleDraft, rolesForUser(detail))
                               }
-                              onClick={handleStatusSave}
+                              aria-label="Save roles"
+                              onClick={handleRoleSave}
                             >
-                              {statusSaving ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
+                              {roleSaving ? (
+                                <Loader2
+                                  data-admin-ux="users-roles-loading"
+                                  aria-hidden="true"
+                                  className="h-4 w-4 animate-spin"
+                                />
                               ) : (
-                                "Save status"
+                                "Save roles"
                               )}
                             </Button>
                           </div>
-                          <Input
-                            value={statusReason}
-                            onChange={(event) =>
-                              setStatusReason(event.target.value)
-                            }
-                            placeholder="Reason for suspension/deletion"
-                          />
-                          {statusDraft !== "active" ? (
-                            <p className="text-xs text-amber-200/75">
-                              Saving this status revokes open sessions and
-                              blocks future login/refresh attempts.
-                            </p>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <div className="mt-2 text-sm text-white/70">
-                          {statusLabel(userStatus(detail))}
-                        </div>
-                      )}
+                        ) : (
+                          <div className="flex flex-wrap gap-2 text-sm text-text-secondary">
+                            {rolesForUser(detail).map((role) => (
+                              <InfoBadge key={role}>
+                                {roleLabel(role)}
+                              </InfoBadge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {(detail.capabilities || [])
+                          .slice(0, 8)
+                          .map((capability) => (
+                            <InfoBadge
+                              key={capability}
+                              className="text-text-muted"
+                            >
+                              {capability}
+                            </InfoBadge>
+                          ))}
+                        {(detail.capabilities?.length ?? 0) > 8 ? (
+                          <InfoBadge className="text-text-subtle">
+                            +{(detail.capabilities?.length ?? 0) - 8} more
+                          </InfoBadge>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="mt-4 rounded-md border border-border-quiet bg-card p-3">
+                      <div className="crate-form-field">
+                        <MonoLabel
+                          as="div"
+                          size="eyebrow"
+                          className="flex items-center gap-2"
+                        >
+                          Account status
+                        </MonoLabel>
+                        {canManageStatus ? (
+                          <div className="space-y-3">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                              <SegmentedControl
+                                as="radio"
+                                label="Account status"
+                                value={statusDraft}
+                                onValueChange={setStatusDraft}
+                                items={STATUS_OPTIONS.map((item) => ({
+                                  ...item,
+                                  disabled: statusSaving,
+                                }))}
+                              />
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={
+                                  statusSaving ||
+                                  statusDraft === userStatus(detail)
+                                }
+                                aria-label="Save status"
+                                onClick={handleStatusSave}
+                              >
+                                {statusSaving ? (
+                                  <Loader2
+                                    data-admin-ux="users-status-loading"
+                                    aria-hidden="true"
+                                    className="h-4 w-4 animate-spin"
+                                  />
+                                ) : (
+                                  "Save status"
+                                )}
+                              </Button>
+                            </div>
+                            <Input
+                              value={statusReason}
+                              onChange={(event) =>
+                                setStatusReason(event.target.value)
+                              }
+                              aria-label="Reason for suspension/deletion"
+                              placeholder="Reason for suspension/deletion"
+                            />
+                            {statusDraft !== "active" ? (
+                              <p className="text-xs text-state-warning-text/75">
+                                Saving this status revokes open sessions and
+                                blocks future login/refresh attempts.
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-text-secondary">
+                            {statusLabel(userStatus(detail))}
+                          </div>
+                        )}
+                      </div>
                       {detail.status_reason ? (
-                        <div className="mt-3 text-xs text-white/42">
+                        <div className="mt-3 text-xs text-text-muted">
                           Reason: {detail.status_reason}
                         </div>
                       ) : null}
                     </div>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-md border border-white/8 bg-black/15 p-3">
-                        <div className="text-[11px] uppercase tracking-[0.12em] text-white/30">
+                      <div className="crate-form-field rounded-md border border-border-quiet bg-card p-3">
+                        <MonoLabel as="div" size="eyebrow">
                           Created
-                        </div>
-                        <div className="mt-1 text-sm text-white/75">
+                        </MonoLabel>
+                        <div className="text-sm text-text-secondary">
                           {formatSessionTimestamp(detail.created_at)}
                         </div>
                       </div>
-                      <div className="rounded-md border border-white/8 bg-black/15 p-3">
-                        <div className="text-[11px] uppercase tracking-[0.12em] text-white/30">
+                      <div className="crate-form-field rounded-md border border-border-quiet bg-card p-3">
+                        <MonoLabel as="div" size="eyebrow">
                           Last login
-                        </div>
-                        <div className="mt-1 text-sm text-white/75">
+                        </MonoLabel>
+                        <div className="text-sm text-text-secondary">
                           {formatSessionTimestamp(detail.last_login)}
                         </div>
                       </div>
@@ -1683,9 +1659,9 @@ function UserDetailDialog({
                   </CardContent>
                 </Card>
 
-                <Card className="border-white/10 bg-panel-surface">
+                <Card>
                   <CardHeader>
-                    <CardTitle className="text-base text-white">
+                    <CardTitle className="font-display text-base text-text-primary">
                       Presence
                     </CardTitle>
                     <CardDescription>
@@ -1695,39 +1671,39 @@ function UserDetailDialog({
                   <CardContent className="space-y-4">
                     <UserPresence user={detail} />
                     <div className="grid gap-3">
-                      <div className="rounded-md border border-white/8 bg-black/15 p-3">
-                        <div className="text-[11px] uppercase tracking-[0.12em] text-white/30">
+                      <div className="crate-form-field rounded-md border border-border-quiet bg-card p-3">
+                        <MonoLabel as="div" size="eyebrow">
                           Last seen
-                        </div>
-                        <div className="mt-1 text-sm text-white/75">
+                        </MonoLabel>
+                        <div className="text-sm text-text-secondary">
                           {formatSessionTimestamp(detail.last_seen_at)}
                         </div>
                       </div>
-                      <div className="rounded-md border border-white/8 bg-black/15 p-3">
-                        <div className="text-[11px] uppercase tracking-[0.12em] text-white/30">
+                      <div className="crate-form-field rounded-md border border-border-quiet bg-card p-3">
+                        <MonoLabel as="div" size="eyebrow">
                           Last play event
-                        </div>
-                        <div className="mt-1 text-sm text-white/75">
+                        </MonoLabel>
+                        <div className="text-sm text-text-secondary">
                           {formatSessionTimestamp(detail.last_played_at)}
                         </div>
                       </div>
                     </div>
                     {detail.current_track ? (
-                      <div className="rounded-md border border-cyan-400/15 bg-cyan-400/8 p-3">
-                        <div className="mb-1 text-[11px] uppercase tracking-[0.12em] text-cyan-100/70">
+                      <div className="crate-form-field rounded-md border border-accent-action/15 bg-accent-action/8 p-3">
+                        <MonoLabel as="div" size="eyebrow" tone="accent">
                           {detail.listening_now
                             ? "Currently playing"
                             : "Latest track"}
-                        </div>
+                        </MonoLabel>
                         <CurrentTrackLine track={detail.current_track} />
                       </div>
                     ) : null}
                   </CardContent>
                 </Card>
 
-                <Card className="border-white/10 bg-panel-surface">
+                <Card>
                   <CardHeader>
-                    <CardTitle className="text-base text-white">
+                    <CardTitle className="font-display text-base text-text-primary">
                       Access & session footprint
                     </CardTitle>
                     <CardDescription>
@@ -1739,54 +1715,51 @@ function UserDetailDialog({
                     <div className="flex flex-wrap gap-2">
                       {(detail.connected_accounts || []).length > 0 ? (
                         (detail.connected_accounts || []).map((account) => (
-                          <CrateChip
-                            key={`${detail.id}-${account.provider}`}
-                            className="text-[11px]"
-                          >
+                          <InfoBadge key={`${detail.id}-${account.provider}`}>
                             {account.provider}
                             {account.external_username
                               ? ` · ${account.external_username}`
                               : ""}
-                          </CrateChip>
+                          </InfoBadge>
                         ))
                       ) : (
-                        <CrateChip className="text-[11px] text-white/45">
+                        <InfoBadge className="text-text-muted">
                           No linked providers
-                        </CrateChip>
+                        </InfoBadge>
                       )}
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-md border border-white/8 bg-black/15 p-3">
-                        <div className="text-[11px] uppercase tracking-[0.12em] text-white/30">
+                      <div className="crate-form-field rounded-md border border-border-quiet bg-card p-3">
+                        <MonoLabel as="div" size="eyebrow">
                           Active footprint
-                        </div>
-                        <div className="mt-1 text-lg font-semibold text-white">
+                        </MonoLabel>
+                        <div className="text-lg font-semibold text-text-primary">
                           {detail.active_devices ?? 0} device
                           {(detail.active_devices ?? 0) === 1 ? "" : "s"}
                         </div>
-                        <div className="mt-1 text-xs text-white/38">
+                        <div className="text-xs text-text-subtle">
                           {detail.active_sessions ?? 0} active session token
                           {(detail.active_sessions ?? 0) === 1 ? "" : "s"}
                         </div>
                       </div>
-                      <div className="rounded-md border border-white/8 bg-black/15 p-3">
-                        <div className="text-[11px] uppercase tracking-[0.12em] text-white/30">
+                      <div className="crate-form-field rounded-md border border-border-quiet bg-card p-3">
+                        <MonoLabel as="div" size="eyebrow">
                           Historical tokens
-                        </div>
-                        <div className="mt-1 text-lg font-semibold text-white">
+                        </MonoLabel>
+                        <div className="text-lg font-semibold text-text-primary">
                           {detail.sessions.length}
                         </div>
-                        <div className="mt-1 text-xs text-white/38">
+                        <div className="text-xs text-text-subtle">
                           {sessionStatusCounts.history} stale/history ·{" "}
                           {sessionStatusCounts.revoked} revoked
                         </div>
                       </div>
                     </div>
-                    <div className="rounded-md border border-white/8 bg-black/15 p-3">
-                      <div className="text-[11px] uppercase tracking-[0.12em] text-white/30">
+                    <div className="crate-form-field rounded-md border border-border-quiet bg-card p-3">
+                      <MonoLabel as="div" size="eyebrow">
                         Security
-                      </div>
-                      <div className="mt-1 text-sm text-white/78">
+                      </MonoLabel>
+                      <div className="text-sm text-text-primary">
                         {authModeSummary(detail)}
                       </div>
                       {canManagePasswords ? (
@@ -1796,7 +1769,6 @@ function UserDetailDialog({
                             variant="outline"
                             onClick={() => setPasswordDialogOpen(true)}
                           >
-                            <Key size={14} className="mr-2" />
                             {detail.has_password
                               ? "Reset password"
                               : "Set password"}
@@ -1806,21 +1778,21 @@ function UserDetailDialog({
                     </div>
                     {sessionSourceSummary.length > 0 ? (
                       <div className="space-y-2">
-                        <div className="text-[11px] uppercase tracking-[0.12em] text-white/30">
+                        <MonoLabel as="div" size="eyebrow">
                           Top clients
-                        </div>
+                        </MonoLabel>
                         <div className="space-y-2">
                           {sessionSourceSummary.slice(0, 4).map((source) => (
                             <div
                               key={source.key}
-                              className="rounded-md border border-white/8 bg-black/15 p-3"
+                              className="rounded-md border border-border-quiet bg-card p-3"
                             >
                               <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div className="min-w-0">
-                                  <div className="truncate text-sm font-medium text-white">
+                                <div className="crate-form-field min-w-0">
+                                  <div className="truncate text-sm font-medium text-text-primary">
                                     {source.label}
                                   </div>
-                                  <div className="mt-1 text-xs text-white/38">
+                                  <div className="text-xs text-text-subtle">
                                     {source.app_id || "web"} · last seen{" "}
                                     {formatRelativeTimestamp(
                                       source.last_seen_at,
@@ -1829,24 +1801,24 @@ function UserDetailDialog({
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                   {source.online + source.connected > 0 ? (
-                                    <CrateChip className="border-green-500/25 bg-green-500/10 text-green-300 text-[11px]">
+                                    <InfoBadge tone="accent">
                                       {source.online + source.connected} active
-                                    </CrateChip>
+                                    </InfoBadge>
                                   ) : null}
                                   {source.recent > 0 ? (
-                                    <CrateChip className="text-[11px]">
+                                    <InfoBadge>
                                       {source.recent} recent
-                                    </CrateChip>
+                                    </InfoBadge>
                                   ) : null}
                                   {source.history > 0 ? (
-                                    <CrateChip className="text-[11px] text-white/55">
+                                    <InfoBadge className="text-text-muted">
                                       {source.history} history
-                                    </CrateChip>
+                                    </InfoBadge>
                                   ) : null}
                                   {source.revoked > 0 ? (
-                                    <CrateChip className="text-[11px] text-white/45">
+                                    <InfoBadge className="text-text-muted">
                                       {source.revoked} revoked
-                                    </CrateChip>
+                                    </InfoBadge>
                                   ) : null}
                                 </div>
                               </div>
@@ -1856,7 +1828,7 @@ function UserDetailDialog({
                       </div>
                     ) : null}
                     {staleOpenCount > 0 ? (
-                      <div className="rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-100/80">
+                      <div className="rounded-md border border-state-warning/20 bg-state-warning/10 p-3 text-sm text-state-warning-text/80">
                         {staleOpenCount} open session
                         {staleOpenCount === 1 ? "" : "s"} look stale or
                         historical. They remain valid records, but they are not
@@ -1868,11 +1840,16 @@ function UserDetailDialog({
                         <Button
                           size="sm"
                           variant="outline"
+                          aria-label="Revoke all sessions"
                           onClick={handleRevokeAll}
                           disabled={revokingAll || detail.sessions.length === 0}
                         >
                           {revokingAll ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            <Loader2
+                              data-admin-ux="users-revoke-all-loading"
+                              aria-hidden="true"
+                              className="mr-2 h-4 w-4 animate-spin"
+                            />
                           ) : null}
                           Revoke all sessions
                         </Button>
@@ -1882,11 +1859,11 @@ function UserDetailDialog({
                 </Card>
               </div>
 
-              <Card className="border-white/10 bg-panel-surface">
+              <Card>
                 <CardHeader>
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                      <CardTitle className="text-base text-white">
+                      <CardTitle className="font-display text-base text-text-primary">
                         Sessions
                       </CardTitle>
                       <CardDescription>
@@ -1895,34 +1872,34 @@ function UserDetailDialog({
                       </CardDescription>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <CratePill
+                      <FilterChip
                         active={sessionFilter === "active"}
                         onClick={() => setSessionFilter("active")}
                       >
                         Active
-                      </CratePill>
-                      <CratePill
+                      </FilterChip>
+                      <FilterChip
                         active={sessionFilter === "recent"}
                         onClick={() => setSessionFilter("recent")}
                       >
                         Recent
-                      </CratePill>
-                      <CratePill
+                      </FilterChip>
+                      <FilterChip
                         active={sessionFilter === "all"}
                         onClick={() => setSessionFilter("all")}
                       >
                         All history
-                      </CratePill>
+                      </FilterChip>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="text-sm text-white/45">
+                  <div className="text-sm text-text-muted">
                     Showing {visibleSessions.length} of {detail.sessions.length}{" "}
                     recorded sessions
                   </div>
                   {sessionFilter !== "all" && hiddenSessionsCount > 0 ? (
-                    <div className="rounded-md border border-white/8 bg-black/15 px-4 py-3 text-sm text-white/55">
+                    <div className="rounded-md border border-border-quiet bg-card px-4 py-3 text-sm text-text-muted">
                       {hiddenSessionsCount} historical or stale session
                       {hiddenSessionsCount === 1 ? "" : "s"} hidden to keep the
                       view focused on real devices and recent sign-ins.
@@ -1936,21 +1913,19 @@ function UserDetailDialog({
                       return (
                         <div
                           key={session.id}
-                          className="flex flex-col gap-3 rounded-md border border-white/8 bg-black/15 p-4 lg:flex-row lg:items-start lg:justify-between"
+                          className="flex flex-col gap-3 rounded-md border border-border-quiet bg-card p-4 lg:flex-row lg:items-start lg:justify-between"
                         >
                           <div className="min-w-0 flex-1 space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
-                              <div className="text-sm font-medium text-white">
+                              <div className="text-sm font-medium text-text-primary">
                                 {sessionDisplayName(session)}
                               </div>
-                              <Badge className={status.className}>
+                              <InfoBadge tone={status.tone}>
                                 {status.label}
-                              </Badge>
-                              <CrateChip className="text-[11px]">
-                                {session.app_id || "web"}
-                              </CrateChip>
+                              </InfoBadge>
+                              <InfoBadge>{session.app_id || "web"}</InfoBadge>
                             </div>
-                            <div className="flex flex-wrap gap-4 text-sm text-white/45">
+                            <div className="flex flex-wrap gap-4 text-sm text-text-muted">
                               <span>
                                 Seen{" "}
                                 {formatRelativeTimestamp(
@@ -1964,18 +1939,18 @@ function UserDetailDialog({
                               <span>IP {session.last_seen_ip || "—"}</span>
                             </div>
                             {metaLine ? (
-                              <div className="text-xs text-white/28">
+                              <div className="text-xs text-text-subtle">
                                 {metaLine}
                               </div>
                             ) : null}
                             {session.device_brand || session.device_model ? (
-                              <div className="text-xs text-white/36">
+                              <div className="text-xs text-text-subtle">
                                 {[session.device_brand, session.device_model]
                                   .filter(Boolean)
                                   .join(" · ")}
                               </div>
                             ) : null}
-                            <div className="text-xs font-mono text-white/20">
+                            <div className="text-xs font-mono text-text-subtle">
                               {session.id}
                             </div>
                           </div>
@@ -1988,10 +1963,15 @@ function UserDetailDialog({
                                   !!session.revoked_at ||
                                   revokingId === session.id
                                 }
+                                aria-label="Revoke"
                                 onClick={() => handleRevokeSession(session.id)}
                               >
                                 {revokingId === session.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  <Loader2
+                                    data-admin-ux="users-revoke-loading"
+                                    aria-hidden="true"
+                                    className="h-4 w-4 animate-spin"
+                                  />
                                 ) : (
                                   "Revoke"
                                 )}
@@ -2002,7 +1982,7 @@ function UserDetailDialog({
                       );
                     })
                   ) : (
-                    <div className="rounded-md border border-dashed border-white/10 bg-black/15 px-6 py-10 text-center text-sm text-white/45">
+                    <div className="rounded-md border border-dashed border-border-quiet bg-card px-6 py-10 text-center text-sm text-text-muted">
                       No sessions match the current visibility filter.
                     </div>
                   )}
@@ -2088,9 +2068,9 @@ function SetPasswordDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="sm">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="font-display">
             {user?.has_password ? "Reset local password" : "Set local password"}
           </DialogTitle>
           <DialogDescription>
@@ -2100,10 +2080,10 @@ function SetPasswordDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-3">
+          <div className="crate-form-field">
+            <div className="flex items-end justify-between gap-3">
               <label
-                className="text-sm font-medium text-white/80"
+                className="text-sm font-medium text-text-primary"
                 htmlFor="admin-user-password"
               >
                 New password
@@ -2111,8 +2091,8 @@ function SetPasswordDialog({
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
-                className="h-auto px-2 py-1 text-xs text-white/60 hover:text-white"
+                size="xs"
+                className="text-text-secondary hover:text-text-primary"
                 onClick={() => setNewPassword(generatePassword())}
               >
                 Generate
@@ -2127,12 +2107,12 @@ function SetPasswordDialog({
               required
             />
           </div>
-          <label className="flex items-start gap-3 rounded-md border border-white/8 bg-black/15 p-3 text-sm text-white/72">
+          <label className="flex items-start gap-3 rounded-md border border-border-quiet bg-card p-3 text-sm text-text-secondary">
             <input
               type="checkbox"
               checked={revokeAllSessions}
               onChange={(event) => setRevokeAllSessions(event.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-white/20 bg-transparent"
+              className="mt-0.5 h-4 w-4 rounded border-border-quiet bg-transparent"
             />
             <span>Revoke other sessions after changing the password</span>
           </label>
@@ -2145,11 +2125,18 @@ function SetPasswordDialog({
               Cancel
             </Button>
             <Button
+              aria-label={
+                user?.has_password ? "Reset password" : "Set password"
+              }
               type="submit"
               disabled={submitting || newPassword.trim().length < 8}
             >
               {submitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2
+                  data-admin-ux="users-password-loading"
+                  aria-hidden="true"
+                  className="h-4 w-4 animate-spin"
+                />
               ) : user?.has_password ? (
                 "Reset password"
               ) : (
@@ -2212,40 +2199,67 @@ function AddUserDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent size="sm">
         <DialogHeader>
-          <DialogTitle>Add User</DialogTitle>
+          <DialogTitle className="font-display">Add User</DialogTitle>
           <DialogDescription>
             Create a new account with initial roles and password.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            placeholder="Name"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            required
-          />
-          <Input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
-          <Input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-            minLength={8}
-          />
+          <div className="crate-form-field">
+            <label
+              htmlFor="new-user-name"
+              className="font-mono text-xs text-text-muted"
+            >
+              Name
+            </label>
+            <Input
+              id="new-user-name"
+              placeholder="Name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              required
+            />
+          </div>
+          <div className="crate-form-field">
+            <label
+              htmlFor="new-user-email"
+              className="font-mono text-xs text-text-muted"
+            >
+              Email
+            </label>
+            <Input
+              id="new-user-email"
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+          </div>
+          <div className="crate-form-field">
+            <label
+              htmlFor="new-user-password"
+              className="font-mono text-xs text-text-muted"
+            >
+              Password
+            </label>
+            <Input
+              id="new-user-password"
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+              minLength={8}
+            />
+          </div>
           {canAssignRoles ? (
-            <div className="rounded-md border border-white/8 bg-black/15 p-3">
-              <div className="mb-2 text-[11px] uppercase tracking-[0.12em] text-white/30">
+            <div className="crate-form-field rounded-md border border-border-quiet bg-card p-3">
+              <MonoLabel as="div" size="eyebrow">
                 Roles
-              </div>
+              </MonoLabel>
               <RolePicker value={roles} onChange={setRoles} />
             </div>
           ) : null}
@@ -2257,9 +2271,13 @@ function AddUserDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting}>
+            <Button aria-label="Create" type="submit" disabled={submitting}>
               {submitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2
+                  data-admin-ux="users-create-loading"
+                  aria-hidden="true"
+                  className="h-4 w-4 animate-spin"
+                />
               ) : (
                 "Create"
               )}
@@ -2327,9 +2345,9 @@ function InviteUserDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle>Invite user</DialogTitle>
+          <DialogTitle className="font-display">Invite user</DialogTitle>
           <DialogDescription>
             Create a single-use invite locked to the exact email address the
             user signs in with.
@@ -2337,9 +2355,9 @@ function InviteUserDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
+          <div className="crate-form-field">
             <label
-              className="text-sm font-medium text-white/80"
+              className="text-sm font-medium text-text-primary"
               htmlFor="invite-email"
             >
               Email
@@ -2353,9 +2371,9 @@ function InviteUserDialog({
               required
             />
           </div>
-          <div className="space-y-2">
+          <div className="crate-form-field">
             <label
-              className="text-sm font-medium text-white/80"
+              className="text-sm font-medium text-text-primary"
               htmlFor="invite-expiry"
             >
               Expires in days
@@ -2372,14 +2390,16 @@ function InviteUserDialog({
           </div>
 
           {invite ? (
-            <div className="rounded-md border border-cyan-400/20 bg-cyan-400/8 p-3">
-              <div className="text-xs uppercase tracking-[0.12em] text-cyan-100/70">
-                Invite link
+            <div className="rounded-md border border-accent-action/20 bg-accent-action/8 p-3">
+              <div className="crate-form-field">
+                <div className="font-mono text-xs uppercase tracking-[0.12em] text-accent-action-hi/70">
+                  Invite link
+                </div>
+                <div className="break-all rounded-md border border-border-quiet bg-card p-3 font-mono text-xs text-text-secondary">
+                  {inviteUrl}
+                </div>
               </div>
-              <div className="mt-2 break-all rounded-md border border-white/8 bg-black/25 p-3 font-mono text-xs text-white/72">
-                {inviteUrl}
-              </div>
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-white/42">
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-text-muted">
                 <span>
                   Locked to {invite.email || email.trim().toLowerCase()} ·
                   single use
@@ -2393,7 +2413,6 @@ function InviteUserDialog({
                   variant="outline"
                   onClick={copyInvite}
                 >
-                  <Copy size={14} className="mr-2" />
                   Copy link
                 </Button>
               </div>
@@ -2408,9 +2427,17 @@ function InviteUserDialog({
             >
               Close
             </Button>
-            <Button type="submit" disabled={submitting || !email.trim()}>
+            <Button
+              aria-label="Create invite"
+              type="submit"
+              disabled={submitting || !email.trim()}
+            >
               {submitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2
+                  data-admin-ux="users-invite-loading"
+                  aria-hidden="true"
+                  className="h-4 w-4 animate-spin"
+                />
               ) : (
                 "Create invite"
               )}

@@ -1,3 +1,4 @@
+import type { TrackMediaMetadata } from "../lib/track-media-metadata";
 export interface PathEndpoint {
   type: string;
   value: string;
@@ -15,7 +16,7 @@ export interface PathSummary {
   created_at: string;
 }
 
-export interface PathTrack {
+export interface PathTrack extends TrackMediaMetadata {
   step: number;
   progress: number;
   track_id: number;

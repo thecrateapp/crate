@@ -1,0 +1,26 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/TrackList.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">TrackList</DocHeading>
+<EntryDetails
+  id="domain-tracks-tracklist"
+  review="Visual review approved · 1AW"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+Supports zero, one or many entries with optional header and empty content. A numeric zero header remains visible when rows exist. At 80 items inclusive, an injected `virtualList` takes over; without an adapter every row renders. Entry keys, row renderer, estimates and overscan retain their contracts. Native root identity, ARIA, refs and handlers are forwarded; `label` and `labelledBy` remain aliases. AlbumTrackList preserves disc order, IDs, selection and callbacks; PlaylistTrackList preserves entry identities and its existing virtualizer. The actual Listen row presentation stays local, with progress subscribed only in the active leaf. Its white play glyph, smaller ring and effects preserve V2 identity.
+
+The approved mockup and Diego's confirmed adjustments remain the reference. Initial adoption
+and contract evidence do not certify every route or native/AT qualification.
+
+<Canvas of={Stories.Base} />
+<Controls of={Stories.Base} />
+
+<Canvas of={Stories.Empty} />
+
+<Canvas of={Stories.Many} />
+
+<Canvas of={Stories.ListenPlayback} />

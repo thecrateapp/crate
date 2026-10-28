@@ -1,0 +1,203 @@
+---
+import { t } from "../../i18n";
+import type { MessageKey } from "../../i18n/en";
+import StatusBadge from "../StatusBadge.astro";
+
+interface Props {
+  locale?: string;
+}
+
+const { locale = "en" } = Astro.props;
+const items = (["jams", "vdj"] as const).map((key) => ({
+  title: t(`working.${key}.title` as MessageKey, locale),
+  body: t(`working.${key}.body` as MessageKey, locale),
+  facts: t(`working.${key}.facts` as MessageKey, locale).split(" · "),
+}));
+---
+
+<section class="roadmap" id="working-on" aria-labelledby="working-on-title" data-reveal data-playing>
+  <header class="viz-bar" data-enter>
+    <h3 class="viz-label" id="working-on-title"><b>{t("working.title", locale)}</b> {items.length} items</h3>
+    <p class="viz-label">{t("working.lede", locale)}</p>
+  </header>
+  <ol class="cards">
+    {
+      items.map((item, index) => (
+        <li style={`--i:${index}`}>
+          <p class="card-head">
+            <span class="n">{String(index + 1).padStart(2, "0")}</span>
+            <StatusBadge locale={locale} />
+          </p>
+          <h4>{item.title}</h4>
+          <p class="body">{item.body}</p>
+          <ul class="facts">
+            {item.facts.map((fact) => (
+              <li>{fact}</li>
+            ))}
+          </ul>
+          <p class="progress viz-label">
+            <i aria-hidden="true">
+              <b />
+            </i>
+            {t("working.progress", locale)}
+          </p>
+        </li>
+      ))
+    }
+  </ol>
+</section>
+
+<style>
+  .roadmap {
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+    scroll-margin-top: 96px;
+  }
+
+  h3 {
+    font-weight: 400;
+  }
+
+  .roadmap > header .viz-label:last-child {
+    max-width: 52ch;
+    text-transform: none;
+    letter-spacing: 0.04em;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+    margin: 30px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .cards > li {
+    display: grid;
+    align-content: start;
+    gap: 16px;
+    padding: 26px clamp(20px, 3vw, 40px) 30px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .cards > li + li {
+    padding-left: clamp(20px, 3vw, 40px);
+    border-left: 1px solid var(--line);
+  }
+
+  :global(:where(html.js)) .cards > li {
+    opacity: 0;
+  }
+
+  :global(:where(html.js)) .is-in .cards > li {
+    animation: enter-up 0.7s var(--spring-snappy) both;
+    animation-delay: calc(120ms + var(--i) * 90ms);
+  }
+
+  .card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0;
+  }
+
+  .n {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: var(--cyan-hi);
+  }
+
+  h4 {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(2rem, 3.6vw, 3.2rem);
+    line-height: 0.95;
+    letter-spacing: -0.045em;
+  }
+
+  .body {
+    max-width: 52ch;
+    margin: 0;
+    font-size: clamp(0.98rem, 1.1vw, 1.06rem);
+    line-height: 1.7;
+    color: var(--fg-2);
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .facts li {
+    padding: 4px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--fg-2);
+  }
+
+  .progress {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 6px;
+    color: var(--amber);
+  }
+
+  .progress i {
+    position: relative;
+    width: 96px;
+    height: 2px;
+    overflow: hidden;
+    background: rgba(251, 191, 36, 0.18);
+  }
+
+  .progress b {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 36%;
+    background: var(--amber);
+  }
+
+  :global(.is-playing) .progress b {
+    animation: building 2.4s var(--ease-in-out) infinite;
+  }
+
+  @keyframes building {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(280%);
+    }
+  }
+
+  @media (max-width: 760px) {
+    .cards {
+      grid-template-columns: 1fr;
+    }
+    .cards > li,
+    .cards > li + li {
+      padding: 24px 0 26px;
+      border-left: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(.is-playing) .progress b {
+      animation: none;
+    }
+    :global(:where(html.js)) .is-in .cards > li {
+      animation: none;
+      opacity: 1;
+    }
+  }
+</style>

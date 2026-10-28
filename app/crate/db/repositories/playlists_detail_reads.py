@@ -35,9 +35,9 @@ def get_playlist_tracks(
                         WHEN COALESCE(pt.duration, 0) > 0 THEN pt.duration
                         ELSE COALESCE(lt.duration, gt.duration_seconds, pt.duration, 0)
                     END AS duration,
-                    lt.bpm,
-                    lt.audio_key,
-                    lt.audio_scale,
+                    COALESCE(lt.bpm, NULLIF(qs.source_payload_json->>'bpm', '')::double precision) AS bpm,
+                    COALESCE(lt.audio_key, qs.source_payload_json->>'audio_key') AS audio_key,
+                    COALESCE(lt.audio_scale, qs.source_payload_json->>'audio_scale') AS audio_scale,
                     lt.energy,
                     lt.danceability,
                     lt.valence,
@@ -47,7 +47,10 @@ def get_playlist_tracks(
                     pt.locked,
                     pt.added_at,
                     lt.genre,
-                    lt.format,
+                    COALESCE(lt.format, qs.source_payload_json->>'format') AS format,
+                    COALESCE(lt.bitrate, NULLIF(qs.source_payload_json->>'bitrate', '')::integer) AS bitrate,
+                    COALESCE(lt.sample_rate, NULLIF(qs.source_payload_json->>'sample_rate', '')::integer) AS sample_rate,
+                    COALESCE(lt.bit_depth, NULLIF(qs.source_payload_json->>'bit_depth', '')::integer) AS bit_depth,
                     lt.year,
                     ar.id AS artist_id,
                     ar.entity_uid::text AS artist_entity_uid,
@@ -79,11 +82,18 @@ def get_playlist_tracks(
                      AND lt_path.path = pt.track_path
                     WHERE pt.playlist_id = :playlist_id
                 ) pt
-                LEFT JOIN library_tracks lt
-                  ON lt.id = pt.resolved_track_id
-                 AND (lt.entity_uid IS NOT NULL OR lt.storage_id IS NOT NULL)
                 LEFT JOIN global_catalog_tracks gt
                   ON gt.global_track_uid = pt.global_track_uid
+                LEFT JOIN library_tracks lt
+                  ON lt.id = COALESCE(pt.resolved_track_id, gt.local_track_id)
+                 AND (lt.entity_uid IS NOT NULL OR lt.storage_id IS NOT NULL)
+                LEFT JOIN LATERAL (
+                    SELECT source_payload_json FROM global_catalog_sources source
+                    WHERE source.entity_type='track' AND source.global_entity_uid=gt.global_track_uid
+                      AND NOT source.source_stale AND source.source_deleted_at IS NULL
+                    ORDER BY (source.source_kind='local') DESC, source.preferred_for_playback DESC,
+                             source.preferred_for_display DESC, source.updated_at DESC LIMIT 1
+                ) qs ON true
                 LEFT JOIN library_albums alb
                   ON alb.id = lt.album_id
                   OR (

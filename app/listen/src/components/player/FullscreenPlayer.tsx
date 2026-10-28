@@ -6,9 +6,9 @@ import { useResolvedPlayerArtist } from "@/components/player/useResolvedPlayerAr
 import { useFullscreenPlayerLyrics } from "@/components/player/useFullscreenPlayerLyrics";
 import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
 import { canUseWebAudioEffects } from "@/lib/mobile-audio-mode";
-import { useEqualizerEnabled } from "@/hooks/use-equalizer-enabled";
 import { artistPagePath } from "@/lib/library-routes";
-import { usePlayer, usePlayerActions } from "@/contexts/PlayerContext";
+import { usePlayerState, usePlayerActions } from "@/contexts/PlayerContext";
+import { usePlayerClock } from "@/contexts/PlayerClock";
 import { useLikedTracks } from "@/contexts/LikedTracksContext";
 import {
   useCrossfadeAwareProgress,
@@ -18,6 +18,7 @@ import { useFullscreenPlayerActions } from "@/components/player/useFullscreenPla
 import { useFullscreenPlayerGestures } from "@/components/player/useFullscreenPlayerGestures";
 import { useFullscreenPlayerLifecycle } from "@/components/player/useFullscreenPlayerLifecycle";
 import { FullscreenPlayerView } from "@/components/player/FullscreenPlayerView";
+import { resolvePlayerMixPresentation } from "./player-mix-presentation";
 
 interface FullscreenPlayerProps {
   open: boolean;
@@ -27,21 +28,22 @@ interface FullscreenPlayerProps {
 export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
   const { t } = useTranslation();
   const {
+    isBuffering,
+    isPlaying,
+    crossfadeTransition,
+    mixState,
+    nativeMixAvailable,
+  } = usePlayerState();
+  const { currentTime, duration } = usePlayerClock().current;
+  const {
     currentTrack,
     queue,
     currentIndex,
-    currentTime,
-    duration,
-    isBuffering,
     seek,
     jumpTo,
-    isPlaying,
-    crossfadeTransition,
     playSource,
     shuffle,
     repeat,
-  } = usePlayer();
-  const {
     pause,
     resume,
     next,
@@ -51,7 +53,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
     toggleShuffle,
     cycleRepeat,
   } = usePlayerActions();
-  const { isLiked, toggleTrackLike } = useLikedTracks();
+  const { isLiked, toggleTrackLike, hasLoaded } = useLikedTracks();
   const crossfadeProgress = useCrossfadeProgress(crossfadeTransition);
   // Keep the crossfade visuals, but let time/progress track the live
   // incoming song so the UI does not jump backwards after the fade.
@@ -62,9 +64,8 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
   );
   const navigate = useNavigate();
   const androidNativePlayerEnabled = shouldUseAndroidNativePlayer();
-  const equalizerEnabled = useEqualizerEnabled();
   const allowMobileEqualizer =
-    equalizerEnabled && (canUseWebAudioEffects || androidNativePlayerEnabled);
+    canUseWebAudioEffects || androidNativePlayerEnabled;
   const spinningDiscJogSeekMode = androidNativePlayerEnabled
     ? "commit"
     : "live";
@@ -91,6 +92,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
   const {
     activePanel,
     animating,
+    handleEscape,
     resetClosedUi,
     setActivePanel,
     setShowEqualizer,
@@ -106,7 +108,13 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
   });
   const isCdMode = surfaceMode === "cd";
 
-  const { activeLyricIndex, lyrics } = useFullscreenPlayerLyrics({
+  const {
+    activeLyricIndex,
+    lyrics,
+    loading: lyricsLoading,
+    error: lyricsError,
+    retry: onRetryLyrics,
+  } = useFullscreenPlayerLyrics({
     activeLyricRef,
     activePanel,
     currentTime,
@@ -139,7 +147,8 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
     surfaceMode,
     t,
     toggleShuffle,
-    toggleTrackLike,
+    toggleTrackLike: (...args) =>
+      hasLoaded === false ? Promise.resolve(false) : toggleTrackLike(...args),
   });
   const { draggingRef, onSwipeEnd, onSwipeMove, onSwipeStart, swipeY } =
     useFullscreenPlayerGestures({
@@ -180,6 +189,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
 
   return (
     <FullscreenPlayerView
+      open={open}
       t={t}
       state={{
         activePanel,
@@ -191,6 +201,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
         jamQueueLocked,
         jamTransportDisabled,
         liked,
+        likeStateAvailable: hasLoaded !== false,
         repeat,
         showEqualizer: allowMobileEqualizer && showEqualizer,
         shuffle,
@@ -198,6 +209,13 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
         swipeY,
       }}
       player={{
+        mix: nativeMixAvailable
+          ? resolvePlayerMixPresentation(mixState, {
+              currentTrackId: currentTrack.id,
+              isPlaying,
+              isBuffering,
+            })
+          : null,
         currentTrack,
         crossfadeProgress,
         crossfadeTransition,
@@ -220,6 +238,7 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
         lyricsContainerRef,
       }}
       actions={{
+        onEscape: handleEscape,
         closeWithFeedback,
         cycleRepeatWithFeedback,
         goNextWithFeedback,
@@ -243,6 +262,9 @@ export function FullscreenPlayer({ open, onClose }: FullscreenPlayerProps) {
         toggleShuffleWithFeedback,
         toggleSurfaceModeWithFeedback,
       }}
+      lyricsLoading={lyricsLoading}
+      lyricsError={lyricsError}
+      onRetryLyrics={onRetryLyrics}
       lyrics={lyrics}
       activeLyricIndex={activeLyricIndex}
       playerTabBottomClearance={playerTabBottomClearance}

@@ -20,6 +20,7 @@ export function JamDeleteRoomModal({
 }: JamDeleteRoomModalProps) {
   return (
     <ConfirmDialog
+      eyebrow={t("actions.confirmation.eyebrow")}
       open={deleteTargetRoom !== null}
       onCancel={() => setDeleteTargetRoom(null)}
       onConfirm={confirmDeleteRoom}

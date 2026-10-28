@@ -26,7 +26,7 @@ export type ExtendedPlayerViewState = {
   canvasRect: VisualizerCanvasRect | null;
   vizCfg: VisualizerConfigState;
   visualizerAllowed: boolean;
-  equalizerEnabled: boolean;
+  equalizerAvailable: boolean;
 };
 
 export type ExtendedPlayerViewRefs = {
@@ -40,6 +40,7 @@ export type ExtendedPlayerViewRefs = {
 };
 
 export type ExtendedPlayerViewActions = {
+  onEscape?: (event: KeyboardEvent) => void;
   closeWithFeedback: () => void;
   goToArtist: () => void;
   onSurfaceModeChange: (mode: PlayerSurfaceMode) => void;

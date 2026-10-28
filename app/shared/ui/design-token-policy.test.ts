@@ -14,27 +14,21 @@ const ORGANIC_BLOB_RADIUS = "rounded-[45%_55%_49%_51%/53%_47%_56%_44%]";
 const ICON_IMPORT =
   /import\s*\{([^}]*)\}\s*from\s*["'](?:@crate\/ui\/icons|(?:\.\.?\/)+icons)(?:\/[^"']+)?["']/g;
 const DYNAMIC_ICON = /^(?:[A-Z]\w*)?Icon$/;
+const LOCAL_FOCUS_DECORATION =
+  /\bfocus(?:-visible|-within)?:(?:ring|shadow)(?:-|\b)/;
 
 const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
   "domain/ArtistHeroPresentation.tsx": {
     "text-[52px]": 1,
     "text-[56px]": 1,
-    "tracking-[0.3em]": 1,
   },
   "domain/brand/CrateLoader.tsx": {
     [ORGANIC_BLOB_RADIUS]: 1,
     "tracking-[0.055em]": 1,
   },
-  "domain/shows/ShowCard.tsx": { "text-[20px]": 1 },
 };
 
-const ICON_SIZE_BUDGET: Record<string, Record<string, number>> = {
-  "composites/AdminSelect.tsx": { "13": 1 },
-  "domain/shows/ShowCard.tsx": { "10": 1, "11": 1, "13": 2 },
-  "domain/stats/OpsPageHero.tsx": { "22": 1 },
-  "primitives/CrateBadge.tsx": { "10": 1, "11": 2 },
-  "primitives/ErrorState.tsx": { "32": 1 },
-};
+const ICON_SIZE_BUDGET: Record<string, Record<string, number>> = {};
 
 function productionSourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -116,6 +110,18 @@ function literalIconSizes(source: string): string[] {
 }
 
 describe("@crate/ui design token policy", () => {
+  it("uses the global keyboard outline instead of the legacy focus shadow in shared and app sources", () => {
+    const appRoot = resolve(SOURCE_ROOT, "../..");
+    const findings = productionSourceFiles(appRoot).flatMap((path) => {
+      const source = readFileSync(path, "utf8");
+      return LOCAL_FOCUS_DECORATION.test(source)
+        ? [relative(appRoot, path)]
+        : [];
+    });
+
+    expect(findings).toEqual([]);
+  }, 15_000);
+
   it("reads literal icon sizes past arrow functions and nested JSX props", () => {
     const source = [
       'import { Heart, Star } from "@crate/ui/icons";',

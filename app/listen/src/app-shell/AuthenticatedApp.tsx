@@ -18,6 +18,7 @@ type CapabilitiesResponse = {
     android_native_crossfade: boolean;
     android_beatmatch: boolean;
     android_bass_handoff?: boolean;
+    android_long_beatmatch?: boolean;
   };
 };
 
@@ -35,6 +36,7 @@ export function AuthenticatedApp() {
           androidNativeCrossfade: smartMix.android_native_crossfade,
           androidBeatmatch: smartMix.android_beatmatch,
           androidBassHandoff: smartMix.android_bass_handoff === true,
+          androidLongBeatmatch: smartMix.android_long_beatmatch === true,
         });
       })
       .catch(() => {
@@ -45,6 +47,7 @@ export function AuthenticatedApp() {
           androidNativeCrossfade: false,
           androidBeatmatch: false,
           androidBassHandoff: false,
+          androidLongBeatmatch: false,
         });
       });
 

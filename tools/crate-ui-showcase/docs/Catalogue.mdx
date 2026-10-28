@@ -1,0 +1,11 @@
+import { Meta, Canvas } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/Catalogue.stories";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+
+<DocHeading as="h1">Component inventory</DocHeading>
+
+This table is derived from the versioned registry. Internal modules can belong to their family's entry; the count is not a count of public exports or rendered instances. Pending preserves an existing source fingerprint: changing that source requires documenting its entry.
+
+<Canvas of={Stories.Catalogue} />

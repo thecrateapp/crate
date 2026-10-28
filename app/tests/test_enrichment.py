@@ -231,6 +231,10 @@ class TestArtistPageEnrichment:
                 "crate.api.enrichment.setlistfm.get_cached_probable_setlist",
                 return_value=[{"title": "Creep"}],
             ),
+            patch(
+                "crate.api.enrichment.setlistfm.get_cached_probable_setlist_generated_at",
+                return_value="2026-10-20T10:00:00+00:00",
+            ),
             patch("crate.api.enrichment.setlistfm.get_probable_setlist") as mock_live,
         ):
             from crate.api.enrichment import get_artist_page_enrichment
@@ -238,7 +242,11 @@ class TestArtistPageEnrichment:
             result = get_artist_page_enrichment("Radiohead")
 
         assert result == {
-            "setlist": {"probable_setlist": [{"title": "Creep"}], "total_shows": 1}
+            "setlist": {
+                "probable_setlist": [{"title": "Creep"}],
+                "total_shows": 1,
+                "generated_at": "2026-10-20T10:00:00+00:00",
+            }
         }
         mock_live.assert_not_called()
 

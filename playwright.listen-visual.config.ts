@@ -3,6 +3,8 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests/listen-visual",
   outputDir: "./test-results/listen-visual",
+  globalSetup: "./tests/visual/capture-setup.ts",
+  updateSnapshots: "none",
   reporter: [
     ["list"],
     [
@@ -11,7 +13,7 @@ export default defineConfig({
     ],
   ],
   snapshotPathTemplate:
-    "{testDir}/{testFilePath}-snapshots/{arg}-{projectName}-{platform}{ext}",
+    "{testDir}/{testFilePath}-snapshots/{arg}-{projectName}{ext}",
   timeout: 45_000,
   expect: {
     timeout: 15_000,
@@ -23,6 +25,7 @@ export default defineConfig({
   },
   use: {
     baseURL: "http://127.0.0.1:4174",
+    channel: process.env.PLAYWRIGHT_CHANNEL,
     colorScheme: "dark",
     deviceScaleFactor: 1,
     locale: "en-US",
@@ -51,7 +54,6 @@ export default defineConfig({
   webServer: {
     command:
       "npm run --workspace=app/listen dev -- --host 127.0.0.1 --port 4174 --strictPort",
-    env: { VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED: "true" },
     url: "http://127.0.0.1:4174",
     reuseExistingServer: false,
     timeout: 120_000,

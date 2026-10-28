@@ -1,0 +1,215 @@
+---
+import { listen } from "../content/listen/en";
+import { t } from "../i18n";
+import AgentTeaser from "./inside/AgentTeaser.astro";
+import InsideTiles from "./inside/InsideTiles.astro";
+import MixTeaser from "./inside/MixTeaser.astro";
+
+interface Props {
+  locale?: string;
+}
+
+const { locale = "en" } = Astro.props;
+const smartMix = listen.chapters.find((chapter) => chapter.smartMix)!;
+const leads = [
+  { id: "mix", href: `/listen#${smartMix.id}` },
+  { id: "mcp", href: "/admin#mcp" },
+] as const;
+---
+
+<section class="inside" aria-labelledby="inside-title" data-reveal>
+  <header class="inside-head">
+    <h2 class="display" id="inside-title" data-enter>{t("inside.title", locale)}</h2>
+    <p data-enter style="--d:120ms">{t("inside.lede", locale)}</p>
+  </header>
+  <ul class="leads">
+    {
+      leads.map((lead, index) => (
+        <li style={`--i:${index}`} data-lead={lead.id}>
+          <a
+            href={lead.href}
+            aria-labelledby={`inside-${lead.id}-title inside-${lead.id}-link`}
+            aria-describedby={`inside-${lead.id}-body`}
+          >
+            <span class="viz-label lead-label">
+              <b>{t(`inside.${lead.id}.label`, locale).split(" · ")[0]}</b>
+              {t(`inside.${lead.id}.label`, locale).split(" · ").slice(1).join(" · ")}
+            </span>
+            <span class="lead-art">
+              {lead.id === "mix" ? (
+                <MixTeaser stages={smartMix.smartMix!.stages} locale={locale} />
+              ) : (
+                <AgentTeaser locale={locale} />
+              )}
+            </span>
+            <span class="lead-copy">
+              <span class="lead-title" id={`inside-${lead.id}-title`}>
+                {t(`inside.${lead.id}.title`, locale)}
+              </span>
+              <span class="lead-body" id={`inside-${lead.id}-body`}>
+                {t(`inside.${lead.id}.body`, locale)}
+              </span>
+              <span class="lead-link" id={`inside-${lead.id}-link`}>
+                {t(`inside.${lead.id}.link`, locale)} <span aria-hidden="true">&rarr;</span>
+              </span>
+            </span>
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+  <InsideTiles locale={locale} />
+</section>
+
+<style>
+  .inside {
+    position: relative;
+    z-index: 5;
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 14vh clamp(20px, 6vw, 96px) 6vh;
+  }
+
+  .inside-head {
+    display: grid;
+    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+    gap: 20px 48px;
+    align-items: end;
+  }
+
+  .inside-head h2 {
+    margin: 0;
+    font-size: clamp(2.8rem, 7vw, 6.4rem);
+  }
+
+  .inside-head p {
+    max-width: 44ch;
+    margin: 0;
+    font-size: clamp(1rem, 1.2vw, 1.15rem);
+    line-height: 1.7;
+    color: var(--fg-2);
+  }
+
+  .leads {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 7vh 0 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--line);
+  }
+
+  .leads li {
+    display: grid;
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+  }
+
+  .leads li + li {
+    border-left: 1px solid var(--line);
+  }
+
+  :global(:where(html.js)) .leads li {
+    opacity: 0;
+  }
+
+  :global(:where(html.js)) .is-in .leads li {
+    opacity: 1;
+    animation: enter-up 0.7s var(--spring-snappy) backwards;
+    animation-delay: calc(120ms + var(--i) * 90ms);
+  }
+
+  .leads a {
+    display: grid;
+    grid-row: span 3;
+    grid-template-rows: subgrid;
+    gap: 22px;
+    padding: 26px clamp(18px, 2.6vw, 40px) 40px;
+    color: var(--fg);
+    text-decoration: none;
+    transition: background-color 0.4s var(--ease-snap);
+  }
+
+  .leads li:first-child a {
+    padding-left: 0;
+  }
+
+  .leads li:last-child a {
+    padding-right: 0;
+  }
+
+  .leads a:hover {
+    background: rgba(6, 182, 212, 0.03);
+  }
+
+  .leads a:focus-visible {
+    outline: 2px solid var(--cyan-hi);
+    outline-offset: -2px;
+  }
+
+  .lead-art {
+    display: block;
+    min-width: 0;
+  }
+
+  .lead-copy {
+    display: grid;
+    align-content: start;
+    gap: 14px;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .lead-title {
+    max-width: 18ch;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.7rem, 2.8vw, 2.7rem);
+    letter-spacing: -0.035em;
+    line-height: 1.02;
+    text-wrap: balance;
+  }
+
+  .lead-body {
+    max-width: 48ch;
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--fg-2);
+  }
+
+  .lead-link {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--cyan-hi);
+  }
+
+  @media (max-width: 1000px) {
+    .leads {
+      grid-template-columns: 1fr;
+    }
+    .leads li + li {
+      border-left: 0;
+      border-top: 1px solid var(--line);
+    }
+    .leads a,
+    .leads li:first-child a,
+    .leads li:last-child a {
+      padding-left: 0;
+      padding-right: 0;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .inside-head {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(:where(html.js)) .is-in .leads li {
+      animation: none;
+    }
+  }
+</style>

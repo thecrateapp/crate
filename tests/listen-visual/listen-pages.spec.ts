@@ -1,23 +1,52 @@
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures";
+import { capturePage } from "../visual/screenshots";
 
 async function expectStablePage(page: Page, name: string) {
-  await expect(page).toHaveScreenshot(`${name}.png`, {
-    fullPage: false,
-  });
+  await capturePage(page, test.info(), name);
 }
 
 test("renders the home shell with the restored player", async ({
   openListenPage,
   page,
-}) => {
+}, info) => {
   await openListenPage("/", { player: true });
   await expect(page.getByTestId("hero-result-artist-name")).toHaveText(
     "High Vis",
   );
   await expect(page.getByText("Mob DLA", { exact: true })).toBeVisible();
+  const dock =
+    info.project.name === "mobile"
+      ? page.locator(".listen-mobile-dock-surface")
+      : page.locator('[data-slot="player-chrome"]');
+  await expect(dock).toHaveCSS(
+    "backdrop-filter",
+    info.project.name === "mobile" ? "blur(18px) saturate(1.18)" : "blur(24px)",
+  );
+  await expect(dock).toHaveCSS("background-color", /\/ 0\.68\)$/);
   await expectStablePage(page, "home-player-default-dark");
+});
+
+test("renders the Smart EQ curve and source chain", async ({
+  openListenPage,
+  page,
+}, info) => {
+  await openListenPage("/", { player: true, smartEq: true });
+  if (info.project.name === "mobile") {
+    await page
+      .getByRole("button", { name: "Open fullscreen player", exact: true })
+      .click();
+  }
+  await page.getByRole("button", { name: "Equalizer", exact: true }).click();
+  const readout = page.locator(
+    '[data-source="genre_taxonomy_preset"][aria-current="true"]',
+  );
+  await expect(readout).toBeVisible();
+  await expect(page.getByRole("slider", { name: / Hz$/ })).toHaveCount(10);
+  await expectStablePage(page, "equalizer-smart-default-dark");
+  await readout.hover();
+  await expect(page.getByRole("tooltip")).toContainText("from Rock");
 });
 
 test("renders the complete artist hero and follow controls", async ({
@@ -119,97 +148,132 @@ test("renders the Stats signal page", async ({ openListenPage, page }) => {
     "30 days of signal",
   );
   await expect(
-    page.getByRole("group", { name: /of listening across 30 bars/ }),
+    page.getByRole("group", {
+      name: "Listening in the selected stretch",
+      exact: true,
+    }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("complementary", { name: "In this stretch", exact: true }),
+  ).toContainText("30 days");
+  const overflow = await page
+    .locator(".stats-explorer-axis")
+    .evaluate((axis) => {
+      const bounds = axis.getBoundingClientRect();
+      return Array.from(axis.children)
+        .map((label) => label.getBoundingClientRect())
+        .filter((rect) => rect.width > 0)
+        .map((rect) =>
+          Math.max(bounds.left - rect.left, rect.right - bounds.right),
+        );
+    });
+  expect(overflow.length).toBeGreaterThan(0);
+  for (const pixels of overflow) expect(pixels).toBeLessThanOrEqual(0.5);
   await expectStablePage(page, "stats-default-dark");
 });
 
-test("renders the appearance editor without native selects", async ({
+async function expectFixedCrateIdentity(page: Page) {
+  const root = page.locator("html");
+  await expect(root).toHaveAttribute("data-crate-identity", "v3");
+  await expect(root).toHaveCSS("color-scheme", "dark");
+  expect(await root.getAttribute("data-crate-mode")).toBeNull();
+  expect(await root.getAttribute("data-crate-skin")).toBeNull();
+  await expect
+    .poll(() =>
+      root.evaluate((element) =>
+        getComputedStyle(element).getPropertyValue("--accent-action").trim(),
+      ),
+    )
+    .toBe("#06b6d4");
+}
+
+test("renders independent interface preferences without visual theme controls or native selects", async ({
   openListenPage,
   page,
 }) => {
   await openListenPage("/settings");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-  await expect(page.getByText("Visual skin")).toBeVisible();
+  await expectFixedCrateIdentity(page);
+  const preferences = page.getByRole("region", {
+    name: "Interface",
+    exact: true,
+  });
+  await expect(preferences).toBeVisible();
+  await expect(preferences.getByRole("combobox")).toHaveCount(3);
+  for (const name of ["Motion", "Effects", "Content density"]) {
+    await expect(
+      preferences.getByRole("combobox", { name, exact: true }),
+    ).toBeVisible();
+  }
+  await expect(page.getByText("Visual skin", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Color mode", { exact: true })).toHaveCount(0);
   await expect(page.locator("select")).toHaveCount(0);
   await expectStablePage(page, "settings-default-dark");
 });
 
-test("renders the default skin in light mode", async ({
-  openListenPage,
-  page,
-}) => {
-  await openListenPage("/settings", { mode: "light" });
-  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-  await expect(page.locator("html")).toHaveAttribute(
-    "data-crate-mode",
-    "light",
-  );
-  await expectStablePage(page, "settings-default-light");
-});
-
-test("renders Crate Red as a complete skin", async ({
-  openListenPage,
-  page,
-}) => {
-  await openListenPage("/settings", { preset: "crateRed" });
-  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
-  await expect(page.locator("html")).toHaveAttribute(
-    "data-crate-skin",
-    "crateRed",
-  );
-  await expect
-    .poll(() =>
-      page.evaluate(() =>
-        getComputedStyle(document.documentElement)
-          .getPropertyValue("--font-brand")
-          .trim(),
-      ),
-    )
-    .toBe("system-ui, sans-serif");
-  await expectStablePage(page, "settings-crate-red-dark");
-});
-
-const richAppearanceVariants = [
-  {
-    label: "default light",
-    mode: "light",
-    preset: "default",
-    snapshot: "artist-default-light",
-  },
-  {
-    label: "Crate Red dark",
-    mode: "dark",
-    preset: "crateRed",
-    snapshot: "artist-crate-red-dark",
-  },
-  {
-    label: "Crate Red light",
-    mode: "light",
-    preset: "crateRed",
-    snapshot: "artist-crate-red-light",
-  },
-] as const;
-
-for (const variant of richAppearanceVariants) {
-  test(`renders the rich artist surface in ${variant.label}`, async ({
-    openListenPage,
-    page,
-  }) => {
-    await openListenPage("/artists/high-vis", {
-      mode: variant.mode,
-      preset: variant.preset,
+for (const mode of ["dark", "light", "system"] as const) {
+  for (const preset of ["default", "crateRed"] as const) {
+    test(`migrates legacy ${preset}/${mode} to the fixed identity and retains functional preferences`, async ({
+      openListenPage,
+      page,
+    }) => {
+      await openListenPage("/settings", {
+        mode,
+        preset,
+        preferences: { motion: "reduced", effects: "off", density: "compact" },
+      });
+      await expectFixedCrateIdentity(page);
+      const preferences = page.getByRole("region", {
+        name: "Interface",
+        exact: true,
+      });
+      await expect(
+        preferences.getByRole("combobox", { name: "Motion", exact: true }),
+      ).toHaveText("Reduce motion");
+      await expect(
+        preferences.getByRole("combobox", { name: "Effects", exact: true }),
+      ).toHaveText("Off");
+      await expect(
+        preferences.getByRole("combobox", {
+          name: "Content density",
+          exact: true,
+        }),
+      ).toHaveText("Compact");
+      const stored = await page.evaluate(() => ({
+        preferences: JSON.parse(
+          localStorage.getItem("crate.interface-preferences.v1")!,
+        ),
+        appearance: localStorage.getItem("crate.listen.appearance.v2"),
+        legacy: localStorage.getItem("crate.listen.theme-skin"),
+        locale: localStorage.getItem("crate-listen-locale"),
+      }));
+      expect(stored).toEqual({
+        preferences: {
+          version: 1,
+          motion: "reduced",
+          effects: "off",
+          density: "compact",
+        },
+        appearance: null,
+        legacy: null,
+        locale: "en",
+      });
+      await page.goto("/artists/high-vis");
+      await expect(
+        page.getByRole("heading", { name: "High Vis" }),
+      ).toBeVisible();
+      await expect(page.getByText("Top Tracks")).toBeVisible();
+      await expectFixedCrateIdentity(page);
+      expect(
+        await page.evaluate(() =>
+          JSON.parse(localStorage.getItem("crate.interface-preferences.v1")!),
+        ),
+      ).toEqual(stored.preferences);
+      expect(
+        await page.evaluate(() =>
+          localStorage.getItem("crate.listen.theme-skin"),
+        ),
+      ).toBeNull();
     });
-    await expect(page.getByRole("heading", { name: "High Vis" })).toBeVisible();
-    await expect(page.getByText("Top Tracks")).toBeVisible();
-    await expect(page.locator("html")).toHaveAttribute(
-      "data-crate-mode",
-      variant.mode,
-    );
-    await expect(page.locator("html")).toHaveAttribute(
-      "data-crate-skin",
-      variant.preset,
-    );
-    await expectStablePage(page, variant.snapshot);
-  });
+  }
 }

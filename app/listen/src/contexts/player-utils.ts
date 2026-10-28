@@ -177,7 +177,9 @@ export function saveQueue(
         wasPlaying: options.wasPlaying ?? false,
         shuffle: options.shuffle ?? false,
         unshuffledQueue: safeUnshuffled,
-        playSource: persistablePlaySource(options.playSource),
+        playSource: safeQueue.length
+          ? persistablePlaySource(options.playSource)
+          : null,
         savedAt: new Date().toISOString(),
       }),
     );

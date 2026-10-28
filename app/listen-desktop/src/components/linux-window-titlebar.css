@@ -1,0 +1,22 @@
+[data-slot="linux-window-titlebar"] {
+  --crate-window-control-minimize: #febc2e;
+  --crate-window-control-maximize: #28c840;
+  --crate-window-control-close: #ff5f57;
+  --crate-window-control-shadow: inset 0 0 0 1px rgb(0 0 0 / 20%);
+}
+
+.listen-desktop-window-control-dot {
+  box-shadow: var(--crate-window-control-shadow);
+}
+
+.listen-desktop-window-control-dot[data-window-control="minimize"] {
+  background: var(--crate-window-control-minimize);
+}
+
+.listen-desktop-window-control-dot[data-window-control="maximize"] {
+  background: var(--crate-window-control-maximize);
+}
+
+.listen-desktop-window-control-dot[data-window-control="close"] {
+  background: var(--crate-window-control-close);
+}

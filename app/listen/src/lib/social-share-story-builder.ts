@@ -38,18 +38,6 @@ import type {
 const STORY_ASSET_TIMEOUT_MS = 4500;
 const STORY_FONT_TIMEOUT_MS = 1500;
 const CRATE_LOGO_URL = "/icons/logo.svg";
-const POPPINS_600_URL = new URL(
-  "../../../shared/fonts/poppins/poppins-600.woff2",
-  import.meta.url,
-).href;
-const POPPINS_700_URL = new URL(
-  "../../../shared/fonts/poppins/poppins-700.woff2",
-  import.meta.url,
-).href;
-const POPPINS_800_URL = new URL(
-  "../../../shared/fonts/poppins/poppins-800.woff2",
-  import.meta.url,
-).href;
 
 export async function buildInstagramStoryCard(
   payload: SharePayload,
@@ -258,26 +246,18 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 let storyFontsPromise: Promise<void> | null = null;
 
 async function loadInstagramStoryFonts(): Promise<void> {
-  if (typeof FontFace === "undefined" || !document.fonts) return;
-  storyFontsPromise ??= Promise.all([
-    loadFontFace("Poppins", POPPINS_600_URL, "600"),
-    loadFontFace("Poppins", POPPINS_700_URL, "700"),
-    loadFontFace("Poppins", POPPINS_800_URL, "800"),
-  ]).then(() => undefined);
+  if (!document.fonts) return;
+  // CSS registers the self-hosted variable face in every runtime. Include Latin
+  // Extended when warming the canvas fonts, so accented artist names render too.
+  storyFontsPromise ??= Promise.all(
+    [600, 700, 800].map((weight) =>
+      document.fonts.load(
+        `${weight} 16px "Roboto"`,
+        "Crate · Música Björk L’été œ ẞ",
+      ),
+    ),
+  ).then(() => undefined);
   await storyFontsPromise;
-}
-
-async function loadFontFace(
-  family: string,
-  url: string,
-  weight: string,
-): Promise<void> {
-  const face = new FontFace(family, `url(${url})`, {
-    style: "normal",
-    weight,
-  });
-  const loaded = await face.load();
-  document.fonts.add(loaded);
 }
 
 interface CanvasArtwork {

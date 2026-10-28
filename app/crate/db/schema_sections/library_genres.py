@@ -1,5 +1,9 @@
 """Genre and taxonomy tables for the library schema bootstrap."""
 
+from crate.db.schema_sections.genre_facets_v136 import (
+    create_genre_taxonomy_facets_v136_schema,
+)
+
 
 def create_library_genres_schema(cur) -> None:
     cur.execute("""
@@ -139,6 +143,7 @@ def create_library_genres_schema(cur) -> None:
         WHERE musicbrainz_mbid IS NOT NULL
         """
     )
+    create_genre_taxonomy_facets_v136_schema(cur)
 
 
 __all__ = ["create_library_genres_schema"]

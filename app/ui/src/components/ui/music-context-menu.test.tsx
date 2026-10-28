@@ -44,3 +44,24 @@ describe("MusicContextMenu", () => {
     expect(content).not.toHaveClass("border-border");
   });
 });
+
+it.each([false, true])(
+  "exposes enrichment only with metadata write permission (%s)",
+  async (allowed) => {
+    renderWithAdminProviders(
+      <MusicContextMenu type="artist" artist="Converge" artistId={7}>
+        <button>Artist</button>
+      </MusicContextMenu>,
+      { auth: { hasCapability: () => allowed } },
+    );
+    fireEvent.contextMenu(screen.getByRole("button", { name: "Artist" }));
+    if (allowed)
+      expect(
+        await screen.findByRole("menuitem", { name: "Enrich Artist" }),
+      ).toBeVisible();
+    else
+      expect(
+        screen.queryByRole("menuitem", { name: "Enrich Artist" }),
+      ).not.toBeInTheDocument();
+  },
+);

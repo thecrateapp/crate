@@ -20,6 +20,7 @@ from crate.db.queries.user_stats_periods import (
     StatsPeriod,
     period_day_filter,
     period_params,
+    previous_window,
 )
 
 METRICS_VERSION = "listening-v1"
@@ -641,10 +642,27 @@ def _heatmap(session, user_id: int | None, period: StatsPeriod) -> dict:
             key=lambda cell: cells[cell[0]][cell[1]],
         )
         peak = {"weekday": weekday, "hour": hour}
+    listener_count = None
+    if user_id is None:
+        listener_count = int(
+            session.execute(
+                text(
+                    f"""
+                    SELECT COUNT(DISTINCT user_id)
+                    FROM user_hourly_listening
+                    WHERE {period_day_filter(period)}
+                    """
+                ),
+                period_params(period),
+            ).scalar_one()
+            or 0
+        )
     return {
         "cells": cells,
         "peak": peak,
         "night_share": round(night / total, 4) if total else 0,
+        "night_hours": list(_NIGHT_HOURS),
+        "listener_count": listener_count,
     }
 
 
@@ -700,6 +718,38 @@ def _music_age(session, user_id: int | None, period: StatsPeriod) -> dict | None
         .mappings()
         .first()
     )
+    newest = (
+        session.execute(
+            text(
+                f"""
+                SELECT alb.name AS album, alb.artist, alb.id AS album_id,
+                       alb.slug AS album_slug,
+                       CAST(SUBSTRING(alb.year FROM '^[0-9]{{4}}') AS integer) AS year
+                FROM user_track_daily td
+                JOIN library_tracks lt ON lt.id = td.track_id
+                JOIN library_albums alb ON alb.id = lt.album_id
+                WHERE (CAST(:user_id AS integer) IS NULL OR td.user_id = :user_id) AND {period_day_filter(period, "td.day")}
+                  AND alb.year ~ '^[0-9]{{4}}'
+                GROUP BY alb.id
+                ORDER BY year DESC, SUM(td.minutes_listened) DESC, alb.name
+                LIMIT 1
+                """
+            ),
+            {"user_id": user_id, **period_params(period)},
+        )
+        .mappings()
+        .first()
+    )
+    last_day = (
+        min(period.end - timedelta(days=1), period.today)
+        if period.end
+        else period.today
+    )
+    share_this_year = round(
+        sum(float(row.minutes or 0) for row in rows if row.year == last_day.year)
+        / total,
+        4,
+    )
     top_albums = {
         int(row["decade"]): {key: row[key] for key in row.keys() if key != "decade"}
         for row in session.execute(
@@ -737,11 +787,13 @@ def _music_age(session, user_id: int | None, period: StatsPeriod) -> dict | None
             for decade, minutes in sorted(decades.items())
         ],
         "oldest_album": dict(oldest) if oldest else None,
+        "newest_album": dict(newest) if newest else None,
+        "share_this_year": share_this_year,
     }
 
 
 def _genre_shares(
-    session, user_id: int | None, filter_sql: str, params: dict
+    session, user_id: int | None, filter_sql: str, params: dict, limit: int = 12
 ) -> list[dict]:
     rows = session.execute(
         text(
@@ -760,38 +812,72 @@ def _genre_shares(
                 """
             )
         ),
-        {"user_id": user_id, "lim": 12, **params},
+        {"user_id": user_id, "lim": limit, **params},
     ).mappings()
     return format_weighted_genre_rows(list(rows))
 
 
+_FULL_GENRE_READ = 500
+_FALLER_MIN_DELTA = -0.005
+
+
 def _genre_trend(session, user_id: int | None, period: StatsPeriod) -> list[dict]:
     params = period_params(period)
-    current = _genre_shares(session, user_id, period_day_filter(period), params)
-    previous: dict[str, float] = {}
+    # Shares are relative to the whole window, so a wide read keeps the top six
+    # intact and lets a genre that fell below rank 12 keep its real current share.
+    # The previous window reads just as wide: a current top-six genre that ranked
+    # below 12 before must be compared with its real share, not with 0.
+    current = _genre_shares(
+        session, user_id, period_day_filter(period), params, limit=_FULL_GENRE_READ
+    )
+    previous_rows: list[dict] = []
     if period.previous_start is not None and period.start is not None:
-        previous = {
-            item["genre_name"].lower(): item["share"]
-            for item in _genre_shares(
-                session,
-                user_id,
-                "day >= :previous_start AND day < :period_start",
-                params,
-            )
-        }
-    return [
-        {
+        previous_rows = _genre_shares(
+            session,
+            user_id,
+            "day >= :previous_start AND day < :period_start",
+            params,
+            limit=_FULL_GENRE_READ,
+        )
+    previous = {item["genre_name"].lower(): item["share"] for item in previous_rows}
+
+    def entry(item: dict, share: float) -> dict:
+        return {
             "genre_name": item["genre_name"],
             "slug": item["slug"],
-            "share": round(item["share"], 4),
+            "share": round(share, 4),
             "delta_vs_previous": None
             if not previous
-            else round(
-                item["share"] - previous.get(item["genre_name"].lower(), 0.0), 4
-            ),
+            else round(share - previous.get(item["genre_name"].lower(), 0.0), 4),
         }
-        for item in current[:6]
+
+    trend = [entry(item, item["share"]) for item in current[:6]]
+    if not previous:
+        return trend
+    # The top six rarely hold the biggest faller: consider the remaining
+    # current genres and those that only appeared in the previous window.
+    shown = {item["genre_name"].lower() for item in trend}
+    candidates = [entry(item, item["share"]) for item in current[6:]]
+    present = {item["genre_name"].lower() for item in current}
+    candidates += [
+        entry(item, 0.0)
+        for item in previous_rows
+        if item["genre_name"].lower() not in present
     ]
+    candidates = [
+        item
+        for item in candidates
+        if item["genre_name"].lower() not in shown
+        and (item["delta_vs_previous"] or 0) <= _FALLER_MIN_DELTA
+    ]
+    if candidates:
+        trend.append(
+            {
+                **min(candidates, key=lambda item: item["delta_vs_previous"]),
+                "faller": True,
+            }
+        )
+    return trend
 
 
 def _computed_until(session, user_id: int | None) -> str | None:
@@ -805,6 +891,46 @@ def _computed_until(session, user_id: int | None) -> str | None:
     return _iso(value)
 
 
+def _overview_previous(
+    session, user_id: int | None, period: StatsPeriod
+) -> dict | None:
+    window = previous_window(period)
+    if window is None:
+        return None
+    start, end = window
+    row = session.execute(
+        text(
+            """
+            WITH daily AS (
+                SELECT COALESCE(SUM(minutes_listened), 0) AS minutes,
+                       COALESCE(SUM(play_count), 0) AS plays,
+                       COUNT(DISTINCT day) AS active_days
+                FROM user_daily_listening
+                WHERE (CAST(:user_id AS integer) IS NULL OR user_id = :user_id)
+                  AND day >= :start AND day <= :last
+            ),
+            artists AS (
+                SELECT COUNT(DISTINCT artist) AS artist_count
+                FROM user_track_daily
+                WHERE (CAST(:user_id AS integer) IS NULL OR user_id = :user_id)
+                  AND artist != '' AND day >= :start AND day <= :last
+            )
+            SELECT d.minutes, d.plays, d.active_days, a.artist_count
+            FROM daily d CROSS JOIN artists a
+            """
+        ),
+        {"user_id": user_id, "start": start, "last": end},
+    ).one()
+    return {
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "minutes_listened": float(row.minutes or 0),
+        "play_count": int(row.plays or 0),
+        "active_days": int(row.active_days or 0),
+        "artist_count": int(row.artist_count or 0),
+    }
+
+
 def get_stats_signal(session, user_id: int | None, period: StatsPeriod) -> dict:
     """Signal sections for one user, or for the whole instance when ``user_id`` is None."""
     return {
@@ -812,6 +938,7 @@ def get_stats_signal(session, user_id: int | None, period: StatsPeriod) -> dict:
         "provisional": period.provisional,
         "computed_until": _computed_until(session, user_id),
         "metrics_version": METRICS_VERSION,
+        "overview_previous": _overview_previous(session, user_id, period),
         "tape": _tape(session, user_id, period),
         "highlights": None
         if user_id is None

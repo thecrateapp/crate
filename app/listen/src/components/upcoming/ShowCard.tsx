@@ -1,27 +1,23 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { Calendar } from "@crate/ui/icons";
 
 import type { ContextMenuHeader } from "@crate/ui/domain/actions";
 import { useEntityMenu } from "@crate/ui/domain/entity/useEntityMenu";
-import { ItemActionMenuButton } from "@/components/actions/ItemActionMenu";
+import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
+import { UpcomingEventArtwork } from "./UpcomingEventRowView";
+import { UpcomingShowCardView } from "./UpcomingShowCardView";
 import { useListenEntityMenu } from "@/components/actions/entity-menu";
 import {
   buildShowActions,
   type ShowActionInput,
 } from "@/components/actions/show-actions";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
-import { cn } from "@/lib/utils";
-
-import {
-  UpcomingShowCollapsedView,
-  UpcomingShowExpandedView,
-} from "./UpcomingShowCardViews";
+import { artistPagePath, artistPhotoApiUrl } from "@/lib/library-routes";
 import type { UpcomingItem } from "./upcoming-model";
+import { useUpcomingGenreProfile } from "./use-upcoming-genre-profile";
 import { useUpcomingShowActions } from "./use-upcoming-show-actions";
-
-const COLLAPSED_HEIGHT = 88;
 
 export type ShowCardVariant = "row" | "preview" | "feature";
 
@@ -46,6 +42,7 @@ export const ShowCard = memo(function ShowCard({
   const navigate = useNavigate();
   const collapsible = variant === "row";
   const expanded = collapsible ? expandedProp : true;
+  const displayItem = useUpcomingGenreProfile(item, expanded);
   const {
     attending,
     savingAttendance,
@@ -105,83 +102,49 @@ export const ShowCard = memo(function ShowCard({
     ],
   );
 
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [measuredHeight, setMeasuredHeight] = useState<number>(0);
-
-  useEffect(() => {
-    if (expanded && contentRef.current) {
-      setMeasuredHeight(contentRef.current.scrollHeight);
-    }
-  }, [expanded]);
-
-  const cardHeight = !collapsible
-    ? undefined
-    : expanded
-      ? measuredHeight > 0
-        ? measuredHeight
-        : "auto"
-      : COLLAPSED_HEIGHT;
-  const showClose = collapsible;
-
+  const artistImageUrl =
+    artistPhotoApiUrl(
+      {
+        artistId: item.artist_id,
+        artistSlug: item.artist_slug,
+        artistName: item.artist,
+      },
+      { size: 320 },
+    ) || resolveMaybeApiAssetUrl(item.cover_url);
   return (
-    <article
-      className={cn(
-        "item-action-target relative overflow-hidden rounded-xl border",
-        expanded
-          ? cn(
-              variant === "feature"
-                ? "border-accent-action/25 shadow-accent-action-card-featured"
-                : "border-accent-action/20 shadow-accent-action-card",
-              collapsible &&
-                "transition-[height,border-color,box-shadow] duration-400 ease-out",
-            )
-          : "border-text-primary/[0.06] bg-text-primary/[0.02] transition-[height,border-color] duration-300 ease-out hover:border-accent-action/15 hover:bg-text-primary/[0.03]",
-      )}
-      data-variant={variant}
-      data-expanded={expanded || undefined}
-      style={cardHeight == null ? undefined : { height: cardHeight }}
-      {...targetProps}
-    >
-      <div ref={contentRef}>
-        {!expanded ? (
-          <>
-            <div className="absolute inset-0 bg-raised-surface" />
-            <UpcomingShowCollapsedView
-              item={item}
-              attending={attending}
-              savingAttendance={savingAttendance}
-              actionMenu={actionMenuSlot}
-              onToggleAttendance={toggleAttendance}
-              onToggle={onToggle}
+    <UpcomingShowCardView
+      item={displayItem}
+      variant={variant}
+      expanded={expanded}
+      artistHref={artistPagePath({
+        artistId: item.artist_id,
+        artistSlug: item.artist_slug,
+      })}
+      attending={attending}
+      savingAttendance={savingAttendance}
+      playingSetlist={playingSetlist}
+      onToggleAttendance={toggleAttendance}
+      onPlaySetlist={playProbableSetlist}
+      onClose={onToggle}
+      actionMenu={actionMenuSlot}
+      articleProps={targetProps}
+      menu={menu}
+      artwork={
+        <UpcomingEventArtwork
+          kind="show"
+          src={artistImageUrl}
+          renderImage={({ src, alt, fallback }) => (
+            <ArtworkSurface
+              source={src}
+              alt={alt}
+              fallback={fallback}
+              imageClassName="object-cover"
+              imageProps={{ loading: "lazy" }}
+              className="size-full"
             />
-          </>
-        ) : (
-          <>
-            <UpcomingShowExpandedView
-              item={item}
-              attending={attending}
-              savingAttendance={savingAttendance}
-              playingSetlist={playingSetlist}
-              onToggleAttendance={toggleAttendance}
-              onPlaySetlist={playProbableSetlist}
-              onClose={onToggle}
-              showClose={showClose}
-            />
-            <ItemActionMenuButton
-              buttonRef={controller.triggerRef}
-              hasActions={controller.hasActions}
-              onClick={controller.openFromTrigger}
-              expanded={controller.open}
-              title={t("actions.menu.more")}
-              className={cn(
-                "absolute top-2.5 z-20 size-7 rounded-lg bg-surface-canvas/40 text-text-primary/60 backdrop-blur-sm hover:text-text-primary",
-                showClose ? "left-11" : "left-2.5",
-              )}
-            />
-          </>
-        )}
-      </div>
-      {menu}
-    </article>
+          )}
+        />
+      }
+    />
   );
 });

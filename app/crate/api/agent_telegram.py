@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import Any, cast
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import TypeAdapter, ValidationError
 from starlette.concurrency import run_in_threadpool
 
@@ -13,15 +13,53 @@ from crate.agent_telegram import CALLBACK_PATH, verify_transport
 from crate.api.agent_guards import require_agent_admin_session
 from crate.api.agent_integrations import invoke, private_response
 from crate.api.openapi_responses import AUTH_ERROR_RESPONSES
-from crate.api.schemas.agent_telegram import NativeEvent, TelegramBindingInput
-from crate.db.repositories.agent_telegram import bind_human, native_event
+from crate.api.schemas.agent_telegram import (
+    NativeEvent,
+    TelegramApproverBindings,
+    TelegramBindingInput,
+    TelegramBindingResult,
+    TelegramBindingRevoked,
+)
+from crate.db.repositories.agent_telegram import (
+    bind_human,
+    list_bindings,
+    native_event,
+    revoke_binding,
+)
 
 router = APIRouter(tags=["agents"], dependencies=[Depends(private_response)])
 
 
+@router.get(
+    "/api/admin/agent-telegram/bindings",
+    response_model=TelegramApproverBindings,
+    responses=AUTH_ERROR_RESPONSES,
+    openapi_extra={"security": [{"cookieAuth": []}]},
+    summary="List the humans bound to approve plans from Telegram on this instance",
+)
+def bindings(
+    request: Request,
+    principal_id: str | None = Query(None, max_length=64),
+):
+    require_agent_admin_session(request, "agents.integrations.manage")
+    return invoke(list_bindings, principal_id=principal_id)
+
+
+@router.delete(
+    "/api/admin/agent-telegram/bindings/{binding_id}",
+    response_model=TelegramBindingRevoked,
+    responses=AUTH_ERROR_RESPONSES,
+    openapi_extra={"security": [{"cookieAuth": []}]},
+    summary="Remove a Telegram approver binding; its pending approvals stop counting",
+)
+def unbind(request: Request, binding_id: str):
+    actor = require_agent_admin_session(request, "agents.integrations.manage")
+    return invoke(revoke_binding, actor, binding_id)
+
+
 @router.post(
     "/api/admin/agent-telegram/bind",
-    response_model=dict,
+    response_model=TelegramBindingResult,
     responses=AUTH_ERROR_RESPONSES,
     openapi_extra={"security": [{"cookieAuth": []}]},
     summary="Bind this independent human to a fixed private Telegram account",

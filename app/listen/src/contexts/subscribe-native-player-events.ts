@@ -7,6 +7,7 @@ export const NATIVE_PLAYER_EVENT_NAMES = [
   "positionChanged",
   "playEventCheckpoint",
   "stateChanged",
+  "mixStateChanged",
   "trackChanged",
   "transitionStarted",
   "transitionProgress",
@@ -47,6 +48,9 @@ export function subscribeNativePlayerEvents(
       register("positionChanged", handlers.positionChanged),
       register("playEventCheckpoint", handlers.playEventCheckpoint),
       register("stateChanged", handlers.stateChanged),
+      register("mixStateChanged", handlers.mixStateChanged).catch(
+        () => () => {},
+      ),
       register("trackChanged", handlers.trackChanged),
       register("transitionStarted", handlers.transitionStarted),
       register("transitionProgress", handlers.transitionProgress),

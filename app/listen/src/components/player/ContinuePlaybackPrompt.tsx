@@ -1,8 +1,6 @@
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { CRATE_ICON_SIZE, MonitorSpeaker, X } from "@crate/ui/icons";
 import { notify } from "@crate/ui/lib/notify";
-import { IconButton } from "@crate/ui/primitives/IconButton";
-import { Button } from "@crate/ui/shadcn/button";
+import { PlayerResumeNotice } from "./PlayerResumeNotice";
 import { useTranslation } from "react-i18next";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -204,53 +202,27 @@ function ContinuePlaybackBanner({
   const { activeRemote, label, promptState } = model;
 
   return (
-    <div className="listen-glass-panel fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+7.25rem)] z-app-modal mx-auto max-w-xl rounded-xl p-3 sm:bottom-24">
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 rounded-lg border border-accent-action/25 bg-accent-action/10 p-2 text-text-accent">
-          <MonitorSpeaker size={CRATE_ICON_SIZE.md} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-text-primary">
-            {activeRemote
-              ? t("player.continue.playingOn", { device: label })
-              : t("player.continue.fromDevice", { device: label })}
-          </div>
-          <div className="mt-1 truncate text-xs text-text-muted">
-            {promptState.artist ? `${promptState.artist} - ` : ""}
-            {promptState.title || t("player.continue.unknownTrack")} -{" "}
-            {formatPosition(promptState.position_ms)}
-          </div>
-          <div className="mt-3 flex items-center gap-2">
-            <Button
-              size="xs"
-              onClick={onContinue}
-              disabled={transferring}
-              className="h-auto rounded-lg px-3 py-1.5 font-semibold shadow-none has-[>svg]:px-3"
-            >
-              {transferring
-                ? t("player.continue.transferring")
-                : activeRemote
-                  ? t("player.continue.playHere")
-                  : t("player.continue.continue")}
-            </Button>
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={onDismiss}
-              className="h-auto rounded-lg border border-border-quiet px-3 py-1.5 text-text-muted hover:bg-text-primary/10 hover:text-text-primary has-[>svg]:px-3"
-            >
-              {t("player.continue.notNow")}
-            </Button>
-          </div>
-        </div>
-        <IconButton
-          label={t("player.continue.dismiss")}
-          onClick={onDismiss}
-          className="size-9 text-text-muted hover:translate-y-0 hover:text-text-primary hover:drop-shadow-none"
-        >
-          <X size={CRATE_ICON_SIZE.lg} className="size-5" />
-        </IconButton>
-      </div>
+    <div className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+7.25rem)] z-app-modal mx-auto max-w-xl sm:bottom-24">
+      <PlayerResumeNotice
+        secondaryLabel={t("player.continue.notNow")}
+        message={
+          activeRemote
+            ? t("player.continue.playingOn", { device: label })
+            : t("player.continue.fromDevice", { device: label })
+        }
+        detail={`${promptState.artist ? `${promptState.artist} - ` : ""}${promptState.title || t("player.continue.unknownTrack")} - ${formatPosition(promptState.position_ms)}`}
+        actionLabel={
+          transferring
+            ? t("player.continue.transferring")
+            : activeRemote
+              ? t("player.continue.playHere")
+              : t("player.continue.continue")
+        }
+        dismissLabel={t("player.continue.dismiss")}
+        busy={transferring}
+        onContinue={onContinue}
+        onDismiss={onDismiss}
+      />
     </div>
   );
 }

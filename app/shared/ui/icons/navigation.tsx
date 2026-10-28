@@ -1,25 +1,23 @@
-import {
-  AlignLeft as SolarAlignLeft,
-  ArrowDown as SolarArrowDown,
-  ArrowLeft as SolarArrowLeft,
-  ArrowRight as SolarArrowRight,
-  ArrowUp as SolarArrowUp,
-  Compass as SolarCompass,
-  Export as SolarExport,
-  Global as SolarGlobal,
-  HamburgerMenu as SolarHamburgerMenu,
-  Home as SolarHome,
-  Link as SolarLink,
-  Magnifer as SolarMagnifer,
-  MapPoint as SolarMapPoint,
-  Maximize as SolarMaximize,
-  RoundAltArrowDown as SolarRoundAltArrowDown,
-  RoundAltArrowLeft as SolarRoundAltArrowLeft,
-  RoundAltArrowRight as SolarRoundAltArrowRight,
-  RoundAltArrowUp as SolarRoundAltArrowUp,
-  Route as SolarRoute,
-  StreetsNavigation as SolarStreetsNavigation,
-} from "@solar-icons/react-perf/Outline";
+import { AlignLeftIcon as SolarAlignLeft } from "@solar-icons/react/outline/align-left";
+import { ArrowDownIcon as SolarArrowDown } from "@solar-icons/react/outline/arrow-down";
+import { ArrowLeftIcon as SolarArrowLeft } from "@solar-icons/react/outline/arrow-left";
+import { ArrowRightIcon as SolarArrowRight } from "@solar-icons/react/outline/arrow-right";
+import { ArrowUpIcon as SolarArrowUp } from "@solar-icons/react/outline/arrow-up";
+import { CompassIcon as SolarCompass } from "@solar-icons/react/outline/compass";
+import { ExportIcon as SolarExport } from "@solar-icons/react/outline/export";
+import { GlobalIcon as SolarGlobal } from "@solar-icons/react/outline/global";
+import { HamburgerMenuIcon as SolarHamburgerMenu } from "@solar-icons/react/outline/hamburger-menu";
+import { HomeIcon as SolarHome } from "@solar-icons/react/outline/home";
+import { LinkIcon as SolarLink } from "@solar-icons/react/outline/link";
+import { MagnifierIcon as SolarMagnifer } from "@solar-icons/react/outline/magnifier";
+import { MapPointIcon as SolarMapPoint } from "@solar-icons/react/outline/map-point";
+import { MaximizeIcon as SolarMaximize } from "@solar-icons/react/outline/maximize";
+import { RoundAltArrowDownIcon as SolarRoundAltArrowDown } from "@solar-icons/react/outline/round-alt-arrow-down";
+import { RoundAltArrowLeftIcon as SolarRoundAltArrowLeft } from "@solar-icons/react/outline/round-alt-arrow-left";
+import { RoundAltArrowRightIcon as SolarRoundAltArrowRight } from "@solar-icons/react/outline/round-alt-arrow-right";
+import { RoundAltArrowUpIcon as SolarRoundAltArrowUp } from "@solar-icons/react/outline/round-alt-arrow-up";
+import { RouteIcon as SolarRoute } from "@solar-icons/react/outline/route";
+import { StreetsNavigationIcon as SolarStreetsNavigation } from "@solar-icons/react/outline/streets-navigation";
 
 import { createIcon } from "./base";
 

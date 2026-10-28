@@ -1,10 +1,12 @@
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { CRATE_ICON_SIZE, Loader2, Plus } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Plus } from "@crate/ui/icons";
 import { Button } from "@crate/ui/shadcn/button";
-import { EmptyState } from "@crate/ui/domain/states";
+import { EmptyState, ErrorState, LoadingState } from "@crate/ui/domain/states";
 import { notify } from "@crate/ui/lib/notify";
 
+import { LibrarySection } from "@/components/library/LibrarySection";
+import { CrateIndexGrid } from "@/components/crates/CrateIndexGrid";
 import { CrateCard } from "@/components/CrateCard";
 import { CrateCreateModal } from "@/components/CrateCreateModal";
 import { CrateEditor } from "@/components/CrateEditor";
@@ -33,17 +35,9 @@ function CrateGridSection({
   children: ReactNode;
 }) {
   return (
-    <section aria-labelledby={titleId} className="mt-10 space-y-4">
-      <h2 id={titleId} className="text-lg font-semibold text-text-primary">
-        {title}
-      </h2>
-      <div
-        data-testid={testId}
-        className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6"
-      >
-        {children}
-      </div>
-    </section>
+    <LibrarySection titleId={titleId} title={title} className="mt-10">
+      <CrateIndexGrid testId={testId}>{children}</CrateIndexGrid>
+    </LibrarySection>
   );
 }
 
@@ -65,9 +59,12 @@ export function Crates({ onCrateChange }: CratesProps) {
     error,
     refetch,
   } = useApi<CrateSummary[]>("/api/me/crates");
-  const { data: followedCrates, loading: followedLoading } = useApi<
-    CrateSummary[]
-  >("/api/me/crates/followed");
+  const {
+    data: followedCrates,
+    loading: followedLoading,
+    error: followedError,
+    refetch: refetchFollowed,
+  } = useApi<CrateSummary[]>("/api/me/crates/followed");
   const ownedCrates = crates?.filter(
     (crate) => crate.access !== "collaborator",
   );
@@ -85,6 +82,7 @@ export function Crates({ onCrateChange }: CratesProps) {
     return playback.map((track) =>
       toPlayableTrack(
         {
+          ...track,
           id: track.local_track_id ?? track.global_track_uid,
           globalTrackUid: track.global_track_uid,
           globalAlbumUid: track.global_album_uid,
@@ -187,43 +185,31 @@ export function Crates({ onCrateChange }: CratesProps) {
 
   return (
     <>
-      <section className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="hidden text-lg font-semibold text-text-primary md:block">
+      <LibrarySection
+        title={
+          <span className="sr-only md:not-sr-only">
             {t("library.crates.title")}
-          </h2>
-          <Button
-            type="button"
-            size="lg"
-            onClick={() => setCreating(true)}
-            className="shrink-0"
-          >
+          </span>
+        }
+        actions={
+          <Button type="button" size="lg" onClick={() => setCreating(true)}>
             <Plus size={CRATE_ICON_SIZE.md} />
             {t("library.crates.new")}
           </Button>
-        </div>
-
+        }
+      >
         {loading && !crates ? (
-          <div className="flex justify-center py-12">
-            <Loader2
-              size={CRATE_ICON_SIZE.xl}
-              className="animate-spin text-accent-action"
-            />
-          </div>
-        ) : error ? (
-          <p
-            role="alert"
-            className="py-10 text-center text-sm text-state-danger"
-          >
-            {t("library.crates.loadFailed")}
-          </p>
+          <LoadingState label={t("common.loadingShort")} />
+        ) : error && !crates ? (
+          <ErrorState
+            message={t("library.crates.loadFailed")}
+            retryLabel={t("common.retry")}
+            onRetry={refetch}
+          />
         ) : ownedCrates?.length ? (
-          <div
-            data-testid="crate-grid"
-            className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6"
-          >
+          <CrateIndexGrid testId="crate-grid">
             {ownedCrates.map((crate) => renderCrateCard(crate, true))}
-          </div>
+          </CrateIndexGrid>
         ) : (
           <EmptyState
             variant="dashed"
@@ -231,7 +217,7 @@ export function Crates({ onCrateChange }: CratesProps) {
             description={t("library.crates.emptyDescription")}
           />
         )}
-      </section>
+      </LibrarySection>
       {sharedCrates?.length ? (
         <CrateGridSection
           titleId="shared-crates-title"
@@ -241,37 +227,30 @@ export function Crates({ onCrateChange }: CratesProps) {
           {sharedCrates.map((crate) => renderCrateCard(crate, true))}
         </CrateGridSection>
       ) : null}
-      <section
-        aria-labelledby="followed-crates-title"
-        className="mt-10 space-y-4"
+      <LibrarySection
+        titleId="followed-crates-title"
+        title={t("library.crates.followedTitle")}
+        className="mt-10"
       >
-        <h2
-          id="followed-crates-title"
-          className="text-lg font-semibold text-text-primary"
-        >
-          {t("library.crates.followedTitle")}
-        </h2>
         {followedLoading && !followedCrates ? (
-          <div className="flex justify-center py-8">
-            <Loader2
-              size={CRATE_ICON_SIZE.lg}
-              className="animate-spin text-accent-action"
-            />
-          </div>
+          <LoadingState label={t("common.loadingShort")} />
+        ) : followedError && !followedCrates ? (
+          <ErrorState
+            message={t("library.crates.loadFailed")}
+            retryLabel={t("common.retry")}
+            onRetry={refetchFollowed}
+          />
         ) : followedCrates?.length ? (
-          <div
-            data-testid="followed-crate-grid"
-            className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6"
-          >
+          <CrateIndexGrid testId="followed-crate-grid">
             {followedCrates.map((crate) => renderCrateCard(crate, false))}
-          </div>
+          </CrateIndexGrid>
         ) : (
           <EmptyState
             variant="dashed"
             message={t("library.crates.followedEmpty")}
           />
         )}
-      </section>
+      </LibrarySection>
       <CrateCreateModal
         key={creating ? "open" : "closed"}
         open={creating}

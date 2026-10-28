@@ -46,6 +46,48 @@ describe("DirectoriesPanel", () => {
     vi.mocked(api).mockResolvedValue({});
   });
 
+  it("uses shared section captions and visible field labels", () => {
+    renderWithAdminProviders(<DirectoriesPanel canManage />);
+    expect(
+      screen.getByRole("heading", { name: "Signed directories" }),
+    ).toHaveClass("crate-mono-label");
+    for (const name of [
+      "Directory URL",
+      "Trusted key ID",
+      "Trusted Ed25519 public key",
+    ]) {
+      expect(
+        screen.getByRole("textbox", { name }).closest("[data-slot=form-field]"),
+      ).not.toBeNull();
+    }
+  });
+
+  it("announces its shared loading and error states", () => {
+    vi.mocked(useApi).mockReturnValue({
+      data: null,
+      loading: true,
+      error: null,
+      refetch,
+    });
+    const { rerender } = renderWithAdminProviders(
+      <DirectoriesPanel canManage />,
+    );
+    expect(
+      screen.getByRole("status", { name: "Loading directories" }),
+    ).toBeInTheDocument();
+
+    vi.mocked(useApi).mockReturnValue({
+      data: null,
+      loading: false,
+      error: "offline",
+      refetch,
+    });
+    rerender(<DirectoriesPanel canManage />);
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Could not load directories.",
+    );
+  });
+
   it("shows signature freshness and pairs through the normal flow", async () => {
     renderWithAdminProviders(<DirectoriesPanel canManage />);
 

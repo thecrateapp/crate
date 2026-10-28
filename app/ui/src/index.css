@@ -1,28 +1,34 @@
-@import "../../shared/fonts/poppins.css";
+@import "../../shared/fonts/bricolage-grotesque.css";
+@import "../../shared/fonts/roboto.css";
+@import "../../shared/fonts/jetbrains-mono.css";
 @import "@crate/ui/tokens/index.css";
 @import "tailwindcss";
 @source "../../shared/ui";
+
+/* Keep Tailwind's explicit `font-sans` utility on the app's approved body face. */
+@theme inline {
+  --font-sans: var(--font-brand);
+}
 
 /* Surface colors as admin utilities (bg-card, bg-secondary, border-border...).
    @crate/ui/tokens/surfaces.css sets these variables per [data-surface] but
    does not register them with Tailwind, so without this block the classes
    generate no CSS. `reference` registers the names without emitting a :root
    declaration and without inlining: bg-card compiles to
-   var(--color-card, <glass value>), so it keeps following [data-surface].
+   var(--color-card, <solid value>), matching the fixed shared identity.
    Register only what app/ui/src uses; src/surface-tokens.test.ts enforces
    that. Listen does not register them, so these classes stay empty there. */
 @theme reference {
-  --color-card: var(--crate-token-surface-card-glass);
-  --color-secondary: var(--crate-token-surface-secondary-glass);
-  --color-muted: var(--crate-token-surface-muted-glass);
-  --color-accent: var(--crate-token-surface-accent-glass);
-  --color-border: var(--crate-token-surface-border-glass);
-  --color-input: var(--crate-token-surface-input-glass);
+  --color-card: var(--crate-token-surface-card-solid);
+  --color-secondary: var(--crate-token-surface-secondary-solid);
+  --color-muted: var(--crate-token-surface-muted-solid);
+  --color-accent: var(--crate-token-surface-accent-solid);
+  --color-border: var(--crate-token-surface-border-solid);
 }
 
 @custom-variant dark (&:is(.dark *));
 
-/* Admin: glass surface variant by default */
+/* Admin uses the fixed solid Crate identity. */
 html {
   background: var(--surface-app);
 }

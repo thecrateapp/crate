@@ -1,0 +1,65 @@
+{
+  "id": 68,
+  "artist_id": 23,
+  "artist_slug": "quicksand",
+  "slug": "quicksand-crystallize",
+  "artist": "Quicksand",
+  "name": "Crystallize",
+  "path": "Quicksand/Crystallize",
+  "track_count": 3,
+  "total_size_mb": 92,
+  "total_length_sec": 678,
+  "has_cover": true,
+  "cover_file": "cover.jpg",
+  "year": "2026",
+  "album_tags": {
+    "album": "Crystallize",
+    "artist": "Quicksand",
+    "genre": "Post-Hardcore",
+    "date": "2026"
+  },
+  "tracks": [
+    {
+      "id": 680,
+      "filename": "01 Crystallize.flac",
+      "format": "flac",
+      "size_mb": 30,
+      "bitrate": 1056,
+      "length_sec": 216,
+      "tags": {
+        "title": "Crystallize",
+        "tracknumber": "1",
+        "artist": "Quicksand",
+        "album": "Crystallize"
+      }
+    },
+    {
+      "id": 681,
+      "filename": "02 Interiors.flac",
+      "format": "flac",
+      "size_mb": 31,
+      "bitrate": 1056,
+      "length_sec": 226,
+      "tags": {
+        "title": "Interiors",
+        "tracknumber": "2",
+        "artist": "Quicksand",
+        "album": "Crystallize"
+      }
+    },
+    {
+      "id": 682,
+      "filename": "03 Signal.flac",
+      "format": "flac",
+      "size_mb": 32,
+      "bitrate": 1056,
+      "length_sec": 236,
+      "tags": {
+        "title": "Signal",
+        "tracknumber": "3",
+        "artist": "Quicksand",
+        "album": "Crystallize"
+      }
+    }
+  ]
+}

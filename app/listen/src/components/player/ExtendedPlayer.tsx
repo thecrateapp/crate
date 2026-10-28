@@ -9,16 +9,16 @@ import { useMusicVisualizer } from "@/components/player/visualizer/useMusicVisua
 import { useVisualizerConfig } from "@/components/player/visualizer/useVisualizerConfig";
 import { measureVisualizerCanvasRect } from "@/components/player/visualizer/canvas-layout";
 import type { MusicVisualizer } from "@/components/player/visualizer/MusicVisualizer";
-import { usePlayer, usePlayerActions } from "@/contexts/PlayerContext";
+import { usePlayerState, usePlayerActions } from "@/contexts/PlayerContext";
+import { usePlayerClock } from "@/contexts/PlayerClock";
 import { getTrackCacheKey } from "@/contexts/player-utils";
 import {
   useCrossfadeAwareProgress,
   useCrossfadeProgress,
 } from "@/hooks/use-crossfade-progress";
-import { useEqualizerEnabled } from "@/hooks/use-equalizer-enabled";
+import { canUseWebAudioEffects } from "@/lib/mobile-audio-mode";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
-import { useEscapeKey } from "@crate/ui/lib/use-escape-key";
 import {
   ExtendedPlayerView,
   type ExtendedPlayerTabId,
@@ -34,17 +34,22 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const {
-    currentTrack,
-    currentTime,
-    duration,
     isPlaying,
     isBuffering,
     volume,
     analyserVersion,
     crossfadeTransition,
-  } = usePlayer();
-  const { pause, resume, playSource, queue, seek, jamQueueLocked } =
-    usePlayerActions();
+  } = usePlayerState();
+  const { currentTime, duration } = usePlayerClock().current;
+  const {
+    currentTrack,
+    pause,
+    resume,
+    playSource,
+    queue,
+    seek,
+    jamQueueLocked,
+  } = usePlayerActions();
   function toggleDiscPlay() {
     if (jamQueueLocked) return;
     if (isPlaying) pause();
@@ -59,7 +64,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
   const [tab, setTab] = useState<ExtendedPlayerTabId>("queue");
   const [showVizSettings, setShowVizSettings] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
-  const equalizerEnabled = useEqualizerEnabled();
+  const equalizerAvailable = canUseWebAudioEffects;
   const { resolvedArtist, artistAvatarUrl, markArtistPhotoFailed } =
     useResolvedPlayerArtist(currentTrack, queue);
   const sourceLabel = getPlaySourceLabel(playSource);
@@ -141,7 +146,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
   useDismissibleLayer({
     active:
       (isVisualizerMode && showVizSettings) ||
-      (equalizerEnabled && showEqualizer),
+      (equalizerAvailable && showEqualizer),
     refs: [
       vizSettingsRef,
       vizSettingsButtonRef,
@@ -171,8 +176,6 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
     },
     [onClose, showEqualizer, showVizSettings],
   );
-
-  useEscapeKey(open, handleEscape);
 
   if (!isDesktop || !currentTrack) return null;
 
@@ -216,14 +219,14 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
         isBuffering,
         isPlaying,
         jamQueueLocked,
-        showEqualizer: equalizerEnabled && showEqualizer,
+        showEqualizer: equalizerAvailable && showEqualizer,
         showVizSettings: isVisualizerMode && showVizSettings,
         tab,
         volume,
         canvasRect,
         vizCfg,
         visualizerAllowed,
-        equalizerEnabled,
+        equalizerAvailable,
       }}
       refs={{
         canvasRef,
@@ -235,6 +238,7 @@ export function ExtendedPlayer({ open, onClose }: ExtendedPlayerProps) {
         vizSettingsButtonRef,
       }}
       actions={{
+        onEscape: handleEscape,
         closeWithFeedback,
         goToArtist,
         onSurfaceModeChange: (mode) => {

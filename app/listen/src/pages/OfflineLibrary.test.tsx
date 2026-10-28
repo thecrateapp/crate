@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OfflineItemRecord } from "@/lib/offline";
 
@@ -59,7 +59,6 @@ describe("OfflineLibrary", () => {
   it("plays only the verified local tracks from the saved item", () => {
     render(<OfflineLibrary />);
 
-    expect(screen.getAllByText("offline.access.status")).toHaveLength(2);
     expect(screen.getByText("Saved Album")).toBeInTheDocument();
     expect(screen.getByText("Saved Song")).toBeInTheDocument();
 
@@ -76,6 +75,31 @@ describe("OfflineLibrary", () => {
       ],
       0,
       { type: "album", name: "Saved Album", id: "1" },
+    );
+  });
+  it("keeps transport unavailable until a verified track is current", () => {
+    render(<OfflineLibrary />);
+    expect(
+      screen.getByRole("button", { name: "offline.access.previous" }),
+    ).toBeDisabled();
+    expect(
+      within(screen.getByRole("region", { name: "player.queue" })).getByRole(
+        "button",
+        { name: "player.play" },
+      ),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "offline.access.next" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText("Saved Song").closest("[role=listitem]"),
+    ).toBeInTheDocument();
+  });
+  it("provides the canonical empty state when no local files are verified", () => {
+    itemsMock.mockReturnValue([]);
+    render(<OfflineLibrary />);
+    expect(screen.getByTestId("empty-state")).toHaveTextContent(
+      "offline.access.empty",
     );
   });
 });

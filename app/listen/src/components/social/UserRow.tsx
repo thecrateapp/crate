@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 
 import type { ContextMenuHeader } from "@crate/ui/domain/actions";
-import { EntityRow, type EntityRowDensity } from "@crate/ui/domain/entity";
+import { type EntityRowDensity } from "@crate/ui/domain/entity";
 import { useListenEntityMenu } from "@/components/actions/entity-menu";
 import {
   buildUserActions,
@@ -12,19 +12,14 @@ import {
 } from "@/components/actions/user-actions";
 import { useAuth } from "@/contexts/AuthContext";
 import { resolveUserAvatarUrl } from "@/lib/user-avatar";
-import { cn } from "@/lib/utils";
+import { UserRowView } from "./UserRowView";
 
 import { ProfileHoverCard } from "./ProfileHoverCard";
 import { UserAvatar } from "./UserAvatar";
 import { useUserFollow } from "./use-user-follow";
 
-export interface UserRowUser {
-  id: number;
-  username: string | null;
-  display_name: string | null;
-  avatar: string | null;
-  bio?: string | null;
-}
+export type { UserRowUser } from "./UserRowView";
+import type { UserRowUser } from "./UserRowView";
 
 interface UserRowProps {
   user: UserRowUser;
@@ -117,7 +112,7 @@ export const UserRow = memo(function UserRow({
   );
 
   const row = (
-    <EntityRow
+    <UserRowView
       title={name}
       subtitle={
         subtitle ?? (username ? `@${username}` : t("people.noUsername"))
@@ -129,10 +124,7 @@ export const UserRow = memo(function UserRow({
           avatar={user.avatar}
           userId={user.id}
           alt=""
-          className={cn(
-            density === "compact" ? "size-10" : "size-11",
-            "bg-accent-action/15 text-text-accent",
-          )}
+          size="md"
         />
       }
       href={profilePath}

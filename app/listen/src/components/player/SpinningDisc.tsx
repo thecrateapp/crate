@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { cn } from "@crate/ui/lib/cn";
+import { SpinningDiscFrame } from "./SpinningDiscFrame";
 import { SpinningDiscArtwork } from "@/components/player/SpinningDiscArtwork";
 import { SpinningDiscControl } from "@/components/player/SpinningDiscControl";
 import {
@@ -13,6 +13,7 @@ import {
 } from "@/components/player/spinning-disc-math";
 import { useSpinningDiscPlayback } from "@/components/player/use-spinning-disc-playback";
 import { clamp } from "@/lib/utils";
+import type { PlayerMixTone } from "./player-mix-presentation";
 
 type JogSeekMode = "live" | "commit";
 
@@ -33,6 +34,8 @@ interface SpinningDiscProps {
   onSeek?: (time: number) => void;
   onTogglePlay: () => void;
   disabled?: boolean;
+  mixTone?: PlayerMixTone;
+  mixBpm?: number | null;
 }
 
 export function SpinningDisc({
@@ -52,6 +55,8 @@ export function SpinningDisc({
   onSeek,
   onTogglePlay,
   disabled = false,
+  mixTone,
+  mixBpm,
 }: SpinningDiscProps) {
   const seekTimerRef = useRef<number | null>(null);
   const lastSeekFlushAtRef = useRef(0);
@@ -69,7 +74,7 @@ export function SpinningDisc({
 
   const [isJogging, setIsJogging] = useState(false);
   const [dragRotation, setDragRotation] = useState<number | null>(null);
-  const { rotorRef, setPlaybackAnchor, setRotorRotation } =
+  const { rotorRef, getRotorRotation, setPlaybackAnchor, setRotorRotation } =
     useSpinningDiscPlayback({
       currentTime,
       dragRotation,
@@ -166,7 +171,7 @@ export function SpinningDisc({
 
       const bounds = event.currentTarget.getBoundingClientRect();
       const angle = getPointerAngle(event.nativeEvent, bounds);
-      const baseRotation = currentTime * DISC_DEGREES_PER_SECOND;
+      const baseRotation = getRotorRotation();
       const now =
         typeof performance !== "undefined" ? performance.now() : Date.now();
 
@@ -185,7 +190,14 @@ export function SpinningDisc({
       event.currentTarget.setPointerCapture(event.pointerId);
       event.preventDefault();
     },
-    [currentTime, duration, jogEnabled, onSeek, setJogPlaybackRate],
+    [
+      currentTime,
+      duration,
+      getRotorRotation,
+      jogEnabled,
+      onSeek,
+      setJogPlaybackRate,
+    ],
   );
 
   const handlePointerMove = useCallback(
@@ -239,7 +251,7 @@ export function SpinningDisc({
       setDragRotation(null);
       setJogPlaybackRate(1, true);
       setPlaybackAnchor(finalTime);
-      setRotorRotation(finalTime * DISC_DEGREES_PER_SECOND);
+      setRotorRotation(dragState.baseRotation + dragState.accumDegrees);
       if (currentTarget.hasPointerCapture(pointerId)) {
         currentTarget.releasePointerCapture(pointerId);
       }
@@ -268,58 +280,36 @@ export function SpinningDisc({
   );
 
   return (
-    <div
-      className={cn(
-        "relative",
-        className,
-        disabled && "pointer-events-none grayscale opacity-60",
-      )}
-    >
-      <div className="spinning-disc-ambient absolute inset-[7%] rounded-full blur-3xl opacity-80" />
-      <div
-        className={cn(
-          "spinning-disc-surface relative aspect-square w-full rounded-full",
-          jogEnabled && onSeek
-            ? "cursor-grab touch-none active:cursor-grabbing"
-            : "",
-        )}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerCancel}
-        data-testid="spinning-disc-jog-surface"
-        style={{ touchAction: jogEnabled && onSeek ? "none" : undefined }}
-      >
-        <div
-          ref={rotorRef}
-          className={cn(
-            "spinning-disc-rotor absolute inset-[5.5%] overflow-hidden rounded-full transition-transform duration-150",
-            isJogging ? "" : "will-change-transform",
-          )}
-          style={{
-            transition:
-              isJogging || (isPlaying && !isBuffering)
-                ? "none"
-                : "transform 140ms linear",
-          }}
-        >
-          <SpinningDiscArtwork
-            albumCover={albumCover}
-            crossfadeIncomingCover={crossfadeIncomingCover}
-            crossfadeOutgoingCover={crossfadeOutgoingCover}
-            crossfadeProgress={crossfadeProgress}
-          />
-        </div>
-
-        <div className="spinning-disc-overlay pointer-events-none absolute inset-[2%] rounded-full" />
-
+    <SpinningDiscFrame
+      className={className}
+      disabled={disabled}
+      jogEnabled={jogEnabled && Boolean(onSeek)}
+      mixTone={isPlaying && !isBuffering && !disabled ? mixTone : undefined}
+      mixBpm={mixBpm}
+      rotorRef={rotorRef}
+      surfaceProps={{
+        onPointerDown: handlePointerDown,
+        onPointerMove: handlePointerMove,
+        onPointerUp: handlePointerUp,
+        onPointerCancel: handlePointerCancel,
+        style: { touchAction: jogEnabled && onSeek ? "none" : undefined },
+      }}
+      artwork={
+        <SpinningDiscArtwork
+          albumCover={albumCover}
+          crossfadeIncomingCover={crossfadeIncomingCover}
+          crossfadeOutgoingCover={crossfadeOutgoingCover}
+          crossfadeProgress={crossfadeProgress}
+        />
+      }
+      control={
         <SpinningDiscControl
           disabled={disabled}
           isBuffering={isBuffering}
           isPlaying={isPlaying}
           onTogglePlay={onTogglePlay}
         />
-      </div>
-    </div>
+      }
+    />
   );
 }

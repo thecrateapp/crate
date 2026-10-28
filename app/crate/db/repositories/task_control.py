@@ -4,7 +4,10 @@ import json
 
 from sqlalchemy import text
 
-from crate.db.repositories.tasks_shared import register_tasks_surface_signal
+from crate.db.repositories.tasks_shared import (
+    _register_task_transition_signal,
+    register_tasks_surface_signal,
+)
 from crate.db.tx import optional_scope, read_scope
 
 _TERMINAL = {"completed", "failed", "cancelled"}
@@ -165,13 +168,19 @@ def acknowledge_cancellation(task_id: str, result=None, *, session=None) -> dict
         }
         if children:
             evidence["children"] = children
-        current.execute(
-            text("""UPDATE tasks SET status='cancelled',cancellation_acknowledged_at=NOW(),
+        cancelled = (
+            current.execute(
+                text("""UPDATE tasks SET status='cancelled',cancellation_acknowledged_at=NOW(),
             result_json=CAST(:result AS jsonb),heartbeat_at=NULL,worker_id=NULL,updated_at=NOW()
-            WHERE id=:id"""),
-            {"id": task_id, "result": json.dumps(evidence, default=str)},
+            WHERE id=:id RETURNING *"""),
+                {"id": task_id, "result": json.dumps(evidence, default=str)},
+            )
+            .mappings()
+            .first()
         )
         register_tasks_surface_signal(current)
+        if cancelled is not None:
+            _register_task_transition_signal(current, dict(cancelled))
         return {
             "task_id": task_id,
             "status": "cancelled",

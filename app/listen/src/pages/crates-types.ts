@@ -1,3 +1,4 @@
+import type { TrackMediaMetadata } from "../lib/track-media-metadata";
 import type { GenreProfileItem } from "@crate/ui/domain/genres/GenrePill";
 
 export interface CrateAlbum {
@@ -59,7 +60,7 @@ export interface CrateDetail extends CrateSummary {
   genre_profile?: GenreProfileItem[];
 }
 
-export interface CratePlaybackTrack {
+export interface CratePlaybackTrack extends TrackMediaMetadata {
   global_track_uid: string;
   global_album_uid: string;
   global_artist_uid: string;

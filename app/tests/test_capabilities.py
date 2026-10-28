@@ -17,6 +17,7 @@ def test_smart_mix_capabilities_default_to_disabled(test_app, monkeypatch):
             "android_native_crossfade": False,
             "android_beatmatch": False,
             "android_bass_handoff": False,
+            "android_long_beatmatch": False,
         },
         "vdj": {
             "available": False,
@@ -50,6 +51,7 @@ def test_smart_mix_capabilities_support_local_environment_overrides(
             "android_native_crossfade": True,
             "android_beatmatch": True,
             "android_bass_handoff": True,
+            "android_long_beatmatch": True,
         },
         "vdj": {
             "available": False,

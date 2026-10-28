@@ -135,15 +135,23 @@ class FakeCommands:
             )
             # Execute the actual repository's fixed selection function on this
             # disposable host fixture, without running any Docker command.
+            import shutil
             import subprocess
 
+            fake_bin = server / "test-bin"
+            fake_bin.mkdir(exist_ok=True)
+            docker = fake_bin / "docker"
+            docker.write_text("#!/bin/sh\nexit 0\n")
+            docker.chmod(0o755)
+            bash = shutil.which("bash")
+            assert bash is not None, "Bash 4 or newer is required for deploy tests"
             script = (
                 Path(__file__).resolve().parents[2] / "scripts/deploy-remote.sh"
             ).read_text()
             prefix = script[: script.index('\ncase "${1:-}" in')]
             subprocess.run(
-                ["/bin/bash", "-c", prefix + "\nrecord_changed_release_services\n"],
-                env={"PATH": "/usr/bin:/bin", **kwargs["env"]},
+                [bash, "-c", prefix + "\nrecord_changed_release_services\n"],
+                env={**kwargs["env"], "PATH": f"{fake_bin}:/usr/bin:/bin"},
                 check=True,
                 capture_output=True,
             )

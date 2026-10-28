@@ -11,6 +11,7 @@ import { EntityPrimaryAction } from "./EntityPrimaryAction";
 import type {
   EntityCardOverlay,
   EntityCover,
+  EntityFrameAttributes,
   EntityFollowOverlay,
   EntityMenuButtonMode,
   EntityMenuProps,
@@ -32,9 +33,12 @@ export interface EntityCardClassNames {
 }
 
 export interface EntityCardProps
-  extends EntityPrimaryActionProps,
-    EntityMenuProps {
+  extends EntityPrimaryActionProps, EntityMenuProps, EntityFrameAttributes {
   title: string;
+  active?: boolean;
+  truncate?: boolean;
+  profileSize?: "compact" | "tile" | "editorial";
+  fillGrid?: boolean;
   subtitle?: ReactNode;
   meta?: ReactNode;
   titleAccessory?: ReactNode;
@@ -69,7 +73,7 @@ const MENU_BUTTON_CLASS_NAME: Record<
 };
 
 const FOLLOW_BUTTON_CLASS_NAME =
-  "pointer-events-auto size-10 rounded-full border border-border-subtle bg-surface-icon-control shadow-icon-control backdrop-blur-md hover:-translate-y-px";
+  "pointer-events-auto size-10 rounded-full border border-border-subtle bg-surface-canvas";
 
 function followRevealClassName(following: boolean) {
   return following
@@ -121,7 +125,7 @@ function EntityCardOverlayControls({
   const circle = shape === "circle";
   const playButton = onPlay ? (
     <PlayButton
-      size="md"
+      size="sm"
       reveal={circle ? "always" : "hover"}
       playing={overlay.playing}
       loading={overlay.loading}
@@ -151,7 +155,7 @@ function EntityCardOverlayControls({
       {circle ? (
         <div
           data-slot="entity-overlay-controls"
-          className="flex items-center justify-center gap-2 transition-[transform,opacity] pointer-fine:translate-y-2 pointer-fine:opacity-0 pointer-fine:group-hover/card:translate-y-0 pointer-fine:group-hover/card:opacity-100 pointer-fine:group-focus-within/card:translate-y-0 pointer-fine:group-focus-within/card:opacity-100"
+          className="flex items-center justify-center gap-2 transition-opacity pointer-fine:opacity-0 pointer-fine:group-hover/card:opacity-100 pointer-fine:group-focus-within/card:opacity-100"
         >
           {playButton}
           {follow ? (
@@ -175,6 +179,10 @@ function EntityCardOverlayControls({
 
 export const EntityCard = memo(function EntityCard({
   title,
+  active = false,
+  truncate = true,
+  profileSize,
+  fillGrid = false,
   subtitle,
   meta,
   titleAccessory,
@@ -193,14 +201,26 @@ export const EntityCard = memo(function EntityCard({
   href,
   external,
   openLabel,
+  pressed,
   actionMenu,
   renderMenu,
   menuButton = "hover",
   menuLabel = "More actions",
   className,
   classNames,
+  ...props
 }: EntityCardProps) {
   const centered = shape === "circle";
+  const profileWidths = {
+    compact: "w-[calc(100px+2*var(--content-card-padding))]",
+    tile: "w-[calc(140px+2*var(--content-card-padding))]",
+    editorial: "w-[calc(156px+2*var(--content-card-padding))]",
+  } as const;
+  const profileMaxWidths = {
+    compact: "mx-auto max-w-[calc(100px+2*var(--content-card-padding))]",
+    tile: "mx-auto max-w-[calc(140px+2*var(--content-card-padding))]",
+    editorial: "mx-auto max-w-[calc(156px+2*var(--content-card-padding))]",
+  } as const;
   const { controller, targetProps, menu } = useEntityMenu({
     actionMenu,
     renderMenu,
@@ -219,11 +239,20 @@ export const EntityCard = memo(function EntityCard({
 
   return (
     <article
+      {...props}
+      data-slot="entity-card"
+      data-active={active || undefined}
+      data-profile-size={centered ? profileSize : undefined}
       className={cn(
-        "item-action-target group/card relative snap-start rounded-xl text-left transition-colors",
+        "crate-entity-card item-action-target group/card relative snap-start rounded-xl text-left transition-colors",
         layout === "grid"
           ? "w-full min-w-0"
           : cn("shrink-0", compact ? "w-[120px]" : "w-[160px]"),
+        centered &&
+          profileSize &&
+          (layout === "grid"
+            ? !fillGrid && profileMaxWidths[profileSize]
+            : profileWidths[profileSize]),
         selected && "bg-text-primary/5",
         disabled && "opacity-50",
         className,
@@ -240,20 +269,19 @@ export const EntityCard = memo(function EntityCard({
         href={href}
         external={external}
         openLabel={openLabel}
+        pressed={pressed}
         disabled={disabled}
-        current={selected}
+        current={active}
         className={cn(
-          "group block w-full rounded-xl text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:hover:bg-transparent",
-          centered
-            ? "p-0"
-            : "p-[var(--content-card-padding)] hover:bg-text-primary/5",
+          "group block w-full rounded-xl text-left transition-colors disabled:cursor-not-allowed disabled:hover:bg-transparent",
+          centered ? "p-0" : "p-[var(--content-card-padding)]",
           classNames?.action,
         )}
       >
         <span
           data-slot="entity-artwork"
           className={cn(
-            "relative mb-[var(--content-card-gap)] block aspect-square overflow-hidden bg-text-primary/5",
+            "relative mb-[var(--content-card-gap)] block aspect-square overflow-hidden bg-accent-action/16",
             SHAPE_RADIUS_CLASS_NAME[shape],
             classNames?.artwork,
           )}
@@ -277,7 +305,9 @@ export const EntityCard = memo(function EntityCard({
         >
           <span
             className={cn(
-              "block min-w-0 truncate text-sm font-medium text-text-primary",
+              "crate-entity-title block min-w-0 text-sm font-medium",
+              active ? "text-accent-action-hi" : "text-text-primary",
+              truncate ? "truncate" : "wrap-anywhere",
               classNames?.title,
             )}
           >
@@ -296,7 +326,8 @@ export const EntityCard = memo(function EntityCard({
         {subtitle != null ? (
           <span
             className={cn(
-              "block truncate text-xs text-text-muted",
+              "crate-media-meta block text-text-muted",
+              truncate ? "truncate" : "wrap-anywhere",
               centered && "text-center",
               classNames?.subtitle,
             )}
@@ -307,7 +338,8 @@ export const EntityCard = memo(function EntityCard({
         {meta != null ? (
           <span
             className={cn(
-              "block truncate text-xs tabular-nums text-text-muted",
+              "crate-media-meta block tabular-nums text-text-muted",
+              truncate ? "truncate" : "wrap-anywhere",
               centered && "text-center",
               classNames?.meta,
             )}

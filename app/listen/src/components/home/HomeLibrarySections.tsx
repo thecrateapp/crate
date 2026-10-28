@@ -1,3 +1,4 @@
+import { GridSkeleton } from "@crate/ui/composites/GridSkeleton";
 import { useTranslation } from "react-i18next";
 import { MediaRail, SectionHeader } from "@crate/ui/domain/lists";
 import { EmptyState, LoadingState } from "@crate/ui/domain/states";
@@ -25,7 +26,14 @@ export function JustLandedSection({
         onAction={onOpenExplore}
       />
       {loading ? (
-        <LoadingState label={t("common.loadingShort")} className="py-10" />
+        <LoadingState label={t("common.loadingShort")}>
+          <GridSkeleton
+            layout="rail"
+            variant="artist-fill"
+            count={7}
+            className="xl:grid-flow-row xl:grid-cols-7 xl:gap-4"
+          />
+        </LoadingState>
       ) : artists?.length ? (
         <MediaRail
           fit="columns"
@@ -60,7 +68,7 @@ export function JustLandedSection({
       ) : (
         <EmptyState
           variant="dashed"
-          className="px-4 py-6"
+          className="px-4"
           message={t("home.library.justLanded.empty")}
         />
       )}

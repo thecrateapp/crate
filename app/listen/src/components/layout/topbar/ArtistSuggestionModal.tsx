@@ -111,7 +111,7 @@ export function ArtistSuggestionModal({
             />
           </FormField>
         </ModalBody>
-        <ModalFooter className="flex justify-end gap-2 px-5 py-4">
+        <ModalFooter>
           <Button
             variant="outline"
             onClick={controller.closeModal}

@@ -73,3 +73,16 @@ class IdentityFieldsMixin(BaseModel):
         ):
             setattr(self, "track_storage_id", None)
         return self
+
+
+class TrackMediaFieldsMixin(BaseModel):
+    """Source metadata for a track list; never infer quality from its album."""
+
+    format: str | None = None
+    bitrate: int | None = None
+    sample_rate: int | None = None
+    bit_depth: int | None = None
+    duration: float | int | None = None
+    bpm: float | None = None
+    audio_key: str | None = None
+    audio_scale: str | None = None

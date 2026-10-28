@@ -82,6 +82,7 @@ export function useAlbumPlaylistActions({
       data
         ? selectedAlbumTracks.map((track) =>
             toPlayableTrack({
+              ...track,
               id: track.id,
               globalTrackUid:
                 track.globalTrackUid ??
@@ -230,6 +231,7 @@ export function useAlbumPlaylistActions({
       name: displayName,
       tracks: playableAlbumTracks.map((track) =>
         toPlayableTrack({
+          ...track,
           id: track.id,
           globalTrackUid:
             track.globalTrackUid ?? track.global_track_uid ?? track.global_uid,

@@ -95,6 +95,9 @@ def test_openapi_marks_genre_routes_as_authenticated_and_typed(test_app):
     eq_operation = data["paths"]["/api/genres/{slug}/eq-preset"]["patch"]
     invalid_operation = data["paths"]["/api/genres/taxonomy/invalid"]["get"]
     cleanup_operation = data["paths"]["/api/genres/taxonomy/cleanup-invalid"]["post"]
+    raw_tag_classification = data["paths"][
+        "/api/genres/taxonomy/raw-tags/{slug}/classification"
+    ]["put"]
 
     assert detail_operation["tags"] == ["genres"]
     assert detail_operation["summary"] == "Get detailed genre information"
@@ -122,6 +125,16 @@ def test_openapi_marks_genre_routes_as_authenticated_and_typed(test_app):
     assert cleanup_operation["responses"]["200"]["content"]["application/json"][
         "schema"
     ]["$ref"].endswith("/TaskEnqueueResponse")
+    assert raw_tag_classification["summary"] == (
+        "Classify an unmapped library genre tag and assign facet values"
+    )
+    assert raw_tag_classification["security"] == [
+        {"cookieAuth": []},
+        {"bearerAuth": []},
+    ]
+    assert raw_tag_classification["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]["$ref"].endswith("/GenreTaxonomyRawTagClassificationUpdateResponse")
 
 
 def test_openapi_types_jam_routes_and_marks_them_authenticated(test_app):
@@ -353,26 +366,10 @@ def test_openapi_types_task_routes_and_marks_them_authenticated(test_app):
     ].endswith("/TaskRetryResponse")
 
 
-def test_openapi_types_setup_routes_and_only_secures_protected_endpoints(test_app):
-    data = test_app.get("/openapi.json").json()
-    status_operation = data["paths"]["/api/setup/status"]["get"]
-    admin_operation = data["paths"]["/api/setup/admin"]["post"]
-    scan_operation = data["paths"]["/api/setup/scan"]["post"]
-
-    assert "security" not in status_operation
-    assert status_operation["responses"]["200"]["content"]["application/json"][
-        "schema"
-    ]["$ref"].endswith("/SetupStatusResponse")
-
-    assert "security" not in admin_operation
-    assert admin_operation["responses"]["200"]["content"]["application/json"]["schema"][
-        "$ref"
-    ].endswith("/SetupAdminResponse")
-
-    assert scan_operation["security"] == [{"cookieAuth": []}, {"bearerAuth": []}]
-    assert scan_operation["responses"]["200"]["content"]["application/json"]["schema"][
-        "$ref"
-    ].endswith("/TaskEnqueueResponse")
+def test_openapi_has_no_setup_wizard_routes(test_app):
+    """The web setup wizard is retired; `crate install` sets Crate up."""
+    paths = test_app.get("/openapi.json").json()["paths"]
+    assert not [path for path in paths if path.startswith("/api/setup")]
 
 
 def test_openapi_types_scanner_and_operations_routes(test_app):
@@ -1591,6 +1588,9 @@ def test_openapi_types_management_routes_and_marks_them_authenticated(test_app):
     analysis_status_operation = data["paths"]["/api/manage/analysis-status"]["get"]
     audit_log_operation = data["paths"]["/api/manage/audit-log"]["get"]
     storage_status_operation = data["paths"]["/api/manage/storage-v2-status"]["get"]
+    portable_album_sidecar_operation = data["paths"][
+        "/api/manage/albums/{album_id}/portable-metadata"
+    ]["get"]
     portable_metadata_operation = data["paths"]["/api/manage/portable-metadata"]["post"]
     portable_rehydrate_operation = data["paths"][
         "/api/manage/portable-metadata/rehydrate"
@@ -1652,6 +1652,11 @@ def test_openapi_types_management_routes_and_marks_them_authenticated(test_app):
     assert analysis_status_operation["responses"]["200"]["content"]["application/json"][
         "schema"
     ]["$ref"].endswith("/AnalysisStatusResponse")
+    schemas = data["components"]["schemas"]
+    assert schemas["AnalysisStatusResponse"]["properties"]["last_fingerprinted"][
+        "$ref"
+    ].endswith("/FingerprintTrackSummaryResponse")
+    assert "source" in schemas["FingerprintTrackSummaryResponse"]["properties"]
 
     assert audit_log_operation["security"] == [{"cookieAuth": []}, {"bearerAuth": []}]
     assert audit_log_operation["responses"]["200"]["content"]["application/json"][
@@ -1665,6 +1670,14 @@ def test_openapi_types_management_routes_and_marks_them_authenticated(test_app):
     assert storage_status_operation["responses"]["200"]["content"]["application/json"][
         "schema"
     ]["$ref"].endswith("/StorageV2StatusResponse")
+
+    assert portable_album_sidecar_operation["security"] == [
+        {"cookieAuth": []},
+        {"bearerAuth": []},
+    ]
+    assert portable_album_sidecar_operation["responses"]["200"]["content"][
+        "application/json"
+    ]["schema"]["$ref"].endswith("/PortableAlbumSidecarResponse")
 
     assert portable_metadata_operation["security"] == [
         {"cookieAuth": []},
@@ -1743,6 +1756,30 @@ def test_openapi_types_playlist_and_crate_collaboration_routes(test_app):
     assert data["paths"]["/api/crates/{crate_id}/members"]["post"]["security"] == auth
 
 
+def test_openapi_declares_stats_dashboard_snapshot_block(test_app):
+    schemas = test_app.get("/openapi.json").json()["components"]["schemas"]
+    snapshot = schemas["StatsDashboardResponse"]["properties"]["snapshot"]
+
+    assert "StatsSnapshotMetaResponse" in str(snapshot)
+    assert {"version", "pending", "stale", "built_at"} <= set(
+        schemas["StatsSnapshotMetaResponse"]["properties"]
+    )
+
+
+def test_openapi_types_stats_range_routes(test_app):
+    data = test_app.get("/openapi.json").json()
+    for path in (
+        "/api/me/stats/range",
+        "/api/users/{username}/stats/range",
+        "/api/stats/range",
+    ):
+        operation = data["paths"][path]["get"]
+        assert operation["security"] == [{"cookieAuth": []}, {"bearerAuth": []}]
+        assert operation["responses"]["200"]["content"]["application/json"]["schema"][
+            "$ref"
+        ].endswith("/StatsRangeResponse")
+
+
 def test_openapi_types_human_agent_management_and_keeps_it_cookie_only(test_app):
     schema = test_app.get("/openapi.json").json()
     admin_schema = test_app.get("/openapi-admin-system.json").json()
@@ -1766,6 +1803,18 @@ def test_openapi_types_human_agent_management_and_keeps_it_cookie_only(test_app)
             )
 
 
+def test_openapi_exposes_typed_authenticated_resource_governor_snapshot(test_app):
+    schema = test_app.get("/openapi.json").json()
+    operation = schema["paths"]["/api/admin/governor"]["get"]
+
+    assert operation["tags"] == ["admin-metrics"]
+    assert operation["security"]
+    assert (
+        operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
+        == "#/components/schemas/AdminGovernorSnapshotResponse"
+    )
+
+
 def test_openapi_native_confirmation_uses_independent_hmac_security(test_app):
     data = test_app.get("/openapi.json").json()
     native = data["paths"]["/api/internal/agent-telegram/events"]["post"]
@@ -1773,6 +1822,21 @@ def test_openapi_native_confirmation_uses_independent_hmac_security(test_app):
     assert native["tags"] == ["agents"]
     assert native["security"] == [{"nativeTelegramHmac": []}]
     assert bind["security"] == [{"cookieAuth": []}]
+    bindings = data["paths"]["/api/admin/agent-telegram/bindings"]["get"]
+    unbind = data["paths"]["/api/admin/agent-telegram/bindings/{binding_id}"]["delete"]
+    for operation, model in (
+        (bind, "TelegramBindingResult"),
+        (bindings, "TelegramApproverBindings"),
+        (unbind, "TelegramBindingRevoked"),
+    ):
+        assert operation["tags"] == ["agents"]
+        assert operation["security"] == [{"cookieAuth": []}]
+        assert (
+            operation["responses"]["200"]["content"]["application/json"]["schema"][
+                "$ref"
+            ]
+            == f"#/components/schemas/{model}"
+        )
     assert (
         data["components"]["securitySchemes"]["nativeTelegramHmac"]["name"]
         == "X-Crate-Signature"

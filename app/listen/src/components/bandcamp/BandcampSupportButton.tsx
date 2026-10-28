@@ -4,13 +4,9 @@ import { CRATE_ICON_SIZE, Loader2 } from "@crate/ui/icons";
 import { notify } from "@crate/ui/lib/notify";
 
 import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
-import {
-  HERO_SECONDARY_ACTION_ACTIVE_CLASS,
-  HERO_SECONDARY_ACTION_CLASS,
-} from "@crate/ui/domain/hero";
+import { BandcampSecondaryActionView } from "./BandcampSecondaryActionView";
 import { api } from "@/lib/api";
 import { openExternalUrl } from "@/lib/external-links";
-import { cn } from "@/lib/utils";
 
 interface BandcampLinkState {
   entity_type?: string;
@@ -214,54 +210,6 @@ function useBandcampActivation(
   return { activate, busy };
 }
 
-function BandcampSecondaryAction({
-  state,
-  busy,
-  className,
-  onActivate,
-}: {
-  state: BandcampActionState;
-  busy: boolean;
-  className: string;
-  onActivate: () => void;
-}) {
-  const ariaLabel =
-    state.ownedAlbum && !state.canImport ? state.ownedLabel : state.label;
-
-  if (state.ownedAlbum && !state.canImport) {
-    return (
-      <span
-        className={cn(
-          HERO_SECONDARY_ACTION_CLASS,
-          HERO_SECONDARY_ACTION_ACTIVE_CLASS,
-          className,
-        )}
-        aria-label={ariaLabel}
-      >
-        <BandcampLogo size={CRATE_ICON_SIZE.lg} />
-        <span>Bandcamp</span>
-      </span>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={onActivate}
-      disabled={busy}
-      className={cn(HERO_SECONDARY_ACTION_CLASS, className)}
-      aria-label={ariaLabel}
-    >
-      {busy ? (
-        <Loader2 size={CRATE_ICON_SIZE.lg} className="animate-spin" />
-      ) : (
-        <BandcampLogo size={CRATE_ICON_SIZE.lg} />
-      )}
-      <span>Bandcamp</span>
-    </button>
-  );
-}
-
 function BandcampDefaultAction({
   state,
   busy,
@@ -349,10 +297,13 @@ export function BandcampSupportButton({
   if (!state) return null;
   if (presentation === "secondary-action") {
     return (
-      <BandcampSecondaryAction
-        state={state}
+      <BandcampSecondaryActionView
+        owned={state.ownedAlbum && !state.canImport}
         busy={busy}
         className={className}
+        label={
+          state.ownedAlbum && !state.canImport ? state.ownedLabel : state.label
+        }
         onActivate={() => void activate()}
       />
     );

@@ -7,7 +7,7 @@ const readTokenFile = (name: string) =>
   readFileSync(resolve(process.cwd(), "tokens", name), "utf8");
 
 describe("runtime token bridge", () => {
-  it("keeps Tailwind foundation values behind runtime variables", () => {
+  it("keeps Tailwind foundation values behind fixed identity variables", () => {
     const colors = readTokenFile("colors.css");
     const radius = readTokenFile("radius.css");
 
@@ -19,25 +19,16 @@ describe("runtime token bridge", () => {
     expect(radius).not.toContain("--radius-md: 0.25rem");
   });
 
-  it("defines runtime values for solid and glass surface recipes", () => {
+  it("defines one solid surface recipe without material selectors", () => {
     const surfaces = readTokenFile("surfaces.css");
-
     expect(surfaces).toContain(
       "--color-card: var(--crate-token-surface-card-solid)",
     );
-    expect(surfaces).toContain(
-      "--color-card: var(--crate-token-surface-card-glass)",
-    );
     expect(surfaces).toContain("--surface-app: var(--crate-token-surface-app)");
-    expect(surfaces).toContain(
-      "--scrollbar-thumb: var(--crate-token-scrollbar-thumb)",
-    );
-    expect(surfaces).toContain(
-      "--scrollbar-hover: var(--crate-token-scrollbar-hover)",
-    );
+    expect(surfaces).not.toMatch(/data-surface|glass/);
   });
 
-  it("paints the fullscreen player on an opaque canvas underlay", () => {
+  it("paints fullscreen header and body on one continuous opaque canvas", () => {
     const recipes = readTokenFile("recipes.css");
     const surface = recipes.match(
       /\.fullscreen-player-surface\s*\{(?<rules>[^}]*)\}/s,
@@ -45,6 +36,7 @@ describe("runtime token bridge", () => {
 
     expect(surface).toMatch(/background-color:\s*var\(--surface-canvas\)/);
     expect(surface).not.toMatch(/(?:^|\s)background:/);
+    expect(surface).not.toMatch(/linear-gradient|color-mix/);
   });
 
   it("keeps an inset focus indicator for links inside truncating containers", () => {
@@ -53,19 +45,58 @@ describe("runtime token bridge", () => {
       /\.link-meta\.link-inset:focus-visible,\s*\.link-accent\.link-inset:focus-visible\s*\{(?<rules>[^}]*)\}/s,
     )?.groups?.rules;
 
-    expect(inset).toMatch(/outline-offset:\s*-2px/);
+    expect(readTokenFile("interactive.css")).toMatch(
+      /\.link-inset:focus-visible[^}]*\{[^}]*outline-offset:\s*-2px/,
+    );
+    expect(inset).not.toMatch(/outline-color:\s*transparent/);
     expect(inset).toMatch(/text-decoration:\s*underline/);
   });
 
-  it("derives runtime defaults in the theme layer", () => {
+  it("keeps shared link feedback free of beams and generated hover underlines", () => {
+    const recipes = readTokenFile("recipes.css");
+    expect(recipes).not.toMatch(/@keyframes\s+crateLinkBeam/);
+    expect(recipes).not.toMatch(
+      /\.link-(?:meta|accent)[^{,]*::(?:before|after)/,
+    );
+    expect(recipes).toMatch(
+      /\.link-accent:hover,\s*\.link-accent:focus-visible\s*\{[^}]*color:\s*var\(--accent-action-hi\)/s,
+    );
+  });
+
+  it("derives fixed defaults in the identity layer", () => {
     const themes = readTokenFile("themes.css");
 
     expect(themes).toContain("--crate-token-color-primary: #06b6d4");
-    expect(themes).toContain("--crate-token-surface-card-solid: #16161e");
-    expect(themes).toContain("--crate-token-surface-card-glass:");
+    expect(themes).toContain("--crate-token-surface-card-solid: #0d0e14");
+    expect(themes).toContain(
+      "--crate-token-surface-border-solid: rgba(241, 245, 249, 0.1)",
+    );
+    expect(themes).toContain("--crate-token-color-primary-hi: #67e8f9");
+    expect(themes).not.toContain("--crate-token-surface-card-glass:");
     expect(themes).toContain("--crate-token-radius-md: 0.25rem");
-    expect(themes).toContain("--crate-token-scrollbar-thumb: #252535");
-    expect(themes).toContain("--crate-token-scrollbar-hover: #353545");
+    expect(themes).toContain(
+      "--crate-token-scrollbar-thumb: rgba(241, 245, 249, 0.1)",
+    );
+    expect(themes).toContain(
+      "--crate-token-scrollbar-hover: rgba(241, 245, 249, 0.18)",
+    );
+  });
+
+  it("exposes the v3 display, mono, label and motion tokens to Tailwind", () => {
+    const typography = readTokenFile("typography.css");
+    const semantic = readTokenFile("semantic.css");
+    const animations = readTokenFile("animations.css");
+
+    expect(typography).toContain("--font-display: var(--font-display-stack)");
+    expect(typography).toContain("--font-mono: var(--font-mono-stack)");
+    expect(typography).toContain("--text-label: 0.6875rem");
+    expect(semantic).toMatch(/--font-display-stack:\s*"Bricolage Grotesque"/);
+    expect(semantic).toMatch(/--font-mono-stack:\s*"JetBrains Mono"/);
+    expect(semantic).toContain(
+      "--color-accent-action-hi: var(--accent-action-hi)",
+    );
+    expect(animations).toContain("--ease-snap: cubic-bezier(0.22, 1, 0.36, 1)");
+    expect(animations).toMatch(/--ease-spring-snappy:\s*linear\(/);
   });
 
   it("disables root view transitions when motion is reduced", () => {
@@ -87,14 +118,29 @@ describe("runtime token bridge", () => {
     expect(typography).toContain("--text-counter--line-height: 1");
   });
 
-  it("renders the focus token as a visible 2px ring on the focus colour", () => {
+  it("keeps progress and meter rails at one pixel", () => {
+    const recipes = readTokenFile("recipes.css");
+
+    expect(recipes).toMatch(
+      /\.crate-progress-hairline\s*\{[^}]*height:\s*1px/s,
+    );
+    expect(recipes).toMatch(/\.crate-meter-track\s*\{[^}]*height:\s*1px/s);
+    expect(recipes).toMatch(
+      /\.stats-digging-progress span\s*\{[^}]*height:\s*1px/s,
+    );
+    expect(recipes).not.toMatch(
+      /\.crate-(?:progress-hairline|meter-track)\[data-thickness=/,
+    );
+  });
+
+  it("keeps the legacy focus utility bridge without a redundant semantic alias", () => {
     const semantic = readTokenFile("semantic.css");
 
     expect(semantic).toMatch(
-      /--focus-shadow:\s*0 0 0 2px var\(--focus-ring\);/,
+      /--shadow-focus:\s*0 0 0 2px var\(--focus-ring\);/,
     );
-    expect(semantic).toContain("--shadow-focus: var(--focus-shadow);");
-    expect(semantic).toContain("--focus-ring: var(--color-ring);");
+    expect(semantic).not.toContain("--focus-shadow:");
+    expect(semantic).toContain("--focus-ring: var(--crate-token-color-ring);");
   });
 });
 

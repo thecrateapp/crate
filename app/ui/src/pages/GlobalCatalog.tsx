@@ -1,32 +1,41 @@
-import { useState } from "react";
 import {
-  AlertTriangle,
-  CheckCircle2,
-  DatabaseZap,
-  GitMerge,
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
+import {
+  RefreshCw as HeaderRefreshCw,
+  GitMerge as HeaderGitMerge,
+  DatabaseBackup as HeaderDatabaseBackup,
   Loader2,
-  RefreshCw,
 } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
-import { Badge } from "@crate/ui/shadcn/badge";
-import { Button } from "@crate/ui/shadcn/button";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@crate/ui/shadcn/card";
+  OpsPageHero,
+  OpsPanel,
+  OpsStatTile,
+  OpsSurface,
+} from "@/components/admin/ops-surfaces";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@crate/ui/shadcn/tabs";
 import { useApi } from "@/hooks/use-api";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 interface GlobalCatalogStatus {
   serving_mode:
-    | "global-ready"
-    | "global-refreshing"
-    | "global-degraded"
-    | "local-fallback";
+    "global-ready" | "global-refreshing" | "global-degraded" | "local-fallback";
   state: {
     status: string;
   };
@@ -85,7 +94,7 @@ function formatDate(value?: string | null) {
 }
 
 function formatNumber(value: number | undefined) {
-  return numberFormatter.format(value || 0);
+  return value == null ? "—" : numberFormatter.format(value);
 }
 
 function servingModeLabel(mode?: GlobalCatalogStatus["serving_mode"]) {
@@ -124,14 +133,31 @@ export function GlobalCatalog() {
   const {
     data: status,
     loading,
+    error: statusError,
     refetch: refetchStatus,
   } = useApi<GlobalCatalogStatus>("/api/admin/global-catalog/status");
-  const { data: runs, refetch: refetchRuns } = useApi<{
+  const {
+    data: runs,
+    loading: runsLoading,
+    error: runsError,
+    refetch: refetchRuns,
+  } = useApi<{
     items: GlobalCatalogRun[];
   }>("/api/admin/global-catalog/runs?limit=25");
-  const { data: duplicates } = useApi<{ items: DuplicateCandidate[] }>(
+  const {
+    data: duplicates,
+    loading: duplicatesLoading,
+    error: duplicatesError,
+    refetch: refetchDuplicates,
+  } = useApi<{ items: DuplicateCandidate[] }>(
     "/api/admin/global-catalog/duplicates?limit=50",
   );
+
+  function refreshAll() {
+    refetchStatus();
+    refetchRuns();
+    refetchDuplicates();
+  }
 
   async function queueReconcile(mode: "incremental" | "full") {
     setReconciling(mode);
@@ -142,7 +168,7 @@ export function GlobalCatalog() {
           ? "Full reconciliation queued"
           : "Incremental reconciliation queued",
       );
-      await Promise.all([refetchStatus(), refetchRuns()]);
+      refreshAll();
     } catch {
       toast.error("Failed to queue reconciliation");
     } finally {
@@ -155,246 +181,324 @@ export function GlobalCatalog() {
   const duplicateItems = duplicates?.items || [];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Global Catalog</h1>
-          <p className="text-sm text-muted-foreground">
-            Canonical deduped collection built from local library and trusted
-            federated catalogs.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            onClick={() => void refetchStatus()}
-            disabled={loading}
-          >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!canManage || reconciling !== null}
-            onClick={() => void queueReconcile("incremental")}
-          >
-            {reconciling === "incremental" ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <GitMerge className="mr-2 h-4 w-4" />
-            )}
-            Reconcile
-          </Button>
-          <Button
-            disabled={!canManage || reconciling !== null}
-            onClick={() => void queueReconcile("full")}
-          >
-            {reconciling === "full" ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <DatabaseZap className="mr-2 h-4 w-4" />
-            )}
-            Full rebuild
-          </Button>
-        </div>
-      </div>
+    <main className="min-w-0 space-y-6">
+      <OpsPageHero
+        title="Global Catalog"
+        description="Canonical deduped collection built from local library and trusted federated catalogs."
+        compactActions
+        actions={
+          <PageHeaderActions>
+            <PageHeaderAction
+              label="Refresh"
+              onClick={refreshAll}
+              disabled={loading}
+            >
+              <HeaderRefreshCw
+                data-admin-ux="header-refresh"
+                aria-hidden="true"
+              />
+            </PageHeaderAction>
+            <PageHeaderAction
+              label="Reconcile"
+              aria-busy={reconciling === "incremental"}
+              disabled={!canManage || reconciling !== null}
+              onClick={() => void queueReconcile("incremental")}
+            >
+              {reconciling === "incremental" ? (
+                <Loader2
+                  aria-hidden="true"
+                  data-admin-ux="catalog-incremental-loading"
+                  className="h-4 w-4 animate-spin"
+                />
+              ) : null}
+              {!(reconciling === "incremental") ? (
+                <HeaderGitMerge
+                  data-admin-ux="header-reconcile"
+                  aria-hidden="true"
+                />
+              ) : null}
+            </PageHeaderAction>
+            <PageHeaderAction
+              label="Full rebuild"
+              aria-busy={reconciling === "full"}
+              disabled={!canManage || reconciling !== null}
+              onClick={() => void queueReconcile("full")}
+            >
+              {reconciling === "full" ? (
+                <Loader2
+                  aria-hidden="true"
+                  data-admin-ux="catalog-full-loading"
+                  className="h-4 w-4 animate-spin"
+                />
+              ) : null}
+              {!(reconciling === "full") ? (
+                <HeaderDatabaseBackup
+                  data-admin-ux="header-full-rebuild"
+                  aria-hidden="true"
+                />
+              ) : null}
+            </PageHeaderAction>
+          </PageHeaderActions>
+        }
+      />
 
-      <div className="flex gap-2 border-b border-white/10">
-        {tabs.map((item) => (
-          <button
-            key={item.key}
-            className={`border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-              tab === item.key
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-            onClick={() => setTab(item.key)}
+      <Tabs
+        value={tab}
+        onValueChange={(value) => setTab(value as Tab)}
+        className="gap-5"
+      >
+        <TabsList aria-label="Global catalog views">
+          {tabs.map((item) => (
+            <TabsTrigger key={item.key} value={item.key}>
+              {item.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        <TabsContent value="overview" className="mt-0">
+          <CatalogReadState
+            data={status}
+            loading={loading}
+            error={statusError}
+            label="catalog status"
+            message="Catalog status could not be loaded."
+            onRetry={refetchStatus}
           >
-            {item.label}
-          </button>
-        ))}
-      </div>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                <MetricCard
+                  label="Artists"
+                  value={formatNumber(counts?.artists)}
+                />
+                <MetricCard
+                  label="Albums"
+                  value={formatNumber(counts?.albums)}
+                />
+                <MetricCard
+                  label="Tracks"
+                  value={formatNumber(counts?.tracks)}
+                />
+                <MetricCard
+                  label="Entity sources"
+                  value={formatNumber(counts?.sources)}
+                />
+              </div>
 
-      {tab === "overview" ? (
-        <div className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-4">
-            <MetricCard label="Artists" value={formatNumber(counts?.artists)} />
-            <MetricCard label="Albums" value={formatNumber(counts?.albums)} />
-            <MetricCard label="Tracks" value={formatNumber(counts?.tracks)} />
-            <MetricCard
-              label="Entity sources"
-              value={formatNumber(counts?.sources)}
-            />
-          </div>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <OpsPanel title="Read model">
+                  <div className="space-y-4 text-sm">
+                    <StatusDot
+                      tone={
+                        status?.serving_mode === "global-degraded"
+                          ? "warn"
+                          : status?.serving_mode === "global-ready"
+                            ? "on"
+                            : "off"
+                      }
+                      label={servingModeLabel(status?.serving_mode)}
+                    />
+                    <p className="m-0 text-text-muted">
+                      {servingModeDescription(status?.serving_mode)}
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <OpsSurface className="p-3">
+                        <MonoLabel as="div">Reconciliation state</MonoLabel>
+                        <p className="mb-0 mt-1 text-text-primary">
+                          {status?.state.status || "unknown"}
+                        </p>
+                      </OpsSurface>
+                      <OpsSurface className="p-3">
+                        <MonoLabel as="div">Stale peers</MonoLabel>
+                        <p className="mb-0 mt-1 tabular-nums text-text-primary">
+                          {status ? formatNumber(status.stale_peer_count) : "—"}
+                        </p>
+                      </OpsSurface>
+                      <OpsSurface className="p-3 sm:col-span-2">
+                        <MonoLabel as="div">
+                          Unresolved match candidates
+                        </MonoLabel>
+                        <p className="mb-0 mt-1 tabular-nums text-text-primary">
+                          {status
+                            ? formatNumber(status.ambiguous_candidate_count)
+                            : "—"}
+                        </p>
+                      </OpsSurface>
+                    </div>
+                    <p className="m-0 text-xs text-text-muted">
+                      Similar sources below the automatic merge threshold; they
+                      remain separate until reviewed.
+                    </p>
+                  </div>
+                </OpsPanel>
 
-          <div className="grid gap-4 lg:grid-cols-3">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  {status?.serving_mode === "global-degraded" ? (
-                    <AlertTriangle className="h-4 w-4 text-amber-400" />
+                <OpsPanel title="Last run" className="lg:col-span-2">
+                  {status?.last_run ? (
+                    <RunSummary run={status.last_run} />
                   ) : (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                    <p className="m-0 text-sm text-text-muted">
+                      No reconciliation runs yet.
+                    </p>
                   )}
-                  Read model
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <Badge
-                  variant={
-                    status?.serving_mode === "global-ready"
-                      ? "default"
-                      : "secondary"
-                  }
-                >
-                  {servingModeLabel(status?.serving_mode)}
-                </Badge>
-                <p className="text-muted-foreground">
-                  {servingModeDescription(status?.serving_mode)}
-                </p>
-                <p className="text-muted-foreground">
-                  Reconciliation state: {status?.state.status || "unknown"}
-                </p>
-                <p className="text-muted-foreground">
-                  Stale peers: {formatNumber(status?.stale_peer_count)}
-                </p>
-                <p className="text-muted-foreground">
-                  Unresolved match candidates:{" "}
-                  {formatNumber(status?.ambiguous_candidate_count)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Similar sources below the automatic merge threshold; they
-                  remain separate until reviewed.
-                </p>
-              </CardContent>
-            </Card>
+                </OpsPanel>
+              </div>
+            </div>
+          </CatalogReadState>
+        </TabsContent>
 
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle className="text-base">Last run</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {status?.last_run ? (
-                  <RunSummary run={status.last_run} />
+        <TabsContent value="runs" className="mt-0">
+          <OpsPanel title="Reconciliation runs" ruled={false}>
+            <CatalogReadState
+              data={runs}
+              loading={runsLoading}
+              error={runsError}
+              label="catalog runs"
+              message="Catalog runs could not be loaded."
+              onRetry={refetchRuns}
+            >
+              <div className="space-y-3">
+                {runItems.length ? (
+                  runItems.map((run) => (
+                    <RunSummary key={run.run_id} run={run} />
+                  ))
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No reconciliation runs yet.
+                  <EmptyState title="No runs found" />
+                )}
+              </div>
+            </CatalogReadState>
+          </OpsPanel>
+        </TabsContent>
+
+        <TabsContent value="duplicates" className="mt-0">
+          <OpsPanel title="Duplicate candidates" ruled={false}>
+            <CatalogReadState
+              data={duplicates}
+              loading={duplicatesLoading}
+              error={duplicatesError}
+              label="duplicate candidates"
+              message="Duplicate candidates could not be loaded."
+              onRetry={refetchDuplicates}
+            >
+              <div className="space-y-3">
+                {duplicateItems.length ? (
+                  duplicateItems.map((candidate) => (
+                    <OpsSurface
+                      as="article"
+                      key={`${candidate.entity_type}-${candidate.match_key}`}
+                      className="p-4"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <InfoBadge>{candidate.entity_type}</InfoBadge>
+                        <span className="min-w-0 break-all font-mono text-sm text-text-primary">
+                          {candidate.match_key}
+                        </span>
+                        <MonoLabel as="span">
+                          {candidate.source_count} sources
+                        </MonoLabel>
+                      </div>
+                      <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                        {candidate.sources.map((source) => (
+                          <OpsSurface
+                            as="div"
+                            key={`${source.source_kind}-${
+                              source.node_uid ??
+                              source.local_entity_uid ??
+                              source.remote_entity_uid ??
+                              source.global_entity_uid ??
+                              source.match_method ??
+                              "source"
+                            }`}
+                            className="min-w-0 p-3 text-xs text-text-muted"
+                          >
+                            <MonoLabel as="div" tone="accent">
+                              {source.source_kind}
+                            </MonoLabel>
+                            <div className="break-all font-mono">
+                              {source.node_uid || source.local_entity_uid}
+                            </div>
+                            <div className="break-all font-mono">
+                              {source.match_method}
+                            </div>
+                          </OpsSurface>
+                        ))}
+                      </div>
+                    </OpsSurface>
+                  ))
+                ) : (
+                  <p className="m-0 text-sm text-text-muted">
+                    No duplicate candidates above the confidence threshold.
                   </p>
                 )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      ) : null}
+              </div>
+            </CatalogReadState>
+          </OpsPanel>
+        </TabsContent>
+      </Tabs>
+    </main>
+  );
+}
 
-      {tab === "runs" ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Reconciliation Runs</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {runItems.length ? (
-              runItems.map((run) => <RunSummary key={run.run_id} run={run} />)
-            ) : (
-              <p className="text-sm text-muted-foreground">No runs found.</p>
-            )}
-          </CardContent>
-        </Card>
+function CatalogReadState({
+  data,
+  loading,
+  error,
+  label,
+  message,
+  onRetry,
+  children,
+}: {
+  data: unknown;
+  loading: boolean;
+  error: string | null | undefined;
+  label: string;
+  message: string;
+  onRetry: () => void;
+  children: ReactNode;
+}) {
+  if (!data && loading) return <LoadingState label={`Loading ${label}`} />;
+  if (!data) return <ErrorState message={message} onRetry={onRetry} />;
+  return (
+    <>
+      {error ? (
+        <ErrorState
+          message={`${message} Showing the last successful results.`}
+          onRetry={onRetry}
+        />
       ) : null}
-
-      {tab === "duplicates" ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Duplicate Candidates</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {duplicateItems.length ? (
-              duplicateItems.map((candidate) => (
-                <div
-                  key={`${candidate.entity_type}-${candidate.match_key}`}
-                  className="rounded-lg border border-white/10 p-4"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">{candidate.entity_type}</Badge>
-                    <span className="font-medium">{candidate.match_key}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {candidate.source_count} sources
-                    </span>
-                  </div>
-                  <div className="mt-3 grid gap-2 md:grid-cols-2">
-                    {candidate.sources.map((source) => (
-                      <div
-                        key={`${source.source_kind}-${
-                          source.node_uid ??
-                          source.local_entity_uid ??
-                          source.remote_entity_uid ??
-                          source.global_entity_uid ??
-                          source.match_method ??
-                          "source"
-                        }`}
-                        className="rounded-md bg-white/[0.03] p-3 text-xs text-muted-foreground"
-                      >
-                        <div className="font-medium text-foreground">
-                          {source.source_kind}
-                        </div>
-                        <div>{source.node_uid || source.local_entity_uid}</div>
-                        <div>{source.match_method}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No duplicate candidates above the confidence threshold.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
-    </div>
+      {children}
+    </>
   );
 }
 
 function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm font-medium text-muted-foreground">
-          {label}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-      </CardContent>
-    </Card>
-  );
+  return <OpsStatTile label={label} value={value} />;
 }
 
 function RunSummary({ run }: { run: GlobalCatalogRun }) {
   return (
-    <div className="rounded-lg border border-white/10 p-4">
+    <OpsSurface as="article" className="p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Badge variant={run.status === "completed" ? "default" : "secondary"}>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <InfoBadge tone={run.status === "completed" ? "accent" : "neutral"}>
             {run.status}
-          </Badge>
-          <span className="font-medium">{run.mode}</span>
-          <span className="text-xs text-muted-foreground">{run.run_id}</span>
+          </InfoBadge>
+          <MonoLabel as="span" tone="accent">
+            {run.mode}
+          </MonoLabel>
+          <span className="break-all font-mono text-xs text-text-muted">
+            {run.run_id}
+          </span>
         </div>
-        <span className="text-xs text-muted-foreground">
-          {formatDate(run.started_at)}
-        </span>
+        <MonoLabel as="span">{formatDate(run.started_at)}</MonoLabel>
       </div>
-      <div className="mt-3 grid gap-2 text-sm text-muted-foreground md:grid-cols-4">
+      <div className="mt-3 grid gap-2 text-sm text-text-muted md:grid-cols-4">
         <span>Seen {formatNumber(run.source_rows_seen)}</span>
         <span>Upserted {formatNumber(run.sources_upserted)}</span>
         <span>Created {formatNumber(run.canonical_created)}</span>
         <span>Updated {formatNumber(run.canonical_updated)}</span>
       </div>
       {run.error ? (
-        <p className="mt-3 text-sm text-red-300">{run.error}</p>
+        <p className="mt-3 text-sm text-state-warning-text">{run.error}</p>
       ) : null}
-    </div>
+    </OpsSurface>
   );
 }

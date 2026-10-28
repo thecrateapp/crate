@@ -13,7 +13,7 @@ const apiMocks = vi.hoisted(() => ({
   resolveMaybeApiAssetUrl: vi.fn((url: string | null | undefined) =>
     url?.startsWith("/api/")
       ? `https://api.example.test${url}&token=native-token`
-      : url ?? null,
+      : (url ?? null),
   ),
 }));
 
@@ -124,7 +124,7 @@ describe("AlbumCard", () => {
 
     expect(
       screen.getByRole("button", { name: "Add to collection" }),
-    ).toHaveClass("shadow-icon-control");
+    ).not.toHaveClass("shadow-icon-control");
     const image = screen.getByAltText("Inlet");
     expect(image).toHaveAttribute("sizes");
     expect(image.getAttribute("srcset")).toMatch(/size=160[^,]* 160w/);
@@ -206,7 +206,7 @@ describe("AlbumCard", () => {
     fireEvent.contextMenu(card!, { clientX: 160, clientY: 120 });
 
     const menu = await screen.findByRole("menu");
-    expect(menu).toHaveClass("listen-glass-panel", "w-72", "rounded-panel");
+    expect(menu).toHaveClass("crate-overlay-surface", "w-72");
     expect(within(menu).getByText("Inlet")).toBeInTheDocument();
     expect(within(menu).getByText("Hum")).toBeInTheDocument();
     expect(within(menu).getByAltText("Inlet")).toHaveAttribute(

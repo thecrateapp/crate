@@ -46,6 +46,7 @@ export interface SmartMixCapabilities {
   androidNativeCrossfade: boolean;
   androidBeatmatch: boolean;
   androidBassHandoff: boolean;
+  androidLongBeatmatch: boolean;
   plannerVersion?: string | null;
 }
 
@@ -54,6 +55,7 @@ const DISABLED_SMART_MIX_CAPABILITIES: SmartMixCapabilities = {
   androidNativeCrossfade: false,
   androidBeatmatch: false,
   androidBassHandoff: false,
+  androidLongBeatmatch: false,
   plannerVersion: null,
 };
 
@@ -70,6 +72,7 @@ export function setSmartMixCapabilities(
     androidNativeCrossfade: capabilities.androidNativeCrossfade === true,
     androidBeatmatch: capabilities.androidBeatmatch === true,
     androidBassHandoff: capabilities.androidBassHandoff === true,
+    androidLongBeatmatch: capabilities.androidLongBeatmatch === true,
     plannerVersion: capabilities.plannerVersion ?? null,
   };
   notifyCapabilityListeners();
@@ -118,6 +121,8 @@ export function getSmartMixCapabilities(): SmartMixCapabilities {
       beatmatch &&
       smartMixCapabilities.androidBassHandoff &&
       getNativeBassHandoffPreference(),
+    androidLongBeatmatch:
+      beatmatch && smartMixCapabilities.androidLongBeatmatch,
   };
 }
 
@@ -153,7 +158,7 @@ interface TransitionPlanResponse {
   handoffProgress: number;
   outgoingGainDb: number;
   incomingGainDb: number;
-  curve: "equal-power";
+  curve: "equal-power" | "dj-blend";
   bassHandoff: "none" | "balanced";
   confidence: number;
   fallbackReason?: string | null;
@@ -385,6 +390,9 @@ export class SmartMixTransitionPlanner {
               allowTempoAdjustment: input.capabilities.androidBeatmatch,
               ...(input.capabilities.androidBassHandoff
                 ? { allowBassHandoff: true }
+                : {}),
+              ...(input.capabilities.androidLongBeatmatch
+                ? { allowLongBeatmatch: true }
                 : {}),
             },
           })),

@@ -1,0 +1,28 @@
+import { Meta, Canvas } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/ProgressHairline.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">ProgressHairline</DocHeading>
+<EntryDetails
+  id="primitives-progresshairline"
+  review="Web closure · awaiting review"
+/>
+
+<DocHeading as="h2">Contract</DocHeading>
+
+Thin progress uses a ratio from0to1, clamps finite values and distinguishes confirmed zero/complete from unknown total. The shared rail stays one pixel; fill is a transform of the real ratio. ARIA reports0..100 with optional contextual `valueText`. Missing, NaN and infinite values omit `aria-valuenow` and remain indeterminate.
+
+Indeterminate motion requires visible intersection and allowed motion. It stops when offscreen,
+when the document is hidden, or when either OS or Crate motion preferences reduce motion. Without
+IntersectionObserver it stays static. The parent provides contextual labels and real progress;
+no timer invents progress. The interactive example uses a shared Slider to change fixture state.
+The Ranges example contains confirmed0,50%,complete,clamped and unknown states together.
+
+The approved mockup and Diego's later amendments are the visual reference. This entry documents actual existing components; native device, assistive technology and complete consumer certification remain separate. No production requests, credentials or persistent preference writes occur here.
+
+<Canvas of={Stories.Base} />
+<Canvas of={Stories.Indeterminate} />
+<Canvas of={Stories.Complete} />
+<Canvas of={Stories.RangeStates} />

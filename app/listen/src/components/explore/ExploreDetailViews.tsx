@@ -1,14 +1,15 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useLocation } from "react-router";
 import { useTranslation } from "react-i18next";
-import { MediaGrid } from "@crate/ui/domain/lists";
 import { BackLink } from "@crate/ui/domain/navigation/BackLink";
-import { PageHeader } from "@crate/ui/domain/navigation/PageHeader";
+import { MediaGrid } from "@crate/ui/domain/lists";
+
 import { EmptyState, ErrorState } from "@crate/ui/domain/states";
 
 import { ArtistCard } from "@/components/cards/ArtistCard";
 import { PlaylistCard } from "@/components/playlists/PlaylistCard";
-import { CrateLoader } from "@/components/ui/CrateLoader";
+import { BrowseReadState, BrowseDetailFrame } from "./ExploreBrowseViews";
+import { exploreSelectionLocation } from "./explore-navigation";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
@@ -25,12 +26,14 @@ import { useGenreDetailModel } from "./use-genre-detail-model";
 
 export function GenreDetailView({
   slug,
+  onBack,
 }: {
   slug: string;
   onBack: () => void;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const [expandedShowId, setExpandedShowId] = useState<string | null>(null);
   const model = useGenreDetailModel(slug);
   const actions = useGenreDetailActions({
@@ -39,61 +42,75 @@ export function GenreDetailView({
     nextShow: model.nextShow,
   });
 
-  if (model.loading) {
-    return <CrateLoader label={t("genre.loading")} />;
+  if (!model.data && (model.loading || (model.error && model.status !== 404))) {
+    return (
+      <BrowseReadState
+        loading={model.loading}
+        error={model.error}
+        onRetry={model.refetch}
+      />
+    );
   }
   if (!model.data) {
     return (
       <ErrorState
         kind="notFound"
         title={t("genre.notFound")}
-        backTo="/explore"
-        backLabel={t("common.back")}
+        action={
+          <BackLink variant="icon" label={t("common.back")} onClick={onBack} />
+        }
       />
     );
   }
 
   return (
-    <GenreDetailContent
-      actionBar={{
-        albumCount: model.albumCount,
-        artistCount: model.artistCount,
-        data: model.data,
-        genreMenuActions: actions.genreMenuActions,
-        heroCoverUrl: model.heroCoverUrl,
-        isDesktop: model.isDesktop,
-        nextShow: model.nextShow,
-        onOpenGenreRadar: actions.openGenreRadar,
-        onPlayGenreRadio: () => void actions.handlePlayGenreRadio(),
-        onShareGenre: actions.shareGenre,
-        startingRadio: actions.startingRadio,
-      }}
-      artistCount={model.artistCount}
-      artists={model.visibleArtists}
-      albumCount={model.albumCount}
-      albums={model.visibleAlbums}
-      data={model.data}
-      description={model.description}
-      expandedShowId={expandedShowId}
-      heroCoverUrl={model.heroCoverUrl}
-      onCoverError={() => {
-        if (model.heroCoverIndex + 1 < model.heroCoverCandidates.length) {
-          model.setHeroCoverIndex((index) => index + 1);
-        } else {
-          model.setHeroCoverIndex(model.heroCoverCandidates.length);
+    <div className="space-y-6">
+      <BrowseReadState error={model.error} onRetry={model.refetch} />
+      <GenreDetailContent
+        actionBar={{
+          albumCount: model.albumCount,
+          artistCount: model.artistCount,
+          data: model.data,
+          genreMenuActions: actions.genreMenuActions,
+          heroCoverUrl: model.heroCoverUrl,
+          isDesktop: model.isDesktop,
+          nextShow: model.nextShow,
+          onOpenGenreRadar: actions.openGenreRadar,
+          onPlayGenreRadio: () => void actions.handlePlayGenreRadio(),
+          onShareGenre: actions.shareGenre,
+          startingRadio: actions.startingRadio,
+        }}
+        artistCount={model.artistCount}
+        artists={model.visibleArtists}
+        albumCount={model.albumCount}
+        albums={model.visibleAlbums}
+        data={model.data}
+        description={model.description}
+        expandedShowId={expandedShowId}
+        heroCoverUrl={model.heroCoverUrl}
+        onCoverError={() => {
+          if (model.heroCoverIndex + 1 < model.heroCoverCandidates.length) {
+            model.setHeroCoverIndex((index) => index + 1);
+          } else {
+            model.setHeroCoverIndex(model.heroCoverCandidates.length);
+          }
+        }}
+        onOpenRelated={(genre) =>
+          navigate(
+            exploreSelectionLocation(
+              location,
+              "genre",
+              genre.page_slug || genre.slug,
+            ),
+          )
         }
-      }}
-      onOpenRelated={(genre) =>
-        navigate(
-          `/explore?genre=${encodeURIComponent(genre.page_slug || genre.slug)}`,
-        )
-      }
-      onToggleShow={(key) =>
-        setExpandedShowId(expandedShowId === key ? null : key)
-      }
-      relatedGenres={model.visibleRelatedGenres}
-      trackCount={model.trackCount}
-    />
+        onToggleShow={(key) =>
+          setExpandedShowId(expandedShowId === key ? null : key)
+        }
+        relatedGenres={model.visibleRelatedGenres}
+        trackCount={model.trackCount}
+      />
+    </div>
   );
 }
 
@@ -105,21 +122,22 @@ export function DecadeDetailView({
   onBack: () => void;
 }) {
   const { t } = useTranslation();
-  const { data, loading } = useApi<DecadeArtists>(
+  const { data, loading, error, refetch } = useApi<DecadeArtists>(
     `/api/catalog/artists?decade=${encodeURIComponent(decade)}&per_page=50`,
   );
 
-  if (loading) return <CrateLoader label={t("explore.decade.loading")} />;
-
   return (
-    <div className="space-y-6">
-      <PageHeader
-        size="md"
-        back={
-          <BackLink variant="icon" label={t("common.back")} onClick={onBack} />
-        }
-        title={decade}
-        subtitle={t("common.artistCountLabel", { count: data?.total ?? 0 })}
+    <BrowseDetailFrame
+      title={decade}
+      onBack={onBack}
+      count={
+        data ? t("common.artistCountLabel", { count: data.total }) : undefined
+      }
+    >
+      <BrowseReadState
+        loading={loading && !data}
+        error={error}
+        onRetry={refetch}
       />
 
       {data && data.items.length > 0 ? (
@@ -140,10 +158,10 @@ export function DecadeDetailView({
             />
           ))}
         </MediaGrid>
-      ) : (
+      ) : loading || error ? null : (
         <EmptyState variant="dashed" message={t("explore.decade.empty")} />
       )}
-    </div>
+    </BrowseDetailFrame>
   );
 }
 
@@ -157,7 +175,7 @@ export function PlaylistCategoryView({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { playAll } = usePlayerActions();
-  const { data, loading, refetch } = useApi<SystemPlaylist[]>(
+  const { data, loading, error, refetch } = useApi<SystemPlaylist[]>(
     `/api/curation/playlists/category/${encodeURIComponent(category)}`,
   );
 
@@ -189,19 +207,20 @@ export function PlaylistCategoryView({
     }
   }
 
-  if (loading) {
-    return <CrateLoader label={t("explore.playlistCategory.loading")} />;
-  }
-
   return (
-    <div className="space-y-6">
-      <PageHeader
-        size="md"
-        back={
-          <BackLink variant="icon" label={t("common.back")} onClick={onBack} />
-        }
-        title={<span className="capitalize">{category}</span>}
-        subtitle={t("common.playlistCountLabel", { count: data?.length ?? 0 })}
+    <BrowseDetailFrame
+      title={category}
+      onBack={onBack}
+      count={
+        data
+          ? t("common.playlistCountLabel", { count: data.length })
+          : undefined
+      }
+    >
+      <BrowseReadState
+        loading={loading && !data}
+        error={error}
+        onRetry={refetch}
       />
 
       {data && data.length > 0 ? (
@@ -239,12 +258,12 @@ export function PlaylistCategoryView({
             />
           ))}
         </MediaGrid>
-      ) : (
+      ) : loading || error ? null : (
         <EmptyState
           variant="dashed"
           message={t("explore.playlistCategory.empty")}
         />
       )}
-    </div>
+    </BrowseDetailFrame>
   );
 }

@@ -1,0 +1,257 @@
+{
+  "checkpoint": "1V",
+  "status": "Propuestas pendientes de revisión de Diego",
+  "proposedRetainedActionGlyphs": 0,
+  "cases": [
+    {
+      "id": "shell-menu",
+      "path": "app/ui/src/components/layout/Shell.tsx",
+      "line": 107,
+      "control": "Menú de navegación",
+      "proposal": "Navegación",
+      "why": "El nombre puede quedar visible; conserva apertura, Escape y foco.",
+      "kind": "replace",
+      "sourceLine": "aria-label=\"Open navigation\""
+    },
+    {
+      "id": "shell-back",
+      "path": "app/ui/src/components/layout/Shell.tsx",
+      "line": 139,
+      "control": "Volver",
+      "proposal": "Atrás",
+      "why": "La palabra identifica la acción y conserva la navegación del historial.",
+      "kind": "replace",
+      "sourceLine": "<ChevronLeft size={16} />"
+    },
+    {
+      "id": "shell-forward",
+      "path": "app/ui/src/components/layout/Shell.tsx",
+      "line": 147,
+      "control": "Avanzar",
+      "proposal": "Adelante",
+      "why": "La palabra identifica la dirección y conserva el estado deshabilitado.",
+      "kind": "replace",
+      "sourceLine": "<ChevronRight size={16} />"
+    },
+    {
+      "id": "sidebar-collapse",
+      "path": "app/ui/src/components/layout/Sidebar.tsx",
+      "line": 340,
+      "control": "Contraer barra lateral",
+      "proposal": "Contraer / Expandir",
+      "why": "Retirar iconos de las entradas exige conservar nombres también al contraer.",
+      "kind": "replace",
+      "sourceLine": "aria-label=\"Collapse sidebar\""
+    },
+    {
+      "id": "palette-maps",
+      "path": "app/ui/src/components/layout/CommandPalette.tsx",
+      "line": 378,
+      "control": "Destinos y acciones de la paleta",
+      "proposal": "Nombres y atajos",
+      "why": "Mantener filtrado, permisos, selección y teclado; los mapas no justifican una excepción.",
+      "kind": "replace",
+      "sourceLine": "<Icon size={14} className=\"text-muted-foreground\" />"
+    },
+    {
+      "id": "zoom-out",
+      "path": "app/ui/src/components/artist/HeroCompositionCanvas.tsx",
+      "line": 568,
+      "control": "Reducir zoom",
+      "proposal": "Reducir",
+      "why": "El texto conserva la operación sin depender de una lupa.",
+      "kind": "replace",
+      "sourceLine": "<IconToolButton"
+    },
+    {
+      "id": "zoom-in",
+      "path": "app/ui/src/components/artist/HeroCompositionCanvas.tsx",
+      "line": 575,
+      "control": "Ampliar zoom",
+      "proposal": "Ampliar",
+      "why": "La misma pareja verbal distingue las dos direcciones.",
+      "kind": "replace",
+      "sourceLine": "<IconToolButton"
+    },
+    {
+      "id": "flip",
+      "path": "app/ui/src/components/artist/HeroCompositionCanvas.tsx",
+      "line": 582,
+      "control": "Reflejar imagen",
+      "proposal": "Reflejar",
+      "why": "Conservar el estado pulsado y el eje horizontal en el nombre accesible.",
+      "kind": "replace",
+      "sourceLine": "<IconToolButton"
+    },
+    {
+      "id": "rotate-left",
+      "path": "app/ui/src/components/artist/HeroCompositionCanvas.tsx",
+      "line": 592,
+      "control": "Girar a la izquierda",
+      "proposal": "Girar −90°",
+      "why": "La cifra comunica dirección y magnitud.",
+      "kind": "replace",
+      "sourceLine": "<IconToolButton"
+    },
+    {
+      "id": "rotate-right",
+      "path": "app/ui/src/components/artist/HeroCompositionCanvas.tsx",
+      "line": 599,
+      "control": "Girar a la derecha",
+      "proposal": "Girar +90°",
+      "why": "La cifra diferencia la acción opuesta.",
+      "kind": "replace",
+      "sourceLine": "<IconToolButton"
+    },
+    {
+      "id": "reset-crop",
+      "path": "app/ui/src/components/artist/HeroCompositionCanvas.tsx",
+      "line": 606,
+      "control": "Restablecer recorte",
+      "proposal": "Restablecer",
+      "why": "La palabra ya nombra la acción; no requiere un glifo.",
+      "kind": "replace",
+      "sourceLine": "<IconToolButton"
+    },
+    {
+      "id": "track-download",
+      "path": "app/ui/src/components/album/TrackTable.tsx",
+      "line": 1029,
+      "control": "Descargar pista",
+      "proposal": "Descargar",
+      "why": "El texto evita depender de la flecha; conservar permisos y descarga de la pista correcta.",
+      "kind": "replace",
+      "sourceLine": "aria-label=\"Download track\""
+    },
+    {
+      "id": "rating",
+      "path": "app/ui/src/components/ui/star-rating.tsx",
+      "line": 43,
+      "control": "Valoración",
+      "proposal": "Valores 1–5 y Borrar",
+      "why": "La cifra comunica la puntuación; probar lectura, selección y eliminación.",
+      "kind": "replace",
+      "sourceLine": "<Star size={size} className={filled ? \"fill-current\" : \"\"} />"
+    },
+    {
+      "id": "playlist-grip",
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1733,
+      "control": "Reordenar pista",
+      "proposal": "Ordinal y marcador CSS",
+      "why": "El agarre puede usar un marcador simple; revisar acceso por teclado en el grupo, no ocultarlo con la retirada del glifo.",
+      "kind": "replace",
+      "sourceLine": "<GripVertical"
+    },
+    {
+      "id": "lightbox-close",
+      "path": "app/ui/src/components/ui/image-lightbox.tsx",
+      "line": 39,
+      "control": "Cerrar imagen",
+      "proposal": "Cerrar",
+      "why": "El cierre no es una excepción automática. Mantener Escape, foco de retorno y área táctil.",
+      "kind": "replace",
+      "sourceLine": "aria-label=\"Close image\""
+    },
+    {
+      "id": "shared-close",
+      "path": "app/shared/ui/shadcn/overlay-close-button.tsx",
+      "line": 24,
+      "control": "Cierre heredado de overlays",
+      "proposal": "Cerrar en Admin",
+      "why": "Requiere contrato compartido explícito y pruebas de consumidores en ambas apps antes de migrar.",
+      "kind": "coordinate",
+      "sourceLine": "<X size={CRATE_ICON_SIZE.xl} aria-hidden=\"true\" />"
+    },
+    {
+      "id": "shared-loading",
+      "path": "app/shared/ui/shadcn/button.tsx",
+      "line": 95,
+      "control": "Carga heredada de Button",
+      "proposal": "Procesando y marcador CSS",
+      "why": "El spinner es condicional. Conservar aria-busy y disabled; no quitarlo globalmente de Listen.",
+      "kind": "coordinate",
+      "sourceLine": "<Loader2"
+    },
+    {
+      "id": "shared-select",
+      "path": "app/shared/ui/shadcn/select.tsx",
+      "line": 51,
+      "control": "Indicador y desplazamiento de Select",
+      "proposal": "Opciones / Subir / Bajar",
+      "why": "Revisar cada consumidor, apertura y desplazamiento. Sin exención general para disclosure.",
+      "kind": "coordinate",
+      "sourceLine": "<ChevronDownIcon"
+    },
+    {
+      "id": "hero-play",
+      "path": "app/ui/src/components/artist/ArtistHeroArtworkEditor.tsx",
+      "line": 1045,
+      "control": "Play en la presentación del hero",
+      "proposal": "Conservar la representación de Listen",
+      "why": "Es un span dentro de una vista pointer-events-none: representa el resultado de otra app, no un transporte Admin. Revisar fidelidad al migrar el editor.",
+      "kind": "content",
+      "sourceLine": "<Play size={17} fill=\"currentColor\" />"
+    },
+    {
+      "id": "hero-follow",
+      "path": "app/ui/src/components/artist/ArtistHeroArtworkEditor.tsx",
+      "line": 1056,
+      "control": "Follow en la presentación del hero",
+      "proposal": "Conservar la representación de Listen",
+      "why": "Mismo contexto de presentación; no autoriza iconos en las acciones del editor.",
+      "kind": "content",
+      "sourceLine": "<Heart size={18} />"
+    },
+    {
+      "id": "qr",
+      "path": "app/ui/src/components/ui/QrCodeImage.tsx",
+      "line": 19,
+      "control": "Código QR",
+      "proposal": "Conservar los datos codificados",
+      "why": "El patrón comunica una URL a un lector; es contenido funcional, no un glifo decorativo.",
+      "kind": "content",
+      "sourceLine": "QRCode.toDataURL(value, {"
+    },
+    {
+      "id": "oauth-google",
+      "path": "app/shared/ui/domain/auth/OAuthButtons.tsx",
+      "line": 121,
+      "control": "Marca de Google",
+      "proposal": "Conservar la marca; revisar botón con texto en su fase",
+      "why": "Activo de identidad del proveedor. No constituye excepción general para iconos de acciones.",
+      "kind": "content",
+      "sourceLine": "<GoogleIcon className=\" size-5\" />"
+    },
+    {
+      "id": "oauth-apple",
+      "path": "app/shared/ui/domain/auth/OAuthButtons.tsx",
+      "line": 140,
+      "control": "Marca de Apple",
+      "proposal": "Conservar la marca; revisar botón con texto en su fase",
+      "why": "Activo de identidad del proveedor; mantener accesibilidad y disponibilidad.",
+      "kind": "content",
+      "sourceLine": "<AppleIcon className=\" size-5\" />"
+    },
+    {
+      "id": "playlist-brand",
+      "path": "app/ui/src/components/playlists/PlaylistArtwork.tsx",
+      "line": 33,
+      "control": "Marca de Crate en cubierta",
+      "proposal": "Conservar la cubierta",
+      "why": "La imagen pertenece al contenido de la playlist; no es decoración de navegación.",
+      "kind": "content",
+      "sourceLine": "logoSrc=\"/assets/logo.svg\""
+    },
+    {
+      "id": "map",
+      "path": "app/ui/src/components/users/UserMap.tsx",
+      "line": 280,
+      "control": "Mapa de usuarios y marcadores",
+      "proposal": "Conservar posiciones, agrupación y datos",
+      "why": "Es un instrumento. Los glifos de sus acciones y leyendas siguen sujetos a retirada.",
+      "kind": "content",
+      "sourceLine": "<Marker"
+    }
+  ]
+}

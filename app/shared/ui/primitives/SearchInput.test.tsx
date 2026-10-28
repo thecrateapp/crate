@@ -127,4 +127,65 @@ describe("SearchInput", () => {
     expect(ref.current).toBeInstanceOf(HTMLInputElement);
     expect(onChange).toHaveBeenCalledTimes(1);
   });
+
+  it("cancels a pending query when clear is pressed", () => {
+    vi.useFakeTimers();
+    const onDebouncedChange = vi.fn();
+    const onValueChange = vi.fn();
+    render(
+      <SearchInput
+        defaultValue="jazz"
+        debounceMs={200}
+        onDebouncedChange={onDebouncedChange}
+        onValueChange={onValueChange}
+      />,
+    );
+    const input = screen.getByRole("searchbox");
+    fireEvent.change(input, { target: { value: "ambient" } });
+    act(() => vi.advanceTimersByTime(100));
+    fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(input).toHaveValue("");
+    expect(input).toHaveFocus();
+    expect(onValueChange).toHaveBeenLastCalledWith("");
+    expect(onDebouncedChange).toHaveBeenCalledWith("");
+    act(() => vi.advanceTimersByTime(500));
+    expect(onDebouncedChange).toHaveBeenCalledOnce();
+  });
+  it("keeps a readonly query immutable by omitting its clear action", async () => {
+    const onValueChange = vi.fn();
+    render(
+      <SearchInput
+        label="Saved query"
+        defaultValue="ambient"
+        readOnly
+        onValueChange={onValueChange}
+      />,
+    );
+    expect(
+      screen.getByRole("searchbox", { name: "Saved query" }),
+    ).toHaveAttribute("readonly");
+    expect(
+      screen.queryByRole("button", { name: "Clear search" }),
+    ).not.toBeInTheDocument();
+    await userEvent.type(screen.getByRole("searchbox"), "jazz");
+    expect(screen.getByRole("searchbox")).toHaveValue("ambient");
+    expect(onValueChange).not.toHaveBeenCalled();
+  });
+
+  it("waits until IME composition ends before emitting a search", () => {
+    vi.useFakeTimers();
+    const onDebouncedChange = vi.fn();
+    render(
+      <SearchInput onDebouncedChange={onDebouncedChange} debounceMs={200} />,
+    );
+    const input = screen.getByRole("searchbox");
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: "に" } });
+    act(() => vi.advanceTimersByTime(500));
+    expect(onDebouncedChange).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: "日本" } });
+    fireEvent.compositionEnd(input);
+    act(() => vi.advanceTimersByTime(200));
+    expect(onDebouncedChange).toHaveBeenCalledWith("日本");
+  });
 });

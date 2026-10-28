@@ -1,19 +1,20 @@
-import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import type { ComponentPropsWithRef, ReactNode } from "react";
 
+import {
+  MEDIA_RAIL_BASE_CLASS_NAME,
+  MEDIA_RAIL_COLUMNS_CLASS_NAME,
+} from "@crate/ui/lib/media-layout";
 import { cn } from "@crate/ui/lib/cn";
 
 export type MediaRailFit = "content" | "columns";
 
 export interface MediaRailProps
-  extends Omit<ComponentPropsWithoutRef<"div">, "children"> {
+  extends Omit<ComponentPropsWithRef<"div">, "children"> {
   children: ReactNode;
   fit?: MediaRailFit;
   label?: string;
   labelledBy?: string;
 }
-
-const COLUMNS_CLASS_NAME =
-  "grid grid-flow-col auto-cols-[var(--content-rail-column-2)] sm:auto-cols-[var(--content-rail-column-3)] md:auto-cols-[var(--content-rail-column-4)] lg:auto-cols-[var(--content-rail-column-5)] xl:auto-cols-[var(--content-rail-column-6)] 2xl:auto-cols-[var(--content-rail-column-7)]";
 
 export function MediaRail({
   children,
@@ -23,17 +24,21 @@ export function MediaRail({
   labelledBy,
   ...props
 }: MediaRailProps) {
+  const name = label ?? props["aria-label"];
+  const heading = labelledBy ?? props["aria-labelledby"];
   return (
     <div
       {...props}
-      role={label || labelledBy ? "region" : props.role}
-      aria-label={label}
-      aria-labelledby={labelledBy}
+      role={props.role ?? (name || heading ? "region" : undefined)}
+      aria-label={name}
+      aria-labelledby={heading}
+      tabIndex={props.tabIndex ?? (name || heading ? 0 : undefined)}
+      data-slot="media-rail"
       data-testid="media-rail"
       data-rail-fit={fit}
       className={cn(
-        "hide-rail-scrollbar snap-x snap-mandatory gap-[var(--content-rail-gap)] overflow-x-auto overflow-y-hidden pb-2 transform-gpu will-change-scroll [&>*]:shrink-0",
-        fit === "columns" ? COLUMNS_CLASS_NAME : "flex",
+        MEDIA_RAIL_BASE_CLASS_NAME,
+        fit === "columns" ? MEDIA_RAIL_COLUMNS_CLASS_NAME : "flex",
         className,
       )}
     >

@@ -1,6 +1,10 @@
 import { useCallback, useRef, useState } from "react";
 
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
+import type { EngineMixState } from "@/lib/playback-engine";
+import { sameNativeMixState } from "@/lib/native-mix-state";
+import { shouldUseAndroidNativePlayer } from "@/lib/android-native-engine";
+import { isCastSessionActive } from "@/lib/cast-sender";
 import type { CrossfadeTransition } from "@/contexts/player-context";
 import { clampIndex } from "@/contexts/player-queue-helpers";
 import {
@@ -39,6 +43,23 @@ export function usePlayerRuntimeState() {
   const [analyserVersion, setAnalyserVersion] = useState(0);
   const [crossfadeTransition, setCrossfadeTransition] =
     useState<CrossfadeTransition | null>(null);
+  const [mixState, setActualMixState] = useState<EngineMixState | null>(null);
+  const nativeMixAvailableRef = useRef(false);
+  const setNativeMixAvailable = useCallback((available: boolean) => {
+    nativeMixAvailableRef.current = available;
+    if (!available) setActualMixState(null);
+  }, []);
+  const setMixState = useCallback((next: EngineMixState | null) => {
+    const accepted =
+      nativeMixAvailableRef.current &&
+      shouldUseAndroidNativePlayer() &&
+      !isCastSessionActive()
+        ? next
+        : null;
+    setActualMixState((previous) =>
+      sameNativeMixState(previous, accepted) ? previous : accepted,
+    );
+  }, []);
   const [shuffle, setShuffleState] = useState(() => stored.shuffle);
   const [playSource, setPlaySource] = useState<PlaySource | null>(
     () => stored.playSource,
@@ -120,6 +141,7 @@ export function usePlayerRuntimeState() {
   const commitQueue = useCallback((nextQueue: Track[]) => {
     queueRef.current = nextQueue;
     setQueueState(nextQueue);
+    setActualMixState(null);
   }, []);
 
   const commitJamQueueLocked = useCallback((locked: boolean) => {
@@ -217,6 +239,9 @@ export function usePlayerRuntimeState() {
     volume,
     analyserVersion,
     crossfadeTransition,
+    mixState,
+    setMixState,
+    setNativeMixAvailable,
     shuffle,
     playSource,
     repeat,

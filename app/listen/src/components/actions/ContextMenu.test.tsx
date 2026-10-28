@@ -69,7 +69,7 @@ describe("ContextMenu", () => {
     mockNonTouchPointerEnvironment();
   });
 
-  it("renders the canonical glass desktop menu with a media header", async () => {
+  it("renders the canonical shared desktop menu with a media header", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     const onSelect = vi.fn();
@@ -87,12 +87,11 @@ describe("ContextMenu", () => {
 
     const menu = screen.getByRole("menu");
     expect(menu).toHaveClass(
-      "listen-glass-panel",
+      "crate-overlay-surface",
       "fixed",
       "max-w-[calc(100vw-24px)]",
       "max-h-[calc(100vh-24px)]",
       "w-72",
-      "rounded-2xl",
       "overflow-y-auto",
       "overflow-x-hidden",
       "z-app-context-menu",
@@ -121,7 +120,7 @@ describe("ContextMenu", () => {
     );
 
     const dialog = screen.getByRole("dialog");
-    expect(dialog.querySelector(".listen-glass-panel")).toBeInTheDocument();
+    expect(dialog.querySelector(".crate-overlay-panel")).toBeInTheDocument();
     expect(screen.getByText("El Cielo")).toBeInTheDocument();
     expect(
       screen.getByRole("menuitem", { name: /Play now/i }),
@@ -168,7 +167,7 @@ describe("ContextMenu", () => {
 
     expect(
       screen.getByRole("menuitem", { name: /Add to playlist/i }),
-    ).toHaveClass("rounded-md");
+    ).toHaveClass("crate-overlay-menu-item");
 
     await user.click(screen.getByRole("menuitem", { name: "Favorites" }));
 

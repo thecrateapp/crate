@@ -1,0 +1,76 @@
+.admin-show-ticket {
+  --show-ticket-notch: 0.875rem;
+}
+
+.admin-show-ticket-top,
+.admin-show-ticket-bottom {
+  border: 1px solid var(--border-quiet);
+  background-color: var(--surface-object);
+}
+
+.admin-show-ticket-top {
+  border-bottom: 0;
+  border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+  -webkit-mask:
+    radial-gradient(
+        circle at 0 100%,
+        transparent var(--show-ticket-notch),
+        black calc(var(--show-ticket-notch) + 0.5px)
+      )
+      left / 51% 100% no-repeat,
+    radial-gradient(
+        circle at 100% 100%,
+        transparent var(--show-ticket-notch),
+        black calc(var(--show-ticket-notch) + 0.5px)
+      )
+      right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(
+        circle at 0 100%,
+        transparent var(--show-ticket-notch),
+        black calc(var(--show-ticket-notch) + 0.5px)
+      )
+      left / 51% 100% no-repeat,
+    radial-gradient(
+        circle at 100% 100%,
+        transparent var(--show-ticket-notch),
+        black calc(var(--show-ticket-notch) + 0.5px)
+      )
+      right / 51% 100% no-repeat;
+}
+
+.admin-show-ticket-bottom {
+  border-top: 0;
+  border-radius: 0 0 var(--radius-panel) var(--radius-panel);
+  -webkit-mask:
+    radial-gradient(
+        circle at 0 0,
+        transparent var(--show-ticket-notch),
+        black calc(var(--show-ticket-notch) + 0.5px)
+      )
+      left / 51% 100% no-repeat,
+    radial-gradient(
+        circle at 100% 0,
+        transparent var(--show-ticket-notch),
+        black calc(var(--show-ticket-notch) + 0.5px)
+      )
+      right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(
+        circle at 0 0,
+        transparent var(--show-ticket-notch),
+        black calc(var(--show-ticket-notch) + 0.5px)
+      )
+      left / 51% 100% no-repeat,
+    radial-gradient(
+        circle at 100% 0,
+        transparent var(--show-ticket-notch),
+        black calc(var(--show-ticket-notch) + 0.5px)
+      )
+      right / 51% 100% no-repeat;
+}
+
+.admin-show-ticket-perforation {
+  margin-inline: var(--show-ticket-notch);
+  border-top: 1px dashed var(--border-interactive);
+}

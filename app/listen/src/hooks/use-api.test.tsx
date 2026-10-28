@@ -274,6 +274,24 @@ describe("useApi", () => {
     expect(result.current.status).toBe(404);
   });
 
+  it("lets an authoritative read report cached failures without discarding its payload", async () => {
+    const cached = { name: "post-punk", shows: [{ id: 42 }] };
+    vi.mocked(cacheGet).mockImplementation((url) =>
+      url === "/api/genres/post-punk" ? cached : null,
+    );
+    vi.mocked(api).mockRejectedValueOnce(
+      Object.assign(new Error("Genre not found"), { status: 404 }),
+    );
+    const { result } = renderHook(() =>
+      useApi("/api/genres/post-punk", "GET", undefined, {
+        reportCachedErrors: true,
+      }),
+    );
+    await waitFor(() => expect(result.current.status).toBe(404));
+    expect(result.current.error).toBe("Genre not found");
+    expect(result.current.data).toBe(cached);
+  });
+
   it("defers initial revalidation when cached data is good enough for first paint", async () => {
     vi.useFakeTimers();
     const apiMock = vi.mocked(api);
@@ -281,15 +299,12 @@ describe("useApi", () => {
     vi.stubGlobal(
       "requestIdleCallback",
       vi.fn((callback: IdleRequestCallback, options?: IdleRequestOptions) => {
-        const handle = window.setTimeout(
-          () => {
-            callback({
-              didTimeout: false,
-              timeRemaining: () => 50,
-            } as IdleDeadline);
-          },
-          options?.timeout ?? 0,
-        );
+        const handle = window.setTimeout(() => {
+          callback({
+            didTimeout: false,
+            timeRemaining: () => 50,
+          } as IdleDeadline);
+        }, options?.timeout ?? 0);
         return handle;
       }),
     );

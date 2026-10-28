@@ -1,0 +1,152 @@
+---
+import { OUTBOX_LANES, OUTBOX_STEPS } from "../../content/architecture/viz";
+
+const column = (id: string) => OUTBOX_LANES.findIndex((lane) => lane.id === id);
+---
+
+<figure class="seq" data-viz="steps" data-step-rate="1.1" data-reveal aria-label="Outbox sequence: the API commits the change and its event together, the relay leases and appends it to a Redis stream, the projector warms the snapshot and only then acknowledges">
+  <ol class="lanes" aria-hidden="true">
+    {OUTBOX_LANES.map((lane) => <li>{lane.label}</li>)}
+  </ol>
+  <ol class="rows">
+    {
+      OUTBOX_STEPS.map((step, index) => {
+        const a = column(step.from);
+        const b = column(step.to);
+        return (
+          <li data-step style={`--from:${Math.min(a, b)};--to:${Math.max(a, b)};--dir:${b > a ? 1 : -1}`}>
+            <span class="n">{String(index + 1).padStart(2, "0")}</span>
+            <span class="track" aria-hidden="true">
+              <i class="arrow" />
+              <i class="dot from" style={`--at:${a}`} />
+              <i class="dot to" style={`--at:${b}`} />
+            </span>
+            <code data-type>{step.text}</code>
+          </li>
+        );
+      })
+    }
+  </ol>
+</figure>
+
+<style>
+  .seq {
+    --cols: 5;
+    margin: 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .lanes,
+  .rows {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .lanes {
+    display: grid;
+    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+    margin-left: 3ch;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--cyan-hi);
+    text-align: center;
+  }
+
+  .rows {
+    position: relative;
+    margin-top: 12px;
+  }
+
+  .rows li {
+    display: grid;
+    grid-template-columns: 3ch minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    gap: 2px 0;
+    padding: 8px 0;
+    transition: opacity 0.35s var(--ease-snap);
+  }
+
+  .seq:global(.is-running) .rows li {
+    opacity: 0.18;
+  }
+
+  .seq:global(.is-running) .rows li:global(.is-on),
+  .seq:global(.is-running) .rows li:global(.is-done) {
+    opacity: 1;
+  }
+
+  .n {
+    grid-row: span 2;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--fg-3);
+  }
+
+  .track {
+    position: relative;
+    height: 14px;
+    background: repeating-linear-gradient(
+      90deg,
+      transparent 0 calc(100% / var(--cols) / 2 - 0.5px),
+      var(--line) calc(100% / var(--cols) / 2 - 0.5px) calc(100% / var(--cols) / 2 + 0.5px),
+      transparent calc(100% / var(--cols) / 2 + 0.5px) calc(100% / var(--cols))
+    );
+  }
+
+  .arrow {
+    position: absolute;
+    top: 6px;
+    left: calc((var(--from) + 0.5) * 100% / var(--cols));
+    width: calc((var(--to) - var(--from)) * 100% / var(--cols));
+    height: 2px;
+    background: var(--cyan-hi);
+    transform-origin: calc(50% - var(--dir) * 50%) 50%;
+    transition: transform 0.6s var(--ease-out);
+  }
+
+  .seq:global(.is-running) li:not(:global(.is-on), :global(.is-done)) .arrow {
+    transform: scaleX(0);
+  }
+
+  .dot {
+    position: absolute;
+    top: 3px;
+    left: calc((var(--at) + 0.5) * 100% / var(--cols) - 4px);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 1px solid var(--cyan-hi);
+  }
+
+  .dot.to {
+    background: var(--cyan-hi);
+  }
+
+  code {
+    min-height: 1.6em;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--fg-2);
+    text-align: left;
+  }
+
+  li:global(.is-on) code {
+    color: var(--fg);
+  }
+
+  @media (max-width: 760px) {
+    .lanes {
+      font-size: 8px;
+      letter-spacing: 0.04em;
+    }
+    code {
+      font-size: 10.5px;
+    }
+  }
+</style>

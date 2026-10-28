@@ -1,16 +1,12 @@
+import { FilterChip } from "@crate/ui/primitives/FilterChip";
+import { ArtistDetailSection } from "./ArtistDetailSection";
+import { AdminSelect } from "@/components/ui";
 import { AlbumCard } from "@/components/album/AlbumCard";
 import { MissingAlbumCard } from "@/components/album/MissingAlbumCard";
 import { TidalAlbumCard } from "@/components/album/TidalAlbumCard";
 import type { ArtistAlbumSummary } from "@/components/artist/artistPageTypes";
 import { Button } from "@crate/ui/shadcn/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@crate/ui/shadcn/select";
-import { Disc3, Eye, EyeOff, Loader2 } from "lucide-react";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 interface MissingAlbum {
   title: string;
@@ -63,50 +59,45 @@ export function ArtistDiscographySection({
   onDownloadDiscography,
 }: ArtistDiscographySectionProps) {
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-4">
-          <h2 className="text-lg font-semibold">{albums.length} Albums</h2>
+    <ArtistDetailSection
+      title="Albums"
+      count={albums.length}
+      actions={
+        <>
           {missingAlbums.length > 0 && (
-            <button
-              onClick={onToggleShowMissing}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {showMissing ? <Eye size={14} /> : <EyeOff size={14} />}
+            <FilterChip active={showMissing} onClick={onToggleShowMissing}>
               {showMissing ? "Hide" : "Show"} missing ({missingAlbums.length})
-            </button>
+            </FilterChip>
           )}
           {canDownloadTidal && tidalMissing.length > 0 && (
             <Button
               size="sm"
               variant="outline"
-              className="border-primary/30 text-primary hover:bg-primary/10"
-              disabled={downloadingDiscog}
+              loading={downloadingDiscog}
               onClick={() => {
                 void onDownloadDiscography();
               }}
             >
-              {downloadingDiscog ? (
-                <Loader2 size={14} className="animate-spin mr-1" />
-              ) : (
-                <Disc3 size={14} className="mr-1" />
-              )}
               Complete Discography ({tidalMissing.length} from Tidal)
             </Button>
           )}
-        </div>
-        <Select value={sort} onValueChange={onSortChange}>
-          <SelectTrigger className="w-[140px] bg-card border-border h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="name">Name</SelectItem>
-            <SelectItem value="year">Newest</SelectItem>
-            <SelectItem value="tracks">Most Tracks</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
+          <div className="w-44">
+            <AdminSelect
+              ariaLabel="Sort albums"
+              placeholder="Sort albums"
+              value={sort}
+              onChange={onSortChange}
+              allowClear={false}
+              options={[
+                { value: "name", label: "Name" },
+                { value: "year", label: "Newest" },
+                { value: "tracks", label: "Most Tracks" },
+              ]}
+            />
+          </div>
+        </>
+      }
+    >
       <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
         {(() => {
           type GridItem =
@@ -150,6 +141,16 @@ export function ArtistDiscographySection({
                     : b.album.first_release_date || "";
               return yearB.localeCompare(yearA);
             });
+          }
+
+          if (items.length === 0) {
+            return (
+              <EmptyState
+                className="col-span-full"
+                title="No albums in library"
+                description="Albums added to this artist will appear here."
+              />
+            );
           }
 
           return items.map((item) =>
@@ -197,6 +198,6 @@ export function ArtistDiscographySection({
           );
         })()}
       </div>
-    </div>
+    </ArtistDetailSection>
   );
 }

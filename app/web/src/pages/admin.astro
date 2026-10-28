@@ -1,0 +1,97 @@
+---
+import Chapter from "../components/Chapter.astro";
+import ChapterRail from "../components/ChapterRail.astro";
+import ChapterToc from "../components/ChapterToc.astro";
+import FeatureList from "../components/FeatureList.astro";
+import Gallery from "../components/Gallery.astro";
+import PageHeader from "../components/PageHeader.astro";
+import McpAgents from "../components/admin/McpAgents.astro";
+import AlbumSidecar from "../components/viz/AlbumSidecar.astro";
+import EnrichmentOrbit from "../components/viz/EnrichmentOrbit.astro";
+import GenreWheel from "../components/viz/GenreWheel.astro";
+import HealthScan from "../components/viz/HealthScan.astro";
+import QueueLanes from "../components/viz/QueueLanes.astro";
+import ReleaseTimeline from "../components/viz/ReleaseTimeline.astro";
+import TrackReadout from "../components/viz/TrackReadout.astro";
+import VizSplit from "../components/viz/VizSplit.astro";
+import { admin } from "../content/admin/en";
+import Base from "../layouts/Base.astro";
+import { chapterId } from "../lib/chapters";
+
+const chapters = admin.chapters.map((chapter, index) => ({
+  ...chapter,
+  index: index + 1,
+  id: chapter.id ?? chapterId(index + 1, chapter.title),
+}));
+const bands: Record<string, unknown> = {
+  Health: HealthScan,
+  Imports: AlbumSidecar,
+  Acquisition: ReleaseTimeline,
+  Genres: GenreWheel,
+  Operations: QueueLanes,
+};
+const splits: Record<string, { visual: unknown; side: "left" | "right" }> = {
+  Enrichment: { visual: EnrichmentOrbit, side: "left" },
+  "Analysis & Insights": { visual: TrackReadout, side: "right" },
+};
+---
+
+<Base title={admin.meta.title} description={admin.meta.description}>
+  <div class="admin">
+    <PageHeader eyebrow={admin.eyebrow} title={admin.title} lede={admin.lede}>
+      <ChapterToc items={chapters} />
+    </PageHeader>
+    <ChapterRail items={chapters} />
+
+    <Gallery app="admin" />
+
+    {
+      chapters.map((chapter) => {
+        const Band = bands[chapter.title] as typeof HealthScan | undefined;
+        const split = splits[chapter.title];
+        const Visual = split?.visual as typeof TrackReadout | undefined;
+        return (
+          <Chapter index={chapter.index} title={chapter.title} id={chapter.id} status={chapter.status}>
+            <Fragment slot="lede">
+              {chapter.lede.map((paragraph) => (
+                <p>{paragraph}</p>
+              ))}
+            </Fragment>
+            {Band && (
+              <div class="viz-band">
+                <Band />
+              </div>
+            )}
+            {split && Visual && chapter.features ? (
+              <VizSplit side={split.side}>
+                <FeatureList items={chapter.features} />
+                <Visual slot="visual" />
+              </VizSplit>
+            ) : (
+              chapter.features && <FeatureList items={chapter.features} />
+            )}
+            {chapter.id === "mcp" && <McpAgents />}
+          </Chapter>
+        );
+      })
+    }
+  </div>
+</Base>
+
+<script>
+  import { initCounters } from "../scripts/architecture/counters";
+  import { mountOnPage } from "../scripts/motion/page";
+  import { initTextMotion } from "../scripts/motion/text-motion";
+  import { initViz } from "../scripts/viz";
+
+  mountOnPage(".admin", () => {
+    const cleanups = [initTextMotion(), initViz(), initCounters()];
+    return () => cleanups.forEach((cleanup) => cleanup());
+  });
+</script>
+
+<style>
+  .admin {
+    padding-bottom: 12vh;
+  }
+</style>

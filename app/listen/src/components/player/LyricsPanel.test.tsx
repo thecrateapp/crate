@@ -33,7 +33,7 @@ describe("lyrics surfaces", () => {
       },
     );
 
-    const panel = screen.getByText("Lyrics").closest(".listen-glass-panel");
+    const panel = screen.getByText("Lyrics").closest(".bg-surface-canvas");
     const activeLine = await screen.findByRole("button", {
       name: "First line",
     });
@@ -43,13 +43,12 @@ describe("lyrics surfaces", () => {
       "border-border-quiet",
       "bottom-(--listen-desktop-player-clearance)",
     );
-    expect(screen.getByText("Lyrics")).toHaveClass("text-text-primary");
-    expect(container.querySelector(".lyrics-ambient-glow")).toBeInTheDocument();
-    expect(activeLine).toHaveClass(
-      "bg-accent-action/10",
-      "text-accent-action",
-      "lyrics-active-line",
-    );
+    expect(screen.getByText("Lyrics")).toHaveClass("font-mono", "uppercase");
+    expect(
+      container.querySelector(".lyrics-ambient-glow"),
+    ).not.toBeInTheDocument();
+    expect(activeLine).toHaveAttribute("aria-current", "true");
+    expect(activeLine).toHaveClass("listen-lyric-line");
     expect(container.innerHTML).not.toContain("rgba(");
     expect(container.innerHTML).not.toContain("text-white/");
   });
@@ -74,12 +73,9 @@ describe("lyrics surfaces", () => {
 
     expect(
       container.querySelector(".lyrics-surface-gradient"),
-    ).toBeInTheDocument();
-    expect(activeLine).toHaveClass(
-      "bg-accent-action/10",
-      "text-accent-action",
-      "lyrics-active-line",
-    );
+    ).not.toBeInTheDocument();
+    expect(activeLine).toHaveAttribute("aria-current", "true");
+    expect(activeLine).toHaveClass("listen-lyric-line");
     expect(container.innerHTML).not.toContain("rgba(");
     expect(container.innerHTML).not.toContain("text-white/");
   });

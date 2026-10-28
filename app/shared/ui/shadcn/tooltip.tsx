@@ -2,9 +2,13 @@ import * as React from "react";
 import { Tooltip as TooltipPrimitive } from "radix-ui";
 
 import { cn } from "@crate/ui/lib/cn";
+import {
+  focusFollowsPointer,
+  trackInputModality,
+} from "@crate/ui/lib/input-modality";
 
 function TooltipProvider({
-  delayDuration = 0,
+  delayDuration = 400,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
   return (
@@ -16,16 +20,34 @@ function TooltipProvider({
   );
 }
 
+const InsideTooltip = React.createContext(false);
+
 function Tooltip({
+  children,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
-  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />;
+  return (
+    <TooltipPrimitive.Root data-slot="tooltip" {...props}>
+      <InsideTooltip.Provider value={true}>{children}</InsideTooltip.Provider>
+    </TooltipPrimitive.Root>
+  );
 }
 
 function TooltipTrigger({
+  onFocus,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
-  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />;
+  React.useEffect(trackInputModality, []);
+  return (
+    <TooltipPrimitive.Trigger
+      data-slot="tooltip-trigger"
+      onFocus={(event) => {
+        onFocus?.(event);
+        if (focusFollowsPointer()) event.preventDefault();
+      }}
+      {...props}
+    />
+  );
 }
 
 function TooltipContent({
@@ -40,7 +62,7 @@ function TooltipContent({
         data-slot="tooltip-content"
         sideOffset={sideOffset}
         className={cn(
-          "z-app-popover w-fit origin-(--radix-tooltip-content-transform-origin) animate-in rounded-md bg-text-primary px-3 py-1.5 text-xs text-balance text-surface-canvas fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
+          "crate-overlay-tooltip z-app-popover w-fit origin-(--radix-tooltip-content-transform-origin) px-3 py-1.5 text-balance",
           className,
         )}
         {...props}
@@ -52,3 +74,33 @@ function TooltipContent({
 }
 
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider };
+
+/** Legacy title metadata uses our tooltip, never a browser tooltip. An outer
+ * Tooltip already owns the description, so nested controls do not create a second one. */
+function TooltipHint({
+  content,
+  children,
+}: {
+  content?: React.ReactNode;
+  children: React.ReactElement;
+}) {
+  const inside = React.useContext(InsideTooltip);
+  const [open, setOpen] = React.useState(false);
+  if (inside) return children;
+  return (
+    <TooltipProvider>
+      <Tooltip
+        open={Boolean(content) && open}
+        onOpenChange={(next) => setOpen(Boolean(content) && next)}
+      >
+        <TooltipTrigger asChild>{children}</TooltipTrigger>
+        {content ? (
+          <TooltipContent side="top" onEscapeKeyDown={() => setOpen(false)}>
+            {content}
+          </TooltipContent>
+        ) : null}
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+export { TooltipHint };

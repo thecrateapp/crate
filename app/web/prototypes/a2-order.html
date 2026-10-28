@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crate · A2 · Order</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      #field {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        opacity: 0;
+      }
+
+      .scrim {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(90deg, rgba(10, 10, 15, 0.92) 0%, rgba(10, 10, 15, 0.7) 34%, rgba(10, 10, 15, 0) 62%);
+      }
+
+      .genre {
+        position: fixed;
+        left: 0;
+        top: 0;
+        pointer-events: none;
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg);
+        white-space: nowrap;
+        opacity: 0;
+      }
+
+      .genre::before {
+        content: "";
+        display: inline-block;
+        width: 18px;
+        height: 1px;
+        margin-right: 8px;
+        background: var(--cyan-hi);
+        vertical-align: middle;
+      }
+
+      .hero-pin {
+        position: relative;
+        height: 260vh;
+      }
+
+      .hero-sticky {
+        position: sticky;
+        top: 0;
+        height: 100dvh;
+        min-height: 660px;
+      }
+
+      .split {
+        position: absolute;
+        inset: 0 clamp(20px, 5vw, 72px);
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+        align-items: center;
+        will-change: opacity, transform;
+      }
+
+      .split .lead {
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+
+      .split .display {
+        font-size: clamp(3.2rem, 8.2vw, 10rem);
+        max-width: 9.5ch;
+        text-wrap: wrap;
+      }
+
+      .split .side {
+        align-self: end;
+        justify-self: end;
+        padding-bottom: 12vh;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 22px;
+        text-align: right;
+        max-width: 640px;
+      }
+
+      .split .sub {
+        font-size: clamp(1.3rem, 2.2vw, 2.3rem);
+      }
+
+      .chapter {
+        position: absolute;
+        inset: 0 clamp(20px, 5vw, 72px);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 22px;
+        max-width: 40vw;
+        pointer-events: none;
+        opacity: 0;
+      }
+
+      .chapter .display {
+        font-size: clamp(2.4rem, 5vw, 5.6rem);
+        font-weight: 700;
+      }
+
+      .chapter .facts {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        font-family: var(--mono);
+        font-size: 11.5px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--fg-3);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .chapter .facts b {
+        color: var(--cyan-hi);
+        font-weight: 400;
+      }
+
+      @media (max-width: 760px) {
+        .scrim {
+          background: rgba(10, 10, 15, 0.55);
+        }
+        .split {
+          grid-template-columns: minmax(0, 1fr);
+          align-content: center;
+          gap: 28px;
+        }
+        .split .display {
+          font-size: 13vw;
+        }
+        .split .side {
+          justify-self: start;
+          align-items: flex-start;
+          text-align: left;
+          padding: 0;
+        }
+        .chapter {
+          max-width: none;
+        }
+        .genre {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="field" aria-hidden="true"></canvas>
+    <div class="scrim" aria-hidden="true"></div>
+
+    <main>
+      <section class="hero-pin">
+        <div class="hero-sticky">
+          <div class="split">
+            <div class="lead"></div>
+            <div class="side"></div>
+          </div>
+          <div class="chapter" aria-hidden="true">
+            <p class="eyebrow"><b>Radio</b> / Paths / Discovery</p>
+            <h2 class="display" data-split style="--step: 45ms">Your library, organised by sound.</h2>
+            <div class="facts">
+              <span><b>20</b> dimensions per track</span>
+              <span><b>48,213</b> tracks analysed</span>
+              <span>BPM · key · energy · loudness · mood</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="proto-tag">A2 · Order</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"></script>
+    <script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+    <script type="module">
+      import {
+        mountNav,
+        mountHero,
+        mountSections,
+        splitWords,
+        startEntry,
+        initReveals,
+        initSmoothScroll,
+        spring,
+        reducedMotion,
+        finePointer,
+        isMobile,
+      } from "./hero.js";
+      import { createField, clusterCenters, cloudPositions, ballPositions } from "./field.js";
+
+      mountNav();
+      const lead = document.querySelector(".split .lead");
+      const side = document.querySelector(".split .side");
+      mountHero(lead);
+      side.append(lead.querySelector(".sub"), lead.querySelector(".cta"));
+      mountSections(document.querySelector("main"));
+      const chapter = document.querySelector(".chapter");
+      splitWords(chapter.querySelector("[data-split]"));
+      initSmoothScroll();
+      initReveals();
+      const split = document.querySelector(".split");
+      startEntry(split, 120);
+
+      const { gsap, ScrollTrigger } = window;
+      const COUNT = isMobile ? 14000 : 48000;
+      const centers = clusterCenters(12, 0.8);
+      const order = cloudPositions(COUNT, centers);
+      const chaos = ballPositions(COUNT, 1.45);
+      const canvas = document.getElementById("field");
+      const field = createField(canvas, { positions: chaos, targets: order.positions, pointScale: 8.4, isMobile });
+
+      const GENRES = ["Post-rock", "Doom", "Shoegaze", "Hip hop", "Ambient", "Jazz", "Techno", "Black metal", "Folk"];
+      const labels = GENRES.map((name) => {
+        const label = document.createElement("div");
+        label.className = "genre";
+        label.textContent = name;
+        document.body.appendChild(label);
+        return label;
+      });
+
+      const state = { intro: 0, morph: 0, labels: 0, yaw: 0, pitch: 0, targetYaw: 0, targetPitch: 0, visible: true };
+      if (finePointer && !reducedMotion) {
+        addEventListener("pointermove", (event) => {
+          state.targetYaw = (event.clientX / innerWidth - 0.5) * 0.35;
+          state.targetPitch = (event.clientY / innerHeight - 0.5) * 0.2;
+        });
+      }
+
+      function render(time) {
+        const t = time / 1000;
+        state.yaw += (state.targetYaw - state.yaw) * 0.045;
+        state.pitch += (state.targetPitch - state.pitch) * 0.045;
+        const orbit = t * 0.06 * (1 - state.morph * 0.7) + state.yaw;
+        const distance = 6.5 - (6.5 - 3.6) * state.intro - state.morph * 0.5;
+        const shift = isMobile ? 0 : -0.95 + state.morph * 0.45;
+        const right = [Math.cos(orbit), 0, -Math.sin(orbit)];
+        const target = [right[0] * shift, 0, right[2] * shift];
+        const eye = [target[0] + Math.sin(orbit) * distance, 0.35 + state.pitch * 1.6, target[2] + Math.cos(orbit) * distance];
+        field.render({ eye, target, time: t, morph: state.morph });
+
+        labels.forEach((label, i) => {
+          const center = centers[i];
+          const s = field.project([center.x, center.y, center.z]);
+          label.style.transform = `translate3d(${s.x + 12}px, ${s.y - 6}px, 0)`;
+          label.style.opacity = s.w > 0 ? state.labels : 0;
+        });
+      }
+
+      if (reducedMotion) {
+        state.intro = 1;
+        state.morph = 1;
+        canvas.style.opacity = 1;
+        render(0);
+      } else {
+        gsap.to(canvas, { opacity: 1, duration: 1.1, ease: "power2.out" });
+        gsap.to(state, { intro: 1, duration: 2, ease: spring });
+        const loop = (time) => {
+          if (state.visible && !document.hidden) render(time);
+          requestAnimationFrame(loop);
+        };
+        requestAnimationFrame(loop);
+
+        let chapterShown = false;
+        ScrollTrigger.create({
+          trigger: ".hero-pin",
+          start: "top top",
+          end: "bottom bottom",
+          scrub: true,
+          onUpdate: ({ progress }) => {
+            const copyFade = Math.min(1, progress / 0.14);
+            gsap.set(split, { opacity: 1 - copyFade, x: -copyFade * 60 });
+            state.morph = Math.min(1, Math.max(0, (progress - 0.12) / 0.5));
+            state.labels = Math.min(1, Math.max(0, (progress - 0.58) / 0.12)) * (1 - Math.max(0, (progress - 0.9) / 0.1));
+            const chapterIn = Math.min(1, Math.max(0, (progress - 0.16) / 0.1));
+            const chapterOut = Math.max(0, (progress - 0.88) / 0.12);
+            gsap.set(chapter, { opacity: chapterIn * (1 - chapterOut) });
+            if (chapterIn > 0.3 && !chapterShown) {
+              chapterShown = true;
+              chapter.classList.add("is-in");
+            }
+          },
+        });
+
+        const fieldFade = { statement: 0, screen: 0 };
+        const applyFieldFade = () => {
+          const opacity = (1 - 0.84 * fieldFade.statement) * (1 - fieldFade.screen);
+          gsap.set(canvas, { opacity });
+          state.visible = opacity > 0.001;
+        };
+        ScrollTrigger.create({
+          trigger: ".statement",
+          start: "top bottom",
+          end: "top 45%",
+          scrub: true,
+          onUpdate: ({ progress }) => {
+            fieldFade.statement = progress;
+            applyFieldFade();
+          },
+        });
+        ScrollTrigger.create({
+          trigger: ".screencast",
+          start: "top bottom",
+          end: "top 30%",
+          scrub: true,
+          onUpdate: ({ progress }) => {
+            fieldFade.screen = progress;
+            applyFieldFade();
+          },
+        });
+        gsap.fromTo(
+          "[data-frame]",
+          { scale: 0.86, opacity: 0, y: 60 },
+          {
+            scale: 1,
+            opacity: 1,
+            y: 0,
+            ease: "none",
+            scrollTrigger: { trigger: ".screencast", start: "top 85%", end: "top 20%", scrub: true },
+          },
+        );
+      }
+    </script>
+  </body>
+</html>

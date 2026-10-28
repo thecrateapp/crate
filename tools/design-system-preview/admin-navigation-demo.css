@@ -1,0 +1,37 @@
+@import "../../app/ui/src/index.css";
+@source "./admin-navigation-demo.tsx";
+@source "./admin-ops-review-demo.tsx";
+@source "./admin-ops-checkpoint.tsx";
+@source "../crate-ui-showcase/reviews/AdminNavigationReview.tsx";
+@source "../crate-ui-showcase/reviews/AdminFederationReview.tsx";
+@source "./admin-controls-demo.tsx";
+@source "./admin-operations-demo.tsx";
+@source "./admin-analysis-demo.tsx";
+@source "./admin-dashboard-demo.tsx";
+@source "./admin-system-health-demo.tsx";
+@source "./admin-health-demo.tsx";
+@source "./admin-trash-demo.tsx";
+@source "./admin-contributions-demo.tsx";
+@source "./admin-bandcamp-demo.tsx";
+@source "./admin-discovery-demo.tsx";
+@source "./admin-new-releases-demo.tsx";
+@source "./admin-global-catalog-demo.tsx";
+@source "./admin-roles-demo.tsx";
+@source "./admin-users-demo.tsx";
+@source "../../app/ui/src";
+html {
+  color-scheme: dark;
+  background: var(--surface-canvas);
+}
+body {
+  margin: 0;
+}
+
+@source "./admin-translations-demo.tsx";
+
+@source "./admin-upcoming-demo.tsx";
+
+@source "./admin-playlists-demo.tsx";
+@source "./admin-playlist-editor-demo.tsx";
+
+@source "./row-interaction-sample.tsx";

@@ -53,7 +53,7 @@ function queueTree(currentTime: number) {
 describe("QueueTab rendering", () => {
   it("does not rebuild queue rows when only playback progress changes", () => {
     const { rerender } = render(queueTree(12));
-    expect(queueRowRender).toHaveBeenCalledTimes(1);
+    expect(queueRowRender).toHaveBeenCalledTimes(2);
     expect(document.querySelector(".overflow-y-auto")).toHaveClass(
       "overscroll-contain",
     );

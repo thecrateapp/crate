@@ -1,0 +1,172 @@
+{
+  "/api/bandcamp/me/status": {
+    "connected": true,
+    "status": "connected",
+    "bridge_enabled": true,
+    "display_name": "Diego de muestra",
+    "username": "sample-fan",
+    "connection_method": "browser_bridge"
+  },
+  "/api/bandcamp/me/collection": {
+    "items": [
+      {
+        "id": 1,
+        "artist_name": "Costa Norte",
+        "album_title": "Luz de octubre",
+        "item_url": "https://bandcamp.example.test/album/luz-de-octubre",
+        "cover_url": null
+      }
+    ],
+    "total": 12
+  },
+  "/api/bandcamp/me/wishlist": {
+    "items": [],
+    "total": 5
+  },
+  "/api/bandcamp/me/following": {
+    "items": [],
+    "total": 3
+  },
+  "/api/bandcamp/me/radar": {
+    "items": [
+      {
+        "id": 11,
+        "artist_name": "Costa Norte",
+        "album_title": "Marea de muestra",
+        "item_url": "https://bandcamp.example.test/album/luz-de-octubre",
+        "cover_url": null,
+        "source": "following"
+      },
+      {
+        "id": 12,
+        "artist_name": "Viento Sur",
+        "album_title": "Puerto de muestra",
+        "item_url": null,
+        "cover_url": null
+      }
+    ],
+    "total": 8
+  },
+  "/api/bandcamp/me/imports": {
+    "imports": [
+      {
+        "id": 21,
+        "artist_name": "Costa Norte",
+        "album_title": "Importación completada",
+        "item_url": "https://bandcamp.example.test/album/luz-de-octubre",
+        "cover_url": null,
+        "requested_format": "flac",
+        "status": "completed"
+      },
+      {
+        "id": 22,
+        "artist_name": "Costa Norte",
+        "album_title": "Importación fallida",
+        "item_url": "https://bandcamp.example.test/album/luz-de-octubre",
+        "cover_url": null,
+        "requested_format": "flac",
+        "status": "failed"
+      },
+      {
+        "id": 23,
+        "artist_name": "Costa Norte",
+        "album_title": "Importación activa",
+        "item_url": "https://bandcamp.example.test/album/luz-de-octubre",
+        "cover_url": null,
+        "requested_format": "flac",
+        "status": "running"
+      },
+      {
+        "id": 24,
+        "artist_name": "Costa Norte",
+        "album_title": "Importación pendiente",
+        "item_url": "https://bandcamp.example.test/album/luz-de-octubre",
+        "cover_url": null,
+        "requested_format": "flac",
+        "status": "queued"
+      }
+    ],
+    "total": 7
+  },
+  "/api/bandcamp/admin/collection?relation_type=collection&limit=50": {
+    "items": [
+      {
+        "id": 31,
+        "artist_name": "Costa Norte",
+        "album_title": "Compra de muestra",
+        "item_url": "https://bandcamp.example.test/album/luz-de-octubre",
+        "cover_url": null,
+        "user_name": "Lucía de muestra",
+        "user_email": "lucia@example.test",
+        "latest_import_status": "completed"
+      },
+      {
+        "id": 32,
+        "artist_name": "Costa Norte",
+        "album_title": "Otra compra",
+        "item_url": "https://bandcamp.example.test/album/luz-de-octubre",
+        "cover_url": null,
+        "user_username": "mar-de-muestra",
+        "latest_import_status": null
+      }
+    ],
+    "total": 11
+  },
+  "/api/bandcamp/admin/matches?limit=100": {
+    "items": [
+      {
+        "id": 71,
+        "artist_name": "Costa Norte",
+        "album_title": "Luz de octubre",
+        "item_url": "https://bandcamp.example.test/album/luz-de-octubre",
+        "cover_url": null,
+        "entity_type": "album",
+        "entity_uid": "album-41",
+        "entity_name": "Luz en Crate",
+        "entity_artist": "Costa Norte",
+        "confidence": 0.92,
+        "status": "candidate",
+        "source": "url"
+      },
+      {
+        "id": 72,
+        "artist_name": "Costa Norte",
+        "album_title": "Luz de octubre",
+        "item_url": null,
+        "cover_url": null,
+        "entity_type": "track",
+        "entity_uid": "track-42",
+        "entity_name": "Bruma en Crate",
+        "entity_artist": "Viento Sur",
+        "confidence": 0.74,
+        "status": "candidate",
+        "source": "search"
+      },
+      {
+        "id": 81,
+        "artist_name": "Costa Norte",
+        "album_title": "Luz de octubre",
+        "item_url": "https://bandcamp.example.test/album/luz-de-octubre",
+        "cover_url": null,
+        "entity_type": "album",
+        "entity_uid": "album-43",
+        "entity_name": "Enlace confirmado",
+        "confidence": 1,
+        "status": "confirmed"
+      },
+      {
+        "id": 91,
+        "artist_name": "Costa Norte",
+        "album_title": "Luz de octubre",
+        "item_url": "https://bandcamp.example.test/album/luz-de-octubre",
+        "cover_url": null,
+        "entity_type": "album",
+        "entity_uid": "album-44",
+        "entity_name": "No debe verse",
+        "confidence": 0.2,
+        "status": "rejected"
+      }
+    ],
+    "total": 4
+  }
+}

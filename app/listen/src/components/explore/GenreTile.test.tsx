@@ -21,6 +21,14 @@ function renderTile(variant: "room" | "related", onOpen = vi.fn()) {
 }
 
 describe("GenreTile", () => {
+  it("uses the shared uppercase mono role for relation captions", () => {
+    renderTile("related");
+    expect(screen.getByText("Parent")).toHaveClass(
+      "font-mono",
+      "uppercase",
+      "font-normal",
+    );
+  });
   it.each(["room", "related"] as const)(
     "renders %s tiles as an article with an inner open button",
     (variant) => {

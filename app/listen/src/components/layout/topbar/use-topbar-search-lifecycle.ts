@@ -9,6 +9,7 @@ import {
 import type { SetStateAction } from "react";
 
 import type { TopBarSearchItem } from "./topbar-search-model";
+import { focusWithModality } from "@crate/ui/lib/input-modality";
 
 export function useTopBarSearchLifecycle({
   searchOpen,
@@ -34,6 +35,7 @@ export function useTopBarSearchLifecycle({
   setExpanded: (value: boolean) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const collapseTimerRef = useRef<number | undefined>(undefined);
@@ -42,6 +44,7 @@ export function useTopBarSearchLifecycle({
     left: number;
     top: number;
     width: number;
+    maxHeight: number;
   } | null>(null);
 
   useEffect(() => {
@@ -116,11 +119,22 @@ export function useTopBarSearchLifecycle({
       setDropdownStyle(null);
       return;
     }
-    setDropdownStyle({
-      left: rect.left,
+    const width = Math.min(rect.width || 384, window.innerWidth - 16);
+    const next = {
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
       top: rect.bottom + 4,
-      width: rect.width || containerRef.current?.offsetWidth || 384,
-    });
+      width,
+      maxHeight: Math.max(0, window.innerHeight - rect.bottom - 12),
+    };
+    setDropdownStyle((previous) =>
+      previous &&
+      Object.keys(next).every(
+        (key) =>
+          previous[key as keyof typeof next] === next[key as keyof typeof next],
+      )
+        ? previous
+        : next,
+    );
   }, []);
 
   useLayoutEffect(() => {
@@ -131,9 +145,12 @@ export function useTopBarSearchLifecycle({
 
     updateDropdownPosition();
     const handlePositionUpdate = () => updateDropdownPosition();
+    const observer = new ResizeObserver(handlePositionUpdate);
+    if (containerRef.current) observer.observe(containerRef.current);
     window.addEventListener("resize", handlePositionUpdate);
     window.addEventListener("scroll", handlePositionUpdate, true);
     return () => {
+      observer.disconnect();
       window.removeEventListener("resize", handlePositionUpdate);
       window.removeEventListener("scroll", handlePositionUpdate, true);
     };
@@ -148,6 +165,7 @@ export function useTopBarSearchLifecycle({
     setExpanded(false);
     setActiveIdx(-1);
     inputRef.current?.blur();
+    requestAnimationFrame(() => focusWithModality(triggerRef.current));
   }, [
     setActiveIdx,
     setCompletedQuery,
@@ -162,7 +180,8 @@ export function useTopBarSearchLifecycle({
   useEffect(() => {
     if (!searchOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing)
+        return;
       event.preventDefault();
       event.stopImmediatePropagation();
       closeSearchEvent();
@@ -179,6 +198,7 @@ export function useTopBarSearchLifecycle({
     dropdownStyle,
     focusInputSoon,
     inputRef,
+    triggerRef,
     openSearch,
     scheduleCollapseIfIdle,
   };

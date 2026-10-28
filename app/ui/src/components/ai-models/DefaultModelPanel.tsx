@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Cpu } from "lucide-react";
+import {} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@crate/ui/shadcn/button";
@@ -205,14 +205,15 @@ export function DefaultModelPanel({
 
   return (
     <OpsPanel
-      icon={Cpu}
       title="Default model"
       description="Every feature uses this model unless you choose a different one for it."
     >
       <div className="space-y-4">
         <p
           className={
-            status.warning ? "text-sm text-amber-100" : "text-sm text-white/70"
+            status.warning
+              ? "text-sm text-state-warning-text"
+              : "text-sm text-white/70"
           }
         >
           {status.text}

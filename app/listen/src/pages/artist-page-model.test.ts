@@ -47,6 +47,37 @@ const pageData: ArtistPageData = {
 };
 
 describe("artist page model", () => {
+  it("shares the existing artist genre profile with that artist's show cards", () => {
+    const profile = [
+      { name: "Hardcore", slug: "hardcore", percent: 83, source: "tags" },
+    ];
+    const view = buildArtistPageViewModel(
+      {
+        ...pageData,
+        artist: { ...pageData.artist, genre_profile: profile },
+        shows: {
+          events: [
+            {
+              id: "show-1",
+              artist_name: "Converge",
+              artist_id: 7,
+              date: "2026-11-03",
+              venue: "Venue",
+              city: "City",
+              country: "GB",
+              country_code: "GB",
+              artist_genres: ["Hardcore"],
+            },
+          ],
+          configured: true,
+          source: "sample",
+        },
+      },
+      null,
+    );
+    expect(view.visibleShowItems[0]).toMatchObject({ genre_profile: profile });
+    expect(view.visibleShowItems[0]!.genre_profile).toBe(profile);
+  });
   it("builds API paths for global and slug routes", () => {
     expect(buildArtistRequestPath("artist-global-7", undefined)).toBe(
       "/api/catalog/artists/artist-global-7/page",

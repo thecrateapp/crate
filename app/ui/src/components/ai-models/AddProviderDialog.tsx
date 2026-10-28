@@ -94,7 +94,7 @@ export function AddProviderDialog({
     >
       <DialogContent aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>Add provider</DialogTitle>
+          <DialogTitle className="font-display">Add provider</DialogTitle>
         </DialogHeader>
         <form onSubmit={(event) => void submit(event)} className="space-y-4">
           <SegmentedControl
@@ -132,7 +132,7 @@ export function AddProviderDialog({
         </form>
         {hidden.length > 0 ? (
           <section className="space-y-1 border-t border-white/10 pt-4 text-sm text-white/60">
-            <h3 className="font-semibold text-white/80">
+            <h3 className="font-semibold text-white/80 font-display">
               From the server environment
             </h3>
             <ul className="space-y-1">

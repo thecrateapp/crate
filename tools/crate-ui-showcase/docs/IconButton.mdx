@@ -1,0 +1,33 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/IconButton.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">IconButton</DocHeading>
+<EntryDetails id="primitives-iconbutton" review="1AS and 1AT approved" />
+<DocHeading as="h2">Contract</DocHeading>
+
+Compact round controls with semantic default/primary/danger tones, icon-only accessible label and native title. Fine sizes32/40/44 with glyph16/18/20; coarse minimum44px is real layout space, never overlapping pseudo-targets. Pressed state and optional active highlighting are separate: active does not invent aria-pressed. Loading disables, marks busy and replaces the glyph with a decorative spinner. Shared global focus and reduced-motion rules apply. Preserve existing round/glow controls; ActionButton is the approved rectangular header/row composition. Card artwork surface now uses the opaque object surface and quiet border, without shadow/backdrop (1AT). No player ring/beam/volume changes.
+
+The approved persistent mockup and Diego’s confirmed adjustments are the reference. Shared components own their geometry, states and typography. Stories add layout only.
+
+<DocHeading as="h2">Real components</DocHeading>
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Sizes} />
+
+<Canvas of={Stories.Pressed} />
+
+<Canvas of={Stories.Disabled} />
+
+<Canvas of={Stories.Loading} />
+
+<Controls of={Stories.Base} />
+
+Consumer adoption, assistive technology and native QA remain separate from catalogue coverage.
+
+<DocHeading as="h2">Primary and tooltip review amendment</DocHeading>
+
+The visible custom tooltip uses the contextual title or accessible label. It no longer emits a native title. If a caller already provides Tooltip, that outer description is retained without a second tooltip.

@@ -131,14 +131,18 @@ describe("UserProfile", () => {
     ).toHaveAttribute("href", "/crate/77777777-7777-4777-8777-777777777777");
     expect(screen.getByText("Jane Band")).toBeVisible();
     expect(screen.getByText("via upload")).toBeVisible();
-    expect(container.querySelector(".user-profile-hero")).toBeInTheDocument();
-    expect(container.querySelector(".user-profile-card")).toBeInTheDocument();
+    expect(screen.getByText("via upload")).toHaveClass(
+      "font-mono",
+      "uppercase",
+    );
+    expect(screen.getByRole("region", { name: "Jane Doe" })).toHaveAttribute(
+      "data-slot",
+      "card",
+    );
+    expect(screen.getByRole("region", { name: "Followers" })).toBeVisible();
     expect(
-      container.querySelector(".user-profile-accent-panel"),
-    ).toBeInTheDocument();
-    expect(
-      container.querySelector(".user-profile-affinity-high"),
-    ).toBeInTheDocument();
+      container.querySelectorAll('[data-testid="page-header"]'),
+    ).toHaveLength(1);
     expect(
       screen.getByRole("link", { name: /View Crate DNA/i }),
     ).toHaveAttribute("href", "/users/jane/stats");
@@ -209,4 +213,22 @@ describe("UserProfile", () => {
     expect(screen.getByText("Aún no hay playlists públicas.")).toBeVisible();
     expect(screen.getByText("Aún no hay Crates públicos.")).toBeVisible();
   });
+});
+
+it("distinguishes network failure from a missing public profile", () => {
+  const retry = vi.fn();
+  vi.mocked(useApi).mockReturnValue({
+    data: null,
+    loading: false,
+    error: "offline",
+    status: 503,
+    refetch: retry,
+  });
+  renderWithListenProviders(<UserProfile />, {
+    route: "/users/jane",
+    path: "/users/:username",
+  });
+  expect(screen.getByRole("alert")).toHaveAttribute("data-kind", "error");
+  screen.getByRole("button", { name: "Retry" }).click();
+  expect(retry).toHaveBeenCalledOnce();
 });

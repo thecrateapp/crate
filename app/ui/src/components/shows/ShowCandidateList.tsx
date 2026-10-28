@@ -174,9 +174,6 @@ export function ShowCandidateList({
             variant="outline"
             size="sm"
             disabled={locked || validIds.length === 0}
-            title={
-              validIds.length === 0 ? "No show is complete yet" : undefined
-            }
             onClick={() => onSelect(validIds)}
           >
             Select all valid
@@ -191,6 +188,11 @@ export function ShowCandidateList({
             Clear selection
           </Button>
         </div>
+        {validIds.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No show is complete yet.
+          </p>
+        ) : null}
         {validCount > MAX_SELECTED_SHOWS ? (
           <p className="text-xs text-muted-foreground">
             Up to 50 shows per save. The rest stay here for the next batch.
@@ -228,7 +230,7 @@ export function ShowCandidateList({
                     )
                   }
                 />
-                <h3 className="text-sm font-medium">
+                <h3 className="text-sm font-medium font-display">
                   {dateLabel
                     ? `Show ${number} · ${dateLabel}`
                     : `Show ${number}`}

@@ -19,43 +19,6 @@ from crate.api.schemas.common import (
 from crate.api.schemas.management import AnalysisStatusResponse
 
 
-class SetupAdminRequest(BaseModel):
-    email: str
-    password: str
-    name: str = ""
-
-
-class SetupKeysRequest(BaseModel):
-    lastfm_apikey: str = ""
-    ticketmaster_api_key: str = ""
-    spotify_id: str = ""
-    spotify_secret: str = ""
-    fanart_api_key: str = ""
-    setlistfm_api_key: str = ""
-
-
-class SetupStatusResponse(BaseModel):
-    needs_setup: bool
-
-
-class SetupAdminResponse(BaseModel):
-    id: int
-    email: str
-
-
-class SetupKeysResponse(BaseModel):
-    saved: int
-
-
-class SetupCheckResponse(BaseModel):
-    has_lastfm: bool
-    has_ticketmaster: bool
-    has_spotify: bool
-    has_fanart: bool
-    has_setlistfm: bool
-    library_stats: Any
-
-
 class ScanRequest(BaseModel):
     only: str | None = None
 
@@ -162,6 +125,31 @@ class AdminLogsSnapshotResponse(BaseModel):
     snapshot: SnapshotMetadataResponse
     logs: list[WorkerLogEntryResponse] = Field(default_factory=list)
     workers: list[WorkerLogWorkerResponse] = Field(default_factory=list)
+
+
+class AdminGovernorGaugeResponse(BaseModel):
+    id: str
+    label: str
+    value: int | float | None = None
+    unit: str = ""
+    limit: int | float
+    scale: int | float
+    over: bool = False
+
+
+class AdminGovernorSnapshotResponse(BaseModel):
+    available: bool = False
+    stale: bool = False
+    sampled_at: datetime | str | None = None
+    sampled_by: str | None = None
+    enabled: bool | None = None
+    allowed: bool | None = None
+    reason: str = ""
+    defer_seconds: int = 0
+    snapshot: dict[str, Any] | None = None
+    limits: dict[str, int | float] = Field(default_factory=dict)
+    gauges: list[AdminGovernorGaugeResponse] = Field(default_factory=list)
+    window: dict[str, Any] | None = None
 
 
 class ScanIssueResponse(BaseModel):

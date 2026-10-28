@@ -1,7 +1,9 @@
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Sparkles, Globe, Lock, Users } from "@crate/ui/icons";
 
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
+
 import { PlaylistCollaboratorsModal } from "@/components/playlists/PlaylistCollaboratorsModal";
 import { PlaylistDeleteModal } from "@/components/playlists/PlaylistDeleteModal";
 import { PlaylistTrackList } from "@/components/playlists/PlaylistTrackList";
@@ -37,17 +39,15 @@ function PlaylistBadges({
     <>
       <OfflineBadge state={offlineState} />
       {data.is_smart ? (
-        <CrateBadge icon={Sparkles}>{t("playlist.badges.smart")}</CrateBadge>
+        <InfoBadge icon={Sparkles}>{t("playlist.badges.smart")}</InfoBadge>
       ) : null}
-      <CrateBadge icon={data.visibility === "public" ? Globe : Lock}>
+      <InfoBadge icon={data.visibility === "public" ? Globe : Lock}>
         {data.visibility === "public"
           ? t("playlist.visibility.public")
           : t("playlist.visibility.private")}
-      </CrateBadge>
+      </InfoBadge>
       {data.is_collaborative ? (
-        <CrateBadge icon={Users}>
-          {t("playlist.badges.collaborative")}
-        </CrateBadge>
+        <InfoBadge icon={Users}>{t("playlist.badges.collaborative")}</InfoBadge>
       ) : null}
     </>
   );
@@ -110,17 +110,9 @@ export function PlaylistContent({
           filteredCount={page.filteredTracks.length}
         />
         {data.tracks.length === 0 ? (
-          <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-text-muted">
-              {page.t("playlist.empty.noTracks")}
-            </p>
-          </div>
+          <EmptyState title={page.t("playlist.empty.noTracks")} />
         ) : page.filteredTracks.length === 0 ? (
-          <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-text-muted">
-              {page.t("playlist.empty.noFilter")}
-            </p>
-          </div>
+          <EmptyState title={page.t("playlist.empty.noFilter")} />
         ) : (
           <PlaylistTrackList
             filteredTracks={page.filteredTracks}
@@ -136,6 +128,7 @@ export function PlaylistContent({
       <PlaylistCreateModal
         open={page.editorOpen}
         mode="edit"
+        editorIdentity={data.id}
         initialName={data.name}
         initialDescription={data.description}
         initialCoverDataUrl={data.cover_data_url}

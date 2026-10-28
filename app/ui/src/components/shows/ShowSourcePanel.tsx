@@ -1,5 +1,8 @@
 import { useId, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, ImagePlus, X } from "lucide-react";
+import { ChevronDown, ChevronRight, X } from "@crate/ui/icons";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
 import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
 import { Textarea } from "@crate/ui/shadcn/textarea";
@@ -48,10 +51,6 @@ function SourceImages({
       }}
     >
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <ImagePlus
-          aria-hidden="true"
-          className="size-5 text-muted-foreground"
-        />
         <span>Drop a flyer or screenshot here, paste it, or</span>
         <Button
           type="button"
@@ -89,16 +88,14 @@ function SourceImages({
               className="flex max-w-full items-center gap-1 rounded-md border border-border py-0.5 pr-0.5 pl-2 text-sm"
             >
               <span className="truncate">{file.name}</span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                aria-label={`Remove image ${index + 1}`}
+              <ActionButton
+                label={`Remove image ${index + 1}`}
+                tooltip="Remove image"
                 disabled={locked}
                 onClick={() => source.removeImage(id)}
               >
                 <X aria-hidden="true" />
-              </Button>
+              </ActionButton>
             </li>
           ))}
         </ul>
@@ -194,9 +191,6 @@ export function ShowSourcePanel({
   source: ShowSourceState;
   disabled?: boolean;
 }) {
-  const textId = useId();
-  const urlId = useId();
-  const urlHintId = useId();
   const locked = disabled || source.busy || source.uncertain;
   return (
     <section
@@ -210,30 +204,24 @@ export function ShowSourcePanel({
       }}
     >
       <SourceImages source={source} locked={locked} />
-      <div className="space-y-1.5">
-        <label htmlFor={textId} className="text-sm font-medium">
-          Pasted text
-        </label>
+      <FormField label="Pasted text">
         <Textarea
-          id={textId}
           value={source.text}
           maxLength={60000}
           disabled={locked}
           placeholder="Paste the event text or a tour list. You can also paste an image here."
           onChange={(event) => source.setText(event.target.value)}
         />
-      </div>
-      <div className="space-y-1.5">
-        <label htmlFor={urlId} className="text-sm font-medium">
-          Event link
-        </label>
+      </FormField>
+      <FormField
+        label="Event link"
+        hint="Crate fetches public pages only. If the page needs a login, paste a screenshot or its text instead."
+      >
         <Input
-          id={urlId}
           type="url"
           value={source.url}
           maxLength={2048}
           disabled={locked}
-          aria-describedby={urlHintId}
           onChange={(event) => source.setUrl(event.target.value)}
           onKeyDown={(event) => {
             if (event.key !== "Enter") return;
@@ -241,14 +229,10 @@ export function ShowSourcePanel({
             if (source.canExtract && !disabled) source.extract();
           }}
         />
-        <p id={urlHintId} className="text-xs text-muted-foreground">
-          Crate fetches public pages only. If the page needs a login, paste a
-          screenshot or its text instead.
-        </p>
-      </div>
+      </FormField>
       {!source.availability && source.availabilityFailed ? (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <p role="alert" className="text-state-danger-text">
+          <p role="alert" className="text-state-warning-text">
             Couldn&apos;t load the import methods.
           </p>
           <Button
@@ -279,7 +263,7 @@ export function ShowSourcePanel({
         </p>
       )}
       {source.error ? (
-        <p role="alert" className="text-sm text-state-danger-text">
+        <p role="alert" className="text-sm text-state-warning-text">
           {source.error}
         </p>
       ) : null}
@@ -288,7 +272,9 @@ export function ShowSourcePanel({
       </p>
       {source.warnings.length ? (
         <div className="space-y-1">
-          <h3 className="text-xs font-medium text-muted-foreground">Notes</h3>
+          <MonoLabel as="h3" tone="accent">
+            Notes
+          </MonoLabel>
           <ul className="list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">
             {source.warnings.map((warning) => (
               <li key={warning}>{warning}</li>

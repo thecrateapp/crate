@@ -33,10 +33,7 @@ function AlertDialogOverlay({
   return (
     <AlertDialogPrimitive.Overlay
       data-slot="alert-dialog-overlay"
-      className={cn(
-        "fixed inset-0 z-app-modal bg-surface-canvas/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
-        className,
-      )}
+      className={cn("crate-overlay-scrim fixed inset-0 z-app-modal", className)}
       {...props}
     />
   );
@@ -47,7 +44,7 @@ function AlertDialogContent({
   size = "default",
   ...props
 }: React.ComponentProps<typeof AlertDialogPrimitive.Content> & {
-  size?: "default" | "sm";
+  size?: "default" | "sm" | "md" | "lg" | "xl";
 }) {
   return (
     <AlertDialogPortal>
@@ -55,8 +52,9 @@ function AlertDialogContent({
       <AlertDialogPrimitive.Content
         data-slot="alert-dialog-content"
         data-size={size}
+        data-overlay-size={size === "default" ? "md" : size}
         className={cn(
-          "group/alert-dialog-content fixed top-[50%] left-[50%] z-app-modal grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-md border border-border-quiet bg-modal-surface p-6 shadow-modal backdrop-blur-xl duration-200 data-[size=sm]:max-w-xs data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[size=default]:sm:max-w-lg",
+          "crate-overlay-panel group/alert-dialog-content fixed top-1/2 left-1/2 z-app-modal grid w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 p-6",
           className,
         )}
         {...props}
@@ -89,7 +87,7 @@ function AlertDialogFooter({
     <div
       data-slot="alert-dialog-footer"
       className={cn(
-        "flex flex-col-reverse gap-2 group-data-[size=sm]/alert-dialog-content:grid group-data-[size=sm]/alert-dialog-content:grid-cols-2 sm:flex-row sm:justify-end",
+        "crate-overlay-footer flex flex-col-reverse gap-2 pt-4 sm:flex-row sm:justify-end",
         className,
       )}
       {...props}
@@ -105,7 +103,7 @@ function AlertDialogTitle({
     <AlertDialogPrimitive.Title
       data-slot="alert-dialog-title"
       className={cn(
-        "text-lg font-semibold sm:group-data-[size=default]/alert-dialog-content:group-has-data-[slot=alert-dialog-media]/alert-dialog-content:col-start-2",
+        "crate-overlay-title sm:group-data-[size=default]/alert-dialog-content:group-has-data-[slot=alert-dialog-media]/alert-dialog-content:col-start-2",
         className,
       )}
       {...props}
@@ -120,7 +118,7 @@ function AlertDialogDescription({
   return (
     <AlertDialogPrimitive.Description
       data-slot="alert-dialog-description"
-      className={cn("text-sm text-text-muted", className)}
+      className={cn("crate-overlay-body", className)}
       {...props}
     />
   );
@@ -162,7 +160,7 @@ function AlertDialogAction({
 
 function AlertDialogCancel({
   className,
-  variant = "outline",
+  variant = "ghost",
   size = "default",
   ...props
 }: React.ComponentProps<typeof AlertDialogPrimitive.Cancel> &

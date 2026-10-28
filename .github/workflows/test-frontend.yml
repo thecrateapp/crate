@@ -2,6 +2,11 @@ name: Frontend Tests
 
 on:
   workflow_dispatch:
+    inputs:
+      update_visual:
+        description: Record Listen and Admin baselines for review
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths:
@@ -11,16 +16,30 @@ on:
       - "app/listen/**"
       - "app/listen-desktop/**"
       - "app/docs/**"
-      - "app/site/**"
+      - "app/web/**"
+      - "app/crate/api/browse_media.py"
+      - "app/crate/actors.py"
+      - "app/crate/audio_analysis.py"
+      - "app/crate/enrichment.py"
+      - "app/crate/genre_taxonomy.py"
+      - "app/crate/portable_metadata.py"
+      - "app/crate/repair_catalog.py"
+      - "app/crate/resource_governor.py"
+      - "app/crate/data/taxonomy/**"
+      - "app/crate/db/queries/portable_metadata.py"
+      - "app/crate/db/repositories/genres_taxonomy_edges.py"
       - "package.json"
       - "package-lock.json"
       - "scripts/design-system/**"
+      - "tools/crate-ui-showcase/**"
       - "playwright.appearance.config.ts"
       - "playwright.listen-visual.config.ts"
       - "playwright.admin.config.ts"
       - "tests/appearance/**"
       - "tests/listen-visual/**"
       - "tests/admin-e2e/**"
+      - "tests/visual/**"
+
       - "docker-compose*.yaml"
       - ".github/workflows/build-images.yml"
       - "app/tests/test_frontend_image_lockfile_contract.py"
@@ -34,16 +53,30 @@ on:
       - "app/listen/**"
       - "app/listen-desktop/**"
       - "app/docs/**"
-      - "app/site/**"
+      - "app/web/**"
+      - "app/crate/api/browse_media.py"
+      - "app/crate/actors.py"
+      - "app/crate/audio_analysis.py"
+      - "app/crate/enrichment.py"
+      - "app/crate/genre_taxonomy.py"
+      - "app/crate/portable_metadata.py"
+      - "app/crate/repair_catalog.py"
+      - "app/crate/resource_governor.py"
+      - "app/crate/data/taxonomy/**"
+      - "app/crate/db/queries/portable_metadata.py"
+      - "app/crate/db/repositories/genres_taxonomy_edges.py"
       - "package.json"
       - "package-lock.json"
       - "scripts/design-system/**"
+      - "tools/crate-ui-showcase/**"
       - "playwright.appearance.config.ts"
       - "playwright.listen-visual.config.ts"
       - "playwright.admin.config.ts"
       - "tests/appearance/**"
       - "tests/listen-visual/**"
       - "tests/admin-e2e/**"
+      - "tests/visual/**"
+
       - "docker-compose*.yaml"
       - ".github/workflows/build-images.yml"
       - "app/tests/test_frontend_image_lockfile_contract.py"
@@ -51,9 +84,12 @@ on:
 
 jobs:
   test:
+    if: ${{ !inputs.update_visual }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -64,6 +100,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Check shared component catalogue
+        env:
+          SHOWCASE_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
+        run: npm run design-system:showcase:check -- --base "$SHOWCASE_BASE_REF"
 
       # The ui, listen and cast-receiver images send an allowlisted context,
       # so a new shared import must be added to their Dockerfile.dockerignore.
@@ -80,21 +121,16 @@ jobs:
 
       - name: Install auxiliary frontend dependencies
         run: |
-          npm ci --prefix app/site
           npm ci --prefix app/docs
+          npm ci --prefix app/web
 
       - name: Test and build marketing site
-        env:
-          SENTRY_ORG: ninja-development
-          SENTRY_PROJECT: crate-site
-          SENTRY_RELEASE: crate-${{ github.sha }}
-          VITE_SENTRY_DSN: ${{ vars.SENTRY_SITE_DSN }}
-          VITE_SENTRY_ENVIRONMENT: production
-          VITE_SENTRY_RELEASE: crate-${{ github.sha }}
-          VITE_SENTRY_TRACES_SAMPLE_RATE: ${{ vars.SENTRY_PUBLIC_SITE_TRACES_SAMPLE_RATE || '0.02' }}
         run: |
-          npm test --prefix app/site
-          npm run build --prefix app/site
+          npm test --prefix app/web
+          npm run build --prefix app/web
+          npm run budget --prefix app/web
+          (cd app/web && npx playwright install --with-deps chromium)
+          npm run test:e2e --prefix app/web
 
       - name: Test and build docs site
         env:
@@ -161,7 +197,9 @@ jobs:
           VITE_SENTRY_DSN: ${{ vars.SENTRY_ADMIN_DSN }}
           VITE_SENTRY_ENVIRONMENT: production
           VITE_SENTRY_RELEASE: crate-${{ github.sha }}
-        run: npm run --workspace=app/ui build
+        run: |
+          npm run --workspace=app/ui build
+          npm run --workspace=app/ui check:bundle
 
       - name: Type check listen app
         run: npm run --workspace=app/listen typecheck
@@ -181,6 +219,9 @@ jobs:
       - name: Check design-system drift budget
         run: npm run design-system:drift -- --check
 
+      - name: Check shared component override budget
+        run: npm run design-system:overrides -- --check
+
       - name: Check generated appearance tokens
         run: npm run design-system:tokens:check
 
@@ -195,7 +236,9 @@ jobs:
           VITE_SENTRY_DSN: ${{ vars.SENTRY_LISTEN_DSN }}
           VITE_SENTRY_ENVIRONMENT: production
           VITE_SENTRY_RELEASE: crate-${{ github.sha }}
-        run: npm run --workspace=app/listen build
+        run: |
+          npm run --workspace=app/listen build
+          npm run --workspace=app/listen check:bundle
 
       - name: Type check desktop app
         run: npm run --workspace=app/listen-desktop typecheck
@@ -204,7 +247,11 @@ jobs:
         run: npm run --workspace=app/listen-desktop test
 
   appearance-chromium:
-    runs-on: ubuntu-latest
+    if: ${{ !inputs.update_visual }}
+    runs-on: ubuntu-24.04
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
+    env:
+      CRATE_PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble
     steps:
       - uses: actions/checkout@v6
 
@@ -217,9 +264,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
 
       - name: Run appearance contracts
         run: npm run test:appearance -- --project=chromium
@@ -240,5 +284,64 @@ jobs:
             playwright-report/listen-visual/
             playwright-report/admin-e2e/
             test-results/appearance/
+            test-results/listen-visual/
+            test-results/admin-e2e/
+
+  update-listen-visual:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.update_visual }}
+    runs-on: ubuntu-24.04
+    container: mcr.microsoft.com/playwright:v1.63.0-noble
+    permissions:
+      contents: read
+    env:
+      CRATE_PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Record Listen baselines
+        run: npm run test:listen-visual -- --update-snapshots --workers=2
+
+      - name: Record Admin baselines
+        run: npm run test:admin-e2e -- --update-snapshots --workers=2
+
+      - name: Identify capture source
+        run: |
+          node --input-type=module <<'JS'
+          import { writeFileSync } from 'node:fs';
+          writeFileSync('tests/capture-manifest.json', JSON.stringify({
+            commit: process.env.GITHUB_SHA,
+            image: process.env.CRATE_PLAYWRIGHT_IMAGE,
+            platform: process.platform,
+            arch: process.arch,
+          }, null, 2) + '\n');
+          JS
+
+      - name: Upload baselines for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            tests/listen-visual/**/*-snapshots/*.png
+            tests/admin-e2e/**/*-snapshots/*.png
+            tests/capture-manifest.json
+
+      - name: Upload capture diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-capture-report-${{ github.sha }}
+          path: |
+            playwright-report/listen-visual/
+            playwright-report/admin-e2e/
             test-results/listen-visual/
             test-results/admin-e2e/

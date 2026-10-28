@@ -1,8 +1,9 @@
-import { useId, useState } from "react";
+import { useState } from "react";
 import { Clock, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { Checkbox } from "@crate/ui/primitives/Checkbox";
+import { FormField } from "@crate/ui/primitives/FormField";
 import { Button } from "@crate/ui/shadcn/button";
 
 import { RelativeTime } from "@/components/admin/RelativeTime";
@@ -20,7 +21,7 @@ const STALE_PLAN_MESSAGE = "The plan changed. Reload and review it again.";
 // `--surface-panel` is a CSS variable, not a theme colour, so the translucent
 // background is spelled as an arbitrary value.
 const barClassName =
-  "sticky bottom-0 z-10 rounded-t-md border-t border-white/10 bg-[color-mix(in_srgb,var(--surface-panel)_95%,transparent)] px-4 py-3 shadow-[0_-18px_40px_rgba(0,0,0,0.25)] backdrop-blur md:px-5";
+  "sticky bottom-0 z-10 rounded-t-md border-t border-border-quiet bg-[color-mix(in_srgb,var(--surface-panel)_95%,transparent)] px-4 py-3 shadow-[0_-18px_40px_rgba(0,0,0,0.25)] backdrop-blur md:px-5";
 
 export function DecisionBar({
   plan,
@@ -43,7 +44,6 @@ export function DecisionBar({
   onDecided: () => void;
   onReload: () => void;
 }) {
-  const checkboxId = useId();
   const [busy, setBusy] = useState(false);
   const [conflict, setConflict] = useState<string | null>(null);
   const [reviewedIdentity, setReviewedIdentity] = useState<string | null>(null);
@@ -98,16 +98,16 @@ export function DecisionBar({
         <div role="alert" className="flex items-start gap-2 text-sm">
           <Clock
             aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0 text-amber-200"
+            className="mt-0.5 size-4 shrink-0 text-state-warning-text"
           />
           {validExpiry ? (
-            <p className="text-white/80">
+            <p className="text-text-secondary">
               This plan expired{" "}
               <RelativeTime value={plan.expires_at} now={now} />. Ask the agent
               to prepare it again.
             </p>
           ) : (
-            <p className="text-white/80">
+            <p className="text-text-secondary">
               This plan expired. Ask the agent to prepare it again.
             </p>
           )}
@@ -122,7 +122,7 @@ export function DecisionBar({
         {!complete ? (
           <p
             role="alert"
-            className="flex items-start gap-2 text-sm text-red-200"
+            className="flex items-start gap-2 text-sm text-state-warning-text"
           >
             <TriangleAlert
               aria-hidden="true"
@@ -135,7 +135,7 @@ export function DecisionBar({
         {conflict ? (
           <div
             role="alert"
-            className="flex flex-wrap items-center gap-3 text-sm text-red-200"
+            className="flex flex-wrap items-center gap-3 text-sm text-state-warning-text"
           >
             <p className="min-w-0 flex-1 break-words">{conflict}</p>
             <Button
@@ -153,10 +153,17 @@ export function DecisionBar({
           </div>
         ) : null}
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-start gap-3">
+          <FormField
+            layout="inline"
+            label={
+              plan.operation === "editorial_change"
+                ? "I reviewed the complete playlist selection, order, rules, exclusions, metadata and effects."
+                : plan.changes.length === 1
+                  ? "I reviewed this change and its effects."
+                  : `I reviewed all ${plan.changes.length} changes and their effects.`
+            }
+          >
             <Checkbox
-              id={checkboxId}
-              className="mt-0.5"
               checked={reviewed}
               onCheckedChange={(checked) =>
                 setReviewedIdentity(
@@ -164,14 +171,7 @@ export function DecisionBar({
                 )
               }
             />
-            <label htmlFor={checkboxId} className="text-sm text-white/80">
-              {plan.operation === "editorial_change"
-                ? "I reviewed the complete playlist selection, order, rules, exclusions, metadata and effects."
-                : plan.changes.length === 1
-                  ? "I reviewed this change and its effects."
-                  : `I reviewed all ${plan.changes.length} changes and their effects.`}
-            </label>
-          </div>
+          </FormField>
           <div className="flex shrink-0 gap-2">
             <Button
               type="button"

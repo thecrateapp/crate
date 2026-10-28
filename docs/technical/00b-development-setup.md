@@ -59,7 +59,6 @@ Sentry is split by runtime so failures remain attributable and queryable:
 | Admin                           | `crate-admin`         | `SENTRY_ADMIN_DSN` GitHub Actions Variable                   |
 | Listen web, Capacitor and Tauri | `crate-listen`        | `SENTRY_LISTEN_DSN` GitHub Actions Variable                  |
 | Cast receiver                   | `crate-cast-receiver` | `SENTRY_CAST_RECEIVER_DSN` GitHub Actions Variable           |
-| Public site                     | `crate-site`          | `SENTRY_SITE_DSN` GitHub Actions Variable                    |
 | Documentation site              | `crate-docs`          | `SENTRY_DOCS_DSN` GitHub Actions Variable                    |
 
 Runtime DSNs are injected by Compose. Browser DSNs are public identifiers and

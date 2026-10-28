@@ -1,18 +1,28 @@
-import type { CSSProperties, PointerEvent } from "react";
+import type { PointerEvent } from "react";
 import { useTranslation } from "react-i18next";
 
-import { formatPlayerTime } from "@/components/player/bar/player-bar-utils";
+import { formatPlayerTime } from "./player-bar-utils";
+
+import { PlayerProgressBeam } from "./PlayerProgressBeam";
 
 import type { SeekBarModel } from "./player-seek-bar-model";
 
 export function SeekBarTimes({
   displayedTime,
   safeDuration,
-}: Pick<SeekBarModel, "displayedTime" | "safeDuration">) {
+  remaining = false,
+}: Pick<SeekBarModel, "displayedTime" | "safeDuration"> & {
+  remaining?: boolean;
+}) {
   return (
-    <div className="flex items-center justify-between text-xs tabular-nums text-text-muted">
+    <div className="flex items-center justify-between font-mono text-xs tabular-nums text-text-muted">
       <span>{formatPlayerTime(displayedTime)}</span>
-      <span>{formatPlayerTime(safeDuration)}</span>
+      <span>
+        {remaining ? "-" : ""}
+        {formatPlayerTime(
+          remaining ? Math.max(0, safeDuration - displayedTime) : safeDuration,
+        )}
+      </span>
     </div>
   );
 }
@@ -38,12 +48,14 @@ export function SeekBarTooltip({
 function SeekBarFrame({
   className,
   showTimes,
+  remaining = false,
   disabled,
   model,
   children,
 }: {
   className: string;
   showTimes: boolean;
+  remaining?: boolean;
   disabled: boolean;
   model: SeekBarModel;
   children: React.ReactNode;
@@ -61,6 +73,7 @@ function SeekBarFrame({
     >
       {showTimes ? (
         <SeekBarTimes
+          remaining={remaining}
           displayedTime={model.displayedTime}
           safeDuration={model.safeDuration}
         />
@@ -97,8 +110,29 @@ function SeekInput({
       }
       disabled={disabled || model.safeDuration <= 0}
       aria-label={t("player.seek")}
+      aria-valuenow={
+        model.safeDuration > 0
+          ? Math.max(0, Math.min(model.displayedTime, model.safeDuration))
+          : 0
+      }
+      aria-valuetext={formatPlayerTime(model.displayedTime)}
       className={className}
       style={style}
+      onKeyDown={(event) => {
+        const changes: Record<string, number> = {
+          ArrowLeft: model.displayedTime - 5,
+          ArrowDown: model.displayedTime - 5,
+          ArrowRight: model.displayedTime + 5,
+          ArrowUp: model.displayedTime + 5,
+          Home: 0,
+          End: model.safeDuration,
+        };
+        const next = changes[event.key];
+        if (next === undefined) return;
+        event.preventDefault();
+        model.commitSeek(Math.max(0, Math.min(model.safeDuration, next)));
+      }}
+      onPointerCancel={model.endScrubbing}
       onPointerDown={(event) => {
         model.stopPropagation(event);
         model.beginScrubbing();
@@ -119,18 +153,23 @@ function SeekInput({
 }
 
 export function GlowSeekBar({
+  compact = false,
   className,
   showTimes,
+  remaining = false,
   disabled,
   model,
 }: {
+  compact?: boolean;
   className: string;
   showTimes: boolean;
+  remaining?: boolean;
   disabled: boolean;
   model: SeekBarModel;
 }) {
   return (
     <SeekBarFrame
+      remaining={remaining}
       className={className}
       showTimes={showTimes}
       disabled={disabled}
@@ -138,6 +177,7 @@ export function GlowSeekBar({
     >
       <div
         ref={model.trackRef}
+        data-compact={compact || undefined}
         className="listen-player-progress group relative py-3"
         onPointerMove={model.handleHover}
         onPointerLeave={model.clearHover}
@@ -147,40 +187,14 @@ export function GlowSeekBar({
           hoverTime={model.hoverTime}
           className="-top-6"
         />
-        <div
-          className={`listen-player-progress-track absolute inset-x-0 top-1/2 -translate-y-1/2 rounded-full ${model.glowTrackClass}`}
-        />
-        <div
-          className="listen-player-progress-width-dynamic pointer-events-none absolute left-0 top-1/2 h-3 overflow-hidden rounded-full opacity-65"
-          style={model.glowWidthStyle}
-        >
-          <div className="listen-player-progress-glow absolute inset-0 blur-[3px]" />
-          <div className="listen-player-progress-fill absolute inset-y-[5px] inset-x-0 rounded-full" />
-        </div>
-        <div
-          className={`listen-player-progress-fill listen-player-progress-width-dynamic absolute left-0 top-1/2 rounded-full ${model.glowTrackClass}`}
-          style={model.glowWidthStyle}
-        />
-        <div
-          className={`listen-player-progress-thumb listen-player-progress-left-dynamic pointer-events-none absolute top-1/2 size-2 -translate-y-1/2 rounded-full transition-opacity duration-150 ${
-            model.progress > 0 ? "opacity-[0.62]" : "opacity-0"
-          }`}
-          style={{
-            ...model.glowLeftStyle,
-          }}
-        />
-        <div
-          className="listen-player-progress-thumb-active listen-player-progress-left-active-dynamic absolute top-1/2 size-2.5 -translate-y-1/2 rounded-full border opacity-0 transition-opacity duration-150 group-hover:opacity-100"
-          style={
-            {
-              "--progress-left": `calc(${model.progress}% - 5px)`,
-            } as CSSProperties
-          }
+        <PlayerProgressBeam
+          progressPercent={model.progress}
+          trackClassName={model.glowTrackClass}
         />
         <SeekInput
           model={model}
           disabled={disabled}
-          className="absolute inset-x-0 top-1/2 h-8 -translate-y-1/2 cursor-pointer opacity-0 disabled:cursor-default"
+          className="listen-player-progress-input absolute inset-0 w-full cursor-pointer opacity-0 disabled:cursor-default"
         />
       </div>
     </SeekBarFrame>
@@ -192,6 +206,7 @@ export function DefaultSeekBar({
   compact,
   thin,
   showTimes,
+  remaining = false,
   disabled,
   model,
 }: {
@@ -199,11 +214,13 @@ export function DefaultSeekBar({
   compact: boolean;
   thin: boolean;
   showTimes: boolean;
+  remaining?: boolean;
   disabled: boolean;
   model: SeekBarModel;
 }) {
   return (
     <SeekBarFrame
+      remaining={remaining}
       className={className}
       showTimes={showTimes}
       disabled={disabled}

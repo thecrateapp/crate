@@ -4,8 +4,7 @@ import { CRATE_ICON_SIZE, Loader2 } from "@crate/ui/icons";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { Button } from "@crate/ui/shadcn/button";
 
-interface HeroActionButtonProps
-  extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface HeroActionButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   label: string;
   loading?: boolean;
   children: ReactNode;
@@ -36,8 +35,7 @@ export function HeroActionButton({
   );
 }
 
-interface HeroPrimaryButtonProps
-  extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface HeroPrimaryButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   label: string;
   loading?: boolean;
   children: ReactNode;
@@ -58,7 +56,7 @@ export function HeroPrimaryButton({
       disabled={disabled || loading}
       variant="outline"
       size="lg"
-      className={`h-11 px-3.5 has-[>svg]:px-3.5 disabled:opacity-35 ${className}`}
+      className={`px-3.5 has-[>svg]:px-3.5 disabled:opacity-35 ${className}`}
       {...props}
     >
       {loading ? (

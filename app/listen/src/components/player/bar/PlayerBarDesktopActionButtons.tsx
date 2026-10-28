@@ -42,7 +42,7 @@ export function PlayerBarDesktopActionButtons({
   } = visibility;
 
   return (
-    <div className="hidden shrink-0 items-center justify-end md:flex md:w-[260px] lg:w-[340px] xl:w-[min(34vw,520px)] 2xl:w-[min(38vw,680px)]">
+    <div className="hidden shrink-0 items-center justify-end md:flex md:w-[min(26vw,260px)] lg:w-[340px] xl:w-[min(34vw,520px)] 2xl:w-[min(38vw,680px)]">
       <div className="hidden items-center justify-end gap-1 lg:flex">
         {qualityBadge && (
           <span className="mr-1 inline-flex items-center">

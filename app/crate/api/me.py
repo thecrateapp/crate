@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from starlette.responses import StreamingResponse
 
 from crate.api import native_oauth_auth
+from crate.api.show_location import resolve_show_location
 from crate.api.auth_dependencies import require_auth as _require_auth
 from crate.api.auth import _require_vdj_scope
 from crate.api._deps import (
@@ -93,6 +94,7 @@ from crate.api.schemas.me import (
     ShowReminderCreateResponse,
     ShowReminderRequest,
     StatsDashboardResponse,
+    StatsRangeResponse,
     StatsOverviewResponse,
     StatsTrendsResponse,
     SyncStatusResponse,
@@ -117,6 +119,10 @@ from crate.db.home import (
     get_home_playlist,
 )
 from crate.db.home_section_surface import get_cached_home_section
+from crate.db.queries.user_library_stats_range import (
+    StatsRangeError,
+    get_user_stats_range,
+)
 from crate.db.queries.shows import get_attending_show_ids, get_show_reminders
 from crate.db.queries.user import (
     get_artist_genres_for_names,
@@ -1116,6 +1122,25 @@ def stats_dashboard(
 
 
 @router.get(
+    "/stats/range",
+    response_model=StatsRangeResponse,
+    responses=_ME_RESPONSES,
+    summary="Listening summary for a date range",
+)
+def stats_range(
+    request: Request,
+    start: date = Query(...),
+    end: date = Query(...),
+    limit: int = Query(3, ge=1, le=20),
+):
+    user = _require_auth(request)
+    try:
+        return get_user_stats_range(user["id"], start, end, limit=limit)
+    except StatsRangeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get(
     "/home/hero",
     responses=AUTH_ERROR_RESPONSES,
     summary="Get the home hero artist card",
@@ -1363,6 +1388,7 @@ def record_play_event_endpoint(request: Request, body: RecordPlayEventRequest):
                 body.playback_session,
                 user_id=int(user["id"]),
                 global_track_uid=body.global_track_uid,
+                played_at=body.started_at,
             )
         except PlaybackSessionInvalid as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -1461,22 +1487,13 @@ def upcoming(request: Request, limit: int = 120):
     today = datetime.now(timezone.utc).date()
     recent_cutoff = (datetime.now(timezone.utc) - timedelta(days=45)).isoformat()
 
-    # Resolve user location for show filtering.
-    # The middleware user dict only has JWT fields (id, email, role) — location
-    # fields are in the DB, so we read the full user record here.
-    full_user = get_user_by_id(user["id"]) or {}
-    user_lat, user_lon, user_radius = None, None, 60
-    location_mode = full_user.get("show_location_mode") or "fixed"
-    if location_mode == "near_me":
-        from crate.geolocation import detect_location_from_ip, get_client_ip
-
-        geo = detect_location_from_ip(get_client_ip(request))
-        if geo:
-            user_lat, user_lon = geo["latitude"], geo["longitude"]
-    else:
-        user_lat = full_user.get("latitude")
-        user_lon = full_user.get("longitude")
-    user_radius = full_user.get("show_radius_km") or 60
+    show_location = resolve_show_location(request, user["id"]) or {
+        "user_lat": None,
+        "user_lon": None,
+        "user_radius": 60,
+        "user_city": None,
+        "user_country": None,
+    }
 
     items: list[dict] = []
     setlist_map: dict[str, list[dict]] = {}
@@ -1506,9 +1523,7 @@ def upcoming(request: Request, limit: int = 120):
             }
         )
 
-    shows = get_upcoming_shows(
-        followed_names, today, user_lat, user_lon, user_radius, limit
-    )
+    shows = get_upcoming_shows(followed_names, today, limit=limit, **show_location)
     attending_show_ids = get_attending_show_ids(
         user["id"],
         [show["id"] for show in shows if show.get("id") is not None],

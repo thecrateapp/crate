@@ -1,5 +1,9 @@
+import type { RefObject } from "react";
 import { useMemo } from "react";
-import type { CrossfadeTransition } from "@/contexts/player-context";
+import type {
+  PlayerProgressValue,
+  CrossfadeTransition,
+} from "@/contexts/player-context";
 import type { RepeatMode, Track } from "@/contexts/player-types";
 import { isCastSessionActive } from "@/lib/cast-sender";
 import type { PlaybackTargetContext } from "@/lib/playback-targets";
@@ -12,6 +16,7 @@ type IsLiked = (
 ) => boolean;
 
 type UsePlayerBarComputedStateOptions = {
+  progressClock?: RefObject<PlayerProgressValue>;
   crossfadeTransition: CrossfadeTransition | null;
   isDesktop: boolean;
   fsOpen: boolean;
@@ -38,6 +43,7 @@ type UsePlayerBarComputedStateOptions = {
 };
 
 export function usePlayerBarComputedState({
+  progressClock,
   crossfadeTransition,
   isDesktop,
   fsOpen,
@@ -65,7 +71,11 @@ export function usePlayerBarComputedState({
   const playbackTargetContext = useMemo<PlaybackTargetContext>(
     () => ({
       currentTrack: displayTrack,
-      currentTime: effectiveDisplayedTime,
+      get currentTime() {
+        return isRemoteConnectActive
+          ? effectiveDisplayedTime
+          : (progressClock?.current.currentTime ?? effectiveDisplayedTime);
+      },
       currentIndex: displayCurrentIndex,
       queue: displayQueue,
       repeatMode: repeat,

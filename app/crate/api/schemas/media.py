@@ -3,6 +3,8 @@
 from datetime import datetime
 from typing import Any, Literal
 
+from crate.api.schemas.common import TrackMediaFieldsMixin
+
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 from crate.api.schemas.common import (
@@ -39,7 +41,7 @@ class SearchAlbumResultResponse(IdentityFieldsMixin):
     has_cover: bool | int | None = None
 
 
-class TrackRefResponse(IdentityFieldsMixin):
+class TrackRefResponse(IdentityFieldsMixin, TrackMediaFieldsMixin):
     model_config = ConfigDict(extra="allow")
 
     id: int | None = None
@@ -156,6 +158,14 @@ class EqFeaturesResponse(BaseModel):
     valence: float | None = None
     acousticness: float | None = None
     instrumentalness: float | None = None
+
+
+class EqCurveResponse(BaseModel):
+    source: str
+    gains: list[float]
+    label: str = ""
+    reasoning: str = ""
+    genre: dict[str, Any] | None = None
 
 
 class EffectiveEqResponse(BaseModel):

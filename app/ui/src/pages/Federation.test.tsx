@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useApi } from "@/hooks/use-api";
@@ -68,9 +69,10 @@ describe("Federation imports", () => {
   });
 
   it("shows manifest and accounting details and approves a pending import", async () => {
+    const user = userEvent.setup();
     renderWithAdminProviders(<Federation />);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Imports" }));
+    await user.click(screen.getByRole("tab", { name: "Imports" }));
     expect(screen.getByText("Pedals")).toBeInTheDocument();
     expect(screen.getByText("sha256:abc")).toBeInTheDocument();
     expect(screen.getByText("global-pedals")).toBeInTheDocument();
@@ -87,8 +89,9 @@ describe("Federation imports", () => {
   });
 
   it("can reject a pending import", async () => {
+    const user = userEvent.setup();
     renderWithAdminProviders(<Federation />);
-    fireEvent.click(screen.getByRole("tab", { name: "Imports" }));
+    await user.click(screen.getByRole("tab", { name: "Imports" }));
     fireEvent.click(screen.getByRole("button", { name: "Reject" }));
 
     await waitFor(() =>

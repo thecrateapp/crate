@@ -34,7 +34,6 @@ const COUNT_KEYS = [
   "common.trackCount",
   "common.followerCount",
   "stats.recap.replayTitle",
-  "stats.story.risingBody",
 ] as const;
 
 async function i18nFor(locale: keyof typeof catalogs) {

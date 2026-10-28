@@ -1,0 +1,27 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/FilterBar.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">FilterBar</DocHeading>
+<EntryDetails
+  id="domain-filters-filterbar"
+  review="Visual review approved by Diego · 1AY"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+Composes leading actions, growing search, stable-width sort, trailing actions and a separate
+wrapping chip row. Empty rows are omitted. Group names are optional and supplied by the app.
+`align="center"` preserves unlabelled control rows; `align="end"` aligns controls with stacked
+FormField captions along their bottom edges. FormField owns the8px gap and its label; FilterBar
+does not resize controls or compensate for labels with margins. Controls wrap at narrow widths.
+The shared Select width does not depend on its selected option. Listen liked tracks opts into
+bottom alignment; other existing Admin/Listen consumers retain center alignment by default.
+
+The approved mockup and Diego's subsequent amendments remain the visual reference. This entry
+does not certify all legacy consumers or native/AT/phase QA.
+
+<Canvas of={Stories.Labelled} />
+<Canvas of={Stories.Centered} />
+<Controls of={Stories.Labelled} />

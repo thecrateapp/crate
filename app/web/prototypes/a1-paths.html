@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crate · A1 · Paths</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      #field {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        opacity: 0;
+      }
+
+      .scrim {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background:
+          radial-gradient(ellipse 44% 30% at 50% 44%, rgba(10, 10, 15, 0.72) 0%, rgba(10, 10, 15, 0.25) 60%, transparent 100%),
+          radial-gradient(ellipse 120% 90% at 50% 50%, transparent 55%, rgba(10, 10, 15, 0.85) 100%);
+      }
+
+      #path {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        overflow: visible;
+      }
+
+      #path polyline {
+        fill: none;
+        stroke: var(--cyan-hi);
+        stroke-width: 1.25;
+        stroke-linejoin: round;
+        filter: drop-shadow(0 0 6px rgba(103, 232, 249, 0.6));
+      }
+
+      #path circle {
+        fill: var(--bg);
+        stroke: var(--cyan-hi);
+        stroke-width: 1.25;
+      }
+
+      #path circle.end {
+        fill: var(--cyan-hi);
+      }
+
+      .node-label {
+        position: fixed;
+        left: 0;
+        top: 0;
+        pointer-events: none;
+        white-space: pre;
+        font-family: var(--mono);
+        font-size: 10px;
+        line-height: 1.6;
+        letter-spacing: 0.08em;
+        color: var(--fg-2);
+        font-variant-numeric: tabular-nums;
+        opacity: 0;
+        transition: opacity 0.4s var(--ease-out);
+      }
+
+      .path-caption {
+        position: fixed;
+        left: clamp(20px, 4vw, 56px);
+        bottom: 26px;
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg-3);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .path-caption b {
+        color: var(--cyan-hi);
+        font-weight: 400;
+      }
+
+      .hero-pin {
+        position: relative;
+        height: 190vh;
+      }
+
+      .hero-sticky {
+        position: sticky;
+        top: 0;
+        height: 100dvh;
+        min-height: 640px;
+        display: grid;
+        place-items: center;
+        padding: 0 clamp(20px, 5vw, 72px) 8vh;
+      }
+
+      .hero-copy {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 22px;
+        will-change: transform, opacity;
+      }
+
+      .hero-copy .display {
+        font-size: clamp(3rem, 7.6vw, 8.6rem);
+        max-width: 12.5ch;
+      }
+
+      .hero-copy .sub {
+        font-size: clamp(1.3rem, 2.3vw, 2.4rem);
+      }
+
+      .hero-copy .cta {
+        margin-top: 18px;
+      }
+
+      @media (max-width: 760px) {
+        #path,
+        .node-label,
+        .path-caption {
+          display: none;
+        }
+        .hero-copy {
+          width: 100%;
+        }
+        .hero-copy .display {
+          font-size: 11.6vw;
+        }
+        .hero-pin {
+          height: 150vh;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="field" aria-hidden="true"></canvas>
+    <div class="scrim" aria-hidden="true"></div>
+    <svg id="path" aria-hidden="true"><polyline points="" /></svg>
+    <div class="path-caption" aria-hidden="true"></div>
+
+    <main>
+      <section class="hero-pin">
+        <div class="hero-sticky">
+          <div class="hero-copy"></div>
+        </div>
+      </section>
+    </main>
+
+    <div class="proto-tag">A1 · Paths</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"></script>
+    <script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+    <script type="module">
+      import {
+        mountNav,
+        mountHero,
+        mountSections,
+        startEntry,
+        initReveals,
+        initSmoothScroll,
+        scrambleText,
+        spring,
+        reducedMotion,
+        finePointer,
+        isMobile,
+      } from "./hero.js";
+      import { createField, clusterCenters, cloudPositions } from "./field.js";
+
+      mountNav();
+      const copy = document.querySelector(".hero-copy");
+      mountHero(copy);
+      mountSections(document.querySelector("main"));
+      initSmoothScroll();
+      initReveals();
+      startEntry(copy, 120);
+
+      const { gsap, ScrollTrigger } = window;
+      const COUNT = isMobile ? 14000 : 52000;
+      const { positions } = cloudPositions(COUNT, clusterCenters(18));
+      const canvas = document.getElementById("field");
+      const field = createField(canvas, { positions, pointScale: 8.4, isMobile });
+
+      const state = { intro: 0, dive: 0, yaw: 0, pitch: 0, targetYaw: 0, targetPitch: 0, visible: true };
+      if (finePointer && !reducedMotion) {
+        addEventListener("pointermove", (event) => {
+          state.targetYaw = (event.clientX / innerWidth - 0.5) * 0.4;
+          state.targetPitch = (event.clientY / innerHeight - 0.5) * 0.24;
+        });
+      }
+
+      const polyline = document.querySelector("#path polyline");
+      const svg = document.getElementById("path");
+      const caption = document.querySelector(".path-caption");
+      const STEPS = 6;
+      const KEYS = ["5A", "6A", "7A", "8A", "9A", "10A", "11A", "12A"];
+      const circles = [];
+      const labels = [];
+      for (let i = 0; i < STEPS; i++) {
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("r", i === 0 || i === STEPS - 1 ? 4.5 : 3);
+        if (i === STEPS - 1) circle.classList.add("end");
+        circle.style.opacity = 0;
+        svg.appendChild(circle);
+        circles.push(circle);
+        const label = document.createElement("div");
+        label.className = "node-label";
+        document.body.appendChild(label);
+        labels.push(label);
+      }
+
+      const path = { nodes: [], draw: 0, alpha: 0, revealed: 0 };
+
+      function planPath() {
+        const y0 = innerHeight * (0.74 + Math.random() * 0.06);
+        const anchors = Array.from({ length: STEPS }, (_, i) => {
+          const t = i / (STEPS - 1);
+          return {
+            x: innerWidth * (0.1 + t * 0.8),
+            y: y0 + Math.sin(t * Math.PI * (1 + Math.random())) * innerHeight * 0.05,
+          };
+        });
+        const projected = Array.from({ length: 3500 }, () => {
+          const index = Math.floor(Math.random() * COUNT);
+          return { index, s: field.project(field.pointAt(index)) };
+        }).filter((candidate) => candidate.s.w > 0);
+        path.nodes = anchors.map((anchor) => {
+          let best = projected[0];
+          let bestDistance = Infinity;
+          for (const candidate of projected) {
+            const d = Math.hypot(candidate.s.x - anchor.x, candidate.s.y - anchor.y);
+            if (d < bestDistance) {
+              bestDistance = d;
+              best = candidate;
+            }
+          }
+          return best.index;
+        });
+
+        const startBpm = 84 + Math.floor(Math.random() * 20);
+        const endBpm = startBpm + 24 + Math.floor(Math.random() * 20);
+        const keyStart = Math.floor(Math.random() * 3);
+        labels.forEach((label, i) => {
+          const bpm = Math.round(startBpm + ((endBpm - startBpm) * i) / (STEPS - 1));
+          const key = KEYS[Math.min(KEYS.length - 1, keyStart + Math.round(i * 0.8))];
+          const head = i === 0 ? "START" : i === STEPS - 1 ? "END" : `0${i + 1}`;
+          label.dataset.text = `${head}\n${bpm} BPM · ${key}`;
+          label.textContent = "";
+          label.style.opacity = 0;
+        });
+        path.revealed = 0;
+        caption.innerHTML = `<b>Music Paths</b> · ${STEPS} steps · ${startBpm} → ${endBpm} BPM`;
+      }
+
+      function revealLabels() {
+        if (path.alpha < 0.5) return;
+        const reached = Math.floor(path.draw * (STEPS - 1) + 0.001) + 1;
+        while (path.revealed < Math.min(STEPS, reached)) {
+          const label = labels[path.revealed];
+          label.style.opacity = 1;
+          scrambleText(label, label.dataset.text, 380);
+          path.revealed += 1;
+        }
+      }
+
+      function drawPath() {
+        if (!path.nodes.length) return;
+        const screen = path.nodes.map((index) => field.project(field.pointAt(index)));
+        const segments = path.draw * (STEPS - 1);
+        const whole = Math.floor(segments);
+        const points = screen.slice(0, Math.min(whole, STEPS - 1) + 1);
+        if (whole < STEPS - 1) {
+          const a = screen[whole];
+          const b = screen[whole + 1];
+          const f = segments - whole;
+          points.push({ x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f });
+        }
+        polyline.setAttribute("points", points.map((p) => `${p.x},${p.y}`).join(" "));
+        polyline.style.opacity = path.alpha;
+        screen.forEach((p, i) => {
+          circles[i].setAttribute("cx", p.x);
+          circles[i].setAttribute("cy", p.y);
+          circles[i].style.opacity = i <= segments + 0.001 ? path.alpha : 0;
+          labels[i].style.transform = `translate3d(${p.x - 20}px, ${p.y + (i % 2 === 0 ? -46 : 14)}px, 0)`;
+        });
+        if (path.alpha < 0.05) labels.forEach((label) => (label.style.opacity = 0));
+        revealLabels();
+      }
+
+      function cycle() {
+        planPath();
+        gsap
+          .timeline({ onComplete: cycle })
+          .set(path, { draw: 0, alpha: 1 })
+          .to(path, { draw: 1, duration: 2.4, ease: "power2.inOut" })
+          .to(path, { alpha: 0, duration: 0.6, ease: "power1.in" }, "+=3.4");
+      }
+
+      function render(time) {
+        const t = time / 1000;
+        state.yaw += (state.targetYaw - state.yaw) * 0.045;
+        state.pitch += (state.targetPitch - state.pitch) * 0.045;
+        const orbit = t * 0.02 + state.yaw + state.dive * 0.9;
+        const distance = 6 - (6 - 3.05) * state.intro - state.dive * 2.3;
+        const eye = [Math.sin(orbit) * distance, 0.3 + state.pitch * 1.8, Math.cos(orbit) * distance];
+        const head = path.nodes.length ? path.nodes[Math.min(STEPS - 1, Math.floor(path.draw * (STEPS - 1)))] : null;
+        field.render({ eye, time: t, focus: head === null ? undefined : field.pointAt(head) });
+        drawPath();
+      }
+
+      if (reducedMotion) {
+        state.intro = 1;
+        canvas.style.opacity = 1;
+        render(0);
+      } else {
+        gsap.to(canvas, { opacity: 1, duration: 1.1, ease: "power2.out" });
+        gsap.to(state, { intro: 1, duration: 1.8, ease: spring });
+        const loop = (time) => {
+          if (state.visible && !document.hidden) render(time);
+          requestAnimationFrame(loop);
+        };
+        requestAnimationFrame(loop);
+        if (!isMobile) setTimeout(cycle, 1500);
+
+        ScrollTrigger.create({
+          trigger: ".hero-pin",
+          start: "top top",
+          end: "bottom bottom",
+          scrub: true,
+          onUpdate: ({ progress }) => {
+            state.dive = progress;
+            const fade = Math.min(1, progress / 0.55);
+            gsap.set(copy, { opacity: 1 - fade, scale: 1 - fade * 0.08, y: -fade * 40 });
+            gsap.set(["#path", ".path-caption"], { autoAlpha: 1 - Math.min(1, progress / 0.25) });
+            document.querySelectorAll(".node-label").forEach((label) => {
+              label.style.visibility = progress > 0.25 ? "hidden" : "visible";
+            });
+          },
+        });
+
+        const fieldFade = { statement: 0, screen: 0 };
+        const applyFieldFade = () => {
+          const opacity = (1 - 0.84 * fieldFade.statement) * (1 - fieldFade.screen);
+          gsap.set(canvas, { opacity });
+          state.visible = opacity > 0.001;
+        };
+        ScrollTrigger.create({
+          trigger: ".statement",
+          start: "top bottom",
+          end: "top 45%",
+          scrub: true,
+          onUpdate: ({ progress }) => {
+            fieldFade.statement = progress;
+            applyFieldFade();
+          },
+        });
+        ScrollTrigger.create({
+          trigger: ".screencast",
+          start: "top bottom",
+          end: "top 30%",
+          scrub: true,
+          onUpdate: ({ progress }) => {
+            fieldFade.screen = progress;
+            applyFieldFade();
+          },
+        });
+        gsap.fromTo(
+          "[data-frame]",
+          { scale: 0.86, opacity: 0, y: 60 },
+          {
+            scale: 1,
+            opacity: 1,
+            y: 0,
+            ease: "none",
+            scrollTrigger: { trigger: ".screencast", start: "top 85%", end: "top 20%", scrub: true },
+          },
+        );
+      }
+    </script>
+  </body>
+</html>

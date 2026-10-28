@@ -1,0 +1,325 @@
+---
+import { EQ_BANDS, EQ_CYCLE, EQ_PRESETS, SMART_EQ_CHAIN } from "../../content/listen/viz";
+
+const first = EQ_CYCLE[0]!;
+const gains = EQ_PRESETS[first]!;
+const presets = Object.keys(EQ_PRESETS);
+const sign = (gain: number) => (gain > 0 ? `+${gain}` : gain < 0 ? `−${Math.abs(gain)}` : "0");
+const sourceIds: Record<string, string> = { "your preset": "preset", genre: "genre" };
+---
+
+<figure class="eq" data-viz="eq" data-reveal aria-label="Ten-band equalizer morphing between Crate presets">
+  <header class="viz-bar" data-enter>
+    <p class="viz-label"><b>EQ</b> 10 bands · ±12 dB · 21 presets</p>
+    <p class="viz-label eq-trail" aria-live="polite">
+      <span data-eq-prev>{EQ_CYCLE[EQ_CYCLE.length - 1]}</span><i>→</i><b data-eq-current>{first}</b><i>→</i><span
+        data-eq-next>{EQ_CYCLE[1]}</span
+      >
+    </p>
+  </header>
+  <div class="eq-body">
+    <ol class="eq-scale" aria-hidden="true">
+      <li>+12</li><li>+6</li><li>0 dB</li><li>−6</li><li>−12</li>
+    </ol>
+    <div class="eq-stage">
+      <svg class="eq-svg" aria-hidden="true"></svg>
+    </div>
+    <ol class="eq-bands" aria-hidden="true">
+      {
+        EQ_BANDS.map((band, index) => (
+          <li>
+            <b data-eq-value>{sign(gains[index] ?? 0)}</b>
+            <span>{band}</span>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+  <div class="eq-progress" aria-hidden="true"><i data-eq-progress></i></div>
+  <div class="eq-controls">
+    <div class="eq-chips" role="group" aria-label="Equalizer presets">
+      {
+        presets.map((name, index) => (
+          <button type="button" data-preset={name} aria-pressed={name === first ? "true" : "false"} style={`--i:${index}`}>
+            {name}
+          </button>
+        ))
+      }
+    </div>
+    <p class="viz-label eq-chain">
+      <span class="eq-chain-title">Smart EQ chain</span>
+      {
+        SMART_EQ_CHAIN.map((step, index) => (
+          <>
+            {index > 0 && <i>→</i>}
+            <span data-source={sourceIds[step] ?? step}>{step}</span>
+          </>
+        ))
+      }
+    </p>
+  </div>
+</figure>
+
+<style>
+  .eq {
+    margin: 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .eq-trail {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .eq-trail span {
+    color: var(--fg-3);
+  }
+
+  .eq-trail i {
+    font-style: normal;
+    color: var(--fg-3);
+  }
+
+  .eq-trail b {
+    display: inline-block;
+    min-width: 12ch;
+    color: var(--cyan-hi);
+    font-weight: 400;
+    font-size: 13px;
+    text-align: center;
+  }
+
+  .eq-body {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    margin-top: 28px;
+  }
+
+  .eq-scale {
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    margin: 0;
+    padding: 6px 0;
+    list-style: none;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    color: var(--fg-3);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .eq-stage {
+    position: relative;
+    grid-row: 1;
+    grid-column: 2;
+    height: clamp(260px, 44vh, 460px);
+  }
+
+  .eq-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .eq-svg :global(.eq-grid line) {
+    stroke: var(--line);
+    stroke-width: 1;
+  }
+
+  .eq-svg :global(.eq-grid line.col) {
+    stroke: rgba(241, 245, 249, 0.04);
+  }
+
+  .eq-svg :global(.eq-grid line.zero) {
+    stroke: rgba(241, 245, 249, 0.22);
+    stroke-dasharray: 2 4;
+  }
+
+  .eq-svg :global(.eq-curve) {
+    fill: none;
+    stroke: var(--cyan-hi);
+    stroke-width: 2.25;
+    stroke-linecap: round;
+  }
+
+  .eq-svg :global(.eq-glow) {
+    fill: none;
+    stroke: var(--cyan);
+    stroke-width: 14;
+    stroke-opacity: 0.12;
+    stroke-linecap: round;
+  }
+
+  .eq-svg :global(.eq-ghost) {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.35);
+    stroke-width: 1;
+    stroke-dasharray: 3 5;
+  }
+
+  .eq-svg :global(.eq-dot) {
+    fill: var(--bg);
+    stroke: var(--cyan-hi);
+    stroke-width: 1.5;
+  }
+
+  .eq-bands {
+    grid-row: 2;
+    grid-column: 2;
+    display: grid;
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    margin: 18px 0 0;
+    padding: 0;
+    list-style: none;
+    text-align: center;
+    font-family: var(--mono);
+  }
+
+  .eq-bands b {
+    display: block;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.1rem, 2.1vw, 2rem);
+    letter-spacing: -0.03em;
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .eq-bands span {
+    display: block;
+    margin-top: 6px;
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    color: var(--fg-3);
+  }
+
+  .eq-progress {
+    height: 1px;
+    margin: 26px 0 0 52px;
+    background: var(--line);
+    overflow: hidden;
+  }
+
+  .eq-progress i {
+    display: block;
+    height: 100%;
+    background: var(--cyan-hi);
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+
+  .eq-controls {
+    display: grid;
+    gap: 22px;
+    margin: 22px 0 0 52px;
+  }
+
+  .eq-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .eq-chips button {
+    min-height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--fg-2);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition:
+      color 0.3s var(--ease-snap),
+      border-color 0.3s var(--ease-snap),
+      background-color 0.3s var(--ease-snap),
+      transform 0.45s var(--spring-snappy);
+  }
+
+  .eq-chips button:hover {
+    color: var(--fg);
+    border-color: rgba(103, 232, 249, 0.4);
+  }
+
+  .eq-chips button:active {
+    transform: scale(0.95);
+  }
+
+  .eq-chips button[aria-pressed="true"] {
+    color: var(--bg);
+    border-color: var(--cyan-hi);
+    background: var(--cyan-hi);
+  }
+
+  .eq-chain {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 10px;
+  }
+
+  .eq-chain-title {
+    margin-right: 8px;
+    color: var(--fg-2);
+  }
+
+  .eq-chain i {
+    font-style: normal;
+    opacity: 0.5;
+  }
+
+  .eq-chain [data-source] {
+    transition: color 0.4s var(--ease-snap);
+  }
+
+  .eq-chain [data-source].is-on {
+    color: var(--cyan-hi);
+  }
+
+  @media (max-width: 760px) {
+    .eq-body {
+      grid-template-columns: 34px minmax(0, 1fr);
+    }
+    .eq-stage {
+      height: 220px;
+    }
+    .eq-bands b {
+      font-size: 0.82rem;
+    }
+    .eq-bands span {
+      font-size: 9px;
+      letter-spacing: 0;
+    }
+    .eq-scale {
+      font-size: 9px;
+    }
+    .eq-progress,
+    .eq-controls {
+      margin-left: 0;
+    }
+    .eq-chips {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      margin: 0 -20px;
+      padding: 0 20px 6px;
+      scrollbar-width: none;
+    }
+    .eq-chips button {
+      flex: none;
+    }
+    .eq-trail span,
+    .eq-trail i {
+      display: none;
+    }
+  }
+</style>

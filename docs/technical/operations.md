@@ -5,15 +5,13 @@ section: operations
 audience: [operator]
 status: canonical
 order: 120
-verified: 2026-10-21
+verified: 2026-10-26
 sources:
   [
     docker-compose.yaml,
     docker-compose.home.yaml,
     scripts/deploy-remote.sh,
     app/crate/projector.py,
-    deploy/hermes/config.json,
-    deploy/hermes/runtime.py,
     deploy/hermes/context_server.py,
     deploy/hermes/activate_context.py,
     scripts/hermes_context.py,
@@ -28,7 +26,7 @@ sources:
 The optional [independent deterministic operator](./crate-operator.md) documents
 standalone incident persistence, job watches, delivery retries and the external
 watchdog. Its opt-in deployment and native callback integration remain separate
-from the read-only pilot.
+from the read-only Crate Agent.
 
 ## Runtime responsibilities
 
@@ -96,84 +94,19 @@ state, then restart in controlled order and verify migrations, cache/eventing,
 projector catch-up, queues, SSE and federation state. The detailed procedure is
 in [Backup and recovery](ops-runbook.md).
 
-## Hermes operator (phase one)
+## Crate Agent and Crate Operator
 
-The optional `hermes` profile adds `crate-hermes-agent` to the Crate Compose project.
-It uses the upstream Hermes v0.22.2 image pinned by digest, its own ChatGPT subscription
-session (`openai-codex`, `gpt-6-luna`) and a dedicated Telegram bot. This phase provides
-on-demand diagnosis and read access; autonomous alert schedules and mutations are not enabled.
-The agent has no Docker socket, SSH keys, music mount or access to another Hermes home.
+Crate Agent is an optional read-only Telegram assistant over the Crate MCP; Crate Operator
+adds changes that a bound human approves with Telegram buttons. Both run from the
+`crate-agent` image on the stack host, with their own bot, model login, memory and expiring
+MCP credential, and without a shell, the Docker socket or the music mount. They replace the
+removed built-in Telegram bot. Set them up with `make agent-init` (add
+`AGENT_PROFILE=operator` for Crate Operator) and check them with `make agent-status` and
+`make agent-smoke`.
 
-All instance state lives under `${DATA_DIR}/hermes-agent/`:
-
-| Path                                        | Purpose                                                       |
-| ------------------------------------------- | ------------------------------------------------------------- |
-| `home/`                                     | Independent OAuth session, conversations and memory           |
-| `secrets/telegram-token`                    | New BotFather token, mode 600                                 |
-| `secrets/mcp-token`                         | Dedicated expiring Crate service credential, mode 600         |
-| `secrets/allowed-users`                     | Explicit private Telegram user IDs, comma-separated, mode 600 |
-| `secrets/managed.env`                       | Generated private environment for supervised gateway children |
-| `runtime/<revision>/` and `runtime/current` | Immutable operator assets and selected revision               |
-| `context/releases/` and `context/active`    | Immutable context bundles and atomic active link              |
-| `context/deployment.json`                   | Release and deployment-state marker used to detect drift      |
-
-Provision a separate service integration using the [MCP connection guide](crate-mcp.md),
-with only `library.health.read`, `ops.status.read`, `ops.jobs.read`, `ops.logs.read`,
-`ops.audit.read`, `ops.schedules.read` and `ops.runtime.read`. These grants expose twelve
-read tools. The runtime rejects discovery containing any tool without a read-only annotation.
-Terminal, file, code execution, connection management, delegation, cron and messaging tools
-are excluded. Telegram permits only the configured private users/chats, with bot senders denied.
-
-Before first start, install the files from `deploy/hermes/` into a new immutable runtime
-directory and atomically select it with `runtime/current`. Create the dedicated secret files
-without logging their values. Generate the supervisor environment on the host:
-
-```bash
-umask 077
-python3 - "$DATA_DIR/hermes-agent" <<'PYTHON'
-import sys
-from pathlib import Path
-root = Path(sys.argv[1])
-sys.path.insert(0, str(root / "runtime/current"))
-from runtime import managed_environment
-(root / "secrets/managed.env").write_text(managed_environment(root / "secrets"))
-PYTHON
-```
-
-Keep the private directory mode 700 and its files readable by the configured `PUID`/`PGID`.
-Authorize ChatGPT inside this agent's own `home/`; do not share or copy rotating OAuth refresh
-tokens from a personal assistant. Build the first context from the deployed release's full
-Git SHA and immutable release manifest using `scripts/hermes_context.py`, then validate and
-activate its archive with `deploy/hermes/activate_context.py`. Start only the new service:
-
-```bash
-docker compose -f docker-compose.yaml -f docker-compose.project.yaml \
-  --profile hermes up -d --no-deps crate-hermes-agent
-```
-
-For bootstrapping against a release whose Compose predates this service, an operator can
-install its declaration in `.deploy/hermes.compose.yaml`; the deployment helper includes
-that overlay when present. Keep it consistent with the selected runtime's mounts and policy.
-Updating operator assets requires a new immutable runtime directory, switching `current` and
-recreating only `crate-hermes-agent`. Deploying Crate does not overwrite its live runtime.
-
-`SOUL.md` defines the Spanish operator identity, evidence rules and read-only boundaries;
-`CONTEXT.md` supplies the knowledge map. The context MCP exposes `get_release_context`,
-`search_crate_context` and `read_crate_context`. The indexed corpus includes canonical docs,
-scoped architecture instructions, backend, database and workers, Go/Rust services, frontend
-clients, desktop, Cast, public site, documentation renderer and deployment scripts. Reads
-are paginated, bounded and checked against their recorded hashes. Secrets, instance data,
-untracked files and music are excluded; source text never grants execution authority.
-
-Normal image-first deployment exports context from the exact release commit and activates it
-only after verification. It records deployment/rollback transitions so Hermes reports stale
-context during a transition or after version drift. Release SHA and reused image `source_sha`
-remain distinct. When deploying from an older checkout without these hooks, synchronize context
-explicitly or use an updated deployment checkout; the old checkout cannot maintain the marker.
-
-Validate the actual Luna tool calls, Telegram polling and private-user policy after setup.
-A running gateway alone does not prove MCP access or model authentication. Also confirm that
-any personal Hermes container retains its original ID, start time and restart count.
+[Crate Agent and Crate Operator over Telegram](crate-agent.md) is the operating guide:
+requirements, bot creation, model providers, credentials, approvals, provenance,
+supervisor alerts, release context, upgrades and troubleshooting.
 
 ### Maintaining the technical context
 
@@ -201,7 +134,7 @@ After updating a page, validate `docs/manifest.json`, its source links and the r
 npm run check:docs --prefix app/docs
 ```
 
-Use `search_crate_context` and `read_crate_context` to check that Hermes can retrieve the
+Use `search_crate_context` and `read_crate_context` to check that Crate Agent can retrieve the
 explanation. Acceptance questions should cover the feature's data flow, job/status semantics,
 version invalidation, fallback behavior and a case where current evidence is unavailable.
 Answers must identify source paths and the context release SHA, and use current MCP evidence
@@ -240,7 +173,7 @@ the real operator model, confirm its source paths and release SHA, and verify th
 states unavailable/stale evidence instead of claiming live health or effects. That check
 requires the real conversational transport and remains deferred from local acceptance.
 
-For the opt-in Hermes operator, use the [candidate and consolidated rollout
+For the opt-in Crate Operator, use the [candidate and consolidated rollout
 contract](hermes-operator-release.md): root-owned host assets, independent native
 recovery, health coverage, exact release context, provenance gates and rollback.
-The existing read-only pilot remains the default.
+Crate Agent, the read-only profile, remains the default.

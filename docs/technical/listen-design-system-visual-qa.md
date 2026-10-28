@@ -5,11 +5,11 @@ section: developer
 audience: [developer, reviewer]
 status: canonical
 order: 98
-verified: 2026-09-08
+verified: 2026-10-16
 sources:
   [
-    app/shared/ui/lib/appearance-resolver.ts,
-    app/shared/ui/primitives/ThemeScope.tsx,
+    app/shared/ui/lib/crate-identity.ts,
+    app/shared/ui/lib/interface-preferences.ts,
     app/shared/ui/domain/ArtistHeroFrame.tsx,
     app/shared/ui/tokens,
     tests/appearance,
@@ -21,41 +21,29 @@ sources:
 
 # Listen design system visual QA
 
-This is the release gate for the appearance engine. It combines computed-style
-contracts with deterministic screenshots of the real Listen application. The
-default `dark + default` appearance remains the visual baseline; `light` and
-`crateRed` are explicit variants of the same layout and interaction model.
+This gate combines computed-style contracts with deterministic screenshots of the real apps.
+V3 has one identity shared by Listen and Admin. Legacy light/system/skin preferences must resolve
+to the same identity while motion, effects, density and OS accessibility remain functional.
 
 ## What is covered
 
-| Contract                                                                  | Evidence                                          |
-| ------------------------------------------------------------------------- | ------------------------------------------------- |
-| `dark`, `light`, `system` mode resolution                                 | resolver tests and `contracts.spec.ts`            |
-| `default` and `crateRed` in both concrete modes                           | resolver tests and `contracts.spec.ts`            |
-| Accent, surface tone, material, radius, typography and effects            | `settings.spec.ts` plus computed CSS              |
-| Apply, Cancel and Reset without cross-scope contamination                 | `settings.spec.ts`, `scopes.spec.ts`              |
-| Portal content and secondary scope isolation                              | `contracts.spec.ts`, `scopes.spec.ts`             |
-| Solid/glass surface recipes                                               | `contracts.spec.ts`, `materials.spec.ts`          |
-| Dynamic logo geometry, paint and reduced motion                           | `logo.spec.ts`                                    |
-| Comfortable/compact content spacing and 72→64 row estimate                | `density.spec.ts` and Listen density tests        |
-| Desktop/mobile hero frame, scrims, crop/extend bounds and overlay content | `hero.spec.ts` and shared/Admin/Listen hero tests |
-| Real Listen shell, routes, player, cards, rows and settings               | `tests/listen-visual/listen-pages.spec.ts`        |
-| Browser runtime free of React render, nesting and page errors             | automatic real-page console error gate            |
+| Contract | Evidence |
+| --- | --- |
+| Fixed palette, actual surface/control AA contrast | registry tests and `contracts.spec.ts` |
+| Legacy preference migration, invalid/future versions, failed writes | shared preference tests and `settings.spec.ts` |
+| Independent density/motion/effects without palette changes | `settings.spec.ts`, `scopes.spec.ts` |
+| One fixed solid recipe across consumers | `contracts.spec.ts`, `materials.spec.ts` |
+| Logo, keyboard focus, forced colors, reduced motion | logo/focus/TopBar browser tests |
+| Comfortable/compact metrics and 72→64 row estimates | `density.spec.ts` and Listen tests |
+| Hero geometry, bounds and overlay content | `hero.spec.ts` and shared/Admin/Listen hero tests |
+| Real routes, players, cards, Settings, legacy startup | `tests/listen-visual/listen-pages.spec.ts` |
+| Real Admin pages, dialogs, toasts and overflow | `tests/admin-e2e` |
+| Native fixed identity, Linux buttons, Cast v1 compatibility | platform unit tests and native device QA |
 
-The contract harness uses the real `@crate/ui` token barrel, resolver, logo and
-hero components. It has deterministic inline artwork and no product API calls.
-The harness intentionally isolates shared component contracts from Admin and
-Listen layout.
-
-The real-page suite starts the actual Listen Vite application and exercises its
-authentication gate, providers, router, shell and full Tailwind stylesheet.
-API responses, media, time and the SSE transport are replaced with
-deterministic fixtures. Authentication, appearance and restored-player state
-are seeded through the same local-storage contracts consumed at bootstrap. It
-takes viewport screenshots of Home with a restored player, Artist, Genre,
-Radar and Settings. The content-rich Artist route covers every supported
-skin/mode combination, including Crate Red light. The suite also fails on
-browser console errors, uncaught page errors and unregistered JSON endpoints.
+The contract harness uses actual shared tokens, identity/preferences modules, logo and hero
+components with deterministic artwork. Real-page suites start the apps and replace API/media/time/
+streams with fixtures. Legacy startup cases verify migration without generating variant PNGs.
+Browser errors, React nesting errors and unregistered endpoints fail the real-page gate.
 
 ## Browser matrix
 
@@ -73,11 +61,11 @@ projects. The fixture catalogue records the review viewports:
 | 1480×900  | canonical artist hero canvas        |
 | 1920×1080 | ultrawide content gutters           |
 
-The deterministic contract suite contains 13 Chromium tests and 13 WebKit
-tests. The real-page suite adds 20 screenshot checks across 1480×900 desktop
-and 375×812 mobile viewports. Full matrices should not be replaced with skips.
-CI runs Chromium contracts and both real-page projects; WebKit remains the
-release/review gate for scopes, materials and hero changes.
+CI runs Chromium contracts and both desktop/mobile real-page projects. WebKit remains a
+release/review gate for shared surfaces and hero changes. Consult the handover for actual
+current results; local Chromium success does not certify WebKit or native devices. Canonical
+PNG baselines are recorded in the pinned Linux Playwright image, reviewed, and imported with
+the original manifest. Old variant PNGs are retired explicitly after checkpoint approval.
 
 ## Commands
 
@@ -111,25 +99,16 @@ and uploaded only for failed CI jobs.
 
 ## Manual review checklist
 
-For a visual change, review the default baseline first, then the smallest
-directed variant that exercises the changed axis:
-
-- Compare `dark + default` against the current production Listen shell,
-  player/dock, home hero, cards, rows, settings and overlays.
-- Switch to `light + default` and verify that text, borders, focus rings,
-  destructive states and glass surfaces retain contrast without changing
-  geometry.
-- Switch to `dark/light + crateRed` and verify that accent, brand logo,
-  surfaces, radius and typography change while navigation and component
-  structure remain unchanged.
-- Test `system` with both `prefers-color-scheme` values and test explicit
-  reduced motion independently of the system preference.
-- Apply compact density and confirm that rows/cards/gaps tighten but controls
-  keep their 40px minimum hit target and the virtualized list anchor remains
-  stable.
-- Review artist hero desktop and mobile compositions with clear and dark
-  artwork, explicit bounds, crop and extend. Legitimate black in the photo is
-  not padding drift.
+- Compare Listen and Admin together: identical tokens/primitives/interaction rules, with domain
+  composition differences only. Legacy local duplicates converge through planned migrations.
+- Seed legacy skins/modes/overrides and confirm the same V3 identity on first paint and reload.
+- Check motion, effects and compact density independently. OS reduced motion must always win;
+  hit targets, virtualized anchors, player geometry and safe areas must remain stable.
+- Check AA text/accent/warning and destructive controls on actual solid/popover/modal surfaces,
+  keyboard focus and forced colors.
+- Review desktop/mobile hero bounds with clear and dark artwork, crop/extend compositions.
+  Legitimate black in the photo is not padding drift.
+- Verify native status bars, Linux button placement and older Cast peers on actual devices.
 
 ## Review policy
 
@@ -139,13 +118,11 @@ assertion when the contract is a token, scope, geometry or accessibility
 invariant, and add a real-route screenshot when the risk spans application
 composition. A failure is triaged in this order:
 
-1. confirm the active scope and resolved `data-crate-*` attributes;
+1. confirm `data-crate-identity="v3"` and functional `data-crate-*` attributes;
 2. inspect the computed custom property and the consuming utility;
-3. check whether a portal escaped the intended `ThemeScope`;
-4. compare the default variant with `main` before changing a token or layout;
+3. check that the portal inherits the shared fixed tokens;
+4. compare both apps and the reviewed baseline before changing a token or layout;
 5. only then update the implementation and its test.
 
-Appearance controls are intentionally bounded. Users can select typed accent,
-surface, material, radius, typography, effect and density values; they cannot
-inject CSS or arbitrary hex values. Static favicon/PWA/launcher assets are not
-recolored by the runtime logo recipe.
+Settings exposes only typed motion/effects/density choices. Static favicon/PWA/launcher assets
+are not recolored at runtime. Artwork-derived visualizer palettes remain content.

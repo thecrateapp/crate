@@ -17,6 +17,9 @@ class PlannerPolicy:
     manual_ramp_ms: int = 350
     minimum_transition_ms: int = 1_000
     maximum_transition_ms: int = 12_000
+    maximum_long_beatmatch_ms: int = 48_000
+    long_beatmatch_phrase_bars: tuple[int, ...] = (32, 16, 8)
+    minimum_long_beatmatch_stability: float = 0.90
     minimum_outgoing_body_ratio: float = 0.5
     minimum_outgoing_body_ms: int = 30_000
     minimum_incoming_body_ms: int = 10_000

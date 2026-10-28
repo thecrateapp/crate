@@ -184,6 +184,13 @@ test("exposes ownership metadata for every raw color exception", () => {
 
   assert.deepEqual(inventory.rawColorAllowlist, [
     {
+      path: "app/listen/src/components/paths/path-cover-textures.ts",
+      owner: "listen-paths",
+      reason:
+        "The cover glow is the measured average colour of the artwork pixels: content, not identity.",
+      reviewBy: "2026-12-31",
+    },
+    {
       path: "app/shared/ui/domain/auth/OAuthButtons.tsx",
       owner: "shared-ui",
       reason: "Provider brand colors must match Google's official OAuth mark.",
@@ -193,7 +200,7 @@ test("exposes ownership metadata for every raw color exception", () => {
       path: "app/shared/ui/lib/appearance-token-registry.ts",
       owner: "design-system",
       reason:
-        "The typed registry is the sole runtime authority for preset and mode palette values.",
+        "The typed registry is the sole authority for the fixed Crate V3 identity values.",
       reviewBy: "2026-12-31",
     },
     {
@@ -241,6 +248,28 @@ test("detects surface tokens used in border and text declarations", () => {
 
   assert.deepEqual(metrics.roleViolations, [
     { property: "border", token: "--surface-quiet" },
+    { property: "color", token: "--surface-quiet" },
+  ]);
+});
+
+test("allows canvas foreground only in the global text-selection rule", () => {
+  const metrics = analyzeSemanticTokens(`
+    ::selection {
+      background: var(--accent-action);
+      color: var(--surface-canvas);
+      border: 1px solid var(--surface-canvas);
+      fill: var(--surface-canvas);
+    }
+    .card { color: var(--surface-canvas); }
+    .card, ::selection { color: var(--surface-canvas); }
+    ::selection { color: var(--surface-quiet); }
+  `);
+
+  assert.deepEqual(metrics.roleViolations, [
+    { property: "border", token: "--surface-canvas" },
+    { property: "fill", token: "--surface-canvas" },
+    { property: "color", token: "--surface-canvas" },
+    { property: "color", token: "--surface-canvas" },
     { property: "color", token: "--surface-quiet" },
   ]);
 });
@@ -293,17 +322,17 @@ test("enforces the normalized semantic token budget", () => {
     {
       tokens: ["--surface-contrast", "--state-danger-foreground"],
       reason:
-        "The default skin shares the same value, but cards and destructive controls are separate semantic roles for future skins.",
+        "Cards and destructive controls share a fixed value but retain distinct semantic roles.",
     },
     {
       tokens: ["--brand-logo-start", "--genre-tone-default"],
       reason:
-        "The logo and genre surfaces currently share the action accent while remaining independent theme slots.",
+        "The logo and genre surfaces share the fixed action accent but retain distinct semantic roles.",
     },
     {
       tokens: ["--brand-logo-end", "--jam-focus-border"],
       reason:
-        "The logo gradient and Jam focus border currently share the strong action accent while remaining independent theme slots.",
+        "The logo and Jam focus border share the fixed strong action accent but retain distinct semantic roles.",
     },
   ]);
   assert.deepEqual(metrics.duplicateTokenGroups, [
@@ -313,7 +342,7 @@ test("enforces the normalized semantic token budget", () => {
   ]);
 });
 
-test("keeps shared animation colors skin-aware", () => {
+test("keeps shared animation colors token-based", () => {
   const animations = readFileSync(
     new URL("../../app/shared/ui/tokens/animations.css", import.meta.url),
     "utf8",
@@ -324,7 +353,7 @@ test("keeps shared animation colors skin-aware", () => {
   assert.match(animations, /var\(--surface-glass-shadow\)/);
 });
 
-test("keeps runtime mode hooks isolated from semantic recipes", () => {
+test("shares one identity across apps with independent functional effects", () => {
   const semantic = readFileSync(
     new URL("../../app/shared/ui/tokens/semantic.css", import.meta.url),
     "utf8",
@@ -334,17 +363,16 @@ test("keeps runtime mode hooks isolated from semantic recipes", () => {
     "utf8",
   );
 
-  assert.doesNotMatch(semantic, /data-crate-mode="(?:dark|light)"/);
-  assert.doesNotMatch(themes, /data-crate-theme="high-contrast"/);
-  assert.match(themes, /\[data-crate-app="listen"\]\[data-crate-mode="dark"\]/);
-  assert.match(
-    themes,
-    /\[data-crate-app="listen"\]\[data-crate-mode="light"\]/,
-  );
-  assert.match(
-    themes,
-    /\[data-crate-app="listen"\]\[data-crate-mode="dark"\][\s\S]*--state-danger-foreground:\s*var\(--surface-canvas\)/,
-  );
+  for (const source of [semantic, themes]) {
+    assert.doesNotMatch(
+      source,
+      /data-crate-(?:app|mode|skin|theme)|data-surface/,
+    );
+  }
+  assert.match(themes, /:root\s*\{/);
+  assert.match(themes, /data-crate-effects="off"/);
+  assert.match(themes, /data-crate-effects="expressive"/);
+  assert.match(themes, /--state-danger-foreground:\s*#0a0a0f;/);
   assert.doesNotMatch(
     themes,
     /(?:^|[;{])\s*(?:margin|padding|width|height)\s*:/m,

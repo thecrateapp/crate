@@ -1,6 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MemoryRouter } from "react-router";
 import { AlbumCard } from "./AlbumCard";
 
 const mocks = vi.hoisted(() => ({
@@ -25,30 +26,46 @@ vi.mock("@/components/ui/music-context-menu", () => ({
 
 describe("AlbumCard", () => {
   beforeEach(() => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
     mocks.albumPagePath.mockClear();
     mocks.navigate.mockClear();
   });
 
   it("uses the API-provided canonical artist slug for navigation", () => {
     render(
-      <AlbumCard
-        albumId={3188}
-        albumSlug="bolsa-amarilla-y-piedra-potente"
-        artist="Derby Motoreta’s Burrito Kachimba"
-        artistSlug="derby-motoretas-burrito-kachimba"
-        name="Bolsa Amarilla y Piedra Potente"
-        tracks={12}
-        formats={["FLAC"]}
-      />,
+      <MemoryRouter>
+        <AlbumCard
+          albumId={3188}
+          albumSlug="bolsa-amarilla-y-piedra-potente"
+          artist="Derby Motoreta’s Burrito Kachimba"
+          artistSlug="derby-motoretas-burrito-kachimba"
+          name="Bolsa Amarilla y Piedra Potente"
+          tracks={12}
+          formats={["FLAC"]}
+        />
+      </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByText("Bolsa Amarilla y Piedra Potente"));
+    expect(
+      screen.getByRole("link", { name: /Bolsa Amarilla/ }),
+    ).toHaveAttribute("href", "/album");
 
     expect(mocks.albumPagePath).toHaveBeenCalledWith(
       expect.objectContaining({
         artistSlug: "derby-motoretas-burrito-kachimba",
       }),
     );
-    expect(mocks.navigate).toHaveBeenCalledWith("/album");
+    expect(
+      screen
+        .getByText("Bolsa Amarilla y Piedra Potente")
+        .closest('[data-slot="entity-card"]'),
+    ).toBeInTheDocument();
   });
 });

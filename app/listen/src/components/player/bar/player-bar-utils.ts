@@ -1,4 +1,5 @@
-import type { Track } from "@/contexts/PlayerContext";
+import { normalizeTrackBitrate } from "../../../lib/track-media-metadata";
+import type { Track } from "../../../contexts/player-types";
 
 export function formatPlayerTime(seconds: number): string {
   if (!seconds || !Number.isFinite(seconds)) return "0:00";
@@ -51,7 +52,7 @@ function classifyTier(
   sampleRate?: number | null,
   bitrate?: number | null,
 ): QualityTier {
-  const lossless = fmt === "flac" || fmt === "wav" || fmt === "alac";
+  const lossless = isLosslessFormat(fmt);
   if (lossless) {
     if ((bitDepth && bitDepth > 16) || (sampleRate && sampleRate > 48000))
       return "hi-res";
@@ -65,6 +66,16 @@ function classifyTier(
   return "standard";
 }
 
+function isLosslessFormat(format: string): boolean {
+  return ["flac", "wav", "alac", "aiff"].includes(format);
+}
+
+function positiveSourceNumber(value?: number | null): number | undefined {
+  return value != null && Number.isFinite(value) && value > 0
+    ? value
+    : undefined;
+}
+
 export function getTrackQualityBadge(track: Track): QualityBadge | null {
   return getQualityBadge(track);
 }
@@ -76,7 +87,7 @@ export function shouldFetchTrackQualityInfo(
 ): boolean {
   if (!track) return false;
   const format = (track.format || "").toLowerCase();
-  const lossless = format === "flac" || format === "wav" || format === "alac";
+  const lossless = isLosslessFormat(format);
   return (
     !track.format ||
     track.bitrate == null ||
@@ -87,17 +98,17 @@ export function shouldFetchTrackQualityInfo(
 
 export function getQualityBadge(input: QualityBadgeInput): QualityBadge | null {
   const fmt =
-    (input.format || "").toLowerCase() ||
+    (input.format || "").trim().replace(/^\./, "").toLowerCase() ||
     inferFormatFromId(input.path || "") ||
     inferFormatFromId(input.id || "");
   if (!fmt) return null;
 
-  const sr = input.sampleRate;
-  const bd = input.bitDepth;
-  const br = input.bitrate;
+  const sr = positiveSourceNumber(input.sampleRate);
+  const bd = positiveSourceNumber(input.bitDepth);
+  const br = positiveSourceNumber(normalizeTrackBitrate(input.bitrate));
   const tier = classifyTier(fmt, bd, sr, br);
 
-  const lossless = fmt === "flac" || fmt === "wav" || fmt === "alac";
+  const lossless = isLosslessFormat(fmt);
   const fmtLabel = fmt === "m4a" || fmt === "aac" ? "AAC" : fmt.toUpperCase();
 
   if (lossless) {

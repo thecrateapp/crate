@@ -105,6 +105,9 @@ describe("CrateMembersModal", () => {
   it("lists the owner first and lets the owner remove collaborators", async () => {
     renderModal(crate());
 
+    expect(
+      screen.getByRole("searchbox").closest('[data-slot="search-input"]'),
+    ).toBeInTheDocument();
     const rows = screen.getAllByRole("listitem");
     expect(rows[0]).toHaveTextContent("Listener");
     expect(rows[0]).toHaveTextContent("Owner");

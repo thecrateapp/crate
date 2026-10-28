@@ -1,6 +1,9 @@
-import { useEffect, useState } from "react";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { AdminSelect } from "@/components/ui/AdminSelect";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { RefreshCw } from "lucide-react";
 
 import { Button } from "@crate/ui/shadcn/button";
 import {
@@ -13,11 +16,12 @@ import {
 } from "@crate/ui/shadcn/dialog";
 import { Input } from "@crate/ui/shadcn/input";
 import { Textarea } from "@crate/ui/shadcn/textarea";
-import { AIButton } from "@/components/ui/AIButton";
+import { ArtistBioResearchAction } from "./ArtistBioResearchAction";
 
 import { api } from "@/lib/api";
 import { artistActionApiPath } from "@/lib/library-routes";
 import { waitForTask } from "@/lib/tasks";
+import { saveArtistBiography } from "@/lib/artist-biography";
 
 import type { ArtistData } from "./artistPageTypes";
 import { ArtistGenreSelector } from "./ArtistGenreSelector";
@@ -94,9 +98,24 @@ export function ArtistMetadataEditor({
   );
   const [saving, setSaving] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const baseline = useRef(initialState(artist));
+  const editorSession = useRef({ artistKey: "", open: false });
 
   useEffect(() => {
-    if (open) setValues(initialState(artist));
+    const artistKey = artist.entity_uid ?? `id:${artist.id ?? artist.name}`;
+    if (
+      open &&
+      (!editorSession.current.open ||
+        editorSession.current.artistKey !== artistKey)
+    ) {
+      const initial = initialState(artist);
+      baseline.current = initial;
+      setValues(initial);
+      setDiscardOpen(false);
+      setResearchOpen(false);
+    }
+    editorSession.current = { artistKey, open };
   }, [artist, open]);
 
   function updateField<K extends keyof ArtistMetadataFormState>(
@@ -107,17 +126,31 @@ export function ArtistMetadataEditor({
   }
 
   function closeEditor(nextOpen: boolean) {
-    if (!nextOpen && !saving) {
-      const dirty =
-        JSON.stringify(values) !== JSON.stringify(initialState(artist));
-      if (
-        dirty &&
-        !window.confirm("Discard unsaved artist metadata changes?")
-      ) {
+    if (!nextOpen) {
+      if (saving) return;
+      const dirty = JSON.stringify(values) !== JSON.stringify(baseline.current);
+      if (dirty) {
+        setDiscardOpen(true);
         return;
       }
     }
     onOpenChange(nextOpen);
+  }
+
+  async function applyBiography(proposal: string) {
+    setSaving(true);
+    try {
+      const biography = await saveArtistBiography(
+        { artistId: artist.id, artistEntityUid: artist.entity_uid },
+        proposal,
+      );
+      // Applying a biography commits only this field; other editorial edits stay in draft.
+      baseline.current = { ...baseline.current, bio: biography };
+      updateField("bio", biography);
+      onSaved?.();
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function save() {
@@ -161,9 +194,14 @@ export function ArtistMetadataEditor({
   return (
     <>
       <Dialog open={open} onOpenChange={closeEditor}>
-        <DialogContent className="flex max-h-[min(92dvh,960px)] max-w-3xl flex-col overflow-hidden">
+        <DialogContent
+          className="flex max-h-[min(92dvh,960px)] flex-col overflow-hidden"
+          size="lg"
+        >
           <DialogHeader className="shrink-0">
-            <DialogTitle>Edit artist metadata</DialogTitle>
+            <DialogTitle className="font-display">
+              Edit artist metadata
+            </DialogTitle>
             <DialogDescription>
               Update descriptive library metadata for {artist.name}. Audio files
               are not modified by this action.
@@ -172,39 +210,35 @@ export function ArtistMetadataEditor({
 
           <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain py-2 pr-1">
             <section className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-medium text-white/75">
-                  Biography
-                </span>
-                <AIButton
-                  actionId="artists.bio.research"
-                  type="button"
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <MonoLabel as="h3" tone="accent">
+                  Editorial data
+                </MonoLabel>
+                <ArtistBioResearchAction
                   onClick={() => setResearchOpen(true)}
                   disabled={saving}
-                >
-                  Research with AI
-                </AIButton>
+                />
               </div>
-              <Textarea
-                aria-label="Bio"
-                value={values.bio}
-                onChange={(event) => updateField("bio", event.target.value)}
-                rows={5}
-                maxLength={4000}
-              />
-              <div className="text-right text-xs text-white/35">
-                {values.bio.length}/4000
-              </div>
+              <FormField label="Biography" hint={`${values.bio.length}/4000`}>
+                <Textarea
+                  aria-label="Bio"
+                  disabled={saving}
+                  value={values.bio}
+                  onChange={(event) => updateField("bio", event.target.value)}
+                  rows={5}
+                  maxLength={4000}
+                />
+              </FormField>
             </section>
 
             <section className="space-y-3">
-              <div>
-                <h3 className="text-sm font-medium text-white/75">Genres</h3>
-                <p className="mt-1 text-xs text-white/40">
-                  Choose canonical taxonomy genres. Provider tags remain stored
-                  separately.
-                </p>
-              </div>
+              <MonoLabel as="h3" tone="accent">
+                Genres
+              </MonoLabel>
+              <p className="m-0 text-sm text-text-muted">
+                Choose canonical taxonomy genres. Provider tags remain stored
+                separately.
+              </p>
               <ArtistGenreSelector
                 value={values.genres}
                 onChange={(genres) => updateField("genres", genres)}
@@ -213,99 +247,75 @@ export function ArtistMetadataEditor({
             </section>
 
             <section className="space-y-3">
-              <h3 className="text-sm font-medium text-white/75">Identity</h3>
+              <MonoLabel as="h3" tone="accent">
+                Identity
+              </MonoLabel>
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="grid gap-2 text-sm">
-                  <span className="text-muted-foreground">MusicBrainz ID</span>
-                  <Input
-                    value={values.mbid}
-                    onChange={(event) =>
-                      updateField("mbid", event.target.value)
-                    }
-                  />
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="text-muted-foreground">Bandcamp URL</span>
-                  <Input
-                    value={values.bandcamp_url}
-                    onChange={(event) =>
-                      updateField("bandcamp_url", event.target.value)
-                    }
-                  />
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="text-muted-foreground">Country</span>
-                  <Input
-                    value={values.country}
-                    onChange={(event) =>
-                      updateField("country", event.target.value)
-                    }
-                  />
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="text-muted-foreground">Area</span>
-                  <Input
-                    value={values.area}
-                    onChange={(event) =>
-                      updateField("area", event.target.value)
-                    }
-                  />
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="text-muted-foreground">Formed</span>
-                  <Input
-                    value={values.formed}
-                    onChange={(event) =>
-                      updateField("formed", event.target.value)
-                    }
-                    placeholder="1998"
-                  />
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="text-muted-foreground">Ended</span>
-                  <Input
-                    value={values.ended}
-                    onChange={(event) =>
-                      updateField("ended", event.target.value)
-                    }
-                    placeholder="optional"
-                  />
-                </label>
-                <label className="grid gap-2 text-sm">
-                  <span className="text-muted-foreground">Type</span>
-                  <select
-                    value={values.artist_type}
-                    onChange={(event) =>
-                      updateField("artist_type", event.target.value)
-                    }
-                    className="h-10 rounded-md border border-white/10 bg-black/25 px-3 text-base text-white"
-                  >
-                    <option value="">Not specified</option>
-                    <option value="Group">Group</option>
-                    <option value="Person">Person</option>
-                    <option value="Character">Character</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </label>
+                {(
+                  [
+                    ["mbid", "MusicBrainz ID"],
+                    ["bandcamp_url", "Bandcamp URL"],
+                    ["country", "Country"],
+                    ["area", "Area"],
+                    ["formed", "Formed"],
+                    ["ended", "Ended"],
+                  ] as const
+                ).map(([field, label]) => (
+                  <FormField key={field} label={label}>
+                    <Input
+                      disabled={saving}
+                      value={values[field]}
+                      onChange={(event) =>
+                        updateField(field, event.target.value)
+                      }
+                      placeholder={
+                        field === "formed"
+                          ? "1998"
+                          : field === "ended"
+                            ? "optional"
+                            : undefined
+                      }
+                    />
+                  </FormField>
+                ))}
+                <FormField label="Type">
+                  {(control) => (
+                    <AdminSelect
+                      {...control}
+                      disabled={saving}
+                      value={values.artist_type}
+                      onChange={(value) => updateField("artist_type", value)}
+                      placeholder="Not specified"
+                      options={[
+                        { value: "", label: "Not specified" },
+                        { value: "Group", label: "Group" },
+                        { value: "Person", label: "Person" },
+                        { value: "Character", label: "Character" },
+                        { value: "Other", label: "Other" },
+                      ]}
+                    />
+                  )}
+                </FormField>
               </div>
             </section>
 
             <section className="space-y-3">
-              <div>
-                <h3 className="text-sm font-medium text-white/75">
-                  External links
-                </h3>
-                <p className="mt-1 text-xs text-white/40">
-                  One per line as label=https://…
-                </p>
-              </div>
-              <Textarea
-                aria-label="External URLs"
-                value={values.urls}
-                onChange={(event) => updateField("urls", event.target.value)}
-                rows={4}
-                placeholder="official=https://example.com"
-              />
+              <MonoLabel as="h3" tone="accent">
+                External links
+              </MonoLabel>
+              <FormField
+                label="External URLs"
+                hint="One per line as label=https://…"
+              >
+                <Textarea
+                  aria-label="External URLs"
+                  disabled={saving}
+                  value={values.urls}
+                  onChange={(event) => updateField("urls", event.target.value)}
+                  rows={4}
+                  placeholder="official=https://example.com"
+                />
+              </FormField>
             </section>
           </div>
 
@@ -318,21 +328,34 @@ export function ArtistMetadataEditor({
             >
               Cancel
             </Button>
-            <Button type="button" onClick={save} disabled={saving}>
-              {saving ? (
-                <RefreshCw size={14} className="mr-2 animate-spin" />
-              ) : null}
+            <Button
+              type="button"
+              onClick={save}
+              disabled={saving}
+              loading={saving}
+            >
               Save metadata
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog
+        open={discardOpen}
+        onOpenChange={setDiscardOpen}
+        title="Discard artist metadata changes?"
+        description="Your unsaved edits will be lost."
+        confirmLabel="Discard changes"
+        onConfirm={() => {
+          setDiscardOpen(false);
+          onOpenChange(false);
+        }}
+      />
       <ArtistBioResearchDialog
         open={researchOpen}
         onOpenChange={setResearchOpen}
         artist={artist}
         currentBio={values.bio}
-        onApply={(bio) => updateField("bio", bio)}
+        onApply={applyBiography}
       />
     </>
   );

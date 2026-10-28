@@ -2,8 +2,8 @@ import type {
   UpcomingItem,
   UpcomingResponse,
   GenreShowsResponse,
-} from "@/pages/shows-page-types";
-import { itemKey } from "@/components/upcoming/UpcomingRows";
+} from "./shows-page-types";
+import { itemKey } from "../components/upcoming/upcoming-list-model";
 
 export type ShowsFilter = "all" | "shows" | "releases";
 
@@ -44,8 +44,10 @@ export function buildShowsPageModel({
   upcomingLoading,
 }: ShowsPageModelInput): ShowsPageModel {
   const isGenreRadar = Boolean(genreSlug);
-  const items = isGenreRadar ? genreData?.shows ?? [] : data?.items ?? [];
-  const loading = isGenreRadar ? genreLoading : upcomingLoading;
+  const items = isGenreRadar ? (genreData?.shows ?? []) : (data?.items ?? []);
+  const loading = isGenreRadar
+    ? genreLoading && !genreData
+    : upcomingLoading && !data;
   const summary = isGenreRadar
     ? {
         followed_artists: 0,
@@ -74,11 +76,13 @@ export function buildShowsPageModel({
     filtered.some((item) => isSameUpcomingItem(item, featuredCandidate))
       ? featuredCandidate
       : null;
-  const comingUp = filtered.filter(
-    (item) =>
-      (item.is_upcoming || item.date >= today) &&
-      (!featuredShow || !isSameUpcomingItem(item, featuredShow)),
-  );
+  const comingUp = filtered
+    .filter(
+      (item) =>
+        (item.is_upcoming || item.date >= today) &&
+        (!featuredShow || !isSameUpcomingItem(item, featuredShow)),
+    )
+    .sort((a, b) => a.date.localeCompare(b.date));
   const recentlyReleased = filtered
     .filter(
       (item) =>

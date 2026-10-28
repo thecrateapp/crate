@@ -95,7 +95,7 @@ def main():
         "--no-projector", action="store_true", help="Disable snapshot projector loop"
     )
     worker_cmd.add_argument(
-        "--no-telegram", action="store_true", help="Disable Telegram bot loop"
+        "--no-telegram", action="store_true", help=argparse.SUPPRESS
     )
     worker_cmd.add_argument(
         "--legacy", action="store_true", help="Use legacy orchestrator (pre-Dramatiq)"
@@ -179,7 +179,6 @@ def main():
             config["worker_service_loop"] = not args.no_service_loop
             config["worker_analysis_daemons"] = not args.no_daemons
             config["worker_projector"] = not args.no_projector
-            config["worker_telegram"] = not args.no_telegram
             from crate.worker import run_worker
 
             run_worker(config)

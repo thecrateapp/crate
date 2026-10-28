@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
-import type { TouchEventHandler } from "react";
-import { cn } from "@crate/ui/lib/cn";
+import type { ReactNode, TouchEventHandler } from "react";
+import { PlayerBarFrame } from "./PlayerBarFrame";
 import { PlayerBarActionButtons } from "@/components/player/bar/PlayerBarActionButtons";
 import { PlayerBarSurfaces } from "@/components/player/bar/PlayerBarSurfaces";
 import { PlayerBarTrackInfo } from "@/components/player/bar/PlayerBarTrackInfo";
@@ -16,6 +16,7 @@ import type { QualityBadge } from "@/components/player/bar/player-bar-utils";
 type PlayerBarViewState = {
   isDesktop: boolean;
   liked: boolean;
+  likeStateAvailable?: boolean;
   isShapedRadioTrack: boolean;
   effectiveIsPlaying: boolean;
   effectiveIsBuffering: boolean;
@@ -41,6 +42,8 @@ type PlayerBarViewState = {
 };
 
 type PlayerBarViewProps = {
+  progressSlot?: ReactNode;
+  readAudioFrame?: () => { frequenciesDb: number[]; sampleRate: number };
   state: PlayerBarViewState;
   t: TFunction;
   displayTrack: Track;
@@ -93,6 +96,8 @@ type PlayerBarViewProps = {
 };
 
 export function PlayerBarView({
+  progressSlot,
+  readAudioFrame,
   state,
   t,
   displayTrack,
@@ -158,6 +163,7 @@ export function PlayerBarView({
     jamQueueLocked,
     jamTransportDisabled,
     liked,
+    likeStateAvailable,
     showEqualizer,
     showLyrics,
     showPlayerBarAnalyzer,
@@ -178,109 +184,85 @@ export function PlayerBarView({
       </div>
 
       {!hidePlayerBarForMobileFullscreen ? (
-        <div
-          className={cn(
-            "fixed isolate h-[var(--listen-mobile-player-height)] overflow-visible transition-[bottom,left,right,height] duration-200 md:left-3 md:right-3 md:h-(--listen-desktop-player-height)",
-            hasFloatingOverlayOpen ? "z-app-player-overlay" : "z-app-player",
-          )}
-          style={{
-            bottom: isDesktop
-              ? "var(--listen-desktop-player-bottom-offset)"
-              : "calc(var(--listen-safe-bottom) + var(--listen-mobile-bottom-dock-inset) + var(--listen-mobile-bottom-nav-content-height))",
-            left: isDesktop ? undefined : "max(1rem, var(--listen-safe-left))",
-            right: isDesktop
-              ? undefined
-              : "max(1rem, var(--listen-safe-right))",
-          }}
+        <PlayerBarFrame
+          isDesktop={isDesktop}
+          overlayRaised={hasFloatingOverlayOpen}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
-          <div
-            aria-hidden="true"
-            className={cn(
-              "pointer-events-none absolute inset-0 z-0",
-              isDesktop
-                ? "listen-player-shell md:rounded-panel md:backdrop-blur-xl"
-                : "rounded-t-[2rem] rounded-b-none",
-            )}
+          <PlayerBarTrackInfo
+            displayTrack={displayTrack}
+            displayCrossfadeTransition={displayCrossfadeTransition}
+            crossfadeProgress={crossfadeProgress}
+            displayPlaySource={displayPlaySource}
+            sourceLabel={sourceLabel}
+            isDesktop={isDesktop}
+            liked={liked}
+            likeStateAvailable={likeStateAvailable}
+            isShapedRadioTrack={isShapedRadioTrack}
+            shapedRadioSessionId={shapedRadioSessionId}
+            onNavigate={onNavigate}
+            onPrepareFullscreen={onPrepareFullscreen}
+            onOpenFullscreen={onOpenFullscreen}
+            onToggleLike={onToggleLike}
+            onNextTrack={onNextTrack}
+            onOverlayChange={onOverlayChange}
           />
-          <div
-            className={cn(
-              "relative z-10 flex h-full items-center gap-2",
-              isDesktop ? "px-3 lg:px-4" : "px-4 pt-3 pb-0.5",
-            )}
-          >
-            <PlayerBarTrackInfo
-              displayTrack={displayTrack}
-              displayCrossfadeTransition={displayCrossfadeTransition}
-              crossfadeProgress={crossfadeProgress}
-              displayPlaySource={displayPlaySource}
-              sourceLabel={sourceLabel}
-              isDesktop={isDesktop}
-              liked={liked}
-              isShapedRadioTrack={isShapedRadioTrack}
-              shapedRadioSessionId={shapedRadioSessionId}
-              onNavigate={onNavigate}
-              onPrepareFullscreen={onPrepareFullscreen}
-              onOpenFullscreen={onOpenFullscreen}
-              onToggleLike={onToggleLike}
-              onNextTrack={onNextTrack}
-              onOverlayChange={onOverlayChange}
-            />
-            <PlayerBarTransportControls
-              t={t}
-              frequenciesDb={frequenciesDb}
-              sampleRate={sampleRate}
-              showAnalyzer={showPlayerBarAnalyzer}
-              isPlaying={isPlaying}
-              shuffle={shuffle}
-              repeat={repeat}
-              jamQueueLocked={jamQueueLocked}
-              jamTransportDisabled={jamTransportDisabled}
-              effectiveIsPlaying={effectiveIsPlaying}
-              effectiveIsBuffering={effectiveIsBuffering}
-              effectiveDisplayedTime={effectiveDisplayedTime}
-              effectiveDisplayedDuration={effectiveDisplayedDuration}
-              progressPct={progressPct}
-              seekHover={seekHover}
-              onSeekHoverChange={onSeekHoverChange}
-              onToggleShuffle={onToggleShuffle}
-              onPreviousTrack={onPreviousTrack}
-              onPlayPause={onPlayPause}
-              onNextTrack={onNextTrack}
-              onCycleRepeat={onCycleRepeat}
-              onSeek={onSeek}
-            />
+          <PlayerBarTransportControls
+            progressSlot={progressSlot}
+            readAudioFrame={readAudioFrame}
+            t={t}
+            frequenciesDb={frequenciesDb}
+            sampleRate={sampleRate}
+            showAnalyzer={showPlayerBarAnalyzer}
+            isPlaying={isPlaying}
+            shuffle={shuffle}
+            repeat={repeat}
+            jamQueueLocked={jamQueueLocked}
+            jamTransportDisabled={jamTransportDisabled}
+            effectiveIsPlaying={effectiveIsPlaying}
+            effectiveIsBuffering={effectiveIsBuffering}
+            effectiveDisplayedTime={effectiveDisplayedTime}
+            effectiveDisplayedDuration={effectiveDisplayedDuration}
+            progressPct={progressPct}
+            seekHover={seekHover}
+            onSeekHoverChange={onSeekHoverChange}
+            onToggleShuffle={onToggleShuffle}
+            onPreviousTrack={onPreviousTrack}
+            onPlayPause={onPlayPause}
+            onNextTrack={onNextTrack}
+            onCycleRepeat={onCycleRepeat}
+            onSeek={onSeek}
+          />
 
-            <PlayerBarActionButtons
-              t={t}
-              qualityBadge={qualityBadge}
-              showsDeliveryQuality={showsDeliveryQuality}
-              effectiveVolume={effectiveVolume}
-              onVolumeChange={onVolumeChange}
-              onOverlayChange={onOverlayChange}
-              playbackTargetContext={playbackTargetContext}
-              visibility={{
-                isRemoteConnectActive,
-                extendedOpen,
-                allowEqualizer,
-                showEqualizer,
-                showQueue,
-                showLyrics,
-              }}
-              displayQueue={displayQueue}
-              displayCurrentIndex={displayCurrentIndex}
-              onToggleEqualizer={onToggleEqualizer}
-              onPrepareEqualizer={onPrepareEqualizer}
-              onToggleQueue={onToggleQueue}
-              onPrepareQueue={onPrepareQueue}
-              onToggleLyrics={onToggleLyrics}
-              onPrepareLyrics={onPrepareLyrics}
-              onToggleExtendedPlayer={onToggleExtendedPlayer}
-              onPrepareExtendedPlayer={onPrepareExtendedPlayer}
-            />
-          </div>
-        </div>
+          <PlayerBarActionButtons
+            t={t}
+            qualityBadge={qualityBadge}
+            showsDeliveryQuality={showsDeliveryQuality}
+            effectiveVolume={effectiveVolume}
+            onVolumeChange={onVolumeChange}
+            onOverlayChange={onOverlayChange}
+            playbackTargetContext={playbackTargetContext}
+            visibility={{
+              isRemoteConnectActive,
+              extendedOpen,
+              allowEqualizer,
+              showEqualizer,
+              showQueue,
+              showLyrics,
+            }}
+            displayQueue={displayQueue}
+            displayCurrentIndex={displayCurrentIndex}
+            onToggleEqualizer={onToggleEqualizer}
+            onPrepareEqualizer={onPrepareEqualizer}
+            onToggleQueue={onToggleQueue}
+            onPrepareQueue={onPrepareQueue}
+            onToggleLyrics={onToggleLyrics}
+            onPrepareLyrics={onPrepareLyrics}
+            onToggleExtendedPlayer={onToggleExtendedPlayer}
+            onPrepareExtendedPlayer={onPrepareExtendedPlayer}
+          />
+        </PlayerBarFrame>
       ) : null}
       <PlayerBarSurfaces
         state={{

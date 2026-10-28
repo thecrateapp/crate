@@ -360,7 +360,7 @@
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
-    "@solar-icons/react-perf": "^2.1.1",
+    "@solar-icons/react": "^2.3.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "radix-ui": "^1.0.0",
@@ -371,12 +371,14 @@
     "tailwind-merge": "^3.0.0"
   },
   "devDependencies": {
-    "@solar-icons/react-perf": "^2.1.1",
+    "@solar-icons/react": "^2.3.3",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.2",
     "@vitejs/plugin-react": "^6.0.1",
     "happy-dom": "^20.9.0",
     "jsdom": "^29.0.2",
+    "lightningcss": "^1.32.0",
+    "tailwindcss": "^4.2.4",
     "tsup": "^8.5.1",
     "vitest": "^4.1.4"
   }

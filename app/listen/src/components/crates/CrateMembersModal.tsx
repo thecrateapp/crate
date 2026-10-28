@@ -1,8 +1,10 @@
+import { CollectionMemberRow } from "../collections/CollectionMemberRow";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CRATE_ICON_SIZE, LogOut, UserMinus, Users } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, LogOut, Users } from "@crate/ui/icons";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
-import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
+import { CollectionMembersDialog } from "../collections/CollectionMembersDialog";
 import { Button } from "@crate/ui/shadcn/button";
 import { notify } from "@crate/ui/lib/notify";
 
@@ -147,10 +149,9 @@ export function CrateMembersModal({
   }
 
   return (
-    <AppModal
+    <CollectionMembersDialog
       open={open}
       onClose={onClose}
-      size="md"
       title={t("library.crates.collaborators")}
       description={
         isOwner
@@ -160,147 +161,119 @@ export function CrateMembersModal({
           : t("crate.members.readOnlySubtitle")
       }
       closeLabel={t("common.close")}
-      closeOnEscape={!leaveConfirmation}
-      headerClassName="bg-transparent"
-      panelClassName="listen-glass-panel flex flex-col border-border-quiet"
+      closeBlocked={leaveConfirmation}
     >
       <div className="flex min-h-0 flex-col">
-        <ModalBody className="space-y-5 p-5">
-          {isOwner && !collaborative ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent-action/15 bg-accent-action/5 p-4">
-              <p className="min-w-0 flex-1 text-sm text-text-primary">
-                {t("crate.members.enableHint")}
-              </p>
-              <Button
-                onClick={() => void enableCollaboration()}
-                loading={enabling}
-              >
-                {enabling ? null : <Users size={CRATE_ICON_SIZE.sm} />}
-                {t("crate.members.enableCollaboration")}
-              </Button>
-            </div>
-          ) : null}
+        {isOwner && !collaborative ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent-action/15 bg-accent-action/5 p-4">
+            <p className="min-w-0 flex-1 text-sm text-text-primary">
+              {t("crate.members.enableHint")}
+            </p>
+            <Button
+              onClick={() => void enableCollaboration()}
+              loading={enabling}
+            >
+              {enabling ? null : <Users size={CRATE_ICON_SIZE.sm} />}
+              {t("crate.members.enableCollaboration")}
+            </Button>
+          </div>
+        ) : null}
 
-          <section className="space-y-3">
-            <ul className="space-y-2">
-              {rows.map((row) => {
-                const isCurrentUser = user?.id === row.userId;
-                return (
-                  <li
-                    key={`${row.role}-${row.userId}`}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-border-quiet bg-text-primary/[0.03] px-3 py-2.5"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
+        <section className="space-y-3">
+          <ul className="space-y-2">
+            {rows.map((row) => {
+              const isCurrentUser = user?.id === row.userId;
+              return (
+                <li key={`${row.role}-${row.userId}`}>
+                  <CollectionMemberRow
+                    name={row.name}
+                    nameContent={
+                      row.username ? (
+                        <UserProfileLink
+                          username={row.username}
+                          hoverClassName="block"
+                          className="link-meta block w-fit max-w-full truncate"
+                        >
+                          {row.name}
+                        </UserProfileLink>
+                      ) : (
+                        row.name
+                      )
+                    }
+                    avatar={
                       <UserProfileAvatar
                         name={row.name}
                         avatar={row.avatar}
                         userId={row.userId}
                         className="size-9 shrink-0 text-sm!"
                       />
-                      <div className="min-w-0">
-                        {row.username ? (
-                          <UserProfileLink
-                            username={row.username}
-                            hoverClassName="block"
-                            className="link-meta block w-fit max-w-full truncate text-sm font-medium text-text-primary"
-                          >
-                            {row.name}
-                          </UserProfileLink>
-                        ) : (
-                          <div className="truncate text-sm font-medium text-text-primary">
-                            {row.name}
-                          </div>
-                        )}
-                        <div className="truncate text-xs text-text-muted">
-                          {row.role === "owner"
-                            ? t("crate.members.owner")
-                            : t("crate.members.collaborator")}
-                          {isCurrentUser ? ` · ${t("crate.members.you")}` : ""}
-                        </div>
-                      </div>
-                    </div>
-                    {isOwner && row.role !== "owner" ? (
-                      <Button
-                        variant="danger-soft"
-                        size="xs"
-                        shape="pill"
-                        onClick={() => void removeMember(row.userId)}
-                        loading={removingUserId === row.userId}
-                        aria-label={t("library.crates.removeMember", {
-                          name: row.name,
-                        })}
-                      >
-                        {removingUserId === row.userId ? null : (
-                          <UserMinus size={CRATE_ICON_SIZE.micro} />
-                        )}
-                        {t("common.remove")}
-                      </Button>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-            {members.error ? (
-              <div
-                role="alert"
-                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-state-danger/20 bg-state-danger/5 px-3 py-2.5"
-              >
-                <p className="min-w-0 flex-1 text-sm text-text-primary">
-                  {t("crate.members.membersFailed")}
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => members.refetch()}
-                >
-                  {t("common.retry")}
-                </Button>
-              </div>
-            ) : isOwner &&
-              collaborative &&
-              !members.loading &&
-              collaboratorRows.length === 0 ? (
-              <p className="text-sm text-text-muted">
-                {t("crate.members.noCollaborators")}
-              </p>
-            ) : null}
-          </section>
-
-          {isOwner ? (
-            <CollaboratorPicker
-              excludeUserIds={rows.map((row) => row.userId)}
-              onAdd={addCollaborator}
+                    }
+                    roleLabel={`${t(row.role === "owner" ? "crate.members.owner" : "crate.members.collaborator")}${isCurrentUser ? ` · ${t("crate.members.you")}` : ""}`}
+                    removeLabel={t("library.crates.removeMember", {
+                      name: row.name,
+                    })}
+                    pending={removingUserId === row.userId}
+                    onRemove={
+                      isOwner && row.role !== "owner"
+                        ? () => void removeMember(row.userId)
+                        : undefined
+                    }
+                  />
+                </li>
+              );
+            })}
+          </ul>
+          {members.error ? (
+            <ErrorState
+              message={t("crate.members.membersFailed")}
+              retryLabel={t("common.retry")}
+              onRetry={() => members.refetch()}
             />
+          ) : isOwner &&
+            collaborative &&
+            !members.loading &&
+            collaboratorRows.length === 0 ? (
+            <p className="text-sm text-text-muted">
+              {t("crate.members.noCollaborators")}
+            </p>
           ) : null}
+        </section>
 
-          {isCollaborator ? (
-            <section className="border-t border-border-quiet pt-4">
-              <Button
-                variant="ghost"
-                onClick={() => setLeaveConfirmation(true)}
-                className="text-state-danger hover:text-state-danger"
-              >
-                <LogOut size={CRATE_ICON_SIZE.sm} />
-                {t("crate.members.leave")}
-              </Button>
-              <ConfirmDialog
-                open={leaveConfirmation}
-                tone="danger"
-                pending={leaving}
-                title={t("crate.members.leave")}
-                body={t("crate.members.leaveConfirmation", {
-                  name: crate.name,
-                })}
-                confirmLabel={t("crate.members.confirmLeave")}
-                cancelLabel={t("common.cancel")}
-                closeLabel={t("common.close")}
-                onCancel={() => setLeaveConfirmation(false)}
-                onConfirm={() => void leaveCrate()}
-              />
-            </section>
-          ) : null}
-        </ModalBody>
+        {isOwner ? (
+          <CollaboratorPicker
+            excludeUserIds={rows.map((row) => row.userId)}
+            onAdd={addCollaborator}
+          />
+        ) : null}
+
+        {isCollaborator ? (
+          <section className="border-t border-border-quiet pt-4">
+            <Button
+              variant="ghost"
+              onClick={() => setLeaveConfirmation(true)}
+              className="text-state-danger hover:text-state-danger"
+            >
+              <LogOut size={CRATE_ICON_SIZE.sm} />
+              {t("crate.members.leave")}
+            </Button>
+            <ConfirmDialog
+              eyebrow={t("actions.confirmation.eyebrow")}
+              open={leaveConfirmation}
+              tone="danger"
+              pending={leaving}
+              title={t("crate.members.leave")}
+              body={t("crate.members.leaveConfirmation", {
+                name: crate.name,
+              })}
+              confirmLabel={t("crate.members.confirmLeave")}
+              cancelLabel={t("common.cancel")}
+              closeLabel={t("common.close")}
+              onCancel={() => setLeaveConfirmation(false)}
+              onConfirm={() => void leaveCrate()}
+            />
+          </section>
+        ) : null}
       </div>
-    </AppModal>
+    </CollectionMembersDialog>
   );
 }

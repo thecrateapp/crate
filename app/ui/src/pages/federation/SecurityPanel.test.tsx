@@ -45,3 +45,61 @@ it("explains and reverses temporary risk actions", async () => {
     ),
   );
 });
+
+it.each([
+  ["pending", null, true, null, "Loading peer risk"],
+  ["failed", null, false, "offline", "Peer risk could not be loaded."],
+  ["missing", null, false, null, "Peer risk could not be loaded."],
+  [
+    "uncomputed",
+    { latest_snapshot: null, observations: [], temporary_actions: [] },
+    false,
+    null,
+    "No risk score has been computed for this peer.",
+  ],
+])(
+  "does not invent a zero risk score for %s data",
+  (_name, data, loading, error, message) => {
+    vi.mocked(useApi).mockImplementation((path: string | null) => ({
+      data: path?.endsWith("status")
+        ? { peers: [{ node_uid: "node-b", display_name: "Node B" }] }
+        : data,
+      loading: path?.endsWith("status") ? false : loading,
+      error: path?.endsWith("status") ? null : error,
+      refetch: vi.fn(),
+    }));
+    renderWithAdminProviders(<SecurityPanel canManage={false} />);
+    expect(screen.queryByText(/Score:/)).not.toBeInTheDocument();
+    if (loading)
+      expect(
+        screen.getByRole("status", { name: String(message) }),
+      ).toBeInTheDocument();
+    else expect(screen.getByText(String(message))).toBeInTheDocument();
+  },
+);
+
+it("preserves a measured zero and retries failed risk reads", async () => {
+  const refetch = vi.fn();
+  let error: string | null = "offline";
+  vi.mocked(useApi).mockImplementation((path: string | null) => ({
+    data: path?.endsWith("status")
+      ? { peers: [{ node_uid: "node-b", display_name: "Node B" }] }
+      : {
+          latest_snapshot: { score: 0, algorithm_version: "v1" },
+          observations: [],
+          temporary_actions: [],
+        },
+    loading: false,
+    error: path?.endsWith("status") ? null : error,
+    refetch,
+  }));
+  const { rerender } = renderWithAdminProviders(
+    <SecurityPanel canManage={false} />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  expect(refetch).toHaveBeenCalledOnce();
+  expect(screen.queryByText(/Score:/)).not.toBeInTheDocument();
+  error = null;
+  rerender(<SecurityPanel canManage={false} />);
+  expect(screen.getByText(/Score: 0/)).toBeInTheDocument();
+});

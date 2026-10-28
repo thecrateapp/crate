@@ -2,7 +2,7 @@ import { toast } from "sonner";
 
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
-import { Badge } from "@crate/ui/shadcn/badge";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Button } from "@crate/ui/shadcn/button";
 import { Card, CardContent } from "@crate/ui/shadcn/card";
 
@@ -10,6 +10,7 @@ import { DirectoriesPanel } from "./DirectoriesPanel";
 import { PairingPanel } from "./PairingPanel";
 import { PanelState } from "./PanelState";
 import type { FederationStatus } from "./types";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 export function PeersPanel({ canManage }: { canManage: boolean }) {
   const status = useApi<FederationStatus>("/api/admin/federation/status");
@@ -32,7 +33,7 @@ export function PeersPanel({ canManage }: { canManage: boolean }) {
         <DirectoriesPanel canManage={canManage} />
         <div className="space-y-3">
           {(status.data?.peers ?? []).length === 0 ? (
-            <p className="text-sm text-white/45">No peers configured.</p>
+            <EmptyState title="No peers configured" />
           ) : (
             status.data?.peers.map((peer) => (
               <Card key={peer.node_uid}>
@@ -40,9 +41,19 @@ export function PeersPanel({ canManage }: { canManage: boolean }) {
                   <div>
                     <p className="flex items-center gap-2 font-medium">
                       {peer.display_name}
-                      <Badge variant="secondary">{peer.trust_state}</Badge>
+                      <InfoBadge
+                        tone={
+                          peer.trust_state === "approved"
+                            ? "success"
+                            : peer.trust_state === "pending"
+                              ? "warning"
+                              : "neutral"
+                        }
+                      >
+                        {peer.trust_state}
+                      </InfoBadge>
                     </p>
-                    <p className="font-mono text-xs text-white/45">
+                    <p className="font-mono text-xs text-text-muted">
                       {peer.node_uid}
                     </p>
                   </div>
@@ -77,7 +88,7 @@ export function PeersPanel({ canManage }: { canManage: boolean }) {
                       ) : null}
                       <Button
                         size="sm"
-                        variant="destructive"
+                        variant="outline"
                         onClick={() =>
                           void mutate(
                             `/api/admin/federation/nodes/${peer.node_uid}/disable`,

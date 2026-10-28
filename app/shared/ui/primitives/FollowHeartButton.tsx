@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { Heart, HeartBold } from "../icons/media";
 import { Loader2 } from "../icons/status";
 import { cn } from "../lib/cn";
@@ -185,6 +186,7 @@ export function FollowHeartButton({
   label,
   labelActive,
   disabled,
+  title,
   ...props
 }: FollowHeartButtonProps) {
   const [followAnimation, setFollowAnimation] = useState<FollowAnimation>(null);
@@ -215,109 +217,113 @@ export function FollowHeartButton({
   };
 
   return (
-    <button
-      {...props}
-      type={type}
-      aria-pressed={following}
-      aria-label={
-        props["aria-label"] ?? (following ? labelActive ?? label : label)
-      }
-      aria-busy={loading || undefined}
-      disabled={disabled || loading}
-      className={cn(
-        "relative inline-flex items-center justify-center gap-1.5 outline-none transition-[color,filter,transform,box-shadow] focus-visible:shadow-focus disabled:opacity-50",
-        className,
-        isActive
-          ? "text-accent-action drop-shadow-accent-action"
-          : "text-text-primary/80",
-      )}
-      onClick={handleClick}
-    >
-      <span
-        className="relative inline-flex shrink-0 items-center justify-center"
-        style={{ width: iconSize, height: iconSize }}
-      >
-        {followAnimation ? (
-          <span
-            key={`${followAnimation}-${followAnimationId}`}
-            data-testid={particlesTestId}
-            aria-hidden="true"
-            className={cn(
-              "crate-follow-particles",
-              followAnimation === "unfollow"
-                ? "crate-follow-particles--unfollow"
-                : "",
-            )}
-          >
-            {(followAnimation === "follow"
-              ? followParticles
-              : FOLLOW_PARTICLES
-            ).map((particle, index) => {
-              const midX =
-                particle.midX ??
-                `${Math.round(Number.parseFloat(particle.orbitX) * 0.65)}px`;
-              const midY =
-                particle.midY ??
-                `${Math.round(Number.parseFloat(particle.orbitY) * 0.65)}px`;
-              const style = {
-                "--follow-particle-size": particle.size,
-                "--follow-particle-delay": particle.delay,
-                "--follow-particle-duration": particle.duration ?? "760ms",
-                "--follow-particle-mid-x": midX,
-                "--follow-particle-mid-y": midY,
-                "--follow-particle-start-x":
-                  followAnimation === "follow"
-                    ? particle.orbitX
-                    : particle.heartX,
-                "--follow-particle-start-y":
-                  followAnimation === "follow"
-                    ? particle.orbitY
-                    : particle.heartY,
-                "--follow-particle-end-x":
-                  followAnimation === "follow"
-                    ? particle.heartX
-                    : particle.orbitX,
-                "--follow-particle-end-y":
-                  followAnimation === "follow"
-                    ? particle.heartY
-                    : particle.orbitY,
-              } as CSSProperties;
-
-              return (
-                <span
-                  key={index}
-                  className="crate-follow-particle"
-                  style={style}
-                />
-              );
-            })}
-          </span>
-        ) : null}
-        {loading ? (
-          <Loader2
-            data-testid={heartTestId}
-            aria-hidden="true"
-            size={iconSize}
-            className="animate-spin"
-          />
-        ) : isActive ? (
-          <HeartBold
-            data-testid={heartTestId}
-            size={iconSize}
-            className={cn(
-              "text-accent-action animate-crate-icon-active-pulse",
-              followAnimation === "follow"
-                ? "crate-follow-heart-in"
-                : followAnimation === "unfollow"
-                  ? "crate-follow-heart-out"
-                  : "",
-            )}
-          />
-        ) : (
-          <Heart data-testid={heartTestId} size={iconSize} />
+    <TooltipHint content={title}>
+      <button
+        {...props}
+        type={type}
+        aria-pressed={following}
+        aria-label={
+          props["aria-label"] ??
+          (following ? (labelActive ?? label) : label) ??
+          title
+        }
+        aria-busy={loading || undefined}
+        disabled={disabled || loading}
+        className={cn(
+          "relative inline-flex items-center justify-center gap-1.5 transition-[color,filter,transform,box-shadow] disabled:opacity-50",
+          className,
+          isActive
+            ? "text-accent-action drop-shadow-accent-action"
+            : "text-text-primary/80",
         )}
-      </span>
-      {children}
-    </button>
+        onClick={handleClick}
+      >
+        <span
+          className="relative inline-flex shrink-0 items-center justify-center"
+          style={{ width: iconSize, height: iconSize }}
+        >
+          {followAnimation ? (
+            <span
+              key={`${followAnimation}-${followAnimationId}`}
+              data-testid={particlesTestId}
+              aria-hidden="true"
+              className={cn(
+                "crate-follow-particles",
+                followAnimation === "unfollow"
+                  ? "crate-follow-particles--unfollow"
+                  : "",
+              )}
+            >
+              {(followAnimation === "follow"
+                ? followParticles
+                : FOLLOW_PARTICLES
+              ).map((particle, index) => {
+                const midX =
+                  particle.midX ??
+                  `${Math.round(Number.parseFloat(particle.orbitX) * 0.65)}px`;
+                const midY =
+                  particle.midY ??
+                  `${Math.round(Number.parseFloat(particle.orbitY) * 0.65)}px`;
+                const style = {
+                  "--follow-particle-size": particle.size,
+                  "--follow-particle-delay": particle.delay,
+                  "--follow-particle-duration": particle.duration ?? "760ms",
+                  "--follow-particle-mid-x": midX,
+                  "--follow-particle-mid-y": midY,
+                  "--follow-particle-start-x":
+                    followAnimation === "follow"
+                      ? particle.orbitX
+                      : particle.heartX,
+                  "--follow-particle-start-y":
+                    followAnimation === "follow"
+                      ? particle.orbitY
+                      : particle.heartY,
+                  "--follow-particle-end-x":
+                    followAnimation === "follow"
+                      ? particle.heartX
+                      : particle.orbitX,
+                  "--follow-particle-end-y":
+                    followAnimation === "follow"
+                      ? particle.heartY
+                      : particle.orbitY,
+                } as CSSProperties;
+
+                return (
+                  <span
+                    key={index}
+                    className="crate-follow-particle"
+                    style={style}
+                  />
+                );
+              })}
+            </span>
+          ) : null}
+          {loading ? (
+            <Loader2
+              data-testid={heartTestId}
+              aria-hidden="true"
+              size={iconSize}
+              className="animate-spin"
+            />
+          ) : isActive ? (
+            <HeartBold
+              data-testid={heartTestId}
+              size={iconSize}
+              className={cn(
+                "text-accent-action animate-crate-icon-active-pulse",
+                followAnimation === "follow"
+                  ? "crate-follow-heart-in"
+                  : followAnimation === "unfollow"
+                    ? "crate-follow-heart-out"
+                    : "",
+              )}
+            />
+          ) : (
+            <Heart data-testid={heartTestId} size={iconSize} />
+          )}
+        </span>
+        {children}
+      </button>
+    </TooltipHint>
   );
 }

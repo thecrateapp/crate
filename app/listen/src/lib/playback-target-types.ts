@@ -1,31 +1,13 @@
 import type { RepeatMode, Track } from "@/contexts/player-types";
 import type { ActiveConnectSession } from "@/lib/crate-connect";
 
-export type PlaybackTargetKind =
-  | "airplay"
-  | "crate-device"
-  | "google-cast"
-  | "local"
-  | "system-route";
-
-export interface PlaybackTargetCapabilities {
-  canPlay: boolean;
-  canSeek: boolean;
-  canSetVolume: boolean;
-  canShowSystemPicker?: boolean;
-}
-
-export interface PlaybackTarget {
-  id: string;
-  providerId: string;
-  kind: PlaybackTargetKind;
-  name: string;
-  subtitle?: string;
-  active: boolean;
-  available: boolean;
-  unavailableReason?: string;
-  capabilities: PlaybackTargetCapabilities;
-}
+import type { PlaybackTarget } from "./playback-target-data";
+export type {
+  PlaybackTarget,
+  PlaybackTargetCapabilities,
+  PlaybackTargetGroup,
+  PlaybackTargetKind,
+} from "./playback-target-data";
 
 export interface PlaybackTargetSelectionResult {
   ok: boolean;
@@ -78,11 +60,4 @@ export interface PlaybackTargetProvider {
     target: PlaybackTarget,
     context?: PlaybackTargetContext,
   ) => PlaybackTargetSelectionResult | Promise<PlaybackTargetSelectionResult>;
-}
-
-export interface PlaybackTargetGroup {
-  providerId: string;
-  label: string;
-  targets: PlaybackTarget[];
-  error?: string;
 }

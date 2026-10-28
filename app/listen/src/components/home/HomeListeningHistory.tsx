@@ -1,3 +1,4 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { SectionHeader } from "@crate/ui/domain/lists";
@@ -108,7 +109,7 @@ function ListeningHistoryCard({
     <button
       type="button"
       onClick={() => onOpen(item)}
-      className="group w-[min(42vw,13rem)] shrink-0 touch-manipulation text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-canvas lg:w-56"
+      className="group w-[min(42vw,13rem)] shrink-0 touch-manipulation text-left lg:w-56"
     >
       <EditorialPlaylistArtwork
         title={historyLabel(item, t, locale)}
@@ -132,10 +133,10 @@ function ListeningHistoryCard({
         <p className="mt-1 line-clamp-2 min-h-10 text-xs leading-5 text-text-muted">
           {artists}
         </p>
-        <div className="home-history-meta mt-auto text-xs font-bold uppercase tracking-caps">
+        <MonoLabel className="mt-auto">
           {t("common.playCount", { count: item.play_count })} ·{" "}
           {formatHistoryMinutes(item.minutes_listened)}
-        </div>
+        </MonoLabel>
       </div>
     </button>
   );

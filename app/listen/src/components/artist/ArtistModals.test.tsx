@@ -1,5 +1,5 @@
 import { MemoryRouter } from "react-router";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
 
@@ -44,12 +44,68 @@ describe("artist mobile modals", () => {
 
     const panel = screen
       .getByText("Probable Setlist")
-      .closest(".listen-glass-panel");
-    expect(panel).toBeInTheDocument();
+      .closest("[data-app-modal-panel]");
+    expect(panel).toHaveClass("crate-overlay-panel");
+    expect(
+      screen
+        .getByText("Smugglers & Scholars")
+        .closest('[data-slot="hairline-row"]'),
+    ).toBeInTheDocument();
+    expect(screen.getByText("80%")).toHaveClass("font-mono", "uppercase");
+    expect(
+      screen.getByRole("list", { name: "Probable Setlist" }),
+    ).not.toHaveClass("border-t");
+    expect(panel).not.toHaveClass("listen-glass-panel");
     expect(panel).not.toHaveClass("fixed");
     expect(panel?.className).not.toContain(
       "listen-mobile-bottom-chrome-height",
     );
+  });
+
+  it("tells how fresh the probable setlist is", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-26T10:00:00Z"));
+    renderWithProviders(
+      <ArtistSetlistModal
+        artistName="Pixies"
+        artistId={7}
+        open
+        onClose={() => {}}
+        onPlay={() => {}}
+        generatedAt="2026-10-23T10:00:00Z"
+        setlist={[{ title: "Hey", frequency: 0.8, play_count: 12 }]}
+      />,
+    );
+    vi.useRealTimers();
+
+    expect(
+      screen.getByText("Pixies · 1 song · Updated 3 days ago"),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps setlist export authority in the app adapter and closes after play", async () => {
+    apiMock.mockResolvedValue({});
+    const calls: string[] = [];
+    renderWithProviders(
+      <ArtistSetlistModal
+        artistName="Artist"
+        artistId={7}
+        open
+        onClose={() => calls.push("close")}
+        onPlay={() => calls.push("play")}
+        setlist={[{ title: "Song", frequency: 0.8, play_count: 12 }]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Export" }));
+    expect(apiMock).toHaveBeenCalledWith(
+      "/api/artists/7/setlist-playlist",
+      "POST",
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Export" })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Play Setlist" }));
+    expect(calls).toEqual(["play", "close"]);
   });
 
   it("renders artist bio as a native bottom sheet instead of a floating panel", () => {
@@ -81,9 +137,10 @@ describe("artist mobile modals", () => {
       />,
     );
 
-    const panel = screen.getByText("Kneecap").closest(".listen-glass-panel");
-    expect(panel).toBeInTheDocument();
-    expect(panel).toHaveClass("sm:max-w-4xl", "max-w-4xl");
+    const panel = screen.getByText("Kneecap").closest("[data-app-modal-panel]");
+    expect(panel).toHaveClass("crate-overlay-panel");
+    expect(panel).not.toHaveClass("listen-glass-panel");
+    expect(panel).toHaveAttribute("data-overlay-size", "xl");
     expect(panel).not.toHaveClass("fixed");
     expect(panel?.className).not.toContain(
       "listen-mobile-bottom-chrome-height",
@@ -181,7 +238,9 @@ describe("artist mobile modals", () => {
       />,
     );
 
-    const panel = screen.getByText("Converge").closest(".listen-glass-panel");
+    const panel = screen
+      .getByText("Converge")
+      .closest("[data-app-modal-panel]");
     const header = screen.getByTestId("artist-bio-header");
     const hardcore = screen.getByRole("button", { name: /hardcore/i });
     const metalcore = screen.getByRole("button", { name: /metalcore/i });
@@ -190,11 +249,11 @@ describe("artist mobile modals", () => {
     expect(panel).toContainElement(hardcore);
     expect(panel).toContainElement(metalcore);
     expect(screen.queryByRole("button", { name: /noise/i })).toBeNull();
-    expect(hardcore).toHaveClass("rounded-md");
-    expect(hardcore).not.toHaveClass("rounded-full", "bg-white/8");
-    expect(header).toHaveClass("border-b-0", "bg-transparent");
+    expect(hardcore).toHaveClass("rounded-full");
+    expect(hardcore).not.toHaveClass("bg-white/8");
+    expect(header).toHaveClass("bg-surface-popover");
     expect(header).not.toHaveClass("backdrop-blur-xl");
-    expect(close).toHaveClass("hover:text-accent-action");
+    expect(close).toHaveClass("hover:text-accent-action-hi");
     expect(close.className).not.toContain("bg-white/5");
     expect(close.className).not.toContain("border-white/10");
   });

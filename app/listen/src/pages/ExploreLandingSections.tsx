@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import { ArrowRight, CRATE_ICON_SIZE, Radio } from "@crate/ui/icons";
+
 import { MediaRail, SectionHeader } from "@crate/ui/domain/lists";
 import { notify } from "@crate/ui/lib/notify";
 
@@ -16,17 +16,6 @@ import { usePlayerActions } from "@/contexts/PlayerContext";
 import { api, resolveMaybeApiAssetUrl } from "@/lib/api";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
-
-const MOOD_COLORS: Record<string, string> = {
-  energetic: "bg-state-warning/20 text-state-warning border-state-warning/30",
-  chill: "bg-state-info/20 text-state-info border-state-info/30",
-  dark: "bg-state-danger/20 text-state-danger border-state-danger/30",
-  happy: "bg-state-warning/20 text-state-warning border-state-warning/30",
-  melancholy: "bg-state-info/20 text-state-info border-state-info/30",
-  intense: "bg-state-danger/20 text-state-danger border-state-danger/30",
-  groovy: "bg-state-success/20 text-state-success border-state-success/30",
-  acoustic: "bg-state-warning/20 text-state-warning border-state-warning/30",
-};
 
 const MOOD_LABEL_KEY: Record<string, string> = {
   energetic: "explore.moods.names.energetic",
@@ -44,47 +33,8 @@ function moodLabel(mood: string, t: TFunction) {
   return key ? t(key) : mood.charAt(0).toUpperCase() + mood.slice(1);
 }
 
-export function ExploreFeatureCard({
-  title,
-  subtitle,
-  icon: Icon,
-  onClick,
-}: {
-  title: string;
-  subtitle: string;
-  icon: typeof Radio;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="explore-feature-card group relative min-h-36 overflow-hidden rounded-panel p-5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/60"
-    >
-      <div className="explore-feature-card-aura absolute inset-0 opacity-80 transition group-hover:opacity-100" />
-      <div className="relative flex h-full flex-col justify-between gap-8">
-        <div className="flex items-center justify-between">
-          <Icon
-            size={CRATE_ICON_SIZE.xl}
-            className="text-accent-action drop-shadow-accent-action-feature"
-          />
-          <ArrowRight
-            size={CRATE_ICON_SIZE.md}
-            className="text-text-primary/35 transition group-hover:translate-x-1 group-hover:text-accent-action"
-          />
-        </div>
-        <div>
-          <div className="text-xl font-black tracking-[-0.035em] text-text-primary">
-            {title}
-          </div>
-          <div className="mt-2 max-w-[28rem] text-sm leading-5 text-text-primary/58">
-            {subtitle}
-          </div>
-        </div>
-      </div>
-    </button>
-  );
-}
+export { ExploreFeatureCard } from "@/components/explore/ExploreBrowseViews";
+import { ExploreMoodChoices } from "@/components/explore/ExploreBrowseViews";
 
 export function ExploreCratePlaylists({
   playlists,
@@ -255,37 +205,11 @@ export function MoodBrowseSection({ moods }: { moods: MoodPreset[] }) {
     }
   }
 
-  if (moods.length === 0) return null;
-
   return (
-    <div className="space-y-3">
-      <SectionHeader
-        title={t("explore.moods.title")}
-        subtitle={t("explore.moods.subtitle")}
-      />
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {moods.map((mood) => (
-          <button
-            key={mood.name}
-            type="button"
-            onClick={() => void playMood(mood.name)}
-            disabled={loadingMood !== null}
-            className={`rounded-lg border px-4 py-3 text-left transition-colors ${
-              MOOD_COLORS[mood.name] ||
-              "bg-text-primary/5 text-text-primary/70 border-border-quiet"
-            } active:scale-[0.98]`}
-          >
-            <span className="text-sm font-medium">
-              {loadingMood === mood.name
-                ? t("common.loadingShort")
-                : moodLabel(mood.name, t)}
-            </span>
-            <span className="mt-0.5 block text-xs opacity-60">
-              {t("common.trackCount", { count: mood.track_count })}
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
+    <ExploreMoodChoices
+      moods={moods}
+      pending={loadingMood}
+      onPlay={(mood) => void playMood(mood)}
+    />
   );
 }

@@ -9,6 +9,15 @@
     "order": 10
   },
   {
+    "sourcePath": "docs/technical/00a-install-with-ai.md",
+    "route": "/start/install-with-ai",
+    "section": "start",
+    "title": "Install with an AI agent",
+    "summary": "Let Claude Code, Codex or another MCP client install Crate with you through `crate mcp`.",
+    "keywords": ["installer", "mcp", "agent", "claude", "codex"],
+    "order": 15
+  },
+  {
     "sourcePath": "docs/technical/00b-development-setup.md",
     "route": "/start/development-setup",
     "section": "start",
@@ -171,6 +180,22 @@
     "order": 110
   },
   {
+    "sourcePath": "docs/technical/upgrade-v2-to-v3.md",
+    "route": "/operations/upgrade-v2-to-v3",
+    "section": "operations",
+    "title": "Upgrade from 2.7 to 3.0",
+    "summary": "Upgrade a self-hosted Crate 2.7.x instance to 3.0.0, with the installer or the image-first deploy, and move the agent pilots.",
+    "keywords": [
+      "upgrade",
+      "v3",
+      "migration",
+      "installer",
+      "deploy",
+      "rollback"
+    ],
+    "order": 115
+  },
+  {
     "sourcePath": "docs/technical/operations.md",
     "route": "/operations/operations",
     "section": "operations",
@@ -178,6 +203,22 @@
     "summary": "Runtime ownership, observability and recovery checks for a running Crate instance.",
     "keywords": ["health", "redis", "projector", "incident"],
     "order": 120
+  },
+  {
+    "sourcePath": "docs/technical/crate-agent.md",
+    "route": "/operations/crate-agent",
+    "section": "operations",
+    "title": "Crate Agent and Crate Operator over Telegram",
+    "summary": "Set up, run and troubleshoot the read-only Crate Agent and the approval-gated Crate Operator on Telegram.",
+    "keywords": [
+      "crate agent",
+      "crate operator",
+      "telegram",
+      "model",
+      "approval",
+      "supervisor"
+    ],
+    "order": 122
   },
   {
     "sourcePath": "docs/technical/crate-operator.md",
@@ -193,7 +234,7 @@
     "route": "/operations/native-plan-confirmation",
     "section": "operations",
     "title": "Native Telegram plan confirmation",
-    "summary": "Exact human button review, deterministic job admission and the opt-in Hermes write profile.",
+    "summary": "Exact human button review, deterministic job admission and the opt-in Crate Operator write profile.",
     "keywords": ["Hermes", "Telegram", "approval", "plans", "operator"],
     "order": 126
   },
@@ -466,7 +507,7 @@
     "route": "/operations/smart-mix",
     "section": "operations",
     "title": "Smart Mix - funcionamiento y operación",
-    "summary": "Perfiles, transiciones, backfill, estados y diagnóstico del Smart Mix implementado, con límites de observación para Hermes.",
+    "summary": "Perfiles, transiciones, backfill, estados y diagnóstico del Smart Mix implementado, con límites de observación para Crate Agent.",
     "keywords": [
       "smart mix",
       "backfill",
@@ -481,7 +522,7 @@
     "sourcePath": "docs/technical/hermes-operator-release.md",
     "route": "/operations/hermes-operator-release",
     "section": "operations",
-    "title": "Hermes operator candidate and rollout",
+    "title": "Crate Operator candidate and rollout",
     "summary": "Complete opt-in operator architecture, authority and coverage matrix, root provisioning, disposable acceptance and rollback.",
     "order": 127,
     "keywords": [

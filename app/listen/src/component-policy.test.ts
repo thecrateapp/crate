@@ -11,15 +11,14 @@ const COMPONENT_DECLARATION =
   /export\s+(?:default\s+)?(?:async\s+)?(?:function\s*\*?|const|let|class)\s+([A-Z]\w*|use[A-Z]\w*)\b/g;
 const NAMED_EXPORT_LIST = /export\s*\{([^}]*)\}/g;
 
-const RAW_CONTROL_BUDGET = { button: 110, input: 10, textarea: 1 };
+// Tighten the native-control inventory as shared primitives retire local controls.
+const RAW_CONTROL_BUDGET = { button: 44, input: 3, textarea: 1 };
 
 const LOCAL_COPY_ALLOWLIST: Record<string, string> = {
   "components/actions/ItemActionMenu.tsx:ItemActionMenu":
     "Listen wrapper over the shared ContextMenu with a translated sheet label.",
   "components/player/extended/InfoTabPrimitives.tsx:StarRating":
     "Read-only rating display; the shared StarRating is an interactive button group.",
-  "components/upcoming/ShowCard.tsx:ShowCard":
-    "Listen upcoming card with attendance and expansion, unrelated to the shared admin show card.",
 };
 
 function sourceFiles(directory: string, extensions: RegExp): string[] {
@@ -144,4 +143,25 @@ describe("Listen component policy", () => {
 
     expect(copies.sort()).toEqual(Object.keys(LOCAL_COPY_ALLOWLIST).sort());
   }, 15_000);
+});
+
+describe("shared modal surface policy", () => {
+  it("does not override shared modal surfaces with the legacy glass recipe or a local scrim", () => {
+    const overrides: string[] = [];
+    for (const path of sourceFiles(SOURCE_ROOT, /\.tsx$/)) {
+      const source = readFileSync(path, "utf8");
+      for (const match of source.matchAll(/<AppModal(?=[\s/>])/g)) {
+        const attributes = tagAttributes(source, match.index);
+        if (
+          /\blisten-glass-panel\b/.test(attributes) ||
+          /\boverlayClassName\s*=\s*["'][^"']*\bbg-/.test(attributes)
+        ) {
+          overrides.push(
+            `${relative(SOURCE_ROOT, path)}:${lineOf(source, match.index)}`,
+          );
+        }
+      }
+    }
+    expect(overrides).toEqual([]);
+  });
 });

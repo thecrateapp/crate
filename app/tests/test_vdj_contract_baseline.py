@@ -14,4 +14,5 @@ def test_capabilities_keep_smart_mix_contract_stable(test_app, monkeypatch):
         "android_native_crossfade": False,
         "android_beatmatch": False,
         "android_bass_handoff": False,
+        "android_long_beatmatch": False,
     }

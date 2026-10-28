@@ -251,6 +251,28 @@ class StorageMigrationRequest(BaseModel):
     artist: str | None = None
 
 
+class PortableMetadataAlbumStatusResponse(BaseModel):
+    sidecar_path: str | None = None
+    sidecar_written_at: datetime | str | None = None
+    audio_tags_written_at: datetime | str | None = None
+    tracks: int = 0
+    tags_written: int = 0
+    tag_errors: int = 0
+    export_path: str | None = None
+    exported_at: datetime | str | None = None
+    updated_at: datetime | str | None = None
+
+
+class PortableAlbumSidecarResponse(BaseModel):
+    schema_version: int = 1
+    artist: dict[str, Any] = Field(default_factory=dict)
+    album: dict[str, Any] = Field(default_factory=dict)
+    tracks: list[dict[str, Any]] = Field(default_factory=list)
+    portable_metadata: PortableMetadataAlbumStatusResponse = Field(
+        default_factory=PortableMetadataAlbumStatusResponse
+    )
+
+
 class PortableMetadataRequest(BaseModel):
     album_id: int | None = None
     album_entity_uid: str | None = None
@@ -372,6 +394,10 @@ class BlissTrackSummaryResponse(BaseModel):
     updated_at: datetime | str | None = None
 
 
+class FingerprintTrackSummaryResponse(BlissTrackSummaryResponse):
+    source: str | None = None
+
+
 class AnalysisStatusResponse(BaseModel):
     total: int = 0
     analysis_done: int = 0
@@ -403,6 +429,9 @@ class AnalysisStatusResponse(BaseModel):
     )
     last_bliss: BlissTrackSummaryResponse = Field(
         default_factory=BlissTrackSummaryResponse
+    )
+    last_fingerprinted: FingerprintTrackSummaryResponse = Field(
+        default_factory=FingerprintTrackSummaryResponse
     )
 
 

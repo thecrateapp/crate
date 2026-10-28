@@ -1,7 +1,7 @@
 """OpenAPI helpers for Crate."""
 
-from copy import deepcopy
 import os
+from copy import deepcopy
 
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
@@ -28,10 +28,6 @@ _PUBLIC_AUTH_PATHS = {
 }
 _PUBLIC_PLAYLIST_PATHS = {
     "/api/playlists/filter-options",
-}
-_PUBLIC_SETUP_PATHS = {
-    "/api/setup/status",
-    "/api/setup/admin",
 }
 _PUBLIC_SCANNER_PATHS = {
     "/api/status",
@@ -402,14 +398,14 @@ _AUTH_REQUIRED_EXACT = frozenset({"/api/scan", "/api/issues", "/api/fix"})
 
 def _should_attach_auth(path: str, operation: dict) -> bool:
     tags = set(operation.get("tags") or [])
+    if path.startswith("/api/catalog/tracks/") and path.endswith("/eq/curves"):
+        return True
     # Public paths are checked first (explicit opt-out overrides prefix match)
     if path in _PUBLIC_SCANNER_PATHS:
         return False
     if path.startswith("/api/auth") and path not in _PUBLIC_AUTH_PATHS:
         return True
     if path.startswith("/api/playlists") and path not in _PUBLIC_PLAYLIST_PATHS:
-        return True
-    if path.startswith("/api/setup") and path not in _PUBLIC_SETUP_PATHS:
         return True
     if path.startswith("/api/cache") and path != "/api/cache/invalidate":
         return True

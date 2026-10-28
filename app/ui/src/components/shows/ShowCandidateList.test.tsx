@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
+import { SHOW_STATUS_LABELS } from "./show-import-presentation";
 import { ShowCandidateFields } from "./ShowCandidateFields";
 import { ShowCandidateList } from "./ShowCandidateList";
 import type { ShowDraftState } from "./show-draft";
@@ -172,7 +173,8 @@ it("explains why nothing can be selected when no show is complete", async () => 
   });
   const selectAll = screen.getByRole("button", { name: "Select all valid" });
   expect(selectAll).toBeDisabled();
-  expect(selectAll).toHaveAttribute("title", "No show is complete yet");
+  expect(screen.getByText("No show is complete yet.")).toBeVisible();
+  expect(selectAll).not.toHaveAttribute("title");
   await user.click(screen.getByRole("button", { name: "Clear selection" }));
   expect(onSelect).toHaveBeenCalledWith([]);
 });
@@ -268,7 +270,8 @@ it("never offers to remove an imported show", () => {
   ).toBeInTheDocument();
 });
 
-it("shows source, evidence and model without raw references", () => {
+it("shows source and model, with full evidence in the shared tooltip", async () => {
+  const user = userEvent.setup();
   renderList({
     draft: {
       candidates: [
@@ -284,8 +287,10 @@ it("shows source, evidence and model without raw references", () => {
   });
   expect(screen.getByText("Source: Uploaded image")).toBeVisible();
   expect(screen.getByText("From the source")).toBeVisible();
-  expect(screen.getByText("MAR 02 SALA NORTE")).toHaveAttribute(
-    "title",
+  const evidence = screen.getByText("MAR 02 SALA NORTE");
+  expect(evidence).not.toHaveAttribute("title");
+  await user.hover(evidence);
+  expect(await screen.findByRole("tooltip")).toHaveTextContent(
     "MAR 02 SALA NORTE",
   );
   expect(screen.getByText("Read by gemini-3.8-flash")).toBeVisible();
@@ -334,8 +339,11 @@ it("uses design-system controls only", async () => {
     "placeholder",
     "Europe/Madrid",
   );
-  await user.click(screen.getByRole("button", { name: "Status for show 1" }));
-  await user.click(screen.getByRole("button", { name: "On sale" }));
+  await user.click(screen.getByRole("combobox", { name: "Status for show 1" }));
+  expect(
+    screen.getAllByRole("option").map((option) => option.textContent),
+  ).toEqual(Object.values(SHOW_STATUS_LABELS));
+  await user.click(screen.getByRole("option", { name: "On sale" }));
   expect(onChange).toHaveBeenLastCalledWith(
     expect.objectContaining({ item_id: "a", status: "onsale" }),
   );

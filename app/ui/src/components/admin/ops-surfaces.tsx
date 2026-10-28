@@ -1,183 +1,283 @@
-import type { ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
+import {
+  useEffect,
+  useReducer,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
+import { PageHeaderLayout } from "../layout/PageHeader";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@crate/ui/lib/cn";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { Button } from "@crate/ui/shadcn/button";
 
 type OpsTone = "default" | "primary" | "success" | "warning" | "danger";
 
-function toneClasses(tone: OpsTone) {
+function valueToneClass(tone: OpsTone) {
   switch (tone) {
-    case "primary":
-      return {
-        iconWrap:
-          "border-cyan-400/20 bg-cyan-400/12 text-primary shadow-[0_18px_40px_rgba(6,182,212,0.14)]",
-        value: "text-white",
-      };
     case "success":
-      return {
-        iconWrap:
-          "border-emerald-400/20 bg-emerald-400/12 text-emerald-300 shadow-[0_18px_40px_rgba(16,185,129,0.14)]",
-        value: "text-emerald-200",
-      };
+      return "text-accent-action-hi";
     case "warning":
-      return {
-        iconWrap:
-          "border-amber-400/20 bg-amber-400/12 text-amber-200 shadow-[0_18px_40px_rgba(245,158,11,0.14)]",
-        value: "text-amber-100",
-      };
     case "danger":
-      return {
-        iconWrap:
-          "border-red-400/20 bg-red-500/12 text-red-200 shadow-[0_18px_40px_rgba(239,68,68,0.14)]",
-        value: "text-red-100",
-      };
+      return "text-state-warning-text";
     default:
-      return {
-        iconWrap: "border-white/10 bg-white/[0.05] text-white/65",
-        value: "text-white",
-      };
+      return "text-text-primary";
   }
 }
 
 export function OpsPageHero({
-  icon: Icon,
   title,
   description,
   actions,
   children,
   className,
+  compactActions = false,
 }: {
-  icon: LucideIcon;
   title: string;
   description: string;
   actions?: ReactNode;
   children?: ReactNode;
   className?: string;
+  compactActions?: boolean;
 }) {
+  const identity = (
+    <div className="space-y-4">
+      <div>
+        <h1 className="crate-page-title">
+          {title}
+        </h1>
+        <p className="mt-3 text-sm text-text-muted">{description}</p>
+      </div>
+      {children ? (
+        <div className="flex flex-wrap items-center gap-2">{children}</div>
+      ) : null}
+    </div>
+  );
   return (
-    <section
-      className={cn(
-        "rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl",
-        className,
-      )}
-    >
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/12 text-primary shadow-[0_18px_40px_rgba(6,182,212,0.14)]">
-              <Icon size={22} />
+    <AdminPageHeader className={className}>
+      {compactActions ? (
+        <PageHeaderLayout actions={actions}>{identity}</PageHeaderLayout>
+      ) : (
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+          {identity}
+          {actions ? (
+            <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+              {actions}
             </div>
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-white">
-                {title}
-              </h1>
-              <p className="text-sm text-white/55">{description}</p>
-            </div>
-          </div>
-          {children ? (
-            <div className="flex flex-wrap items-center gap-2">{children}</div>
           ) : null}
         </div>
-        {actions ? (
-          <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-            {actions}
-          </div>
-        ) : null}
-      </div>
-    </section>
+      )}
+    </AdminPageHeader>
+  );
+}
+
+export function AdminPageHeader({
+  className,
+  ...props
+}: ComponentProps<"header">) {
+  return (
+    <header
+      {...props}
+      data-slot="admin-page-header-container"
+      className={cn("min-w-0", className)}
+    />
   );
 }
 
 export function OpsStatTile({
-  icon: Icon,
   label,
   value,
   caption,
   tone = "default",
   className,
 }: {
-  icon: LucideIcon;
   label: string;
   value: ReactNode;
   caption?: ReactNode;
   tone?: OpsTone;
   className?: string;
 }) {
-  const toneClass = toneClasses(tone);
-
   return (
     <div
       className={cn(
-        "rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]",
+        "@container rounded-md border border-border-quiet bg-raised-surface p-4 shadow-none",
         className,
       )}
     >
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="text-[11px] uppercase tracking-[0.12em] text-white/35">
-          {label}
-        </div>
+      <div className="crate-form-field">
+        <MonoLabel as="div">{label}</MonoLabel>
         <div
           className={cn(
-            "flex h-9 w-9 items-center justify-center rounded-md border",
-            toneClass.iconWrap,
+            "font-mono text-numeral-md font-normal leading-none tabular-nums",
+            valueToneClass(tone),
           )}
         >
-          <Icon size={16} />
+          {value}
         </div>
       </div>
-      <div
-        className={cn("text-xl font-semibold tracking-tight", toneClass.value)}
-      >
-        {value}
-      </div>
       {caption ? (
-        <div className="mt-1 text-xs text-white/40">{caption}</div>
+        <div className="mt-1 text-xs text-text-muted">{caption}</div>
       ) : null}
     </div>
   );
 }
 
+type OpsSurfaceProps = ComponentProps<"div"> & {
+  as?: "article" | "div";
+};
+
+export function OpsSurface({
+  as: Element = "div",
+  className,
+  ...props
+}: OpsSurfaceProps) {
+  return (
+    <Element
+      {...props}
+      className={cn(
+        "min-w-0 rounded-md border border-border-quiet bg-raised-surface shadow-none",
+        className,
+      )}
+    />
+  );
+}
+
 export function OpsPanel({
-  icon: Icon,
   title,
+  titleTone = "accent",
   description,
   action,
+  ruled,
   children,
   className,
 }: {
-  icon: LucideIcon;
   title: string;
+  titleTone?: ComponentProps<typeof MonoLabel>["tone"];
   description?: string;
   action?: ReactNode;
+  ruled?: boolean;
   children: ReactNode;
   className?: string;
 }) {
   return (
-    <section
+    <InstrumentPanel
+      as="section"
+      headingLevel={2}
+      label={{ children: title, tone: titleTone }}
+      description={description}
+      actions={action}
+      ruled={ruled}
+      className={className}
+    >
+      {children}
+    </InstrumentPanel>
+  );
+}
+
+export type OpsStreamStatus = "connecting" | "live" | "reconnecting" | "paused";
+
+export function OpsSnapshotStatus({
+  snapshot,
+  streamStatus,
+}: {
+  snapshot:
+    | { stale?: boolean; built_at?: string | null; stale_after?: string | null }
+    | null
+    | undefined;
+  streamStatus: OpsStreamStatus;
+}) {
+  const [, expire] = useReducer((version: number) => version + 1, 0);
+  const built = Date.parse(snapshot?.built_at ?? "");
+  const deadline = Date.parse(snapshot?.stale_after ?? "");
+  useEffect(() => {
+    if (!Number.isFinite(deadline) || deadline <= Date.now()) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) expire();
+      else timer = setTimeout(schedule, Math.min(remaining + 1, 2147483647));
+    };
+    schedule();
+    return () => clearTimeout(timer);
+  }, [deadline]);
+  const stale =
+    snapshot?.stale === true ||
+    (Number.isFinite(deadline) && deadline <= Date.now());
+  const current =
+    snapshot?.stale === false &&
+    Number.isFinite(built) &&
+    Number.isFinite(deadline) &&
+    built <= Date.now() &&
+    deadline > built &&
+    !stale;
+  const freshnessLabel = stale
+    ? "Snapshot stale"
+    : current
+      ? "Snapshot current"
+      : "Snapshot freshness unknown";
+  const freshnessTitle = snapshot?.built_at
+    ? `Snapshot built ${new Date(snapshot.built_at).toLocaleString()}`
+    : undefined;
+  const streamLabel = {
+    connecting: "Connecting",
+    live: "Live updates",
+    reconnecting: "Reconnecting",
+    paused: "Live updates paused",
+  }[streamStatus];
+
+  return (
+    <>
+      {snapshot ? (
+        <InfoBadge tone={stale ? "warning" : "neutral"} title={freshnessTitle}>
+          {freshnessLabel}
+        </InfoBadge>
+      ) : null}
+      <InfoBadge
+        tone={
+          streamStatus === "live"
+            ? "success"
+            : streamStatus === "reconnecting"
+              ? "warning"
+              : "neutral"
+        }
+      >
+        {streamLabel}
+      </InfoBadge>
+    </>
+  );
+}
+
+export function OpsRefreshNotice({
+  message,
+  onRetry,
+  retrying = false,
+  className,
+}: {
+  message: string;
+  onRetry: () => void;
+  retrying?: boolean;
+  className?: string;
+}) {
+  return (
+    <div
+      role="alert"
+      data-slot="ops-refresh-notice"
       className={cn(
-        "rounded-md border border-white/10 bg-panel-surface/90 shadow-[0_24px_60px_rgba(0,0,0,0.2)] backdrop-blur-xl",
+        "flex flex-wrap items-center justify-between gap-3 rounded-md border border-state-warning/25 bg-state-warning/[0.06] px-4 py-3 text-sm text-text-secondary",
         className,
       )}
     >
-      <div className="flex flex-col gap-3 border-b border-white/8 px-4 py-4 md:flex-row md:items-start md:justify-between md:px-5">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-white/70">
-            <Icon size={16} />
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-lg font-semibold tracking-tight text-white">
-              {title}
-            </h2>
-            {description ? (
-              <p className="max-w-3xl text-sm text-white/45">{description}</p>
-            ) : null}
-          </div>
-        </div>
-        {action ? (
-          <div className="flex flex-wrap items-center gap-2">{action}</div>
-        ) : null}
-      </div>
-      <div className="px-4 py-4 md:px-5 md:py-5">{children}</div>
-    </section>
+      <span>{message}</span>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onRetry}
+        disabled={retrying}
+        aria-busy={retrying || undefined}
+      >
+        {retrying ? "Retrying" : "Retry"}
+      </Button>
+    </div>
   );
 }

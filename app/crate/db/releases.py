@@ -391,7 +391,8 @@ def get_new_releases(
                 la.id AS artist_id,
                 la.slug AS artist_slug,
                 alb.id AS album_id,
-                alb.slug AS album_slug
+                alb.slug AS album_slug,
+                alb.track_count AS available_tracks
             FROM new_releases nr
             LEFT JOIN library_artists la ON LOWER(la.name) = LOWER(nr.artist_name)
             LEFT JOIN library_albums alb
@@ -451,7 +452,8 @@ def get_upcoming_releases_for_artist(
                     la.id AS artist_id,
                     la.slug AS artist_slug,
                     alb.id AS album_id,
-                    alb.slug AS album_slug
+                    alb.slug AS album_slug,
+                    alb.track_count AS available_tracks
                 FROM new_releases nr
                 LEFT JOIN library_artists la ON LOWER(la.name) = LOWER(nr.artist_name)
                 LEFT JOIN library_albums alb

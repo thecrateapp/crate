@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Plus } from "lucide-react";
-import { Button } from "@crate/ui/shadcn/button";
+import { CalendarPlus } from "@crate/ui/icons";
 import { useAuth } from "@/contexts/AuthContext";
+import { PageHeaderAction } from "@/components/layout/PageHeader";
 import { AddShowSheet } from "./AddShowSheet";
 
 export function AddShowButton({ onSaved }: { onSaved: () => void }) {
@@ -10,10 +10,13 @@ export function AddShowButton({ onSaved }: { onSaved: () => void }) {
   if (!hasCapability("curation.shows.write")) return null;
   return (
     <>
-      <Button size="sm" onClick={() => setOpen(true)}>
-        <Plus size={14} className="mr-1" />
-        Add show
-      </Button>
+      <PageHeaderAction
+        label="Add show"
+        type="button"
+        onClick={() => setOpen(true)}
+      >
+        <CalendarPlus data-admin-ux="show-add" aria-hidden="true" />
+      </PageHeaderAction>
       <AddShowSheet open={open} onOpenChange={setOpen} onSaved={onSaved} />
     </>
   );

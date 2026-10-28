@@ -56,6 +56,8 @@ final class NativeMixController {
     private final float[] recentPhaseErrorsMs = new float[9];
     private int phaseSamples;
     private float beatmatchSpeed = 1.0f;
+    private boolean beatmatchEngaged;
+    private boolean bassHandoffEngaged;
     private float lastPhaseErrorMs;
     private float pendingTempoRestoreSpeed = 1.0f;
     private boolean standbyPreparationFailed;
@@ -99,6 +101,8 @@ final class NativeMixController {
         cancel("queue_replaced");
         prerollPlan = null;
         beatmatchSpeed = 1.0f;
+        beatmatchEngaged = false;
+        bassHandoffEngaged = false;
         queue.clear();
         if (tracks != null) {
             queue.addAll(tracks);
@@ -257,21 +261,26 @@ final class NativeMixController {
             mixIncomingDeck.releaseHold();
             if (!beatmatch) mixIncomingDeck.setSpeed(1.0f);
         }
+        beatmatchEngaged = beatmatch;
+        bassHandoffEngaged = beatmatch && plan.hasBassHandoff();
         beatmatchSpeed = beatmatch ? plan.incomingTempoRatio : 1.0f;
-        float bassHandoffAt = beatmatch && plan.hasBassHandoff()
+        float bassHandoffAt = bassHandoffEngaged
             ? plan.handoffProgress
             : Float.NaN;
+        boolean djBlend = beatmatch && plan.isDjBlend();
         mixOutgoingDeck.startEnvelope(
             NativeMixAudioProcessor.Role.OUTGOING,
             plan.durationMs,
             plan.outgoingGainDb,
-            bassHandoffAt
+            bassHandoffAt,
+            djBlend
         );
         mixIncomingDeck.startEnvelope(
             NativeMixAudioProcessor.Role.INCOMING,
             Math.round(plan.durationMs * (double) beatmatchSpeed),
             plan.incomingGainDb,
-            bassHandoffAt
+            bassHandoffAt,
+            djBlend
         );
         mixIncomingDeck.setVolume(effectiveOutputVolume());
         mixIncomingDeck.play();
@@ -393,7 +402,14 @@ final class NativeMixController {
     }
 
     boolean isBeatmatching() {
-        return (activePlan != null || prerollPlan != null) && beatmatchSpeed != 1.0f;
+        return (activePlan != null && beatmatchEngaged) || prerollPlan != null;
+    }
+
+    @Nullable
+    NativeMixState activeMixState(String revision) {
+        return activePlan == null ? null : NativeMixState.mixing(
+            revision, executionId, activePlan, beatmatchEngaged, bassHandoffEngaged
+        );
     }
 
     float measurePhase() {
@@ -742,6 +758,8 @@ final class NativeMixController {
 
     private void resetTransition() {
         beatmatchSpeed = 1.0f;
+        beatmatchEngaged = false;
+        bassHandoffEngaged = false;
         activePlan = null;
         mixOutgoingDeck = null;
         mixIncomingDeck = null;

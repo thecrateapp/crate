@@ -1,25 +1,22 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { Link, type To } from "react-router";
-
 import type { CrateIcon } from "@crate/ui/icons";
-import {
-  AlertTriangle,
-  ArrowLeft,
-  Compass,
-  CRATE_ICON_SIZE,
-  Lock,
-  RefreshCw,
-} from "@crate/ui/icons";
 import { cn } from "@crate/ui/lib/cn";
 import { Button } from "@crate/ui/shadcn/button";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
 
 export type ErrorStateKind = "error" | "notFound" | "unavailable";
 export type ErrorStateTitleLevel = "h1" | "h2" | "h3" | "p";
 
 export interface ErrorStateProps {
+  variant?: "compact" | "page";
   kind?: ErrorStateKind;
   title?: ReactNode;
   message?: ReactNode;
+  eyebrow?: ReactNode;
+  statusCode?: number | string;
+  /** @deprecated Error states no longer render decorative icons. */
   icon?: CrateIcon | null;
   onRetry?: () => void;
   retryLabel?: string;
@@ -35,24 +32,19 @@ const DEFAULT_MESSAGE: Record<ErrorStateKind, string> = {
   notFound: "We couldn't find what you were looking for",
   unavailable: "This is unavailable right now",
 };
-
-const DEFAULT_ICON: Record<ErrorStateKind, CrateIcon> = {
-  error: AlertTriangle,
-  notFound: Compass,
-  unavailable: Lock,
-};
-
-const ICON_CLASS_NAME: Record<ErrorStateKind, string> = {
-  error: "text-state-danger-text",
-  notFound: "text-text-muted",
-  unavailable: "text-accent-action",
+const DEFAULT_EYEBROW: Record<ErrorStateKind, string> = {
+  error: "Error",
+  notFound: "Not found",
+  unavailable: "Unavailable",
 };
 
 export function ErrorState({
+  variant = "compact",
   kind = "error",
   title,
   message,
-  icon,
+  eyebrow,
+  statusCode,
   onRetry,
   retryLabel = "Retry",
   backTo,
@@ -61,50 +53,67 @@ export function ErrorState({
   titleAs: Title = "h2",
   className,
 }: ErrorStateProps) {
-  const Icon = icon === undefined ? DEFAULT_ICON[kind] : icon;
-  const resolvedMessage =
-    message ?? (title ? undefined : DEFAULT_MESSAGE[kind]);
-  const hasActions = Boolean(onRetry || backTo !== undefined || action);
-
+  const id = useId();
+  const body = message ?? (title ? undefined : DEFAULT_MESSAGE[kind]);
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center py-24 text-center",
+        "crate-error-state",
+        variant === "page" && "crate-error-page",
         className,
       )}
       data-testid="error-state"
       data-kind={kind}
-      role={kind === "error" ? "alert" : undefined}
+      data-variant={variant}
+      role={kind === "error" ? "alert" : "group"}
+      aria-labelledby={`${id}-${title ? "title" : "message"}`}
+      aria-describedby={title && body ? `${id}-message` : undefined}
     >
-      {Icon ? (
-        <Icon
-          size={32}
-          aria-hidden="true"
-          className={cn("mb-3", ICON_CLASS_NAME[kind])}
-        />
+      {variant === "page" ? (
+        <MonoLabel as="div" className="flex items-center gap-2">
+          <StatusDot tone={kind === "notFound" ? "off" : "warn"} />
+          <span>
+            {eyebrow ?? DEFAULT_EYEBROW[kind]}
+            {statusCode !== undefined ? ` · ${statusCode}` : null}
+          </span>
+        </MonoLabel>
       ) : null}
       {title ? (
-        <Title className="mb-2 text-lg font-semibold text-text-primary">
-          {title}
-        </Title>
+        <div className="flex items-baseline gap-2">
+          {variant === "compact" ? <StatusDot tone="warn" /> : null}
+          <Title
+            id={`${id}-title`}
+            className={cn(
+              "m-0 font-display text-text-primary",
+              variant === "page"
+                ? "crate-error-page-title"
+                : "text-xl font-bold",
+            )}
+          >
+            {title}
+          </Title>
+        </div>
       ) : null}
-      {resolvedMessage ? (
-        <p className="text-text-muted mb-4 max-w-md">{resolvedMessage}</p>
+      {body ? (
+        <p
+          id={`${id}-message`}
+          className="m-0 max-w-md text-sm leading-6 text-text-muted"
+        >
+          {body}
+        </p>
       ) : null}
-      {hasActions ? (
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          {onRetry && (
-            <Button variant="outline" size="sm" onClick={onRetry}>
-              <RefreshCw size={CRATE_ICON_SIZE.sm} className="mr-1" />{" "}
+      {onRetry || backTo !== undefined || action ? (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          {onRetry ? (
+            <Button variant="ghost" shape="pill" size="sm" onClick={onRetry}>
               {retryLabel}
             </Button>
-          )}
+          ) : null}
           {backTo !== undefined ? (
             <Link
               to={backTo}
-              className="link-accent inline-flex items-center gap-2 text-sm"
+              className="link-accent inline-flex min-h-11 items-center text-sm"
             >
-              <ArrowLeft size={CRATE_ICON_SIZE.sm} aria-hidden="true" />
               {backLabel}
             </Link>
           ) : null}

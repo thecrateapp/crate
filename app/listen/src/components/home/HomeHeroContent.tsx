@@ -1,9 +1,4 @@
-import { useTranslation } from "react-i18next";
-import { CRATE_ICON_SIZE, Play } from "@crate/ui/icons";
-import { Button } from "@crate/ui/shadcn/button";
-
 import { GenrePill } from "@crate/ui/domain/genres/GenrePill";
-import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import { artistHeroArtworkFitClassName } from "@crate/ui/domain/ArtistHeroFrame";
 import { CrateImage } from "@/components/artwork/CrateImage";
 import { cn } from "@/lib/utils";
@@ -46,69 +41,21 @@ export function HeroBackdrop({
 export function HeroGenres({ hero }: { hero: HomeHeroArtist }) {
   const genres = hero.genre_profile?.length
     ? hero.genre_profile
-    : hero.genres?.flatMap((name) => (name ? [{ name }] : [])) ?? [];
+    : (hero.genres?.flatMap((name) => (name ? [{ name }] : [])) ?? []);
 
   if (genres.length === 0) return null;
 
   return (
-    <div className="mt-4 flex min-w-0 max-w-full flex-wrap gap-1.5 overflow-hidden">
+    <div className="mt-1.5 flex min-w-0 max-w-full flex-wrap gap-1.5 overflow-hidden">
       {genres.slice(0, 2).map((genre) => (
         <GenrePill
           key={genre.name}
           item={genre}
-          className="max-w-[42vw] backdrop-blur-sm sm:max-w-none"
+          className="max-w-[42vw] sm:max-w-none"
         />
       ))}
     </div>
   );
 }
 
-export function HeroActions({
-  hero,
-  following,
-  onPlay,
-  onToggleFollow,
-}: {
-  hero: HomeHeroArtist;
-  following: boolean;
-  onPlay: () => void;
-  onToggleFollow: () => void;
-}) {
-  const { t } = useTranslation();
-
-  const playLabel = t("home.hero.playArtist", { name: hero.name });
-  const followLabel = t(
-    following ? "actions.artist.unfollowNamed" : "actions.artist.followNamed",
-    { name: hero.name },
-  );
-
-  return (
-    <div className="mt-6 flex items-center gap-2.5">
-      <Button
-        aria-label={playLabel}
-        size="lg"
-        className="home-discovery-play-button px-5 text-base font-semibold has-[>svg]:px-5"
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          onPlay();
-        }}
-      >
-        <Play size={CRATE_ICON_SIZE.md} fill="currentColor" />
-        <span>{t("home.hero.playCta")}</span>
-      </Button>
-      <FollowHeartButton
-        aria-label={followLabel}
-        className="home-hero-follow inline-flex size-11 items-center justify-center rounded-md border-0 bg-transparent transition-colors hover:bg-transparent"
-        following={following}
-        heartTestId="hero-follow-heart"
-        particlesTestId="hero-follow-particles"
-        onClick={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          onToggleFollow();
-        }}
-      />
-    </div>
-  );
-}
+export { HeroActions } from "./HomeHeroActions";

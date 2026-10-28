@@ -1,8 +1,16 @@
-import { act, screen, waitFor } from "@testing-library/react";
+import { useReducer } from "react";
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useApi } from "@/hooks/use-api";
+import { api } from "@/lib/api";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 import type {
   StatsDashboard,
@@ -14,6 +22,11 @@ import { Stats } from "./Stats";
 
 vi.mock("@/hooks/use-api", () => ({
   useApi: vi.fn(),
+}));
+
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
+  api: vi.fn(() => new Promise(() => {})),
 }));
 
 vi.mock("@/hooks/use-lazy-crate-options", () => ({
@@ -43,7 +56,7 @@ const CURRENT_YEAR = new Date().getFullYear();
 
 function mockApis(dashboard: StatsDashboard | null, today?: StatsToday) {
   mockUseApi.mockImplementation((url: string | null) => ({
-    data: url === "/api/me/stats/today" ? today ?? null : dashboard,
+    data: url === "/api/me/stats/today" ? (today ?? null) : dashboard,
     loading: false,
     error: null,
     refetch: vi.fn(),
@@ -51,6 +64,218 @@ function mockApis(dashboard: StatsDashboard | null, today?: StatsToday) {
 }
 
 describe("Stats page", () => {
+  it("shows freshness and the previous-period comparison from the dashboard", () => {
+    const dashboard = signalDashboard();
+    dashboard.snapshot = {
+      built_at: new Date(Date.now() - 5 * 60_000).toISOString(),
+    };
+    dashboard.provisional = true;
+    dashboard.overview.previous = {
+      start: "2026-08-22",
+      end: "2026-09-20",
+      minutes_listened: 1710,
+      play_count: 406,
+      active_days: 27,
+      artist_count: 10,
+    };
+    mockApis(dashboard);
+    renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "en",
+    });
+    expect(
+      screen.getByText("Updated 5 minutes ago · today still counting"),
+    ).toBeVisible();
+    expect(screen.getByText("vs previous 30 days")).toBeVisible();
+    expect(screen.getAllByText("+100%").length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    [`/stats?window=year:${CURRENT_YEAR}`, "vs previous year"],
+    ["/stats?window=365d", "vs previous year"],
+    ["/stats?month=2026-09", "vs previous month"],
+  ])("captions the comparison for %s as %s", (route, caption) => {
+    const dashboard = signalDashboard();
+    dashboard.overview.previous = {
+      start: "2025-01-01",
+      end: "2025-12-31",
+      minutes_listened: 1710,
+      play_count: 406,
+      active_days: 27,
+      artist_count: 10,
+    };
+    mockApis(dashboard);
+    renderWithListenProviders(<Stats />, {
+      route,
+      path: "/stats",
+      locale: "en",
+    });
+    expect(screen.getByText(caption)).toBeVisible();
+    expect(screen.getAllByText("+100%").length).toBeGreaterThan(0);
+  });
+
+  it("reserves loading geometry without claiming zero activity or an empty library", () => {
+    mockUseApi.mockImplementation(() => ({
+      data: null,
+      loading: true,
+      error: null,
+      refetch: vi.fn(),
+    }));
+    const { container } = renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "en",
+    });
+    expect(
+      container.querySelector('[data-slot="skeleton-card"]'),
+    ).not.toBeNull();
+    expect(screen.queryByTestId("empty-state")).not.toBeInTheDocument();
+    expect(screen.queryByText("0", { exact: true })).not.toBeInTheDocument();
+  });
+
+  it("offers retry after an uncached read failure instead of claiming no activity", async () => {
+    const refetch = vi.fn();
+    mockUseApi.mockImplementation(() => ({
+      data: null,
+      loading: false,
+      error: "Internal request error",
+      refetch,
+    }));
+    renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "en",
+    });
+    expect(screen.getByRole("alert")).toBeVisible();
+    expect(screen.queryByTestId("empty-state")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Internal request error"),
+    ).not.toBeInTheDocument();
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Retry" }));
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it("keeps a cold pending snapshot loading until a real result is available", () => {
+    const cold = {
+      ...baseDashboard(),
+      provisional: true,
+      snapshot: { pending: true, version: 0 },
+    };
+    mockUseApi.mockImplementation(() => ({
+      data: cold,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    }));
+    function Fixture() {
+      const [, refresh] = useReducer((value) => value + 1, 0);
+      return (
+        <>
+          <button type="button" onClick={refresh}>
+            Refresh fixture
+          </button>
+          <Stats />
+        </>
+      );
+    }
+    renderWithListenProviders(<Fixture />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "en",
+    });
+    expect(screen.getByTestId("loading-state")).toBeVisible();
+    expect(screen.queryByTestId("empty-state")).not.toBeInTheDocument();
+    mockApis(signalDashboard());
+    fireEvent.click(screen.getByRole("button", { name: "Refresh fixture" }));
+    expect(screen.queryByTestId("loading-state")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Converge" })).toBeVisible();
+    mockApis({ ...baseDashboard(), snapshot: { pending: false, version: 1 } });
+    fireEvent.click(screen.getByRole("button", { name: "Refresh fixture" }));
+    expect(screen.getByTestId("empty-state")).toBeVisible();
+  });
+
+  it("keeps the dashboard content, not the empty state, while a versioned empty snapshot is rebuilding", () => {
+    const dashboard = signalDashboard();
+    mockApis({
+      ...dashboard,
+      overview: { ...dashboard.overview, play_count: 0 },
+      snapshot: { pending: true, version: 1 },
+    });
+    renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "en",
+    });
+    expect(
+      screen.queryByText("Your stats are waiting for signal"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("loading-state")).toBeNull();
+    expect(screen.getByRole("link", { name: "Converge" })).toBeVisible();
+  });
+
+  it("retains a cached dashboard during a failed refresh", () => {
+    mockUseApi.mockImplementation(() => ({
+      data: signalDashboard(),
+      loading: false,
+      error: "Refresh failed",
+      refetch: vi.fn(),
+    }));
+    renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "en",
+    });
+    expect(screen.getByRole("link", { name: "Converge" })).toBeVisible();
+    expect(
+      screen.queryByText("Your stats are waiting for a signal"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("retains ranked entities while a cached dashboard refreshes", () => {
+    const dashboard = signalDashboard();
+    dashboard.top_artists.items = [
+      {
+        artist_id: 9,
+        artist_name: "High Vis",
+        artist_slug: "high-vis",
+        play_count: 12,
+        complete_play_count: 12,
+        minutes_listened: 43,
+      },
+    ];
+    mockUseApi.mockImplementation(() => ({
+      data: dashboard,
+      loading: true,
+      error: null,
+      refetch: vi.fn(),
+    }));
+    renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "en",
+    });
+    expect(screen.getByRole("link", { name: /High Vis/ })).toBeVisible();
+  });
+
+  it("uses canonical uppercase mono captions throughout editorial metrics", () => {
+    mockApis(signalDashboard());
+    renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      path: "/stats",
+      locale: "en",
+    });
+    for (const key of [
+      "Your artist of the period",
+      "Longest streak",
+      "Music age",
+    ]) {
+      expect(screen.getByText(key)).toHaveClass("font-mono", "uppercase");
+    }
+  });
+
   beforeEach(() => {
     mockApis(null);
   });
@@ -108,7 +333,7 @@ describe("Stats page", () => {
     expect(screen.getAllByTestId("empty-state")).toHaveLength(1);
   });
 
-  it("renders the signal tape and every section of the redesigned page", () => {
+  it("renders the explorer and every section of the redesigned page", () => {
     mockApis(signalDashboard(), {
       day: "2026-10-08",
       timezone: "Europe/Madrid",
@@ -123,7 +348,7 @@ describe("Stats page", () => {
     });
 
     expect(
-      screen.getByRole("group", { name: /de escucha en 30 barras/ }),
+      screen.getByRole("group", { name: "Escucha en el tramo seleccionado" }),
     ).toBeInTheDocument();
     expect(screen.getByText("minutos hoy")).toBeInTheDocument();
     expect(screen.getByText("artistas")).toBeInTheDocument();
@@ -141,7 +366,14 @@ describe("Stats page", () => {
     expect(screen.getAllByText("Spectral Wound").length).toBeGreaterThan(0);
     expect(screen.getByText("31×")).toBeInTheDocument();
     expect(screen.getByText("Cómo escuchas")).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: /22:00/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("grid", { name: "Escucha por día de la semana y hora" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Se escucha sobre todo el domingo hacia las 22:00; el 38 %, de noche.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByText(/ha crecido 9 puntos/)).toBeInTheDocument();
     expect(screen.getByText("2009")).toBeInTheDocument();
     expect(screen.getByText(/When Forever Comes Crashing/)).toBeInTheDocument();
@@ -186,9 +418,129 @@ describe("Stats page", () => {
       locale: "en",
     });
 
-    expect(screen.queryByRole("group")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("group", { name: "Escucha en el tramo seleccionado" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Top tracks")).toBeInTheDocument();
   });
+
+  it.each([
+    ["personal", "/stats", ["Hero", "Top Two", "Top Three"]],
+    ["global", "/stats/global", []],
+  ] as const)(
+    "wires movement exclusions and scope on the %s page",
+    (scope, route, _unused) => {
+      void _unused;
+      const dashboard = signalDashboard();
+      const artist = (name: string) => ({
+        artist_name: name,
+        play_count: 5,
+        minutes_listened: 20,
+        complete_play_count: 5,
+      });
+      dashboard.artist_of_period = {
+        ...dashboard.artist_of_period!,
+        artist_name: "Hero",
+      };
+      dashboard.top_artists = {
+        window: "30d",
+        items: [
+          artist("Top One"),
+          artist("Top Two"),
+          artist("Top Three"),
+          artist("Top Four"),
+        ],
+      } as StatsDashboard["top_artists"];
+      const signal = (name: string, delta?: number) => ({
+        artist_name: name,
+        play_count: 9,
+        minutes_listened: 30,
+        delta_play_count: delta,
+      });
+      dashboard.story = {
+        ...dashboard.story!,
+        movers: [
+          signal("Hero", 9),
+          signal("Top One", 8),
+          signal("Top Three", 7),
+          signal("Top Four", 6),
+          signal("Fresh Riser", 5),
+        ],
+        discoveries: [signal("Fresh Face")],
+        comebacks: [signal("Fresh Return")],
+      };
+      mockApis(dashboard);
+      const { container } = renderWithListenProviders(<Stats />, {
+        route,
+        path: route,
+        locale: "en",
+      });
+      const movement = container.querySelector("#movement") as HTMLElement;
+      expect(movement).not.toBeNull();
+      const inside = within(movement);
+      for (const name of ["Hero", "Top One", "Top Three"]) {
+        expect(inside.queryByText(name)).toBeNull();
+      }
+      expect(inside.getByText("Top Four")).toBeInTheDocument();
+      expect(inside.getByText("Fresh Riser")).toBeInTheDocument();
+      if (scope === "global") {
+        expect(inside.queryByText("Fresh Face")).toBeNull();
+        expect(inside.queryByText("Fresh Return")).toBeNull();
+      } else {
+        expect(inside.getByText("Fresh Face")).toBeInTheDocument();
+        expect(inside.getByText("Fresh Return")).toBeInTheDocument();
+      }
+    },
+  );
+
+  it.each([
+    ["a visible new artist", "/stats", ["Fresh Face"], true],
+    ["only excluded new artists", "/stats", ["Hero", "Top One"], false],
+    ["no New column", "/stats/global", ["Fresh Face"], false],
+  ] as const)(
+    "links the New artists highlight to Movement with %s",
+    (_case, route, discoveries, linked) => {
+      const dashboard = signalDashboard();
+      dashboard.artist_of_period = {
+        ...dashboard.artist_of_period!,
+        artist_name: "Hero",
+      };
+      dashboard.top_artists = {
+        window: "30d",
+        items: [
+          {
+            artist_name: "Top One",
+            play_count: 5,
+            minutes_listened: 20,
+            complete_play_count: 5,
+          },
+        ],
+      } as StatsDashboard["top_artists"];
+      dashboard.story = {
+        ...dashboard.story!,
+        discoveries: discoveries.map((name) => ({
+          artist_name: name,
+          play_count: 9,
+          minutes_listened: 30,
+        })),
+      };
+      mockApis(dashboard);
+      renderWithListenProviders(<Stats />, {
+        route,
+        path: route,
+        locale: "en",
+      });
+
+      expect(screen.getByText("New artists")).toBeInTheDocument();
+      const link = screen.queryByRole("link", { name: /New artists/ });
+      if (linked) {
+        expect(link).toHaveAttribute("href", "#movement");
+      } else {
+        // The New column is empty or absent: nothing to jump to.
+        expect(link).toBeNull();
+      }
+    },
+  );
 
   it("offers the rolling year instead of the calendar year for Crate Pulse", () => {
     mockApis(signalDashboard());
@@ -207,4 +559,142 @@ describe("Stats page", () => {
     ).toBeNull();
     expect(mockUseApi).toHaveBeenCalledWith(null);
   });
+
+  it.each([
+    ["personal", "/stats", "/stats", null, 1],
+    ["user", "/users/ana/stats", "/users/:username/stats", null, 0],
+    ["global", "/stats/global", "/stats/global", 4, 0],
+  ] as const)(
+    "wires the listening heatmap band for %s stats",
+    (_scope, route, path, listeners, nowCells) => {
+      const dashboard = signalDashboard();
+      dashboard.heatmap!.listener_count = listeners;
+      mockApis(dashboard);
+      const { container } = renderWithListenProviders(<Stats />, {
+        route,
+        path,
+        locale: "en",
+      });
+      const listening = container.querySelector<HTMLElement>("#listening")!;
+      const grid = within(listening).getByRole("grid", {
+        name: "Listening by weekday and hour",
+      });
+      expect(within(grid).getAllByRole("gridcell")).toHaveLength(168);
+      // The now outline only on the viewer's own stats.
+      expect(grid.querySelectorAll("[data-now]")).toHaveLength(nowCells);
+      // The top genre skips the appended faller.
+      expect(within(listening).getByText("Metalcore")).toBeInTheDocument();
+      expect(within(listening).getByText("Night 22–05")).toBeInTheDocument();
+    },
+  );
+
+  it("resets the heatmap band per subject and plays each subject's wave once", async () => {
+    const user = userEvent.setup();
+    const personal = signalDashboard();
+    const pulse = signalDashboard();
+    pulse.heatmap = {
+      cells: Array.from({ length: 7 }, (_, weekday) =>
+        Array.from({ length: 24 }, (_, hour) =>
+          weekday === 0 && hour === 9 ? 60 : 5,
+        ),
+      ),
+      peak: { weekday: 0, hour: 9 },
+      night_share: 0.2,
+      night_hours: [22, 23, 0, 1, 2, 3, 4, 5],
+      listener_count: 4,
+    };
+    mockUseApi.mockImplementation((url: string | null) => ({
+      data: url?.startsWith("/api/stats/dashboard")
+        ? pulse
+        : url === "/api/me/stats/today"
+          ? null
+          : personal,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    }));
+    // No route pattern: the same mounted <Stats/> follows the scope links.
+    const { container } = renderWithListenProviders(<Stats />, {
+      route: "/stats",
+      locale: "en",
+    });
+    const listening = () => container.querySelector<HTMLElement>("#listening")!;
+    const grid = () => within(listening()).getByRole("grid");
+    const readout = () =>
+      listening().querySelector("[data-slot='heatmap-readout']");
+
+    expect(readout()).toHaveTextContent("Sunday 22:00 · 1h 30m");
+    expect(grid()).toHaveAttribute("data-entering");
+    fireEvent.click(
+      within(grid()).getByRole("gridcell", { name: "Friday 07:00, 5 minutes" }),
+    );
+    expect(readout()).toHaveTextContent("Friday 07:00 · 5m");
+
+    // Crate Pulse: its own peak, its own first wave.
+    await user.click(screen.getByRole("link", { name: "Crate Pulse" }));
+    expect(readout()).toHaveTextContent("Monday 09:00 · 1h");
+    expect(grid()).toHaveAttribute("data-entering");
+
+    // Back to the viewer's own stats: the peak again, no second wave.
+    await user.click(screen.getByRole("link", { name: "Crate DNA" }));
+    expect(readout()).toHaveTextContent("Sunday 22:00 · 1h 30m");
+    expect(grid()).not.toHaveAttribute("data-entering");
+  });
+
+  it("hides the Crate Pulse heatmap grid below three listeners", () => {
+    const dashboard = signalDashboard();
+    // As the instance builder ships it below three listeners (PD43).
+    dashboard.heatmap = {
+      cells: Array.from({ length: 7 }, () => Array<number>(24).fill(0)),
+      peak: null,
+      night_share: null,
+      night_hours: [22, 23, 0, 1, 2, 3, 4, 5],
+      listener_count: 2,
+      hidden_reason: "few_listeners",
+    };
+    mockApis(dashboard);
+    const { container } = renderWithListenProviders(<Stats />, {
+      route: "/stats/global",
+      path: "/stats/global",
+      locale: "en",
+    });
+    const listening = container.querySelector<HTMLElement>("#listening")!;
+    expect(within(listening).queryByRole("grid")).toBeNull();
+    expect(
+      within(listening).getByText(
+        "The hourly pattern appears once at least 3 listeners have played music in this period.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it.each([
+    ["personal", "/stats", "/stats", "/api/me/stats/range?"],
+    ["global", "/stats/global", "/stats/global", "/api/stats/range?"],
+    [
+      "user",
+      "/users/ana%20b/stats",
+      "/users/:username/stats",
+      "/api/users/ana%20b/stats/range?",
+    ],
+  ])(
+    "renders the explorer for %s stats with their range endpoint",
+    async (_scope, route, path, expected) => {
+      vi.mocked(api).mockClear();
+      mockApis(signalDashboard());
+      renderWithListenProviders(<Stats />, { route, path, locale: "en" });
+      expect(
+        screen.getByRole("group", {
+          name: "Listening in the selected stretch",
+        }),
+      ).toBeInTheDocument();
+      await waitFor(() =>
+        expect(vi.mocked(api)).toHaveBeenCalledWith(
+          expect.stringContaining(expected),
+          "GET",
+          undefined,
+          expect.anything(),
+        ),
+      );
+    },
+  );
 });

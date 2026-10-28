@@ -1,5 +1,6 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useId, useState, type ReactNode } from "react";
-import { ArrowRight, ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 import { Button } from "@crate/ui/shadcn/button";
 import {
@@ -20,6 +21,7 @@ import {
   type DiffRowView,
 } from "@/lib/agent-plan-technical";
 import { humanizeKey } from "@/lib/humanize";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 function BeforeAfter({
   current,
@@ -30,27 +32,24 @@ function BeforeAfter({
 }) {
   return (
     <dl className="grid gap-3 sm:grid-cols-2">
-      <div className="min-w-0 rounded-md border border-white/8 bg-black/10 p-3">
-        <dt className="text-[11px] uppercase tracking-[0.12em] text-white/40">
-          Current
-        </dt>
-        <dd className="mt-1 text-sm text-white/70">{current}</dd>
+      <div className="min-w-0 rounded-md border border-border-quiet p-3">
+        <MonoLabel as="dt">Current</MonoLabel>
+        <dd className="mt-1 text-sm text-text-secondary">{current}</dd>
       </div>
-      <div className="min-w-0 rounded-md border border-cyan-400/20 bg-cyan-400/[0.06] p-3">
-        <dt className="flex items-center gap-1 text-[11px] uppercase tracking-[0.12em] text-cyan-100/70">
-          <ArrowRight aria-hidden="true" className="size-3" />
+      <div className="min-w-0 rounded-md border border-accent-action/20 bg-accent-action/[0.06] p-3">
+        <MonoLabel as="dt" tone="accent">
           Proposed
-        </dt>
-        <dd className="mt-1 text-sm text-white">{proposed}</dd>
+        </MonoLabel>
+        <dd className="mt-1 text-sm text-text-primary">{proposed}</dd>
       </div>
     </dl>
   );
 }
 
 const rowTone: Record<FieldDiffRow["status"], string> = {
-  changed: "bg-amber-400/[0.07]",
-  added: "bg-emerald-400/[0.06]",
-  cleared: "bg-red-500/[0.08]",
+  changed: "bg-state-warning/[0.07]",
+  added: "bg-accent-action/[0.06]",
+  cleared: "bg-state-warning/[0.08]",
   unchanged: "",
 };
 
@@ -62,10 +61,10 @@ const statusWord: Record<FieldDiffRow["status"], string> = {
 };
 
 const markerTone: Record<FieldDiffRow["status"], string> = {
-  changed: "text-amber-200/80",
-  added: "text-emerald-200/80",
-  cleared: "text-red-200/80",
-  unchanged: "text-white/45",
+  changed: "text-state-warning-text/80",
+  added: "text-accent-action-hi/80",
+  cleared: "text-state-warning-text/80",
+  unchanged: "text-text-subtle",
 };
 
 /** «Changed», or «Changed · see Technical details» when ids are listed there. */
@@ -73,7 +72,7 @@ function RowMarker({ row }: { row: DiffRowView }) {
   const plain = row.status === "changed" || row.status === "added";
   if (!plain && !row.seeTechnical) return null;
   return (
-    <span className={`block text-[11px] ${markerTone[row.status]}`}>
+    <span className={`block text-label ${markerTone[row.status]}`}>
       {statusWord[row.status]}
       {row.seeTechnical ? " · see Technical details" : null}
     </span>
@@ -99,7 +98,7 @@ function FieldDiffTable({
   return (
     <div className="space-y-2">
       {identifiersOnly ? (
-        <p className="text-[11px] text-amber-200/80">
+        <p className="text-label text-state-warning-text/80">
           Identifiers change · see Technical details
         </p>
       ) : null}
@@ -120,16 +119,16 @@ function FieldDiffTable({
                   data-status={row.status}
                   className={rowTone[row.status]}
                 >
-                  <TableCell className="align-top font-medium break-words whitespace-normal text-white/80">
+                  <TableCell className="align-top font-medium break-words whitespace-normal text-text-secondary">
                     {humanizeKey(row.key)}
                     <RowMarker row={row} />
                   </TableCell>
-                  <TableCell className="align-top break-words whitespace-normal text-white/60">
+                  <TableCell className="align-top break-words whitespace-normal text-text-secondary">
                     <StructuredValue value={row.before} />
                   </TableCell>
-                  <TableCell className="align-top break-words whitespace-normal text-white">
+                  <TableCell className="align-top break-words whitespace-normal text-text-primary">
                     {row.status === "cleared" ? (
-                      <span className="text-red-200">Cleared</span>
+                      <span className="text-state-warning-text">Cleared</span>
                     ) : (
                       <StructuredValue value={row.after} />
                     )}
@@ -139,7 +138,7 @@ function FieldDiffTable({
             </TableBody>
           </Table>
         ) : identifiersOnly ? null : (
-          <p className="text-sm text-white/55">No field changes.</p>
+          <p className="text-sm text-text-muted">No field changes.</p>
         )}
       </div>
       {unchangedCount > 0 ? (
@@ -178,7 +177,7 @@ function ChangeBodyView({ body }: { body: ChangeBody }) {
       return (
         <div className="space-y-2">
           {body.seeTechnical ? (
-            <p className="text-[11px] text-amber-200/80">
+            <p className="text-label text-state-warning-text/80">
               Changed · see Technical details
             </p>
           ) : null}
@@ -186,7 +185,7 @@ function ChangeBodyView({ body }: { body: ChangeBody }) {
             current={<StructuredValue value={body.current} />}
             proposed={
               body.cleared ? (
-                <span className="text-red-200">Cleared</span>
+                <span className="text-state-warning-text">Cleared</span>
               ) : (
                 <StructuredValue value={body.proposed} />
               )
@@ -196,7 +195,7 @@ function ChangeBodyView({ body }: { body: ChangeBody }) {
       );
     case "details":
       return body.details ? (
-        <div className="text-sm text-white/80">
+        <div className="text-sm text-text-secondary">
           <StructuredValue value={body.details} />
         </div>
       ) : null;
@@ -220,16 +219,14 @@ export function ChangeList({ plan }: { plan: AgentPlan }) {
         {changes.map(({ view, key }) => (
           <li
             key={key}
-            className="min-w-0 space-y-3 rounded-md border border-white/10 bg-white/[0.02] p-4"
+            className="min-w-0 space-y-3 rounded-md border border-border-quiet p-4"
           >
             <div className="space-y-1">
               {view.numbered ? (
-                <p className="text-[11px] uppercase tracking-[0.12em] text-white/40">
-                  Change {view.number}
-                </p>
+                <MonoLabel>Change {view.number}</MonoLabel>
               ) : null}
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <p className="font-medium break-words text-white">
+                <p className="font-medium break-words text-text-primary">
                   {view.targets.map((label, index) => (
                     <span key={`${index}:${label}`}>
                       {index > 0 ? ", " : null}
@@ -237,26 +234,24 @@ export function ChangeList({ plan }: { plan: AgentPlan }) {
                     </span>
                   ))}
                 </p>
-                <p className="text-sm text-white/55">{view.subject}</p>
+                <p className="text-sm text-text-muted">{view.subject}</p>
               </div>
               {view.discriminator ? (
-                <p className="text-xs break-words text-white/45">
+                <p className="text-xs break-words text-text-subtle">
                   {view.discriminator}
                 </p>
               ) : null}
             </div>
             <ChangeBodyView body={view.body} />
             {view.details ? (
-              <div className="border-t border-white/8 pt-3 text-sm text-white/80">
+              <div className="border-t border-border-quiet pt-3 text-sm text-text-secondary">
                 <StructuredValue value={view.details} />
               </div>
             ) : null}
           </li>
         ))}
       </ul>
-      {changes.length === 0 ? (
-        <p className="text-sm text-white/55">No changes listed.</p>
-      ) : null}
+      {changes.length === 0 ? <EmptyState title="No changes listed" /> : null}
     </div>
   );
 }

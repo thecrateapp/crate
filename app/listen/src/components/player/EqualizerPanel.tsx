@@ -2,6 +2,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { notify } from "@crate/ui/lib/notify";
 
+import { usePlayerActions } from "@/contexts/PlayerContext";
+import { useTrackEqCurves } from "@/hooks/use-track-eq-curves";
+
 import { useEqualizer } from "@/hooks/use-equalizer";
 
 import { EqualizerPanelView } from "./EqualizerPanelSections";
@@ -14,6 +17,8 @@ interface EqualizerPanelProps {
 export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
   const { t } = useTranslation();
   const eq = useEqualizer();
+  const { currentTrack } = usePlayerActions();
+  const inventory = useTrackEqCurves(currentTrack);
   const [saving, setSaving] = useState(false);
 
   const handleSaveTrack = async () => {
@@ -46,6 +51,8 @@ export function EqualizerPanel({ onClose }: EqualizerPanelProps) {
   return (
     <EqualizerPanelView
       eq={eq}
+      curves={inventory.curves}
+      curvesStatus={inventory.status}
       onClose={onClose}
       onClear={() => void handleClearTrack()}
       onSave={() => void handleSaveTrack()}

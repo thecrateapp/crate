@@ -182,3 +182,23 @@ class TestCreateTaskDedup:
 
         assert continuation_id is not None
         assert duplicate_root is None
+
+    def test_a_running_task_that_released_its_key_no_longer_suppresses_new_ones(
+        self, pg_db
+    ):
+        from crate.db.repositories.tasks import release_task_dedup_key
+
+        task_type = "rebuild_instance_listening_days"
+        params = {"days": ["2026-10-01"]}
+        dedup_key = "instance-listening-days:abc"
+        running = pg_db.create_task_dedup(task_type, params, dedup_key)
+        pg_db.update_task(running, status="running")
+        assert pg_db.create_task_dedup(task_type, params, dedup_key) is None
+
+        assert release_task_dedup_key(running) is True
+        assert release_task_dedup_key(running) is False
+
+        fresh = pg_db.create_task_dedup(task_type, params, dedup_key)
+        assert fresh is not None
+        assert fresh != running
+        assert pg_db.get_task(running)["status"] == "running"

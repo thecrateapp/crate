@@ -1,4 +1,4 @@
-import type { StatsDashboard } from "@/components/stats/stats-model";
+import type { StatsDashboard } from "../components/stats/stats-types";
 
 export function baseDashboard(window = "30d"): StatsDashboard {
   return {
@@ -47,7 +47,9 @@ export function signalDashboard(): StatsDashboard {
       start: "2026-09-09",
       end: "2026-10-09",
       points: Array.from({ length: 30 }, (_, index) => ({
-        bucket: `2026-09-${String(9 + Math.min(index, 21)).padStart(2, "0")}`,
+        bucket: new Date(Date.UTC(2026, 8, 9 + index))
+          .toISOString()
+          .slice(0, 10),
         minutes: 20 + index,
         plays: 5,
       })),
@@ -83,6 +85,7 @@ export function signalDashboard(): StatsDashboard {
         plays: 31,
         minutes: 120,
         track: {
+          track_id: 11,
           title: "Spectral Wound",
           artist: "Black Curse",
           album: "Burning",
@@ -108,6 +111,7 @@ export function signalDashboard(): StatsDashboard {
       ),
       peak: { weekday: 6, hour: 22 },
       night_share: 0.38,
+      night_hours: [22, 23, 0, 1, 2, 3, 4, 5],
     },
     music_age: {
       median_year: 2009,
@@ -117,6 +121,8 @@ export function signalDashboard(): StatsDashboard {
         { decade: 2010, share: 0.3 },
       ],
       oldest_album: { album: "When Forever Comes Crashing", year: 1998 },
+      newest_album: { album: "Heaven Is a Place", year: 2026 },
+      share_this_year: 0.12,
     },
     genre_trend: [
       {
@@ -124,6 +130,19 @@ export function signalDashboard(): StatsDashboard {
         slug: "metalcore",
         share: 0.34,
         delta_vs_previous: 0.09,
+      },
+      {
+        genre_name: "Post-Rock",
+        slug: "post-rock",
+        share: 0.21,
+        delta_vs_previous: -0.03,
+      },
+      {
+        genre_name: "Hardcore",
+        slug: "hardcore",
+        share: 0,
+        delta_vs_previous: -0.11,
+        faller: true,
       },
     ],
     story: {
@@ -144,6 +163,12 @@ export function signalDashboard(): StatsDashboard {
         danceability: 0.32,
         valence: 0.5,
         bpm: 137,
+      },
+      audio_profile_previous: {
+        energy: 0.64,
+        danceability: 0.4,
+        valence: 0.5,
+        bpm: 131,
       },
       monthly_snapshots: [],
     },

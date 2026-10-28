@@ -1,0 +1,20 @@
+{
+  "recordedAt": "2026-10-22",
+  "basis": "Reconciled the source inventory after A1–A5 migrations: A1a resolves Shell headers, A1b OpsPageHero/OpsStatTile, A2a nested SystemHealth/Stack surfaces, A3c Discover OpportunityCard, and A5a removes the playlist-creation shadows. No pending Admin surface debt remains.",
+  "scope": [
+    "app/ui/src/components/layout/Sidebar.tsx",
+    "app/ui/src/components/shows/ShowCard.tsx",
+    "app/ui/src/pages/Discover.tsx",
+    "app/ui/src/pages/NewReleases.tsx",
+    "app/ui/src/pages/Playlists.tsx",
+    "app/ui/src/pages/Roles.tsx",
+    "app/ui/src/pages/Users.tsx",
+    "app/ui/src/pages/I18nReview.tsx",
+    "app/ui/src/pages/Upcoming.tsx",
+    "app/ui/src/pages/Bandcamp.tsx",
+    "app/ui/src/pages/Analysis.tsx",
+    "app/ui/src/pages/Health.tsx",
+    "app/ui/src/pages/PlaylistEditor.tsx"
+  ],
+  "pending": []
+}

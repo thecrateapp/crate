@@ -7,6 +7,7 @@ import { useApi } from "@/hooks/use-api";
 import { Playlist } from "./Playlist";
 import { CuratedPlaylist } from "./CuratedPlaylist";
 import { HomePlaylist } from "./HomePlaylist";
+import { HomeSection } from "./HomeSection";
 
 const trackRowProps = vi.hoisted(() => [] as Array<Record<string, unknown>>);
 
@@ -249,6 +250,60 @@ describe("playlist pages", () => {
     );
   });
 
+  it("passes complete global-track metadata from a curated playlist response to the canonical row", () => {
+    const media = {
+      format: "flac",
+      bitrate: 1200000,
+      sample_rate: 96000,
+      bit_depth: 24,
+      bpm: 99,
+      audio_key: "D",
+      audio_scale: "minor",
+      duration: 143,
+    };
+    mockUseApi.mockReturnValue({
+      data: {
+        ...basePlaylist,
+        is_curated: true,
+        follower_count: 0,
+        is_followed: false,
+        tracks: [
+          {
+            ...playlistTrack,
+            ...media,
+            id: 501,
+            track_id: null,
+            global_track_uid: "global-song",
+            global_artist_uid: "global-artist",
+            global_album_uid: "global-album",
+          },
+        ],
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    renderWithListenProviders(<CuratedPlaylist />, {
+      route: "/curation/playlist/42",
+      path: "/curation/playlist/:id",
+    });
+    const row = trackRowProps[trackRowProps.length - 1]!;
+    expect(row.track).toMatchObject({
+      ...media,
+      bitrate: 1200,
+      id: "global-song",
+      global_track_uid: "global-song",
+      global_artist_uid: "global-artist",
+      global_album_uid: "global-album",
+    });
+    expect(row.track).toHaveProperty("library_track_id", undefined);
+    expect(row).toMatchObject({
+      showCoverThumb: true,
+      showArtist: true,
+      showAlbum: true,
+    });
+  });
+
   it("renders a retryable error state when a curated playlist fails to load", () => {
     const refetch = vi.fn();
     vi.mocked(useApi).mockReturnValue({
@@ -374,3 +429,25 @@ describe("playlist page access", () => {
     expect(screen.queryByRole("button", { name: "Follow" })).toBeNull();
   });
 });
+
+it.each([
+  [Playlist, "/playlist/7", "/playlist/:id"],
+  [HomePlaylist, "/home/playlist/mix", "/home/playlist/:playlistId"],
+  [HomeSection, "/home/section/favorite-artists", "/home/section/:sectionId"],
+] as const)(
+  "keeps read failures retryable instead of claiming a missing collection",
+  (Page, route, path) => {
+    const refetch = vi.fn();
+    vi.mocked(useApi).mockReturnValue({
+      data: null,
+      loading: false,
+      error: "Failed",
+      status: 503,
+      refetch,
+    });
+    renderWithListenProviders(<Page />, { route, path });
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(refetch).toHaveBeenCalled();
+  },
+);

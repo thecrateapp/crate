@@ -203,16 +203,17 @@ describe("Home", () => {
     expect(screen.getByText("Just landed")).toBeInTheDocument();
   });
 
-  it("composes the desktop greeting inside the hero without overlapping the rails", () => {
+  it("shows no greeting or date over the desktop hero and keeps the rails clear", () => {
     viewportState.isDesktop = true;
 
     renderWithListenProviders(<Home />);
 
+    expect(screen.queryByTestId("desktop-hero-intro")).toBeNull();
     expect(
-      within(screen.getByTestId("desktop-hero-intro")).getByRole("heading", {
+      screen.queryByRole("heading", {
         name: /Good (morning|afternoon|evening)/,
       }),
-    ).toBeInTheDocument();
+    ).toBeNull();
     expect(screen.getByTestId("home-discovery-content")).toHaveClass(
       "max-w-content",
       "relative",

@@ -87,6 +87,7 @@ export function ArtistContent({ page }: { page: LoadedArtistPageController }) {
           artistName={data.name}
           artistId={data.id}
           setlist={enrichment.setlist.probable_setlist}
+          generatedAt={enrichment.setlist.generated_at}
           open={setlistModalOpen}
           onClose={() => setSetlistModalOpen(false)}
           onPlay={() => void page.handlePlayArtistSetlist()}

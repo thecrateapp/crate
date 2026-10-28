@@ -117,7 +117,7 @@ IMAGE_SPECS: dict[str, ImageSpec] = {
         repository="crate-site",
         environment="CRATE_SITE_IMAGE",
         services=("crate-site",),
-        patterns=("app/site/**", "app/shared/**", "install.sh"),
+        patterns=("app/web/**", "app/shared/**", "install.sh"),
     ),
     "docs": ImageSpec(
         repository="crate-docs",
@@ -127,8 +127,20 @@ IMAGE_SPECS: dict[str, ImageSpec] = {
     ),
 }
 
+# Agent images are optional manifest entries outside the provenance-bound fleet.
+# The Crate Agent image bakes the release context, so every change rebuilds it.
+AGENT_IMAGE_SPECS: dict[str, ImageSpec] = {
+    "agent": ImageSpec(
+        repository="crate-agent",
+        environment="CRATE_AGENT_IMAGE",
+        services=("crate-agent", "crate-operator"),
+        patterns=("**",),
+    ),
+}
+ALL_IMAGE_SPECS: dict[str, ImageSpec] = {**IMAGE_SPECS, **AGENT_IMAGE_SPECS}
+
 REQUEST_ALIASES = {
-    "all": frozenset(IMAGE_SPECS),
+    "all": frozenset(ALL_IMAGE_SPECS),
     "backend": frozenset({"api", "worker", "analysis-worker", "playback-worker"}),
 }
 
@@ -141,35 +153,52 @@ def _matches(path: str, patterns: Iterable[str]) -> bool:
     return any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns)
 
 
-def detect_changed_images(
-    paths: Iterable[str], *, requested: str | None = None
+def _requested_images(requested: str) -> set[str]:
+    selected: set[str] = set()
+    for raw_name in requested.split(","):
+        name = raw_name.strip()
+        if not name:
+            continue
+        if name in REQUEST_ALIASES:
+            selected.update(REQUEST_ALIASES[name])
+            continue
+        if name not in ALL_IMAGE_SPECS:
+            raise ManifestError(f"unknown image selection: {name}")
+        selected.add(name)
+    return selected
+
+
+def _detect(
+    specs: dict[str, ImageSpec], paths: Iterable[str], requested: str | None
 ) -> set[str]:
     if requested:
-        selected: set[str] = set()
-        for raw_name in requested.split(","):
-            name = raw_name.strip()
-            if not name:
-                continue
-            if name in REQUEST_ALIASES:
-                selected.update(REQUEST_ALIASES[name])
-                continue
-            if name not in IMAGE_SPECS:
-                raise ManifestError(f"unknown image selection: {name}")
-            selected.add(name)
-        return selected
-
+        return _requested_images(requested) & set(specs)
     normalized_paths = [
         path.strip()[2:] if path.strip().startswith("./") else path.strip()
         for path in paths
         if path.strip()
     ]
     if any(_matches(path, GLOBAL_BUILD_PATTERNS) for path in normalized_paths):
-        return set(IMAGE_SPECS)
+        return set(specs)
     return {
         name
-        for name, spec in IMAGE_SPECS.items()
+        for name, spec in specs.items()
         if any(_matches(path, spec.patterns) for path in normalized_paths)
     }
+
+
+def detect_changed_images(
+    paths: Iterable[str], *, requested: str | None = None
+) -> set[str]:
+    if requested:
+        _requested_images(requested)
+    return _detect(IMAGE_SPECS, paths, requested)
+
+
+def detect_changed_agent_images(
+    paths: Iterable[str], *, requested: str | None = None
+) -> set[str]:
+    return _detect(AGENT_IMAGE_SPECS, paths, requested)
 
 
 def _expected_repository(registry: str, owner: str, spec: ImageSpec) -> str:
@@ -202,9 +231,22 @@ def validate_manifest(
     if extra:
         raise ManifestError(f"unknown image entries: {', '.join(sorted(extra))}")
 
+    agent_images = manifest.get("agent_images", {})
+    if not isinstance(agent_images, dict):
+        raise ManifestError("agent_images must be an object")
+    unknown = set(agent_images).difference(AGENT_IMAGE_SPECS)
+    if unknown:
+        raise ManifestError(
+            f"unknown agent image entries: {', '.join(sorted(unknown))}"
+        )
+
     repository_prefix: str | None = None
-    for name, spec in IMAGE_SPECS.items():
-        entry = images[name]
+    entries = [(name, spec, images[name]) for name, spec in IMAGE_SPECS.items()] + [
+        (name, spec, agent_images[name])
+        for name, spec in AGENT_IMAGE_SPECS.items()
+        if name in agent_images
+    ]
+    for name, spec, entry in entries:
         if not isinstance(entry, dict):
             raise ManifestError(f"{name} image entry must be an object")
         repository = entry.get("repository")
@@ -261,7 +303,7 @@ def assemble_manifest(
 ) -> dict:
     if not SHA_RE.fullmatch(release_sha):
         raise ManifestError("release_sha must be a full lowercase commit SHA")
-    unknown = set(changed_digests).difference(IMAGE_SPECS)
+    unknown = set(changed_digests).difference(ALL_IMAGE_SPECS)
     if unknown:
         raise ManifestError(f"unknown changed images: {', '.join(sorted(unknown))}")
     if previous is not None:
@@ -285,11 +327,29 @@ def assemble_manifest(
             raise ManifestError(f"missing image entry for {name}")
         images[name] = deepcopy(previous["images"][name])
 
+    agent_images: dict[str, dict] = {}
+    for name, spec in AGENT_IMAGE_SPECS.items():
+        digest = changed_digests.get(name)
+        if digest is not None:
+            if not DIGEST_RE.fullmatch(digest):
+                raise ManifestError(f"{name} digest must be a sha256 OCI digest")
+            agent_images[name] = {
+                "repository": _expected_repository(registry, owner, spec),
+                "digest": digest,
+                "source_sha": release_sha,
+                "environment": spec.environment,
+                "services": list(spec.services),
+            }
+        elif previous is not None and name in previous.get("agent_images", {}):
+            agent_images[name] = deepcopy(previous["agent_images"][name])
+
     manifest = {
         "schema_version": SCHEMA_VERSION,
         "release_sha": release_sha,
         "images": images,
     }
+    if agent_images:
+        manifest["agent_images"] = agent_images
     validate_manifest(
         manifest,
         expected_release_sha=release_sha,
@@ -302,10 +362,16 @@ def assemble_manifest(
 def render_release_env(manifest: dict) -> str:
     validate_manifest(manifest)
     lines = [f"CRATE_RELEASE_SHA={manifest['release_sha']}"]
-    for name, spec in IMAGE_SPECS.items():
-        entry = manifest["images"][name]
-        lines.append(f"{spec.environment}={entry['repository']}@{entry['digest']}")
+    for name, entry in _image_entries(manifest):
+        lines.append(f"{entry['environment']}={entry['repository']}@{entry['digest']}")
     return "\n".join(lines) + "\n"
+
+
+def _image_entries(manifest: dict) -> list[tuple[str, dict]]:
+    agent_images = manifest.get("agent_images", {})
+    return [(name, manifest["images"][name]) for name in IMAGE_SPECS] + [
+        (name, agent_images[name]) for name in AGENT_IMAGE_SPECS if name in agent_images
+    ]
 
 
 def _load_manifest(path: str | None) -> dict | None:
@@ -388,12 +454,15 @@ def main() -> int:
     args = _build_parser().parse_args()
     if args.command == "detect":
         if args.requested:
-            selected = detect_changed_images([], requested=args.requested)
+            selected = detect_changed_images(
+                [], requested=args.requested
+            ) | detect_changed_agent_images([], requested=args.requested)
         elif args.base:
-            selected = detect_changed_images(_git_changed_paths(args.base, args.head))
+            paths = _git_changed_paths(args.base, args.head)
+            selected = detect_changed_images(paths) | detect_changed_agent_images(paths)
         else:
-            selected = set(IMAGE_SPECS)
-        for name in IMAGE_SPECS:
+            selected = set(ALL_IMAGE_SPECS)
+        for name in ALL_IMAGE_SPECS:
             output_name = name.replace("-", "_")
             print(f"{output_name}={'true' if name in selected else 'false'}")
         print(f"any={'true' if selected else 'false'}")
@@ -443,8 +512,7 @@ def main() -> int:
         manifest = _load_manifest(args.manifest)
         assert manifest is not None
         validate_manifest(manifest)
-        for name in IMAGE_SPECS:
-            entry = manifest["images"][name]
+        for _name, entry in _image_entries(manifest):
             print(f"{entry['repository']}@{entry['digest']}")
         return 0
     if args.command == "base-sha":

@@ -387,7 +387,10 @@ describe("Album page", () => {
 
     const badge = screen.getByText("Pre-release");
     const title = screen.getByRole("heading", { name: "MORIR" });
-    expect(badge.parentElement).toHaveClass("flex", "flex-wrap");
+    expect(badge.closest("[data-slot=info-badge]")?.parentElement).toHaveClass(
+      "flex",
+      "flex-wrap",
+    );
     expect(badge.compareDocumentPosition(title)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
@@ -403,8 +406,10 @@ describe("Album page", () => {
     const playButton = within(primary).getByRole("button", { name: "Play" });
     expect(playButton).toHaveTextContent("Play");
     expect(playButton).toHaveClass(
-      "shadow-action-solid",
-      "hover:shadow-action-solid-hover",
+      "border",
+      "border-accent-action",
+      "bg-transparent",
+      "text-accent-action",
     );
     const shuffleButton = within(primary).getByRole("button", {
       name: "Shuffle",
@@ -581,7 +586,7 @@ describe("Album page", () => {
 
     const menu = await screen.findByRole("menu");
     expect(menu).toHaveClass(
-      "listen-glass-panel",
+      "crate-overlay-surface",
       "w-72",
       "z-app-context-menu",
     );
@@ -876,5 +881,24 @@ describe("Album page", () => {
     expect(trackRow("DOLOR")).toHaveAttribute("aria-selected", "true");
     expect(trackRow("NADA")).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("3 selected")).toBeInTheDocument();
+  });
+  it("distinguishes read failures from missing albums and exposes retry", () => {
+    const retry = vi.fn();
+    vi.mocked(useApi).mockReturnValue({
+      data: null,
+      loading: false,
+      error: "Service temporarily unavailable",
+      status: 503,
+      refetch: retry,
+    });
+    renderWithListenProviders(<Album />, {
+      route: "/albums/42/morir",
+      path: "/albums/:albumId/:albumSlug",
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Service temporarily unavailable",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(retry).toHaveBeenCalledOnce();
   });
 });

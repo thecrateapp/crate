@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
-import { Music4 } from "@crate/ui/icons";
+import { InfoTabHeroArtworkView } from "./InfoTabHeroArtworkView";
 
-import { CrateImage } from "@/components/artwork/CrateImage";
+import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
 import type { Track } from "@/contexts/player-types";
 
 export function InfoTabHeroArtwork({
@@ -13,23 +13,21 @@ export function InfoTabHeroArtwork({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="info-tab-artwork relative size-24 shrink-0 overflow-hidden rounded-xl sm:size-28">
-      {currentTrack.albumCover ? (
-        <CrateImage
-          src={currentTrack.albumCover}
-          alt={t("player.info.albumCoverAlt", {
-            name: albumName || currentTrack.title,
-          })}
-          width={112}
-          height={112}
-          loading="lazy"
-          className=" size-full object-cover"
+    <InfoTabHeroArtworkView
+      src={currentTrack.albumCover}
+      alt={t("player.info.albumCoverAlt", {
+        name: albumName || currentTrack.title,
+      })}
+      renderImage={({ src, alt, className, fallback }) => (
+        <ArtworkSurface
+          source={src}
+          alt={alt}
+          className="size-full"
+          imageClassName={className}
+          imageProps={{ width: 112, height: 112, loading: "lazy" }}
+          fallback={fallback}
         />
-      ) : (
-        <div className="flex size-full items-center justify-center text-text-muted">
-          <Music4 size={28} />
-        </div>
       )}
-    </div>
+    />
   );
 }

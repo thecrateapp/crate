@@ -8,6 +8,7 @@ interface PlayerSeekBarProps {
   compact?: boolean;
   thin?: boolean;
   showTimes?: boolean;
+  remaining?: boolean;
   className?: string;
   variant?: "default" | "glow";
   disabled?: boolean;
@@ -20,14 +21,17 @@ export function PlayerSeekBar({
   compact = false,
   thin = false,
   showTimes = false,
+  remaining = false,
   className = "",
   variant = "default",
   disabled = false,
 }: PlayerSeekBarProps) {
-  const model = useSeekBarModel(currentTime, duration, thin, onSeek);
+  const model = useSeekBarModel(currentTime, duration, onSeek);
 
   return variant === "glow" ? (
     <GlowSeekBar
+      remaining={remaining}
+      compact={compact}
       className={className}
       showTimes={showTimes}
       disabled={disabled}
@@ -35,6 +39,7 @@ export function PlayerSeekBar({
     />
   ) : (
     <DefaultSeekBar
+      remaining={remaining}
       className={className}
       compact={compact}
       thin={thin}

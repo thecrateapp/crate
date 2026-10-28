@@ -33,7 +33,6 @@ jobs:
       VITE_CAST_CUSTOM_RECEIVER_ENABLED: ${{ vars.CAST_CUSTOM_RECEIVER_ENABLED || 'false' }}
       VITE_CAST_RECEIVER_APP_ID: ${{ vars.CAST_RECEIVER_APP_ID || 'CC1AD845' }}
       VITE_CRATE_CONNECT_FEATURE_ENABLED: ${{ vars.CRATE_CONNECT_FEATURE_ENABLED || 'false' }}
-      VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED: ${{ vars.LISTEN_APPEARANCE_SETTINGS_ENABLED || 'false' }}
       VITE_SENTRY_DSN: ${{ vars.SENTRY_LISTEN_DSN }}
       VITE_SENTRY_ENVIRONMENT: production
       VITE_SENTRY_RELEASE: crate-${{ github.sha }}
@@ -201,6 +200,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v3
         with:
+          body_path: docs/releases/${{ github.ref_name }}.md
           files: |
             ${{ steps.rename.outputs.apk_dest }}
             ${{ steps.rename.outputs.aab_dest }}

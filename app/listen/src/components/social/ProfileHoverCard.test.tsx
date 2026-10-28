@@ -95,13 +95,20 @@ describe("ProfileHoverCard", () => {
       expect(mockApi).toHaveBeenCalledWith("/api/users/jane/card");
     });
     expect(await screen.findByText("Jane")).toBeInTheDocument();
-    expect(screen.getByText("Jane")).toHaveClass("profile-hover-title");
-    expect(screen.getAllByText("82").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("screamo")).toHaveClass("profile-hover-top-genre");
-    expect(screen.getAllByText("Contributor")[1]).toHaveAttribute(
-      "data-tone",
-      "accent",
+    expect(
+      screen
+        .getByRole("dialog", { name: "Jane" })
+        .querySelector('[data-slot="avatar"]'),
+    ).toHaveTextContent("J");
+    expect(screen.getByRole("link", { name: "Jane" })).toHaveAttribute(
+      "href",
+      "/users/jane",
     );
+    expect(screen.getAllByText("82%").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("screamo")).toBeVisible();
+    expect(
+      screen.getByText("Contributor").closest('[data-slot="info-badge"]'),
+    ).toHaveAttribute("data-tone", "accent");
   });
 
   it("does not cancel a slow card request when loading state changes", async () => {
@@ -163,11 +170,75 @@ describe("ProfileHoverCard", () => {
     fireEvent.pointerEnter(screen.getByText("@jane").parentElement!);
     await screen.findByText("Jane");
 
-    fireEvent.click(screen.getByTitle("Follow"));
+    fireEvent.click(screen.getByRole("button", { name: "Follow" }));
 
     await waitFor(() => {
       expect(mockApi).toHaveBeenCalledWith("/api/users/7/follow", "POST");
     });
-    expect(await screen.findByTitle("Following")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Following" }),
+    ).toBeInTheDocument();
+  });
+
+  it("does not offer follow on the signed-in user's hover card", async () => {
+    mockDesktop(true);
+    clearProfileCardCacheForTests();
+    mockApi.mockResolvedValueOnce(profileCard({ id: 1 }));
+    renderWithListenProviders(
+      <ProfileHoverCard username="jane" openDelayMs={0}>
+        <a href="/users/jane">Own profile</a>
+      </ProfileHoverCard>,
+    );
+    fireEvent.pointerEnter(screen.getByText("Own profile").parentElement!);
+    await screen.findByText("Jane");
+    expect(screen.queryByRole("button", { name: "Follow" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Crate DNA" })).toHaveAttribute(
+      "href",
+      "/stats",
+    );
+  });
+
+  it("allows the profile popover to scroll without closing it", async () => {
+    mockApi.mockResolvedValueOnce(profileCard());
+    renderWithListenProviders(
+      <ProfileHoverCard username="jane" openDelayMs={0}>
+        <a href="/users/jane">Trigger</a>
+      </ProfileHoverCard>,
+    );
+    fireEvent.pointerEnter(screen.getByText("Trigger").parentElement!);
+    await screen.findByText("Jane");
+    fireEvent.scroll(
+      screen.getByRole("link", { name: "View profile" }).parentElement!,
+    );
+    expect(screen.getByRole("button", { name: "Follow" })).toBeVisible();
+  });
+  it("keeps Escape dismissed when focus returns from the card to its trigger", async () => {
+    mockApi.mockResolvedValueOnce(profileCard());
+    renderWithListenProviders(
+      <ProfileHoverCard username="jane" openDelayMs={0}>
+        <a href="/users/jane">Trigger</a>
+      </ProfileHoverCard>,
+    );
+    fireEvent.pointerEnter(screen.getByText("Trigger").parentElement!);
+    await screen.findByText("Jane");
+    screen.getByRole("link", { name: "View profile" }).focus();
+    fireEvent.keyDown(window, { key: "Escape" });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(screen.queryByText("Jane")).toBeNull();
+    expect(screen.getByText("Trigger")).toHaveFocus();
+  });
+  it("offers retry after a failed card read", async () => {
+    mockApi
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce(profileCard());
+    renderWithListenProviders(
+      <ProfileHoverCard username="jane" openDelayMs={0}>
+        <a href="/users/jane">Trigger</a>
+      </ProfileHoverCard>,
+    );
+    fireEvent.pointerEnter(screen.getByText("Trigger").parentElement!);
+    await screen.findByRole("alert");
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("Jane")).toBeVisible();
   });
 });

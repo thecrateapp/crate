@@ -1,0 +1,57 @@
+{
+  "snapshot": {
+    "scope": "ops:logs",
+    "subject_key": "global",
+    "version": 1,
+    "built_at": "2026-10-22T09:30:00Z",
+    "stale_after": "2026-10-22T09:35:00Z",
+    "stale": false,
+    "generation_ms": 3
+  },
+  "logs": [
+    {
+      "id": 1,
+      "worker_id": "worker-one",
+      "task_id": "scan-sample-123",
+      "level": "error",
+      "category": "analysis",
+      "message": "Sample analysis needs attention",
+      "metadata": {
+        "album": "Costa Norte"
+      },
+      "created_at": "2026-10-17T12:00:00Z"
+    },
+    {
+      "id": 2,
+      "worker_id": "worker-two",
+      "task_id": null,
+      "level": "warn",
+      "category": "sync",
+      "message": "Sample sync waiting",
+      "metadata": null,
+      "created_at": "2026-10-17T11:59:00Z"
+    },
+    {
+      "id": 3,
+      "worker_id": "worker-one",
+      "task_id": null,
+      "level": "info",
+      "category": "general",
+      "message": "Sample library ready",
+      "metadata": null,
+      "created_at": "2026-10-17T11:58:00Z"
+    }
+  ],
+  "workers": [
+    {
+      "worker_id": "worker-one",
+      "last_seen": "2026-10-17T12:00:00Z",
+      "log_count": 2
+    },
+    {
+      "worker_id": "worker-two",
+      "last_seen": "2026-10-15T12:00:00Z",
+      "log_count": 1
+    }
+  ]
+}

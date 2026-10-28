@@ -1,6 +1,5 @@
 import { CRATE_ICON_SIZE, MoreHorizontal } from "@crate/ui/icons";
 
-import { cn } from "@crate/ui/lib/cn";
 import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 
 import { ContextMenu } from "./ContextMenu";
@@ -72,10 +71,7 @@ export function ItemActionMenuButton({
       aria-haspopup="menu"
       aria-expanded={expanded}
       title={title}
-      className={cn(
-        "focus-visible:shadow-focus focus-visible:outline-none",
-        className,
-      )}
+      className={className}
     >
       <MoreHorizontal size={CRATE_ICON_SIZE.md} />
     </ActionIconButton>

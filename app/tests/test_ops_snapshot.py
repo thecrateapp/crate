@@ -93,7 +93,14 @@ def test_build_analysis_payload_uses_stale_runtime_state_without_recomputing(
     def fake_get_ops_runtime_state(key, *, max_age_seconds=None):
         calls.append(max_age_seconds)
         if max_age_seconds is None:
-            return {"total": 10, "analysis_done": 8}
+            return {
+                "total": 10,
+                "analysis_done": 8,
+                "last_fingerprinted": {
+                    "title": "Latest fingerprint",
+                    "source": "chromaprint-v1",
+                },
+            }
         return None
 
     monkeypatch.setattr(
@@ -104,6 +111,7 @@ def test_build_analysis_payload_uses_stale_runtime_state_without_recomputing(
 
     assert payload["total"] == 10
     assert payload["analysis_done"] == 8
+    assert payload["last_fingerprinted"]["source"] == "chromaprint-v1"
     assert payload["stale"] is True
     assert calls == [180, None]
 
@@ -122,3 +130,4 @@ def test_build_analysis_payload_returns_empty_when_runtime_state_missing(monkeyp
     assert payload["unavailable"] is True
     assert payload["stale"] is True
     assert payload["total"] == 0
+    assert payload["last_fingerprinted"] == {}

@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CRATE_ICON_SIZE, Pencil, Plus, Trash2 } from "@crate/ui/icons";
 
+import { LibrarySection } from "@/components/library/LibrarySection";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { notify } from "@crate/ui/lib/notify";
 import { Button } from "@crate/ui/shadcn/button";
-import { EmptyState, LoadingState } from "@crate/ui/domain/states";
+import { EmptyState, ErrorState, LoadingState } from "@crate/ui/domain/states";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
 import { usePlaylistComposer } from "@/contexts/PlaylistComposerContext";
@@ -18,9 +19,9 @@ import { api } from "@/lib/api";
 import { formatTotalDuration } from "@/lib/utils";
 import { toPlayableTrack } from "@/lib/playable-track";
 import {
-  hasTrackReference,
-  toTrackReferencePayload,
-} from "@/lib/track-reference";
+  createPlaylistTrackEditSession,
+  persistPlaylistTracks,
+} from "@/pages/persist-playlist-tracks";
 
 import {
   playlistOwnerLabel,
@@ -42,7 +43,7 @@ function editableTracks(playlist: PlaylistDetail): PlaylistComposerTrack[] {
 export function LibraryPlaylistsTab() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { data, loading, refetch } = useApi<LibraryPlaylistsPageData>(
+  const { data, loading, error, refetch } = useApi<LibraryPlaylistsPageData>(
     "/api/me/playlists-page",
   );
   const { openCreatePlaylist } = usePlaylistComposer();
@@ -50,6 +51,7 @@ export function LibraryPlaylistsTab() {
     null,
   );
   const [saving, setSaving] = useState(false);
+  const trackEditSession = useRef(createPlaylistTrackEditSession());
   const [deletingPlaylist, setDeletingPlaylist] = useState<Playlist | null>(
     null,
   );
@@ -64,6 +66,14 @@ export function LibraryPlaylistsTab() {
     !followedCurated?.length;
 
   if (loading) return <LoadingState label={t("common.loadingShort")} />;
+  if (error && !data)
+    return (
+      <ErrorState
+        message={t("search.errors.tryAgain")}
+        retryLabel={t("common.retry")}
+        onRetry={refetch}
+      />
+    );
 
   async function toggleSystemPlaylistFollow(playlist: CuratedPlaylist) {
     try {
@@ -97,7 +107,7 @@ export function LibraryPlaylistsTab() {
         coverDataUrl={playlist.cover_data_url}
         tracks={playlist.artwork_tracks}
         trackCount={playlist.track_count}
-        meta={playlistOwnerLabel(playlist) ?? undefined}
+        ownerLabel={playlistOwnerLabel(playlist) ?? undefined}
         href={`/playlist/${playlist.id}`}
         detailEndpoint={`/api/playlists/${playlist.id}`}
         isFollowed={followedRow || undefined}
@@ -111,6 +121,7 @@ export function LibraryPlaylistsTab() {
   async function openPlaylistEditor(playlistId: number) {
     try {
       const detail = await api<PlaylistDetail>(`/api/playlists/${playlistId}`);
+      trackEditSession.current = createPlaylistTrackEditSession();
       setEditingPlaylist(detail);
     } catch {
       notify.error(t("playlist.toasts.loadFailed"));
@@ -126,6 +137,7 @@ export function LibraryPlaylistsTab() {
     tracks: PlaylistComposerTrack[];
   }) {
     if (!editingPlaylist) return;
+    const session = trackEditSession.current;
     setSaving(true);
     try {
       await api(`/api/playlists/${editingPlaylist.id}`, "PUT", {
@@ -136,45 +148,12 @@ export function LibraryPlaylistsTab() {
         is_collaborative: payload.isCollaborative,
       });
 
-      const originalByEntryId = new Map(
-        editableTracks(editingPlaylist)
-          .filter((track) => track.playlistEntryId != null)
-          .map((track) => [track.playlistEntryId as number, track]),
+      await persistPlaylistTracks(
+        editingPlaylist.id,
+        editableTracks(editingPlaylist),
+        payload.tracks,
+        session,
       );
-
-      const nextEntryIds = new Set(
-        payload.tracks
-          .map((track) => track.playlistEntryId)
-          .filter((value): value is number => value != null),
-      );
-
-      const removedTracks = [...originalByEntryId.values()]
-        .filter((track) => !nextEntryIds.has(track.playlistEntryId as number))
-        .sort((a, b) => (b.playlistPosition || 0) - (a.playlistPosition || 0));
-
-      for (const track of removedTracks) {
-        if (track.playlistPosition != null) {
-          await api(
-            `/api/playlists/${editingPlaylist.id}/tracks/${track.playlistPosition}`,
-            "DELETE",
-          );
-        }
-      }
-
-      const newTracks = payload.tracks.filter(
-        (track) => track.playlistEntryId == null && hasTrackReference(track),
-      );
-      if (newTracks.length > 0) {
-        await api(`/api/playlists/${editingPlaylist.id}/tracks`, "POST", {
-          tracks: newTracks.map((track) =>
-            toTrackReferencePayload({
-              ...track,
-              album: track.album || "",
-              duration: track.duration || 0,
-            }),
-          ),
-        });
-      }
 
       notify.success(t("playlist.toasts.updated"));
       setEditingPlaylist(null);
@@ -203,12 +182,8 @@ export function LibraryPlaylistsTab() {
 
   return (
     <div className="space-y-3">
-      <Button
-        variant="secondary"
-        onClick={() => openCreatePlaylist()}
-        className="library-new-playlist w-full justify-start rounded-lg bg-text-primary/5 px-4 hover:bg-text-primary/10 has-[>svg]:px-4"
-      >
-        <Plus size={CRATE_ICON_SIZE.sm} className="text-accent-action" />
+      <Button variant="secondary" onClick={() => openCreatePlaylist()}>
+        <Plus size={CRATE_ICON_SIZE.md} />
         {t("library.playlists.new")}
       </Button>
 
@@ -221,10 +196,7 @@ export function LibraryPlaylistsTab() {
       ) : null}
 
       {owned.length > 0 ? (
-        <div className="space-y-1">
-          <div className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-text-primary/40">
-            {t("library.playlists.yours")}
-          </div>
+        <LibrarySection title={t("library.playlists.yours")}>
           {owned.map((pl) => (
             <PlaylistCard
               variant="row"
@@ -261,32 +233,23 @@ export function LibraryPlaylistsTab() {
               ]}
             />
           ))}
-        </div>
+        </LibrarySection>
       ) : null}
 
       {shared.length > 0 ? (
-        <div className="space-y-1">
-          <div className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-text-primary/40">
-            {t("library.playlists.shared")}
-          </div>
+        <LibrarySection title={t("library.playlists.shared")}>
           {shared.map((playlist) => renderReadOnlyRow(playlist, false))}
-        </div>
+        </LibrarySection>
       ) : null}
 
       {followed.length > 0 ? (
-        <div className="space-y-1">
-          <div className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-text-primary/40">
-            {t("library.playlists.followed")}
-          </div>
+        <LibrarySection title={t("library.playlists.followed")}>
           {followed.map((playlist) => renderReadOnlyRow(playlist, true))}
-        </div>
+        </LibrarySection>
       ) : null}
 
       {followedCurated && followedCurated.length > 0 ? (
-        <div className="space-y-1">
-          <div className="px-1 pb-1 text-xs font-bold uppercase tracking-wider text-text-primary/40">
-            {t("explore.fromCrate.title")}
-          </div>
+        <LibrarySection title={t("explore.fromCrate.title")}>
           {followedCurated.map((playlist) => (
             <PlaylistCard
               variant="row"
@@ -316,12 +279,13 @@ export function LibraryPlaylistsTab() {
               onToggleFollow={() => toggleSystemPlaylistFollow(playlist)}
             />
           ))}
-        </div>
+        </LibrarySection>
       ) : null}
 
       <PlaylistCreateModal
         open={!!editingPlaylist}
         mode="edit"
+        editorIdentity={editingPlaylist?.id}
         initialName={editingPlaylist?.name}
         initialDescription={editingPlaylist?.description}
         initialCoverDataUrl={editingPlaylist?.cover_data_url}
@@ -334,6 +298,7 @@ export function LibraryPlaylistsTab() {
       />
 
       <ConfirmDialog
+        eyebrow={t("actions.confirmation.eyebrow")}
         open={!!deletingPlaylist}
         tone="danger"
         pending={deleting}

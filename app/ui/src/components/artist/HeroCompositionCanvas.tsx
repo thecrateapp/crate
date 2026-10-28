@@ -1,3 +1,6 @@
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import Konva from "konva";
 import type { Filter } from "konva/lib/Node";
 import {
@@ -17,8 +20,6 @@ import {
   Transformer,
 } from "react-konva";
 import {
-  Crop,
-  Expand,
   FlipHorizontal2,
   RefreshCcw,
   RotateCcw,
@@ -32,12 +33,6 @@ import {
   artistHeroArtworkFitClassName,
   type ArtistHeroArtworkBounds,
 } from "@crate/ui/domain/ArtistHeroFrame";
-import { ThemeScope } from "@crate/ui/primitives/ThemeScope";
-import {
-  DEFAULT_APPEARANCE_PREFERENCES,
-  resolveAppearance,
-  type AppearanceResolution,
-} from "@crate/ui/lib/appearance-resolver";
 
 import { cn } from "@/lib/utils";
 
@@ -70,16 +65,11 @@ interface HeroCompositionCanvasProps {
   editable?: boolean;
   previewOnly?: boolean;
   previewArtworkBounds?: ArtistHeroArtworkBounds;
-  appearance?: AppearanceResolution;
   children?: ReactNode;
   onRecipeChange: (recipe: HeroRecipe) => void;
 }
 
 const MOBILE_PRESENTATION_VIEWPORT = { width: 430, height: 537.5 } as const;
-const DEFAULT_HERO_PREVIEW_APPEARANCE = resolveAppearance(
-  DEFAULT_APPEARANCE_PREFERENCES,
-  { prefersColorSchemeDark: true, prefersReducedMotion: false },
-);
 
 function useLoadedImage(sourceUrl: string | null): HTMLImageElement | null {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -187,7 +177,6 @@ export function HeroCompositionCanvas({
   editable = true,
   previewOnly = false,
   previewArtworkBounds,
-  appearance = DEFAULT_HERO_PREVIEW_APPEARANCE,
   children,
   onRecipeChange,
 }: HeroCompositionCanvasProps) {
@@ -362,11 +351,7 @@ export function HeroCompositionCanvas({
   const presentationScale = canvas.width / presentationViewport.width;
 
   return (
-    <ThemeScope
-      appearance={appearance}
-      data-testid="hero-composition-theme-scope"
-      className="min-w-0"
-    >
+    <div data-testid="hero-composition-preview" className="min-w-0">
       <div
         ref={containerRef}
         data-testid="hero-composition-canvas"
@@ -528,7 +513,7 @@ export function HeroCompositionCanvas({
                   )}
                 />
               ) : (
-                <div className="flex h-full min-h-[280px] items-center justify-center text-sm text-white/40">
+                <div className="flex h-full min-h-[280px] items-center justify-center text-sm text-text-muted">
                   Select a source to compose the hero
                 </div>
               )}
@@ -551,51 +536,53 @@ export function HeroCompositionCanvas({
           ) : null}
         </ArtistHeroFrame>
         {!previewOnly ? (
-          <div className="pointer-events-none absolute right-3 top-3 z-30 rounded-md border border-border-quiet bg-surface-overlay px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted backdrop-blur-md">
+          <MonoLabel
+            as="div"
+            className="pointer-events-none absolute right-3 top-3 z-30 rounded-md border border-border-quiet bg-surface-overlay px-3 py-1"
+          >
             {recipe.mode === "crop" ? "Crop" : "Fill preview"} · {composition}
-          </div>
+          </MonoLabel>
         ) : null}
       </div>
 
       {!previewOnly ? (
         <>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <div className="flex rounded-md border border-border bg-background/35 p-1">
-              <ToolButton
-                label="Crop"
-                pressed={recipe.mode === "crop"}
-                disabled={!canCompose}
-                onClick={() => setRecipe({ mode: "crop" })}
-              >
-                <Crop className="h-4 w-4" />
-                Crop
-              </ToolButton>
-              <ToolButton
-                label="Fill"
-                pressed={recipe.mode === "extend"}
-                disabled={!canCompose}
-                onClick={() => setRecipe({ mode: "extend" })}
-              >
-                <Expand className="h-4 w-4" />
-                Fill
-              </ToolButton>
-            </div>
+            <SegmentedControl
+              as="radio"
+              label="Framing mode"
+              value={recipe.mode}
+              onValueChange={(mode) => setRecipe({ mode })}
+              items={[
+                { value: "crop", label: "Crop", disabled: !canCompose },
+                { value: "extend", label: "Fill", disabled: !canCompose },
+              ]}
+            />
             <div className="ml-auto flex items-center gap-1">
               <IconToolButton
+                data-admin-ux="composition-zoom-out"
                 label="Zoom out"
                 disabled={!canCompose}
                 onClick={() => applyZoom(1 / 1.12)}
               >
-                <ZoomOut className="h-4 w-4" />
+                <ZoomOut
+                  data-admin-ux="composition-zoom-out-glyph"
+                  className="h-4 w-4"
+                />
               </IconToolButton>
               <IconToolButton
+                data-admin-ux="composition-zoom-in"
                 label="Zoom in"
                 disabled={!canCompose}
                 onClick={() => applyZoom(1.12)}
               >
-                <ZoomIn className="h-4 w-4" />
+                <ZoomIn
+                  data-admin-ux="composition-zoom-in-glyph"
+                  className="h-4 w-4"
+                />
               </IconToolButton>
               <IconToolButton
+                data-admin-ux="composition-flip"
                 label="Flip"
                 disabled={!canCompose}
                 pressed={recipe.flip_horizontal}
@@ -603,28 +590,43 @@ export function HeroCompositionCanvas({
                   setRecipe({ flip_horizontal: !recipe.flip_horizontal })
                 }
               >
-                <FlipHorizontal2 className="h-4 w-4" />
+                <FlipHorizontal2
+                  data-admin-ux="composition-flip-glyph"
+                  className="h-4 w-4"
+                />
               </IconToolButton>
               <IconToolButton
+                data-admin-ux="composition-rotate-left"
                 label="Rotate counterclockwise"
                 disabled={!canCompose}
                 onClick={() => rotate(-90)}
               >
-                <RotateCcw className="h-4 w-4" />
+                <RotateCcw
+                  data-admin-ux="composition-rotate-left-glyph"
+                  className="h-4 w-4"
+                />
               </IconToolButton>
               <IconToolButton
+                data-admin-ux="composition-rotate-right"
                 label="Rotate clockwise"
                 disabled={!canCompose}
                 onClick={() => rotate(90)}
               >
-                <RotateCw className="h-4 w-4" />
+                <RotateCw
+                  data-admin-ux="composition-rotate-right-glyph"
+                  className="h-4 w-4"
+                />
               </IconToolButton>
               <IconToolButton
+                data-admin-ux="composition-reset"
                 label="Reset"
                 disabled={!canCompose}
                 onClick={reset}
               >
-                <RefreshCcw className="h-4 w-4" />
+                <RefreshCcw
+                  data-admin-ux="composition-reset-glyph"
+                  className="h-4 w-4"
+                />
               </IconToolButton>
             </div>
           </div>
@@ -635,38 +637,7 @@ export function HeroCompositionCanvas({
           </p>
         </>
       ) : null}
-    </ThemeScope>
-  );
-}
-
-function ToolButton({
-  label,
-  pressed,
-  disabled,
-  onClick,
-  children,
-}: React.PropsWithChildren<{
-  label: string;
-  pressed: boolean;
-  disabled: boolean;
-  onClick: () => void;
-}>) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-pressed={pressed}
-      disabled={disabled}
-      onClick={onClick}
-      className={cn(
-        "inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
-        pressed
-          ? "bg-primary/14 text-primary"
-          : "text-muted-foreground hover:bg-white/5 hover:text-foreground",
-      )}
-    >
-      {children}
-    </button>
+    </div>
   );
 }
 
@@ -683,18 +654,13 @@ function IconToolButton({
   onClick: () => void;
 }>) {
   return (
-    <button
-      type="button"
-      aria-label={label}
+    <ActionButton
+      label={label}
       aria-pressed={pressed}
       disabled={disabled}
       onClick={onClick}
-      className={cn(
-        "inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background/35 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40",
-        pressed ? "border-primary/40 text-primary" : "",
-      )}
     >
       {children}
-    </button>
+    </ActionButton>
   );
 }

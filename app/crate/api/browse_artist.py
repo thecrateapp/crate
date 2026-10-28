@@ -30,6 +30,7 @@ from crate.api._deps import (
     library_path,
 )
 from crate.api.auth import _require_auth
+from crate.api.show_location import ShowLocation, resolve_show_location
 from crate.api.browse_shared import (
     ARTIST_PHOTO_NAMES,
     build_genre_profile,
@@ -54,10 +55,12 @@ from crate.api.schemas.browse import (
     ArtistDetailResponse,
     ArtistEnqueueResponse,
     ArtistInfoResponse,
+    ArtistNetworkCardResponse,
     ArtistNetworkResponse,
     ArtistPageResponse,
     ArtistSetlistPlayableResponse,
     CachedShowsResponse,
+    ProbableSetlistCoverageResponse,
     ShowsListResponse,
     UpcomingResponse,
     ArtistShowsResponse,
@@ -74,6 +77,7 @@ from crate.external_artist_artwork import (
     queue_external_artist_artwork,
 )
 from crate.db.queries.user_library import get_top_artists
+from crate.db.queries.user import get_upcoming_shows as get_user_upcoming_shows
 from crate.db.repositories.library import (
     get_album_quality_map,
     get_library_albums,
@@ -117,6 +121,7 @@ from crate.db.queries.shows import (
 )
 from crate.db.releases import get_new_releases, get_upcoming_releases_for_artist
 from crate.db.similarities import get_artist_network
+from crate.db.queries.artist_network_card import get_network_artist_card
 from crate.lastfm import (
     get_artist_info,
     get_cached_artist_info,
@@ -313,9 +318,11 @@ def _build_artist_page_payload(
     stats_window: str,
     stats_limit: int,
 ) -> dict | JSONResponse:
+    show_location = resolve_show_location(request, user_id)
     cache_key = (
         f"listen:artist_page:v6:{user_id}:{artist_id}:"
-        f"{top_tracks_count}:{shows_limit}:{stats_window}:{stats_limit}"
+        f"{top_tracks_count}:{shows_limit}:{stats_window}:{stats_limit}:"
+        f"{json.dumps(show_location, sort_keys=True)}"
     )
     cached = get_cache(cache_key, max_age_seconds=300)
     if cached is not None:
@@ -338,6 +345,7 @@ def _build_artist_page_payload(
         name=artist_name,
         limit=shows_limit,
         country="",
+        location=show_location,
     )
     appears_on_payload = get_public_system_playlists_for_artist(
         artist_id=artist_id,
@@ -444,6 +452,9 @@ def _format_artist_top_track(row: dict) -> dict:
         "duration": row["duration"] or 0,
         "track": row["track_number"] or 0,
         "format": row["format"],
+        "bitrate": row.get("bitrate"),
+        "sample_rate": row.get("sample_rate"),
+        "bit_depth": row.get("bit_depth"),
         "bpm": row.get("bpm"),
         "audio_key": row.get("audio_key"),
         "audio_scale": row.get("audio_scale"),
@@ -564,8 +575,14 @@ def _get_artist_top_tracks_payload(artist_name: str, *, count: int) -> list[dict
 
 
 def _get_artist_page_shows(
-    *, user_id: int | None, name: str, limit: int, country: str
+    *,
+    user_id: int | None,
+    name: str,
+    limit: int,
+    country: str,
+    location: ShowLocation | None = None,
 ) -> dict:
+    from datetime import datetime, timezone
     from crate import setlistfm
     from crate.ticketmaster import is_configured
 
@@ -578,7 +595,14 @@ def _get_artist_page_shows(
         probable_setlist = []
 
     cached = dedupe_show_rows(
-        db_get_shows(artist_name=name, country=country or None, limit=limit),
+        get_user_upcoming_shows(
+            followed_names=[name],
+            today=datetime.now(timezone.utc).date(),
+            limit=limit,
+            **location,
+        )
+        if location
+        else db_get_shows(artist_name=name, country=country or None, limit=limit),
     )
     if cached:
         attending_show_ids = (
@@ -1828,33 +1852,117 @@ def api_artists_with_shows(request: Request):
     responses=AUTH_ERROR_RESPONSES,
     summary="List cached upcoming shows",
 )
-def api_cached_shows(request: Request, limit: int = Query(50)):
+def api_cached_shows(
+    request: Request,
+    limit: int = Query(50, ge=1, le=5000),
+    artist: str | None = Query(None, min_length=1, max_length=300),
+):
     _require_auth(request)
 
-    shows = db_get_shows(limit=limit)
-    artist_names = [
-        artist_name
-        for show in shows
-        for artist_name in ([show.get("artist_name")] + list(show.get("lineup") or []))
-        if artist_name
-    ]
+    from crate import setlistfm
+
+    shows = db_get_shows(artist_name=artist, limit=limit)
+    artist_names = setlistfm.billed_show_artist_names(shows)
     genre_map = get_all_artist_genre_map(artist_names, limit=3)
 
     refs_by_name = _lookup_artist_refs(artist_names)
+    setlist_health = setlistfm.get_probable_setlist_health(artist_names)
     events = []
     for show in shows:
-        artist_ref = refs_by_name.get((show.get("artist_name") or "").lower())
+        artist_name = str(show.get("artist_name") or "")
+        artist_ref = refs_by_name.get(artist_name.lower())
+        lineup_artists = _show_lineup_artists(show, refs_by_name)
+        if artist_name and not any(
+            str(artist.get("name") or "").strip().casefold()
+            == artist_name.strip().casefold()
+            for artist in lineup_artists
+        ):
+            primary: dict[str, Any] = {"name": artist_name}
+            if artist_ref:
+                primary.update(
+                    {"id": artist_ref.get("id"), "slug": artist_ref.get("slug")}
+                )
+            lineup_artists.insert(0, primary)
+        for lineup_artist in lineup_artists:
+            health = setlist_health.get(
+                " ".join(str(lineup_artist.get("name") or "").split()).casefold(),
+                {"status": "missing", "song_count": 0},
+            )
+            lineup_artist.update(
+                {
+                    "probable_setlist_status": health["status"],
+                    "probable_setlist_generated_at": health.get("generated_at"),
+                    "probable_setlist_song_count": health.get("song_count", 0),
+                    "probable_setlist_source_show_count": health.get(
+                        "source_show_count"
+                    ),
+                    "probable_setlist_mode": health.get("mode"),
+                    "probable_setlist_tour_name": health.get("tour_name"),
+                }
+            )
+        health = setlist_health.get(
+            " ".join(artist_name.split()).casefold(),
+            {"status": "missing", "song_count": 0},
+        )
         events.append(
             {
                 **show,
                 "artist_id": artist_ref.get("id") if artist_ref else None,
                 "artist_slug": artist_ref.get("slug") if artist_ref else None,
-                "lineup_artists": _show_lineup_artists(show, refs_by_name),
-                "artist_genres": genre_map.get(show["artist_name"], [])[:3],
+                "lineup_artists": lineup_artists,
+                "artist_genres": genre_map.get(artist_name, [])[:3],
                 "artist_listeners": 0,
+                "probable_setlist_status": health["status"],
+                "probable_setlist_generated_at": health.get("generated_at"),
+                "probable_setlist_song_count": health.get("song_count", 0),
+                "probable_setlist_source_show_count": health.get("source_show_count"),
+                "probable_setlist_mode": health.get("mode"),
+                "probable_setlist_tour_name": health.get("tour_name"),
             }
         )
-    return {"events": events}
+    counts = {"fresh": 0, "stale": 0, "missing": 0, "unknown": 0}
+    for health in setlist_health.values():
+        status = health.get("status")
+        if status in counts:
+            counts[status] += 1
+    return {
+        "events": events,
+        "setlist_coverage": {
+            "artist_count": len(artist_names),
+            **counts,
+        },
+    }
+
+
+@router.post(
+    "/api/shows/probable-setlists/refresh",
+    response_model=ProbableSetlistCoverageResponse,
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Queue refreshes for missing or outdated show setlists",
+)
+def api_refresh_show_probable_setlists(request: Request):
+    require_permission(request, "library.metadata.write")
+    shows = db_get_shows(limit=5000)
+    from crate import setlistfm
+
+    artist_names = setlistfm.billed_show_artist_names(shows)
+    health = setlistfm.get_probable_setlist_health(artist_names)
+    counts = {"fresh": 0, "stale": 0, "missing": 0, "unknown": 0}
+    for status in health.values():
+        if status.get("status") in counts:
+            counts[status["status"]] += 1
+    outdated = counts["missing"] + counts["stale"]
+    if outdated:
+        create_task_dedup(
+            "refresh_show_probable_setlists",
+            {},
+            dedup_key="probable-setlists:shows",
+        )
+    return {
+        "artist_count": len(artist_names),
+        **counts,
+        "queued": outdated,
+    }
 
 
 @router.get(
@@ -2136,6 +2244,34 @@ def api_external_artist_photo(
             "X-Crate-External-Artwork": "pending",
         },
     )
+
+
+@router.get(
+    "/api/network/artist-card",
+    response_model=ArtistNetworkCardResponse,
+    responses=_BROWSE_RESPONSES,
+    summary="Inspector card for an artist in the similarity network",
+)
+def api_network_artist_card(
+    request: Request, name: str = Query(..., min_length=1, max_length=300)
+):
+    _require_auth(request)
+    card = get_network_artist_card(name.strip())
+    shows = db_get_shows(artist_name=card["name"], limit=1)
+    show = shows[0] if shows else None
+    show_date = coerce_date(show.get("date")) if show else None
+    card["next_show"] = (
+        {
+            "date": show_date.isoformat(),
+            "venue": show.get("venue"),
+            "city": show.get("city"),
+            "country": show.get("country"),
+            "url": show.get("url"),
+        }
+        if show and show_date
+        else None
+    )
+    return card
 
 
 @router.get(

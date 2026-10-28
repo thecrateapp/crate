@@ -1,4 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -169,6 +176,62 @@ beforeEach(() => {
 });
 
 describe("CommandPalette", () => {
+  it("offers Playback Delivery to operators with health access", async () => {
+    const user = userEvent.setup();
+    mockAuth(["ops.health.view"]);
+
+    render(
+      <MemoryRouter>
+        <CommandPalette />
+      </MemoryRouter>,
+    );
+
+    await user.keyboard("{Control>}k{/Control}");
+
+    const dialog = screen.getByRole("dialog", { name: "Command palette" });
+    expect(
+      await within(dialog).findByRole("option", { name: "Playback Delivery" }),
+    ).toBeVisible();
+    expect(
+      within(dialog).getByRole("option", { name: "System Health" }),
+    ).toBeVisible();
+  });
+
+  it("offers named icon-free commands, keyboard selection and an explicit close action", async () => {
+    const user = userEvent.setup();
+    mockAuth(["admin.access", "library.import.manage"]);
+    render(
+      <MemoryRouter>
+        <button>Open focus anchor</button>
+        <CommandPalette />
+      </MemoryRouter>,
+    );
+    const anchor = screen.getByRole("button", { name: "Open focus anchor" });
+    anchor.focus();
+    await user.keyboard("{Control>}k{/Control}");
+    const dialog = screen.getByRole("dialog", { name: "Command palette" });
+    const input = within(dialog).getByRole("combobox", {
+      name: "Search commands",
+    });
+    expect(input).toHaveFocus();
+    expect(
+      await within(dialog).findByRole("option", { name: "Sync Library" }),
+    ).toHaveTextContent("Sync Library");
+    expect(dialog.querySelectorAll("svg")).toHaveLength(2);
+    expect(dialog.querySelectorAll('[role="option"] svg')).toHaveLength(0);
+    await user.type(input, "sync lib");
+    await user.keyboard("{ArrowDown}{Enter}");
+    await waitFor(() =>
+      expect(api).toHaveBeenCalledWith("/api/tasks/sync-library", "POST"),
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(anchor).toHaveFocus());
+    await user.keyboard("{Meta>}k{/Meta}");
+    await user.click(
+      screen.getByRole("button", { name: "Close command palette" }),
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
   it("filters navigation commands by current capabilities", async () => {
     vi.mocked(useAuth).mockReturnValue({
       user: {
@@ -269,7 +332,7 @@ describe("CommandPalette", () => {
     expect(screen.getByText("Health")).toBeInTheDocument();
     expect(screen.getByText("Acquisition")).toBeInTheDocument();
     expect(screen.getByText("Bandcamp")).toBeInTheDocument();
-    expect(screen.getByText("New Releases")).toBeInTheDocument();
+    expect(screen.getByText("Release Radar")).toBeInTheDocument();
     expect(await screen.findByText("Sync Library")).toBeInTheDocument();
     expect(await screen.findByText("Run Health Check")).toBeInTheDocument();
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
@@ -397,8 +460,8 @@ describe("CommandPalette", () => {
 
     fireEvent.keyDown(document, { key: "k", ctrlKey: true });
 
-    expect(screen.getByText("Upcoming")).toBeInTheDocument();
-    expect(screen.queryByText("New Releases")).not.toBeInTheDocument();
+    expect(screen.getByText("Show Management")).toBeInTheDocument();
+    expect(screen.queryByText("Release Radar")).not.toBeInTheDocument();
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
   });
 
@@ -434,8 +497,8 @@ describe("CommandPalette", () => {
 
     fireEvent.keyDown(document, { key: "k", metaKey: true });
 
-    expect(screen.getByText("Upcoming")).toBeInTheDocument();
-    expect(screen.getByText("New Releases")).toBeInTheDocument();
+    expect(screen.getByText("Show Management")).toBeInTheDocument();
+    expect(screen.getByText("Release Radar")).toBeInTheDocument();
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
   });
 

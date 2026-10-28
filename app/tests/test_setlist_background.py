@@ -215,3 +215,111 @@ def test_force_refresh_setlist_returns_not_found_for_unknown_artist(monkeypatch)
         enrichment.refresh_probable_setlist_by_id(request, 404)
 
     assert exc.value.status_code == 404
+
+
+def test_billed_show_artist_names_dedupes_headliners_and_lineups():
+    from crate.setlistfm import billed_show_artist_names
+
+    names = billed_show_artist_names(
+        [
+            {"artist_name": "Main Act", "lineup": ["Main Act", " support   act "]},
+            {"artist_name": "Support Act", "lineup": None},
+            {"artist_name": "", "lineup": ["Another Act"]},
+        ]
+    )
+
+    assert names == ["Main Act", "support act", "Another Act"]
+
+
+def test_outdated_show_setlists_skip_fresh_and_legacy_unknown_caches(monkeypatch):
+    from crate import setlistfm
+
+    queued: list[tuple[list[str], bool]] = []
+    monkeypatch.setattr(
+        setlistfm,
+        "get_probable_setlist_health",
+        lambda names: {
+            "fresh act": {"status": "fresh"},
+            "legacy act": {"status": "unknown"},
+            "missing act": {"status": "missing"},
+            "stale act": {"status": "stale"},
+        },
+    )
+    monkeypatch.setattr(
+        setlistfm,
+        "queue_probable_setlist_refreshes",
+        lambda names, *, force=False: queued.append((names, force)) or ["t1", "t2"],
+    )
+
+    result = setlistfm.queue_outdated_show_setlist_refreshes(
+        ["Fresh Act", "Legacy Act", "Missing Act", "Stale Act"]
+    )
+
+    assert result == ["t1", "t2"]
+    assert queued == [(["Missing Act", "Stale Act"], True)]
+
+
+def test_show_setlist_worker_queues_outdated_billed_artists(monkeypatch):
+    from crate import setlistfm
+    from crate.db.queries import shows
+    from crate.worker_handlers.enrichment import ENRICHMENT_TASK_HANDLERS
+
+    monkeypatch.setattr(
+        shows,
+        "get_upcoming_shows",
+        lambda **kwargs: [{"artist_name": "Main Act", "lineup": ["Support Act"]}],
+    )
+    monkeypatch.setattr(
+        setlistfm,
+        "queue_outdated_show_setlist_refreshes",
+        lambda names: ["task-1"] if names == ["Main Act", "Support Act"] else [],
+    )
+
+    result = ENRICHMENT_TASK_HANDLERS["refresh_show_probable_setlists"]("task", {}, {})
+
+    assert result == {"artist_count": 2, "queued": 1}
+
+
+def test_cached_setlist_generated_at_reads_the_versioned_cache_entry(monkeypatch):
+    from crate import setlistfm
+
+    monkeypatch.setattr(
+        setlistfm,
+        "get_cache",
+        lambda key, max_age_seconds=None: {
+            "songs": [{"title": "Hey"}],
+            "generated_at": "2026-10-20T10:00:00+00:00",
+        },
+    )
+    assert (
+        setlistfm.get_cached_probable_setlist_generated_at("Pixies")
+        == "2026-10-20T10:00:00+00:00"
+    )
+
+    monkeypatch.setattr(
+        setlistfm, "get_cache", lambda key, max_age_seconds=None: [{"title": "Hey"}]
+    )
+    assert setlistfm.get_cached_probable_setlist_generated_at("Pixies") is None
+
+
+def test_artist_page_enrichment_reports_when_the_setlist_was_generated(monkeypatch):
+    from crate.api import enrichment as api_enrichment
+
+    monkeypatch.setattr(
+        api_enrichment, "get_cache", lambda key, max_age_seconds=None: None
+    )
+    monkeypatch.setattr(
+        api_enrichment.setlistfm,
+        "get_cached_probable_setlist",
+        lambda name: [{"title": "Hey", "frequency": 0.8, "play_count": 4}],
+    )
+    monkeypatch.setattr(
+        api_enrichment.setlistfm,
+        "get_cached_probable_setlist_generated_at",
+        lambda name: "2026-10-20T10:00:00+00:00",
+    )
+
+    payload = api_enrichment.get_artist_page_enrichment("Pixies")
+
+    assert payload["setlist"]["generated_at"] == "2026-10-20T10:00:00+00:00"
+    assert payload["setlist"]["total_shows"] == 1

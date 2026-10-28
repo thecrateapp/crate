@@ -3,16 +3,10 @@ import { Link, Navigate, useNavigate, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { CrateLoader } from "@/components/ui/CrateLoader";
-import { CrateLogo } from "@crate/ui/domain/brand/CrateLogo";
-import { FormField } from "@crate/ui/primitives/FormField";
-import { Button } from "@crate/ui/shadcn/button";
-import { Input } from "@crate/ui/shadcn/input";
+import { CredentialsForm } from "@/components/auth/CredentialsForm";
 import { api, ApiError, setAuthTokens } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { waitForPendingSecureSessionWrites } from "@/lib/server-store";
-
-const AUTH_INPUT_CLASS_NAME =
-  "h-10 rounded-lg bg-text-primary/5 px-3 shadow-none backdrop-blur-none md:text-base";
 
 export function Register() {
   const navigate = useNavigate();
@@ -91,105 +85,36 @@ export function Register() {
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-surface-canvas px-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-5">
-        <div className="flex flex-col items-center pb-4">
-          <CrateLogo title="Crate" className="mb-2 size-16" />
-          <h1 className="text-2xl font-bold text-text-primary">
-            {t("auth.register.title")}
-          </h1>
-          <p className="text-sm text-text-primary/40 -mt-0.5">
-            {t("auth.tagline")}
-          </p>
-        </div>
-
-        {inviteOnly ? (
-          <div
-            className={`rounded-xl px-4 py-3 text-sm ${
-              inviteToken
-                ? "border border-accent-action/20 bg-accent-action/10 text-text-accent"
-                : "border border-state-warning/20 bg-state-warning/10 text-state-warning-text"
-            }`}
-          >
-            {inviteToken
-              ? t("auth.register.inviteApplied")
-              : t("auth.register.inviteOnly")}
-          </div>
-        ) : null}
-
-        {error && (
-          <p role="alert" className="text-sm text-state-danger text-center">
-            {error}
-          </p>
-        )}
-
-        <FormField
-          label={t("common.name")}
-          className="gap-1"
-          labelClassName="font-normal text-text-primary/60"
+    <CredentialsForm
+      mode="register"
+      name={name}
+      email={email}
+      password={password}
+      busy={loading}
+      error={error}
+      disabled={inviteOnly && !inviteToken}
+      notice={
+        inviteOnly
+          ? inviteToken
+            ? t("auth.register.inviteApplied")
+            : t("auth.register.inviteOnly")
+          : undefined
+      }
+      onNameChange={setName}
+      onEmailChange={setEmail}
+      onPasswordChange={setPassword}
+      onSubmit={handleSubmit}
+    >
+      <OAuthButtons returnTo={returnTo} inviteToken={inviteToken} />
+      <p className="text-center text-sm text-text-muted">
+        {t("auth.register.hasAccount")}{" "}
+        <Link
+          to={`/login?return_to=${encodeURIComponent(returnTo)}`}
+          className="link-accent"
         >
-          <Input
-            id="reg-name"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            className={AUTH_INPUT_CLASS_NAME}
-            placeholder={t("auth.register.namePlaceholder")}
-          />
-        </FormField>
-        <FormField
-          label={t("common.email")}
-          className="gap-1"
-          labelClassName="font-normal text-text-primary/60"
-        >
-          <Input
-            id="reg-email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className={AUTH_INPUT_CLASS_NAME}
-            placeholder="you@example.com"
-          />
-        </FormField>
-        <FormField
-          label={t("common.password")}
-          className="gap-1"
-          labelClassName="font-normal text-text-primary/60"
-        >
-          <Input
-            id="reg-password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-            className={AUTH_INPUT_CLASS_NAME}
-            placeholder={t("auth.register.passwordPlaceholder")}
-          />
-        </FormField>
-
-        <Button
-          type="submit"
-          disabled={loading || (inviteOnly && !inviteToken)}
-          className="h-10 w-full rounded-lg"
-        >
-          {loading ? t("auth.register.submitting") : t("auth.register.submit")}
-        </Button>
-
-        <OAuthButtons returnTo={returnTo} inviteToken={inviteToken} />
-
-        <p className="text-center text-sm text-text-primary/40">
-          {t("auth.register.hasAccount")}{" "}
-          <Link
-            to={`/login?return_to=${encodeURIComponent(returnTo)}`}
-            className="link-accent"
-          >
-            {t("auth.login.submit")}
-          </Link>
-        </p>
-      </form>
-    </div>
+          {t("auth.login.submit")}
+        </Link>
+      </p>
+    </CredentialsForm>
   );
 }

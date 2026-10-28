@@ -11,12 +11,7 @@ const GENRE_MAP_CALL =
 const CHIP_TAG = /<(span|button|a|Link)(?=[\s>])/g;
 const GENRE = /genre/i;
 
-const HAND_MADE_GENRE_CHIP_ALLOWLIST: Record<string, string> = {
-  "shared/domain/shows/ShowCard.tsx:map":
-    "Low-emphasis show listing tags inside the shared upcoming show card; not a genre profile badge.",
-  "shared/domain/shows/ShowCard.tsx:child":
-    "Same show listing tag as above, matched by its rendered child.",
-};
+const HAND_MADE_GENRE_CHIP_ALLOWLIST: Record<string, string> = {};
 
 interface Offender {
   key: string;

@@ -1,0 +1,37 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/SearchInput.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">SearchInput</DocHeading>
+<EntryDetails
+  id="primitives-searchinput"
+  review="Visual review approved by Diego · 1AR"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+- Search field with optional clear action and controlled or uncontrolled value.
+- Uses Input geometry/type. The clear action retains keyboard focus in the search input and a 32 px fine / 44 px coarse target.
+- Debounce defaults to 300 ms, clears immediately and suppresses partial IME composition. A readonly or disabled query has no mutating clear action. Apps provide translated labels and API behavior.
+- The approved persistent mockup and Diego's confirmed adjustments are the visual reference. Examples import the actual component; scene CSS does not repair its internals.
+
+<DocHeading as="h2">Real component</DocHeading>
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Disabled} />
+
+<Canvas of={Stories.ReadOnly} />
+
+<Canvas of={Stories.Invalid} />
+
+<Canvas of={Stories.Debounce} />
+
+<Controls of={Stories.Base} />
+
+Consumer adoption and platform QA are separate from this entry and its visual review.
+
+<DocHeading as="h2">Primary and tooltip review amendment</DocHeading>
+
+The clear action retains its localized accessible name and focus return, with one custom Tooltip instead of a native title. Query, debounce and IME behavior are unchanged.

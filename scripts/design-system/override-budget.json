@@ -1,0 +1,286 @@
+{
+  "ActionIconButton": {
+    "height": 1,
+    "textColor": 3
+  },
+  "AppMenuButton": {
+    "height": 3,
+    "padding": 3
+  },
+  "AppModal": {
+    "background": 1,
+    "height": 2,
+    "radius": 1
+  },
+  "AppPopover": {
+    "height": 3,
+    "margin": 2,
+    "padding": 7,
+    "radius": 2
+  },
+  "AppPopoverDivider": {
+    "margin": 1
+  },
+  "AppleIcon": {
+    "height": 1
+  },
+  "ArtistHeroFrame": {
+    "height": 8
+  },
+  "BackLink": {
+    "margin": 1
+  },
+  "Button": {
+    "background": 3,
+    "border": 2,
+    "height": 10,
+    "margin": 6,
+    "padding": 14,
+    "radius": 6,
+    "shadow": 1,
+    "textColor": 16,
+    "textSize": 11,
+    "typography": 4
+  },
+  "Card": {
+    "height": 2,
+    "padding": 20
+  },
+  "CardContent": {
+    "padding": 11,
+    "textSize": 2
+  },
+  "CardTitle": {
+    "textColor": 3,
+    "textSize": 3,
+    "typography": 4
+  },
+  "Checkbox": {
+    "margin": 1
+  },
+  "ContextMenuItem": {
+    "textSize": 7
+  },
+  "CrateLogo": {
+    "height": 8,
+    "margin": 1
+  },
+  "DialogContent": {
+    "height": 7,
+    "padding": 1
+  },
+  "DialogTitle": {
+    "typography": 22
+  },
+  "DropdownMenuLabel": {
+    "padding": 1
+  },
+  "EmptyState": {
+    "height": 1,
+    "margin": 1,
+    "padding": 2
+  },
+  "EntityPrimaryAction": {
+    "height": 1,
+    "padding": 1,
+    "radius": 1
+  },
+  "EqBands": {
+    "height": 2
+  },
+  "ErrorState": {
+    "margin": 2,
+    "padding": 4
+  },
+  "FollowHeartButton": {
+    "background": 1,
+    "height": 2,
+    "padding": 1,
+    "radius": 3,
+    "textColor": 1
+  },
+  "FormField": {
+    "border": 2,
+    "margin": 2,
+    "padding": 3
+  },
+  "GenrePill": {
+    "background": 3,
+    "border": 3,
+    "shadow": 1,
+    "textColor": 3
+  },
+  "GenrePillRow": {
+    "margin": 5
+  },
+  "GoogleIcon": {
+    "height": 1
+  },
+  "HairlineList": {
+    "margin": 2
+  },
+  "HairlineRow": {
+    "padding": 2
+  },
+  "IconButton": {
+    "background": 3,
+    "height": 8,
+    "padding": 3,
+    "shadow": 3,
+    "textColor": 3
+  },
+  "InfoBadge": {
+    "textColor": 5
+  },
+  "Input": {
+    "border": 1,
+    "height": 11,
+    "padding": 3,
+    "radius": 2,
+    "shadow": 2,
+    "textColor": 3,
+    "textSize": 2,
+    "typography": 2
+  },
+  "InstrumentPanel": {
+    "padding": 3
+  },
+  "LoadingState": {
+    "padding": 5
+  },
+  "MediaCover": {
+    "background": 1,
+    "border": 3,
+    "height": 3,
+    "radius": 5
+  },
+  "ModalBody": {
+    "height": 1,
+    "padding": 13
+  },
+  "ModalHeader": {
+    "padding": 3
+  },
+  "MonoLabel": {
+    "background": 2,
+    "border": 2,
+    "margin": 45,
+    "padding": 11,
+    "radius": 2,
+    "textColor": 28,
+    "typography": 1
+  },
+  "OAuthButtons": {
+    "radius": 2
+  },
+  "OverlayCloseButton": {
+    "height": 2,
+    "margin": 1
+  },
+  "PageHeader": {
+    "padding": 1,
+    "radius": 1
+  },
+  "PageHero": {
+    "height": 2,
+    "margin": 2,
+    "padding": 2,
+    "radius": 1
+  },
+  "PopoverContent": {
+    "height": 1,
+    "padding": 3
+  },
+  "QrCodeImage": {
+    "padding": 1,
+    "radius": 1
+  },
+  "RadioGroupItem": {
+    "margin": 2
+  },
+  "SearchInput": {
+    "height": 2,
+    "margin": 1,
+    "padding": 1,
+    "radius": 2,
+    "shadow": 2,
+    "textColor": 2,
+    "textSize": 2
+  },
+  "SectionHeader": {
+    "padding": 3
+  },
+  "SegmentedControl": {
+    "height": 1,
+    "margin": 1,
+    "padding": 1,
+    "radius": 1,
+    "typography": 1
+  },
+  "SheetContent": {
+    "padding": 1
+  },
+  "SheetFooter": {
+    "background": 2,
+    "border": 2,
+    "shadow": 2
+  },
+  "SheetHeader": {
+    "padding": 3
+  },
+  "SheetTitle": {
+    "textSize": 1
+  },
+  "Skeleton": {
+    "height": 15,
+    "margin": 5,
+    "radius": 4
+  },
+  "StatNumber": {
+    "border": 2,
+    "padding": 2
+  },
+  "StatusDot": {
+    "margin": 1,
+    "textColor": 1
+  },
+  "TableCell": {
+    "padding": 7,
+    "textColor": 20,
+    "textSize": 14,
+    "typography": 7
+  },
+  "TableHead": {
+    "textSize": 7,
+    "typography": 7
+  },
+  "TableRow": {
+    "border": 2
+  },
+  "Tabs": {
+    "height": 1
+  },
+  "TabsContent": {
+    "height": 1,
+    "margin": 21
+  },
+  "Textarea": {
+    "height": 5,
+    "padding": 3,
+    "radius": 1,
+    "shadow": 1,
+    "textColor": 1,
+    "textSize": 1,
+    "typography": 1
+  },
+  "UpcomingEventRow": {
+    "border": 1,
+    "padding": 2,
+    "radius": 1
+  },
+  "VtNavLink": {
+    "height": 1,
+    "padding": 1,
+    "radius": 1
+  }
+}

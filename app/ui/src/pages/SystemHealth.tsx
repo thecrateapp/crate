@@ -1,31 +1,33 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
+import { Button } from "@crate/ui/shadcn/button";
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
+import { Loader2, RefreshCw as HeaderRefreshCw } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 
-import { ResponsiveLine } from "@nivo/line";
-import {
-  Activity,
-  AlertTriangle,
-  Clock,
-  Cpu,
-  Database,
-  Disc3,
-  Gauge,
-  HardDrive,
-  Headphones,
-  Radio,
-  RefreshCw,
-  Route,
-  Zap,
-} from "lucide-react";
+import { MetricChart } from "@/components/system-health/MetricChart";
+import { metricStreams } from "@/components/system-health/metric-stream-model";
 
 import {
   OpsPageHero,
   OpsPanel,
+  OpsRefreshNotice,
   OpsStatTile,
+  OpsSurface,
 } from "@/components/admin/ops-surfaces";
-import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
-import { CrateChip } from "@crate/ui/primitives/CrateBadge";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { Meter } from "@crate/ui/primitives/Meter";
+import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
+
+import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 import { useApi } from "@/hooks/use-api";
 import { taskLabel, useTaskCatalog } from "@/lib/task-catalog";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { Link } from "react-router";
 
 interface MetricSummary {
   count: number;
@@ -282,241 +284,89 @@ function formatRouteErrorRate(value: number | null | undefined) {
   return `${pct >= 10 ? pct.toFixed(0) : pct.toFixed(1)}%`;
 }
 
-function ChartTooltip({
-  title,
-  items,
+function HealthSignal({
+  score,
+  summary,
 }: {
-  title: string;
-  items: { label: string; value: string }[];
+  score: number | null;
+  summary: string;
 }) {
-  return (
-    <div className="min-w-[180px] rounded-sm border border-white/10 bg-panel-surface/95 px-3 py-3 text-xs text-white shadow-[0_18px_40px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-      <div className="text-[10px] uppercase tracking-[0.14em] text-cyan-200/65">
-        Metric slice
-      </div>
-      <div className="mt-2 font-medium text-white">{title}</div>
-      <div className="mt-3 space-y-1.5">
-        {items.map((item) => (
-          <div
-            key={`${item.label}-${item.value}`}
-            className="flex items-center justify-between gap-4 border-b border-white/6 pb-1 last:border-b-0 last:pb-0"
-          >
-            <span className="text-white/45">{item.label}</span>
-            <span className="font-medium text-white">{item.value}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function HealthSignal({ score, summary }: { score: number; summary: string }) {
   const color =
-    score >= 80
-      ? "text-emerald-300"
-      : score >= 50
-        ? "text-amber-200"
-        : "text-red-200";
+    score == null
+      ? "text-text-subtle"
+      : score >= 80
+        ? "text-accent-action-hi"
+        : "text-state-warning-text";
   const bg =
-    score >= 80
-      ? "border-emerald-400/25 bg-emerald-500/[0.08]"
-      : score >= 50
-        ? "border-amber-400/25 bg-amber-500/[0.08]"
-        : "border-red-400/25 bg-red-500/[0.08]";
+    score == null
+      ? "border-border-quiet bg-raised-surface"
+      : score >= 80
+        ? "border-accent-action/25 bg-accent-action/[0.08]"
+        : "border-state-warning/25 bg-state-warning/[0.08]";
 
   return (
-    <div
-      className={`rounded-md border px-5 py-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)] ${bg}`}
-    >
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-black/20">
-          <Gauge size={20} className={color} />
-        </div>
-        <div>
-          <div className={`text-3xl font-bold tabular-nums ${color}`}>
-            {score}
-          </div>
-          <div className="text-[11px] uppercase tracking-[0.14em] text-white/40">
-            Health Score
-          </div>
+    <OpsSurface className={`px-5 py-4 ${bg}`}>
+      <div className="crate-form-field">
+        <MonoLabel as="div">Health Score</MonoLabel>
+        <div className={`font-mono text-3xl font-normal tabular-nums ${color}`}>
+          {score ?? "—"}
         </div>
       </div>
-      <div className="mt-3 text-xs text-white/45">{summary}</div>
-    </div>
+      <div className="mt-3 text-xs text-text-muted">{summary}</div>
+    </OpsSurface>
   );
 }
 
 function ResourceCard({
-  icon: Icon,
   label,
   value,
   children,
 }: {
-  icon: typeof Activity;
   label: string;
   value: string;
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
-      <div className="flex items-center gap-2 text-[11px] text-white/40 uppercase tracking-[0.14em]">
-        <Icon size={12} />
-        {label}
-      </div>
-      <div className="mt-2 text-lg font-semibold text-white tabular-nums">
-        {value}
+    <OpsSurface className="p-4">
+      <div className="crate-form-field">
+        <MonoLabel as="div">{label}</MonoLabel>
+        <div className="font-mono text-xl font-normal text-text-primary tabular-nums break-words">
+          {value}
+        </div>
       </div>
       <div className="mt-3 space-y-2">{children}</div>
-    </div>
+    </OpsSurface>
   );
 }
 
-function ProgressBar({
+function ResourceMeter({
   value,
   max,
-  color = "bg-primary",
-  label,
+  color,
+  label = "Usage",
+  valueText,
 }: {
-  value: number;
+  value: number | null;
   max: number;
   color?: string;
   label?: string;
+  valueText?: string;
 }) {
-  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  const pct = value != null && max > 0 ? (value / max) * 100 : null;
   return (
-    <div className="space-y-1">
-      {label ? (
-        <div className="flex min-w-0 justify-between gap-2 text-[11px]">
-          <span className="min-w-0 truncate text-white/40">{label}</span>
-          <span className="shrink-0 text-white/60 tabular-nums">
-            {pct.toFixed(0)}%
-          </span>
-        </div>
+    <div className="space-y-2">
+      <Meter
+        value={value}
+        max={max}
+        label={label}
+        valueText={
+          valueText ?? (pct == null ? "Unavailable" : `${pct.toFixed(0)}%`)
+        }
+        over={value != null && max > 0 && value > max}
+      />
+      {value != null && value <= max && color === "bg-state-warning" ? (
+        <InfoBadge tone="warning">Elevated</InfoBadge>
       ) : null}
-      <div className="h-1.5 overflow-hidden rounded-full bg-white/8">
-        <div
-          className={`h-full rounded-full transition-[width,background-color] ${color}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function MetricChart({
-  title,
-  data,
-  yLabel,
-  series,
-}: {
-  title: string;
-  data: TimeseriesPoint[];
-  yLabel: string;
-  series?: { id: string; field: keyof TimeseriesPoint }[];
-}) {
-  const { chartData, tickValues } = useMemo(() => {
-    if (!data?.length) return { chartData: [], tickValues: [] as string[] };
-    const labels = data.map((point) =>
-      new Date(point.timestamp).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    );
-    const maxTicks = 6;
-    const step = Math.max(1, Math.floor(labels.length / maxTicks));
-    const picks: string[] = [];
-    for (let i = 0; i < labels.length; i += step) {
-      const label = labels[i];
-      if (label) picks.push(label);
-    }
-
-    const lines = series ?? [
-      { id: "avg", field: "avg" as const },
-      { id: "max", field: "max" as const },
-    ];
-
-    return {
-      chartData: lines.map((line) => ({
-        id: line.id,
-        data: data.map((point, index) => ({
-          x: labels[index] ?? "",
-          y: (point[line.field] as number) ?? 0,
-        })),
-      })),
-      tickValues: picks,
-    };
-  }, [data, series]);
-
-  if (!chartData.length) {
-    return (
-      <div className="rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
-        <div className="mb-2 text-sm font-medium text-white">{title}</div>
-        <div className="flex h-48 items-center justify-center text-sm text-white/30">
-          No data yet
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
-      <div className="mb-2 text-sm font-medium text-white">{title}</div>
-      <div className="h-48">
-        <ResponsiveLine
-          data={chartData}
-          margin={{ top: 8, right: 16, bottom: 32, left: 48 }}
-          xScale={{ type: "point" }}
-          yScale={{ type: "linear", min: 0, max: "auto" }}
-          curve="monotoneX"
-          colors={[
-            "#06b6d4",
-            "rgba(6,182,212,0.3)",
-            "#f59e0b",
-            "rgba(245,158,11,0.3)",
-          ]}
-          lineWidth={2}
-          pointSize={0}
-          enableArea={true}
-          areaOpacity={0.08}
-          enableGridX={false}
-          gridYValues={4}
-          theme={{
-            text: { fill: "rgba(255,255,255,0.4)", fontSize: 10 },
-            grid: { line: { stroke: "rgba(255,255,255,0.06)" } },
-            crosshair: { line: { stroke: "#06b6d4", strokeWidth: 1 } },
-            tooltip: {
-              container: {
-                background: "transparent",
-                border: "none",
-                boxShadow: "none",
-                padding: 0,
-              },
-            },
-          }}
-          axisBottom={{ tickSize: 0, tickPadding: 8, tickValues }}
-          axisLeft={{
-            tickSize: 0,
-            tickPadding: 8,
-            tickValues: 4,
-            legend: yLabel,
-            legendPosition: "middle",
-            legendOffset: -40,
-          }}
-          enableSlices="x"
-          sliceTooltip={({ slice }) => (
-            <ChartTooltip
-              title={String(slice.points[0]?.data.x ?? "")}
-              items={slice.points.map((point) => ({
-                label: String(point.seriesId),
-                value:
-                  typeof point.data.y === "number"
-                    ? (point.data.y as number).toFixed(1)
-                    : String(point.data.y ?? "0"),
-              }))}
-            />
-          )}
-        />
-      </div>
     </div>
   );
 }
@@ -540,21 +390,18 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
 
   return (
     <OpsPanel
-      icon={Route}
       title="API Route Latency"
       description="Recent endpoint latency ranked by p95, useful for finding the routes hurting admin and Listen first."
     >
       <div className="space-y-4">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <OpsStatTile
-            icon={Route}
             label="Measured Routes"
             value={routes.length.toLocaleString()}
             caption={`${totalRequests.toLocaleString()} sampled requests`}
             tone={routes.length > 0 ? "primary" : "default"}
           />
           <OpsStatTile
-            icon={Clock}
             label="Slowest p95"
             value={formatMs(slowest?.p95)}
             caption={
@@ -565,7 +412,6 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
             tone={slowest && slowest.p95 > 1000 ? "warning" : "default"}
           />
           <OpsStatTile
-            icon={Gauge}
             label="Highest p99"
             value={formatMs(highestP99?.p99)}
             caption={
@@ -576,7 +422,6 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
             tone={highestP99 && highestP99.p99 > 3000 ? "warning" : "default"}
           />
           <OpsStatTile
-            icon={AlertTriangle}
             label="Route 5xx"
             value={failing.toLocaleString()}
             caption="Server errors in the sampled window"
@@ -584,81 +429,83 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
           />
         </div>
 
-        <div className="overflow-hidden rounded-md border border-white/8 bg-black/20 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
+        <OpsSurface className="overflow-hidden">
           {visibleRoutes.length > 0 ? (
-            <div className="divide-y divide-white/6">
+            <div className="divide-y divide-border-quiet">
               {visibleRoutes.map((route) => {
                 const isSlow = route.p95 >= 1000;
                 const isVerySlow = route.p95 >= 3000 || route.error_rate > 0.01;
                 const barColor = isVerySlow
-                  ? "bg-red-400"
+                  ? "bg-state-warning"
                   : isSlow
-                    ? "bg-amber-400"
-                    : "bg-cyan-400";
+                    ? "bg-state-warning"
+                    : "bg-accent-action";
 
                 return (
                   <div
                     key={route.route_id}
-                    className="grid gap-3 px-4 py-3 xl:grid-cols-[minmax(0,1fr)_7rem_7rem_7rem_6rem] xl:items-center"
+                    className="grid grid-cols-2 gap-3 px-4 py-3 xl:grid-cols-[minmax(0,1fr)_7rem_7rem_7rem_6rem] xl:items-center"
                   >
-                    <div className="min-w-0">
+                    <div className="col-span-2 min-w-0 xl:col-span-1">
                       <div className="flex min-w-0 items-center gap-2">
-                        <CrateChip className="shrink-0 font-mono">
+                        <InfoBadge className="shrink-0">
                           {route.method}
-                        </CrateChip>
-                        <span className="min-w-0 truncate font-mono text-sm text-white/85">
+                        </InfoBadge>
+                        <span className="min-w-0 truncate font-mono text-sm text-text-primary">
                           {route.path}
                         </span>
                       </div>
                       <div className="mt-2 max-w-xl">
-                        <ProgressBar
+                        <ResourceMeter
                           value={route.p95}
                           max={maxP95}
                           color={barColor}
+                          label={`${route.method} ${route.path} p95`}
+                          valueText={`${route.p95.toFixed(0)} ms; highest sampled route p95 ${maxP95.toFixed(0)} ms`}
                         />
                       </div>
                     </div>
-                    <div className="flex items-center justify-between gap-3 xl:block">
-                      <span className="text-[10px] uppercase tracking-[0.12em] text-white/30 xl:block">
+                    <div className="crate-form-field">
+                      <MonoLabel as="span" data-slot="form-field-label">
                         Count
-                      </span>
-                      <span className="text-sm font-medium tabular-nums text-white/75">
+                      </MonoLabel>
+                      <span className="text-sm font-medium tabular-nums text-text-primary">
                         {route.count.toLocaleString()}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between gap-3 xl:block">
-                      <span className="text-[10px] uppercase tracking-[0.12em] text-white/30 xl:block">
+                    <div className="crate-form-field">
+                      <MonoLabel as="span" data-slot="form-field-label">
                         Avg
-                      </span>
-                      <span className="text-sm font-medium tabular-nums text-white/75">
+                      </MonoLabel>
+                      <span className="text-sm font-medium tabular-nums text-text-primary">
                         {formatMs(route.avg)}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between gap-3 xl:block">
-                      <span className="text-[10px] uppercase tracking-[0.12em] text-white/30 xl:block">
+                    <div className="crate-form-field">
+                      <MonoLabel as="span" data-slot="form-field-label">
                         p95 / p99
-                      </span>
+                      </MonoLabel>
                       <span
                         className={`text-sm font-medium tabular-nums ${
                           isVerySlow
-                            ? "text-red-100"
+                            ? "text-state-warning-text"
                             : isSlow
-                              ? "text-amber-100"
-                              : "text-white/80"
+                              ? "text-state-warning-text"
+                              : "text-text-primary"
                         }`}
                       >
                         {formatMs(route.p95)} · {formatMs(route.p99)}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between gap-3 xl:block">
-                      <span className="text-[10px] uppercase tracking-[0.12em] text-white/30 xl:block">
+                    <div className="crate-form-field">
+                      <MonoLabel as="span" data-slot="form-field-label">
                         5xx
-                      </span>
+                      </MonoLabel>
                       <span
                         className={`text-sm font-medium tabular-nums ${
                           route.error_rate > 0
-                            ? "text-red-100"
-                            : "text-white/65"
+                            ? "text-state-warning-text"
+                            : "text-text-secondary"
                         }`}
                       >
                         {formatRouteErrorRate(route.error_rate)}
@@ -669,198 +516,9 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
               })}
             </div>
           ) : (
-            <div className="flex min-h-[132px] items-center justify-center text-sm text-white/30">
-              No route latency samples yet
-            </div>
+            <EmptyState title="No route latency samples yet" />
           )}
-        </div>
-      </div>
-    </OpsPanel>
-  );
-}
-
-function PlaybackTranscodingOverview({
-  delivery,
-  durationSummary,
-  completedSummary,
-  failedSummary,
-}: {
-  delivery: PlaybackDeliverySnapshot | undefined;
-  durationSummary: MetricSummary | undefined;
-  completedSummary: MetricSummary | undefined;
-  failedSummary: MetricSummary | undefined;
-}) {
-  const stats = delivery?.stats;
-  const runtime = delivery?.runtime;
-  const variantsTotal = Math.max(1, stats?.variants ?? 0);
-  const statuses = [
-    { label: "Ready", value: stats?.ready ?? 0, color: "bg-emerald-400" },
-    { label: "Running", value: stats?.running ?? 0, color: "bg-cyan-400" },
-    {
-      label: "Active pending",
-      value: stats?.pending_active ?? stats?.pending ?? 0,
-      color: "bg-amber-400",
-    },
-    {
-      label: "Unassigned",
-      value: stats?.pending_unassigned ?? 0,
-      color: "bg-yellow-300",
-    },
-    {
-      label: "Stale pending",
-      value: stats?.pending_stale ?? 0,
-      color: "bg-orange-500",
-    },
-    { label: "Failed", value: stats?.failed ?? 0, color: "bg-red-400" },
-    { label: "Missing", value: stats?.missing ?? 0, color: "bg-white/35" },
-  ];
-  const completed = completedSummary?.count ?? 0;
-  const failed = failedSummary?.count ?? 0;
-  const failRate =
-    completed + failed > 0 ? (failed / (completed + failed)) * 100 : 0;
-  const avgTranscode =
-    durationSummary && durationSummary.count > 0
-      ? `${durationSummary.avg.toFixed(1)}s`
-      : "—";
-  const avgPrepare =
-    stats?.avg_prepare_seconds != null
-      ? `${stats.avg_prepare_seconds.toFixed(1)}s`
-      : "—";
-
-  return (
-    <OpsPanel
-      icon={Headphones}
-      title="Playback Transcoding"
-      description="Cached AAC delivery coverage, playback worker slots and recent transcode health for Listen."
-    >
-      <div className="space-y-4">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <OpsStatTile
-            icon={Headphones}
-            label="Lossless Coverage"
-            value={stats ? `${stats.coverage_percent}%` : "—"}
-            caption={
-              stats
-                ? `${stats.ready_tracks.toLocaleString()} / ${stats.lossless_tracks.toLocaleString()} tracks`
-                : "Waiting for cache stats"
-            }
-            tone={stats && stats.coverage_percent > 0 ? "success" : "default"}
-          />
-          <OpsStatTile
-            icon={Activity}
-            label="Transcode Slots"
-            value={`${runtime?.active ?? 0}/${runtime?.limit ?? 1}`}
-            caption="Active playback worker capacity"
-            tone={(runtime?.active ?? 0) > 0 ? "primary" : "default"}
-          />
-          <OpsStatTile
-            icon={HardDrive}
-            label="Cache Size"
-            value={formatBytes(stats?.cached_bytes)}
-            caption={`${formatBytes(
-              stats?.estimated_saved_bytes,
-            )} avoided vs source`}
-          />
-          <OpsStatTile
-            icon={Clock}
-            label="Avg Prepare"
-            value={avgPrepare}
-            caption={`${avgTranscode} worker avg in current metrics window`}
-          />
-          <OpsStatTile
-            icon={AlertTriangle}
-            label="Transcode Failures"
-            value={`${failRate.toFixed(0)}%`}
-            caption={`${failed} failed / ${completed} completed samples`}
-            tone={
-              failRate > 5 || (stats?.failed ?? 0) > 0 ? "warning" : "default"
-            }
-          />
-        </div>
-
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <div className="rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-medium text-white">
-                  Variant Status
-                </div>
-                <div className="mt-1 text-xs text-white/35">
-                  {(stats?.variants ?? 0).toLocaleString()} cached variant
-                  records
-                </div>
-              </div>
-              <CrateChip>
-                {(stats?.variant_tracks ?? 0).toLocaleString()} tracks
-              </CrateChip>
-            </div>
-            <div className="space-y-3">
-              {statuses.map((status) => (
-                <ProgressBar
-                  key={status.label}
-                  value={status.value}
-                  max={variantsTotal}
-                  color={status.color}
-                  label={`${status.label} ${status.value.toLocaleString()}`}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-md border border-white/8 bg-black/20 p-4 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-medium text-white">
-                  Recent Variants
-                </div>
-                <div className="mt-1 text-xs text-white/35">
-                  Latest playback cache writes and retries.
-                </div>
-              </div>
-              <CrateChip>
-                {(stats?.hires_tracks ?? 0).toLocaleString()} hi-res sources
-              </CrateChip>
-            </div>
-            <div className="space-y-2">
-              {(delivery?.recent_variants ?? []).length > 0 ? (
-                delivery?.recent_variants.map((variant) => (
-                  <div
-                    key={variant.id}
-                    className="flex items-center gap-3 rounded-md border border-white/6 bg-white/[0.03] px-3 py-2"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm text-white/80">
-                        {[variant.artist, variant.title]
-                          .filter(Boolean)
-                          .join(" - ") || variant.id}
-                      </div>
-                      <div className="mt-0.5 text-xs text-white/35">
-                        {variant.preset} · {variant.delivery_format}{" "}
-                        {variant.delivery_bitrate}k ·{" "}
-                        {formatBytes(variant.bytes)}
-                      </div>
-                    </div>
-                    <CrateChip
-                      className={
-                        variant.status === "ready"
-                          ? "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-100"
-                          : variant.status === "failed"
-                            ? "border-red-500/20 bg-red-500/[0.08] text-red-100"
-                            : "border-amber-500/20 bg-amber-500/[0.06] text-amber-100"
-                      }
-                    >
-                      {variant.status}
-                    </CrateChip>
-                  </div>
-                ))
-              ) : (
-                <div className="flex min-h-[118px] items-center justify-center text-sm text-white/30">
-                  No playback variants prepared yet
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        </OpsSurface>
       </div>
     </OpsPanel>
   );
@@ -871,36 +529,36 @@ export function SystemHealth() {
   const [period, setPeriod] = useState<Period>("minute");
   const minutes = period === "minute" ? 60 : 1440;
 
-  const { data: dashboard, refetch: refetchDashboard } =
-    useApi<SystemHealthDashboardResponse>(
-      `/api/admin/metrics/dashboard?period=${period}&minutes=${minutes}`,
-    );
+  const {
+    data: dashboard,
+    loading,
+    error,
+    refetch: refetchDashboard,
+  } = useApi<SystemHealthDashboardResponse>(
+    `/api/admin/metrics/dashboard?period=${period}&minutes=${minutes}`,
+  );
+
+  // useApi retains its previous response while a different window loads (or fails).
+  // Bind bucket semantics to each response identity, never to the selected control.
+  const [metricSnapshot, setMetricSnapshot] = useState({
+    data: dashboard,
+    period,
+  });
+  if (dashboard !== metricSnapshot.data) {
+    setMetricSnapshot({ data: dashboard, period });
+  }
+  const samplePeriod =
+    dashboard === metricSnapshot.data ? metricSnapshot.period : period;
 
   const summary = dashboard?.summary ?? null;
   const system = dashboard?.system ?? null;
   const tasks = dashboard?.tasks ?? [];
-  const latencyTs = dashboard?.timeseries?.["api.latency"] ?? [];
-  const requestsTs = dashboard?.timeseries?.["api.requests"] ?? [];
-  const errorsTs = dashboard?.timeseries?.["api.errors"] ?? [];
-  const apiSlowTs = dashboard?.timeseries?.["api.slow"] ?? [];
-  const streamTs = dashboard?.timeseries?.["stream.requests"] ?? [];
-  const transcodeDurationTs =
-    dashboard?.timeseries?.["stream.transcode.duration"] ?? [];
-  const homeComputeTs = dashboard?.timeseries?.["home.compute.ms"] ?? [];
-  const homeEndpointComputeTs =
-    dashboard?.timeseries?.["home.endpoint_compute.ms"] ?? [];
-  const queueTs = dashboard?.timeseries?.["worker.queue.depth"] ?? [];
-  const taskDurationTs = dashboard?.timeseries?.["worker.task.duration"] ?? [];
-  const queueWaitTs = dashboard?.timeseries?.["worker.queue.wait"] ?? [];
-  const resourceDeferredTs =
-    dashboard?.timeseries?.["worker.resource.deferred"] ?? [];
-  const resourceLoadTs =
-    dashboard?.timeseries?.["worker.resource.load_ratio"] ?? [];
+
   const playbackDelivery = dashboard?.playback_delivery;
   const routeLatency = dashboard?.route_latency ?? [];
 
   const score = useMemo(() => {
-    if (!summary) return 100;
+    if (!summary) return null;
     let next = 100;
     if (summary.api_latency.max > 3000) next -= 15;
     if (summary.api_errors.count > 0 && summary.api_requests.count > 0) {
@@ -924,7 +582,7 @@ export function SystemHealth() {
       ? ((summary.api_errors.count / summary.api_requests.count) * 100).toFixed(
           2,
         )
-      : "0";
+      : "—";
   const homeCacheTotal =
     (summary?.home_cache_hit.count ?? 0) +
     (summary?.home_cache_miss.count ?? 0);
@@ -943,113 +601,128 @@ export function SystemHealth() {
       : 0;
 
   const scoreSummary =
-    score >= 80
-      ? "Core services look stable and current pressure is within healthy bounds."
-      : score >= 50
-        ? "The system is usable, but latency or load deserve attention before they become user-facing."
-        : "Health is degraded enough to warrant immediate triage on latency, queue pressure or database usage.";
+    score == null
+      ? "Health score unavailable: no metrics summary was returned."
+      : score >= 80
+        ? "Core services look stable and current pressure is within healthy bounds."
+        : score >= 50
+          ? "The system is usable, but latency or load deserve attention before they become user-facing."
+          : "Health is degraded enough to warrant immediate triage on latency, queue pressure or database usage.";
 
+  const queueTs = dashboard?.timeseries?.["worker.queue.depth"] ?? [];
   const runningTasks = tasks.length;
-  const queueDepth = queueTs.length ? queueTs[queueTs.length - 1]?.max ?? 0 : 0;
+  const queueDepth = queueTs.length
+    ? (queueTs[queueTs.length - 1]?.max ?? 0)
+    : null;
+
+  if (loading && !dashboard) {
+    return (
+      <div
+        role="status"
+        aria-label="Loading system health metrics"
+        aria-busy="true"
+        className="flex justify-center py-16 text-text-muted"
+      >
+        <Loader2
+          data-admin-ux="system-health-loading"
+          aria-hidden="true"
+          className="h-5 w-5 animate-spin text-accent-action-hi"
+        />
+      </div>
+    );
+  }
+
+  if (error && !dashboard) {
+    return (
+      <ErrorState
+        message="Could not load system health metrics."
+        onRetry={refetchDashboard}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
+      {error && dashboard ? (
+        <OpsRefreshNotice
+          message="Could not refresh system health metrics. Showing the last successful sample."
+          onRetry={refetchDashboard}
+        />
+      ) : null}
       <OpsPageHero
-        icon={Activity}
         title="System Health"
         description="Runtime pressure, API performance, queue behavior and infrastructure saturation across the stack."
+        compactActions
         actions={
-          <div className="flex items-center gap-2">
-            <div className="flex items-center rounded-md border border-white/10 bg-black/20 p-0.5 text-xs shadow-[0_12px_28px_rgba(0,0,0,0.18)]">
-              <button
-                type="button"
-                onClick={() => setPeriod("minute")}
-                className={`rounded-sm px-3 py-1.5 transition-colors ${
-                  period === "minute"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-white/50 hover:text-white"
-                }`}
-              >
-                1h
-              </button>
-              <button
-                type="button"
-                onClick={() => setPeriod("hour")}
-                className={`rounded-sm px-3 py-1.5 transition-colors ${
-                  period === "hour"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-white/50 hover:text-white"
-                }`}
-              >
-                24h
-              </button>
-            </div>
-            <ActionIconButton
-              variant="card"
+          <PageHeaderActions>
+            <SegmentedControl
+              as="radio"
+              label="Metrics window"
+              value={period}
+              onValueChange={setPeriod}
+              items={[
+                { value: "minute", label: "1h" },
+                { value: "hour", label: "24h" },
+              ]}
+            />
+            <PageHeaderAction
+              label="Refresh metrics"
               onClick={() => refetchDashboard()}
-              title="Refresh metrics"
             >
-              <RefreshCw size={15} />
-            </ActionIconButton>
-          </div>
+              <HeaderRefreshCw
+                data-admin-ux="header-refresh-metrics"
+                aria-hidden="true"
+              />
+            </PageHeaderAction>
+          </PageHeaderActions>
         }
       >
-        <CrateChip icon={Activity}>
+        <InfoBadge>
           {summary
             ? `${summary.api_requests.count} requests`
             : "Metrics loading"}
-        </CrateChip>
-        <CrateChip icon={Zap}>{runningTasks} running tasks</CrateChip>
-        <CrateChip icon={Clock}>{queueDepth} queued depth</CrateChip>
-        {summary ? (
-          <CrateChip
-            className={
-              Number(errorRate) > 1
-                ? "border-red-500/25 bg-red-500/10 text-red-100"
-                : undefined
-            }
-          >
+        </InfoBadge>
+        <InfoBadge>{runningTasks} running tasks</InfoBadge>
+        <InfoBadge>{queueDepth ?? "—"} queued depth</InfoBadge>
+        {summary && errorRate !== "—" ? (
+          <InfoBadge tone={Number(errorRate) > 1 ? "warning" : undefined}>
             {errorRate}% error rate
-          </CrateChip>
+          </InfoBadge>
         ) : null}
         {summary && homeCacheTotal > 0 ? (
-          <CrateChip>{homeCacheHitRate.toFixed(0)}% home core hit</CrateChip>
+          <InfoBadge>{homeCacheHitRate.toFixed(0)}% home core hit</InfoBadge>
         ) : null}
         {summary && homeEndpointCacheTotal > 0 ? (
-          <CrateChip>
+          <InfoBadge>
             {homeEndpointCacheHitRate.toFixed(0)}% home endpoint hit
-          </CrateChip>
-        ) : null}
-        {playbackDelivery?.stats ? (
-          <CrateChip icon={Headphones}>
-            {playbackDelivery.stats.coverage_percent}% playback coverage
-          </CrateChip>
+          </InfoBadge>
         ) : null}
         {summary?.worker_resource_deferred?.count ? (
-          <CrateChip icon={Gauge}>
+          <InfoBadge>
             {summary.worker_resource_deferred.count} batch deferrals
-          </CrateChip>
+          </InfoBadge>
         ) : null}
         {system?.resource_pressure ? (
-          <CrateChip
-            icon={Gauge}
-            className={
-              system.resource_pressure.allowed
-                ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-100"
-                : "border-amber-500/25 bg-amber-500/10 text-amber-100"
-            }
+          <InfoBadge
+            tone={system.resource_pressure.allowed ? "accent" : "warning"}
           >
             {system.resource_pressure.allowed ? "Batch open" : "Batch deferred"}
-          </CrateChip>
+          </InfoBadge>
         ) : null}
       </OpsPageHero>
 
-      <div className="grid gap-4 xl:grid-cols-[1.2fr_repeat(6,minmax(0,1fr))]">
+      <div
+        data-slot="system-health-summary"
+        className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-4"
+      >
         <HealthSignal score={score} summary={scoreSummary} />
         <OpsStatTile
-          icon={Activity}
-          label="API p95"
-          value={summary ? `${summary.api_latency.max.toFixed(0)}ms` : "—"}
+          label="API max"
+          value={
+            <span className="whitespace-nowrap">
+              {summary ? `${summary.api_latency.max.toFixed(0)}ms` : "—"}
+            </span>
+          }
           caption={
             summary
               ? `avg ${summary.api_latency.avg.toFixed(0)}ms`
@@ -1060,9 +733,8 @@ export function SystemHealth() {
           }
         />
         <OpsStatTile
-          icon={AlertTriangle}
           label="Error Rate"
-          value={`${errorRate}%`}
+          value={errorRate === "—" ? "—" : `${errorRate}%`}
           caption={
             summary
               ? `${summary.api_errors.count} / ${summary.api_requests.count} requests`
@@ -1071,7 +743,6 @@ export function SystemHealth() {
           tone={Number(errorRate) > 1 ? "danger" : "default"}
         />
         <OpsStatTile
-          icon={Clock}
           label="Slow Requests"
           value={summary ? `${summary.api_slow.count}` : "—"}
           caption={
@@ -1082,7 +753,6 @@ export function SystemHealth() {
           tone={summary && summary.api_slow.count > 0 ? "warning" : "default"}
         />
         <OpsStatTile
-          icon={Radio}
           label="Home Core Cache"
           value={homeCacheTotal > 0 ? `${homeCacheHitRate.toFixed(0)}%` : "—"}
           caption={
@@ -1093,7 +763,6 @@ export function SystemHealth() {
           tone="default"
         />
         <OpsStatTile
-          icon={Radio}
           label="Home Endpoint Cache"
           value={
             homeEndpointCacheTotal > 0
@@ -1108,7 +777,6 @@ export function SystemHealth() {
           tone="default"
         />
         <OpsStatTile
-          icon={Cpu}
           label="Load"
           value={system?.load ? `${system.load.load_1m}` : "—"}
           caption={
@@ -1126,35 +794,65 @@ export function SystemHealth() {
 
       <RouteLatencyOverview routes={routeLatency} />
 
-      <PlaybackTranscodingOverview
-        delivery={playbackDelivery}
-        durationSummary={summary?.stream_transcode_duration}
-        completedSummary={summary?.stream_transcode_completed}
-        failedSummary={summary?.stream_transcode_failed}
-      />
+      <OpsPanel
+        title="Playback delivery"
+        description="A concise view of cached audio readiness. Open the dedicated page for variants and worker capacity."
+        action={
+          <Button asChild variant="outline" size="sm">
+            <Link to="/playback">Open playback delivery</Link>
+          </Button>
+        }
+      >
+        {playbackDelivery?.stats && playbackDelivery.runtime ? (
+          <div className="flex flex-wrap gap-2">
+            <InfoBadge>
+              {playbackDelivery.stats.coverage_percent}% lossless coverage
+            </InfoBadge>
+            <InfoBadge>
+              {playbackDelivery.stats.ready_tracks.toLocaleString()} tracks
+              ready
+            </InfoBadge>
+            <InfoBadge>
+              {playbackDelivery.runtime.active}/{playbackDelivery.runtime.limit}{" "}
+              transcodes
+            </InfoBadge>
+          </div>
+        ) : (
+          <p className="m-0 text-sm text-text-muted">
+            Playback delivery metrics are unavailable in this sample.
+          </p>
+        )}
+      </OpsPanel>
 
       {system ? (
-        <OpsPanel
-          icon={HardDrive}
-          title="Resources"
-          description="Storage pressure, database pool use and analysis backlog surfaced as operational cards."
+        <InstrumentPanel
+          label={{ children: "Resources", tone: "accent" }}
+          headingLevel={2}
+          summary={
+            system.disk?.music
+              ? `Music volume uses ${system.disk.music.used_gb} of ${system.disk.music.total_gb} GB.`
+              : undefined
+          }
         >
+          <p className="mb-5 text-sm text-muted-foreground">
+            Storage pressure, database pool use and analysis backlog surfaced as
+            operational cards.
+          </p>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {system.disk?.music ? (
               <ResourceCard
-                icon={HardDrive}
                 label="Music Volume"
                 value={`${system.disk.music.used_gb} / ${system.disk.music.total_gb} GB`}
               >
-                <ProgressBar
+                <ResourceMeter
                   value={system.disk.music.used_gb}
                   max={system.disk.music.total_gb}
                   color={
                     system.disk.music.percent > 90
-                      ? "bg-red-500"
+                      ? "bg-state-warning"
                       : system.disk.music.percent > 75
-                        ? "bg-amber-500"
-                        : "bg-primary"
+                        ? "bg-state-warning"
+                        : "bg-accent-action-hi"
                   }
                   label={`${system.disk.music.free_gb} GB free`}
                 />
@@ -1163,19 +861,18 @@ export function SystemHealth() {
 
             {system.disk?.data ? (
               <ResourceCard
-                icon={Database}
                 label="Data Volume"
                 value={`${system.disk.data.used_gb} / ${system.disk.data.total_gb} GB`}
               >
-                <ProgressBar
+                <ResourceMeter
                   value={system.disk.data.used_gb}
                   max={system.disk.data.total_gb}
                   color={
                     system.disk.data.percent > 90
-                      ? "bg-red-500"
+                      ? "bg-state-warning"
                       : system.disk.data.percent > 75
-                        ? "bg-amber-500"
-                        : "bg-primary"
+                        ? "bg-state-warning"
+                        : "bg-accent-action-hi"
                   }
                   label={`${system.disk.data.free_gb} GB free`}
                 />
@@ -1184,31 +881,30 @@ export function SystemHealth() {
 
             {system.db_pool?.size > 0 ? (
               <ResourceCard
-                icon={Database}
                 label="DB Pools"
                 value={`${system.db_pool.checked_out} / ${
                   system.db_pool.size +
                   (system.db_pool.overflow > 0 ? system.db_pool.overflow : 0)
                 }`}
               >
-                <ProgressBar
+                <ResourceMeter
                   value={system.db_pool.checked_out}
                   max={system.db_pool.size}
                   color={
                     system.db_pool.checked_out >= system.db_pool.size
-                      ? "bg-red-500"
-                      : "bg-primary"
+                      ? "bg-state-warning"
+                      : "bg-accent-action-hi"
                   }
                   label={`${system.db_pool.checked_in} idle, ${system.db_pool.checked_out} active`}
                 />
                 {system.db_pools?.sqlalchemy?.size ? (
-                  <div className="text-[10px] text-white/30">
+                  <div className="font-mono text-label text-text-subtle">
                     SQLAlchemy: {system.db_pools.sqlalchemy.checked_out}/
                     {system.db_pools.sqlalchemy.size} checked out
                   </div>
                 ) : null}
                 {system.db_pools?.legacy?.size ? (
-                  <div className="text-[10px] text-white/30">
+                  <div className="font-mono text-label text-text-subtle">
                     Legacy: {system.db_pools.legacy.checked_out}/
                     {system.db_pools.legacy.size} checked out
                   </div>
@@ -1218,27 +914,33 @@ export function SystemHealth() {
 
             {system.analysis?.analysis ? (
               <ResourceCard
-                icon={Disc3}
                 label="Analysis"
                 value={`${system.analysis.analysis.done} / ${
                   system.analysis.analysis.done +
                   system.analysis.analysis.pending
                 }`}
               >
-                <ProgressBar
-                  value={system.analysis.analysis.done}
-                  max={
+                <ProgressHairline
+                  label="Audio analysis coverage"
+                  value={
                     system.analysis.analysis.done +
-                    system.analysis.analysis.pending
+                      system.analysis.analysis.pending >
+                    0
+                      ? system.analysis.analysis.done /
+                        (system.analysis.analysis.done +
+                          system.analysis.analysis.pending)
+                      : undefined
                   }
-                  label={`${system.analysis.analysis.pending} pending${
-                    system.analysis.analysis.failed > 0
-                      ? `, ${system.analysis.analysis.failed} failed`
-                      : ""
-                  }`}
+                  valueText={`${system.analysis.analysis.done} done, ${system.analysis.analysis.pending} pending, ${system.analysis.analysis.failed} failed`}
                 />
+                <MonoLabel as="p">
+                  {system.analysis.analysis.pending} pending
+                  {system.analysis.analysis.failed > 0
+                    ? `, ${system.analysis.analysis.failed} failed`
+                    : ""}
+                </MonoLabel>
                 {system.analysis.bliss && system.analysis.bliss.pending > 0 ? (
-                  <div className="text-[10px] text-white/30">
+                  <div className="font-mono text-label text-text-subtle">
                     Bliss: {system.analysis.bliss.done} done,{" "}
                     {system.analysis.bliss.pending} pending
                   </div>
@@ -1248,19 +950,20 @@ export function SystemHealth() {
 
             {system.resource_pressure ? (
               <ResourceCard
-                icon={Gauge}
                 label="Resource Governor"
                 value={system.resource_pressure.allowed ? "Open" : "Deferring"}
               >
-                <ProgressBar
+                <ResourceMeter
                   value={
-                    (system.resource_pressure.snapshot?.load_ratio ?? 0) * 100
+                    system.resource_pressure.snapshot?.load_ratio != null
+                      ? system.resource_pressure.snapshot.load_ratio * 100
+                      : null
                   }
                   max={100}
                   color={
                     system.resource_pressure.allowed
-                      ? "bg-primary"
-                      : "bg-amber-500"
+                      ? "bg-accent-action-hi"
+                      : "bg-state-warning"
                   }
                   label={
                     system.resource_pressure.reason
@@ -1268,7 +971,7 @@ export function SystemHealth() {
                       : "No batch pressure detected"
                   }
                 />
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-white/35">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-label text-text-muted">
                   <span>
                     IO wait:{" "}
                     {system.resource_pressure.snapshot?.iowait_percent ?? "—"}%
@@ -1289,7 +992,7 @@ export function SystemHealth() {
                   </span>
                 </div>
                 {system.resource_pressure.window?.enabled ? (
-                  <div className="text-[10px] text-white/30">
+                  <div className="font-mono text-label text-text-subtle">
                     Window {system.resource_pressure.window.start}-
                     {system.resource_pressure.window.end}
                     {" · "}
@@ -1303,7 +1006,6 @@ export function SystemHealth() {
 
             {system.media_worker ? (
               <ResourceCard
-                icon={Radio}
                 label="Media Worker"
                 value={
                   system.media_worker.redis_connected
@@ -1313,19 +1015,19 @@ export function SystemHealth() {
                     : "Redis offline"
                 }
               >
-                <ProgressBar
+                <ResourceMeter
                   value={system.media_worker.active_slots?.length ?? 0}
                   max={Math.max(1, system.media_worker.max_active ?? 1)}
                   color={
                     system.media_worker.pending > 0
-                      ? "bg-amber-500"
-                      : "bg-primary"
+                      ? "bg-state-warning"
+                      : "bg-accent-action-hi"
                   }
                   label={`${
                     system.media_worker.pending ?? 0
                   } pending bridge events`}
                 />
-                <div className="text-[10px] text-white/30">
+                <div className="font-mono text-label text-text-subtle">
                   {system.media_worker.recent_events?.[0]?.event
                     ? `Latest: ${String(
                         system.media_worker.recent_events[0].event,
@@ -1333,7 +1035,7 @@ export function SystemHealth() {
                     : system.media_worker.consumer_group}
                 </div>
                 {summary?.media_worker_completed ? (
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] text-white/35">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 font-mono text-label text-text-muted">
                     <span>Done: {summary.media_worker_completed.count}</span>
                     <span>
                       Failed: {summary.media_worker_failed?.count ?? 0}
@@ -1353,77 +1055,27 @@ export function SystemHealth() {
               </ResourceCard>
             ) : null}
           </div>
-        </OpsPanel>
+        </InstrumentPanel>
       ) : null}
 
       <OpsPanel
-        icon={Gauge}
         title="Metric Streams"
         description="Latency, request volume, queue pressure and task execution trends over the selected time window."
       >
         <div className="grid gap-4 lg:grid-cols-2">
-          <MetricChart title="API Latency" data={latencyTs} yLabel="ms" />
-          <MetricChart title="Request Volume" data={requestsTs} yLabel="req" />
-          <MetricChart
-            title="Error Rate"
-            data={errorsTs}
-            yLabel="errors"
-            series={[{ id: "errors", field: "count" }]}
-          />
-          <MetricChart
-            title="Slow Requests"
-            data={apiSlowTs}
-            yLabel="slow"
-            series={[{ id: "slow", field: "count" }]}
-          />
-          <MetricChart
-            title="Stream Activity"
-            data={streamTs}
-            yLabel="streams"
-          />
-          <MetricChart
-            title="Transcode Duration"
-            data={transcodeDurationTs}
-            yLabel="sec"
-          />
-          <MetricChart
-            title="Home Core Compute"
-            data={homeComputeTs}
-            yLabel="ms"
-          />
-          <MetricChart
-            title="Home Endpoint Compute"
-            data={homeEndpointComputeTs}
-            yLabel="ms"
-          />
-          <MetricChart
-            title="Task Duration"
-            data={taskDurationTs}
-            yLabel="sec"
-          />
-          <MetricChart
-            title="Queue Wait Time"
-            data={queueWaitTs}
-            yLabel="sec"
-          />
-          <MetricChart title="Queue Depth" data={queueTs} yLabel="tasks" />
-          <MetricChart
-            title="Resource Deferrals"
-            data={resourceDeferredTs}
-            yLabel="deferrals"
-            series={[{ id: "deferred", field: "count" }]}
-          />
-          <MetricChart
-            title="Resource Load Ratio"
-            data={resourceLoadTs}
-            yLabel="ratio"
-          />
+          {metricStreams.map((stream) => (
+            <MetricChart
+              key={stream.id}
+              stream={stream}
+              data={dashboard?.timeseries?.[stream.id] ?? []}
+              intervalSeconds={samplePeriod === "minute" ? 60 : 3600}
+            />
+          ))}
         </div>
       </OpsPanel>
 
       {tasks.length > 0 ? (
         <OpsPanel
-          icon={Zap}
           title="Running Tasks"
           description="The worker jobs currently in flight, with elapsed time and live progress where available."
         >
@@ -1460,15 +1112,16 @@ export function SystemHealth() {
                     : `${elapsed}s`;
 
               return (
-                <div
+                <OpsSurface
+                  as="div"
                   key={task.id}
-                  className="flex items-center gap-3 rounded-md border border-white/8 bg-black/20 px-4 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.12)]"
+                  className="grid grid-cols-2 items-center gap-3 px-4 py-3 sm:flex"
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-white">
+                  <div className="col-span-2 min-w-0 flex-1">
+                    <div className="break-words text-sm font-medium text-text-primary">
                       {task.label || taskLabel(task.type)}
                     </div>
-                    <div className="mt-0.5 text-xs text-white/40">
+                    <div className="mt-0.5 break-words text-xs text-text-muted">
                       {progress?.phase ? (
                         <span>{String(progress.phase)}</span>
                       ) : null}
@@ -1478,26 +1131,26 @@ export function SystemHealth() {
                     </div>
                   </div>
                   {pct > 0 ? (
-                    <div className="flex w-32 items-center gap-2">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
-                        <div
-                          className="h-full rounded-full bg-primary transition-[width,background-color]"
-                          style={{ width: `${pct}%` }}
+                    <div className="flex min-w-0 items-center gap-2 sm:w-32 sm:shrink-0">
+                      <div className="min-w-0 flex-1">
+                        <ProgressHairline
+                          label={`${task.label || taskLabel(task.type)} progress`}
+                          value={pct / 100}
                         />
                       </div>
-                      <span className="w-8 text-right text-[10px] tabular-nums text-white/40">
+                      <span className="w-8 text-right font-mono text-label tabular-nums text-text-muted">
                         {pct.toFixed(0)}%
                       </span>
                     </div>
                   ) : null}
-                  <div className="flex items-center gap-1 text-[10px] text-white/30">
-                    <Clock size={10} />
+                  <div className="flex items-center justify-self-end gap-1 font-mono text-label font-normal text-text-subtle">
+                    Elapsed
                     <span className="tabular-nums">{elapsedStr}</span>
                   </div>
-                  <span className="font-mono text-[10px] text-white/20">
+                  <span className="font-mono text-label text-text-subtle">
                     {task.id.slice(0, 8)}
                   </span>
-                </div>
+                </OpsSurface>
               );
             })}
           </div>

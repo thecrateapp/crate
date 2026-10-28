@@ -1,12 +1,10 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-  formatStatsMinutes,
-  type StatsTape,
-} from "@/components/stats/stats-model";
-import { TapeBars, localToday } from "@/components/stats/StatsSignalTape";
-import { buildTapeModel } from "@/components/stats/stats-tape-model";
+import { formatStatsMinutes } from "./stats-format";
+import type { StatsTape } from "./stats-types";
+import { TapeBars, localToday } from "./TapeBars";
+import { buildTapeModel } from "./stats-tape-model";
 
 export function StatsMiniTape({ tape }: { tape: StatsTape }) {
   const { t, i18n } = useTranslation();

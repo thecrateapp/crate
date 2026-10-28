@@ -21,6 +21,7 @@ log = logging.getLogger(__name__)
 
 RESOURCE_GOVERNED_TASK_TYPES = frozenset(
     {
+        "refresh_collection_insights",
         "backfill_track_audio_fingerprints",
         "backfill_smart_mix_profiles",
         "backfill_artwork_variants",
@@ -331,6 +332,133 @@ def evaluate_resources(
             decision.policy_hash = state["policy_hash"]
         _record_policy_use("governor", state)
         return decision
+
+
+def build_governor_surface() -> dict:
+    """Build the current governor decision and its configured gauge limits.
+
+    This is intended for the worker-owned monitoring sample. It must not be
+    called from a request or an SSE loop: sampling iowait waits briefly and the
+    listener counts query recent playback activity.
+    """
+    with _runtime_policy_scope() as state:
+        if state is not None and state.get("unavailable"):
+            return {
+                "enabled": None,
+                "allowed": False,
+                "reason": "runtime policy unavailable",
+                "defer_seconds": DEFAULT_DEFER_SECONDS,
+                "snapshot": None,
+                "limits": {},
+                "gauges": [],
+                "window": None,
+                "sampled_by": "crate-worker",
+            }
+
+        enabled = _enabled()
+        decision = evaluate_resources(
+            label="admin governor sample", listener_sensitive=True
+        )
+        if not enabled:
+            # Keep the instrumentation useful while enforcement is switched off.
+            decision.snapshot = build_snapshot(include_playback=True)
+
+        window_decision = evaluate_maintenance_window(task_type="library_pipeline")
+        limits = {
+            "load_ratio": _float_setting(
+                "CRATE_RESOURCE_MAX_LOAD_RATIO", DEFAULT_LOAD_RATIO
+            ),
+            "iowait_percent": _float_setting(
+                "CRATE_RESOURCE_MAX_IOWAIT_PERCENT", DEFAULT_IOWAIT_PERCENT
+            ),
+            "swap_used_percent": _float_setting(
+                "CRATE_RESOURCE_MAX_SWAP_PERCENT", DEFAULT_SWAP_PERCENT
+            ),
+            "active_users": _nonnegative_int_setting(
+                "CRATE_RESOURCE_MAX_ACTIVE_USERS", DEFAULT_MAX_ACTIVE_USERS
+            ),
+            "active_streams": _nonnegative_int_setting(
+                "CRATE_RESOURCE_MAX_ACTIVE_STREAMS", DEFAULT_MAX_ACTIVE_STREAMS
+            ),
+        }
+        snapshot = decision.snapshot
+        gauges = []
+        if snapshot is not None:
+            values = {
+                "load_ratio": snapshot.load_ratio,
+                "iowait_percent": snapshot.iowait_percent,
+                "swap_used_percent": snapshot.swap_used_percent,
+                "active_users": snapshot.active_users,
+                "active_streams": snapshot.active_streams,
+            }
+            labels = {
+                "load_ratio": "Load ratio",
+                "iowait_percent": "I/O wait",
+                "swap_used_percent": "Swap used",
+                "active_users": "Listeners",
+                "active_streams": "Streams",
+            }
+            units = {
+                "load_ratio": "",
+                "iowait_percent": "%",
+                "swap_used_percent": "%",
+                "active_users": "",
+                "active_streams": "",
+            }
+            scale_factors = {
+                "load_ratio": 1.2 / DEFAULT_LOAD_RATIO,
+                "iowait_percent": 40 / DEFAULT_IOWAIT_PERCENT,
+                "swap_used_percent": 60 / DEFAULT_SWAP_PERCENT,
+                "active_users": 1.4,
+                "active_streams": 1.4,
+            }
+            for gauge_id, value in values.items():
+                limit = limits[gauge_id]
+                over = value is not None and value > limit
+                if gauge_id == "swap_used_percent" and over:
+                    over = _swap_indicates_pressure(
+                        snapshot,
+                        min_swap_used_mb=_float_setting(
+                            "CRATE_RESOURCE_MIN_SWAP_USED_MB",
+                            DEFAULT_SWAP_MIN_USED_MB,
+                        ),
+                        min_memory_available=_float_setting(
+                            "CRATE_RESOURCE_MIN_MEMORY_AVAILABLE_PERCENT",
+                            DEFAULT_MIN_MEMORY_AVAILABLE_PERCENT,
+                        ),
+                    )
+                scale = max(
+                    limit * scale_factors[gauge_id],
+                    float(value or 0),
+                    1.0 if limit == 0 else 0.0,
+                )
+                gauges.append(
+                    {
+                        "id": gauge_id,
+                        "label": labels[gauge_id],
+                        "value": value,
+                        "unit": units[gauge_id],
+                        "limit": limit,
+                        "scale": scale,
+                        "over": over,
+                    }
+                )
+
+        reasons = [
+            reason for reason in (decision.reason, window_decision.reason) if reason
+        ]
+        allowed = decision.allowed and window_decision.allowed
+        return {
+            "enabled": enabled,
+            "allowed": allowed,
+            "reason": ", ".join(reasons),
+            "defer_seconds": max(decision.defer_seconds, window_decision.defer_seconds),
+            "snapshot": asdict(snapshot) if snapshot else None,
+            "limits": limits,
+            "gauges": gauges,
+            "window": window_decision.window,
+            "sampled_by": "crate-worker",
+        }
 
 
 def _evaluate_resources(
@@ -845,6 +973,7 @@ __all__ = [
     "RESOURCE_GOVERNED_TASK_TYPES",
     "ResourceDecision",
     "ResourceSnapshot",
+    "build_governor_surface",
     "build_snapshot",
     "evaluate_maintenance_window",
     "evaluate_resources",

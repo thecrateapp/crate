@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from crate.db.queries.social_shared import user_profile_sql
 from crate.db.tx import read_scope
@@ -106,17 +107,24 @@ def get_public_user_profile(user_id: int) -> dict | None:
     return dict(row) if row else None
 
 
-def get_public_user_profile_by_username(username: str) -> dict | None:
-    with read_scope() as session:
+def get_public_user_profile_by_username(
+    username: str, *, session: Session | None = None
+) -> dict | None:
+    def _impl(current: Session) -> dict | None:
         row = (
-            session.execute(
+            current.execute(
                 text(user_profile_sql("u.username = :username")),
                 {"username": username},
             )
             .mappings()
             .first()
         )
-    return dict(row) if row else None
+        return dict(row) if row else None
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
 
 
 def get_public_playlists_for_user(user_id: int) -> list[dict]:

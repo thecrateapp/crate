@@ -1,45 +1,63 @@
-import { useEffect, useState } from "react";
-
+import { useCallback, useEffect, useState } from "react";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { api } from "@/lib/api";
 import type { UserSearchResult } from "@/pages/people-types";
-
 export const PEOPLE_SEARCH_DEBOUNCE_MS = 250;
 
 export function usePeopleSearch(query: string) {
-  const [results, setResults] = useState<UserSearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
   const trimmed = query.trim();
   const debouncedQuery = useDebouncedValue(trimmed, PEOPLE_SEARCH_DEBOUNCE_MS);
-
+  const [attempt, setAttempt] = useState(0);
+  const [state, setState] = useState({
+    query: "",
+    results: [] as UserSearchResult[],
+    searching: false,
+    error: false,
+  });
+  const retry = useCallback(() => setAttempt((value) => value + 1), []);
   useEffect(() => {
     if (!debouncedQuery) {
-      setResults([]);
-      setSearching(false);
+      setState({ query: "", results: [], searching: false, error: false });
       return;
     }
-
     const controller = new AbortController();
-    setSearching(true);
+    setState({
+      query: debouncedQuery,
+      results: [],
+      searching: true,
+      error: false,
+    });
     api<UserSearchResult[]>(
       `/api/users/search?q=${encodeURIComponent(debouncedQuery)}&limit=12`,
       "GET",
       undefined,
       { signal: controller.signal },
     )
-      .then((items) => setResults(items || []))
-      .catch(() => {
-        if (!controller.signal.aborted) setResults([]);
+      .then((items) => {
+        if (!controller.signal.aborted)
+          setState({
+            query: debouncedQuery,
+            results: items || [],
+            searching: false,
+            error: false,
+          });
       })
-      .finally(() => {
-        if (!controller.signal.aborted) setSearching(false);
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setState({
+            query: debouncedQuery,
+            results: [],
+            searching: false,
+            error: true,
+          });
       });
-
     return () => controller.abort();
-  }, [debouncedQuery]);
-
+  }, [debouncedQuery, attempt]);
+  const current = trimmed === state.query;
   return {
-    results,
-    searching: searching || (trimmed !== "" && trimmed !== debouncedQuery),
+    results: current ? state.results : [],
+    searching: !!trimmed && (!current || state.searching),
+    error: current && state.error,
+    retry,
   };
 }

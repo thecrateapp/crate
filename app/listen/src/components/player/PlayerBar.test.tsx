@@ -1,16 +1,24 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { useMemo, useState } from "react";
+import { PlayerProviderSurface } from "@/contexts/PlayerProviderSurface";
+import { usePlayerActions, usePlayerState } from "@/contexts/PlayerContext";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createMockTrack,
   renderWithListenProviders,
 } from "@/test/render-with-listen-providers";
-import { setEqualizerEnabled } from "@/lib/equalizer-prefs";
+import { getEqualizerEnabled } from "@/lib/equalizer-prefs";
 import type { Track } from "@/contexts/player-types";
 import { longPress, pressMenuKey } from "@/test/item-action-gestures";
 
 import { PlayerBar, PlayerSurfaceFallback } from "./PlayerBar";
 
+const likesReadState = vi.hoisted(() => ({ hasLoaded: true }));
+afterEach(() => {
+  likesReadState.hasLoaded = true;
+});
+const trackReads = vi.hoisted(() => vi.fn());
 const useIsDesktopMock = vi.hoisted(() => vi.fn(() => false));
 const isLikedMock = vi.hoisted(() => vi.fn(() => false));
 const likeTrackMock = vi.hoisted(() => vi.fn(async () => true));
@@ -24,6 +32,7 @@ vi.mock("@crate/ui/lib/use-breakpoint", () => ({
 
 vi.mock("@/contexts/LikedTracksContext", () => ({
   useLikedTracks: () => ({
+    hasLoaded: likesReadState.hasLoaded,
     isLiked: isLikedMock,
     likeTrack: likeTrackMock,
     unlikeTrack: unlikeTrackMock,
@@ -55,7 +64,10 @@ vi.mock("@/hooks/use-track-info", () => ({
 }));
 
 vi.mock("@/hooks/use-track-playback", () => ({
-  useTrackPlayback: () => ({ resolution: null, loading: false }),
+  useTrackPlayback: () => {
+    trackReads();
+    return { resolution: null, loading: false };
+  },
 }));
 
 vi.mock("@/lib/crate-connect", () => ({
@@ -84,8 +96,8 @@ vi.mock("@crate/ui/lib/use-dismissible-layer", () => ({
   useDismissibleLayer: vi.fn(),
 }));
 
-vi.mock("@/components/player/lazy-player-surfaces", () => ({
-  LazyEqualizerPopover: () => null,
+vi.mock("@/components/player/lazy-player-surfaces", async () => ({
+  LazyEqualizerPopover: (await import("./EqualizerPopover")).EqualizerPopover,
   LazyExtendedPlayer: () => null,
   LazyFullscreenPlayer: ({ open }: { open: boolean }) =>
     open ? <div data-testid="fullscreen-player" /> : null,
@@ -243,8 +255,8 @@ describe("PlayerBar mobile mini-player", () => {
 
       for (const button of buttons) {
         expect(button.className).toContain("text-text-");
-        expect(button.className).toContain("hover:text-accent-action");
-        expect(button.className).toContain("hover:drop-shadow-accent-action");
+        expect(button).toHaveAttribute("data-size", "icon-lg");
+        expect(button.className).not.toContain("drop-shadow-accent-action");
         expect(button.className).not.toContain("text-white/");
         expect(button.className).not.toContain("rgba(");
       }
@@ -262,7 +274,7 @@ describe("PlayerBar mobile mini-player", () => {
       playerActions: { currentTrack: track, queue: [track] },
     });
 
-    const shell = container.querySelector(".listen-player-shell");
+    const shell = container.querySelector('[data-slot="player-chrome"]');
     const artwork = container.querySelector(".listen-player-artwork");
 
     expect(shell).toBeInTheDocument();
@@ -292,15 +304,11 @@ describe("PlayerBar mobile mini-player", () => {
       },
     });
 
-    const activeGlow = "drop-shadow-accent-action";
-
     expect(screen.getByRole("button", { name: "Disable shuffle" })).toHaveClass(
-      "text-accent-action",
-      activeGlow,
+      "aria-pressed:text-accent-action-hi",
     );
     expect(screen.getByRole("button", { name: "Repeat: one" })).toHaveClass(
-      "text-accent-action",
-      activeGlow,
+      "aria-pressed:text-accent-action-hi",
     );
   });
 
@@ -320,8 +328,8 @@ describe("PlayerBar mobile mini-player", () => {
 
       for (const button of buttons) {
         expect(button.className).toContain("text-text-");
-        expect(button.className).toContain("hover:text-accent-action");
-        expect(button.className).toContain("hover:drop-shadow-accent-action");
+        expect(button).toHaveAttribute("data-size", "icon-lg");
+        expect(button.className).not.toContain("drop-shadow-accent-action");
         expect(button.className).not.toContain("text-white/");
         expect(button.className).not.toContain("rgba(");
       }
@@ -359,7 +367,7 @@ describe("PlayerBar mobile mini-player", () => {
     expect(queueCounter).not.toHaveClass("text-xs");
   });
 
-  it("hides the desktop Equalizer access when the global toggle is disabled", async () => {
+  it("keeps the desktop Equalizer panel and access while powered off, so it can be powered on again", async () => {
     useIsDesktopMock.mockReturnValue(true);
     localStorage.setItem("listen-eq-enabled", "true");
     const track = createMockTrack({
@@ -371,13 +379,32 @@ describe("PlayerBar mobile mini-player", () => {
       playerActions: { currentTrack: track, queue: [track] },
     });
 
-    expect(screen.getByLabelText("Equalizer")).toBeInTheDocument();
-
-    setEqualizerEnabled(false);
-
-    await waitFor(() => {
-      expect(screen.queryByLabelText("Equalizer")).not.toBeInTheDocument();
+    const access = screen.getByRole("button", {
+      name: "Equalizer",
     });
+    fireEvent.click(access);
+    const panel = await screen.findByRole("dialog", {
+      name: "Equalizer",
+    });
+    fireEvent.click(within(panel).getByRole("button", { name: "On" }));
+    expect(getEqualizerEnabled()).toBe(false);
+    expect(panel).toBeInTheDocument();
+    expect(access).toBeInTheDocument();
+    expect(access).toHaveAttribute("aria-pressed", "true");
+    expect(within(panel).getByRole("button", { name: "Off" })).toBeEnabled();
+    fireEvent.click(
+      within(panel).getByRole("button", { name: "Close equalizer" }),
+    );
+    expect(
+      screen.queryByRole("dialog", { name: "Equalizer" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(access);
+    const reopened = await screen.findByRole("dialog", {
+      name: "Equalizer",
+    });
+    fireEvent.click(within(reopened).getByRole("button", { name: "Off" }));
+    expect(getEqualizerEnabled()).toBe(true);
+    expect(within(reopened).getByRole("button", { name: "On" })).toBeEnabled();
   });
 
   it("opens the track menu with a long press without opening fullscreen", async () => {
@@ -500,7 +527,7 @@ describe("PlayerBar mobile mini-player", () => {
       .find((button) => button.className.includes("h-12"));
     const nextButton = screen
       .getAllByRole("button", { name: "Next track" })
-      .find((button) => button.className.includes("size-12"));
+      .find((button) => button.closest('[data-slot="mobile-transport"]'));
 
     expect(playButton).toBeDefined();
     expect(nextButton).toBeDefined();
@@ -542,7 +569,7 @@ describe("PlayerBar mobile mini-player", () => {
       .find((button) => button.className.includes("h-12"));
     const nextButton = screen
       .getAllByRole("button", { name: "Next track" })
-      .find((button) => button.className.includes("size-12"));
+      .find((button) => button.closest('[data-slot="mobile-transport"]'));
 
     fireEvent.click(playButton!);
     fireEvent.click(nextButton!);
@@ -661,4 +688,88 @@ describe("PlayerBar desktop track identity", () => {
       null,
     );
   });
+});
+
+it("updates the seek leaf without rerendering the bar controller on a clock pulse", () => {
+  useIsDesktopMock.mockReturnValue(true);
+  function ClockHarness() {
+    const actions = usePlayerActions(),
+      state = usePlayerState();
+    const [currentTime, setTime] = useState(10);
+    const child = useMemo(() => <PlayerBar />, []);
+    return (
+      <>
+        <button type="button" onClick={() => setTime(20)}>
+          Pulse clock
+        </button>
+        <PlayerProviderSurface
+          actionsValue={actions}
+          stateValue={state}
+          progressValue={{ currentTime, duration: 240 }}
+          playbackNeedsUserGesture={false}
+          currentTrack={actions.currentTrack}
+          resumeAfterUserGesture={() => {}}
+        >
+          {child}
+        </PlayerProviderSurface>
+      </>
+    );
+  }
+  renderWithListenProviders(<ClockHarness />, {
+    playerActions: {
+      currentTrack: createMockTrack({ title: "Clock track", duration: 240 }),
+    },
+  });
+  const reads = trackReads.mock.calls.length;
+  fireEvent.click(screen.getByRole("button", { name: "Pulse clock" }));
+  expect(
+    screen.getByRole("slider", { name: "Seek track position" }),
+  ).toHaveAttribute("aria-valuenow", "20");
+  expect(trackReads.mock.calls.length).toBe(reads);
+});
+
+it("uses the shared reviewable frosted player frame", () => {
+  useIsDesktopMock.mockReturnValue(true);
+  renderWithListenProviders(<PlayerBar />, {
+    playerActions: { currentTrack: createMockTrack() },
+  });
+  expect(screen.getByTestId("player-bar-frame")).toHaveAttribute(
+    "data-position",
+    "dock",
+  );
+  const chrome = screen
+    .getByTestId("player-bar-frame")
+    .querySelector('[data-slot="player-chrome"]');
+  expect(chrome).toHaveClass("listen-player-shell", "rounded-panel");
+  expect(chrome?.className).not.toMatch(/accent|glow|gradient|backdrop-blur/);
+});
+
+it("leaves the mobile dock shape to the shell slab, with no divider", () => {
+  useIsDesktopMock.mockReturnValue(false);
+  renderWithListenProviders(<PlayerBar />, {
+    playerActions: { currentTrack: createMockTrack() },
+  });
+  const chrome = screen
+    .getByTestId("player-bar-frame")
+    .querySelector('[data-slot="player-chrome"]');
+  expect(chrome).toBeInTheDocument();
+  expect(chrome?.className).not.toMatch(/\bborder\b|rounded/);
+});
+
+it("does not offer a blind like before the initial collection read succeeds", () => {
+  likesReadState.hasLoaded = false;
+  likeTrackMock.mockClear();
+  unlikeTrackMock.mockClear();
+  useIsDesktopMock.mockReturnValue(true);
+  const track = createMockTrack({ title: "Unknown like state" });
+  renderWithListenProviders(<PlayerBar />, {
+    playerActions: { currentTrack: track, queue: [track] },
+  });
+  const heart = screen.getByRole("button", {
+    name: "Liked status unavailable",
+  });
+  expect(heart).toBeDisabled();
+  fireEvent.click(heart);
+  expect(likeTrackMock).not.toHaveBeenCalled();
+  expect(unlikeTrackMock).not.toHaveBeenCalled();
 });

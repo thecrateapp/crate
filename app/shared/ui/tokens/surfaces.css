@@ -1,9 +1,6 @@
-/* crate-ui — Surface variants
-   Runtime values live in themes.css. Recipes only select the requested
-   material, so a skin can replace both recipes without changing consumers. */
+/* crate-ui — Fixed Crate v3 surfaces */
 
-:root,
-[data-surface="solid"] {
+:root {
   --color-card: var(--crate-token-surface-card-solid);
   --color-card-foreground: var(--crate-token-surface-card-foreground-solid);
   --color-secondary: var(--crate-token-surface-secondary-solid);
@@ -23,32 +20,7 @@
   --surface-panel: var(--crate-token-surface-panel-solid);
   --surface-raised: var(--crate-token-surface-raised-solid);
   --surface-modal: var(--crate-token-surface-modal-solid);
-  --surface-popover: var(--crate-token-surface-overlay-solid);
-  --scrollbar-thumb: var(--crate-token-scrollbar-thumb);
-  --scrollbar-hover: var(--crate-token-scrollbar-hover);
-}
-
-[data-surface="glass"] {
-  --color-card: var(--crate-token-surface-card-glass);
-  --color-card-foreground: var(--crate-token-surface-card-foreground-glass);
-  --color-secondary: var(--crate-token-surface-secondary-glass);
-  --color-secondary-foreground: var(
-    --crate-token-surface-secondary-foreground-glass
-  );
-  --color-muted: var(--crate-token-surface-muted-glass);
-  --color-accent: var(--crate-token-surface-accent-glass);
-  --color-accent-foreground: var(--crate-token-surface-accent-foreground-glass);
-  --color-popover: var(--crate-token-surface-popover-glass);
-  --color-popover-foreground: var(
-    --crate-token-surface-popover-foreground-glass
-  );
-  --color-border: var(--crate-token-surface-border-glass);
-  --color-input: var(--crate-token-surface-input-glass);
-  --surface-app: var(--crate-token-surface-app);
-  --surface-panel: var(--crate-token-surface-panel-glass);
-  --surface-raised: var(--crate-token-surface-raised-glass);
-  --surface-modal: var(--crate-token-surface-modal-glass);
-  --surface-popover: var(--crate-token-surface-overlay-glass);
+  --surface-popover: var(--crate-token-surface-popover-solid);
   --scrollbar-thumb: var(--crate-token-scrollbar-thumb);
   --scrollbar-hover: var(--crate-token-scrollbar-hover);
 }
@@ -68,4 +40,7 @@
 }
 .bg-popover-surface {
   background-color: var(--surface-popover);
+}
+.bg-surface-object {
+  background-color: var(--surface-object);
 }

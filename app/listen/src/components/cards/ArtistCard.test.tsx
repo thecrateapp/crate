@@ -324,6 +324,30 @@ describe("ArtistCard", () => {
     ).not.toBeInTheDocument();
   });
 
+  it.each(["tile", "row", "editorial"] as const)(
+    "uses uppercase MonoLabel for %s artist context, preserving the name",
+    (variant) => {
+      renderWithListenProviders(
+        <ArtistCard
+          variant={variant}
+          name="Chelsea Wolfe"
+          subtitle="84 plays · 2 albums · 0 tracks"
+          meta="93% match"
+        />,
+      );
+      expect(screen.getByText("84 plays · 2 albums · 0 tracks")).toHaveClass(
+        "font-mono",
+        "uppercase",
+        "text-label",
+      );
+      expect(screen.getByText("93% match")).toHaveClass(
+        "font-mono",
+        "uppercase",
+      );
+      expect(screen.getByText("Chelsea Wolfe")).not.toHaveClass("uppercase");
+    },
+  );
+
   it("renders the row variant with rank, meta and the artist menu", async () => {
     renderWithListenProviders(
       <ArtistCard
@@ -351,11 +375,16 @@ describe("ArtistCard", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders the editorial variant as a larger circular tile", () => {
+  it("renders the editorial variant as a larger circular tile with the shared title scale", () => {
     renderWithListenProviders(
       <ArtistCard variant="editorial" name="Dredg" artistId={1} />,
     );
 
+    expect(screen.getByText("Dredg")).toHaveClass("text-sm", "font-medium");
+    expect(screen.getByText("Dredg")).not.toHaveClass(
+      "text-base",
+      "font-semibold",
+    );
     expect(screen.getByAltText("Dredg")).toHaveAttribute("sizes", "156px");
     expect(screen.getByText("Dredg").closest("article")).toHaveAttribute(
       "data-shape",
@@ -417,7 +446,8 @@ describe("ArtistCard", () => {
     expect(placeholder).toHaveAttribute("aria-hidden", "true");
     expect(placeholder).toHaveAttribute("data-placeholder-style", "flat-disc");
     expect(placeholder).toHaveTextContent("PW");
-    expect(placeholder).toHaveClass("rounded-full");
+    expect(placeholder).toHaveClass("rounded-full", "bg-surface-placeholder");
+    expect(placeholder.className).not.toMatch(/accent/);
     expect(placeholder.childElementCount).toBe(1);
     expect(placeholder.className).not.toMatch(
       /gradient|border|shadow|backdrop/,
@@ -552,7 +582,7 @@ describe("ArtistCard", () => {
     resolveMaybeApiAssetUrlMock.mockImplementation((url) =>
       url?.startsWith("/api/")
         ? `https://api.example.test${url}&token=desktop-token`
-        : url ?? null,
+        : (url ?? null),
     );
 
     renderWithListenProviders(
@@ -675,7 +705,7 @@ describe("ArtistCard", () => {
     resolveMaybeApiAssetUrlMock.mockImplementation((url) =>
       url?.startsWith("/api/")
         ? `https://api.example.test${url}&media_ticket=menu-ticket`
-        : url ?? null,
+        : (url ?? null),
     );
 
     renderWithListenProviders(
@@ -692,7 +722,7 @@ describe("ArtistCard", () => {
     fireEvent.contextMenu(card!, { clientX: 160, clientY: 120 });
 
     const menu = await screen.findByRole("menu");
-    expect(menu).toHaveClass("listen-glass-panel", "w-72", "rounded-panel");
+    expect(menu).toHaveClass("crate-overlay-surface", "w-72");
     expect(within(menu).getByText("Dredg")).toBeInTheDocument();
     expect(within(menu).getByAltText("Dredg")).toHaveAttribute(
       "src",

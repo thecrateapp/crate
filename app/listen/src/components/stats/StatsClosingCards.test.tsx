@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 import { StatsDecadeColumns } from "./StatsClosingCards";
+import { StatsMusicAgeCardView } from "./StatsClosingViews";
 import type { StatsMusicAge } from "./stats-model";
 
 const musicAge: StatsMusicAge = {
@@ -44,5 +45,85 @@ describe("StatsDecadeColumns", () => {
     renderWithListenProviders(<StatsDecadeColumns musicAge={musicAge} />);
 
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+});
+
+describe("StatsMusicAgeCardView", () => {
+  it("shows newest album and the period year's share", () => {
+    renderWithListenProviders(
+      <StatsMusicAgeCardView
+        musicAge={{
+          ...musicAge,
+          oldest_album: { album: "Jane Doe", year: 2001 },
+          newest_album: { album: "Fresh Cut", year: 2026 },
+          share_this_year: 0.18,
+        }}
+        shareYear={2026}
+        decades={null}
+      />,
+    );
+
+    expect(
+      screen.getByText("Your oldest record this period: Jane Doe (2001)."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Your newest record this period: Fresh Cut (2026)."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("18% of your listening is from 2026."),
+    ).toBeInTheDocument();
+  });
+
+  it("names the measured year on a past-year window", () => {
+    // R12 measures the period's last year: year:2023 is about 2023, not now.
+    const { unmount } = renderWithListenProviders(
+      <StatsMusicAgeCardView
+        musicAge={{ ...musicAge, share_this_year: 0.25 }}
+        shareYear={2023}
+        decades={null}
+      />,
+    );
+    expect(
+      screen.getByText("25% of your listening is from 2023."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/this year/)).not.toBeInTheDocument();
+    unmount();
+
+    renderWithListenProviders(
+      <StatsMusicAgeCardView
+        musicAge={{ ...musicAge, share_this_year: 0.25 }}
+        shareYear={2023}
+        decades={null}
+      />,
+      { locale: "de" },
+    );
+    // The year is a label, never a grouped number ("2.023").
+    expect(
+      screen.getByText("25% deiner Hörzeit stammen aus dem Jahr 2023."),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps a real zero share and hides an unknown one", () => {
+    const { rerender } = renderWithListenProviders(
+      <StatsMusicAgeCardView
+        musicAge={{ ...musicAge, share_this_year: 0 }}
+        shareYear={2026}
+        decades={null}
+      />,
+    );
+    expect(
+      screen.getByText("0% of your listening is from 2026."),
+    ).toBeInTheDocument();
+
+    rerender(
+      <StatsMusicAgeCardView
+        musicAge={{ ...musicAge, share_this_year: null }}
+        shareYear={2026}
+        decades={null}
+      />,
+    );
+    expect(
+      screen.queryByText(/of your listening is from/),
+    ).not.toBeInTheDocument();
   });
 });

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { CRATE_ICON_SIZE, Loader2, Star } from "@crate/ui/icons";
 import { notify } from "@crate/ui/lib/notify";
 import { Button } from "@crate/ui/shadcn/button";
+import { TrackList } from "@crate/ui/domain/tracks/TrackList";
 
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import {
@@ -13,6 +14,7 @@ import { fetchTrackRadio } from "@/lib/radio";
 
 import { SuggestedTrackRow } from "./SuggestedTrackRow";
 import { useSuggestedTracks } from "./use-suggested-tracks";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 export function SuggestedTab() {
   const { t } = useTranslation();
@@ -75,9 +77,7 @@ export function SuggestedTab() {
 
   if (tracks.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-text-primary/20">
-        {t("player.suggested.empty")}
-      </div>
+      <EmptyState title={t("player.suggested.empty")} className="flex-1" />
     );
   }
 
@@ -103,14 +103,16 @@ export function SuggestedTab() {
           {t("actions.track.radio")}
         </Button>
       </div>
-      {tracks.map((track, index) => (
-        <SuggestedTrackRow
-          key={track.track_entity_uid ?? track.track_id ?? track.path}
-          track={track}
-          index={index}
-          onPlay={handlePlay}
-        />
-      ))}
+      <TrackList
+        items={tracks}
+        label={t("player.suggested")}
+        itemKey={(track) =>
+          track.track_entity_uid ?? track.track_id ?? track.path
+        }
+        renderRow={(track, index) => (
+          <SuggestedTrackRow track={track} index={index} onPlay={handlePlay} />
+        )}
+      />
     </div>
   );
 }

@@ -15,6 +15,44 @@ from crate.worker_handlers.show_imports import handle_show_extraction
 from tests.test_show_import_plans import show_world as show_world  # noqa: PLC0414
 
 
+@pytest.fixture(autouse=True)
+def no_external_geocoding(monkeypatch):
+    monkeypatch.setattr(
+        "crate.show_location_enrichment.geocode_city", lambda query: None
+    )
+
+
+def test_extraction_keeps_geocoded_city_in_private_draft_before_publication(
+    show_world, monkeypatch
+):
+    from crate.show_ocr import parse_show_text
+
+    draft = parse_show_text("2027-02-25")
+    draft["candidates"][0].update(
+        artist_name="Samiam", city="Madrid", country_code="ES"
+    )
+    monkeypatch.setattr(
+        "crate.worker_handlers.show_imports.extract_show_candidates",
+        lambda *args, **kwargs: draft,
+    )
+    monkeypatch.setattr(
+        "crate.show_location_enrichment.geocode_city",
+        lambda query: dict(latitude=40.4, longitude=-3.7, country_code="ES"),
+    )
+    actor = show_world["principal"]
+    accepted = accept_show_extraction(
+        actor, {"mode": "parse", "raw_text": "2027-02-25"}, "city-enrichment"
+    )
+    start_task(accepted["job_id"])
+    result = handle_show_extraction(accepted["job_id"], {}, {})
+    assert result["execution"]["status"] == "extracted"
+    saved = read_show_job(actor, accepted["job_id"])["result"]["draft"]
+    assert saved["candidates"][0]["latitude"] == 40.4
+    assert saved["location_enrichment"][0]["precision"] == "city"
+    with read_scope() as db:
+        assert db.execute(text("SELECT count(*) FROM shows")).scalar() == 0
+
+
 def test_owned_ocr_job_replays_without_library_or_shared_payload_leaks(show_world):
     actor = show_world["principal"]
     upload = stage_show_image(

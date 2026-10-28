@@ -6,6 +6,54 @@ import { MemoryRouter } from "react-router";
 import { ErrorState } from "./ErrorState";
 
 describe("ErrorState", () => {
+  it("renders a named compact error without a danger icon", () => {
+    const { container } = render(
+      <ErrorState title="Albums unavailable" message="Try again later" />,
+    );
+    expect(
+      screen.getByRole("alert", { name: "Albums unavailable" }),
+    ).toHaveAttribute("data-variant", "compact");
+    expect(container.querySelector("svg")).toBeNull();
+    expect(screen.getByText("Try again later")).toBeInTheDocument();
+  });
+
+  it("supports a page error eyebrow with a status code and retains retry/back actions", async () => {
+    const retry = vi.fn();
+    render(
+      <MemoryRouter>
+        <ErrorState
+          variant="page"
+          statusCode={503}
+          eyebrow="Service error"
+          title="Service unavailable"
+          onRetry={retry}
+          backTo="/library"
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/Service error/)).toHaveTextContent("503");
+    const heading = screen.getByRole("heading", {
+      name: "Service unavailable",
+    });
+    expect(
+      heading.parentElement!.querySelector(".crate-status-dot"),
+    ).toBeNull();
+    expect(
+      screen
+        .getByText(/Service error/)
+        .parentElement!.querySelector(".crate-status-dot"),
+    ).not.toBeNull();
+    expect(
+      screen.getByRole("alert", { name: "Service unavailable" }),
+    ).toHaveAttribute("data-variant", "page");
+    expect(screen.getByRole("link", { name: "Go back" })).toHaveAttribute(
+      "href",
+      "/library",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
   it("renders default message", () => {
     render(<ErrorState />);
     expect(screen.getByText("Something went wrong")).toBeInTheDocument();

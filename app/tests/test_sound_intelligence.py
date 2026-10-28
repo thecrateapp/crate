@@ -1,5 +1,4 @@
 from unittest.mock import MagicMock
-from uuid import uuid4
 
 
 class _Mappings:
@@ -22,81 +21,116 @@ class _Session:
         return MagicMock(mappings=lambda: _Mappings(rows))
 
 
-def test_sound_intelligence_health_reports_effective_eq_distribution():
+def test_sound_intelligence_reports_genre_eq_coverage_and_listening_priorities():
     from crate.db.queries.sound_intelligence import get_sound_intelligence_health
 
     health = get_sound_intelligence_health(
         session=_Session(
             [
                 [
-                    {"source": "instance_album_preset", "count": 4},
-                    {"source": "audio_analysis_preset", "count": 6},
-                    {"source": "flat", "count": 0},
-                ],
-                [
                     {
-                        "node_count": 10,
+                        "node_count": 12,
                         "top_level_count": 3,
                         "orphan_count": 1,
                         "missing_description_count": 2,
-                        "missing_direct_eq_count": 5,
+                        "missing_direct_eq_count": 8,
+                        "direct_eq_count": 4,
+                        "inherited_eq_count": 3,
+                        "missing_effective_eq_count": 5,
                         "unmapped_raw_count": 7,
                         "edge_count": 12,
                         "locked_edge_count": 4,
                         "manual_edge_count": 9,
                         "ai_edge_count": 1,
+                        "listening_priorities": [
+                            {
+                                "slug": "grime",
+                                "name": "Grime",
+                                "weighted_play_count": 31.5,
+                                "listening_share_90d_pct": 4.3,
+                            }
+                        ],
                     }
-                ],
+                ]
             ]
         )
     )
 
-    assert health["eq"]["total_tracks"] == 10
+    assert health["eq"]["total_genres"] == 12
     by_source = {item["source"]: item for item in health["eq"]["sources"]}
-    assert by_source["instance_album_preset"]["percent"] == 40.0
-    assert by_source["audio_analysis_preset"]["percent"] == 60.0
-    assert by_source["flat"]["percent"] == 0.0
+    assert by_source["genre_taxonomy_preset"]["percent"] == 33.3
+    assert by_source["genre_taxonomy_inherited_preset"]["percent"] == 25.0
+    assert by_source["no_genre_eq"]["percent"] == 41.7
     assert health["taxonomy"]["unmapped_raw_count"] == 7
     assert health["taxonomy"]["locked_edge_count"] == 4
+    assert health["taxonomy"]["missing_effective_eq_count"] == 5
+    assert health["listening_priorities"] == [
+        {
+            "slug": "grime",
+            "name": "Grime",
+            "weighted_play_count": 31.5,
+            "listening_share_90d_pct": 4.3,
+        }
+    ]
 
 
-def test_sound_intelligence_health_reads_uuid_equalizer_targets(pg_db):
+def test_sound_intelligence_resolves_inherited_eq_and_prioritizes_listened_gaps(pg_db):
+    from sqlalchemy import text
+
     from crate.db.queries.sound_intelligence import get_sound_intelligence_health
-    from crate.db.repositories.equalizer_presets import upsert_equalizer_preset
+    from crate.db.repositories.genres_taxonomy_edges import upsert_genre_taxonomy_edge
+    from crate.db.repositories.genres_taxonomy_metadata import set_genre_eq_gains
+    from crate.db.repositories.genres_taxonomy_nodes import upsert_genre_taxonomy_node
+    from crate.db.tx import transaction_scope
 
-    artist = "Sound Intelligence Artist"
-    album = "Sound Intelligence Album"
-    album_uid = str(uuid4())
-    track_uid = str(uuid4())
-    pg_db.upsert_artist({"name": artist})
-    album_id = pg_db.upsert_album(
-        {
-            "artist": artist,
-            "name": album,
-            "path": "/music/sound-intelligence/album",
-            "entity_uid": album_uid,
-        }
+    upsert_genre_taxonomy_node(
+        "sound-intelligence-test-parent", name="Sound Intelligence Test Parent"
     )
-    pg_db.upsert_track(
-        {
-            "album_id": album_id,
-            "artist": artist,
-            "album": album,
-            "filename": "01-track.flac",
-            "title": "Track",
-            "path": "/music/sound-intelligence/album/01-track.flac",
-            "entity_uid": track_uid,
-        }
+    upsert_genre_taxonomy_node(
+        "sound-intelligence-test-child", name="Sound Intelligence Test Child"
     )
-    upsert_equalizer_preset(
-        scope="instance",
-        target_type="track",
-        target_entity_uid=track_uid,
-        gains=[0.0] * 10,
+    upsert_genre_taxonomy_node(
+        "sound-intelligence-test-uncovered", name="Sound Intelligence Test Uncovered"
     )
+    set_genre_eq_gains("sound-intelligence-test-parent", [0.0] * 10)
+    upsert_genre_taxonomy_edge(
+        "sound-intelligence-test-child",
+        "sound-intelligence-test-parent",
+        relation_type="parent",
+    )
+
+    with transaction_scope() as session:
+        user_id = session.execute(
+            text(
+                "INSERT INTO users (email, created_at) VALUES (:email, NOW()) RETURNING id"
+            ),
+            {"email": "sound-intelligence-test@example.test"},
+        ).scalar_one()
+        session.execute(
+            text(
+                "INSERT INTO user_genre_stats "
+                "(user_id, stat_window, genre_name, play_count) "
+                "VALUES (:user_id, '90d', :genre_name, 12)"
+            ),
+            {
+                "user_id": user_id,
+                "genre_name": "Sound Intelligence Test Uncovered",
+            },
+        )
 
     health = get_sound_intelligence_health()
 
-    assert health["eq"]["total_tracks"] == 1
     by_source = {item["source"]: item for item in health["eq"]["sources"]}
-    assert by_source["instance_track_preset"]["count"] == 1
+    assert by_source["genre_taxonomy_preset"]["count"] >= 1
+    assert by_source["genre_taxonomy_inherited_preset"]["count"] >= 1
+    assert by_source["no_genre_eq"]["count"] >= 1
+    assert (
+        health["taxonomy"]["missing_effective_eq_count"]
+        == by_source["no_genre_eq"]["count"]
+    )
+    assert health["listening_priorities"][0] == {
+        "slug": "sound-intelligence-test-uncovered",
+        "name": "sound intelligence test uncovered",
+        "weighted_play_count": 12.0,
+        "listening_share_90d_pct": 100.0,
+    }

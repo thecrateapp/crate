@@ -1,0 +1,31 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/RadioGroup.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">RadioGroup</DocHeading>
+<EntryDetails
+  id="primitives-radiogroup"
+  review="Visual review approved by Diego · 1AR"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+- Mutually exclusive native-style choices. Group and individual options need accessible names.
+- 18 px circle / 8 px center, 1 px border, high accent, warning state and 44 px coarse hit area align with Checkbox/Switch.
+- One tab stop with arrow-key roving; skip disabled choices. Group required/invalid/name and native form values remain Radix semantics. FormField labels a group through aria-labelledby.
+- The approved persistent mockup and Diego's confirmed adjustments are the visual reference. Examples import the actual component; scene CSS does not repair its internals.
+
+The visible field caption uses the same MonoLabel as Input and Select. Inline placement does not change its typography, tracking or color.
+
+<DocHeading as="h2">Real component</DocHeading>
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Disabled} />
+
+<Canvas of={Stories.Invalid} />
+
+<Controls of={Stories.Base} />
+
+Consumer adoption and platform QA are separate from this entry and its visual review.

@@ -1,7 +1,14 @@
 import { renderWithAdminProviders as render } from "@/test/render-with-admin-providers";
-import { screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useLocation } from "react-router";
 
 const { apiMock, refetchMock, useApiMock } = vi.hoisted(() => ({
   apiMock: vi.fn(),
@@ -80,12 +87,6 @@ const settingsData = {
     llm_refinement_enabled: true,
     llm_refinement_cache_ttl_hours: 168,
   },
-  telegram: {
-    enabled: false,
-    bot_token: "",
-    chat_id: "",
-    has_token: false,
-  },
   about: {
     version: "dev",
     git_commit: "abcdef123",
@@ -97,6 +98,11 @@ const settingsData = {
     total_size_gb: 1.2,
   },
 };
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location-search">{location.search}</output>;
+}
 
 describe("Settings", () => {
   beforeEach(() => {
@@ -114,6 +120,184 @@ describe("Settings", () => {
       loading: false,
       refetch: refetchMock,
     });
+    useApiMock.mockImplementation((path: string) => ({
+      data:
+        path === "/api/settings"
+          ? settingsData
+          : path === "/api/acquisition/status"
+            ? {
+                tidal: { authenticated: false },
+                soulseek: { connected: false, state: "offline" },
+              }
+            : path === "/api/admin/download-policy"
+              ? {
+                  downloads_allowed_now: true,
+                  active_users: 0,
+                  active_streams: 0,
+                  time_window: {
+                    enabled: false,
+                    in_window: false,
+                    start: "02:00",
+                    end: "06:00",
+                  },
+                  user_limit: { enabled: false, max: 0 },
+                  stream_limit: { enabled: false, max: 0 },
+                }
+              : null,
+      loading: false,
+      refetch: refetchMock,
+    }));
+  });
+
+  it("uses the shared loading state while settings are being fetched", () => {
+    useApiMock.mockImplementation(() => ({
+      data: null,
+      loading: true,
+      refetch: refetchMock,
+    }));
+    render(<Settings />);
+
+    expect(
+      screen.getByRole("status", { name: "Loading settings" }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the selected section in the URL and removes the default section", async () => {
+    const user = userEvent.setup();
+    apiMock.mockResolvedValue(settingsData);
+    render(
+      <>
+        <Settings />
+        <LocationProbe />
+      </>,
+    );
+    expect(screen.getByRole("heading", { name: "Settings" })).toHaveClass(
+      "crate-page-title",
+    );
+
+    await user.click(screen.getByRole("tab", { name: "Downloads" }));
+    expect(screen.getByTestId("location-search")).toHaveTextContent(
+      "?section=downloads",
+    );
+    expect(screen.getByRole("group", { name: "Tidal Access" })).toBeVisible();
+
+    await user.click(screen.getByRole("tab", { name: "General" }));
+    expect(screen.getByTestId("location-search")).toHaveTextContent("");
+    expect(screen.getByRole("group", { name: "Worker Engine" })).toBeVisible();
+  });
+
+  it("opens the Settings section requested by the URL", () => {
+    render(<Settings />, { route: "/?section=storage" });
+
+    expect(screen.getByRole("tab", { name: "Storage" })).toHaveAttribute(
+      "data-state",
+      "active",
+    );
+    expect(
+      screen.getByRole("group", { name: "Database Footprint" }),
+    ).toBeVisible();
+  });
+
+  it("uses the shared StatNumber treatment for library and runtime metrics", () => {
+    render(<Settings />);
+
+    const artistsLabel = screen.getByText("Artists");
+    expect(artistsLabel.parentElement).toHaveClass("inline-flex", "flex-col");
+    expect(within(artistsLabel.parentElement!).getByText("10")).toBeVisible();
+
+    const versionLabel = screen.getByText("Version");
+    expect(versionLabel.parentElement).toHaveClass("inline-flex", "flex-col");
+    expect(within(versionLabel.parentElement!).getByText("dev")).toBeVisible();
+  });
+
+  it("offers a retry when the settings snapshot is unavailable", async () => {
+    const user = userEvent.setup();
+    useApiMock.mockReturnValue({
+      data: null,
+      loading: false,
+      refetch: refetchMock,
+    });
+
+    render(<Settings />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Settings could not be loaded",
+    );
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    expect(refetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("removes an extension through the shared 44px action and tooltip", async () => {
+    apiMock.mockResolvedValue({ ok: true });
+    const { container } = render(<Settings />, {
+      route: "/?section=enrichment",
+    });
+    const remove = screen.getByRole("button", { name: "Remove .flac" });
+    expect(remove).toHaveAttribute("data-size", "icon-lg");
+    expect(remove).not.toHaveAttribute("title");
+    await userEvent.hover(remove);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "Remove extension",
+    );
+    await userEvent.click(remove);
+    expect(apiMock).toHaveBeenCalledWith("/api/settings/library", "PUT", {
+      audio_extensions: [".mp3"],
+    });
+    expect(
+      screen.queryByRole("button", { name: "Remove .flac" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Save Sources" }).querySelector("svg"),
+    ).toBeNull();
+    expect(
+      container.querySelectorAll('button[role="switch"] svg'),
+    ).toHaveLength(0);
+  });
+
+  it("shows audit timestamps through the shared tooltip without a native title", async () => {
+    const timestamp = "2026-10-22T12:30:00Z";
+    apiMock.mockResolvedValue({
+      entries: [
+        {
+          id: 1,
+          timestamp,
+          action: "library_sync",
+          target_type: "artist",
+          target_name: "Example",
+          details: {},
+          user_id: null,
+          task_id: null,
+        },
+      ],
+      total: 1,
+      limit: 50,
+      offset: 0,
+    });
+    const { container } = render(<Settings />, { route: "/?section=audit" });
+    await screen.findByText("Example");
+    const time = container.querySelector("time");
+    expect(time).toHaveAttribute("datetime", timestamp);
+    expect(time).not.toHaveAttribute("title");
+    if (!time) throw new Error("Audit timestamp is missing");
+    fireEvent.keyDown(document, { key: "Tab" });
+    time.focus();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      new Date(timestamp).toLocaleString(),
+    );
+  });
+
+  it("no longer offers the legacy Telegram bot settings", () => {
+    render(<Settings />);
+
+    expect(
+      screen.queryByRole("button", { name: /notifications/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/telegram/i)).not.toBeInTheDocument();
+    expect(apiMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("/api/settings/telegram"),
+      expect.anything(),
+      expect.anything(),
+    );
   });
 
   it("shows one AI refinement state after setup", async () => {
@@ -121,9 +305,7 @@ describe("Settings", () => {
 
     render(<Settings />);
 
-    await user.click(
-      screen.getAllByRole("button", { name: /enrichment/i })[0]!,
-    );
+    await user.click(screen.getByRole("tab", { name: /enrichment/i }));
 
     expect(
       screen.getByText(/AI refinement: On · uses paths-model/),
@@ -146,9 +328,7 @@ describe("Settings", () => {
 
     render(<Settings />);
 
-    await user.click(
-      screen.getAllByRole("button", { name: /enrichment/i })[0]!,
-    );
+    await user.click(screen.getByRole("tab", { name: /enrichment/i }));
 
     expect(screen.getByText(/AI refinement: Off/)).toBeVisible();
   });
@@ -165,10 +345,13 @@ describe("Settings", () => {
 
     render(<Settings />);
 
-    await user.click(
-      screen.getAllByRole("button", { name: /enrichment/i })[0]!,
-    );
-    await user.click(screen.getByRole("switch", { name: /ai refinement/i }));
+    await user.click(screen.getByRole("tab", { name: /enrichment/i }));
+    const refinementSwitch = screen.getByRole("switch", {
+      name: /ai refinement/i,
+    });
+    expect(refinementSwitch).toHaveAttribute("data-slot", "switch");
+    expect(refinementSwitch).toHaveClass("crate-form-switch");
+    await user.click(refinementSwitch);
 
     await waitFor(() => {
       expect(apiMock).toHaveBeenCalledWith("/api/settings/paths", "PUT", {
@@ -192,9 +375,7 @@ describe("Settings", () => {
 
     render(<Settings />);
 
-    await user.click(
-      screen.getAllByRole("button", { name: /enrichment/i })[0]!,
-    );
+    await user.click(screen.getByRole("tab", { name: /enrichment/i }));
 
     expect(
       screen.getByRole("link", { name: "Manage in AI models" }),
@@ -214,9 +395,7 @@ describe("Settings", () => {
       auth: { hasCapability: (cap) => cap !== "ai.config.read" },
     });
 
-    await user.click(
-      screen.getAllByRole("button", { name: /enrichment/i })[0]!,
-    );
+    await user.click(screen.getByRole("tab", { name: /enrichment/i }));
 
     expect(screen.getByText("Manage in AI models")).toBeVisible();
     expect(
@@ -230,7 +409,7 @@ describe("Settings", () => {
 
     render(<Settings />);
 
-    await user.click(screen.getAllByRole("button", { name: /storage/i })[0]!);
+    await user.click(screen.getByRole("tab", { name: /storage/i }));
     await user.click(screen.getByRole("button", { name: /music paths ai/i }));
 
     await waitFor(() => {
@@ -268,7 +447,7 @@ describe("Settings", () => {
 
     render(<Settings />);
 
-    await user.click(screen.getAllByRole("button", { name: /schedules/i })[0]!);
+    await user.click(screen.getByRole("tab", { name: /schedules/i }));
     await user.click(
       await screen.findByRole("button", { name: "Run Library Scan now" }),
     );
@@ -280,5 +459,181 @@ describe("Settings", () => {
       );
     });
     expect(toast.info).toHaveBeenCalledWith("Library Scan is already queued");
+  });
+  it("names the processing range and preserves its numeric persistence on mouse release", async () => {
+    apiMock.mockResolvedValue({ ok: true });
+    render(<Settings />);
+    await userEvent.click(screen.getByRole("tab", { name: /enrichment/i }));
+    const slider = screen.getByRole("slider", { name: "MB auto-apply" });
+    fireEvent.change(slider, { target: { value: "90" } });
+    fireEvent.mouseUp(slider);
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith("/api/settings/processing", "PUT", {
+        mb_auto_apply_threshold: 90,
+      }),
+    );
+  });
+
+  it("persists a processing range change committed with the keyboard", async () => {
+    apiMock.mockResolvedValue({ ok: true });
+    render(<Settings />);
+    await userEvent.click(screen.getByRole("tab", { name: /enrichment/i }));
+    const slider = screen.getByRole("slider", { name: "MB auto-apply" });
+    fireEvent.change(slider, { target: { value: "96" } });
+    fireEvent.keyUp(slider, { key: "ArrowRight" });
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith("/api/settings/processing", "PUT", {
+        mb_auto_apply_threshold: 96,
+      }),
+    );
+  });
+
+  it("does not expose editable download defaults before the policy loads", () => {
+    useApiMock.mockImplementation((path: string) => ({
+      data: path === "/api/settings" ? settingsData : null,
+      loading: path !== "/api/settings",
+      error: null,
+      refetch: refetchMock,
+    }));
+    render(<Settings />, { route: "/?section=downloads" });
+    expect(
+      screen.getByRole("status", { name: "Loading download policy" }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("switch", { name: "Time window" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("slskd container not running"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers a retry for a failed download policy instead of editable defaults", async () => {
+    useApiMock.mockImplementation((path: string) => ({
+      data: path === "/api/settings" ? settingsData : null,
+      loading: false,
+      error: path === "/api/admin/download-policy" ? "network failure" : null,
+      refetch: refetchMock,
+    }));
+    render(<Settings />, { route: "/?section=downloads" });
+    expect(
+      screen.getByText("Download policy could not be loaded."),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("switch", { name: "Time window" }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Retry download policy" }),
+    );
+    expect(refetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("restores an extension after its autosave fails", async () => {
+    apiMock.mockRejectedValue(new Error("network failure"));
+    render(<Settings />, { route: "/?section=enrichment" });
+    await userEvent.click(screen.getByRole("button", { name: "Remove .flac" }));
+    expect(
+      await screen.findByRole("button", { name: "Remove .flac" }),
+    ).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent(/could not be saved/i);
+  });
+
+  it("restores the confirmed download policy when its write fails", async () => {
+    apiMock.mockRejectedValue(new Error("network failure"));
+    render(<Settings />, { route: "/?section=downloads" });
+    const control = await screen.findByRole("switch", { name: "Time window" });
+    await userEvent.click(control);
+    await waitFor(() => expect(control).not.toBeChecked());
+    expect(screen.getByRole("alert")).toHaveTextContent(/could not be saved/i);
+  });
+
+  it.each([
+    ["downloads", "spinbutton", "Min bitrate"],
+    ["downloads", "spinbutton", "Max active users"],
+    ["downloads", "spinbutton", "Max active streams"],
+    ["enrichment", "spinbutton", "Re-enrich age"],
+    ["enrichment", "spinbutton", "Track popularity"],
+  ])(
+    "names the %s field %s %s through its visible caption",
+    async (section, role, name) => {
+      apiMock.mockResolvedValue(settingsData);
+      render(<Settings />, { route: `/?section=${section}` });
+      expect(await screen.findByRole(role, { name })).toBeVisible();
+    },
+  );
+
+  it("keeps an audit failure distinct from a confirmed empty log and retries it", async () => {
+    apiMock
+      .mockRejectedValueOnce(new Error("network failure"))
+      .mockResolvedValue({
+        entries: [
+          {
+            id: 7,
+            timestamp: "2026-10-24T10:00:00Z",
+            action: "library_sync",
+            target_type: "artist",
+            target_name: "Recovered artist",
+            details: {},
+            user_id: null,
+            task_id: null,
+          },
+        ],
+        total: 1,
+        limit: 50,
+        offset: 0,
+      });
+    render(<Settings />, { route: "/?section=audit" });
+    expect(
+      await screen.findByText("Audit log could not be loaded."),
+    ).toBeVisible();
+    expect(screen.queryByText("No entries")).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Retry audit log" }),
+    );
+    expect(await screen.findByText("Recovered artist")).toBeVisible();
+  });
+  it("locks processing autosaves until the request settles and restores its confirmed value", async () => {
+    let rejectWrite!: (error: Error) => void;
+    apiMock.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectWrite = reject;
+        }),
+    );
+    render(<Settings />, { route: "/?section=enrichment" });
+    const slider = screen.getByRole("slider", { name: "MB auto-apply" });
+    fireEvent.change(slider, { target: { value: "85" } });
+    fireEvent.mouseUp(slider);
+    expect(slider).toBeDisabled();
+    expect(
+      screen.getByRole("spinbutton", { name: "Re-enrich age" }),
+    ).toBeDisabled();
+    expect(apiMock).toHaveBeenCalledOnce();
+    await act(async () => rejectWrite(new Error("offline")));
+    expect(slider).toHaveValue("95");
+    expect(slider).toBeEnabled();
+    expect(screen.getByRole("alert")).toHaveTextContent(/could not be saved/i);
+  });
+  it("restores Soulseek quality and keeps its controls locked during a failed write", async () => {
+    let rejectWrite!: (error: Error) => void;
+    apiMock.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectWrite = reject;
+        }),
+    );
+    render(<Settings />, { route: "/?section=downloads" });
+    await userEvent.click(
+      screen.getByRole("radio", { name: "FLAC + MP3 320k" }),
+    );
+    expect(screen.getByRole("radio", { name: "FLAC only" })).toBeDisabled();
+    expect(
+      screen.getByRole("spinbutton", { name: "Min bitrate" }),
+    ).toBeDisabled();
+    expect(apiMock).toHaveBeenCalledOnce();
+    await act(async () => rejectWrite(new Error("offline")));
+    expect(screen.getByRole("radio", { name: "FLAC only" })).toBeChecked();
+    expect(
+      screen.getByRole("spinbutton", { name: "Min bitrate" }),
+    ).toBeEnabled();
   });
 });

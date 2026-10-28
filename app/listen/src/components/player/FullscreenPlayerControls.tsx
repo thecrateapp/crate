@@ -1,7 +1,6 @@
 import type { TFunction } from "i18next";
 
 import {
-  Disc3,
   Loader2,
   Pause,
   Play,
@@ -11,12 +10,13 @@ import {
   SlidersHorizontal,
   SkipBack,
   SkipForward,
-  Square,
   CRATE_ICON_SIZE,
 } from "@crate/ui/icons";
-import { cn } from "@crate/ui/lib/cn";
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
 import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
+import { buttonVariants } from "@crate/ui/shadcn/button";
 
+import { PlayerSurfaceModeSwitch } from "./PlayerSurfaceModeSwitch";
 import { PlayerTrackMenu } from "@/components/player/bar/PlayerTrackMenu";
 import type {
   ViewActions,
@@ -39,31 +39,23 @@ function FullscreenPlayerTransportControls({
 }: FullscreenPlayerTransportControlsProps) {
   return (
     <div className="mx-auto mt-5 flex w-full max-w-[360px] items-center justify-center gap-3">
-      <button
-        type="button"
+      <ActionButton
+        aria-pressed={state.shuffle}
         onClick={actions.toggleShuffleWithFeedback}
         disabled={state.jamQueueLocked}
-        aria-label={
+        label={
           state.shuffle ? t("player.disableShuffle") : t("player.enableShuffle")
         }
-        className={cn(
-          "flex h-12 w-12 touch-manipulation items-center justify-center rounded-full transition-colors active:bg-surface-control disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40",
-          state.shuffle
-            ? "text-accent-action drop-shadow-accent-action"
-            : "text-text-muted active:text-text-secondary",
-        )}
       >
         <Shuffle size={CRATE_ICON_SIZE.lg} />
-      </button>
-      <button
-        type="button"
+      </ActionButton>
+      <ActionButton
         onClick={actions.goPrevWithFeedback}
         disabled={state.jamQueueLocked}
-        aria-label={t("player.previous")}
-        className="flex size-12 touch-manipulation items-center justify-center rounded-full text-text-secondary transition-colors active:bg-surface-control active:text-text-primary disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40"
+        label={t("player.previous")}
       >
         <SkipBack size={CRATE_ICON_SIZE.xl} fill="currentColor" />
-      </button>
+      </ActionButton>
       <SpectrumPlayButton
         onClick={actions.togglePlaybackWithFeedback}
         disabled={state.jamTransportDisabled}
@@ -78,42 +70,34 @@ function FullscreenPlayerTransportControls({
             className="animate-spin text-accent-action"
           />
         ) : state.isPlaying ? (
-          <Pause size={26} className="text-text-primary" />
+          <Pause size={CRATE_ICON_SIZE.xl} className="text-text-primary" />
         ) : (
           <Play
-            size={26}
+            size={CRATE_ICON_SIZE.xl}
             className="ml-1 text-text-primary"
             fill="currentColor"
           />
         )}
       </SpectrumPlayButton>
-      <button
-        type="button"
+      <ActionButton
         onClick={actions.goNextWithFeedback}
         disabled={state.jamTransportDisabled}
-        aria-label={t("player.next")}
-        className="flex size-12 touch-manipulation items-center justify-center rounded-full text-text-secondary transition-colors active:bg-surface-control active:text-text-primary disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40"
+        label={t("player.next")}
       >
         <SkipForward size={CRATE_ICON_SIZE.xl} fill="currentColor" />
-      </button>
-      <button
-        type="button"
+      </ActionButton>
+      <ActionButton
+        aria-pressed={state.repeat !== "off"}
         onClick={actions.cycleRepeatWithFeedback}
         disabled={state.jamQueueLocked}
-        aria-label={t("player.repeat", { mode: state.repeat })}
-        className={cn(
-          "flex h-12 w-12 touch-manipulation items-center justify-center rounded-full transition-colors active:bg-surface-control disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40",
-          state.repeat !== "off"
-            ? "text-accent-action drop-shadow-accent-action"
-            : "text-text-muted active:text-text-secondary",
-        )}
+        label={t("player.repeat", { mode: state.repeat })}
       >
         {state.repeat === "one" ? (
           <Repeat1 size={CRATE_ICON_SIZE.lg} />
         ) : (
           <Repeat size={CRATE_ICON_SIZE.lg} />
         )}
-      </button>
+      </ActionButton>
     </div>
   );
 }
@@ -135,53 +119,54 @@ function FullscreenPlayerUtilityControls({
     <div className="mx-auto mt-3 flex w-full max-w-[360px] items-center justify-center gap-2">
       <FollowHeartButton
         following={state.liked}
-        label={t("actions.track.like")}
-        labelActive={t("actions.track.unlike")}
+        disabled={state.likeStateAvailable === false}
+        label={t(
+          state.likeStateAvailable === false
+            ? "library.liked.stateUnavailable"
+            : "actions.track.like",
+        )}
+        labelActive={t(
+          state.likeStateAvailable === false
+            ? "library.liked.stateUnavailable"
+            : "actions.track.unlike",
+        )}
         heartTestId="fullscreen-like-heart"
         particlesTestId="fullscreen-like-particles"
         iconSize={CRATE_ICON_SIZE.md}
+        title={t(
+          state.likeStateAvailable === false
+            ? "library.liked.stateUnavailable"
+            : state.liked
+              ? "actions.track.unlike"
+              : "actions.track.like",
+        )}
         onClick={() => void actions.toggleLikeWithFeedback()}
-        className="size-12 touch-manipulation rounded-full border border-border-subtle bg-surface-control active:bg-surface-control-hover"
+        className={buttonVariants({ variant: "ghost", size: "icon-lg" })}
       />
       {state.allowMobileEqualizer ? (
-        <button
-          type="button"
+        <ActionButton
           ref={actions.equalizerButtonRef}
           onClick={() => {
             triggerHaptic("selection");
             actions.setShowEqualizer((value) => !value);
           }}
-          aria-label={t("player.equalizer")}
-          className={cn(
-            "flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-border-subtle bg-surface-control transition-colors active:bg-surface-control-hover",
-            state.showEqualizer
-              ? "text-accent-action drop-shadow-accent-action"
-              : "text-text-secondary active:text-text-primary",
-          )}
+          label={t("player.equalizer")}
+          aria-pressed={state.showEqualizer}
         >
           <SlidersHorizontal size={CRATE_ICON_SIZE.lg} />
-        </button>
+        </ActionButton>
       ) : null}
-      <button
-        type="button"
-        onClick={actions.toggleSurfaceModeWithFeedback}
-        aria-label={
-          state.surfaceMode === "cd" ? "Show album cover" : "Show spinning CD"
-        }
-        title={
-          state.surfaceMode === "cd" ? "Show album cover" : "Show spinning CD"
-        }
-        className="flex size-12 touch-manipulation items-center justify-center rounded-full border border-border-subtle bg-surface-control text-text-secondary transition-colors active:bg-surface-control-hover active:text-text-primary"
-      >
-        {state.surfaceMode === "cd" ? (
-          <Square size={CRATE_ICON_SIZE.lg} />
-        ) : (
-          <Disc3 size={CRATE_ICON_SIZE.lg} />
-        )}
-      </button>
+      <PlayerSurfaceModeSwitch
+        mode={state.surfaceMode}
+        allowVisualizer={false}
+        onChange={(mode) => {
+          if (mode !== state.surfaceMode)
+            actions.toggleSurfaceModeWithFeedback();
+        }}
+      />
       <PlayerTrackMenu
         currentTrack={player.currentTrack}
-        className=" size-12 rounded-full border border-border-subtle bg-surface-control text-text-secondary transition-colors active:bg-surface-control-hover active:text-text-primary"
+        className={buttonVariants({ variant: "ghost", size: "icon-lg" })}
       />
     </div>
   );

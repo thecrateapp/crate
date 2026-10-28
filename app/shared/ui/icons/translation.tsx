@@ -1,7 +1,5 @@
-import {
-  CloseSquare as SolarCloseSquare,
-  Refresh as SolarRefresh,
-} from "@solar-icons/react-perf/Outline";
+import { CloseSquareIcon as SolarCloseSquare } from "@solar-icons/react/outline/close-square";
+import { RefreshIcon as SolarRefresh } from "@solar-icons/react/outline/refresh";
 
 import { createIcon } from "./base";
 

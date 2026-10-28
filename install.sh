@@ -1,896 +1,100 @@
 #!/usr/bin/env bash
+# Crate installer bootstrap.
+#
+#   curl -fsSL https://cratemusic.app/install.sh | bash
+#
+# Downloads the `crate` installer for this machine from GitHub Releases,
+# verifies its checksum, keeps it on the PATH for later changes and runs
+# `crate install`. Every flag is passed through, for example:
+#
+#   curl -fsSL https://cratemusic.app/install.sh | bash -s -- --dir /srv/crate
+#
+# CRATE_INSTALLER_VERSION pins a release tag; CRATE_BIN_DIR chooses where the
+# binary is kept (default ~/.local/bin); CRATE_RELEASE_BASE points at a mirror;
+# CRATE_INSTALLER_ONLY=1 keeps the binary without running it, for installing
+# with an AI agent through `crate mcp`.
 set -euo pipefail
 
 CRATE_REPO="${CRATE_REPO:-thecrateapp/crate}"
-CRATE_REF="${CRATE_REF:-main}"
-CRATE_RAW_BASE="${CRATE_RAW_BASE:-https://raw.githubusercontent.com/${CRATE_REPO}/${CRATE_REF}}"
-CRATE_INSTALL_DIR="${CRATE_INSTALL_DIR:-${HOME}/crate}"
-CRATE_ASSUME_YES="${CRATE_ASSUME_YES:-0}"
-CRATE_DRY_RUN="${CRATE_DRY_RUN:-0}"
-CRATE_SKIP_START="${CRATE_SKIP_START:-0}"
-CRATE_ACCESS_MODE="${CRATE_ACCESS_MODE:-${CRATE_INSTALL_MODE:-}}"
-CRATE_LOCAL_DOMAIN="${CRATE_LOCAL_DOMAIN:-crate.local}"
-
-if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
-  CYAN=$'\033[0;36m'
-  GREEN=$'\033[0;32m'
-  YELLOW=$'\033[1;33m'
-  RED=$'\033[0;31m'
-  BOLD=$'\033[1m'
-  NC=$'\033[0m'
-else
-  CYAN=""
-  GREEN=""
-  YELLOW=""
-  RED=""
-  BOLD=""
-  NC=""
-fi
-
-TTY_FD=""
-if [[ -r /dev/tty ]]; then
-  if { exec 3</dev/tty; } 2>/dev/null; then
-    TTY_FD=3
-  fi
-fi
-
-DOCKER_CMD=(docker)
-COMPOSE_CMD=()
-GENERATED_ADMIN_PASSWORD=""
-
-log() {
-  printf "%b\n" "$*"
-}
-
-info() {
-  log "${CYAN}==>${NC} $*"
-}
-
-success() {
-  log "${GREEN}✓${NC} $*"
-}
-
-warn() {
-  log "${YELLOW}!${NC} $*"
-}
+CRATE_INSTALLER_VERSION="${CRATE_INSTALLER_VERSION:-latest}"
+CRATE_BIN_DIR="${CRATE_BIN_DIR:-${HOME}/.local/bin}"
 
 die() {
-  log "${RED}Error:${NC} $*" >&2
+  printf 'Crate installer: %s\n' "$*" >&2
   exit 1
 }
 
-run() {
-  if [[ "${CRATE_DRY_RUN}" == "1" ]]; then
-    printf "[dry-run]"
-    printf " %q" "$@"
-    printf "\n"
-    return 0
-  fi
-  "$@"
-}
+case "$(uname -s)" in
+  Linux) os=linux ;;
+  Darwin) os=darwin ;;
+  *) die "Crate installs on Linux and macOS." ;;
+esac
 
-can_prompt() {
-  [[ -n "${TTY_FD}" && "${CRATE_ASSUME_YES}" != "1" ]]
-}
+case "$(uname -m)" in
+  x86_64 | amd64) arch=amd64 ;;
+  arm64 | aarch64) arch=arm64 ;;
+  *) die "unsupported processor $(uname -m)." ;;
+esac
 
-read_from_tty() {
-  local prompt="$1"
-  local value=""
-  if can_prompt; then
-    printf "%b" "${prompt}" >/dev/tty
-    IFS= read -r -u "${TTY_FD}" value || true
-  fi
-  printf "%s" "${value}"
-}
-
-prompt_default() {
-  local label="$1"
-  local default="$2"
-  local value=""
-  value="$(read_from_tty "${BOLD}${label}${NC} [${default}]: ")"
-  if [[ -z "${value}" ]]; then
-    value="${default}"
-  fi
-  printf "%s" "${value}"
-}
-
-prompt_secret_optional() {
-  local label="$1"
-  local value=""
-  if can_prompt; then
-    printf "%b" "${BOLD}${label}${NC} (leave empty to auto-generate): " >/dev/tty
-    stty -echo < /dev/tty || true
-    IFS= read -r -u "${TTY_FD}" value || true
-    stty echo < /dev/tty || true
-    printf "\n" >/dev/tty
-  fi
-  printf "%s" "${value}"
-}
-
-confirm() {
-  local label="$1"
-  local default="${2:-yes}"
-  local suffix="[Y/n]"
-  local answer=""
-  if [[ "${default}" == "no" ]]; then
-    suffix="[y/N]"
-  fi
-  if ! can_prompt; then
-    [[ "${default}" == "yes" ]]
-    return $?
-  fi
-  answer="$(read_from_tty "${BOLD}${label}${NC} ${suffix}: ")"
-  if [[ -z "${answer}" ]]; then
-    answer="${default}"
-  fi
-  case "${answer}" in
-    y|Y|yes|YES|Yes) return 0 ;;
-    *) return 1 ;;
-  esac
-}
-
-normalize_access_mode() {
-  local mode="$1"
-  case "${mode}" in
-    cloudflare|cf|https)
-      printf "cloudflare"
-      ;;
-    dnsmasq|dns)
-      printf "dnsmasq"
-      ;;
-    hosts|host)
-      printf "hosts"
-      ;;
-    ports|port|localhost|local-only|"")
-      printf "ports"
-      ;;
-    *)
-      die "Unknown CRATE_ACCESS_MODE='${mode}'. Use cloudflare, dnsmasq, hosts, or ports."
-      ;;
-  esac
-}
-
-default_access_mode() {
-  if [[ -n "${CRATE_DOMAIN:-}" || -n "${CF_DNS_API_TOKEN:-}" ]]; then
-    printf "cloudflare"
-  else
-    printf "ports"
-  fi
-}
-
-prompt_access_mode() {
-  local default mode
-  default="$(default_access_mode)"
-  mode="$(prompt_default "Access mode (cloudflare, dnsmasq, hosts, ports)" "${default}")"
-  normalize_access_mode "${mode}"
-}
-
-expand_path() {
-  local path="$1"
-  case "${path}" in
-    "~") printf "%s" "${HOME}" ;;
-    "~/"*) printf "%s/%s" "${HOME}" "${path#~/}" ;;
-    *) printf "%s" "${path}" ;;
-  esac
-}
-
-absolute_path() {
-  local path
-  path="$(expand_path "$1")"
-  if [[ "${path}" == /* ]]; then
-    printf "%s" "${path}"
-  else
-    printf "%s/%s" "$(pwd)" "${path}"
-  fi
-}
-
-generate_secret() {
-  if command -v openssl >/dev/null 2>&1; then
-    openssl rand -hex 32
-    return
-  fi
-  od -An -N32 -tx1 /dev/urandom | tr -d ' \n'
-}
-
-quote_env_value() {
-  local value="$1"
-  value="${value//\\/\\\\}"
-  value="${value//\"/\\\"}"
-  value="${value//\$/\\\$}"
-  value="${value//\`/\\\`}"
-  printf '"%s"' "${value}"
-}
-
-detect_timezone() {
-  if [[ -n "${TZ:-}" ]]; then
-    printf "%s" "${TZ}"
-  elif command -v timedatectl >/dev/null 2>&1; then
-    timedatectl show -p Timezone --value 2>/dev/null || printf "UTC"
-  elif [[ -f /etc/timezone ]]; then
-    sed -n '1p' /etc/timezone
-  else
-    printf "UTC"
-  fi
-}
-
-detect_os() {
-  local kernel
-  kernel="$(uname -s)"
-  case "${kernel}" in
-    Linux)
-      OS_FAMILY="linux"
-      OS_ID="unknown"
-      if [[ -r /etc/os-release ]]; then
-        # shellcheck disable=SC1091
-        . /etc/os-release
-        OS_ID="${ID:-unknown}"
-      fi
-      ;;
-    Darwin)
-      OS_FAMILY="macos"
-      OS_ID="macos"
-      ;;
-    *)
-      OS_FAMILY="unsupported"
-      OS_ID="${kernel}"
-      ;;
-  esac
-}
+if [[ -n "${CRATE_RELEASE_BASE:-}" ]]; then
+  base="${CRATE_RELEASE_BASE}"
+elif [[ "${CRATE_INSTALLER_VERSION}" == "latest" ]]; then
+  base="https://github.com/${CRATE_REPO}/releases/latest/download"
+else
+  base="https://github.com/${CRATE_REPO}/releases/download/${CRATE_INSTALLER_VERSION}"
+fi
 
 download() {
-  local url="$1"
-  local dest="$2"
-  local tmp="${dest}.tmp"
   if command -v curl >/dev/null 2>&1; then
-    run curl -fsSL "${url}" -o "${tmp}"
+    curl -fsSL "$1" -o "$2"
   elif command -v wget >/dev/null 2>&1; then
-    run wget -qO "${tmp}" "${url}"
+    wget -qO "$2" "$1"
   else
-    die "curl or wget is required to download Crate files."
+    die "curl or wget is required."
   fi
-  run mv "${tmp}" "${dest}"
 }
 
-docker() {
-  "${DOCKER_CMD[@]}" "$@"
-}
-
-compose() {
-  "${COMPOSE_CMD[@]}" "$@"
-}
-
-docker_is_usable() {
-  "${DOCKER_CMD[@]}" info >/dev/null 2>&1
-}
-
-install_docker_linux() {
-  if ! confirm "Docker is missing. Install Docker now using Docker's official installer?" "yes"; then
-    die "Docker is required. Install Docker Desktop/Engine and rerun this installer."
-  fi
-
-  local installer="/tmp/crate-get-docker.sh"
-  info "Downloading Docker installer..."
-  if command -v curl >/dev/null 2>&1; then
-    run curl -fsSL https://get.docker.com -o "${installer}"
-  elif command -v wget >/dev/null 2>&1; then
-    run wget -qO "${installer}" https://get.docker.com
+sha256() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | cut -d' ' -f1
   else
-    die "curl or wget is required to install Docker automatically."
+    shasum -a 256 "$1" | cut -d' ' -f1
   fi
-  run sudo sh "${installer}"
-  run rm -f "${installer}"
 }
 
-install_compose_plugin_linux() {
-  if ! confirm "Docker Compose v2 is missing. Try to install the Compose plugin now?" "yes"; then
-    die "Docker Compose v2 is required."
-  fi
+asset="crate-${os}-${arch}"
+workdir="$(mktemp -d)"
+trap 'rm -rf "${workdir}"' EXIT
 
-  case "${OS_ID}" in
-    ubuntu|debian|raspbian)
-      run sudo apt-get update
-      run sudo apt-get install -y docker-compose-plugin
-      ;;
-    fedora)
-      run sudo dnf install -y docker-compose-plugin
-      ;;
-    arch|manjaro)
-      run sudo pacman -Sy --noconfirm docker-compose
-      ;;
-    *)
-      die "Automatic Compose installation is not supported for ${OS_ID}. Install Docker Compose v2 and rerun."
-      ;;
+printf 'Downloading the Crate installer for %s/%s…\n' "${os}" "${arch}"
+download "${base}/${asset}" "${workdir}/crate" ||
+  die "could not download ${asset} from ${base}."
+download "${base}/crate-checksums.txt" "${workdir}/checksums.txt" ||
+  die "could not download the checksums from ${base}."
+
+expected="$(awk -v name="${asset}" '$2 == name { print $1 }' "${workdir}/checksums.txt")"
+[[ -n "${expected}" ]] || die "no checksum published for ${asset}."
+[[ "$(sha256 "${workdir}/crate")" == "${expected}" ]] ||
+  die "checksum mismatch for ${asset}; the download is incomplete or was altered."
+
+chmod +x "${workdir}/crate"
+binary="${workdir}/crate"
+if mkdir -p "${CRATE_BIN_DIR}" 2>/dev/null && cp "${workdir}/crate" "${CRATE_BIN_DIR}/crate" 2>/dev/null; then
+  binary="${CRATE_BIN_DIR}/crate"
+  case ":${PATH}:" in
+    *":${CRATE_BIN_DIR}:"*) ;;
+    *) printf 'The installer is kept at %s; add %s to your PATH to run `crate` later.\n' "${binary}" "${CRATE_BIN_DIR}" ;;
   esac
-}
-
-ensure_docker() {
-  if ! command -v docker >/dev/null 2>&1; then
-    case "${OS_FAMILY}" in
-      linux)
-        install_docker_linux
-        ;;
-      macos)
-        if command -v brew >/dev/null 2>&1 && confirm "Docker Desktop is missing. Install it with Homebrew Cask?" "no"; then
-          run brew install --cask docker
-          die "Docker Desktop was installed. Open it once, wait until it is running, then rerun this installer."
-        fi
-        die "Install Docker Desktop from https://www.docker.com/products/docker-desktop/ and rerun this installer."
-        ;;
-      *)
-        die "Unsupported OS: ${OS_ID}. Crate's one-line installer supports Linux and macOS."
-        ;;
-    esac
-  fi
-
-  if ! docker_is_usable; then
-    if [[ "${OS_FAMILY}" == "linux" ]] && command -v sudo >/dev/null 2>&1 && sudo -n docker info >/dev/null 2>&1; then
-      DOCKER_CMD=(sudo docker)
-    elif [[ "${OS_FAMILY}" == "linux" ]] && command -v systemctl >/dev/null 2>&1; then
-      warn "Docker is installed but not reachable. Trying to start the daemon."
-      run sudo systemctl enable --now docker
-      if ! docker_is_usable && sudo -n docker info >/dev/null 2>&1; then
-        DOCKER_CMD=(sudo docker)
-      fi
-    fi
-  fi
-
-  if ! docker_is_usable; then
-    die "Docker is installed but this user cannot reach the daemon. Start Docker Desktop or add your user to the docker group."
-  fi
-
-  if "${DOCKER_CMD[@]}" compose version >/dev/null 2>&1; then
-    COMPOSE_CMD=("${DOCKER_CMD[@]}" compose)
-  elif command -v docker-compose >/dev/null 2>&1; then
-    COMPOSE_CMD=(docker-compose)
-  else
-    if [[ "${OS_FAMILY}" == "linux" ]]; then
-      install_compose_plugin_linux
-    else
-      die "Docker Compose v2 is required. Update Docker Desktop and rerun."
-    fi
-    COMPOSE_CMD=("${DOCKER_CMD[@]}" compose)
-  fi
-
-  success "Docker is ready: $("${DOCKER_CMD[@]}" --version)"
-  success "Compose is ready: $("${COMPOSE_CMD[@]}" version --short 2>/dev/null || "${COMPOSE_CMD[@]}" version)"
-}
-
-validate_domain() {
-  local domain="$1"
-  if [[ "${domain}" == "localhost" ]]; then
-    return
-  fi
-  if [[ ! "${domain}" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]]; then
-    die "Invalid domain '${domain}'. Use a plain hostname such as crate.local or example.com."
-  fi
-}
-
-local_domain_hosts() {
-  local domain="$1"
-  printf "admin.%s listen.%s api.%s traefik.%s" "${domain}" "${domain}" "${domain}" "${domain}"
-}
-
-install_dnsmasq_if_missing() {
-  if command -v dnsmasq >/dev/null 2>&1; then
-    success "dnsmasq is already installed."
-    return
-  fi
-
-  info "dnsmasq is missing; installing it for local wildcard DNS."
-  case "${OS_FAMILY}" in
-    macos)
-      if ! command -v brew >/dev/null 2>&1; then
-        die "dnsmasq mode on macOS requires Homebrew. Install Homebrew or use CRATE_ACCESS_MODE=hosts."
-      fi
-      run brew install dnsmasq
-      ;;
-    linux)
-      case "${OS_ID}" in
-        ubuntu|debian|raspbian)
-          run sudo apt-get update
-          run sudo apt-get install -y dnsmasq
-          ;;
-        fedora)
-          run sudo dnf install -y dnsmasq
-          ;;
-        arch|manjaro)
-          run sudo pacman -Sy --noconfirm dnsmasq
-          ;;
-        *)
-          die "Automatic dnsmasq installation is not supported for ${OS_ID}. Install dnsmasq or use CRATE_ACCESS_MODE=hosts."
-          ;;
-      esac
-      ;;
-    *)
-      die "dnsmasq mode supports Linux and macOS only."
-      ;;
-  esac
-}
-
-configure_hosts_domain() {
-  local domain="$1"
-  local hosts line
-
-  validate_domain "${domain}"
-  hosts="$(local_domain_hosts "${domain}")"
-  if grep -q "admin.${domain}" /etc/hosts 2>/dev/null; then
-    success "/etc/hosts already contains Crate entries for ${domain}."
-    return
-  fi
-
-  info "Adding Crate local hostnames to /etc/hosts."
-  line="127.0.0.1 ${hosts}"
-  run sudo sh -c "printf '\n# Crate local domains (${domain})\n${line}\n' >> /etc/hosts"
-}
-
-configure_dnsmasq_macos() {
-  local domain="$1"
-  local prefix dnsmasq_conf resolver_file rule
-
-  prefix="$(brew --prefix)"
-  dnsmasq_conf="${prefix}/etc/dnsmasq.conf"
-  resolver_file="/etc/resolver/${domain}"
-  rule="address=/.${domain}/127.0.0.1"
-
-  run mkdir -p "${prefix}/etc"
-  if [[ ! -f "${dnsmasq_conf}" ]] || ! grep -Fxq "${rule}" "${dnsmasq_conf}"; then
-    info "Adding wildcard DNS rule for *.${domain} to dnsmasq."
-    run sh -c "printf '\n# Crate local domain\n${rule}\n' >> '${dnsmasq_conf}'"
-  fi
-
-  run sudo mkdir -p /etc/resolver
-  run sudo sh -c "printf 'nameserver 127.0.0.1\n' > '${resolver_file}'"
-  if ! run sudo brew services restart dnsmasq; then
-    warn "Could not restart dnsmasq via Homebrew services. Start it manually with: sudo brew services restart dnsmasq"
-  fi
-  run sudo killall -HUP mDNSResponder 2>/dev/null || true
-}
-
-configure_dnsmasq_linux_resolver() {
-  local domain="$1"
-  local resolved_conf="/etc/systemd/resolved.conf.d/crate-${domain//./-}.conf"
-
-  if command -v resolvectl >/dev/null 2>&1 && command -v systemctl >/dev/null 2>&1; then
-    info "Routing *.${domain} through local dnsmasq via systemd-resolved."
-    run sudo mkdir -p /etc/systemd/resolved.conf.d
-    run sudo sh -c "printf '[Resolve]\nDNS=127.0.0.1\nDomains=~${domain}\n' > '${resolved_conf}'"
-    if ! run sudo systemctl restart systemd-resolved; then
-      warn "Could not restart systemd-resolved; DNS may require a manual restart."
-    fi
-    return
-  fi
-
-  if ! grep -q '^nameserver 127\.0\.0\.1' /etc/resolv.conf 2>/dev/null; then
-    warn "Prepending 127.0.0.1 to /etc/resolv.conf so *.${domain} resolves locally."
-    run sudo cp /etc/resolv.conf /etc/resolv.conf.crate-backup
-    run sudo sh -c "printf 'nameserver 127.0.0.1\n' | cat - /etc/resolv.conf > /tmp/crate-resolv.conf && cp /tmp/crate-resolv.conf /etc/resolv.conf"
-  fi
-}
-
-configure_dnsmasq_domain() {
-  local domain="$1"
-  local conf_path rule
-
-  validate_domain "${domain}"
-  install_dnsmasq_if_missing
-
-  case "${OS_FAMILY}" in
-    macos)
-      configure_dnsmasq_macos "${domain}"
-      ;;
-    linux)
-      conf_path="/etc/dnsmasq.d/crate-${domain//./-}.conf"
-      rule="address=/.${domain}/127.0.0.1"
-      info "Adding wildcard DNS rule for *.${domain} to dnsmasq."
-      run sudo mkdir -p /etc/dnsmasq.d
-      run sudo sh -c "printf '# Crate local domain\n${rule}\n' > '${conf_path}'"
-      if command -v systemctl >/dev/null 2>&1; then
-        run sudo systemctl enable --now dnsmasq
-        run sudo systemctl restart dnsmasq
-      else
-        run sudo service dnsmasq restart
-      fi
-      configure_dnsmasq_linux_resolver "${domain}"
-      ;;
-  esac
-
-  success "Local wildcard DNS is configured for *.${domain}."
-}
-
-configure_local_name_resolution() {
-  local domain="$1"
-  local access_mode="$2"
-
-  case "${access_mode}" in
-    hosts)
-      configure_hosts_domain "${domain}"
-      ;;
-    dnsmasq)
-      configure_dnsmasq_domain "${domain}"
-      ;;
-  esac
-}
-
-write_env_file() {
-  local env_path="$1"
-  local install_dir="$2"
-  local default_tz default_music_dir default_data_dir default_downloads_dir
-  local access_mode domain cf_token admin_password jwt_secret postgres_password puid pgid docker_gid image_owner image_registry
-  local tls_enabled secure_entrypoint cert_resolver redis_password readplane_service_token
-
-  default_tz="$(detect_timezone)"
-  default_music_dir="${install_dir}/media/music"
-  default_data_dir="${install_dir}/data"
-  default_downloads_dir="${install_dir}/media/downloads/soulseek"
-
-  CRATE_MUSIC_DIR="${CRATE_MUSIC_DIR:-$(prompt_default "Music library path" "${default_music_dir}")}"
-  CRATE_DATA_DIR="${CRATE_DATA_DIR:-$(prompt_default "Crate data path" "${default_data_dir}")}"
-  CRATE_DOWNLOADS_DIR="${CRATE_DOWNLOADS_DIR:-$(prompt_default "Download/import path" "${default_downloads_dir}")}"
-  TZ_VALUE="${TZ:-$(prompt_default "Timezone" "${default_tz}")}"
-
-  if [[ -z "${CRATE_ACCESS_MODE}" ]]; then
-    access_mode="$(prompt_access_mode)"
-  else
-    access_mode="$(normalize_access_mode "${CRATE_ACCESS_MODE}")"
-  fi
-  CRATE_ACCESS_MODE="${access_mode}"
-
-  cf_token="${CF_DNS_API_TOKEN:-}"
-  tls_enabled="false"
-  secure_entrypoint="web"
-  cert_resolver=""
-  case "${access_mode}" in
-    cloudflare)
-      domain="${CRATE_DOMAIN:-$(prompt_default "Base domain for HTTPS" "")}"
-      if [[ -z "${domain}" ]]; then
-        die "Cloudflare mode requires a base domain. Use CRATE_ACCESS_MODE=ports for local-only installs."
-      fi
-      validate_domain "${domain}"
-      tls_enabled="true"
-      secure_entrypoint="websecure"
-      cert_resolver="letsencrypt"
-      if [[ -z "${cf_token}" ]]; then
-        cf_token="$(prompt_secret_optional "Cloudflare DNS API token")"
-        if [[ -z "${cf_token}" ]]; then
-          warn "No Cloudflare token configured. Local ports will work, but HTTPS certificates will not be issued yet."
-        fi
-      fi
-      ;;
-    dnsmasq|hosts)
-      domain="${CRATE_DOMAIN:-$(prompt_default "Local domain" "${CRATE_LOCAL_DOMAIN}")}"
-      domain="${domain:-${CRATE_LOCAL_DOMAIN}}"
-      validate_domain "${domain}"
-      ;;
-    ports)
-      domain="${CRATE_DOMAIN:-localhost}"
-      ;;
-  esac
-
-  admin_password="${DEFAULT_ADMIN_PASSWORD:-$(prompt_secret_optional "Initial admin password")}"
-  if [[ -z "${admin_password}" ]]; then
-    admin_password="$(generate_secret | cut -c1-24)"
-    GENERATED_ADMIN_PASSWORD="${admin_password}"
-  fi
-
-  jwt_secret="${JWT_SECRET:-$(generate_secret)}"
-  postgres_password="${CRATE_POSTGRES_PASSWORD:-$(generate_secret | cut -c1-32)}"
-  redis_password="${REDIS_PASSWORD:-$(generate_secret)}"
-  readplane_service_token="${CRATE_READPLANE_SERVICE_TOKEN:-$(generate_secret)}"
-  puid="${PUID:-$(id -u 2>/dev/null || printf "1000")}"
-  pgid="${PGID:-$(id -g 2>/dev/null || printf "1000")}"
-  docker_gid="${DOCKER_GID:-$(stat -c '%g' /var/run/docker.sock 2>/dev/null || stat -f '%g' /var/run/docker.sock 2>/dev/null || printf "988")}"
-  image_owner="${CRATE_IMAGE_OWNER:-${CRATE_REPO%%/*}}"
-  image_registry="${CRATE_IMAGE_REGISTRY:-ghcr.io}"
-
-  CRATE_MUSIC_DIR="$(absolute_path "${CRATE_MUSIC_DIR}")"
-  CRATE_DATA_DIR="$(absolute_path "${CRATE_DATA_DIR}")"
-  CRATE_DOWNLOADS_DIR="$(absolute_path "${CRATE_DOWNLOADS_DIR}")"
-
-  run mkdir -p "${CRATE_MUSIC_DIR}" "${CRATE_DATA_DIR}" "${CRATE_DOWNLOADS_DIR}"
-
-  if [[ -f "${env_path}" && "${CRATE_FORCE_ENV:-0}" != "1" ]]; then
-    warn ".env already exists; keeping it unchanged. Set CRATE_FORCE_ENV=1 to regenerate it."
-    return
-  fi
-
-  info "Writing ${env_path}"
-  if [[ "${CRATE_DRY_RUN}" == "1" ]]; then
-    log "[dry-run] write ${env_path}"
-    return
-  fi
-
-  umask 077
-  cat > "${env_path}" <<EOF
-# Crate home installation
-TZ=$(quote_env_value "${TZ_VALUE}")
-PUID=$(quote_env_value "${puid}")
-PGID=$(quote_env_value "${pgid}")
-DOCKER_GID=$(quote_env_value "${docker_gid}")
-LANGUAGE=$(quote_env_value "${LANGUAGE:-en}")
-
-CRATE_IMAGE_TAG=$(quote_env_value "${CRATE_IMAGE_TAG:-latest}")
-CRATE_IMAGE_OWNER=$(quote_env_value "${image_owner}")
-CRATE_IMAGE_REGISTRY=$(quote_env_value "${image_registry}")
-DOMAIN=$(quote_env_value "${domain:-localhost}")
-CRATE_ACCESS_MODE=$(quote_env_value "${access_mode}")
-CRATE_LOCAL_DOMAIN=$(quote_env_value "${CRATE_LOCAL_DOMAIN}")
-CRATE_CONFIG_FILE=$(quote_env_value "${CRATE_CONFIG_FILE:-./config.yaml}")
-
-DATA_DIR=$(quote_env_value "${CRATE_DATA_DIR}")
-MUSIC_DIR=$(quote_env_value "${CRATE_MUSIC_DIR}")
-DOWNLOADS_DIR=$(quote_env_value "${CRATE_DOWNLOADS_DIR}")
-
-TRAEFIK_HTTP_PORT=$(quote_env_value "${TRAEFIK_HTTP_PORT:-80}")
-TRAEFIK_HTTPS_PORT=$(quote_env_value "${TRAEFIK_HTTPS_PORT:-443}")
-TRAEFIK_TLS_ENABLED=$(quote_env_value "${tls_enabled}")
-TRAEFIK_SECURE_ENTRYPOINT=$(quote_env_value "${secure_entrypoint}")
-TRAEFIK_CERT_RESOLVER=$(quote_env_value "${cert_resolver}")
-CRATE_API_PORT=$(quote_env_value "${CRATE_API_PORT:-8585}")
-CRATE_ADMIN_PORT=$(quote_env_value "${CRATE_ADMIN_PORT:-8580}")
-CRATE_LISTEN_PORT=$(quote_env_value "${CRATE_LISTEN_PORT:-8581}")
-
-CF_DNS_API_TOKEN=$(quote_env_value "${cf_token}")
-
-POSTGRES_SUPERUSER_USER=$(quote_env_value "${POSTGRES_SUPERUSER_USER:-crate}")
-POSTGRES_SUPERUSER_PASSWORD=$(quote_env_value "${POSTGRES_SUPERUSER_PASSWORD:-${postgres_password}}")
-POSTGRES_SUPERUSER_DB=$(quote_env_value "${POSTGRES_SUPERUSER_DB:-crate}")
-
-CRATE_POSTGRES_USER=$(quote_env_value "${CRATE_POSTGRES_USER:-crate}")
-CRATE_POSTGRES_PASSWORD=$(quote_env_value "${postgres_password}")
-CRATE_POSTGRES_DB=$(quote_env_value "${CRATE_POSTGRES_DB:-crate}")
-
-JWT_SECRET=$(quote_env_value "${jwt_secret}")
-REDIS_PASSWORD=$(quote_env_value "${redis_password}")
-CRATE_READPLANE_SERVICE_TOKEN=$(quote_env_value "${readplane_service_token}")
-DEFAULT_ADMIN_PASSWORD=$(quote_env_value "${admin_password}")
-GOOGLE_CLIENT_ID=$(quote_env_value "${GOOGLE_CLIENT_ID:-}")
-GOOGLE_CLIENT_SECRET=$(quote_env_value "${GOOGLE_CLIENT_SECRET:-}")
-
-LASTFM_APIKEY=$(quote_env_value "${LASTFM_APIKEY:-}")
-LASTFM_API_SECRET=$(quote_env_value "${LASTFM_API_SECRET:-}")
-FANART_API_KEY=$(quote_env_value "${FANART_API_KEY:-}")
-SPOTIFY_ID=$(quote_env_value "${SPOTIFY_ID:-}")
-SPOTIFY_SECRET=$(quote_env_value "${SPOTIFY_SECRET:-}")
-SETLISTFM_API_KEY=$(quote_env_value "${SETLISTFM_API_KEY:-}")
-DISCOGS_CONSUMER_KEY=$(quote_env_value "${DISCOGS_CONSUMER_KEY:-}")
-DISCOGS_CONSUMER_SECRET=$(quote_env_value "${DISCOGS_CONSUMER_SECRET:-}")
-TICKETMASTER_API_KEY=$(quote_env_value "${TICKETMASTER_API_KEY:-}")
-
-SLSKD_URL=$(quote_env_value "${SLSKD_URL:-}")
-SLSKD_API_KEY=$(quote_env_value "${SLSKD_API_KEY:-}")
-
-READPLANE_ENABLED=$(quote_env_value "${READPLANE_ENABLED:-true}")
-READPLANE_ENABLE_SSE=$(quote_env_value "${READPLANE_ENABLE_SSE:-true}")
-READPLANE_ROUTE_MODE=$(quote_env_value "${READPLANE_ROUTE_MODE:-shadow}")
-READPLANE_FALLBACK_ENABLED=$(quote_env_value "${READPLANE_FALLBACK_ENABLED:-true}")
-EOF
-}
-
-write_traefik_config() {
-  local data_dir="$1"
-  local domain="$2"
-  local access_mode="${3:-cloudflare}"
-  local email="${CRATE_ACME_EMAIL:-admin@${domain:-localhost}}"
-  local traefik_dir="${data_dir}/traefik"
-
-  run mkdir -p "${traefik_dir}/conf" "${traefik_dir}/logs"
-  if [[ "${CRATE_DRY_RUN}" == "1" ]]; then
-    log "[dry-run] write ${traefik_dir}/traefik.yml"
-    log "[dry-run] write ${traefik_dir}/conf/dynamic.yml"
-    return
-  fi
-
-  if [[ "${access_mode}" == "cloudflare" ]]; then
-    cat > "${traefik_dir}/traefik.yml" <<EOF
-global:
-  checkNewVersion: true
-  sendAnonymousUsage: false
-
-log:
-  level: INFO
-  filePath: "/var/log/traefik/traefik.log"
-
-accessLog:
-  filePath: "/var/log/traefik/access.log"
-  bufferingSize: 100
-
-api:
-  dashboard: true
-
-entryPoints:
-  web:
-    address: ":80"
-    http:
-      redirections:
-        entryPoint:
-          to: websecure
-          scheme: https
-          permanent: true
-
-  websecure:
-    address: ":443"
-
-providers:
-  docker:
-    endpoint: "unix:///var/run/docker.sock"
-    network: crate
-    exposedByDefault: false
-
-  file:
-    directory: /conf
-    watch: true
-
-certificatesResolvers:
-  letsencrypt:
-    acme:
-      email: ${email}
-      storage: /acme.json
-      keyType: EC384
-      dnsChallenge:
-        provider: cloudflare
-        resolvers:
-          - "1.1.1.1:53"
-          - "1.0.0.1:53"
-
-tls:
-  options:
-    default:
-      minVersion: VersionTLS12
-EOF
-  else
-    cat > "${traefik_dir}/traefik.yml" <<'EOF'
-global:
-  checkNewVersion: true
-  sendAnonymousUsage: false
-
-log:
-  level: INFO
-  filePath: "/var/log/traefik/traefik.log"
-
-accessLog:
-  filePath: "/var/log/traefik/access.log"
-  bufferingSize: 100
-
-api:
-  dashboard: true
-
-entryPoints:
-  web:
-    address: ":80"
-
-  websecure:
-    address: ":443"
-
-providers:
-  docker:
-    endpoint: "unix:///var/run/docker.sock"
-    network: crate
-    exposedByDefault: false
-
-  file:
-    directory: /conf
-    watch: true
-EOF
-  fi
-
-  cat > "${traefik_dir}/conf/dynamic.yml" <<'EOF'
-http:
-  middlewares: {}
-EOF
-
-  touch "${traefik_dir}/acme.json"
-  chmod 600 "${traefik_dir}/acme.json"
-}
-
-install_crate_files() {
-  local install_dir="$1"
-  run mkdir -p "${install_dir}"
-  run mkdir -p "${install_dir}/deploy/traefik"
-
-  info "Downloading Crate compose files from ${CRATE_REPO}@${CRATE_REF}"
-  download "${CRATE_RAW_BASE}/docker-compose.home.yaml" "${install_dir}/docker-compose.yaml"
-  download "${CRATE_RAW_BASE}/app/config.yaml" "${install_dir}/config.yaml"
-  download "${CRATE_RAW_BASE}/deploy/traefik/federation-readplane.yml" \
-    "${install_dir}/deploy/traefik/federation-readplane.yml"
-  success "Installer files are in ${install_dir}"
-}
-
-start_crate() {
-  local install_dir="$1"
-  if [[ "${CRATE_SKIP_START}" == "1" ]]; then
-    warn "Skipping startup because CRATE_SKIP_START=1."
-    return
-  fi
-
-  info "Pulling Crate images..."
-  (cd "${install_dir}" && compose -f docker-compose.yaml pull)
-
-  info "Starting Crate..."
-  (cd "${install_dir}" && compose -f docker-compose.yaml up -d --remove-orphans)
-  (cd "${install_dir}" && compose -f docker-compose.yaml ps)
-}
-
-print_next_steps() {
-  local domain="$1"
-  local access_mode="${2:-ports}"
-  local admin_port="${CRATE_ADMIN_PORT:-8580}"
-  local listen_port="${CRATE_LISTEN_PORT:-8581}"
-  local api_port="${CRATE_API_PORT:-8585}"
-  local http_port="${TRAEFIK_HTTP_PORT:-80}"
-  local http_scheme="http"
-  local install_dir_display
-  printf -v install_dir_display "%q" "${CRATE_INSTALL_DIR}"
-
-  log ""
-  success "Crate is installed."
-  log ""
-  log "${BOLD}Local URLs:${NC}"
-  log "  Admin:  http://localhost:${admin_port}"
-  log "  Listen: http://localhost:${listen_port}"
-  log "  API:    http://localhost:${api_port}/api/status"
-
-  if [[ "${access_mode}" == "cloudflare" && -n "${domain}" && "${domain}" != "localhost" ]]; then
-    log ""
-    log "${BOLD}Public URLs:${NC}"
-    log "  Admin:  https://admin.${domain}"
-    log "  Listen: https://listen.${domain}"
-    log "  API:    https://api.${domain}"
-  elif [[ "${access_mode}" == "hosts" || "${access_mode}" == "dnsmasq" ]]; then
-    local suffix=""
-    if [[ "${http_port}" != "80" ]]; then
-      suffix=":${http_port}"
-    fi
-    log ""
-    log "${BOLD}Local domain URLs:${NC}"
-    log "  Admin:  ${http_scheme}://admin.${domain}${suffix}"
-    log "  Listen: ${http_scheme}://listen.${domain}${suffix}"
-    log "  API:    ${http_scheme}://api.${domain}${suffix}/api/status"
-  fi
-
-  log ""
-  log "${BOLD}Default admin user:${NC} admin@cratemusic.app"
-  if [[ -n "${GENERATED_ADMIN_PASSWORD}" ]]; then
-    log "${BOLD}Generated admin password:${NC} ${GENERATED_ADMIN_PASSWORD}"
-  else
-    log "Use the admin password you entered during installation."
-  fi
-  log ""
-  log "Manage the stack from the install directory:"
-  log "  cd ${install_dir_display}"
-  log "  docker compose -f docker-compose.yaml ps"
-}
-
-main() {
-  log ""
-  log "${CYAN}${BOLD}Crate one-line installer${NC}"
-  log ""
-
-  detect_os
-  info "Detected OS: ${OS_ID}"
-  if [[ "${CRATE_DRY_RUN}" == "1" || "${CRATE_SKIP_START}" == "1" ]]; then
-    warn "Skipping Docker validation because containers will not be started."
-  else
-    ensure_docker
-  fi
-
-  CRATE_INSTALL_DIR="$(absolute_path "$(prompt_default "Install directory" "${CRATE_INSTALL_DIR}")")"
-  install_crate_files "${CRATE_INSTALL_DIR}"
-  write_env_file "${CRATE_INSTALL_DIR}/.env" "${CRATE_INSTALL_DIR}"
-
-  if [[ "${CRATE_DRY_RUN}" == "1" ]]; then
-    warn "Dry-run complete; no files were written and no containers were started."
-    return
-  fi
-
-  # shellcheck disable=SC1091
-  set -a
-  . "${CRATE_INSTALL_DIR}/.env"
-  set +a
-
-  write_traefik_config "${DATA_DIR}" "${DOMAIN}" "${CRATE_ACCESS_MODE}"
-  configure_local_name_resolution "${DOMAIN}" "${CRATE_ACCESS_MODE}"
-  start_crate "${CRATE_INSTALL_DIR}"
-  print_next_steps "${DOMAIN}" "${CRATE_ACCESS_MODE}"
-}
-
-main "$@"
+fi
+
+if [[ "${CRATE_INSTALLER_ONLY:-0}" == "1" ]]; then
+  printf 'The Crate installer is ready at %s.\n' "${binary}"
+  printf 'Connect it to your AI agent with `crate mcp`, or run `crate install` yourself.\n'
+  exit 0
+fi
+
+# Piped into bash, stdin is this script: read the answers from the terminal.
+if [[ -r /dev/tty ]] && { exec </dev/tty; } 2>/dev/null; then
+  :
+fi
+"${binary}" install "$@"

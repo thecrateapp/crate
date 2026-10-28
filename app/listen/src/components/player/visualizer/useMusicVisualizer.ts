@@ -4,6 +4,10 @@ import { createAnalyserNode } from "@/hooks/use-audio-visualizer";
 import { getAnalyserNode } from "@/lib/gapless-player";
 import type { VisualizerMode } from "@/lib/player-visualizer-prefs";
 import type { VisualizerQualityProfileName } from "./visualizer-quality";
+import {
+  isMotionBlocked,
+  subscribeToMotionAvailability,
+} from "@/lib/motion-availability";
 
 function dbg(msg: string) {
   const d = document.getElementById("viz-debug");
@@ -81,7 +85,12 @@ export function useMusicVisualizer(
       if (!shouldRender) {
         visualizer?.stop();
       } else if (visualizer) {
-        visualizer.start();
+        if (
+          isMotionBlocked() ||
+          document.documentElement.dataset.crateEffects === "off"
+        )
+          visualizer.renderStaticFrame();
+        else visualizer.start();
       } else {
         tryInit();
       }
@@ -146,7 +155,12 @@ export function useMusicVisualizer(
 
     // Small delay to let the DOM settle after display:none → visible
     scheduleTimeout(tryInit, 50);
-    document.addEventListener("visibilitychange", syncRenderActivity);
+    const unsubscribeMotion = subscribeToMotionAvailability(syncRenderActivity);
+    const effectsObserver = new MutationObserver(syncRenderActivity);
+    effectsObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-crate-effects"],
+    });
     const resizeObserver =
       typeof ResizeObserver === "undefined"
         ? null
@@ -155,7 +169,8 @@ export function useMusicVisualizer(
 
     return () => {
       cancelled = true;
-      document.removeEventListener("visibilitychange", syncRenderActivity);
+      unsubscribeMotion();
+      effectsObserver.disconnect();
       resizeObserver?.disconnect();
       for (const id of timeoutIds) window.clearTimeout(id);
       timeoutIds.clear();

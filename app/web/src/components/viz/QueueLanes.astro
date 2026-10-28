@@ -1,0 +1,207 @@
+---
+import { GOVERNED_TASKS, QUEUE_ORDER, QUEUE_PICKS } from "../../content/admin/viz";
+import scale from "../../data/scale.json";
+import GovernorGauges from "./GovernorGauges.astro";
+
+const queues = scale.taskQueues as Record<string, string[]>;
+const WORKERS: Record<string, string> = {
+  maintenance: "maintenance-worker",
+  default: "worker",
+  fast: "worker · fast-worker",
+  heavy: "analysis-worker",
+  playback: "playback-worker",
+};
+const lanes = QUEUE_ORDER.map((queue) => ({
+  queue,
+  count: queues[queue]?.length ?? 0,
+  workers: WORKERS[queue],
+  picks: QUEUE_PICKS[queue].map((name) => ({ name, governed: GOVERNED_TASKS.includes(name) })),
+}));
+---
+
+<figure class="queues" data-viz="queues" data-reveal aria-label={`${scale.taskTypes} task types on five queues. Governed background work waits while the server is under load; user work keeps running.`}>
+  <header class="viz-bar" data-enter>
+    <p class="viz-label"><b>Operations</b> {scale.taskTypes} task types · five queues</p>
+    <p class="viz-label"><i class="key gov" aria-hidden="true"></i> governed by the resource governor</p>
+  </header>
+
+  <ol class="lanes">
+    {
+      lanes.map((lane, index) => (
+        <li class="lane" data-queue={lane.queue} data-picks={JSON.stringify(lane.picks)} style={`--i:${index}`}>
+          <div class="lane-meta">
+            <span class="lane-name">{lane.queue}</span>
+            <b data-count data-value={lane.count}>
+              {lane.count}
+            </b>
+            <span class="lane-workers">{lane.workers}</span>
+          </div>
+          <div class="lane-track" aria-hidden="true">
+            <span class="zone queued">queued</span>
+            <span class="zone running">running</span>
+            <span class="zone done">done</span>
+            {lane.picks.slice(0, 1).map((pick) => (
+              <span class:list={["chip", { gov: pick.governed }]} data-chip style="--x:calc(34% + 8px);--p:55%">
+                {pick.name}
+              </span>
+            ))}
+          </div>
+        </li>
+      ))
+    }
+  </ol>
+
+  <GovernorGauges />
+</figure>
+
+<style>
+  .queues {
+    margin: 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .key {
+    display: inline-block;
+    width: 18px;
+    height: 9px;
+    margin-right: 8px;
+    border: 1px dashed rgba(251, 191, 36, 0.7);
+    border-radius: 999px;
+    vertical-align: -1px;
+  }
+
+  .lanes {
+    margin: 5vh 0 4vh;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--line);
+  }
+
+  .lane {
+    display: grid;
+    grid-template-columns: minmax(150px, 2fr) minmax(0, 9fr);
+    gap: 24px;
+    align-items: center;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .lane-meta {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 12px;
+    align-items: baseline;
+  }
+
+  .lane-name {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--cyan-hi);
+  }
+
+  .lane-meta b {
+    grid-row: span 2;
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(1.8rem, 3vw, 2.8rem);
+    line-height: 1;
+    letter-spacing: -0.045em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lane-workers {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--fg-3);
+  }
+
+  .lane-track {
+    position: relative;
+    height: 40px;
+    overflow: hidden;
+    border-radius: 6px;
+    background:
+      linear-gradient(90deg, transparent calc(34% - 0.5px), var(--line) calc(34% - 0.5px), var(--line) calc(34% + 0.5px), transparent calc(34% + 0.5px)),
+      linear-gradient(90deg, transparent calc(84% - 0.5px), var(--line) calc(84% - 0.5px), var(--line) calc(84% + 0.5px), transparent calc(84% + 0.5px)),
+      rgba(241, 245, 249, 0.02);
+  }
+
+  .zone {
+    position: absolute;
+    top: 4px;
+    font-family: var(--mono);
+    font-size: 8.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(241, 245, 249, 0.3);
+  }
+
+  .zone.queued {
+    left: 8px;
+  }
+
+  .zone.running {
+    left: calc(34% + 8px);
+  }
+
+  .zone.done {
+    left: calc(84% + 8px);
+  }
+
+  .chip {
+    position: absolute;
+    top: 15px;
+    left: 0;
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 9px;
+    overflow: hidden;
+    border: 1px solid rgba(103, 232, 249, 0.4);
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(6, 182, 212, 0.28) var(--p, 0%), rgba(10, 10, 15, 0.92) var(--p, 0%));
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 10px;
+    white-space: nowrap;
+    left: var(--x, 0);
+  }
+
+  .chip.gov {
+    border-style: dashed;
+  }
+
+  .chip:global(.is-deferred) {
+    border-color: rgba(251, 191, 36, 0.8);
+    color: var(--amber);
+  }
+
+  .chip:global(.is-done) {
+    border-color: var(--line);
+    color: var(--fg-3);
+  }
+
+  @media (max-width: 760px) {
+    .lane {
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    .lane-meta {
+      grid-template-columns: auto auto 1fr;
+      align-items: baseline;
+    }
+    .lane-meta b {
+      grid-row: auto;
+      font-size: 1.6rem;
+    }
+    .lane-workers {
+      justify-self: end;
+    }
+    .chip {
+      font-size: 9px;
+    }
+  }
+</style>

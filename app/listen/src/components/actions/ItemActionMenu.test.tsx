@@ -75,7 +75,7 @@ describe("ItemActionMenu mobile sheet", () => {
 
     const dialog = screen.getByRole("dialog");
     expect(dialog.className).toContain("z-app-modal");
-    expect(dialog.querySelector(".listen-glass-panel")).toHaveStyle({
+    expect(dialog.querySelector(".crate-overlay-panel")).toHaveStyle({
       bottom: "0px",
     });
 
@@ -200,7 +200,7 @@ describe("ItemActionMenu mobile sheet", () => {
     );
 
     const dialog = screen.getByRole("dialog");
-    const panel = dialog.querySelector(".listen-glass-panel") as HTMLElement;
+    const panel = dialog.querySelector(".crate-overlay-panel") as HTMLElement;
     const handle = panel.querySelector(
       "[data-mobile-sheet-drag-handle='true']",
     ) as HTMLElement;
@@ -254,10 +254,38 @@ describe("ItemActionMenu desktop menu", () => {
     );
 
     expect(screen.getByRole("menu")).toHaveClass(
-      "listen-glass-panel",
+      "crate-overlay-surface",
       "w-72",
-      "rounded-panel",
       "z-app-context-menu",
     );
   });
+});
+
+describe("ItemActionMenu surface adapter", () => {
+  it.each([false, true])(
+    "forwards the surface class while preserving the shared recipe (desktop: %s)",
+    (desktop) => {
+      isDesktop = desktop;
+      canHover = true;
+      mockNonTouchPointerEnvironment();
+
+      render(
+        <ItemActionMenu
+          actions={[{ key: "share", label: "Share track", onSelect: vi.fn() }]}
+          open
+          position={desktop ? { x: 12, y: 20 } : null}
+          menuRef={createRef<HTMLDivElement>()}
+          onClose={vi.fn()}
+          surfaceClassName="adapter-surface"
+        />,
+      );
+
+      const surface = screen.getByRole("menu").closest(".adapter-surface");
+      expect(surface).toHaveClass("crate-overlay-surface");
+      if (!desktop) expect(surface).toHaveClass("crate-overlay-panel");
+      expect(
+        screen.getByRole("menuitem", { name: "Share track" }),
+      ).toBeInTheDocument();
+    },
+  );
 });

@@ -27,6 +27,7 @@ DEFAULT_SCHEDULES = {
     "federation_directory_refresh": 300,  # 5min — refresh due signed directories
     "global_catalog_reconcile_incremental": 300,  # 5min — drain dirty sources
     "global_catalog_reconcile_full": 43200,  # 12h — verify canonical catalog
+    "refresh_dirty_listening_stats": 300,  # 5min — trailing edge for debounced plays
 }
 
 SCHEDULED_TASKS = [

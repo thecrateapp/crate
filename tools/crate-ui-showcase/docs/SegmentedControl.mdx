@@ -1,0 +1,33 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/SegmentedControl.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+
+<DocHeading as="h1">SegmentedControl</DocHeading>
+
+<EntryDetails
+  id="segmented-control"
+  review="Visual review approved by Diego · 1AR"
+/>
+
+<DocHeading as="h2">Contract</DocHeading>
+
+- Radio or tabs according to the contract. Exclusive selection is not a collection of independent toggles.
+- Arrow keys, Home/End, roving focus and disabled-item skipping are implemented by the real component.
+- 12 px text and 32/44 px minimums. V3 content tabs also have their separate underlined Tabs component.
+
+<DocHeading as="h2">Real component</DocHeading>
+
+<Canvas of={Stories.Keyboard} />
+<Canvas of={Stories.Tabs} />
+<Canvas of={Stories.Tonal} />
+<Canvas of={Stories.FullWidth} />
+<Controls of={Stories.Keyboard} />
+
+Controls expose the actual shared props. Radio and tabs examples keep state in Storybook args; tabs include their matching panel.
+
+The 1AQ reference remains approved. This entry has 1AR changes pending review; consumer adoption and platform QA remain separate.
+
+The root forwards `id`, `aria-labelledby`, `aria-describedby`, `aria-invalid` and `aria-required` supplied by FormField. Use `FormField kind="group"` to associate the visible caption and help/error with this non-labelable group. Radio mode exposes `aria-checked`; tab mode exposes `aria-selected` and controls its panel. Both legacy visual variants share the V3 recipe.

@@ -1,18 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
-import {
-  Loader2,
-  ArrowRight,
-  Server,
-  AlertCircle,
-  CheckCircle2,
-  CRATE_ICON_SIZE,
-} from "@crate/ui/icons";
-import { CrateLogo } from "@crate/ui/domain/brand/CrateLogo";
-import { FormField } from "@crate/ui/primitives/FormField";
-import { Button } from "@crate/ui/shadcn/button";
-import { Input } from "@crate/ui/shadcn/input";
+import { AlertCircle, CheckCircle2, CRATE_ICON_SIZE } from "@crate/ui/icons";
+import { ServerSetupView } from "@/components/auth/ServerSetupView";
 
 import {
   addServer,
@@ -87,7 +77,6 @@ async function probe(url: string): Promise<ProbeState> {
 
 export function ServerSetup() {
   const navigate = useNavigate();
-  const { t } = useTranslation();
   const [url, setUrl] = useState("");
   const [probeState, setProbeState] = useState<ProbeState>({ status: "idle" });
 
@@ -130,102 +119,13 @@ export function ServerSetup() {
   }
 
   return (
-    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-surface-canvas px-6 py-10 text-text-primary">
-      <div className="server-setup-atmosphere pointer-events-none absolute inset-0" />
-      <form
-        onSubmit={handleSubmit}
-        className="relative w-full max-w-[560px] rounded-panel border border-border-quiet bg-surface-elevated/90 p-8 shadow-card backdrop-blur-xl sm:p-10"
-      >
-        <div className="flex flex-col items-center text-center">
-          <div className="mb-5 flex size-20 items-center justify-center rounded-xl border border-accent-action/20 bg-accent-action/10 shadow-accent-action-strong">
-            <CrateLogo title="Crate" className="size-14" />
-          </div>
-          <h1 className="text-balance text-3xl font-bold tracking-display text-text-primary sm:text-4xl">
-            {t("serverSetup.title")}
-          </h1>
-          <p className="mt-3 max-w-md text-sm leading-6 text-text-secondary">
-            {t("serverSetup.description")}
-          </p>
-        </div>
-
-        <FormField
-          label={t("serverSetup.urlLabel")}
-          className="mt-8 gap-2"
-          labelClassName="text-xs font-semibold uppercase tracking-overline text-text-muted"
-        >
-          {(control) => (
-            <div className="relative">
-              <Server
-                size={CRATE_ICON_SIZE.md}
-                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-text-accent/50"
-              />
-              <Input
-                {...control}
-                type="url"
-                inputMode="url"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://api.your-crate.com"
-                className="h-14 rounded-lg bg-text-primary/[0.04] pl-12 pr-4 shadow-none backdrop-blur-none placeholder:text-text-muted/70 hover:border-text-primary/20 focus-visible:border-accent-action/70 focus-visible:bg-text-primary/[0.06] md:text-base"
-                required
-              />
-            </div>
-          )}
-        </FormField>
-
-        {/* Status strip. One line, changes tone based on probeState. */}
-        <StatusLine state={probeState} />
-
-        <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-          <Button
-            type="submit"
-            disabled={probeState.status === "probing"}
-            className="group h-auto min-h-12 flex-1 rounded-lg px-5 font-semibold shadow-action-solid has-[>svg]:px-5"
-          >
-            {probeState.status === "probing" ? (
-              <>
-                <Loader2
-                  size={CRATE_ICON_SIZE.sm}
-                  className="size-4 animate-spin"
-                />
-                {t("serverSetup.checking")}
-              </>
-            ) : (
-              <>
-                {t("serverSetup.continue")}
-                <ArrowRight
-                  size={CRATE_ICON_SIZE.sm}
-                  className="size-4 transition group-hover:translate-x-0.5"
-                />
-              </>
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => setUrl("http://localhost:8585")}
-            className="h-auto min-h-12 rounded-lg border border-border-quiet px-5 font-semibold text-text-secondary-strong hover:border-text-primary/20 hover:bg-text-primary/[0.05] hover:text-text-primary has-[>svg]:px-5"
-          >
-            {t("serverSetup.localDev")}
-          </Button>
-        </div>
-
-        <p className="pt-5 text-center text-[0.75rem] leading-5 text-text-muted">
-          {t("serverSetup.docsPrefix")}{" "}
-          <a
-            href="https://docs.cratemusic.app/technical/development-deployment-and-operations"
-            className="link-accent"
-            target="_blank"
-            rel="noreferrer"
-          >
-            {t("serverSetup.docsLink")}
-          </a>
-          {t("serverSetup.docsSuffix")}
-        </p>
-      </form>
-    </div>
+    <ServerSetupView
+      url={url}
+      onUrlChange={setUrl}
+      busy={probeState.status === "probing"}
+      onSubmit={handleSubmit}
+      status={<StatusLine state={probeState} />}
+    />
   );
 }
 

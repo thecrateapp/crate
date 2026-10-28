@@ -43,9 +43,7 @@ export default defineConfig({
   splitting: true,
   treeshake: true,
   external: [
-    "@solar-icons/react-perf",
-    "@solar-icons/react-perf/Outline",
-    "@solar-icons/react-perf/Bold",
+    /^@solar-icons\/react(\/.*)?$/,
     "react",
     "react-dom",
     "react-router",

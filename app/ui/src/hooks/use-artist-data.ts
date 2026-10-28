@@ -41,6 +41,7 @@ interface EnrichmentData {
     }[];
     total_shows?: number;
     last_show?: { date: string; venue: string; city: string };
+    generated_at?: string | null;
   };
   musicbrainz?: {
     mbid?: string;

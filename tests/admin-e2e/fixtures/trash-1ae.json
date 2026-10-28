@@ -1,0 +1,33 @@
+{
+  "count": 2,
+  "items": [
+    {
+      "quarantine_path": "Costa Norte/Luz de octubre/01.flac",
+      "filename": "01.flac",
+      "size_bytes": 1048576,
+      "modified_at": "2026-10-18T10:00:00Z",
+      "suggested_target_path": "Costa Norte/Luz de octubre/01.flac",
+      "title": "Marea",
+      "artist": "Costa Norte",
+      "album": "Luz de octubre",
+      "track_number": "1",
+      "duration": 213,
+      "sample_rate": 44100,
+      "bit_depth": 16
+    },
+    {
+      "quarantine_path": "Costa Norte/Luz de octubre/02.flac",
+      "filename": "02.flac",
+      "size_bytes": 2097152,
+      "modified_at": "2026-10-18T10:00:00Z",
+      "suggested_target_path": "Costa Norte/Luz de octubre/02.flac",
+      "title": "Noche larga",
+      "artist": "Costa Norte",
+      "album": "Luz de octubre",
+      "track_number": "2",
+      "duration": 242,
+      "sample_rate": 48000,
+      "bit_depth": 24
+    }
+  ]
+}

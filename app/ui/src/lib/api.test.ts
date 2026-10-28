@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { api } from "./api";
 import { createApiClient, ApiError } from "../../../shared/web/api";
 
 describe("createApiClient", () => {
@@ -71,37 +72,152 @@ describe("createApiClient", () => {
 });
 
 describe("api onUnauthorized", () => {
-  it("redirects to login with current path on 401", async () => {
-    const originalHref = window.location.href;
+  it("keeps an authenticated Admin page when a stricter endpoint rejects its session", async () => {
+    const originalLocation = window.location;
     Object.defineProperty(window, "location", {
-      writable: true,
-      value: { pathname: "/dashboard", search: "", hash: "", href: "" },
+      configurable: true,
+      value: { pathname: "/ai", search: "", hash: "", href: "/ai" },
     });
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(
+        async (url: string) =>
+          new Response(
+            url === "/api/auth/me"
+              ? JSON.stringify({ id: 1 })
+              : "Human cookie session required",
+            { status: url === "/api/auth/me" ? 200 : 401 },
+          ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      await expect(api("/api/admin/agent-plans/summary")).rejects.toMatchObject(
+        { status: 401 },
+      );
+      await vi.waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith(
+          "/api/auth/me",
+          expect.objectContaining({
+            credentials: "same-origin",
+            cache: "no-store",
+          }),
+        ),
+      );
+      expect(window.location.href).toBe("/ai");
+    } finally {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: originalLocation,
+      });
+      vi.unstubAllGlobals();
+    }
+  });
 
-    const client = createApiClient({
-      onUnauthorized: () => {
-        if (window.location.pathname !== "/login") {
-          const redirect = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-          window.location.href = `/login?redirect=${encodeURIComponent(
-            redirect,
-          )}`;
-        }
-      },
-    });
+  it.each([401, 503, "network"] as const)(
+    "redirects only for an expired session, not a transient %s check",
+    async (status) => {
+      const originalLocation = window.location;
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: {
+          pathname: "/ai",
+          search: "?tab=providers",
+          hash: "#models",
+          href: "/ai",
+        },
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockImplementation(async (url: string) => {
+          if (url === "/api/auth/me" && status === "network")
+            throw new TypeError("Network unavailable");
+          return new Response("Unavailable", {
+            status:
+              url === "/api/auth/me" && typeof status === "number"
+                ? status
+                : 401,
+          });
+        }),
+      );
+      try {
+        await expect(
+          api("/api/admin/agent-plans/summary"),
+        ).rejects.toMatchObject({ status: 401 });
+        await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(window.location.href).toBe(
+          status === 401
+            ? "/login?redirect=%2Fai%3Ftab%3Dproviders%23models"
+            : "/ai",
+        );
+      } finally {
+        Object.defineProperty(window, "location", {
+          configurable: true,
+          value: originalLocation,
+        });
+        vi.unstubAllGlobals();
+      }
+    },
+  );
 
-    globalThis.fetch = vi.fn().mockResolvedValueOnce({
-      ok: false,
-      status: 401,
-      text: async () => "Unauthorized",
-      headers: new Headers(),
-    });
-
-    await expect(client("/api/test")).rejects.toThrow(ApiError);
-    expect(window.location.href).toBe("/login?redirect=%2Fdashboard");
-
+  it("shares one session check across concurrent endpoint failures", async () => {
+    const originalLocation = window.location;
     Object.defineProperty(window, "location", {
-      writable: true,
-      value: { href: originalHref },
+      configurable: true,
+      value: { pathname: "/ai", href: "/ai" },
     });
+    let finishCheck!: (response: Response) => void;
+    const check = new Promise<Response>((resolve) => {
+      finishCheck = resolve;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(async (url: string) =>
+        url === "/api/auth/me"
+          ? check
+          : new Response("Unauthorized", { status: 401 }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      await Promise.allSettled([
+        api("/api/admin/agent-plans/summary"),
+        api("/api/admin/agent-integrations"),
+      ]);
+      expect(
+        fetchMock.mock.calls.filter(([url]) => url === "/api/auth/me"),
+      ).toHaveLength(1);
+      finishCheck(new Response(JSON.stringify({ id: 1 })));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(window.location.href).toBe("/ai");
+    } finally {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: originalLocation,
+      });
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("does not redirect or recheck the session from the login page", async () => {
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { pathname: "/login", href: "/login" },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("Unauthorized", { status: 401 })),
+    );
+    try {
+      await expect(api("/api/auth/me")).rejects.toMatchObject({ status: 401 });
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(window.location.href).toBe("/login");
+    } finally {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: originalLocation,
+      });
+      vi.unstubAllGlobals();
+    }
   });
 });

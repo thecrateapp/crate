@@ -3,6 +3,8 @@
     "windows": [
       {
         "label": "main",
+        "dragDropEnabled": false,
+        "backgroundThrottling": "disabled",
         "title": "Crate",
         "width": 1280,
         "height": 820,

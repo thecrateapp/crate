@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { AppPopover, AppPopoverDivider, AppMenuButton } from "./AppPopover";
 
 describe("AppPopover", () => {
@@ -41,10 +42,19 @@ describe("AppMenuButton", () => {
     ).toBeInTheDocument();
   });
 
-  it("applies danger styles when danger is true", () => {
-    render(<AppMenuButton danger>Delete</AppMenuButton>);
-    expect(screen.getByRole("button")).toHaveClass(
-      "text-[var(--status-danger-text)]",
+  it("preserves the danger intent and action while using the neutral menu recipe", async () => {
+    const onClick = vi.fn();
+    render(
+      <AppMenuButton danger onClick={onClick}>
+        Delete
+      </AppMenuButton>,
     );
+    const button = screen.getByRole("button", { name: "Delete" });
+
+    expect(button).toHaveAttribute("data-danger", "true");
+    expect(button).toHaveClass("crate-overlay-menu-item");
+    expect(button).not.toHaveClass("text-[var(--status-danger-text)]");
+    await userEvent.click(button);
+    expect(onClick).toHaveBeenCalledTimes(1);
   });
 });

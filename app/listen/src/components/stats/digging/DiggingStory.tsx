@@ -10,9 +10,11 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
 import { CRATE_ICON_SIZE, X } from "@crate/ui/icons";
+import { acquireBodyScrollLock } from "@crate/ui/lib/body-scroll-lock";
 import { IconButton } from "@crate/ui/primitives/IconButton";
 
-import { isMotionBlocked } from "@/lib/motion-availability";
+import { isMotionBlocked } from "../../../lib/motion-availability";
+import { focusWithModality } from "@crate/ui/lib/input-modality";
 
 export const DIGGING_CHAPTER_MS = 5200;
 
@@ -45,8 +47,22 @@ export function DiggingStory({
   );
 
   useEffect(() => {
-    rootRef.current?.focus();
-  }, []);
+    if (!count) return;
+    const previousFocus = document.activeElement;
+    const releaseScroll = acquireBodyScrollLock(document);
+    const root = rootRef.current;
+    focusWithModality(root);
+    return () => {
+      releaseScroll();
+      if (
+        previousFocus instanceof HTMLElement &&
+        previousFocus.isConnected &&
+        (root?.contains(document.activeElement) ||
+          document.activeElement === document.body)
+      )
+        focusWithModality(previousFocus);
+    };
+  }, [count > 0]);
 
   useEffect(() => {
     if (!autoplay.current || paused || last) return;
@@ -55,6 +71,24 @@ export function DiggingStory({
   }, [index, last, paused, step]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Tab") {
+      const controls = Array.from(
+        rootRef.current?.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), a[href], [tabindex='0']",
+        ) ?? [],
+      );
+      const first = controls[0],
+        lastControl = controls[controls.length - 1];
+      if (
+        document.activeElement === rootRef.current ||
+        (event.shiftKey && document.activeElement === first) ||
+        (!event.shiftKey && document.activeElement === lastControl)
+      ) {
+        event.preventDefault();
+        (event.shiftKey ? lastControl : first)?.focus();
+      }
+      return;
+    }
     if (event.key === "ArrowRight") step(1);
     else if (event.key === "ArrowLeft") step(-1);
     else if (event.key === "Escape") onClose();

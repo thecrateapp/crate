@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 
 import { CrateLoader } from "@/components/ui/CrateLoader";
@@ -19,22 +19,31 @@ import {
 
 export function SearchResults() {
   const { t } = useTranslation();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const query = searchParams.get("q") || "";
   const [emptyQuery, setEmptyQuery] = useState("");
-  const [data, setData] = useState<SearchData | null>(null);
+  const [result, setResult] = useState<{
+    query: string;
+    data: SearchData;
+  } | null>(null);
+  const [searching, setSearching] = useState(false);
+  const data = result?.data;
   const [searchError, setSearchError] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
   const { playAll } = usePlayerActions();
 
   useEffect(() => {
     if (!query.trim()) {
-      setData(null);
+      setResult(null);
       setSearchError(null);
+      setSearching(false);
       return;
     }
     const controller = new AbortController();
     setSearchError(null);
+    setSearching(true);
     api<SearchData>(
       "/api/catalog/search?q=" + encodeURIComponent(query) + "&limit=50",
       "GET",
@@ -42,18 +51,21 @@ export function SearchResults() {
       { signal: controller.signal },
     )
       .then((nextData) => {
-        setData(nextData);
+        if (controller.signal.aborted) return;
+        setResult({ query, data: nextData });
         setSearchError(null);
       })
       .catch((error) => {
         if (controller.signal.aborted) return;
-        setData(null);
         setSearchError(
           searchErrorHint(error, {
             sessionRefresh: t("search.sessionRefresh"),
             tryAgain: t("search.tryAgain"),
           }),
         );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSearching(false);
       });
     return () => controller.abort();
   }, [query, retryKey, t]);
@@ -68,7 +80,18 @@ export function SearchResults() {
       <EmptySearchState
         value={emptyQuery}
         onChange={setEmptyQuery}
-        onSearch={(nextQuery) => setSearchParams({ q: nextQuery })}
+        onSearch={(nextQuery) => {
+          const next = new URLSearchParams(searchParams);
+          next.set("q", nextQuery);
+          void navigate(
+            {
+              pathname: location.pathname,
+              search: `?${next}`,
+              hash: location.hash,
+            },
+            { state: location.state },
+          );
+        }}
       />
     );
   }
@@ -86,11 +109,16 @@ export function SearchResults() {
   }
 
   return (
-    <SearchResultsContent
-      data={data}
-      query={query}
-      trackRowData={trackRowData}
-      playAll={playAll}
-    />
+    <div aria-busy={searching || result?.query !== query} className="space-y-6">
+      {searching || result?.query !== query ? (
+        <CrateLoader label={t("search.loadingResults")} />
+      ) : null}
+      <SearchResultsContent
+        data={data}
+        query={result!.query}
+        trackRowData={trackRowData}
+        playAll={playAll}
+      />
+    </div>
   );
 }

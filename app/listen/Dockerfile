@@ -2,7 +2,9 @@
 # Build context: the repository root. app/listen/Dockerfile.dockerignore limits
 # it to the root manifest and lockfile, app/listen and the shared code Listen
 # imports, so the image installs exactly the workspace lockfile.
-FROM node:22-alpine AS build
+# The bundle is the same on every architecture: build it once on the builder's
+# platform and copy it into each architecture's nginx.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS build
 
 WORKDIR /repo
 
@@ -30,7 +32,6 @@ ARG SENTRY_PROJECT=crate-listen
 ARG VITE_CAST_CUSTOM_RECEIVER_ENABLED=false
 ARG VITE_CAST_RECEIVER_APP_ID=CC1AD845
 ARG VITE_CRATE_CONNECT_FEATURE_ENABLED=false
-ARG VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED=false
 RUN if [ "$VITE_CAST_CUSTOM_RECEIVER_ENABLED" = "true" ]; then \
       printf '%s' "$VITE_CAST_RECEIVER_APP_ID" | grep -Eq '^[A-Za-z0-9]{8}$' \
         && [ "$VITE_CAST_RECEIVER_APP_ID" != "CC1AD845" ] \
@@ -44,8 +45,7 @@ ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN \
     SENTRY_RELEASE=$VITE_SENTRY_RELEASE \
     VITE_CAST_CUSTOM_RECEIVER_ENABLED=$VITE_CAST_CUSTOM_RECEIVER_ENABLED \
     VITE_CAST_RECEIVER_APP_ID=$VITE_CAST_RECEIVER_APP_ID \
-    VITE_CRATE_CONNECT_FEATURE_ENABLED=$VITE_CRATE_CONNECT_FEATURE_ENABLED \
-    VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED=$VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED
+    VITE_CRATE_CONNECT_FEATURE_ENABLED=$VITE_CRATE_CONNECT_FEATURE_ENABLED
 # Skip tsc typecheck in Docker (CI handles it separately).
 RUN --mount=type=secret,id=sentry_auth_token,required=false \
     if [ -s /run/secrets/sentry_auth_token ]; then \

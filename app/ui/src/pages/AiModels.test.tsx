@@ -130,7 +130,9 @@ describe("AiModels", () => {
     }));
     renderWithAdminProviders(<AiModels />);
 
-    expect(screen.getByText("Loading AI settings…")).toBeVisible();
+    expect(
+      screen.getByRole("status", { name: "Loading AI settings" }),
+    ).toBeVisible();
   });
 
   it("shows a readable error state with a retry control", () => {
@@ -214,5 +216,43 @@ describe("AiModels", () => {
     renderWithAdminProviders(<AiModels />);
 
     expect(screen.getByText("Default model unavailable")).toBeVisible();
+  });
+
+  it("exposes usage failures and retries their read without hiding AI configuration", () => {
+    const retry = vi.fn();
+    useApiMock.mockReset().mockImplementation((url: string | null) => ({
+      data: url?.endsWith("/snapshot")
+        ? migratedSnapshot()
+        : url?.includes("/activity")
+          ? activityFixture
+          : null,
+      loading: false,
+      error: url?.endsWith("/usage") ? "network failure" : null,
+      refetch: retry,
+    }));
+    renderWithAdminProviders(<AiModels />);
+    expect(screen.getByText("AI usage could not be loaded.")).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Default model" }),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(retry).toHaveBeenCalledOnce();
+  });
+
+  it("identifies failed recent-run context independently from an empty history", () => {
+    const retry = vi.fn();
+    useApiMock.mockReset().mockImplementation((url: string | null) => ({
+      data: url?.endsWith("/snapshot") ? migratedSnapshot() : null,
+      loading: false,
+      error: url?.includes("/activity?limit=50") ? "network failure" : null,
+      refetch: retry,
+    }));
+    renderWithAdminProviders(<AiModels />);
+    expect(
+      screen.getByText("Recent feature runs could not be loaded."),
+    ).toBeVisible();
+    expect(screen.queryByText("No recent runs")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry recent runs" }));
+    expect(retry).toHaveBeenCalledOnce();
   });
 });

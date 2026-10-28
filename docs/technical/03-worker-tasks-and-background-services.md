@@ -54,7 +54,9 @@ run every concern inside a single container anymore.
 Current production split:
 
 - `crate-worker`: `fast,default` queues, service loop, scheduler, watcher,
-  imports, cleanup, Telegram, and write-capable general work.
+  imports, cleanup, health snapshot, and write-capable general work. Telegram
+  control is Crate Agent or Crate Operator (see `crate-agent.md`); the worker
+  no longer runs a bot.
 - `crate-maintenance-worker`: `maintenance` queue for repair/sync/enrichment
   style work that can be deferred.
 - `crate-analysis-worker`: `heavy` queue for CPU/DSP-heavy analysis,
@@ -321,7 +323,6 @@ coverage: exhausted failures and missing/outdated profiles remain separate obser
 See [Smart Mix operation](smart-mix-operations.md) for backfill priority, generations,
 publication outcomes and the diagnostic sequence.
 
-
 ## Deferral, cancellation acknowledgement and replay
 
 Verified against implementation and tests on 2026-10-21. Queue assignment is defined by
@@ -355,7 +356,7 @@ requires a supported failed task, no cancellation uncertainty, depth/budget chec
 current grants for the underlying work. It creates a provenance-linked retry, rather than
 resetting arbitrary work. Agent-origin handlers recheck authority before effects. Inspect
 execution, verification and projection in the durable result separately and reconcile
-uncertain outcomes before preparing another plan. The default Hermes pilot has read grants
+uncertain outcomes before preparing another plan. The default read-only Crate Agent has read grants
 only and cannot perform these controls.
 
 Sources: `app/crate/actors.py`, `app/crate/resource_governor.py`,

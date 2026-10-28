@@ -1,0 +1,17 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/ArtistBioText.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">ArtistBioText</DocHeading>
+<EntryDetails id="domain-artistbiotext" review="1BC · Artist reconciliation" />
+
+Shared biography text and safe external links, preserving punctuation and URL-aware truncation.
+
+Listen artist hero/profile; Admin artist About/Overview.
+
+The approved mockup and later confirmed decisions remain the reference. App adapters retain managed image recovery, authorization, routing, i18n, API and playback. Fixture callbacks are local. Captions use MonoLabel; names and prose preserve case. No new app contexts or synthetic data enter shared UI.
+
+<Canvas of={Stories.Base} />
+<Controls of={Stories.Base} />

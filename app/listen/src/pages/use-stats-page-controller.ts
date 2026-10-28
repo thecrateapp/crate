@@ -16,10 +16,14 @@ import {
 import type { TrackRowData } from "@/components/cards/TrackRowModel";
 import { usePlayerActions, type PlaySource } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
+import { shuffleArray } from "@/lib/utils";
 import { usePendingStatsSnapshotRefresh } from "@/hooks/use-pending-stats-snapshot-refresh";
 import {
   STATS_DASHBOARD_LIMITS,
+  buildPreviousSoundProfile,
   buildSoundProfile,
+  pickEnergeticFavourite,
+  type EnergeticFavourite,
   formatMonthTitle,
   normalizeMonthParam,
   normalizeSelectionParam,
@@ -35,25 +39,30 @@ const EMPTY_TOP_ARTISTS: StatsDashboard["top_artists"]["items"] = [];
 const EMPTY_TOP_ALBUMS: StatsDashboard["top_albums"]["items"] = [];
 const EMPTY_TOP_GENRES: StatsDashboard["top_genres"]["items"] = [];
 const EMPTY_REPLAY_ITEMS: ReplayMix["items"] = [];
-const EMPTY_DISCOVERIES: StatsStory["discoveries"] = [];
 
 export interface StatsPageController {
   changeSelection: (selection: StatsSelection) => void;
   dashboard: StatsDashboard | null | undefined;
   dashboardLoading: boolean;
-  discoveries: StatsStory["discoveries"];
+  dashboardError: string | null;
+  retryDashboard: () => void;
   hasStats: boolean;
   isGlobalStats: boolean;
   isUserStats: boolean;
   kicker: string;
   overview: StatsDashboard["overview"] | undefined;
   playReplay: () => void;
+  shuffleReplay: () => void;
+  rangeEndpoint: string;
+  replay: ReplayMix | undefined;
   replayItems: ReplayMix["items"];
   selectedMonth: string | null;
   selection: StatsSelection;
   selectionOptions: StatsSelectionOption[];
   signalTitle: { lead: string; accent: string };
   soundProfile: SoundProfile;
+  previousSoundProfile: SoundProfile | null;
+  energeticFavourite: EnergeticFavourite | null;
   subjectName: string | null;
   t: ReturnType<typeof useTranslation>["t"];
   today: StatsToday | null;
@@ -75,6 +84,17 @@ function buildStatsEndpoint(
     return `/api/users/${encodeURIComponent(username)}/stats/dashboard`;
   }
   return "/api/me/stats/dashboard";
+}
+
+function buildRangeEndpoint(
+  isGlobalStats: boolean,
+  username: string | undefined,
+): string {
+  if (isGlobalStats) return "/api/stats/range";
+  if (username) {
+    return `/api/users/${encodeURIComponent(username)}/stats/range`;
+  }
+  return "/api/me/stats/range";
 }
 
 function buildKicker(
@@ -142,6 +162,7 @@ export function useStatsPageController(): StatsPageController {
   const {
     data: dashboard,
     loading: dashboardLoading,
+    error: dashboardError,
     refetch: refetchDashboard,
   } = useApi<StatsDashboard>(
     `${statsEndpoint}?${periodQuery}&${STATS_DASHBOARD_LIMITS}`,
@@ -185,23 +206,38 @@ export function useStatsPageController(): StatsPageController {
     });
   }
 
+  function shuffleReplay() {
+    if (!replayItems.length) return;
+    playAll(shuffleArray(replayItems.map(toPlayerTrack)), 0, {
+      type: "playlist",
+      name: replayTitle,
+    });
+  }
+
   return {
     changeSelection,
     dashboard,
     dashboardLoading,
-    discoveries: story?.discoveries ?? EMPTY_DISCOVERIES,
-    hasStats: Boolean(overview?.play_count),
+    dashboardError,
+    retryDashboard: refetchDashboard,
+    hasStats:
+      Boolean(overview?.play_count) || dashboard?.snapshot?.pending === true,
     isGlobalStats,
     isUserStats,
     kicker: buildKicker(isGlobalStats, isUserStats, subjectName, t),
     overview,
     playReplay,
+    shuffleReplay,
+    rangeEndpoint: buildRangeEndpoint(isGlobalStats, username),
+    replay,
     replayItems,
     selectedMonth,
     selection,
     selectionOptions,
     signalTitle: buildSignalTitle(selectedMonth, selection, i18n.language, t),
     soundProfile: buildStatsSoundProfile(story, topTrackItems),
+    previousSoundProfile: buildPreviousSoundProfile(story),
+    energeticFavourite: pickEnergeticFavourite(topTrackItems),
     subjectName,
     t,
     today: today ?? null,

@@ -25,6 +25,7 @@ def _context(
     automatic: bool = True,
     preferred_duration_ms: int = 6_000,
     allow_bass_handoff: bool = False,
+    allow_long_beatmatch: bool = False,
 ) -> TransitionContext:
     return TransitionContext(
         source=source,
@@ -35,6 +36,7 @@ def _context(
         allow_beatmatch=True,
         allow_tempo_adjustment=True,
         allow_bass_handoff=allow_bass_handoff,
+        allow_long_beatmatch=allow_long_beatmatch,
     )
 
 
@@ -746,3 +748,76 @@ def test_active_end_bounds_the_transition_before_trailing_silence() -> None:
     )
 
     assert plan.outgoing_cue_ms + plan.duration_ms <= 172_000
+
+
+def test_long_beatmatch_mixes_over_the_longest_phrase_that_fits() -> None:
+    plan = plan_transition(
+        _profile("outgoing"),
+        _profile("incoming"),
+        _context(source="playlist", allow_long_beatmatch=True),
+    )
+
+    assert plan.mode is TransitionMode.BEATMATCH
+    assert plan.curve == "dj-blend"
+    assert plan.duration_ms == 32_000
+    assert plan.outgoing_cue_ms + plan.duration_ms <= 180_000
+
+
+def test_long_beatmatch_drops_to_a_shorter_phrase_when_the_intro_is_short() -> None:
+    plan = plan_transition(
+        _profile("outgoing"),
+        _profile("incoming", duration_ms=40_000),
+        _context(source="playlist", allow_long_beatmatch=True),
+    )
+
+    assert plan.mode is TransitionMode.BEATMATCH
+    assert plan.curve == "dj-blend"
+    assert plan.duration_ms == 16_000
+
+
+def test_long_beatmatch_keeps_the_short_mix_when_no_phrase_fits() -> None:
+    plan = plan_transition(
+        _profile("outgoing"),
+        _profile("incoming", duration_ms=25_000),
+        _context(source="playlist", allow_long_beatmatch=True),
+    )
+
+    assert plan.mode is TransitionMode.BEATMATCH
+    assert plan.curve == "equal-power"
+    assert plan.duration_ms == 6_000
+
+
+def test_clients_without_long_beatmatch_keep_the_short_equal_power_mix() -> None:
+    plan = plan_transition(
+        _profile("outgoing"),
+        _profile("incoming"),
+        _context(source="playlist"),
+    )
+
+    assert plan.mode is TransitionMode.BEATMATCH
+    assert plan.curve == "equal-power"
+    assert plan.duration_ms == 6_000
+
+
+def test_long_beatmatch_never_applies_to_a_crossfade_fallback() -> None:
+    plan = plan_transition(
+        _profile("outgoing", bpm_confidence=0.2),
+        _profile("incoming"),
+        _context(source="playlist", allow_long_beatmatch=True),
+    )
+
+    assert plan.mode is TransitionMode.ADAPTIVE
+    assert plan.curve == "equal-power"
+    assert plan.duration_ms <= PLANNER_POLICY.maximum_transition_ms
+
+
+def test_long_beatmatch_needs_whole_track_tempo_stability() -> None:
+    plan = plan_transition(
+        _profile("outgoing", tempo_stability=0.85),
+        _profile("incoming"),
+        _context(source="playlist", allow_long_beatmatch=True),
+    )
+
+    assert plan.mode is TransitionMode.BEATMATCH
+    assert plan.curve == "equal-power"
+    assert plan.duration_ms == 6_000

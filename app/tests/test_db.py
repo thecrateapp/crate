@@ -1894,7 +1894,12 @@ class TestTaskCRUD:
                     },
                 )
 
-        with patch("crate.db.repositories.tasks_maintenance.dispatch_task") as dispatch:
+        with (
+            patch("crate.db.repositories.tasks_maintenance.dispatch_task") as dispatch,
+            patch(
+                "crate.db.repositories.tasks_shared._publish_task_transition_signal"
+            ) as publish_transition,
+        ):
             cleaned = cleanup_zombie_tasks(
                 heartbeat_timeout_min=5, no_heartbeat_timeout_min=3
             )
@@ -1908,6 +1913,32 @@ class TestTaskCRUD:
         assert retryable["retry_count"] == 1
         assert retryable["error"] == "Worker died (no heartbeat); requeued"
         assert pg_db.get_task(healthy_task)["status"] == "running"
+        transitions = [call.args[0] for call in publish_transition.call_args_list]
+        assert {transition["id"] for transition in transitions} == {
+            stale_heartbeat_task,
+            stale_updated_task,
+            stale_retryable_task,
+        }
+        assert sorted(transition["status"] for transition in transitions) == [
+            "failed",
+            "failed",
+            "pending",
+        ]
+
+    def test_cleanup_orphaned_tasks_publishes_failure_transition(self, pg_db):
+        from crate.db.tasks import cleanup_orphaned_tasks
+
+        task_id = pg_db.create_task("scan")
+        pg_db.start_task(task_id, worker_id="worker-test")
+        with patch(
+            "crate.db.repositories.tasks_shared._publish_task_transition_signal"
+        ) as publish_transition:
+            assert cleanup_orphaned_tasks() == 1
+
+        transitions = [call.args[0] for call in publish_transition.call_args_list]
+        assert len(transitions) == 1
+        assert transitions[0]["id"] == task_id
+        assert transitions[0]["status"] == "failed"
 
     def test_start_task_atomically_claims_pending_row_with_heartbeat(self, pg_db):
         task_id = pg_db.create_task("scan")
@@ -2360,6 +2391,25 @@ class TestHomeCaching:
         pg_db.update_task(task_id, status="running")
         task = pg_db.get_task(task_id)
         assert task["status"] == "running"
+
+    def test_task_lifecycle_publishes_each_committed_status_transition(self, pg_db):
+        with (
+            patch("crate.db.repositories.tasks_shared.publish_tasks_surface_signal"),
+            patch(
+                "crate.db.repositories.tasks_shared._publish_task_transition_signal"
+            ) as publish_transition,
+        ):
+            task_id = pg_db.create_task("scan")
+            pg_db.start_task(task_id, worker_id="worker-test")
+            pg_db.update_task(task_id, status="completed")
+
+        transitions = [call.args[0] for call in publish_transition.call_args_list]
+        assert [transition["status"] for transition in transitions] == [
+            "pending",
+            "running",
+            "completed",
+        ]
+        assert all(transition["id"] == task_id for transition in transitions)
 
     def test_update_task_progress(self, pg_db):
         task_id = pg_db.create_task("scan")

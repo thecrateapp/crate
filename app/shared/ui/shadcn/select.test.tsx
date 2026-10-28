@@ -42,6 +42,15 @@ describe("Select", () => {
     expect(dialog?.contains(content)).toBe(false);
   });
 
+  it("keeps the keyboard outline inside each portalled option", () => {
+    render(<ModalSelect />);
+
+    for (const item of screen.getAllByRole("option")) {
+      expect(item).toHaveClass("crate-focus-inset");
+      expect(item).not.toHaveClass("outline-hidden");
+    }
+  });
+
   it("dismisses only the select when Escape is pressed inside a modal", () => {
     const onClose = vi.fn();
     render(<ModalSelect onClose={onClose} />);
@@ -49,5 +58,31 @@ describe("Select", () => {
     fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
 
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("uses the shared field recipe while retaining invalid and label attributes", () => {
+    const ref = { current: null as HTMLButtonElement | null };
+    render(
+      <Select defaultValue="private">
+        <SelectTrigger
+          ref={ref}
+          aria-label="Visibility"
+          aria-invalid
+          aria-describedby="visibility-error"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <p id="visibility-error">Choose visibility</p>
+      </Select>,
+    );
+    const trigger = screen.getByRole("combobox", { name: "Visibility" });
+    expect(ref.current).toBe(trigger);
+    expect(trigger).toHaveClass("crate-form-control");
+    expect(trigger).toHaveAttribute("aria-invalid", "true");
+    expect(trigger).toHaveAccessibleDescription("Choose visibility");
+    expect(trigger.className).not.toMatch(
+      /state-danger|backdrop-blur|shadow-control/,
+    );
+    expect(trigger).not.toHaveClass("outline-none", "outline-hidden");
   });
 });

@@ -1,0 +1,495 @@
+# Crate installation manifest.
+#
+# Single source of truth for the configuration the `crate` installer writes
+# to `.env`. Every variable docker-compose.home.yaml reads is declared here,
+# and app/installer tests fail when the two drift apart.
+#
+#   core          values the wizard asks for or derives from the answers
+#   generated     secrets created once and kept when the install is reconfigured
+#   tuning        knobs with safe compose defaults; never asked
+#   integrations  optional features the user can enable, with their variables
+#
+# installer_only variables stay in .env for the installer and the compose CLI;
+# no container reads them. transient variables are handed to a setup step and
+# never written to .env.
+
+version: 1
+
+core:
+  - env: TZ
+    label: Timezone
+  - env: PUID
+    label: User id that owns the files
+  - env: PGID
+    label: Group id that owns the files
+  - env: DOCKER_GID
+    label: Group id of the Docker socket
+  - env: MUSIC_DIR
+    label: Music library
+  - env: DATA_DIR
+    label: Crate data
+  - env: CACHE_DIR
+    label: Transcode and artwork cache
+  - env: DOWNLOADS_DIR
+    label: Downloads waiting to be imported
+  - env: DOMAIN
+    label: Base domain
+  - env: CRATE_LISTEN_PUBLIC_BASE_URL
+    label: Public Listen URL
+  - env: CRATE_PUBLIC_API_BASE_URL
+    label: Public API URL
+  - env: CRATE_INSTANCE_NAME
+    label: Instance name
+  - env: CRATE_ACCESS_MODE
+    label: Access mode
+    installer_only: true
+  - env: CRATE_LOCAL_DOMAIN
+    label: Local domain
+    installer_only: true
+  # Read by the docker compose CLI itself, not interpolated in the file.
+  - env: COMPOSE_PROFILES
+    label: Optional services
+    installer_only: true
+  - env: COMPOSE_FILE
+    label: Compose files
+    installer_only: true
+  - env: CF_DNS_API_TOKEN
+    label: Cloudflare DNS API token
+    secret: true
+  - env: TRAEFIK_HTTP_PORT
+    label: HTTP port
+  - env: TRAEFIK_HTTPS_PORT
+    label: HTTPS port
+  - env: TRAEFIK_TLS_ENABLED
+    label: HTTPS through Traefik
+  - env: TRAEFIK_SECURE_ENTRYPOINT
+    label: Traefik secure entrypoint
+  - env: TRAEFIK_CERT_RESOLVER
+    label: Traefik certificate resolver
+  - env: CRATE_API_PORT
+    label: API port
+  - env: CRATE_ADMIN_PORT
+    label: Admin port
+  - env: CRATE_LISTEN_PORT
+    label: Listen port
+  - env: CRATE_IMAGE_TAG
+    label: Image tag
+  - env: CRATE_IMAGE_OWNER
+    label: Image owner
+  - env: CRATE_IMAGE_REGISTRY
+    label: Image registry
+  - env: CRATE_CONFIG_FILE
+    label: Crate config file
+  - env: POSTGRES_SUPERUSER_USER
+    label: Postgres superuser
+  - env: POSTGRES_SUPERUSER_DB
+    label: Postgres superuser database
+  - env: CRATE_POSTGRES_USER
+    label: Postgres user
+  - env: CRATE_POSTGRES_DB
+    label: Postgres database
+  - env: DEFAULT_ADMIN_PASSWORD
+    label: Initial admin password
+    secret: true
+
+generated:
+  - env: JWT_SECRET
+    format: hex32
+  - env: CRATE_POSTGRES_PASSWORD
+    format: hex16
+  - env: POSTGRES_SUPERUSER_PASSWORD
+    format: same:CRATE_POSTGRES_PASSWORD
+  - env: REDIS_PASSWORD
+    format: hex32
+  - env: CRATE_READPLANE_SERVICE_TOKEN
+    format: hex32
+  - env: CRATE_CREDENTIAL_KEY
+    format: fernet
+  - env: CRATE_FEDERATION_SUBJECT_SECRET
+    format: hex32
+  - env: CRATE_FEDERATION_CURSOR_SECRET
+    format: hex32
+
+tuning:
+  - ANALYSIS_LEGACY_POOL_MAXCONN
+  - ANALYSIS_SQLALCHEMY_MAX_OVERFLOW
+  - ANALYSIS_SQLALCHEMY_POOL_SIZE
+  - ANALYSIS_WORKER_PROCESSES
+  - CRATE_AGENT_IMAGE
+  - CRATE_AGENT_INSTANCE_ID
+  - CRATE_AGENT_MCP_HOST
+  - CRATE_AGENT_MCP_URL
+  - CRATE_ANALYSIS_WORKER_IMAGE
+  - CRATE_ANDROID_BASS_HANDOFF_ENABLED
+  - CRATE_ANDROID_BEATMATCH_ENABLED
+  - CRATE_ANDROID_NATIVE_CROSSFADE_ENABLED
+  - CRATE_API_IMAGE
+  - CRATE_CREDENTIAL_PREVIOUS_KEYS
+  - CRATE_DOCKER_SOCKET
+  - CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES
+  - CRATE_FEDERATION_IMPORT_GLOBAL_RESERVED_BYTES
+  - CRATE_FEDERATION_IMPORT_LEASE_SECONDS
+  - CRATE_FEDERATION_IMPORT_MAX_BYTES
+  - CRATE_FEDERATION_IMPORT_PEER_RESERVED_BYTES
+  - CRATE_INFRA_RELAY_GID
+  - CRATE_LISTEN_IMAGE
+  - CRATE_MAINTENANCE_WINDOW_ENABLED
+  - CRATE_MAINTENANCE_WINDOW_END
+  - CRATE_MAINTENANCE_WINDOW_FINGERPRINT_LIMIT
+  - CRATE_MAINTENANCE_WINDOW_START
+  - CRATE_MCP_HEALTH_FRESH_SECONDS
+  - CRATE_MCP_HEALTH_STALE_SECONDS
+  - CRATE_MCP_HEARTBEAT_FRESH_SECONDS
+  - CRATE_MCP_OPS_FRESH_SECONDS
+  - CRATE_MCP_OPS_STALE_SECONDS
+  - CRATE_MEDIA_WORKER_IMAGE
+  - CRATE_MEDIA_WORKER_MAX_ACTIVE
+  - CRATE_METRICS_REDIS_TTL_SECONDS
+  - CRATE_OPERATOR_PRINCIPAL_IDS
+  - CRATE_OPERATOR_ROOT
+  - CRATE_PLAYBACK_WORKER_IMAGE
+  - CRATE_PROJECTOR_BATCH_LIMIT
+  - CRATE_PROJECTOR_INTERVAL_SECONDS
+  - CRATE_READPLANE_IMAGE
+  - CRATE_RELEASE_SHA
+  - CRATE_RESOURCE_DEFER_SECONDS
+  - CRATE_RESOURCE_GOVERNOR_ENABLED
+  - CRATE_RESOURCE_MAX_ACTIVE_STREAMS
+  - CRATE_RESOURCE_MAX_ACTIVE_USERS
+  - CRATE_RESOURCE_MAX_IOWAIT_PERCENT
+  - CRATE_RESOURCE_MAX_LOAD_RATIO
+  - CRATE_RESOURCE_MAX_SWAP_PERCENT
+  - CRATE_RESOURCE_MIN_MEMORY_AVAILABLE_PERCENT
+  - CRATE_RESOURCE_MIN_SWAP_USED_MB
+  - CRATE_SMART_MIX_ENABLED
+  - CRATE_SSE_REDIS_MAX_CONNECTIONS
+  - CRATE_STREAM_CACHE_CLEANUP_MAX_FILES
+  - CRATE_STREAM_CACHE_LOW_WATERMARK_BYTES
+  - CRATE_STREAM_CACHE_MAX_BYTES
+  - CRATE_STREAM_CACHE_MAX_IDLE_SECONDS
+  - CRATE_STREAM_CACHE_ORPHAN_GRACE_SECONDS
+  - CRATE_UI_IMAGE
+  - CRATE_WORKER_FFMPEG_THREADS
+  - CRATE_WORKER_IMAGE
+  - CRATE_WORKER_LEGACY_POOL_MAXCONN
+  - CRATE_WORKER_NATIVE_THREADS
+  - CRATE_WORKER_PROCESSES
+  - CRATE_WORKER_SQLALCHEMY_MAX_OVERFLOW
+  - CRATE_WORKER_SQLALCHEMY_POOL_SIZE
+  - FAST_WORKER_PROCESSES
+  - MAINTENANCE_LEGACY_POOL_MAXCONN
+  - MAINTENANCE_SQLALCHEMY_MAX_OVERFLOW
+  - MAINTENANCE_SQLALCHEMY_POOL_SIZE
+  - MAINTENANCE_WORKER_PROCESSES
+  - PLAYBACK_LEGACY_POOL_MAXCONN
+  - PLAYBACK_SQLALCHEMY_MAX_OVERFLOW
+  - PLAYBACK_SQLALCHEMY_POOL_SIZE
+  - PLAYBACK_WORKER_PROCESSES
+  - PROJECTOR_LEGACY_POOL_MAXCONN
+  - PROJECTOR_SQLALCHEMY_MAX_OVERFLOW
+  - PROJECTOR_SQLALCHEMY_POOL_SIZE
+  - READPLANE_ENABLED
+  - READPLANE_ENABLE_SSE
+  - READPLANE_FALLBACK_ENABLED
+  - READPLANE_FEDERATION_CONNECT_TIMEOUT_MS
+  - READPLANE_FEDERATION_CONTROL_TIMEOUT_MS
+  - READPLANE_FEDERATION_HEADER_TIMEOUT_MS
+  - READPLANE_FEDERATION_PROXY_ENABLED
+  - READPLANE_LOCAL_MEDIA_ENABLED
+  - READPLANE_MAX_DB_CONNS
+  - READPLANE_MIN_DB_CONNS
+  - READPLANE_QUERY_TIMEOUT_MS
+  - READPLANE_ROUTE_MODE
+  - READPLANE_SESSION_TOUCH_INTERVAL_SECONDS
+  - READPLANE_SNAPSHOT_MAX_AGE_SECONDS
+  - READPLANE_STALE_MAX_AGE_SECONDS
+  - READPLANE_STATS_SNAPSHOT_MAX_AGE_SECONDS
+  - READPLANE_STATS_STALE_MAX_AGE_SECONDS
+  - SETLISTFM_SHOWS_SYNC_ENABLED
+  - SETLISTFM_SHOWS_SYNC_MAX_ARTISTS
+  - STREAM_TRANSCODE_MAX_CONCURRENT
+
+integrations:
+  - id: lastfm
+    group: enrichment
+    title: Last.fm
+    tagline: biographies, tags and similar artists
+    summary: Artist biographies, tags, similar artists and listening data.
+    recommended: true
+    env:
+      - name: LASTFM_APIKEY
+        label: API key
+        secret: true
+      - name: LASTFM_API_SECRET
+        label: Shared secret
+        secret: true
+    get_key:
+      url: https://www.last.fm/api/account/create
+      steps:
+        - Sign in to Last.fm and open the API account page.
+        - Name the application after your Crate instance; the callback URL can stay empty.
+        - Copy the API key and the shared secret.
+    validate: lastfm
+
+  - id: fanart
+    group: enrichment
+    title: Fanart.tv
+    tagline: artist photos and logos
+    summary: Artist photos, logos and backgrounds.
+    recommended: true
+    env:
+      - name: FANART_API_KEY
+        label: Personal API key
+        secret: true
+    get_key:
+      url: https://fanart.tv/get-an-api-key/
+      steps:
+        - Create a free fanart.tv account.
+        - Open your profile and copy the personal API key.
+    validate: fanart
+
+  - id: spotify
+    group: enrichment
+    title: Spotify
+    tagline: popularity and artwork
+    summary: Popularity signals and artwork for your artists.
+    env:
+      - name: SPOTIFY_ID
+        label: Client ID
+      - name: SPOTIFY_SECRET
+        label: Client secret
+        secret: true
+    get_key:
+      url: https://developer.spotify.com/dashboard
+      steps:
+        - Create an app in the Spotify developer dashboard.
+        - Any redirect URI works; Crate only uses client credentials.
+        - Copy the client ID and the client secret.
+    validate: spotify
+
+  - id: discogs
+    group: enrichment
+    title: Discogs
+    tagline: credits, labels and editions
+    summary: Credits, labels and release editions.
+    env:
+      - name: DISCOGS_CONSUMER_KEY
+        label: Consumer key
+      - name: DISCOGS_CONSUMER_SECRET
+        label: Consumer secret
+        secret: true
+    get_key:
+      url: https://www.discogs.com/settings/developers
+      steps:
+        - Register a new application in your Discogs developer settings.
+        - Copy the consumer key and the consumer secret.
+    validate: discogs
+
+  - id: setlistfm
+    group: shows
+    title: Setlist.fm
+    tagline: probable setlists
+    summary: Probable setlists for your artists' upcoming shows.
+    env:
+      - name: SETLISTFM_API_KEY
+        label: API key
+        secret: true
+    get_key:
+      url: https://www.setlist.fm/settings/api
+      steps:
+        - Sign in to setlist.fm and apply for an API key for non-commercial use.
+        - The key arrives on the same page once approved.
+    validate: setlistfm
+
+  - id: ticketmaster
+    group: shows
+    title: Ticketmaster
+    tagline: upcoming concerts
+    summary: Upcoming concerts for the artists in your library.
+    env:
+      - name: TICKETMASTER_API_KEY
+        label: Consumer key
+        secret: true
+    get_key:
+      url: https://developer.ticketmaster.com/user/me/apps
+      steps:
+        - Create a Ticketmaster developer account.
+        - Open My Apps and copy the consumer key of the default app.
+    validate: ticketmaster
+
+  - id: soulseek
+    group: acquisition
+    title: Soulseek
+    tagline: downloads through slskd
+    summary: Search and download from the Soulseek network through slskd.
+    env:
+      - name: SLSKD_URL
+        label: slskd URL
+        placeholder: http://192.168.1.20:5030
+      - name: SLSKD_API_KEY
+        label: slskd API key
+        secret: true
+      - name: SLSKD_SLSK_USERNAME
+        label: Soulseek username
+      - name: SLSKD_SLSK_PASSWORD
+        label: Soulseek password
+        secret: true
+      - name: SLSKD_LISTEN_PORT
+        label: Soulseek listening port
+        default: "50300"
+    get_key:
+      url: https://github.com/slskd/slskd
+      steps:
+        - Crate can run slskd for you, or use an slskd server you already have.
+        - With Crate's slskd, pick a Soulseek username and password; the network creates the account the first time it signs in.
+        - Forward the listening port on your router so other users can reach you; searches work without it, downloads get faster with it.
+    validate: slskd
+
+  - id: tidal
+    group: acquisition
+    title: Tidal
+    tagline: lossless downloads
+    summary: Download lossless albums with your Tidal subscription.
+    env: []
+    get_key:
+      url: https://tidal.com/activate
+      steps:
+        - Tidal uses a device code instead of an API key.
+        - After Crate starts, open Admin > Settings > Downloads and connect Tidal.
+    validate: tidal
+
+  - id: ai
+    group: ai
+    title: AI models
+    tagline: Gemini, OpenAI, Anthropic or Ollama
+    summary: Biographies, playlist ideas and agents through Gemini, OpenAI, Anthropic or a local Ollama.
+    env:
+      - name: LLM_PROVIDER
+        label: Default model
+      - name: GEMINI_API_KEY
+        label: Gemini API key
+        secret: true
+      - name: OPENAI_API_KEY
+        label: OpenAI API key
+        secret: true
+      - name: ANTHROPIC_API_KEY
+        label: Anthropic API key
+        secret: true
+      - name: OLLAMA_URL
+        label: Ollama URL
+      - name: AUDIOMUSE_GEMINI_API_KEY
+        label: Gemini API key for AudioMuse
+        secret: true
+    get_key:
+      url: https://aistudio.google.com/app/apikey
+      steps:
+        - Gemini keys come from Google AI Studio; it has a free tier.
+        - OpenAI keys come from https://platform.openai.com/api-keys
+        - Anthropic keys come from https://console.anthropic.com/settings/keys
+        - Ollama runs locally and needs no key; point Crate at its URL.
+    validate: ai
+
+  - id: mcp
+    group: ai
+    title: Agents (MCP)
+    tagline: Claude, Codex and other agents
+    summary: Let Claude, Codex and other agents read and operate Crate.
+    env:
+      - name: CRATE_MCP_ENABLED
+        label: Enable the MCP endpoint
+      - name: CRATE_MCP_ACTIONS_ENABLED
+        label: Allow agents to change things
+      - name: CRATE_MCP_OAUTH_ENABLED
+        label: OAuth for agents
+      - name: CRATE_MCP_OAUTH_ISSUER
+        label: OAuth issuer URL
+      - name: CRATE_MCP_OAUTH_ALLOW_LOCALHOST
+        label: Allow localhost OAuth clients
+      - name: CRATE_MCP_ALLOWED_ORIGINS
+        label: Allowed origins
+      - name: CRATE_MCP_ALLOWED_HOSTS
+        label: Allowed hosts
+      - name: CRATE_MCP_ADMIN_ORIGINS
+        label: Admin origins
+    get_key:
+      url: https://cratemusic.app/docs
+      steps:
+        - Agents connect with tokens you create in Admin > Agents.
+
+  - id: agent
+    group: ai
+    title: Crate Agent
+    tagline: ask about your Crate on Telegram
+    summary: A Telegram bot that answers questions about your library, jobs and health. It only reads; Crate Operator, which `crate configure agent` sets up, can also make changes you approve.
+    env:
+      - name: CRATE_AGENT_MODE
+        label: Mode
+        installer_only: true
+      - name: CRATE_AGENT_PROVIDER
+        label: Model provider
+      - name: CRATE_AGENT_MODEL
+        label: Model
+      - name: CRATE_AGENT_BASE_URL
+        label: Model base URL
+      - name: AGENT_TELEGRAM_TOKEN
+        label: Telegram bot token
+        secret: true
+        transient: true
+      - name: AGENT_ALLOWED_USERS
+        label: Telegram user IDs allowed to use the bot
+        transient: true
+      - name: AGENT_MODEL_API_KEY
+        label: Model API key
+        secret: true
+        transient: true
+      - name: AGENT_APPROVER_EMAIL
+        label: Email of the admin who approves changes
+        transient: true
+      - name: AGENT_APPROVER_TELEGRAM_ID
+        label: Telegram user ID of that admin
+        transient: true
+    get_key:
+      url: https://t.me/BotFather
+      steps:
+        - Open @BotFather in Telegram, send /newbot and pick a username ending in bot.
+        - Use a new bot that no other program reads; BotFather replies with its token.
+        - Everyone who may use the bot sends it a message, so Crate can find their account.
+    validate: agent
+
+  - id: google-login
+    group: accounts
+    title: Sign in with Google
+    tagline: listeners sign in with Google
+    summary: Let listeners sign in with their Google account.
+    env:
+      - name: GOOGLE_CLIENT_ID
+        label: OAuth client ID
+      - name: GOOGLE_CLIENT_SECRET
+        label: OAuth client secret
+        secret: true
+    get_key:
+      url: https://console.cloud.google.com/apis/credentials
+      steps:
+        - Create an OAuth client ID of type Web application.
+        - Add https://api.<your domain>/api/auth/oauth/google/callback as a redirect URI.
+
+  - id: apple-login
+    group: accounts
+    title: Sign in with Apple
+    tagline: listeners sign in with Apple
+    summary: Let listeners sign in with their Apple ID.
+    env:
+      - name: APPLE_CLIENT_ID
+        label: Services ID
+      - name: APPLE_TEAM_ID
+        label: Team ID
+      - name: APPLE_KEY_ID
+        label: Key ID
+      - name: APPLE_PRIVATE_KEY
+        label: Private key
+        secret: true
+    get_key:
+      url: https://developer.apple.com/account/resources/identifiers/list/serviceId
+      steps:
+        - Requires a paid Apple Developer account.
+        - Create a Services ID and a Sign in with Apple key, then copy the IDs and the key.

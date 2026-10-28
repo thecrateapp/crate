@@ -29,10 +29,13 @@ describe("ShowsLocationControls", () => {
 
     expect(screen.getByText("Madrid, Spain")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /Fixed city/ }),
+      screen.getByRole("combobox", { name: "Location for shows" }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Near me/ }));
+    fireEvent.click(
+      screen.getByRole("combobox", { name: "Location for shows" }),
+    );
+    fireEvent.click(screen.getByRole("option", { name: "Near me" }));
 
     expect(onChange).toHaveBeenCalledWith("near_me");
   });
@@ -42,7 +45,8 @@ describe("ShowsLocationControls", () => {
 
     renderWithI18n(<RadiusPicker radius={60} onChange={onChange} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "100 km" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "Search radius" }));
+    fireEvent.click(screen.getByRole("option", { name: "100 km" }));
 
     expect(onChange).toHaveBeenCalledWith(100);
   });
@@ -74,8 +78,20 @@ describe("ShowsLocationControls", () => {
       />,
     );
 
-    fireEvent.mouseDown(screen.getByRole("button", { name: "Madrid, Spain" }));
+    fireEvent.focus(screen.getByRole("combobox", { name: "City" }));
+    fireEvent.click(screen.getByRole("option", { name: "Madrid, Spain" }));
 
-    expect(onSelect).toHaveBeenCalledWith(result);
+    const input = screen.getByRole("combobox", { name: "City" });
+    expect(input).toHaveAttribute("aria-controls");
+    expect(input).toHaveAttribute("aria-expanded", "true");
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(
+      screen.getByRole("option", { name: "Madrid, Spain" }),
+    ).toHaveAttribute("data-active", "true");
+    fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onSelect).toHaveBeenCalledTimes(2);
+    expect(onSelect).toHaveBeenLastCalledWith(result);
   });
 });

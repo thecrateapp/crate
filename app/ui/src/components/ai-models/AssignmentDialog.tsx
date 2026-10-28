@@ -51,7 +51,10 @@ function OutcomeGroup({
   if (items.length === 0) return null;
   return (
     <section aria-labelledby={headingId} className="space-y-2">
-      <h3 id={headingId} className="text-sm font-semibold text-foreground">
+      <h3
+        id={headingId}
+        className="text-sm font-semibold text-foreground font-display"
+      >
         {title}
       </h3>
       <ul role="list" className="space-y-1 text-sm">
@@ -127,13 +130,15 @@ export function AssignmentDialog({
         if (!next && !busy) onCancel();
       }}
     >
-      <DialogContent aria-describedby={undefined} className="sm:max-w-xl">
+      <DialogContent aria-describedby={undefined}>
         <DialogHeader>
-          <DialogTitle>Use {modelId} for all features?</DialogTitle>
+          <DialogTitle className="font-display">
+            Use {modelId} for all features?
+          </DialogTitle>
         </DialogHeader>
 
         {result?.activation && connections.length > 0 ? (
-          <div className="space-y-1 rounded-md border border-amber-500/25 bg-amber-500/10 p-3 text-sm text-amber-100">
+          <div className="space-y-1 rounded-md border border-state-warning/25 bg-state-warning/10 p-3 text-sm text-state-warning-text">
             <p>Connection limits start to apply.</p>
             <ul role="list" className="space-y-1">
               {connections.map((connection) => (

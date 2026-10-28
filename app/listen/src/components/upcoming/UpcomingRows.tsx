@@ -1,4 +1,6 @@
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
+import { UpcomingMonthGroupView } from "./UpcomingMonthGroupView";
 
 import { ReleaseRow } from "@/components/upcoming/ReleaseRow";
 import { ShowCard } from "@/components/upcoming/ShowCard";
@@ -26,49 +28,53 @@ export function UpcomingMonthGroup({
   items,
   expandedId,
   onToggleExpand,
+  onAttendanceChange,
 }: {
   month: string;
   items: UpcomingItem[];
   expandedId: string | null;
   onToggleExpand: (id: string | null) => void;
+  onAttendanceChange?: (attending: boolean) => void;
 }) {
+  const { t, i18n } = useTranslation();
   const [attendanceOverrides, setAttendanceOverrides] = useState<
     Record<string, boolean>
   >({});
 
   return (
-    <div className="space-y-2">
-      <div className="border-b border-text-primary/5 pb-2 text-xs font-semibold uppercase tracking-eyebrow text-text-primary/40">
-        {formatMonthLabel(month)}
-      </div>
-      <div className="space-y-2">
-        {items.map((item, index) => {
-          const key = itemKey(item, index);
-          const itemWithOverrides =
-            attendanceOverrides[key] == null
-              ? item
-              : { ...item, user_attending: attendanceOverrides[key] };
+    <UpcomingMonthGroupView
+      label={formatMonthLabel(month, i18n.language, t("common.unknown"))}
+    >
+      {items.map((item, index) => {
+        const key = itemKey(item, index);
+        const itemWithOverrides =
+          attendanceOverrides[key] == null
+            ? item
+            : { ...item, user_attending: attendanceOverrides[key] };
 
-          if (item.type === "show") {
-            return (
-              <ShowCard
-                key={key}
-                item={itemWithOverrides}
-                expanded={expandedId === key}
-                onToggle={() => onToggleExpand(expandedId === key ? null : key)}
-                onAttendanceChange={(attending) => {
-                  setAttendanceOverrides((current) => ({
-                    ...current,
-                    [key]: attending,
-                  }));
-                }}
-              />
-            );
-          }
+        if (item.type === "show") {
+          return (
+            <ShowCard
+              key={key}
+              item={itemWithOverrides}
+              expanded={expandedId === key}
+              onToggle={() => onToggleExpand(expandedId === key ? null : key)}
+              onAttendanceChange={(attending) => {
+                if (onAttendanceChange) {
+                  onAttendanceChange(attending);
+                  return;
+                }
+                setAttendanceOverrides((current) => ({
+                  ...current,
+                  [key]: attending,
+                }));
+              }}
+            />
+          );
+        }
 
-          return <ReleaseRow key={key} item={itemWithOverrides} />;
-        })}
-      </div>
-    </div>
+        return <ReleaseRow key={key} item={itemWithOverrides} />;
+      })}
+    </UpcomingMonthGroupView>
   );
 }

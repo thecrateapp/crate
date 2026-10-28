@@ -142,8 +142,8 @@ async function choose(
   select: string,
   option: string,
 ) {
-  await user.click(within(scope).getByRole("button", { name: select }));
-  await user.click(await screen.findByRole("button", { name: option }));
+  await user.click(within(scope).getByRole("combobox", { name: select }));
+  await user.click(await screen.findByRole("option", { name: option }));
 }
 
 beforeEach(() => {
@@ -371,7 +371,7 @@ describe("AdvancedPanel", () => {
     ).not.toBeInTheDocument();
     // The current version's model is resolved from the catalog.
     expect(
-      within(dialog).getByRole("button", { name: "Image detail" }),
+      within(dialog).getByRole("combobox", { name: "Image detail" }),
     ).toBeEnabled();
     expect(within(dialog).getByLabelText("Output tokens")).toHaveAttribute(
       "max",
@@ -580,7 +580,7 @@ describe("AdvancedPanel", () => {
 
     rerenderPanel(view, withPosterVersion2(snapshot));
     expect(
-      within(dialog).getByRole("button", { name: "Model" }),
+      within(dialog).getByRole("combobox", { name: "Model" }),
     ).toHaveTextContent("Budget");
     expect(reviewed).not.toBeChecked();
     await user.click(reviewed);

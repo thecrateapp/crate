@@ -44,4 +44,25 @@ describe("Login", () => {
     expect(screen.getByText("¿No tienes cuenta?")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Crea una" })).toBeInTheDocument();
   });
+  it("uses canonical access fields with browser credential semantics", () => {
+    renderWithListenProviders(<Login />, {
+      auth: { user: null, loading: false },
+      locale: "en",
+    });
+    expect(screen.getByLabelText("Email")).toHaveAttribute(
+      "autocomplete",
+      "email",
+    );
+    expect(screen.getByLabelText("Password")).toHaveAttribute(
+      "autocomplete",
+      "current-password",
+    );
+    expect(
+      screen.getByLabelText("Password").closest("[data-slot=auth-frame]"),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).not.toHaveClass(
+      "h-10",
+      "md:text-base",
+    );
+  });
 });

@@ -1,3 +1,4 @@
+import { ArtistAlbumGroupFrame } from "./ArtistLibraryFrames";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -77,26 +78,21 @@ export function ArtistAlbumsSection({
   return (
     <div className="space-y-10">
       {groupedAlbums.map((group) => (
-        <section key={group.category}>
-          <h2 className="mb-4 text-lg font-semibold text-text-primary">
-            {t(group.labelKey)}
-          </h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-            {group.albums.map((album) => (
-              <ArtistAlbumItem
-                key={
-                  album.global_album_uid ??
-                  album.global_uid ??
-                  album.id ??
-                  `${album.name}-${album.year}`
-                }
-                album={album}
-                artistName={artistName}
-                artistSlug={artistSlug}
-              />
-            ))}
-          </div>
-        </section>
+        <ArtistAlbumGroupFrame key={group.category} title={t(group.labelKey)}>
+          {group.albums.map((album) => (
+            <ArtistAlbumItem
+              key={
+                album.global_album_uid ??
+                album.global_uid ??
+                album.id ??
+                `${album.name}-${album.year}`
+              }
+              album={album}
+              artistName={artistName}
+              artistSlug={artistSlug}
+            />
+          ))}
+        </ArtistAlbumGroupFrame>
       ))}
     </div>
   );

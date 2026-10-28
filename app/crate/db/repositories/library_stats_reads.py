@@ -127,6 +127,40 @@ def get_library_track_count(*, session: Session | None = None) -> int:
         return _impl(s)
 
 
+def has_library_catalog_data(*, session: Session | None = None) -> bool:
+    """Return whether the library has artist or album metadata, even without audio."""
+
+    def _impl(s: Session) -> bool:
+        return bool(
+            s.execute(
+                text(
+                    """
+                    SELECT
+                        EXISTS (
+                            SELECT 1
+                            FROM library_artists
+                            WHERE name IS NOT NULL
+                              AND BTRIM(name) <> ''
+                              AND name NOT LIKE '.%'
+                        )
+                        OR EXISTS (
+                            SELECT 1
+                            FROM library_albums
+                            WHERE name IS NOT NULL
+                              AND BTRIM(name) <> ''
+                              AND quarantined_at IS NULL
+                        )
+                    """
+                )
+            ).scalar_one()
+        )
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as s:
+        return _impl(s)
+
+
 def get_track_rating(track_id: int, *, session: Session | None = None) -> int:
     def _impl(s: Session) -> int:
         rating = s.execute(

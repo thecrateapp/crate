@@ -6,6 +6,8 @@ export {
 export { MediaRail, type MediaRailFit, type MediaRailProps } from "./MediaRail";
 export {
   SectionHeader,
+  SectionActionLabel,
+  SectionActionButton,
   type SectionHeaderLevel,
   type SectionHeaderProps,
   type SectionHeaderSize,

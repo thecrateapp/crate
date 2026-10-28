@@ -1,3 +1,4 @@
+import userEvent from "@testing-library/user-event";
 import { screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -29,17 +30,18 @@ describe("TopBar", () => {
     expect(screen.queryByTestId("topbar-user-menu")).toBeNull();
   });
 
-  it("localizes navigation controls", () => {
+  it("localizes navigation controls without native duplicate hints", async () => {
     renderWithListenProviders(<TopBar />, { locale: "es" });
 
-    expect(screen.getByRole("button", { name: "Volver" })).toHaveAttribute(
-      "title",
-      "Volver",
-    );
-    expect(screen.getByRole("button", { name: "Avanzar" })).toHaveAttribute(
-      "title",
-      "Avanzar",
-    );
+    const back = screen.getByRole("button", { name: "Volver" });
+    const forward = screen.getByRole("button", { name: "Avanzar" });
+    expect(back).not.toHaveAttribute("title");
+    expect(forward).not.toHaveAttribute("title");
+    await userEvent.tab();
+    expect(back).toHaveFocus();
+    expect(
+      await screen.findByRole("tooltip", { name: "Volver" }),
+    ).toBeVisible();
   });
 
   it("uses semantic text tokens for navigation controls", () => {
@@ -47,7 +49,7 @@ describe("TopBar", () => {
 
     expect(screen.getByRole("button", { name: "Go back" })).toHaveClass(
       "text-text-secondary",
-      "hover:text-text-primary",
+      "hover:text-accent-action-hi",
     );
   });
 });

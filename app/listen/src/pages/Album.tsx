@@ -1,3 +1,4 @@
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { Navigate } from "react-router";
 
 import { CrateLoader } from "@/components/ui/CrateLoader";
@@ -13,9 +14,16 @@ export function Album() {
 
   if (page.error || !page.data) {
     return (
-      <div className="text-center py-20">
-        <p className="text-text-muted">{page.t("album.notFound")}</p>
-      </div>
+      <ErrorState
+        kind={page.status === 404 || !page.error ? "notFound" : "error"}
+        message={
+          page.status === 404 || !page.error
+            ? page.t("album.notFound")
+            : page.error
+        }
+        onRetry={page.error && page.status !== 404 ? page.refetch : undefined}
+        retryLabel={page.t("common.retry")}
+      />
     );
   }
 

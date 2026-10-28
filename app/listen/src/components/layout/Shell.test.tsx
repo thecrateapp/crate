@@ -1,4 +1,5 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { Link, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -46,6 +47,56 @@ function scrollWindowTo(y: number) {
 }
 
 describe("Shell", () => {
+  it("uses uppercase MonoLabel for primary and Collection sidebar destinations", () => {
+    viewportState.isDesktop = true;
+    renderWithListenProviders(<Shell />, { route: "/library?tab=artists" });
+    const nav = screen.getByRole("navigation", { name: "Collection" });
+    for (const label of ["Music", "Artists", "Albums", "Collection"]) {
+      expect(within(nav).getByText(label)).toHaveClass(
+        "crate-mono-label",
+        "uppercase",
+        "font-mono",
+        "text-inherit",
+      );
+    }
+  });
+  it("uses the same navigation item recipe for Collection children and first-level destinations", async () => {
+    viewportState.isDesktop = true;
+    renderWithListenProviders(<Shell />, { route: "/library?tab=artists" });
+    const nav = screen.getByRole("navigation", { name: "Collection" });
+    expect(within(nav).getByRole("link", { name: "Artists" })).toBeVisible();
+    await userEvent.click(
+      within(nav).getByRole("button", { name: "Collection" }),
+    );
+    expect(within(nav).getByRole("link", { name: "Artists" })).toHaveClass(
+      "listen-nav-item",
+    );
+    expect(within(nav).getByRole("link", { name: "Music" })).toHaveClass(
+      "listen-nav-item",
+    );
+    expect(
+      within(nav).getByRole("button", { name: "Collection" }),
+    ).toHaveAttribute("aria-expanded", "true");
+    await userEvent.click(within(nav).getByRole("link", { name: "Albums" }));
+    expect(within(nav).getByRole("link", { name: "Artists" })).toBeVisible();
+    await userEvent.click(within(nav).getByRole("link", { name: "Music" }));
+    expect(
+      within(nav).queryByRole("link", { name: "Artists" }),
+    ).not.toBeInTheDocument();
+  });
+  it("adds the ordinary header hairline after scrolling", async () => {
+    viewportState.isDesktop = true;
+    renderWithListenProviders(<Shell />, { route: "/library" });
+    expect(screen.getByTestId("listen-header")).not.toHaveClass(
+      "border-border-quiet",
+    );
+    scrollWindowTo(HEADER_SOLID_SCROLL_THRESHOLD + 1);
+    await waitFor(() =>
+      expect(screen.getByTestId("listen-header")).toHaveClass(
+        "border-border-quiet",
+      ),
+    );
+  });
   beforeEach(() => {
     viewportState.isDesktop = false;
     setWindowScroll(0);
@@ -72,7 +123,7 @@ describe("Shell", () => {
     expect(screen.getByText("Radar")).toBeInTheDocument();
   });
 
-  it("renders one unified glass backdrop for the mobile dock when a track is loaded", () => {
+  it("renders one unified frosted backdrop for the mobile dock when a track is loaded", () => {
     const { container } = renderWithListenProviders(<Shell />, {
       playerActions: {
         currentTrack: {
@@ -83,12 +134,22 @@ describe("Shell", () => {
       },
     });
 
-    const dockBackdrop = container.querySelector(".listen-mobile-dock-glass");
+    const dockBackdrop = container.querySelector(".listen-mobile-dock-surface");
     const nav = screen.getByRole("navigation");
 
     expect(dockBackdrop).toBeInTheDocument();
-    expect(dockBackdrop).toHaveClass("listen-glass-panel");
+    expect(dockBackdrop).toHaveClass(
+      "listen-mobile-dock-glass",
+      "border-border-quiet",
+    );
+    expect(dockBackdrop).not.toHaveClass("listen-glass-panel");
+    expect(dockBackdrop?.className).not.toMatch(/accent|glow|gradient/);
     expect(nav).toHaveClass("bg-transparent");
+    const labels = nav.querySelectorAll(".listen-mobile-nav-item > span");
+    expect(labels.length).toBeGreaterThan(0);
+    for (const label of labels) {
+      expect(label).toHaveClass("crate-mono-label", "uppercase");
+    }
   });
 
   it("opens a mobile Collection sheet with all collection sections", () => {
@@ -98,20 +159,18 @@ describe("Shell", () => {
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Collection" })).toBeVisible();
-    expect(screen.getByRole("menuitem", { name: /Playlists/i })).toBeVisible();
-    expect(screen.getByRole("menuitem", { name: /Artists/i })).toBeVisible();
-    expect(screen.getByRole("menuitem", { name: /Albums/i })).toBeVisible();
-    expect(screen.getByRole("menuitem", { name: /Crates/i })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Playlists/i })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Artists/i })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Albums/i })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Crates/i })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Liked tracks/i })).toBeVisible();
     expect(
-      screen.getByRole("menuitem", { name: /Liked tracks/i }),
-    ).toBeVisible();
-    expect(screen.getByRole("menuitem", { name: /Bandcamp/i })).toBeVisible();
-    expect(
-      screen.getByRole("menuitem", { name: /Contributions/i }),
-    ).toBeVisible();
-    expect(
-      screen.getByRole("menuitem", { name: /Playlists/i }),
-    ).not.toHaveClass("rounded-2xl");
+      screen.queryByRole("link", { name: /Bandcamp/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Contributions/i })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Playlists/i })).not.toHaveClass(
+      "rounded-2xl",
+    );
   });
 
   it("orders the mobile Collection sections consistently", () => {
@@ -119,14 +178,15 @@ describe("Shell", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Collection" }));
 
-    const items = screen.getAllByRole("menuitem");
+    const items = screen
+      .getAllByRole("link")
+      .filter((el) => el.closest('[role="dialog"]'));
     expect(items.map((item) => item.textContent?.trim())).toEqual([
       "Artists",
       "Crates",
       "Playlists",
       "Albums",
       "Liked tracks",
-      "Bandcamp",
       "Contributions",
     ]);
   });
@@ -137,7 +197,7 @@ describe("Shell", () => {
     renderWithListenProviders(<Shell />);
     fireEvent.click(screen.getByRole("button", { name: "Collection" }));
 
-    expect(screen.getByRole("button", { name: /Crates/i })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Crates/i })).toBeVisible();
   });
 
   it("uses a transparent mobile header when the page declares a hero", () => {
@@ -191,7 +251,7 @@ describe("Shell", () => {
 
     const header = screen.getByTestId("listen-header");
     expect(header).toHaveAttribute("data-transparent", "false");
-    expect(header).toHaveClass("bg-surface-chrome", "shadow-chrome");
+    expect(header).toHaveClass("bg-surface-chrome");
     expect(header).not.toHaveClass("bg-transparent");
     expect(screen.getByTestId("topbar")).toHaveAttribute(
       "data-hide-mobile-actions",
@@ -362,16 +422,15 @@ describe("Shell", () => {
       "bg-surface-canvas",
     );
     expect(screen.getByTestId("listen-header")).toHaveClass(
-      "border-border-quiet",
+      "border-transparent",
       "bg-surface-chrome",
-      "shadow-chrome",
     );
     expect(screen.getByRole("link", { name: "Stats" })).toHaveClass(
-      "text-accent-action",
+      "listen-nav-item",
     );
   });
 
-  it("keeps the discovery-active brand label on the accent token", () => {
+  it("keeps the brand stable during discovery playback", () => {
     viewportState.isDesktop = true;
 
     renderWithListenProviders(<Shell />, {
@@ -394,8 +453,7 @@ describe("Shell", () => {
       .getAllByText("Crate")
       .find((element) => element.tagName === "SPAN");
 
-    expect(brandLabel).toHaveClass("text-accent-action");
-    expect(brandLabel).not.toHaveClass("text-text-primary");
+    expect(brandLabel).toHaveClass("text-text-primary");
   });
 
   it("keeps the inactive brand label on the primary text token", () => {
@@ -420,4 +478,46 @@ describe("Shell", () => {
     expect(container.querySelector(".listen-home-top-scrim")).toBeNull();
     expect(screen.getByTestId("listen-content")).toHaveClass("pt-0");
   });
+});
+
+it.each([false, true])(
+  "keeps skip navigation first and focuses main on desktop=%s",
+  async (isDesktop) => {
+    viewportState.isDesktop = isDesktop;
+    const user = userEvent.setup();
+    renderWithListenProviders(
+      <Shell>
+        <button type="button">First content action</button>
+      </Shell>,
+      { route: "/library?tab=albums#details" },
+    );
+    const link = screen.getByRole("link", { name: "Skip to main content" });
+    const main = screen.getByRole("main");
+    expect(main).toHaveAttribute("tabindex", "-1");
+    expect(link).toHaveAttribute("href", `#${main.id}`);
+    await user.tab();
+    expect(link).toHaveFocus();
+    const url = window.location.href;
+    await user.keyboard("{Enter}");
+    expect(main).toHaveFocus();
+    expect(window.location.href).toBe(url);
+    await user.tab();
+    expect(
+      screen.getByRole("button", { name: "First content action" }),
+    ).toHaveFocus();
+  },
+);
+
+it.each([
+  ["en", "Skip to main content"],
+  ["es", "Saltar al contenido principal"],
+  ["fr", "Aller au contenu principal"],
+  ["de", "Zum Hauptinhalt springen"],
+  ["it", "Vai al contenuto principale"],
+  ["ca", "Ves al contingut principal"],
+  ["eu", "Joan eduki nagusira"],
+] as const)("localizes skip navigation in %s", (locale, label) => {
+  viewportState.isDesktop = false;
+  renderWithListenProviders(<Shell />, { locale });
+  expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
 });

@@ -117,17 +117,27 @@ def test_selection_rejects_two_corrections_of_the_same_physical_show(show_world)
 
 
 def test_admin_show_plan_works_without_mcp_flags_or_llm_and_replays_durable_ids(
-    show_world,
+    show_world, monkeypatch
 ):
     from crate.db.repositories.show_imports import (
         get_show_editor_principal,
         read_show_job,
     )
 
-    accepted, plan = prepare(show_world)
+    transitions = []
+    monkeypatch.setattr(
+        "crate.db.repositories.tasks_shared._publish_task_transition_signal",
+        transitions.append,
+    )
+    _, plan = prepare(show_world)
     assert scalar("SELECT count(*) FROM shows") == 0
     job, result = apply(show_world, plan)
     assert result["verification"]["status"] == "passed", result
+    job_transitions = [
+        transition for transition in transitions if transition["id"] == job["job_id"]
+    ]
+    statuses = [transition["status"] for transition in job_transitions]
+    assert statuses.index("completing") < statuses.index("completed")
     assert result["execution"]["items"][0]["status"] == "created"
     show_id = result["execution"]["items"][0]["show_id"]
     fresh = get_show_editor_principal(show_world["user"]["id"])
@@ -576,11 +586,18 @@ def test_selection_resolves_its_own_duplicate_or_uncertain_sessions(
         assert any(issue["status"] == "conflict" for issue in plan["issues"])
 
 
-def test_show_consolidation_requires_exact_plan_and_human_approval(show_world):
-    from crate.db.repositories.show_identities import upsert_canonical_show
+def test_show_consolidation_requires_exact_plan_and_human_approval(
+    show_world, monkeypatch
+):
     from crate.db.repositories.agent_plans import get_plan
+    from crate.db.repositories.show_identities import upsert_canonical_show
     from tests.agent_plan_support import decide
 
+    transitions = []
+    monkeypatch.setattr(
+        "crate.db.repositories.tasks_shared._publish_task_transition_signal",
+        transitions.append,
+    )
     original = upsert_canonical_show(
         items(local_time="18:00")[0], {"provider": "manual", "actor": "test"}
     )
@@ -637,6 +654,12 @@ def test_show_consolidation_requires_exact_plan_and_human_approval(show_world):
     applied = execute(job)
     assert applied["verification"]["status"] == "passed", applied
     assert applied["execution"]["items"][0]["show_id"] == original["show_id"]
+    statuses = [
+        transition["status"]
+        for transition in transitions
+        if transition["id"] == job["job_id"]
+    ]
+    assert statuses.index("completing") < statuses.index("completed")
 
 
 def test_fifty_date_apply_uses_batched_reads_and_one_invalidation_set(

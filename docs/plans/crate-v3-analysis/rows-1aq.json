@@ -1,0 +1,4755 @@
+{
+  "date": "2026-10-19",
+  "status": "Analysis/proposal only; no row migration authorized by this inventory",
+  "scannedProductionFiles": 1069,
+  "method": "TypeScript AST source JSX/import sites and named row/date functions. Counts are source occurrences, not runtime instances. Inline class candidates are a discovery index, not confirmed drift.",
+  "counts": {
+    "TrackTable": {
+      "Admin": 1,
+      "Listen": 0,
+      "Shared": 0
+    },
+    "ArtistRow": {
+      "Admin": 1,
+      "Listen": 0,
+      "Shared": 0
+    },
+    "EventDate": {
+      "Admin": 2,
+      "Listen": 0,
+      "Shared": 0
+    },
+    "ReleaseDateBadge": {
+      "Admin": 1,
+      "Listen": 0,
+      "Shared": 0
+    },
+    "ReleaseTimelineRow": {
+      "Admin": 1,
+      "Listen": 0,
+      "Shared": 0
+    },
+    "TableRow": {
+      "Admin": 8,
+      "Listen": 0,
+      "Shared": 0
+    },
+    "ShowCard": {
+      "Admin": 5,
+      "Listen": 3,
+      "Shared": 0
+    },
+    "EventRow": {
+      "Admin": 1,
+      "Listen": 0,
+      "Shared": 0
+    },
+    "EntityRow": {
+      "Admin": 0,
+      "Listen": 8,
+      "Shared": 0
+    },
+    "TrackRow": {
+      "Admin": 0,
+      "Listen": 15,
+      "Shared": 0
+    },
+    "TrackList": {
+      "Admin": 0,
+      "Listen": 3,
+      "Shared": 0
+    },
+    "PlaylistCard": {
+      "Admin": 0,
+      "Listen": 9,
+      "Shared": 0
+    },
+    "PathRow": {
+      "Admin": 0,
+      "Listen": 1,
+      "Shared": 0
+    },
+    "UserRow": {
+      "Admin": 0,
+      "Listen": 3,
+      "Shared": 0
+    },
+    "QueueTrackRow": {
+      "Admin": 0,
+      "Listen": 5,
+      "Shared": 0
+    },
+    "ReleaseRow": {
+      "Admin": 0,
+      "Listen": 1,
+      "Shared": 0
+    },
+    "HairlineList": {
+      "Admin": 0,
+      "Listen": 1,
+      "Shared": 0
+    },
+    "HairlineRow": {
+      "Admin": 0,
+      "Listen": 1,
+      "Shared": 0
+    },
+    "SuggestedTrackRow": {
+      "Admin": 0,
+      "Listen": 1,
+      "Shared": 0
+    }
+  },
+  "sites": [
+    {
+      "path": "app/ui/src/pages/Album.tsx",
+      "line": 1319,
+      "name": "TrackTable",
+      "from": "@/components/album/TrackTable",
+      "className": ""
+    },
+    {
+      "path": "app/ui/src/pages/Browse.tsx",
+      "line": 542,
+      "name": "ArtistRow",
+      "from": "@/components/artist/ArtistRow",
+      "className": ""
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 104,
+      "name": "EventDate",
+      "from": "@/components/ui/EventDate",
+      "className": ""
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 208,
+      "name": "ReleaseDateBadge",
+      "from": "local",
+      "className": ""
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 733,
+      "name": "ReleaseTimelineRow",
+      "from": "local",
+      "className": ""
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 1701,
+      "name": "TableRow",
+      "from": "@crate/ui/shadcn/table",
+      "className": ""
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 1715,
+      "name": "TableRow",
+      "from": "@crate/ui/shadcn/table",
+      "className": "\"border-white/5\""
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 1847,
+      "name": "TableRow",
+      "from": "@crate/ui/shadcn/table",
+      "className": ""
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 1864,
+      "name": "TableRow",
+      "from": "@crate/ui/shadcn/table",
+      "className": "\"border-white/5\""
+    },
+    {
+      "path": "app/ui/src/pages/Shows.tsx",
+      "line": 420,
+      "name": "ShowCard",
+      "from": "@/components/shows/ShowCard",
+      "className": ""
+    },
+    {
+      "path": "app/ui/src/pages/Shows.tsx",
+      "line": 494,
+      "name": "ShowCard",
+      "from": "@/components/shows/ShowCard",
+      "className": ""
+    },
+    {
+      "path": "app/ui/src/pages/Shows.tsx",
+      "line": 577,
+      "name": "ShowCard",
+      "from": "@/components/shows/ShowCard",
+      "className": ""
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 629,
+      "name": "ShowCard",
+      "from": "@/components/shows/ShowCard",
+      "className": ""
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 667,
+      "name": "EventRow",
+      "from": "@/components/ui/EventRow",
+      "className": ""
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 689,
+      "name": "EventDate",
+      "from": "@/components/ui/EventDate",
+      "className": ""
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 979,
+      "name": "ShowCard",
+      "from": "@/components/shows/ShowCard",
+      "className": "\"w-full\""
+    },
+    {
+      "path": "app/ui/src/components/album/TrackTable.tsx",
+      "line": 846,
+      "name": "TableRow",
+      "from": "@crate/ui/shadcn/table",
+      "className": ""
+    },
+    {
+      "path": "app/ui/src/components/album/TrackTable.tsx",
+      "line": 920,
+      "name": "TableRow",
+      "from": "@crate/ui/shadcn/table",
+      "className": "{\n                      quarantiningTrackKey === trackId ||\n                      movingTrackKey === trackId\n                        ? \"opacity-55\"\n                        : undefined\n                    }"
+    },
+    {
+      "path": "app/ui/src/components/scanner/MatchCard.tsx",
+      "line": 70,
+      "name": "TableRow",
+      "from": "@crate/ui/shadcn/table",
+      "className": ""
+    },
+    {
+      "path": "app/ui/src/components/scanner/MatchCard.tsx",
+      "line": 79,
+      "name": "TableRow",
+      "from": "@crate/ui/shadcn/table",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/CrateCard.tsx",
+      "line": 301,
+      "name": "EntityRow",
+      "from": "@crate/ui/domain/entity",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/pages/ArtistTopTracks.tsx",
+      "line": 141,
+      "name": "TrackRow",
+      "from": "@/components/cards/TrackRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/pages/CuratedPlaylistContent.tsx",
+      "line": 109,
+      "name": "TrackList",
+      "from": "@crate/ui/domain/tracks",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/pages/CuratedPlaylistContent.tsx",
+      "line": 115,
+      "name": "TrackRow",
+      "from": "@/components/cards/TrackRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/pages/ExploreLandingSections.tsx",
+      "line": 110,
+      "name": "PlaylistCard",
+      "from": "@/components/playlists/PlaylistCard",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/pages/HomePlaylist.tsx",
+      "line": 276,
+      "name": "TrackRow",
+      "from": "@/components/cards/TrackRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/pages/HomeSection.tsx",
+      "line": 281,
+      "name": "TrackRow",
+      "from": "@/components/cards/TrackRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/pages/LibraryLikedTab.tsx",
+      "line": 159,
+      "name": "TrackList",
+      "from": "@crate/ui/domain/tracks",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/pages/LibraryLikedTab.tsx",
+      "line": 168,
+      "name": "TrackRow",
+      "from": "@/components/cards/TrackRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/pages/LibraryPlaylistsTab.tsx",
+      "line": 90,
+      "name": "PlaylistCard",
+      "from": "@/components/playlists/PlaylistCard",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/pages/LibraryPlaylistsTab.tsx",
+      "line": 229,
+      "name": "PlaylistCard",
+      "from": "@/components/playlists/PlaylistCard",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/pages/LibraryPlaylistsTab.tsx",
+      "line": 291,
+      "name": "PlaylistCard",
+      "from": "@/components/playlists/PlaylistCard",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/pages/PathDetailParts.tsx",
+      "line": 165,
+      "name": "TrackRow",
+      "from": "@/components/cards/TrackRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/pages/Paths.tsx",
+      "line": 158,
+      "name": "PathRow",
+      "from": "@/components/paths/PathRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/pages/PeopleSearch.tsx",
+      "line": 59,
+      "name": "UserRow",
+      "from": "@/components/social/UserRow",
+      "className": "\"border border-border-quiet bg-text-primary/[0.02]\""
+    },
+    {
+      "path": "app/listen/src/pages/SearchTrackResults.tsx",
+      "line": 50,
+      "name": "TrackRow",
+      "from": "@/components/cards/TrackRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/pages/ShowsContent.tsx",
+      "line": 86,
+      "name": "ShowCard",
+      "from": "@/components/upcoming/UpcomingRows",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/pages/StatsCollectionPanels.tsx",
+      "line": 114,
+      "name": "TrackRow",
+      "from": "@/components/cards/TrackRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/pages/UserConnections.tsx",
+      "line": 74,
+      "name": "UserRow",
+      "from": "@/components/social/UserRow",
+      "className": "\"border border-border-quiet bg-text-primary/[0.02]\""
+    },
+    {
+      "path": "app/listen/src/pages/UserProfileLibrarySections.tsx",
+      "line": 229,
+      "name": "PlaylistCard",
+      "from": "@/components/playlists/PlaylistCard",
+      "className": "\"user-profile-item\""
+    },
+    {
+      "path": "app/listen/src/pages/UserProfileNetworkSections.tsx",
+      "line": 61,
+      "name": "UserRow",
+      "from": "@/components/social/UserRow",
+      "className": "\"user-profile-item\""
+    },
+    {
+      "path": "app/listen/src/components/album/AlbumTrackList.tsx",
+      "line": 103,
+      "name": "TrackRow",
+      "from": "@/components/cards/TrackRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/artist/ArtistCommunitySections.tsx",
+      "line": 204,
+      "name": "PlaylistCard",
+      "from": "@/components/playlists/PlaylistCard",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/artist/ArtistTopTracksSection.tsx",
+      "line": 56,
+      "name": "TrackRow",
+      "from": "@/components/cards/TrackRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/cards/AlbumCard.tsx",
+      "line": 146,
+      "name": "EntityRow",
+      "from": "@crate/ui/domain/entity",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/cards/ArtistCard.tsx",
+      "line": 148,
+      "name": "EntityRow",
+      "from": "@crate/ui/domain/entity",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/explore/ExploreDetailViews.tsx",
+      "line": 210,
+      "name": "PlaylistCard",
+      "from": "@/components/playlists/PlaylistCard",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/explore/ExploreSearchResults.tsx",
+      "line": 86,
+      "name": "TrackRow",
+      "from": "@/components/cards/TrackRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/explore/GenreDetailSections.tsx",
+      "line": 113,
+      "name": "ShowCard",
+      "from": "@/components/upcoming/UpcomingRows",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/home/CoreTracksPlaylistCard.tsx",
+      "line": 26,
+      "name": "PlaylistCard",
+      "from": "@/components/playlists/PlaylistCard",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/home/HomeCustomMixes.tsx",
+      "line": 92,
+      "name": "PlaylistCard",
+      "from": "@/components/playlists/PlaylistCard",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/home/HomeDiscoveryRecommendations.tsx",
+      "line": 50,
+      "name": "TrackRow",
+      "from": "@/components/cards/TrackRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/home/HomeRecentEntityRows.tsx",
+      "line": 56,
+      "name": "EntityRow",
+      "from": "@crate/ui/domain/entity",
+      "className": "\"home-discovery-card gap-3 p-3\""
+    },
+    {
+      "path": "app/listen/src/components/home/HomeReplaySection.tsx",
+      "line": 160,
+      "name": "TrackRow",
+      "from": "@/components/cards/TrackRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/paths/PathRow.tsx",
+      "line": 69,
+      "name": "EntityRow",
+      "from": "@crate/ui/domain/entity",
+      "className": "\"border border-text-primary/6 bg-text-primary/[0.02] hover:border-accent-action/20\""
+    },
+    {
+      "path": "app/listen/src/components/player/FullscreenPlayerTabs.tsx",
+      "line": 141,
+      "name": "QueueTrackRow",
+      "from": "@/components/player/QueueTrackRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/player/QueuePanel.tsx",
+      "line": 117,
+      "name": "QueueTrackRow",
+      "from": "@/components/player/QueueTrackRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/player/QueuePanel.tsx",
+      "line": 146,
+      "name": "QueueTrackRow",
+      "from": "@/components/player/QueueTrackRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/player/QueueTrackRow.tsx",
+      "line": 73,
+      "name": "TrackRow",
+      "from": "@/components/cards/TrackRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/playlists/PlaylistCard.tsx",
+      "line": 539,
+      "name": "EntityRow",
+      "from": "@crate/ui/domain/entity",
+      "className": "{cn(rowSurfaceClass(offlineState), props.className)}"
+    },
+    {
+      "path": "app/listen/src/components/playlists/PlaylistTrackList.tsx",
+      "line": 74,
+      "name": "TrackList",
+      "from": "@crate/ui/domain/tracks",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/playlists/PlaylistTrackList.tsx",
+      "line": 79,
+      "name": "TrackRow",
+      "from": "@/components/cards/TrackRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/social/UserRow.tsx",
+      "line": 120,
+      "name": "EntityRow",
+      "from": "@crate/ui/domain/entity",
+      "className": "{className}"
+    },
+    {
+      "path": "app/listen/src/components/upcoming/ReleaseRow.tsx",
+      "line": 61,
+      "name": "EntityRow",
+      "from": "@crate/ui/domain/entity",
+      "className": "\"upcoming-event-row-atmosphere rounded-panel border border-accent-action/10 p-4 hover:border-accent-action/25\""
+    },
+    {
+      "path": "app/listen/src/components/upcoming/UpcomingRows.tsx",
+      "line": 55,
+      "name": "ShowCard",
+      "from": "@/components/upcoming/ShowCard",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/upcoming/UpcomingRows.tsx",
+      "line": 70,
+      "name": "ReleaseRow",
+      "from": "@/components/upcoming/ReleaseRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/upcoming/UpcomingShowExpandedView.tsx",
+      "line": 129,
+      "name": "HairlineList",
+      "from": "@crate/ui/primitives/HairlineList",
+      "className": "\"mt-3\""
+    },
+    {
+      "path": "app/listen/src/components/upcoming/UpcomingShowExpandedView.tsx",
+      "line": 131,
+      "name": "HairlineRow",
+      "from": "@crate/ui/primitives/HairlineList",
+      "className": "\"setlist-ticket-row\""
+    },
+    {
+      "path": "app/listen/src/components/player/extended/QueueTabPastTracks.tsx",
+      "line": 29,
+      "name": "QueueTrackRow",
+      "from": "@/components/player/QueueTrackRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/player/extended/QueueTabUpcoming.tsx",
+      "line": 31,
+      "name": "QueueTrackRow",
+      "from": "@/components/player/QueueTrackRow",
+      "className": ""
+    },
+    {
+      "path": "app/listen/src/components/player/extended/SuggestedTab.tsx",
+      "line": 107,
+      "name": "SuggestedTrackRow",
+      "from": "./SuggestedTrackRow",
+      "className": ""
+    }
+  ],
+  "declarations": [
+    {
+      "path": "app/shared/ui/domain/ArtistBioProfile.tsx",
+      "line": 151,
+      "name": "formatMemberDate"
+    },
+    {
+      "path": "app/shared/ui/primitives/HairlineList.tsx",
+      "line": 61,
+      "name": "HairlineRow"
+    },
+    {
+      "path": "app/shared/ui/shadcn/table.tsx",
+      "line": 53,
+      "name": "TableRow"
+    },
+    {
+      "path": "app/shared/ui/domain/genres/GenrePill.tsx",
+      "line": 118,
+      "name": "GenrePillRow"
+    },
+    {
+      "path": "app/shared/ui/domain/shows/show-types.ts",
+      "line": 28,
+      "name": "formatShowDateParts"
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 422,
+      "name": "MatchRow"
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "line": 212,
+      "name": "ReleaseRadarRow"
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "line": 275,
+      "name": "PopularityRow"
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1392,
+      "name": "QueueRow"
+    },
+    {
+      "path": "app/ui/src/pages/GlobalCatalog.tsx",
+      "line": 86,
+      "name": "formatDate"
+    },
+    {
+      "path": "app/ui/src/pages/Health.tsx",
+      "line": 1117,
+      "name": "IssueRow"
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 134,
+      "name": "LogRow"
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 102,
+      "name": "ReleaseDateBadge"
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 192,
+      "name": "ReleaseTimelineRow"
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 271,
+      "name": "FieldRow"
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1280,
+      "name": "HistoryTaskRow"
+    },
+    {
+      "path": "app/ui/src/components/album/AlbumRow.tsx",
+      "line": 30,
+      "name": "AlbumRow"
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRow.tsx",
+      "line": 27,
+      "name": "ArtistRow"
+    },
+    {
+      "path": "app/ui/src/components/shows/ShowCard.tsx",
+      "line": 101,
+      "name": "formatDateParts"
+    },
+    {
+      "path": "app/ui/src/components/ui/EventDate.tsx",
+      "line": 1,
+      "name": "formatEventDate"
+    },
+    {
+      "path": "app/ui/src/components/ui/EventDate.tsx",
+      "line": 26,
+      "name": "EventDate"
+    },
+    {
+      "path": "app/ui/src/components/ui/EventRow.tsx",
+      "line": 5,
+      "name": "EventRow"
+    },
+    {
+      "path": "app/listen/src/components/CrateCard.tsx",
+      "line": 296,
+      "name": "CrateRow"
+    },
+    {
+      "path": "app/listen/src/components/CrateEditor.tsx",
+      "line": 431,
+      "name": "SortableCrateAlbumRow"
+    },
+    {
+      "path": "app/listen/src/components/CrateEditor.tsx",
+      "line": 445,
+      "name": "CrateAlbumRow"
+    },
+    {
+      "path": "app/listen/src/lib/social-share-story-canvas.ts",
+      "line": 663,
+      "name": "drawChartRow"
+    },
+    {
+      "path": "app/listen/src/lib/social-share-story-canvas.ts",
+      "line": 1168,
+      "name": "drawBrandRow"
+    },
+    {
+      "path": "app/listen/src/pages/Crate.tsx",
+      "line": 543,
+      "name": "CrateAlbumPreviewRow"
+    },
+    {
+      "path": "app/listen/src/pages/LibraryPlaylistsTab.tsx",
+      "line": 88,
+      "name": "renderReadOnlyRow"
+    },
+    {
+      "path": "app/listen/src/pages/StatsCollectionPanels.tsx",
+      "line": 95,
+      "name": "TopTrackRow"
+    },
+    {
+      "path": "app/listen/src/pages/UserProfileLibrarySections.tsx",
+      "line": 130,
+      "name": "UserProfileCrateRow"
+    },
+    {
+      "path": "app/listen/src/pages/home-page-model.ts",
+      "line": 85,
+      "name": "dedupeTrackRows"
+    },
+    {
+      "path": "app/listen/src/pages/user-profile-model.ts",
+      "line": 86,
+      "name": "formatJoinedDate"
+    },
+    {
+      "path": "app/listen/src/components/cards/TrackRowModel.ts",
+      "line": 220,
+      "name": "isQueueableTrackRow"
+    },
+    {
+      "path": "app/listen/src/components/home/HomeRecentEntityRows.tsx",
+      "line": 33,
+      "name": "RecentEntityRow"
+    },
+    {
+      "path": "app/listen/src/components/home/HomeSectionCards.tsx",
+      "line": 12,
+      "name": "UpcomingPreviewRow"
+    },
+    {
+      "path": "app/listen/src/components/home/home-upcoming-model.ts",
+      "line": 11,
+      "name": "formatUpcomingDate"
+    },
+    {
+      "path": "app/listen/src/components/player/PlaybackTargetPopover.tsx",
+      "line": 174,
+      "name": "PlaybackTargetRow"
+    },
+    {
+      "path": "app/listen/src/components/playlists/PlaylistCard.tsx",
+      "line": 483,
+      "name": "PlaylistRow"
+    },
+    {
+      "path": "app/listen/src/components/settings/SettingsPrimitives.tsx",
+      "line": 25,
+      "name": "RangeRow"
+    },
+    {
+      "path": "app/listen/src/components/settings/SettingsPrimitives.tsx",
+      "line": 75,
+      "name": "ToggleRow"
+    },
+    {
+      "path": "app/listen/src/components/upcoming/UpcomingShowCollapsedView.tsx",
+      "line": 73,
+      "name": "CollapsedShowDate"
+    },
+    {
+      "path": "app/listen/src/components/player/extended/SuggestedTrackRow.tsx",
+      "line": 7,
+      "name": "SuggestedTrackRow"
+    }
+  ],
+  "inlineCandidates": [
+    {
+      "path": "app/shared/ui/composites/AdminSelect.tsx",
+      "line": 283,
+      "element": "button",
+      "className": "\"crate-overlay-menu-item crate-focus-inset flex w-full items-center gap-2 px-3 text-left\""
+    },
+    {
+      "path": "app/shared/ui/domain/ArtistBioProfile.tsx",
+      "line": 377,
+      "element": "a",
+      "className": "\"inline-flex items-center gap-1.5 rounded-md border border-border-quiet px-2.5 py-1 text-xs text-text-muted-strong transition-colors hover:border-border-interactive hover:bg-surface-quiet-subtle hover:text-text-secondary-strong\""
+    },
+    {
+      "path": "app/shared/ui/domain/ArtistBioProfile.tsx",
+      "line": 443,
+      "element": "div",
+      "className": "\"mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-muted\""
+    },
+    {
+      "path": "app/shared/ui/domain/ArtistBioProfile.tsx",
+      "line": 491,
+      "element": "button",
+      "className": "\"link-accent mt-2 flex w-fit max-w-full items-center gap-1 text-xs\""
+    },
+    {
+      "path": "app/shared/ui/primitives/AppErrorBoundary.tsx",
+      "line": 22,
+      "element": "div",
+      "className": "\"flex min-h-screen flex-col items-center justify-center gap-4 bg-surface-canvas text-text-primary\""
+    },
+    {
+      "path": "app/shared/ui/primitives/AppPopover.tsx",
+      "line": 61,
+      "element": "button",
+      "className": "{cn(\n        \"crate-overlay-menu-item flex w-full items-center gap-3 px-3 text-left\",\n        className,\n      )}"
+    },
+    {
+      "path": "app/shared/ui/primitives/ErrorState.tsx",
+      "line": 106,
+      "element": "div",
+      "className": "\"mt-3 flex flex-wrap items-center gap-3\""
+    },
+    {
+      "path": "app/shared/ui/primitives/FilterChip.tsx",
+      "line": 24,
+      "element": "button",
+      "className": "{cn(\n        \"crate-form-chip inline-flex min-h-8 items-center justify-center gap-1.5 rounded-full border px-3 py-1 font-mono font-normal text-filter-chip tracking-chip [@media(pointer:coarse)]:min-h-11 disabled:cursor-not-allowed disabled:opacity-[var(--disabled-opacity)]\",\n        !pressed && tone && BADGE_TONE_CLASS[tone],\n        className,\n      )}"
+    },
+    {
+      "path": "app/shared/ui/primitives/FollowHeartButton.tsx",
+      "line": 218,
+      "element": "button",
+      "className": "{cn(\n        \"relative inline-flex items-center justify-center gap-1.5 transition-[color,filter,transform,box-shadow] disabled:opacity-50\",\n        className,\n        isActive\n          ? \"text-accent-action drop-shadow-accent-action\"\n          : \"text-text-primary/80\",\n      )}"
+    },
+    {
+      "path": "app/shared/ui/primitives/ImageLightbox.tsx",
+      "line": 58,
+      "element": "button",
+      "className": "\"fixed inset-0 z-app-modal flex items-center justify-center border-0 bg-surface-canvas/80 p-0 animate-in fade-in duration-200\""
+    },
+    {
+      "path": "app/shared/ui/primitives/SearchInput.tsx",
+      "line": 121,
+      "element": "button",
+      "className": "\"crate-form-search-clear absolute top-1/2 right-1 z-10 inline-flex -translate-y-1/2 items-center justify-center rounded-full text-text-subtle transition-colors hover:text-text-primary\""
+    },
+    {
+      "path": "app/shared/ui/primitives/SegmentedControl.tsx",
+      "line": 101,
+      "element": "div",
+      "className": "{cn(\n        \"flex-wrap items-center gap-2\",\n        fullWidth ? \"flex w-full\" : \"inline-flex\",\n        className,\n      )}"
+    },
+    {
+      "path": "app/shared/ui/primitives/StarRating.tsx",
+      "line": 21,
+      "element": "div",
+      "className": "\"flex items-center gap-0.5\""
+    },
+    {
+      "path": "app/shared/ui/shadcn/alert-dialog.tsx",
+      "line": 71,
+      "element": "div",
+      "className": "{cn(\n        \"grid grid-rows-[auto_1fr] place-items-center gap-1.5 text-center has-data-[slot=alert-dialog-media]:grid-rows-[auto_auto_1fr] has-data-[slot=alert-dialog-media]:gap-x-6 sm:group-data-[size=default]/alert-dialog-content:place-items-start sm:group-data-[size=default]/alert-dialog-content:text-left sm:group-data-[size=default]/alert-dialog-content:has-data-[slot=alert-dialog-media]:grid-rows-[auto_1fr]\",\n        className,\n      )}"
+    },
+    {
+      "path": "app/shared/ui/shadcn/alert-dialog.tsx",
+      "line": 132,
+      "element": "div",
+      "className": "{cn(\n        \"mb-2 inline-flex size-16 items-center justify-center rounded-md bg-surface-container sm:group-data-[size=default]/alert-dialog-content:row-span-2 *:[svg:not([class*='size-'])]:size-8\",\n        className,\n      )}"
+    },
+    {
+      "path": "app/shared/ui/shadcn/card.tsx",
+      "line": 7,
+      "element": "div",
+      "className": "{cn(\n        \"flex flex-col gap-6 rounded-md border border-border-quiet bg-surface-container py-6 text-text-primary shadow-card backdrop-blur-xl\",\n        className,\n      )}"
+    },
+    {
+      "path": "app/shared/ui/shadcn/card.tsx",
+      "line": 20,
+      "element": "div",
+      "className": "{cn(\n        \"@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:border-text-primary/5 [.border-b]:pb-6\",\n        className,\n      )}"
+    },
+    {
+      "path": "app/shared/ui/shadcn/card.tsx",
+      "line": 76,
+      "element": "div",
+      "className": "{cn(\n        \"flex items-center px-6 [.border-t]:border-text-primary/5 [.border-t]:pt-6\",\n        className,\n      )}"
+    },
+    {
+      "path": "app/shared/ui/domain/actions/ContextMenu.tsx",
+      "line": 253,
+      "element": "div",
+      "className": "\"flex items-center gap-3 border-b border-border-quiet p-4 \""
+    },
+    {
+      "path": "app/shared/ui/domain/auth/OAuthButtons.tsx",
+      "line": 100,
+      "element": "div",
+      "className": "\"relative flex items-center gap-3 py-1\""
+    },
+    {
+      "path": "app/shared/ui/domain/auth/OAuthButtons.tsx",
+      "line": 101,
+      "element": "div",
+      "className": "\"flex-1 border-t border-border-quiet\""
+    },
+    {
+      "path": "app/shared/ui/domain/auth/OAuthButtons.tsx",
+      "line": 105,
+      "element": "div",
+      "className": "\"flex-1 border-t border-border-quiet\""
+    },
+    {
+      "path": "app/shared/ui/domain/auth/OAuthButtons.tsx",
+      "line": 108,
+      "element": "div",
+      "className": "\"flex items-center justify-center gap-3\""
+    },
+    {
+      "path": "app/shared/ui/domain/auth/OAuthButtons.tsx",
+      "line": 110,
+      "element": "button",
+      "className": "{cn(\n              \"flex h-10 w-10 items-center justify-center border border-border-quiet bg-text-primary/5 transition-colors hover:bg-text-primary/10 disabled:opacity-30 disabled:cursor-not-allowed\",\n              buttonClassName,\n            )}"
+    },
+    {
+      "path": "app/shared/ui/domain/auth/OAuthButtons.tsx",
+      "line": 125,
+      "element": "button",
+      "className": "{cn(\n              \"flex h-10 w-10 items-center justify-center border border-border-quiet bg-text-primary/5 text-text-primary transition-colors hover:bg-text-primary/10 disabled:opacity-30 disabled:cursor-not-allowed\",\n              buttonClassName,\n            )}"
+    },
+    {
+      "path": "app/shared/ui/domain/brand/CrateLoader.tsx",
+      "line": 55,
+      "element": "div",
+      "className": "{cn(\n        \"relative flex flex-col items-center justify-center gap-6 overflow-visible text-center\",\n        WRAPPER_CLASSES[variant],\n        className,\n      )}"
+    },
+    {
+      "path": "app/shared/ui/domain/entity/EntityCard.tsx",
+      "line": 151,
+      "element": "div",
+      "className": "\"flex items-center justify-center gap-2 transition-opacity pointer-fine:opacity-0 pointer-fine:group-hover/card:opacity-100 pointer-fine:group-focus-within/card:opacity-100\""
+    },
+    {
+      "path": "app/shared/ui/domain/entity/EntityRow.tsx",
+      "line": 190,
+      "element": "div",
+      "className": "{cn(\n            \"flex shrink-0 items-center gap-2\",\n            classNames?.trailing,\n          )}"
+    },
+    {
+      "path": "app/shared/ui/domain/filters/FilterBar.tsx",
+      "line": 36,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/shared/ui/domain/filters/FilterBar.tsx",
+      "line": 38,
+      "element": "div",
+      "className": "\"flex shrink-0 items-center gap-2\""
+    },
+    {
+      "path": "app/shared/ui/domain/filters/FilterBar.tsx",
+      "line": 46,
+      "element": "div",
+      "className": "\"flex shrink-0 items-center gap-2\""
+    },
+    {
+      "path": "app/shared/ui/domain/filters/FilterBar.tsx",
+      "line": 54,
+      "element": "div",
+      "className": "\"ml-auto flex shrink-0 items-center gap-2\""
+    },
+    {
+      "path": "app/shared/ui/domain/filters/FilterBar.tsx",
+      "line": 61,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/shared/ui/domain/genres/GenrePill.tsx",
+      "line": 69,
+      "element": "button",
+      "className": "\"inline-flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-full px-3 py-1 text-left pointer-coarse:min-h-11\""
+    },
+    {
+      "path": "app/shared/ui/domain/hero/HeroActionBar.tsx",
+      "line": 124,
+      "element": "button",
+      "className": "\"flex size-11 touch-manipulation items-center justify-center rounded-full text-text-primary/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action-hover\""
+    },
+    {
+      "path": "app/shared/ui/domain/hero/HeroActionBar.tsx",
+      "line": 201,
+      "element": "div",
+      "className": "{cn(\n        \"mx-auto flex w-full max-w-content flex-col gap-5 md:flex-row md:items-center md:justify-between md:gap-6\",\n        className,\n      )}"
+    },
+    {
+      "path": "app/shared/ui/domain/hero/PageHero.tsx",
+      "line": 200,
+      "element": "div",
+      "className": "\"mb-2 flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/shared/ui/domain/hero/PageHero.tsx",
+      "line": 209,
+      "element": "div",
+      "className": "\"mt-2 flex flex-wrap items-center gap-2 text-sm text-text-muted\""
+    },
+    {
+      "path": "app/shared/ui/domain/hero/PageHero.tsx",
+      "line": 265,
+      "element": "div",
+      "className": "{cn(\n              \"relative mt-5 flex flex-wrap items-center gap-2\",\n              actionsClassName,\n            )}"
+    },
+    {
+      "path": "app/shared/ui/domain/lists/EmptyState.tsx",
+      "line": 60,
+      "element": "div",
+      "className": "\"mt-3 flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/shared/ui/domain/lists/SectionHeader.tsx",
+      "line": 50,
+      "element": "button",
+      "className": "\"link-accent inline-flex items-center gap-1 text-sm\""
+    },
+    {
+      "path": "app/shared/ui/domain/lists/SectionHeader.tsx",
+      "line": 96,
+      "element": "div",
+      "className": "\"flex shrink-0 items-center gap-2\""
+    },
+    {
+      "path": "app/shared/ui/domain/navigation/PageHeader.tsx",
+      "line": 62,
+      "element": "div",
+      "className": "\"flex shrink-0 flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/shared/ui/domain/playlists/PlaylistArtwork.tsx",
+      "line": 53,
+      "element": "div",
+      "className": "{`absolute right-2.5 top-2.5 flex items-center justify-center ${className}`}"
+    },
+    {
+      "path": "app/shared/ui/domain/user/UserMenu.tsx",
+      "line": 65,
+      "element": "button",
+      "className": "{cn(\n        \"flex h-12 w-12 touch-manipulation items-center justify-center overflow-hidden rounded-full border border-border-quiet bg-surface-canvas/30 text-sm font-medium text-text-primary/70 shadow-icon-control backdrop-blur-sm transition-colors hover:bg-surface-canvas/50 hover:text-text-primary\",\n        triggerClassName,\n      )}"
+    },
+    {
+      "path": "app/ui/src/main.tsx",
+      "line": 22,
+      "element": "div",
+      "className": "\"flex min-h-screen items-center justify-center bg-app-surface px-6 text-foreground\""
+    },
+    {
+      "path": "app/ui/src/main.tsx",
+      "line": 38,
+      "element": "button",
+      "className": "\"mt-5 inline-flex h-10 items-center rounded-md border border-white/12 bg-white/8 px-4 text-sm font-medium text-foreground transition-colors hover:bg-white/12\""
+    },
+    {
+      "path": "app/ui/src/components/ImageCropUpload.tsx",
+      "line": 133,
+      "element": "div",
+      "className": "\"flex items-center justify-between px-4 py-3 border-b border-border\""
+    },
+    {
+      "path": "app/ui/src/components/ImageCropUpload.tsx",
+      "line": 160,
+      "element": "div",
+      "className": "\"px-4 py-2 flex items-center gap-3\""
+    },
+    {
+      "path": "app/ui/src/components/ImageCropUpload.tsx",
+      "line": 174,
+      "element": "div",
+      "className": "\"flex justify-end gap-2 px-4 py-3 border-t border-border\""
+    },
+    {
+      "path": "app/ui/src/pages/Album.tsx",
+      "line": 325,
+      "element": "div",
+      "className": "\"flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground\""
+    },
+    {
+      "path": "app/ui/src/pages/Album.tsx",
+      "line": 335,
+      "element": "button",
+      "className": "\"flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors  disabled:cursor-not-allowed disabled:opacity-45\""
+    },
+    {
+      "path": "app/ui/src/pages/Album.tsx",
+      "line": 479,
+      "element": "div",
+      "className": "\"flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground\""
+    },
+    {
+      "path": "app/ui/src/pages/Album.tsx",
+      "line": 489,
+      "element": "button",
+      "className": "\"flex w-full items-center gap-3 px-4 py-3 text-left transition-colors  disabled:cursor-not-allowed disabled:opacity-45\""
+    },
+    {
+      "path": "app/ui/src/pages/Album.tsx",
+      "line": 1249,
+      "element": "div",
+      "className": "\"mb-4 flex items-center gap-2 text-xs text-muted-foreground\""
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 138,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 599,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Artist.tsx",
+      "line": 207,
+      "element": "div",
+      "className": "\"flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground\""
+    },
+    {
+      "path": "app/ui/src/pages/Artist.tsx",
+      "line": 217,
+      "element": "button",
+      "className": "\"flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors  disabled:cursor-not-allowed disabled:opacity-45\""
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 372,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 383,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 441,
+      "element": "article",
+      "className": "\"grid gap-4 rounded-2xl border border-white/8 bg-black/18 p-4 md:grid-cols-[56px_minmax(0,1fr)_auto] md:items-center\""
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 444,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 522,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 550,
+      "element": "button",
+      "className": "\"flex min-h-11 w-full items-center gap-3 rounded-2xl border border-white/6 bg-black/16 p-3 text-left transition hover:border-primary/35\""
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 584,
+      "element": "div",
+      "className": "\"flex items-center gap-3 rounded-2xl border border-white/6 bg-black/16 p-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 613,
+      "element": "button",
+      "className": "\"flex min-h-11 w-full items-center gap-3 rounded-2xl border border-white/6 bg-black/16 p-3 text-left transition hover:border-primary/35\""
+    },
+    {
+      "path": "app/ui/src/pages/Browse.tsx",
+      "line": 379,
+      "element": "div",
+      "className": "\"flex items-center gap-2 mb-4 flex-wrap\""
+    },
+    {
+      "path": "app/ui/src/pages/Browse.tsx",
+      "line": 468,
+      "element": "div",
+      "className": "\"flex border border-border rounded-md overflow-hidden ml-auto\""
+    },
+    {
+      "path": "app/ui/src/pages/Browse.tsx",
+      "line": 584,
+      "element": "div",
+      "className": "\"fixed bottom-14 left-0 right-0 md:left-[220px] z-40 bg-card/95 backdrop-blur-md border-t border-border px-4 py-3 flex items-center gap-3 animate-in slide-in-from-bottom\""
+    },
+    {
+      "path": "app/ui/src/pages/Browse.tsx",
+      "line": 653,
+      "element": "div",
+      "className": "\"flex items-center gap-3 px-3 py-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Contributions.tsx",
+      "line": 129,
+      "element": "div",
+      "className": "\"flex items-center gap-2 p-6 text-sm text-muted-foreground\""
+    },
+    {
+      "path": "app/ui/src/pages/Contributions.tsx",
+      "line": 170,
+      "element": "div",
+      "className": "\"flex flex-col gap-4 px-5 py-4 xl:flex-row xl:items-center xl:justify-between\""
+    },
+    {
+      "path": "app/ui/src/pages/Contributions.tsx",
+      "line": 174,
+      "element": "div",
+      "className": "\"flex min-w-0 flex-1 items-center gap-4\""
+    },
+    {
+      "path": "app/ui/src/pages/Dashboard.tsx",
+      "line": 103,
+      "element": "li",
+      "className": "\"flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between\""
+    },
+    {
+      "path": "app/ui/src/pages/Dashboard.tsx",
+      "line": 271,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center justify-between gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Dashboard.tsx",
+      "line": 272,
+      "element": "div",
+      "className": "\"flex min-w-0 items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Dashboard.tsx",
+      "line": 363,
+      "element": "div",
+      "className": "\"mt-5 grid gap-3 border-t border-border-quiet pt-4\""
+    },
+    {
+      "path": "app/ui/src/pages/Dashboard.tsx",
+      "line": 420,
+      "element": "div",
+      "className": "\"grid gap-3 border-t border-border-quiet pt-5\""
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "line": 144,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2 text-xs text-white/40\""
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "line": 187,
+      "element": "div",
+      "className": "\"mt-4 flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "line": 232,
+      "element": "div",
+      "className": "\"flex items-center gap-3 rounded-sm border border-white/6 bg-black/15 px-3 py-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "line": 285,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3 rounded-sm border border-white/6 bg-black/15 px-3 py-2.5\""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 654,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 692,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2 rounded-md border border-white/8 bg-white/[0.03] p-3 xl:min-w-[520px]\""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 734,
+      "element": "div",
+      "className": "\"mb-3 flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 758,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 784,
+      "element": "div",
+      "className": "\"mt-3 flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 866,
+      "element": "div",
+      "className": "\"mt-4 mb-4 flex flex-wrap gap-2 border-b border-white/8 pb-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1005,
+      "element": "div",
+      "className": "\"flex items-center gap-3 px-3 py-2 rounded-md  transition-colors group\""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1138,
+      "element": "div",
+      "className": "\"flex items-center gap-2 text-sm text-muted-foreground px-2 py-1.5 rounded-md \""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1248,
+      "element": "div",
+      "className": "\"flex items-center gap-3 p-3 bg-card border border-border rounded-md\""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1259,
+      "element": "div",
+      "className": "\"text-xs text-muted-foreground flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1407,
+      "element": "div",
+      "className": "\"flex items-center gap-3 rounded-md border border-white/10 bg-panel-surface px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.16)]\""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1521,
+      "element": "div",
+      "className": "\"flex items-center gap-4\""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1701,
+      "element": "div",
+      "className": "\"absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100\""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1739,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-1.5 mt-1\""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1774,
+      "element": "div",
+      "className": "\"flex items-center gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1805,
+      "element": "div",
+      "className": "\"flex items-center gap-2 py-1.5 px-2 rounded  group/track\""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1831,
+      "element": "div",
+      "className": "\"flex gap-2 mt-4 pt-3 border-t border-border\""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1924,
+      "element": "div",
+      "className": "\"flex items-center gap-2 text-[10px] text-muted-foreground\""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1951,
+      "element": "div",
+      "className": "\"flex items-center gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1966,
+      "element": "div",
+      "className": "\"flex items-center gap-2 mt-1 text-[10px] text-muted-foreground\""
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1994,
+      "element": "div",
+      "className": "\"flex items-center gap-2 py-1.5 px-2 rounded \""
+    },
+    {
+      "path": "app/ui/src/pages/Federation.tsx",
+      "line": 46,
+      "element": "div",
+      "className": "\"flex items-center gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 383,
+      "element": "button",
+      "className": "\"flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs text-white/70 transition hover:bg-accent-action/10 hover:text-accent-action-hi\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 784,
+      "element": "div",
+      "className": "\"mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 800,
+      "element": "div",
+      "className": "\"flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 801,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 916,
+      "element": "div",
+      "className": "\"mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 971,
+      "element": "div",
+      "className": "\"flex h-full flex-col items-center justify-center gap-2 bg-[radial-gradient(circle_at_30%_20%,rgba(34,211,238,0.18),transparent_38%),linear-gradient(135deg,rgba(255,255,255,0.07),rgba(255,255,255,0.015))] text-center\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1031,
+      "element": "div",
+      "className": "\"mt-3 flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1236,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1423,
+      "element": "div",
+      "className": "\"mb-3 flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1512,
+      "element": "div",
+      "className": "\"flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1525,
+      "element": "div",
+      "className": "\"flex items-center gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1539,
+      "element": "div",
+      "className": "\"flex items-center gap-2 rounded-md border border-white/10 bg-black/20 p-1 shadow-[0_12px_28px_rgba(0,0,0,0.16)]\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1562,
+      "element": "div",
+      "className": "\"mb-3 flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1620,
+      "element": "div",
+      "className": "\"mb-3 flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1641,
+      "element": "div",
+      "className": "\"flex items-center justify-between rounded-md border border-state-warning/20 bg-black/10 px-3 py-2 text-left transition-colors \""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1658,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1721,
+      "element": "div",
+      "className": "\"flex shrink-0 items-center gap-1.5\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1757,
+      "element": "div",
+      "className": "\"flex items-center gap-3 text-xs text-muted-foreground mt-1.5\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1859,
+      "element": "div",
+      "className": "\"flex items-center gap-2 mb-6\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1899,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 2076,
+      "element": "div",
+      "className": "\"flex items-center gap-2 text-xs\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 2089,
+      "element": "div",
+      "className": "\"flex items-center gap-2 text-xs\""
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 2101,
+      "element": "div",
+      "className": "\"flex items-center gap-2 text-xs\""
+    },
+    {
+      "path": "app/ui/src/pages/GlobalCatalog.tsx",
+      "line": 230,
+      "element": "div",
+      "className": "\"flex gap-2 border-b border-white/10\""
+    },
+    {
+      "path": "app/ui/src/pages/GlobalCatalog.tsx",
+      "line": 345,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/GlobalCatalog.tsx",
+      "line": 400,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/GlobalCatalog.tsx",
+      "line": 401,
+      "element": "div",
+      "className": "\"flex min-w-0 flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Health.tsx",
+      "line": 739,
+      "element": "div",
+      "className": "\"mb-4 flex flex-wrap items-center gap-3 text-sm text-text-muted\""
+    },
+    {
+      "path": "app/ui/src/pages/Health.tsx",
+      "line": 811,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center justify-between gap-5 py-6\""
+    },
+    {
+      "path": "app/ui/src/pages/Health.tsx",
+      "line": 822,
+      "element": "div",
+      "className": "\"mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-label text-text-muted\""
+    },
+    {
+      "path": "app/ui/src/pages/Health.tsx",
+      "line": 932,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Health.tsx",
+      "line": 1074,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Health.tsx",
+      "line": 1163,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center justify-between gap-x-4 gap-y-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Health.tsx",
+      "line": 1164,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/I18nReview.tsx",
+      "line": 638,
+      "element": "div",
+      "className": "\"flex flex-col gap-3 md:flex-row md:items-center md:justify-between\""
+    },
+    {
+      "path": "app/ui/src/pages/I18nReview.tsx",
+      "line": 811,
+      "element": "div",
+      "className": "\"flex min-h-56 flex-col items-center justify-center gap-3 px-6 text-center\""
+    },
+    {
+      "path": "app/ui/src/pages/I18nReview.tsx",
+      "line": 839,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/I18nReview.tsx",
+      "line": 862,
+      "element": "div",
+      "className": "\"mt-2 inline-flex items-center gap-1 text-[11px] text-white/35\""
+    },
+    {
+      "path": "app/ui/src/pages/I18nReview.tsx",
+      "line": 912,
+      "element": "div",
+      "className": "\"flex flex-col gap-3 md:flex-row md:items-center md:justify-between\""
+    },
+    {
+      "path": "app/ui/src/pages/I18nReview.tsx",
+      "line": 997,
+      "element": "div",
+      "className": "\"hidden grid-cols-[minmax(0,0.24fr)_minmax(0,0.24fr)_minmax(0,0.36fr)_auto] gap-4 font-mono md:grid border-b border-white/8 bg-white/[0.03] px-4 py-2 text-[11px] font-normal uppercase tracking-[0.12em] text-white/35\""
+    },
+    {
+      "path": "app/ui/src/pages/I18nReview.tsx",
+      "line": 1095,
+      "element": "div",
+      "className": "\"flex min-h-[420px] flex-col items-center justify-center gap-3 px-6 text-center\""
+    },
+    {
+      "path": "app/ui/src/pages/I18nReview.tsx",
+      "line": 1119,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3 border-b border-white/8 px-4 py-3\""
+    },
+    {
+      "path": "app/ui/src/pages/I18nReview.tsx",
+      "line": 1153,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Insights.tsx",
+      "line": 139,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-4 border-b border-white/6 pb-1 last:border-b-0 last:pb-0\""
+    },
+    {
+      "path": "app/ui/src/pages/Login.tsx",
+      "line": 27,
+      "element": "div",
+      "className": "\"flex min-h-screen items-center justify-center bg-app-surface px-4\""
+    },
+    {
+      "path": "app/ui/src/pages/Login.tsx",
+      "line": 70,
+      "element": "div",
+      "className": "\"flex min-h-screen items-center justify-center bg-app-surface px-4\""
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 141,
+      "element": "div",
+      "className": "{cn(\n        \"grid gap-3 border-b border-white/6 px-4 py-3 font-mono text-[11px] transition-colors  md:grid-cols-[78px_68px_minmax(0,1fr)]\",\n      )}"
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 154,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2 text-[10px] text-white/35\""
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 400,
+      "element": "div",
+      "className": "\"flex flex-col gap-3 xl:flex-row xl:items-center\""
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 493,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center justify-between gap-2 border-b border-white/6 px-4 py-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 494,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 113,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2 text-xs text-white/40\""
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 162,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 205,
+      "element": "div",
+      "className": "\"group flex flex-col gap-3 rounded-md border border-white/8 bg-black/15 p-4 transition-colors hover:border-white/14  xl:flex-row xl:items-center\""
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 206,
+      "element": "div",
+      "className": "\"flex items-center gap-4 xl:w-[320px] xl:flex-shrink-0\""
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 337,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 545,
+      "element": "div",
+      "className": "\"flex items-center gap-1\""
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 656,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 713,
+      "element": "div",
+      "className": "\"flex items-center justify-center gap-2 py-16 text-white/45\""
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1285,
+      "element": "div",
+      "className": "\"mb-3 flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1413,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4\""
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1430,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1447,
+      "element": "div",
+      "className": "\"mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-primary/10 pt-4\""
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1517,
+      "element": "div",
+      "className": "\"flex items-center gap-3 rounded-md px-2 py-2 \""
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1635,
+      "element": "div",
+      "className": "\"mt-3 flex items-center gap-2 text-xs text-muted-foreground\""
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1649,
+      "element": "div",
+      "className": "\"flex items-center gap-3 rounded-md border border-white/8 bg-black/20 px-3 py-2\""
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1744,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1771,
+      "element": "div",
+      "className": "{\n                          \"group flex items-center gap-3 rounded-md border border-transparent px-2 py-2 transition-colors hover:border-white/10  \" +\n                          (draggedTrackId === rowId\n                            ? \"bg-primary/10\"\n                            : \"bg-transparent\")\n                        }"
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1890,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1891,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 405,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 458,
+      "element": "div",
+      "className": "\"flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between\""
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 502,
+      "element": "div",
+      "className": "\"flex items-center justify-center gap-2 py-16 text-muted-foreground\""
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 553,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 585,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-1.5\""
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 722,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 800,
+      "element": "div",
+      "className": "\"flex flex-col gap-3 border-t border-white/10 pt-4 md:flex-row md:items-center md:justify-between\""
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 805,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 969,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 1053,
+      "element": "div",
+      "className": "\"mb-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between\""
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 1061,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 1115,
+      "element": "div",
+      "className": "\"mb-3 flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 1219,
+      "element": "div",
+      "className": "\"mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4\""
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 1235,
+      "element": "div",
+      "className": "\"flex flex-col gap-3 border-t border-white/10 pt-4 md:flex-row md:items-center md:justify-between\""
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 1240,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Profile.tsx",
+      "line": 99,
+      "element": "div",
+      "className": "\"flex items-center gap-4 mb-6\""
+    },
+    {
+      "path": "app/ui/src/pages/Profile.tsx",
+      "line": 207,
+      "element": "div",
+      "className": "{`flex items-center justify-between py-3 ${\n                index === 0 ? \"border-b border-border\" : \"\"\n              }`}"
+    },
+    {
+      "path": "app/ui/src/pages/Roles.tsx",
+      "line": 91,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 281,
+      "element": "div",
+      "className": "\"grid gap-x-3 gap-y-2 rounded-md border border-white/6 bg-black/15 p-3 md:grid-cols-[200px_minmax(0,1fr)] md:items-center\""
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 288,
+      "element": "div",
+      "className": "\"flex min-w-0 flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 321,
+      "element": "div",
+      "className": "\"mb-3 flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 473,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 690,
+      "element": "div",
+      "className": "\"flex items-center gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 721,
+      "element": "div",
+      "className": "\"flex items-center gap-2 rounded-md border border-white/6 bg-black/15 px-3 py-2 text-xs text-muted-foreground\""
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 1533,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 1636,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2 md:pl-[212px] pt-1\""
+    },
+    {
+      "path": "app/ui/src/pages/Setup.tsx",
+      "line": 77,
+      "element": "div",
+      "className": "\"min-h-screen bg-background flex items-center justify-center px-4\""
+    },
+    {
+      "path": "app/ui/src/pages/Setup.tsx",
+      "line": 82,
+      "element": "div",
+      "className": "\"flex items-center justify-center gap-2 mb-8\""
+    },
+    {
+      "path": "app/ui/src/pages/Setup.tsx",
+      "line": 84,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Setup.tsx",
+      "line": 111,
+      "element": "div",
+      "className": "\"flex items-center gap-2 mb-1\""
+    },
+    {
+      "path": "app/ui/src/pages/Setup.tsx",
+      "line": 155,
+      "element": "div",
+      "className": "\"flex items-center gap-2 mb-1\""
+    },
+    {
+      "path": "app/ui/src/pages/Setup.tsx",
+      "line": 203,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Shows.tsx",
+      "line": 206,
+      "element": "div",
+      "className": "{`flex items-center gap-2 ${\n        isMap ? \"absolute top-4 right-4 z-[1000]\" : \"mb-6 justify-between\"\n      }`}"
+    },
+    {
+      "path": "app/ui/src/pages/Shows.tsx",
+      "line": 212,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Shows.tsx",
+      "line": 246,
+      "element": "div",
+      "className": "{`flex border rounded-md overflow-hidden ${\n            isMap\n              ? \"border-border/50 bg-card/90 backdrop-blur\"\n              : \"border-border\"\n          }`}"
+    },
+    {
+      "path": "app/ui/src/pages/Shows.tsx",
+      "line": 312,
+      "element": "button",
+      "className": "{`flex items-center gap-2 w-full text-left text-xs px-2 py-1 rounded ${\n                      genreFilter === genre\n                        ? \"bg-primary/20 text-primary\"\n                        : \"text-muted-foreground hover:text-foreground\"\n                    }`}"
+    },
+    {
+      "path": "app/ui/src/pages/Shows.tsx",
+      "line": 615,
+      "element": "button",
+      "className": "\"flex items-center gap-4 p-3 bg-card border border-border rounded-md  transition-colors w-full text-left\""
+    },
+    {
+      "path": "app/ui/src/pages/Stack.tsx",
+      "line": 222,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Stack.tsx",
+      "line": 237,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Stack.tsx",
+      "line": 299,
+      "element": "a",
+      "className": "\"inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-border-subtle bg-surface-control px-3 text-sm text-text-primary hover:bg-surface-control-hover\""
+    },
+    {
+      "path": "app/ui/src/pages/Stack.tsx",
+      "line": 354,
+      "element": "div",
+      "className": "\"mb-3 flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Stack.tsx",
+      "line": 359,
+      "element": "div",
+      "className": "\"flex items-center gap-2 py-6 text-sm text-white/45\""
+    },
+    {
+      "path": "app/ui/src/pages/Stack.tsx",
+      "line": 660,
+      "element": "div",
+      "className": "\"flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between\""
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 294,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-4 border-b border-white/6 pb-1 last:border-b-0 last:pb-0\""
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 585,
+      "element": "div",
+      "className": "\"grid grid-cols-2 gap-3 px-4 py-3 xl:grid-cols-[minmax(0,1fr)_7rem_7rem_7rem_6rem] xl:items-center\""
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 590,
+      "element": "div",
+      "className": "\"flex min-w-0 items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 786,
+      "element": "div",
+      "className": "\"mb-4 flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 814,
+      "element": "div",
+      "className": "\"mb-4 flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 830,
+      "element": "div",
+      "className": "\"flex items-center gap-3 rounded-md border border-white/6 bg-white/[0.03] px-3 py-2\""
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 1450,
+      "element": "div",
+      "className": "\"grid min-w-0 grid-cols-2 items-center gap-3 rounded-md border border-white/8 bg-black/20 px-4 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.12)] sm:flex\""
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 1468,
+      "element": "div",
+      "className": "\"flex min-w-0 items-center gap-2 sm:w-32 sm:shrink-0\""
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 1480,
+      "element": "div",
+      "className": "\"flex items-center justify-self-end gap-1 font-mono text-label font-normal text-text-subtle\""
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 499,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center justify-between gap-2 text-xs text-white/40\""
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 500,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 616,
+      "element": "div",
+      "className": "{cn(\n        \"mb-3 flex items-center gap-2 rounded-md border px-3 py-2 text-xs\",\n        status.cardClass,\n      )}"
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 842,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 843,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 850,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 851,
+      "element": "div",
+      "className": "\"flex items-center gap-1 rounded-md border border-white/10 bg-black/20 p-1\""
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 914,
+      "element": "div",
+      "className": "{cn(\n              \"flex h-9 flex-1 items-center justify-center rounded-sm border px-2 text-[11px] transition-colors\",\n              task\n                ? \"border-primary/25 bg-primary/10 text-primary\"\n                : \"border-white/8 bg-black/15 text-white/30\",\n            )}"
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 946,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 972,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 992,
+      "element": "div",
+      "className": "\"flex items-center gap-2 text-sm text-white/45\""
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1038,
+      "element": "div",
+      "className": "\"flex items-center gap-2 text-sm text-white/45\""
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1056,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1057,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1136,
+      "element": "div",
+      "className": "\"grid gap-3 border-b border-white/6 px-4 py-3 last:border-b-0 lg:grid-cols-[minmax(0,1fr)_150px_150px_120px] lg:items-center\""
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1218,
+      "element": "div",
+      "className": "\"mt-1 flex flex-wrap items-center gap-2 text-xs text-white/40\""
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1233,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1318,
+      "element": "button",
+      "className": "\"flex w-full items-center gap-3 px-4 py-3 text-left transition-colors \""
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1325,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Trash.tsx",
+      "line": 306,
+      "element": "div",
+      "className": "\"flex items-center gap-2 p-6 text-sm text-muted-foreground\""
+    },
+    {
+      "path": "app/ui/src/pages/Trash.tsx",
+      "line": 330,
+      "element": "div",
+      "className": "\"flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between\""
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 341,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 345,
+      "element": "div",
+      "className": "\"flex shrink-0 items-center gap-1\""
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 482,
+      "element": "div",
+      "className": "\"mt-3 flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 616,
+      "element": "div",
+      "className": "\"mb-3 flex items-center gap-2 border-b border-white/8 pb-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 755,
+      "element": "div",
+      "className": "\"flex min-w-0 flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 769,
+      "element": "div",
+      "className": "\"mt-1 flex min-w-0 items-center gap-1.5 text-xs text-text-secondary\""
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 774,
+      "element": "div",
+      "className": "\"mt-2 flex flex-wrap items-center gap-1.5\""
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 1056,
+      "element": "div",
+      "className": "\"flex items-center gap-1.5 mt-1\""
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 1064,
+      "element": "div",
+      "className": "\"font-mono font-normal text-xs text-muted-foreground mb-2 flex items-center gap-1\""
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 1073,
+      "element": "button",
+      "className": "\"min-h-11 flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-xs font-medium\""
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 1096,
+      "element": "div",
+      "className": "\"font-mono font-normal flex items-center gap-1.5 text-xs text-primary\""
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 638,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-1.5 text-sm text-white/65\""
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 885,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 924,
+      "element": "div",
+      "className": "\"flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between\""
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1141,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3 border-t border-white/8 pt-4\""
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1495,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1595,
+      "element": "div",
+      "className": "\"flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.12em] text-white/30\""
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1810,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center justify-between gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1885,
+      "element": "div",
+      "className": "\"flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between\""
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1940,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 2432,
+      "element": "div",
+      "className": "\"mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-white/42\""
+    },
+    {
+      "path": "app/ui/src/components/admin/ops-surfaces.tsx",
+      "line": 45,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/admin/ops-surfaces.tsx",
+      "line": 62,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2 xl:justify-end\""
+    },
+    {
+      "path": "app/ui/src/components/admin/ops-surfaces.tsx",
+      "line": 130,
+      "element": "div",
+      "className": "\"flex flex-col gap-3 border-b border-white/8 px-4 py-4 md:flex-row md:items-start md:justify-between md:px-5\""
+    },
+    {
+      "path": "app/ui/src/components/admin/ops-surfaces.tsx",
+      "line": 140,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/album/AlbumHeader.tsx",
+      "line": 348,
+      "element": "div",
+      "className": "\"mb-3 mt-3 flex flex-wrap items-center gap-4 text-sm text-white/50\""
+    },
+    {
+      "path": "app/ui/src/components/album/AlbumHeader.tsx",
+      "line": 369,
+      "element": "div",
+      "className": "\"mb-3 flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/album/AlbumRow.tsx",
+      "line": 58,
+      "element": "div",
+      "className": "\"group flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors \""
+    },
+    {
+      "path": "app/ui/src/components/album/AudioProfileCard.tsx",
+      "line": 104,
+      "element": "div",
+      "className": "\"px-5 py-3 border-b border-border flex items-center justify-between\""
+    },
+    {
+      "path": "app/ui/src/components/album/AudioProfileCard.tsx",
+      "line": 194,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/album/AudioProfileCard.tsx",
+      "line": 215,
+      "element": "div",
+      "className": "\"flex items-center gap-2 flex-wrap\""
+    },
+    {
+      "path": "app/ui/src/components/album/AudioProfileCard.tsx",
+      "line": 246,
+      "element": "div",
+      "className": "{`flex items-center gap-1.5 mb-1 ${color}`}"
+    },
+    {
+      "path": "app/ui/src/components/album/MissingAlbumCard.tsx",
+      "line": 44,
+      "element": "div",
+      "className": "\"text-xs text-muted-foreground text-left flex items-center gap-1 flex-wrap mt-0.5\""
+    },
+    {
+      "path": "app/ui/src/components/album/RelatedAlbums.tsx",
+      "line": 82,
+      "element": "div",
+      "className": "\"absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100\""
+    },
+    {
+      "path": "app/ui/src/components/album/TagEditor.tsx",
+      "line": 118,
+      "element": "div",
+      "className": "\"flex gap-3 items-center mb-3\""
+    },
+    {
+      "path": "app/ui/src/components/album/TagEditor.tsx",
+      "line": 200,
+      "element": "button",
+      "className": "\"flex items-center gap-2 text-sm font-medium hover:text-foreground mb-3\""
+    },
+    {
+      "path": "app/ui/src/components/album/TagEditor.tsx",
+      "line": 209,
+      "element": "div",
+      "className": "\"flex gap-2 items-center text-[10px] text-muted-foreground uppercase tracking-wider px-1 mb-1\""
+    },
+    {
+      "path": "app/ui/src/components/album/TagEditor.tsx",
+      "line": 221,
+      "element": "div",
+      "className": "{`flex gap-2 items-center rounded-md px-1 py-0.5 ${\n                      modified ? \"bg-primary/5 ring-1 ring-primary/20\" : \"\"\n                    }`}"
+    },
+    {
+      "path": "app/ui/src/components/album/TidalAlbumCard.tsx",
+      "line": 69,
+      "element": "div",
+      "className": "\"absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200\""
+    },
+    {
+      "path": "app/ui/src/components/album/TidalAlbumCard.tsx",
+      "line": 95,
+      "element": "div",
+      "className": "\"text-xs text-muted-foreground/60 text-left flex items-center gap-1 mt-0.5\""
+    },
+    {
+      "path": "app/ui/src/components/album/TrackTable.tsx",
+      "line": 156,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/album/TrackTable.tsx",
+      "line": 185,
+      "element": "div",
+      "className": "\"flex min-w-[104px] items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/album/TrackTable.tsx",
+      "line": 296,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/components/album/TrackTable.tsx",
+      "line": 376,
+      "element": "button",
+      "className": "{`inline-flex min-w-[68px] items-center justify-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold leading-none transition-colors hover:bg-white/[0.08] disabled:cursor-wait disabled:opacity-70 ${lyricsTone(\n              status,\n            )}`}"
+    },
+    {
+      "path": "app/ui/src/components/album/TrackTable.tsx",
+      "line": 524,
+      "element": "div",
+      "className": "\"flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground\""
+    },
+    {
+      "path": "app/ui/src/components/album/TrackTable.tsx",
+      "line": 534,
+      "element": "button",
+      "className": "\"flex w-full items-center gap-3 px-4 py-3 text-left transition-colors  disabled:cursor-not-allowed disabled:opacity-45\""
+    },
+    {
+      "path": "app/ui/src/components/album/TrackTable.tsx",
+      "line": 675,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/album/TrackTable.tsx",
+      "line": 696,
+      "element": "div",
+      "className": "\"mt-2 flex items-center gap-2 border-t border-white/5 pt-1.5\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistAboutSection.tsx",
+      "line": 41,
+      "element": "button",
+      "className": "\"mt-2 flex items-center gap-1 text-xs text-primary hover:text-primary/80\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistAboutSection.tsx",
+      "line": 71,
+      "element": "div",
+      "className": "\"flex items-center justify-between border-b border-white/5 py-2 last:border-0\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistAboutSection.tsx",
+      "line": 199,
+      "element": "a",
+      "className": "{`inline-flex items-center gap-1.5 rounded-md border border-white/10 px-3 py-1.5 text-xs transition-colors hover:border-white/20 hover:bg-white/5 ${link.color}`}"
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistArtworkGallery.tsx",
+      "line": 353,
+      "element": "div",
+      "className": "\"mt-5 flex min-h-40 flex-col items-center justify-center rounded-md border border-dashed border-border bg-background/25 text-center\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistArtworkGallery.tsx",
+      "line": 417,
+      "element": "div",
+      "className": "\"grid grid-cols-2 gap-1.5 border-t border-border pt-3\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistBioResearchDialog.tsx",
+      "line": 155,
+      "element": "div",
+      "className": "\"flex flex-wrap gap-2 border-b border-border-quiet pb-3\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistBioResearchDialog.tsx",
+      "line": 371,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center justify-between gap-2 text-xs text-text-muted\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistBioResearchDialog.tsx",
+      "line": 486,
+      "element": "div",
+      "className": "\"flex items-center gap-3 rounded-lg border border-accent-action/20 bg-accent-action/5 p-5 text-sm text-text-secondary-strong\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistCard.tsx",
+      "line": 110,
+      "element": "div",
+      "className": "\"mt-2 flex flex-wrap items-center justify-center gap-1.5\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistDiscographySection.tsx",
+      "line": 61,
+      "element": "div",
+      "className": "\"mb-4 flex flex-wrap items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistDiscographySection.tsx",
+      "line": 62,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-4\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistDiscographySection.tsx",
+      "line": 65,
+      "element": "button",
+      "className": "\"flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistGenreSelector.tsx",
+      "line": 85,
+      "element": "button",
+      "className": "{cn(\n            \"flex min-h-11 w-full items-center gap-2 rounded-md border border-white/10 bg-black/25 px-3 text-left text-sm transition-colors hover:border-white/20\",\n            disabled && \"cursor-not-allowed opacity-50\",\n          )}"
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistGenreSelector.tsx",
+      "line": 141,
+      "element": "button",
+      "className": "{cn(\n                    \"flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-colors hover:bg-white/[0.06]\",\n                    selected && \"bg-primary/10 text-primary\",\n                  )}"
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistHeroArtworkEditor.tsx",
+      "line": 591,
+      "element": "div",
+      "className": "\"flex items-center gap-3 rounded-md border border-border bg-background/35 px-3 py-2\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistHeroArtworkEditor.tsx",
+      "line": 685,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-4\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistHeroArtworkEditor.tsx",
+      "line": 877,
+      "element": "div",
+      "className": "\"flex min-h-48 items-center justify-center rounded-md border border-border bg-background/40 text-sm text-muted-foreground\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistHeroArtworkEditor.tsx",
+      "line": 954,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistHeroArtworkEditor.tsx",
+      "line": 1038,
+      "element": "div",
+      "className": "\"mt-6 flex items-center gap-2.5\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistHeroSection.tsx",
+      "line": 256,
+      "element": "div",
+      "className": "\"hidden md:flex items-center gap-3 text-sm text-white/50 mb-2\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistHeroSection.tsx",
+      "line": 279,
+      "element": "div",
+      "className": "\"flex items-center gap-2 md:gap-4 text-xs md:text-sm text-white/50 mb-2 flex-wrap\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistHeroSection.tsx",
+      "line": 301,
+      "element": "a",
+      "className": "\"inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-accent-action/10 border border-accent-action/20 text-accent-action-hi hover:bg-accent-action/20 transition-colors text-xs mb-2\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistHeroSection.tsx",
+      "line": 328,
+      "element": "div",
+      "className": "\"flex items-center gap-2 mb-2\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistMetadataEditor.tsx",
+      "line": 177,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistOverviewSection.tsx",
+      "line": 59,
+      "element": "div",
+      "className": "\"mb-2 flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistOverviewSection.tsx",
+      "line": 71,
+      "element": "button",
+      "className": "\"mt-2 flex items-center gap-1 text-xs text-primary hover:text-primary/80\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistOverviewSection.tsx",
+      "line": 118,
+      "element": "div",
+      "className": "\"group flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors \""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistOverviewSection.tsx",
+      "line": 224,
+      "element": "a",
+      "className": "{`inline-flex items-center gap-1.5 rounded-md border border-white/10 px-3 py-1.5 text-xs transition-colors hover:border-white/20 hover:bg-white/5 ${link.color}`}"
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistPageBits.tsx",
+      "line": 17,
+      "element": "div",
+      "className": "\"flex items-center gap-1.5 text-white/40 mb-1\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistPageBits.tsx",
+      "line": 28,
+      "element": "div",
+      "className": "\"flex items-center gap-1\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRepairDialog.tsx",
+      "line": 575,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRepairDialog.tsx",
+      "line": 601,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRepairDialog.tsx",
+      "line": 643,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRepairDialog.tsx",
+      "line": 698,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRepairDialog.tsx",
+      "line": 778,
+      "element": "div",
+      "className": "\"flex shrink-0 items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRepairDialog.tsx",
+      "line": 807,
+      "element": "div",
+      "className": "\"inline-flex items-center gap-2 rounded-md border border-white/8 bg-black/20 px-3 py-2 text-xs text-white/45\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRow.tsx",
+      "line": 56,
+      "element": "div",
+      "className": "{`flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 transition-colors  ${\n        isSelected ? \"bg-white/[0.06]\" : \"\"\n      }`}"
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRow.tsx",
+      "line": 102,
+      "element": "div",
+      "className": "\"absolute -right-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-md bg-state-warning/12 text-state-warning-text\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRow.tsx",
+      "line": 109,
+      "element": "div",
+      "className": "\"flex min-w-0 items-center gap-1.5\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRow.tsx",
+      "line": 139,
+      "element": "div",
+      "className": "\"hidden w-20 items-center justify-end gap-1 text-xs text-muted-foreground md:flex\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistSetlistSection.tsx",
+      "line": 109,
+      "element": "div",
+      "className": "\"mb-4 flex items-center justify-between gap-4\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistSetlistSection.tsx",
+      "line": 154,
+      "element": "div",
+      "className": "\"flex items-center gap-4 px-4 py-2 text-xs text-white/30 border-b border-white/5 mb-1\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistSetlistSection.tsx",
+      "line": 167,
+      "element": "button",
+      "className": "{`w-full flex items-center gap-4 px-4 py-2.5 rounded-md  transition-colors text-left group ${\n                    !isPlayable ? \"opacity-50\" : \"\"\n                  }`}"
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistSetlistSection.tsx",
+      "line": 204,
+      "element": "div",
+      "className": "\"w-28 flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistShowsSection.tsx",
+      "line": 57,
+      "element": "a",
+      "className": "\"flex items-center gap-4 p-3 rounded-md border border-accent-action/10 hover:border-accent-action/20 transition-[border-color,background-color]  group\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistShowsSection.tsx",
+      "line": 76,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistShowsSection.tsx",
+      "line": 81,
+      "element": "div",
+      "className": "\"text-xs text-muted-foreground truncate flex items-center gap-1.5\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistShowsSection.tsx",
+      "line": 113,
+      "element": "div",
+      "className": "\"flex items-center gap-1 flex-shrink-0\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistTopTracksSection.tsx",
+      "line": 46,
+      "element": "div",
+      "className": "\"flex items-center gap-4 px-4 py-2 text-xs text-white/30 border-b border-white/5 mb-1\""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistTopTracksSection.tsx",
+      "line": 77,
+      "element": "div",
+      "className": "\"w-full flex items-center gap-4 px-4 py-2 text-left transition-colors group \""
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistTopTracksSection.tsx",
+      "line": 106,
+      "element": "div",
+      "className": "\"w-full flex items-center gap-4 px-4 py-2 text-left opacity-60 transition-colors \""
+    },
+    {
+      "path": "app/ui/src/components/artist/HeroCompositionCanvas.tsx",
+      "line": 546,
+      "element": "div",
+      "className": "\"mt-3 flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/artist/HeroCompositionCanvas.tsx",
+      "line": 547,
+      "element": "div",
+      "className": "\"flex rounded-md border border-border bg-background/35 p-1\""
+    },
+    {
+      "path": "app/ui/src/components/artist/HeroCompositionCanvas.tsx",
+      "line": 567,
+      "element": "div",
+      "className": "\"ml-auto flex items-center gap-1\""
+    },
+    {
+      "path": "app/ui/src/components/artist/HeroCompositionCanvas.tsx",
+      "line": 639,
+      "element": "button",
+      "className": "{cn(\n        \"inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40\",\n        pressed\n          ? \"bg-primary/14 text-primary\"\n          : \"text-muted-foreground hover:bg-white/5 hover:text-foreground\",\n      )}"
+    },
+    {
+      "path": "app/ui/src/components/artist/HeroCompositionCanvas.tsx",
+      "line": 670,
+      "element": "button",
+      "className": "{cn(\n        \"inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background/35 text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40\",\n        pressed ? \"border-primary/40 text-primary\" : \"\",\n      )}"
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreEqEditor.tsx",
+      "line": 136,
+      "element": "div",
+      "className": "\"mb-3 flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreEqEditor.tsx",
+      "line": 137,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreEqEditor.tsx",
+      "line": 175,
+      "element": "div",
+      "className": "\"mt-4 flex flex-wrap items-center justify-between gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreNetworkGraph.tsx",
+      "line": 227,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground\""
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+      "line": 312,
+      "element": "div",
+      "className": "\"mt-1.5 flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+      "line": 344,
+      "element": "div",
+      "className": "\"flex items-center gap-4 text-sm text-muted-foreground\""
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+      "line": 366,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+      "line": 492,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+      "line": 493,
+      "element": "a",
+      "className": "\"inline-flex items-center gap-1.5 text-xs text-primary/80 hover:text-primary transition-colors\""
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+      "line": 523,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+      "line": 524,
+      "element": "a",
+      "className": "\"inline-flex items-center gap-1.5 text-xs text-primary/80 hover:text-primary transition-colors\""
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+      "line": 535,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+      "line": 738,
+      "element": "button",
+      "className": "\"inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-white/5 transition-colors\""
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+      "line": 762,
+      "element": "button",
+      "className": "\"inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-xs text-foreground hover:bg-white/5 transition-colors\""
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+      "line": 1036,
+      "element": "div",
+      "className": "{`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition ${\n            isSelected\n              ? \"border-accent-action/40 bg-accent-action/10\"\n              : \"border-white/6 bg-white/[0.02] hover:border-white/15 \"\n          }`}"
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+      "line": 1061,
+      "element": "button",
+      "className": "\"flex min-w-0 flex-1 items-center gap-3 border-0 bg-transparent p-0 text-left text-sm\""
+    },
+    {
+      "path": "app/ui/src/components/layout/CommandPalette.tsx",
+      "line": 296,
+      "element": "div",
+      "className": "\"flex items-center border-b border-border px-3\""
+    },
+    {
+      "path": "app/ui/src/components/layout/PageHeader.tsx",
+      "line": 62,
+      "element": "div",
+      "className": "\"flex max-w-full flex-wrap items-center justify-end gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/layout/SearchBar.tsx",
+      "line": 437,
+      "element": "button",
+      "className": "{`flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left transition-colors ${\n                    index === selectedIdx ? \"bg-white/10\" : \"hover:bg-white/5\"\n                  }`}"
+    },
+    {
+      "path": "app/ui/src/components/layout/SearchBar.tsx",
+      "line": 468,
+      "element": "button",
+      "className": "{`flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left transition-colors ${\n                    index === selectedIdx ? \"bg-white/10\" : \"hover:bg-white/5\"\n                  }`}"
+    },
+    {
+      "path": "app/ui/src/components/layout/SearchBar.tsx",
+      "line": 486,
+      "element": "div",
+      "className": "\"flex items-center justify-center gap-2 text-sm text-white/45\""
+    },
+    {
+      "path": "app/ui/src/components/layout/Shell.tsx",
+      "line": 115,
+      "element": "div",
+      "className": "\"z-app-header fixed inset-x-0 top-0 flex items-center gap-3 border-b border-white/6 bg-app-surface/75 px-4 py-3 backdrop-blur-xl md:hidden\""
+    },
+    {
+      "path": "app/ui/src/components/layout/Shell.tsx",
+      "line": 150,
+      "element": "div",
+      "className": "\"flex h-16 w-full items-center gap-4 px-4 pointer-events-none\""
+    },
+    {
+      "path": "app/ui/src/components/layout/Shell.tsx",
+      "line": 151,
+      "element": "div",
+      "className": "\"pointer-events-auto flex shrink-0 items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/layout/Shell.tsx",
+      "line": 152,
+      "element": "button",
+      "className": "\"flex min-h-11 min-w-11 items-center justify-center rounded-md p-0 text-sm text-text-muted transition-colors hover:bg-surface-control hover:text-text-primary\""
+    },
+    {
+      "path": "app/ui/src/components/layout/Shell.tsx",
+      "line": 164,
+      "element": "button",
+      "className": "\"flex min-h-11 min-w-11 items-center justify-center rounded-md p-0 text-sm text-text-muted transition-colors hover:bg-surface-control hover:text-text-primary\""
+    },
+    {
+      "path": "app/ui/src/components/layout/Shell.tsx",
+      "line": 180,
+      "element": "div",
+      "className": "\"pointer-events-auto flex min-w-0 flex-1 items-center gap-3 md:gap-4 lg:w-[500px] lg:flex-none [&>div]:w-full\""
+    },
+    {
+      "path": "app/ui/src/components/layout/Sidebar.tsx",
+      "line": 270,
+      "element": "div",
+      "className": "\"flex min-h-16 items-center gap-2 px-3\""
+    },
+    {
+      "path": "app/ui/src/components/layout/Sidebar.tsx",
+      "line": 376,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/layout/Sidebar.tsx",
+      "line": 407,
+      "element": "div",
+      "className": "\"flex items-center gap-3\""
+    },
+    {
+      "path": "app/ui/src/components/layout/Sidebar.tsx",
+      "line": 447,
+      "element": "div",
+      "className": "\"flex flex-col items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/scanner/IssueList.tsx",
+      "line": 55,
+      "element": "div",
+      "className": "\"flex gap-2 items-center flex-shrink-0\""
+    },
+    {
+      "path": "app/ui/src/components/scanner/MatchCard.tsx",
+      "line": 44,
+      "element": "div",
+      "className": "\"flex items-center gap-4 mb-3\""
+    },
+    {
+      "path": "app/ui/src/components/scanner/ScanProgress.tsx",
+      "line": 99,
+      "element": "div",
+      "className": "{cn(\n                \"flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-[color,background-color,border-color]\",\n                isDone &&\n                  \"border-l-2 border-l-accent-action border-accent-action/30 text-accent-action-hi bg-accent-action/5\",\n                isRunning &&\n                  \"border-l-2 border-l-accent-action border-accent-action/30 text-accent-action-hi bg-accent-action/5\",\n                !isDone && !isRunning && \"border-border text-muted-foreground\",\n              )}"
+    },
+    {
+      "path": "app/ui/src/components/shows/ShowCard.tsx",
+      "line": 252,
+      "element": "div",
+      "className": "\"flex min-w-0 cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs transition-colors \""
+    },
+    {
+      "path": "app/ui/src/components/shows/ShowCard.tsx",
+      "line": 288,
+      "element": "div",
+      "className": "\"absolute inset-x-0 top-0 z-10 flex h-full items-center gap-0\""
+    },
+    {
+      "path": "app/ui/src/components/shows/ShowCard.tsx",
+      "line": 308,
+      "element": "div",
+      "className": "\"mt-1 flex items-center gap-1 text-[11px] text-white/40\""
+    },
+    {
+      "path": "app/ui/src/components/shows/ShowCard.tsx",
+      "line": 329,
+      "element": "div",
+      "className": "\"flex flex-shrink-0 flex-col items-center justify-center px-2\""
+    },
+    {
+      "path": "app/ui/src/components/shows/ShowCard.tsx",
+      "line": 341,
+      "element": "div",
+      "className": "\"flex flex-shrink-0 flex-col items-center gap-1 pr-2\""
+    },
+    {
+      "path": "app/ui/src/components/shows/ShowCard.tsx",
+      "line": 377,
+      "element": "a",
+      "className": "{cn(\n        \"flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md border py-2.5 text-[11px] font-semibold transition-colors\",\n        tone === \"primary\"\n          ? \"border-primary/20 bg-primary/10 text-primary hover:bg-primary/18\"\n          : \"border-white/10 text-muted-foreground hover:border-primary/20 hover:text-primary\",\n      )}"
+    },
+    {
+      "path": "app/ui/src/components/shows/ShowCard.tsx",
+      "line": 438,
+      "element": "button",
+      "className": "\"absolute left-2.5 top-2.5 z-10 flex h-11 w-11 items-center justify-center rounded-md bg-black/40 text-white/60 backdrop-blur-sm transition-colors hover:text-white\""
+    },
+    {
+      "path": "app/ui/src/components/shows/ShowCard.tsx",
+      "line": 460,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/components/track/SimilarTracksPanel.tsx",
+      "line": 77,
+      "element": "div",
+      "className": "\"flex items-center justify-between px-4 py-3 border-b border-border\""
+    },
+    {
+      "path": "app/ui/src/components/track/SimilarTracksPanel.tsx",
+      "line": 103,
+      "element": "button",
+      "className": "\"w-full flex items-center gap-3 px-4 py-2.5  transition-colors text-left group\""
+    },
+    {
+      "path": "app/ui/src/components/track/SimilarTracksPanel.tsx",
+      "line": 138,
+      "element": "div",
+      "className": "\"flex items-center gap-1.5 flex-shrink-0\""
+    },
+    {
+      "path": "app/ui/src/components/ui/EventRow.tsx",
+      "line": 26,
+      "element": "div",
+      "className": "\"grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)_3rem] items-center gap-x-3 gap-y-2 pr-2 @xl:grid-cols-[5.5rem_minmax(0,1fr)_3rem_auto]\""
+    },
+    {
+      "path": "app/ui/src/components/ui/image-lightbox.tsx",
+      "line": 34,
+      "element": "button",
+      "className": "\"fixed inset-0 z-app-modal flex items-center justify-center border-0 bg-black/80 p-0 animate-in fade-in duration-200\""
+    },
+    {
+      "path": "app/ui/src/components/ui/star-rating.tsx",
+      "line": 21,
+      "element": "div",
+      "className": "\"flex items-center gap-0.5\""
+    },
+    {
+      "path": "app/ui/src/components/users/UserMap.tsx",
+      "line": 177,
+      "element": "div",
+      "className": "\"mb-1 flex items-center gap-1 text-[10px] uppercase tracking-[0.12em] text-accent-action-hi/60\""
+    },
+    {
+      "path": "app/ui/src/components/users/UserMap.tsx",
+      "line": 243,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center justify-between gap-3 border-b border-white/8 px-5 py-4\""
+    },
+    {
+      "path": "app/ui/src/components/users/UserMap.tsx",
+      "line": 245,
+      "element": "div",
+      "className": "\"flex items-center gap-2 text-sm font-semibold text-white\""
+    },
+    {
+      "path": "app/ui/src/components/users/UserMap.tsx",
+      "line": 300,
+      "element": "div",
+      "className": "\"flex items-center gap-2 text-sm font-semibold text-white\""
+    },
+    {
+      "path": "app/ui/src/components/users/UserMap.tsx",
+      "line": 322,
+      "element": "button",
+      "className": "{`flex w-full items-center justify-between gap-2 rounded-md border px-2.5 py-2 text-left text-xs transition ${\n                      user.id === selectedUser.id\n                        ? \"border-primary/35 bg-primary/10 text-white\"\n                        : \"border-white/8 bg-black/15 text-white/65 hover:bg-white/6\"\n                    }`}"
+    },
+    {
+      "path": "app/ui/src/pages/federation/AuditPanel.tsx",
+      "line": 23,
+      "element": "div",
+      "className": "\"flex items-center gap-3 rounded-md border border-white/5 px-3 py-2 text-xs\""
+    },
+    {
+      "path": "app/ui/src/pages/federation/DirectoriesPanel.tsx",
+      "line": 145,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/ui/src/pages/federation/DirectoriesPanel.tsx",
+      "line": 250,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/ui/src/pages/federation/DirectoriesPanel.tsx",
+      "line": 252,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/app-shell/PublicShell.tsx",
+      "line": 22,
+      "element": "div",
+      "className": "\"mx-auto flex h-16 w-full max-w-content items-center justify-between gap-4 px-4 sm:px-6\""
+    },
+    {
+      "path": "app/listen/src/app-shell/PublicShell.tsx",
+      "line": 41,
+      "element": "div",
+      "className": "\"mx-auto flex w-full max-w-content flex-col items-center justify-between gap-2 px-4 py-6 text-sm text-text-muted sm:flex-row sm:px-6\""
+    },
+    {
+      "path": "app/listen/src/components/CrateAlbumPicker.tsx",
+      "line": 148,
+      "element": "li",
+      "className": "\"flex items-center gap-3 py-2.5 first:pt-0 last:pb-0\""
+    },
+    {
+      "path": "app/listen/src/components/CrateEditor.tsx",
+      "line": 475,
+      "element": "li",
+      "className": "\"flex items-center gap-3 px-3 py-2.5\""
+    },
+    {
+      "path": "app/listen/src/pages/Artist.tsx",
+      "line": 25,
+      "element": "div",
+      "className": "\"flex flex-col items-center gap-4 py-20 text-center\""
+    },
+    {
+      "path": "app/listen/src/pages/ArtistTopTracks.tsx",
+      "line": 103,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-4\""
+    },
+    {
+      "path": "app/listen/src/pages/ArtistTopTracks.tsx",
+      "line": 104,
+      "element": "div",
+      "className": "\"flex items-center gap-3\""
+    },
+    {
+      "path": "app/listen/src/pages/AuthCallback.tsx",
+      "line": 100,
+      "element": "div",
+      "className": "\"flex min-h-dvh items-center justify-center bg-surface-canvas px-6 text-text-primary\""
+    },
+    {
+      "path": "app/listen/src/pages/AuthCallback.tsx",
+      "line": 111,
+      "element": "a",
+      "className": "\"mt-6 inline-flex h-12 items-center justify-center rounded-full bg-accent-action px-6 text-sm font-semibold text-accent-action-foreground transition hover:bg-accent-action-hover\""
+    },
+    {
+      "path": "app/listen/src/pages/Crate.tsx",
+      "line": 552,
+      "element": "div",
+      "className": "\"flex items-center gap-[var(--content-row-gap)] px-3 py-[var(--content-row-padding-y)]\""
+    },
+    {
+      "path": "app/listen/src/pages/Crates.tsx",
+      "line": 191,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/listen/src/pages/JamInvite.tsx",
+      "line": 40,
+      "element": "div",
+      "className": "\"flex min-h-[50vh] flex-col items-center justify-center gap-3 text-center\""
+    },
+    {
+      "path": "app/listen/src/pages/LibraryAlbumsTab.tsx",
+      "line": 52,
+      "element": "div",
+      "className": "\"flex h-10 items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/listen/src/pages/LibraryAlbumsTab.tsx",
+      "line": 85,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/listen/src/pages/LibraryArtistsTab.tsx",
+      "line": 50,
+      "element": "div",
+      "className": "\"flex h-10 items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/listen/src/pages/LibraryArtistsTab.tsx",
+      "line": 83,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/listen/src/pages/LibraryBandcampHeader.tsx",
+      "line": 27,
+      "element": "div",
+      "className": "\"flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between\""
+    },
+    {
+      "path": "app/listen/src/pages/LibraryBandcampImported.tsx",
+      "line": 45,
+      "element": "article",
+      "className": "\"flex items-center gap-3 rounded-xl border border-text-primary/8 bg-text-primary/[0.03] p-3\""
+    },
+    {
+      "path": "app/listen/src/pages/LibraryCollectionSortDropdown.tsx",
+      "line": 37,
+      "element": "button",
+      "className": "{[\n          \"listen-glass-panel flex h-10 min-w-[172px] items-center justify-between gap-3 rounded-lg border border-border-quiet/10 px-4 text-sm font-semibold text-text-primary transition-[border-color,box-shadow,filter,transform] hover:-translate-y-px hover:border-accent-action/40 hover:shadow-accent-action-soft focus-visible:border-accent-action/70\",\n          open ? \"border-accent-action/45 shadow-accent-action\" : \"\",\n        ].join(\" \")}"
+    },
+    {
+      "path": "app/listen/src/pages/LibraryCollectionSortDropdown.tsx",
+      "line": 70,
+      "element": "button",
+      "className": "{[\n                  \"flex min-h-10 w-full items-center justify-between gap-3 rounded-lg px-3 text-left text-sm font-semibold transition-[background-color,color,filter]\",\n                  isSelected\n                    ? \"bg-accent-action/14 text-accent-action drop-shadow-accent-action\"\n                    : \"text-text-primary hover:bg-text-primary/7 hover:text-accent-action hover:drop-shadow-accent-action-soft\",\n                ].join(\" \")}"
+    },
+    {
+      "path": "app/listen/src/pages/LibraryContributionsTab.tsx",
+      "line": 129,
+      "element": "article",
+      "className": "\"flex items-center gap-3 rounded-xl border border-text-primary/8 bg-text-primary/[0.03] p-3\""
+    },
+    {
+      "path": "app/listen/src/pages/Login.tsx",
+      "line": 108,
+      "element": "div",
+      "className": "\"flex min-h-dvh items-center justify-center bg-surface-canvas px-4\""
+    },
+    {
+      "path": "app/listen/src/pages/OfflineLibrary.tsx",
+      "line": 131,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-4\""
+    },
+    {
+      "path": "app/listen/src/pages/OfflineLibrary.tsx",
+      "line": 140,
+      "element": "div",
+      "className": "\"flex shrink-0 items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/pages/PathDetail.tsx",
+      "line": 125,
+      "element": "div",
+      "className": "\"mt-1.5 flex items-center gap-2 text-[0.75rem] text-text-primary/40\""
+    },
+    {
+      "path": "app/listen/src/pages/PathDetail.tsx",
+      "line": 154,
+      "element": "div",
+      "className": "\"mb-4 flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/pages/PathDetailParts.tsx",
+      "line": 88,
+      "element": "div",
+      "className": "\"flex items-center gap-3\""
+    },
+    {
+      "path": "app/listen/src/pages/Paths.tsx",
+      "line": 91,
+      "element": "div",
+      "className": "\"flex items-center gap-3\""
+    },
+    {
+      "path": "app/listen/src/pages/Paths.tsx",
+      "line": 123,
+      "element": "div",
+      "className": "\"flex items-center gap-3\""
+    },
+    {
+      "path": "app/listen/src/pages/PathsParts.tsx",
+      "line": 218,
+      "element": "button",
+      "className": "\"flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-text-primary/70 transition  hover:text-text-primary\""
+    },
+    {
+      "path": "app/listen/src/pages/PeopleSearch.tsx",
+      "line": 40,
+      "element": "div",
+      "className": "\"flex items-center gap-2 text-sm text-text-muted\""
+    },
+    {
+      "path": "app/listen/src/pages/RadioHero.tsx",
+      "line": 38,
+      "element": "button",
+      "className": "\"radio-discovery-button group inline-flex min-h-12 items-center justify-center gap-3 rounded-full px-5 text-sm font-semibold transition duration-300\""
+    },
+    {
+      "path": "app/listen/src/pages/RadioSeedPanel.tsx",
+      "line": 34,
+      "element": "div",
+      "className": "\"radio-seed-heading flex items-center gap-2 text-sm font-semibold\""
+    },
+    {
+      "path": "app/listen/src/pages/RadioSeedPanel.tsx",
+      "line": 62,
+      "element": "button",
+      "className": "\"radio-seed-result flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition\""
+    },
+    {
+      "path": "app/listen/src/pages/RadioSessionStatus.tsx",
+      "line": 20,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/pages/RadioSessionStatus.tsx",
+      "line": 37,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/pages/RadioSessionStatus.tsx",
+      "line": 46,
+      "element": "div",
+      "className": "\"radio-session-muted mt-1.5 flex items-center gap-1 text-xs\""
+    },
+    {
+      "path": "app/listen/src/pages/Register.tsx",
+      "line": 94,
+      "element": "div",
+      "className": "\"flex min-h-dvh items-center justify-center bg-surface-canvas px-4\""
+    },
+    {
+      "path": "app/listen/src/pages/SearchTrackResults.tsx",
+      "line": 29,
+      "element": "div",
+      "className": "\"mb-3 flex items-center gap-3\""
+    },
+    {
+      "path": "app/listen/src/pages/ServerSetup.tsx",
+      "line": 128,
+      "element": "div",
+      "className": "\"relative flex min-h-dvh items-center justify-center overflow-hidden bg-surface-canvas px-6 py-10 text-text-primary\""
+    },
+    {
+      "path": "app/listen/src/pages/ServerSetup.tsx",
+      "line": 234,
+      "element": "div",
+      "className": "\"flex items-center gap-2 text-caption text-state-success-text\""
+    },
+    {
+      "path": "app/listen/src/pages/ServerSetup.tsx",
+      "line": 243,
+      "element": "div",
+      "className": "\"flex items-center gap-2 text-caption text-state-warning-text\""
+    },
+    {
+      "path": "app/listen/src/pages/ServerSetup.tsx",
+      "line": 250,
+      "element": "div",
+      "className": "\"flex items-center gap-2 text-caption text-state-danger-text\""
+    },
+    {
+      "path": "app/listen/src/pages/ShowsContent.tsx",
+      "line": 95,
+      "element": "div",
+      "className": "\"flex flex-col gap-3 rounded-panel border border-text-primary/5 bg-text-primary/[0.02] p-4 md:flex-row md:items-center md:justify-between\""
+    },
+    {
+      "path": "app/listen/src/pages/Stats.tsx",
+      "line": 145,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-x-3 text-base font-bold\""
+    },
+    {
+      "path": "app/listen/src/pages/StatsCollectionPanels.tsx",
+      "line": 381,
+      "element": "div",
+      "className": "\"flex items-center gap-3 px-2 py-2\""
+    },
+    {
+      "path": "app/listen/src/pages/StatsCollectionPanels.tsx",
+      "line": 406,
+      "element": "div",
+      "className": "\"mb-4 flex items-center justify-between gap-4\""
+    },
+    {
+      "path": "app/listen/src/pages/StatsNarrativeSections.tsx",
+      "line": 59,
+      "element": "div",
+      "className": "\"flex flex-col gap-5 md:flex-row md:items-center md:justify-between\""
+    },
+    {
+      "path": "app/listen/src/pages/Upload.tsx",
+      "line": 231,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-4\""
+    },
+    {
+      "path": "app/listen/src/pages/Upload.tsx",
+      "line": 258,
+      "element": "div",
+      "className": "\"flex items-center gap-3\""
+    },
+    {
+      "path": "app/listen/src/pages/Upload.tsx",
+      "line": 332,
+      "element": "div",
+      "className": "\"flex items-center gap-2 font-medium\""
+    },
+    {
+      "path": "app/listen/src/pages/UserConnections.tsx",
+      "line": 41,
+      "element": "div",
+      "className": "\"mt-4 flex items-center gap-3\""
+    },
+    {
+      "path": "app/listen/src/pages/UserProfileHero.tsx",
+      "line": 82,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/pages/UserProfileHero.tsx",
+      "line": 127,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/pages/UserProfileLibrarySections.tsx",
+      "line": 65,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/pages/UserProfileLibrarySections.tsx",
+      "line": 106,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/pages/UserProfileLibrarySections.tsx",
+      "line": 152,
+      "element": "div",
+      "className": "\"user-profile-item flex items-center gap-4 rounded-lg px-4 py-3\""
+    },
+    {
+      "path": "app/listen/src/pages/UserProfileLibrarySections.tsx",
+      "line": 213,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/pages/UserProfileMatch.tsx",
+      "line": 17,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/pages/UserProfileNetworkSections.tsx",
+      "line": 49,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/album/AlbumHero.tsx",
+      "line": 132,
+      "element": "button",
+      "className": "\"link-meta inline-flex items-center gap-2 self-start text-sm\""
+    },
+    {
+      "path": "app/listen/src/components/album/AlbumHeroContributor.tsx",
+      "line": 31,
+      "element": "div",
+      "className": "\"mt-3 flex items-center gap-2 text-xs text-text-muted\""
+    },
+    {
+      "path": "app/listen/src/components/album/AlbumTrackList.tsx",
+      "line": 132,
+      "element": "div",
+      "className": "\"listen-glass-panel mb-3 flex flex-wrap items-center gap-2 rounded-lg p-3 \""
+    },
+    {
+      "path": "app/listen/src/components/album/AlbumTrackList.tsx",
+      "line": 215,
+      "element": "div",
+      "className": "\"mb-2 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-text-muted\""
+    },
+    {
+      "path": "app/listen/src/components/artist/ArtistCommunitySections.tsx",
+      "line": 43,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-4\""
+    },
+    {
+      "path": "app/listen/src/components/artist/ArtistHeroSection.tsx",
+      "line": 278,
+      "element": "button",
+      "className": "\"link-accent mt-2 flex w-fit max-w-full items-center gap-1 text-xs\""
+    },
+    {
+      "path": "app/listen/src/components/artist/ArtistSetlistSection.tsx",
+      "line": 82,
+      "element": "div",
+      "className": "\"flex items-center gap-3 rounded-lg px-3 py-2 transition-colors \""
+    },
+    {
+      "path": "app/listen/src/components/artist/ArtistSetlistSection.tsx",
+      "line": 98,
+      "element": "div",
+      "className": "\"mt-1 flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/artist/ArtistTopTracksSection.tsx",
+      "line": 40,
+      "element": "div",
+      "className": "\"mb-4 flex items-center justify-between gap-4\""
+    },
+    {
+      "path": "app/listen/src/components/bandcamp/BandcampItem.tsx",
+      "line": 105,
+      "element": "article",
+      "className": "{cn(\n        \"item-action-target group relative border border-text-primary/8 bg-surface-canvas/18\",\n        tile\n          ? \"overflow-hidden rounded-panel\"\n          : \"flex items-center gap-3 rounded-xl p-3\",\n      )}"
+    },
+    {
+      "path": "app/listen/src/components/bandcamp/BandcampSupportButton.tsx",
+      "line": 300,
+      "element": "button",
+      "className": "{`bandcamp-support-action inline-flex h-10 items-center ${\n        iconOnly ? \"w-10 justify-center px-0\" : \"gap-2 px-4\"\n      } rounded-full text-sm font-medium disabled:opacity-50 ${className}`}"
+    },
+    {
+      "path": "app/listen/src/components/cards/TrackRow.tsx",
+      "line": 98,
+      "element": "div",
+      "className": "{cn(\n        \"item-action-target group track-row flex items-center gap-[var(--content-row-gap)] transition-colors\",\n        compact ? \"px-2 py-1.5\" : \"px-3 py-[var(--content-row-padding-y)]\",\n      )}"
+    },
+    {
+      "path": "app/listen/src/components/cards/TrackRowContent.tsx",
+      "line": 42,
+      "element": "div",
+      "className": "\"flex min-w-0 items-center gap-[var(--content-row-inline-gap)]\""
+    },
+    {
+      "path": "app/listen/src/components/crates/CrateForm.tsx",
+      "line": 119,
+      "element": "div",
+      "className": "\"grid gap-4 rounded-xl border border-border-quiet bg-text-primary/[0.025] p-4 sm:grid-cols-2\""
+    },
+    {
+      "path": "app/listen/src/components/crates/CrateMembersModal.tsx",
+      "line": 170,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent-action/15 bg-accent-action/5 p-4\""
+    },
+    {
+      "path": "app/listen/src/components/crates/CrateMembersModal.tsx",
+      "line": 189,
+      "element": "li",
+      "className": "\"flex items-center justify-between gap-3 rounded-lg border border-border-quiet bg-text-primary/[0.03] px-3 py-2.5\""
+    },
+    {
+      "path": "app/listen/src/components/crates/CrateMembersModal.tsx",
+      "line": 193,
+      "element": "div",
+      "className": "\"flex min-w-0 items-center gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/crates/CrateMembersModal.tsx",
+      "line": 244,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center justify-between gap-3 rounded-lg border border-state-danger/20 bg-state-danger/5 px-3 py-2.5\""
+    },
+    {
+      "path": "app/listen/src/components/dev/TauriDevLogPanel.tsx",
+      "line": 37,
+      "element": "div",
+      "className": "\"flex items-center justify-between border-b border-border-quiet px-3 py-2\""
+    },
+    {
+      "path": "app/listen/src/components/dev/TauriDevLogPanel.tsx",
+      "line": 77,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/explore/ExplorePrimitives.tsx",
+      "line": 11,
+      "element": "button",
+      "className": "\"inline-flex items-center gap-2 rounded-full border border-border-quiet px-4 py-2 transition-colors hover:border-accent-action/40 hover:bg-accent-action/5\""
+    },
+    {
+      "path": "app/listen/src/components/home/HomeCanonicalHero.tsx",
+      "line": 155,
+      "element": "div",
+      "className": "\"absolute right-6 top-[200px] z-30 flex h-[190px] w-8 flex-col items-center\""
+    },
+    {
+      "path": "app/listen/src/components/home/HomeCanonicalHero.tsx",
+      "line": 156,
+      "element": "div",
+      "className": "\"flex flex-1 flex-col items-center justify-center gap-1\""
+    },
+    {
+      "path": "app/listen/src/components/home/HomeCanonicalHero.tsx",
+      "line": 177,
+      "element": "div",
+      "className": "\"flex flex-col items-center gap-0.5\""
+    },
+    {
+      "path": "app/listen/src/components/home/HomeHeroContent.tsx",
+      "line": 86,
+      "element": "div",
+      "className": "\"mt-6 flex items-center gap-2.5\""
+    },
+    {
+      "path": "app/listen/src/components/home/HomeLegacyHero.tsx",
+      "line": 182,
+      "element": "div",
+      "className": "\"absolute inset-x-0 bottom-5 z-30 flex items-center justify-center gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/home/HomeLegacyHero.tsx",
+      "line": 190,
+      "element": "div",
+      "className": "\"flex items-center gap-1.5\""
+    },
+    {
+      "path": "app/listen/src/components/home/HomeLegacyHero.tsx",
+      "line": 192,
+      "element": "button",
+      "className": "\"flex h-6 items-center bg-transparent px-1\""
+    },
+    {
+      "path": "app/listen/src/components/home/HomeReplaySection.tsx",
+      "line": 154,
+      "element": "div",
+      "className": "\"home-replay-panel-kicker mb-3 flex items-center gap-2 text-xs uppercase tracking-wider\""
+    },
+    {
+      "path": "app/listen/src/components/home/HomeSectionCards.tsx",
+      "line": 29,
+      "element": "button",
+      "className": "\"group relative flex w-full items-center gap-3 overflow-hidden rounded-lg border border-transparent px-3 py-2 text-left transition-colors hover:border-border-quiet \""
+    },
+    {
+      "path": "app/listen/src/components/home/HomeSectionCards.tsx",
+      "line": 45,
+      "element": "div",
+      "className": "\"relative flex size-11 shrink-0 flex-col items-center justify-center rounded-xl border border-border-quiet bg-text-primary/[0.03]\""
+    },
+    {
+      "path": "app/listen/src/components/home/HomeSectionCards.tsx",
+      "line": 54,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/home/HomeUpcomingFeatureCard.tsx",
+      "line": 49,
+      "element": "div",
+      "className": "\"mt-1 inline-flex items-center gap-1 text-sm font-semibold text-text-primary\""
+    },
+    {
+      "path": "app/listen/src/components/home/HomeUpcomingFeatureCard.tsx",
+      "line": 85,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/home/HomeUpcomingPreviewPanel.tsx",
+      "line": 20,
+      "element": "div",
+      "className": "\"mb-3 flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/home/HomeUpcomingPreviewPanel.tsx",
+      "line": 21,
+      "element": "div",
+      "className": "\"home-upcoming-panel-kicker flex items-center gap-2 text-xs uppercase tracking-wider\""
+    },
+    {
+      "path": "app/listen/src/components/home/MixArtwork.tsx",
+      "line": 68,
+      "element": "div",
+      "className": "\"absolute right-3.5 top-3.5 flex items-center justify-center\""
+    },
+    {
+      "path": "app/listen/src/components/imports/RemoteImportAction.tsx",
+      "line": 92,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-3 text-sm\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamActivityPanel.tsx",
+      "line": 49,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamActivityPanel.tsx",
+      "line": 61,
+      "element": "div",
+      "className": "\"jam-dark-surface mt-2 flex items-center gap-2 rounded-xl p-2\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamMembersPanel.tsx",
+      "line": 34,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamMembersPanel.tsx",
+      "line": 44,
+      "element": "div",
+      "className": "\"jam-queue-item flex items-center gap-2 rounded-lg px-2.5 py-2\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamMembersPanel.tsx",
+      "line": 97,
+      "element": "div",
+      "className": "\"flex min-w-0 items-center gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamOpenRoomsPanel.tsx",
+      "line": 114,
+      "element": "div",
+      "className": "\"mb-3 flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamQueueListSections.tsx",
+      "line": 177,
+      "element": "div",
+      "className": "\"flex shrink-0 items-center gap-1.5\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamQueueListSections.tsx",
+      "line": 212,
+      "element": "div",
+      "className": "\"flex items-center gap-1\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamQueueToolbarSections.tsx",
+      "line": 69,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamQueueToolbarSections.tsx",
+      "line": 82,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamQueueToolbarSections.tsx",
+      "line": 106,
+      "element": "button",
+      "className": "\"jam-accent-control flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs disabled:opacity-50\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamQueueToolbarSections.tsx",
+      "line": 127,
+      "element": "button",
+      "className": "\"jam-info-chip flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs disabled:opacity-50\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamQueueToolbarSections.tsx",
+      "line": 172,
+      "element": "div",
+      "className": "\"jam-queue-item flex min-w-0 items-center gap-2 rounded-lg px-2.5 py-2\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamQueueToolbarSections.tsx",
+      "line": 249,
+      "element": "button",
+      "className": "\"jam-queue-search-item flex w-full items-center gap-3 px-3 py-2.5 text-left disabled:cursor-default disabled:opacity-45\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomActions.tsx",
+      "line": 54,
+      "element": "div",
+      "className": "\"jam-room-actions-panel flex flex-col gap-3 rounded-xl p-3 sm:flex-row sm:items-center sm:justify-between\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomAutoDjOptions.tsx",
+      "line": 41,
+      "element": "div",
+      "className": "\"jam-tag-input flex min-h-11 flex-wrap items-center gap-1.5 rounded-lg px-3 py-1.5\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomAutoDjOptions.tsx",
+      "line": 146,
+      "element": "button",
+      "className": "\"jam-taxonomy-option flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomCard.tsx",
+      "line": 120,
+      "element": "div",
+      "className": "\"absolute right-4 top-4 z-10 flex items-center gap-1\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomCreateOptions.tsx",
+      "line": 50,
+      "element": "button",
+      "className": "{`jam-toggle-option flex items-center gap-2 rounded-lg p-3 text-left text-sm transition-colors ${\n          roomVisibility === \"private\" ? \"\" : \"text-text-muted\"\n        }`}"
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomCreateOptions.tsx",
+      "line": 62,
+      "element": "button",
+      "className": "{`jam-toggle-option flex items-center gap-2 rounded-lg p-3 text-left text-sm transition-colors ${\n          roomVisibility === \"public\" ? \"\" : \"text-text-muted\"\n        }`}"
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomHeaderSections.tsx",
+      "line": 80,
+      "element": "div",
+      "className": "\"mt-1 flex flex-wrap items-center gap-2.5\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomHeaderSections.tsx",
+      "line": 106,
+      "element": "div",
+      "className": "\"mt-3 flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomPlaybackSections.tsx",
+      "line": 60,
+      "element": "div",
+      "className": "\"flex min-w-0 items-center gap-4\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomPlaybackSections.tsx",
+      "line": 91,
+      "element": "div",
+      "className": "\"mt-3 flex items-center gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomPlaybackSections.tsx",
+      "line": 211,
+      "element": "div",
+      "className": "\"flex items-center gap-2 md:justify-end\""
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomPlaybackSections.tsx",
+      "line": 223,
+      "element": "div",
+      "className": "\"jam-now-playing grid min-w-0 gap-4 rounded-xl p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:p-5\""
+    },
+    {
+      "path": "app/listen/src/components/layout/MobileBottomNav.tsx",
+      "line": 114,
+      "element": "button",
+      "className": "{`flex min-h-14 min-w-0 flex-1 touch-manipulation flex-col items-center justify-center gap-1 p-1.5 transition-[color,filter,transform] active:scale-[0.97] ${\n            collectionActive\n              ? \"text-accent-action drop-shadow-accent-action\"\n              : \"text-text-muted hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action\"\n          }`}"
+    },
+    {
+      "path": "app/listen/src/components/layout/TopBar.tsx",
+      "line": 24,
+      "element": "div",
+      "className": "\"flex h-16 w-full items-center gap-2 px-3 pointer-events-none sm:gap-4 sm:px-4\""
+    },
+    {
+      "path": "app/listen/src/components/layout/TopBar.tsx",
+      "line": 25,
+      "element": "div",
+      "className": "\"flex shrink-0 items-center gap-2 pointer-events-auto\""
+    },
+    {
+      "path": "app/listen/src/components/layout/TopBar.tsx",
+      "line": 48,
+      "element": "div",
+      "className": "\"flex min-w-0 flex-1 items-center gap-3 md:flex-none md:gap-4 pointer-events-auto\""
+    },
+    {
+      "path": "app/listen/src/components/player/ContinuePlaybackPrompt.tsx",
+      "line": 223,
+      "element": "div",
+      "className": "\"mt-3 flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/player/EqualizerAdaptiveReadouts.tsx",
+      "line": 60,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-1.5\""
+    },
+    {
+      "path": "app/listen/src/components/player/EqualizerAdaptiveReadouts.tsx",
+      "line": 100,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-1.5 rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-xs text-text-secondary\""
+    },
+    {
+      "path": "app/listen/src/components/player/EqualizerAdaptiveReadouts.tsx",
+      "line": 114,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-1.5 rounded-md border border-border-quiet bg-surface-control px-2.5 py-1.5 text-xs text-text-secondary\""
+    },
+    {
+      "path": "app/listen/src/components/player/EqualizerAdaptiveReadouts.tsx",
+      "line": 128,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-1.5 rounded-md border border-accent-action/30 bg-accent-action/10 px-2.5 py-1.5 text-xs text-accent-action\""
+    },
+    {
+      "path": "app/listen/src/components/player/EqualizerPanelSections.tsx",
+      "line": 64,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/player/EqualizerPanelSections.tsx",
+      "line": 70,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/player/EqualizerPanelSections.tsx",
+      "line": 112,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/player/EqualizerPanelSections.tsx",
+      "line": 188,
+      "element": "div",
+      "className": "\"flex items-center gap-1.5\""
+    },
+    {
+      "path": "app/listen/src/components/player/ExtendedPlayerHeader.tsx",
+      "line": 48,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/player/FullscreenPlayerControls.tsx",
+      "line": 41,
+      "element": "div",
+      "className": "\"mx-auto mt-5 flex w-full max-w-[360px] items-center justify-center gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/player/FullscreenPlayerControls.tsx",
+      "line": 135,
+      "element": "div",
+      "className": "\"mx-auto mt-3 flex w-full max-w-[360px] items-center justify-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/player/FullscreenPlayerControls.tsx",
+      "line": 147,
+      "element": "button",
+      "className": "{cn(\n            \"flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-border-subtle bg-surface-control transition-colors active:bg-surface-control-hover\",\n            state.showEqualizer\n              ? \"text-accent-action drop-shadow-accent-action\"\n              : \"text-text-secondary active:text-text-primary\",\n          )}"
+    },
+    {
+      "path": "app/listen/src/components/player/FullscreenPlayerControls.tsx",
+      "line": 165,
+      "element": "button",
+      "className": "\"flex size-12 touch-manipulation items-center justify-center rounded-full border border-border-subtle bg-surface-control text-text-secondary transition-colors active:bg-surface-control-hover active:text-text-primary\""
+    },
+    {
+      "path": "app/listen/src/components/player/FullscreenPlayerHeader.tsx",
+      "line": 40,
+      "element": "div",
+      "className": "\"flex items-center gap-2 px-4 pb-3\""
+    },
+    {
+      "path": "app/listen/src/components/player/FullscreenPlayerHeader.tsx",
+      "line": 48,
+      "element": "div",
+      "className": "\"flex min-w-0 flex-1 items-center justify-end gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/player/FullscreenPlayerHeader.tsx",
+      "line": 52,
+      "element": "button",
+      "className": "{cn(\n                \"group relative flex h-14 min-w-14 touch-manipulation flex-col items-center justify-center gap-1 rounded-xl px-1 text-xs font-semibold leading-none transition-[color,filter,transform] active:scale-[0.96]\",\n                selected\n                  ? \"text-accent-action drop-shadow-accent-action-icon\"\n                  : \"text-text-muted active:text-text-secondary\",\n              )}"
+    },
+    {
+      "path": "app/listen/src/components/player/FullscreenPlayerTabs.tsx",
+      "line": 49,
+      "element": "div",
+      "className": "\"relative flex flex-1 flex-col items-center justify-center overflow-hidden px-6\""
+    },
+    {
+      "path": "app/listen/src/components/player/LyricsPanel.tsx",
+      "line": 93,
+      "element": "div",
+      "className": "\"listen-glass-panel listen-glass-panel--dock z-app-player-drawer fixed right-0 top-0 bottom-(--listen-desktop-player-clearance) flex w-[480px] flex-col overflow-hidden border-l border-border-quiet\""
+    },
+    {
+      "path": "app/listen/src/components/player/LyricsPanel.tsx",
+      "line": 96,
+      "element": "div",
+      "className": "\"relative flex items-center justify-between border-b border-border-quiet px-4 py-3\""
+    },
+    {
+      "path": "app/listen/src/components/player/PlaybackTargetButton.tsx",
+      "line": 23,
+      "element": "button",
+      "className": "{cn(\n        \"relative inline-flex items-center gap-1.5 rounded-md p-1.5 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action\",\n        open || hasRemoteTarget\n          ? \"text-accent-action drop-shadow-accent-action\"\n          : \"text-text-muted\",\n      )}"
+    },
+    {
+      "path": "app/listen/src/components/player/PlaybackTargetPopover.tsx",
+      "line": 59,
+      "element": "div",
+      "className": "\"flex items-center gap-2 px-3 py-4 text-sm text-text-muted\""
+    },
+    {
+      "path": "app/listen/src/components/player/PlaybackTargetPopover.tsx",
+      "line": 78,
+      "element": "div",
+      "className": "\"mt-1 grid grid-cols-2 gap-2 border-t border-border-quiet px-2 pt-3\""
+    },
+    {
+      "path": "app/listen/src/components/player/PlayerTrackIdentity.tsx",
+      "line": 132,
+      "element": "button",
+      "className": "{cn(\n            \"inline-flex items-center gap-2 rounded-full border border-border-subtle bg-surface-quiet-subtle px-2 py-1.5 transition-colors\",\n            artistClickable\n              ? \"active:bg-surface-control-hover\"\n              : \"cursor-default\",\n            badgeClassName,\n          )}"
+    },
+    {
+      "path": "app/listen/src/components/player/QueuePanel.tsx",
+      "line": 45,
+      "element": "div",
+      "className": "\"flex items-center justify-between border-b border-border-quiet px-4 py-3\""
+    },
+    {
+      "path": "app/listen/src/components/player/QueuePanel.tsx",
+      "line": 66,
+      "element": "div",
+      "className": "\"flex items-center gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/player/QueuePanel.tsx",
+      "line": 172,
+      "element": "div",
+      "className": "\"listen-glass-panel listen-glass-panel--dock z-app-player-drawer fixed right-0 top-0 bottom-(--listen-desktop-player-clearance) flex w-[360px] animate-in slide-in-from-right flex-col border-l border-border-quiet\""
+    },
+    {
+      "path": "app/listen/src/components/player/RadioFeedback.tsx",
+      "line": 59,
+      "element": "div",
+      "className": "\"flex items-center gap-1\""
+    },
+    {
+      "path": "app/listen/src/components/player/SpinningDiscControl.tsx",
+      "line": 19,
+      "element": "button",
+      "className": "\"spinning-disc-control absolute left-1/2 top-1/2 z-10 flex size-[26%] min-h-[72px] min-w-[72px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full backdrop-blur-xl transition-transform duration-200 hover:scale-[1.03] active:scale-[0.97]\""
+    },
+    {
+      "path": "app/listen/src/components/playlists/PlaylistCollaboratorsModal.tsx",
+      "line": 75,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3 rounded-lg border border-border-quiet bg-text-primary/[0.03] px-4 py-3\""
+    },
+    {
+      "path": "app/listen/src/components/playlists/PlaylistCollaboratorsModal.tsx",
+      "line": 99,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/playlists/PlaylistComposerTrackList.tsx",
+      "line": 38,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-2 px-3 py-2.5\""
+    },
+    {
+      "path": "app/listen/src/components/playlists/PlaylistComposerTrackList.tsx",
+      "line": 52,
+      "element": "div",
+      "className": "\"flex items-center gap-3 min-w-0 flex-1\""
+    },
+    {
+      "path": "app/listen/src/components/playlists/PlaylistComposerTrackList.tsx",
+      "line": 91,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/playlists/PlaylistIdentitySection.tsx",
+      "line": 72,
+      "element": "button",
+      "className": "\"inline-flex w-full items-center justify-center gap-1 rounded-full bg-text-primary/5 px-2 py-1.5 text-center text-xs font-medium leading-4 text-text-primary transition-colors hover:bg-text-primary/10\""
+    },
+    {
+      "path": "app/listen/src/components/playlists/PlaylistIdentitySection.tsx",
+      "line": 180,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2 pt-1\""
+    },
+    {
+      "path": "app/listen/src/components/playlists/PlaylistTrackSearch.tsx",
+      "line": 47,
+      "element": "button",
+      "className": "\"flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors \""
+    },
+    {
+      "path": "app/listen/src/components/settings/AccountSectionForms.tsx",
+      "line": 163,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-4 rounded-lg border border-border-quiet/10 p-3 \""
+    },
+    {
+      "path": "app/listen/src/components/settings/AccountSectionForms.tsx",
+      "line": 226,
+      "element": "button",
+      "className": "\"link-meta flex w-fit max-w-full items-center gap-2 text-sm\""
+    },
+    {
+      "path": "app/listen/src/components/settings/AccountTimezoneField.tsx",
+      "line": 39,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/settings/BandcampSection.tsx",
+      "line": 78,
+      "element": "div",
+      "className": "\"flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between\""
+    },
+    {
+      "path": "app/listen/src/components/settings/BandcampSection.tsx",
+      "line": 79,
+      "element": "div",
+      "className": "\"flex min-w-0 items-center gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/settings/ConnectDevicesSection.tsx",
+      "line": 209,
+      "element": "div",
+      "className": "\"flex items-center gap-2 text-sm text-text-muted\""
+    },
+    {
+      "path": "app/listen/src/components/settings/ConnectDevicesSection.tsx",
+      "line": 223,
+      "element": "div",
+      "className": "\"flex items-start justify-between gap-4 rounded-lg border border-border-quiet p-3 \""
+    },
+    {
+      "path": "app/listen/src/components/settings/ConnectDevicesSection.tsx",
+      "line": 228,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/settings/ConnectDevicesSection.tsx",
+      "line": 229,
+      "element": "div",
+      "className": "\"inline-flex items-center gap-2 text-sm font-medium text-text-primary\""
+    },
+    {
+      "path": "app/listen/src/components/settings/InterfacePreferencesSection.tsx",
+      "line": 51,
+      "element": "div",
+      "className": "\"flex flex-wrap items-center justify-between gap-x-3 gap-y-2\""
+    },
+    {
+      "path": "app/listen/src/components/settings/LanguageSection.tsx",
+      "line": 118,
+      "element": "div",
+      "className": "\"flex items-start gap-3 rounded-lg border border-border-quiet/10 bg-text-primary/[0.03] px-4 py-3 text-sm text-text-muted\""
+    },
+    {
+      "path": "app/listen/src/components/settings/LinksSection.tsx",
+      "line": 54,
+      "element": "button",
+      "className": "\"flex w-full items-center gap-3 rounded-xl p-3 text-left text-sm text-state-danger transition-colors \""
+    },
+    {
+      "path": "app/listen/src/components/settings/OpenSubsonicCredentialsSection.tsx",
+      "line": 132,
+      "element": "div",
+      "className": "\"flex flex-col gap-3 sm:flex-row sm:items-center\""
+    },
+    {
+      "path": "app/listen/src/components/settings/OpenSubsonicCredentialsSection.tsx",
+      "line": 150,
+      "element": "div",
+      "className": "{`inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${\n              configured\n                ? \"border-state-success/30 bg-state-success/10 text-state-success\"\n                : \"border-border-quiet bg-surface-container text-text-muted\"\n            }`}"
+    },
+    {
+      "path": "app/listen/src/components/settings/ScrobbleSection.tsx",
+      "line": 262,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/settings/ScrobbleSection.tsx",
+      "line": 305,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/settings/ScrobbleSection.tsx",
+      "line": 332,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/settings/ServersSection.tsx",
+      "line": 74,
+      "element": "div",
+      "className": "\"mb-1 flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/settings/ServersSection.tsx",
+      "line": 88,
+      "element": "div",
+      "className": "{`flex items-center gap-3 rounded-xl border px-4 py-3 transition ${\n                isCurrent\n                  ? \"border-accent-action/40 bg-accent-action/10\"\n                  : \"border-border-quiet bg-text-primary/[0.03]\"\n              }`}"
+    },
+    {
+      "path": "app/listen/src/components/settings/ServersSection.tsx",
+      "line": 102,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/settings/SettingsPrimitives.tsx",
+      "line": 48,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-4\""
+    },
+    {
+      "path": "app/listen/src/components/settings/ShowsLocationControls.tsx",
+      "line": 73,
+      "element": "button",
+      "className": "{`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${\n        active\n          ? \"border-accent-action/30 bg-accent-action/8\"\n          : \"border-border-quiet/10 bg-text-primary/[0.02] hover:bg-text-primary/[0.04]\"\n      }`}"
+    },
+    {
+      "path": "app/listen/src/components/settings/ShowsLocationControls.tsx",
+      "line": 151,
+      "element": "button",
+      "className": "\"flex items-center gap-1 text-xs link-accent disabled:opacity-50\""
+    },
+    {
+      "path": "app/listen/src/components/settings/ShowsLocationControls.tsx",
+      "line": 188,
+      "element": "button",
+      "className": "\"flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-text-primary transition-colors hover:bg-text-primary/5\""
+    },
+    {
+      "path": "app/listen/src/components/settings/SleepTimerSection.tsx",
+      "line": 59,
+      "element": "div",
+      "className": "\"flex items-center justify-between rounded-lg border border-accent-action/20 bg-accent-action/5 px-4 py-3\""
+    },
+    {
+      "path": "app/listen/src/components/settings/SleepTimerSection.tsx",
+      "line": 60,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/share/ShareSheet.tsx",
+      "line": 219,
+      "element": "div",
+      "className": "\"relative flex items-start gap-3 border-b border-text-primary/8 bg-surface-canvas/[0.08] p-4 \""
+    },
+    {
+      "path": "app/listen/src/components/share/ShareSheet.tsx",
+      "line": 248,
+      "element": "div",
+      "className": "\"flex items-center gap-2 pb-1\""
+    },
+    {
+      "path": "app/listen/src/components/share/ShareSheet.tsx",
+      "line": 375,
+      "element": "button",
+      "className": "{cn(\n        \"group flex w-full items-center gap-3 rounded-lg border border-border-quiet bg-surface-canvas/20 px-3 py-3 text-left transition\",\n        \"hover:border-text-primary/20 hover:bg-text-primary/[0.06]\",\n        disabled &&\n          \"cursor-not-allowed opacity-45 hover:border-border-quiet hover:bg-surface-canvas/20\",\n        busy && \"opacity-100\",\n      )}"
+    },
+    {
+      "path": "app/listen/src/components/social/CollaboratorPicker.tsx",
+      "line": 66,
+      "element": "li",
+      "className": "\"flex items-center justify-between gap-3 rounded-lg border border-border-quiet bg-text-primary/[0.03] px-3 py-2\""
+    },
+    {
+      "path": "app/listen/src/components/social/CollaboratorPicker.tsx",
+      "line": 70,
+      "element": "div",
+      "className": "\"flex min-w-0 items-center gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/social/ProfileHoverCardContent.tsx",
+      "line": 119,
+      "element": "div",
+      "className": "\"flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/social/ProfileHoverCardContent.tsx",
+      "line": 196,
+      "element": "div",
+      "className": "\"relative mt-4 flex items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/upcoming/UpcomingShowCollapsedView.tsx",
+      "line": 114,
+      "element": "div",
+      "className": "\"flex shrink-0 flex-col items-center gap-1 pr-2\""
+    },
+    {
+      "path": "app/listen/src/components/upcoming/UpcomingShowCollapsedView.tsx",
+      "line": 175,
+      "element": "div",
+      "className": "\"absolute inset-x-0 top-0 z-10 flex h-full items-center gap-0\""
+    },
+    {
+      "path": "app/listen/src/components/upcoming/UpcomingShowExpandedView.tsx",
+      "line": 174,
+      "element": "div",
+      "className": "\"mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-4\""
+    },
+    {
+      "path": "app/listen/src/components/upcoming/UpcomingShowExpandedView.tsx",
+      "line": 175,
+      "element": "div",
+      "className": "\"flex items-center gap-3.5\""
+    },
+    {
+      "path": "app/listen/src/i18n/translation-mode/TranslationOverlay.tsx",
+      "line": 61,
+      "element": "div",
+      "className": "\"flex items-start justify-between gap-3 border-b border-border-quiet px-4 py-3\""
+    },
+    {
+      "path": "app/listen/src/components/layout/sidebar/SidebarBrand.tsx",
+      "line": 86,
+      "element": "button",
+      "className": "\"relative flex size-10 items-center justify-center transition-[filter,transform] hover:-translate-y-px hover:drop-shadow-accent-action\""
+    },
+    {
+      "path": "app/listen/src/components/layout/sidebar/SidebarNavigation.tsx",
+      "line": 137,
+      "element": "button",
+      "className": "{`flex w-full items-center gap-3 rounded-lg transition-colors ${\n              expanded ? \"px-3 py-2\" : \"h-10 w-10 justify-center\"\n            } ${\n              collectionOpen\n                ? \"text-accent-action drop-shadow-accent-action\"\n                : \"text-text-muted hover:text-accent-action hover:drop-shadow-accent-action\"\n            }`}"
+    },
+    {
+      "path": "app/listen/src/components/layout/sidebar/SidebarNavigation.tsx",
+      "line": 175,
+      "element": "button",
+      "className": "{`flex w-full items-center gap-3 rounded-lg text-left text-text-muted transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action ${\n                    expanded ? \"px-3 py-1.5\" : \"px-4 py-2\"\n                  }`}"
+    },
+    {
+      "path": "app/listen/src/components/layout/topbar/TopBarSearchDropdown.tsx",
+      "line": 98,
+      "element": "button",
+      "className": "{cn(\n                \"flex w-full items-center gap-3 px-3 py-2 text-left transition-colors\",\n                index === activeIdx\n                  ? \"bg-text-primary/10\"\n                  : \"hover:bg-text-primary/5\",\n              )}"
+    },
+    {
+      "path": "app/listen/src/components/layout/topbar/TopBarSearchDropdown.tsx",
+      "line": 125,
+      "element": "div",
+      "className": "\"flex shrink-0 items-center gap-1.5 text-xs\""
+    },
+    {
+      "path": "app/listen/src/components/layout/topbar/TopBarSearchDropdown.tsx",
+      "line": 168,
+      "element": "button",
+      "className": "{cn(\n                \"flex w-full items-center gap-3 px-3 py-2 text-left transition-colors\",\n                index === activeIdx\n                  ? \"bg-text-primary/10\"\n                  : \"hover:bg-text-primary/5\",\n              )}"
+    },
+    {
+      "path": "app/listen/src/components/layout/topbar/TopBarSearchView.tsx",
+      "line": 268,
+      "element": "button",
+      "className": "{cn(\n            \"crate-focus-inset absolute left-0 top-0 z-10 flex h-12 touch-manipulation items-center rounded-xl border-0 bg-transparent shadow-none backdrop-blur-0 transition-[color,transform,opacity,width,padding] duration-500 ease-[cubic-bezier(0.22,1.18,0.36,1)] motion-reduce:transition-none md:h-11 md:w-11 md:justify-center md:px-0\",\n            searchOpen\n              ? \"w-12 justify-center px-0 text-text-primary/42\"\n              : \"w-full justify-start gap-2 px-4 text-text-primary/72 group-hover:scale-[1.03] group-hover:text-text-primary/88\",\n          )}"
+    },
+    {
+      "path": "app/listen/src/components/layout/topbar/UserMenuAvatarButton.tsx",
+      "line": 23,
+      "element": "button",
+      "className": "\"flex size-12 touch-manipulation items-center justify-center overflow-hidden rounded-full border border-border-quiet bg-surface-canvas/30 text-sm font-medium text-text-primary/70 shadow-icon-control backdrop-blur-sm transition-colors hover:bg-surface-canvas/50 hover:text-text-primary\""
+    },
+    {
+      "path": "app/listen/src/components/player/bar/PlayerBarCompactActionButtons.tsx",
+      "line": 27,
+      "element": "div",
+      "className": "\"hidden items-center gap-1 md:flex lg:hidden\""
+    },
+    {
+      "path": "app/listen/src/components/player/bar/PlayerBarDesktopActionButtons.tsx",
+      "line": 46,
+      "element": "div",
+      "className": "\"hidden items-center justify-end gap-1 lg:flex\""
+    },
+    {
+      "path": "app/listen/src/components/player/bar/PlayerBarProgress.tsx",
+      "line": 32,
+      "element": "div",
+      "className": "\"relative mt-2 flex w-full items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/player/bar/PlayerBarTrackActions.tsx",
+      "line": 28,
+      "element": "div",
+      "className": "\"ml-1 flex shrink-0 items-center gap-0.5\""
+    },
+    {
+      "path": "app/listen/src/components/player/bar/PlayerBarTrackInfo.tsx",
+      "line": 105,
+      "element": "div",
+      "className": "\"flex min-w-0 shrink-0 flex-1 items-center gap-3 md:w-[260px] md:flex-none lg:w-[340px] xl:w-[min(34vw,520px)] 2xl:w-[min(38vw,680px)]\""
+    },
+    {
+      "path": "app/listen/src/components/player/bar/PlayerBarTrackInfo.tsx",
+      "line": 106,
+      "element": "div",
+      "className": "\"item-action-target flex min-w-0 flex-1 touch-manipulation cursor-pointer items-center gap-3 rounded-xl md:flex-initial md:cursor-default\""
+    },
+    {
+      "path": "app/listen/src/components/player/bar/PlayerBarTransportControls.tsx",
+      "line": 122,
+      "element": "div",
+      "className": "\"relative flex items-center justify-center gap-3 lg:gap-5\""
+    },
+    {
+      "path": "app/listen/src/components/player/bar/PlayerBarTransportControls.tsx",
+      "line": 249,
+      "element": "div",
+      "className": "\"flex items-center gap-1 self-stretch md:hidden\""
+    },
+    {
+      "path": "app/listen/src/components/player/bar/PlayerBarTransportControls.tsx",
+      "line": 258,
+      "element": "button",
+      "className": "\"flex size-12 touch-manipulation items-center justify-center text-text-secondary transition-[color,filter,transform] hover:text-accent-action hover:drop-shadow-accent-action active:scale-[0.96] active:text-accent-action disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:text-text-secondary disabled:active:scale-100\""
+    },
+    {
+      "path": "app/listen/src/components/player/bar/PlayerBarView.tsx",
+      "line": 207,
+      "element": "div",
+      "className": "{cn(\n              \"relative z-10 flex h-full items-center gap-2\",\n              isDesktop ? \"px-3 lg:px-4\" : \"px-4 pt-3 pb-0.5\",\n            )}"
+    },
+    {
+      "path": "app/listen/src/components/player/bar/PlayerSurfaceFallback.tsx",
+      "line": 18,
+      "element": "div",
+      "className": "\"listen-player-surface-fallback flex items-center gap-2 rounded-full px-3 py-2 text-xs backdrop-blur-xl\""
+    },
+    {
+      "path": "app/listen/src/components/player/bar/PlayerSurfaceFallback.tsx",
+      "line": 29,
+      "element": "div",
+      "className": "\"listen-player-fullscreen-scrim fixed inset-0 z-fullscreen-player flex items-center justify-center backdrop-blur-xl\""
+    },
+    {
+      "path": "app/listen/src/components/player/extended/InfoTabHeroIdentity.tsx",
+      "line": 66,
+      "element": "div",
+      "className": "\"mt-2 flex flex-wrap items-center gap-2 text-sm\""
+    },
+    {
+      "path": "app/listen/src/components/player/extended/InfoTabHeroRating.tsx",
+      "line": 17,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/player/extended/InfoTabPrimitives.tsx",
+      "line": 21,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/player/extended/InfoTabQuietMetrics.tsx",
+      "line": 14,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/player/extended/InfoTabQuietMetrics.tsx",
+      "line": 30,
+      "element": "div",
+      "className": "\"flex items-center justify-between gap-3\""
+    },
+    {
+      "path": "app/listen/src/components/player/extended/QueueTabCurrentTrack.tsx",
+      "line": 23,
+      "element": "div",
+      "className": "\"mb-2 flex items-center justify-between px-1\""
+    },
+    {
+      "path": "app/listen/src/components/player/extended/QueueTabCurrentTrack.tsx",
+      "line": 38,
+      "element": "div",
+      "className": "\"flex items-center gap-3 rounded-lg bg-surface-control px-2 py-1.5\""
+    },
+    {
+      "path": "app/listen/src/components/player/extended/SuggestedTrackRow.tsx",
+      "line": 20,
+      "element": "button",
+      "className": "\"group flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors \""
+    },
+    {
+      "path": "app/listen/src/components/player/extended/SuggestedTrackRow.tsx",
+      "line": 37,
+      "element": "div",
+      "className": "\"flex shrink-0 items-center gap-2\""
+    },
+    {
+      "path": "app/listen/src/components/player/visualizer/VisualizerSettingsPanel.tsx",
+      "line": 158,
+      "element": "div",
+      "className": "\"flex items-center gap-2 font-mono\""
+    }
+  ],
+  "sourceHashes": {
+    "app/shared/ui/domain/ArtistBioProfile.tsx": "303d3df6d17b8689473144fc29a54b80531fab0a9e4cb9d19a1fffaa82434e68",
+    "app/shared/ui/primitives/HairlineList.tsx": "f02e7902debfa62d2f9ab56c6fffc53f6396aa4b42070f75e232fa26d759ec27",
+    "app/shared/ui/shadcn/table.tsx": "9ee0c610820b269fa9add6b825089a2ec37cfefdb314fc63839407b8293f55d2",
+    "app/shared/ui/domain/genres/GenrePill.tsx": "44477c22b46b54fdd3719511ea17a6ef0dbd026202261e76f16b59fe17d55363",
+    "app/shared/ui/domain/shows/show-types.ts": "8b88f09f2aeda9a0ed0ef32cfe49965747a07470d8b09e1d26d2570b96b083ea",
+    "app/ui/src/pages/Album.tsx": "fbc29a0a3bec79bac43e7717a94ed71af570bedd1e81582ed1d9befed866f8ea",
+    "app/ui/src/pages/Bandcamp.tsx": "fac743360ff077b677b3a7be21b8d9426a81ad254a584799a7040dadbaaad7e7",
+    "app/ui/src/pages/Browse.tsx": "b99388843d8042e538014f3bb77186da3c7905d02a3ee850b889a3073da8062a",
+    "app/ui/src/pages/Discover.tsx": "ac8733fc7d354a96209b9a7dbbcca8c1c1cc6e3e09ef62b6f87d20e0e6578123",
+    "app/ui/src/pages/Download.tsx": "8235c87296c07b86632bba23450a88667d68dc57d24c0abbea128a237c6fa528",
+    "app/ui/src/pages/GlobalCatalog.tsx": "aae2970e9fc6ae1b7cdd6e6e38d80db02de5ec8a576a84b1bde355c5fc176eaf",
+    "app/ui/src/pages/Health.tsx": "8ec95b66ca9ac80bc746a740e96a61b8a96e92a11ad7ea780e1acd06ed486280",
+    "app/ui/src/pages/Logs.tsx": "ed19fe79dcf5619aa32a9237d82ed6069af14a9ee2a244657d32a96830f0455b",
+    "app/ui/src/pages/NewReleases.tsx": "f2dcbe280caed3509d7942329341ebef09cda1bcc087551a10f063f4e3fe31a5",
+    "app/ui/src/pages/Settings.tsx": "247743e17a41fd2a0448de21efac811ff3804e7e07f86e1450ffecc286b65139",
+    "app/ui/src/pages/Shows.tsx": "48a68061638f2ea0abe03668f3fedb4f3e2ae52e31df4f090cc929b7a246d6ce",
+    "app/ui/src/pages/Tasks.tsx": "37a75670d0cabb8e1aa2897fb12357379e96ca9ede95d2937a7eb826937a7510",
+    "app/ui/src/pages/Upcoming.tsx": "17b119e7ae2892d3be9a01f7741bba09f2a741012ff15f2d567ae05e7d5a18e5",
+    "app/ui/src/components/album/AlbumRow.tsx": "9f93ddd268b60a30e096f2f2d91894ce39cc3f3d9ef29008bc63d04dce94b052",
+    "app/ui/src/components/album/TrackTable.tsx": "e079474b1c880dadf54150cc83174f3f3fd9b5381d2764febcd07d25b6c8fcea",
+    "app/ui/src/components/artist/ArtistRow.tsx": "1f6c84a842a572f7e5cc952fafc90e8f883ba565f13cee1bdd080e25b14b85fb",
+    "app/ui/src/components/scanner/MatchCard.tsx": "8f800c36c27f1cf8355c051b922f81b67f2a5f501b926d75807d82c1875e02f0",
+    "app/ui/src/components/shows/ShowCard.tsx": "cceb9a9e3e506910bf6324b403aa8c980835c97092ffeab06d08a62690539570",
+    "app/ui/src/components/ui/EventDate.tsx": "b44a70ceb0a48f6af3b5105efd3b20ebd583589c75e910ae0fa6c4ec1fe1ba23",
+    "app/ui/src/components/ui/EventRow.tsx": "7bf05780a5d5ee6d579fec7898a43e23004c953fa38b33b1267ca5df1f59847d",
+    "app/listen/src/components/CrateCard.tsx": "a615083deb4fcbf9186a49d1311fce0de1b32363aeeca62e5c04e9bbe49942cd",
+    "app/listen/src/components/CrateEditor.tsx": "daf3acc5eb141df313081961f6ab83101ff2cfa4afb1be6b89d0edcd35dd6874",
+    "app/listen/src/lib/social-share-story-canvas.ts": "ba46d21aaad894bc4e856117594bf7dac96eed062865f0af2e39ce28f378dcd6",
+    "app/listen/src/pages/ArtistTopTracks.tsx": "ad2d3f91588e40bb420e396a9ba39e84d22c20a71737da109d23485c4605b6e0",
+    "app/listen/src/pages/Crate.tsx": "e0ef6b4a290f0a771d7e02854e45d0c070778a25afa2fd09069ba65ff312ca6c",
+    "app/listen/src/pages/CuratedPlaylistContent.tsx": "dfe16211e4c473af62bb2959d0aec3a4dabfb7abd54a438a5055799079d4ed34",
+    "app/listen/src/pages/ExploreLandingSections.tsx": "fd7a8d9cae257d55f475383ab30b16e7a0f92f1466bd1cdb45dcebda15ffcf29",
+    "app/listen/src/pages/HomePlaylist.tsx": "b89845568dc12f6e9a212854667cc98d7b6886e164d5756bf6196d7345fef5b6",
+    "app/listen/src/pages/HomeSection.tsx": "3044794738a12c9383030fe2791ff4b1c42eb7ee96fe118730c10250150801fb",
+    "app/listen/src/pages/LibraryLikedTab.tsx": "353e68c67dfaef8182d3f7be33a2bbb2553a086445da6b8f00979fa1a53be55d",
+    "app/listen/src/pages/LibraryPlaylistsTab.tsx": "045edfeb84aa654144d2362ab9be83c66ce3013d5a37cdaab9cbd90e2583bd7c",
+    "app/listen/src/pages/PathDetailParts.tsx": "73c98e50057258c7383bb6f634e1a830a879bfe69422782d3505853ac309f7f1",
+    "app/listen/src/pages/Paths.tsx": "52a95c2c88e56c8e77a991ad566e9d573b53971f62e6b3db2410fcbf9cc00f1a",
+    "app/listen/src/pages/PeopleSearch.tsx": "e1202c06c71c41d7a74f03b5e4d7aed2e56eaa1757bc18e192810de4968bb5ea",
+    "app/listen/src/pages/SearchTrackResults.tsx": "a92b8cdace69c37c4913a5535668f8f00b42ba616428f0f80d443542b815752d",
+    "app/listen/src/pages/ShowsContent.tsx": "a48e251b2cbe27efcbc632e0e957e8c3cdbb08a3cb24f897c78ee2d58909b0ab",
+    "app/listen/src/pages/StatsCollectionPanels.tsx": "8accbe3d38587f2d2a3d58d2eb8e3118fef49c5b54706c12c0fd47cc26bfd021",
+    "app/listen/src/pages/UserConnections.tsx": "a6434742899b123dc4b0aabb00396dfeee70604c23508311a1d4613eaecc9d8b",
+    "app/listen/src/pages/UserProfileLibrarySections.tsx": "3b638a312885bdd41ca603a417e2bc58f5087ac6cd1eb7a60a727d1274cebdeb",
+    "app/listen/src/pages/UserProfileNetworkSections.tsx": "2e42a3e43819e61d3d5a4ddb948ed71092434b3410933eeba6a233b62e7a81fd",
+    "app/listen/src/pages/home-page-model.ts": "7359a3b8cd8c68c2d69fdd3bcfe40e261e0b0a1a16a1daa1845d9d28a856dbd3",
+    "app/listen/src/pages/user-profile-model.ts": "74d6b624e19b726a8326fabd270751b91744173727da084ca80ed6b2a01a5545",
+    "app/listen/src/components/album/AlbumTrackList.tsx": "30ab79f51302ad10466f5638a5e2738ff7044f0d89070f0054f6d8239c43d53f",
+    "app/listen/src/components/artist/ArtistCommunitySections.tsx": "e1b2ae56f3c02fbd7c3fd496905170031e0fee360fc1a56766b51e8ba38d37f8",
+    "app/listen/src/components/artist/ArtistTopTracksSection.tsx": "5948ca7959e9c51eb812b1a3eba7316330eca8a8bd80119169f72494a1629de7",
+    "app/listen/src/components/cards/AlbumCard.tsx": "8bfea2462bee882934982dbd8daccf0a891e685d852c3bb69edf281207644cb4",
+    "app/listen/src/components/cards/ArtistCard.tsx": "e9c3116bc380c17ba693b1e33bd3c01c78303d54875fb0d1bad8f6617cce2f6e",
+    "app/listen/src/components/cards/TrackRowModel.ts": "c9a03d6ee692343e4e72f2558dd21064f80e3fe3d4d5f626084ccdb6da69d74b",
+    "app/listen/src/components/explore/ExploreDetailViews.tsx": "7f712de837e7230644c35d9797226ba0020dce459828c4badf919dd2ca35015c",
+    "app/listen/src/components/explore/ExploreSearchResults.tsx": "f73455dda465e1ae3ff1773ffd875e318b43baf9c81d335d5046b409e7b0f42d",
+    "app/listen/src/components/explore/GenreDetailSections.tsx": "80032e7870502d978fc4f19a668e5bc3291dafab8388d525d8c595fbf962ea09",
+    "app/listen/src/components/home/CoreTracksPlaylistCard.tsx": "a15ea2380e39b62056c792c312ae548e285e76b6ba8914a1ab4cb032bdb2da84",
+    "app/listen/src/components/home/HomeCustomMixes.tsx": "f17535ae3694440fcb8f0b102ac044cb67adfe57825f50eb234bff166bda4ccf",
+    "app/listen/src/components/home/HomeDiscoveryRecommendations.tsx": "ed4672fc7aec0862094b479cd79e47d7cd7d5830b9731b13e4e155f32492432e",
+    "app/listen/src/components/home/HomeRecentEntityRows.tsx": "91ee49386ce4e6beada461d4053043c1ee7c03ee737f1965a24ef9832f4912f4",
+    "app/listen/src/components/home/HomeReplaySection.tsx": "0453b0b1044ea65cd046d6fec0a3b713e25fa5d1b962096aaf2e66636ed8a6f9",
+    "app/listen/src/components/home/HomeSectionCards.tsx": "22a34ad7e595fae26b2fcb975fe6068f00f0016f0cee3cef767e62b064890330",
+    "app/listen/src/components/home/home-upcoming-model.ts": "fdd5106dc1afdaf3646745057a6ac32146b8165632ef45fdce151c2905676356",
+    "app/listen/src/components/paths/PathRow.tsx": "e2ed46a9eece75092fef2e768ed8dc85c294c42ae7ce0366861b11c09c482706",
+    "app/listen/src/components/player/FullscreenPlayerTabs.tsx": "f6d4789b91cd3028fdd4126efc440234bbc492bb7cf4df884ff69bd00eba42bd",
+    "app/listen/src/components/player/PlaybackTargetPopover.tsx": "719df6f1ec6fdec33c649b23985e7ce72e86b41fa0b9204203eacd841bd378c9",
+    "app/listen/src/components/player/QueuePanel.tsx": "978970448f568ac7b1b6f99bc5261441f27210dbc5deec4acfe9b8639592bafb",
+    "app/listen/src/components/player/QueueTrackRow.tsx": "2d1e5c86e02ed51665e38c99c6ff1db850c7f57289bdbf6f33a2dc6147a23d4f",
+    "app/listen/src/components/playlists/PlaylistCard.tsx": "88fd93366f79e6dfc2b8de71aa360b7a3e18c1f2c37fc793cf61f339c979261d",
+    "app/listen/src/components/playlists/PlaylistTrackList.tsx": "5897c430e65a8cda7e0a1345dbd940f33684d9c64e13cf2e02c13df7ac4f57ca",
+    "app/listen/src/components/settings/SettingsPrimitives.tsx": "d36ff74ce622a29071daba0445f94aec81c0fc861e48154cf3a4180a1d34220c",
+    "app/listen/src/components/social/UserRow.tsx": "b24c34b36f6a9e86add71f2c492ca4bbce0c7207a5ec7b018707fd8ed1df06be",
+    "app/listen/src/components/upcoming/ReleaseRow.tsx": "95d099134d7819e9f4e072fd0a7aace975e68bb0beecf4c042c36d90b84ea070",
+    "app/listen/src/components/upcoming/UpcomingRows.tsx": "3591debeb196600555496e7ee2117bd8a6de4bc7e533787c57f12c3d77a27bfd",
+    "app/listen/src/components/upcoming/UpcomingShowCollapsedView.tsx": "a59742db9d2102c54d3fefc2468db88431f0116acf6fc2869c01bc2d07ebcd35",
+    "app/listen/src/components/upcoming/UpcomingShowExpandedView.tsx": "1e1bc16af1548353946fc21f704716d617771e8847fd1d13cfedae0b032852d2",
+    "app/listen/src/components/player/extended/QueueTabPastTracks.tsx": "441f91ab0a08efba449a45ccf0035b9ffc3fe5e1be45d1fbfec3497d0cc4923a",
+    "app/listen/src/components/player/extended/QueueTabUpcoming.tsx": "f1b79230cf493f8cb239fab723d8ffc92fa2f1bca10bf016a732e11cf095d598",
+    "app/listen/src/components/player/extended/SuggestedTab.tsx": "5fc61f8028b2c1f0024a982ad9ec70af239079f043e669cc1dcbba3c54702fd9",
+    "app/listen/src/components/player/extended/SuggestedTrackRow.tsx": "c1b7f4b914e2ee7830a27fb456c9d06ebb1daf943a519a276690e3ffda167745"
+  }
+}

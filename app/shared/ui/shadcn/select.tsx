@@ -1,16 +1,17 @@
 import * as React from "react";
-import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "@crate/ui/icons";
+import { ChevronDownIcon, ChevronUpIcon } from "@crate/ui/icons";
 import { Select as SelectPrimitive } from "radix-ui";
 
 import { cn } from "@crate/ui/lib/cn";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
 
 export const SELECT_TRIGGER_BASE_CLASS =
-  "flex w-fit items-center justify-between gap-2 rounded-md border border-border-quiet bg-surface-canvas/25 px-3 py-2 text-sm whitespace-nowrap text-text-primary shadow-control-inset backdrop-blur-sm transition-[background-color,border-color,box-shadow] outline-none focus-visible:border-accent-action/35 focus-visible:bg-surface-canvas/35 focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-state-danger data-[placeholder]:text-text-muted data-[size=default]:h-10 data-[size=sm]:h-8 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[18px] [&_svg:not([class*='text-'])]:text-text-muted";
-export const SELECT_TRIGGER_ICON_CLASS = "size-4 opacity-50";
+  "crate-form-control flex w-48 max-w-full items-center justify-between gap-2 px-3 py-2 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:flex-1 *:data-[slot=select-value]:overflow-hidden *:data-[slot=select-value]:text-left *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[18px] [&_svg:not([class*='text-'])]:text-text-subtle";
+export const SELECT_TRIGGER_ICON_CLASS = "size-4 text-text-subtle";
 export const SELECT_CONTENT_BASE_CLASS =
-  "relative z-app-dropdown max-h-(--radix-select-content-available-height) min-w-[8rem] origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border border-border-quiet bg-popover-surface text-popover-foreground shadow-popover backdrop-blur-xl data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95";
+  "crate-overlay-surface relative z-app-dropdown max-h-(--radix-select-content-available-height) min-w-[8rem] origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto";
 export const SELECT_ITEM_BASE_CLASS =
-  "relative flex w-full cursor-default items-center gap-2 rounded-md py-2 pr-8 pl-3 text-sm outline-hidden select-none focus:bg-text-primary/5 focus:text-text-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[18px] [&_svg:not([class*='text-'])]:text-text-muted *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2";
+  "crate-overlay-menu-item crate-focus-inset relative flex w-full cursor-default items-center gap-2 pr-8 pl-3 select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[18px] [&_svg:not([class*='text-'])]:text-text-subtle *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2";
 
 function Select({
   ...props
@@ -47,7 +48,10 @@ function SelectTrigger({
     >
       {children}
       <SelectPrimitive.Icon asChild>
-        <ChevronDownIcon className={SELECT_TRIGGER_ICON_CLASS} />
+        <ChevronDownIcon
+          aria-hidden="true"
+          className={SELECT_TRIGGER_ICON_CLASS}
+        />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );
@@ -67,7 +71,7 @@ function SelectContent({
         className={cn(
           SELECT_CONTENT_BASE_CLASS,
           position === "popper" &&
-            "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
+            "w-[var(--radix-select-trigger-width)] data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
           className,
         )}
         position={position}
@@ -79,7 +83,7 @@ function SelectContent({
           className={cn(
             "p-1",
             position === "popper" &&
-              "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1",
+              "h-[var(--radix-select-trigger-height)] w-full scroll-my-1",
           )}
         >
           {children}
@@ -97,7 +101,7 @@ function SelectLabel({
   return (
     <SelectPrimitive.Label
       data-slot="select-label"
-      className={cn("px-2 py-1.5 text-xs text-text-muted", className)}
+      className={cn("crate-overlay-menu-label px-3 pb-1 pt-2", className)}
       {...props}
     />
   );
@@ -119,7 +123,7 @@ function SelectItem({
         className="absolute right-2 flex size-3.5 items-center justify-center"
       >
         <SelectPrimitive.ItemIndicator>
-          <CheckIcon className="size-4" />
+          <StatusDot />
         </SelectPrimitive.ItemIndicator>
       </span>
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
@@ -135,7 +139,7 @@ function SelectSeparator({
     <SelectPrimitive.Separator
       data-slot="select-separator"
       className={cn(
-        "pointer-events-none -mx-1 my-1 h-px bg-border-subtle",
+        "pointer-events-none -mx-1 my-1 h-px bg-border-quiet-subtle",
         className,
       )}
       {...props}

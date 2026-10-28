@@ -220,6 +220,13 @@ class TestUploadWorkerHelpers:
             patch(
                 "crate.db.import_queue_read_models.mark_import_queue_item_imported"
             ) as mock_mark,
+            patch(
+                "crate.db.import_queue_read_models.mark_import_queue_item_importing",
+                return_value=True,
+            ) as mock_mark_importing,
+            patch(
+                "crate.db.import_queue_read_models.mark_import_queue_item_pending"
+            ) as mock_mark_pending,
             patch("crate.worker_handlers.acquisition.emit_task_event") as mock_event,
         ):
             result = _handle_import_queue_item(
@@ -233,12 +240,143 @@ class TestUploadWorkerHelpers:
             )
 
         assert result["status"] == "imported"
+        mock_mark_importing.assert_called_once_with(
+            "/music/.imports/tidal/A/B", task_id="task-1"
+        )
+        mock_mark_pending.assert_not_called()
         mock_mark.assert_called_once_with(
             "/music/.imports/tidal/A/B",
             result={"status": "imported", "dest": "/music/A/B"},
         )
         assert mock_event.call_count >= 2
         mock_start_scan.assert_called_once()
+
+    def test_import_queue_item_failure_returns_to_pending(self, monkeypatch):
+        from crate.worker_handlers.acquisition import _handle_import_queue_item
+
+        queue = type(
+            "Queue",
+            (),
+            {
+                "import_item": lambda self, source_path, artist, album: {
+                    "status": "failed",
+                    "error": "The destination is not writable",
+                }
+            },
+        )()
+        monkeypatch.setattr("crate.importer.ImportQueue", lambda config: queue)
+
+        with (
+            patch(
+                "crate.db.import_queue_read_models.mark_import_queue_item_importing",
+                return_value=True,
+            ),
+            patch(
+                "crate.db.import_queue_read_models.mark_import_queue_item_pending"
+            ) as mock_mark_pending,
+            patch(
+                "crate.db.import_queue_read_models.mark_import_queue_item_imported"
+            ) as mock_mark_imported,
+            patch("crate.worker_handlers.acquisition.emit_task_event"),
+        ):
+            result = _handle_import_queue_item(
+                "task-1",
+                {
+                    "source_path": "/music/.imports/tidal/A/B",
+                    "artist": "A",
+                    "album": "B",
+                },
+                {"library_path": "/music"},
+            )
+
+        assert result["status"] == "failed"
+        mock_mark_pending.assert_called_once_with(
+            "/music/.imports/tidal/A/B",
+            error="The destination is not writable",
+        )
+        mock_mark_imported.assert_not_called()
+
+    def test_import_queue_item_interrupted_by_time_limit_returns_to_pending(
+        self, monkeypatch
+    ):
+        from crate.worker_handlers.acquisition import _handle_import_queue_item
+
+        class TimeLimitExceeded(BaseException):
+            pass
+
+        def interrupted(self, source_path, artist, album):
+            raise TimeLimitExceeded()
+
+        queue = type("Queue", (), {"import_item": interrupted})()
+        monkeypatch.setattr("crate.importer.ImportQueue", lambda config: queue)
+
+        with (
+            patch(
+                "crate.db.import_queue_read_models.mark_import_queue_item_importing",
+                return_value=True,
+            ),
+            patch(
+                "crate.db.import_queue_read_models.mark_import_queue_item_pending"
+            ) as mock_mark_pending,
+            patch("crate.worker_handlers.acquisition.emit_task_event"),
+            pytest.raises(TimeLimitExceeded),
+        ):
+            _handle_import_queue_item(
+                "task-1",
+                {
+                    "source_path": "/music/.imports/tidal/A/B",
+                    "artist": "A",
+                    "album": "B",
+                },
+                {"library_path": "/music"},
+            )
+
+        mock_mark_pending.assert_called_once_with(
+            "/music/.imports/tidal/A/B", error="TimeLimitExceeded"
+        )
+
+    def test_import_queue_all_interrupted_by_time_limit_returns_item_to_pending(
+        self, monkeypatch
+    ):
+        from crate.worker_handlers.acquisition import _handle_import_queue_all
+
+        class TimeLimitExceeded(BaseException):
+            pass
+
+        def interrupted(self, source_path, artist, album):
+            raise TimeLimitExceeded()
+
+        queue = type("Queue", (), {"import_item": interrupted})()
+        monkeypatch.setattr("crate.importer.ImportQueue", lambda config: queue)
+        item = {
+            "source_path": "/music/.imports/tidal/A/B",
+            "source": "tidal",
+            "artist": "A",
+            "album": "B",
+        }
+
+        with (
+            patch(
+                "crate.db.import_queue_read_models.list_import_queue_items",
+                return_value=[item],
+            ),
+            patch(
+                "crate.db.import_queue_read_models.mark_import_queue_item_importing",
+                return_value=True,
+            ),
+            patch(
+                "crate.db.import_queue_read_models.mark_import_queue_item_pending"
+            ) as mock_mark_pending,
+            patch("crate.worker_handlers.acquisition.is_cancelled", return_value=False),
+            patch("crate.worker_handlers.acquisition.emit_progress"),
+            patch("crate.worker_handlers.acquisition.emit_task_event"),
+            pytest.raises(TimeLimitExceeded),
+        ):
+            _handle_import_queue_all("task-1", {}, {"library_path": "/music"})
+
+        mock_mark_pending.assert_called_once_with(
+            "/music/.imports/tidal/A/B", source="tidal", error="TimeLimitExceeded"
+        )
 
     def test_import_queue_remove_handler_updates_read_model(self, monkeypatch):
         from crate.worker_handlers.acquisition import _handle_import_queue_remove

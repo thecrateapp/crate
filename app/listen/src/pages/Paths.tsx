@@ -2,9 +2,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
-import { ArrowRight, CRATE_ICON_SIZE, Loader2, Route } from "@crate/ui/icons";
 import { notify } from "@crate/ui/lib/notify";
-import { Button } from "@crate/ui/shadcn/button";
+import { PathsPageView } from "./PathsPageView";
 
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
@@ -18,7 +17,12 @@ import type { PathDetail, PathSummary, SearchResult } from "./paths-model";
 
 export function Paths() {
   const { t } = useTranslation();
-  const { data: paths, refetch } = useApi<PathSummary[]>("/api/paths");
+  const {
+    data: paths,
+    loading,
+    error,
+    refetch,
+  } = useApi<PathSummary[]>("/api/paths");
   const { playAll } = usePlayerActions();
   const navigate = useNavigate();
   const [origin, setOrigin] = useState<SearchResult | null>(null);
@@ -87,84 +91,45 @@ export function Paths() {
   };
 
   return (
-    <div className="animate-page-in space-y-6 sm:py-6">
-      <div className="flex items-center gap-3">
-        <Route size={22} className="text-accent-action" />
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">
-            {t("paths.title")}
-          </h1>
-          <p className="text-caption text-text-primary/40">
-            {t("paths.subtitle")}
-          </p>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <EndpointPanel side="origin" selected={origin} onSelect={setOrigin} />
-        <div className="flex items-center justify-center sm:py-8">
-          <ArrowRight
-            size={CRATE_ICON_SIZE.lg}
-            className="rotate-90 text-accent-action/40 sm:rotate-0"
+    <>
+      <PathsPageView
+        originPanel={
+          <EndpointPanel
+            side="origin"
+            selected={origin}
+            onSelect={setOrigin}
+            disabled={creating}
           />
-        </div>
-        <EndpointPanel
-          side="destination"
-          selected={destination}
-          onSelect={setDestination}
-        />
-      </div>
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
-        <div className="flex-1">
-          <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-text-primary/35">
-            {t("paths.length")}
-          </div>
-          <div className="flex items-center gap-3">
-            <input
-              type="range"
-              aria-label={t("paths.length")}
-              min={5}
-              max={50}
-              value={steps}
-              onChange={(event) => setSteps(Number(event.target.value))}
-              className="flex-1 accent-primary"
-            />
-            <span className="w-16 text-right font-mono text-[0.75rem] tabular-nums text-text-primary/50">
-              {t("common.trackCountLabel", { count: steps })}
-            </span>
-          </div>
-        </div>
-        <Button
-          onClick={create}
-          disabled={!canCreate}
-          className="h-auto rounded-lg px-6 py-3 font-semibold shadow-accent-action hover:bg-accent-action/90 disabled:opacity-25 disabled:shadow-none [&_svg:not([class*='size-'])]:size-4 has-[>svg]:px-6"
-        >
-          {creating ? (
-            <Loader2 size={CRATE_ICON_SIZE.sm} className="animate-spin" />
-          ) : (
-            <Route size={CRATE_ICON_SIZE.sm} />
-          )}
-          {t("paths.compute")}
-        </Button>
-      </div>
-
-      {paths && paths.length > 0 ? (
-        <div className="space-y-2 pt-4">
-          <div className="text-xs font-semibold uppercase tracking-wider text-text-primary/30">
-            {t("paths.saved")}
-          </div>
-          {paths.map((path) => (
-            <PathRow
-              key={path.id}
-              path={path}
-              onPlay={() => void playPath(path.id)}
-              onDelete={() => setPendingDelete(path)}
-            />
-          ))}
-        </div>
-      ) : null}
+        }
+        destinationPanel={
+          <EndpointPanel
+            side="destination"
+            selected={destination}
+            onSelect={setDestination}
+            disabled={creating}
+          />
+        }
+        steps={steps}
+        onStepsChange={setSteps}
+        creating={creating}
+        canCreate={Boolean(canCreate)}
+        onCreate={() => void create()}
+        loading={loading}
+        error={error}
+        onRetry={refetch}
+        pathCount={paths?.length ?? null}
+      >
+        {paths?.map((path) => (
+          <PathRow
+            key={path.id}
+            path={path}
+            onPlay={() => void playPath(path.id)}
+            onDelete={() => setPendingDelete(path)}
+          />
+        ))}
+      </PathsPageView>
       <ConfirmDialog
+        eyebrow={t("actions.confirmation.eyebrow")}
         open={pendingDelete !== null}
         onOpenChange={(open) => {
           if (!open) setPendingDelete(null);
@@ -185,6 +150,6 @@ export function Paths() {
         ariaLabel={t("paths.delete.confirmTitle")}
         backdropLabel={t("common.close")}
       />
-    </div>
+    </>
   );
 }

@@ -1,42 +1,53 @@
+import { FilterChip } from "@crate/ui/primitives/FilterChip";
+import { InfoBadge, type InfoBadgeTone } from "@crate/ui/primitives/InfoBadge";
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
+import {
+  ScanSearch as HeaderScanSearch,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+import { SeverityMeter } from "@/components/admin/status-indicators";
+import {
+  OpsPageHero,
+  OpsPanel,
+  OpsRefreshNotice,
+  OpsSnapshotStatus,
+  type OpsStreamStatus,
+} from "@/components/admin/ops-surfaces";
 import {
   useCallback,
   useEffect,
   useEffectEvent,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
 import { Link } from "react-router";
 import { artistPagePath } from "@/lib/library-routes";
-import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
-import { cn, timeAgo } from "@/lib/utils";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+
+import { timeAgo } from "@/lib/utils";
 import { Button } from "@crate/ui/shadcn/button";
-import { Card } from "@crate/ui/shadcn/card";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import {
-  Stethoscope,
-  Loader2,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  Info,
-  Wrench,
-  ChevronDown,
-  ChevronUp,
-  EyeOff,
-} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { useTaskEvents } from "@/hooks/use-task-events";
 import {
+  useHealthRepairBatches,
+  type RepairBatchStatus,
+} from "@/hooks/use-health-repair-batches";
+import {
   pickLatestRepairTask,
-  repairOutcomeTone,
   taskNeedsAttention,
-  taskRevalidationIssueCount,
   type TaskInsightLike,
 } from "@/lib/task-insights";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 interface HealthIssue {
   id: number;
@@ -63,6 +74,8 @@ interface HealthSnapshotData {
     scope: string;
     subject_key: string;
     version: number;
+    built_at?: string | null;
+    stale_after?: string | null;
     stale: boolean;
     generation_ms: number;
   };
@@ -106,37 +119,6 @@ interface TasksSnapshotLite {
   history: RepairHistoryTask[];
 }
 
-const SEVERITY_ICONS: Record<string, typeof AlertTriangle> = {
-  critical: XCircle,
-  high: AlertTriangle,
-  medium: Info,
-  low: Info,
-};
-const SEVERITY_COLORS: Record<
-  string,
-  { text: string; border: string; bg: string }
-> = {
-  critical: {
-    text: "text-red-500",
-    border: "border-red-500/30",
-    bg: "bg-red-500/5",
-  },
-  high: {
-    text: "text-orange-500",
-    border: "border-orange-500/30",
-    bg: "bg-orange-500/5",
-  },
-  medium: {
-    text: "text-yellow-500",
-    border: "border-yellow-500/30",
-    bg: "bg-yellow-500/5",
-  },
-  low: {
-    text: "text-muted-foreground",
-    border: "border-border",
-    bg: "bg-card",
-  },
-};
 const SEVERITY_ORDER: Record<string, number> = {
   critical: 0,
   high: 1,
@@ -188,23 +170,12 @@ const CHECK_DESCRIPTIONS: Record<string, string> = {
     "Lower quality copies of tracks that already exist in a better format",
 };
 
-const RISK_TONES: Record<string, string> = {
-  safe: "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-100",
-  caution: "border-amber-500/20 bg-amber-500/[0.06] text-amber-100",
-  destructive: "border-red-500/20 bg-red-500/[0.08] text-red-100",
-};
-
 const SCOPE_TONES: Record<string, string> = {
-  db: "border-cyan-400/20 bg-cyan-400/[0.05] text-cyan-100",
-  filesystem: "border-fuchsia-400/20 bg-fuchsia-400/[0.05] text-fuchsia-100",
-  hybrid: "border-violet-400/20 bg-violet-400/[0.06] text-violet-100",
-};
-
-const REPAIR_OUTCOME_TONES: Record<string, string> = {
-  success: "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-100",
-  warning: "border-amber-500/20 bg-amber-500/[0.06] text-amber-100",
-  danger: "border-red-500/20 bg-red-500/[0.08] text-red-100",
-  neutral: "border-white/10 bg-white/[0.04] text-white/70",
+  db: "border-accent-action/20 bg-accent-action/[0.05] text-accent-action-hi",
+  filesystem:
+    "border-accent-action/20 bg-accent-action/[0.05] text-accent-action-hi",
+  hybrid:
+    "border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi",
 };
 
 function riskLabel(risk: string | undefined) {
@@ -239,65 +210,109 @@ function executionLane(entry: RepairCatalogEntry | undefined) {
   return "Review required";
 }
 
-function executionLaneTone(entry: RepairCatalogEntry | undefined) {
-  if (!entry) return "border-white/10 bg-white/[0.04] text-white/55";
-  if (entry.support === "manual" || !entry.auto_fixable)
-    return "border-white/10 bg-white/[0.04] text-white/55";
-  if (entry.supports_global_scope)
-    return "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-100";
-  return "border-amber-500/20 bg-amber-500/[0.06] text-amber-100";
+function executionLaneTone(
+  entry: RepairCatalogEntry | undefined,
+): InfoBadgeTone {
+  if (!entry) return "neutral";
+  if (entry.support === "manual" || !entry.auto_fixable) return "neutral";
+  if (entry.supports_global_scope) return "accent";
+  return "warning";
 }
 
-function latestRepairSummary(task: RepairHistoryTask | null) {
+export function latestRepairSummary(task: TaskInsightLike | null) {
   if (!task) return "No repair or health runs recorded yet.";
   if (task.error) return task.error;
-
   const result = task.result ?? {};
+  const count = (value: unknown): number | null =>
+    typeof value === "number" && Number.isInteger(value) && value >= 0
+      ? value
+      : null;
+  const parts: string[] = [];
   if (task.type === "repair") {
     const summary =
       (result.summary as Record<string, unknown> | undefined) ?? {};
-    const remaining = taskRevalidationIssueCount(result);
-    const parts = [`${Number(summary.applied ?? 0)} applied`];
-    if (Number(summary.skipped ?? 0) > 0)
-      parts.push(`${Number(summary.skipped ?? 0)} skipped`);
-    if (Number(summary.failed ?? 0) > 0)
-      parts.push(`${Number(summary.failed ?? 0)} failed`);
-    if (Number(summary.unsupported ?? 0) > 0)
-      parts.push(`${Number(summary.unsupported ?? 0)} manual`);
+    for (const [key, label] of [
+      ["applied", "applied"],
+      ["skipped", "skipped"],
+      ["failed", "failed"],
+      ["unsupported", "manual"],
+    ]) {
+      const value = count(summary[key!]);
+      if (value != null && (key === "applied" || value > 0))
+        parts.push(`${value} ${label}`);
+    }
+  } else if (task.type === "fix_artist") {
+    for (const [key, label] of [
+      ["albums_fixed", "albums fixed"],
+      ["synced_tracks", "tracks synced"],
+    ]) {
+      const value = count(result[key!]);
+      if (value != null) parts.push(`${value} ${label}`);
+    }
+  } else if (task.type === "health_check") {
+    const value = count(result.issue_count);
+    return value == null
+      ? "Result details unavailable"
+      : `${value} issue${value === 1 ? "" : "s"} found`;
+  }
+  if (task.type === "repair" || task.type === "fix_artist") {
+    const revalidation = result.revalidation as
+      Record<string, unknown> | undefined;
+    const remaining = count(revalidation?.issue_count);
     if (remaining != null) parts.push(`${remaining} open after revalidation`);
-    return parts.join(", ");
   }
+  return parts.length ? parts.join(", ") : "Result details unavailable";
+}
 
-  if (task.type === "fix_artist") {
-    const parts = [
-      `${Number(result.albums_fixed ?? 0)} albums fixed`,
-      `${Number(result.synced_tracks ?? 0)} tracks synced`,
-    ];
-    const remaining = taskRevalidationIssueCount(result);
-    if (remaining != null) parts.push(`${remaining} open after revalidation`);
-    return parts.join(", ");
+export function groupHealthIssues(issues: HealthIssue[]) {
+  const groups = new Map<
+    string,
+    { check: string; severity: string; items: HealthIssue[] }
+  >();
+  for (const issue of issues) {
+    const group = groups.get(issue.check_type);
+    if (!group)
+      groups.set(issue.check_type, {
+        check: issue.check_type,
+        severity: issue.severity,
+        items: [issue],
+      });
+    else {
+      group.items.push(issue);
+      if (
+        (SEVERITY_ORDER[issue.severity] ?? 4) <
+        (SEVERITY_ORDER[group.severity] ?? 4)
+      )
+        group.severity = issue.severity;
+    }
   }
-
-  if (task.type === "health_check") {
-    return `${Number(result.issue_count ?? 0)} issue${
-      Number(result.issue_count ?? 0) === 1 ? "" : "s"
-    } found`;
-  }
-
-  return "Repair run completed";
+  return [...groups.values()].sort(
+    (a, b) =>
+      (SEVERITY_ORDER[a.severity] ?? 4) - (SEVERITY_ORDER[b.severity] ?? 4) ||
+      a.check.localeCompare(b.check),
+  );
 }
 
 function repairOutcomeLabel(task: RepairHistoryTask | null) {
   if (!task) return "No recent repair";
   if (task.status === "failed") return "Failed";
   if (taskNeedsAttention(task)) return "Needs attention";
-  if (task.status === "completed") return "Completed cleanly";
+  if (task.status === "completed") return "Completed";
   if (task.status === "cancelled") return "Cancelled";
   return task.status;
 }
 
+const REPAIR_BATCH_LABELS: Record<RepairBatchStatus, string> = {
+  waiting: "Awaiting result",
+  following: "Following task",
+  retrying: "Tracking unavailable; retrying",
+  completed: "Completed",
+  failed: "Failed",
+  cancelled: "Cancelled",
+};
+
 export function Health() {
-  const { isAdmin } = useAuth();
+  const { hasCapability } = useAuth();
   const [issues, setIssues] = useState<HealthIssue[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [runs, setRuns] = useState<Record<string, HealthCheckRun>>({});
@@ -307,7 +322,16 @@ export function Health() {
   const [latestRepairTask, setLatestRepairTask] =
     useState<RepairHistoryTask | null>(null);
   const [loading, setLoading] = useState(true);
+  const [snapshotMetadata, setSnapshotMetadata] = useState<
+    HealthSnapshotData["snapshot"] | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [hasSnapshot, setHasSnapshot] = useState(false);
+  const [streamStatus, setStreamStatus] =
+    useState<OpsStreamStatus>("connecting");
+  const hasSnapshotRef = useRef(false);
   const [scanning, setScanning] = useState(false);
   const [filter, setFilter] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -317,10 +341,38 @@ export function Health() {
     count: number;
   } | null>(null);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [repairBatchIds, setRepairBatchIds] = useState<string[]>([]);
+  const operationBusyRef = useRef(false);
+  const operationBusy = scanning || fixing !== null || activeTaskId !== null;
   const reconnectTimerRef = useRef<number | null>(null);
   const taskReconnectTimerRef = useRef<number | null>(null);
   const { done: activeTaskDone, reset: resetTaskEvents } =
     useTaskEvents(activeTaskId);
+  const {
+    statuses: repairBatchStatuses,
+    finishedCount: repairBatchesFinished,
+  } = useHealthRepairBatches(repairBatchIds, (outcomes) => {
+    const completed = outcomes.filter(
+      (status) => status === "completed",
+    ).length;
+    const failed = outcomes.filter((status) => status === "failed").length;
+    const cancelled = outcomes.filter(
+      (status) => status === "cancelled",
+    ).length;
+    if (failed || cancelled) {
+      toast.error(
+        `Repair batches finished: ${completed} completed, ${failed} failed, ${cancelled} cancelled`,
+      );
+    } else {
+      toast.success(
+        `Repair complete: ${completed} of ${repairBatchIds.length} batches completed`,
+      );
+    }
+    void fetchIssues(true);
+    void fetchLatestRepairTask(true);
+    operationBusyRef.current = false;
+    setFixing(null);
+  });
 
   async function fetchRepairCatalog() {
     try {
@@ -353,6 +405,8 @@ export function Health() {
 
   const fetchIssues = useCallback(
     async (fresh = false, signal?: AbortSignal) => {
+      const retainingSnapshot = hasSnapshotRef.current;
+      if (retainingSnapshot) setRefreshing(true);
       try {
         const query = new URLSearchParams();
         if (filter) query.set("check_type", filter);
@@ -368,11 +422,23 @@ export function Health() {
         setIssues(data.issues);
         setCounts(data.counts);
         setRuns(data.runs ?? {});
+        setSnapshotMetadata(data.snapshot);
+        hasSnapshotRef.current = true;
+        setHasSnapshot(true);
         setError(null);
+        setRefreshError(null);
       } catch {
-        setError("Failed to load health issues");
+        if (signal?.aborted) return;
+        if (hasSnapshotRef.current) {
+          setRefreshError(
+            "Could not refresh library health. Showing the last successful snapshot.",
+          );
+        } else {
+          setError("Failed to load health issues");
+        }
       } finally {
-        setLoading(false);
+        if (!signal?.aborted) setLoading(false);
+        if (retainingSnapshot) setRefreshing(false);
       }
     },
     [filter],
@@ -400,18 +466,25 @@ export function Health() {
 
     function connect() {
       if (disposed) return;
+      setStreamStatus("connecting");
       const query = filter ? `?check_type=${encodeURIComponent(filter)}` : "";
       stream = new EventSource(`/api/admin/health-stream${query}`, {
         withCredentials: true,
       });
+      stream.onopen = () => setStreamStatus("live");
       stream.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data) as HealthSnapshotData;
           setIssues(payload.issues);
           setCounts(payload.counts);
           setRuns(payload.runs ?? {});
+          setSnapshotMetadata(payload.snapshot);
+          hasSnapshotRef.current = true;
+          setHasSnapshot(true);
           setError(null);
+          setRefreshError(null);
           setLoading(false);
+          setStreamStatus("live");
         } catch {
           // Ignore malformed payloads and wait for the next event.
         }
@@ -419,7 +492,8 @@ export function Health() {
       stream.onerror = () => {
         stream?.close();
         if (!disposed) {
-          reconnectTimerRef.current = window.setTimeout(connect, 3000);
+          setStreamStatus("reconnecting");
+          reconnectTimerRef.current = window.setTimeout(connect, 5000);
         }
       };
     }
@@ -473,8 +547,7 @@ export function Health() {
     if (!activeTaskId || !activeTaskDone) return;
     if (activeTaskDone.status === "completed") {
       const revalidation = activeTaskDone.result?.revalidation as
-        | Record<string, unknown>
-        | undefined;
+        Record<string, unknown> | undefined;
       const remaining = Number(revalidation?.issue_count ?? NaN);
       if (!scanning && Number.isFinite(remaining)) {
         toast.success(
@@ -489,17 +562,24 @@ export function Health() {
       }
       void fetchIssuesEvent(true);
       void fetchLatestRepairTask(true);
-    } else if (activeTaskDone.status === "failed") {
+    } else if (
+      activeTaskDone.status === "failed" ||
+      activeTaskDone.status === "cancelled"
+    ) {
       toast.error(scanning ? "Scan failed" : "Repair failed");
       void fetchLatestRepairTask(true);
     }
     setScanning(false);
+    operationBusyRef.current = false;
     setFixing(null);
     setActiveTaskId(null);
     resetTaskEvents();
   }, [activeTaskDone, activeTaskId, resetTaskEvents, scanning]);
 
   async function runScan() {
+    if (operationBusyRef.current) return;
+    operationBusyRef.current = true;
+    setRepairBatchIds([]);
     setScanning(true);
     try {
       const { task_id } = await api<{ task_id: string }>(
@@ -509,12 +589,17 @@ export function Health() {
       toast.success("Health scan started...");
       setActiveTaskId(task_id);
     } catch {
+      operationBusyRef.current = false;
       setScanning(false);
       toast.error("Failed to start scan");
     }
   }
 
   async function runDuplicateCleanup() {
+    if (operationBusyRef.current) return;
+    operationBusyRef.current = true;
+    setRepairBatchIds([]);
+    setFixing("duplicate_tracks");
     try {
       const result = await api<{ task_id: string; status?: string }>(
         "/api/manage/repair-duplicate-tracks",
@@ -526,7 +611,13 @@ export function Health() {
           : "Duplicate cleanup queued",
       );
       if (result.task_id) setActiveTaskId(result.task_id);
+      else {
+        operationBusyRef.current = false;
+        setFixing(null);
+      }
     } catch {
+      operationBusyRef.current = false;
+      setFixing(null);
       toast.error("Failed to start the duplicate cleanup");
     }
   }
@@ -556,7 +647,10 @@ export function Health() {
     }
   }
 
-  async function handleFixType(checkType: string) {
+  async function handleFixType(checkType: string, propagateError = false) {
+    if (operationBusyRef.current) return;
+    operationBusyRef.current = true;
+    setRepairBatchIds([]);
     setFixing(checkType);
     try {
       const res = await api<{
@@ -566,7 +660,13 @@ export function Health() {
         allowed: boolean;
         reason?: string | null;
       }>(`/api/manage/health-issues/fix-type/${checkType}`, "POST");
-      if (!res.task_id) {
+      const taskIds = [
+        ...new Set([
+          ...(res.task_ids ?? []),
+          ...(res.task_id ? [res.task_id] : []),
+        ]),
+      ];
+      if (!taskIds.length) {
         if (res.reason === "global_scope_not_supported") {
           toast.error("This repair must be reviewed artist-by-artist");
         } else if (res.reason === "not_auto_fixable") {
@@ -575,18 +675,22 @@ export function Health() {
           toast.error("No auto-fixable issues");
         }
         setFixing(null);
+        operationBusyRef.current = false;
         return;
       }
-      const batches = res.task_ids?.length ?? 1;
+      const batches = taskIds.length;
       toast.success(
         batches > 1
           ? `Fixing ${res.fixable} issues in ${batches} batches...`
           : `Fixing ${res.fixable} issues...`,
       );
-      setActiveTaskId(res.task_id);
-    } catch {
+      if (batches > 1) setRepairBatchIds(taskIds);
+      else setActiveTaskId(taskIds[0]!);
+    } catch (error) {
       setFixing(null);
+      operationBusyRef.current = false;
       toast.error("Failed to start repair");
+      if (propagateError) throw error;
     }
   }
 
@@ -629,538 +733,514 @@ export function Health() {
       CHECK_LABELS[b.check_type] || b.check_type,
     );
   });
-  const batchReadyCount = catalogItems.filter(
-    (entry) =>
-      (counts[entry.check_type] || 0) > 0 &&
-      entry.auto_fixable &&
-      entry.supports_global_scope,
-  ).length;
-  const artistReviewCount = catalogItems.filter(
-    (entry) =>
-      (counts[entry.check_type] || 0) > 0 &&
-      entry.auto_fixable &&
-      !entry.supports_global_scope &&
-      entry.supports_artist_scope,
-  ).length;
-  const healthyCatalogCount = catalogItems.filter(
-    (entry) => (counts[entry.check_type] || 0) === 0,
-  ).length;
-  const latestRepairTone =
-    REPAIR_OUTCOME_TONES[
-      repairOutcomeTone(
-        latestRepairTask ?? { type: "repair", status: "cancelled" },
-      )
-    ] || REPAIR_OUTCOME_TONES.neutral;
-  const latestRemaining = latestRepairTask
-    ? taskRevalidationIssueCount(latestRepairTask.result)
-    : null;
-
-  // Group issues
-  const grouped: { check: string; severity: string; items: HealthIssue[] }[] =
-    [];
-  const byCheck: Record<string, HealthIssue[]> = {};
-  for (const issue of issues) {
-    (byCheck[issue.check_type] ??= []).push(issue);
-  }
-  for (const [check, items] of Object.entries(byCheck).sort(
-    ([, a], [, b]) =>
-      (SEVERITY_ORDER[a[0]?.severity || "low"] ?? 4) -
-      (SEVERITY_ORDER[b[0]?.severity || "low"] ?? 4),
-  )) {
-    grouped.push({ check, severity: items[0]?.severity || "medium", items });
-  }
-  if (error)
+  const grouped = groupHealthIssues(issues);
+  const visibleCount = filter ? (counts[filter] ?? 0) : totalOpen;
+  if (error && !hasSnapshot)
     return (
       <ErrorState message={error} onRetry={() => void fetchIssues(true)} />
     );
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <section className="rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/12 text-primary shadow-[0_18px_40px_rgba(6,182,212,0.14)]">
-                <Stethoscope size={22} />
-              </div>
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-white">
-                  Library Health
-                </h1>
-                <p className="text-sm text-white/55">
-                  Repair queue for structural mismatches, stale records, and
-                  metadata drift across the library.
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {totalOpen > 0 ? (
-                <CrateChip className="border-yellow-500/25 bg-yellow-500/10 text-yellow-200">
-                  {totalOpen} open issues
-                </CrateChip>
-              ) : !loading ? (
-                <CrateChip className="border-green-500/25 bg-green-500/10 text-green-300">
-                  Healthy
-                </CrateChip>
-              ) : null}
-              {lastScan && <CrateChip>Last scan {timeAgo(lastScan)}</CrateChip>}
-              {Object.keys(counts).length > 0 && (
-                <CrateChip>{Object.keys(counts).length} check types</CrateChip>
-              )}
-            </div>
-          </div>
-          {isAdmin && (
-            <Button onClick={runScan} disabled={scanning}>
-              {scanning ? (
-                <Loader2 size={14} className="mr-2 animate-spin" />
-              ) : (
-                <Stethoscope size={14} className="mr-2" />
-              )}
-              {scanning ? "Scanning..." : "Run scan"}
-            </Button>
-          )}
-        </div>
-      </section>
-
-      {/* Filter pills */}
-      {Object.keys(counts).length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          <CratePill active={filter === null} onClick={() => setFilter(null)}>
-            All
-            <span className="ml-1 text-white/40">{totalOpen}</span>
-          </CratePill>
-          {Object.entries(counts)
-            .sort(([, a], [, b]) => b - a)
-            .map(([check, count]) => (
-              <CratePill
-                key={check}
-                active={filter === check}
-                onClick={() => setFilter(check)}
+    <div data-slot="library-health-page" className="min-w-0 space-y-6">
+      <OpsPageHero
+        title="Library Health"
+        description="Find problems in your library and how to resolve them."
+        compactActions
+        actions={
+          <PageHeaderActions>
+            {hasCapability("library.repair.run") ? (
+              <PageHeaderAction
+                label={scanning ? "Scanning..." : "Run scan"}
+                onClick={runScan}
+                disabled={operationBusy}
+                aria-busy={scanning}
               >
-                {CHECK_LABELS[check] || check.replace(/_/g, " ")}
-                <span className="ml-1 text-white/40">{count}</span>
-              </CratePill>
-            ))}
-        </div>
-      )}
+                {scanning ? (
+                  <Loader2
+                    data-admin-ux="health-scan-loading"
+                    aria-hidden="true"
+                    size={14}
+                    className="animate-spin"
+                  />
+                ) : null}
+                {!scanning ? (
+                  <HeaderScanSearch
+                    data-admin-ux="header-run-scan"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
+            ) : null}
+          </PageHeaderActions>
+        }
+      >
+        <OpsSnapshotStatus
+          snapshot={snapshotMetadata}
+          streamStatus={streamStatus}
+        />
+        <InfoBadge tone={lastScan ? "neutral" : "warning"}>
+          {lastScan ? `Last check ${timeAgo(lastScan)}` : "No check recorded"}
+        </InfoBadge>
+      </OpsPageHero>
+      {refreshError ? (
+        <OpsRefreshNotice
+          message={refreshError}
+          onRetry={() => void fetchIssues(true)}
+          retrying={refreshing}
+          className="mt-5"
+        />
+      ) : null}
 
-      <Card className="border-white/10 bg-panel-surface shadow-[0_20px_52px_rgba(0,0,0,0.18)]">
-        <div className="space-y-4 p-5">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-            <div className="space-y-3">
-              <div>
-                <div className="text-sm font-semibold text-white">
-                  Latest repair impact
-                </div>
-                <div className="mt-1 text-xs text-white/45">
-                  Sticky readout of the most recent repair, fix-artist or health
-                  scan, including whether issues still remain.
-                </div>
+      {repairBatchIds.length > 1 ? (
+        <OpsPanel title="Repair batches">
+          <p role="status" className="text-sm text-text-muted">
+            {repairBatchesFinished} of {repairBatchIds.length} batches finished
+          </p>
+          <ul className="mt-3 space-y-2">
+            {repairBatchIds.map((id, index) => {
+              const status = repairBatchStatuses[id] ?? "waiting";
+              return (
+                <li key={id} className="flex flex-wrap items-center gap-3">
+                  <Link
+                    className="inline-flex min-h-11 items-center text-sm text-accent-action hover:underline"
+                    to={`/tasks?task=${encodeURIComponent(id)}`}
+                  >
+                    Repair batch {index + 1}
+                  </Link>
+                  <InfoBadge
+                    tone={
+                      status === "failed" || status === "cancelled"
+                        ? "danger"
+                        : status === "retrying"
+                          ? "warning"
+                          : "neutral"
+                    }
+                  >
+                    {REPAIR_BATCH_LABELS[status]}
+                  </InfoBadge>
+                </li>
+              );
+            })}
+          </ul>
+        </OpsPanel>
+      ) : null}
+
+      <OpsPanel
+        title={loading ? "Library issues" : `${totalOpen} recorded issues`}
+        description="Expand a check to inspect its cases and available repair actions."
+        action={
+          Object.keys(counts).length > 0 ? (
+            <details className="min-w-0">
+              <summary className="flex min-h-11 cursor-pointer items-center py-2">
+                <MonoLabel as="span" tone="accent">
+                  Filter issues
+                </MonoLabel>
+              </summary>
+              <div
+                className="flex flex-wrap gap-2 pt-2"
+                role="group"
+                aria-label="Filter by check"
+              >
+                <FilterChip
+                  active={filter === null}
+                  onClick={() => setFilter(null)}
+                >
+                  All <span className="ml-1 text-text-muted">{totalOpen}</span>
+                </FilterChip>
+                {Object.entries(counts)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([check, count]) => (
+                    <FilterChip
+                      key={check}
+                      active={filter === check}
+                      onClick={() => setFilter(check)}
+                    >
+                      {CHECK_LABELS[check] || check.replace(/_/g, " ")}{" "}
+                      <span className="ml-1 text-text-muted">{count}</span>
+                    </FilterChip>
+                  ))}
               </div>
-              {latestRepairTask ? (
-                <>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <CrateChip className={latestRepairTone}>
-                      {repairOutcomeLabel(latestRepairTask)}
-                    </CrateChip>
-                    <CrateChip>
-                      {latestRepairTask.type.replace(/_/g, " ")}
-                    </CrateChip>
-                    <CrateChip>
-                      Updated{" "}
-                      {timeAgo(
-                        latestRepairTask.updated_at ||
-                          latestRepairTask.created_at,
-                      )}
-                    </CrateChip>
-                    {latestRemaining != null ? (
-                      <CrateChip
-                        className={
-                          latestRemaining > 0
-                            ? "border-amber-500/20 bg-amber-500/[0.06] text-amber-100"
-                            : "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-100"
-                        }
-                      >
-                        {latestRemaining > 0
-                          ? `${latestRemaining} still open`
-                          : "No open issues remain"}
-                      </CrateChip>
+            </details>
+          ) : null
+        }
+      >
+        {!loading && grouped.length > 0 ? (
+          <p className="mb-5 text-sm text-text-muted">
+            Loaded issues, most severe first
+          </p>
+        ) : null}
+        {filter ? (
+          <div className="mb-4 flex flex-wrap items-center gap-3 text-sm text-text-muted">
+            <p>Showing {CHECK_LABELS[filter] || filter.replace(/_/g, " ")}.</p>
+            <Button variant="ghost" onClick={() => setFilter(null)}>
+              Clear filter
+            </Button>
+          </div>
+        ) : null}
+        {!loading && issues.length > 0 && issues.length < visibleCount ? (
+          <p className="mb-4 text-sm text-text-muted">
+            Showing {issues.length} of {visibleCount} recorded issues.
+          </p>
+        ) : null}
+        {loading ? (
+          <div
+            role="status"
+            aria-label="Loading health issues"
+            className="flex justify-center py-16"
+          >
+            <Loader2
+              data-admin-ux="health-loading"
+              aria-hidden="true"
+              className="h-6 w-6 animate-spin text-accent-action-hi"
+            />
+          </div>
+        ) : null}
+        {!loading && issues.length === 0 ? (
+          <div className="border-t border-border-quiet py-10">
+            <h3 className="font-display text-xl font-bold text-text-primary">
+              {filter
+                ? "No loaded issues for this filter"
+                : totalOpen > 0
+                  ? "No issue details loaded"
+                  : lastScan
+                    ? "No open issues recorded"
+                    : "No check result available"}
+            </h3>
+            <p className="mt-3 text-sm text-text-muted">
+              {filter || totalOpen > 0
+                ? `${totalOpen} open issues recorded across the library.`
+                : lastScan
+                  ? "No open issues are recorded in the current results."
+                  : "Run a scan to check the library for issues."}
+            </p>
+          </div>
+        ) : null}
+        {!loading &&
+          grouped.map(({ check, severity, items }) => {
+            const isExpanded = expandedGroups.has(check);
+            const contentId = `health-issues-${encodeURIComponent(check)}`;
+            const label = CHECK_LABELS[check] || check.replace(/_/g, " ");
+            const description = CHECK_DESCRIPTIONS[check] || "";
+            const catalogEntry = catalogByCheck[check];
+            const fixableCount = items.filter((i) => i.auto_fixable).length;
+            const isFixing = fixing === check;
+            const fixAll = fixAllMode(catalogEntry, fixableCount);
+            const canRunBulkFix = fixAll === "bulk";
+            const canRunGlobalFix = fixAll !== "none";
+            const hasArtistReview = Boolean(
+              catalogEntry?.supports_artist_scope &&
+              items.some((issue) => issue.artist_id),
+            );
+            const recordedCount = counts[check] ?? items.length;
+            return (
+              <article
+                key={check}
+                aria-labelledby={`${contentId}-title`}
+                className="min-w-0 border-t border-border-quiet"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-5 py-6">
+                  <div
+                    id={`${contentId}-summary`}
+                    className="min-w-0 flex-1 basis-72"
+                  >
+                    <h3
+                      id={`${contentId}-title`}
+                      className="break-words font-display text-[1.4375rem] font-semibold leading-tight tracking-tight text-text-primary"
+                    >
+                      {label}
+                    </h3>{" "}
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+                      <InfoBadge variant="counter">
+                        {recordedCount}{" "}
+                        {recordedCount === 1 ? "issue" : "issues"}
+                      </InfoBadge>{" "}
+                      <SeverityMeter level={severity} label={severity} />{" "}
+                      {catalogEntry ? (
+                        <span className="sr-only">
+                          {riskLabel(catalogEntry.risk)}{" "}
+                          {scopeLabel(catalogEntry.scope)}
+                        </span>
+                      ) : null}{" "}
+                      {runs[check]?.last_run_at ? (
+                        <>
+                          {" "}
+                          <InfoBadge>
+                            Checked {timeAgo(runs[check]!.last_run_at!)}
+                          </InfoBadge>
+                        </>
+                      ) : null}
+                    </div>
+                    {description ? (
+                      <p className="mt-2 max-w-[45rem] text-caption leading-relaxed text-text-muted">
+                        {description}
+                      </p>
+                    ) : null}
+                    {catalogEntry?.requires_confirmation ? (
+                      <span className="sr-only">
+                        {" "}
+                        Review artist-by-artist before applying this fix.
+                      </span>
                     ) : null}
                   </div>
-                  <div className="max-w-3xl text-sm text-white/72">
-                    {latestRepairSummary(latestRepairTask)}
-                  </div>
-                </>
-              ) : (
-                <div className="text-sm text-white/55">
-                  No repair or health runs recorded yet.
+                  <Button
+                    variant="ghost"
+                    className="shrink-0 gap-4 aria-expanded:text-accent-action-hi aria-expanded:hover:text-accent-action-hi"
+                    onClick={() => toggleGroup(check)}
+                    aria-label={`Review issues: ${label}`}
+                    aria-expanded={isExpanded}
+                    aria-controls={contentId}
+                    aria-describedby={`${contentId}-summary`}
+                  >
+                    Review issues
+                    {isExpanded ? (
+                      <ChevronUp
+                        data-admin-ux="health-group-collapse"
+                        aria-hidden="true"
+                        size={14}
+                      />
+                    ) : (
+                      <ChevronDown
+                        data-admin-ux="health-group-expand"
+                        aria-hidden="true"
+                        size={14}
+                      />
+                    )}
+                  </Button>
                 </div>
+                {isExpanded ? (
+                  <section
+                    id={contentId}
+                    aria-label={`${label} issues`}
+                    className="mb-6 min-w-0 border-l border-accent-action pt-1 pb-6 pl-4 sm:pl-6"
+                  >
+                    {items.length < recordedCount ? (
+                      <p className="mb-5 text-sm text-text-muted">
+                        Showing {items.length} of {recordedCount} recorded
+                        issues for this check.
+                      </p>
+                    ) : null}
+                    <div className="grid min-w-0 items-start gap-8 md:grid-cols-2">
+                      <div className="crate-form-field min-w-0">
+                        <MonoLabel as="div" role="heading" aria-level={4}>
+                          Detected cases
+                        </MonoLabel>
+                        <div className="min-w-0 space-y-4">
+                          {groupIssuesByArtist(items).map((artistGroup) => (
+                            <ArtistGroupHeader
+                              key={artistGroup.key}
+                              group={artistGroup}
+                              canRepair={Boolean(
+                                catalogEntry?.supports_artist_scope,
+                              )}
+                            >
+                              {artistGroup.items.map((issue) => (
+                                <IssueRow
+                                  key={issue.id}
+                                  issue={issue}
+                                  onResolve={() => handleResolve(issue.id)}
+                                  onDismiss={() => handleDismiss(issue.id)}
+                                />
+                              ))}
+                            </ArtistGroupHeader>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="crate-form-field min-w-0">
+                        <MonoLabel as="div" role="heading" aria-level={4}>
+                          How to resolve
+                        </MonoLabel>
+                        <div className="min-w-0 space-y-4">
+                          <p className="text-caption leading-relaxed text-text-secondary">
+                            {!catalogEntry
+                              ? "Repair options are unavailable. You can still review these issues."
+                              : catalogEntry.support === "manual"
+                                ? "Automatic fix is not available for this repair type yet."
+                                : catalogEntry.supports_global_scope
+                                  ? "Global fix can be queued directly from here."
+                                  : catalogEntry.supports_bulk_fix
+                                    ? "Use Queue repair to queue artist repairs in batches of 20, or Review and repair for one artist."
+                                    : "This repair is available from the artist repair flow, not as a global batch."}
+                          </p>
+                          {catalogEntry ? (
+                            <div className="flex flex-wrap items-center gap-3">
+                              <SeverityMeter
+                                level={catalogEntry.risk}
+                                label={riskLabel(catalogEntry.risk)}
+                              />
+                              <InfoBadge
+                                className={
+                                  SCOPE_TONES[catalogEntry.scope] ||
+                                  SCOPE_TONES.hybrid
+                                }
+                              >
+                                {scopeLabel(catalogEntry.scope)}
+                              </InfoBadge>
+                              <InfoBadge>
+                                {executionLane(catalogEntry)}
+                              </InfoBadge>
+                            </div>
+                          ) : null}
+                          {catalogEntry?.requires_confirmation ? (
+                            <p className="text-caption text-state-warning-text">
+                              Review artist-by-artist before applying this fix.
+                            </p>
+                          ) : null}
+                          <div className="flex flex-wrap gap-2">
+                            {canRunGlobalFix ? (
+                              <Button
+                                variant={
+                                  hasArtistReview ? "outline" : "default"
+                                }
+                                aria-label={`Queue repair for ${label}`}
+                                onClick={() =>
+                                  canRunBulkFix
+                                    ? setPendingBulkFix({
+                                        check,
+                                        count: fixableCount,
+                                      })
+                                    : handleFixType(check)
+                                }
+                                disabled={operationBusy}
+                                aria-busy={isFixing}
+                              >
+                                {isFixing ? (
+                                  <Loader2
+                                    data-admin-ux="health-fix-loading"
+                                    aria-hidden="true"
+                                    size={12}
+                                    className="mr-2 animate-spin"
+                                  />
+                                ) : null}
+                                Queue repair
+                              </Button>
+                            ) : null}
+                            {check === "duplicate_tracks" ? (
+                              <Button
+                                variant={
+                                  hasArtistReview || canRunGlobalFix
+                                    ? "outline"
+                                    : "default"
+                                }
+                                onClick={() => void runDuplicateCleanup()}
+                                disabled={operationBusy}
+                              >
+                                Run cleanup now
+                              </Button>
+                            ) : null}
+                            <Button
+                              variant="ghost"
+                              className="text-caption text-text-muted"
+                              onClick={() => handleDismissType(check)}
+                              aria-label={`Dismiss all ${label} issues`}
+                            >
+                              Dismiss all
+                            </Button>
+                          </div>
+                          {canRunGlobalFix ? (
+                            <p className="text-xs text-text-muted">
+                              {fixableCount} auto-fixable in the loaded results.
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                ) : null}
+              </article>
+            );
+          })}
+      </OpsPanel>
+      <details className="mt-6 border-t border-border-quiet pt-3">
+        <summary className="flex min-h-11 cursor-pointer items-center gap-3 py-3">
+          <MonoLabel as="span" tone="accent">
+            Latest activity
+          </MonoLabel>
+          {latestRepairTask ? (
+            <MonoLabel as="span">
+              {repairOutcomeLabel(latestRepairTask)} ·{" "}
+              {timeAgo(
+                latestRepairTask.updated_at || latestRepairTask.created_at,
               )}
-            </div>
-            {latestRepairTask ? (
-              <Button size="sm" variant="outline" asChild>
+            </MonoLabel>
+          ) : null}
+        </summary>
+        <div className="space-y-3 py-3 text-sm text-text-secondary">
+          {latestRepairTask ? (
+            <>
+              <p>{latestRepairSummary(latestRepairTask)}</p>
+              <Button variant="ghost" asChild>
                 <Link to={`/tasks?task=${latestRepairTask.id}`}>
                   View task log
                 </Link>
               </Button>
-            ) : null}
-          </div>
+            </>
+          ) : (
+            <EmptyState title="No repair or health runs recorded yet" />
+          )}
         </div>
-      </Card>
-
+      </details>
       {catalogItems.length > 0 ? (
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <Card className="border-white/10 bg-panel-surface shadow-[0_20px_52px_rgba(0,0,0,0.18)]">
-            <div className="space-y-4 p-5">
-              <div>
-                <div className="text-sm font-semibold text-white">
-                  Repair lanes
+        <details className="mt-4 border-t border-border-quiet pt-3">
+          <summary className="flex min-h-11 cursor-pointer items-center py-3">
+            <MonoLabel as="span" tone="accent">
+              Available checks ({catalogItems.length})
+            </MonoLabel>
+          </summary>
+          <ul className="divide-y divide-border-quiet">
+            {catalogItems.map((entry) => (
+              <li key={entry.check_type} className="space-y-3 py-4">
+                <div className="flex flex-wrap items-baseline justify-between gap-3">
+                  <h3 className="font-display text-lg font-bold">
+                    {CHECK_LABELS[entry.check_type] ||
+                      entry.check_type.replace(/_/g, " ")}
+                  </h3>
+                  <InfoBadge>
+                    {counts[entry.check_type]
+                      ? `${counts[entry.check_type]} open issues recorded`
+                      : runs[entry.check_type]?.last_run_at
+                        ? "No open issues recorded"
+                        : "No check result available"}
+                  </InfoBadge>
                 </div>
-                <div className="mt-1 text-xs text-white/45">
-                  How open issues can be executed right now across the repair
-                  catalog.
+                <p className="text-sm text-text-muted">
+                  {CHECK_DESCRIPTIONS[entry.check_type] ||
+                    "No description available."}
+                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <InfoBadge tone={executionLaneTone(entry)}>
+                    {executionLane(entry)}
+                  </InfoBadge>
+                  <SeverityMeter
+                    level={entry.risk}
+                    label={riskLabel(entry.risk)}
+                  />
+                  <InfoBadge>{scopeLabel(entry.scope)}</InfoBadge>
                 </div>
-              </div>
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-md border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-3">
-                  <div className="text-xs uppercase tracking-[0.12em] text-emerald-200/75">
-                    Global batch
-                  </div>
-                  <div className="mt-2 text-2xl font-semibold text-emerald-100">
-                    {batchReadyCount}
-                  </div>
-                  <div className="mt-1 text-xs text-emerald-100/70">
-                    Checks with open issues that can run safely from Health.
-                  </div>
-                </div>
-                <div className="rounded-md border border-amber-500/20 bg-amber-500/[0.06] px-4 py-3">
-                  <div className="text-xs uppercase tracking-[0.12em] text-amber-200/75">
-                    Artist review
-                  </div>
-                  <div className="mt-2 text-2xl font-semibold text-amber-100">
-                    {artistReviewCount}
-                  </div>
-                  <div className="mt-1 text-xs text-amber-100/70">
-                    Checks that need artist-level preview before applying.
-                  </div>
-                </div>
-                <div className="rounded-md border border-cyan-400/20 bg-cyan-400/[0.05] px-4 py-3">
-                  <div className="text-xs uppercase tracking-[0.12em] text-cyan-100/75">
-                    Healthy checks
-                  </div>
-                  <div className="mt-2 text-2xl font-semibold text-cyan-100">
-                    {healthyCatalogCount}
-                  </div>
-                  <div className="mt-1 text-xs text-cyan-100/70">
-                    Catalog entries with no currently open issues.
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="border-white/10 bg-panel-surface shadow-[0_20px_52px_rgba(0,0,0,0.18)]">
-            <div className="space-y-4 p-5">
-              <div>
-                <div className="text-sm font-semibold text-white">
-                  Repair catalog
-                </div>
-                <div className="mt-1 text-xs text-white/45">
-                  Canonical capabilities per check type: route, risk and storage
-                  impact.
-                </div>
-              </div>
-              <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
-                {catalogItems.map((entry) => {
-                  const openCount = counts[entry.check_type] || 0;
-                  return (
-                    <div
-                      key={entry.check_type}
-                      className="rounded-md border border-white/8 bg-black/15 px-3 py-3"
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-medium text-white">
-                            {CHECK_LABELS[entry.check_type] || entry.check_type}
-                          </div>
-                          <div className="mt-1 text-xs text-white/40">
-                            {CHECK_DESCRIPTIONS[entry.check_type] ||
-                              "No description available."}
-                          </div>
-                        </div>
-                        <CrateChip
-                          className={
-                            openCount > 0
-                              ? "border-yellow-500/25 bg-yellow-500/10 text-yellow-200"
-                              : "border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-100"
-                          }
-                        >
-                          {openCount > 0 ? `${openCount} open` : "Healthy"}
-                        </CrateChip>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <CrateChip className={executionLaneTone(entry)}>
-                          {executionLane(entry)}
-                        </CrateChip>
-                        <CrateChip
-                          className={
-                            RISK_TONES[entry.risk] || RISK_TONES.caution
-                          }
-                        >
-                          {riskLabel(entry.risk)}
-                        </CrateChip>
-                        <CrateChip
-                          className={
-                            SCOPE_TONES[entry.scope] || SCOPE_TONES.hybrid
-                          }
-                        >
-                          {scopeLabel(entry.scope)}
-                        </CrateChip>
-                        <CrateChip>
-                          {entry.support === "manual"
-                            ? "Manual"
-                            : entry.support === "automatic"
-                              ? "Automatic"
-                              : "Scan only"}
-                        </CrateChip>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </Card>
-        </section>
+              </li>
+            ))}
+          </ul>
+        </details>
       ) : null}
-
-      {/* Loading */}
-      {loading && (
-        <div className="flex items-center justify-center py-24">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        </div>
-      )}
-
-      {/* Empty state */}
-      {!loading && issues.length === 0 && (
-        <div className="rounded-md border border-white/10 bg-panel-surface px-6 py-24 text-center shadow-[0_28px_80px_rgba(0,0,0,0.24)]">
-          <CheckCircle2
-            size={48}
-            className="text-green-500 mx-auto mb-3 opacity-50"
-          />
-          <div className="text-lg font-semibold text-green-500">
-            Library is healthy
-          </div>
-          <div className="text-sm text-muted-foreground mt-1">
-            {totalOpen === 0 && Object.keys(counts).length === 0
-              ? "Run a scan to check for issues"
-              : "No issues found for this filter"}
-          </div>
-        </div>
-      )}
-
-      {/* Issue groups */}
-      {!loading &&
-        grouped.map(({ check, severity, items }) => {
-          const Icon = SEVERITY_ICONS[severity] || Info;
-          const colors = SEVERITY_COLORS[severity] ?? SEVERITY_COLORS.low!;
-          const isExpanded = expandedGroups.has(check);
-          const label = CHECK_LABELS[check] || check.replace(/_/g, " ");
-          const description = CHECK_DESCRIPTIONS[check] || "";
-          const catalogEntry = catalogByCheck[check];
-          const fixableCount = items.filter((i) => i.auto_fixable).length;
-          const isFixing = fixing === check;
-          const fixAll = fixAllMode(catalogEntry, fixableCount);
-          const canRunBulkFix = fixAll === "bulk";
-          const canRunGlobalFix = fixAll !== "none";
-          const reviewOnly = Boolean(
-            catalogEntry?.auto_fixable && !catalogEntry.supports_global_scope,
-          );
-          const manualOnly = catalogEntry?.support === "manual";
-
-          return (
-            <Card
-              key={check}
-              className={`mb-3 overflow-hidden border ${colors.border} bg-panel-surface shadow-[0_20px_52px_rgba(0,0,0,0.18)]`}
-            >
-              {/* Group header */}
-              <button
-                className={cn(
-                  "w-full text-left transition-colors",
-                  "bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.05),transparent_46%)] hover:bg-white/[0.04]",
-                )}
-                onClick={() => toggleGroup(check)}
-              >
-                <div className="flex items-start gap-3 p-4">
-                  <div
-                    className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-md border shadow-[0_16px_36px_rgba(0,0,0,0.18)] ${colors.border} ${colors.bg}`}
-                  >
-                    <Icon size={16} className={colors.text} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-white">{label}</span>
-                      <CrateChip>{items.length}</CrateChip>
-                      <CrateChip
-                        className={`${colors.border} ${colors.bg} ${colors.text}`}
-                      >
-                        {severity}
-                      </CrateChip>
-                      {catalogEntry ? (
-                        <>
-                          <CrateChip
-                            className={
-                              RISK_TONES[catalogEntry.risk] ||
-                              RISK_TONES.caution
-                            }
-                          >
-                            {riskLabel(catalogEntry.risk)}
-                          </CrateChip>
-                          <CrateChip
-                            className={
-                              SCOPE_TONES[catalogEntry.scope] ||
-                              SCOPE_TONES.hybrid
-                            }
-                          >
-                            {scopeLabel(catalogEntry.scope)}
-                          </CrateChip>
-                        </>
-                      ) : null}
-                    </div>
-                    {description && !isExpanded && (
-                      <div className="mt-1 truncate text-xs text-white/45">
-                        {description}
-                      </div>
-                    )}
-                    {runs[check]?.last_run_at ? (
-                      <div className="mt-1 text-xs text-white/35">
-                        Checked {timeAgo(runs[check]!.last_run_at!)}
-                      </div>
-                    ) : null}
-                    {catalogEntry?.requires_confirmation ? (
-                      <div className="mt-1 text-xs text-amber-200/80">
-                        Review artist-by-artist before applying this fix.
-                      </div>
-                    ) : null}
-                  </div>
-                  <div
-                    className="flex items-center gap-2"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {canRunGlobalFix ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-9 rounded-md border-green-500/30 px-3 text-xs text-green-300 hover:bg-green-500/10"
-                        onClick={() =>
-                          canRunBulkFix
-                            ? setPendingBulkFix({ check, count: fixableCount })
-                            : handleFixType(check)
-                        }
-                        disabled={isFixing}
-                      >
-                        {isFixing ? (
-                          <Loader2 size={12} className="mr-1 animate-spin" />
-                        ) : (
-                          <Wrench size={12} className="mr-1" />
-                        )}
-                        Fix all ({fixableCount})
-                      </Button>
-                    ) : null}
-                    {check === "duplicate_tracks" ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-9 rounded-md px-3 text-xs"
-                        onClick={() => void runDuplicateCleanup()}
-                      >
-                        <Wrench size={12} className="mr-1" />
-                        Run cleanup now
-                      </Button>
-                    ) : null}
-                    {canRunGlobalFix ? null : reviewOnly || manualOnly ? (
-                      <div className="inline-flex h-9 items-center gap-2 rounded-md border border-white/10 bg-black/20 px-3 text-xs text-white/55">
-                        <AlertTriangle size={12} />
-                        {manualOnly ? "Manual only" : "Review per artist"}
-                      </div>
-                    ) : null}
-                    <ActionIconButton
-                      onClick={() => handleDismissType(check)}
-                      title="Dismiss all issues of this type"
-                    >
-                      <EyeOff size={14} />
-                    </ActionIconButton>
-                    <ActionIconButton
-                      title={isExpanded ? "Collapse" : "Expand"}
-                    >
-                      {isExpanded ? (
-                        <ChevronUp size={14} />
-                      ) : (
-                        <ChevronDown size={14} />
-                      )}
-                    </ActionIconButton>
-                  </div>
-                </div>
-              </button>
-
-              {/* Expanded issue list */}
-              {isExpanded && (
-                <div className="border-t border-white/8">
-                  {description && (
-                    <div className="px-4 pb-1 pt-3 text-xs text-white/45">
-                      {description}
-                    </div>
-                  )}
-                  {catalogEntry ? (
-                    <div className="px-4 pb-2 text-xs text-white/50">
-                      {catalogEntry.support === "manual"
-                        ? "Automatic fix is not available for this repair type yet."
-                        : catalogEntry.supports_global_scope
-                          ? "Global fix can be queued directly from here."
-                          : catalogEntry.supports_bulk_fix
-                            ? "Fix all queues the artist repairs in batches of 20 artists, or repair one artist at a time below."
-                            : "This repair is available from the artist repair flow, not as a global batch."}
-                    </div>
-                  ) : null}
-                  <div className="space-y-3 px-2 pb-2">
-                    {groupIssuesByArtist(items).map((artistGroup) => (
-                      <div key={artistGroup.key} className="space-y-1">
-                        <ArtistGroupHeader
-                          group={artistGroup}
-                          canRepair={Boolean(
-                            catalogEntry?.supports_artist_scope,
-                          )}
-                        />
-                        {artistGroup.items.map((issue) => (
-                          <IssueRow
-                            key={issue.id}
-                            issue={issue}
-                            catalogEntry={catalogEntry}
-                            onResolve={() => handleResolve(issue.id)}
-                            onDismiss={() => handleDismiss(issue.id)}
-                          />
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </Card>
-          );
-        })}
       <ConfirmDialog
         open={pendingBulkFix !== null}
         onOpenChange={(open) => !open && setPendingBulkFix(null)}
-        title="Fix all artists"
-        description={`Queue repairs for ${pendingBulkFix?.count ?? 0} ${
-          CHECK_LABELS[pendingBulkFix?.check ?? ""] ?? "issues"
-        }? Files move on disk and each artist is re-synced afterwards.`}
+        title="Queue artist repairs"
+        description={`Queue eligible ${
+          CHECK_LABELS[pendingBulkFix?.check ?? ""] ?? "artist"
+        } repairs across the library? ${pendingBulkFix?.count ?? 0} auto-fixable in the loaded results. ${
+          pendingBulkFix && counts[pendingBulkFix.check] != null
+            ? `${counts[pendingBulkFix.check]} open issues recorded for this check.`
+            : "Recorded total unavailable for this check."
+        } Files move on disk and each affected artist is re-synced afterwards.`}
         confirmLabel="Queue repairs"
-        onConfirm={() => {
-          const check = pendingBulkFix?.check;
-          setPendingBulkFix(null);
-          if (check) void handleFixType(check);
+        onConfirm={async () => {
+          if (pendingBulkFix) await handleFixType(pendingBulkFix.check, true);
         }}
+        onError={() => {
+          /* The operation reports its recoverable error. */
+        }}
+        eyebrow="Confirm action"
+        consequence="Check-wide eligible repairs · moves files on disk · re-syncs each affected artist"
       />
     </div>
   );
@@ -1168,12 +1248,10 @@ export function Health() {
 
 function IssueRow({
   issue,
-  catalogEntry,
   onResolve,
   onDismiss,
 }: {
   issue: HealthIssue;
-  catalogEntry?: RepairCatalogEntry;
   onResolve: () => void;
   onDismiss: () => void;
 }) {
@@ -1188,94 +1266,64 @@ function IssueRow({
     : [];
 
   return (
-    <div className="group flex items-center gap-3 rounded-md border border-white/6 bg-white/[0.04] px-3 py-3 transition-colors hover:bg-white/[0.06]">
-      {/* Severity dot */}
-      <span
-        className={`w-1.5 h-1.5 rounded-md flex-shrink-0 ${
-          issue.severity === "critical"
-            ? "bg-red-500"
-            : issue.severity === "high"
-              ? "bg-orange-500"
-              : issue.severity === "medium"
-                ? "bg-yellow-500"
-                : "bg-muted-foreground/50"
-        }`}
-      />
-
+    <div className="grid min-w-0 gap-2 py-2">
       {/* Description */}
       <div className="flex-1 min-w-0">
-        <div className="truncate text-xs text-white">{issue.description}</div>
+        <div className="break-words text-caption leading-relaxed text-text-secondary">
+          {issue.description}
+        </div>
         {path && (
-          <div className="mt-0.5 truncate font-mono text-[10px] text-white/35">
+          <div className="mt-2 break-all font-mono text-label text-text-muted">
             {path}
           </div>
         )}
         {blockedReason ? (
-          <div className="mt-1 text-[11px] text-amber-200/80">
+          <div className="mt-1 text-[11px] text-state-warning-text/80">
             Automatic cleanup skipped it: {blockedReason}
           </div>
         ) : null}
         {paths.map((item) => (
           <div
             key={item}
-            className="mt-0.5 truncate font-mono text-[10px] text-white/35"
+            className="mt-2 break-all font-mono text-label text-text-muted"
           >
             {item}
           </div>
         ))}
-        {catalogEntry ? (
-          <div className="mt-2 flex flex-wrap gap-2">
-            <CrateChip
-              className={RISK_TONES[catalogEntry.risk] || RISK_TONES.caution}
-            >
-              {riskLabel(catalogEntry.risk)}
-            </CrateChip>
-            <CrateChip
-              className={SCOPE_TONES[catalogEntry.scope] || SCOPE_TONES.hybrid}
-            >
-              {scopeLabel(catalogEntry.scope)}
-            </CrateChip>
-            {catalogEntry.auto_fixable ? (
-              <CrateChip>
-                {catalogEntry.supports_global_scope
-                  ? "Global batch fix"
-                  : "Artist repair"}
-              </CrateChip>
-            ) : (
-              <CrateChip>Manual review</CrateChip>
-            )}
-          </div>
-        ) : null}
       </div>
 
-      {/* Age */}
-      <CrateChip className="hidden sm:inline-flex">
-        {timeAgo(issue.created_at)}
-      </CrateChip>
-      <span className="sr-only">{timeAgo(issue.created_at)}</span>
-
-      {/* Actions — always visible */}
-      <div className="flex flex-shrink-0 gap-1">
-        <ActionIconButton
-          onClick={(e) => {
-            e.stopPropagation();
-            onResolve();
-          }}
-          className="hover:bg-green-500/10 hover:text-green-300"
-          title="Mark as resolved"
-        >
-          <CheckCircle2 size={13} />
-        </ActionIconButton>
-        <ActionIconButton
-          onClick={(e) => {
-            e.stopPropagation();
-            onDismiss();
-          }}
-          className="hover:bg-white/10 hover:text-white"
-          title="Dismiss: it stays hidden unless its details change"
-        >
-          <EyeOff size={13} />
-        </ActionIconButton>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <SeverityMeter level={issue.severity} label={issue.severity} />
+          <span className="font-mono text-label text-text-muted">
+            {timeAgo(issue.created_at)}
+          </span>
+        </div>
+        {/* Actions remain visible beside secondary case metadata. */}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="ghost"
+            onClick={(e) => {
+              e.stopPropagation();
+              onResolve();
+            }}
+            className="text-caption text-text-muted"
+            aria-label="Mark as resolved"
+          >
+            Resolve
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDismiss();
+            }}
+            className="text-caption text-text-muted"
+            aria-label="Dismiss: it stays hidden unless its details change"
+          >
+            Dismiss
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -1320,14 +1368,19 @@ export function groupIssuesByArtist(items: HealthIssue[]): ArtistIssueGroup[] {
 function ArtistGroupHeader({
   group,
   canRepair,
+  children,
 }: {
   group: ArtistIssueGroup;
   canRepair: boolean;
+  children: ReactNode;
 }) {
   if (!group.artistName && !group.artistId) {
     return (
-      <div className="px-2 pt-1 text-xs font-medium text-white/45">
-        Not linked to an artist ({group.items.length})
+      <div className="min-w-0 space-y-2">
+        <p className="text-caption text-text-muted">
+          Not linked to an artist ({group.items.length})
+        </p>
+        {children}
       </div>
     );
   }
@@ -1336,25 +1389,22 @@ function ArtistGroupHeader({
     artistName: group.artistName ?? undefined,
   });
   return (
-    <div className="flex items-center justify-between gap-3 px-2 pt-1">
+    <div className="min-w-0 space-y-2">
       <Link
         to={href}
-        className="truncate text-xs font-medium text-white hover:text-primary"
+        className="inline-flex min-h-11 min-w-0 max-w-full items-center text-caption text-text-secondary hover:text-accent-action-hi"
       >
-        {group.artistName ?? `Artist #${group.artistId}`}
-        <span className="ml-2 text-white/40">{group.items.length}</span>
+        <span className="min-w-0 truncate">
+          {group.artistName ?? `Artist #${group.artistId}`}
+        </span>
+        <span className="ml-2 shrink-0 text-text-subtle">
+          {group.items.length}
+        </span>
       </Link>
+      {children}
       {canRepair && group.artistId ? (
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 px-2 text-xs"
-          asChild
-        >
-          <Link to={`${href}?repair=1`}>
-            <Wrench size={12} className="mr-1" />
-            Review and repair
-          </Link>
+        <Button asChild>
+          <Link to={`${href}?repair=1`}>Review and repair</Link>
         </Button>
       ) : null}
     </div>

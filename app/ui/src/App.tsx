@@ -1,7 +1,9 @@
-import { lazy, Suspense, useEffect } from "react";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
-import { api } from "@/lib/api";
 import { Toaster } from "sonner";
+import { toasterConfig } from "@crate/ui/lib/toaster-config";
 import { TooltipProvider } from "@crate/ui/shadcn/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { LLMStatusProvider } from "@/hooks/use-llm";
@@ -39,6 +41,9 @@ const Trash = lazy(() =>
 const Contributions = lazy(() =>
   import("@/pages/Contributions").then((m) => ({ default: m.Contributions })),
 );
+const Imports = lazy(() =>
+  import("@/pages/Imports").then((m) => ({ default: m.Imports })),
+);
 const Playlists = lazy(() =>
   import("@/pages/Playlists").then((m) => ({ default: m.Playlists })),
 );
@@ -47,9 +52,6 @@ const Stack = lazy(() =>
 );
 const Genres = lazy(() =>
   import("@/pages/Genres").then((m) => ({ default: m.Genres })),
-);
-const Timeline = lazy(() =>
-  import("@/pages/Timeline").then((m) => ({ default: m.Timeline })),
 );
 const Login = lazy(() =>
   import("@/pages/Login").then((m) => ({ default: m.Login })),
@@ -110,14 +112,16 @@ const Upcoming = lazy(() =>
 const Bandcamp = lazy(() =>
   import("@/pages/Bandcamp").then((m) => ({ default: m.Bandcamp })),
 );
-const Setup = lazy(() =>
-  import("@/pages/Setup").then((m) => ({ default: m.Setup })),
-);
 const Analysis = lazy(() =>
   import("@/pages/Analysis").then((m) => ({ default: m.Analysis })),
 );
 const SystemHealth = lazy(() =>
   import("@/pages/SystemHealth").then((m) => ({ default: m.SystemHealth })),
+);
+const PlaybackDelivery = lazy(() =>
+  import("@/pages/PlaybackDelivery").then((m) => ({
+    default: m.PlaybackDelivery,
+  })),
 );
 const Logs = lazy(() =>
   import("@/pages/Logs").then((m) => ({ default: m.Logs })),
@@ -134,30 +138,9 @@ const GlobalCatalog = lazy(() =>
   })),
 );
 
-function PageSpinner() {
-  return (
-    <div className="flex items-center justify-center py-24">
-      <div className="h-6 w-6 animate-spin rounded-md border-2 border-primary border-t-transparent" />
-    </div>
-  );
-}
-
-function SetupGuard() {
-  useEffect(() => {
-    api<{ needs_setup: boolean }>("/api/setup/status")
-      .then((d) => {
-        if (d.needs_setup && !window.location.pathname.startsWith("/setup")) {
-          window.location.href = "/setup";
-        }
-      })
-      .catch(() => {});
-  }, []);
-  return null;
-}
-
 function ProfileRedirect() {
   const { user, loading, hasCapability } = useAuth();
-  if (loading) return <PageSpinner />;
+  if (loading) return <LoadingState variant="route" />;
   if (!user) return <Navigate to="/login" replace />;
   if (!hasCapability("users.view")) return <Navigate to="/browse" replace />;
   return <Navigate to={`/users?inspect=${user.id}`} replace />;
@@ -180,14 +163,12 @@ function AdminIndex() {
   if (hasCapability("library.view")) return <Navigate to="/browse" replace />;
   if (hasCapability("ai.config.read")) return <Navigate to="/ai" replace />;
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-center">
-      <p className="text-lg font-semibold text-foreground">
-        No console landing page available
-      </p>
-      <p className="max-w-md text-sm text-muted-foreground">
-        Your role can access the console, but this surface is not enabled yet.
-      </p>
-    </div>
+    <ErrorState
+      variant="page"
+      kind="unavailable"
+      title="No console landing page available"
+      message="Your role can access the console, but this surface is not enabled yet."
+    />
   );
 }
 
@@ -228,11 +209,11 @@ const ACQUISITION_MANAGE = [
   "library.tidal.manage",
 ] as const;
 const CONTRIBUTION_REVIEW = ["library.import.manage"] as const;
+const IMPORTS_MANAGE = ["library.import.manage"] as const;
 const BANDCAMP_MANAGE = ["library.bandcamp.manage"] as const;
 const UPCOMING_CURATION = [
   "curation.shows.write",
-  "curation.releases.write",
-  "library.tidal.manage",
+  "library.metadata.write",
 ] as const;
 const SYSTEM_PLAYLISTS_WRITE = ["curation.playlists.write"] as const;
 const FEDERATION_NODES_VIEW = ["federation.nodes.view"] as const;
@@ -241,10 +222,8 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <TooltipProvider>
-          <SetupGuard />
-          <Suspense fallback={<PageSpinner />}>
+          <Suspense fallback={<LoadingState variant="route" />}>
             <Routes>
-              <Route path="setup" element={<Setup />} />
               <Route path="login" element={<Login />} />
               <Route
                 element={
@@ -325,14 +304,6 @@ export default function App() {
                   }
                 />
                 <Route
-                  path="artists/:artistId/:slug"
-                  element={
-                    <RequireCapabilities anyOf={LIBRARY_VIEW}>
-                      <Artist />
-                    </RequireCapabilities>
-                  }
-                />
-                <Route
                   path="albums/:albumId/:slug"
                   element={
                     <RequireCapabilities anyOf={LIBRARY_VIEW}>
@@ -373,6 +344,14 @@ export default function App() {
                   }
                 />
                 <Route
+                  path="imports"
+                  element={
+                    <RequireCapabilities anyOf={IMPORTS_MANAGE}>
+                      <Imports />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
                   path="insights"
                   element={
                     <RequireCapabilities anyOf={LIBRARY_VIEW}>
@@ -393,6 +372,14 @@ export default function App() {
                   element={
                     <RequireCapabilities anyOf={OPS_HEALTH_VIEW}>
                       <SystemHealth />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="playback"
+                  element={
+                    <RequireCapabilities anyOf={OPS_HEALTH_VIEW}>
+                      <PlaybackDelivery />
                     </RequireCapabilities>
                   }
                 />
@@ -456,7 +443,7 @@ export default function App() {
                   path="timeline"
                   element={
                     <RequireCapabilities anyOf={LIBRARY_VIEW}>
-                      <Timeline />
+                      <Navigate to="/browse" replace />
                     </RequireCapabilities>
                   }
                 />
@@ -561,7 +548,7 @@ export default function App() {
             </Routes>
           </Suspense>
         </TooltipProvider>
-        <Toaster theme="dark" position="bottom-right" richColors />
+        <Toaster {...toasterConfig} theme="dark" position="bottom-right" />
       </AuthProvider>
     </BrowserRouter>
   );

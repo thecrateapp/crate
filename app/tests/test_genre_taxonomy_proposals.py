@@ -39,6 +39,8 @@ def test_build_genre_taxonomy_node_proposal_filters_unknown_targets(monkeypatch)
             description="Guitar-led instrumental rock with post-rock dynamics.",
             aliases=["instrumental"],
             relations=[Relation()],
+            eq_gains=[-14, -10, -5, -1, 0, 2, 3, 4, 8, 14],
+            eq_reasoning="  Lift   presence without harshness. ",
             reasoning="Seed artists point to post-rock adjacency.",
         ),
     )
@@ -55,6 +57,19 @@ def test_build_genre_taxonomy_node_proposal_filters_unknown_targets(monkeypatch)
             "reasoning": "Shared instrumental dynamics.",
         }
     ]
+    assert result["eq_gains"] == [
+        -12.0,
+        -10.0,
+        -5.0,
+        -1.0,
+        0.0,
+        2.0,
+        3.0,
+        4.0,
+        8.0,
+        12.0,
+    ]
+    assert result["eq_reasoning"] == "Lift presence without harshness."
 
 
 def test_build_genre_taxonomy_node_proposal_supports_raw_unmapped_genre(
@@ -132,6 +147,103 @@ def test_build_genre_taxonomy_node_proposal_supports_raw_unmapped_genre(
     assert captured["sample_albums"][1].startswith("Explosions in the Sky")
     assert "instrumental-rock" in captured["cooccurring_genres"]
     assert captured["candidate_targets"][0]["slug"] == "instrumental-rock"
+
+
+def test_raw_unmapped_proposal_can_classify_a_tag_as_facet(monkeypatch):
+    from crate import genre_taxonomy_proposals as proposals
+
+    monkeypatch.setattr(
+        proposals,
+        "get_genre_catalog",
+        lambda: {"ambient": {"name": "Ambient", "top_level": True}},
+    )
+    monkeypatch.setattr(
+        proposals,
+        "get_genre_detail",
+        lambda _slug: {
+            "name": "Instrumental",
+            "artist_count": 4,
+            "album_count": 6,
+            "artists": [{"artist_name": "Mogwai"}],
+            "albums": [],
+        },
+    )
+    monkeypatch.setattr(
+        proposals, "get_genre_cooccurring_artist_slugs", lambda _slug: []
+    )
+    monkeypatch.setattr(
+        proposals, "get_genre_cooccurring_album_slugs", lambda _slug: []
+    )
+
+    def fake_generate(**_kwargs):
+        return SimpleNamespace(
+            recommended_action="classify_facet",
+            recommended_target_slug=None,
+            facets=[SimpleNamespace(dimension="vocals", name="Instrumental")],
+            description="Should not be applied to a facet.",
+            aliases=["instrumental"],
+            relations=[],
+            eq_gains=[],
+            eq_reasoning="",
+            reasoning="The tag describes vocal presence, not a genre.",
+        )
+
+    monkeypatch.setattr(
+        "crate.llm.prompts.genre_taxonomy_node_proposal.generate_genre_taxonomy_node_proposal",
+        fake_generate,
+    )
+
+    result = proposals.build_genre_taxonomy_node_proposal("instrumental")
+
+    assert result["recommended_action"] == "classify_facet"
+    assert result["facets"] == [
+        {"dimension": "vocals", "slug": "instrumental", "name": "Instrumental"}
+    ]
+    assert result["description"] == ""
+    assert result["aliases"] == []
+    assert result["relations"] == []
+    assert result["eq_gains"] == []
+
+
+def test_canonical_node_proposal_cannot_be_classified_as_facet(monkeypatch):
+    from crate import genre_taxonomy_proposals as proposals
+
+    monkeypatch.setattr(
+        proposals,
+        "get_genre_catalog",
+        lambda: {
+            "ambient": {
+                "name": "Ambient",
+                "top_level": True,
+                "description": "Atmospheric music.",
+                "aliases": [],
+                "parents": [],
+                "related": [],
+                "influenced_by": [],
+                "fusion_of": [],
+            }
+        },
+    )
+    monkeypatch.setattr(proposals, "get_genre_seed_artists", lambda _slug: [])
+    monkeypatch.setattr(
+        "crate.llm.prompts.genre_taxonomy_node_proposal.generate_genre_taxonomy_node_proposal",
+        lambda **_kwargs: SimpleNamespace(
+            recommended_action="classify_facet",
+            facets=[SimpleNamespace(dimension="mood", name="dark")],
+            description="Atmospheric music.",
+            aliases=[],
+            relations=[],
+            eq_gains=[0] * 10,
+            eq_reasoning="",
+            reasoning="Should not reclassify a node.",
+        ),
+    )
+
+    result = proposals.build_genre_taxonomy_node_proposal("ambient")
+
+    assert result["source_kind"] == "taxonomy_node"
+    assert result["recommended_action"] == "needs_review"
+    assert result["facets"] == []
 
 
 def test_build_genre_taxonomy_rebuild_proposal_is_review_only(monkeypatch):

@@ -1,22 +1,12 @@
-import { useTranslation } from "react-i18next";
-
-import { UserProfileHero, UserProfileMatch } from "./UserProfileHeroSections";
+import { UserProfileAvatar } from "./UserProfileAvatar";
 import { UserProfileLibrary } from "./UserProfileLibrarySections";
 import { UserProfileNetwork } from "./UserProfileNetworkSections";
+import { UserProfileView } from "./UserProfileView";
 import type { PublicProfile } from "./user-profile-model";
-
 export { UserProfileHero, UserProfileMatch } from "./UserProfileHeroSections";
 export { UserProfileLibrary } from "./UserProfileLibrarySections";
 export { UserProfileNetwork } from "./UserProfileNetworkSections";
-
-export function UserProfileContent({
-  data,
-  isOwnProfile,
-  username,
-  busy,
-  onFollowToggle,
-  locale,
-}: {
+export function UserProfileContent(props: {
   data: PublicProfile;
   isOwnProfile: boolean;
   username?: string;
@@ -24,25 +14,18 @@ export function UserProfileContent({
   onFollowToggle: () => void;
   locale: string;
 }) {
-  const { t } = useTranslation();
-  const displayName =
-    data.display_name || data.username || t("people.unknownUser");
   return (
-    <div className="space-y-6">
-      <UserProfileHero
-        data={data}
-        displayName={displayName}
-        isOwnProfile={isOwnProfile}
-        username={username}
-        busy={busy}
-        onFollowToggle={onFollowToggle}
-        locale={locale}
-      />
-      <UserProfileMatch data={data} isOwnProfile={isOwnProfile} />
-      <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <UserProfileLibrary data={data} />
-        <UserProfileNetwork data={data} />
-      </div>
-    </div>
+    <UserProfileView
+      {...props}
+      avatar={
+        <UserProfileAvatar
+          name={props.data.display_name || props.data.username || ""}
+          avatar={props.data.avatar}
+          userId={props.data.id}
+        />
+      }
+      library={<UserProfileLibrary data={props.data} />}
+      network={<UserProfileNetwork data={props.data} />}
+    />
   );
 }

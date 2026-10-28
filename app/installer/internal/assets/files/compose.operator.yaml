@@ -1,0 +1,275 @@
+# Crate Operator overlay; works with docker-compose.yaml alone (make agent-up
+# AGENT_PROFILE=operator). State lives under CRATE_OPERATOR_ROOT, default
+# ${DATA_DIR}/crate-operator. No public ports. Never combine the agent and
+# crate-operator profiles. The supervisor (push channel for incidents and alert
+# rules) and the infra relay are optional: make agent-up starts each only once its
+# config/bridge exists. crate-provenance publishes the release evidence that opens
+# mutations only while the running fleet uses official GHCR images; it reads Docker
+# through crate-provenance-docker, which allows only container listing and image
+# inspection (docs/technical/hermes-operator-release.md).
+networks:
+  crate-provenance:
+    internal: true
+
+configs:
+  crate-provenance-docker:
+    content: |
+      global
+        maxconn 32
+      defaults
+        mode http
+        timeout connect 5s
+        timeout client 15s
+        timeout server 15s
+      frontend inspect
+        bind :2375
+        http-request deny unless { method GET } { path -m reg ^/(v1\.[0-9]{1,3}/)?(containers/json|images/sha256:[0-9a-f]{64}/json)$$ }
+        default_backend docker
+      backend docker
+        server docker /var/run/docker.sock
+
+services:
+  crate-operator:
+    profiles: [crate-operator]
+    image: ${CRATE_AGENT_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-agent:${CRATE_IMAGE_TAG:-latest}}
+    container_name: crate-operator
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 0.5
+    pids_limit: 192
+    security_opt: [no-new-privileges:true]
+    environment:
+      HERMES_UID: ${PUID:-1000}
+      HERMES_GID: ${PGID:-1000}
+      HERMES_HOME: /opt/data
+      HERMES_TIMEZONE: ${TZ:-UTC}
+      TZ: ${TZ:-UTC}
+      HERMES_MANAGED_DIR: /etc/hermes
+      HOME: /opt/data
+      XDG_STATE_HOME: /opt/data/xdg-state
+      CRATE_AGENT_PROFILE: operator
+      CRATE_MCP_URL: http://crate-api:8585/mcp
+      CRATE_MCP_HOST: ${CRATE_AGENT_MCP_HOST:-api.${DOMAIN}}
+      CRATE_AGENT_PROVIDER: ${CRATE_AGENT_PROVIDER:-}
+      CRATE_AGENT_MODEL: ${CRATE_AGENT_MODEL:-}
+      CRATE_AGENT_BASE_URL: ${CRATE_AGENT_BASE_URL:-}
+      CRATE_RELEASE_SHA: ${CRATE_RELEASE_SHA:-}
+    working_dir: /opt/data
+    command: [python3, /opt/crate-hermes/runtime.py]
+    volumes:
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/home:/opt/data
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/secrets/domain:/run/crate-hermes-secrets:ro
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/secrets/domain-native:/run/crate-hermes-native:ro
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/secrets/infra-native:/run/crate-hermes-infra-native:ro
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/secrets/supervisor-native:/run/crate-hermes-supervisor-native:ro
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/secrets/delivery:/run/crate-hermes-delivery:ro
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/secrets/infra-client:/run/crate-infra-client:ro
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/secrets/supervisor-client:/run/crate-supervisor-client:ro
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/context:/opt/crate-context:ro
+    tmpfs:
+      - /etc/hermes:uid=${PUID:-1000},gid=${PGID:-1000},mode=0700
+    networks: [crate]
+    healthcheck:
+      test: [CMD, python3, /opt/crate-hermes/runtime.py, --health]
+      interval: 30s
+      timeout: 5s
+      start_period: 180s
+      retries: 3
+    labels:
+      traefik.enable: false
+
+  crate-infra-relay:
+    profiles: [crate-operator]
+    image: ${CRATE_AGENT_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-agent:${CRATE_IMAGE_TAG:-latest}}
+    user: ${PUID:-1000}:${CRATE_INFRA_RELAY_GID:-1000}
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    mem_limit: 64m
+    pids_limit: 32
+    restart: unless-stopped
+    working_dir: /opt/crate-operator
+    entrypoint: [python3, -m, deploy.operator.infra_relay]
+    volumes:
+      - /run/crate-infra:/run/crate-infra:ro
+    networks: [crate]
+    labels:
+      traefik.enable: false
+
+  crate-operator-supervisor:
+    profiles: [crate-operator]
+    image: ${CRATE_AGENT_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-agent:${CRATE_IMAGE_TAG:-latest}}
+    user: ${PUID:-1000}:${PGID:-1000}
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    mem_limit: 128m
+    pids_limit: 48
+    restart: unless-stopped
+    working_dir: /opt/crate-operator
+    entrypoint: [python3, -m, deploy.operator.server]
+    command: [--config, /etc/crate-operator/config.json]
+    volumes:
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/supervisor-config.json:/etc/crate-operator/config.json:ro
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/supervisor-state:/var/lib/crate-operator
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/secrets/supervisor:/run/secrets:ro
+    networks: [crate]
+    labels:
+      traefik.enable: false
+
+  crate-provenance-docker:
+    profiles: [crate-operator]
+    image: haproxy:3.2-alpine@sha256:5893840576071e6217cd52ebdcc14f454c6f7a631056fa6f4e0f40d3cac4215b
+    # Root only to open the host socket; no capabilities, read-only, internal network.
+    user: "0:0"
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    mem_limit: 64m
+    pids_limit: 32
+    restart: unless-stopped
+    configs:
+      - source: crate-provenance-docker
+        target: /usr/local/etc/haproxy/haproxy.cfg
+    volumes:
+      - ${CRATE_DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock:ro
+    networks: [crate-provenance]
+    healthcheck:
+      test:
+        [
+          CMD,
+          wget,
+          -q,
+          -O,
+          /dev/null,
+          "http://127.0.0.1:2375/containers/json?limit=1",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      traefik.enable: false
+
+  crate-provenance:
+    profiles: [crate-operator]
+    image: ${CRATE_AGENT_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-agent:${CRATE_IMAGE_TAG:-latest}}
+    user: ${PUID:-1000}:${PGID:-1000}
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    mem_limit: 96m
+    pids_limit: 32
+    restart: unless-stopped
+    working_dir: /opt/crate-operator
+    entrypoint: [python3, -m, deploy.operator.provenance]
+    environment:
+      CRATE_AGENT_INSTANCE_ID: ${CRATE_AGENT_INSTANCE_ID:?Provision instance identity}
+      CRATE_DOCKER_API: http://crate-provenance-docker:2375
+    volumes:
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/context:/opt/crate-context:ro
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/provenance:/opt/crate-provenance
+    networks: [crate, crate-provenance]
+    healthcheck:
+      test: [CMD, python3, -m, deploy.operator.provenance, --health]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    labels:
+      traefik.enable: false
+
+  crate-api:
+    environment:
+      CRATE_OPERATOR_PRINCIPAL_IDS: ${CRATE_OPERATOR_PRINCIPAL_IDS:?Provision exact server-side operator principal IDs}
+      CRATE_AGENT_INSTANCE_ID: ${CRATE_AGENT_INSTANCE_ID:?Provision instance identity}
+    volumes:
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/context/public:/run/crate-provenance:ro
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/provenance:/run/crate-provenance-evidence:ro
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/secrets/domain-native:/run/crate-telegram-secrets:ro
+
+  crate-worker:
+    environment:
+      CRATE_OPERATOR_PRINCIPAL_IDS: ${CRATE_OPERATOR_PRINCIPAL_IDS:?Provision exact server-side operator principal IDs}
+      CRATE_AGENT_INSTANCE_ID: ${CRATE_AGENT_INSTANCE_ID:?Provision instance identity}
+      CRATE_READINESS_ROLE: worker
+      CRATE_READINESS_QUEUES: default,fast
+    volumes:
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/context/public:/run/crate-provenance:ro
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/provenance:/run/crate-provenance-evidence:ro
+    healthcheck: &worker-health
+      test: [CMD, python3, -m, crate.role_readiness]
+      interval: 15s
+      timeout: 7s
+      start_period: 90s
+      retries: 3
+
+  crate-fast-worker:
+    environment:
+      CRATE_OPERATOR_PRINCIPAL_IDS: ${CRATE_OPERATOR_PRINCIPAL_IDS:?Provision exact server-side operator principal IDs}
+      CRATE_AGENT_INSTANCE_ID: ${CRATE_AGENT_INSTANCE_ID:?Provision instance identity}
+      CRATE_READINESS_ROLE: worker
+      CRATE_READINESS_QUEUES: fast
+    volumes:
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/context/public:/run/crate-provenance:ro
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/provenance:/run/crate-provenance-evidence:ro
+    healthcheck: *worker-health
+
+  crate-maintenance-worker:
+    environment:
+      CRATE_OPERATOR_PRINCIPAL_IDS: ${CRATE_OPERATOR_PRINCIPAL_IDS:?Provision exact server-side operator principal IDs}
+      CRATE_AGENT_INSTANCE_ID: ${CRATE_AGENT_INSTANCE_ID:?Provision instance identity}
+      CRATE_READINESS_ROLE: worker
+      CRATE_READINESS_QUEUES: maintenance
+    volumes:
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/context/public:/run/crate-provenance:ro
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/provenance:/run/crate-provenance-evidence:ro
+    healthcheck: *worker-health
+
+  crate-analysis-worker:
+    environment:
+      CRATE_OPERATOR_PRINCIPAL_IDS: ${CRATE_OPERATOR_PRINCIPAL_IDS:?Provision exact server-side operator principal IDs}
+      CRATE_AGENT_INSTANCE_ID: ${CRATE_AGENT_INSTANCE_ID:?Provision instance identity}
+      CRATE_MCP_ENABLED: ${CRATE_MCP_ENABLED:-false}
+      CRATE_MCP_ACTIONS_ENABLED: ${CRATE_MCP_ACTIONS_ENABLED:-false}
+      CRATE_READINESS_ROLE: worker
+      CRATE_READINESS_QUEUES: heavy
+    volumes:
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/context/public:/run/crate-provenance:ro
+      - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/provenance:/run/crate-provenance-evidence:ro
+    healthcheck: *worker-health
+
+  crate-playback-worker:
+    environment:
+      CRATE_READINESS_ROLE: worker
+      CRATE_READINESS_QUEUES: playback
+    healthcheck: *worker-health
+
+  crate-projector:
+    environment:
+      CRATE_READINESS_ROLE: projector
+    healthcheck: *worker-health
+
+  crate-media-worker:
+    healthcheck:
+      test:
+        [
+          CMD,
+          curl,
+          --fail,
+          --silent,
+          --max-time,
+          "3",
+          http://127.0.0.1:8687/healthz,
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  crate-ui:
+    healthcheck: &frontend-health
+      test: [CMD-SHELL, "wget -q -O /dev/null -T 3 http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+  crate-listen:
+    healthcheck: *frontend-health

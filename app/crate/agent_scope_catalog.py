@@ -113,6 +113,42 @@ _LIBRARY_MAINTAINER_SCOPES: tuple[str, ...] = tuple(
     "ops.jobs.cancel_pending",
 )
 
+_CRATE_AGENT_SCOPES: tuple[str, ...] = (
+    "library.health.read",
+    "ops.status.read",
+    "ops.jobs.read",
+    "ops.logs.read",
+    "ops.audit.read",
+    "ops.schedules.read",
+    "ops.runtime.read",
+)
+
+_CRATE_OPERATOR_SCOPES: tuple[str, ...] = _CRATE_AGENT_SCOPES + (
+    "library.health.run",
+    "library.quality.run",
+    "library.repair.run",
+    "library.repair.photo_flag",
+    "library.metadata.write",
+    "library.metadata.export",
+    "library.metadata.rehydrate",
+    "library.enrichment.run",
+    "library.analysis.run",
+    "library.sync.run",
+    "library.acquisition.search",
+    "library.acquisition.write",
+    "ops.jobs.retry",
+    "ops.jobs.cancel",
+    "ops.schedules.run",
+    "ops.schedules.write",
+    "ops.runtime.write",
+    "curation.shows.read",
+    "curation.shows.write",
+    "editorial.read",
+    "editorial.prepare",
+    "editorial.write",
+    "editorial.publish",
+)
+
 SCOPE_PRESETS: tuple[ScopePreset, ...] = (
     ScopePreset(
         id="read_only",
@@ -155,6 +191,24 @@ SCOPE_PRESETS: tuple[ScopePreset, ...] = (
             "selected items."
         ),
         scopes=_LIBRARY_MAINTAINER_SCOPES,
+    ),
+    ScopePreset(
+        id="crate_agent",
+        label="Crate Agent (read only)",
+        description=(
+            "Exactly what Crate Agent uses: health, status, jobs, logs, audit, "
+            "schedules and runtime policy. Cannot change anything."
+        ),
+        scopes=_CRATE_AGENT_SCOPES,
+    ),
+    ScopePreset(
+        id="crate_operator",
+        label="Crate Operator",
+        description=(
+            "Exactly what Crate Operator tools need, including reviewed changes. "
+            "Requires actions to be enabled and human approval."
+        ),
+        scopes=_CRATE_OPERATOR_SCOPES,
     ),
 )
 

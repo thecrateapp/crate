@@ -1,6 +1,7 @@
 import { useId } from "react";
 import { RadioGroup, RadioGroupItem } from "@crate/ui/primitives/RadioGroup";
 import { Button } from "@crate/ui/shadcn/button";
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -63,11 +64,13 @@ function MethodCard({
       <p id={descriptionId} className="text-xs text-muted-foreground">
         {option.description}
       </p>
-      <StatusBadge tone={option.billable ? "info" : "success"}>
-        <span id={costId} title={option.model ?? undefined}>
-          {option.cost}
+      <TooltipHint content={option.model}>
+        <span className="inline-flex" tabIndex={option.model ? 0 : undefined}>
+          <StatusBadge tone={option.billable ? "info" : "success"}>
+            <span id={costId}>{option.cost}</span>
+          </StatusBadge>
         </span>
-      </StatusBadge>
+      </TooltipHint>
       {option.disabledReason ? (
         <div className="space-y-1 text-xs">
           <p id={reasonId} className="text-state-warning-text">

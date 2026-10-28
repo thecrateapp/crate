@@ -1,0 +1,96 @@
+{
+  "scope": "Native label elements use shared uppercase recipe; these are explicitly marked non-label local captions in both apps. Values/copy untouched.",
+  "captions": [
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 993,
+      "text": "<span data-slot=\"form-field-label\" className=\"text-[11px] uppercase tracking-wider text-white/35\" > Description </span>"
+    },
+    {
+      "path": "app/ui/src/pages/I18nReview.tsx",
+      "line": 1259,
+      "text": "<span data-slot=\"form-field-label\" className=\"block font-mono text-meta uppercase tracking-[0.12em] text-text-muted\" > {label} </span>"
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 607,
+      "text": "<span data-slot=\"form-field-label\" className=\"font-mono text-label font-normal uppercase tracking-caps text-text-subtle\" > Count </span>"
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 618,
+      "text": "<span data-slot=\"form-field-label\" className=\"font-mono text-label font-normal uppercase tracking-caps text-text-subtle\" > Avg </span>"
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 629,
+      "text": "<span data-slot=\"form-field-label\" className=\"font-mono text-label font-normal uppercase tracking-caps text-text-subtle\" > p95 / p99 </span>"
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 648,
+      "text": "<span data-slot=\"form-field-label\" className=\"font-mono text-label font-normal uppercase tracking-caps text-text-subtle\" > 5xx </span>"
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 437,
+      "text": "<span data-slot=\"form-field-label\" className=\"font-mono text-meta text-text-muted\" > Genre </span>"
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 460,
+      "text": "<span data-slot=\"form-field-label\" className=\"font-mono text-meta text-text-muted\" > City </span>"
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistBioResearchDialog.tsx",
+      "line": 414,
+      "text": "<span data-slot=\"form-field-label\" className=\"font-medium text-text-secondary-strong\" > Proposed biography </span>"
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistMetadataEditor.tsx",
+      "line": 220,
+      "text": "<span data-slot=\"form-field-label\" className=\"text-muted-foreground\" > MusicBrainz ID </span>"
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistMetadataEditor.tsx",
+      "line": 234,
+      "text": "<span data-slot=\"form-field-label\" className=\"text-muted-foreground\" > Bandcamp URL </span>"
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistMetadataEditor.tsx",
+      "line": 248,
+      "text": "<span data-slot=\"form-field-label\" className=\"text-muted-foreground\" > Country </span>"
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistMetadataEditor.tsx",
+      "line": 262,
+      "text": "<span data-slot=\"form-field-label\" className=\"text-muted-foreground\" > Area </span>"
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistMetadataEditor.tsx",
+      "line": 276,
+      "text": "<span data-slot=\"form-field-label\" className=\"text-muted-foreground\" > Formed </span>"
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistMetadataEditor.tsx",
+      "line": 291,
+      "text": "<span data-slot=\"form-field-label\" className=\"text-muted-foreground\" > Ended </span>"
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+      "line": 415,
+      "text": "<span data-slot=\"form-field-label\" className=\"text-[11px] uppercase tracking-wider text-white/35\" > Description </span>"
+    },
+    {
+      "path": "app/listen/src/components/settings/AccountSectionForms.tsx",
+      "line": 114,
+      "text": "<span data-slot=\"form-field-label\" className=\"text-xs text-text-muted\"> {t(\"common.email\")} </span>"
+    },
+    {
+      "path": "app/listen/src/i18n/translation-mode/TranslationOverlay.tsx",
+      "line": 84,
+      "text": "<span data-slot=\"form-field-label\" className=\"block text-xs font-bold uppercase tracking-label text-text-primary/35\" > Current value </span>"
+    }
+  ],
+  "reviewNote": "Current production caption anchors; native labels use the shared recipe. Preview-only caption also marked in admin-controls-demo.tsx. Selectable track values carry form-field-value and are exempt from case inheritance."
+}

@@ -1,9 +1,7 @@
 import { useTranslation } from "react-i18next";
-
-import { CRATE_ICON_SIZE, Users } from "@crate/ui/icons";
-
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { ProfileSection } from "../components/social/ProfileSection";
 import type { PublicProfile } from "./user-profile-model";
-
 export function UserProfileMatch({
   data,
   isOwnProfile,
@@ -13,33 +11,22 @@ export function UserProfileMatch({
 }) {
   const { t } = useTranslation();
   return (
-    <section className="user-profile-card rounded-panel p-5 sm:p-6">
-      <div className="flex items-center gap-2">
-        <Users size={CRATE_ICON_SIZE.sm} className="user-profile-accent-icon" />
-        <h2 className="text-lg font-semibold text-text-primary">
-          {t("userProfile.match.title")}
-        </h2>
-      </div>
-      {isOwnProfile ? (
-        <p className="mt-3 text-sm text-text-muted">
-          {t("userProfile.match.ownProfile")}
+    <ProfileSection title={t("userProfile.match.title")}>
+      {isOwnProfile || !data.affinity_reasons.length ? (
+        <p className="text-sm leading-6 text-text-muted">
+          {t(
+            isOwnProfile
+              ? "userProfile.match.ownProfile"
+              : "userProfile.match.notEnough",
+          )}
         </p>
-      ) : data.affinity_reasons.length > 0 ? (
-        <div className="mt-4 flex flex-wrap gap-2">
+      ) : (
+        <div className="flex flex-wrap gap-2">
           {data.affinity_reasons.map((reason) => (
-            <span
-              key={reason}
-              className="user-profile-reason rounded-full px-3 py-1.5 text-xs"
-            >
-              {reason}
-            </span>
+            <InfoBadge key={reason}>{reason}</InfoBadge>
           ))}
         </div>
-      ) : (
-        <p className="mt-3 text-sm text-text-muted">
-          {t("userProfile.match.notEnough")}
-        </p>
       )}
-    </section>
+    </ProfileSection>
   );
 }

@@ -1,3 +1,24 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import {
+  CRATE_ICON_SIZE,
+  Download as DownloadActionIcon,
+  Heart as HeartIcon,
+  Loader2,
+  Trash2,
+  ArrowUp,
+  ArrowLeft,
+  ListOrdered as List,
+} from "@crate/ui/icons";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
+import {
+  OpsPageHero,
+  OpsSurface,
+  OpsRefreshNotice,
+} from "@/components/admin/ops-surfaces";
 import {
   useState,
   useCallback,
@@ -7,10 +28,8 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useSearchParams } from "react-router";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
+
 import { Button } from "@crate/ui/shadcn/button";
-import { Input } from "@crate/ui/shadcn/input";
-import { Badge } from "@crate/ui/shadcn/badge";
 import {
   Tabs,
   TabsList,
@@ -23,37 +42,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@crate/ui/shadcn/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@crate/ui/shadcn/select";
 import { api, apiSseUrl } from "@/lib/api";
 import { useApi } from "@/hooks/use-api";
 import { toast } from "sonner";
-import {
-  Search,
-  Download,
-  Disc3,
-  Music,
-  Users,
-  Loader2,
-  CheckCircle2,
-  ExternalLink,
-  Heart,
-  Clock,
-  XCircle,
-  Trash2,
-  ArrowUp,
-  RotateCcw,
-  Upload,
-  ArrowLeft,
-  Gauge,
-  Zap,
-  List,
-} from "lucide-react";
+import { EntityAvatar } from "@crate/ui/domain/entity";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 // encPath available if needed for navigation
 
 interface TidalAlbum {
@@ -65,6 +58,7 @@ interface TidalAlbum {
   cover: string | null;
   url: string;
   quality: string[];
+  type?: string;
 }
 
 interface TidalTrack {
@@ -319,23 +313,6 @@ function fmtDuration(secs: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-const STATUS_ICONS: Record<string, typeof Loader2> = {
-  downloading: Loader2,
-  queued: Clock,
-  processing: Loader2,
-  wishlist: Heart,
-  completed: CheckCircle2,
-  failed: XCircle,
-};
-const STATUS_COLORS: Record<string, string> = {
-  downloading: "text-blue-500",
-  queued: "text-yellow-500",
-  processing: "text-blue-500",
-  wishlist: "text-pink-500",
-  completed: "text-green-500",
-  failed: "text-red-500",
-};
-
 // Session persistence helpers — survive navigation, cleared on tab close
 const STORE_KEY = "crate:acquisition:search";
 function loadSession(): {
@@ -372,6 +349,12 @@ export function DownloadPage() {
   const [query, setQuery] = useState(initialQ || session.query);
   const [results, setResults] = useState<SearchResult | null>(session.results);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [soulseekError, setSoulseekError] = useState<string | null>(null);
+  const searchGeneration = useRef(0);
+  const searchController = useRef<AbortController | null>(null);
+  const [queueBusy, setQueueBusy] = useState<Set<number>>(new Set());
+  const queueBusyRef = useRef(new Set<number>());
   const [quality, setQuality] = useState("max");
   const [activeDownloads, setActiveDownloads] = useState<Set<string>>(
     new Set(),
@@ -386,15 +369,24 @@ export function DownloadPage() {
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadTaskId, setUploadTaskId] = useState<string | null>(null);
+  const [uploadDragActive, setUploadDragActive] = useState(false);
   const [browsingArtist, setBrowsingArtist] = useState<{
     id: string;
     name: string;
     picture: string | null;
   } | null>(null);
-  const { data: acquisitionSurface, refetch: refetchAcquisitionSurface } =
-    useApi<AcquisitionSurface>("/api/acquisition/snapshot");
-  const { data: artistSuggestions, refetch: refetchArtistSuggestions } =
-    useApi<ArtistSuggestionsPayload>("/api/acquisition/artist-suggestions");
+  const {
+    data: acquisitionSurface,
+    loading: acquisitionLoading,
+    error: acquisitionError,
+    refetch: refetchAcquisitionSurface,
+  } = useApi<AcquisitionSurface>("/api/acquisition/snapshot");
+  const {
+    data: artistSuggestions,
+    loading: suggestionsLoading,
+    error: suggestionsError,
+    refetch: refetchArtistSuggestions,
+  } = useApi<ArtistSuggestionsPayload>("/api/acquisition/artist-suggestions");
   const [liveAcquisitionSurface, setLiveAcquisitionSurface] =
     useState<AcquisitionSurface | null>(null);
 
@@ -403,7 +395,7 @@ export function DownloadPage() {
   const tidalQueue = currentAcquisitionSurface?.tidal_queue ?? [];
   const slskQueue = currentAcquisitionSurface?.soulseek_queue ?? [];
   const tidalAuthenticated =
-    currentAcquisitionSurface?.tidal_authenticated ?? false;
+    currentAcquisitionSurface?.tidal_authenticated ?? null;
 
   // Merged queue
   const queue = tidalQueue;
@@ -441,68 +433,90 @@ export function DownloadPage() {
     async (q?: string) => {
       const term = (q ?? query).trim();
       if (term.length < 2) return;
+      const generation = ++searchGeneration.current;
+      searchController.current?.abort();
+      const controller = new AbortController();
+      searchController.current = controller;
+      const current = () =>
+        generation === searchGeneration.current && !controller.signal.aborted;
+      slskStreamRef.current?.close();
+      slskStreamRef.current = null;
+      setResults(null);
+      setSoulseekResults(null);
+      setSearchError(null);
+      setSoulseekError(null);
       setSearching(true);
+      setSearchingSlsk(term.length >= 3);
+      setSlskSearchId(null);
+      if (term.length >= 3) {
+        void api<{ search_id: string }>(
+          "/api/acquisition/search/soulseek",
+          "POST",
+          { query: term },
+          { signal: controller.signal },
+        )
+          .then((data) => {
+            if (!current()) return;
+            if (!data.search_id)
+              throw new Error("Missing Soulseek search identity");
+            setSlskSearchId(data.search_id);
+            const stream = new EventSource(
+              apiSseUrl(
+                `/api/acquisition/search/soulseek/${data.search_id}/stream`,
+              ),
+            );
+            slskStreamRef.current = stream;
+            stream.onmessage = (event) => {
+              if (!current()) return;
+              try {
+                const payload = JSON.parse(event.data) as {
+                  results: SoulseekResult[];
+                  isComplete: boolean;
+                };
+                setSoulseekResults(payload.results);
+                if (payload.isComplete) {
+                  setSearchingSlsk(false);
+                  stream.close();
+                  if (slskStreamRef.current === stream)
+                    slskStreamRef.current = null;
+                }
+              } catch {
+                /* Wait for the next valid frame. */
+              }
+            };
+            stream.onerror = () => {
+              stream.close();
+              if (!current()) return;
+              setSearchingSlsk(false);
+              setSoulseekError(
+                "Could not refresh Soulseek results. Retry the search.",
+              );
+              if (slskStreamRef.current === stream)
+                slskStreamRef.current = null;
+            };
+          })
+          .catch(() => {
+            if (current()) {
+              setSoulseekError("Could not search Soulseek. Retry the search.");
+              setSearchingSlsk(false);
+            }
+          });
+      }
       try {
         const data = await api<SearchResult>(
           `/api/tidal/search?q=${encodeURIComponent(term)}&limit=20`,
+          "GET",
+          undefined,
+          { signal: controller.signal },
         );
-        setResults(data);
+        if (current()) setResults(data);
       } catch {
-        toast.error("Search failed — check Tidal authentication");
+        if (current())
+          setSearchError(
+            "Could not search Tidal. Check authentication and retry.",
+          );
       } finally {
-        setSearching(false);
-      }
-      // Also search Soulseek (non-blocking: start search, then poll)
-      if (term.length >= 3) {
-        slskStreamRef.current?.close();
-        slskStreamRef.current = null;
-        setSoulseekResults(null);
-        setSearchingSlsk(true);
-        setSlskSearchId(null);
-
-        api<{ search_id: string }>("/api/acquisition/search/soulseek", "POST", {
-          query: term,
-        })
-          .then((d) => {
-            if (d.search_id) {
-              setSlskSearchId(d.search_id);
-              const stream = new EventSource(
-                apiSseUrl(
-                  `/api/acquisition/search/soulseek/${d.search_id}/stream`,
-                ),
-              );
-              slskStreamRef.current = stream;
-              stream.onmessage = (event) => {
-                try {
-                  const payload = JSON.parse(event.data) as {
-                    results: SoulseekResult[];
-                    isComplete: boolean;
-                  };
-                  setSoulseekResults(payload.results);
-                  if (payload.isComplete) {
-                    setSearchingSlsk(false);
-                    stream.close();
-                    if (slskStreamRef.current === stream) {
-                      slskStreamRef.current = null;
-                    }
-                  }
-                } catch {
-                  // Ignore malformed search frames and keep the stream alive.
-                }
-              };
-              stream.onerror = () => {
-                setSearchingSlsk(false);
-                stream.close();
-                if (slskStreamRef.current === stream) {
-                  slskStreamRef.current = null;
-                }
-              };
-            }
-          })
-          .catch(() => {
-            setSoulseekResults([]);
-            setSearchingSlsk(false);
-          });
+        if (current()) setSearching(false);
       }
     },
     [query],
@@ -557,6 +571,8 @@ export function DownloadPage() {
   useEffect(() => {
     if (initialQ) doSearchEvent(initialQ);
     return () => {
+      searchGeneration.current += 1;
+      searchController.current?.abort();
       slskStreamRef.current?.close();
       slskStreamRef.current = null;
     };
@@ -606,16 +622,63 @@ export function DownloadPage() {
   }
 
   async function removeQueueItem(id: number) {
-    await api(`/api/tidal/queue/${id}`, "DELETE").catch(() => {});
-    refetchQueue();
+    if (queueBusyRef.current.has(id)) return;
+    queueBusyRef.current.add(id);
+    setQueueBusy(new Set(queueBusyRef.current));
+    try {
+      await api(`/api/tidal/queue/${id}`, "DELETE");
+      refetchQueue();
+    } catch {
+      toast.error("Could not remove the acquisition item. Retry the action.");
+    } finally {
+      queueBusyRef.current.delete(id);
+      setQueueBusy(new Set(queueBusyRef.current));
+    }
   }
 
-  async function promoteWishlist(id: number) {
-    await api(`/api/tidal/queue/${id}`, "PUT", { status: "queued" }).catch(
-      () => {},
+  async function promoteWishlist(id: number, quiet = false) {
+    if (queueBusyRef.current.has(id)) return false;
+    queueBusyRef.current.add(id);
+    setQueueBusy(new Set(queueBusyRef.current));
+    try {
+      await api(`/api/tidal/queue/${id}`, "PUT", { status: "queued" });
+      setLiveAcquisitionSurface((current) => {
+        const surface = current ?? acquisitionSurface;
+        return surface
+          ? {
+              ...surface,
+              tidal_queue: surface.tidal_queue.map((item) =>
+                item.id === id ? { ...item, status: "queued" } : item,
+              ),
+            }
+          : current;
+      });
+      if (!quiet) toast.success("Moved to download queue");
+      refetchQueue();
+      return true;
+    } catch {
+      if (!quiet)
+        toast.error(
+          "Could not queue the wishlist item. It remains in Wishlist.",
+        );
+      return false;
+    } finally {
+      queueBusyRef.current.delete(id);
+      setQueueBusy(new Set(queueBusyRef.current));
+    }
+  }
+
+  async function promoteAllWishlist() {
+    const results = await Promise.all(
+      wishlist.map((item) => promoteWishlist(item.id, true)),
     );
-    toast.success("Moved to download queue");
-    refetchQueue();
+    const queued = results.filter(Boolean).length;
+    const failed = results.length - queued;
+    if (failed)
+      toast.error(
+        `${queued} queued · ${failed} failed. Failed items remain in Wishlist.`,
+      );
+    else toast.success(`${queued} wishlist items moved to download queue`);
   }
 
   async function submitUpload() {
@@ -650,101 +713,145 @@ export function DownloadPage() {
   const history =
     queue?.filter((q) => ["completed", "failed"].includes(q.status)) ?? [];
 
+  const queueReadState = acquisitionError ? (
+    <ErrorState
+      message="Could not load acquisition queue."
+      onRetry={refetchQueue}
+    />
+  ) : (
+    <LoadingState
+      label={
+        acquisitionLoading
+          ? "Loading acquisition queue"
+          : "Waiting for acquisition queue"
+      }
+    />
+  );
   return (
     <div className="space-y-6">
-      <section className="rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/12 text-primary shadow-[0_18px_40px_rgba(6,182,212,0.14)]">
-                <Download size={22} />
-              </div>
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-white">
-                  Acquisition
-                </h1>
-                <p className="text-sm text-white/55">
-                  Intake for Tidal, Soulseek and uploads into the shared Crate
-                  library.
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <CrateChip
-                className={
-                  tidalAuthenticated
-                    ? "border-green-500/25 bg-green-500/10 text-green-300"
-                    : "border-red-500/25 bg-red-500/10 text-red-300"
-                }
-              >
-                Tidal {tidalAuthenticated ? "connected" : "disconnected"}
-              </CrateChip>
-              <CrateChip
-                className={
-                  activeQueue.length > 0
-                    ? "border-blue-500/25 bg-blue-500/10 text-blue-300"
-                    : ""
-                }
-              >
-                {activeQueue.length} active
-              </CrateChip>
-              <CrateChip>{wishlist.length} wishlist</CrateChip>
-              <CrateChip>{slskDownloads.length} Soulseek downloads</CrateChip>
-            </div>
-          </div>
+      <OpsPageHero
+        title="Acquisition"
+        description="Find music, bring it into the library, and follow every import."
+      >
+        <InfoBadge tone={tidalAuthenticated ? "accent" : "warning"}>
+          {tidalAuthenticated == null
+            ? "Tidal status unavailable"
+            : `Tidal ${tidalAuthenticated ? "connected" : "disconnected"}`}
+        </InfoBadge>
+        {currentAcquisitionSurface ? (
+          <InfoBadge>
+            {activeQueue.length + slskDownloads.length} active downloads
+          </InfoBadge>
+        ) : null}
+        {wishlist.length > 0 ? (
+          <InfoBadge>{wishlist.length} wishlisted</InfoBadge>
+        ) : null}
+      </OpsPageHero>
 
-          <div className="flex flex-wrap items-center gap-2 rounded-md border border-white/8 bg-white/[0.03] p-3 xl:min-w-[520px]">
-            <div className="relative min-w-[240px] flex-1">
-              <Search
-                size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
-              />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && doSearch()}
-                placeholder="Search Tidal + Soulseek..."
-                className="h-10 rounded-md border-white/10 bg-white/[0.04] pl-9"
-              />
-            </div>
-            <Select value={quality} onValueChange={setQuality}>
-              <SelectTrigger className="w-36 rounded-md border-white/10 bg-white/[0.04]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="max">Max (HiRes)</SelectItem>
-                <SelectItem value="high">High (FLAC)</SelectItem>
-                <SelectItem value="normal">Normal</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              onClick={() => doSearch()}
-              disabled={searching || query.trim().length < 2}
-            >
-              {searching ? (
-                <Loader2 size={14} className="animate-spin mr-1" />
-              ) : (
-                <Search size={14} className="mr-1" />
-              )}
-              Search
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {suggestions.length > 0 ? (
-        <section className="rounded-md border border-white/10 bg-panel-surface/85 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.24)] backdrop-blur-xl">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold text-white">
-                Listener suggestions
-              </h2>
-              <p className="text-xs text-white/45">
-                Artist requests from Listen, ready to search and triage.
+      {acquisitionError && currentAcquisitionSurface ? (
+        <OpsRefreshNotice
+          message="Could not refresh acquisition. Showing the last successful queue."
+          onRetry={refetchQueue}
+        />
+      ) : null}
+      {suggestionsError ? (
+        <OpsRefreshNotice
+          message="Could not load listener suggestions."
+          onRetry={refetchArtistSuggestions}
+        />
+      ) : suggestionsLoading && !artistSuggestions ? (
+        <LoadingState label="Loading listener suggestions" />
+      ) : null}
+      <OpsSurface
+        as="div"
+        role="region"
+        aria-label="Music search"
+        className="overflow-hidden p-4 sm:p-6"
+      >
+        <div className="grid gap-5">
+          <header className="grid gap-2 sm:flex sm:items-end sm:justify-between sm:gap-6">
+            <div className="grid gap-2">
+              <MonoLabel as="h2" tone="accent">
+                Find music
+              </MonoLabel>
+              <p className="m-0 max-w-2xl text-sm text-text-muted">
+                Search Tidal and Soulseek together, then choose the release you
+                want to add to Crate.
               </p>
             </div>
-            <CrateChip>{suggestions.length} open</CrateChip>
+            <p className="m-0 text-xs text-text-subtle sm:max-w-xs sm:text-right">
+              Tidal searches from 2 characters. Soulseek joins at 3.
+            </p>
+          </header>
+
+          <form
+            aria-label="Acquisition search"
+            className="grid items-stretch gap-3 sm:grid-cols-[minmax(0,1fr)_auto]"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void doSearch();
+            }}
+          >
+            <SearchInput
+              label="Search music"
+              containerClassName="min-w-0"
+              value={query}
+              onValueChange={setQuery}
+              placeholder="Artist, album, or track"
+            />
+            <Button
+              type="submit"
+              disabled={searching || query.trim().length < 2}
+              className="min-w-32"
+            >
+              {searching ? (
+                <Loader2 size={14} className="mr-2 animate-spin" />
+              ) : null}
+              Search
+            </Button>
+          </form>
+
+          <div className="grid gap-4 border-t border-border-quiet pt-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+            <div className="crate-form-field">
+              <MonoLabel as="span">Download quality</MonoLabel>
+              <p className="m-0 max-w-xl text-xs text-text-subtle">
+                Used for Tidal downloads and wishlist items. Soulseek keeps the
+                quality offered by each peer.
+              </p>
+            </div>
+            <SegmentedControl
+              as="radio"
+              label="Tidal download quality"
+              value={quality}
+              onValueChange={setQuality}
+              items={[
+                { value: "max", label: "Max (HiRes)" },
+                { value: "high", label: "High (FLAC)" },
+                { value: "normal", label: "Normal" },
+              ]}
+            />
           </div>
+        </div>
+      </OpsSurface>
+
+      {suggestions.length > 0 ? (
+        <OpsSurface
+          as="div"
+          role="region"
+          aria-label="Listener suggestions"
+          className="grid gap-4 p-4 sm:p-5"
+        >
+          <header className="flex flex-wrap items-start justify-between gap-3">
+            <div className="grid gap-1">
+              <MonoLabel as="h2" tone="accent">
+                Listener suggestions
+              </MonoLabel>
+              <p className="m-0 text-sm text-text-muted">
+                Artist requests from Listen, ready to search and review.
+              </p>
+            </div>
+            <InfoBadge>{suggestions.length} open</InfoBadge>
+          </header>
           <div className="grid gap-3 xl:grid-cols-2">
             {suggestions.slice(0, 6).map((suggestion) => {
               const requester =
@@ -752,26 +859,28 @@ export function DownloadPage() {
                 suggestion.created_by_email ||
                 "Listener";
               return (
-                <div
+                <OpsSurface
+                  as="article"
+                  aria-label={`${suggestion.artist_name} artist suggestion`}
                   key={suggestion.id}
-                  className="rounded-md border border-white/8 bg-black/20 p-3"
+                  className="grid gap-3 p-3 sm:p-4"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="truncate text-sm font-semibold text-white">
+                        <h3 className="m-0 truncate text-sm font-semibold text-text-primary font-display">
                           {suggestion.artist_name}
                         </h3>
-                        <CrateChip className="text-[10px]">
+                        <InfoBadge>
                           {suggestion.supporter_count || 1} request
                           {(suggestion.supporter_count || 1) === 1 ? "" : "s"}
-                        </CrateChip>
+                        </InfoBadge>
                       </div>
-                      <p className="mt-1 text-xs text-white/45">
+                      <p className="m-0 mt-1 text-xs text-text-subtle">
                         Suggested by {requester}
                       </p>
                       {suggestion.note ? (
-                        <p className="mt-2 line-clamp-2 text-xs text-white/55">
+                        <p className="m-0 mt-2 line-clamp-2 text-sm text-text-muted">
                           {suggestion.note}
                         </p>
                       ) : null}
@@ -784,28 +893,24 @@ export function DownloadPage() {
                       />
                     ) : null}
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 border-t border-border-quiet pt-3">
                     <Button
-                      size="sm"
                       onClick={() => void searchArtistSuggestion(suggestion)}
                     >
-                      <Search size={14} />
-                      Search
+                      Search artist
                     </Button>
                     {suggestion.artist_url ? (
-                      <Button size="sm" variant="outline" asChild>
+                      <Button variant="outline" asChild>
                         <a
                           href={suggestion.artist_url}
                           target="_blank"
                           rel="noreferrer"
                         >
-                          <ExternalLink size={14} />
                           Open link
                         </a>
                       </Button>
                     ) : null}
                     <Button
-                      size="sm"
                       variant="outline"
                       onClick={() =>
                         void updateArtistSuggestionStatus(
@@ -814,15 +919,14 @@ export function DownloadPage() {
                         )
                       }
                     >
-                      <XCircle size={14} />
                       Dismiss
                     </Button>
                   </div>
-                </div>
+                </OpsSurface>
               );
             })}
           </div>
-        </section>
+        </OpsSurface>
       ) : null}
 
       {browsingArtist && (
@@ -830,7 +934,6 @@ export function DownloadPage() {
           artistId={browsingArtist.id}
           artistName={browsingArtist.name}
           artistPicture={browsingArtist.picture}
-          quality={quality}
           onBack={() => setBrowsingArtist(null)}
           onDownload={(url, title, upgradeAlbumId) =>
             startDownload(url, title, "search", upgradeAlbumId)
@@ -845,399 +948,512 @@ export function DownloadPage() {
           <TabsTrigger value="search">Search Results</TabsTrigger>
           <TabsTrigger value="upload">Upload</TabsTrigger>
           <TabsTrigger value="queue">
-            Queue{" "}
+            Queue
             {activeQueue.length + slskDownloads.length > 0 && (
-              <Badge variant="secondary" className="ml-1 text-[10px] px-1">
+              <InfoBadge variant="counter">
                 {activeQueue.length + slskDownloads.length}
-              </Badge>
+              </InfoBadge>
             )}
           </TabsTrigger>
           <TabsTrigger value="wishlist">
-            Wishlist{" "}
+            Wishlist
             {wishlist.length > 0 && (
-              <Badge variant="secondary" className="ml-1 text-[10px] px-1">
-                {wishlist.length}
-              </Badge>
+              <InfoBadge variant="counter">{wishlist.length}</InfoBadge>
             )}
           </TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
         {/* Search Results */}
-        <TabsContent value="search">
-          {/* Source sub-tabs */}
-          <div className="mt-4 mb-4 flex flex-wrap gap-2 border-b border-white/8 pb-3">
-            <CratePill
-              active={resultTab === "tidal"}
-              onClick={() => setResultTab("tidal")}
-            >
-              Tidal
-              {results && (
-                <span className="ml-1 text-white/40">
-                  {(results.albums?.length || 0) +
-                    (results.tracks?.length || 0)}
-                </span>
-              )}
-            </CratePill>
-            <CratePill
-              active={resultTab === "soulseek"}
-              onClick={() => setResultTab("soulseek")}
-            >
-              Soulseek
-              {soulseekResults && (
-                <span className="ml-1 text-white/40">
-                  {soulseekResults.length}
-                </span>
-              )}
-              {searchingSlsk && (
-                <Loader2 size={12} className="ml-1 animate-spin" />
-              )}
-            </CratePill>
-          </div>
+        <TabsContent value="search" className="mt-6">
+          <Tabs
+            value={resultTab}
+            onValueChange={(value) =>
+              setResultTab(value as "tidal" | "soulseek")
+            }
+            className="gap-5"
+          >
+            <TabsList aria-label="Search result provider">
+              <TabsTrigger value="tidal">
+                Tidal
+                {results && (
+                  <span className="ml-2 tabular-nums text-text-subtle">
+                    {(results.artists?.length || 0) +
+                      (results.albums?.length || 0) +
+                      (results.tracks?.length || 0)}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="soulseek">
+                Soulseek
+                {soulseekResults && (
+                  <span className="ml-2 tabular-nums text-text-subtle">
+                    {soulseekResults.length}
+                  </span>
+                )}
+                {searchingSlsk ? (
+                  <Loader2 size={12} className="ml-2 animate-spin" />
+                ) : null}
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Tidal results */}
-          {resultTab === "tidal" && results ? (
-            <div className="space-y-8">
-              {/* Artists */}
-              {(results.artists ?? []).length > 0 && (
-                <div>
-                  <h2 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                    <Users size={14} /> Artists
-                  </h2>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                    {results.artists!.map((artist) => (
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        key={artist.id}
-                        className="bg-card border border-border rounded-md p-4 text-center cursor-pointer hover:border-primary/40 transition-colors"
-                        onClick={() =>
-                          setBrowsingArtist({
-                            id: artist.id,
-                            name: artist.name,
-                            picture: artist.picture,
-                          })
-                        }
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            setBrowsingArtist({
-                              id: artist.id,
-                              name: artist.name,
-                              picture: artist.picture,
-                            });
-                          }
-                        }}
-                      >
-                        <div className="w-full aspect-square rounded-md mb-3 overflow-hidden bg-secondary mx-auto">
-                          {artist.picture ? (
-                            <img
-                              src={artist.picture}
-                              alt={artist.name}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display =
-                                  "none";
-                              }}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Users
-                                size={32}
-                                className="text-muted-foreground"
-                              />
+            <TabsContent value="tidal" className="mt-0">
+              {searchError ? (
+                <ErrorState
+                  message={searchError}
+                  onRetry={() => void doSearch()}
+                />
+              ) : searching ? (
+                <LoadingState label="Searching Tidal" />
+              ) : results ? (
+                <div className="space-y-8">
+                  {/* Artists */}
+                  {(results.artists ?? []).length > 0 && (
+                    <div>
+                      <MonoLabel as="h2" tone="accent" className="mb-3">
+                        Artists
+                      </MonoLabel>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                        {results.artists!.map((artist) => (
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            key={artist.id}
+                            className="group min-h-11 cursor-pointer rounded-md border border-border-quiet bg-raised-surface p-4 text-center transition-colors pointer-fine:hover:bg-accent-action/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                            onClick={() =>
+                              setBrowsingArtist({
+                                id: artist.id,
+                                name: artist.name,
+                                picture: artist.picture,
+                              })
+                            }
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                setBrowsingArtist({
+                                  id: artist.id,
+                                  name: artist.name,
+                                  picture: artist.picture,
+                                });
+                              }
+                            }}
+                          >
+                            <div className="relative mx-auto mb-3 aspect-square w-full overflow-hidden rounded-md">
+                              <span className="absolute inset-0 grid place-items-center font-mono text-xl text-text-subtle">
+                                {artist.name.slice(0, 1).toUpperCase()}
+                              </span>
+                              {artist.picture ? (
+                                <img
+                                  src={artist.picture}
+                                  alt={artist.name}
+                                  className="relative h-full w-full object-cover"
+                                  onError={(event) => {
+                                    event.currentTarget.style.display = "none";
+                                  }}
+                                />
+                              ) : null}
                             </div>
-                          )}
-                        </div>
-                        <div className="font-semibold text-sm truncate mb-1">
-                          {artist.name}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground">
-                          Click to browse albums
-                        </div>
+                            <div className="mb-1 truncate text-sm font-semibold text-text-primary group-hover:text-accent-action-hi">
+                              {artist.name}
+                            </div>
+                            <div className="text-xs text-text-muted">
+                              Click to browse albums
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  )}
+
+                  {/* Albums */}
+                  {(results.albums ?? []).length > 0 && (
+                    <div>
+                      <MonoLabel as="h2" tone="accent" className="mb-3">
+                        Albums
+                      </MonoLabel>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                        {results.albums!.map((album) => (
+                          <TidalAlbumCard
+                            key={album.id}
+                            album={album}
+                            isDownloading={activeDownloads.has(album.url)}
+                            onDownloadAlbum={() =>
+                              startDownload(
+                                album.url,
+                                `${album.artist} - ${album.title}`,
+                              )
+                            }
+                            onDownloadTrack={(trackUrl, title) =>
+                              startDownload(trackUrl, title)
+                            }
+                            onWishlist={() =>
+                              addToWishlist({
+                                url: album.url,
+                                tidal_id: album.id,
+                                title: album.title,
+                                artist: album.artist,
+                                cover_url: album.cover,
+                              })
+                            }
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tracks */}
+                  {(results.tracks ?? []).length > 0 && (
+                    <div>
+                      <MonoLabel as="h2" tone="accent" className="mb-3">
+                        Tracks
+                      </MonoLabel>
+                      <div className="space-y-1">
+                        {results.tracks!.map((track) => (
+                          <div
+                            key={track.id}
+                            className="group flex items-center gap-3 rounded-md px-3 py-2 transition-colors"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="truncate text-sm text-text-primary">
+                                {track.title}
+                              </div>
+                              <div className="truncate text-xs text-text-muted">
+                                {track.artist} — {track.album}
+                              </div>
+                            </div>
+                            <span className="text-xs text-text-muted">
+                              {fmtDuration(track.duration)}
+                            </span>
+                            <ActionIconButton
+                              title="Add to wishlist"
+                              aria-label={`Add ${track.title} to wishlist`}
+                              className="text-text-muted pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100 focus-visible:opacity-100"
+                              onClick={() =>
+                                addToWishlist({
+                                  url: track.url,
+                                  tidal_id: track.id,
+                                  title: track.title,
+                                  artist: track.artist,
+                                  content_type: "track",
+                                })
+                              }
+                            >
+                              <HeartIcon
+                                size={CRATE_ICON_SIZE.sm}
+                                aria-hidden="true"
+                              />
+                            </ActionIconButton>
+                            <ActionIconButton
+                              title="Download"
+                              aria-label={`Download ${track.title}`}
+                              className="text-text-muted"
+                              onClick={() =>
+                                startDownload(
+                                  track.url,
+                                  `${track.artist} - ${track.title}`,
+                                )
+                              }
+                            >
+                              <DownloadActionIcon
+                                size={CRATE_ICON_SIZE.sm}
+                                aria-hidden="true"
+                              />
+                            </ActionIconButton>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {!results.albums?.length &&
+                    !results.tracks?.length &&
+                    !results.artists?.length && (
+                      <div className="grid min-h-44 content-center justify-items-center gap-2 rounded-md border border-dashed border-border-quiet px-5 py-8 text-center">
+                        <MonoLabel as="span" tone="accent">
+                          No matches
+                        </MonoLabel>
+                        <p className="m-0 text-sm text-text-muted">
+                          No Tidal results for “{query.trim()}”. Try another
+                          name or search term.
+                        </p>
+                      </div>
+                    )}
+                </div>
+              ) : (
+                <div className="grid min-h-56 content-center justify-items-center gap-3 rounded-md border border-dashed border-border-quiet px-5 py-8 text-center">
+                  <MonoLabel as="span" tone="accent">
+                    Ready when you are
+                  </MonoLabel>
+                  <p className="m-0 max-w-md text-sm text-text-muted">
+                    Search by artist, album, or track. Tidal and Soulseek
+                    results will appear here under their own source.
+                  </p>
                 </div>
               )}
+            </TabsContent>
 
-              {/* Albums */}
-              {(results.albums ?? []).length > 0 && (
-                <div>
-                  <h2 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                    <Disc3 size={14} /> Albums
-                  </h2>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                    {results.albums!.map((album) => (
-                      <TidalAlbumCard
-                        key={album.id}
-                        album={album}
-                        isDownloading={activeDownloads.has(album.url)}
-                        onDownloadAlbum={() =>
-                          startDownload(
-                            album.url,
-                            `${album.artist} - ${album.title}`,
-                          )
-                        }
-                        onDownloadTrack={(trackUrl, title) =>
-                          startDownload(trackUrl, title)
-                        }
-                        onWishlist={() =>
-                          addToWishlist({
-                            url: album.url,
-                            tidal_id: album.id,
-                            title: album.title,
-                            artist: album.artist,
-                            cover_url: album.cover,
-                          })
-                        }
+            <TabsContent value="soulseek" className="mt-0">
+              <div>
+                {soulseekError ? (
+                  <ErrorState
+                    message={soulseekError}
+                    onRetry={() => void doSearch()}
+                  />
+                ) : soulseekResults && soulseekResults.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {soulseekResults.map((r) => (
+                      <SlskResultCard
+                        key={`${r.username}-${r.artist}-${r.album}-${r.totalSize}`}
+                        result={r}
+                        onDownload={() => downloadFromSoulseek(r)}
                       />
                     ))}
                   </div>
-                </div>
-              )}
-
-              {/* Tracks */}
-              {(results.tracks ?? []).length > 0 && (
-                <div>
-                  <h2 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                    <Music size={14} /> Tracks
-                  </h2>
-                  <div className="space-y-1">
-                    {results.tracks!.map((track) => (
-                      <div
-                        key={track.id}
-                        className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-secondary/30 transition-colors group"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm truncate">{track.title}</div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {track.artist} — {track.album}
-                          </div>
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          {fmtDuration(track.duration)}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 opacity-0 group-hover:opacity-100"
-                          aria-label={`Add ${track.title} to wishlist`}
-                          onClick={() =>
-                            addToWishlist({
-                              url: track.url,
-                              tidal_id: track.id,
-                              title: track.title,
-                              artist: track.artist,
-                              content_type: "track",
-                            })
-                          }
-                        >
-                          <Heart size={13} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          aria-label={`Download ${track.title}`}
-                          onClick={() =>
-                            startDownload(
-                              track.url,
-                              `${track.artist} - ${track.title}`,
-                            )
-                          }
-                        >
-                          <Download size={14} />
-                        </Button>
-                      </div>
-                    ))}
+                ) : soulseekResults && soulseekResults.length === 0 ? (
+                  <div className="text-sm text-muted-foreground py-4">
+                    No Soulseek results
                   </div>
-                </div>
-              )}
-
-              {!results.albums?.length &&
-                !results.tracks?.length &&
-                !results.artists?.length && (
-                  <div className="text-center py-12 text-muted-foreground">
-                    No results found
+                ) : searchingSlsk ? (
+                  <div className="text-center py-12">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary mx-auto" />
+                  </div>
+                ) : query.trim().length >= 2 && query.trim().length < 3 ? (
+                  <div className="grid min-h-44 content-center justify-items-center gap-2 rounded-md border border-dashed border-border-quiet px-5 py-8 text-center">
+                    <MonoLabel as="span" tone="accent">
+                      Add one more character
+                    </MonoLabel>
+                    <p className="m-0 text-sm text-text-muted">
+                      Soulseek starts searching when your query has at least 3
+                      characters.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid min-h-44 content-center justify-items-center gap-2 rounded-md border border-dashed border-border-quiet px-5 py-8 text-center">
+                    <MonoLabel as="span" tone="accent">
+                      Soulseek results
+                    </MonoLabel>
+                    <p className="m-0 text-sm text-text-muted">
+                      Search for an artist, album, or track to find available
+                      files from peers.
+                    </p>
                   </div>
                 )}
-            </div>
-          ) : resultTab === "tidal" ? (
-            <div className="text-center py-12 text-muted-foreground">
-              Search to find music on Tidal
-            </div>
-          ) : null}
-
-          {/* Soulseek Results */}
-          {resultTab === "soulseek" && (
-            <div>
-              {soulseekResults && soulseekResults.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                  {soulseekResults.map((r) => (
-                    <SlskResultCard
-                      key={`${r.username}-${r.artist}-${r.album}-${r.totalSize}`}
-                      result={r}
-                      onDownload={() => downloadFromSoulseek(r)}
-                    />
-                  ))}
-                </div>
-              ) : soulseekResults && soulseekResults.length === 0 ? (
-                <div className="text-sm text-muted-foreground py-4">
-                  No Soulseek results
-                </div>
-              ) : searchingSlsk ? (
-                <div className="text-center py-12">
-                  <Loader2 className="h-5 w-5 animate-spin text-primary mx-auto" />
-                </div>
-              ) : (
-                <div className="text-center py-12 text-muted-foreground">
-                  Search to find music on Soulseek
-                </div>
-              )}
-            </div>
-          )}
+              </div>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="upload">
-          <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="rounded-md border border-border bg-card p-5">
-              <h2 className="text-base font-semibold mb-2">
-                Upload music into the library
-              </h2>
-              <p className="text-sm text-muted-foreground mb-4">
-                Upload individual tracks or zipped albums. Crate will import
-                them into the global library and run the same enrichment
-                pipeline as any other source.
-              </p>
-              <label className="flex min-h-52 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border bg-secondary/20 px-6 py-8 text-center hover:border-primary/40 transition-colors">
-                <div className="w-12 h-12 rounded-md bg-primary/10 text-primary flex items-center justify-center mb-4">
-                  <Upload size={22} />
-                </div>
-                <div className="text-sm font-medium">
-                  Choose files or drop them here
-                </div>
-                <div className="text-xs text-muted-foreground mt-2">
-                  FLAC, MP3, AAC, WAV, OGG, OPUS, ALAC, or ZIP
-                </div>
+          <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.75fr)]">
+            <OpsSurface
+              as="article"
+              role="region"
+              aria-label="Upload music"
+              className="grid content-start gap-4 p-4 sm:p-5"
+            >
+              <header className="grid gap-2">
+                <MonoLabel as="h2" tone="accent">
+                  Add music
+                </MonoLabel>
+                <p className="m-0 max-w-2xl text-sm text-text-muted">
+                  Choose individual tracks or a ZIP album. Drop files here or
+                  browse your device.
+                </p>
+              </header>
+              <div
+                role="group"
+                aria-label="Upload music files"
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  setUploadDragActive(true);
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setUploadDragActive(true);
+                }}
+                onDragLeave={(event) => {
+                  if (event.currentTarget === event.target) {
+                    setUploadDragActive(false);
+                  }
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setUploadDragActive(false);
+                  setUploadFiles(Array.from(event.dataTransfer.files));
+                }}
+                className={`grid min-h-56 content-center justify-items-center gap-3 rounded-md border border-dashed px-5 py-8 text-center transition-colors ${
+                  uploadDragActive
+                    ? "border-accent-action bg-accent-action/[0.08]"
+                    : "border-border-quiet hover:border-accent-action/50"
+                }`}
+              >
+                <label
+                  htmlFor="acquisition-upload-files"
+                  className="cursor-pointer text-sm font-semibold text-text-primary underline decoration-border-quiet underline-offset-4 hover:text-accent-action-hi"
+                >
+                  Choose files
+                </label>
                 <input
+                  id="acquisition-upload-files"
                   type="file"
                   multiple
-                  accept=".flac,.mp3,.m4a,.ogg,.opus,.wav,.aac,.alac,.zip,audio/*,.zip"
-                  className="hidden"
-                  onChange={(e) =>
-                    setUploadFiles(Array.from(e.target.files || []))
+                  accept=".flac,.mp3,.m4a,.ogg,.opus,.wav,.aac,.alac,.zip,audio/*"
+                  aria-label="Choose music files"
+                  className="sr-only"
+                  onChange={(event) =>
+                    setUploadFiles(Array.from(event.target.files || []))
                   }
                 />
-              </label>
-              {uploadFiles.length > 0 && (
-                <div className="mt-4 rounded-md border border-border bg-secondary/10 p-4">
-                  <div className="text-sm font-medium mb-2">
-                    {uploadFiles.length} file
-                    {uploadFiles.length === 1 ? "" : "s"} ready
+                <p className="m-0 text-xs text-text-subtle">
+                  FLAC, MP3, AAC, WAV, OGG, OPUS, ALAC, or ZIP
+                </p>
+              </div>
+              {uploadFiles.length > 0 ? (
+                <div className="grid gap-3 rounded-md border border-border-quiet p-3 sm:p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <MonoLabel as="span" tone="accent">
+                      {uploadFiles.length} file
+                      {uploadFiles.length === 1 ? "" : "s"} ready to import
+                    </MonoLabel>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setUploadFiles([])}
+                    >
+                      Clear selection
+                    </Button>
                   </div>
-                  <div className="max-h-56 overflow-y-auto space-y-1">
+                  <div className="grid max-h-56 gap-1 overflow-y-auto">
                     {uploadFiles.map((file) => (
                       <div
                         key={`${file.name}-${file.size}-${file.lastModified}`}
-                        className="flex items-center gap-2 text-sm text-muted-foreground px-2 py-1.5 rounded-md hover:bg-secondary/30"
+                        className="flex min-w-0 items-center gap-3 rounded-md px-2 py-2 text-sm text-text-secondary"
                       >
-                        {file.name.toLowerCase().endsWith(".zip") ? (
-                          <Disc3 size={14} className="text-primary" />
-                        ) : (
-                          <Music size={14} className="text-primary" />
-                        )}
-                        <span className="truncate flex-1">{file.name}</span>
-                        <span className="text-[11px]">
+                        <span className="min-w-0 flex-1 truncate">
+                          {file.name}
+                        </span>
+                        <span className="shrink-0 font-mono text-xs tabular-nums text-text-subtle">
                           {Math.round((file.size / 1024 / 1024) * 10) / 10} MB
                         </span>
                       </div>
                     ))}
                   </div>
                 </div>
-              )}
-            </div>
+              ) : null}
+            </OpsSurface>
 
-            <div className="rounded-md border border-border bg-card p-5 space-y-4">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                Import behavior
-              </h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>Imports land in the shared library.</li>
-                <li>Library sync and enrichment run in the background.</li>
-                <li>
-                  The uploader gets the imported music added to their collection
-                  automatically.
-                </li>
-              </ul>
+            <OpsSurface
+              as="article"
+              aria-label="Import details"
+              className="grid content-start gap-5 p-4 sm:p-5"
+            >
+              <header className="grid gap-2">
+                <MonoLabel as="h2" tone="accent">
+                  After import
+                </MonoLabel>
+                <p className="m-0 text-sm text-text-muted">
+                  Your music joins the shared library and appears in your
+                  collection when processing finishes.
+                </p>
+              </header>
               <Button
                 onClick={submitUpload}
                 disabled={uploading || uploadFiles.length === 0}
                 className="w-full"
               >
                 {uploading ? (
-                  <Loader2 size={14} className="animate-spin mr-2" />
-                ) : (
-                  <Upload size={14} className="mr-2" />
-                )}
-                Import to library
+                  <Loader2 size={14} className="mr-2 animate-spin" />
+                ) : null}
+                Add to library
               </Button>
-              {uploadTaskId && (
-                <div className="rounded-md border border-green-500/20 bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-300">
-                  Upload queued as task{" "}
-                  <span className="font-mono">{uploadTaskId}</span>
+              {uploadTaskId ? (
+                <div
+                  role="status"
+                  className="grid gap-1 rounded-md border border-accent-action/20 bg-accent-action/10 px-3 py-3 text-sm text-accent-action-hi"
+                >
+                  <MonoLabel as="span" tone="accent">
+                    Upload queued
+                  </MonoLabel>
+                  <p className="m-0 text-xs text-text-muted">
+                    Follow its progress from the Queue tab.
+                  </p>
                 </div>
-              )}
-            </div>
+              ) : null}
+            </OpsSurface>
           </div>
         </TabsContent>
 
         {/* Queue */}
         <TabsContent value="queue">
-          <div className="mt-4 space-y-2">
-            {(slskDownloads.length > 0 || activeQueue.length > 0) && (
-              <div className="flex gap-2 mb-3">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={async () => {
-                    await api("/api/acquisition/queue/clear-completed", "POST");
-                    refetchQueue();
-                    toast.success("Cleared completed downloads");
-                  }}
-                >
-                  Clear Completed
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={async () => {
-                    await api("/api/acquisition/queue/clear-errored", "POST");
-                    refetchQueue();
-                    toast.success("Cleared errored downloads");
-                  }}
-                >
-                  Clear Errored
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={async () => {
-                    await api(
-                      "/api/acquisition/queue/cleanup-incomplete",
-                      "POST",
-                    );
-                    toast.success("Cleanup task created");
-                  }}
-                >
-                  Clean Incomplete Albums
-                </Button>
+          <section aria-label="Active downloads" className="mt-5 grid gap-4">
+            <header className="flex flex-wrap items-start justify-between gap-4">
+              <div className="grid gap-2">
+                <MonoLabel as="h2" tone="accent">
+                  Active downloads
+                </MonoLabel>
+                <p className="m-0 text-sm text-text-muted">
+                  Follow current transfers and manage work already in progress.
+                </p>
               </div>
-            )}
-            {activeQueue.length === 0 && slskDownloads.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                No active downloads
-              </div>
+              {(slskDownloads.length > 0 || activeQueue.length > 0) && (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      await api(
+                        "/api/acquisition/queue/clear-completed",
+                        "POST",
+                      );
+                      refetchQueue();
+                      toast.success("Cleared completed downloads");
+                    }}
+                  >
+                    Clear completed
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      await api("/api/acquisition/queue/clear-errored", "POST");
+                      refetchQueue();
+                      toast.success("Cleared errored downloads");
+                    }}
+                  >
+                    Clear errors
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      await api(
+                        "/api/acquisition/queue/cleanup-incomplete",
+                        "POST",
+                      );
+                      toast.success("Cleanup task created");
+                    }}
+                  >
+                    Clean incomplete albums
+                  </Button>
+                </div>
+              )}
+            </header>
+            {!currentAcquisitionSurface ? (
+              queueReadState
+            ) : activeQueue.length === 0 && slskDownloads.length === 0 ? (
+              <OpsSurface
+                role="status"
+                className="grid min-h-48 content-center justify-items-center gap-2 px-5 py-8 text-center"
+              >
+                <MonoLabel as="span" tone="accent">
+                  Queue is clear
+                </MonoLabel>
+                <p className="m-0 max-w-md text-sm text-text-muted">
+                  Downloads you start or promote from your wishlist will appear
+                  here.
+                </p>
+              </OpsSurface>
             ) : (
               <>
                 {activeQueue.map((item) => (
@@ -1245,147 +1461,225 @@ export function DownloadPage() {
                     key={item.id}
                     item={item}
                     onRemove={removeQueueItem}
+                    busy={queueBusy.has(item.id)}
                   />
                 ))}
                 {slskDownloads.map((d) => (
-                  <div
+                  <OpsSurface
+                    as="article"
+                    aria-label={`${d.artist} — ${d.album}`}
                     key={`slsk-${d.username}-${d.artist}-${d.album}-${d.filename}`}
-                    className="flex items-center gap-3 p-3 bg-card border border-border rounded-md"
+                    className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-3 py-3 sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:gap-x-4 sm:px-4"
                   >
-                    <div className="w-10 h-10 rounded bg-secondary flex items-center justify-center flex-shrink-0">
-                      <Music size={16} className="text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">
+                    <EntityAvatar
+                      name={d.album}
+                      alt=""
+                      shape="rounded"
+                      size="md"
+                    />
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-text-primary">
                         {d.filename || d.album}
                       </div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-2">
-                        <Badge className="bg-purple-500/10 text-purple-400 border-0 text-[10px] px-1 py-0">
-                          SLSK
-                        </Badge>
-                        <span>from {d.username}</span>
-                        {d.speed > 0 && (
-                          <span>{Math.round(d.speed / 1024)} KB/s</span>
-                        )}
-                        <span>{d.status}</span>
+                      <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
+                        <span className="truncate">
+                          {d.artist} · {d.album}
+                        </span>
+                        <InfoBadge tone="accent">Soulseek</InfoBadge>
+                        <span>{d.username}</span>
+                        {d.speed > 0 ? (
+                          <span className="font-mono tabular-nums">
+                            {Math.round(d.speed / 1024)} KB/s
+                          </span>
+                        ) : null}
                       </div>
-                      {d.progress > 0 && d.progress < 100 && (
-                        <div className="h-1 bg-secondary rounded-md mt-1 overflow-hidden">
+                      {d.progress > 0 && d.progress < 100 ? (
+                        <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                           <div
-                            className="h-full bg-purple-500 rounded-md transition-[width,background-color]"
-                            style={{ width: `${d.progress}%` }}
-                          />
+                            role="progressbar"
+                            aria-label={`${d.album} download progress`}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={d.progress}
+                            className="h-px overflow-hidden rounded-full bg-border-quiet"
+                          >
+                            <div
+                              className="h-full rounded-full bg-accent-action transition-[width]"
+                              style={{ width: `${d.progress}%` }}
+                            />
+                          </div>
+                          <span className="font-mono text-xs tabular-nums text-text-subtle">
+                            {d.progress}%
+                          </span>
                         </div>
+                      ) : null}
+                    </div>
+                    <div className="col-start-2 flex items-center justify-between gap-2 sm:col-start-auto sm:justify-end">
+                      <InfoBadge
+                        tone={
+                          d.status.includes("Errored") ||
+                          d.status.includes("Rejected") ||
+                          d.status.includes("Aborted")
+                            ? "warning"
+                            : d.progress >= 100
+                              ? "success"
+                              : "neutral"
+                        }
+                      >
+                        {d.status}
+                      </InfoBadge>
+
+                      {(d.status.includes("Errored") ||
+                        d.status.includes("Rejected") ||
+                        d.status.includes("Aborted")) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-shrink-0"
+                          onClick={async () => {
+                            // Parse artist from directory path (e.g. "music/D/Dredg - 2002 - El Cielo/track.flac")
+                            const path = (
+                              d.fullPath ||
+                              d.filename ||
+                              ""
+                            ).replace(/\\/g, "/");
+                            const parts = path.split("/");
+                            const dirName =
+                              parts.length >= 2 ? parts[parts.length - 2] : "";
+                            // Try to extract artist from parent dir
+                            const artistGuess =
+                              parts.length >= 3 ? parts[parts.length - 3] : "";
+                            const trackName =
+                              parts[parts.length - 1]
+                                ?.replace(/\.[^.]+$/, "")
+                                .replace(/^\d+[\s._-]*/, "") || d.filename;
+
+                            try {
+                              await api("/api/acquisition/download", "POST", {
+                                source: "soulseek",
+                                find_alternate: true,
+                                artist: d.artist || artistGuess,
+                                album: d.album || dirName,
+                                files: [
+                                  {
+                                    filename: d.fullPath || d.filename,
+                                    size: 0,
+                                  },
+                                ],
+                              });
+                              toast.success(
+                                `Searching alternate peer for: ${trackName}`,
+                              );
+                              refetchQueue();
+                            } catch {
+                              toast.error("Retry failed");
+                            }
+                          }}
+                        >
+                          {" "}
+                          Find alternate
+                        </Button>
                       )}
                     </div>
-                    {d.progress >= 100 && (
-                      <CheckCircle2
-                        size={16}
-                        className="text-green-500 flex-shrink-0"
-                      />
-                    )}
-                    {(d.status.includes("Errored") ||
-                      d.status.includes("Rejected") ||
-                      d.status.includes("Aborted")) && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-shrink-0 text-xs"
-                        onClick={async () => {
-                          // Parse artist from directory path (e.g. "music/D/Dredg - 2002 - El Cielo/track.flac")
-                          const path = (d.fullPath || d.filename || "").replace(
-                            /\\/g,
-                            "/",
-                          );
-                          const parts = path.split("/");
-                          const dirName =
-                            parts.length >= 2 ? parts[parts.length - 2] : "";
-                          // Try to extract artist from parent dir
-                          const artistGuess =
-                            parts.length >= 3 ? parts[parts.length - 3] : "";
-                          const trackName =
-                            parts[parts.length - 1]
-                              ?.replace(/\.[^.]+$/, "")
-                              .replace(/^\d+[\s._-]*/, "") || d.filename;
-
-                          try {
-                            await api("/api/acquisition/download", "POST", {
-                              source: "soulseek",
-                              find_alternate: true,
-                              artist: d.artist || artistGuess,
-                              album: d.album || dirName,
-                              files: [
-                                { filename: d.fullPath || d.filename, size: 0 },
-                              ],
-                            });
-                            toast.success(
-                              `Searching alternate peer for: ${trackName}`,
-                            );
-                            refetchQueue();
-                          } catch {
-                            toast.error("Retry failed");
-                          }
-                        }}
-                      >
-                        <RotateCcw size={12} className="mr-1" /> Find alternate
-                      </Button>
-                    )}
-                  </div>
+                  </OpsSurface>
                 ))}
               </>
             )}
-          </div>
+          </section>
         </TabsContent>
 
         {/* Wishlist */}
         <TabsContent value="wishlist">
-          <div className="mt-4 space-y-2">
-            {wishlist.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                Wishlist is empty
+          <section aria-label="Download wishlist" className="mt-5 grid gap-4">
+            <header className="flex flex-wrap items-start justify-between gap-4">
+              <div className="grid gap-2">
+                <MonoLabel as="h2" tone="accent">
+                  Wishlist
+                </MonoLabel>
+                <p className="m-0 text-sm text-text-muted">
+                  Save releases to download later, or send the whole list to the
+                  queue.
+                </p>
               </div>
+              {wishlist.length > 0 ? (
+                <Button
+                  onClick={() => void promoteAllWishlist()}
+                  disabled={queueBusy.size > 0}
+                  aria-busy={queueBusy.size > 0}
+                >
+                  Download all ({wishlist.length})
+                </Button>
+              ) : null}
+            </header>
+            {!currentAcquisitionSurface ? (
+              queueReadState
+            ) : wishlist.length === 0 ? (
+              <OpsSurface
+                role="status"
+                className="grid min-h-48 content-center justify-items-center gap-2 px-5 py-8 text-center"
+              >
+                <MonoLabel as="span" tone="accent">
+                  Wishlist is empty
+                </MonoLabel>
+                <p className="m-0 max-w-md text-sm text-text-muted">
+                  Save an album from Tidal search results and it will be ready
+                  here when you are.
+                </p>
+              </OpsSurface>
             ) : (
-              <>
-                <div className="flex justify-end mb-2">
-                  <Button
-                    size="sm"
-                    onClick={() =>
-                      wishlist.forEach((w) => promoteWishlist(w.id))
-                    }
-                  >
-                    <Download size={14} className="mr-1" /> Download All
-                  </Button>
-                </div>
+              <div className="grid gap-3">
                 {wishlist.map((item) => (
                   <QueueRow
                     key={item.id}
                     item={item}
                     onRemove={removeQueueItem}
+                    busy={queueBusy.has(item.id)}
                     onPromote={promoteWishlist}
                   />
                 ))}
-              </>
+              </div>
             )}
-          </div>
+          </section>
         </TabsContent>
 
         {/* History */}
         <TabsContent value="history">
-          <div className="mt-4 space-y-2">
-            {history.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                No download history
-              </div>
+          <section aria-label="Download history" className="mt-5 grid gap-4">
+            <header className="grid gap-2">
+              <MonoLabel as="h2" tone="accent">
+                Download history
+              </MonoLabel>
+              <p className="m-0 text-sm text-text-muted">
+                Check completed downloads and anything that needs another try.
+              </p>
+            </header>
+            {!currentAcquisitionSurface ? (
+              queueReadState
+            ) : history.length === 0 ? (
+              <OpsSurface
+                role="status"
+                className="grid min-h-48 content-center justify-items-center gap-2 px-5 py-8 text-center"
+              >
+                <MonoLabel as="span" tone="accent">
+                  Nothing here yet
+                </MonoLabel>
+                <p className="m-0 max-w-md text-sm text-text-muted">
+                  Finished and unsuccessful downloads will be listed here.
+                </p>
+              </OpsSurface>
             ) : (
-              history.map((item) => (
-                <QueueRow
-                  key={item.id}
-                  item={item}
-                  onRemove={removeQueueItem}
-                />
-              ))
+              <div className="grid gap-3">
+                {history.map((item) => (
+                  <QueueRow
+                    key={item.id}
+                    item={item}
+                    onRemove={removeQueueItem}
+                    busy={queueBusy.has(item.id)}
+                  />
+                ))}
+              </div>
             )}
-          </div>
+          </section>
         </TabsContent>
       </Tabs>
     </div>
@@ -1396,71 +1690,66 @@ function QueueRow({
   item,
   onRemove,
   onPromote,
+  busy = false,
 }: {
   item: QueueItem;
+  busy?: boolean;
   onRemove: (id: number) => void;
   onPromote?: (id: number) => void;
 }) {
-  const Icon = STATUS_ICONS[item.status] || Clock;
-  const color = STATUS_COLORS[item.status] || "text-muted-foreground";
-  const isSpinning =
-    item.status === "downloading" || item.status === "processing";
+  const statusTone =
+    item.status === "completed" || item.status === "wishlist"
+      ? "accent"
+      : item.status === "failed"
+        ? "warning"
+        : "neutral";
 
   return (
-    <div className="flex items-center gap-3 rounded-md border border-white/10 bg-panel-surface px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.16)]">
-      <Icon
-        size={16}
-        className={`${color} ${isSpinning ? "animate-spin" : ""} flex-shrink-0`}
+    <OpsSurface
+      as="article"
+      aria-label={item.title}
+      className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-3 py-3 sm:grid-cols-[3rem_minmax(0,1fr)_auto] sm:gap-x-4 sm:px-4"
+    >
+      <EntityAvatar
+        src={item.cover_url}
+        name={item.title}
+        alt=""
+        shape="rounded"
+        size="md"
       />
-      {item.cover_url && (
-        <img
-          src={item.cover_url}
-          alt=""
-          className="h-11 w-11 flex-shrink-0 rounded-md object-cover shadow-[0_12px_26px_rgba(0,0,0,0.18)]"
-        />
-      )}
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium truncate">{item.title}</div>
-        <div className="text-xs text-muted-foreground truncate">
-          {item.artist && `${item.artist} · `}
-          {item.source} · {item.quality}
+      <div className="min-w-0">
+        <div className="truncate text-sm font-semibold text-text-primary">
+          {item.title}
+        </div>
+        <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
+          {item.artist ? <span className="truncate">{item.artist}</span> : null}
+          <span>{item.source}</span>
+          <span className="font-mono text-text-subtle">{item.quality}</span>
         </div>
       </div>
-      <CrateChip
-        className={
-          item.status === "completed"
-            ? "border-green-500/25 bg-green-500/10 text-green-300"
-            : item.status === "failed"
-              ? "border-red-500/25 bg-red-500/10 text-red-300"
-              : item.status === "wishlist"
-                ? "border-pink-500/25 bg-pink-500/10 text-pink-300"
-                : ""
-        }
-      >
-        {item.status}
-      </CrateChip>
-      {onPromote && item.status === "wishlist" && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          aria-label="Download now"
-          onClick={() => onPromote(item.id)}
-          title="Download now"
-        >
-          <ArrowUp size={14} />
-        </Button>
-      )}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-7 w-7 text-muted-foreground hover:text-destructive"
-        aria-label="Remove download"
-        onClick={() => onRemove(item.id)}
-      >
-        <Trash2 size={12} />
-      </Button>
-    </div>
+      <div className="col-start-2 flex items-center justify-between gap-2 sm:col-start-auto sm:justify-end">
+        <InfoBadge tone={statusTone}>{item.status}</InfoBadge>
+        <div className="flex items-center gap-1">
+          {onPromote && item.status === "wishlist" ? (
+            <ActionIconButton
+              title={`Download ${item.title} now`}
+              disabled={busy}
+              aria-busy={busy || undefined}
+              onClick={() => onPromote(item.id)}
+            >
+              <ArrowUp size={15} aria-hidden="true" />
+            </ActionIconButton>
+          ) : null}
+          <ActionIconButton
+            title={`Remove ${item.title} from acquisition`}
+            disabled={busy}
+            onClick={() => onRemove(item.id)}
+          >
+            <Trash2 size={15} aria-hidden="true" />
+          </ActionIconButton>
+        </div>
+      </div>
+    </OpsSurface>
   );
 }
 
@@ -1487,8 +1776,6 @@ function TidalArtistBrowser({
   artistId,
   artistName,
   artistPicture,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  quality: _quality,
   onBack,
   onDownload,
   onWishlist,
@@ -1497,7 +1784,6 @@ function TidalArtistBrowser({
   artistId: string;
   artistName: string;
   artistPicture: string | null;
-  quality: string;
   onBack: () => void;
   onDownload: (url: string, title: string, upgradeAlbumId?: number) => void;
   onWishlist: (item: {
@@ -1509,7 +1795,7 @@ function TidalArtistBrowser({
   }) => void;
   activeDownloads: Set<string>;
 }) {
-  const { data, loading } = useApi<{
+  const { data, loading, error, refetch } = useApi<{
     albums: TidalArtistAlbum[];
     artist_name: string;
   }>(`/api/tidal/artists/${artistId}/albums`);
@@ -1519,35 +1805,48 @@ function TidalArtistBrowser({
   const availableCount = albums.filter((a) => a.status === "available").length;
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft size={14} className="mr-1" /> Back
+    <section aria-label={`${artistName} Tidal albums`} className="grid gap-4">
+      {error && data ? (
+        <OpsRefreshNotice
+          message="Could not refresh artist albums. Showing the last successful list."
+          onRetry={refetch}
+        />
+      ) : null}
+      <OpsSurface
+        as="div"
+        className="flex flex-wrap items-center gap-3 p-3 sm:p-4"
+      >
+        <Button variant="outline" onClick={onBack}>
+          <ArrowLeft size={14} aria-hidden="true" />
+          Back to results
         </Button>
-        {artistPicture && (
+        {artistPicture ? (
           <img
             src={artistPicture}
-            alt={artistName}
-            className="w-12 h-12 rounded-md object-cover"
+            alt=""
+            className="h-12 w-12 rounded-md border border-border-quiet object-cover"
           />
-        )}
-        <div>
-          <h2 className="text-lg font-semibold">{artistName}</h2>
-          <div className="flex gap-2 text-xs text-muted-foreground">
-            <span>{albums.length} albums on Tidal</span>
-            {localCount > 0 && (
-              <span className="text-green-400">{localCount} in library</span>
-            )}
-            {availableCount > 0 && (
-              <span className="text-primary">{availableCount} available</span>
-            )}
-          </div>
+        ) : null}
+        <div className="min-w-0 flex-1">
+          <MonoLabel as="h2" tone="accent">
+            {artistName} on Tidal
+          </MonoLabel>
+          <p className="m-0 mt-1 text-sm text-text-muted">
+            Browse releases and compare them with your local library.
+          </p>
         </div>
-        {availableCount > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {data ? <InfoBadge>{albums.length} albums</InfoBadge> : null}
+          {localCount > 0 ? (
+            <InfoBadge tone="accent">{localCount} in library</InfoBadge>
+          ) : null}
+          {availableCount > 0 ? (
+            <InfoBadge tone="neutral">{availableCount} to add</InfoBadge>
+          ) : null}
+        </div>
+        {availableCount > 0 ? (
           <Button
-            size="sm"
-            className="ml-auto"
+            className="w-full sm:ml-auto sm:w-auto"
             onClick={() => {
               for (const album of albums) {
                 if (album.status === "available") {
@@ -1556,22 +1855,40 @@ function TidalArtistBrowser({
               }
             }}
           >
-            <Download size={12} className="mr-1" /> Download all missing (
-            {availableCount})
+            Download {availableCount} missing album
+            {availableCount === 1 ? "" : "s"}
           </Button>
-        )}
-      </div>
+        ) : null}
+      </OpsSurface>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 size={20} className="animate-spin text-primary" />
-        </div>
+      {error && !data ? (
+        <ErrorState
+          message="Could not load Tidal artist albums."
+          onRetry={refetch}
+        />
+      ) : loading && !data ? (
+        <OpsSurface
+          role="status"
+          className="grid min-h-48 place-items-center px-4 py-8 text-center"
+        >
+          <MonoLabel as="span" tone="accent">
+            Loading {artistName} albums
+          </MonoLabel>
+        </OpsSurface>
       ) : albums.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          No albums found on Tidal
-        </div>
+        <OpsSurface
+          role="status"
+          className="grid min-h-48 place-items-center gap-2 px-4 py-8 text-center"
+        >
+          <MonoLabel as="span" tone="accent">
+            No Tidal albums found
+          </MonoLabel>
+          <p className="m-0 text-sm text-text-muted">
+            Try another artist or return to your search results.
+          </p>
+        </OpsSurface>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {albums.map((album) => (
             <TidalAlbumCard
               key={album.id}
@@ -1600,7 +1917,7 @@ function TidalArtistBrowser({
           ))}
         </div>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -1636,6 +1953,7 @@ function TidalAlbumCard({
   const [open, setOpen] = useState(false);
   const [tracks, setTracks] = useState<TidalTrackItem[] | null>(null);
   const [loadingTracks, setLoadingTracks] = useState(false);
+  const [tracksError, setTracksError] = useState<string | null>(null);
   const isLocal = status === "local";
   const tidalTier = qualityTier(album.quality);
   const localTier = localQuality ? localQualityTier(localQuality) : 0;
@@ -1646,13 +1964,14 @@ function TidalAlbumCard({
     setOpen(true);
     if (!tracks) {
       setLoadingTracks(true);
+      setTracksError(null);
       try {
         const data = await api<{ tracks: TidalTrackItem[] }>(
           `/api/tidal/albums/${album.id}/tracks`,
         );
         setTracks(data.tracks);
       } catch {
-        setTracks([]);
+        setTracksError("Could not load album tracks.");
       } finally {
         setLoadingTracks(false);
       }
@@ -1661,16 +1980,14 @@ function TidalAlbumCard({
 
   return (
     <>
-      <div
-        className={`bg-card border rounded-md overflow-hidden group transition-colors ${
-          isLocal && !hasUpgrade
-            ? "border-green-500/20 opacity-50"
-            : isLocal && hasUpgrade
-              ? "border-amber-500/30"
-              : "border-border hover:border-primary/40"
+      <OpsSurface
+        as="article"
+        aria-label={`${album.title} Tidal album`}
+        className={`overflow-hidden p-0 ${
+          isLocal && hasUpgrade ? "border-state-warning/40" : ""
         }`}
       >
-        <div className="w-full aspect-square bg-secondary relative">
+        <div className="relative aspect-square w-full">
           {album.cover ? (
             <img
               src={album.cover}
@@ -1681,110 +1998,95 @@ function TidalAlbumCard({
               }}
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Disc3 size={32} className="text-muted-foreground" />
+            <div className="grid h-full w-full place-items-center font-mono text-2xl text-text-subtle">
+              {album.title.slice(0, 1).toUpperCase()}
             </div>
           )}
-          {isLocal && !hasUpgrade && (
-            <div className="absolute top-2 right-2">
-              <Badge className="bg-green-500/90 text-white text-[10px] px-1.5 py-0">
-                <CheckCircle2 size={10} className="mr-0.5" /> In library
-              </Badge>
-            </div>
-          )}
-          {hasUpgrade && (
-            <div className="absolute top-2 right-2">
-              <Badge className="bg-amber-500/90 text-white text-[10px] px-1.5 py-0">
-                <ArrowUp size={10} className="mr-0.5" /> Upgrade available
-              </Badge>
-            </div>
-          )}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-            <Button
-              size="icon"
-              className="h-9 w-9 rounded-full bg-white text-black shadow-lg"
-              onClick={onDownloadAlbum}
-              title={hasUpgrade ? "Download upgrade" : "Download album"}
-            >
-              {isDownloading ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Download size={16} />
-              )}
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9 rounded-full text-white hover:text-primary bg-white/10"
-              onClick={openTracklist}
-              title="View tracks"
-            >
-              <List size={16} />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-9 w-9 rounded-full text-white hover:text-pink-400 bg-white/10"
-              onClick={onWishlist}
-              title="Wishlist"
-            >
-              <Heart size={16} />
-            </Button>
-          </div>
         </div>
-        <div className="p-2.5">
-          <div className="font-medium text-sm truncate">{album.title}</div>
-          <div className="text-xs text-muted-foreground truncate">
-            {album.artist}
+        <div className="grid gap-3 p-3">
+          <div className="min-w-0">
+            <h3 className="m-0 truncate text-sm font-semibold text-text-primary font-display">
+              {album.title}
+            </h3>
+            <p className="m-0 mt-1 truncate text-xs text-text-muted">
+              {album.artist}
+            </p>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 mt-1">
-            {album.year && (
-              <span className="text-[10px] text-muted-foreground">
-                {album.year}
-              </span>
-            )}
-            <span className="text-[10px] text-muted-foreground">
-              {album.tracks} tracks
-            </span>
-            {(album as any).type && (album as any).type !== "ALBUM" && (
-              <Badge variant="outline" className="text-[9px] px-1 py-0">
-                {(album as any).type}
-              </Badge>
-            )}
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            {album.year ? <InfoBadge>{album.year}</InfoBadge> : null}
+            <InfoBadge>{album.tracks} tracks</InfoBadge>
+            {album.type && album.type !== "ALBUM" ? (
+              <InfoBadge>{album.type}</InfoBadge>
+            ) : null}
+            {isLocal && !hasUpgrade ? (
+              <InfoBadge tone="accent">In library</InfoBadge>
+            ) : null}
+            {hasUpgrade ? (
+              <InfoBadge tone="warning">Upgrade available</InfoBadge>
+            ) : null}
             {normalizedQuality.map((q) => (
-              <span
+              <InfoBadge
                 key={q.label}
-                className={`inline-flex items-center rounded-md border px-1.5 py-0 text-[9px] font-medium leading-relaxed ${
-                  q.tier === "hi-res"
-                    ? "border-amber-400/50 text-amber-300 bg-amber-400/10"
-                    : q.tier === "lossless"
-                      ? "border-cyan-400/40 text-cyan-300 bg-cyan-400/8"
-                      : q.tier === "high"
-                        ? "border-primary/30 text-primary/70"
-                        : "border-white/15 text-muted-foreground"
-                }`}
+                tone={
+                  q.tier === "hi-res" || q.tier === "lossless"
+                    ? "accent"
+                    : q.tier === "high"
+                      ? "info"
+                      : "neutral"
+                }
               >
                 {q.label}
-              </span>
+              </InfoBadge>
             ))}
           </div>
+          <div className="grid grid-cols-2 gap-2 border-t border-border-quiet pt-3">
+            <Button
+              className="col-span-2 w-full"
+              onClick={onDownloadAlbum}
+              disabled={isDownloading || (isLocal && !hasUpgrade)}
+            >
+              {isDownloading
+                ? "Download queued"
+                : hasUpgrade
+                  ? "Get upgrade"
+                  : isLocal
+                    ? "In library"
+                    : "Download album"}
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full px-2 text-xs"
+              onClick={openTracklist}
+            >
+              View tracks
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full px-2 text-xs"
+              onClick={onWishlist}
+            >
+              Wishlist
+            </Button>
+          </div>
         </div>
-      </div>
+      </OpsSurface>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg" aria-describedby={undefined}>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader>
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               {album.cover && (
                 <img
                   src={album.cover}
                   alt=""
-                  className="w-12 h-12 rounded object-cover"
+                  className="h-12 w-12 rounded-md object-cover"
                 />
               )}
-              <div>
-                <DialogTitle>{album.title}</DialogTitle>
-                <p className="text-sm text-muted-foreground">
+              <div className="min-w-0">
+                <DialogTitle className="truncate font-display">
+                  {album.title}
+                </DialogTitle>
+                <p className="m-0 text-sm text-text-muted">
                   {album.artist} {album.year && `(${album.year})`}
                 </p>
               </div>
@@ -1798,6 +2100,11 @@ function TidalAlbumCard({
                   className="animate-spin text-muted-foreground"
                 />
               </div>
+            ) : tracksError ? (
+              <ErrorState
+                message={tracksError}
+                onRetry={() => void openTracklist()}
+              />
             ) : !tracks?.length ? (
               <div className="text-sm text-muted-foreground py-4 text-center">
                 No tracks found
@@ -1807,7 +2114,7 @@ function TidalAlbumCard({
                 {tracks.map((t) => (
                   <div
                     key={t.id}
-                    className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-secondary/50 group/track"
+                    className="flex items-center gap-2 py-1.5 px-2 rounded  group/track"
                   >
                     <span className="text-[11px] text-muted-foreground w-5 text-right font-mono">
                       {t.track_number}
@@ -1816,39 +2123,34 @@ function TidalAlbumCard({
                     <span className="text-[11px] text-muted-foreground">
                       {fmtDuration(t.duration)}
                     </span>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7 opacity-0 group-hover/track:opacity-100 transition-opacity"
+                    <ActionIconButton
                       onClick={() =>
                         onDownloadTrack(t.url, `${t.artist} - ${t.title}`)
                       }
-                      title="Download track"
+                      title="Download"
+                      aria-label={`Download ${t.title}`}
                     >
-                      <Download size={12} />
-                    </Button>
+                      <DownloadActionIcon
+                        size={CRATE_ICON_SIZE.sm}
+                        aria-hidden="true"
+                      />
+                    </ActionIconButton>
                   </div>
                 ))}
               </div>
             )}
-            <div className="flex gap-2 mt-4 pt-3 border-t border-border">
+            <div className="grid gap-2 border-t border-border-quiet pt-3 sm:grid-cols-2">
               <Button
-                size="sm"
                 onClick={() => {
                   onDownloadAlbum();
                   setOpen(false);
                 }}
-                className="flex-1"
+                disabled={isDownloading || (isLocal && !hasUpgrade)}
               >
-                {isDownloading ? (
-                  <Loader2 size={13} className="animate-spin mr-1.5" />
-                ) : (
-                  <Download size={13} className="mr-1.5" />
-                )}
-                Download full album
+                {isDownloading ? "Download queued" : "Download full album"}
               </Button>
-              <Button size="sm" variant="outline" onClick={onWishlist}>
-                <Heart size={13} className="mr-1.5" /> Wishlist
+              <Button variant="outline" onClick={onWishlist}>
+                Add to wishlist
               </Button>
             </div>
           </div>
@@ -1872,7 +2174,7 @@ function SlskResultCard({
 
   return (
     <>
-      <div className="bg-card border border-border rounded-md overflow-hidden hover:border-primary/30 transition-colors group">
+      <article className="group overflow-hidden rounded-md border border-border-quiet bg-surface-object transition-colors hover:border-accent-action/30">
         <div className="flex gap-3 p-3">
           <div className="w-14 h-14 rounded bg-secondary flex-shrink-0 overflow-hidden relative">
             {cover ? (
@@ -1882,17 +2184,19 @@ function SlskResultCard({
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <Disc3 size={20} className="text-muted-foreground" />
+              <div className="flex h-full w-full items-center justify-center">
+                <span className="font-display text-2xl font-semibold text-text-subtle">
+                  {r.album.slice(0, 1).toUpperCase()}
+                </span>
               </div>
             )}
-            <button
+            <ActionIconButton
               onClick={() => setOpen(true)}
-              className="absolute inset-0 bg-black/0 hover:bg-black/50 transition-colors flex items-center justify-center opacity-0 hover:opacity-100"
               title="View files"
+              className="absolute bottom-1 right-1 transition-opacity pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100 focus-visible:opacity-100"
             >
-              <List size={14} className="text-white" />
-            </button>
+              <List size={14} aria-hidden="true" />
+            </ActionIconButton>
           </div>
           <div className="min-w-0 flex-1 space-y-1.5">
             <div>
@@ -1902,56 +2206,39 @@ function SlskResultCard({
               </div>
             </div>
             <div className="flex flex-wrap gap-1">
-              <span
-                className={`inline-flex items-center rounded-md border px-1.5 py-0 text-[10px] font-medium leading-relaxed ${
-                  r.quality.toLowerCase().includes("flac 24")
-                    ? "border-amber-400/50 text-amber-300 bg-amber-400/10"
-                    : r.quality.toLowerCase().includes("flac")
-                      ? "border-cyan-400/40 text-cyan-300 bg-cyan-400/8"
-                      : "border-white/15 text-muted-foreground"
-                }`}
+              <InfoBadge
+                tone={
+                  r.quality.toLowerCase().includes("flac")
+                    ? "accent"
+                    : "neutral"
+                }
               >
                 {r.quality}
-              </span>
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                {r.files.length} tracks
-              </Badge>
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                {Math.round(r.totalSize / 1048576)} MB
-              </Badge>
-              {r.freeSlot && (
-                <Badge className="bg-green-500/10 text-green-400 border-green-500/20 text-[10px] px-1.5 py-0">
-                  <Zap size={8} className="mr-0.5" /> Free
-                </Badge>
-              )}
+              </InfoBadge>
+              <InfoBadge>{r.files.length} tracks</InfoBadge>
+              <InfoBadge>{Math.round(r.totalSize / 1048576)} MB</InfoBadge>
+              {r.freeSlot && <InfoBadge tone="success">Free slot</InfoBadge>}
             </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                <Users size={10} />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-text-muted">
                 <span className="font-mono">{r.username}</span>
-                <span className="text-white/20">|</span>
-                <Gauge size={10} />
+                <span aria-hidden="true">·</span>
                 <span>
                   {r.speed > 1048576
                     ? `${(r.speed / 1048576).toFixed(1)} MB/s`
                     : `${Math.round(r.speed / 1024)} KB/s`}
                 </span>
               </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={onDownload}
-              >
-                <Download size={12} className="mr-1" /> Get
+              <Button size="sm" variant="outline" onClick={onDownload}>
+                Download
               </Button>
             </div>
           </div>
         </div>
-      </div>
+      </article>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent>
           <DialogHeader>
             <div className="flex items-center gap-3">
               {cover ? (
@@ -1961,25 +2248,23 @@ function SlskResultCard({
                   className="w-12 h-12 rounded object-cover"
                 />
               ) : (
-                <div className="w-12 h-12 rounded bg-secondary flex items-center justify-center">
-                  <Disc3 size={20} className="text-muted-foreground" />
+                <div className="flex h-12 w-12 items-center justify-center rounded font-display text-xl font-semibold text-text-subtle">
+                  {r.album.slice(0, 1).toUpperCase()}
                 </div>
               )}
               <div>
-                <DialogTitle>{r.album}</DialogTitle>
+                <DialogTitle className="font-display">{r.album}</DialogTitle>
                 <p className="text-sm text-muted-foreground">{r.artist}</p>
                 <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
-                  <span
-                    className={`inline-flex items-center rounded-md border px-1.5 py-0 text-[10px] font-medium leading-relaxed ${
-                      r.quality.toLowerCase().includes("flac 24")
-                        ? "border-amber-400/50 text-amber-300 bg-amber-400/10"
-                        : r.quality.toLowerCase().includes("flac")
-                          ? "border-cyan-400/40 text-cyan-300 bg-cyan-400/8"
-                          : "border-white/15 text-muted-foreground"
-                    }`}
+                  <InfoBadge
+                    tone={
+                      r.quality.toLowerCase().includes("flac")
+                        ? "accent"
+                        : "neutral"
+                    }
                   >
                     {r.quality}
-                  </span>
+                  </InfoBadge>
                   <span>{Math.round(r.totalSize / 1048576)} MB</span>
                   <span>from {r.username}</span>
                   <span>
@@ -1998,7 +2283,7 @@ function SlskResultCard({
               return (
                 <div
                   key={`${f.filename}-${f.size}-${f.length}`}
-                  className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-secondary/50"
+                  className="flex items-center gap-2 py-1.5 px-2 rounded "
                 >
                   <span className="text-[11px] text-muted-foreground w-5 text-right font-mono">
                     {i + 1}
@@ -2023,8 +2308,8 @@ function SlskResultCard({
               }}
               className="w-full"
             >
-              <Download size={13} className="mr-1.5" /> Download all{" "}
-              {r.files.length} files from {r.username}
+              {" "}
+              Download all {r.files.length} files from {r.username}
             </Button>
           </div>
         </DialogContent>

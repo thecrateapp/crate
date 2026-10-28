@@ -1,8 +1,4 @@
-import type {
-  StatsTape,
-  StatsTapeMonth,
-  StatsTapePeak,
-} from "@/components/stats/stats-model";
+import type { StatsTape, StatsTapeMonth, StatsTapePeak } from "./stats-types";
 
 export const TAPE_WIDTH = 1000;
 export const TAPE_HEIGHT = 220;
@@ -173,4 +169,20 @@ export function tapeIndexAt(
     count - 1,
     Math.max(0, Math.floor((offsetX / width) * count)),
   );
+}
+
+/**
+ * Year that `music_age.share_this_year` measures: the backend uses the
+ * period's last day, `min(end - 1 day, today)`, and the tape `end` is
+ * exclusive and never later than tomorrow on rolling windows.
+ */
+export function musicAgeShareYear(
+  tape: Pick<StatsTape, "end"> | null | undefined,
+  fallbackYear: number,
+): number {
+  if (!tape?.end) return fallbackYear;
+  const lastDay = Date.parse(`${tape.end}T00:00:00Z`) - 86_400_000;
+  return Number.isNaN(lastDay)
+    ? fallbackYear
+    : new Date(lastDay).getUTCFullYear();
 }

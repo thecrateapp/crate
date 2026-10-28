@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -204,7 +210,7 @@ describe("PermissionPicker", () => {
     ).not.toBeChecked();
   });
 
-  it("shows grouped checkboxes with ids only in the title when Custom is chosen", async () => {
+  it("shows grouped checkboxes with scope ids in keyboard-accessible tooltips", async () => {
     const user = userEvent.setup();
     render(
       <PermissionPicker
@@ -221,7 +227,13 @@ describe("PermissionPicker", () => {
       within(showsGroup).getByText("Read upcoming shows"),
     ).toBeInTheDocument();
     expect(screen.queryByText("curation.shows.read")).not.toBeInTheDocument();
-    expect(screen.getByTitle("curation.shows.read")).toBeInTheDocument();
+    const scope = screen.getByRole("checkbox", { name: "Read upcoming shows" });
+    expect(scope).not.toHaveAttribute("title");
+    fireEvent.keyDown(document, { key: "Tab" });
+    scope.focus();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "curation.shows.read",
+    );
   });
 
   it("disables a preset that needs a permission the caller lacks", () => {
@@ -322,11 +334,13 @@ describe("PermissionPicker", () => {
     );
 
     const other = screen.getByRole("group", { name: "Other" });
-    expect(within(other).getByText("Unknown permission")).toHaveAttribute(
-      "title",
+    const unknown = within(other).getByText("Unknown permission");
+    expect(unknown).not.toHaveAttribute("title");
+    unknown.focus();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
       "ops.future.read",
     );
-    expect(screen.queryByText("ops.future.read")).not.toBeInTheDocument();
+    expect(other).not.toHaveTextContent("ops.future.read");
     await user.click(
       within(other).getByRole("button", { name: "Remove unknown permission" }),
     );
@@ -497,6 +511,9 @@ describe("ConnectAgentDialog", () => {
       />,
     );
 
+    expect(
+      screen.getByLabelText("Name").closest("[data-slot=form-field]"),
+    ).not.toBeNull();
     expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
     await user.type(screen.getByLabelText("Name"), "   ");
     expect(screen.getByRole("button", { name: "Next" })).toBeDisabled();
@@ -687,5 +704,98 @@ describe("ConnectAgentDialog", () => {
     ).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByLabelText("Name")).toHaveValue("Retry this proposal");
+  });
+});
+
+describe("Crate Agent presets", () => {
+  const crateAgentScopes = [
+    "library.health.read",
+    "ops.status.read",
+    "ops.jobs.read",
+    "ops.logs.read",
+    "ops.audit.read",
+    "ops.schedules.read",
+    "ops.runtime.read",
+  ];
+  const agentCatalog: AgentCatalog = {
+    ...catalog,
+    presets: [
+      ...catalog.presets,
+      {
+        id: "crate_agent",
+        label: "Crate Agent (read only)",
+        description:
+          "Exactly what Crate Agent uses: health, status, jobs, logs, audit, schedules and runtime policy. Cannot change anything.",
+        scopes: crateAgentScopes,
+      },
+      {
+        id: "crate_operator",
+        label: "Crate Operator",
+        description:
+          "Exactly what Crate Operator tools need, including reviewed changes. Requires actions to be enabled and human approval.",
+        scopes: [
+          ...crateAgentScopes,
+          "library.repair.run",
+          "curation.shows.read",
+          "curation.shows.write",
+          "editorial.read",
+          "editorial.publish",
+        ],
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    apiMock.mockReset();
+  });
+
+  it("creates a connection with exactly the Crate Agent grants", async () => {
+    const user = userEvent.setup();
+    apiMock.mockResolvedValue({
+      token: "crate_mcp_visible-once",
+      credential_id: "credential-1",
+      expires_at: "2030-01-01T00:00:00Z",
+    });
+    render(
+      <ConnectAgentDialog
+        open
+        onOpenChange={vi.fn()}
+        catalog={agentCatalog}
+        onCreated={vi.fn()}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("Name"), "Crate Agent");
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await user.click(
+      screen.getByRole("radio", { name: "Crate Agent (read only)" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Create connection" }));
+
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        "/api/admin/agent-integrations",
+        "POST",
+        expect.objectContaining({ grants: crateAgentScopes }),
+      ),
+    );
+  });
+
+  it("keeps the existing default and disables Crate Operator without every permission", () => {
+    render(
+      <PermissionPicker
+        catalog={agentCatalog}
+        value={readOnlyPreset.scopes}
+        onChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("radio", { name: "Read only" })).toBeChecked();
+    expect(
+      screen.getByRole("radio", { name: "Crate Agent (read only)" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("radio", { name: "Crate Operator" }),
+    ).toBeDisabled();
   });
 });

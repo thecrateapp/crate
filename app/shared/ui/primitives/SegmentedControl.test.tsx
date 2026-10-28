@@ -88,37 +88,31 @@ describe("SegmentedControl", () => {
     );
   });
 
-  it("applies variants and sizes", () => {
+  it("preserves variants and sizes while sharing the chip recipe", () => {
     render(<Harness variant="tonal" size="sm" />);
     const selected = screen.getByRole("tab", { name: "Albums" });
-    expect(selected).toHaveClass("bg-accent-action/12", "h-7");
+    expect(screen.getByRole("tablist")).toHaveAttribute(
+      "data-variant",
+      "tonal",
+    );
+    expect(screen.getByRole("tablist")).toHaveAttribute("data-size", "sm");
+    expect(selected).toHaveClass("crate-form-chip");
+    expect(selected).toHaveAttribute("data-slot", "chip");
   });
 
-  it("draws an offset 2px focus ring that stays visible on the selected pill", () => {
+  it("uses the global outline without hiding focus on the selected pill", () => {
     render(<Harness />);
     for (const tab of screen.getAllByRole("tab")) {
-      expect(tab).toHaveClass(
-        "outline-none",
-        "focus-visible:outline-solid",
-        "focus-visible:outline-2",
-        "focus-visible:outline-offset-2",
-        "focus-visible:outline-focus-ring",
-      );
-      expect(tab).not.toHaveClass("focus-visible:shadow-focus");
+      expect(tab).toHaveClass("rounded-full");
+      expect(tab).not.toHaveClass("outline-none");
     }
   });
 
-  it("extends the hit area to 44px on coarse pointers without changing visual size", () => {
+  it("uses the shared chip geometry for compact controls too", () => {
     render(<Harness size="sm" />);
     for (const tab of screen.getAllByRole("tab")) {
-      expect(tab).toHaveClass(
-        "relative",
-        "h-7",
-        "after:absolute",
-        "after:h-11",
-        "after:-translate-y-1/2",
-        "pointer-fine:after:hidden",
-      );
+      expect(tab).toHaveClass("crate-form-chip");
+      expect(tab).toHaveAttribute("data-slot", "chip");
     }
   });
 
@@ -127,5 +121,21 @@ describe("SegmentedControl", () => {
     render(<Harness onChange={onChange} />);
     await userEvent.click(screen.getByRole("tab", { name: "Albums" }));
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps radio semantics and keyboard callbacks with chip styling", async () => {
+    const onChange = vi.fn();
+    render(<Harness as="radio" onChange={onChange} />);
+    const albums = screen.getByRole("radio", { name: "Albums" });
+    expect(albums).toHaveClass("crate-form-chip");
+    await userEvent.click(albums);
+    await userEvent.keyboard("{ArrowDown}");
+    const tracks = screen.getByRole("radio", { name: "Tracks" });
+    expect(tracks).toHaveFocus();
+    expect(tracks).toHaveAttribute("aria-checked", "true");
+    expect(tracks).not.toHaveAttribute("aria-pressed");
+    expect(onChange).toHaveBeenCalledOnce();
+    expect(onChange).toHaveBeenCalledWith("tracks");
+    expect(screen.getByRole("radio", { name: "Artists" })).toBeDisabled();
   });
 });

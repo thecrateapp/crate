@@ -34,6 +34,50 @@ const replay: ReplayMix = {
 };
 
 describe("HomeReplaySection", () => {
+  it("retains track quality and analysis in the Crate DNA rows", () => {
+    const items = replay.items.map((item) => ({
+      ...item,
+      format: "flac",
+      sample_rate: 96000,
+      bit_depth: 24,
+      duration: 236,
+      bpm: 99,
+      audio_key: "C",
+      audio_scale: "major",
+    }));
+    renderWithListenProviders(
+      <HomeReplaySection
+        replay={replay}
+        replayPreview={items}
+        onOpenStats={vi.fn()}
+        onPlayReplay={vi.fn()}
+        onPlayTrack={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Hi-Res 24/96")).toBeInTheDocument();
+    expect(screen.getByText("99")).toBeInTheDocument();
+  });
+
+  it("uses the canonical Card surface and StatNumber metrics", () => {
+    const { container } = renderWithListenProviders(
+      <HomeReplaySection
+        replay={replay}
+        replayPreview={replay.items}
+        onOpenStats={vi.fn()}
+        onPlayReplay={vi.fn()}
+        onPlayTrack={vi.fn()}
+      />,
+    );
+    expect(container.querySelectorAll('[data-slot="card"]')).toHaveLength(2);
+    expect(screen.getByText("1")).toHaveClass(
+      "font-display",
+      "text-numeral-md",
+    );
+    expect(screen.getByText("Replay June 2026")).toHaveClass(
+      "crate-mono-label",
+      "uppercase",
+    );
+  });
   it("presents the monthly replay as Crate DNA", () => {
     const { container } = renderWithListenProviders(
       <HomeReplaySection
@@ -46,13 +90,21 @@ describe("HomeReplaySection", () => {
     );
 
     expect(screen.getAllByText("Crate DNA")).toHaveLength(1);
-    expect(screen.getByText("Open Crate DNA")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Open Crate DNA" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Replay June 2026")).toBeInTheDocument();
     expect(screen.getByText("Play month replay")).toBeInTheDocument();
     expect(screen.getByText("Month replay")).toBeInTheDocument();
-    expect(screen.getByText("Tracks")).toBeInTheDocument();
-    expect(container.querySelector(".home-replay-card")).toBeInTheDocument();
-    expect(container.querySelector(".home-replay-panel")).toBeInTheDocument();
+    expect(
+      screen.getByText("Tracks", { selector: "span.font-mono" }),
+    ).toHaveClass("font-mono", "uppercase", "text-label");
+    expect(
+      container.querySelector('[data-home-slot="dna-summary"]'),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-home-slot="dna-tracks"]'),
+    ).toBeInTheDocument();
     expect(container.querySelector(".stats-mini-tape")).not.toBeInTheDocument();
   });
 
@@ -90,7 +142,9 @@ describe("HomeReplaySection", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("4,143")).toBeInTheDocument();
     expect(screen.getByText("1,384")).toBeInTheDocument();
-    expect(screen.getByText("artists")).toBeInTheDocument();
+    expect(
+      screen.getByText("artists", { selector: "span.font-mono" }),
+    ).toBeInTheDocument();
     expect(container.querySelector(".stats-mini-tape svg rect")).not.toBeNull();
   });
 

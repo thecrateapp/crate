@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from crate.db.orm.library import LibraryAlbum, LibraryArtist, LibraryTrack
 from crate.db.tx import read_scope
+from crate.smart_mix.versions import ANALYZER_VERSION, PROFILE_SCHEMA_VERSION
 
 
 def get_artist_analysis_tracks(
@@ -17,7 +18,8 @@ def get_artist_analysis_tracks(
             s.execute(
                 text(
                     """
-                SELECT t.title,
+                SELECT t.id AS track_id, t.entity_uid::text AS track_entity_uid,
+                       t.album_id, t.title, t.analysis_state, t.analysis_completed_at,
                        t.bpm AS tempo,
                        t.audio_key AS key,
                        t.audio_scale AS scale,
@@ -29,13 +31,81 @@ def get_artist_analysis_tracks(
                        t.loudness,
                        t.dynamic_range,
                        t.spectral_complexity,
-                       t.mood_json
+                       t.mood_json,
+                       CASE WHEN mp.track_id IS NOT NULL THEN jsonb_build_object(
+                           'profile_version', mp.profile_version,
+                           'profile_revision', mp.profile_revision,
+                           'analyzer', mp.analyzer,
+                           'analyzer_version', mp.analyzer_version,
+                           'source_revision', mp.source_revision,
+                           'quality', mp.quality,
+                           'is_current_full_profile',
+                               mp.quality = 'full'
+                               AND mp.profile_version = :mix_profile_version
+                               AND mp.analyzer_version = :mix_analyzer_version
+                               AND mp.source_stale_at IS NULL,
+                           'analyzed_at', mp.analyzed_at,
+                           'source_stale_at', mp.source_stale_at,
+                           'duration_ms', mp.duration_ms,
+                           'integrated_lufs', mp.integrated_lufs,
+                           'measurement_version', mp.measurement_version,
+                           'true_peak_dbfs', mp.true_peak_dbfs,
+                           'intro_lufs', mp.intro_lufs,
+                           'outro_lufs', mp.outro_lufs,
+                           'bpm', mp.bpm,
+                           'bpm_confidence', mp.bpm_confidence,
+                           'tempo_stability', mp.tempo_stability,
+                           'beat_anchor_ms', mp.beat_anchor_ms,
+                           'downbeat_anchor_ms', mp.downbeat_anchor_ms,
+                           'time_signature', mp.time_signature,
+                           'beat_grid_format', mp.beat_grid_format,
+                           'key_confidence', mp.key_confidence,
+                           'intro_cue_ms', mp.intro_cue_ms,
+                           'outro_cue_ms', mp.outro_cue_ms,
+                           'active_start_ms', mp.active_start_ms,
+                           'active_end_ms', mp.active_end_ms,
+                           'intro_bpm', mp.intro_bpm,
+                           'outro_bpm', mp.outro_bpm,
+                           'intro_beat_ms', mp.intro_beat_ms,
+                           'outro_beat_ms', mp.outro_beat_ms,
+                           'intro_tempo_stability', mp.intro_tempo_stability,
+                           'outro_tempo_stability', mp.outro_tempo_stability,
+                           'intro_downbeat_ms', mp.intro_downbeat_ms,
+                           'outro_downbeat_ms', mp.outro_downbeat_ms,
+                           'intro_energy', mp.intro_energy,
+                           'outro_energy', mp.outro_energy,
+                           'intro_spectral_density', mp.intro_spectral_density,
+                           'outro_spectral_density', mp.outro_spectral_density,
+                           'global_energy', mp.global_energy,
+                           'danceability', mp.danceability,
+                           'valence', mp.valence,
+                           'bliss_vector_revision', mp.bliss_vector_revision,
+                           'key', mp.audio_key, 'scale', mp.audio_scale,
+                           'camelot', mp.key_camelot,
+                           'status', CASE WHEN mp.source_stale_at IS NULL
+                               THEN 'available' ELSE 'source_changed' END
+                       ) END AS smart_mix,
+                       jsonb_build_object(
+                           'available', t.bliss_vector IS NOT NULL
+                               AND cardinality(t.bliss_vector) > 0,
+                           'dimensions', cardinality(t.bliss_vector),
+                           'state', t.bliss_state,
+                           'computed_at', t.bliss_computed_at,
+                           'revision', mp.bliss_vector_revision,
+                           'revision_source', 'mix_profile'
+                       ) AS bliss
                 FROM library_tracks t
                 JOIN library_albums a ON t.album_id = a.id
-                WHERE a.artist = :artist_name AND t.bpm IS NOT NULL
+                LEFT JOIN track_mix_profiles mp ON mp.track_id = t.id
+                WHERE a.artist = :artist_name
+                ORDER BY t.id
                 """
                 ),
-                {"artist_name": artist_name},
+                {
+                    "artist_name": artist_name,
+                    "mix_profile_version": PROFILE_SCHEMA_VERSION,
+                    "mix_analyzer_version": ANALYZER_VERSION,
+                },
             )
             .mappings()
             .all()
@@ -148,6 +218,15 @@ def enrich_track_refs(
                     LibraryTrack.id.label("track_id"),
                     LibraryTrack.entity_uid.label("track_entity_uid"),
                     LibraryTrack.slug.label("track_slug"),
+                    LibraryTrack.path.label("track_path"),
+                    LibraryTrack.duration,
+                    LibraryTrack.format,
+                    LibraryTrack.bitrate,
+                    LibraryTrack.sample_rate,
+                    LibraryTrack.bit_depth,
+                    LibraryTrack.bpm,
+                    LibraryTrack.audio_key,
+                    LibraryTrack.audio_scale,
                     LibraryAlbum.id.label("album_id"),
                     LibraryAlbum.entity_uid.label("album_entity_uid"),
                     LibraryAlbum.slug.label("album_slug"),

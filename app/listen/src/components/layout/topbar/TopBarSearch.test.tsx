@@ -86,6 +86,7 @@ describe("TopBarSearch", () => {
 
     await waitFor(() => {
       expect(searchButton.getAttribute("aria-expanded")).toBe("false");
+      expect(document.activeElement).toBe(searchButton);
     });
   });
 
@@ -112,51 +113,14 @@ describe("TopBarSearch", () => {
     ).toBeInTheDocument();
   });
 
-  it("uses the shared glass surface for the mobile search shell", () => {
-    mockHoverPointer(false);
+  it("uses canonical solid SearchInput geometry on mobile and desktop", async () => {
+    const user = userEvent.setup();
     renderWithListenProviders(<TopBarSearch />);
-
-    const searchButton = screen.getByRole("button", { name: "Search" });
-
-    expect(searchButton.closest(".listen-glass-panel")).toBeInTheDocument();
-  });
-
-  it("keeps the desktop search shell on the non-glass main style", () => {
-    mockHoverPointer(true);
-    renderWithListenProviders(<TopBarSearch />);
-
-    const searchButton = screen.getByRole("button", { name: "Search" });
-    const searchShell = searchButton.parentElement?.parentElement;
-
-    expect(searchShell).toBeInTheDocument();
-    expect(searchShell).toHaveClass("bg-transparent", "border-0");
-    expect(searchShell).not.toHaveClass(
-      "listen-glass-panel",
-      "listen-search-glass",
-    );
-  });
-
-  it("keeps the collapsed desktop search trigger fully transparent", async () => {
-    mockHoverPointer(true);
-    renderWithListenProviders(<TopBarSearch />);
-
-    const searchButton = screen.getByRole("button", { name: "Search" });
-    const searchShell = searchButton.closest('div[data-state="closed"]');
-
-    await waitFor(() => {
-      expect(searchShell).toHaveClass(
-        "border-0",
-        "bg-transparent",
-        "shadow-none",
-        "backdrop-blur-0",
-      );
-      expect(searchButton).toHaveClass(
-        "border-0",
-        "bg-transparent",
-        "shadow-none",
-        "backdrop-blur-0",
-      );
-    });
+    await user.click(screen.getByRole("button", { name: "Search" }));
+    expect(screen.getByRole("combobox")).toHaveClass("crate-form-control");
+    expect(
+      screen.getByRole("combobox").closest(".listen-glass-panel"),
+    ).toBeNull();
   });
 
   it("opens on hover and collapses again when idle", async () => {
@@ -210,16 +174,6 @@ describe("TopBarSearch", () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(input);
     });
-  });
-
-  it("shows a token focus ring around the search shell", () => {
-    renderWithListenProviders(<TopBarSearch />);
-
-    const searchButton = screen.getByRole("button", { name: "Search" });
-
-    expect(searchButton.closest("div[data-state]")).toHaveClass(
-      "focus-within:shadow-focus",
-    );
   });
 
   it("collapses when focus tabs away with an empty query", async () => {
@@ -307,9 +261,23 @@ describe("TopBarSearch", () => {
 
     expect(screen.getByText("High Vis")).toHaveClass("text-text-primary/80");
     expect(screen.getByText("High Vis").closest(".z-app-dropdown")).toHaveClass(
-      "listen-glass-panel",
-      "rounded-panel",
+      "crate-overlay-surface",
+      "bg-surface-popover",
     );
+    const viewAll = screen.getByRole("button", {
+      name: 'View all results for "high"',
+    });
+    expect(screen.getByText("View All")).toHaveClass(
+      "font-mono",
+      "uppercase",
+      "text-accent-action-hi",
+    );
+    expect(viewAll.querySelector(".crate-status-dot")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    fireEvent.click(viewAll);
+    expect(navigateMock).toHaveBeenCalledWith("/search?q=high");
   });
 
   it("labels canonical results that are only available remotely", async () => {
@@ -437,7 +405,7 @@ describe("TopBarSearch", () => {
     expect(screen.queryByText("No music found")).not.toBeInTheDocument();
   });
 
-  it("does not show the empty state before the current query completes", async () => {
+  it("names a pending global search without showing a premature empty state", async () => {
     vi.useFakeTimers();
     vi.mocked(api).mockReturnValue(new Promise(() => {}));
     mockSearchBoxRect();
@@ -450,6 +418,12 @@ describe("TopBarSearch", () => {
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: "high" } });
 
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(
+      screen.getByRole("status", { name: "Finding your music..." }),
+    ).toBeInTheDocument();
     expect(screen.queryByText("No music found")).not.toBeInTheDocument();
   });
 
@@ -533,5 +507,60 @@ describe("TopBarSearch", () => {
     expect(
       localStorage.getItem(TOP_BAR_SEARCH_RECENTS_STORAGE_KEY),
     ).not.toBeNull();
+  });
+  it("stops showing a pending search as busy once IME composition starts", async () => {
+    vi.useFakeTimers();
+    vi.mocked(api).mockReturnValue(new Promise(() => {}));
+    renderWithListenProviders(<TopBarSearch />);
+    const input = screen.getByPlaceholderText(
+      "Search artists, albums, tracks...",
+    );
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "high" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(input).toHaveAttribute("aria-busy", "true");
+
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: "high v" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(input).toHaveAttribute("aria-busy", "false");
+  });
+
+  it("defers API search during IME composition and exposes the active option", async () => {
+    vi.useFakeTimers();
+    mockSearchBoxRect();
+    vi.mocked(api).mockResolvedValue({
+      artists: [{ id: 52, slug: "high-vis", name: "High Vis" }],
+      albums: [],
+      tracks: [],
+    });
+    renderWithListenProviders(<TopBarSearch />);
+    const input = screen.getByPlaceholderText(
+      "Search artists, albums, tracks...",
+    );
+    fireEvent.focus(input);
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: "high" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(api).not.toHaveBeenCalled();
+    fireEvent.compositionEnd(input);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(input).toHaveAttribute("role", "combobox");
+    const option = screen.getByRole("option", { name: /High Vis/ });
+    expect(input).toHaveAttribute("aria-activedescendant", option.id);
+    expect(input).toHaveAttribute(
+      "aria-controls",
+      screen.getByRole("listbox").id,
+    );
   });
 });

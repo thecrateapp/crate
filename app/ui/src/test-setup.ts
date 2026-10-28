@@ -68,3 +68,25 @@ if (typeof globalThis.ResizeObserver === "undefined") {
     configurable: true,
   });
 }
+
+// The shared Select uses Radix pointer capture and scroll focus APIs absent in jsdom.
+import { installRadixElementPolyfills } from "./test/radix-element-polyfills";
+installRadixElementPolyfills();
+
+// Browser media-query hooks are used by the shared entity and action components.
+if (typeof window.matchMedia !== "function") {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    writable: true,
+    value: (query: string): MediaQueryList => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener() {},
+      removeListener() {},
+      addEventListener() {},
+      removeEventListener() {},
+      dispatchEvent: () => true,
+    }),
+  });
+}

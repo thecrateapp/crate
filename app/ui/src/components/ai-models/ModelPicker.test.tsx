@@ -64,7 +64,7 @@ describe("ModelPicker", () => {
       screen.getByText("Couldn't load this connection's models."),
     ).toBeVisible();
     expect(document.body.textContent).not.toContain("Internal Server Error");
-    expect(screen.getByRole("button", { name: "Model" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Model" })).toBeDisabled();
     expect(onModelResolved).not.toHaveBeenCalled();
   });
 });

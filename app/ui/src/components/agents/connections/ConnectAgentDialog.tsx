@@ -1,3 +1,4 @@
+import { FormField } from "@crate/ui/primitives/FormField";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { Button } from "@crate/ui/shadcn/button";
@@ -112,23 +113,21 @@ export function ConnectAgentDialog({
     <Dialog open={open} onOpenChange={requestOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Connect your agent</DialogTitle>
+          <DialogTitle className="font-display">Connect your agent</DialogTitle>
           <DialogDescription>Step {step} of 3</DialogDescription>
         </DialogHeader>
 
         {step === 1 ? (
           <form onSubmit={goToPermissions} className="space-y-4">
-            <label className="grid gap-1 text-sm">
-              Name
+            <FormField label="Name">
               <Input
                 required
                 maxLength={120}
                 value={name}
                 onChange={(event) => setName(event.target.value)}
               />
-            </label>
-            <div className="space-y-1.5">
-              <p className="text-sm font-medium">Token lifetime</p>
+            </FormField>
+            <FormField label="Token lifetime" kind="group">
               <SegmentedControl
                 as="radio"
                 label="Token lifetime"
@@ -136,7 +135,7 @@ export function ConnectAgentDialog({
                 value={lifetime}
                 onValueChange={setLifetime}
               />
-            </div>
+            </FormField>
             <div className="flex justify-end">
               <Button type="submit" disabled={!name.trim()}>
                 Next
@@ -153,21 +152,19 @@ export function ConnectAgentDialog({
               onChange={setGrants}
               disabled={busy}
             />
-            <div className="space-y-1.5">
-              <label className="flex items-center gap-2 text-sm">
-                <Switch
-                  checked={requireApproval}
-                  onCheckedChange={setRequireApproval}
-                  disabled={busy}
-                />
-                Require approval before changes
-              </label>
-              <p className="text-sm text-muted-foreground">
-                High-risk and whole-library changes always need approval.
-              </p>
-            </div>
+            <FormField
+              label="Require approval before changes"
+              hint="High-risk and whole-library changes always need approval."
+              layout="inline"
+            >
+              <Switch
+                checked={requireApproval}
+                onCheckedChange={setRequireApproval}
+                disabled={busy}
+              />
+            </FormField>
             {error ? (
-              <p role="alert" className="text-destructive">
+              <p role="alert" className="text-state-warning-text">
                 {error}
               </p>
             ) : null}
@@ -189,7 +186,7 @@ export function ConnectAgentDialog({
 
         {step === 3 && secret ? (
           <div className="space-y-4">
-            <p className="text-sm text-destructive">
+            <p className="text-sm text-state-warning-text">
               This token is shown only once. Copy it now.
             </p>
             <div className="flex items-center gap-2">

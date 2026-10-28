@@ -55,6 +55,26 @@ function renderDisc(props: Partial<Parameters<typeof SpinningDisc>[0]> = {}) {
 }
 
 describe("SpinningDisc", () => {
+  it.each([
+    [true, false, false, "beatmatch"],
+    [false, false, false, undefined],
+    [true, true, false, undefined],
+    [true, false, true, undefined],
+  ] as const)(
+    "only lights the actual mix ring while playing=%s buffering=%s disabled=%s",
+    (isPlaying, isBuffering, disabled, expected) => {
+      const { surface } = renderDisc({
+        isPlaying,
+        isBuffering,
+        disabled,
+        mixTone: "beatmatch",
+      });
+      const ring = surface.querySelector(".spinning-disc-overlay")!;
+      if (expected) expect(ring).toHaveAttribute("data-mix-tone", expected);
+      else expect(ring).not.toHaveAttribute("data-mix-tone");
+    },
+  );
+
   let now = 1000;
 
   beforeEach(() => {

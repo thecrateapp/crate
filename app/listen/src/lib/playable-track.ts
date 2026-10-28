@@ -1,3 +1,4 @@
+import { normalizeTrackBitrate } from "./track-media-metadata";
 import type { Track } from "@/contexts/player-types";
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
 
@@ -224,7 +225,7 @@ export function toPlayableTrack(
     path: input.path ?? input.track_path ?? undefined,
     libraryTrackId: getPlayableTrackLibraryId(input),
     format: input.format ?? undefined,
-    bitrate: input.bitrate ?? null,
+    bitrate: normalizeTrackBitrate(input.bitrate),
     sampleRate: input.sampleRate ?? input.sample_rate ?? null,
     bitDepth: input.bitDepth ?? input.bit_depth ?? null,
     bpm: input.bpm ?? null,

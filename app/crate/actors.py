@@ -122,10 +122,17 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "global_catalog_reconcile_full": TaskPoolConfig("maintenance", 3, 14400, 0),
     "reset_enrichment": TaskPoolConfig("fast", 1, 120, 0),
     "refresh_user_listening_stats": TaskPoolConfig("fast", 1, 300, 0),
+    "refresh_dirty_listening_stats": TaskPoolConfig("fast", 1, 120, 0),
+    # Idempotent rebuilds from user_track_daily; one retry keeps the days of a
+    # transient failure, since the task params are their only record.
+    "rebuild_instance_listening_days": TaskPoolConfig("fast", 1, 300, 1),
+    "backfill_instance_listening_rollups": TaskPoolConfig("maintenance", 3, 600, 1),
     "refresh_home_discovery_snapshot": TaskPoolConfig("fast", 1, 120, 1),
     "refresh_user_stats_dashboard_snapshot": TaskPoolConfig("fast", 1, 300, 1),
     "refresh_instance_stats_dashboard_snapshot": TaskPoolConfig("fast", 1, 600, 1),
+    "refresh_collection_insights": TaskPoolConfig("maintenance", 2, 600, 1),
     "refresh_probable_setlist": TaskPoolConfig("fast", 1, 180, 3),
+    "refresh_show_probable_setlists": TaskPoolConfig("fast", 1, 300, 1),
     "generate_cast_spectrum": TaskPoolConfig("heavy", 1, 1200, 2),
     # New content processing (priority 1)
     "process_new_content": TaskPoolConfig("default", 1, 14400, 0),
@@ -843,12 +850,6 @@ def _execute_task(task_type: str, task_id: str):
             except Exception:
                 log.debug("Metrics recording failed", exc_info=True)
             try:
-                from crate.telegram import notify_task_failed
-
-                notify_task_failed(task_type, task_id, error[:300])
-            except Exception:
-                log.debug("Telegram notification failed", exc_info=True)
-            try:
                 from crate.db.events import _publish_to_redis
 
                 _publish_to_redis(
@@ -877,12 +878,6 @@ def _execute_task(task_type: str, task_id: str):
                 )
             except Exception:
                 log.debug("Metrics recording failed", exc_info=True)
-            try:
-                from crate.telegram import notify_task_completed
-
-                notify_task_completed(task_type, task_id, result)
-            except Exception:
-                log.debug("Telegram notification failed", exc_info=True)
             try:
                 from crate.db.events import _publish_to_redis
 
@@ -930,12 +925,6 @@ def _execute_task(task_type: str, task_id: str):
                 _try_fan_in_parent(task, task_type, task_id)
         except Exception:
             log.error("Could not mark task %s as failed", task_id)
-        try:
-            from crate.telegram import notify_task_failed
-
-            notify_task_failed(task_type, task_id, str(e)[:300])
-        except Exception:
-            log.debug("Telegram notification failed", exc_info=True)
         try:
             from crate.db.events import _publish_to_redis
 

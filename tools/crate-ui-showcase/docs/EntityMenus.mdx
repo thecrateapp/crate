@@ -1,0 +1,30 @@
+import { Meta, Canvas } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/EntityMenus.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">Entity menus</DocHeading>
+<EntryDetails
+  id="domain-actions-itemactionmenu"
+  review="Web closure · awaiting review"
+/>
+<EntryDetails
+  id="domain-actions-mobileactionsheet"
+  review="Web closure · awaiting review"
+/>
+<EntryDetails
+  id="domain-entity-useentitymenu"
+  review="Web closure · awaiting review"
+/>
+
+<DocHeading as="h2">Contract</DocHeading>
+
+Entity menu controller and native trigger, ItemActionMenu renderer, and MobileActionSheet. Fine-pointer desktop menus and touch sheets preserve disabled/danger actions, keyboard opening, focus return, long labels and dismissal. The app retains action authority. Standalone touch-sheet fixture uses the real sheet.
+
+The approved mockup and Diego's later amendments are the visual reference. This entry documents actual existing components; native device, assistive technology and complete consumer certification remain separate. No production requests, credentials or persistent preference writes occur here.
+
+<Canvas of={Stories.Base} />
+<Canvas of={Stories.LongLabels} />
+<Canvas of={Stories.Disabled} />
+<Canvas of={Stories.TouchSheet} />

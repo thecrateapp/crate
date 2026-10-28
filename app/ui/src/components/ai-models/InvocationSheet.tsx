@@ -104,7 +104,7 @@ export function InvocationSheet({
           </dl>
 
           <section className="space-y-1">
-            <h3 className="font-semibold text-white/80">Tokens</h3>
+            <h3 className="font-semibold text-white/80 font-display">Tokens</h3>
             <dl>
               <Field label="Input">{tokens(invocation.input_tokens)}</Field>
               <Field label="Cached input">

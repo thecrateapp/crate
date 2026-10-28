@@ -118,6 +118,27 @@ def test_unknown_windows_are_rejected(pg_db):
         get_user_stats_dashboard(1, window="year:1900")
 
 
+def test_music_age_reports_newest_and_current_year_share(history):
+    music_age = _dashboard("year:2024")["music_age"]
+
+    assert music_age["newest_album"]["year"] == 2024
+    assert music_age["newest_album"]["album_id"] and music_age["newest_album"]["album"]
+    assert music_age["oldest_album"]["year"] <= music_age["newest_album"]["year"]
+    assert 0 < music_age["share_this_year"] <= 1
+
+    rolling = _dashboard("365d")["music_age"]
+    assert rolling["newest_album"]["year"] == 2024
+    # No release in the library is from the period's last year (2026).
+    assert rolling["share_this_year"] == 0
+
+
+def test_heatmap_exposes_night_hours(history):
+    heatmap = _dashboard("365d")["heatmap"]
+
+    assert heatmap["night_hours"] == [22, 23, 0, 1, 2, 3, 4, 5]
+    assert heatmap["listener_count"] is None
+
+
 def test_artist_rank_needs_enough_listeners(pg_db):
     from sqlalchemy import text
 
@@ -172,3 +193,389 @@ def _seed_artist_listeners(*, listeners: list[int], artist: str) -> None:
                 ),
                 {"u": 100 + index, "artist": artist, "plays": plays},
             )
+
+
+def test_overview_previous_totals_match_daily_rows(history):
+    from sqlalchemy import text
+
+    from crate.db.queries.user_stats_periods import (
+        previous_window,
+        resolve_stats_period,
+    )
+    from crate.db.tx import read_scope
+
+    payload = _dashboard("30d")
+    previous = payload["overview"]["previous"]
+    period = resolve_stats_period("UTC", window="30d")
+    start, end = previous_window(period)
+    assert (previous["start"], previous["end"]) == (start.isoformat(), end.isoformat())
+
+    with read_scope() as session:
+        row = session.execute(
+            text(
+                "SELECT COALESCE(SUM(minutes_listened), 0) AS minutes,"
+                " COALESCE(SUM(play_count), 0) AS plays,"
+                " COUNT(DISTINCT day) AS days FROM user_daily_listening"
+                " WHERE user_id = 1 AND day BETWEEN :s AND :e"
+            ),
+            {"s": start, "e": end},
+        ).one()
+        artists = session.execute(
+            text(
+                "SELECT COUNT(DISTINCT artist) FROM user_track_daily"
+                " WHERE user_id = 1 AND artist != '' AND day BETWEEN :s AND :e"
+            ),
+            {"s": start, "e": end},
+        ).scalar_one()
+    assert row.plays > 0
+    assert previous["play_count"] == row.plays
+    assert previous["minutes_listened"] == pytest.approx(row.minutes)
+    assert previous["active_days"] == row.days
+    assert previous["artist_count"] == artists
+
+
+def test_overview_previous_is_absent_for_all_time(history):
+    assert _dashboard("all_time")["overview"]["previous"] is None
+
+
+def _play_new_track_yesterday() -> None:
+    from sqlalchemy import text
+
+    from crate.db.repositories.library_album_upserts import upsert_album
+    from crate.db.repositories.library_artist_upserts import upsert_artist
+    from crate.db.repositories.library_track_upserts import upsert_track
+    from crate.db.tx import transaction_scope
+
+    upsert_artist({"name": "Fresh Face"})
+    album_id = upsert_album(
+        {
+            "artist": "Fresh Face",
+            "name": "Fresh Record",
+            "path": "/music/Fresh Face/Fresh Record",
+            "year": "2026",
+            "genre": "Shoegaze",
+        }
+    )
+    upsert_track(
+        {
+            "album_id": album_id,
+            "artist": "Fresh Face",
+            "album": "Fresh Record",
+            "filename": "01.flac",
+            "title": "Fresh Song",
+            "track_number": 1,
+            "format": "flac",
+            "genre": "Shoegaze",
+            "year": "2026",
+            "duration": 200.0,
+            "path": "/music/Fresh Face/Fresh Record/01.flac",
+        }
+    )
+    ended = datetime.now(timezone.utc) - timedelta(hours=26)
+    with transaction_scope() as session:
+        track_id = session.execute(
+            text("SELECT id FROM library_tracks WHERE title = 'Fresh Song'")
+        ).scalar_one()
+        for index in range(40):
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_play_events (
+                        user_id, client_event_id, track_id, track_entity_uid,
+                        track_path, title, artist, album, started_at, ended_at,
+                        played_seconds, track_duration_seconds, completion_ratio,
+                        was_skipped, was_completed, play_source_type, device_type,
+                        app_platform, created_at
+                    )
+                    SELECT 1, 'fresh-' || :i, lt.id, lt.entity_uid, lt.path,
+                           lt.title, lt.artist, lt.album,
+                           CAST(:ended AS timestamptz) - interval '200 seconds',
+                           CAST(:ended AS timestamptz), 200, 200, 1, false, true,
+                           'album', 'web', 'listen-web', CAST(:ended AS timestamptz)
+                    FROM library_tracks lt WHERE lt.id = :track_id
+                    """
+                ),
+                {"i": index, "ended": ended, "track_id": track_id},
+            )
+
+
+def test_top_items_flag_entities_first_heard_in_period(history):
+    _play_new_track_yesterday()
+    recompute_user_listening_aggregates(1)
+
+    payload = _dashboard("30d")
+
+    tracks = {item["title"]: item["is_new"] for item in payload["top_tracks"]["items"]}
+    artists = {
+        item["artist_name"]: item["is_new"] for item in payload["top_artists"]["items"]
+    }
+    albums = {item["album"]: item["is_new"] for item in payload["top_albums"]["items"]}
+    assert tracks["Fresh Song"] is True
+    assert artists["Fresh Face"] is True
+    assert albums["Fresh Record"] is True
+    older = [name for name in artists if name != "Fresh Face"]
+    assert older and not any(artists[name] for name in older)
+    assert not any(is_new for title, is_new in tracks.items() if title != "Fresh Song")
+
+    year = datetime.now(timezone.utc).year
+    year_items = _dashboard(f"year:{year}")["top_artists"]["items"]
+    assert year_items and all("is_new" in item for item in year_items)
+
+
+def test_all_time_marks_nothing_new(history):
+    _play_new_track_yesterday()
+    recompute_user_listening_aggregates(1)
+
+    payload = _dashboard("all_time")
+
+    items = (
+        payload["top_tracks"]["items"]
+        + payload["top_artists"]["items"]
+        + payload["top_albums"]["items"]
+    )
+    assert items and all(item["is_new"] is False for item in items)
+
+
+def test_audio_profile_previous_uses_previous_window(history):
+    from sqlalchemy import text
+
+    from crate.db.queries.user_stats_periods import (
+        previous_window,
+        resolve_stats_period,
+    )
+    from crate.db.tx import read_scope
+
+    payload = _dashboard("30d")
+    previous = payload["story"]["audio_profile_previous"]
+    period = resolve_stats_period("UTC", window="30d")
+    first, last = previous_window(period)
+    with read_scope() as session:
+        expected = session.execute(
+            text(
+                """
+                SELECT SUM(lt.energy * td.play_count) / SUM(td.play_count) AS energy
+                FROM user_track_daily td
+                JOIN library_tracks lt ON lt.id = td.track_id
+                WHERE td.user_id = 1 AND td.day BETWEEN :first AND :last
+                """
+            ),
+            {"first": first, "last": last},
+        ).scalar_one()
+    assert previous is not None
+    assert previous["energy"] == pytest.approx(float(expected))
+    assert set(previous) == set(payload["story"]["audio_profile"])
+
+    assert _dashboard("all_time")["story"]["audio_profile_previous"] is None
+
+
+def _share(name: str, share: float) -> dict:
+    return {"genre_name": name, "slug": name.lower(), "share": share}
+
+
+def _period():
+    from datetime import date
+
+    from crate.db.queries.user_stats_periods import StatsPeriod
+
+    return StatsPeriod(
+        key="30d",
+        start=date(2026, 9, 21),
+        end=date(2026, 10, 21),
+        previous_start=date(2026, 8, 22),
+        timezone="UTC",
+        today=date(2026, 10, 20),
+    )
+
+
+def _trend(monkeypatch, current: list[dict], previous: list[dict]):
+    from crate.db.queries import user_library_stats_signal as signal
+
+    calls = iter([current, previous])
+    monkeypatch.setattr(signal, "_genre_shares", lambda *args, **kwargs: next(calls))
+    return signal._genre_trend(None, 1, _period())
+
+
+def test_genre_trend_appends_the_biggest_faller_beyond_the_top_six(monkeypatch):
+    current = [_share(f"G{i}", 0.2 - i * 0.02) for i in range(6)] + [
+        _share("Seventh", 0.03),
+        _share("Eighth", 0.02),
+    ]
+    previous = [_share(f"G{i}", 0.2 - i * 0.02) for i in range(6)] + [
+        _share("Seventh", 0.10),
+        _share("Eighth", 0.02),
+        _share("Gone", 0.12),
+    ]
+
+    trend = _trend(monkeypatch, current, previous)
+
+    assert len(trend) == 7
+    assert not any(item.get("faller") for item in trend[:6])
+    faller = trend[-1]
+    assert faller["faller"] is True
+    assert faller["genre_name"] == "Gone"
+    assert faller["slug"] == "gone"
+    assert faller["share"] == 0.0
+    assert faller["delta_vs_previous"] == -0.12
+
+
+def test_genre_trend_picks_a_remaining_current_genre_as_faller(monkeypatch):
+    current = [_share(f"G{i}", 0.2 - i * 0.02) for i in range(6)] + [
+        _share("Seventh", 0.03)
+    ]
+    previous = [_share(f"G{i}", 0.2 - i * 0.02) for i in range(6)] + [
+        _share("Seventh", 0.10)
+    ]
+
+    trend = _trend(monkeypatch, current, previous)
+
+    assert trend[-1]["genre_name"] == "Seventh"
+    assert trend[-1]["faller"] is True
+    assert trend[-1]["delta_vs_previous"] == -0.07
+
+
+def test_genre_trend_skips_the_faller_without_previous_or_a_drop(monkeypatch):
+    current = [_share(f"G{i}", 0.15) for i in range(7)]
+
+    assert len(_trend(monkeypatch, current, [])) == 6
+    assert len(_trend(monkeypatch, current, current)) == 6
+
+
+def test_audio_profile_reports_unknown_analysis_as_null():
+    from crate.db.queries.user_library_stats_story import _audio_profile_payload
+
+    class _Result:
+        def mappings(self):
+            return self
+
+        def first(self):
+            return {"energy": None, "danceability": 0, "valence": None, "bpm": None}
+
+    class _Session:
+        def execute(self, *args, **kwargs):
+            return _Result()
+
+    payload = _audio_profile_payload(_Session(), 1, _period())
+
+    assert payload["energy"] is None
+    assert payload["valence"] is None
+    assert payload["danceability"] == 0.0
+
+
+def test_genre_trend_ignores_drops_below_the_faller_threshold(monkeypatch):
+    current = [_share(f"G{i}", 0.15) for i in range(6)] + [_share("Seventh", 0.096)]
+    previous = [_share(f"G{i}", 0.15) for i in range(6)] + [_share("Seventh", 0.1)]
+
+    assert len(_trend(monkeypatch, current, previous)) == 6
+
+
+def test_genre_trend_keeps_the_real_share_of_a_genre_ranked_below_twelve(
+    monkeypatch,
+):
+    current = [_share(f"G{i}", 0.06) for i in range(13)] + [_share("Deep", 0.015)]
+    previous = [_share(f"G{i}", 0.06) for i in range(13)] + [_share("Deep", 0.095)]
+
+    faller = _trend(monkeypatch, current, previous)[-1]
+
+    assert faller["genre_name"] == "Deep"
+    assert faller["share"] == 0.015
+    assert faller["delta_vs_previous"] == -0.08
+
+
+def _seed_genre_days(rows: list[tuple[str, str, int]]) -> None:
+    """Insert ``(day, genre, plays)`` projection rows for user 1."""
+    from sqlalchemy import text
+
+    from crate.db.tx import transaction_scope
+
+    with transaction_scope() as session:
+        for index, (day, genre, plays) in enumerate(rows):
+            session.execute(
+                text(
+                    """
+                    INSERT INTO user_track_daily (
+                        user_id, day, entity_key, artist, album, genre,
+                        play_count, complete_play_count, minutes_listened,
+                        first_played_at, last_played_at
+                    )
+                    VALUES (
+                        1, CAST(:day AS date), :key, :artist, '', :genre,
+                        :plays, :plays, :plays * 3.0,
+                        CAST(:day AS timestamptz), CAST(:day AS timestamptz)
+                    )
+                    """
+                ),
+                {
+                    "day": day,
+                    "key": f"genre-seed-{index}",
+                    "artist": f"Artist {index}",
+                    "genre": genre,
+                    "plays": plays,
+                },
+            )
+
+
+def test_genre_trend_reads_the_previous_share_of_a_genre_ranked_below_twelve(
+    pg_db,
+):
+    """A current top-six genre that ranked 13th before is compared to its real share."""
+    from crate.db.queries import user_library_stats_signal as signal
+    from crate.db.tx import read_scope
+
+    current_day, previous_day = "2026-10-01", "2026-09-01"
+    _seed_genre_days(
+        [(current_day, "Deep", 100)]
+        + [(current_day, f"Now{i}", 50) for i in range(5)]
+        + [(previous_day, f"Then{i}", 100) for i in range(12)]
+        + [(previous_day, "Deep", 10)]
+    )
+
+    with read_scope() as session:
+        trend = signal._genre_trend(session, 1, _period())
+
+    deep = next(item for item in trend if item["genre_name"] == "Deep")
+    current_share = 100 / (100 + 5 * 50)
+    previous_share = 10 / (12 * 100 + 10)
+    assert deep["share"] == round(current_share, 4)
+    assert deep["delta_vs_previous"] == round(current_share - previous_share, 4)
+
+
+def test_genre_trend_matches_names_that_differ_only_in_case(monkeypatch):
+    current = [_share(f"G{i}", 0.15) for i in range(6)] + [_share("Shoegaze", 0.05)]
+    previous = [_share(f"G{i}", 0.15) for i in range(6)] + [_share("shoegaze", 0.05)]
+
+    trend = _trend(monkeypatch, current, previous)
+
+    assert len(trend) == 6
+    assert all(item["delta_vs_previous"] == 0.0 for item in trend)
+
+
+def test_global_audio_profile_reports_unknown_analysis_as_null(monkeypatch):
+    from contextlib import contextmanager
+    from datetime import datetime, timezone
+
+    from crate.db.queries import user_library_stats_global as global_stats
+
+    class _Result:
+        def mappings(self):
+            return self
+
+        def first(self):
+            return {"energy": None, "danceability": 0, "valence": None, "bpm": None}
+
+    class _Session:
+        def execute(self, *args, **kwargs):
+            return _Result()
+
+    @contextmanager
+    def _scope():
+        yield _Session()
+
+    monkeypatch.setattr(global_stats, "read_scope", _scope)
+
+    payload = global_stats._audio_profile_payload(
+        current_start=datetime(2026, 9, 1, tzinfo=timezone.utc)
+    )
+
+    assert payload["energy"] is None
+    assert payload["valence"] is None
+    assert payload["danceability"] == 0.0

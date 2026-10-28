@@ -9,6 +9,24 @@ import {
 } from "@/components/playlists/playlist-composer-model";
 
 describe("playlist composer model", () => {
+  it("moves and removes duplicate catalog tracks by their distinct playlist entry", () => {
+    const first = {
+      title: "Track",
+      artist: "Band",
+      globalTrackUid: "same",
+      playlistEntryId: 11,
+    };
+    const second = { ...first, playlistEntryId: 12 };
+    const moved = playlistComposerReducer(
+      { ...initialPlaylistComposerState, tracks: [first, second] },
+      { type: "move-track", activeId: "entry:12", overId: "entry:11" },
+    );
+    expect(moved.tracks).toEqual([second, first]);
+    expect(
+      playlistComposerReducer(moved, { type: "remove-track", key: "entry:11" })
+        .tracks,
+    ).toEqual([second]);
+  });
   it("uses the most stable available identity for tracks", () => {
     expect(
       getTrackKey({
@@ -112,5 +130,29 @@ describe("playlist composer model", () => {
       isCollaborative: true,
       tracks: [track],
     });
+  });
+});
+
+it("retains album identity when a search result becomes an editable playlist track", () => {
+  const track = {
+    title: "Talk For Hours",
+    artist: "High Vis",
+    album: "Blending",
+    duration: 183,
+    global_track_uid: "track-1",
+    global_album_uid: "album-1",
+    album_id: 12,
+    album_entity_uid: "album-entity",
+    artist_entity_uid: "artist-entity",
+    album_slug: "blending",
+    artist_slug: "high-vis",
+  };
+  expect(toComposerTrack(track)).toMatchObject({
+    globalAlbumUid: "album-1",
+    albumId: 12,
+    albumEntityUid: "album-entity",
+    artistEntityUid: "artist-entity",
+    albumSlug: "blending",
+    artistSlug: "high-vis",
   });
 });

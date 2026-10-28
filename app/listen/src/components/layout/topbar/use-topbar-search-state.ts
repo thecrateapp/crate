@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type { SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -65,7 +65,7 @@ function topBarSearchReducer(
 ): TopBarSearchState {
   switch (action.type) {
     case "set-query":
-      return { ...state, query: action.value };
+      return { ...state, query: action.value, activeIdx: -1 };
     case "set-results":
       return { ...state, results: action.value };
     case "set-loading":
@@ -101,6 +101,7 @@ export function useTopBarSearchState() {
       recents: getTopBarSearchRecents(),
     }),
   );
+  const [composing, setComposing] = useState(false);
   const queryRef = useRef(state.query);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -119,6 +120,11 @@ export function useTopBarSearchState() {
       return;
     }
 
+    if (composing) {
+      dispatch({ type: "set-loading", value: false });
+      return;
+    }
+    let cancelled = false;
     dispatch({ type: "set-loading", value: true });
     dispatch({ type: "set-completed-query", value: null });
     dispatch({ type: "set-search-error", value: null });
@@ -127,7 +133,7 @@ export function useTopBarSearchState() {
         `/api/catalog/search?q=${encodeURIComponent(requestQuery)}&limit=10`,
       )
         .then((data) => {
-          if (queryRef.current.trim() !== requestQuery) return;
+          if (cancelled || queryRef.current.trim() !== requestQuery) return;
           dispatch({
             type: "set-results",
             value: flattenTopBarSearchResults(data),
@@ -137,7 +143,7 @@ export function useTopBarSearchState() {
           dispatch({ type: "set-search-error", value: null });
         })
         .catch((error) => {
-          if (queryRef.current.trim() !== requestQuery) return;
+          if (cancelled || queryRef.current.trim() !== requestQuery) return;
           dispatch({ type: "set-results", value: [] });
           dispatch({ type: "set-active-index", value: -1 });
           dispatch({ type: "set-completed-query", value: requestQuery });
@@ -150,16 +156,17 @@ export function useTopBarSearchState() {
           });
         })
         .finally(() => {
-          if (queryRef.current.trim() === requestQuery) {
+          if (!cancelled && queryRef.current.trim() === requestQuery) {
             dispatch({ type: "set-loading", value: false });
           }
         });
     }, 200);
 
     return () => {
+      cancelled = true;
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [state.query, t]);
+  }, [state.query, composing, t]);
 
   const setQuery = useCallback(
     (value: string) => dispatch({ type: "set-query", value }),
@@ -203,6 +210,7 @@ export function useTopBarSearchState() {
   return {
     ...state,
     queryRef,
+    setComposing,
     setQuery,
     setResults,
     setLoading,

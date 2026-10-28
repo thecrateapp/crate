@@ -1,5 +1,6 @@
-import { useState } from "react";
 import { Link } from "react-router";
+import { EntityAvatar } from "@crate/ui/domain/entity/EntityAvatar";
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { artistPagePath, artistPhotoApiUrl } from "@/lib/library-routes";
 
 interface ArtistAvatarProps {
@@ -9,7 +10,6 @@ interface ArtistAvatarProps {
   size?: number;
   linked?: boolean;
 }
-
 export function ArtistAvatar({
   name,
   artistId,
@@ -17,43 +17,32 @@ export function ArtistAvatar({
   size = 36,
   linked = false,
 }: ArtistAvatarProps) {
-  const [failed, setFailed] = useState(false);
-  const letter = name.charAt(0).toUpperCase();
-
-  const img = !failed ? (
-    <img
+  const avatar = (
+    <EntityAvatar
       src={artistPhotoApiUrl({ artistId, artistSlug, artistName: name })}
+      name={name}
       alt={name}
-      className="w-full h-full object-cover"
-      onError={() => setFailed(true)}
-    />
-  ) : (
-    <span className="text-[10px] font-bold text-foreground/60">{letter}</span>
-  );
-
-  const wrapper = (
-    <div
-      className="rounded-md ring-2 ring-card overflow-hidden bg-secondary flex items-center justify-center flex-shrink-0"
+      size="sm"
+      shape="circle"
       style={{ width: size, height: size }}
-      title={name}
-    >
-      {img}
-    </div>
+    />
   );
-
-  if (linked && artistId != null) {
-    return (
-      <Link
-        to={artistPagePath({ artistId, artistSlug, artistName: name })}
-        className="hover:ring-primary/50 rounded-md transition-[box-shadow]"
-      >
-        {wrapper}
-      </Link>
-    );
-  }
-  return wrapper;
+  return (
+    <TooltipHint content={name}>
+      {linked && artistId != null ? (
+        <Link
+          to={artistPagePath({ artistId, artistSlug, artistName: name })}
+          aria-label={`Open ${name}`}
+          className="inline-flex rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+        >
+          {avatar}
+        </Link>
+      ) : (
+        avatar
+      )}
+    </TooltipHint>
+  );
 }
-
 export function ArtistAvatarStack({
   names,
   size = 18,
@@ -62,9 +51,9 @@ export function ArtistAvatarStack({
   size?: number;
 }) {
   return (
-    <div className="flex -space-x-1 flex-shrink-0">
-      {names.map((n) => (
-        <ArtistAvatar key={n} name={n} size={size} />
+    <div className="flex shrink-0 -space-x-1">
+      {names.map((name) => (
+        <ArtistAvatar key={name} name={name} size={size} />
       ))}
     </div>
   );

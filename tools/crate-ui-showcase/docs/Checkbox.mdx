@@ -1,0 +1,36 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/Checkbox.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">Checkbox</DocHeading>
+<EntryDetails
+  id="primitives-checkbox"
+  review="Visual review approved by Diego · 1AR"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+- Independent binary or indeterminate choice. Keep the visible caption associated via FormField or a native label.
+- 18 × 18 px visual; 1 px border and high accent for checked/mixed. A 44 × 44 px pseudo hit area on coarse pointers preserves the compact visual.
+- Space toggles; disabled is inert; warning state and native form name/required behavior follow Radix. Use RadioGroup for a mutually exclusive choice.
+- Use `FormField layout="inline"`: the control comes first and its label is to the right.
+- The approved persistent mockup and Diego's confirmed adjustments are the visual reference. Examples import the actual component; scene CSS does not repair its internals.
+
+The visible field caption uses the same MonoLabel as Input and Select. Inline placement does not change its typography, tracking or color.
+
+<DocHeading as="h2">Real component</DocHeading>
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Checked} />
+
+<Canvas of={Stories.Indeterminate} />
+
+<Canvas of={Stories.Disabled} />
+
+<Canvas of={Stories.Invalid} />
+
+<Controls of={Stories.Base} />
+
+Consumer adoption and platform QA are separate from this entry and its visual review.

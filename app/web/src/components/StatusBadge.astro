@@ -1,0 +1,73 @@
+---
+import { t } from "../i18n";
+import type { Status } from "../lib/chapters";
+
+interface Props {
+  kind?: Status;
+  locale?: string;
+}
+
+const { kind = "in-development", locale = "en" } = Astro.props;
+const labels = {
+  "in-development": "status.inDevelopment",
+  "optional-llm": "status.optionalLlm",
+  "opt-in": "status.optIn",
+  available: "status.available",
+  planned: "status.planned",
+} as const;
+const label = t(labels[kind], locale);
+---
+
+<span class:list={["status-badge", kind]}>{label}</span>
+
+<style>
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 11px;
+    border-radius: 999px;
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    background: rgba(251, 191, 36, 0.06);
+    color: var(--amber);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  .status-badge::before {
+    content: "";
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .optional-llm {
+    border-color: var(--line);
+    background: transparent;
+    color: var(--fg-2);
+    white-space: normal;
+  }
+
+  .optional-llm::before {
+    border-radius: 0;
+    background: var(--cyan-hi);
+  }
+
+  .opt-in,
+  .available {
+    border-color: rgba(103, 232, 249, 0.35);
+    background: rgba(6, 182, 212, 0.06);
+    color: var(--cyan-hi);
+  }
+
+  .planned {
+    border-color: var(--line);
+    background: transparent;
+    color: var(--fg-2);
+  }
+</style>

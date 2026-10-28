@@ -1,0 +1,211 @@
+@import "../../app/shared/fonts/bricolage-grotesque.css";
+@import "../../app/shared/fonts/roboto.css";
+@import "../../app/shared/fonts/jetbrains-mono.css";
+@import "../../app/shared/ui/tokens/index.css";
+@import "tailwindcss";
+@source '../../app/shared/ui';
+@source '../../app/ui/src/components/layout';
+@source '../../app/ui/src/components/admin/ops-surfaces.tsx';
+@source '../../app/ui/src/components/admin/QueueLanes.tsx';
+@source '../../app/ui/src/components/admin/DbHeavyGate.tsx';
+@source '../../app/ui/src/pages/PlaylistEditor.tsx';
+@source '../../app/ui/src/pages/Playlists.tsx';
+@source '../../app/ui/src/components/admin/ListPagination.tsx';
+@source '../../app/ui/src/components/ui/AdminSelect.tsx';
+@source './stories';
+@source './components';
+@source './reviews';
+@source '../design-system-preview/admin-ops-checkpoint.tsx';
+@source '../design-system-preview/admin-task-playback-review.tsx';
+@source '../../app/ui/src/pages/PlaybackDelivery.tsx';
+@source '../../app/listen-desktop/src/components';
+@source '../../app/listen/src/components/dev';
+:root {
+  color-scheme: dark;
+  background: var(--surface-canvas);
+  color: var(--text-primary);
+}
+body {
+  font-family: var(--font-brand), sans-serif;
+}
+/* Scene layout only. No selector below changes shared component internals. */
+.showcase-stack {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+.showcase-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.showcase-narrow {
+  width: 280px;
+  max-width: 100%;
+}
+.showcase-panel {
+  padding: 16px;
+  background: var(--surface-container);
+  border: 1px solid var(--border-quiet);
+}
+.showcase-swatch {
+  width: 160px;
+  min-height: 90px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border-quiet);
+}
+.showcase-heading {
+  font: 600 24px/1.2 var(--font-display-stack);
+  margin: 0;
+}
+.showcase-doc-heading {
+  font-family: var(--font-display-stack);
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 24px 0 16px;
+}
+h1.showcase-doc-heading {
+  font-size: 40px;
+}
+h2.showcase-doc-heading {
+  font-size: 24px;
+}
+h3.showcase-doc-heading {
+  font-size: 18px;
+}
+.showcase-table {
+  border-collapse: collapse;
+  width: 100%;
+  font: 400 12px/1.5 var(--font-mono-stack);
+}
+.showcase-table :is(th, td) {
+  padding: 8px;
+  border-bottom: 1px solid var(--border-quiet);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.showcase-table caption {
+  text-align: left;
+  padding-block: 12px;
+}
+.showcase-code {
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono-stack);
+}
+
+.showcase-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 24px;
+  min-width: 0;
+}
+
+@source "../../app/listen/src/components/cards/TrackRowView.tsx";
+@source "../../app/listen/src/components/cards/TrackRowContent.tsx";
+@source "../../app/listen/src/components/cards/TrackRowPlaybackControl.tsx";
+
+@source "../../app/listen/src/components/layout/topbar/TopBarSearchDropdownView.tsx";
+
+@source "../../app/listen/src/components/layout";
+@source "../../app/listen/src/pages/SearchFormView.tsx";
+
+@source "../../app/listen/src/pages/LibraryLikedView.tsx";
+@source "../../app/listen/src/pages/SearchTrackResultsView.tsx";
+@source "../../app/listen/src/pages/SearchAlbumResultsView.tsx";
+@source "../../app/listen/src/pages/SearchErrorState.tsx";
+
+@source "../../app/listen/src/components/player";
+@source "../../app/listen/src/components/settings/SleepTimerView.tsx";
+
+@source "../../app/listen/src/components/auth";
+@source "../../app/listen/src/components/album";
+@source "../../app/listen/src/components/imports/RemoteImportView.tsx";
+@source "../../app/listen/src/pages/OfflineLibraryView.tsx";
+
+@source "../../app/listen/src/components/artist/ArtistLibraryFrames.tsx";
+@source "../../app/listen/src/components/upcoming/UpcomingShowExpandedView.tsx";
+@source "../../app/listen/src/components/upcoming/UpcomingMonthGroupView.tsx";
+
+@source "../../app/listen/src/components/home/HomeGreeting.tsx";
+@source "../../app/listen/src/components/home/HomeHeroActions.tsx";
+@source "../../app/listen/src/components/library";
+@source "../../app/listen/src/components/crates/CrateIndexGrid.tsx";
+@source "../../app/listen/src/pages/LibraryBandcampHeader.tsx";
+
+@source "../../app/listen/src/components/collections";
+@source "../../app/listen/src/components/crates/CrateForm.tsx";
+@source "../../app/listen/src/components/crates/CrateHeroFrame.tsx";
+@source "../../app/listen/src/components/crates/CrateCoverFlowView.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistHeroView.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistIdentityView.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistTrackSearch.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistComposerTrackList.tsx";
+@source "../../app/listen/src/components/social/CollaboratorSearchView.tsx";
+@source "../../node_modules/@ashishgogula/coverflow/dist";
+@source "../../app/listen/node_modules/@ashishgogula/coverflow/dist";
+
+@source "../../app/listen/src/components/crates/CrateAlbumListView.tsx";
+@source "../../app/listen/src/components/CrateAlbumPickerView.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistListRowView.tsx";
+
+@source "../../app/listen/src/components/search/CatalogSearchView.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistTrackSearchView.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistComposerTrackListView.tsx";
+
+@source "../../app/listen/src/components/explore/ExploreBrowseViews.tsx";
+@source "../../app/listen/src/components/explore/GenreTileView.tsx";
+@source "../../app/listen/src/components/explore/GenreHeroView.tsx";
+
+@source "../../app/listen/src/components/upcoming";
+@source "../../app/listen/src/pages/ShowsPageView.tsx";
+
+@source "../../app/listen/src/components/paths";
+@source "../../app/listen/src/components/radio/RadioStationCardView.tsx";
+@source "../../app/listen/src/pages/RadioPageView.tsx";
+@source "../../app/listen/src/pages/RadioSeedPanelView.tsx";
+@source "../../app/listen/src/pages/RadioStationRailView.tsx";
+@source "../../app/listen/src/pages/PathsPageView.tsx";
+@source "../../app/listen/src/pages/PathEndpointPanelView.tsx";
+@source "../../app/listen/src/pages/PathDetailHeaderView.tsx";
+
+@source "../../app/listen/src/components/settings";
+@source "../../app/listen/src/pages/SettingsPageView.tsx";
+
+@source "../../app/listen/src/components/social";
+@source "../../app/listen/src/pages/PeopleContent.tsx";
+@source "../../app/listen/src/pages/PeopleSummary.tsx";
+@source "../../app/listen/src/pages/PeopleSearch.tsx";
+@source "../../app/listen/src/pages/UserConnectionsView.tsx";
+@source "../../app/listen/src/pages/UserProfileView.tsx";
+@source "../../app/listen/src/pages/UserProfileHero.tsx";
+@source "../../app/listen/src/pages/UserProfileRelationships.tsx";
+@source "../../app/listen/src/pages/UserProfileTaste.tsx";
+@source "../../app/listen/src/pages/UserProfileMatch.tsx";
+@source "../../app/listen/src/pages/UserProfileLibraryView.tsx";
+@source "../../app/listen/src/pages/UserProfileNetworkView.tsx";
+
+@source "../../app/listen/src/components/share/ShareSheetView.tsx";
+@source "../../app/listen/src/components/bandcamp";
+@source "../../app/listen/src/pages/BandcampPageView.tsx";
+@source "../../app/listen/src/pages/UploadView.tsx";
+
+@source "../../app/listen/src/components/stats";
+@source "../../app/listen/src/pages/StatsPageView.tsx";
+@source "../../app/listen/src/pages/StatsSoundProfileView.tsx";
+@source "../../app/listen/src/pages/StatsAnalyticsPrimitives.tsx";
+@source "../../app/listen/src/pages/StatsArtistRankView.tsx";
+
+@source "../../app/listen/src/components/player/EqualizerPanelSections.tsx";
+@source "../../app/listen/src/components/player/EqualizerSmartReadout.tsx";
+@source "../../app/listen/src/components/player/EqualizerAdaptiveReadouts.tsx";
+@source "../../app/listen/src/components/player/EqualizerPanelSurface.tsx";
+
+@source "../../app/listen/src/components/home";
+@source "../../app/listen/src/components/stats/TapeBars.tsx";
+@source "../../app/listen/src/components/upcoming";

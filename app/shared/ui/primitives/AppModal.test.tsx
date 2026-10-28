@@ -349,15 +349,6 @@ describe("AppModal", () => {
     window.dispatchEvent(event);
     expect(onClose).not.toHaveBeenCalled();
   });
-
-  it("applies custom maxWidthClassName", () => {
-    render(
-      <AppModal open onClose={() => {}} maxWidthClassName="max-w-4xl">
-        Content
-      </AppModal>,
-    );
-    expect(screen.getByText("Content")).toHaveClass("max-w-4xl");
-  });
 });
 
 describe("AppModal labelling and sizing", () => {
@@ -440,40 +431,31 @@ describe("AppModal labelling and sizing", () => {
     ).toBeInTheDocument();
   });
 
-  it.each([
-    ["sm", "sm:max-w-md"],
-    ["md", "sm:max-w-lg"],
-    ["lg", "sm:max-w-2xl"],
-    ["xl", "sm:max-w-4xl"],
-  ] as const)("maps size %s to %s", (size, className) => {
+  it.each(["sm", "md", "lg", "xl", "2xl", "3xl"] as const)(
+    "sizes the panel through the %s overlay recipe",
+    (size) => {
+      render(
+        <AppModal open onClose={() => {}} size={size}>
+          Content
+        </AppModal>,
+      );
+      expect(screen.getByText("Content")).toHaveAttribute(
+        "data-overlay-size",
+        size,
+      );
+    },
+  );
+
+  it("defaults to the lg overlay recipe as a flex column", () => {
     render(
-      <AppModal open onClose={() => {}} size={size}>
-        Content
-      </AppModal>,
-    );
-    expect(screen.getByText("Content")).toHaveClass(className);
-  });
-
-  it("defaults to sm:max-w-2xl and lets maxWidthClassName win over size", () => {
-    const { rerender } = render(
       <AppModal open onClose={() => {}}>
-        Content
+        <ModalBody>Body</ModalBody>
       </AppModal>,
     );
-    expect(screen.getByText("Content")).toHaveClass("sm:max-w-2xl");
-
-    rerender(
-      <AppModal
-        open
-        onClose={() => {}}
-        size="sm"
-        maxWidthClassName="sm:max-w-[30rem]"
-      >
-        Content
-      </AppModal>,
-    );
-    expect(screen.getByText("Content")).toHaveClass("sm:max-w-[30rem]");
-    expect(screen.getByText("Content")).not.toHaveClass("sm:max-w-md");
+    const panel = screen.getByText("Body").closest("[data-app-modal-panel]");
+    expect(panel).toHaveAttribute("data-overlay-size", "lg");
+    expect(panel).toHaveClass("flex", "min-h-0", "flex-col");
+    expect(screen.getByText("Body")).toHaveClass("min-h-0", "flex-1");
   });
 });
 
@@ -514,6 +496,41 @@ describe("ModalCloseButton", () => {
   it("accepts a translated label and shows the focus ring token", () => {
     render(<ModalCloseButton onClick={() => {}} label="Cerrar" />);
     const button = screen.getByRole("button", { name: "Cerrar" });
-    expect(button).toHaveClass("focus-visible:shadow-focus");
+    expect(button).not.toHaveClass("focus-visible:shadow-focus");
   });
+});
+
+it("lets only the top nested custom modal consume Escape", () => {
+  const parentClose = vi.fn(),
+    childClose = vi.fn();
+  render(
+    <AppModal open onClose={parentClose} title="Parent">
+      <AppModal open onClose={childClose} title="Child">
+        Child content
+      </AppModal>
+    </AppModal>,
+  );
+  fireEvent.keyDown(screen.getByRole("dialog", { name: "Child" }), {
+    key: "Escape",
+  });
+  expect(childClose).toHaveBeenCalledTimes(1);
+  expect(parentClose).not.toHaveBeenCalled();
+});
+it("keeps the scroll lock if the older locking modal unmounts before the newer one", () => {
+  document.body.style.overflow = "auto";
+  const first = render(
+    <AppModal open onClose={() => {}} title="Older">
+      Older
+    </AppModal>,
+  );
+  const second = render(
+    <AppModal open onClose={() => {}} title="Newer">
+      Newer
+    </AppModal>,
+  );
+  first.unmount();
+  expect(document.body.style.overflow).toBe("hidden");
+  second.unmount();
+  expect(document.body.style.overflow).toBe("auto");
+  document.body.style.overflow = "";
 });

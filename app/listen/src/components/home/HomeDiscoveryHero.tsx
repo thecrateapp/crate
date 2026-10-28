@@ -1,5 +1,3 @@
-import { type ReactNode } from "react";
-
 import type { HomeDiscoveryHeroSurfaces, HomeHeroArtist } from "./home-model";
 import { heroBackgroundSrc, legacyHeroBackgroundSrc } from "./home-hero-utils";
 import {
@@ -26,7 +24,6 @@ interface HomeTasteHeroProps {
   onOpenArtist: (artist: HomeHeroArtist) => void;
   onPlay: (artist: HomeHeroArtist) => void;
   onToggleFollow: (artist: HomeHeroArtist) => void;
-  desktopIntro?: ReactNode;
 }
 
 function MobileTasteHero({
@@ -74,7 +71,6 @@ function DesktopTasteHero({
   onPrevious,
   onNext,
   onSelect,
-  desktopIntro,
 }: {
   heroes: HomeHeroArtist[];
   activeIndex: number;
@@ -86,7 +82,6 @@ function DesktopTasteHero({
   onPrevious: () => void;
   onNext: () => void;
   onSelect: (index: number) => void;
-  desktopIntro?: ReactNode;
 }) {
   const count = heroes.length;
 
@@ -145,17 +140,6 @@ function DesktopTasteHero({
           />
         )
       ) : null}
-
-      {mode === "canonical" && desktopIntro ? (
-        <div
-          data-testid="desktop-hero-intro"
-          className="pointer-events-none absolute inset-x-0 top-0 z-20"
-        >
-          <div className="mx-auto w-full max-w-content px-6 pt-[92px]">
-            {desktopIntro}
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -167,7 +151,6 @@ export function HomeTasteHero({
   onOpenArtist,
   onPlay,
   onToggleFollow,
-  desktopIntro,
 }: HomeTasteHeroProps) {
   const { composition, isDesktop, mode, surfaceHeroes } = useHeroSurface(
     heroes,
@@ -212,7 +195,6 @@ export function HomeTasteHero({
         desktopSelection.setIndex((current) => (current + 1) % count)
       }
       onSelect={desktopSelection.setIndex}
-      desktopIntro={desktopIntro}
     />
   );
 }

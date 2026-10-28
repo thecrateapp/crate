@@ -521,7 +521,7 @@ def rebuild_user_listening_projections(session, user_id: int) -> dict:
     _rebuild_sessions(session, user_id, None, None)
     _rebuild_window_stats(session, user_id, tz)
     _save_state(session, user_id, tz, rebuilt=True)
-    return {"mode": "rebuild", "timezone": tz, "days": None}
+    return {"mode": "rebuild", "timezone": tz, "days": None, "keys": None, "full": True}
 
 
 def refresh_user_listening_projections(session, user_id: int) -> dict:
@@ -551,6 +551,7 @@ def refresh_user_listening_projections(session, user_id: int) -> dict:
             {"user_id": user_id},
         ).scalars()
     )
+    keys: dict[str, list] = {}
     if days:
         before = _touched_keys(session, user_id, days)
         _rebuild_days(session, user_id, tz, days)
@@ -564,7 +565,23 @@ def refresh_user_listening_projections(session, user_id: int) -> dict:
         _rebuild_sessions(session, user_id, start, end)
     _rebuild_window_stats(session, user_id, tz)
     _save_state(session, user_id, tz, rebuilt=False)
-    return {"mode": "incremental", "timezone": tz, "days": [str(day) for day in days]}
+    return {
+        "mode": "incremental",
+        "timezone": tz,
+        "days": [day.isoformat() for day in days],
+        "keys": keys,
+        "full": False,
+    }
+
+
+def users_with_dirty_listening_days(session) -> list[int]:
+    return list(
+        session.execute(
+            text(
+                "SELECT DISTINCT user_id FROM user_listening_dirty_days ORDER BY user_id"
+            )
+        ).scalars()
+    )
 
 
 def user_listening_projections_pending(session, user_id: int) -> bool:
@@ -591,6 +608,7 @@ def user_listening_projections_pending(session, user_id: int) -> bool:
 
 
 __all__ = [
+    "users_with_dirty_listening_days",
     "SESSION_GAP_MINUTES",
     "local_today",
     "mark_listening_day_dirty",

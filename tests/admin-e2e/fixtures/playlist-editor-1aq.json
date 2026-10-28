@@ -1,0 +1,179 @@
+{
+  "surface": {
+    "playlist": {
+      "id": 42,
+      "name": "Costa de noche",
+      "description": "Selección editorial de muestra.",
+      "cover_data_url": null,
+      "artwork_tracks": [],
+      "generation_mode": "smart",
+      "is_curated": true,
+      "is_active": true,
+      "featured_rank": 1,
+      "category": "editorial",
+      "follower_count": 3,
+      "track_count": 2,
+      "total_duration": 420,
+      "generation_status": "idle",
+      "last_generated_at": "2026-10-19T06:00:00Z",
+      "is_smart": true,
+      "is_system": true,
+      "scope": "system",
+      "visibility": "public",
+      "auto_refresh_enabled": true,
+      "smart_rules": {
+        "match": "all",
+        "rules": [
+          {
+            "field": "genre",
+            "op": "contains",
+            "value": "Ambient"
+          }
+        ],
+        "limit": 50,
+        "sort": "random"
+      },
+      "generation_error": null,
+      "tracks": [
+        {
+          "id": 1,
+          "playlist_id": 42,
+          "track_id": 10,
+          "track_entity_uid": "track:sample-10",
+          "track_storage_id": "store-10",
+          "track_path": "sample/first.flac",
+          "title": "Marea",
+          "artist": "Costa Norte",
+          "album": "Luz de octubre",
+          "duration": 180,
+          "position": 1,
+          "source": "generated",
+          "locked": false,
+          "genre": "Ambient",
+          "format": "FLAC",
+          "year": 2024
+        },
+        {
+          "id": 2,
+          "playlist_id": 42,
+          "track_id": 11,
+          "track_entity_uid": "track:sample-11",
+          "title": "Horizonte",
+          "artist": "Viento Sur",
+          "album": "Bruma",
+          "duration": 240,
+          "position": 2,
+          "source": "manual",
+          "locked": true,
+          "genre": "Ambient",
+          "format": "FLAC",
+          "year": 2025
+        }
+      ]
+    },
+    "history": [
+      {
+        "id": 1,
+        "started_at": "2026-10-19T06:00:00Z",
+        "completed_at": "2026-10-19T06:00:02Z",
+        "status": "idle",
+        "track_count": 2,
+        "duration_sec": 2,
+        "error": null,
+        "triggered_by": "manual",
+        "rule_snapshot": {
+          "match": "all",
+          "rules": [
+            {
+              "field": "genre",
+              "op": "contains",
+              "value": "Ambient"
+            }
+          ],
+          "limit": 50,
+          "sort": "random"
+        }
+      }
+    ],
+    "snapshot": null
+  },
+  "filterOptions": {
+    "genres": ["Ambient", "Rock"],
+    "formats": ["flac", "mp3"],
+    "keys": ["Am", "C"],
+    "artists": ["Costa Norte", "Bruma"],
+    "scales": ["major", "minor"],
+    "year_range": ["1980", "2026"],
+    "bpm_range": [60, 200]
+  },
+  "candidates": [
+    {
+      "id": 12,
+      "track_id": 12,
+      "track_entity_uid": "track:sample-12",
+      "track_storage_id": "store-12",
+      "track_path": "sample/bruma.flac",
+      "title": "Bruma",
+      "artist": "Costa Norte",
+      "album": "Luz de octubre",
+      "duration": 210,
+      "genre": "Ambient",
+      "format": "FLAC",
+      "year": 2026
+    }
+  ],
+  "preview": {
+    "total_matching": 3,
+    "tracks": [
+      {
+        "title": "Bruma",
+        "artist": "Costa Norte",
+        "album": "Luz de octubre",
+        "duration": 210,
+        "year": 2026,
+        "format": "FLAC"
+      }
+    ],
+    "genre_distribution": {
+      "Ambient": 3
+    },
+    "artist_distribution": {
+      "Costa Norte": 2,
+      "Viento Sur": 1
+    },
+    "format_distribution": {
+      "FLAC": 3
+    },
+    "duration_total_sec": 630,
+    "avg_year": 2025,
+    "year_range": [2024, 2026]
+  },
+  "proposal": {
+    "summary": "Una pista duplicada puede retirarse.",
+    "issues": [
+      {
+        "type": "duplicate",
+        "severity": "warning",
+        "message": "Duplicado de muestra detectado.",
+        "positions": [1, 2]
+      }
+    ],
+    "actions": [
+      {
+        "id": "remove-duplicate",
+        "type": "remove",
+        "label": "Remove duplicate",
+        "reason": "Duplicate track",
+        "position": 2,
+        "track_id": 11
+      }
+    ],
+    "score_version": "editorial-v1",
+    "proposal_id": "review-proposal-1",
+    "editorial_revision": 1
+  },
+  "description": {
+    "description": "Una selección nocturna de ambient y costa.",
+    "applied": false
+  }
+}

@@ -1,4 +1,6 @@
 import {
+  createContext,
+  useContext,
   useCallback,
   useEffect,
   useId,
@@ -10,27 +12,22 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { CRATE_ICON_SIZE, X } from "@crate/ui/icons";
+import { OverlayCloseButton } from "@crate/ui/shadcn/overlay-close-button";
 
+import { acquireBodyScrollLock } from "@crate/ui/lib/body-scroll-lock";
 import { cn } from "@crate/ui/lib/cn";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { useModalFocus } from "@crate/ui/lib/use-modal-focus";
 import { useSheetDrag } from "@crate/ui/lib/use-sheet-drag";
 
-export type AppModalSize = "sm" | "md" | "lg" | "xl";
-
-const MODAL_SIZE_CLASS_NAMES: Record<AppModalSize, string> = {
-  sm: "sm:max-w-md",
-  md: "sm:max-w-lg",
-  lg: "sm:max-w-2xl",
-  xl: "sm:max-w-4xl",
-};
-
-const DEFAULT_MAX_WIDTH_CLASS_NAME = MODAL_SIZE_CLASS_NAMES.lg;
+export type AppModalSize = "sm" | "md" | "lg" | "xl" | "2xl" | "3xl";
 
 export interface AppModalProps {
   open: boolean;
   onClose: () => void;
   children?: ReactNode;
   title?: ReactNode;
+  eyebrow?: ReactNode;
   description?: ReactNode;
   size?: AppModalSize;
   role?: "dialog" | "alertdialog";
@@ -41,7 +38,6 @@ export interface AppModalProps {
   closeDisabled?: boolean;
   backdropLabel?: string;
   headerClassName?: string;
-  maxWidthClassName?: string;
   panelClassName?: string;
   overlayClassName?: string;
   closeOnOverlay?: boolean;
@@ -54,20 +50,14 @@ interface ModalSectionProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
 }
 
-const FOCUSABLE_SELECTOR = [
-  "a[href]",
-  "button:not([disabled])",
-  "textarea:not([disabled])",
-  "input:not([disabled])",
-  "select:not([disabled])",
-  "[tabindex]:not([tabindex='-1'])",
-].join(",");
+const ModalDepth = createContext(0);
 
 export function AppModal({
   open,
   onClose,
   children,
   title,
+  eyebrow,
   description,
   size,
   role = "dialog",
@@ -78,7 +68,6 @@ export function AppModal({
   closeDisabled = false,
   backdropLabel = "Close dialog backdrop",
   headerClassName,
-  maxWidthClassName,
   panelClassName,
   overlayClassName,
   closeOnOverlay = true,
@@ -86,6 +75,7 @@ export function AppModal({
   lockBodyScroll = true,
   mobileSafeArea = false,
 }: AppModalProps) {
+  const depth = useContext(ModalDepth);
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descriptionId = useId();
@@ -94,102 +84,25 @@ export function AppModal({
   const labelledBy = ariaLabelledBy ?? (hasTitle ? titleId : undefined);
   const describedBy =
     ariaDescribedBy ?? (hasTitle && hasDescription ? descriptionId : undefined);
-  const resolvedMaxWidthClassName =
-    maxWidthClassName ??
-    (size ? MODAL_SIZE_CLASS_NAMES[size] : DEFAULT_MAX_WIDTH_CLASS_NAME);
-  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+  useModalFocus({
+    active: open,
+    panelRef,
+    onEscape: (event) => {
+      if (!closeOnEscape) return;
+      event.preventDefault();
+      onClose();
+    },
+  });
 
   useEffect(() => {
     if (!open) return undefined;
 
-    const previousOverflow = document.body.style.overflow;
-    const previousBodyOverscroll = document.body.style.overscrollBehavior;
-    const previousHtmlOverflow = document.documentElement.style.overflow;
-    const previousHtmlOverscroll =
-      document.documentElement.style.overscrollBehavior;
-    if (lockBodyScroll) {
-      document.body.style.overflow = "hidden";
-      document.body.style.overscrollBehavior = "none";
-      document.documentElement.style.overflow = "hidden";
-      document.documentElement.style.overscrollBehavior = "none";
-    }
+    const releaseScrollLock = lockBodyScroll
+      ? acquireBodyScrollLock(document)
+      : undefined;
 
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && closeOnEscape && !event.defaultPrevented) {
-        onClose();
-      }
-      if (event.key !== "Tab") return;
-      const panel = panelRef.current;
-      if (!panel) return;
-      const focusable = Array.from(
-        panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
-      ).filter(
-        (element) =>
-          !element.hasAttribute("disabled") &&
-          element.getAttribute("aria-hidden") !== "true",
-      );
-      if (focusable.length === 0) {
-        event.preventDefault();
-        panel.focus();
-        return;
-      }
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (!first || !last) return;
-      const active = document.activeElement;
-      if (event.shiftKey && (active === first || active === panel)) {
-        event.preventDefault();
-        last.focus();
-        return;
-      }
-      if (!event.shiftKey && active === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      if (lockBodyScroll) {
-        document.body.style.overflow = previousOverflow;
-        document.body.style.overscrollBehavior = previousBodyOverscroll;
-        document.documentElement.style.overflow = previousHtmlOverflow;
-        document.documentElement.style.overscrollBehavior =
-          previousHtmlOverscroll;
-      }
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [closeOnEscape, lockBodyScroll, onClose, open]);
-
-  useEffect(() => {
-    if (!open) return;
-    previouslyFocusedElementRef.current =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-    const frame = window.requestAnimationFrame(() => {
-      const panel = panelRef.current;
-      if (!panel) return;
-      const activeElement = document.activeElement;
-      if (
-        activeElement instanceof HTMLElement &&
-        panel.contains(activeElement)
-      ) {
-        return;
-      }
-      const firstFocusable =
-        panel.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
-      (firstFocusable ?? panel).focus();
-    });
-    return () => {
-      window.cancelAnimationFrame(frame);
-      const previous = previouslyFocusedElementRef.current;
-      if (previous && document.contains(previous)) {
-        previous.focus();
-      }
-      previouslyFocusedElementRef.current = null;
-    };
-  }, [open]);
+    return () => releaseScrollLock?.();
+  }, [lockBodyScroll, open]);
 
   const [isEntering, setIsEntering] = useState(open);
   const [isDragClosing, setIsDragClosing] = useState(false);
@@ -268,97 +181,108 @@ export function AppModal({
   if (!open) return null;
 
   return createPortal(
-    <dialog
-      open
-      role={role}
-      aria-modal="true"
-      aria-label={labelledBy ? undefined : ariaLabel}
-      aria-labelledby={labelledBy}
-      aria-describedby={describedBy}
-      tabIndex={-1}
-      className={cn(
-        "z-app-modal fixed inset-0 m-0 flex h-full max-h-none w-full max-w-none items-end justify-center border-0 bg-surface-canvas/72 p-0 text-inherit backdrop-blur-md animate-fade-in sm:items-center sm:p-6",
-        overlayClassName,
-      )}
-    >
-      <button
-        type="button"
-        aria-label={backdropLabel}
+    <ModalDepth value={depth + 1}>
+      <dialog
+        open
+        role={role}
+        aria-modal="true"
+        aria-label={labelledBy ? undefined : ariaLabel}
+        aria-labelledby={labelledBy}
+        aria-describedby={describedBy}
         tabIndex={-1}
-        className="absolute inset-0 h-full w-full cursor-default border-0 bg-transparent p-0"
-        onClick={handleOverlayClick}
-        onPointerDown={handleOverlayPointerDown}
-      />
-      <div
-        ref={panelRef}
-        data-app-modal-panel="true"
-        tabIndex={-1}
+        style={
+          depth ? { zIndex: `calc(var(--z-modal) + ${depth})` } : undefined
+        }
         className={cn(
-          "bg-modal-surface relative z-10 w-full overflow-hidden overscroll-contain rounded-t-3xl border border-border-quiet shadow-2xl sm:rounded-3xl",
-          isDragClosing
-            ? undefined
-            : isEntering && !isDragging
-              ? "animate-sheet-up sm:animate-pop-in"
-              : undefined,
-          mobileSafeArea
-            ? "max-h-[calc(var(--listen-viewport-height)-var(--listen-safe-top)-0.75rem)] pb-[var(--listen-safe-bottom)] sm:max-h-[92vh] sm:pb-0"
-            : "max-h-[92vh]",
-          resolvedMaxWidthClassName,
-          panelClassName,
+          "crate-overlay-scrim z-app-modal fixed inset-0 m-0 flex h-full max-h-none w-full max-w-none items-end justify-center border-0 p-0 text-inherit sm:items-center sm:p-6",
+          overlayClassName,
         )}
-        style={{
-          transform: swipeY > 0 ? `translateY(${swipeY}px)` : undefined,
-          transition: isDragging
-            ? "none"
-            : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
-        }}
-        onClick={(event) => event.stopPropagation()}
-        onPointerDown={(event) => {
-          isDismissedRef.current = false;
-          event.stopPropagation();
-        }}
       >
+        <button
+          type="button"
+          aria-label={backdropLabel}
+          tabIndex={-1}
+          className="absolute inset-0 h-full w-full cursor-default border-0 bg-transparent p-0"
+          onClick={handleOverlayClick}
+          onPointerDown={handleOverlayPointerDown}
+        />
         <div
-          ref={dragHandleRef}
-          data-mobile-sheet-drag-handle="true"
+          ref={panelRef}
+          data-app-modal-panel="true"
+          data-modal-depth={depth}
+          data-overlay-size={size ?? "lg"}
+          tabIndex={-1}
           className={cn(
-            "flex justify-center sm:hidden",
-            mobileSafeArea ? "touch-none pt-4 pb-3" : "touch-none pt-2 pb-1",
+            "crate-overlay-panel relative z-10 flex min-h-0 w-full flex-col overflow-hidden overscroll-contain",
+            isDragClosing
+              ? undefined
+              : isEntering && !isDragging
+                ? "crate-overlay-enter"
+                : undefined,
+            mobileSafeArea
+              ? "max-h-[calc(var(--listen-viewport-height)-var(--listen-safe-top)-0.75rem)] pb-[var(--listen-safe-bottom)] sm:max-h-[92vh] sm:pb-0"
+              : "max-h-[92vh]",
+            panelClassName,
           )}
-          {...dragHandleProps}
+          style={{
+            transform: swipeY > 0 ? `translateY(${swipeY}px)` : undefined,
+            transition: isDragging
+              ? "none"
+              : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+          }}
+          onClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => {
+            isDismissedRef.current = false;
+            event.stopPropagation();
+          }}
         >
-          <div className="w-10 h-1 rounded-full bg-text-primary/20" />
-        </div>
-        {hasTitle ? (
-          <ModalHeader
+          <div
+            ref={dragHandleRef}
+            data-mobile-sheet-drag-handle="true"
             className={cn(
-              "flex items-center justify-between gap-4 px-5 py-4",
-              headerClassName,
+              "flex justify-center sm:hidden",
+              mobileSafeArea ? "touch-none pt-4 pb-3" : "touch-none pt-2 pb-1",
             )}
+            {...dragHandleProps}
           >
-            <div className="min-w-0">
-              <h2
-                id={titleId}
-                className="text-lg font-semibold text-text-primary"
-              >
-                {title}
-              </h2>
-              {hasDescription ? (
-                <p id={descriptionId} className="text-xs text-text-muted">
-                  {description}
-                </p>
-              ) : null}
-            </div>
+            <div className="crate-overlay-grabber" />
+          </div>
+          {hasTitle ? (
+            <ModalHeader
+              className={cn(
+                "flex items-center justify-between gap-4 px-5 py-4",
+                headerClassName,
+              )}
+            >
+              <div className="min-w-0 pr-12">
+                {eyebrow != null ? (
+                  <MonoLabel size="eyebrow" className="mb-2">
+                    {eyebrow}
+                  </MonoLabel>
+                ) : null}
+                <h2 id={titleId} className="crate-overlay-title">
+                  {title}
+                </h2>
+                {hasDescription ? (
+                  <p id={descriptionId} className="crate-overlay-body mt-2">
+                    {description}
+                  </p>
+                ) : null}
+              </div>
+            </ModalHeader>
+          ) : null}
+          {hasTitle ? (
             <ModalCloseButton
+              className="absolute top-4 right-4 z-20"
               onClick={onClose}
               disabled={closeDisabled}
               label={closeLabel}
             />
-          </ModalHeader>
-        ) : null}
-        {children}
-      </div>
-    </dialog>,
+          ) : null}
+          {children}
+        </div>
+      </dialog>
+    </ModalDepth>,
     document.body,
   );
 }
@@ -372,7 +296,7 @@ export function ModalHeader({
     <div
       {...props}
       className={cn(
-        "sticky top-0 z-10 border-b border-border-quiet bg-modal-surface backdrop-blur-xl",
+        "sticky top-0 z-10 border-b border-border-quiet bg-surface-popover",
         className,
       )}
     >
@@ -389,7 +313,10 @@ export function ModalBody({
   return (
     <div
       {...props}
-      className={cn("overflow-y-auto overscroll-contain", className)}
+      className={cn(
+        "crate-overlay-body min-h-0 flex-1 overflow-y-auto overscroll-contain",
+        className,
+      )}
     >
       {children}
     </div>
@@ -405,7 +332,7 @@ export function ModalFooter({
     <div
       {...props}
       className={cn(
-        "sticky bottom-0 z-10 border-t border-border-quiet bg-modal-surface backdrop-blur-xl",
+        "crate-overlay-footer sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-2 bg-surface-popover px-5 py-4",
         className,
       )}
     >
@@ -428,17 +355,11 @@ export function ModalCloseButton({
   label = "Close",
 }: ModalCloseButtonProps) {
   return (
-    <button
-      type="button"
+    <OverlayCloseButton
       aria-label={label}
-      className={cn(
-        "flex size-10 items-center justify-center rounded-full text-text-primary/55 transition-[color,box-shadow] hover:text-text-primary focus-visible:text-text-primary focus-visible:shadow-focus focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50",
-        className,
-      )}
+      className={className}
       onClick={onClick}
       disabled={disabled}
-    >
-      <X size={CRATE_ICON_SIZE.xl} />
-    </button>
+    />
   );
 }

@@ -3,6 +3,8 @@
 from datetime import date as date_type, datetime
 from typing import Any, Literal
 
+from crate.api.schemas.common import TrackMediaFieldsMixin
+
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -341,7 +343,7 @@ class SaveAlbumResponse(OkResponse):
     added: bool
 
 
-class LikedTrackResponse(IdentityFieldsMixin):
+class LikedTrackResponse(IdentityFieldsMixin, TrackMediaFieldsMixin):
     model_config = ConfigDict(extra="allow")
 
     track_id: int | None = None
@@ -416,6 +418,15 @@ class StatsOverviewTopArtistResponse(BaseModel):
     artist_slug: str | None = None
 
 
+class StatsOverviewPreviousResponse(BaseModel):
+    start: date_type | str
+    end: date_type | str
+    minutes_listened: float
+    play_count: int
+    active_days: int
+    artist_count: int
+
+
 class StatsOverviewResponse(BaseModel):
     window: str
     play_count: int
@@ -425,6 +436,7 @@ class StatsOverviewResponse(BaseModel):
     active_days: int
     skip_rate: float | int
     top_artist: StatsOverviewTopArtistResponse | None = None
+    previous: StatsOverviewPreviousResponse | None = None
 
 
 class TrendPointResponse(BaseModel):
@@ -440,13 +452,18 @@ class StatsTrendsResponse(BaseModel):
     points: list[TrendPointResponse] = Field(default_factory=list)
 
 
-class StatsTrackResponse(IdentityFieldsMixin):
+class StatsTrackResponse(IdentityFieldsMixin, TrackMediaFieldsMixin):
     model_config = ConfigDict(extra="allow")
 
     track_id: int | None = None
     global_track_uid: str | None = None
     track_entity_uid: str | None = None
     track_path: str | None = None
+    format: str | None = None
+    bitrate: int | None = None
+    sample_rate: int | None = None
+    bit_depth: int | None = None
+    duration: float | None = None
     title: str | None = None
     artist: str | None = None
     album: str | None = None
@@ -468,6 +485,7 @@ class StatsTrackResponse(IdentityFieldsMixin):
     minutes_listened: float | int
     first_played_at: datetime | str | None = None
     last_played_at: datetime | str | None = None
+    is_new: bool = False
 
 
 class StatsArtistResponse(BaseModel):
@@ -480,6 +498,7 @@ class StatsArtistResponse(BaseModel):
     minutes_listened: float | int
     first_played_at: datetime | str | None = None
     last_played_at: datetime | str | None = None
+    is_new: bool = False
 
 
 class StatsAlbumResponse(BaseModel):
@@ -496,6 +515,7 @@ class StatsAlbumResponse(BaseModel):
     minutes_listened: float | int
     first_played_at: datetime | str | None = None
     last_played_at: datetime | str | None = None
+    is_new: bool = False
 
 
 class StatsGenreResponse(BaseModel):
@@ -562,9 +582,9 @@ class StatsRhythmResponse(BaseModel):
 
 
 class StatsAudioProfileResponse(BaseModel):
-    energy: float | int = 0
-    danceability: float | int = 0
-    valence: float | int = 0
+    energy: float | int | None = None
+    danceability: float | int | None = None
+    valence: float | int | None = None
     bpm: float | int | None = None
 
 
@@ -607,6 +627,7 @@ class StatsStoryResponse(BaseModel):
     comebacks: list[StatsStoryArtistSignalResponse] = Field(default_factory=list)
     rhythm: StatsRhythmResponse
     audio_profile: StatsAudioProfileResponse
+    audio_profile_previous: StatsAudioProfileResponse | None = None
     monthly_snapshots: list[StatsMonthlySnapshotResponse] = Field(default_factory=list)
 
 
@@ -748,7 +769,12 @@ class StatsHeatmapPeakResponse(BaseModel):
 class StatsHeatmapResponse(BaseModel):
     cells: list[list[float]] = Field(default_factory=list)
     peak: StatsHeatmapPeakResponse | None = None
-    night_share: float = 0
+    # Null when the instance heatmap is hidden (PD43).
+    night_share: float | None = 0
+    night_hours: list[int] = Field(default_factory=list)
+    listener_count: int | None = None
+    # "few_listeners" when Crate Pulse has fewer than three listeners (PD43).
+    hidden_reason: str | None = None
 
 
 class StatsYearAlbumResponse(BaseModel):
@@ -769,6 +795,8 @@ class StatsMusicAgeResponse(BaseModel):
     median_year: int
     decades: list[StatsDecadeShareResponse] = Field(default_factory=list)
     oldest_album: StatsYearAlbumResponse | None = None
+    newest_album: StatsYearAlbumResponse | None = None
+    share_this_year: float | None = None
 
 
 class StatsGenreTrendResponse(BaseModel):
@@ -776,6 +804,7 @@ class StatsGenreTrendResponse(BaseModel):
     slug: str | None = None
     share: float
     delta_vs_previous: float | None = None
+    faller: bool = False
 
 
 class StatsTopListenerResponse(BaseModel):
@@ -786,6 +815,66 @@ class StatsTopListenerResponse(BaseModel):
     minutes: float
     plays: int
     active_days: int
+
+
+class StatsSnapshotMetaResponse(BaseModel):
+    scope: str | None = None
+    subject_key: str | None = None
+    version: int | None = None
+    # ui_snapshots stores TIMESTAMPTZ; warm and stale rows arrive as datetimes.
+    built_at: datetime | str | None = None
+    source_seq: int | None = None
+    stale_after: datetime | str | None = None
+    stale: bool = False
+    pending: bool = False
+    generation_ms: int | None = None
+
+
+class StatsRangeArtistResponse(BaseModel):
+    artist_name: str
+    artist_id: int | None = None
+    artist_slug: str | None = None
+    minutes: float
+    plays: int
+    share: float
+
+
+class StatsRangeAlbumResponse(StatsAlbumRefResponse):
+    minutes: float
+
+
+class StatsRangeTrackResponse(StatsTrackRefResponse):
+    track_path: str | None = None
+    track_entity_uid: str | None = None
+    bpm: float | None = None
+    audio_key: str | None = None
+    audio_scale: str | None = None
+    format: str | None = None
+    bitrate: int | None = None
+    sample_rate: int | None = None
+    bit_depth: int | None = None
+    duration: float | None = None
+    plays: int
+    minutes: float
+
+
+class StatsRangeDiscoveryResponse(BaseModel):
+    artist_name: str
+    artist_id: int | None = None
+    artist_slug: str | None = None
+    first_day: str
+    minutes: float
+
+
+class StatsRangeResponse(BaseModel):
+    start: str
+    end: str
+    available: bool = True
+    hidden_reason: str | None = None
+    top_artists: list[StatsRangeArtistResponse] = Field(default_factory=list)
+    top_albums: list[StatsRangeAlbumResponse] = Field(default_factory=list)
+    top_tracks: list[StatsRangeTrackResponse] = Field(default_factory=list)
+    discoveries: list[StatsRangeDiscoveryResponse] = Field(default_factory=list)
 
 
 class StatsDashboardResponse(BaseModel):
@@ -811,6 +900,7 @@ class StatsDashboardResponse(BaseModel):
     music_age: StatsMusicAgeResponse | None = None
     genre_trend: list[StatsGenreTrendResponse] = Field(default_factory=list)
     top_listeners: list[StatsTopListenerResponse] = Field(default_factory=list)
+    snapshot: StatsSnapshotMetaResponse | None = None
 
 
 class HomeArtworkRefResponse(IdentityFieldsMixin):
@@ -827,7 +917,7 @@ class HomeArtworkRefResponse(IdentityFieldsMixin):
     artist_name: str | None = None
 
 
-class HomeTrackResponse(IdentityFieldsMixin):
+class HomeTrackResponse(IdentityFieldsMixin, TrackMediaFieldsMixin):
     model_config = ConfigDict(extra="allow")
 
     track_id: int | None = None

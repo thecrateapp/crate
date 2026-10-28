@@ -52,12 +52,6 @@ class PathsSettingsUpdateRequest(BaseModel):
     llm_refinement_enabled: bool | None = None
 
 
-class TelegramSettingsUpdateRequest(BaseModel):
-    bot_token: str | None = None
-    enabled: bool | None = None
-    chat_id: str | int | None = None
-
-
 class SoulseekSettingsUpdateRequest(BaseModel):
     url: str | None = None
     quality: str | None = None
@@ -108,13 +102,6 @@ class SoulseekSettingsResponse(BaseModel):
     shares_music: bool
 
 
-class TelegramSettingsResponse(BaseModel):
-    enabled: bool
-    bot_token: str
-    chat_id: str
-    has_token: bool
-
-
 class AboutInfoResponse(BaseModel):
     version: str
     git_commit: str
@@ -139,7 +126,6 @@ class SettingsResponse(BaseModel):
     paths: PathsSettingsResponse
     shows: ShowsSettingsResponse
     soulseek: SoulseekSettingsResponse
-    telegram: TelegramSettingsResponse
     about: AboutInfoResponse
 
 
@@ -166,7 +152,3 @@ class RemoteScrobblingPreferenceResponse(BaseModel):
 
 class RemoteScrobblingPreferenceUpdate(BaseModel):
     remote_scrobbling_enabled: bool
-
-
-class TelegramTestResponse(OkResponse):
-    pass

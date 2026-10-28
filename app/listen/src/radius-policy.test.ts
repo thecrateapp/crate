@@ -22,14 +22,14 @@ function productionSourceFiles(directory: string): string[] {
 }
 
 describe("Listen radius policy", () => {
-  it("normalizes legacy text CTAs without changing icon-only controls", () => {
+  it("normalizes legacy text CTAs while exempting v3 chips and icon-only controls", () => {
     const listenStyles = readFileSync(
       resolve(SOURCE_ROOT, "index.css"),
       "utf8",
     );
 
     expect(listenStyles).toMatch(
-      /:is\(button,\s*a\)\.rounded-full\[class\*=["']px-["']\]\s*\{[^}]*border-radius:\s*var\(--radius-lg\)/s,
+      /:is\(button,\s*a\)\.rounded-full\[class\*=["']px-["']\]:not\(\[data-slot=["']chip["']\]\)\s*\{[^}]*border-radius:\s*var\(--radius-lg\)/s,
     );
   });
 

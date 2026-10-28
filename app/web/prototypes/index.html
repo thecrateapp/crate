@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crate · Hero prototypes</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      main {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 14vh clamp(20px, 6vw, 96px) 12vh;
+      }
+      h1 {
+        font-size: clamp(3rem, 8vw, 7rem);
+        margin: 16px 0 12px;
+      }
+      .lede {
+        max-width: 60ch;
+        color: var(--fg-2);
+        line-height: 1.6;
+        margin: 0 0 64px;
+      }
+      h2 {
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: clamp(1.6rem, 3vw, 2.4rem);
+        letter-spacing: -0.03em;
+        margin: 64px 0 8px;
+      }
+      .option {
+        display: grid;
+        grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1.3fr);
+        gap: 24px;
+        align-items: baseline;
+        padding: 26px 0;
+        border-top: 1px solid var(--line);
+        color: var(--fg);
+        text-decoration: none;
+        transition: color 0.3s var(--ease-snap);
+      }
+      .option:hover {
+        color: var(--cyan-hi);
+      }
+      .option strong {
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: clamp(1.6rem, 3vw, 2.6rem);
+        letter-spacing: -0.035em;
+      }
+      .option .what {
+        color: var(--fg-2);
+        line-height: 1.55;
+        font-size: 15px;
+      }
+      .option .what em {
+        display: block;
+        margin-top: 6px;
+        font-style: normal;
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--fg-3);
+      }
+      .archive {
+        margin-top: 72px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px 28px;
+        font-family: var(--mono);
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .archive a {
+        color: var(--fg-3);
+      }
+      .archive a:hover {
+        color: var(--cyan-hi);
+      }
+      @media (max-width: 760px) {
+        .option {
+          grid-template-columns: 40px minmax(0, 1fr);
+        }
+        .option .what {
+          grid-column: 2;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow"><b>v3</b> / iteration on A and C</p>
+      <h1 class="display">Pick a hero</h1>
+      <p class="lede">Six directions built on the A and C heroes. Each one runs on its own: wait about ten seconds, move the mouse, then scroll to the end to see the transition into the screencast.</p>
+
+      <h2>A · The library as a field</h2>
+      <a class="option" href="a1-paths.html">
+        <span class="eyebrow">A1</span><strong>Paths</strong>
+        <span class="what">Centered headline over the field. A Music Path draws itself under the CTA: six steps, rising BPM, neighbouring keys. Scroll dives into the field.<em>Try: wait for a few paths, scroll slowly</em></span>
+      </a>
+      <a class="option" href="a2-order.html">
+        <span class="eyebrow">A2</span><strong>Order</strong>
+        <span class="what">Asymmetric split. The field starts as noise; scrolling sorts it into clusters with genre labels while the second message lands: your library, organised by sound.<em>Try: scroll through the whole pinned section</em></span>
+      </a>
+      <a class="option" href="a3-mark.html">
+        <span class="eyebrow">A3</span><strong>Mark</strong>
+        <span class="what">Forty thousand points fly in and form the Crate mark. The cursor pushes them away. Scrolling dissolves the mark back into the library and dives in.<em>Try: sweep the cursor over the mark</em></span>
+      </a>
+
+      <h2>C · The library as records</h2>
+      <a class="option" href="c1-shelf.html">
+        <span class="eyebrow">C1</span><strong>Shelf</strong>
+        <span class="what">Cover flow with the focal record in colour and its vinyl sliding out of the sleeve, spinning. Drag, arrow keys or click a side record. The focal record flies into the screencast frame.<em>Try: drag sideways, then scroll</em></span>
+      </a>
+      <a class="option" href="c2-crate.html">
+        <span class="eyebrow">C2</span><strong>Crate</strong>
+        <span class="what">A real record crate seen from above. The front record tips forward to reveal the next. Scrolling flips through fourteen records while a counter runs through the library.<em>Try: click the crate, then scroll</em></span>
+      </a>
+      <a class="option" href="c3-now.html">
+        <span class="eyebrow">C3</span><strong>Now Playing</strong>
+        <span class="what">Full-bleed cyan duotone of the current album, the sharp sleeve on the right with progress and an up-next queue. Albums wipe in every five seconds; the sleeve becomes the screencast.<em>Try: hover the sleeve, click the queue</em></span>
+      </a>
+
+      <div class="archive">
+        <span class="eyebrow">Archive</span>
+        <a href="a-signal-lock.html">v2 A</a>
+        <a href="c-digging.html">v2 C</a>
+        <a href="b-spectrum.html">v2 B (discarded)</a>
+        <a href="v1/a-signal-lock.html">v1 A</a>
+        <a href="v1/b-spectrum.html">v1 B</a>
+        <a href="v1/c-digging.html">v1 C</a>
+      </div>
+    </main>
+  </body>
+</html>

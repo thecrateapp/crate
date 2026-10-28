@@ -1,9 +1,8 @@
 import type { TFunction } from "i18next";
 
-import type { UpcomingItem } from "./upcoming-model";
+import type { UpcomingItem } from "./upcoming-types";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-const HOUR_MS = 60 * 60 * 1000;
+import { upcomingCountdown } from "./upcoming-timing-model";
 
 export function formatShowTimeRemaining(
   item: UpcomingItem,
@@ -15,36 +14,27 @@ export function formatShowTimeRemaining(
   const t = typeof tOrNow === "function" ? tOrNow : null;
   const now = tOrNow instanceof Date ? tOrNow : nowArg;
 
-  const showDate = new Date(`${item.date}T${item.time || "12:00:00"}`);
-  if (Number.isNaN(showDate.getTime())) return null;
-
-  const diff = showDate.getTime() - now.getTime();
-  if (diff <= 0) return t ? t("radar.show.time.showTime") : "Show time";
-
-  const days = Math.floor(diff / DAY_MS);
-  if (days >= 60) {
-    const count = Math.round(days / 30);
-    return t
-      ? t("radar.show.time.monthsToGo", { count })
-      : `${count} months to go`;
+  const countdown = upcomingCountdown(item.date, item.time, now);
+  if (!countdown) {
+    const target = new Date(`${item.date}T${item.time || "23:59:59"}`);
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(item.date) ||
+      target.getMonth() + 1 !== Number(item.date.slice(5, 7)) ||
+      target.getDate() !== Number(item.date.slice(8, 10)) ||
+      !(target.getTime() <= now.getTime())
+    )
+      return null;
+    return t ? t("radar.show.time.showTime") : "Show time";
   }
-  if (days >= 30) {
-    return t ? t("radar.show.time.oneMonthToGo") : "1 month to go";
-  }
-  if (days >= 1) {
-    return t
-      ? t("radar.show.time.daysToGo", { count: days })
-      : `${days} ${days === 1 ? "day" : "days"} to go`;
-  }
-
-  const hours = Math.floor(diff / HOUR_MS);
-  if (hours >= 1) {
-    return t
-      ? t("radar.show.time.hoursToGo", { count: hours })
-      : `${hours} ${hours === 1 ? "hour" : "hours"} to go`;
-  }
-
-  return t ? t("radar.show.time.startingSoon") : "Starting soon";
+  const { value: count, unit } = countdown;
+  return t
+    ? t(
+        unit === "hours"
+          ? "radar.show.time.hoursToGo"
+          : "radar.show.time.daysToGo",
+        { count },
+      )
+    : `${count} ${unit === "hours" ? (count === 1 ? "hour" : "hours") : count === 1 ? "day" : "days"} to go`;
 }
 
 function showDestination(item: UpcomingItem): string | null {

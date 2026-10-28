@@ -1,3 +1,4 @@
+import { ArtistDetailSection } from "./ArtistDetailSection";
 import { ArtistNetworkGraph } from "@/components/artist/ArtistNetworkGraph";
 import { SimilarArtistCard } from "@/components/artist/ArtistPageBits";
 
@@ -25,14 +26,13 @@ export function ArtistSimilarSection({
 }: ArtistSimilarSectionProps) {
   return (
     <div>
-      <div className="bg-card border border-border rounded-md overflow-hidden mb-6">
-        <h4 className="text-sm font-semibold px-4 pt-4 pb-2">Artist Network</h4>
+      <ArtistDetailSection title="Artist Network" className="mb-8">
         <ArtistNetworkGraph
           centerArtist={artistName}
           centerArtistId={artistId}
           centerArtistEntityUid={artistEntityUid}
         />
-      </div>
+      </ArtistDetailSection>
       {artists.length > 0 && (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-4">
           {artists.map((artist) => (

@@ -51,6 +51,8 @@ export interface Track {
   valence?: number | null;
   blissVector?: number[] | null;
   isSuggested?: boolean;
+  /** Automatically appended album/playlist radio; explicit queue additions stay unmarked. */
+  isAutoplayContinuation?: boolean;
   suggestionSource?: "playlist";
   origin?: TrackOrigin;
   offlineOnly?: boolean;
@@ -58,6 +60,14 @@ export interface Track {
 }
 
 export type RepeatMode = "off" | "one" | "all";
+
+export interface CrossfadeTransition {
+  outgoing: Track;
+  incoming: Track;
+  durationMs: number;
+  startedAt: number;
+  outgoingDurationSeconds: number;
+}
 
 type RadioSeedType =
   | "track"

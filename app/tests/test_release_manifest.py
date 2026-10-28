@@ -219,3 +219,65 @@ def test_release_environment_uses_immutable_digest_references() -> None:
         in rendered
     )
     assert ":latest" not in rendered
+
+
+AGENT_DIGEST = f"sha256:{777:064x}"
+
+
+def test_any_change_rebuilds_the_agent_image_without_touching_fleet_detection() -> None:
+    detect_agent = release_manifest.detect_changed_agent_images
+    assert detect_changed_images(["docs/technical/operations.md"]) == {"docs"}
+    assert detect_agent(["docs/technical/operations.md"]) == {"agent"}
+    assert detect_agent([]) == set()
+    assert detect_agent([], requested="api") == set()
+    assert detect_agent([], requested="agent") == {"agent"}
+    assert detect_changed_images([], requested="agent") == set()
+    assert "agent" in detect_agent([], requested="all")
+
+
+def test_agent_image_is_an_optional_entry_outside_the_fleet() -> None:
+    previous = _previous_manifest()
+    validate_manifest(previous, registry="ghcr.io", owner="thecrateapp")
+    without = assemble_manifest(
+        release_sha=RELEASE_SHA,
+        registry="ghcr.io",
+        owner="thecrateapp",
+        previous=previous,
+        changed_digests={},
+    )
+    assert "agent_images" not in without
+    assert "CRATE_AGENT_IMAGE" not in render_release_env(without)
+
+    manifest = assemble_manifest(
+        release_sha=RELEASE_SHA,
+        registry="ghcr.io",
+        owner="thecrateapp",
+        previous=previous,
+        changed_digests={"agent": AGENT_DIGEST},
+    )
+    assert set(manifest["images"]) == set(IMAGE_SPECS)
+    entry = manifest["agent_images"]["agent"]
+    assert entry["repository"] == "ghcr.io/thecrateapp/crate-agent"
+    assert entry["services"] == ["crate-agent", "crate-operator"]
+    assert (
+        f"CRATE_AGENT_IMAGE=ghcr.io/thecrateapp/crate-agent@{AGENT_DIGEST}"
+        in render_release_env(manifest)
+    )
+
+    carried = assemble_manifest(
+        release_sha="c" * 40,
+        registry="ghcr.io",
+        owner="thecrateapp",
+        previous=manifest,
+        changed_digests={},
+    )
+    assert carried["agent_images"] == manifest["agent_images"]
+
+    tampered = deepcopy(manifest)
+    tampered["agent_images"]["agent"]["digest"] = "latest"
+    with pytest.raises(ManifestError, match="digest"):
+        validate_manifest(tampered)
+    unknown = deepcopy(manifest)
+    unknown["agent_images"]["other"] = entry
+    with pytest.raises(ManifestError, match="unknown agent image"):
+        validate_manifest(unknown)

@@ -1,6 +1,6 @@
 import { Activity, Sun, Volume2, Zap } from "@crate/ui/icons";
 
-import type { EqFeatures } from "@/hooks/use-eq-features";
+import type { EqFeatures } from "../../lib/equalizer-types";
 
 export type AdaptiveFeatureChipData = {
   key: string;

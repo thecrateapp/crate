@@ -254,7 +254,9 @@ describe("HomeTasteHero", () => {
     expect(screen.getByText("Featured Artist")).toBeInTheDocument();
     expect(screen.queryByText("Just landed")).toBeNull();
     expect(screen.queryByText("Recommended")).toBeNull();
-    expect(screen.getByTitle("Hardcore")).toHaveClass("rounded-md");
+    expect(screen.getByText("hardcore").closest(".genre-pill")!).toHaveClass(
+      "rounded-full",
+    );
     expect(screen.getByText("hardcore")).toBeInTheDocument();
     expect(screen.getByText("mathcore")).toBeInTheDocument();
     expect(screen.queryByText("metalcore")).toBeNull();
@@ -386,7 +388,7 @@ describe("HomeTasteHero", () => {
     );
   });
 
-  it("keeps the Featured Artist kicker tight to the artist name", () => {
+  it("uses the canonical MonoLabel kicker while keeping the artist name adjacent", () => {
     mockDesktopPointer();
 
     renderWithListenProviders(
@@ -399,7 +401,12 @@ describe("HomeTasteHero", () => {
       />,
     );
 
-    expect(screen.getByText("Featured Artist")).toHaveClass("leading-none");
+    expect(screen.getByText("Featured Artist")).toHaveClass(
+      "font-mono",
+      "font-normal",
+      "text-label",
+      "uppercase",
+    );
     expect(screen.getByRole("heading", { name: "Converge" })).toHaveClass(
       "mt-1",
     );
@@ -454,12 +461,6 @@ describe("HomeTasteHero", () => {
         onOpenArtist={vi.fn()}
         onPlay={vi.fn()}
         onToggleFollow={vi.fn()}
-        desktopIntro={
-          <div>
-            <h1>Good morning</h1>
-            <p>Saturday, August 1</p>
-          </div>
-        }
       />,
     );
 
@@ -471,11 +472,6 @@ describe("HomeTasteHero", () => {
       "aspect-[1480/600]",
       "min-h-[clamp(480px,38dvh,600px)]",
     );
-    expect(
-      within(screen.getByTestId("desktop-hero-intro")).getByRole("heading", {
-        name: "Good morning",
-      }),
-    ).toBeInTheDocument();
     for (const layer of screen.getAllByTestId("desktop-hero-copy-layer")) {
       expect(layer).toHaveClass("top-[39%]");
       expect(layer).not.toHaveClass("bottom-0");
@@ -837,6 +833,24 @@ describe("HomeTasteHero", () => {
 });
 
 describe("RecentEntityRow", () => {
+  it("keeps the canonical EntityRow title weight without a local typography override", () => {
+    renderWithListenProviders(
+      <RecentEntityRow
+        item={
+          {
+            type: "album",
+            album_name: "Sample record",
+            artist_name: "Sample artist",
+            album_id: 7,
+          } as HomeRecentItem
+        }
+        onClick={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Sample record")).toHaveClass("font-medium");
+    expect(screen.getByText("Sample record")).not.toHaveClass("font-semibold");
+  });
+
   it("shows only the first four recently played rows on mobile and keeps view all", () => {
     mockMobilePointer();
     const onViewAll = vi.fn();
@@ -1063,7 +1077,7 @@ describe("RecentEntityRow", () => {
     });
 
     const menu = await screen.findByRole("menu");
-    expect(menu).toHaveClass("listen-glass-panel", "w-72", "rounded-panel");
+    expect(menu).toHaveClass("crate-overlay-surface", "w-72");
     expect(within(menu).getByText("El Cielo")).toBeInTheDocument();
     expect(within(menu).getByText("Dredg")).toBeInTheDocument();
     expect(
@@ -1163,9 +1177,11 @@ describe("RadioStationCard", () => {
     expect(screen.getByText("Artist Radio")).toBeInTheDocument();
     expect(screen.getByText("Converge")).toBeInTheDocument();
     expect(screen.queryByText("Based on your heavy rotation")).toBeNull();
-    expect(container.querySelector(".home-radio-card")).toBeInTheDocument();
     expect(
-      container.querySelector('.crate-badge[data-surface="overlay"]'),
+      container.querySelector('[data-slot="entity-card"]'),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('.crate-info-badge[data-surface="overlay"]'),
     ).toBeInTheDocument();
   });
 
@@ -1271,7 +1287,7 @@ describe("UpcomingAlbumsSection", () => {
     );
 
     expect(screen.getByText("What's coming up")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "View all" }));
+    fireEvent.click(screen.getByRole("button", { name: "View All" }));
     expect(onViewAll).toHaveBeenCalledWith("upcoming-albums");
   });
 });

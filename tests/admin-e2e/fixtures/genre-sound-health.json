@@ -1,0 +1,49 @@
+{
+  "eq": {
+    "total_genres": 94,
+    "sources": [
+      {
+        "source": "genre_taxonomy_preset",
+        "count": 88,
+        "percent": 93.6
+      },
+      {
+        "source": "genre_taxonomy_inherited_preset",
+        "count": 4,
+        "percent": 4.3
+      },
+      {
+        "source": "no_genre_eq",
+        "count": 2,
+        "percent": 2.1
+      }
+    ]
+  },
+  "taxonomy": {
+    "node_count": 94,
+    "top_level_count": 8,
+    "orphan_count": 0,
+    "missing_description_count": 3,
+    "missing_direct_eq_count": 6,
+    "missing_effective_eq_count": 2,
+    "unmapped_raw_count": 0,
+    "edge_count": 112,
+    "locked_edge_count": 10,
+    "manual_edge_count": 12,
+    "ai_edge_count": 90
+  },
+  "listening_priorities": [
+    {
+      "slug": "post-hardcore",
+      "name": "Post-Hardcore",
+      "weighted_play_count": 42.5,
+      "listening_share_90d_pct": 6.8
+    },
+    {
+      "slug": "alternative-rock",
+      "name": "Alternative Rock",
+      "weighted_play_count": 18,
+      "listening_share_90d_pct": 2.9
+    }
+  ]
+}

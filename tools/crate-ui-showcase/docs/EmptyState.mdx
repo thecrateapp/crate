@@ -1,0 +1,24 @@
+import { Meta, Canvas } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/EmptyState.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">EmptyState</DocHeading>
+<EntryDetails
+  id="domain-lists-emptystate"
+  review="Web closure · awaiting review"
+/>
+
+<DocHeading as="h2">Contract</DocHeading>
+
+Inline textual empty state, semantic heading, descriptive prose and injected native action. Panel/dashed are compatibility aliases. Empty collection, empty filter and failed request are different states; do not turn failure into a fake zero.
+
+The approved mockup and Diego's later amendments are the visual reference. This entry documents actual existing components; native device, assistive technology and complete consumer certification remain separate. No production requests, credentials or persistent preference writes occur here.
+
+Content is centred in its container, both in plain flow and inside bordered or card regions. Callers do not add padding, height or alignment classes.
+
+Copy follows one rule in both apps. `title` is a short state without a final period ("No tracks yet", "No lyrics found"). `message` is one full sentence ending in a period that says what fills the space or what to do next, without repeating the title. A short fragment alone goes in `title`; a single sentence alone goes in `message`. Never mention implementation details such as "modal".
+
+<Canvas of={Stories.Base} />
+<Canvas of={Stories.LongContent} />

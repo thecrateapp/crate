@@ -1,10 +1,11 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import React, { useState } from "react";
-import { useNavigate } from "react-router";
-import { ImageDown, Loader2, Music } from "lucide-react";
+import { ImagePlus, Loader2 } from "@crate/ui/icons";
+import { EntityCard } from "@crate/ui/domain/entity/EntityCard";
 import { toast } from "sonner";
 
-import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
-import { CrateChip } from "@crate/ui/primitives/CrateBadge";
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+
 import { MusicContextMenu } from "@/components/ui/music-context-menu";
 import { api } from "@/lib/api";
 import {
@@ -29,15 +30,6 @@ interface AlbumCardProps {
   bitDepth?: number | null;
   sampleRate?: number | null;
   hasCover?: boolean;
-}
-
-function hashColor(value: string): string {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = value.charCodeAt(index) + ((hash << 5) - hash);
-  }
-  const hue = Math.abs(hash) % 360;
-  return `hsl(${hue}, 30%, 15%)`;
 }
 
 function qualityLabel(
@@ -78,9 +70,8 @@ export const AlbumCard = React.memo(function AlbumCard({
   bitDepth,
   sampleRate,
 }: AlbumCardProps) {
-  const navigate = useNavigate();
-  const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [coverRevision, setCoverRevision] = useState(0);
   const [fetchingCover, setFetchingCover] = useState(false);
   const coverUrl = albumCoverApiUrl({
     albumId,
@@ -92,6 +83,7 @@ export const AlbumCard = React.memo(function AlbumCard({
   });
 
   async function handleFetchCover(event: React.MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
     event.stopPropagation();
     if (!albumId || fetchingCover) return;
     setFetchingCover(true);
@@ -102,8 +94,8 @@ export const AlbumCard = React.memo(function AlbumCard({
       );
       toast.success("Searching for cover...");
       await new Promise((resolve) => window.setTimeout(resolve, 8000));
+      setCoverRevision(Date.now());
       setImgError(false);
-      setImgLoaded(false);
     } catch {
       toast.error("Failed to search for cover");
     } finally {
@@ -123,121 +115,76 @@ export const AlbumCard = React.memo(function AlbumCard({
       albumEntityUid={albumEntityUid}
       albumSlug={albumSlug}
     >
-      <div
-        role="link"
-        tabIndex={0}
-        onClick={() =>
-          navigate(
-            albumPagePath({
-              albumId,
-              albumSlug,
-              artistSlug,
-              artistName: artist,
-              albumName: name,
-            }),
-          )
-        }
-        onKeyDown={(event) => {
-          if (event.target !== event.currentTarget) return;
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            navigate(
-              albumPagePath({
-                albumId,
-                albumSlug,
-                artistSlug,
-                artistName: artist,
-                albumName: name,
-              }),
-            );
-          }
-        }}
-        className="group cursor-pointer rounded-md p-2 text-left transition-colors hover:bg-white/5"
-      >
-        <div className="relative mb-3 aspect-square overflow-hidden rounded-md bg-white/5">
-          {!imgError ? (
-            <img
-              src={coverUrl}
-              alt={name}
-              loading="lazy"
-              className={`h-full w-full object-cover transition-opacity duration-300 ${
-                imgLoaded ? "opacity-100" : "opacity-0"
-              }`}
-              onLoad={() => setImgLoaded(true)}
-              onError={() => setImgError(true)}
-            />
-          ) : null}
-          {imgError || !imgLoaded ? (
-            <div
-              className={`absolute inset-0 flex items-center justify-center transition-opacity duration-300 ${
-                imgLoaded && !imgError ? "opacity-0" : "opacity-100"
-              }`}
-              style={{
-                background: `linear-gradient(135deg, ${hashColor(
-                  name,
-                )}, ${hashColor(name + name)})`,
-              }}
-            >
-              <span className="text-3xl font-bold text-white/25">
-                {name.charAt(0).toUpperCase()}
-              </span>
-              {!imgError ? (
-                <Music
-                  size={16}
-                  className="absolute bottom-2 right-2 text-white/10"
-                />
+      <div className="group relative min-w-0">
+        <EntityCard
+          title={displayName || name}
+          href={albumPagePath({
+            albumId,
+            albumSlug,
+            artistSlug,
+            artistName: artist,
+            albumName: name,
+          })}
+          layout="grid"
+          menuButton="none"
+          disableItemActionTarget
+          cover={{
+            src: imgError
+              ? null
+              : `${coverUrl}${coverRevision ? `${coverUrl.includes("?") ? "&" : "?"}t=${coverRevision}` : ""}`,
+            alt: name,
+            renderImage: (image) => (
+              <img
+                src={image.src}
+                alt={image.alt}
+                className={image.className}
+                loading="lazy"
+                onError={() => {
+                  image.onError();
+                  setImgError(true);
+                }}
+              />
+            ),
+          }}
+          subtitle={year ? `${year} · ${artist}` : artist}
+          meta={
+            <span className="flex flex-wrap items-center gap-2">
+              <span>{tracks} tracks</span>
+              {qualityLabel(formats, bitDepth, sampleRate) ? (
+                <InfoBadge
+                  tone={
+                    qualityLabel(formats, bitDepth, sampleRate)?.tier ===
+                    "lossy"
+                      ? "neutral"
+                      : "accent"
+                  }
+                >
+                  {qualityLabel(formats, bitDepth, sampleRate)?.label}
+                </InfoBadge>
               ) : null}
-            </div>
-          ) : null}
-
-          {imgError && albumId ? (
-            <ActionIconButton
-              variant="card"
-              className="absolute right-2 top-2 opacity-100 md:opacity-0 md:group-hover:opacity-100"
+            </span>
+          }
+        />
+        {imgError && albumId ? (
+          <div className="absolute right-3 top-3 pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100">
+            <ActionButton
               onClick={handleFetchCover}
-              disabled={fetchingCover}
-              title="Search for cover"
+              loading={fetchingCover}
+              label="Search for cover"
             >
               {fetchingCover ? (
-                <Loader2 size={15} className="animate-spin" />
+                <Loader2
+                  data-admin-ux="album-cover-loading"
+                  aria-hidden="true"
+                  className="animate-spin"
+                />
               ) : (
-                <ImageDown size={15} />
+                <ImagePlus
+                  data-admin-ux="album-cover-search"
+                  aria-hidden="true"
+                />
               )}
-            </ActionIconButton>
-          ) : null}
-        </div>
-
-        <div className="truncate text-sm font-medium text-foreground">
-          {displayName || name}
-        </div>
-        <div className="truncate text-xs text-muted-foreground">
-          {year ? `${year} · ${artist}` : artist}
-          <span className="ml-1.5 text-white/35">· {tracks} tracks</span>
-        </div>
-        {formats.length ? (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {(() => {
-              const q = qualityLabel(formats, bitDepth, sampleRate);
-              if (!q)
-                return formats.map((f) => (
-                  <CrateChip key={f}>
-                    {f.replace(".", "").toUpperCase()}
-                  </CrateChip>
-                ));
-              return (
-                <span
-                  className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium leading-none ${
-                    q.tier === "hi-res"
-                      ? "border-amber-400/50 text-amber-300 bg-amber-400/10"
-                      : q.tier === "lossless"
-                        ? "border-cyan-400/40 text-cyan-300 bg-cyan-400/8"
-                        : "border-white/15 text-muted-foreground"
-                  }`}
-                >
-                  {q.label}
-                </span>
-              );
-            })()}
+            </ActionButton>
           </div>
         ) : null}
       </div>

@@ -1,3 +1,4 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import {
   AlertCircle,
   ArrowDownToLine,
@@ -10,7 +11,6 @@ import {
   type OfflineItemState,
 } from "@crate/ui/lib/offline";
 import { cn } from "@crate/ui/lib/cn";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 interface OfflineBadgeProps {
   state: OfflineItemState;
@@ -68,15 +68,16 @@ export function OfflineBadge({
           : Loader2;
 
   return (
-    <CrateBadge
+    <InfoBadge
       icon={badgeIcon}
       tone={state === "error" ? "danger" : "accent"}
       surface={compact ? "overlay" : "default"}
       title={compact && label ? label : undefined}
-      className={cn(compact && "px-1.5", className)}
+      aria-label={compact && label ? label : undefined}
+      className={className}
       iconClassName={badgeIcon === Loader2 ? "animate-spin" : undefined}
     >
       {!compact ? label : null}
-    </CrateBadge>
+    </InfoBadge>
   );
 }

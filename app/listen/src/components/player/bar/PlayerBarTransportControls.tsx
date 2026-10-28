@@ -1,3 +1,5 @@
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+import type { ReactNode } from "react";
 import type { TFunction } from "i18next";
 import {
   Loader2,
@@ -10,17 +12,16 @@ import {
   SkipBack,
   SkipForward,
 } from "@crate/ui/icons";
-import { SpectrumPlayButton } from "@/components/player/SpectrumPlayButton";
-import {
-  PlayerBarProgress,
-  type PlayerSeekHover,
-} from "@/components/player/bar/PlayerBarProgress";
-import { WaveformCanvas } from "@/components/player/bar/WaveformCanvas";
-import type { RepeatMode } from "@/contexts/player-types";
+import { SpectrumPlayButton } from "../SpectrumPlayButton";
+import { PlayerBarProgress, type PlayerSeekHover } from "./PlayerBarProgress";
+import { WaveformCanvas } from "./WaveformCanvas";
+import type { RepeatMode } from "../../../contexts/player-types";
 
-export type { PlayerSeekHover } from "@/components/player/bar/PlayerBarProgress";
+export type { PlayerSeekHover } from "./PlayerBarProgress";
 
 type PlayerBarTransportControlsProps = {
+  progressSlot?: ReactNode;
+  readAudioFrame?: () => { frequenciesDb: number[]; sampleRate: number };
   t: TFunction;
   frequenciesDb: number[];
   sampleRate: number;
@@ -119,70 +120,61 @@ function DesktopTransportActions({
   onCycleRepeat,
 }: TransportActionProps) {
   return (
-    <div className="relative flex items-center justify-center gap-3 lg:gap-5">
-      <button
-        type="button"
+    <div
+      data-slot="player-transport"
+      className="relative flex items-center justify-center gap-0 lg:gap-1"
+    >
+      <ActionButton
+        label={shuffle ? t("player.disableShuffle") : t("player.enableShuffle")}
+        aria-pressed={shuffle}
         onClick={onToggleShuffle}
         disabled={jamQueueLocked}
-        aria-label={
-          shuffle ? t("player.disableShuffle") : t("player.enableShuffle")
-        }
-        className={`transition-colors disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 ${
-          shuffle
-            ? "text-accent-action drop-shadow-accent-action"
-            : "text-text-muted hover:text-accent-action hover:drop-shadow-accent-action"
-        }`}
       >
-        <Shuffle size={CRATE_ICON_SIZE.md} />
-      </button>
-      <button
-        type="button"
+        <Shuffle size={CRATE_ICON_SIZE.lg} />
+      </ActionButton>
+      <ActionButton
+        label={t("player.previous")}
         onClick={onPreviousTrack}
         disabled={jamQueueLocked}
-        aria-label={t("player.previous")}
-        className="text-text-secondary transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:text-text-secondary"
       >
-        <SkipBack size={CRATE_ICON_SIZE.lg} fill="currentColor" />
-      </button>
-      <PlayPauseControl
-        t={t}
-        effectiveIsPlaying={effectiveIsPlaying}
-        effectiveIsBuffering={effectiveIsBuffering}
-        onPlayPause={onPlayPause}
-        disabled={jamTransportDisabled}
-        size="sm"
-      />
-      <button
-        type="button"
+        <SkipBack size={CRATE_ICON_SIZE.lg} />
+      </ActionButton>
+      <div className="flex size-11 shrink-0 items-center justify-center">
+        <PlayPauseControl
+          t={t}
+          effectiveIsPlaying={effectiveIsPlaying}
+          effectiveIsBuffering={effectiveIsBuffering}
+          onPlayPause={onPlayPause}
+          disabled={jamTransportDisabled}
+          size="sm"
+        />
+      </div>
+      <ActionButton
+        label={t("player.next")}
         onClick={onNextTrack}
         disabled={jamTransportDisabled}
-        aria-label={t("player.next")}
-        className="text-text-secondary transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:text-text-secondary"
       >
-        <SkipForward size={CRATE_ICON_SIZE.lg} fill="currentColor" />
-      </button>
-      <button
-        type="button"
+        <SkipForward size={CRATE_ICON_SIZE.lg} />
+      </ActionButton>
+      <ActionButton
+        label={t("player.repeat", { mode: repeat })}
+        aria-pressed={repeat !== "off"}
         onClick={onCycleRepeat}
         disabled={jamQueueLocked}
-        aria-label={t("player.repeat", { mode: repeat })}
-        className={`transition-colors disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 ${
-          repeat !== "off"
-            ? "text-accent-action drop-shadow-accent-action"
-            : "text-text-muted hover:text-accent-action hover:drop-shadow-accent-action"
-        }`}
       >
         {repeat === "one" ? (
-          <Repeat1 size={CRATE_ICON_SIZE.md} />
+          <Repeat1 size={CRATE_ICON_SIZE.lg} />
         ) : (
-          <Repeat size={CRATE_ICON_SIZE.md} />
+          <Repeat size={CRATE_ICON_SIZE.lg} />
         )}
-      </button>
+      </ActionButton>
     </div>
   );
 }
 
 function DesktopTransportControls({
+  progressSlot,
+  readAudioFrame,
   frequenciesDb,
   sampleRate,
   showAnalyzer,
@@ -198,10 +190,11 @@ function DesktopTransportControls({
 }: PlayerBarTransportControlsProps) {
   return (
     <div className="mx-auto hidden max-w-[640px] flex-1 md:flex md:items-center md:justify-center">
-      <div className="relative w-full overflow-visible px-4 py-2">
+      <div className="relative w-full overflow-visible px-2 py-1">
         {showAnalyzer ? (
           <div className="player-analyzer-mask pointer-events-none absolute -inset-y-2 -inset-x-10 opacity-26">
             <WaveformCanvas
+              readAudioFrame={readAudioFrame}
               frequenciesDb={frequenciesDb}
               sampleRate={sampleRate}
               isPlaying={isPlaying}
@@ -214,16 +207,18 @@ function DesktopTransportControls({
           jamQueueLocked={jamQueueLocked}
         />
 
-        <PlayerBarProgress
-          effectiveDisplayedDuration={effectiveDisplayedDuration}
-          effectiveDisplayedTime={effectiveDisplayedTime}
-          jamQueueLocked={jamQueueLocked}
-          onSeek={onSeek}
-          onSeekHoverChange={onSeekHoverChange}
-          progressPct={progressPct}
-          seekHover={seekHover}
-          t={actionProps.t}
-        />
+        {progressSlot ?? (
+          <PlayerBarProgress
+            effectiveDisplayedDuration={effectiveDisplayedDuration}
+            effectiveDisplayedTime={effectiveDisplayedTime}
+            jamQueueLocked={jamQueueLocked}
+            onSeek={onSeek}
+            onSeekHoverChange={onSeekHoverChange}
+            progressPct={progressPct}
+            seekHover={seekHover}
+            t={actionProps.t}
+          />
+        )}
       </div>
     </div>
   );
@@ -246,7 +241,10 @@ function MobileTransportControls({
   | "onNextTrack"
 >) {
   return (
-    <div className="flex items-center gap-1 self-stretch md:hidden">
+    <div
+      data-slot="mobile-transport"
+      className="flex items-center gap-1 self-stretch md:hidden"
+    >
       <PlayPauseControl
         t={t}
         effectiveIsPlaying={effectiveIsPlaying}
@@ -255,15 +253,13 @@ function MobileTransportControls({
         disabled={jamTransportDisabled}
         size="md"
       />
-      <button
-        type="button"
+      <ActionButton
+        label={t("player.next")}
         onClick={onNextTrack}
         disabled={jamTransportDisabled}
-        aria-label={t("player.next")}
-        className="flex size-12 touch-manipulation items-center justify-center text-text-secondary transition-[color,filter,transform] hover:text-accent-action hover:drop-shadow-accent-action active:scale-[0.96] active:text-accent-action disabled:cursor-not-allowed disabled:grayscale disabled:opacity-40 disabled:hover:text-text-secondary disabled:active:scale-100"
       >
-        <SkipForward size={CRATE_ICON_SIZE.navMobile} fill="currentColor" />
-      </button>
+        <SkipForward size={CRATE_ICON_SIZE.lg} />
+      </ActionButton>
     </div>
   );
 }

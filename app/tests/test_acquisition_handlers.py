@@ -640,6 +640,7 @@ def test_upcoming_pre_release_queries_use_strict_future_filter(monkeypatch):
 
     assert all("nr.release_date > :today" in sql for sql in captured_sql)
     assert all("nr.release_date >= :today" not in sql for sql in captured_sql)
+    assert all("alb.track_count AS available_tracks" in sql for sql in captured_sql)
 
 
 def test_check_new_releases_skips_recently_checked_artists(monkeypatch):

@@ -1,0 +1,25 @@
+.instrument-chart-point circle {
+  transition:
+    r 180ms ease-out,
+    fill 180ms ease-out,
+    stroke 180ms ease-out;
+}
+
+.instrument-chart-point {
+  transition: opacity 180ms ease-out;
+}
+
+.instrument-chart-point[data-muted="true"] {
+  opacity: 0.35;
+}
+
+.instrument-chart-point[data-selected="true"] circle {
+  filter: drop-shadow(0 0 3px currentColor);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .instrument-chart-point,
+  .instrument-chart-point circle {
+    transition: none;
+  }
+}

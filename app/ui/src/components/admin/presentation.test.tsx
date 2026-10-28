@@ -16,11 +16,19 @@ import { TechnicalDetails } from "./TechnicalDetails";
 describe("RelativeTime", () => {
   const now = Date.parse("2026-10-19T12:00:00Z");
 
-  it("renders a past moment relative to now with a non-empty absolute title", () => {
-    render(<RelativeTime value="2026-10-19T10:00:00Z" now={now} />);
+  it("renders a past moment with its exact timestamp and a keyboard-accessible absolute tooltip", async () => {
+    const user = userEvent.setup();
+    const value = "2026-10-19T10:00:00Z";
+    render(<RelativeTime value={value} now={now} />);
     const time = screen.getByText("2 hours ago");
     expect(time.tagName).toBe("TIME");
-    expect(time.getAttribute("title")).toBeTruthy();
+    expect(time).toHaveAttribute("dateTime", value);
+    expect(time).toHaveAttribute("tabIndex", "0");
+    expect(time).not.toHaveAttribute("title");
+    await user.tab();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      new Date(value).toLocaleString(),
+    );
   });
 
   it("renders a future moment relative to now", () => {

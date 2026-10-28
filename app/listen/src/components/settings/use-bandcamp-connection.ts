@@ -23,38 +23,54 @@ function delay(ms: number): Promise<void> {
 export function useBandcampConnection() {
   const { t } = useTranslation();
   const [status, setStatus] = useState<BandcampStatus | null>(null);
-  const [counts, setCounts] = useState<BandcampCounts>({
-    collection: 0,
-    wishlist: 0,
-    following: 0,
-  });
+  const [counts, setCounts] = useState<BandcampCounts | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [countsError, setCountsError] = useState(false);
+  const [loadingCounts, setLoadingCounts] = useState(false);
   const [bandcampCookie, setBandcampCookie] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
 
-  const loadBandcamp = useCallback(async () => {
-    const nextStatus = await api<BandcampStatus>("/api/bandcamp/me/status");
-    setStatus(nextStatus);
-    if (!nextStatus.connected) {
-      setCounts({ collection: 0, wishlist: 0, following: 0 });
-      return;
+  const loadBandcampCounts = useCallback(async () => {
+    setLoadingCounts(true);
+    try {
+      const [collection, wishlist, following] = await Promise.all([
+        api<{ total: number }>("/api/bandcamp/me/collection"),
+        api<{ total: number }>("/api/bandcamp/me/wishlist"),
+        api<{ total: number }>("/api/bandcamp/me/following"),
+      ]);
+      setCounts({
+        collection: collection.total,
+        wishlist: wishlist.total,
+        following: following.total,
+      });
+      setCountsError(false);
+    } catch {
+      setCounts(null);
+      setCountsError(true);
+    } finally {
+      setLoadingCounts(false);
     }
-    const [collection, wishlist, following] = await Promise.all([
-      api<{ total: number }>("/api/bandcamp/me/collection").catch(() => ({
-        total: 0,
-      })),
-      api<{ total: number }>("/api/bandcamp/me/wishlist").catch(() => ({
-        total: 0,
-      })),
-      api<{ total: number }>("/api/bandcamp/me/following").catch(() => ({
-        total: 0,
-      })),
-    ]);
-    setCounts({
-      collection: collection.total || 0,
-      wishlist: wishlist.total || 0,
-      following: following.total || 0,
-    });
   }, []);
+  const loadBandcamp = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const nextStatus = await api<BandcampStatus>("/api/bandcamp/me/status");
+      setStatus(nextStatus);
+      if (!nextStatus.connected) {
+        setCounts(null);
+        setCountsError(false);
+        return;
+      }
+      await loadBandcampCounts();
+    } catch (error) {
+      setLoadError(true);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [loadBandcampCounts]);
 
   const connectWithCookie = useCallback(
     async (
@@ -78,7 +94,7 @@ export function useBandcampConnection() {
         });
         notify.success(t("settings.bandcamp.toasts.connected"));
         setBandcampCookie("");
-        await loadBandcamp();
+        await loadBandcamp().catch(() => {});
       } catch (error) {
         notify.error(
           (error as Error).message ||
@@ -149,7 +165,7 @@ export function useBandcampConnection() {
           `/api/tasks/${encodeURIComponent(result.task_id)}`,
         );
         if (task.status === "completed") {
-          await loadBandcamp();
+          await loadBandcamp().catch(() => {});
           const synced = task.result?.synced;
           const importsQueued = task.result?.imports_queued ?? 0;
           const skippedExisting = task.result?.imports_skipped_existing ?? 0;
@@ -199,7 +215,7 @@ export function useBandcampConnection() {
     try {
       await api("/api/bandcamp/me/disconnect", "POST");
       notify.success(t("settings.bandcamp.toasts.disconnected"));
-      await loadBandcamp();
+      await loadBandcamp().catch(() => {});
     } catch (error) {
       notify.error(
         (error as Error).message ||
@@ -211,6 +227,12 @@ export function useBandcampConnection() {
   }, [loadBandcamp, t]);
 
   return {
+    countsError,
+    loadingCounts,
+    loadBandcampCounts,
+    loading,
+    loadError,
+    loadBandcamp,
     bandcampCookie,
     busy,
     connectWithCookie,

@@ -108,6 +108,24 @@ def test_context_and_plan_serialize_for_typescript_and_java() -> None:
     assert plan.to_dict()["fallbackReason"] == "low_confidence"
 
 
+def test_long_beatmatch_context_and_dj_blend_plan_serialize() -> None:
+    context = TransitionContext(
+        source="playlist",
+        automatic=True,
+        offline=False,
+        preferred_duration_ms=5_000,
+        user_cue_profile="default",
+        allow_beatmatch=True,
+        allow_tempo_adjustment=True,
+        allow_long_beatmatch=True,
+    )
+
+    assert context.to_dict()["allowLongBeatmatch"] is True
+    assert transition_plan(curve="dj-blend").to_dict()["curve"] == "dj-blend"
+    with pytest.raises(ValueError, match="Unsupported transition curve"):
+        transition_plan(curve="linear")
+
+
 def test_summary_omits_grid_while_full_serialization_includes_it() -> None:
     mix_profile = profile()
 

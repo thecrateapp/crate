@@ -1,20 +1,21 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import {
-  ArchiveDown as SolarArchiveDownOutline,
-  Cassette2 as SolarCassette2Outline,
-  Heart as SolarHeartOutline,
-  Microphone as SolarMicrophoneOutline,
-  Pulse as SolarPulseOutline,
-  Radar2 as SolarRadar2Outline,
-} from "@solar-icons/react-perf/Outline";
-import {
-  ArchiveDown as SolarArchiveDownBold,
-  Heart as SolarHeartBold,
-  Pause as SolarPauseBold,
-} from "@solar-icons/react-perf/Bold";
+import { EyeIcon as SolarEyeOutline } from "@solar-icons/react/outline/eye";
+import { ArchiveDownIcon as SolarArchiveDownOutline } from "@solar-icons/react/outline/archive-down";
+import { Cassette2Icon as SolarCassette2Outline } from "@solar-icons/react/outline/cassette-2";
+import { HeartIcon as SolarHeartOutline } from "@solar-icons/react/outline/heart";
+import { MicrophoneIcon as SolarMicrophoneOutline } from "@solar-icons/react/outline/microphone";
+import { MinusSquareIcon as SolarMinusSquareOutline } from "@solar-icons/react/outline/minus-square";
+import { PulseIcon as SolarPulseOutline } from "@solar-icons/react/outline/pulse";
+import { Radar2Icon as SolarRadar2Outline } from "@solar-icons/react/outline/radar-2";
+import { ArchiveDownIcon as SolarArchiveDownBold } from "@solar-icons/react/bold/archive-down";
+import { HeartIcon as SolarHeartBold } from "@solar-icons/react/bold/heart";
+import { PauseIcon as SolarPauseBold } from "@solar-icons/react/bold/pause";
 
 import {
+  Eye,
+  Bot,
+  Toolbox,
   ArrowDownToLine,
   ArrowDownToLineBold,
   BarChart3,
@@ -22,6 +23,7 @@ import {
   Heart,
   HeartBold,
   Loader2,
+  Minus,
   Pause,
   Play,
   Radio,
@@ -34,20 +36,41 @@ function renderSvgInner(ui: React.ReactElement) {
 }
 
 describe("@crate/ui/icons", () => {
+  it("exports the Solar Eye outline for preview actions", () => {
+    expect(renderSvgInner(<Eye />)).toBe(renderSvgInner(<SolarEyeOutline />));
+  });
+  it("renders the official Bot Outline paths with the normal icon contract", () => {
+    const { container } = render(
+      <Bot size={20} aria-hidden="true" className="ai-glyph" />,
+    );
+    const svg = container.querySelector("svg");
+    expect(svg).toHaveStyle({ fontSize: "20px" });
+    expect(svg).toHaveAttribute("width", "1em");
+    expect(svg).toHaveAttribute("aria-hidden", "true");
+    expect(svg).toHaveClass("ai-glyph");
+    expect(svg?.querySelectorAll("path")).toHaveLength(4);
+  });
+  it("renders the official Solar Toolbox Outline for repair actions", () => {
+    const { container } = render(<Toolbox aria-hidden="true" />);
+    const svg = container.querySelector("svg");
+    expect(svg).toHaveStyle({ fontSize: "18px" });
+    expect(svg).toHaveAttribute("viewBox", "0 0 24 24");
+    expect(svg?.querySelectorAll("path")).toHaveLength(1);
+    expect(svg?.querySelector("path")).toHaveAttribute("fill", "currentColor");
+  });
   it("maps size to svg dimensions", () => {
     const { container } = render(<Play size={32} />);
 
     const svg = container.querySelector("svg");
-    expect(svg).toHaveAttribute("width", "32");
-    expect(svg).toHaveAttribute("height", "32");
+    expect(svg).toHaveStyle({ fontSize: "32px" });
+    expect(svg).toHaveAttribute("width", "1em");
   });
 
   it("lets explicit dimensions override size", () => {
     const { container } = render(<Play size={32} width={18} height={20} />);
 
     const svg = container.querySelector("svg");
-    expect(svg).toHaveAttribute("width", "18");
-    expect(svg).toHaveAttribute("height", "20");
+    expect(svg).toHaveStyle({ width: "18px", height: "20px" });
   });
 
   it("keeps compatibility aliases renderable", () => {
@@ -59,6 +82,12 @@ describe("@crate/ui/icons", () => {
   it("uses Solar Outline as the default visual style", () => {
     expect(renderSvgInner(<Heart size={24} />)).toBe(
       renderSvgInner(<SolarHeartOutline size={24} />),
+    );
+  });
+
+  it("maps the decrement action to the Solar Minus Square outline", () => {
+    expect(renderSvgInner(<Minus size={18} />)).toBe(
+      renderSvgInner(<SolarMinusSquareOutline size={18} />),
     );
   });
 

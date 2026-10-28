@@ -1,0 +1,42 @@
+@import "../../app/shared/fonts/bricolage-grotesque.css";
+@import "../../app/shared/fonts/roboto.css";
+@import "../../app/shared/fonts/jetbrains-mono.css";
+@import "../../app/shared/ui/tokens/index.css";
+@import "tailwindcss";
+@source "./skip-link-demo.tsx";
+@source "../../app/shared/ui/shadcn/button.tsx";
+@source "../../app/shared/ui/primitives/SkipLink.tsx";
+
+html {
+  color-scheme: dark;
+  background: var(--surface-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-brand), system-ui, sans-serif;
+}
+nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-height: 60px;
+  border-bottom: 1px solid var(--border-quiet);
+  padding: 1rem;
+}
+nav strong {
+  margin-right: auto;
+}
+nav a {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+main {
+  padding: 2rem 1rem;
+}
+h1 {
+  font-family: var(--font-display-stack);
+  font-size: 2rem;
+  line-height: 1;
+  margin-block: 1rem;
+}
+main > p {
+  margin-bottom: 1.5rem;
+}

@@ -14,63 +14,16 @@ const ICON_IMPORT =
 const DYNAMIC_ICON = /^(?:[A-Z]\w*)?Icon$/;
 
 const ARBITRARY_VALUE_BUDGET: Record<string, Record<string, number>> = {
-  "components/album/ReleaseCountdown.tsx": {
-    "tracking-[-0.075em]": 1,
-    "tracking-[0.13em]": 1,
-  },
-  "components/cards/TrackRowParts.tsx": { [ORGANIC_BLOB_RADIUS]: 1 },
-  "components/dev/TauriDevLogPanel.tsx": {
-    "text-[0.65rem]": 1,
-    "text-[0.68rem]": 1,
-  },
+  "components/cards/TrackRowPlaybackControl.tsx": { [ORGANIC_BLOB_RADIUS]: 1 },
   "components/home/HomeListeningHistory.tsx": { "tracking-[-0.035em]": 1 },
-  "components/layout/MobileBottomNav.tsx": { "text-[0.59375rem]": 3 },
-  "components/layout/sidebar/SidebarBrand.tsx": {
-    "rounded-[18px]": 1,
-    "rounded-[22px]": 1,
-  },
-  "components/layout/sidebar/SidebarNavigation.tsx": { "text-[0.75rem]": 1 },
-  "components/layout/topbar/TopBarSearchView.tsx": {
-    "text-[16px]": 1,
-    "tracking-[-0.01em]": 1,
-  },
-  "components/player/ExtendedPlayerTabs.tsx": { "text-[0.75rem]": 1 },
-  "components/player/FullscreenPlayerTabs.tsx": {
-    "text-[1.45rem]": 1,
-    "text-[1.55rem]": 2,
-    "text-[1.9rem]": 1,
-  },
-  "components/player/LyricsPanel.tsx": {
-    "text-[0.875rem]": 3,
-    "text-[17px]": 1,
-  },
-  "components/player/PlayerTrackIdentity.tsx": { "text-[0.75rem]": 1 },
   "components/player/SpectrumPlayButton.tsx": { [ORGANIC_BLOB_RADIUS]: 1 },
-  "components/player/bar/PlayerBarView.tsx": { "rounded-t-[2rem]": 1 },
-  "components/player/extended/InfoTabPrimitives.tsx": { "text-[0.75rem]": 1 },
-  "components/player/extended/LyricsLine.tsx": {
-    "text-[0.875rem]": 2,
-    "text-[17px]": 1,
-  },
-  "components/player/extended/LyricsTab.tsx": { "text-[0.875rem]": 1 },
-  "components/player/extended/QueueTabCurrentTrack.tsx": {
-    "text-[0.75rem]": 1,
-  },
-  "components/player/extended/SuggestedTrackRow.tsx": { "text-[0.75rem]": 1 },
   "components/playlists/EditorialPlaylistArtwork.tsx": {
     "rounded-[3px]": 1,
     "tracking-[-0.09em]": 1,
     "tracking-[0.13em]": 1,
   },
-  "components/settings/ServersSection.tsx": { "text-[0.75rem]": 1 },
-  "components/social/ProfileHoverCardContent.tsx": { "text-[8rem]": 1 },
-  "components/upcoming/UpcomingShowCollapsedView.tsx": { "text-[1.25rem]": 1 },
   "i18n/translation-mode/TranslationOverlay.tsx": { "rounded-[4px]": 1 },
-  "pages/ExploreLandingSections.tsx": { "tracking-[-0.035em]": 1 },
-  "pages/PathDetail.tsx": { "text-[0.75rem]": 1 },
-  "pages/Paths.tsx": { "text-[0.75rem]": 1 },
-  "pages/ServerSetup.tsx": { "text-[0.75rem]": 1 },
-  "pages/StatsCollectionPanels.tsx": {
+  "pages/StatsArtistRankView.tsx": {
     "text-[8.5rem]": 1,
     "tracking-[-0.12em]": 1,
   },
@@ -80,15 +33,9 @@ const ICON_SIZE_BUDGET: Record<string, Record<string, number>> = {
   "components/album/AlbumHero.tsx": { "64": 1 },
   "components/jam/JamRoomPlaybackSections.tsx": { "22": 1 },
   "components/player/FullscreenPlayerArtwork.tsx": { "64": 1 },
-  "components/player/FullscreenPlayerControls.tsx": { "26": 2 },
-  "components/player/FullscreenPlayerHeader.tsx": { "28": 1 },
   "components/player/SpinningDiscArtwork.tsx": { "88": 1 },
   "components/player/SpinningDiscControl.tsx": { "22": 3 },
-  "components/player/extended/InfoTabHeroArtwork.tsx": { "28": 1 },
   "pages/JamInvite.tsx": { "22": 1 },
-  "pages/Paths.tsx": { "22": 1 },
-  "pages/SearchAlbumResults.tsx": { "32": 1 },
-  "pages/StatsCollectionPanels.tsx": { "22": 1 },
 };
 
 function productionSourceFiles(directory: string): string[] {

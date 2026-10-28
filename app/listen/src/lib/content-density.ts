@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
-import { subscribeThemeSkin } from "@crate/ui/lib/theme-skin";
+import { subscribeUiPreferences } from "@crate/ui/lib/interface-preferences";
 import { CONTENT_DENSITY_METRICS } from "@crate/ui/lib/content-density";
-import type { ContentDensity } from "@crate/ui/lib/appearance-types";
+import type { ContentDensity } from "@crate/ui/lib/interface-preferences";
 
 export { CONTENT_DENSITY_METRICS } from "@crate/ui/lib/content-density";
 
@@ -14,7 +14,7 @@ export function getContentDensity(): ContentDensity {
 
 export function useContentDensity(): ContentDensity {
   return useSyncExternalStore(
-    subscribeThemeSkin,
+    subscribeUiPreferences,
     getContentDensity,
     () => "comfortable" as const,
   );

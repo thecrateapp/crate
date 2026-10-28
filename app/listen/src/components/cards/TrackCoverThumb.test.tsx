@@ -33,3 +33,8 @@ describe("TrackCoverThumb", () => {
     expect(container.firstChild).toHaveClass("rounded-md");
   });
 });
+
+it("uses the shared minimum-size media frame", () => {
+  const { container } = render(<TrackCoverThumb className="size-8" />);
+  expect(container.firstChild).toHaveClass("crate-media-thumbnail");
+});

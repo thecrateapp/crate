@@ -24,20 +24,42 @@ IMAGE_PREFIX="${DEPLOY_IMAGE_REGISTRY}/${DEPLOY_IMAGE_OWNER}"
 cd "$SERVER_PATH"
 
 COMPOSE=(docker compose -f docker-compose.yaml -f docker-compose.project.yaml)
-# The bootstrap overlay preserves the Hermes profile on older releases. Once the
+# The bootstrap overlay preserves the agent profile on older releases. Once the
 # base release declares the service, applying the copied full-service overlay
 # duplicates list fields such as security_opt and makes Compose reject the stack.
-select_hermes_overlay() {
-  [[ -f .deploy/hermes.compose.yaml ]] || return 0
+select_operator_overlay() {
+  [[ -f .deploy/crate-operator.compose.yaml ]] || return 0
 
   local base_services
-  base_services="$(docker compose --profile hermes \
+  base_services="$(docker compose --profile agent \
     -f docker-compose.yaml -f docker-compose.project.yaml config --services)"
-  if ! grep -Fxq "crate-hermes-agent" <<< "$base_services"; then
-    COMPOSE+=(-f .deploy/hermes.compose.yaml)
+  if ! grep -Fxq "crate-agent" <<< "$base_services"; then
+    COMPOSE+=(-f .deploy/crate-operator.compose.yaml)
   fi
 }
-select_hermes_overlay
+select_operator_overlay
+# A running Crate Operator keeps its overlay through every stage: without it
+# crate-api and the workers lose the operator identity and --remove-orphans
+# removes the operator containers.
+OPERATOR_OVERLAY=""
+select_running_operator_overlay() {
+  [[ -n "$(docker ps -q -f name='^crate-operator$')" ]] || return 0
+  if [[ " ${COMPOSE[*]} " == *" .deploy/crate-operator.compose.yaml "* ]]; then
+    OPERATOR_OVERLAY=.deploy/crate-operator.compose.yaml
+    return 0
+  fi
+  local candidate
+  for candidate in .deploy/crate-operator.compose.yaml deploy/operator/compose.operator.yaml; do
+    if [[ -f "$candidate" ]]; then
+      OPERATOR_OVERLAY="$candidate"
+      COMPOSE+=(-f "$candidate")
+      return 0
+    fi
+  done
+  echo "crate-operator is running but deploy/operator/compose.operator.yaml is missing" >&2
+  exit 1
+}
+select_running_operator_overlay
 PROJECT_SERVICES=(crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-cast-receiver crate-site crate-docs)
 HEALTHY_SERVICES=(crate-redis crate-postgres crate-api crate-cast-receiver)
 RUNNING_SERVICES=(crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-cast-receiver crate-site crate-docs)
@@ -55,6 +77,11 @@ RELEASE_ENV_KEYS=(
   CRATE_CAST_RECEIVER_IMAGE
   CRATE_SITE_IMAGE
   CRATE_DOCS_IMAGE
+)
+# Agent images are optional: older manifests do not carry them. A deployment
+# only recreates a Crate Agent that is already running.
+OPTIONAL_RELEASE_ENV_KEYS=(
+  CRATE_AGENT_IMAGE
 )
 
 declare -A SERVICE_IMAGE_REPOS=(
@@ -175,7 +202,7 @@ set_env_value() {
 is_release_env_key() {
   local candidate="$1"
   local key
-  for key in "${RELEASE_ENV_KEYS[@]}"; do
+  for key in "${RELEASE_ENV_KEYS[@]}" "${OPTIONAL_RELEASE_ENV_KEYS[@]}"; do
     [[ "$candidate" == "$key" ]] && return 0
   done
   return 1
@@ -791,7 +818,7 @@ cmd_config() {
   set_env_value CRATE_IMAGE_REGISTRY "$DEPLOY_IMAGE_REGISTRY"
   apply_release_env "$candidate_env"
   cp -a .deploy/release-manifest.json.candidate .deploy/release-manifest.json
-  record_hermes_deployment deploying
+  record_agent_deployment deploying
   dc config -q
   assert_compose_redis_auth
   assert_music_mount_ready
@@ -887,14 +914,44 @@ cmd_verify() {
     wait_for_public_url "https://docs.cratemusic.app"
   fi
   # The opt-in operator stays closed until its exact approved context activates.
-  [[ -n "$(env_value CRATE_OPERATOR_ROOT)" ]] || record_hermes_deployment verified
+  [[ -n "$(env_value CRATE_OPERATOR_ROOT)" ]] || record_agent_deployment verified
 }
 
-cmd_hermes_context() {
+cmd_agent_context() {
+  activate_agent_context
+  refresh_running_agent
+}
+
+# A running Crate Agent or Crate Operator follows the release image, whose baked
+# context matches the deployed release. Compose recreates only containers whose
+# image or configuration changed; the supervisor, relay and provenance publisher
+# follow only if running.
+refresh_running_agent() {
+  local services=() service
+  [[ -n "$(env_value CRATE_AGENT_IMAGE)" ]] || return 0
+  if [[ -n "$(docker ps -q -f name='^crate-agent$')" ]]; then
+    log "Recreating the running Crate Agent on the release image"
+    dc --profile agent up -d --no-build --no-deps crate-agent \
+      || log "Crate Agent recreation failed; the deployed release is unaffected"
+  fi
+  [[ -n "$OPERATOR_OVERLAY" ]] || return 0
+  for service in crate-operator crate-operator-supervisor crate-infra-relay \
+    crate-provenance crate-provenance-docker; do
+    if [[ -n "$(dc --profile crate-operator ps -q --status running "$service" 2>/dev/null)" ]]; then
+      services+=("$service")
+    fi
+  done
+  (( ${#services[@]} > 0 )) || return 0
+  log "Recreating the running Crate Operator services on the release image: ${services[*]}"
+  dc --profile crate-operator up -d --no-build --no-deps "${services[@]}" \
+    || log "Crate Operator recreation failed; the deployed release is unaffected"
+}
+
+activate_agent_context() {
   local data_dir context_root revision operator_root
   data_dir="$(env_value DATA_DIR)"
   operator_root="$(env_value CRATE_OPERATOR_ROOT)"
-  context_root="${data_dir}/hermes-agent/context"
+  context_root="${data_dir}/crate-agent/context"
   [[ -z "$operator_root" ]] || context_root="${operator_root}/context"
   if [[ -n "$operator_root" && ! -d "$context_root" ]]; then
     echo "Managed operator context destination is missing" >&2
@@ -905,19 +962,19 @@ cmd_hermes_context() {
   if [[ -n "$operator_root" ]]; then
     # Never substitute a cached same-SHA bundle for the exact reviewed archive.
     python3 -I deploy/hermes/activate_context.py --root "$context_root" --revision "$revision" \
-      --archive .deploy/hermes-context.candidate.tar.gz
+      --archive .deploy/agent-context.candidate.tar.gz
   elif compgen -G "${context_root}/releases/${revision}*/context-manifest.json" >/dev/null; then
     python3 -I deploy/hermes/activate_context.py --root "$context_root" --revision "$revision"
   else
     python3 -I deploy/hermes/activate_context.py --root "$context_root" --revision "$revision" \
-      --archive .deploy/hermes-context.candidate.tar.gz
+      --archive .deploy/agent-context.candidate.tar.gz
   fi
 }
 
-record_hermes_deployment() {
+record_agent_deployment() {
   local data_dir context_root
   data_dir="$(env_value DATA_DIR)"
-  context_root="${data_dir}/hermes-agent/context"
+  context_root="${data_dir}/crate-agent/context"
   [[ -z "$(env_value CRATE_OPERATOR_ROOT)" ]] || context_root="$(env_value CRATE_OPERATOR_ROOT)/context"
   [[ -d "$context_root" && -f deploy/hermes/activate_context.py ]] || return 0
   if [[ ! -f .deploy/release-manifest.json ]]; then
@@ -976,7 +1033,7 @@ cmd_rollback() {
   else
     rm -f .deploy/release-manifest.json
   fi
-  record_hermes_deployment rollback
+  record_agent_deployment rollback
   dc config -q
 
   if (( ${#rollback_services[@]} == 0 )); then
@@ -1049,7 +1106,7 @@ cmd_state_rollback() {
     rm -f .deploy/release-manifest.json
   fi
 
-  record_hermes_deployment rollback
+  record_agent_deployment rollback
 
   pg_user="$(env_value CRATE_POSTGRES_USER)"
   pg_password="$(env_value CRATE_POSTGRES_PASSWORD)"
@@ -1206,14 +1263,14 @@ case "${1:-}" in
   pull) cmd_pull ;;
   up) cmd_up ;;
   verify) cmd_verify ;;
-  hermes-context) cmd_hermes_context ;;
+  agent-context) cmd_agent_context ;;
   rollback) cmd_rollback ;;
   state-rollback) cmd_state_rollback ;;
   cleanup) cmd_cleanup ;;
   ps) cmd_ps ;;
   diagnose) cmd_diagnose ;;
   *)
-    printf 'Usage: %s {release-preflight|preflight|backup|recovery-snapshot|config|pull|up|verify|hermes-context|rollback|state-rollback|cleanup|ps|diagnose}\n' "$0" >&2
+    printf 'Usage: %s {release-preflight|preflight|backup|recovery-snapshot|config|pull|up|verify|agent-context|rollback|state-rollback|cleanup|ps|diagnose}\n' "$0" >&2
     exit 2
     ;;
 esac

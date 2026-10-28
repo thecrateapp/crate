@@ -10,6 +10,21 @@ import { StreamsPanel } from "./StreamsPanel";
 vi.mock("@/hooks/use-api", () => ({ useApi: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api: vi.fn() }));
 
+it("keeps the empty state at the top when there are no peer summaries", () => {
+  vi.mocked(useApi).mockImplementation((path: string | null) => ({
+    data: path?.endsWith("streams") ? [] : { peers: [] },
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  }));
+  renderWithAdminProviders(<StreamsPanel canManage={false} />);
+
+  const emptyState = screen.getByTestId("empty-state");
+  expect(emptyState).toHaveTextContent("No active stream tickets");
+  expect(emptyState.parentElement?.children).toHaveLength(1);
+  expect(emptyState.parentElement).toHaveClass("space-y-4");
+});
+
 it("lists and revokes active tickets", async () => {
   vi.mocked(useApi).mockImplementation((path: string | null) => ({
     data: path?.endsWith("streams")

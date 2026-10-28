@@ -25,12 +25,20 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
         final long durationMs;
         final float stagingGain;
         final float bassHandoffAt;
+        final boolean djBlend;
 
-        Envelope(Role role, long durationMs, float stagingGain, float bassHandoffAt) {
+        Envelope(
+            Role role,
+            long durationMs,
+            float stagingGain,
+            float bassHandoffAt,
+            boolean djBlend
+        ) {
             this.role = role;
             this.durationMs = durationMs;
             this.stagingGain = stagingGain;
             this.bassHandoffAt = bassHandoffAt;
+            this.djBlend = djBlend;
         }
     }
 
@@ -41,7 +49,7 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
     }
 
     private volatile EnvelopeReporter envelopeReporter;
-    private static final Envelope NO_ENVELOPE = new Envelope(Role.INCOMING, 0L, 1.0f, Float.NaN);
+    private static final Envelope NO_ENVELOPE = new Envelope(Role.INCOMING, 0L, 1.0f, Float.NaN, false);
 
     private final BassHandoffFilter bassFilter = new BassHandoffFilter();
 
@@ -95,12 +103,22 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
     }
 
     void startEnvelope(Role role, long durationMs, float stagingGainDb, float bassHandoffAt) {
+        startEnvelope(role, durationMs, stagingGainDb, bassHandoffAt, false);
+    }
+
+    void startEnvelope(
+        Role role,
+        long durationMs,
+        float stagingGainDb,
+        float bassHandoffAt,
+        boolean djBlend
+    ) {
         float stagingGain = Float.isFinite(stagingGainDb)
             ? (float) Math.pow(10.0, Math.min(0.0f, stagingGainDb) / 20.0)
             : 1.0f;
         envelopeProgressBits.set(Float.floatToIntBits(0.0f));
         requestedEnvelope.set(
-            new Envelope(role, Math.max(1L, durationMs), stagingGain, bassHandoffAt)
+            new Envelope(role, Math.max(1L, durationMs), stagingGain, bassHandoffAt, djBlend)
         );
     }
 
@@ -267,6 +285,25 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
         requestedRevision.incrementAndGet();
     }
 
+    static final float DJ_BLEND_ENTRY = 0.3f;
+    static final float DJ_BLEND_EXIT = 0.7f;
+
+    static float djBlendProgress(float progress) {
+        float safeProgress = clampUnit(progress);
+        if (safeProgress <= DJ_BLEND_ENTRY) {
+            return 0.5f * smoothstep(safeProgress / DJ_BLEND_ENTRY);
+        }
+        if (safeProgress < DJ_BLEND_EXIT) {
+            return 0.5f;
+        }
+        return 0.5f + 0.5f * smoothstep((safeProgress - DJ_BLEND_EXIT) / (1.0f - DJ_BLEND_EXIT));
+    }
+
+    private static float smoothstep(float value) {
+        float x = Math.max(0.0f, Math.min(1.0f, value));
+        return x * x * (3.0f - 2.0f * x);
+    }
+
     static float equalPowerOutgoing(float progress) {
         float safeProgress = clampUnit(progress);
         if (safeProgress >= 1.0f) {
@@ -337,9 +374,10 @@ final class NativeMixAudioProcessor extends BaseAudioProcessor {
         if (envelopeFrame < envelopeFrames) {
             envelopeFrame++;
         }
+        float crossfade = activeEnvelope.djBlend ? djBlendProgress(progress) : progress;
         envelopeFactor = activeEnvelope.role == Role.OUTGOING
-            ? equalPowerOutgoing(progress) * staging(activeEnvelope.stagingGain, easeIn(progress))
-            : equalPowerIncoming(progress) * staging(activeEnvelope.stagingGain, easeOut(progress));
+            ? equalPowerOutgoing(crossfade) * staging(activeEnvelope.stagingGain, easeIn(progress))
+            : equalPowerIncoming(crossfade) * staging(activeEnvelope.stagingGain, easeOut(progress));
         return envelopeFactor;
     }
 

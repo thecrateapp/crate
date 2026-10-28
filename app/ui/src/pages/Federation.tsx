@@ -1,7 +1,13 @@
 import { useState } from "react";
-import { Shield } from "lucide-react";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { OpsPageHero } from "@/components/admin/ops-surfaces";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@crate/ui/shadcn/tabs";
 import { AuditPanel } from "@/pages/federation/AuditPanel";
 import { FederationOverview } from "@/pages/federation/FederationOverview";
 import { ImportsPanel } from "@/pages/federation/ImportsPanel";
@@ -37,44 +43,56 @@ export function Federation() {
   const canManageImports = hasAnyCapability(["federation.import.manage"]);
   if (!canView)
     return (
-      <div className="flex items-center justify-center py-24 text-white/45">
-        You do not have permission to view federation settings.
+      <div className="min-w-0 space-y-6">
+        <OpsPageHero
+          title="Federation"
+          description="Manage this node, trusted peers, policies and shared streams."
+        />
+        <p className="text-sm text-text-muted" role="status">
+          You do not have permission to view federation settings.
+        </p>
       </div>
     );
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <div className="flex items-center gap-3">
-        <Shield className="h-6 w-6 text-white/60" />
-        <h1 className="text-xl font-semibold">Federation</h1>
-      </div>
-      <div
-        role="tablist"
-        aria-label="Federation operations"
-        className="flex w-fit flex-wrap gap-1 rounded-lg border border-white/10 bg-panel-surface p-1"
+    <div className="min-w-0 space-y-6">
+      <OpsPageHero
+        title="Federation"
+        description="Manage this node, trusted peers, policies and shared streams."
+      />
+      <Tabs
+        value={tab}
+        onValueChange={(value) => setTab(value as Tab)}
+        className="gap-5"
       >
-        {TABS.map((item) => (
-          <button
-            role="tab"
-            aria-selected={tab === item.key}
-            key={item.key}
-            onClick={() => setTab(item.key)}
-            className={`rounded-md px-3 py-1.5 text-sm ${
-              tab === item.key
-                ? "bg-white/10 text-white"
-                : "text-white/45 hover:text-white/75"
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-      {tab === "overview" ? <FederationOverview /> : null}
-      {tab === "peers" ? <PeersPanel canManage={canManage} /> : null}
-      {tab === "policies" ? <PoliciesPanel canManage={canManage} /> : null}
-      {tab === "streams" ? <StreamsPanel canManage={canManage} /> : null}
-      {tab === "imports" ? <ImportsPanel canManage={canManageImports} /> : null}
-      {tab === "security" ? <SecurityPanel canManage={canManage} /> : null}
-      {tab === "audit" ? <AuditPanel /> : null}
+        <TabsList aria-label="Federation operations">
+          {TABS.map((item) => (
+            <TabsTrigger key={item.key} value={item.key}>
+              {item.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        <TabsContent value="overview" className="mt-0">
+          <FederationOverview />
+        </TabsContent>
+        <TabsContent value="peers" className="mt-0">
+          <PeersPanel canManage={canManage} />
+        </TabsContent>
+        <TabsContent value="policies" className="mt-0">
+          <PoliciesPanel canManage={canManage} />
+        </TabsContent>
+        <TabsContent value="streams" className="mt-0">
+          <StreamsPanel canManage={canManage} />
+        </TabsContent>
+        <TabsContent value="imports" className="mt-0">
+          <ImportsPanel canManage={canManageImports} />
+        </TabsContent>
+        <TabsContent value="security" className="mt-0">
+          <SecurityPanel canManage={canManage} />
+        </TabsContent>
+        <TabsContent value="audit" className="mt-0">
+          <AuditPanel />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

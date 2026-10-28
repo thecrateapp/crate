@@ -169,7 +169,7 @@ it("names each issue's actions after its row while keeping the visible text", as
     screen.getByRole("link", { name: "View it (Show 2)" }),
   ).toHaveTextContent(/^View it$/);
   const artist = screen.getByRole("button", { name: "Use Band (Show 2)" });
-  expect(artist).toHaveAttribute("title", "uid-9");
+  expect(artist).not.toHaveAttribute("title");
   const user = userEvent.setup();
   await user.click(update);
   expect(onUseExisting).toHaveBeenCalledWith("b", 42);
@@ -178,4 +178,36 @@ it("names each issue's actions after its row while keeping the visible text", as
     artist_uid: "uid-9",
     name: "Band",
   });
+});
+
+it("reveals full source evidence through the shared tooltip without a native title", async () => {
+  const evidence = "Doors open at seven; support starts at eight.";
+  render(
+    <ShowPlanSummary
+      plan={plan({
+        changes: [
+          {
+            item_id: "a",
+            before: {},
+            after: {
+              item_id: "a",
+              artist_name: "Band",
+              date: "2027-03-02",
+              venue: "Hall",
+              city: "Madrid",
+              evidence,
+            },
+          },
+        ],
+      })}
+      candidates={candidates}
+      onUseExisting={vi.fn()}
+      onUseArtist={vi.fn()}
+    />,
+  );
+  const user = userEvent.setup();
+  const source = screen.getByText(evidence);
+  expect(source).not.toHaveAttribute("title");
+  await user.hover(source);
+  expect(await screen.findByRole("tooltip")).toHaveTextContent(evidence);
 });

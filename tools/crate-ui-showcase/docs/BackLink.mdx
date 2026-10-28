@@ -1,0 +1,28 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/BackLink.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">BackLink</DocHeading>
+<EntryDetails
+  id="domain-navigation-backlink"
+  review="Visual review approved · 1AU"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+Native router navigation or callback Back control with preserved labels.
+
+With to, render a react-router Link retaining query/replace/onClick semantics. Without to, render a native type=button callback control. Text variants retain their14px body label and Solar ArrowLeft16; icon variants expose the same label via aria-label/title. Text controls reserve44px height. Round icon controls are40px fine and44px coarse in actual layout, with no overlapping pseudo hit area. Native ARIA/description/id/handlers pass through. Back remains outside page identity; do not silently replace descriptive text with an arrow-only control. Listen consumers and PlaylistEditor use the same contract.
+
+The approved mockup and Diego’s confirmed amendments are the visual reference. Shared components own their contracts; stories add layout only. Consumer adoption and native/AT/phase QA remain separate.
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Icon} />
+
+<Canvas of={Stories.Button} />
+
+<Canvas of={Stories.LongContent} />
+
+<Controls of={Stories.Base} />

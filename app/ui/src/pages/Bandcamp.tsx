@@ -1,24 +1,32 @@
-import { useCallback, useMemo, useState } from "react";
+import { InfoBadge, type InfoBadgeTone } from "@crate/ui/primitives/InfoBadge";
 import {
-  ArrowUpRight,
-  CheckCircle2,
-  Download,
-  ExternalLink,
-  Heart,
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
+import {
+  RefreshCw as HeaderFolderSync,
+  Radar as HeaderRadar,
+  Link as HeaderLink,
   Loader2,
-  Radar,
-  RefreshCw,
-  XCircle,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+} from "@crate/ui/icons";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 
-import { BandcampLogo } from "@crate/ui/domain/brand/BandcampLogo";
+import {
+  OpsPageHero,
+  OpsPanel,
+  OpsStatTile,
+  OpsSurface,
+} from "@/components/admin/ops-surfaces";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { Button } from "@crate/ui/shadcn/button";
-import { Badge } from "@crate/ui/shadcn/badge";
-import { CratePill } from "@crate/ui/primitives/CrateBadge";
+
 import { api } from "@/lib/api";
+import { waitForTask } from "@/lib/tasks";
 import { useApi } from "@/hooks/use-api";
 import { cn } from "@/lib/utils";
 
@@ -53,11 +61,6 @@ interface BandcampImportResponse {
 interface BandcampMatchesResponse {
   items: BandcampMatch[];
   total: number;
-}
-
-interface BandcampTaskResponse {
-  task_id: string;
-  status: string;
 }
 
 interface BandcampItem {
@@ -122,6 +125,8 @@ export function Bandcamp() {
     "/api/bandcamp/admin/matches?limit=100",
   );
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const taskWait = useRef<AbortController | null>(null);
+  useEffect(() => () => taskWait.current?.abort(), []);
 
   const refreshAll = useCallback(() => {
     status.refetch();
@@ -143,34 +148,42 @@ export function Bandcamp() {
     wishlist,
   ]);
 
-  const counts = useMemo(
-    () => [
-      {
-        label: "Collection",
-        value: collection.data?.total ?? 0,
-        icon: Download,
-      },
-      { label: "Wishlist", value: wishlist.data?.total ?? 0, icon: Heart },
-      {
-        label: "Following",
-        value: following.data?.total ?? 0,
-        icon: BandcampLogo,
-      },
-      { label: "Radar", value: radar.data?.total ?? 0, icon: Radar },
-    ],
-    [collection.data, following.data, radar.data, wishlist.data],
-  );
+  const counts = [
+    { label: "Collection", source: collection },
+    { label: "Wishlist", source: wishlist },
+    { label: "Following", source: following },
+    { label: "Radar", source: radar },
+  ].map(({ label, source }) => ({
+    label,
+    value:
+      source.data && !source.loading && !source.error
+        ? source.data.total
+        : null,
+  }));
 
   async function queueTask(path: string, label: string) {
+    const controller = new AbortController();
+    taskWait.current = controller;
     setBusyAction(label);
+    let queued = false;
     try {
-      const response = await api<BandcampTaskResponse>(path, "POST");
-      toast.success(`${label} queued (${response.task_id})`);
+      const { task_id } = await api<{ task_id: string }>(path, "POST");
+      if (!task_id) throw new Error(`${label} returned no task identifier`);
+      queued = true;
+      toast.success(`${label} queued`);
+      const task = await waitForTask(task_id, 300000, controller.signal);
+      if (task.status !== "completed")
+        throw new Error(task.error || `${label} ${task.status}`);
       refreshAll();
+      toast.success(`${label} completed`);
     } catch (error) {
-      toast.error((error as Error).message || `Failed to queue ${label}`);
+      if (!controller.signal.aborted)
+        toast.error(
+          (error as Error).message ||
+            `Failed to ${queued ? "complete" : "queue"} ${label}`,
+        );
     } finally {
-      setBusyAction(null);
+      if (!controller.signal.aborted) setBusyAction(null);
     }
   }
 
@@ -205,138 +218,187 @@ export function Bandcamp() {
 
   return (
     <main className="space-y-8">
-      <section className="relative overflow-hidden rounded-[1.75rem] border border-white/8 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_36%),linear-gradient(135deg,rgba(18,18,24,0.96),rgba(10,10,14,0.98))] p-8 shadow-[0_24px_80px_rgba(0,0,0,0.38)]">
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.04))]" />
-        <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-          <div className="max-w-3xl space-y-4">
-            <CratePill icon={BandcampLogo}>Bandcamp bridge</CratePill>
-            <div>
-              <h1 className="text-4xl font-black tracking-tight text-white">
-                Support layer for the collection
-              </h1>
-              <p className="mt-2 text-base text-slate-400">
-                Connect purchases, match Bandcamp URLs to Crate entities and
-                import owned releases without making the library messy.
-              </p>
-            </div>
-            <ConnectionStatus status={status.data} loading={status.loading} />
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Button
-              onClick={() =>
-                queueTask("/api/bandcamp/me/sync", "Bandcamp sync")
-              }
-              disabled={!connected || busyAction !== null}
-              className="gap-2 rounded-full"
-            >
-              {busyAction === "Bandcamp sync" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              Sync collection
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() =>
-                queueTask("/api/bandcamp/me/radar/refresh", "Bandcamp Radar")
-              }
-              disabled={!connected || busyAction !== null}
-              className="gap-2 rounded-full"
-            >
-              <Radar className="h-4 w-4" />
-              Refresh Radar
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() =>
-                queueTask(
-                  "/api/bandcamp/admin/backfill-urls?limit=250&public_search=true",
-                  "Bandcamp URL backfill",
-                )
-              }
-              disabled={busyAction !== null}
-              className="gap-2 rounded-full"
-            >
-              {busyAction === "Bandcamp URL backfill" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <ExternalLink className="h-4 w-4" />
-              )}
-              Backfill URLs
-            </Button>
-          </div>
-        </div>
-      </section>
+      <OpsPageHero
+        title="Bandcamp"
+        description="Connect purchases, match Bandcamp URLs to Crate entities and import owned releases without making the library messy."
+        compactActions
+        actions={
+          <PageHeaderActions>
+            <>
+              {" "}
+              <PageHeaderAction
+                label="Sync collection"
+                onClick={() =>
+                  queueTask("/api/bandcamp/me/sync", "Bandcamp sync")
+                }
+                aria-busy={busyAction === "Bandcamp sync"}
+                disabled={!connected || busyAction !== null}
+              >
+                {busyAction === "Bandcamp sync" && (
+                  <Loader2
+                    data-admin-ux="bandcamp-sync-loading"
+                    aria-hidden="true"
+                    className="h-4 w-4 animate-spin"
+                  />
+                )}
+                {!(busyAction === "Bandcamp sync") ? (
+                  <HeaderFolderSync
+                    data-admin-ux="header-sync-collection"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
+              <PageHeaderAction
+                label="Refresh Radar"
+                onClick={() =>
+                  queueTask("/api/bandcamp/me/radar/refresh", "Bandcamp Radar")
+                }
+                aria-busy={busyAction === "Bandcamp Radar"}
+                disabled={!connected || busyAction !== null}
+              >
+                <HeaderRadar
+                  data-admin-ux="header-refresh-radar"
+                  aria-hidden="true"
+                />
+              </PageHeaderAction>
+              <PageHeaderAction
+                label="Backfill URLs"
+                onClick={() =>
+                  queueTask(
+                    "/api/bandcamp/admin/backfill-urls?limit=250&public_search=true",
+                    "Bandcamp URL backfill",
+                  )
+                }
+                aria-busy={busyAction === "Bandcamp URL backfill"}
+                disabled={busyAction !== null}
+              >
+                {busyAction === "Bandcamp URL backfill" && (
+                  <Loader2
+                    data-admin-ux="bandcamp-backfill-loading"
+                    aria-hidden="true"
+                    className="h-4 w-4 animate-spin"
+                  />
+                )}
+                {!(busyAction === "Bandcamp URL backfill") ? (
+                  <HeaderLink
+                    data-admin-ux="header-backfill-urls"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
+            </>
+          </PageHeaderActions>
+        }
+      >
+        <InfoBadge>Bandcamp bridge</InfoBadge>
+        <ConnectionStatus
+          status={status.data}
+          loading={status.loading}
+          error={status.error}
+          onRetry={() => void status.refetch()}
+        />
+      </OpsPageHero>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {counts.map((count) => (
-          <MetricCard
+          <OpsStatTile
             key={count.label}
             label={count.label}
-            value={count.value}
-            icon={count.icon}
+            value={count.value?.toLocaleString() ?? "—"}
           />
         ))}
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(360px,0.8fr)]">
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(360px,0.8fr)]">
         <Panel
           title="Match candidates"
-          eyebrow={`${candidateMatches.length} pending`}
+          eyebrow={
+            matches.data && !matches.error
+              ? `${candidateMatches.length} pending`
+              : "Not available"
+          }
         >
-          {candidateMatches.length ? (
-            <div className="space-y-3">
-              {candidateMatches.map((match) => (
-                <MatchRow
-                  key={match.id}
-                  match={match}
-                  busyAction={busyAction}
-                  onConfirm={() => updateMatch(match.id, "confirm")}
-                  onReject={() => updateMatch(match.id, "reject")}
-                />
-              ))}
-            </div>
-          ) : (
-            <EmptyState label="No Bandcamp match candidates pending." />
-          )}
+          <ReadState source={matches} label="Bandcamp matches">
+            {candidateMatches.length ? (
+              <div className="space-y-3">
+                {candidateMatches.map((match) => (
+                  <MatchRow
+                    key={match.id}
+                    match={match}
+                    busyAction={busyAction}
+                    onConfirm={() => updateMatch(match.id, "confirm")}
+                    onReject={() => updateMatch(match.id, "reject")}
+                  />
+                ))}
+              </div>
+            ) : (
+              <EmptyState description="No Bandcamp match candidates pending." />
+            )}
+          </ReadState>
         </Panel>
 
         <div className="space-y-6">
-          <Panel title="Radar" eyebrow={`${latestRadar.length} visible`}>
-            <CompactItemList
-              items={latestRadar}
-              empty="No Radar candidates yet."
-            />
+          <Panel
+            title="Radar"
+            eyebrow={
+              radar.data && !radar.error
+                ? `${latestRadar.length} visible`
+                : "Not available"
+            }
+          >
+            <ReadState source={radar} label="Bandcamp Radar">
+              <CompactItemList
+                items={latestRadar}
+                empty="No Radar candidates yet."
+              />
+            </ReadState>
           </Panel>
           <Panel
             title="Recent imports"
-            eyebrow={`${imports.data?.total ?? 0} total`}
+            eyebrow={
+              imports.data && !imports.error
+                ? `${imports.data.total} total`
+                : "Not available"
+            }
           >
-            <CompactImportList imports={latestImports} />
+            <ReadState source={imports} label="Bandcamp imports">
+              <CompactImportList imports={latestImports} />
+            </ReadState>
           </Panel>
           <Panel
             title="Synced purchases"
-            eyebrow={`${adminCollection.data?.total ?? 0} across users`}
+            eyebrow={
+              adminCollection.data && !adminCollection.error
+                ? `${adminCollection.data.total} across users`
+                : "Not available"
+            }
           >
-            <AdminCollectionList items={syncedPurchases} />
+            <ReadState source={adminCollection} label="Bandcamp purchases">
+              <AdminCollectionList items={syncedPurchases} />
+            </ReadState>
           </Panel>
         </div>
       </section>
 
       <Panel
         title="Confirmed links"
-        eyebrow={`${confirmedMatches.length} recent`}
+        eyebrow={
+          matches.data && !matches.error
+            ? `${confirmedMatches.length} recent`
+            : "Not available"
+        }
       >
-        {confirmedMatches.length ? (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {confirmedMatches.map((match) => (
-              <ConfirmedMatchCard key={match.id} match={match} />
-            ))}
-          </div>
-        ) : (
-          <EmptyState label="Confirmed Bandcamp links will appear here." />
-        )}
+        <ReadState source={matches} label="Confirmed Bandcamp links">
+          {confirmedMatches.length ? (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {confirmedMatches.map((match) => (
+                <ConfirmedMatchCard key={match.id} match={match} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState description="Confirmed Bandcamp links will appear here." />
+          )}
+        </ReadState>
       </Panel>
     </main>
   );
@@ -345,20 +407,30 @@ export function Bandcamp() {
 function ConnectionStatus({
   status,
   loading,
+  error,
+  onRetry,
 }: {
   status: BandcampConnectionStatus | null;
   loading: boolean;
+  error: string | null;
+  onRetry: () => void;
 }) {
+  if (error)
+    return (
+      <ErrorState
+        message="Bandcamp connection could not be loaded."
+        onRetry={onRetry}
+      />
+    );
   if (loading && !status) {
-    return <Badge variant="outline">Checking connection...</Badge>;
+    return <InfoBadge>Checking connection...</InfoBadge>;
   }
-  if (!status?.connected) {
+  if (!status) return <InfoBadge>Connection unavailable</InfoBadge>;
+  if (!status.connected) {
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <Badge className="border-amber-400/30 bg-amber-400/10 text-amber-200">
-          Not connected
-        </Badge>
-        <span className="text-sm text-slate-500">
+        <InfoBadge tone="neutral">Not connected</InfoBadge>
+        <span className="text-sm text-text-muted">
           Connect from Listen Settings before syncing purchases.
         </span>
       </div>
@@ -366,41 +438,13 @@ function ConnectionStatus({
   }
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Badge className="border-emerald-400/30 bg-emerald-400/10 text-emerald-200">
-        Connected
-      </Badge>
-      <span className="text-sm text-slate-300">
+      <InfoBadge tone="success">Connected</InfoBadge>
+      <span className="text-sm text-text-secondary">
         {status.display_name || status.username || "Bandcamp fan"}
       </span>
       {status.connection_method ? (
-        <span className="text-xs uppercase tracking-[0.22em] text-slate-500">
-          {status.connection_method}
-        </span>
+        <MonoLabel as="span">{status.connection_method}</MonoLabel>
       ) : null}
-    </div>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  icon: Icon,
-}: {
-  label: string;
-  value: number;
-  icon: LucideIcon | typeof BandcampLogo;
-}) {
-  return (
-    <div className="rounded-3xl border border-white/8 bg-white/[0.035] p-5">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-bold uppercase tracking-[0.24em] text-slate-500">
-          {label}
-        </span>
-        <Icon className="h-4 w-4 text-primary" />
-      </div>
-      <div className="mt-5 text-4xl font-black text-white">
-        {value.toLocaleString()}
-      </div>
     </div>
   );
 }
@@ -415,15 +459,16 @@ function Panel({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-[1.5rem] border border-white/8 bg-[#121218]/88 p-5 shadow-[0_18px_56px_rgba(0,0,0,0.28)]">
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <h2 className="text-xl font-black text-white">{title}</h2>
-        <span className="text-xs font-bold uppercase tracking-[0.22em] text-primary">
+    <OpsPanel
+      title={title}
+      action={
+        <MonoLabel as="span" className="text-accent-action-hi">
           {eyebrow}
-        </span>
-      </div>
+        </MonoLabel>
+      }
+    >
       {children}
-    </section>
+    </OpsPanel>
   );
 }
 
@@ -446,24 +491,25 @@ function MatchRow({
     .filter(Boolean)
     .join(" · ");
   return (
-    <article className="grid gap-4 rounded-2xl border border-white/8 bg-black/18 p-4 md:grid-cols-[56px_minmax(0,1fr)_auto] md:items-center">
+    <OpsSurface
+      as="article"
+      className="grid gap-4 p-4 md:grid-cols-[56px_minmax(0,1fr)_auto] md:items-center"
+    >
       <ItemCover item={match} />
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline">{match.entity_type}</Badge>
-          <Badge className="bg-cyan-400/10 text-cyan-200">
+          <InfoBadge>{match.entity_type}</InfoBadge>
+          <InfoBadge tone="accent">
             {Math.round((match.confidence || 0) * 100)}%
-          </Badge>
-          <span className="text-xs uppercase tracking-[0.2em] text-slate-500">
-            {match.source || "sync"}
-          </span>
+          </InfoBadge>
+          <MonoLabel as="span">{match.source || "sync"}</MonoLabel>
         </div>
-        <h3 className="mt-2 truncate text-base font-bold text-white">
+        <h3 className="mt-2 truncate text-base font-bold text-text-primary font-display">
           {entity}
         </h3>
-        <p className="truncate text-sm text-slate-400">{title}</p>
+        <p className="m-0 truncate text-sm text-text-muted">{title}</p>
         {subtitle ? (
-          <p className="truncate text-xs text-slate-500">{subtitle}</p>
+          <p className="m-0 truncate text-xs text-text-subtle">{subtitle}</p>
         ) : null}
       </div>
       <div className="flex flex-wrap gap-2 md:justify-end">
@@ -471,40 +517,42 @@ function MatchRow({
           <Button
             variant="ghost"
             size="sm"
-            className="gap-2 rounded-full"
+            className="gap-2"
             onClick={() =>
               window.open(match.item_url || "", "_blank", "noopener,noreferrer")
             }
           >
-            <ExternalLink className="h-4 w-4" />
             Open
           </Button>
         ) : null}
         <Button
           size="sm"
-          className="gap-2 rounded-full"
+          className="gap-2"
+          aria-busy={busyAction === `confirm:${match.id}`}
           disabled={busyAction !== null}
           onClick={onConfirm}
         >
-          {busyAction === `confirm:${match.id}` ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <CheckCircle2 className="h-4 w-4" />
+          {busyAction === `confirm:${match.id}` && (
+            <Loader2
+              data-admin-ux="bandcamp-confirm-loading"
+              aria-hidden="true"
+              className="h-4 w-4 animate-spin"
+            />
           )}
           Confirm
         </Button>
         <Button
           variant="outline"
           size="sm"
-          className="gap-2 rounded-full"
+          className="gap-2"
+          aria-busy={busyAction === `reject:${match.id}`}
           disabled={busyAction !== null}
           onClick={onReject}
         >
-          <XCircle className="h-4 w-4" />
           Reject
         </Button>
       </div>
-    </article>
+    </OpsSurface>
   );
 }
 
@@ -512,7 +560,7 @@ function ConfirmedMatchCard({ match }: { match: BandcampMatch }) {
   return (
     <button
       type="button"
-      className="group min-w-0 rounded-2xl border border-white/8 bg-black/18 p-3 text-left transition hover:border-primary/40 hover:bg-primary/5"
+      className="group min-h-11 min-w-0 rounded-md border border-border-quiet bg-raised-surface p-3 text-left transition hover:border-accent-action-hi/40 hover:bg-panel-surface"
       onClick={() =>
         match.item_url &&
         window.open(match.item_url, "_blank", "noopener,noreferrer")
@@ -521,13 +569,14 @@ function ConfirmedMatchCard({ match }: { match: BandcampMatch }) {
       <ItemCover item={match} large />
       <div className="mt-3 min-w-0">
         <div className="flex items-center gap-2">
-          <Badge variant="outline">{match.entity_type}</Badge>
-          <ArrowUpRight className="h-3.5 w-3.5 text-slate-500 transition group-hover:text-primary" />
+          <InfoBadge>{match.entity_type}</InfoBadge>
         </div>
-        <h3 className="mt-2 truncate text-sm font-bold text-white">
+        <h3 className="mt-2 truncate text-sm font-bold text-text-primary font-display">
           {match.entity_name || itemTitle(match)}
         </h3>
-        <p className="truncate text-xs text-slate-500">{itemTitle(match)}</p>
+        <p className="m-0 truncate text-xs text-text-subtle">
+          {itemTitle(match)}
+        </p>
       </div>
     </button>
   );
@@ -540,14 +589,14 @@ function CompactItemList({
   items: BandcampItem[];
   empty: string;
 }) {
-  if (!items.length) return <EmptyState label={empty} />;
+  if (!items.length) return <EmptyState description={empty} />;
   return (
     <div className="space-y-3">
       {items.map((item) => (
         <button
           key={`${item.id}-${item.item_url}`}
           type="button"
-          className="flex w-full items-center gap-3 rounded-2xl border border-white/6 bg-black/16 p-3 text-left transition hover:border-primary/35"
+          className="flex min-h-11 w-full items-center gap-3 rounded-md border border-border-quiet bg-raised-surface p-3 text-left transition hover:border-accent-action-hi/40 hover:bg-panel-surface"
           onClick={() =>
             item.item_url &&
             window.open(item.item_url, "_blank", "noopener,noreferrer")
@@ -555,14 +604,13 @@ function CompactItemList({
         >
           <ItemCover item={item} />
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-sm font-bold text-white">
+            <h3 className="truncate text-sm font-bold text-text-primary font-display">
               {itemTitle(item)}
             </h3>
-            <p className="truncate text-xs text-slate-500">
+            <p className="m-0 truncate text-xs text-text-subtle">
               {item.artist_name}
             </p>
           </div>
-          <ExternalLink className="h-4 w-4 text-slate-600" />
         </button>
       ))}
     </div>
@@ -570,26 +618,27 @@ function CompactItemList({
 }
 
 function CompactImportList({ imports }: { imports: BandcampImport[] }) {
-  if (!imports.length) return <EmptyState label="No Bandcamp imports yet." />;
+  if (!imports.length)
+    return <EmptyState description="No Bandcamp imports yet." />;
   return (
     <div className="space-y-3">
       {imports.map((item) => (
         <div
           key={item.id}
-          className="flex items-center gap-3 rounded-2xl border border-white/6 bg-black/16 p-3"
+          className="flex items-center gap-3 rounded-md border border-border-quiet bg-raised-surface p-3"
         >
           <ItemCover item={item} />
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-sm font-bold text-white">
+            <h3 className="truncate text-sm font-bold text-text-primary font-display">
               {itemTitle(item)}
             </h3>
-            <p className="truncate text-xs text-slate-500">
+            <p className="m-0 truncate text-xs text-text-subtle">
               {item.requested_format || "flac"} · {item.status || "queued"}
             </p>
           </div>
-          <Badge className={cn("capitalize", importStatusClass(item.status))}>
+          <InfoBadge tone={importStatusTone(item.status)}>
             {item.status || "queued"}
-          </Badge>
+          </InfoBadge>
         </div>
       ))}
     </div>
@@ -598,7 +647,7 @@ function CompactImportList({ imports }: { imports: BandcampImport[] }) {
 
 function AdminCollectionList({ items }: { items: BandcampItem[] }) {
   if (!items.length) {
-    return <EmptyState label="No Bandcamp purchases synced yet." />;
+    return <EmptyState description="No Bandcamp purchases synced yet." />;
   }
   return (
     <div className="space-y-3">
@@ -606,7 +655,7 @@ function AdminCollectionList({ items }: { items: BandcampItem[] }) {
         <button
           key={`${item.user_email}-${item.id}-${item.item_url}`}
           type="button"
-          className="flex w-full items-center gap-3 rounded-2xl border border-white/6 bg-black/16 p-3 text-left transition hover:border-primary/35"
+          className="flex min-h-11 w-full items-center gap-3 rounded-md border border-border-quiet bg-raised-surface p-3 text-left transition hover:border-accent-action-hi/40 hover:bg-panel-surface"
           onClick={() =>
             item.item_url &&
             window.open(item.item_url, "_blank", "noopener,noreferrer")
@@ -614,25 +663,20 @@ function AdminCollectionList({ items }: { items: BandcampItem[] }) {
         >
           <ItemCover item={item} />
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-sm font-bold text-white">
+            <h3 className="truncate text-sm font-bold text-text-primary font-display">
               {itemTitle(item)}
             </h3>
-            <p className="truncate text-xs text-slate-500">
+            <p className="m-0 truncate text-xs text-text-subtle">
               {item.artist_name} ·{" "}
               {item.user_name || item.user_username || item.user_email}
             </p>
           </div>
           {item.latest_import_status ? (
-            <Badge
-              className={cn(
-                "capitalize",
-                importStatusClass(item.latest_import_status),
-              )}
-            >
+            <InfoBadge tone={importStatusTone(item.latest_import_status)}>
               {item.latest_import_status}
-            </Badge>
+            </InfoBadge>
           ) : (
-            <Badge variant="outline">synced</Badge>
+            <InfoBadge>synced</InfoBadge>
           )}
         </button>
       ))}
@@ -651,7 +695,7 @@ function ItemCover({
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/8 bg-white/6",
+        "flex shrink-0 items-center justify-center overflow-hidden rounded-md border border-border-quiet bg-panel-surface",
         large ? "aspect-square w-full" : "h-14 w-14",
       )}
     >
@@ -663,7 +707,7 @@ function ItemCover({
           loading="lazy"
         />
       ) : (
-        <span className="px-2 text-center text-xs font-black text-slate-500">
+        <span className="px-2 text-center text-xs font-bold text-text-subtle">
           {title.slice(0, 2).toUpperCase()}
         </span>
       )}
@@ -671,12 +715,30 @@ function ItemCover({
   );
 }
 
-function EmptyState({ label }: { label: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-white/10 bg-black/14 p-6 text-sm text-slate-500">
-      {label}
-    </div>
-  );
+function ReadState({
+  source,
+  label,
+  children,
+}: {
+  source: {
+    data: unknown;
+    loading: boolean;
+    error: unknown;
+    refetch: () => unknown;
+  };
+  label: string;
+  children: ReactNode;
+}) {
+  if (source.loading) return <LoadingState label={`Loading ${label}`} />;
+  if (source.error || !source.data) {
+    return (
+      <ErrorState
+        message={`${label} could not be loaded.`}
+        onRetry={() => void source.refetch()}
+      />
+    );
+  }
+  return children;
 }
 
 function itemTitle(item: BandcampItem) {
@@ -685,9 +747,8 @@ function itemTitle(item: BandcampItem) {
   );
 }
 
-function importStatusClass(status?: string | null) {
-  if (status === "completed") return "bg-emerald-400/10 text-emerald-200";
-  if (status === "failed") return "bg-red-400/10 text-red-200";
-  if (status === "running") return "bg-cyan-400/10 text-cyan-200";
-  return "bg-white/10 text-slate-300";
+function importStatusTone(status?: string | null): InfoBadgeTone {
+  if (status === "completed" || status === "running") return "accent";
+  if (status === "failed") return "warning";
+  return "neutral";
 }

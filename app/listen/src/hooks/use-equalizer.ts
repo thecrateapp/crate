@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import {
@@ -18,6 +18,19 @@ import {
   setEqualizerSmart,
 } from "@/lib/equalizer-prefs";
 import { EQ_PRESETS, type EqPresetName } from "@/lib/equalizer";
+import {
+  androidNativeEngine,
+  shouldUseAndroidNativePlayer,
+} from "@/lib/android-native-engine";
+import { setEqualizer as engineSetEqualizer } from "@/lib/gapless-player";
+import { canUseWebAudioEffects } from "@/lib/mobile-audio-mode";
+
+export const NATIVE_EQ_LIVE_INTERVAL_MS = 60;
+const NATIVE_EQ_RAMP_MS = 80;
+
+function logNativeEqError(error: unknown) {
+  console.error("[native-player] failed to apply equalizer:", error);
+}
 
 /**
  * Subscribes a React component to equalizer preferences and keeps the
@@ -62,23 +75,100 @@ export function useEqualizer() {
     [setSnapshot],
   );
 
-  const updateBand = useCallback(
-    (bandIndex: number, dB: number) => {
-      setSnapshot((prev) => {
-        const nextGains = [...prev.gains];
-        nextGains[bandIndex] = dB;
-        setCustomEqualizerGains(nextGains);
-        return {
-          ...prev,
-          preset: "custom",
-          gains: nextGains,
-          smart: false,
-          adaptive: false,
-          genreAdaptive: false,
-        };
-      });
+  const latestRef = useRef({
+    gains: effectiveGains,
+    enabled: snapshot.enabled,
+  });
+  const liveGainsRef = useRef<number[] | null>(null);
+  const nativeLiveRef = useRef<{
+    lastSentAt: number;
+    timer: ReturnType<typeof setTimeout> | null;
+    pending: number[] | null;
+  }>({ lastSentAt: -Infinity, timer: null, pending: null });
+
+  useLayoutEffect(() => {
+    latestRef.current = { gains: effectiveGains, enabled: snapshot.enabled };
+  });
+
+  const cancelNativeLive = useCallback(() => {
+    const native = nativeLiveRef.current;
+    if (native.timer !== null) clearTimeout(native.timer);
+    native.timer = null;
+    native.pending = null;
+  }, []);
+
+  useEffect(() => cancelNativeLive, [cancelNativeLive]);
+
+  const sendLiveGains = useCallback((gains: number[]) => {
+    const { enabled } = latestRef.current;
+    if (!shouldUseAndroidNativePlayer()) {
+      engineSetEqualizer(canUseWebAudioEffects && enabled, gains);
+      return;
+    }
+    const native = nativeLiveRef.current;
+    const send = (next: number[]) => {
+      native.lastSentAt = Date.now();
+      void androidNativeEngine
+        .setEq(latestRef.current.enabled, next, NATIVE_EQ_RAMP_MS)
+        .catch(logNativeEqError);
+    };
+    const wait = native.lastSentAt + NATIVE_EQ_LIVE_INTERVAL_MS - Date.now();
+    if (wait <= 0 && native.timer === null) {
+      send(gains);
+      return;
+    }
+    native.pending = gains;
+    if (native.timer !== null) return;
+    native.timer = setTimeout(
+      () => {
+        native.timer = null;
+        const pending = native.pending;
+        native.pending = null;
+        if (pending) send(pending);
+      },
+      Math.max(wait, 0),
+    );
+  }, []);
+
+  const editedGains = useCallback((bandIndex: number, dB: number) => {
+    const next = [...(liveGainsRef.current ?? latestRef.current.gains)];
+    next[bandIndex] = dB;
+    return next;
+  }, []);
+
+  const showCustomGains = useCallback(
+    (gains: number[]) => {
+      setSnapshot((prev) => ({
+        ...prev,
+        preset: "custom",
+        gains,
+        smart: false,
+        adaptive: false,
+        genreAdaptive: false,
+      }));
     },
     [setSnapshot],
+  );
+
+  const updateBand = useCallback(
+    (bandIndex: number, dB: number) => {
+      const next = editedGains(bandIndex, dB);
+      liveGainsRef.current = next;
+      showCustomGains(next);
+      sendLiveGains(next);
+    },
+    [editedGains, sendLiveGains, showCustomGains],
+  );
+
+  const commitBand = useCallback(
+    (bandIndex: number, dB: number) => {
+      const next = editedGains(bandIndex, dB);
+      liveGainsRef.current = null;
+      cancelNativeLive();
+      showCustomGains(next);
+      setCustomEqualizerGains(next);
+    },
+    [cancelNativeLive, editedGains, showCustomGains],
   );
 
   const resetToFlat = useCallback(() => {
@@ -183,6 +273,7 @@ export function useEqualizer() {
     toggleGenreAdaptive,
     applyPreset,
     updateBand,
+    commitBand,
     resetToFlat,
     saveForCurrentTrack,
     clearCurrentTrackPreset,

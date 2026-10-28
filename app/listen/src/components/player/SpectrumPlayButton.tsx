@@ -40,7 +40,6 @@ export const SpectrumPlayButton = forwardRef<
         "group relative z-30 isolate flex shrink-0 items-center justify-center overflow-visible rounded-full",
         "spectrum-play-button",
         "transition-[transform,filter,box-shadow] duration-200 hover:scale-105 active:scale-95 data-[active=true]:brightness-110 data-[active=true]:saturate-125",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/70 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-canvas",
         sizeClasses[size],
         className,
       )}

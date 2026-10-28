@@ -1,5 +1,6 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -126,10 +127,6 @@ vi.mock("@crate/ui/lib/use-dismissible-layer", () => ({
   useDismissibleLayer: vi.fn(),
 }));
 
-vi.mock("@crate/ui/lib/use-escape-key", () => ({
-  useEscapeKey: vi.fn(),
-}));
-
 describe("ExtendedPlayer", () => {
   beforeEach(() => {
     localStorage.removeItem("listen-eq-enabled");
@@ -206,16 +203,13 @@ describe("ExtendedPlayer", () => {
     });
 
     const onClose = vi.fn();
-    renderWithListenProviders(
-      <ExtendedPlayer open={false} onClose={onClose} />,
-      {
-        playerActions: createMockPlayerActions({
-          currentTrack: track,
-          queue: [track],
-          currentIndex: 0,
-        }),
-      },
-    );
+    renderWithListenProviders(<ExtendedPlayer open onClose={onClose} />, {
+      playerActions: createMockPlayerActions({
+        currentTrack: track,
+        queue: [track],
+        currentIndex: 0,
+      }),
+    });
 
     await userEvent
       .setup()
@@ -225,7 +219,7 @@ describe("ExtendedPlayer", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it("hides the desktop Equalizer access when it is globally disabled", () => {
+  it("keeps desktop Equalizer access while the effect is off without enabling it", async () => {
     localStorage.setItem("listen-eq-enabled", "false");
     const track = createMockTrack({
       id: "extended-eq-track",
@@ -234,18 +228,26 @@ describe("ExtendedPlayer", () => {
       artist: "Crate",
     });
 
-    renderWithListenProviders(
-      <ExtendedPlayer open={false} onClose={vi.fn()} />,
-      {
-        playerActions: createMockPlayerActions({
-          currentTrack: track,
-          queue: [track],
-          currentIndex: 0,
-        }),
-      },
-    );
+    renderWithListenProviders(<ExtendedPlayer open onClose={vi.fn()} />, {
+      playerActions: createMockPlayerActions({
+        currentTrack: track,
+        queue: [track],
+        currentIndex: 0,
+      }),
+    });
 
-    expect(screen.queryByLabelText("Equalizer")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Equalizer" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Now playing", { exact: true }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Equalizer" }));
+    expect(screen.getByRole("button", { name: "Equalizer" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(localStorage.getItem("listen-eq-enabled")).toBe("false");
   });
 
   it("uses semantic tokens for the player chrome and tabs", async () => {
@@ -258,61 +260,41 @@ describe("ExtendedPlayer", () => {
       artist: "Crate",
     });
 
-    renderWithListenProviders(
-      <ExtendedPlayer open={false} onClose={vi.fn()} />,
-      {
-        playerActions: createMockPlayerActions({
-          currentTrack: track,
-          queue: [track],
-          currentIndex: 0,
-        }),
-      },
-    );
+    renderWithListenProviders(<ExtendedPlayer open onClose={vi.fn()} />, {
+      playerActions: createMockPlayerActions({
+        currentTrack: track,
+        queue: [track],
+        currentIndex: 0,
+      }),
+    });
 
     const closeButton = screen.getByLabelText("Close player");
-    const equalizerButton = screen.getByLabelText("Equalizer");
-    const visualizerSettingsButton = screen.getByLabelText(
-      "Visualizer settings",
-    );
+    const equalizerButton = screen.getByRole("button", {
+      name: "Equalizer",
+    });
+    const visualizerSettingsButton = screen.getByRole("button", {
+      name: "Visualizer settings",
+    });
     const activeTab = screen.getByRole("tab", { name: "Queue" });
     const inactiveTab = screen.getByRole("tab", { name: "Suggested" });
 
-    for (const button of [closeButton, equalizerButton]) {
-      expect(button).toHaveClass(
-        "bg-surface-control",
-        "text-text-secondary",
-        "hover:bg-surface-control-hover",
-        "hover:text-text-primary",
-      );
-      expect(button.className).not.toContain("black/");
-      expect(button.className).not.toContain("white/");
+    for (const button of [
+      closeButton,
+      equalizerButton,
+      visualizerSettingsButton,
+    ]) {
+      expect(button).toHaveAttribute("data-size", "icon-lg");
+      expect(button.className).not.toContain("backdrop-blur");
     }
-
-    expect(visualizerSettingsButton).toHaveClass(
-      "bg-surface-icon-control",
-      "text-text-faint",
-    );
-    expect(visualizerSettingsButton.className).not.toContain("black/");
-    expect(visualizerSettingsButton.className).not.toContain("white/");
-
+    expect(visualizerSettingsButton).toBeDisabled();
     expect(activeTab).toHaveAttribute("aria-selected", "true");
-    expect(activeTab).toHaveClass(
-      "data-[state=active]:bg-surface-control",
-      "data-[state=active]:text-text-primary",
+    expect(inactiveTab).toHaveAttribute("aria-selected", "false");
+    expect(activeTab).toHaveAttribute(
+      "aria-controls",
+      screen.getByRole("tabpanel").id,
     );
-    expect(inactiveTab).toHaveClass(
-      "data-[state=inactive]:text-text-muted",
-      "data-[state=inactive]:hover:text-text-secondary",
-    );
-    expect(activeTab.className).not.toContain("white/");
-    expect(inactiveTab.className).not.toContain("white/");
-
     await user.click(equalizerButton);
-    expect(equalizerButton).toHaveClass(
-      "bg-accent-action/18",
-      "text-accent-action",
-      "drop-shadow-accent-action",
-    );
+    expect(equalizerButton).toHaveAttribute("aria-pressed", "true");
   });
 
   it("uses semantic tokens for the artwork surface", () => {
@@ -340,10 +322,10 @@ describe("ExtendedPlayer", () => {
       },
     );
 
-    expect(container.innerHTML).toContain("bg-accent-action/10");
-    expect(container.innerHTML).toContain("border-border-quiet");
+    expect(container.innerHTML).not.toContain("blur-3xl");
+
     expect(container.innerHTML).toContain("bg-surface-quiet-subtle");
-    expect(container.innerHTML).toContain("shadow-player-artwork");
+    expect(container.innerHTML).not.toContain("shadow-player-artwork");
     expect(container.innerHTML).toContain("text-text-muted");
     expect(container.innerHTML).not.toContain("bg-primary/10");
     expect(container.innerHTML).not.toContain("border-white/10");
@@ -352,7 +334,7 @@ describe("ExtendedPlayer", () => {
     expect(container.innerHTML).not.toContain("text-white/40");
   });
 
-  it("uses the layered semantic shadow for visible cover art", () => {
+  it("keeps visible cover art without decorative shadow", () => {
     useVisualizerConfigMock.mockReturnValue({
       surfaceMode: "cover",
       useAlbumPalette: false,
@@ -378,6 +360,51 @@ describe("ExtendedPlayer", () => {
       },
     );
 
-    expect(container.innerHTML).toContain("shadow-player-artwork-layered");
+    expect(container.innerHTML).not.toContain("shadow-player-artwork-layered");
   });
+});
+
+it("isolates the prepared and closed surface and returns focus to its launcher", async () => {
+  const user = userEvent.setup();
+  const track = createMockTrack({
+    id: "focus-track",
+    title: "Paused focus track",
+  });
+  function PlayerHarness() {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <button onClick={() => setOpen(true)}>Expand player</button>
+        <ExtendedPlayer open={open} onClose={() => setOpen(false)} />
+        <button>After player</button>
+      </>
+    );
+  }
+  renderWithListenProviders(<PlayerHarness />, {
+    playerActions: createMockPlayerActions({
+      currentTrack: track,
+      queue: [track],
+      currentIndex: 0,
+    }),
+  });
+  const closedSurface = screen
+    .getByTestId("player-track-identity")
+    .closest(".z-app-extended-player");
+  expect(closedSurface).toHaveAttribute("inert");
+  expect(closedSurface).toHaveAttribute("aria-hidden", "true");
+  expect(
+    screen.queryByRole("button", { name: "Close player" }),
+  ).not.toBeInTheDocument();
+  const launcher = screen.getByRole("button", { name: "Expand player" });
+  await user.click(launcher);
+  const close = screen.getByRole("button", { name: "Close player" });
+  await waitFor(() => expect(close).toHaveFocus());
+  await user.click(close);
+  expect(launcher).toHaveFocus();
+  expect(closedSurface).toHaveAttribute("inert");
+  // jsdom does not enforce native inert during user-event tabbing.
+  // The AX boundary and focus restoration are asserted here; real Tab is checked in browser.
+  expect(
+    screen.queryByRole("button", { name: "Close player" }),
+  ).not.toBeInTheDocument();
 });

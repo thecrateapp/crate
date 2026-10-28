@@ -263,12 +263,12 @@ class NativePresenter:
                             [
                                 [
                                     InlineKeyboardButton(
-                                        "Aprobar" if last else "Siguiente",
+                                        "Approve" if last else "Next",
                                         callback_data=prefix
                                         + ("approve" if last else "next"),
                                     ),
                                     InlineKeyboardButton(
-                                        "Rechazar", callback_data=prefix + "reject"
+                                        "Reject", callback_data=prefix + "reject"
                                     ),
                                 ]
                             ]

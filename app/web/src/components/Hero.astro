@@ -1,0 +1,328 @@
+---
+import { t } from "../i18n";
+import InstallCommand from "./InstallCommand.astro";
+
+interface Props {
+  locale?: string;
+}
+
+const { locale = "en" } = Astro.props;
+---
+
+<canvas id="field" aria-hidden="true"></canvas>
+<div class="mark-solid" aria-hidden="true">
+  <span class="solid-aura"></span>
+  {
+    [6, 5, 4, 3, 2, 1].map((layer) => (
+      <img class="solid-depth" src="/icons/logo.svg" alt="" width="1052" height="1120" style={`--z:${layer}`} />
+    ))
+  }
+  <img class="solid-face" src="/icons/logo.svg" alt="" width="1052" height="1120" />
+  <span class="solid-scan"></span>
+  <span class="solid-sheen"></span>
+</div>
+<div class="scrim" aria-hidden="true"></div>
+
+<section class="hero-pin">
+  <div class="hero-sticky">
+    <img class="mark-static" src="/icons/logo.svg" alt="" width="1052" height="1120" />
+    <div class="hero-copy">
+      <h1 class="display" data-split style="--d:90ms;--step:55ms">{t("hero.title", locale)}</h1>
+      <p class="sub" data-split style="--d:300ms;--step:40ms">{t("hero.subline", locale)}</p>
+      <InstallCommand locale={locale} delay="440ms" />
+    </div>
+    <div class="scroll-cue" aria-hidden="true">
+      <span class="scroll-label">{t("hero.scroll", locale)}</span>
+      <span class="scroll-track"></span>
+      <svg class="scroll-arrow" viewBox="0 0 12 8" width="12" height="8"><path d="M1 1.5 6 6.5 11 1.5" /></svg>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { initHero } from "../scripts/hero/mark";
+
+  let cleanup: (() => void) | undefined;
+
+  document.addEventListener("astro:page-load", () => {
+    cleanup?.();
+    cleanup = document.querySelector(".hero-pin") ? initHero() : undefined;
+  });
+
+  document.addEventListener("astro:before-swap", () => {
+    cleanup?.();
+    cleanup = undefined;
+  });
+</script>
+
+<style>
+  #field {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    opacity: 0;
+  }
+
+  .mark-solid {
+    position: fixed;
+    left: 0;
+    top: 0;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    aspect-ratio: 1052 / 1120;
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+
+  .mark-solid > * {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .solid-depth {
+    transform: translateZ(calc(var(--z) * -3.5px));
+    filter: brightness(calc(0.62 - var(--z) * 0.06)) saturate(1.2);
+  }
+
+  .solid-face {
+    transform: translateZ(1px);
+    animation: solid-pulse 3.2s ease-in-out infinite;
+  }
+
+  .solid-scan,
+  .solid-sheen {
+    transform: translateZ(1.5px);
+    mask: url("/icons/logo.svg") center / 100% 100% no-repeat;
+  }
+
+  .solid-scan {
+    background: repeating-linear-gradient(180deg, rgba(10, 10, 15, 0.22) 0 1px, transparent 1px 4px);
+    background-size: 100% 8px;
+    animation: solid-scan 1.6s linear infinite;
+  }
+
+  .solid-sheen {
+    background: linear-gradient(
+      115deg,
+      transparent 38%,
+      rgba(236, 254, 255, 0.5) 48%,
+      rgba(103, 232, 249, 0.25) 52%,
+      transparent 62%
+    );
+    background-size: 250% 100%;
+    mix-blend-mode: screen;
+    animation: solid-sheen 3.6s ease-in-out infinite;
+  }
+
+  .solid-aura {
+    inset: -12% !important;
+    width: auto !important;
+    height: auto !important;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(6, 182, 212, 0.08), transparent 65%);
+    transform: translateZ(-30px);
+  }
+
+  @keyframes solid-pulse {
+    0%,
+    100% {
+      filter: drop-shadow(0 0 4px rgba(103, 232, 249, 0.25)) brightness(1);
+    }
+    50% {
+      filter: drop-shadow(0 0 8px rgba(103, 232, 249, 0.4)) brightness(1.08);
+    }
+  }
+
+  @keyframes solid-scan {
+    to {
+      background-position: 0 8px;
+    }
+  }
+
+  @keyframes solid-sheen {
+    0% {
+      background-position: 120% 0;
+    }
+    60%,
+    100% {
+      background-position: -20% 0;
+    }
+  }
+
+  .scrim {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse 120% 90% at 50% 45%, transparent 55%, rgba(10, 10, 15, 0.8) 100%);
+  }
+
+  .hero-pin {
+    position: relative;
+    height: 200vh;
+  }
+
+  .hero-sticky {
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    min-height: 700px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 55vh clamp(20px, 5vw, 72px) 0;
+  }
+
+  .mark-static {
+    position: absolute;
+    left: 50%;
+    top: 35.9vh;
+    width: 29.5vh;
+    height: auto;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    :global(html.js) .mark-static {
+      opacity: 0;
+    }
+  }
+
+  .scroll-cue {
+    position: absolute;
+    right: clamp(16px, 2.6vw, 40px);
+    bottom: 7vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    color: var(--fg-3);
+    pointer-events: none;
+    animation: cue-in 0.8s ease-out 2.4s both;
+    transition: opacity 0.4s ease;
+  }
+
+  .scroll-cue.is-hidden {
+    opacity: 0;
+  }
+
+  .scroll-label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    writing-mode: vertical-rl;
+  }
+
+  .scroll-track {
+    position: relative;
+    width: 1px;
+    height: 56px;
+    overflow: hidden;
+    background: rgba(241, 245, 249, 0.14);
+  }
+
+  .scroll-track::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1px;
+    height: 40%;
+    background: var(--cyan-hi);
+    animation: cue-run 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  }
+
+  .scroll-arrow {
+    fill: none;
+    stroke: var(--cyan-hi);
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    animation: cue-bob 1.8s ease-in-out infinite;
+  }
+
+  @keyframes cue-in {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+  }
+
+  @keyframes cue-run {
+    from {
+      transform: translateY(-100%);
+    }
+    to {
+      transform: translateY(250%);
+    }
+  }
+
+  @keyframes cue-bob {
+    50% {
+      transform: translateY(4px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .scroll-cue,
+    .scroll-track::after,
+    .scroll-arrow {
+      animation: none;
+    }
+  }
+
+  .hero-copy {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 18px;
+    will-change: transform, opacity;
+  }
+
+  .hero-copy .display {
+    font-size: clamp(2.6rem, 5.4vw, 6.4rem);
+    max-width: 16ch;
+  }
+
+  .hero-copy .sub {
+    font-size: clamp(1.15rem, 1.8vw, 1.9rem);
+  }
+
+  .hero-copy :global(.cta) {
+    margin-top: 8px;
+  }
+
+  @media (max-width: 760px) {
+    .scroll-cue {
+      left: 0;
+      right: 0;
+      bottom: calc(max(0px, 100% - 100svh) + 3svh);
+      gap: 10px;
+    }
+    .scroll-label {
+      display: none;
+    }
+    .scroll-track {
+      height: 36px;
+    }
+    .mark-static {
+      top: 37.7vh;
+      width: 27.2vh;
+    }
+    .hero-copy {
+      width: 100%;
+    }
+    .hero-copy .display {
+      font-size: 11vw;
+    }
+  }
+</style>

@@ -10,6 +10,7 @@ from crate.db.repositories.show_extraction_jobs import (
     save_show_extractor_readiness,
 )
 from crate.show_extraction import SHOW_ACTIONS, extract_show_candidates
+from crate.show_location_enrichment import enrich_show_draft_locations
 from crate.ai import consumers
 from crate.ai.contracts import AIConfigurationError
 
@@ -52,6 +53,7 @@ def handle_show_extraction(task_id: str, params: dict, config: dict) -> dict:
             draft["warnings"].append(
                 "The accepted model configuration changed or was revoked; accept a new extraction."
             )
+        draft = enrich_show_draft_locations(draft, cancelled=cancelled)
         from crate.show_telemetry import record_show_metrics
 
         record_show_metrics(candidates=len(draft.get("candidates", [])))

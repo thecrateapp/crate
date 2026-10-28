@@ -9,6 +9,7 @@ import {
 import type { JamTransportControls } from "@/contexts/player-context";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlayerConnectTransport } from "@/contexts/use-player-connect-transport";
+import { useNativeMixAvailability } from "@/contexts/use-native-mix-availability";
 import { useCastPlaybackRuntime } from "@/contexts/use-cast-playback-runtime";
 import { usePlayerQueueActions } from "@/contexts/use-player-queue-actions";
 import { usePlayerRuntimeState } from "@/contexts/use-player-runtime-state";
@@ -43,6 +44,8 @@ export function usePlayerProviderRuntime(children: ReactNode) {
     volume,
     analyserVersion,
     crossfadeTransition,
+    mixState,
+    setNativeMixAvailable,
     shuffle,
     playSource,
     repeat,
@@ -82,7 +85,7 @@ export function usePlayerProviderRuntime(children: ReactNode) {
     commitIsBuffering,
   } = runtimeState;
 
-  useCastPlaybackRuntime({
+  const castActive = useCastPlaybackRuntime({
     commitCurrentIndex,
     commitCurrentTime,
     commitDuration,
@@ -291,6 +294,12 @@ export function usePlayerProviderRuntime(children: ReactNode) {
       volume,
     });
 
+  const nativeMixAvailable = useNativeMixAvailability({
+    castActive,
+    remoteActive: connectValue.isRemoteActive,
+    setAvailable: setNativeMixAvailable,
+  });
+
   const { playbackNeedsUserGesture, resumeAfterUserGesture } =
     usePlayerLifecycleRuntime({
       clearQueueRef,
@@ -361,6 +370,8 @@ export function usePlayerProviderRuntime(children: ReactNode) {
     state: {
       analyserVersion,
       crossfadeTransition,
+      mixState: nativeMixAvailable ? mixState : null,
+      nativeMixAvailable,
       isBuffering,
       isPlaying,
       volume,

@@ -43,12 +43,16 @@ COPY crate ./crate
 COPY scripts ./scripts
 COPY bin ./bin
 
-# Install crate-cli binary for production Linux workers (x86_64 only).
-# Core workers use it for fast scan/quality/tag/fingerprint paths, but do not
-# carry the heavy ML stack used only by the analysis worker.
+# Install crate-cli for production Linux workers: required on x86_64, used on
+# ARM when the build provides it (release builds do; local ARM builds fall back
+# to the Python paths). Core workers use it for fast scan/quality/tag/
+# fingerprint paths, but do not carry the heavy ML stack of the analysis worker.
 RUN if [ "$(uname -m)" = "x86_64" ]; then \
         test -f bin/crate-cli-linux-amd64 || (echo "bin/crate-cli-linux-amd64 is required for x86_64 worker images" >&2; exit 1); \
         cp bin/crate-cli-linux-amd64 /usr/local/bin/crate-cli && \
+        chmod +x /usr/local/bin/crate-cli; \
+    elif [ "$(uname -m)" = "aarch64" ] && [ -f bin/crate-cli-linux-arm64 ]; then \
+        cp bin/crate-cli-linux-arm64 /usr/local/bin/crate-cli && \
         chmod +x /usr/local/bin/crate-cli; \
     fi
 
@@ -89,9 +93,12 @@ COPY requirements-worker-analysis.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --prefer-binary -r requirements-worker-analysis.txt
 
-# PyTorch CPU-only + PANNs for audio classification (x86_64 only).
+# PyTorch CPU-only + PANNs for audio classification. PANNS=on installs them on
+# every architecture (release images); auto keeps local ARM builds light by
+# installing them on x86_64 only; off skips them.
+ARG PANNS=auto
 RUN --mount=type=cache,target=/root/.cache/pip \
-    if [ "$(uname -m)" = "x86_64" ]; then \
+    if [ "$PANNS" = "on" ] || { [ "$PANNS" = "auto" ] && [ "$(uname -m)" = "x86_64" ]; }; then \
         pip install torch --index-url https://download.pytorch.org/whl/cpu && \
         pip install panns_inference; \
     fi
@@ -99,7 +106,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Download PANNs CNN14 checkpoint before mutable source COPY so Docker layer
 # caching preserves this expensive step across code-only changes.
 COPY scripts/download_models.sh ./scripts/
-RUN if [ "$(uname -m)" = "x86_64" ]; then \
+RUN if [ "$PANNS" = "on" ] || { [ "$PANNS" = "auto" ] && [ "$(uname -m)" = "x86_64" ]; }; then \
         bash scripts/download_models.sh /app/models && \
         chmod -R 755 /app/panns_data && \
         apt-get purge -y --auto-remove curl && \

@@ -8,7 +8,6 @@ import {
 
 import type { FSPanel } from "@/components/player/fullscreen-player-types";
 import { useDismissibleLayer } from "@crate/ui/lib/use-dismissible-layer";
-import { useEscapeKey } from "@crate/ui/lib/use-escape-key";
 import {
   getPlayerSurfaceModePreference,
   PLAYER_VIZ_PREFS_EVENT,
@@ -60,19 +59,22 @@ export function useFullscreenPlayerLifecycle({
     }
   }, [open]);
 
-  useEscapeKey(visible, (event) => {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    if (showEqualizer) {
-      setShowEqualizer(false);
-      return;
-    }
-    if (activePanel !== null) {
-      setActivePanel(null);
-      return;
-    }
-    resetClosedUi();
-  });
+  const handleEscape = useCallback(
+    (event: KeyboardEvent) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (showEqualizer) {
+        setShowEqualizer(false);
+        return;
+      }
+      if (activePanel !== null) {
+        setActivePanel(null);
+        return;
+      }
+      resetClosedUi();
+    },
+    [activePanel, resetClosedUi, showEqualizer],
+  );
 
   useEffect(() => {
     const syncSurfaceMode = () =>
@@ -121,6 +123,7 @@ export function useFullscreenPlayerLifecycle({
   return {
     activePanel,
     animating,
+    handleEscape,
     resetClosedUi,
     setActivePanel,
     setShowEqualizer,

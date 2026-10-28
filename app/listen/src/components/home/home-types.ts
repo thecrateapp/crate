@@ -1,4 +1,5 @@
-import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
+import type { TrackMediaMetadata } from "../../lib/track-media-metadata";
+import type { PlaylistArtworkTrack } from "@crate/ui/domain/playlists/PlaylistArtwork";
 import type { ArtistHeroArtworkBounds } from "@crate/ui/domain/ArtistHeroFrame";
 import type { GenreProfileItem } from "@crate/ui/domain/genres/GenrePill";
 import type {
@@ -86,6 +87,11 @@ export interface HomeUpcomingResponse {
 }
 
 export interface ReplayTrack {
+  format?: string | null;
+  bitrate?: number | null;
+  sample_rate?: number | null;
+  bit_depth?: number | null;
+  duration?: number | null;
   track_id: number | null;
   global_track_uid?: string | null;
   track_entity_uid?: string | null;
@@ -122,7 +128,7 @@ export interface ReplayMix {
   items: ReplayTrack[];
 }
 
-export interface PlaylistDetailTrack {
+export interface PlaylistDetailTrack extends TrackMediaMetadata {
   id?: number;
   track_id?: number;
   track_entity_uid?: string;

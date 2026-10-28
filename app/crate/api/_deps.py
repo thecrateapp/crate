@@ -103,6 +103,19 @@ def enrich_radio_tracks(tracks: list[dict]) -> list[dict]:
         track_id = track.get("track_id")
         ref = refs_by_track_id.get(int(track_id)) if track_id is not None else None
         if ref:
+            for key in (
+                "track_path",
+                "duration",
+                "format",
+                "bitrate",
+                "sample_rate",
+                "bit_depth",
+                "bpm",
+                "audio_key",
+                "audio_scale",
+            ):
+                if current.get(key) is None:
+                    current[key] = ref.get(key)
             current.setdefault("track_entity_uid", ref.get("track_entity_uid"))
             current.setdefault("track_slug", ref.get("track_slug"))
             current.setdefault("album_id", ref.get("album_id"))

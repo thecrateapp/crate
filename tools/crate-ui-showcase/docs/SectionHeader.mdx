@@ -1,0 +1,49 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/SectionHeader.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">SectionHeader</DocHeading>
+<EntryDetails
+  id="domain-lists-sectionheader"
+  review="Visual review approved · 1AU; action caption and dot approved by Diego · 1BD"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+Content-section heading, optional context/count and text action.
+
+A content or rail heading, distinct from InstrumentPanel's Mono caption. Bricolage Grotesque700 at18/24/30px for md/lg/display; native heading defaults h2 and accepts h1–h4/id. Optional eyebrow is uppercase MonoLabel. Count is normal-weight12px tabular Mono;0is visible and absence is omitted. Subtitle uses the body-font variable at14px, remains readable and is not line-clamped. Grid8px gaps own context/title/subtitle spacing. Long/unbroken names and sibling actions wrap without widening the container. The default text action has a native callback and44px hit height; an injected action retains its native behavior. Existing props and heading levels remain compatible. General panels use InstrumentPanel.
+
+The approved mockup and Diego’s confirmed amendments are the visual reference. Shared components own their contracts; stories add layout only. Consumer adoption and native/AT/phase QA remain separate.
+
+### 1BD approved section-action labels
+
+The default section action uses an accent uppercase MonoLabel and a decorative StatusDot with
+the shared accent glow, replacing the arrow. `SectionActionLabel` owns this composition and is
+also used inside injected native links and Listen's search footer. The standard English label
+is **View All**; localization remains the caller's responsibility. Button/link semantics,
+44px hit height, callbacks and keyboard focus remain unchanged. The dot has no accessible name
+and no pulse. Names, headings and descriptive text keep their original case.
+
+`SectionActionButton` owns the native callback form of this pattern. It has no horizontal
+padding, so contextual actions such as the artist biography's **Show more** align with the
+preceding text. It retains a44px hit height, native refs/disabled behavior and visible keyboard
+focus, without a background fill or hover underline. Keep the contextual action's own label;
+only collection navigation uses **View All**. Biography More/Less uses the same component.
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Large} />
+
+<Canvas of={Stories.Display} />
+
+<Canvas of={Stories.WithoutContext} />
+
+<Canvas of={Stories.LongContent} />
+
+<Canvas of={Stories.NativeLink} />
+
+<Canvas of={Stories.TextAlignedAction} />
+
+<Controls of={Stories.Base} />

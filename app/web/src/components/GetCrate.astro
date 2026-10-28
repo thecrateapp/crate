@@ -1,0 +1,129 @@
+---
+import { t } from "../i18n";
+import { downloads } from "../lib/downloads";
+import InstallCommand from "./InstallCommand.astro";
+
+interface Props {
+  locale?: string;
+}
+
+const { locale = "en" } = Astro.props;
+const platforms = [...new Set(downloads.map((download) => download.platform))].map((platform) => ({
+  platform,
+  builds: downloads.filter((download) => download.platform === platform),
+}));
+---
+
+<section class="get" id="get" data-reveal aria-labelledby="get-title">
+  <h2 class="display" id="get-title" data-enter>{t("get.title", locale)}</h2>
+
+  <div class="block" data-enter style="--d:120ms">
+    <p class="eyebrow"><b>01</b> / {t("get.server", locale)}</p>
+    <InstallCommand locale={locale} />
+    <p class="note">{t("get.requirements", locale)}</p>
+    <a class="u-link" href="/install">{t("get.docs", locale)}</a>
+  </div>
+
+  <div class="block" data-enter style="--d:220ms">
+    <p class="eyebrow"><b>02</b> / {t("get.clients", locale)}</p>
+    <dl class="apps">
+      {
+        platforms.map(({ platform, builds }) => (
+          <div class="platform">
+            <dt>{platform}</dt>
+            <dd>
+              {builds.map((build) => (
+                <a class="u-link" href={build.url}>
+                  {build.label}
+                </a>
+              ))}
+            </dd>
+          </div>
+        ))
+      }
+      <div class="platform">
+        <dt>iOS</dt>
+        <dd class="note">{t("get.ios", locale)}</dd>
+      </div>
+    </dl>
+  </div>
+</section>
+
+<style>
+  .get {
+    position: relative;
+    z-index: 5;
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 16vh clamp(20px, 6vw, 96px) 12vh;
+    display: grid;
+    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+    gap: 56px clamp(32px, 6vw, 96px);
+  }
+
+  .get .display {
+    grid-column: 1 / -1;
+    font-size: clamp(2.6rem, 6vw, 6rem);
+  }
+
+  .block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 22px;
+    min-width: 0;
+  }
+
+  .note {
+    margin: 0;
+    color: var(--fg-2);
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 44ch;
+  }
+
+  .apps {
+    margin: 0;
+    width: 100%;
+    display: grid;
+  }
+
+  .platform {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 16px;
+    align-items: baseline;
+    padding: 16px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  dt {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: -0.02em;
+  }
+
+  dd {
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 24px;
+  }
+
+  @media (pointer: coarse) {
+    dd {
+      row-gap: 28px;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .get {
+      grid-template-columns: 1fr;
+    }
+    .platform {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+  }
+</style>

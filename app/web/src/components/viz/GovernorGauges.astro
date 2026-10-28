@@ -1,0 +1,176 @@
+---
+import { GOVERNOR } from "../../content/admin/viz";
+
+interface Props {
+  standalone?: boolean;
+}
+
+const { standalone = false } = Astro.props;
+const gauges = [
+  { id: "loadRatio", label: "Load ratio", limit: GOVERNOR.loadRatio, max: 1.2, unit: "", digits: 2, value: 0.38 },
+  { id: "iowaitPercent", label: "iowait", limit: GOVERNOR.iowaitPercent, max: 40, unit: "%", digits: 0, value: 4 },
+  { id: "swapUsedPercent", label: "Swap", limit: GOVERNOR.swapPercent, max: 60, unit: "%", digits: 0, value: 3 },
+  { id: "activeUsers", label: "Listeners", limit: GOVERNOR.maxActiveUsers, max: 14, unit: "", digits: 0, value: 2 },
+  { id: "activeStreams", label: "Streams", limit: GOVERNOR.maxActiveStreams, max: 14, unit: "", digits: 0, value: 2 },
+];
+const Tag = standalone ? "figure" : "div";
+---
+
+<Tag
+  class:list={["governor", { standalone }]}
+  data-viz={standalone ? "governor" : undefined}
+  data-reveal={standalone ? "" : undefined}
+  data-governor
+  aria-label={standalone ? `Resource governor: background work waits while load passes ${GOVERNOR.loadRatio}, iowait ${GOVERNOR.iowaitPercent}% or listeners and streams pass ${GOVERNOR.maxActiveUsers}` : undefined}
+>
+  <p class="viz-bar">
+    <span class="viz-label"><b>Resource governor</b> example load</span>
+    <span class="viz-label">heaviest maintenance {GOVERNOR.window[0]}–{GOVERNOR.window[1]}</span>
+  </p>
+  <ul class="gauges">
+    {
+      gauges.map((gauge) => (
+        <li
+          data-gauge={gauge.id}
+          data-max={gauge.max}
+          data-limit={gauge.limit}
+          data-digits={gauge.digits}
+          data-unit={gauge.unit}
+          style={`--v:${(gauge.value / gauge.max).toFixed(3)};--limit:${(gauge.limit / gauge.max).toFixed(3)}`}
+        >
+          <span class="viz-label">{gauge.label}</span>
+          <output>
+            {gauge.value.toFixed(gauge.digits)}
+            {gauge.unit}
+          </output>
+          <i class="track" aria-hidden="true">
+            <b />
+            <s />
+          </i>
+          <span class="limit">
+            max {gauge.limit}
+            {gauge.unit}
+          </span>
+        </li>
+      ))
+    }
+  </ul>
+  <p class="status" data-governor-status aria-live="polite">Allowed · background work runs</p>
+</Tag>
+
+<style>
+  .governor {
+    margin: 0;
+  }
+
+  .governor.standalone {
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .gauges {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 22px;
+    margin: 20px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .gauges li {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px 8px;
+    align-items: baseline;
+  }
+
+  output {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.3rem, 2vw, 1.9rem);
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    transition: color 0.3s var(--ease-snap);
+  }
+
+  .track {
+    position: relative;
+    grid-column: 1 / -1;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--line);
+  }
+
+  .track b {
+    position: absolute;
+    inset: 0;
+    border-radius: 2px;
+    background: var(--cyan-hi);
+    transform-origin: left;
+    transform: scaleX(var(--v));
+    transition: background-color 0.3s var(--ease-snap);
+  }
+
+  .track s {
+    position: absolute;
+    top: -4px;
+    bottom: -4px;
+    left: calc(var(--limit) * 100%);
+    width: 1px;
+    background: var(--fg);
+  }
+
+  .limit {
+    grid-column: 1 / -1;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--fg-3);
+  }
+
+  li:global(.is-over) output {
+    color: var(--amber);
+  }
+
+  li:global(.is-over) .track b {
+    background: var(--amber);
+  }
+
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 20px 0 0;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    color: var(--fg-2);
+  }
+
+  .status::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--cyan-hi);
+    transition: background-color 0.3s var(--ease-snap);
+  }
+
+  .status:global(.is-blocked) {
+    color: var(--amber);
+  }
+
+  .status:global(.is-blocked)::before {
+    background: var(--amber);
+  }
+
+  @media (max-width: 860px) {
+    .gauges {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .gauges li:first-child {
+      grid-column: 1 / -1;
+    }
+  }
+</style>

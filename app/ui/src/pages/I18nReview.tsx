@@ -1,20 +1,33 @@
 import { useActionLLMStatus } from "@/hooks/use-llm";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { OpsPageHero } from "@/components/admin/ops-surfaces";
 import {
-  CheckCircle2,
-  Clock,
-  Languages,
-  Loader2,
-  RefreshCw,
-  XCircle,
-} from "lucide-react";
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
+import { RefreshCw as HeaderRefreshCw, Loader2 } from "lucide-react";
+import { SeverityMeter } from "@/components/admin/status-indicators";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { Badge } from "@crate/ui/shadcn/badge";
 import { Button } from "@crate/ui/shadcn/button";
 import { Card } from "@crate/ui/shadcn/card";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
+import { InfoBadge, type InfoBadgeTone } from "@crate/ui/primitives/InfoBadge";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { Textarea } from "@crate/ui/shadcn/textarea";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@crate/ui/shadcn/tabs";
 import { api } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
+import { AdminSelect } from "@/components/ui/AdminSelect";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 interface TranslationRequest {
   id: string;
@@ -131,20 +144,23 @@ function statusLabel(status: string) {
   return STATUS_LABELS[status] ?? status;
 }
 
-function statusBadgeClass(status: string) {
-  if (status === "needs_review") {
-    return "border-cyan-400/30 bg-cyan-400/10 text-cyan-200";
+function statusTone(status: string): InfoBadgeTone {
+  if (status === "needs_review" || status === "pending") {
+    return "warning";
   }
   if (status === "published") {
-    return "border-emerald-400/25 bg-emerald-400/10 text-emerald-200";
+    return "success";
+  }
+  if (status === "drafting_ai") {
+    return "accent";
   }
   if (status === "rejected") {
-    return "border-red-400/25 bg-red-400/10 text-red-200";
+    return "danger";
   }
   if (status === "manual_required") {
-    return "border-amber-400/25 bg-amber-400/10 text-amber-200";
+    return "warning";
   }
-  return "border-white/10 bg-white/5 text-white/65";
+  return "neutral";
 }
 
 function bundleKey(locale: string, sourceVersion: string) {
@@ -175,6 +191,11 @@ export function I18nReview() {
   const [sourceFilter, setSourceFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [requestedBundle, setRequestedBundle] =
+    useState<TranslationBundleSummary | null>(null);
+  const bundleRequest = useRef(0);
+  const activeBundleId = useRef<string | null>(null);
   const [actionBusy, setActionBusy] = useState<"publish" | "reject" | null>(
     null,
   );
@@ -284,6 +305,9 @@ export function I18nReview() {
 
   useEffect(() => {
     void loadReviewData();
+    return () => {
+      bundleRequest.current += 1;
+    };
   }, [loadReviewData]);
 
   useEffect(() => {
@@ -313,6 +337,15 @@ export function I18nReview() {
   }, []);
 
   const selectBundle = useCallback(async (bundle: TranslationBundleSummary) => {
+    const request = ++bundleRequest.current;
+    activeBundleId.current = bundle.id;
+    setRequestedBundle(bundle);
+    setSelectedBundle(null);
+    setDetailError(null);
+    setActionBusy(null);
+    setSavingKey(null);
+    setWorkspaceSavingKey(null);
+    setExportBusy(false);
     setDetailLoading(true);
     setQualityReport(null);
     setExportedJson(null);
@@ -328,26 +361,38 @@ export function I18nReview() {
           )}&source_version=${encodeURIComponent(bundle.sourceVersion)}`,
         ),
       ]);
+      if (request !== bundleRequest.current) return;
       setSelectedBundle(detail);
       setMessageDrafts(detail.messages);
       setQualityReport(quality);
     } catch (nextError) {
+      if (request !== bundleRequest.current) return;
+      setDetailError("The translation bundle could not be loaded. Try again.");
       toast.error("Failed to load translation bundle");
       console.error(nextError);
     } finally {
-      setDetailLoading(false);
+      if (request === bundleRequest.current) setDetailLoading(false);
     }
   }, []);
 
   const reviewAction = useCallback(
     async (action: "publish" | "reject") => {
-      if (!selectedBundle) return;
+      if (
+        !selectedBundle ||
+        detailLoading ||
+        activeBundleId.current !== selectedBundle.id ||
+        actionBusy ||
+        savingKey !== null
+      )
+        return;
+      const request = bundleRequest.current;
       setActionBusy(action);
       try {
         const next = await api<TranslationBundleDetail>(
           `/api/admin/i18n/listen/bundles/${selectedBundle.id}/${action}`,
           "POST",
         );
+        if (request !== bundleRequest.current) return;
         setSelectedBundle(next);
         toast.success(
           action === "publish"
@@ -356,6 +401,7 @@ export function I18nReview() {
         );
         await loadReviewData();
       } catch (nextError) {
+        if (request !== bundleRequest.current) return;
         toast.error(
           action === "publish"
             ? "Failed to publish translation bundle"
@@ -363,15 +409,24 @@ export function I18nReview() {
         );
         console.error(nextError);
       } finally {
-        setActionBusy(null);
+        if (request === bundleRequest.current) setActionBusy(null);
       }
     },
-    [loadReviewData, selectedBundle],
+    [loadReviewData, selectedBundle, detailLoading, actionBusy, savingKey],
   );
 
   const saveBundleMessage = useCallback(
     async (key: string) => {
-      if (!selectedBundle) return;
+      if (
+        !selectedBundle ||
+        detailLoading ||
+        savingKey !== null ||
+        actionBusy !== null ||
+        activeBundleId.current !== selectedBundle.id
+      )
+        return;
+      const request = bundleRequest.current;
+      const sentValue = messageDrafts[key] ?? "";
       setSavingKey(key);
       try {
         const next = await api<TranslationBundleDetail>(
@@ -379,24 +434,45 @@ export function I18nReview() {
             selectedBundle.id
           }/messages/${encodeURIComponent(key)}`,
           "PATCH",
-          { value: messageDrafts[key] ?? "" },
+          { value: sentValue },
         );
-        setSelectedBundle(next);
-        setMessageDrafts(next.messages);
+        if (request !== bundleRequest.current) return;
+        const savedValue = next.messages[key] ?? sentValue;
+        setSelectedBundle((current) =>
+          current
+            ? {
+                ...current,
+                messages: { ...current.messages, [key]: savedValue },
+              }
+            : current,
+        );
+        setMessageDrafts((current) =>
+          current[key] === sentValue
+            ? { ...current, [key]: savedValue }
+            : current,
+        );
         toast.success("Translation key saved");
       } catch (nextError) {
+        if (request !== bundleRequest.current) return;
         toast.error("Failed to save translation key");
         console.error(nextError);
       } finally {
-        setSavingKey(null);
+        if (request === bundleRequest.current) setSavingKey(null);
       }
     },
-    [messageDrafts, selectedBundle],
+    [messageDrafts, selectedBundle, detailLoading, savingKey, actionBusy],
   );
 
   const saveWorkspaceMessage = useCallback(
     async (key: string) => {
-      if (!selectedBundle || !localCatalogOrigin) return;
+      if (
+        !selectedBundle ||
+        !localCatalogOrigin ||
+        detailLoading ||
+        activeBundleId.current !== selectedBundle.id
+      )
+        return;
+      const request = bundleRequest.current;
       setWorkspaceSavingKey(key);
       try {
         const response = await fetch(
@@ -420,15 +496,17 @@ export function I18nReview() {
           );
         }
 
-        toast.success("Translation key saved to workspace JSON");
+        if (request === bundleRequest.current)
+          toast.success("Translation key saved to workspace JSON");
       } catch (nextError) {
+        if (request !== bundleRequest.current) return;
         toast.error("Failed to save translation key to workspace JSON");
         console.error(nextError);
       } finally {
-        setWorkspaceSavingKey(null);
+        if (request === bundleRequest.current) setWorkspaceSavingKey(null);
       }
     },
-    [localCatalogOrigin, messageDrafts, selectedBundle],
+    [localCatalogOrigin, messageDrafts, selectedBundle, detailLoading],
   );
 
   const draftMissingForLocale = useCallback(
@@ -455,21 +533,29 @@ export function I18nReview() {
   );
 
   const exportSelectedBundle = useCallback(async () => {
-    if (!selectedBundle) return;
+    if (
+      !selectedBundle ||
+      detailLoading ||
+      activeBundleId.current !== selectedBundle.id
+    )
+      return;
+    const request = bundleRequest.current;
     setExportBusy(true);
     try {
       const exported = await api<TranslationBundleExport>(
         `/api/admin/i18n/listen/bundles/${selectedBundle.id}/export`,
       );
+      if (request !== bundleRequest.current) return;
       setExportedJson(JSON.stringify(exported, null, 2));
       toast.success("Translation bundle exported");
     } catch (nextError) {
+      if (request !== bundleRequest.current) return;
       toast.error("Failed to export translation bundle");
       console.error(nextError);
     } finally {
-      setExportBusy(false);
+      if (request === bundleRequest.current) setExportBusy(false);
     }
-  }, [selectedBundle]);
+  }, [selectedBundle, detailLoading]);
 
   const messageRows = selectedBundle
     ? Object.keys(selectedBundle.messages)
@@ -484,121 +570,118 @@ export function I18nReview() {
     : [];
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-        <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-          <div className="min-w-0">
-            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-md border border-cyan-400/25 bg-cyan-400/10 text-cyan-200">
-              <Languages size={21} />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white">
-              Listen Translations
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Manage Listen language bundles, review draft quality, and publish
-              remote translations.
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {draftAI?.available
-                ? `AI drafts: ${draftAI.model_id}.`
-                : "AI draft action unavailable; requests remain available for manual translation review."}
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={loadReviewData}
-            disabled={loading}
-          >
-            {loading ? (
-              <Loader2 size={15} className="animate-spin" />
-            ) : (
-              <RefreshCw size={15} />
-            )}
-            Refresh
-          </Button>
-        </div>
-
-        <div
-          role="tablist"
-          aria-label="Listen translation manager sections"
-          className="mt-5 flex flex-wrap gap-2"
-        >
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                "rounded-md border px-3 py-2 text-sm font-semibold transition-colors",
-                activeTab === tab.id
-                  ? "border-cyan-400/35 bg-cyan-400/12 text-cyan-100"
-                  : "border-white/10 bg-white/[0.03] text-white/58 hover:border-cyan-400/25 hover:text-cyan-100",
-              )}
+    <div className="min-w-0 space-y-6">
+      <OpsPageHero
+        title="Listen Translations"
+        description="Manage Listen language bundles, review draft quality, and publish remote translations."
+        compactActions
+        actions={
+          <PageHeaderActions>
+            <PageHeaderAction
+              label="Refresh"
+              onClick={loadReviewData}
+              disabled={loading}
             >
+              {loading ? (
+                <Loader2
+                  data-admin-ux="translations-refresh"
+                  aria-hidden="true"
+                  size={15}
+                  className="animate-spin"
+                />
+              ) : null}
+              {!loading ? (
+                <HeaderRefreshCw
+                  data-admin-ux="header-refresh"
+                  aria-hidden="true"
+                />
+              ) : null}
+            </PageHeaderAction>
+          </PageHeaderActions>
+        }
+      >
+        <InfoBadge tone={draftAI?.available ? "success" : "warning"}>
+          {draftAI?.available
+            ? `AI drafts: ${draftAI.model_id}`
+            : "AI drafts unavailable · manual review ready"}
+        </InfoBadge>
+      </OpsPageHero>
+
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as ManagerTab)}
+        className="gap-5"
+      >
+        <TabsList aria-label="Listen translation manager sections">
+          {TABS.map((tab) => (
+            <TabsTrigger key={tab.id} value={tab.id}>
               {tab.label}
-            </button>
+            </TabsTrigger>
           ))}
-        </div>
-      </section>
+        </TabsList>
 
-      {activeTab === "overview" ? (
-        <OverviewSection
-          loading={loading}
-          error={error}
-          localeHealth={localeHealth}
-          needsReviewCount={needsReviewCount}
-          requestCount={requests.length}
-          aiConfigured={aiConfigured}
-          draftBusyLocale={draftBusyLocale}
-          onDraftMissing={draftMissingForLocale}
-        />
-      ) : null}
+        <TabsContent value="overview" className="mt-0">
+          <OverviewSection
+            loading={loading}
+            error={error}
+            localeHealth={localeHealth}
+            needsReviewCount={needsReviewCount}
+            requestCount={requests.length}
+            aiConfigured={aiConfigured}
+            draftBusyLocale={draftBusyLocale}
+            onDraftMissing={draftMissingForLocale}
+          />
+        </TabsContent>
 
-      {activeTab === "bundles" ? (
-        <BundlesSection
-          loading={loading}
-          error={error}
-          bundles={filteredBundles}
-          requestsByBundle={requestsByBundle}
-          localeOptions={localeOptions}
-          sourceOptions={sourceOptions}
-          localeFilter={localeFilter}
-          statusFilter={statusFilter}
-          sourceFilter={sourceFilter}
-          setLocaleFilter={setLocaleFilter}
-          setStatusFilter={setStatusFilter}
-          setSourceFilter={setSourceFilter}
-          selectedBundleId={selectedBundle?.id ?? null}
-          onSelectBundle={selectBundle}
-        />
-      ) : null}
+        <TabsContent value="bundles" className="mt-0">
+          <BundlesSection
+            loading={loading}
+            error={error}
+            bundles={filteredBundles}
+            requestsByBundle={requestsByBundle}
+            localeOptions={localeOptions}
+            sourceOptions={sourceOptions}
+            localeFilter={localeFilter}
+            statusFilter={statusFilter}
+            sourceFilter={sourceFilter}
+            setLocaleFilter={setLocaleFilter}
+            setStatusFilter={setStatusFilter}
+            setSourceFilter={setSourceFilter}
+            selectedBundleId={selectedBundle?.id ?? null}
+            onSelectBundle={selectBundle}
+          />
+        </TabsContent>
 
-      {activeTab === "editor" ? (
-        <EditorSection
-          selectedBundle={selectedBundle}
-          detailLoading={detailLoading}
-          actionBusy={actionBusy}
-          savingKey={savingKey}
-          workspaceSavingKey={workspaceSavingKey}
-          canSaveWorkspaceJson={localCatalogOrigin !== null}
-          exportBusy={exportBusy}
-          qualityReport={qualityReport}
-          exportedJson={exportedJson}
-          messageRows={messageRows}
-          onDraftChange={(key, value) =>
-            setMessageDrafts((current) => ({ ...current, [key]: value }))
-          }
-          onSaveMessage={saveBundleMessage}
-          onSaveWorkspaceMessage={saveWorkspaceMessage}
-          onExportBundle={exportSelectedBundle}
-          onReviewAction={reviewAction}
-        />
-      ) : null}
+        <TabsContent value="editor" className="mt-0">
+          <EditorSection
+            selectedBundle={selectedBundle}
+            detailLoading={detailLoading}
+            detailError={detailError}
+            onRetry={() => {
+              if (requestedBundle) void selectBundle(requestedBundle);
+            }}
+            actionBusy={actionBusy}
+            savingKey={savingKey}
+            workspaceSavingKey={workspaceSavingKey}
+            canSaveWorkspaceJson={localCatalogOrigin !== null}
+            exportBusy={exportBusy}
+            qualityReport={qualityReport}
+            exportedJson={exportedJson}
+            messageRows={messageRows}
+            onDraftChange={(key, value) =>
+              setMessageDrafts((current) => ({ ...current, [key]: value }))
+            }
+            onSaveMessage={saveBundleMessage}
+            onSaveWorkspaceMessage={saveWorkspaceMessage}
+            onExportBundle={exportSelectedBundle}
+            onReviewAction={reviewAction}
+          />
+        </TabsContent>
 
-      {activeTab === "import-export" ? <ImportExportSection /> : null}
+        <TabsContent value="import-export" className="mt-0">
+          <ImportExportSection />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -631,60 +714,71 @@ function OverviewSection({
 }) {
   return (
     <Card className="gap-0 overflow-hidden p-0">
-      <div className="border-b border-white/8 px-5 py-4">
+      <div className="border-b border-border-quiet px-4 py-4 sm:px-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-white">Locale health</h2>
+            <h2 className="font-display text-sm font-semibold text-white">
+              Locale health
+            </h2>
             <p className="mt-1 text-xs text-muted-foreground">
               {needsReviewCount} draft{needsReviewCount === 1 ? "" : "s"} ·{" "}
               {requestCount} request{requestCount === 1 ? "" : "s"}
             </p>
           </div>
-          <Badge variant="secondary">{localeHealth.length} locales</Badge>
+          <InfoBadge>{localeHealth.length} locales</InfoBadge>
         </div>
       </div>
 
       {loading ? (
         <LoadingBlock />
       ) : error ? (
-        <div className="p-5 text-sm text-red-200">{error}</div>
+        <div className="p-5 text-sm text-state-warning-text">{error}</div>
       ) : (
-        <div className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">
+        <div>
           {localeHealth.map((health) => (
             <article
               key={health.locale}
               aria-label={`${health.locale} locale health`}
-              className="rounded-md border border-white/8 bg-white/[0.03] p-4"
+              className="grid min-w-0 gap-4 border-b border-border-quiet-subtle p-4 last:border-b-0 sm:p-5 md:grid-cols-[minmax(9rem,1.15fr)_repeat(3,minmax(5rem,0.7fr))_minmax(12rem,1.3fr)] md:items-center"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-xl font-bold text-white">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <div className="font-display text-xl font-bold text-text-primary">
                     {health.locale}
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {health.bundleCount === 0 ? "No bundle yet" : "Configured"}
-                  </div>
+                  <StatusDot
+                    tone={
+                      health.draftCount > 0
+                        ? "warn"
+                        : health.bundleCount > 0
+                          ? "on"
+                          : "off"
+                    }
+                    label={
+                      health.draftCount > 0
+                        ? "Needs review"
+                        : health.bundleCount > 0
+                          ? "Stable"
+                          : "No bundle"
+                    }
+                  />
                 </div>
-                <Badge
-                  variant="outline"
-                  className={
-                    health.draftCount > 0
-                      ? statusBadgeClass("needs_review")
-                      : statusBadgeClass("published")
-                  }
-                >
-                  {health.draftCount > 0 ? "Review" : "Stable"}
-                </Badge>
+                <p className="mt-1 text-xs text-text-muted">
+                  {health.bundleCount === 0
+                    ? "No bundle yet"
+                    : `${health.bundleCount} bundle${health.bundleCount === 1 ? "" : "s"} available`}
+                </p>
               </div>
-              <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-                <HealthMetric label="draft" value={health.draftCount} />
-                <HealthMetric label="published" value={health.publishedCount} />
-                <HealthMetric label="request" value={health.requestCount} />
-              </div>
+              <HealthMetric label="Drafts" value={health.draftCount} />
+              <HealthMetric
+                label="Published bundles"
+                value={health.publishedCount}
+              />
+              <HealthMetric label="Requests" value={health.requestCount} />
               <Button
                 variant="outline"
                 size="sm"
-                className="mt-4 w-full"
+                className="w-full md:w-auto"
                 aria-label={`Draft missing/stale with AI for ${health.locale}`}
                 disabled={
                   !aiConfigured ||
@@ -697,7 +791,12 @@ function OverviewSection({
                 }}
               >
                 {draftBusyLocale === health.locale ? (
-                  <Loader2 size={15} className="animate-spin" />
+                  <Loader2
+                    data-admin-ux="translations-draft"
+                    aria-hidden="true"
+                    size={15}
+                    className="animate-spin"
+                  />
                 ) : null}
                 Draft missing/stale with AI
               </Button>
@@ -742,15 +841,17 @@ function BundlesSection({
 }) {
   return (
     <Card className="gap-0 overflow-hidden p-0">
-      <div className="border-b border-white/8 px-5 py-4">
+      <div className="border-b border-border-quiet px-5 py-4">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-white">Bundles</h2>
+            <h2 className="font-display text-sm font-semibold text-white">
+              Bundles
+            </h2>
             <p className="mt-1 text-xs text-muted-foreground">
               {bundles.length} bundle{bundles.length === 1 ? "" : "s"} in view
             </p>
           </div>
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)]">
             <FilterSelect
               label="Locale"
               value={localeFilter}
@@ -760,15 +861,21 @@ function BundlesSection({
                 value === "all" ? "All locales" : value
               }
             />
-            <FilterSelect
-              label="Status"
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={STATUS_FILTERS}
-              formatOption={(value) =>
-                value === "all" ? "All statuses" : statusLabel(value)
-              }
-            />
+            <div className="crate-form-field">
+              <MonoLabel as="span" className="block">
+                Status
+              </MonoLabel>
+              <SegmentedControl
+                as="radio"
+                label="Status"
+                value={statusFilter}
+                onValueChange={setStatusFilter}
+                items={STATUS_FILTERS.map((value) => ({
+                  value,
+                  label: value === "all" ? "All statuses" : statusLabel(value),
+                }))}
+              />
+            </div>
             <FilterSelect
               label="Source"
               value={sourceFilter}
@@ -785,19 +892,14 @@ function BundlesSection({
       {loading ? (
         <LoadingBlock />
       ) : error ? (
-        <div className="p-5 text-sm text-red-200">{error}</div>
+        <div className="p-5 text-sm text-state-warning-text">{error}</div>
       ) : bundles.length === 0 ? (
-        <div className="flex min-h-56 flex-col items-center justify-center gap-3 px-6 text-center">
-          <CheckCircle2 size={30} className="text-emerald-300/80" />
-          <div>
-            <p className="font-semibold text-white">No bundles match filters</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Change filters to see draft, published, or rejected bundles.
-            </p>
-          </div>
-        </div>
+        <EmptyState
+          title="No bundles match the filters"
+          message="Change the filters to see draft, published or rejected bundles."
+        />
       ) : (
-        <div className="divide-y divide-white/6">
+        <div className="divide-y divide-border-quiet-subtle">
           {bundles.map((bundle) => {
             const request = requestsByBundle.get(
               bundleKey(bundle.locale, bundle.sourceVersion),
@@ -810,24 +912,24 @@ function BundlesSection({
                 aria-label={`Review ${bundle.locale}`}
                 onClick={() => void onSelectBundle(bundle)}
                 className={cn(
-                  "block w-full px-5 py-4 text-left transition-colors hover:bg-white/[0.04]",
-                  selected && "bg-cyan-400/[0.06]",
+                  "block w-full px-5 py-4 text-left transition-colors ",
+                  selected && "bg-accent-action/[0.06]",
                 )}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-lg font-bold text-white">
+                      <span
+                        data-slot="entity-title"
+                        className="font-display text-lg font-bold text-white"
+                      >
                         {bundle.locale}
                       </span>
-                      <Badge
-                        variant="outline"
-                        className={statusBadgeClass(bundle.status)}
-                      >
+                      <InfoBadge tone={statusTone(bundle.status)}>
                         {statusLabel(bundle.status)}
-                      </Badge>
+                      </InfoBadge>
                     </div>
-                    <p className="mt-1 truncate text-sm text-white/62">
+                    <p className="mt-1 truncate text-sm text-text-muted">
                       {bundle.bundleVersion}
                     </p>
                     <p className="mt-2 text-xs text-muted-foreground">
@@ -836,11 +938,10 @@ function BundlesSection({
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <div className="text-sm font-semibold text-white">
+                    <div className="font-mono text-sm font-normal text-white tabular-nums">
                       {bundle.messageCount} strings
                     </div>
-                    <div className="mt-2 inline-flex items-center gap-1 text-[11px] text-white/35">
-                      <Clock size={12} />
+                    <div className="mt-2 inline-flex items-center gap-1 text-[11px] text-text-subtle">
                       {request?.client ?? "admin"}
                     </div>
                   </div>
@@ -857,6 +958,8 @@ function BundlesSection({
 function EditorSection({
   selectedBundle,
   detailLoading,
+  detailError,
+  onRetry,
   actionBusy,
   savingKey,
   workspaceSavingKey,
@@ -873,6 +976,8 @@ function EditorSection({
 }: {
   selectedBundle: TranslationBundleDetail | null;
   detailLoading: boolean;
+  detailError: string | null;
+  onRetry: () => void;
   actionBusy: "publish" | "reject" | null;
   savingKey: string | null;
   workspaceSavingKey: string | null;
@@ -889,16 +994,18 @@ function EditorSection({
 }) {
   return (
     <Card className="min-h-[520px] gap-0 overflow-hidden p-0">
-      <div className="border-b border-white/8 px-5 py-4">
+      <div className="border-b border-border-quiet px-5 py-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-white">Editor</h2>
+            <h2 className="font-display text-sm font-semibold text-white">
+              Editor
+            </h2>
             <p className="mt-1 text-xs text-muted-foreground">
               Preview bundle copy and review quality before publish.
             </p>
           </div>
           {selectedBundle ? (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -906,7 +1013,12 @@ function EditorSection({
                 disabled={exportBusy}
               >
                 {exportBusy ? (
-                  <Loader2 size={15} className="animate-spin" />
+                  <Loader2
+                    data-admin-ux="translations-export"
+                    aria-hidden="true"
+                    size={15}
+                    className="animate-spin"
+                  />
                 ) : null}
                 Export JSON
               </Button>
@@ -915,28 +1027,39 @@ function EditorSection({
                 size="sm"
                 onClick={() => void onReviewAction("reject")}
                 disabled={
-                  !!actionBusy || selectedBundle.status !== "needs_review"
+                  !!actionBusy ||
+                  savingKey !== null ||
+                  selectedBundle.status !== "needs_review"
                 }
               >
                 {actionBusy === "reject" ? (
-                  <Loader2 size={15} className="animate-spin" />
-                ) : (
-                  <XCircle size={15} />
-                )}
+                  <Loader2
+                    data-admin-ux="translations-reject"
+                    aria-hidden="true"
+                    size={15}
+                    className="animate-spin"
+                  />
+                ) : null}
                 Reject bundle
               </Button>
               <Button
                 size="sm"
                 onClick={() => void onReviewAction("publish")}
                 disabled={
-                  !!actionBusy || selectedBundle.status !== "needs_review"
+                  !!actionBusy ||
+                  savingKey !== null ||
+                  selectedBundle.status !== "needs_review"
                 }
               >
                 {actionBusy === "publish" ? (
-                  <Loader2 size={15} className="animate-spin" />
-                ) : (
-                  <CheckCircle2 size={15} />
-                )}
+                  <Loader2
+                    data-admin-ux="translations-publish"
+                    aria-hidden="true"
+                    data-testid="translations-publish-progress"
+                    size={15}
+                    className="animate-spin"
+                  />
+                ) : null}
                 Publish bundle
               </Button>
             </div>
@@ -946,6 +1069,12 @@ function EditorSection({
 
       {detailLoading ? (
         <LoadingBlock />
+      ) : detailError ? (
+        <ErrorState
+          title="Translation bundle unavailable"
+          message={detailError}
+          onRetry={onRetry}
+        />
       ) : selectedBundle ? (
         <div className="space-y-4 p-5">
           <div className="grid gap-3 md:grid-cols-4">
@@ -957,44 +1086,58 @@ function EditorSection({
 
           <QualityIssues report={qualityReport} />
 
-          <div className="overflow-hidden rounded-md border border-white/8">
-            <div className="grid grid-cols-[minmax(0,0.24fr)_minmax(0,0.24fr)_minmax(0,0.36fr)_auto] gap-4 border-b border-white/8 bg-white/[0.03] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.12em] text-white/35">
+          <div className="overflow-hidden rounded-md border border-border-quiet">
+            <div className="hidden grid-cols-[minmax(0,0.24fr)_minmax(0,0.24fr)_minmax(0,0.36fr)_auto] gap-4 border-b border-border-quiet bg-raised-surface px-4 py-2 font-mono text-[11px] font-normal uppercase tracking-[0.12em] text-text-subtle md:grid">
               <span>Key</span>
               <span>English source</span>
               <span>Translation</span>
               <span>Status</span>
             </div>
-            <div className="max-h-[520px] divide-y divide-white/6 overflow-y-auto">
+            <div className="max-h-[520px] divide-y divide-border-quiet-subtle overflow-y-auto">
               {messageRows.map(([key, value]) => (
                 <div
                   key={key}
-                  className="grid grid-cols-[minmax(0,0.24fr)_minmax(0,0.24fr)_minmax(0,0.36fr)_auto] items-start gap-4 px-4 py-3 text-sm"
+                  className="grid grid-cols-1 md:grid-cols-[minmax(0,0.24fr)_minmax(0,0.24fr)_minmax(0,0.36fr)_auto] items-start gap-4 px-4 py-3 text-sm"
                 >
-                  <code className="break-words font-mono text-xs text-cyan-100/80">
+                  <code className="break-all font-mono text-xs text-accent-action-hi/80">
                     {key}
                   </code>
-                  <span className="break-words text-white/38">
+                  <span className="break-words text-text-subtle">
                     Source unavailable
                   </span>
-                  <div className="space-y-2">
-                    <textarea
-                      aria-label={`Translation for ${key}`}
-                      value={value}
-                      onChange={(event) =>
-                        onDraftChange(key, event.target.value)
+                  <div className="min-w-0 space-y-2">
+                    <FormField
+                      id={`translation-${key}`}
+                      label={
+                        <>
+                          Translation <span className="sr-only">for {key}</span>
+                        </>
                       }
-                      className="min-h-16 w-full resize-y rounded-md border border-white/10 bg-black/18 px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-white/28 focus:border-cyan-400/45"
-                    />
+                      className="min-w-0"
+                    >
+                      <Textarea
+                        value={value}
+                        onChange={(event) =>
+                          onDraftChange(key, event.target.value)
+                        }
+                        className="min-h-16 resize-y"
+                      />
+                    </FormField>
                     <div className="flex flex-wrap gap-2">
                       <Button
                         variant="outline"
                         size="sm"
                         aria-label={`Save ${key}`}
                         onClick={() => void onSaveMessage(key)}
-                        disabled={savingKey === key}
+                        disabled={savingKey !== null || actionBusy !== null}
                       >
                         {savingKey === key ? (
-                          <Loader2 size={15} className="animate-spin" />
+                          <Loader2
+                            data-admin-ux="translations-save"
+                            aria-hidden="true"
+                            size={15}
+                            className="animate-spin"
+                          />
                         ) : null}
                         Save
                       </Button>
@@ -1007,7 +1150,12 @@ function EditorSection({
                           disabled={workspaceSavingKey === key}
                         >
                           {workspaceSavingKey === key ? (
-                            <Loader2 size={15} className="animate-spin" />
+                            <Loader2
+                              data-admin-ux="translations-workspace-save"
+                              aria-hidden="true"
+                              size={15}
+                              className="animate-spin"
+                            />
                           ) : null}
                           Save to workspace JSON
                         </Button>
@@ -1024,13 +1172,13 @@ function EditorSection({
           </div>
 
           {exportedJson ? (
-            <div className="overflow-hidden rounded-md border border-white/8 bg-black/18">
-              <div className="border-b border-white/8 px-4 py-3">
-                <h3 className="text-sm font-semibold text-white">
+            <div className="overflow-hidden rounded-md border border-border-quiet bg-card">
+              <div className="border-b border-border-quiet px-4 py-3">
+                <h3 className="font-display text-sm font-semibold text-white">
                   Exported JSON
                 </h3>
               </div>
-              <pre className="max-h-72 overflow-auto p-4 text-xs text-cyan-50/82">
+              <pre className="max-h-72 overflow-auto p-4 text-xs text-accent-action-hi/82">
                 {exportedJson}
               </pre>
             </div>
@@ -1038,7 +1186,6 @@ function EditorSection({
         </div>
       ) : (
         <div className="flex min-h-[420px] flex-col items-center justify-center gap-3 px-6 text-center">
-          <Languages size={32} className="text-white/25" />
           <div>
             <p className="font-semibold text-white">
               Select a bundle to review
@@ -1061,31 +1208,28 @@ function QualityIssues({
 }) {
   const issues = report?.issues ?? [];
   return (
-    <div className="overflow-hidden rounded-md border border-white/8 bg-white/[0.03]">
-      <div className="flex items-center justify-between gap-3 border-b border-white/8 px-4 py-3">
+    <div className="overflow-hidden rounded-md border border-border-quiet bg-raised-surface">
+      <div className="flex items-center justify-between gap-3 border-b border-border-quiet px-4 py-3">
         <div>
-          <h3 className="text-sm font-semibold text-white">Quality issues</h3>
+          <h3 className="font-display text-sm font-semibold text-white">
+            Quality issues
+          </h3>
           <p className="mt-1 text-xs text-muted-foreground">
             {report
               ? `${report.errorCount} errors · ${report.warningCount} warnings`
               : "Quality report unavailable"}
           </p>
         </div>
-        <Badge
-          variant="outline"
-          className={
-            issues.length > 0
-              ? "border-red-400/25 bg-red-400/10 text-red-200"
-              : "border-emerald-400/25 bg-emerald-400/10 text-emerald-200"
-          }
-        >
+        <InfoBadge tone={issues.length > 0 ? "warning" : "success"}>
           {issues.length > 0 ? "Needs work" : "Clean"}
-        </Badge>
+        </InfoBadge>
       </div>
       {issues.length === 0 ? (
-        <div className="px-4 py-3 text-sm text-white/62">No quality issues</div>
+        <div className="px-4 py-3 text-sm text-text-muted">
+          No quality issues
+        </div>
       ) : (
-        <div className="divide-y divide-white/6">
+        <div className="divide-y divide-border-quiet-subtle">
           {issues.map((issue) => (
             <div
               key={`${issue.locale}:${issue.key ?? issue.code}:${
@@ -1094,23 +1238,22 @@ function QualityIssues({
               className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[minmax(0,0.3fr)_minmax(0,0.7fr)]"
             >
               <div className="min-w-0">
-                <Badge
-                  variant="outline"
-                  className={
-                    issue.severity === "error"
-                      ? "border-red-400/25 bg-red-400/10 text-red-200"
-                      : "border-amber-400/25 bg-amber-400/10 text-amber-200"
-                  }
-                >
-                  {issue.code}
-                </Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  <SeverityMeter
+                    level={issue.severity}
+                    label={issue.severity}
+                  />
+                  <code className="break-all font-mono text-meta text-text-secondary">
+                    {issue.code}
+                  </code>
+                </div>
                 {issue.key ? (
-                  <code className="mt-2 block truncate font-mono text-xs text-cyan-100/80">
+                  <code className="mt-2 block truncate font-mono text-xs text-accent-action-hi/80">
                     {issue.key}
                   </code>
                 ) : null}
               </div>
-              <p className="text-white/78">{issue.message}</p>
+              <p className="text-text-primary">{issue.message}</p>
             </div>
           ))}
         </div>
@@ -1128,14 +1271,7 @@ function MessageStatusBadge({
 }) {
   const issue = qualityReport?.issues.find((item) => item.key === keyName);
   if (!issue) {
-    return (
-      <Badge
-        variant="outline"
-        className="border-emerald-400/25 bg-emerald-400/10 text-emerald-200"
-      >
-        ok
-      </Badge>
-    );
+    return <InfoBadge tone="success">ok</InfoBadge>;
   }
   const status =
     issue.code === "stale_translation"
@@ -1144,40 +1280,34 @@ function MessageStatusBadge({
         ? "missing"
         : "error";
   return (
-    <Badge
-      variant="outline"
-      className={
-        status === "stale" || status === "missing"
-          ? "border-amber-400/25 bg-amber-400/10 text-amber-200"
-          : "border-red-400/25 bg-red-400/10 text-red-200"
-      }
-    >
+    <InfoBadge tone={status === "error" ? "danger" : "warning"}>
       {status}
-    </Badge>
+    </InfoBadge>
   );
 }
 
 function ImportExportSection() {
   return (
     <Card className="gap-0 overflow-hidden p-0">
-      <div className="border-b border-white/8 px-5 py-4">
-        <h2 className="text-sm font-semibold text-white">Import / Export</h2>
+      <div className="border-b border-border-quiet px-5 py-4">
+        <h2 className="font-display text-sm font-semibold text-white">
+          Import / Export
+        </h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          JSON bundle tools will land with inline editing.
+          Import availability and the existing JSON export flow.
         </p>
       </div>
       <div className="grid gap-3 p-5 md:grid-cols-2">
-        <div className="rounded-md border border-white/8 bg-white/[0.03] p-4">
+        <div className="rounded-md border border-border-quiet bg-raised-surface p-4">
           <p className="font-semibold text-white">Import JSON</p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Draft creation stays on the existing review flow until import
-            actions are wired.
+            JSON import is not available. Review existing drafts in Bundles.
           </p>
         </div>
-        <div className="rounded-md border border-white/8 bg-white/[0.03] p-4">
+        <div className="rounded-md border border-border-quiet bg-raised-surface p-4">
           <p className="font-semibold text-white">Export bundle</p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Published and draft bundle export is reserved for the next API cut.
+            Select a bundle in Bundles, then use Export JSON in Editor.
           </p>
         </div>
       </div>
@@ -1198,36 +1328,49 @@ function FilterSelect({
   options: string[];
   formatOption: (value: string) => string;
 }) {
+  const selectId = `translation-filter-${label.toLowerCase()}`;
+
   return (
-    <label className="block min-w-0">
-      <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-white/35">
-        {label}
-      </span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-9 w-full rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-white outline-none transition-colors hover:border-cyan-400/25 focus:border-cyan-400/45"
+    <div className="crate-form-field">
+      <label
+        htmlFor={selectId}
+        data-slot="form-field-label"
+        className="block font-mono text-meta uppercase tracking-[0.12em] text-text-muted"
       >
-        {options.map((option) => (
-          <option
-            key={option}
-            value={option}
-            className="bg-[#101014] text-white"
-          >
-            {formatOption(option)}
-          </option>
-        ))}
-      </select>
-    </label>
+        {label}
+      </label>
+      <AdminSelect
+        id={selectId}
+        ariaLabel={label}
+        value={value}
+        onChange={onChange}
+        options={options.map((option) => ({
+          value: option,
+          label: formatOption(option),
+        }))}
+        placeholder={formatOption(options[0] ?? "")}
+        allowClear={false}
+        triggerClassName="h-11 w-full max-w-none"
+      />
+    </div>
   );
 }
 
 function HealthMetric({ label, value }: { label: string; value: number }) {
+  const accessibleLabel =
+    label === "Drafts"
+      ? `${value} draft${value === 1 ? "" : "s"}`
+      : label === "Requests"
+        ? `${value} request${value === 1 ? "" : "s"}`
+        : `${value} published bundle${value === 1 ? "" : "s"}`;
+
   return (
-    <div className="rounded-md border border-white/6 bg-black/10 px-2 py-2">
-      <div className="font-semibold text-white">
-        {value} {label}
-        {value === 1 ? "" : "s"}
+    <div role="group" aria-label={accessibleLabel} className="min-w-0">
+      <MonoLabel as="div" size="eyebrow">
+        {label}
+      </MonoLabel>
+      <div className="mt-1 font-mono text-xl font-normal tabular-nums text-text-primary">
+        {value}
       </div>
     </div>
   );
@@ -1235,19 +1378,28 @@ function HealthMetric({ label, value }: { label: string; value: number }) {
 
 function LoadingBlock() {
   return (
-    <div className="flex min-h-56 items-center justify-center text-muted-foreground">
-      <Loader2 size={22} className="animate-spin" />
+    <div
+      role="status"
+      aria-label="Loading translations"
+      className="flex min-h-56 items-center justify-center text-muted-foreground"
+    >
+      <Loader2
+        data-admin-ux="translations-loading"
+        aria-hidden="true"
+        size={22}
+        className="animate-spin"
+      />
     </div>
   );
 }
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-white/8 bg-white/[0.03] px-3 py-2">
-      <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/32">
+    <div className="crate-form-field min-w-0 rounded-md border border-border-quiet bg-raised-surface px-3 py-2">
+      <div className="font-mono text-meta uppercase tracking-[0.12em] text-text-muted">
         {label}
       </div>
-      <div className="mt-1 truncate text-sm font-semibold text-white">
+      <div className="break-all font-mono text-sm font-normal text-white">
         {value}
       </div>
     </div>

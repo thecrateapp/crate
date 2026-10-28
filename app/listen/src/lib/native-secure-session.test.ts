@@ -51,6 +51,12 @@ describe("native secure session bridge", () => {
     });
   });
 
+  it("reads a missing native value as null", async () => {
+    plugin.get.mockResolvedValue({});
+
+    expect(await getSecureSessionValue("crate.session.server-1")).toBeNull();
+  });
+
   it.each([
     "",
     "server-1",

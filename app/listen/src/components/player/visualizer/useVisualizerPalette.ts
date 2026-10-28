@@ -1,9 +1,10 @@
-import { useEffect, useSyncExternalStore, type MutableRefObject } from "react";
+import { useEffect, type MutableRefObject } from "react";
 
 import type { CrossfadeTransition } from "@/contexts/PlayerContext";
 import type { Track } from "@/contexts/player-types";
 import { extractPalette } from "@/lib/palette";
 import { clamp } from "@/lib/utils";
+import { isMotionBlocked } from "@/lib/motion-availability";
 import type { MusicVisualizer } from "./MusicVisualizer";
 import type { VisualizerTrackProfile } from "./useTrackVisualizerProfile";
 import {
@@ -11,10 +12,6 @@ import {
   type VisualizerColorTriplet,
 } from "./visualizer-colors";
 import { adjustPaletteColor } from "./visualizer-palette-math";
-import {
-  getAppliedThemeSkin,
-  subscribeThemeSkin,
-} from "@crate/ui/lib/theme-skin";
 
 type PaletteTriplet = VisualizerColorTriplet;
 
@@ -62,12 +59,6 @@ export function useVisualizerPalette({
   useAlbumPalette,
   vizEnabled,
 }: VisualizerPaletteProps) {
-  const appearanceVersion = useSyncExternalStore(
-    subscribeThemeSkin,
-    () => `${getAppliedThemeSkin().skin}:${getAppliedThemeSkin().resolvedMode}`,
-    () => "default:dark",
-  );
-
   useEffect(() => {
     if (!isOpen || !vizEnabled || crossfadeTransition) return;
 
@@ -99,6 +90,7 @@ export function useVisualizerPalette({
           vizRef.current.color1 = mapped.c1;
           vizRef.current.color2 = mapped.c2;
           vizRef.current.color3 = mapped.c3;
+          vizRef.current.invalidateFrame();
           return;
         }
         if (attempt < 8) {
@@ -144,7 +136,6 @@ export function useVisualizerPalette({
     useAlbumPalette,
     vizEnabled,
     vizRef,
-    appearanceVersion,
   ]);
 
   useEffect(() => {
@@ -203,13 +194,18 @@ export function useVisualizerPalette({
       const tick = () => {
         if (cancelled || !vizRef.current) return;
         const elapsed = performance.now() - crossfadeTransition.startedAt;
-        const progress = clamp(elapsed / crossfadeTransition.durationMs, 0, 1);
+        const progress =
+          isMotionBlocked() ||
+          document.documentElement.dataset.crateEffects === "off"
+            ? 1
+            : clamp(elapsed / crossfadeTransition.durationMs, 0, 1);
         vizRef.current.color1 = lerpTriplet(fromC1, toC1, progress);
         vizRef.current.color2 = lerpTriplet(fromC2, toC2, progress);
         vizRef.current.color3 = lerpTriplet(fromC3, toC3, progress);
+        vizRef.current.invalidateFrame();
         if (progress < 1) raf = requestAnimationFrame(tick);
       };
-      raf = requestAnimationFrame(tick);
+      tick();
     });
 
     return () => {

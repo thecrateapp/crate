@@ -4,11 +4,11 @@ import { CRATE_ICON_SIZE, Lock } from "@crate/ui/icons";
 import { FormField } from "@crate/ui/primitives/FormField";
 import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
+import { EntityRow } from "@crate/ui/domain/entity/EntityRow";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
+import { GoogleIcon, AppleIcon } from "@crate/ui/domain/auth/OAuthButtons";
 import { Textarea } from "@crate/ui/shadcn/textarea";
-
-const FIELD_CLASS_NAME =
-  "h-10 rounded-lg border-transparent bg-text-primary/5 px-3 shadow-none backdrop-blur-none focus-visible:border-transparent focus-visible:bg-text-primary/8 md:text-base";
-const FIELD_LABEL_CLASS_NAME = "text-xs font-normal text-text-muted";
+import { Section } from "./SettingsPrimitives";
 
 export function AccountProfileForm({
   name,
@@ -40,79 +40,65 @@ export function AccountProfileForm({
   const { t } = useTranslation();
 
   return (
-    <div className="space-y-4">
-      <FormField
-        label={t("settings.account.displayName")}
-        className="gap-2"
-        labelClassName={FIELD_LABEL_CLASS_NAME}
-      >
+    <div className="grid gap-4 @md:grid-cols-2">
+      <FormField label={t("common.email")}>
+        <Input
+          id="settings-email"
+          type="email"
+          value={email || ""}
+          placeholder="—"
+          readOnly
+          autoComplete="email"
+        />
+      </FormField>
+      <FormField label={t("settings.account.displayName")}>
         <Input
           id="settings-display-name"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className={FIELD_CLASS_NAME}
           placeholder={t("auth.register.namePlaceholder")}
         />
       </FormField>
       <FormField
         label={t("settings.account.username")}
         hint={t("settings.account.usernameDescription")}
-        className="gap-2"
-        labelClassName={FIELD_LABEL_CLASS_NAME}
       >
         <Input
           id="settings-username"
           type="text"
           value={username}
           onChange={(e) => setUsername(e.target.value.replace(/\s+/g, "-"))}
-          className={FIELD_CLASS_NAME}
           placeholder={t("settings.account.usernamePlaceholder")}
         />
       </FormField>
       <FormField
         label={t("settings.account.instagram")}
         hint={t("settings.account.instagramDescription")}
-        className="gap-2"
-        labelClassName={FIELD_LABEL_CLASS_NAME}
       >
         <Input
           id="settings-instagram"
           type="text"
           value={instagram}
           onChange={(e) => setInstagram(e.target.value.replace(/\s+/g, ""))}
-          className={FIELD_CLASS_NAME}
           placeholder={t("settings.account.instagramPlaceholder")}
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
         />
       </FormField>
-      <FormField
-        label={t("settings.account.bio")}
-        className="gap-2"
-        labelClassName={FIELD_LABEL_CLASS_NAME}
-      >
+      <FormField label={t("settings.account.bio")} className="@md:col-span-2">
         <Textarea
           id="settings-bio"
           value={bio}
           onChange={(e) => setBio(e.target.value)}
-          className="min-h-24 rounded-lg border-transparent bg-text-primary/5 p-3 shadow-none backdrop-blur-none focus-visible:border-transparent focus-visible:bg-text-primary/8 md:text-base"
           placeholder={t("settings.account.bioPlaceholder")}
         />
       </FormField>
-      <div className="flex justify-end">
-        <Button
-          onClick={onSave}
-          disabled={saving || profileUnchanged}
-          className="h-10 rounded-lg px-4 disabled:opacity-40 has-[>svg]:px-4"
-        >
+      <div className="flex justify-end @md:col-span-2">
+        <Button onClick={onSave} disabled={saving || profileUnchanged}>
           {saving ? t("common.saving") : t("settings.account.saveProfile")}
         </Button>
-      </div>
-      <div className="space-y-2">
-        <span className="text-xs text-text-muted">{t("common.email")}</span>
-        <p className="px-1 text-sm text-text-primary/60">{email || "—"}</p>
       </div>
     </div>
   );
@@ -144,53 +130,72 @@ export function ConnectedAccounts({
   if (providers.length === 0) return null;
 
   return (
-    <div className="space-y-3 rounded-xl bg-text-primary/5 p-4">
-      <div>
-        <div className="text-sm font-medium text-text-primary">
-          {t("settings.account.connectedAccounts")}
-        </div>
-        <p className="mt-1 text-xs text-text-muted">
-          {t("settings.account.connectedAccountsDescription")}
-        </p>
-      </div>
-      {providers.map(([provider]) => {
-        const linked = linkedProviders.has(provider);
-        const busy =
-          linkingProvider === provider || unlinkingProvider === provider;
-        return (
-          <div
-            key={provider}
-            className="flex items-center justify-between gap-4 rounded-lg border border-border-quiet/10 p-3 "
-          >
-            <div>
-              <div className="text-sm font-medium capitalize text-text-primary">
-                {provider}
-              </div>
-              <div className="text-xs text-text-muted">
-                {linked
-                  ? t("settings.account.linked")
-                  : t("settings.account.notLinked")}
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy}
-              onClick={() =>
-                void (linked ? onUnlink(provider) : onLink(provider))
+    <Section
+      title={t("settings.account.connectedAccounts")}
+      description={t("settings.account.connectedAccountsDescription")}
+    >
+      <div className="grid max-w-xl divide-y divide-border-quiet">
+        {providers.map(([provider]) => {
+          const linked = linkedProviders.has(provider);
+          const busy =
+            linkingProvider === provider || unlinkingProvider === provider;
+          return (
+            <EntityRow
+              key={provider}
+              title={
+                provider === "google"
+                  ? "Google"
+                  : provider === "apple"
+                    ? "Apple"
+                    : provider
               }
-              className="h-auto rounded-lg border-border-quiet/15 bg-text-primary/5 px-3 py-2 text-xs shadow-none hover:bg-text-primary/10 has-[>svg]:px-3"
-            >
-              {busy
-                ? t("common.working")
-                : linked
-                  ? t("settings.account.unlink")
-                  : t("settings.account.link")}
-            </Button>
-          </div>
-        );
-      })}
-    </div>
+              density="compact"
+              menuButton="none"
+              truncate={false}
+              leading={
+                provider === "google" || provider === "apple" ? (
+                  <span
+                    aria-hidden="true"
+                    className="flex shrink-0 items-center"
+                  >
+                    {provider === "google" ? (
+                      <GoogleIcon className="size-6" />
+                    ) : (
+                      <AppleIcon className="size-6" />
+                    )}
+                  </span>
+                ) : undefined
+              }
+              subtitle={
+                <StatusDot
+                  tone={linked ? "on" : "off"}
+                  label={
+                    linked
+                      ? t("settings.account.linked")
+                      : t("settings.account.notLinked")
+                  }
+                />
+              }
+              trailing={
+                <Button
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() =>
+                    void (linked ? onUnlink(provider) : onLink(provider))
+                  }
+                >
+                  {busy
+                    ? t("common.working")
+                    : linked
+                      ? t("settings.account.unlink")
+                      : t("settings.account.link")}
+                </Button>
+              }
+            />
+          );
+        })}
+      </div>
+    </Section>
   );
 }
 
@@ -221,52 +226,50 @@ export function PasswordChangeForm({
 
   if (!showPassword) {
     return (
-      <button
-        type="button"
-        onClick={() => setShowPassword(true)}
-        className="link-meta flex w-fit max-w-full items-center gap-2 text-sm"
-      >
+      <Button variant="ghost" onClick={() => setShowPassword(true)}>
         <Lock size={CRATE_ICON_SIZE.xs} />{" "}
         {t("settings.account.changePassword")}
-      </button>
+      </Button>
     );
   }
 
   return (
-    <div className="space-y-2 rounded-xl bg-text-primary/5 p-4">
-      <Input
-        type="password"
-        value={currentPassword}
-        onChange={(e) => setCurrentPassword(e.target.value)}
-        placeholder={t("settings.account.currentPassword")}
-        aria-label={t("settings.account.currentPassword")}
-        className={FIELD_CLASS_NAME}
-        autoComplete="current-password"
-      />
-      <Input
-        type="password"
-        value={newPassword}
-        onChange={(e) => setNewPassword(e.target.value)}
-        placeholder={t("settings.account.newPassword")}
-        aria-label={t("settings.account.newPassword")}
-        className={FIELD_CLASS_NAME}
-        autoComplete="new-password"
-      />
-      <Input
-        type="password"
-        value={confirmPassword}
-        onChange={(e) => setConfirmPassword(e.target.value)}
-        placeholder={t("settings.account.confirmPassword")}
-        aria-label={t("settings.account.confirmPassword")}
-        className={FIELD_CLASS_NAME}
-        autoComplete="new-password"
-      />
-      <div className="flex gap-2 pt-1">
-        <Button
-          onClick={onChangePassword}
-          disabled={saving}
-          className="h-9 rounded-lg px-4 disabled:opacity-40 has-[>svg]:px-4"
-        >
+    <div className="grid gap-4 @md:grid-cols-2">
+      <FormField
+        label={t("settings.account.currentPassword")}
+        className="@md:col-span-2"
+      >
+        <Input
+          type="password"
+          value={currentPassword}
+          onChange={(e) => setCurrentPassword(e.target.value)}
+          placeholder={t("settings.account.currentPassword")}
+          aria-label={t("settings.account.currentPassword")}
+          autoComplete="current-password"
+        />
+      </FormField>
+      <FormField label={t("settings.account.newPassword")}>
+        <Input
+          type="password"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          placeholder={t("settings.account.newPassword")}
+          aria-label={t("settings.account.newPassword")}
+          autoComplete="new-password"
+        />
+      </FormField>
+      <FormField label={t("settings.account.confirmPassword")}>
+        <Input
+          type="password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          placeholder={t("settings.account.confirmPassword")}
+          aria-label={t("settings.account.confirmPassword")}
+          autoComplete="new-password"
+        />
+      </FormField>
+      <div className="flex gap-2 pt-1 @md:col-span-2">
+        <Button onClick={onChangePassword} disabled={saving}>
           {t("settings.account.changePasswordAction")}
         </Button>
         <Button
@@ -277,7 +280,6 @@ export function PasswordChangeForm({
             setNewPassword("");
             setConfirmPassword("");
           }}
-          className="h-9 rounded-lg bg-text-primary/5 px-4 font-normal text-text-primary/60 has-[>svg]:px-4"
         >
           {t("common.cancel")}
         </Button>

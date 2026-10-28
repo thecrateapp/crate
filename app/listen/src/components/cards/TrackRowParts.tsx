@@ -1,7 +1,11 @@
-import { useEffect, useId, useMemo, type MouseEvent } from "react";
+import {
+  TrackRowPlaybackControl,
+  TrackRowPlaybackProgressView,
+} from "./TrackRowPlaybackControl";
+import { useEffect, useMemo, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import { CRATE_ICON_SIZE, Disc3, Pause, Play } from "@crate/ui/icons";
+import { CRATE_ICON_SIZE, Disc3 } from "@crate/ui/icons";
 import {
   ItemActionMenu,
   ItemActionMenuButton,
@@ -12,8 +16,8 @@ import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { useTrackPlaylistActions } from "@/hooks/use-track-playlist-actions";
 import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import { TrackCoverThumb } from "@/components/artwork/TrackCoverThumb";
-import { useLikedTracks } from "@/contexts/LikedTracksContext";
 import { usePlayerProgress } from "@/contexts/PlayerContext";
+import { useLikedTracks } from "@/contexts/LikedTracksContext";
 import { isOfflineBusy, type OfflineItemState } from "@/lib/offline";
 import { cn } from "@/lib/utils";
 import { albumPagePath, artistPagePath } from "@/lib/library-routes";
@@ -22,96 +26,19 @@ import type {
   TrackRowProps,
 } from "@/components/cards/TrackRowModel";
 
+// Subscribe only in the active visual leaf, never in a row or list.
 function TrackRowPlaybackProgress({ isPlaying }: { isPlaying: boolean }) {
   const { currentTime, duration } = usePlayerProgress();
-  const gradientId = useId().replace(/:/g, "");
-  const size = 38;
-  const stroke = 2.5;
-  const radius = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const progress =
-    Number.isFinite(duration) && duration > 0
-      ? Math.max(0, Math.min(1, currentTime / duration))
-      : 0;
-
   return (
-    <span
-      className="group/track-progress track-row-playback-progress relative isolate flex size-10 items-center justify-center overflow-visible rounded-full backdrop-blur-md"
-      data-testid="track-row-playback-progress"
-    >
-      <span
-        aria-hidden="true"
-        className={cn(
-          "track-row-playback-aura pointer-events-none absolute -inset-[13px] z-0 origin-[46%_57%] rounded-[45%_55%_49%_51%/53%_47%_56%_44%] opacity-[0.64] blur-[1px]",
-          isPlaying && "animate-crate-play-aura-pulse",
-        )}
-      />
-      <span
-        aria-hidden="true"
-        className={cn(
-          "track-row-playback-rim pointer-events-none absolute inset-[4px] z-10 rounded-full opacity-70",
-          isPlaying && "animate-crate-play-rim-pulse",
-        )}
-      />
-      <span
-        aria-hidden="true"
-        className={cn(
-          "track-row-playback-core pointer-events-none absolute inset-[2px] z-20 rounded-full",
-          isPlaying && "animate-crate-play-core-pulse",
-        )}
-      />
-      <svg
-        aria-hidden="true"
-        viewBox={`0 0 ${size} ${size}`}
-        className="absolute inset-[1px] z-30 size-[calc(100%-2px)] -rotate-90 overflow-visible"
-      >
-        <defs>
-          <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" className="track-row-playback-gradient-start" />
-            <stop offset="48%" className="track-row-playback-gradient-mid" />
-            <stop offset="100%" className="track-row-playback-gradient-end" />
-          </linearGradient>
-        </defs>
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          className="track-row-playback-track"
-          strokeWidth={stroke}
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke={`url(#${gradientId})`}
-          strokeDasharray={circumference}
-          strokeDashoffset={circumference * (1 - progress)}
-          strokeLinecap="round"
-          strokeWidth={stroke}
-          className="track-row-playback-ring transition-[stroke-dashoffset] duration-300 ease-linear"
-        />
-      </svg>
-      {isPlaying ? (
-        <Pause
-          size={CRATE_ICON_SIZE.sm}
-          className="track-row-playback-icon relative z-40"
-          fill="currentColor"
-        />
-      ) : (
-        <Play
-          size={CRATE_ICON_SIZE.sm}
-          className="track-row-playback-icon relative z-40 ml-0.5"
-          fill="currentColor"
-        />
-      )}
-    </span>
+    <TrackRowPlaybackProgressView
+      isPlaying={isPlaying}
+      currentTime={currentTime}
+      duration={duration}
+    />
   );
 }
 
 export function TrackRowLeadingControl({
-  compact = false,
   cover,
   disabled,
   index,
@@ -133,65 +60,29 @@ export function TrackRowLeadingControl({
   trackNumber?: number;
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
-  const trackIndex = index != null ? index : trackNumber || "-";
-  const playIcon = isActive ? (
-    <TrackRowPlaybackProgress isPlaying={isPlaying} />
-  ) : (
-    <Play
-      size={CRATE_ICON_SIZE.sm}
-      className="text-text-primary mx-auto hidden md:group-hover:block"
-    />
-  );
-
   return (
-    <button
-      type="button"
-      className={cn(
-        showCoverThumb
-          ? cn(
-              "relative shrink-0 rounded-md border-0 bg-transparent p-0 text-inherit",
-              compact ? "size-10" : "size-12",
-            )
-          : "flex w-10 shrink-0 justify-center rounded-full border-0 bg-transparent p-0 text-center text-inherit",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-action/45 disabled:cursor-not-allowed",
-      )}
-      aria-label={playControlLabel}
-      title={playControlLabel}
+    <TrackRowPlaybackControl
       disabled={disabled}
+      index={index ?? trackNumber ?? "—"}
+      isActive={isActive}
+      isPlaying={isPlaying}
+      activeGlyph={
+        isActive ? (
+          <TrackRowPlaybackProgress isPlaying={isPlaying} />
+        ) : undefined
+      }
+      label={playControlLabel}
       onClick={onClick}
-    >
-      {showCoverThumb ? (
-        <>
+      artwork={
+        showCoverThumb ? (
           <TrackCoverThumb
             src={cover}
             iconSize={CRATE_ICON_SIZE.md}
             className="absolute inset-0 rounded-md"
           />
-          <div className="track-row-cover-overlay absolute inset-0 flex items-center justify-center rounded-md transition-colors">
-            {disabled ? null : isActive ? (
-              <TrackRowPlaybackProgress isPlaying={isPlaying} />
-            ) : (
-              <Play
-                size={CRATE_ICON_SIZE.md}
-                className="track-row-cover-play-icon"
-                fill="currentColor"
-              />
-            )}
-          </div>
-        </>
-      ) : disabled ? (
-        <span className="text-text-muted text-xs">{trackIndex}</span>
-      ) : isActive ? (
-        playIcon
-      ) : (
-        <>
-          <span className="text-text-muted text-xs md:group-hover:hidden">
-            {trackIndex}
-          </span>
-          {playIcon}
-        </>
-      )}
-    </button>
+        ) : undefined
+      }
+    />
   );
 }
 
@@ -294,7 +185,7 @@ export function TrackRowDetails({
   if (!showArtist && !showAlbum && !offlineLabel) return null;
 
   return (
-    <div className="text-text-muted truncate text-xs">
+    <div className="crate-track-details text-text-muted truncate text-xs">
       {showArtist ? (
         <TrackRowArtistLink
           globalArtistUid={globalArtistUid}
@@ -322,11 +213,13 @@ export function TrackRowDetails({
 
 export function TrackRowLikeControl({
   hasTrackRef,
+  likesKnown = true,
   liked,
   toggleTrackLike,
   track,
 }: {
   hasTrackRef: boolean;
+  likesKnown?: boolean;
   liked: boolean;
   toggleTrackLike: ReturnType<typeof useLikedTracks>["toggleTrackLike"];
   track: TrackRowData;
@@ -336,15 +229,25 @@ export function TrackRowLikeControl({
 
   return (
     <FollowHeartButton
-      className={` size-9 shrink-0 rounded-full transition-opacity before:absolute before:left-1/2 before:top-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:content-[''] ${
-        liked ? "opacity-100" : "md:opacity-0 md:group-hover:opacity-100"
+      className={` crate-track-action size-9 shrink-0 rounded-full transition-opacity before:absolute before:left-1/2 before:top-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:content-[''] ${
+        liked
+          ? "opacity-100"
+          : "pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100 focus-visible:opacity-100"
       }`}
-      title={t(liked ? "actions.track.unlike" : "actions.track.like")}
+      title={t(
+        !likesKnown
+          ? "library.liked.stateUnavailable"
+          : liked
+            ? "actions.track.unlike"
+            : "actions.track.like",
+      )}
+      disabled={!likesKnown}
       following={liked}
       heartTestId="track-like-heart"
       particlesTestId="track-like-particles"
       onClick={async (event) => {
         event.stopPropagation();
+        if (!likesKnown) return;
         try {
           await toggleTrackLike(
             track.library_track_id ??
@@ -504,7 +407,7 @@ export function TrackRowActions({
           onContextMenu={actionMenu.handleContextMenu}
           expanded={actionMenu.open}
           title={t("actions.menu.more")}
-          className={compact ? "size-8" : "size-9"}
+          className={cn("crate-track-action", compact ? "size-8" : "size-9")}
         />
       </div>
       {actionMenu.open ? (

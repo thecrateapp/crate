@@ -1,0 +1,50 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/MediaCover.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">MediaCover</DocHeading>
+<EntryDetails
+  id="domain-media-mediacover"
+  review="1AW approved · compact avatar distinction under review in 1BA"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+The approved existing frame has a quiet inset hairline and a neutral `--surface-placeholder` fallback; the accent is no longer used while artwork loads, and Listen artist initials sit on the same surface. Square/rounded/circle retain6px/16px/circular clipping. Standalone track/album/artist thumbnails enforce a48px minimum in both dimensions. Outer composition can enlarge them; MediaCover owns crop, clipping and fallback. Technical initials are uppercase JetBrains Mono40014px; a one-word title takes its first two characters, multiword titles first/last initials, missing text an em dash. A named absent image keeps the same accessible name; empty alt stays decorative. Native image loading is lazy with async decode. Native failure tries fallbackUrl, then content/icon/initials. Changing only fallbackUrl does not retry a failed primary. Native frame attributes/ref are forwarded.
+
+renderImage receives canonical src/alt, image classes, a final-error callback and decorative fallback content. Managed transports own loading, ready preservation and credential recovery; they can retain the fallback until decoded and must not call the final-error callback for a recoverable credential change. AlbumCardArtwork adopts the shared frame while ArtworkSurface/CrateImage retains its existing lifecycle, responsive srcSet/sizes and lazy loading. This is a frame and lifecycle boundary, not an alternative API client.
+
+The approved mockup and Diego's confirmed amendments are the visual reference. Stories mount
+real shared components. Local1AV evidence is separate from adoption on all routes and native/AT QA.
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Image} />
+
+<Canvas of={Stories.Shapes} />
+
+<Canvas of={Stories.FailedImage} />
+
+<Canvas of={Stories.FallbackUrl} />
+
+<Canvas of={Stories.ManagedRenderer} />
+
+<Controls of={Stories.Base} />
+
+<Canvas of={Stories.MinimumThumbnail} />
+
+Legacy managed/raw frames use the shared `crate-media-thumbnail` minimum recipe until their
+owning page adopts MediaCover. TrackCoverThumb deliberately retains ArtworkSurface/CrateImage;
+wrapping that renderer in an auto-height frame caused invisible artwork and was withdrawn.
+Compact artist identity beside a name uses EntityAvatar instead:24px in album bylines and28px
+in the player, preserving V2. Circular standalone artist media still keep the48px minimum.
+The focused browser fixture mounts the actual Listen renderer and checks decoded, visible48px
+artwork in both densities. It does not certify production credentials or every native runtime.
+
+<DocHeading as="h2">Sizes</DocHeading>
+
+`size` sets a fixed, non-shrinking frame: `48` (list rows, the minimum), `56` (contribution and radar
+rows), `64`, `80`, `88` (event rows), `96`, or `"fill"` to take the parent box. Callers no longer
+pass `size-*`/`shrink-0` classes; without `size` the parent owns the geometry, as before.
+Responsive covers that change size at a breakpoint keep their own classes.

@@ -1,4 +1,9 @@
-import type { MouseEvent, ReactNode } from "react";
+import type {
+  AriaAttributes,
+  ComponentPropsWithRef,
+  MouseEvent,
+  ReactNode,
+} from "react";
 
 import type {
   ContextMenuHeader,
@@ -55,6 +60,8 @@ export interface EntityPrimaryActionProps {
   href?: string;
   external?: boolean;
   openLabel?: string;
+  /** Selection belongs to the primary callback button, independently of playback. */
+  pressed?: boolean;
 }
 
 export interface EntityMenuProps {
@@ -63,3 +70,9 @@ export interface EntityMenuProps {
   menuButton?: EntityMenuButtonMode;
   menuLabel?: string;
 }
+
+export type EntityFrameAttributes = AriaAttributes &
+  Pick<
+    ComponentPropsWithRef<"article">,
+    "id" | "ref" | "style" | "lang" | "dir"
+  >;

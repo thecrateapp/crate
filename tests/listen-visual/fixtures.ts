@@ -1,7 +1,12 @@
 import { expect, test as base, type Route } from "@playwright/test";
 
 type AppearancePreset = "default" | "crateRed";
-type ColorMode = "dark" | "light";
+type ColorMode = "dark" | "light" | "system";
+interface FunctionalPreferences {
+  motion: "system" | "reduced";
+  density: "comfortable" | "compact";
+  effects: "off" | "subtle" | "expressive";
+}
 
 interface ListenVisualFixtures {
   failOnConsoleErrors: void;
@@ -10,7 +15,15 @@ interface ListenVisualFixtures {
     options?: {
       mode?: ColorMode;
       player?: boolean;
+      playerIdentity?: {
+        title?: string;
+        artist?: string;
+        album?: string;
+        source?: string;
+      };
+      smartEq?: boolean;
       preset?: AppearancePreset;
+      preferences?: Partial<FunctionalPreferences>;
     },
   ) => Promise<void>;
 }
@@ -161,6 +174,19 @@ const upcomingItems = [
     country_code: "GB",
     lineup: ["High Vis", "Militarie Gun"],
     genres: ["hardcore"],
+    probable_setlist: [
+      { title: "Mob DLA", artist: "High Vis" },
+      { title: "Trauma Bonds", artist: "High Vis" },
+      { title: "Guided Tour", artist: "High Vis" },
+    ],
+    probable_setlist_context: {
+      model_version: 2,
+      mode: "recent",
+      source_show_count: 12,
+      source_date_from: "2026-08-01",
+      source_date_to: "2026-09-10",
+    },
+    probable_setlist_status: "ready",
     user_attending: true,
   },
   {
@@ -546,6 +572,56 @@ const statsDashboard = {
   ],
 };
 
+const statsRange = {
+  start: statsDay(29),
+  end: statsDay(0),
+  available: true,
+  hidden_reason: null,
+  top_artists: [
+    {
+      artist_name: "High Vis",
+      artist_id: 7,
+      artist_slug: "high-vis",
+      minutes: 720,
+      plays: 204,
+      share: 0.21,
+    },
+  ],
+  top_albums: statsDashboard.top_albums.items.map((album) => ({
+    album: album.album,
+    artist: album.artist,
+    plays: album.play_count,
+    album_id: album.album_id,
+    minutes: album.minutes_listened,
+  })),
+  top_tracks: statsDashboard.top_tracks.items.map((track) => ({
+    track_id: track.track_id,
+    track_path: track.track_path,
+    title: track.title,
+    artist: track.artist,
+    artist_id: track.artist_id,
+    artist_slug: track.artist_slug,
+    album: track.album,
+    album_id: track.album_id,
+    album_slug: track.album_slug,
+    format: "FLAC",
+    duration: 198,
+    plays: track.play_count,
+    minutes: track.minutes_listened,
+  })),
+  discoveries: [
+    {
+      artist_name: "High Vis",
+      artist_id: 7,
+      artist_slug: "high-vis",
+      first_day: "2026-08-20",
+      minutes: 120,
+    },
+  ],
+};
+
+const smartEqGains = [2, 1, 0, -1, 0, 1, 2, 1, 0, -1];
+
 function userPlaylist(id: number, overrides: Record<string, unknown>) {
   return {
     id,
@@ -592,6 +668,7 @@ function responseFor(pathname: string): unknown {
   }
   if (pathname === "/api/me/home/discovery") return homeDiscovery;
   if (pathname === "/api/me/stats/dashboard") return statsDashboard;
+  if (pathname === "/api/me/stats/range") return statsRange;
   if (pathname === "/api/me/stats/today") {
     return { day: "2026-09-12", timezone: "UTC", minutes: 38, plays: 9 };
   }
@@ -690,6 +767,42 @@ function responseFor(pathname: string): unknown {
     };
   }
   if (pathname === "/api/playback/prepare") return {};
+  if (pathname === "/api/tracks/1/eq") {
+    return {
+      trackId: 1,
+      trackEntityUid: null,
+      albumId: 71,
+      albumEntityUid: null,
+      gains: smartEqGains,
+      source: "genre_taxonomy_preset",
+      label: "Hardcore",
+      reasoning: "Inherited from Rock",
+      scope: "instance",
+      targetType: "track",
+      targetEntityUid: null,
+      userId: null,
+      genre: { slug: "hardcore", name: "Hardcore", canonical: true },
+      inheritedFrom: { slug: "rock", name: "Rock" },
+    };
+  }
+  if (pathname === "/api/tracks/1/eq/curves") {
+    return [
+      {
+        source: "genre_taxonomy_preset",
+        gains: smartEqGains,
+        label: "Hardcore",
+        reasoning: "",
+        genre: { slug: "hardcore", name: "Hardcore", canonical: true },
+      },
+      {
+        source: "flat",
+        gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        label: "",
+        reasoning: "",
+        genre: null,
+      },
+    ];
+  }
   if (pathname === "/api/me/now-playing") return {};
   if (pathname === "/api/me/play-events") return {};
   if (pathname === "/api/bandcamp/links/artist/by-entity/artist-high-vis") {
@@ -699,6 +812,9 @@ function responseFor(pathname: string): unknown {
   if (pathname === "/api/catalog/genres/hardcore") return genreDetail;
   if (pathname.startsWith("/api/artist-slugs/high-vis/page")) {
     return artistPage;
+  }
+  if (pathname === "/api/artist-slugs/high-vis") {
+    return { ...artistPage.artist, is_v2: true, bio: artistPage.info.bio };
   }
   if (pathname === "/api/me/upcoming") {
     return {
@@ -794,35 +910,49 @@ async function fulfillApi(route: Route): Promise<void> {
   });
 }
 
-function appearancePreferences(mode: ColorMode, preset: AppearancePreset) {
+function appearancePreferences(
+  mode: ColorMode,
+  preset: AppearancePreset,
+  preferences: Partial<FunctionalPreferences> = {},
+) {
   return {
     version: 2,
     mode,
     preset,
-    overrides: {},
-    presentation: { density: "comfortable" },
-    accessibility: { motion: "reduced" },
+    overrides: { effects: preferences.effects ?? "subtle" },
+    presentation: { density: preferences.density ?? "comfortable" },
+    accessibility: { motion: preferences.motion ?? "reduced" },
   };
 }
 
-function playerSnapshot() {
+function playerSnapshot(
+  identity: {
+    title?: string;
+    artist?: string;
+    album?: string;
+    source?: string;
+  } = {},
+) {
   return {
     queue: [
       {
         id: "High Vis/Guided Tour/01 Mob DLA.flac",
         libraryTrackId: 1,
         path: "High Vis/Guided Tour/01 Mob DLA.flac",
-        title: "Mob DLA",
-        artist: "High Vis",
+        title: identity.title ?? "Mob DLA",
+        artist: identity.artist ?? "High Vis",
         artistId: 7,
         artistSlug: "high-vis",
-        album: "Guided Tour",
+        album: identity.album ?? "Guided Tour",
         albumId: 71,
         albumSlug: "guided-tour",
         albumCover: svgDataUrl("GUIDED"),
         duration: 198,
       },
     ],
+    playSource: identity.source
+      ? { type: "playlist", name: identity.source, id: 10 }
+      : null,
     currentIndex: 0,
     currentTime: 42,
     wasPlaying: false,
@@ -878,16 +1008,23 @@ export const test = base.extend<ListenVisualFixtures>({
       const mode = options.mode ?? "dark";
       const preset = options.preset ?? "default";
       await page.addInitScript(
-        ({ appearance, player }) => {
+        ({ appearance, player, smartEq }) => {
+          if (sessionStorage.getItem("crate-visual-preferences-seeded")) return;
+          sessionStorage.setItem("crate-visual-preferences-seeded", "true");
           localStorage.clear();
           localStorage.setItem(
             "crate.listen.appearance.v2",
             JSON.stringify(appearance),
           );
-          localStorage.setItem("crate.listen.theme-skin", appearance.preset);
+          localStorage.setItem(
+            "crate.listen.theme-skin",
+            JSON.stringify({ mode: appearance.mode, skin: appearance.preset }),
+          );
           localStorage.setItem("crate-listen-sidebar-expanded", "true");
           localStorage.setItem("i18nextLng", "en");
-          localStorage.setItem("listen-eq-smart", "false");
+          localStorage.setItem("crate-listen-locale", "en");
+          localStorage.setItem("listen-eq-smart", String(smartEq));
+          localStorage.setItem("listen-eq-enabled", String(smartEq));
           if (player) {
             localStorage.setItem(
               "listen-player-state:v1",
@@ -896,8 +1033,11 @@ export const test = base.extend<ListenVisualFixtures>({
           }
         },
         {
-          appearance: appearancePreferences(mode, preset),
-          player: options.player ? playerSnapshot() : null,
+          appearance: appearancePreferences(mode, preset, options.preferences),
+          player: options.player
+            ? playerSnapshot(options.playerIdentity)
+            : null,
+          smartEq: options.smartEq ?? false,
         },
       );
       await page.goto(path);

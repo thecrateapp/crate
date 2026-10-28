@@ -134,8 +134,10 @@ export function useOfflineSynchronization({
       return;
     }
     if (resumedProfileRef.current === profileKey) return;
-    const hasPendingItems = Object.values(snapshot.items).some((item) =>
-      isOfflineBusy(item.state),
+    const hasPendingItems = Object.values(snapshot.items).some(
+      (item) =>
+        isOfflineBusy(item.state) ||
+        (navigator.onLine && item.artworkVersion !== 1),
     );
     if (!hasPendingItems) return;
     resumedProfileRef.current = profileKey;

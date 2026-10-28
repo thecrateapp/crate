@@ -1,0 +1,37 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta title="System/Introduction" />
+
+<DocHeading as="h1">Crate UI — Design System</DocHeading>
+
+The living catalogue for the components shared by Admin and Listen. Examples import actual @crate/ui code, fonts and tokens. This workspace is part of the 1AQ reconciliation.
+
+- [Foundations](?path=/docs/system-foundations--docs): identity, type roles, tokens, geometry, layers and motion.
+- [Inventory](?path=/docs/system-inventory--docs): documented coverage and pending debt, linked to source.
+- [Maintenance](?path=/docs/system-maintenance--docs): mandatory updates whenever a component is added or changed.
+
+The historical screen/checkpoint preview remains available at [127.0.0.1:5186](http://127.0.0.1:5186/).
+
+<DocHeading as="h2">Visual source of truth</DocHeading>
+
+Diego's approved persistent mockup at 5186, with his subsequently confirmed adjustments, defines
+the visual reference. Shared components and this catalogue implement and document it. Compare
+computed styles; do not accept a Storybook default as a new design decision. Discuss doubts,
+deviations or mobile sizing conflicts with Diego before choosing a different presentation.
+
+<DocHeading as="h2">Reading an entry</DocHeading>
+
+Documented, adopted and validated are separate statuses. Initial entries have real scenarios; the remaining catalogue is explicitly pending. Known defects are tracked without compensating CSS. HairlineRow is the first completed geometry reconciliation; its Admin adoption is still pending.
+
+This catalogue describes the current contract of each family. Plans preserve decisions and history. Adoption closes by family, with real consumers in both apps. No selectable skins or claims of live backend data.
+
+<DocHeading as="h2">First collection</DocHeading>
+
+Component entries are organized by purpose: Forms, Feedback, Data Display, Navigation, Actions,
+Overlays, Media and Layout. Compatibility adapters have their own group. Every inventory entry
+has one primary category; sidebar groups grow as pending entries receive real documentation.
+
+MonoLabel, StatusDot, StatNumber, HairlineList/Row, InfoBadge and OfflineBadge, FilterChip, SegmentedControl, GenrePill and badge adapters. Page rows and playback controls have not been migrated in this tooling block.
+
+The complete form family is available under Components / Forms. [Open the composed form example](?path=/story/patterns-forms--complete). New examples live here; the persistent mockup remains the visual reference.

@@ -213,7 +213,7 @@ export function usePlayEventTracker(
   );
 
   const recordProgress = useCallback(
-    (nextTime: number) => {
+    (nextTime: number, maxDeltaSeconds = PLAY_EVENT_DELTA_CAP_SECONDS) => {
       const session = sessionRef.current;
       if (!session) return;
       const snapshot = getPlaybackSnapshot();
@@ -226,7 +226,7 @@ export function usePlayEventTracker(
       }
 
       const delta = nextTime - session.lastKnownTime;
-      if (delta > 0 && delta <= PLAY_EVENT_DELTA_CAP_SECONDS) {
+      if (delta > 0 && delta <= maxDeltaSeconds) {
         session.listenedSeconds += delta;
       }
       session.lastKnownTime = nextTime;

@@ -14,6 +14,10 @@ import type {
 } from "@/pages/shows-page-types";
 
 export interface ShowsPageController extends ShowsPageModel {
+  error: string | null;
+  status: number | null | undefined;
+  refetch: () => void;
+  hasData: boolean;
   expandedId: string | null;
   focusShowId: string | null;
   genreName: string | undefined;
@@ -34,12 +38,18 @@ export function useShowsPageController(): ShowsPageController {
   const [filter, setFilter] = useState<ShowsFilter>("all");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const { data, loading: upcomingLoading } = useApi<UpcomingResponse>(
+  const upcomingRead = useApi<UpcomingResponse>(
     genreSlug ? null : "/api/me/upcoming",
   );
-  const { data: genreData, loading: genreLoading } = useApi<GenreShowsResponse>(
+  const genreRead = useApi<GenreShowsResponse>(
     genreSlug ? `/api/genres/${genreSlug}?view=genre-detail-v5` : null,
+    "GET",
+    undefined,
+    { reportCachedErrors: true },
   );
+  const { data, loading: upcomingLoading } = upcomingRead;
+  const { data: genreData, loading: genreLoading } = genreRead;
+  const read = genreSlug ? genreRead : upcomingRead;
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const model = useMemo(
     () =>
@@ -69,6 +79,10 @@ export function useShowsPageController(): ShowsPageController {
 
   return {
     ...model,
+    error: read.error,
+    status: read.status,
+    refetch: read.refetch,
+    hasData: read.data != null,
     expandedId,
     filter,
     focusShowId,

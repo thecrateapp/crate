@@ -1,3 +1,30 @@
+import { PageHeaderLayout } from "@crate/ui/domain/navigation/PageHeader";
+import { BackLink } from "@crate/ui/domain/navigation/BackLink";
+import { FilterChip } from "@crate/ui/primitives/FilterChip";
+import { HairlineList, HairlineRow } from "@crate/ui/primitives/HairlineList";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { ActionButton, ActionGroup } from "@crate/ui/primitives/ActionGroup";
+import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
+import { FormField } from "@crate/ui/primitives/FormField";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
+import { EmptyState, ErrorState, LoadingState } from "@crate/ui/domain/states";
+import { OpsRefreshNotice } from "@/components/admin/ops-surfaces";
+import { RelativeTime } from "@/components/admin/RelativeTime";
+import { PlaylistEditorTrackList } from "@/components/playlists/PlaylistEditorTrackList";
+import { PlaylistTrackRequirements } from "@/components/playlists/PlaylistTrackRequirements";
+import {
+  serializePlaylistEditorDraft,
+  usePlaylistEditorDraft,
+  type PlaylistRuleDraft,
+} from "@/components/playlists/use-playlist-editor-draft";
+import { StatNumber } from "@crate/ui/primitives/StatNumber";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
+import { SeverityMeter } from "@/components/admin/status-indicators";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import {
   useCallback,
   useDeferredValue,
@@ -6,43 +33,28 @@ import {
   useRef,
   useState,
   type ChangeEvent,
-  type ReactNode,
 } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
-  ArrowLeft,
+  Camera,
   Copy,
-  GripVertical,
-  ImagePlus,
-  ListMusic,
+  Eye,
+  RefreshCw as ListRestart,
   Loader2,
-  Play,
-  Plus,
-  RefreshCw,
   Save,
-  Search,
-  Sparkles,
   Trash2,
-  Upload,
-  X,
-} from "lucide-react";
+} from "@crate/ui/icons";
 import { toast } from "sonner";
 
-import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { AdminSelect } from "@/components/ui/AdminSelect";
 import { AIButton } from "@/components/ui/AIButton";
+import { useSnapshotStream } from "@/hooks/use-snapshot-stream";
 import {
   PlaylistArtwork,
   type PlaylistArtworkTrack,
 } from "@/components/playlists/PlaylistArtwork";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
+
 import { Button } from "@crate/ui/shadcn/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@crate/ui/shadcn/card";
 import { Input } from "@crate/ui/shadcn/input";
 import { Textarea } from "@crate/ui/shadcn/textarea";
 import { useApi } from "@/hooks/use-api";
@@ -78,6 +90,7 @@ interface SmartRules {
   rules: SmartRule[];
   limit: number;
   sort: string;
+  require_full_mix_profile?: boolean;
 }
 
 interface SmartRule {
@@ -281,10 +294,6 @@ function getOpsForField(field: string) {
   return getFieldType(field) === "text" ? TEXT_OPS : NUMBER_OPS;
 }
 
-function numericRuleInput(field: string, value: string): string | number {
-  return field === "year" ? value : Number(value);
-}
-
 function formatMinutes(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -314,32 +323,6 @@ function playlistTrackPayload(track: Track): Record<string, unknown> {
   };
 }
 
-function trackSourceLabel(track: Track): string {
-  if (track.locked) return "locked";
-  if (track.source === "manual") return "manual";
-  if (track.source === "generated") return "generated";
-  return track.source || "track";
-}
-
-function Field({
-  label,
-  className = "",
-  children,
-}: {
-  label: string;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className={className}>
-      <span className="mb-1.5 block text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-        {label}
-      </span>
-      {children}
-    </div>
-  );
-}
-
 function TogglePill({
   label,
   active,
@@ -350,44 +333,126 @@ function TogglePill({
   onClick: () => void;
 }) {
   return (
-    <CratePill active={active} onClick={onClick}>
+    <FilterChip active={active} onClick={onClick}>
       {label}
-    </CratePill>
+    </FilterChip>
   );
 }
 
-function StatusChip({ status }: { status: string }) {
-  if (status === "running") {
-    return (
-      <CrateChip active className="text-[11px]">
-        Generating
-      </CrateChip>
-    );
-  }
-  if (status === "queued") {
-    return (
-      <CrateChip className="border-amber-400/25 bg-amber-400/10 text-[11px] text-amber-200">
-        Queued
-      </CrateChip>
-    );
-  }
-  if (status === "failed") {
-    return (
-      <CrateChip className="border-red-400/25 bg-red-500/10 text-[11px] text-red-200">
-        Failed
-      </CrateChip>
-    );
-  }
-  return <CrateChip className="text-[11px]">Idle</CrateChip>;
+function GenerationPhaseLine({
+  status,
+  lastGeneratedAt,
+  streamStatus,
+}: {
+  status: string;
+  lastGeneratedAt: string | null;
+  streamStatus: ReturnType<typeof useSnapshotStream>;
+}) {
+  const phaseIndex =
+    status === "queued"
+      ? 0
+      : status === "running" || status === "failed"
+        ? 1
+        : lastGeneratedAt
+          ? 2
+          : -1;
+  const labels = ["Queued", "Generating", "Ready"];
+  const streamCopy =
+    streamStatus === "live"
+      ? "Live updates"
+      : streamStatus === "reconnecting"
+        ? "Reconnecting"
+        : streamStatus === "connecting"
+          ? "Connecting"
+          : "Stream paused";
+
+  return (
+    <div
+      role="status"
+      aria-label="Playlist generation progress"
+      data-generation-phase-line
+      className="flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-border-quiet pt-4"
+    >
+      <ol className="flex min-w-0 flex-1 items-center">
+        {labels.map((label, index) => {
+          const isCurrent = index === phaseIndex;
+          const isComplete = phaseIndex > index;
+          const failed = isCurrent && status === "failed";
+          const stepLabel = failed ? "Failed" : label;
+          const tone =
+            isComplete || (isCurrent && !failed)
+              ? "on"
+              : failed
+                ? "warn"
+                : "off";
+
+          return (
+            <li
+              key={label}
+              aria-current={isCurrent ? "step" : undefined}
+              className="flex min-w-0 flex-1 items-center last:flex-none"
+            >
+              <StatusDot
+                tone={tone}
+                label={stepLabel}
+                pulse={
+                  isCurrent && (status === "queued" || status === "running")
+                }
+                className="whitespace-nowrap"
+              />
+              {index < labels.length - 1 ? (
+                <span
+                  aria-hidden="true"
+                  className={`mx-3 h-px min-w-2 flex-1 ${isComplete ? "bg-accent-action/45" : "bg-border-quiet"}`}
+                />
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
+      <StatusDot
+        label={streamCopy}
+        tone={streamStatus === "live" ? "on" : "off"}
+        pulse={streamStatus === "connecting" || streamStatus === "reconnecting"}
+      />
+    </div>
+  );
 }
 
-function MetricTile({ label, value }: { label: string; value: ReactNode }) {
+function formatRuleValue(rule: SmartRule): string {
+  if (Array.isArray(rule.value)) {
+    const [minimum, maximum] = rule.value;
+    return `${minimum ?? "…"}–${maximum ?? "…"}`;
+  }
+  return String(rule.value ?? "").trim() || "Any value";
+}
+
+function RuleExpression({ rule, index }: { rule: SmartRule; index: number }) {
+  const field = RULE_FIELDS.find((candidate) => candidate.value === rule.field);
+  const operatorLabels: Record<string, string> = {
+    eq: "=",
+    neq: "≠",
+    contains: "CONTAINS",
+    not_contains: "NOT CONTAINS",
+    gte: "≥",
+    lte: "≤",
+    between: "BETWEEN",
+  };
+  const operator = operatorLabels[rule.op] ?? rule.op;
+
   return (
-    <div className="rounded-md border border-white/10 bg-black/15 p-3">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-        {label}
-      </div>
-      <div className="mt-1 text-base font-semibold">{value}</div>
+    <div
+      role="group"
+      aria-label={`Rule ${index + 1}: ${field?.label ?? rule.field} ${operator} ${formatRuleValue(rule)}`}
+      className="flex min-w-0 flex-wrap items-center gap-1.5"
+    >
+      <InfoBadge>{field?.label ?? rule.field}</InfoBadge>
+      <MonoLabel as="span" className="px-1">
+        {operator}
+      </MonoLabel>
+      <InfoBadge className="max-w-full truncate">
+        {formatRuleValue(rule)}
+      </InfoBadge>
     </div>
   );
 }
@@ -402,15 +467,13 @@ function DistributionBlock({
   if (items.length === 0) return null;
 
   return (
-    <div className="space-y-2">
-      <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-        {label}
-      </div>
+    <div className="crate-form-field">
+      <MonoLabel as="div">{label}</MonoLabel>
       <div className="flex flex-wrap gap-1.5">
         {items.map(([name, count]) => (
-          <CrateChip key={name} className="text-[11px]">
-            {name} <span className="text-white/35">{count}</span>
-          </CrateChip>
+          <InfoBadge key={name}>
+            {name} <span className="text-text-subtle">{count}</span>
+          </InfoBadge>
         ))}
       </div>
     </div>
@@ -425,6 +488,7 @@ export function PlaylistEditor() {
   const {
     data: surface,
     loading,
+    error: loadError,
     refetch,
   } = useApi<PlaylistEditorSurface>(
     id ? `/api/admin/system-playlists/${id}/editor-snapshot` : null,
@@ -441,48 +505,58 @@ export function PlaylistEditor() {
     null,
   );
 
-  const playlist = liveSurface?.playlist ?? surface?.playlist ?? null;
-  const history = liveSurface?.history ?? surface?.history ?? [];
+  const activeSurface =
+    liveSurface?.playlist.id === id
+      ? liveSurface
+      : surface?.playlist.id === id
+        ? surface
+        : null;
+  const playlist = activeSurface?.playlist ?? null;
+  const history = activeSurface?.history ?? [];
 
   useEffect(() => {
-    setLiveSurface(surface);
-  }, [surface]);
+    if (surface?.playlist.id === id) setLiveSurface(surface);
+  }, [id, surface]);
 
-  useEffect(() => {
-    if (!id) return;
-    const source = new EventSource(
-      apiSseUrl(`/api/admin/system-playlists/${id}/stream`),
-    );
-    source.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data) as PlaylistEditorSurface;
-        setLiveSurface(payload);
-      } catch {
-        // Ignore malformed frames and keep the stream alive.
-      }
-    };
-    return () => {
-      source.close();
-    };
-  }, [id]);
+  const acceptLiveSurface = useCallback(
+    (payload: PlaylistEditorSurface) => {
+      if (payload.playlist.id === id) setLiveSurface(payload);
+    },
+    [id],
+  );
+  const streamStatus = useSnapshotStream<PlaylistEditorSurface>(
+    id ? apiSseUrl(`/api/admin/system-playlists/${id}/stream`) : null,
+    acceptLiveSurface,
+  );
 
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("");
-  const [featuredRank, setFeaturedRank] = useState<number | null>(null);
-  const [isActive, setIsActive] = useState(true);
-  const [isCurated, setIsCurated] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState(true);
-  const [rules, setRules] = useState<SmartRule[]>([]);
-  const [match, setMatch] = useState<"all" | "any">("all");
-  const [limit, setLimit] = useState(50);
-  const [sort, setSort] = useState("random");
+  const { draft, setField, dirtyFields, isDirty, acceptSaved } =
+    usePlaylistEditorDraft(id, playlist);
+  const {
+    name,
+    description,
+    category,
+    featuredRank,
+    isActive,
+    isCurated,
+    autoRefresh,
+    rules,
+    match,
+    limit,
+    sort,
+    requireFullMixProfile,
+  } = draft;
+  const [validatedScope, setValidatedScope] = useState<"all" | "rules" | null>(
+    null,
+  );
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [describing, setDescribing] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [preview, setPreview] = useState<PreviewResult | null>(null);
+  const [previewKey, setPreviewKey] = useState<string | null>(null);
+  const previewRequest = useRef(0);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [removingCover, setRemovingCover] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const [trackSearchQuery, setTrackSearchQuery] = useState("");
   const deferredTrackSearchQuery = useDeferredValue(trackSearchQuery);
@@ -490,83 +564,88 @@ export function PlaylistEditor() {
     "rules",
   );
   const [trackSearchResults, setTrackSearchResults] = useState<Track[]>([]);
+  const [trackSearchError, setTrackSearchError] = useState<string | null>(null);
+  const [searchRetry, setSearchRetry] = useState(0);
   const [trackSearching, setTrackSearching] = useState(false);
   const [addingTrackId, setAddingTrackId] = useState<number | null>(null);
-  const [draggedTrackId, setDraggedTrackId] = useState<number | null>(null);
   const [refining, setRefining] = useState(false);
   const [applyingRefinement, setApplyingRefinement] = useState(false);
   const [refineProposal, setRefineProposal] =
     useState<RefinementProposal | null>(null);
 
-  useEffect(() => {
-    const basePlaylist = surface?.playlist;
-    if (!basePlaylist) return;
-    setName(basePlaylist.name);
-    setDescription(basePlaylist.description || "");
-    setCategory(basePlaylist.category || "");
-    setFeaturedRank(basePlaylist.featured_rank);
-    setIsActive(basePlaylist.is_active);
-    setIsCurated(basePlaylist.is_curated);
-    setAutoRefresh(basePlaylist.auto_refresh_enabled);
-    if (basePlaylist.smart_rules) {
-      setRules(basePlaylist.smart_rules.rules || []);
-      setMatch(basePlaylist.smart_rules.match || "all");
-      setLimit(basePlaylist.smart_rules.limit || 50);
-      setSort(basePlaylist.smart_rules.sort || "random");
-    } else {
-      setRules([]);
-      setMatch("all");
-      setLimit(50);
-      setSort("random");
-    }
-  }, [surface]);
-
-  const basePlaylist = surface?.playlist ?? null;
+  const basePlaylist = playlist;
   const isSmart = basePlaylist?.is_smart ?? false;
+  const isStaticPlaylist = basePlaylist !== null && !isSmart;
   const persistedSmartRules = basePlaylist?.smart_rules;
-  const currentSmartRules = useMemo(
-    () => ({
-      ...persistedSmartRules,
-      match,
-      rules: rules.map((rule) =>
-        rule.field === "year"
-          ? {
-              ...rule,
-              value: Array.isArray(rule.value)
-                ? rule.value.map(String)
-                : String(rule.value),
-            }
-          : rule,
-      ),
-      limit,
-      sort,
-    }),
-    [persistedSmartRules, limit, match, rules, sort],
-  );
   const smartRulesChanged =
     isSmart &&
-    (match !== (persistedSmartRules?.match || "all") ||
-      limit !== (persistedSmartRules?.limit || 50) ||
-      sort !== (persistedSmartRules?.sort || "random") ||
-      JSON.stringify(rules) !==
-        JSON.stringify(persistedSmartRules?.rules || []));
+    ["rules", "match", "limit", "sort", "requireFullMixProfile"].some((key) =>
+      dirtyFields.has(key as keyof typeof draft),
+    );
+  const allValidation = useMemo(
+    () =>
+      serializePlaylistEditorDraft(draft, {
+        isSmart: isSmart && smartRulesChanged,
+        persistedSmartRules,
+        scope: "all",
+      }),
+    [draft, isSmart, smartRulesChanged, persistedSmartRules],
+  );
+  const rulesValidation = useMemo(
+    () =>
+      serializePlaylistEditorDraft(draft, {
+        isSmart,
+        persistedSmartRules,
+        scope: "rules",
+      }),
+    [draft, isSmart, persistedSmartRules],
+  );
+  const currentSmartRules = rulesValidation.valid
+    ? rulesValidation.smartRules
+    : null;
+  const currentPreviewKey = currentSmartRules
+    ? JSON.stringify(currentSmartRules)
+    : null;
+  const previewStale = preview !== null && previewKey !== currentPreviewKey;
+  const validation =
+    validatedScope === "rules" ? rulesValidation : allValidation;
+  const fieldError = (key: string) =>
+    validatedScope && !validation.valid ? validation.errors[key] : undefined;
+  const validate = (scope: "all" | "rules") => {
+    const result = scope === "all" ? allValidation : rulesValidation;
+    setValidatedScope(scope);
+    if (!result.valid)
+      toast.error("Check the highlighted fields before continuing.");
+    return result;
+  };
+  useEffect(() => {
+    previewRequest.current += 1;
+    setPreview(null);
+    setPreviewKey(null);
+    setPreviewing(false);
+    setValidatedScope(null);
+    setRefineProposal(null);
+    setTrackSearchQuery("");
+  }, [id]);
 
   useEffect(() => {
-    if (!isSmart && trackSearchScope === "rules") {
+    if (isStaticPlaylist && trackSearchScope === "rules") {
       setTrackSearchScope("library");
     }
-  }, [isSmart, trackSearchScope]);
+  }, [isStaticPlaylist, trackSearchScope]);
 
   useEffect(() => {
     const query = deferredTrackSearchQuery.trim();
     if (!playlist || query.length < 2) {
       setTrackSearchResults([]);
+      setTrackSearchError(null);
       setTrackSearching(false);
       return;
     }
 
     let cancelled = false;
     setTrackSearching(true);
+    setTrackSearchError(null);
     const timeout = window.setTimeout(() => {
       api<TrackSearchResponse>(
         `/api/admin/system-playlists/${id}/track-search?q=${encodeURIComponent(
@@ -579,7 +658,7 @@ export function PlaylistEditor() {
         .catch(() => {
           if (!cancelled) {
             setTrackSearchResults([]);
-            toast.error("Track search failed");
+            setTrackSearchError("Could not search tracks. Try again.");
           }
         })
         .finally(() => {
@@ -591,24 +670,21 @@ export function PlaylistEditor() {
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [deferredTrackSearchQuery, id, playlist, trackSearchScope]);
+  }, [deferredTrackSearchQuery, id, !!playlist, trackSearchScope, searchRetry]);
 
-  const handleSave = useCallback(async () => {
+  const handleSave = async () => {
+    const result = validate("all");
+    if (!result.valid) return;
+    const sent = structuredClone(draft);
     setSaving(true);
     try {
-      const body: Record<string, unknown> = {
-        name,
-        description: description || null,
-        category: category || null,
-        featured_rank: featuredRank,
-        is_active: isActive,
-        is_curated: isCurated,
+      const body = {
+        ...result.payload,
+        ...(isSmart ? { auto_refresh_enabled: autoRefresh } : {}),
       };
-      if (isSmart) {
-        if (smartRulesChanged) body.smart_rules = currentSmartRules;
-        body.auto_refresh_enabled = autoRefresh;
-      }
+      if (isSmart && !smartRulesChanged) delete body.smart_rules;
       await api(`/api/admin/system-playlists/${id}`, "PUT", body);
+      acceptSaved(sent);
       toast.success("Playlist saved");
       void refetch();
     } catch {
@@ -616,60 +692,65 @@ export function PlaylistEditor() {
     } finally {
       setSaving(false);
     }
-  }, [
-    autoRefresh,
-    category,
-    description,
-    featuredRank,
-    id,
-    isActive,
-    isCurated,
-    isSmart,
-    smartRulesChanged,
-    name,
-    currentSmartRules,
-    refetch,
-  ]);
+  };
 
-  const handleGenerate = useCallback(async () => {
+  const handleGenerate = async () => {
+    const result = validate("rules");
+    if (!result.valid || !isSmart) return;
+    const sent = {
+      rules: structuredClone(rules),
+      match,
+      limit,
+      sort,
+      requireFullMixProfile,
+      autoRefresh,
+    };
     setGenerating(true);
     try {
       if (smartRulesChanged) {
-        await api(`/api/admin/system-playlists/${id}`, "PUT", {
-          smart_rules: currentSmartRules,
-          auto_refresh_enabled: autoRefresh,
-        });
-        toast.success("Rules saved and generation enqueued");
+        await api(`/api/admin/system-playlists/${id}`, "PUT", result.payload);
       } else {
+        if (dirtyFields.has("autoRefresh")) {
+          await api(`/api/admin/system-playlists/${id}`, "PUT", {
+            auto_refresh_enabled: autoRefresh,
+          });
+        }
         await api(`/api/admin/system-playlists/${id}/generate`, "POST");
-        toast.success("Generation enqueued");
       }
+      acceptSaved(sent);
+      toast.success("Generation enqueued");
       void refetch();
     } catch {
       toast.error("Failed to enqueue generation");
     } finally {
       setGenerating(false);
     }
-  }, [autoRefresh, currentSmartRules, id, refetch, smartRulesChanged]);
+  };
 
-  const handlePreview = useCallback(async () => {
+  const handlePreview = async () => {
+    const result = validate("rules");
+    if (!result.valid || !result.smartRules) return;
+    const request = ++previewRequest.current;
+    const key = JSON.stringify(result.smartRules);
     setPreviewing(true);
-    setPreview(null);
     try {
-      const result = await api<PreviewResult>(
+      const response = await api<PreviewResult>(
         `/api/admin/system-playlists/${id}/preview`,
         "POST",
         {
-          smart_rules: currentSmartRules,
+          smart_rules: result.smartRules,
         },
       );
-      setPreview(result);
+      if (request !== previewRequest.current) return;
+      setPreview(response);
+      setPreviewKey(key);
     } catch {
-      toast.error("Preview failed");
+      if (request === previewRequest.current)
+        toast.error("Preview failed. Try again.");
     } finally {
-      setPreviewing(false);
+      if (request === previewRequest.current) setPreviewing(false);
     }
-  }, [currentSmartRules, id]);
+  };
 
   const handleGenerateDescription = useCallback(async () => {
     if (!llmAvailable) {
@@ -686,14 +767,21 @@ export function PlaylistEditor() {
           smart_rules: isSmart ? currentSmartRules : null,
         },
       );
-      setDescription(result.description);
+      setField("description", result.description);
       toast.success("AI description generated");
     } catch (error) {
       toast.error(apiErrorDetail(error, "Failed to generate description"));
     } finally {
       setDescribing(false);
     }
-  }, [currentSmartRules, id, isSmart, llmAvailable, llmUnavailableReason]);
+  }, [
+    currentSmartRules,
+    id,
+    isSmart,
+    llmAvailable,
+    llmUnavailableReason,
+    setField,
+  ]);
 
   const handleDuplicate = useCallback(async () => {
     try {
@@ -715,8 +803,9 @@ export function PlaylistEditor() {
       setUploadingCover(true);
       try {
         const reader = new FileReader();
-        const encoded = await new Promise<string>((resolve) => {
+        const encoded = await new Promise<string>((resolve, reject) => {
           reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(reader.error);
           reader.readAsDataURL(file);
         });
         await api(`/api/admin/system-playlists/${id}`, "PUT", {
@@ -737,6 +826,7 @@ export function PlaylistEditor() {
   );
 
   const handleRemoveCover = useCallback(async () => {
+    setRemovingCover(true);
     try {
       await api(`/api/admin/system-playlists/${id}`, "PUT", {
         cover_data_url: null,
@@ -745,6 +835,8 @@ export function PlaylistEditor() {
       void refetch();
     } catch {
       toast.error("Failed to remove cover");
+    } finally {
+      setRemovingCover(false);
     }
   }, [id, refetch]);
 
@@ -759,7 +851,9 @@ export function PlaylistEditor() {
           { tracks: [playlistTrackPayload(track)] },
         );
         setLiveSurface((current) =>
-          current ? { ...current, playlist: result } : current,
+          current?.playlist.id === id && result.id === id
+            ? { ...current, playlist: result }
+            : current,
         );
         setTrackSearchQuery("");
         setTrackSearchResults([]);
@@ -783,62 +877,43 @@ export function PlaylistEditor() {
           "DELETE",
         );
         setLiveSurface((current) =>
-          current ? { ...current, playlist: result } : current,
+          current?.playlist.id === id && result.id === id
+            ? { ...current, playlist: result }
+            : current,
         );
         toast.success("Track removed");
         void refetch();
-      } catch {
+      } catch (error) {
         toast.error("Failed to remove track");
+        throw error;
       }
     },
     [id, refetch],
   );
 
-  const handleTrackDrop = useCallback(
-    async (targetTrackId: number | undefined) => {
-      if (
-        !playlist ||
-        draggedTrackId == null ||
-        targetTrackId == null ||
-        draggedTrackId === targetTrackId
-      ) {
-        setDraggedTrackId(null);
-        return;
-      }
-      const ids = playlist.tracks
-        .map((track) => track.id)
-        .filter((trackId): trackId is number => typeof trackId === "number");
-      const fromIndex = ids.indexOf(draggedTrackId);
-      const toIndex = ids.indexOf(targetTrackId);
-      if (fromIndex < 0 || toIndex < 0) {
-        setDraggedTrackId(null);
-        return;
-      }
-      const nextIds = [...ids];
-      const [moved] = nextIds.splice(fromIndex, 1);
-      if (moved == null) {
-        setDraggedTrackId(null);
-        return;
-      }
-      nextIds.splice(toIndex, 0, moved);
-      setDraggedTrackId(null);
-
+  const handleTrackReorder = useCallback(
+    async (nextIds: number[]) => {
       try {
         const result = await api<Playlist>(
           `/api/admin/system-playlists/${id}/tracks/reorder`,
           "POST",
-          { track_ids: nextIds },
+          {
+            track_ids: nextIds,
+          },
         );
         setLiveSurface((current) =>
-          current ? { ...current, playlist: result } : current,
+          current?.playlist.id === id && result.id === id
+            ? { ...current, playlist: result }
+            : current,
         );
         toast.success("Track order locked");
         void refetch();
-      } catch {
+      } catch (error) {
         toast.error("Failed to reorder tracks");
+        throw error;
       }
     },
-    [draggedTrackId, id, playlist, refetch],
+    [id, refetch],
   );
 
   const handleRefineTracklist = useCallback(async () => {
@@ -876,20 +951,20 @@ export function PlaylistEditor() {
   }, [id, refineProposal, refetch]);
 
   function addRule() {
-    setRules((current) => [
+    setField("rules", (current) => [
       ...current,
       { field: "genre", op: "contains", value: "" },
     ]);
   }
 
   function removeRule(index: number) {
-    setRules((current) =>
+    setField("rules", (current) =>
       current.filter((_, ruleIndex) => ruleIndex !== index),
     );
   }
 
-  function updateRule(index: number, patch: Partial<SmartRule>) {
-    setRules((current) =>
+  function updateRule(index: number, patch: Partial<PlaylistRuleDraft>) {
+    setField("rules", (current) =>
       current.map((rule, ruleIndex) =>
         ruleIndex === index ? { ...rule, ...patch } : rule,
       ),
@@ -901,999 +976,954 @@ export function PlaylistEditor() {
     updateRule(index, { field, op: nextOp, value: "" });
   }
 
-  if (loading) {
+  if (loading && !playlist)
+    return <LoadingState label="Loading playlist editor" />;
+  if (loadError && !playlist)
     return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-      </div>
+      <ErrorState
+        message="Could not load the playlist editor."
+        onRetry={() => void refetch()}
+      />
     );
-  }
-
-  if (!playlist) {
+  if (!playlist)
     return (
-      <div className="py-12 text-center text-muted-foreground">
-        Playlist not found
-      </div>
+      <EmptyState
+        title="Playlist not found"
+        description="This playlist is unavailable or no longer exists."
+        action={
+          <BackLink
+            label="Back to playlists"
+            onClick={() => navigate("/playlists")}
+          />
+        }
+      />
     );
-  }
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-md border border-white/10 bg-panel-surface/95 p-5 shadow-[0_28px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-        <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-          <div className="flex flex-col gap-5 md:flex-row md:items-start">
-            <div className="space-y-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/playlists")}
-                className="w-fit"
-              >
-                <ArrowLeft size={14} className="mr-1" /> Back to playlists
-              </Button>
-
-              <PlaylistArtwork
-                name={playlist.name}
-                coverDataUrl={playlist.cover_data_url}
-                tracks={playlist.artwork_tracks}
-                className="h-28 w-28 rounded-md border border-white/10 bg-white/[0.03]"
-                crateMarkClassName="right-3 top-3 [&_img]:h-4.5 [&_img]:w-4.5"
+    <div className="min-w-0 space-y-6">
+      <BackLink
+        data-admin-ux="editor-back"
+        label="Back to playlists"
+        onClick={() => navigate("/playlists")}
+      />
+      <PageHeaderLayout
+        as="header"
+        aria-labelledby="playlist-editor-title"
+        artwork={
+          <PlaylistArtwork
+            name={playlist.name}
+            coverDataUrl={playlist.cover_data_url}
+            tracks={playlist.artwork_tracks}
+            className="size-28 shrink-0 rounded-md border border-border-quiet object-cover md:size-56"
+            crateMarkClassName="right-3 top-3 [&_img]:h-4.5 [&_img]:w-4.5"
+          />
+        }
+        actions={
+          <PageHeaderActions label="Playlist actions">
+            <PageHeaderAction label="Duplicate" onClick={handleDuplicate}>
+              <Copy
+                data-admin-ux="editor-duplicate-action"
+                aria-hidden="true"
               />
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                <CrateChip active={isSmart} className="text-[11px]">
-                  {isSmart ? "smart" : "static"}
-                </CrateChip>
-                <CrateChip className="text-[11px]">
-                  {isCurated ? "curated" : "internal"}
-                </CrateChip>
-                <CrateChip className="text-[11px]">
-                  {isActive ? "active" : "inactive"}
-                </CrateChip>
-                {isSmart ? (
-                  <CrateChip active={autoRefresh} className="text-[11px]">
-                    auto-refresh
-                  </CrateChip>
-                ) : null}
-                <StatusChip status={playlist.generation_status} />
-              </div>
-
-              <div className="space-y-2">
-                <h1 className="text-3xl font-semibold tracking-tight">
-                  {name || playlist.name}
-                </h1>
-                <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                  {description ||
-                    "No editorial description yet. Add one so the playlist reads like a first-class surface in listen."}
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-1.5">
-                <CrateChip className="text-[11px]">
-                  {playlist.track_count} tracks
-                </CrateChip>
-                <CrateChip className="text-[11px]">
-                  {formatMinutes(playlist.total_duration)}
-                </CrateChip>
-                <CrateChip className="text-[11px]">
-                  {playlist.follower_count} follower
-                  {playlist.follower_count === 1 ? "" : "s"}
-                </CrateChip>
-                {category ? (
-                  <CrateChip className="text-[11px]">{category}</CrateChip>
-                ) : null}
-                {featuredRank != null ? (
-                  <CrateChip className="text-[11px]">
-                    Rank {featuredRank}
-                  </CrateChip>
-                ) : null}
-                {playlist.last_generated_at ? (
-                  <CrateChip className="text-[11px]">
-                    Generated {timeAgo(playlist.last_generated_at)}
-                  </CrateChip>
-                ) : null}
-              </div>
-
-              {playlist.generation_error ? (
-                <div className="rounded-md border border-red-400/20 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-                  {playlist.generation_error}
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleDuplicate}>
-              <Copy size={14} className="mr-1" /> Duplicate
-            </Button>
+            </PageHeaderAction>
             {isSmart ? (
-              <Button
-                variant="outline"
-                size="sm"
+              <PageHeaderAction
+                label="Preview"
                 onClick={handlePreview}
-                disabled={previewing}
+                disabled={previewing || generating || saving}
+                aria-busy={previewing || undefined}
               >
                 {previewing ? (
-                  <Loader2 size={14} className="mr-1 animate-spin" />
+                  <Loader2
+                    data-admin-ux="editor-preview"
+                    aria-hidden="true"
+                    className="animate-spin"
+                  />
                 ) : (
-                  <Play size={14} className="mr-1" />
+                  <Eye
+                    data-admin-ux="editor-preview-action"
+                    aria-hidden="true"
+                  />
                 )}
-                Preview
-              </Button>
+              </PageHeaderAction>
             ) : null}
             {isSmart ? (
-              <Button
-                variant="outline"
-                size="sm"
+              <PageHeaderAction
+                label={smartRulesChanged ? "Save rules + generate" : "Generate"}
                 onClick={handleGenerate}
-                disabled={generating}
+                disabled={generating || saving}
+                aria-busy={generating || undefined}
               >
                 {generating ? (
-                  <Loader2 size={14} className="mr-1 animate-spin" />
+                  <Loader2
+                    data-admin-ux="editor-generate"
+                    aria-hidden="true"
+                    className="animate-spin"
+                  />
                 ) : (
-                  <RefreshCw size={14} className="mr-1" />
+                  <ListRestart
+                    data-admin-ux="editor-generate-action"
+                    aria-hidden="true"
+                  />
                 )}
-                {smartRulesChanged ? "Save + generate" : "Generate"}
-              </Button>
+              </PageHeaderAction>
             ) : null}
-            <Button size="sm" onClick={handleSave} disabled={saving}>
+            <PageHeaderAction
+              label="Save changes"
+              onClick={handleSave}
+              disabled={saving || generating}
+              aria-busy={saving || undefined}
+            >
               {saving ? (
-                <Loader2 size={14} className="mr-1 animate-spin" />
+                <Loader2
+                  data-admin-ux="editor-save"
+                  aria-hidden="true"
+                  className="animate-spin"
+                />
               ) : (
-                <Save size={14} className="mr-1" />
+                <Save data-admin-ux="editor-save-action" aria-hidden="true" />
               )}
-              Save changes
-            </Button>
+            </PageHeaderAction>
+          </PageHeaderActions>
+        }
+      >
+        <div className="flex min-h-28 min-w-0 flex-col justify-between gap-3 md:min-h-56 md:gap-4">
+          <div className="grid min-w-0 gap-3">
+            <div className="flex min-w-0 flex-nowrap gap-2 overflow-x-auto">
+              <InfoBadge active={isSmart}>
+                {isSmart ? "smart" : "static"}
+              </InfoBadge>
+              <InfoBadge>{isCurated ? "curated" : "internal"}</InfoBadge>
+              <InfoBadge>{isActive ? "active" : "inactive"}</InfoBadge>
+              {isSmart ? (
+                <InfoBadge active={autoRefresh}>auto-refresh</InfoBadge>
+              ) : null}
+              {isDirty ? (
+                <InfoBadge tone="warning">Unsaved changes</InfoBadge>
+              ) : null}
+            </div>
+            <div className="grid min-w-0 gap-2">
+              <h1
+                id="playlist-editor-title"
+                className="crate-page-title min-w-0 wrap-anywhere"
+              >
+                {name || playlist.name}
+              </h1>
+              <p className="m-0 line-clamp-2 max-w-3xl font-[family-name:var(--font-brand)] text-sm font-normal leading-6 text-text-muted md:line-clamp-3">
+                {description ||
+                  "No editorial description yet. Add one so the playlist reads like a first-class surface in listen."}
+              </p>
+            </div>
+          </div>
+          <div className="flex min-w-0 flex-nowrap gap-1.5 overflow-x-auto">
+            <InfoBadge>{playlist.track_count} tracks</InfoBadge>
+            <InfoBadge>{formatMinutes(playlist.total_duration)}</InfoBadge>
+            <InfoBadge>
+              {playlist.follower_count} follower
+              {playlist.follower_count === 1 ? "" : "s"}
+            </InfoBadge>
+            {category ? <InfoBadge>{category}</InfoBadge> : null}
+            {featuredRank !== "" ? (
+              <InfoBadge>Rank {featuredRank}</InfoBadge>
+            ) : null}
+            {playlist.last_generated_at ? (
+              <InfoBadge>
+                Generated {timeAgo(playlist.last_generated_at)}
+              </InfoBadge>
+            ) : null}
           </div>
         </div>
-      </section>
+      </PageHeaderLayout>
+      {loadError ? (
+        <OpsRefreshNotice
+          message="Could not refresh the playlist. Your pending edits are preserved."
+          onRetry={() => void refetch()}
+          retrying={loading}
+        />
+      ) : null}
+      {playlist.generation_error ? (
+        <ErrorState
+          message={playlist.generation_error}
+          onRetry={isSmart ? handleGenerate : undefined}
+        />
+      ) : null}
+      {isSmart ? (
+        <GenerationPhaseLine
+          status={playlist.generation_status}
+          lastGeneratedAt={playlist.last_generated_at}
+          streamStatus={streamStatus}
+        />
+      ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-6">
-          <Card className="border-white/10 bg-card">
-            <CardHeader className="space-y-1">
-              <CardTitle className="text-base">Editorial</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Core metadata and visibility settings for how this playlist
-                behaves across the product.
+      <div className="min-w-0 space-y-8">
+        <InstrumentPanel
+          as="section"
+          headingLevel={2}
+          label={{ children: "Editorial data", tone: "accent" }}
+          description="Edit the playlist identity, cover and visibility. Save changes applies these settings together."
+        >
+          <div className="grid min-w-0 gap-6 @3xl:grid-cols-[176px_minmax(0,1fr)]">
+            <div className="min-w-0 space-y-3">
+              <MonoLabel as="p">Cover image</MonoLabel>
+              <div className="relative w-44 max-w-full">
+                <PlaylistArtwork
+                  name={playlist.name}
+                  coverDataUrl={playlist.cover_data_url}
+                  tracks={playlist.artwork_tracks}
+                  className="aspect-square w-full rounded-md"
+                />
+                <div className="absolute bottom-1 right-1">
+                  <ActionGroup label="Cover actions">
+                    <ActionButton
+                      label={
+                        playlist.cover_data_url
+                          ? "Replace cover"
+                          : "Upload cover"
+                      }
+                      loading={uploadingCover}
+                      disabled={removingCover}
+                      onClick={() => coverInputRef.current?.click()}
+                    >
+                      <Camera
+                        data-admin-ux="editor-edit-cover"
+                        aria-hidden="true"
+                      />
+                    </ActionButton>
+                    {playlist.cover_data_url ? (
+                      <ActionButton
+                        label="Remove cover"
+                        tooltip="Remove cover"
+                        loading={removingCover}
+                        disabled={uploadingCover}
+                        onClick={() => void handleRemoveCover()}
+                      >
+                        <Trash2
+                          data-admin-ux="editor-remove-cover"
+                          aria-hidden="true"
+                        />
+                      </ActionButton>
+                    ) : null}
+                  </ActionGroup>
+                </div>
+              </div>
+              <input
+                ref={coverInputRef}
+                type="file"
+                aria-label="Cover image"
+                accept="image/*"
+                onChange={handleCoverUpload}
+                className="hidden"
+              />
+              <p className="text-sm text-text-muted">
+                {playlist.cover_data_url
+                  ? "Manual cover"
+                  : "Automatic album collage"}
+                . Image changes apply immediately.
               </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_220px_160px]">
-                <Field label="Name">
+            </div>
+            <div className="min-w-0 space-y-4">
+              <div className="grid min-w-0 gap-4 @2xl:grid-cols-[minmax(0,1fr)_minmax(140px,220px)_minmax(100px,160px)]">
+                <FormField label="Name" error={fieldError("name")} required>
                   <Input
                     value={name}
-                    onChange={(event) => setName(event.target.value)}
+                    onChange={(event) => setField("name", event.target.value)}
                   />
-                </Field>
-                <Field label="Category">
+                </FormField>
+                <FormField label="Category">
                   <AdminSelect
+                    placeholder="Category"
                     value={category}
-                    onChange={setCategory}
-                    options={CATEGORY_OPTIONS}
-                    placeholder="None"
+                    onChange={(value) => setField("category", value)}
+                    options={[
+                      { value: "", label: "None" },
+                      ...CATEGORY_OPTIONS,
+                    ]}
+                    allowClear={false}
                     triggerClassName="w-full max-w-none"
                   />
-                </Field>
-                <Field label="Featured rank">
+                </FormField>
+                <FormField
+                  label="Featured rank"
+                  error={fieldError("featuredRank")}
+                >
                   <Input
-                    type="number"
-                    value={featuredRank ?? ""}
+                    inputMode="numeric"
+                    value={featuredRank}
                     onChange={(event) =>
-                      setFeaturedRank(
-                        event.target.value ? Number(event.target.value) : null,
-                      )
+                      setField("featuredRank", event.target.value)
                     }
                     placeholder="Optional"
                   />
-                </Field>
+                </FormField>
               </div>
-
-              <Field label="Description">
+              <FormField label="Description">
                 <Textarea
                   value={description}
-                  onChange={(event) => setDescription(event.target.value)}
+                  onChange={(event) =>
+                    setField("description", event.target.value)
+                  }
                   rows={5}
-                  placeholder="Editorial description shown in listen"
+                  placeholder="Editorial description shown in Listen"
                 />
-                <div className="mt-2 flex justify-end">
+              </FormField>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div
+                  className="flex flex-wrap gap-2"
+                  role="group"
+                  aria-label="Playlist visibility"
+                >
+                  <TogglePill
+                    label="Active"
+                    active={isActive}
+                    onClick={() => setField("isActive", (value) => !value)}
+                  />
+                  <TogglePill
+                    label="Curated in Listen"
+                    active={isCurated}
+                    onClick={() => setField("isCurated", (value) => !value)}
+                  />
+                  {isSmart ? (
+                    <TogglePill
+                      label="Auto-refresh daily"
+                      active={autoRefresh}
+                      onClick={() => setField("autoRefresh", (value) => !value)}
+                    />
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  {describing ? (
+                    <InfoBadge active data-ai-description-busy>
+                      Generating
+                    </InfoBadge>
+                  ) : null}
                   <AIButton
                     actionId="playlists.description.generate"
                     type="button"
                     onClick={handleGenerateDescription}
                     loading={describing}
                     disabled={describing || !name.trim() || !llmAvailable}
-                    title={!llmAvailable ? llmUnavailableReason : undefined}
                   >
                     Generate description with AI
                   </AIButton>
                 </div>
-              </Field>
-
-              <div className="flex flex-wrap gap-2 border-t border-white/10 pt-4">
-                <TogglePill
-                  label="Active"
-                  active={isActive}
-                  onClick={() => setIsActive((value) => !value)}
-                />
-                <TogglePill
-                  label="Curated in listen"
-                  active={isCurated}
-                  onClick={() => setIsCurated((value) => !value)}
-                />
-                {isSmart ? (
-                  <TogglePill
-                    label="Auto-refresh daily"
-                    active={autoRefresh}
-                    onClick={() => setAutoRefresh((value) => !value)}
-                  />
-                ) : null}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+        </InstrumentPanel>
 
-          <Card className="border-white/10 bg-card">
-            <CardHeader className="space-y-1">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ImagePlus size={16} /> Cover
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Upload a clean image-only hero asset. Listen renders the
-                playlist title, description and metadata on top.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col gap-5 md:flex-row md:items-start">
-                <PlaylistArtwork
-                  name={playlist.name}
-                  coverDataUrl={playlist.cover_data_url}
-                  tracks={playlist.artwork_tracks}
-                  className="h-28 w-28 shrink-0 rounded-md border border-white/10 bg-white/[0.03]"
-                  crateMarkClassName="right-3 top-3 [&_img]:h-4.5 [&_img]:w-4.5"
-                />
-
-                <div className="min-w-0 flex-1 space-y-3">
-                  <div className="flex flex-wrap gap-2">
-                    <CrateChip className="text-[11px]">
-                      {playlist.cover_data_url
-                        ? "Manual cover active"
-                        : "Using auto-collage"}
-                    </CrateChip>
-                  </div>
-
-                  <p className="text-sm text-muted-foreground">
-                    Keep text out of the image itself; the public playlist page
-                    composes the typography and metadata in the hero layout.
-                  </p>
-
-                  <div className="flex flex-wrap gap-2">
-                    <input
-                      ref={coverInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleCoverUpload}
-                      className="hidden"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => coverInputRef.current?.click()}
-                      disabled={uploadingCover}
-                    >
-                      {uploadingCover ? (
-                        <Loader2 size={14} className="mr-1 animate-spin" />
-                      ) : (
-                        <Upload size={14} className="mr-1" />
-                      )}
-                      {playlist.cover_data_url
-                        ? "Replace cover"
-                        : "Upload cover"}
-                    </Button>
-                    {playlist.cover_data_url ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleRemoveCover}
-                      >
-                        <Trash2 size={14} className="mr-1" /> Remove cover
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {isSmart ? (
-            <Card className="border-white/10 bg-card">
-              <CardHeader className="space-y-1">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Sparkles size={16} /> Smart rules
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Keep the builder dense, but readable: editorial intent first,
-                  then execution details and preview.
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 lg:grid-cols-[180px_120px_180px]">
-                  <Field label="Match">
-                    <AdminSelect
-                      value={match}
-                      onChange={(value) => setMatch(value as "all" | "any")}
-                      options={[
-                        { value: "all", label: "All rules" },
-                        { value: "any", label: "Any rule" },
-                      ]}
-                      allowClear={false}
-                      placeholder="Match"
-                      triggerClassName="w-full max-w-none"
-                    />
-                  </Field>
-
-                  <Field label="Limit">
-                    <Input
-                      type="number"
-                      min={1}
-                      max={500}
-                      value={limit}
-                      onChange={(event) =>
-                        setLimit(Number(event.target.value) || 50)
-                      }
-                    />
-                  </Field>
-
-                  <Field label="Sort">
-                    <AdminSelect
-                      value={sort}
-                      onChange={setSort}
-                      options={SORT_OPTIONS}
-                      allowClear={false}
-                      placeholder="Sort"
-                      triggerClassName="w-full max-w-none"
-                    />
-                  </Field>
-                </div>
-
-                <div className="space-y-3">
-                  {rules.map((rule, index) => {
-                    const dropdownConfig = DROPDOWN_FIELDS[rule.field];
-                    const dropdownOptions =
-                      dropdownConfig && filterOptions
-                        ? filterOptions[dropdownConfig.optionsKey].map(
-                            (value) => ({ value, label: value }),
-                          )
-                        : [];
-                    const ops = getOpsForField(rule.field);
-
-                    return (
-                      <div
-                        key={`${rule.field}-${rule.op}-${String(rule.value)}`}
-                        className="rounded-md border border-white/10 bg-black/10 p-3"
-                      >
-                        <div className="mb-3 flex items-center justify-between gap-3">
-                          <CrateChip className="text-[11px]">
-                            Rule {index + 1}
-                          </CrateChip>
-                          <ActionIconButton
-                            variant="row"
-                            tone="danger"
-                            className="h-8 w-8"
-                            onClick={() => removeRule(index)}
-                          >
-                            <X size={14} />
-                          </ActionIconButton>
-                        </div>
-
-                        <div className="grid gap-3 xl:grid-cols-[180px_160px_minmax(0,1fr)]">
-                          <Field label="Field">
-                            <AdminSelect
-                              value={rule.field}
-                              onChange={(value) =>
-                                updateRuleField(index, value)
-                              }
-                              options={RULE_FIELDS.map((field) => ({
-                                value: field.value,
-                                label: field.label,
-                              }))}
-                              allowClear={false}
-                              placeholder="Field"
-                              triggerClassName="w-full max-w-none"
-                            />
-                          </Field>
-
-                          <Field label="Operator">
-                            <AdminSelect
-                              value={rule.op}
-                              onChange={(value) =>
-                                updateRule(index, { op: value, value: "" })
-                              }
-                              options={ops}
-                              allowClear={false}
-                              placeholder="Operator"
-                              triggerClassName="w-full max-w-none"
-                            />
-                          </Field>
-
-                          <Field label="Value">
-                            {rule.op === "between" ? (
-                              <div className="grid gap-3 sm:grid-cols-2">
-                                <Input
-                                  type="number"
-                                  value={
-                                    Array.isArray(rule.value)
-                                      ? String(rule.value[0] ?? "")
-                                      : ""
-                                  }
-                                  placeholder="Minimum"
-                                  onChange={(event) =>
-                                    updateRule(index, {
-                                      value: [
-                                        numericRuleInput(
-                                          rule.field,
-                                          event.target.value,
-                                        ),
-                                        numericRuleInput(
-                                          rule.field,
-                                          String(
-                                            Array.isArray(rule.value)
-                                              ? (rule.value[1] ?? "")
-                                              : "",
-                                          ),
-                                        ),
-                                      ],
-                                    })
-                                  }
-                                />
-                                <Input
-                                  type="number"
-                                  value={
-                                    Array.isArray(rule.value)
-                                      ? String(rule.value[1] ?? "")
-                                      : ""
-                                  }
-                                  placeholder="Maximum"
-                                  onChange={(event) =>
-                                    updateRule(index, {
-                                      value: [
-                                        numericRuleInput(
-                                          rule.field,
-                                          String(
-                                            Array.isArray(rule.value)
-                                              ? (rule.value[0] ?? "")
-                                              : "",
-                                          ),
-                                        ),
-                                        numericRuleInput(
-                                          rule.field,
-                                          event.target.value,
-                                        ),
-                                      ],
-                                    })
-                                  }
-                                />
-                              </div>
-                            ) : dropdownConfig ? (
-                              <AdminSelect
-                                value={String(rule.value ?? "")}
-                                onChange={(value) =>
-                                  updateRule(index, { value })
-                                }
-                                options={dropdownOptions}
-                                placeholder={dropdownConfig.placeholder}
-                                searchable
-                                searchPlaceholder={
-                                  dropdownConfig.searchPlaceholder
-                                }
-                                allowClear={false}
-                                triggerClassName="w-full max-w-none"
-                              />
-                            ) : (
-                              <Input
-                                value={String(rule.value ?? "")}
-                                placeholder="Value"
-                                onChange={(event) =>
-                                  updateRule(index, {
-                                    value:
-                                      getFieldType(rule.field) === "number"
-                                        ? numericRuleInput(
-                                            rule.field,
-                                            event.target.value,
-                                          )
-                                        : event.target.value,
-                                  })
-                                }
-                              />
-                            )}
-                          </Field>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
-                  <p className="text-sm text-muted-foreground">
-                    Use preview to sanity-check the shape of the result before
-                    saving or generating again.
-                  </p>
-                  <Button variant="outline" size="sm" onClick={addRule}>
-                    <Plus size={14} className="mr-1" /> Add rule
-                  </Button>
-                </div>
-
-                {preview ? (
-                  <div className="rounded-md border border-primary/20 bg-primary/5 p-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <CrateChip active className="text-[11px]">
-                        {preview.total_matching} matching tracks
-                      </CrateChip>
-                      <CrateChip className="text-[11px]">
-                        {formatMinutes(preview.duration_total_sec)}
-                      </CrateChip>
-                      {preview.avg_year ? (
-                        <CrateChip className="text-[11px]">
-                          Avg year {preview.avg_year}
-                        </CrateChip>
-                      ) : null}
-                      {preview.year_range ? (
-                        <CrateChip className="text-[11px]">
-                          {preview.year_range[0]}-{preview.year_range[1]}
-                        </CrateChip>
-                      ) : null}
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-primary/10 pt-4">
-                      <p className="max-w-2xl text-sm text-muted-foreground">
-                        Preview is only a simulation. It does not replace the
-                        playlist tracks until you generate the playlist with
-                        these rules.
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {smartRulesChanged ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleSave}
-                            disabled={saving}
-                          >
-                            {saving ? (
-                              <Loader2
-                                size={14}
-                                className="mr-1 animate-spin"
-                              />
-                            ) : (
-                              <Save size={14} className="mr-1" />
-                            )}
-                            Save rules
-                          </Button>
-                        ) : null}
-                        <Button
-                          size="sm"
-                          onClick={handleGenerate}
-                          disabled={generating}
-                        >
-                          {generating ? (
-                            <Loader2 size={14} className="mr-1 animate-spin" />
-                          ) : (
-                            <RefreshCw size={14} className="mr-1" />
-                          )}
-                          {smartRulesChanged
-                            ? "Apply preview to playlist"
-                            : "Generate playlist"}
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                      <DistributionBlock
-                        label="Top genres"
-                        items={Object.entries(preview.genre_distribution).slice(
-                          0,
-                          10,
-                        )}
-                      />
-                      <DistributionBlock
-                        label="Top artists"
-                        items={Object.entries(
-                          preview.artist_distribution,
-                        ).slice(0, 8)}
-                      />
-                    </div>
-
-                    {preview.tracks.length > 0 ? (
-                      <div className="mt-4 border-t border-primary/10 pt-4">
-                        <div className="mb-2 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                          Matching track sample
-                        </div>
-                        <div className="space-y-1.5">
-                          {preview.tracks.slice(0, 8).map((track, index) => (
-                            <div
-                              key={`${track.artist ?? "artist"}-${
-                                track.album ?? "album"
-                              }-${track.title ?? "track"}`}
-                              className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-white/[0.03]"
-                            >
-                              <span className="w-6 text-right text-xs text-muted-foreground">
-                                {index + 1}
-                              </span>
-                              <div className="min-w-0 flex-1">
-                                <div className="truncate text-sm font-medium">
-                                  {track.title || "Untitled"}
-                                </div>
-                                <div className="truncate text-xs text-muted-foreground">
-                                  {[track.artist, track.album]
-                                    .filter(Boolean)
-                                    .join(" — ")}
-                                </div>
-                              </div>
-                              <div className="flex shrink-0 gap-1.5">
-                                {track.format ? (
-                                  <CrateChip className="text-[10px]">
-                                    {track.format}
-                                  </CrateChip>
-                                ) : null}
-                                {track.year ? (
-                                  <CrateChip className="text-[10px]">
-                                    {track.year}
-                                  </CrateChip>
-                                ) : null}
-                                {track.duration != null ? (
-                                  <CrateChip className="text-[10px]">
-                                    {formatTrackDuration(track.duration)}
-                                  </CrateChip>
-                                ) : null}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-              </CardContent>
-            </Card>
-          ) : null}
-
-          <Card className="border-white/10 bg-card">
-            <CardHeader className="space-y-3">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <ListMusic size={16} /> Tracks
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Curate the generated snapshot. Manual adds and dragged rows
-                    are locked against future auto-refreshes.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  onClick={handleRefineTracklist}
-                  disabled={refining || (playlist.tracks?.length ?? 0) === 0}
-                >
-                  {refining
-                    ? "Preparing refinements..."
-                    : "Suggest refinements"}
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-md border border-primary/15 bg-primary/[0.04] p-3">
-                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px]">
-                  <div className="relative">
-                    <Search
-                      size={14}
-                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
-                    />
-                    <Input
-                      value={trackSearchQuery}
-                      onChange={(event) =>
-                        setTrackSearchQuery(event.target.value)
-                      }
-                      placeholder={
-                        isSmart
-                          ? "Search tracks matching this playlist..."
-                          : "Search library tracks..."
-                      }
-                      className="border-white/10 bg-black/25 pl-9"
-                    />
-                  </div>
+        {isSmart ? (
+          <InstrumentPanel
+            as="section"
+            headingLevel={2}
+            label={{ children: "Smart rules", tone: "accent" }}
+            description="Choose which tracks match, how many to include and how to order them. Preview the selection before generating."
+          >
+            <div className="space-y-5">
+              <div className="grid min-w-0 gap-4 @2xl:grid-cols-[minmax(140px,180px)_minmax(100px,120px)_minmax(140px,180px)]">
+                <FormField label="Match" error={fieldError("match")}>
                   <AdminSelect
-                    value={trackSearchScope}
+                    placeholder="Match"
+                    value={match}
                     onChange={(value) =>
-                      setTrackSearchScope(value as "rules" | "library")
+                      setField("match", value as "all" | "any")
                     }
                     options={[
-                      {
-                        value: "rules",
-                        label: "Matching rules",
-                      },
-                      { value: "library", label: "Entire library" },
+                      { value: "all", label: "All rules" },
+                      { value: "any", label: "Any rule" },
                     ]}
                     allowClear={false}
-                    disabled={!isSmart}
-                    placeholder="Search scope"
                     triggerClassName="w-full max-w-none"
                   />
-                </div>
-
-                {trackSearching ? (
-                  <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 size={13} className="animate-spin" /> Searching
-                    candidates...
-                  </div>
-                ) : trackSearchResults.length > 0 ? (
-                  <div className="mt-3 space-y-1.5 border-t border-primary/10 pt-3">
-                    {trackSearchResults.map((track) => {
-                      const trackId = track.track_id ?? track.id ?? 0;
-                      return (
-                        <div
-                          key={`${trackId}-${track.title}`}
-                          className="flex items-center gap-3 rounded-md border border-white/8 bg-black/20 px-3 py-2"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-medium">
-                              {track.title || "Untitled"}
-                            </div>
-                            <div className="truncate text-xs text-muted-foreground">
-                              {[track.artist, track.album]
-                                .filter(Boolean)
-                                .join(" — ")}
-                            </div>
-                          </div>
-                          {track.duration != null ? (
-                            <span className="text-xs tabular-nums text-muted-foreground">
-                              {formatTrackDuration(track.duration)}
-                            </span>
-                          ) : null}
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={addingTrackId === trackId}
-                            onClick={() => void handleAddCandidateTrack(track)}
+                </FormField>
+                <FormField
+                  label="Limit"
+                  hint="1–500 tracks"
+                  error={fieldError("limit")}
+                >
+                  <Input
+                    inputMode="numeric"
+                    value={limit}
+                    onChange={(event) => setField("limit", event.target.value)}
+                  />
+                </FormField>
+                <FormField label="Sort" error={fieldError("sort")}>
+                  <AdminSelect
+                    placeholder="Sort"
+                    value={sort}
+                    onChange={(value) => setField("sort", value)}
+                    options={SORT_OPTIONS}
+                    allowClear={false}
+                    triggerClassName="w-full max-w-none"
+                  />
+                </FormField>
+              </div>
+              <PlaylistTrackRequirements
+                value={requireFullMixProfile}
+                onChange={(value) => setField("requireFullMixProfile", value)}
+                disabled={saving || generating}
+              />
+              <div className="space-y-5">
+                {rules.map((rule, index) => {
+                  const dropdownConfig = DROPDOWN_FIELDS[rule.field];
+                  const dropdownOptions =
+                    dropdownConfig && filterOptions
+                      ? filterOptions[dropdownConfig.optionsKey].map(
+                          (value) => ({ value, label: value }),
+                        )
+                      : [];
+                  const numeric = getFieldType(rule.field) === "number";
+                  return (
+                    <fieldset
+                      key={index}
+                      className="min-w-0 space-y-3 border-0 border-b border-border-quiet p-0 pb-5"
+                    >
+                      <legend className="mb-3">
+                        <MonoLabel as="span">Rule {index + 1}</MonoLabel>
+                      </legend>
+                      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+                        <RuleExpression rule={rule} index={index} />
+                        <ActionGroup label={`Rule ${index + 1} actions`}>
+                          <ActionButton
+                            label={`Remove rule ${index + 1}`}
+                            tooltip="Remove rule"
+                            onClick={() => removeRule(index)}
                           >
-                            {addingTrackId === trackId ? (
-                              <Loader2
-                                size={13}
-                                className="mr-1.5 animate-spin"
-                              />
-                            ) : (
-                              <Plus size={13} className="mr-1.5" />
-                            )}
-                            Add locked
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : deferredTrackSearchQuery.trim().length >= 2 ? (
-                  <div className="mt-3 rounded-md border border-dashed border-white/10 bg-black/15 px-3 py-4 text-center text-xs text-muted-foreground">
-                    No candidate tracks found in this scope.
+                            <Trash2
+                              data-admin-ux="editor-remove-rule"
+                              aria-hidden="true"
+                            />
+                          </ActionButton>
+                        </ActionGroup>
+                      </div>
+                      <div className="grid min-w-0 gap-3 @2xl:grid-cols-[180px_160px_minmax(0,1fr)]">
+                        <FormField
+                          label="Field"
+                          error={fieldError(`rules.${index}.field`)}
+                        >
+                          <AdminSelect
+                            value={rule.field}
+                            onChange={(value) => updateRuleField(index, value)}
+                            options={RULE_FIELDS.map((field) => ({
+                              value: field.value,
+                              label: field.label,
+                            }))}
+                            allowClear={false}
+                            placeholder="Field"
+                            triggerClassName="w-full max-w-none"
+                          />
+                        </FormField>
+                        <FormField
+                          label="Operator"
+                          error={fieldError(`rules.${index}.op`)}
+                        >
+                          <AdminSelect
+                            value={rule.op}
+                            onChange={(value) =>
+                              updateRule(index, {
+                                op: value,
+                                value:
+                                  value === "between" || value === "in"
+                                    ? [""]
+                                    : "",
+                              })
+                            }
+                            options={getOpsForField(rule.field)}
+                            allowClear={false}
+                            placeholder="Operator"
+                            triggerClassName="w-full max-w-none"
+                          />
+                        </FormField>
+                        {rule.op === "between" ? (
+                          <div className="grid min-w-0 grid-cols-2 gap-3">
+                            {["Minimum", "Maximum"].map((label, valueIndex) => (
+                              <FormField
+                                key={label}
+                                label={label}
+                                error={
+                                  fieldError(
+                                    `rules.${index}.value.${valueIndex}`,
+                                  ) ||
+                                  (valueIndex === 0
+                                    ? fieldError(`rules.${index}.value`)
+                                    : undefined)
+                                }
+                              >
+                                <Input
+                                  inputMode={
+                                    rule.field === "year"
+                                      ? "numeric"
+                                      : "decimal"
+                                  }
+                                  value={
+                                    Array.isArray(rule.value)
+                                      ? (rule.value[valueIndex] ?? "")
+                                      : ""
+                                  }
+                                  onChange={(event) =>
+                                    updateRule(index, {
+                                      value: [0, 1].map((position) =>
+                                        position === valueIndex
+                                          ? event.target.value
+                                          : Array.isArray(rule.value)
+                                            ? (rule.value[position] ?? "")
+                                            : "",
+                                      ),
+                                    })
+                                  }
+                                />
+                              </FormField>
+                            ))}
+                          </div>
+                        ) : rule.op === "in" ? (
+                          <FormField
+                            label="Values"
+                            hint="Separate values with commas."
+                            error={
+                              fieldError(`rules.${index}.value`) ||
+                              (validatedScope && !validation.valid
+                                ? Object.entries(validation.errors).find(
+                                    ([key]) =>
+                                      key.startsWith(`rules.${index}.value.`),
+                                  )?.[1]
+                                : undefined)
+                            }
+                          >
+                            <Input
+                              value={
+                                Array.isArray(rule.value)
+                                  ? rule.value.join(",")
+                                  : rule.value
+                              }
+                              onChange={(event) =>
+                                updateRule(index, {
+                                  value: event.target.value.split(","),
+                                })
+                              }
+                            />
+                          </FormField>
+                        ) : dropdownConfig ? (
+                          <FormField
+                            label="Value"
+                            error={fieldError(`rules.${index}.value`)}
+                          >
+                            <AdminSelect
+                              value={String(rule.value ?? "")}
+                              onChange={(value) => updateRule(index, { value })}
+                              options={dropdownOptions}
+                              placeholder={dropdownConfig.placeholder}
+                              searchable
+                              searchPlaceholder={
+                                dropdownConfig.searchPlaceholder
+                              }
+                              allowClear={false}
+                              triggerClassName="w-full max-w-none"
+                            />
+                          </FormField>
+                        ) : (
+                          <FormField
+                            label="Value"
+                            error={fieldError(`rules.${index}.value`)}
+                          >
+                            <Input
+                              inputMode={
+                                numeric
+                                  ? rule.field === "year"
+                                    ? "numeric"
+                                    : "decimal"
+                                  : "text"
+                              }
+                              value={String(rule.value ?? "")}
+                              placeholder="Value"
+                              onChange={(event) =>
+                                updateRule(index, { value: event.target.value })
+                              }
+                            />
+                          </FormField>
+                        )}
+                      </div>
+                    </fieldset>
+                  );
+                })}
+              </div>
+              {fieldError("rules") ? (
+                <p role="alert" className="text-sm text-state-warning-text">
+                  {fieldError("rules")}
+                </p>
+              ) : null}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-text-muted">
+                  Up to 12 rules. Generation saves the current rules; editorial
+                  changes use Save changes.
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={addRule}
+                  disabled={rules.length >= 12}
+                >
+                  Add rule
+                </Button>
+              </div>
+            </div>
+          </InstrumentPanel>
+        ) : null}
+
+        {isSmart && (preview || previewing) ? (
+          <InstrumentPanel
+            as="section"
+            headingLevel={2}
+            label={{ children: "Preview", tone: "accent" }}
+            status={
+              previewing
+                ? "Calculating"
+                : previewStale
+                  ? "Out of date"
+                  : "Current rules"
+            }
+            actions={
+              <Button
+                variant="outline"
+                onClick={handlePreview}
+                disabled={previewing || saving || generating}
+                loading={previewing}
+              >
+                {previewStale ? "Update preview" : "Recalculate preview"}
+              </Button>
+            }
+          >
+            {previewing ? (
+              <LoadingState label="Calculating playlist preview" />
+            ) : preview ? (
+              <div className="space-y-5">
+                {previewStale ? (
+                  <p role="status" className="text-sm text-state-warning-text">
+                    The rules changed after this preview. Update it before using
+                    these results.
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap items-center gap-4">
+                  <StatNumber
+                    value={preview.total_matching.toLocaleString()}
+                    label="Matching tracks"
+                    size="lg"
+                  />
+                  <InfoBadge>
+                    {formatMinutes(preview.duration_total_sec)}
+                  </InfoBadge>
+                  {preview.avg_year ? (
+                    <InfoBadge>Avg year {preview.avg_year}</InfoBadge>
+                  ) : null}
+                  {preview.year_range ? (
+                    <InfoBadge>
+                      {preview.year_range[0]}–{preview.year_range[1]}
+                    </InfoBadge>
+                  ) : null}
+                </div>
+                <div className="grid min-w-0 gap-5 @2xl:grid-cols-2">
+                  <DistributionBlock
+                    label="Top genres"
+                    items={Object.entries(preview.genre_distribution).slice(
+                      0,
+                      8,
+                    )}
+                  />
+                  <DistributionBlock
+                    label="Top artists"
+                    items={Object.entries(preview.artist_distribution).slice(
+                      0,
+                      8,
+                    )}
+                  />
+                </div>
+                {preview.tracks.length ? (
+                  <div className="space-y-3">
+                    <MonoLabel as="h3">Matching track sample</MonoLabel>
+                    <HairlineList label="Preview track sample">
+                      {preview.tracks.slice(0, 8).map((track, index) => (
+                        <HairlineRow
+                          key={`${track.artist}-${track.album}-${track.title}-${index}`}
+                          index={index + 1}
+                          truncate={false}
+                          trailing={
+                            <MonoLabel
+                              as="span"
+                              meta={[
+                                track.format,
+                                track.year != null ? String(track.year) : null,
+                                formatTrackDuration(track.duration),
+                              ]}
+                            />
+                          }
+                        >
+                          <div className="text-sm text-text-primary">
+                            {track.title || "Untitled"}
+                          </div>
+                          <p className="text-sm text-text-muted">
+                            {[track.artist, track.album]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </p>
+                        </HairlineRow>
+                      ))}
+                    </HairlineList>
                   </div>
                 ) : null}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="max-w-2xl text-sm text-text-muted">
+                    Preview is a simulation. Generation reruns the current rules
+                    and may select different tracks with random sorting.
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={handleGenerate}
+                    disabled={generating || saving || previewStale}
+                    loading={generating}
+                  >
+                    Generate current rules
+                  </Button>
+                </div>
               </div>
+            ) : null}
+          </InstrumentPanel>
+        ) : null}
 
-              {refineProposal ? (
-                <div className="rounded-md border border-primary/25 bg-primary/[0.06] p-4 shadow-[0_0_40px_rgba(34,211,238,0.08)]">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
-                        Editorial refinement proposal
+        <InstrumentPanel
+          as="section"
+          headingLevel={2}
+          label={{ children: "Tracks", tone: "accent" }}
+          description={
+            isSmart
+              ? "Manual additions and reordered tracks are locked against future auto-refreshes."
+              : "Add tracks from your library and arrange their order."
+          }
+          actions={
+            <Button
+              variant="outline"
+              onClick={handleRefineTracklist}
+              disabled={refining || (playlist.tracks?.length ?? 0) === 0}
+              loading={refining}
+            >
+              {refining ? "Preparing refinements" : "Suggest refinements"}
+            </Button>
+          }
+        >
+          <div className="space-y-5">
+            <div className="grid min-w-0 items-start gap-4 @2xl:grid-cols-[minmax(0,1fr)_220px]">
+              <FormField label="Search tracks">
+                <SearchInput
+                  label="Search tracks"
+                  value={trackSearchQuery}
+                  onValueChange={setTrackSearchQuery}
+                  placeholder={
+                    isSmart && trackSearchScope === "rules"
+                      ? "Search tracks matching this playlist…"
+                      : "Search library tracks…"
+                  }
+                />
+              </FormField>
+              <FormField
+                label="Search scope"
+                hint={
+                  isSmart && trackSearchScope === "rules"
+                    ? "Uses saved rules. Preview evaluates pending rule changes."
+                    : undefined
+                }
+              >
+                <AdminSelect
+                  placeholder="Search scope"
+                  value={trackSearchScope}
+                  onChange={(value) =>
+                    setTrackSearchScope(value as "rules" | "library")
+                  }
+                  options={[
+                    { value: "rules", label: "Matching rules" },
+                    { value: "library", label: "Entire library" },
+                  ]}
+                  allowClear={false}
+                  disabled={!isSmart}
+                  triggerClassName="w-full max-w-none"
+                />
+              </FormField>
+            </div>
+            {trackSearching ? (
+              <LoadingState label="Searching candidate tracks" />
+            ) : trackSearchError ? (
+              <ErrorState
+                message={trackSearchError}
+                onRetry={() => setSearchRetry((value) => value + 1)}
+              />
+            ) : trackSearchResults.length ? (
+              <HairlineList label="Candidate tracks">
+                {trackSearchResults.map((track, index) => {
+                  const trackId = track.track_id ?? track.id ?? 0;
+                  return (
+                    <HairlineRow
+                      key={`${trackId}-${index}`}
+                      truncate={false}
+                      trailing={
+                        <Button
+                          variant="outline"
+                          disabled={addingTrackId !== null}
+                          loading={addingTrackId === trackId}
+                          aria-label={`Add ${track.title || "Untitled"} and lock`}
+                          onClick={() => void handleAddCandidateTrack(track)}
+                        >
+                          Add locked
+                        </Button>
+                      }
+                    >
+                      <div className="text-sm text-text-primary">
+                        {track.title || "Untitled"}
                       </div>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {refineProposal.summary}
+                      <p className="text-sm text-text-muted">
+                        {[track.artist, track.album]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </p>
-                    </div>
-                    {refineProposal.actions.length > 0 ? (
-                      <Button
-                        size="sm"
-                        onClick={handleApplyRefinement}
-                        disabled={applyingRefinement}
-                      >
-                        {applyingRefinement ? (
-                          <Loader2 size={14} className="mr-1 animate-spin" />
-                        ) : (
-                          <Sparkles size={14} className="mr-1" />
-                        )}
-                        Apply safe fixes
-                      </Button>
-                    ) : null}
+                      {track.duration != null ? (
+                        <MonoLabel as="span">
+                          {formatTrackDuration(track.duration)}
+                        </MonoLabel>
+                      ) : null}
+                    </HairlineRow>
+                  );
+                })}
+              </HairlineList>
+            ) : deferredTrackSearchQuery.trim().length >= 2 ? (
+              <EmptyState message="No candidate tracks found in this scope." />
+            ) : null}
+
+            {refineProposal ? (
+              <InstrumentPanel
+                as="section"
+                headingLevel={3}
+                label={{
+                  children: "Editorial refinement proposal",
+                  tone: "accent",
+                }}
+                description={refineProposal.summary}
+                actions={
+                  <>
                     <Button
-                      type="button"
-                      size="sm"
                       variant="ghost"
                       onClick={() => setRefineProposal(null)}
                     >
                       Dismiss
                     </Button>
-                  </div>
-
-                  {refineProposal.issues.length > 0 ? (
-                    <div className="mt-4 grid gap-2">
+                    {refineProposal.actions.length ? (
+                      <Button
+                        variant="outline"
+                        onClick={handleApplyRefinement}
+                        disabled={applyingRefinement}
+                        loading={applyingRefinement}
+                      >
+                        Apply safe fixes
+                      </Button>
+                    ) : null}
+                  </>
+                }
+              >
+                <div className="space-y-4">
+                  {refineProposal.issues.length ? (
+                    <HairlineList label="Refinement issues">
                       {refineProposal.issues.slice(0, 8).map((issue) => (
-                        <div
+                        <HairlineRow
                           key={`${issue.type}-${issue.positions.join("-")}`}
-                          className="rounded-md border border-white/10 bg-black/20 px-3 py-2"
+                          truncate={false}
                         >
-                          <div className="flex flex-wrap items-center gap-2">
-                            <CrateChip active className="text-[10px]">
-                              {issue.severity}
-                            </CrateChip>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <SeverityMeter
+                              level={issue.severity}
+                              label={issue.severity}
+                            />
                             <span className="text-sm">{issue.message}</span>
                           </div>
-                        </div>
+                        </HairlineRow>
                       ))}
-                    </div>
+                    </HairlineList>
                   ) : null}
-
-                  {refineProposal.actions.length > 0 ? (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {refineProposal.actions.slice(0, 10).map((action) => (
-                        <CrateChip key={action.id} className="text-[10px]">
-                          {action.label}
-                        </CrateChip>
-                      ))}
-                    </div>
-                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    {refineProposal.actions.slice(0, 10).map((action) => (
+                      <InfoBadge key={action.id}>{action.label}</InfoBadge>
+                    ))}
+                  </div>
                 </div>
-              ) : null}
+              </InstrumentPanel>
+            ) : null}
 
-              {playlist.tracks?.length > 0 ? (
-                <div className="space-y-1.5">
-                  {playlist.tracks.map((track, index) => {
-                    const rowId = track.id;
-                    return (
-                      <div
-                        key={
-                          rowId ??
-                          `${track.artist}-${track.album}-${track.title}`
-                        }
-                        draggable={typeof rowId === "number"}
-                        onDragStart={() => {
-                          if (typeof rowId === "number") {
-                            setDraggedTrackId(rowId);
-                          }
-                        }}
-                        onDragOver={(event) => event.preventDefault()}
-                        onDrop={() => void handleTrackDrop(rowId)}
-                        onDragEnd={() => setDraggedTrackId(null)}
-                        className={
-                          "group flex items-center gap-3 rounded-md border border-transparent px-2 py-2 transition-colors hover:border-white/10 hover:bg-white/[0.03] " +
-                          (draggedTrackId === rowId
-                            ? "bg-primary/10"
-                            : "bg-transparent")
-                        }
-                      >
-                        <GripVertical
-                          size={14}
-                          className="shrink-0 cursor-grab text-white/25 group-hover:text-white/55"
-                        />
-                        <span className="w-6 text-right text-xs text-muted-foreground">
-                          {index + 1}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-medium">
-                            {track.title}
-                          </div>
-                          <div className="truncate text-xs text-muted-foreground">
-                            {track.artist} — {track.album}
-                          </div>
-                        </div>
-                        <div className="hidden shrink-0 gap-1.5 xl:flex">
-                          <CrateChip
-                            active={Boolean(track.locked)}
-                            className="text-[10px]"
-                          >
-                            {trackSourceLabel(track)}
-                          </CrateChip>
-                          {track.format ? (
-                            <CrateChip className="text-[10px]">
-                              {track.format}
-                            </CrateChip>
-                          ) : null}
-                        </div>
-                        {track.duration != null ? (
-                          <span className="w-12 text-right text-xs tabular-nums text-muted-foreground">
-                            {formatTrackDuration(track.duration)}
-                          </span>
-                        ) : null}
-                        <ActionIconButton
-                          variant="row"
-                          tone="danger"
-                          className="h-8 w-8 opacity-70 hover:opacity-100"
-                          onClick={() =>
-                            void handleRemoveTrack(track, index + 1)
-                          }
-                        >
-                          <Trash2 size={14} />
-                        </ActionIconButton>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="rounded-md border border-dashed border-white/10 bg-black/10 px-4 py-8 text-center text-sm text-muted-foreground">
-                  {isSmart
-                    ? "No generated tracks yet. Run a generation once the rule set is ready."
-                    : "No tracks in this playlist yet."}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-4">
-          <Card className="border-white/10 bg-card">
-            <CardHeader className="space-y-1">
-              <CardTitle className="text-sm uppercase tracking-[0.12em] text-muted-foreground">
-                Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-              <MetricTile label="Tracks" value={playlist.track_count} />
-              <MetricTile
-                label="Duration"
-                value={formatMinutes(playlist.total_duration || 0)}
-              />
-              <MetricTile label="Followers" value={playlist.follower_count} />
-              <MetricTile
-                label="Last generated"
-                value={
-                  playlist.last_generated_at
-                    ? timeAgo(playlist.last_generated_at)
-                    : "Never"
+            {playlist.tracks?.length ? (
+              <PlaylistEditorTrackList
+                tracks={playlist.tracks}
+                onRemove={handleRemoveTrack}
+                onReorder={handleTrackReorder}
+                busy={
+                  generating || applyingRefinement || addingTrackId !== null
                 }
               />
-            </CardContent>
-          </Card>
+            ) : (
+              <EmptyState
+                title="No tracks yet"
+                description={
+                  isSmart
+                    ? "Generate the playlist when its rules are ready."
+                    : "Search your library to add tracks."
+                }
+              />
+            )}
+          </div>
+        </InstrumentPanel>
 
-          {history && history.length > 0 ? (
-            <Card className="border-white/10 bg-card">
-              <CardHeader className="space-y-1">
-                <CardTitle className="text-sm uppercase tracking-[0.12em] text-muted-foreground">
-                  Generation history
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {history.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="rounded-md border border-white/10 bg-black/10 px-3 py-2"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <StatusChip status={entry.status} />
-                        <span className="text-sm">
-                          {timeAgo(entry.started_at)}
-                        </span>
-                      </div>
-                      {entry.track_count != null ? (
-                        <span className="text-xs tabular-nums text-muted-foreground">
-                          {entry.track_count} tracks
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {entry.triggered_by}
-                      {entry.duration_sec != null
-                        ? ` · ${Math.round(entry.duration_sec)}s`
-                        : ""}
-                    </div>
-                    {entry.error ? (
-                      <div className="mt-2 text-xs text-red-200">
-                        {entry.error}
-                      </div>
-                    ) : null}
+        {history.length ? (
+          <InstrumentPanel
+            as="section"
+            headingLevel={2}
+            label={{ children: "Generation history", tone: "accent" }}
+          >
+            <HairlineList label="Generation history">
+              {history.map((entry) => (
+                <HairlineRow
+                  key={entry.id}
+                  truncate={false}
+                  trailing={
+                    entry.track_count != null ? (
+                      <MonoLabel as="span">
+                        {entry.track_count} tracks
+                      </MonoLabel>
+                    ) : undefined
+                  }
+                >
+                  <div className="flex flex-wrap items-center gap-3">
+                    <InfoBadge
+                      tone={
+                        entry.status === "failed"
+                          ? "warning"
+                          : entry.status === "completed"
+                            ? "accent"
+                            : "neutral"
+                      }
+                    >
+                      {entry.status}
+                    </InfoBadge>
+                    <RelativeTime value={entry.started_at} />
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-          ) : null}
-        </div>
+                  <MonoLabel
+                    as="p"
+                    meta={[
+                      entry.triggered_by,
+                      entry.duration_sec != null
+                        ? `${Math.round(entry.duration_sec)}s`
+                        : null,
+                    ]}
+                  />
+                  {entry.error ? (
+                    <p className="text-sm text-state-warning-text">
+                      {entry.error}
+                    </p>
+                  ) : null}
+                </HairlineRow>
+              ))}
+            </HairlineList>
+          </InstrumentPanel>
+        ) : null}
       </div>
     </div>
   );

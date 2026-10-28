@@ -1,10 +1,10 @@
+import { usePlayerClock } from "@/contexts/PlayerClock";
 import { useState } from "react";
 
-import { usePlayer, usePlayerActions } from "@/contexts/PlayerContext";
+import { usePlayerState, usePlayerActions } from "@/contexts/PlayerContext";
 import { getTrackCacheKey } from "@/contexts/player-utils";
 import { useLikedTracks } from "@/contexts/LikedTracksContext";
 import { useAudioVisualizer } from "@/hooks/use-audio-visualizer";
-import { useEqualizerEnabled } from "@/hooks/use-equalizer-enabled";
 import {
   useCrossfadeAwareProgress,
   useCrossfadeProgress,
@@ -30,14 +30,14 @@ const SHOW_PLAYER_BAR_ANALYZER = true;
 
 export function usePlayerBarController() {
   const {
-    currentTime,
-    duration,
     isPlaying,
     isBuffering,
     volume,
     analyserVersion,
     crossfadeTransition,
-  } = usePlayer();
+  } = usePlayerState();
+  const clock = usePlayerClock();
+  const { currentTime, duration } = clock.current;
   const {
     currentTrack,
     jamQueueLocked,
@@ -60,10 +60,10 @@ export function usePlayerBarController() {
     cycleRepeat,
   } = usePlayerActions();
   const isDesktop = useIsDesktop();
-  const equalizerEnabled = useEqualizerEnabled();
   const equalizerRuntimeAvailable =
     canUseWebAudioEffects || shouldUseAndroidNativePlayer();
-  const allowEqualizer = equalizerEnabled && equalizerRuntimeAvailable;
+  // Power controls audio bypass; access depends only on runtime capability.
+  const allowEqualizer = equalizerRuntimeAvailable;
   const showPlayerBarAnalyzer =
     SHOW_PLAYER_BAR_ANALYZER && isDesktop && equalizerRuntimeAvailable;
 
@@ -106,11 +106,13 @@ export function usePlayerBarController() {
     },
   });
 
-  const { frequenciesDb, sampleRate } = useAudioVisualizer(
+  const { frequenciesDb, sampleRate, readFrame } = useAudioVisualizer(
     showPlayerBarAnalyzer && isPlaying && !isRemoteConnectActive,
     `${
       currentTrack ? getTrackCacheKey(currentTrack) : "none"
     }:${analyserVersion}`,
+    undefined,
+    true,
   );
 
   const [seekHover, setSeekHover] = useState<{
@@ -119,7 +121,7 @@ export function usePlayerBarController() {
   } | null>(null);
   const [playbackDeliveryPolicy, setPlaybackDeliveryPolicy] =
     useState<PlaybackDeliveryPreference>(getPlaybackDeliveryPolicyPreference);
-  const { isLiked, likeTrack, unlikeTrack } = useLikedTracks();
+  const { isLiked, likeTrack, unlikeTrack, hasLoaded } = useLikedTracks();
   usePlayerBarPlaybackPreferenceEffect({
     eventName: PLAYER_PLAYBACK_PREFS_EVENT,
     getPreference: getPlaybackDeliveryPolicyPreference,
@@ -136,6 +138,7 @@ export function usePlayerBarController() {
     displayQueue,
     displayCurrentIndex,
     displayPlaySource,
+    sourceTrackQuality,
     qualityBadge,
     showsDeliveryQuality,
     shapedRadioSessionId,
@@ -166,6 +169,7 @@ export function usePlayerBarController() {
     playbackTargetContext,
     progressPct,
   } = usePlayerBarComputedState({
+    progressClock: clock,
     activeConnectDeviceId,
     activeConnectSession,
     connect,
@@ -232,6 +236,7 @@ export function usePlayerBarController() {
   return {
     isDesktop,
     liked,
+    likeStateAvailable: hasLoaded !== false,
     isShapedRadioTrack,
     effectiveIsPlaying,
     effectiveIsBuffering,
@@ -264,7 +269,9 @@ export function usePlayerBarController() {
     duration,
     onPrepareFullscreen: prepareFullscreenPlayer,
     onOpenFullscreen: openFullscreenPlayer,
-    onToggleLike: () => void toggleLike(),
+    onToggleLike: () => {
+      if (hasLoaded !== false) void toggleLike();
+    },
     onNextTrack: handleNextTrack,
     onOverlayChange: surface.setHasFloatingOverlayOpen,
     handleTouchStart,
@@ -273,6 +280,7 @@ export function usePlayerBarController() {
     repeat,
     frequenciesDb,
     sampleRate,
+    readAudioFrame: readFrame,
     progressPct,
     seekHover,
     onSeekHoverChange: setSeekHover,
@@ -281,6 +289,7 @@ export function usePlayerBarController() {
     onPlayPause: handlePlayPause,
     onCycleRepeat: handleCycleRepeat,
     onSeek: handleSeek,
+    sourceTrackQuality,
     qualityBadge,
     showsDeliveryQuality,
     effectiveVolume,

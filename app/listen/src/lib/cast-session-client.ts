@@ -59,16 +59,10 @@ interface CastSessionCreateRequest {
 const DEFAULT_APPEARANCE: CastAppearance = {
   contractVersion: 1,
   skinId: "default",
-  preferredMode: "system",
+  preferredMode: "dark",
   resolvedMode: "dark",
   reducedMotion: false,
 };
-
-function receiverSkinId(skinId: string): string {
-  return skinId === "crateRed" || skinId === "crate-red"
-    ? "crate-red"
-    : "default";
-}
 
 function hashPath(value: string): string {
   let hash = 0x811c9dc5;
@@ -184,9 +178,9 @@ export function buildCastSessionRequest(
     receiver_capabilities: DEFAULT_RECEIVER_CAPABILITIES,
     appearance: {
       contract_version: 1,
-      skin_id: receiverSkinId(appearance.skinId),
-      preferred_mode: appearance.preferredMode,
-      resolved_mode: appearance.resolvedMode,
+      skin_id: "default",
+      preferred_mode: "dark",
+      resolved_mode: "dark",
       reduced_motion: appearance.reducedMotion,
     },
     current_index: currentIndex,

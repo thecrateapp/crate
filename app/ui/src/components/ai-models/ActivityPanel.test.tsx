@@ -21,6 +21,15 @@ const { apiMock, useApiMock, barProps } = vi.hoisted(() => ({
 vi.mock("@/lib/api", () => ({ api: apiMock }));
 vi.mock("@/hooks/use-api", () => ({ useApi: useApiMock }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("@crate/ui/lib/read-css-color", () => ({
+  readCssColorToken: (_element: HTMLElement, token: string) =>
+    ({
+      "--accent-action-hi": "rgb(1, 2, 3)",
+      "--state-danger": "rgb(4, 5, 6)",
+      "--text-muted": "rgb(7, 8, 9)",
+      "--border-quiet": "rgb(10, 11, 12)",
+    })[token],
+}));
 vi.mock("@nivo/bar", () => ({
   ResponsiveBar: (props: Record<string, unknown>) => {
     barProps.push(props);
@@ -141,6 +150,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  delete document.documentElement.dataset.crateMotion;
   vi.useRealTimers();
 });
 
@@ -167,8 +177,9 @@ describe("ActivityPanel", () => {
     expect(row).toHaveTextContent("Succeeded");
     const time = row.querySelector("time");
     expect(time).not.toBeNull();
-    expect(time).toHaveAttribute("title");
-    expect(time?.getAttribute("title")).not.toBe("");
+    expect(time).not.toHaveAttribute("title");
+    expect(time).toHaveAttribute("dateTime", refine.created_at);
+    expect(time).toHaveAttribute("tabIndex", "0");
     expect(time).toHaveTextContent("5 minutes ago");
 
     const list = screen.getByRole("list", { name: "Recent calls" });
@@ -295,9 +306,9 @@ describe("ActivityPanel", () => {
       3,
     );
 
-    await user.click(screen.getByRole("button", { name: "Feature" }));
+    await user.click(screen.getByRole("combobox", { name: "Feature" }));
     await user.click(
-      await screen.findByRole("button", { name: "Propose genre EQ" }),
+      await screen.findByRole("option", { name: "Propose genre EQ" }),
     );
 
     await waitFor(() =>
@@ -312,7 +323,8 @@ describe("ActivityPanel", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("charts daily calls with Nivo", () => {
+  it("charts daily calls with Nivo, resolved tokens and reduced motion", () => {
+    document.documentElement.dataset.crateMotion = "reduced";
     renderPanel();
 
     expect(
@@ -333,6 +345,7 @@ describe("ActivityPanel", () => {
     expect(props.keys).toEqual(["Completed", "Failed"]);
     expect(props.indexBy).toBe("day");
     expect(props.groupMode).toBe("stacked");
+    expect(props.animate).toBe(false);
     expect(last(data)).toEqual({
       day: "2026-10-20",
       Completed: 3,
@@ -341,8 +354,8 @@ describe("ActivityPanel", () => {
     });
 
     const colors = props.colors as (bar: { id: string }) => string;
-    expect(colors({ id: "Completed" })).toBe("#06b6d4");
-    expect(colors({ id: "Failed" })).toBe("#f87171");
+    expect(colors({ id: "Completed" })).toBe("rgb(1, 2, 3)");
+    expect(colors({ id: "Failed" })).toBe("rgb(4, 5, 6)");
 
     const axis = props.axisBottom as {
       tickValues: string[];
@@ -361,7 +374,14 @@ describe("ActivityPanel", () => {
       data: (typeof data)[number];
     }>;
     render(createElement(Tooltip, { data: last(data)! }));
-    expect(screen.getByText("Oct 20: 4 calls · 1,200 tokens")).toBeVisible();
+    const tooltip = screen.getByText("Oct 20: 4 calls · 1,200 tokens");
+    expect(tooltip).toBeVisible();
+    expect(tooltip).toHaveClass("bg-surface-popover", "border-border-quiet");
+    expect(tooltip.className).not.toMatch(/backdrop|bg-panel-surface\//);
+    expect(props.theme).toMatchObject({
+      text: { fill: "rgb(7, 8, 9)", fontSize: 12 },
+      grid: { line: { stroke: "rgb(10, 11, 12)" } },
+    });
   });
 
   it("explains missing usage history", () => {

@@ -47,8 +47,14 @@ def get_all_genres() -> list[dict]:
                 LEFT JOIN album_counts alc ON alc.genre_id = g.id
                 LEFT JOIN genre_taxonomy_aliases gta ON gta.alias_slug = g.slug
                 LEFT JOIN genre_taxonomy_nodes tn ON tn.id = gta.genre_id
-                WHERE COALESCE(ac.artist_count, 0) > 0
-                   OR COALESCE(alc.album_count, 0) > 0
+                LEFT JOIN genre_taxonomy_raw_tag_classifications classification
+                  ON classification.genre_id = g.id
+                WHERE (
+                    COALESCE(ac.artist_count, 0) > 0
+                    OR COALESCE(alc.album_count, 0) > 0
+                )
+                AND COALESCE(classification.classification, 'genre')
+                    NOT IN ('facet', 'ignore')
                 ORDER BY COALESCE(ac.artist_count, 0) DESC
                 """
                 )
@@ -76,7 +82,11 @@ def get_unmapped_genres(limit: int = 24) -> list[dict]:
                 LEFT JOIN artist_genres ag ON g.id = ag.genre_id
                 LEFT JOIN album_genres alg ON g.id = alg.genre_id
                 LEFT JOIN genre_taxonomy_aliases gta ON gta.alias_slug = g.slug
+                LEFT JOIN genre_taxonomy_raw_tag_classifications classification
+                  ON classification.genre_id = g.id
                 WHERE gta.alias_slug IS NULL
+                  AND COALESCE(classification.classification, 'genre')
+                      NOT IN ('facet', 'ignore')
                   AND NOT EXISTS (
                       SELECT 1
                       FROM genre_taxonomy_aliases gta_name
@@ -142,7 +152,11 @@ def list_unmapped_genres_for_inference(
                     FROM genres g
                     LEFT JOIN artist_genres ag ON g.id = ag.genre_id
                     LEFT JOIN album_genres alg ON g.id = alg.genre_id
+                    LEFT JOIN genre_taxonomy_raw_tag_classifications classification
+                      ON classification.genre_id = g.id
                     WHERE g.slug = :focus_slug
+                      AND COALESCE(classification.classification, 'genre')
+                          NOT IN ('facet', 'ignore')
                     GROUP BY g.id, g.entity_uid, g.name, g.slug
                     """
                     ),
@@ -171,7 +185,11 @@ def list_unmapped_genres_for_inference(
                     LEFT JOIN artist_genres ag ON g.id = ag.genre_id
                     LEFT JOIN album_genres alg ON g.id = alg.genre_id
                     LEFT JOIN genre_taxonomy_aliases gta ON gta.alias_slug = g.slug
+                    LEFT JOIN genre_taxonomy_raw_tag_classifications classification
+                      ON classification.genre_id = g.id
                     WHERE gta.alias_slug IS NULL
+                      AND COALESCE(classification.classification, 'genre')
+                          NOT IN ('facet', 'ignore')
                       AND NOT EXISTS (
                           SELECT 1
                           FROM genre_taxonomy_aliases gta_name
@@ -202,7 +220,11 @@ def get_unmapped_genre_count() -> int:
                 SELECT COUNT(*)::INTEGER AS cnt
                 FROM genres g
                 LEFT JOIN genre_taxonomy_aliases gta ON gta.alias_slug = g.slug
+                LEFT JOIN genre_taxonomy_raw_tag_classifications classification
+                  ON classification.genre_id = g.id
                 WHERE gta.alias_slug IS NULL
+                  AND COALESCE(classification.classification, 'genre')
+                      NOT IN ('facet', 'ignore')
                   AND NOT EXISTS (
                       SELECT 1
                       FROM genre_taxonomy_aliases gta_name

@@ -69,6 +69,8 @@ class TestImportQueueReadModels:
             count_import_queue_items,
             list_import_queue_items,
             mark_import_queue_item_imported,
+            mark_import_queue_item_importing,
+            mark_import_queue_item_pending,
             refresh_import_queue_items,
             remove_import_queue_item,
         )
@@ -105,6 +107,55 @@ class TestImportQueueReadModels:
         assert current["album"] == f"Album {suffix}"
         assert current["track_count"] == 12
         assert current["formats"] == ["flac"]
+
+        claimed = mark_import_queue_item_importing(
+            source_path,
+            source="tidal",
+            task_id=f"import-{suffix}",
+        )
+        assert claimed is True
+        importing = next(
+            item
+            for item in list_import_queue_items(status="importing")
+            if item["source_path"] == source_path
+        )
+        assert importing["task_id"] == f"import-{suffix}"
+
+        # A filesystem rescan must not erase the live worker state.
+        refresh_import_queue_items(
+            [
+                {
+                    "source": "tidal",
+                    "source_path": source_path,
+                    "artist": f"Artist {suffix}",
+                    "album": f"Album {suffix}",
+                    "track_count": 12,
+                    "formats": ["flac"],
+                    "total_size_mb": 512,
+                    "dest_path": dest_path,
+                    "dest_exists": False,
+                    "status": "pending",
+                }
+            ],
+            scanned_sources=["tidal"],
+        )
+        assert any(
+            item["source_path"] == source_path
+            for item in list_import_queue_items(status="importing")
+        )
+
+        returned_to_pending = mark_import_queue_item_pending(
+            source_path,
+            source="tidal",
+            error="temporary filesystem error",
+        )
+        assert returned_to_pending is True
+        failed = next(
+            item
+            for item in list_import_queue_items(status="pending")
+            if item["source_path"] == source_path
+        )
+        assert failed["last_error"] == "temporary filesystem error"
 
         changed = mark_import_queue_item_imported(
             source_path,
@@ -201,3 +252,56 @@ class TestImportQueueReadModels:
             item["source_path"] != source_path
             for item in list_import_queue_items(status="pending")
         )
+
+    def test_release_orphaned_import_claims_keeps_live_tasks(self):
+        from crate.db.import_queue_mutations import release_orphaned_import_claims
+        from crate.db.import_queue_read_models import (
+            list_import_queue_items,
+            mark_import_queue_item_importing,
+            refresh_import_queue_items,
+        )
+        from crate.db.tx import transaction_scope
+
+        self._ensure_tables()
+        suffix = uuid.uuid4().hex[:8]
+        live = f"/music/.imports/tidal/Live-{suffix}/Album"
+        orphan = f"/music/.imports/tidal/Orphan-{suffix}/Album"
+        refresh_import_queue_items(
+            [
+                {
+                    "source": "tidal",
+                    "source_path": path,
+                    "artist": "Artist",
+                    "album": "Album",
+                    "status": "pending",
+                }
+                for path in (live, orphan)
+            ],
+            scanned_sources=["tidal"],
+        )
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    "INSERT INTO tasks (id, type, status, created_at, updated_at) "
+                    "VALUES (:id, 'import_queue_item', 'running', NOW(), NOW())"
+                ),
+                {"id": f"live-{suffix}"},
+            )
+        assert mark_import_queue_item_importing(
+            live, source="tidal", task_id=f"live-{suffix}"
+        )
+        assert mark_import_queue_item_importing(
+            orphan, source="tidal", task_id=f"gone-{suffix}"
+        )
+
+        assert release_orphaned_import_claims() >= 1
+
+        pending = {
+            item["source_path"] for item in list_import_queue_items(status="pending")
+        }
+        importing = {
+            item["source_path"] for item in list_import_queue_items(status="importing")
+        }
+        assert orphan in pending
+        assert live in importing
+        assert live not in pending

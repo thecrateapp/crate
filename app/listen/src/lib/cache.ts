@@ -53,6 +53,11 @@ function scopedCacheKey(url: string, context = cacheContext()): string {
   return `${context}\u0000${url}`;
 }
 
+/** Key for per-account, per-server in-memory stores outside this module. */
+export function cacheScopedKey(url: string): string {
+  return scopedCacheKey(url);
+}
+
 function storageCacheKey(url: string, context = cacheContext()): string {
   return `${STORAGE_KEY}:${context}:${url}`;
 }
@@ -213,6 +218,13 @@ export function scopesForUrl(url: string): string[] {
   // Jam rooms
   else if (url.startsWith("/api/jam")) scopes.push("jam");
 
+  if (
+    /^\/api\/(?:catalog\/artists|artists|artists\/by-entity|artist-slugs)\/[^/]+\/page(?:\?|$)/.test(
+      url,
+    )
+  ) {
+    scopes.push("shows");
+  }
   return scopes;
 }
 

@@ -1,18 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Badge } from "@crate/ui/shadcn/badge";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Button } from "@crate/ui/shadcn/button";
-import {
-  ImagePlus,
-  Images,
-  Loader2,
-  Search,
-  Sparkles,
-  Trash2,
-} from "lucide-react";
+import { Bot, ImagePlus, Loader2, Search, Trash2 } from "@crate/ui/icons";
+import { ActionButton, ActionGroup } from "@crate/ui/primitives/ActionGroup";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { toast } from "sonner";
 
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { useActionLLMStatus } from "@/hooks/use-llm";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { waitForTask } from "@/lib/tasks";
 
 type ArtworkSlot = "avatar" | "background" | "hero_desktop" | "hero_mobile";
@@ -204,9 +199,9 @@ export function ArtistArtworkGallery({
       toast.error(
         error instanceof Error ? error.message : "Artwork deletion failed",
       );
+      throw error;
     } finally {
       setBusy(null);
-      setAssetToDelete(null);
     }
   }
 
@@ -292,13 +287,13 @@ export function ArtistArtworkGallery({
   }
 
   return (
-    <section className="rounded-md border border-border bg-card/55 p-4 md:p-6">
+    <section className="space-y-4 border-t border-border-quiet pt-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+          <MonoLabel as="p" tone="accent">
             Curated source library
-          </p>
-          <h3 className="mt-1 text-xl font-semibold text-foreground">
+          </MonoLabel>
+          <h3 className="mt-1 text-xl font-semibold text-foreground font-display">
             Artist image gallery
           </h3>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
@@ -307,7 +302,7 @@ export function ArtistArtworkGallery({
           </p>
         </div>
         {canEdit ? (
-          <div className="flex flex-wrap gap-2">
+          <ActionGroup label="Gallery actions">
             <input
               ref={uploadRef}
               type="file"
@@ -319,41 +314,35 @@ export function ArtistArtworkGallery({
                 if (file) void upload(file);
               }}
             />
-            <Button
-              variant="outline"
+            <ActionButton
+              label="Add image"
               disabled={uploading}
+              loading={uploading}
               onClick={() => uploadRef.current?.click()}
             >
-              {uploading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <ImagePlus className="mr-2 h-4 w-4" />
-              )}
-              Add image
-            </Button>
-            <Button
-              variant="outline"
+              <ImagePlus data-admin-ux="artwork-upload" aria-hidden="true" />
+            </ActionButton>
+            <ActionButton
+              label="Find image candidates"
               disabled={discovering}
+              loading={discovering}
               onClick={() => void discoverCandidates()}
             >
-              {discovering ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Search className="mr-2 h-4 w-4" />
-              )}
-              Find image candidates
-            </Button>
-          </div>
+              <Search data-admin-ux="artwork-search" aria-hidden="true" />
+            </ActionButton>
+          </ActionGroup>
         ) : null}
       </div>
 
       {loading ? (
         <div className="mt-5 flex min-h-40 items-center justify-center text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin" />
+          <Loader2
+            data-admin-ux="artwork-loading"
+            className="h-5 w-5 animate-spin"
+          />
         </div>
       ) : assets.length === 0 ? (
-        <div className="mt-5 flex min-h-40 flex-col items-center justify-center rounded-md border border-dashed border-border bg-background/25 text-center">
-          <Images className="h-7 w-7 text-muted-foreground" />
+        <div className="mt-5 flex min-h-40 flex-col items-center justify-center rounded-md border border-dashed border-border bg-surface-object text-center">
           <p className="mt-3 text-sm font-medium text-foreground">
             No curated images yet
           </p>
@@ -366,30 +355,29 @@ export function ArtistArtworkGallery({
           {assets.map((asset) => (
             <article
               key={asset.id}
-              className="overflow-hidden rounded-md border border-border bg-background/35"
+              className="overflow-hidden rounded-md border border-border-quiet bg-surface-object"
             >
-              <div className="relative aspect-[4/3] overflow-hidden bg-black/40">
+              <div className="relative aspect-[4/3] overflow-hidden bg-surface-object">
                 <img
                   src={asset.preview_url}
                   alt={asset.label}
                   className="h-full w-full object-cover"
                 />
                 {canEdit && asset.slots.length === 0 ? (
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="destructive"
-                    aria-label={`Delete ${asset.label}`}
-                    className="absolute right-2 top-2 z-10 h-9 w-9 shadow-lg"
-                    disabled={busy !== null}
-                    onClick={() => setAssetToDelete(asset)}
-                  >
-                    {busy === `delete:${asset.id}` ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </Button>
+                  <div className="absolute right-2 top-2 z-10 rounded-md bg-surface-canvas">
+                    <ActionButton
+                      label={`Delete ${asset.label}`}
+                      tooltip="Delete"
+                      disabled={busy !== null}
+                      loading={busy === `delete:${asset.id}`}
+                      onClick={() => setAssetToDelete(asset)}
+                    >
+                      <Trash2
+                        data-admin-ux="artwork-delete"
+                        aria-hidden="true"
+                      />
+                    </ActionButton>
+                  </div>
                 ) : null}
               </div>
               <div className="space-y-3 p-3">
@@ -409,9 +397,7 @@ export function ArtistArtworkGallery({
                 {asset.slots.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
                     {asset.slots.map((slot) => (
-                      <Badge key={slot} variant="secondary">
-                        {slotLabel(slot)}
-                      </Badge>
+                      <InfoBadge key={slot}>{slotLabel(slot)}</InfoBadge>
                     ))}
                   </div>
                 ) : null}
@@ -429,7 +415,10 @@ export function ArtistArtworkGallery({
                         onClick={() => void assign(asset, slot.value)}
                       >
                         {busy === `assign:${asset.id}:${slot.value}` ? (
-                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                          <Loader2
+                            data-admin-ux="artwork-upload-loading"
+                            className="mr-1.5 h-3.5 w-3.5 animate-spin"
+                          />
                         ) : null}
                         Use: {slot.label}
                       </Button>
@@ -445,7 +434,7 @@ export function ArtistArtworkGallery({
       {candidates.length > 0 ? (
         <div className="mt-7 border-t border-border pt-5">
           <div>
-            <h4 className="text-sm font-semibold text-foreground">
+            <h4 className="text-sm font-semibold text-foreground font-display">
               Available candidates
             </h4>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -459,9 +448,9 @@ export function ArtistArtworkGallery({
               return (
                 <article
                   key={candidate.id}
-                  className="overflow-hidden rounded-md border border-border bg-background/35"
+                  className="overflow-hidden rounded-md border border-border-quiet bg-surface-object"
                 >
-                  <div className="aspect-[4/3] overflow-hidden bg-black/40">
+                  <div className="aspect-[4/3] overflow-hidden bg-surface-object">
                     <img
                       src={candidate.preview_url}
                       alt={`${candidate.label} candidate`}
@@ -479,12 +468,8 @@ export function ArtistArtworkGallery({
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      <Badge variant="outline">
-                        Desktop {candidate.desktop.score}
-                      </Badge>
-                      <Badge variant="outline">
-                        Mobile {candidate.mobile.score}
-                      </Badge>
+                      <InfoBadge>Desktop {candidate.desktop.score}</InfoBadge>
+                      <InfoBadge>Mobile {candidate.mobile.score}</InfoBadge>
                     </div>
                     {analysis ? (
                       <div className="rounded-md border border-primary/20 bg-primary/5 p-2.5">
@@ -498,25 +483,22 @@ export function ArtistArtworkGallery({
                       </div>
                     ) : null}
                     <div className="grid grid-cols-2 gap-1.5">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        aria-label={`Analyze ${candidate.label}`}
-                        title={
+                      <ActionButton
+                        label={`Analyze ${candidate.label}`}
+                        tooltip={
                           heroAI?.available
                             ? `Analyze with ${heroAI.model_id}`
                             : "Image analysis action unavailable"
                         }
                         disabled={busy !== null || !heroAI?.available}
+                        loading={busy === `analyze:${candidate.id}`}
                         onClick={() => void analyze(candidate)}
                       >
-                        {busy === `analyze:${candidate.id}` ? (
-                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                        )}
-                        Analyze fit
-                      </Button>
+                        <Bot
+                          data-admin-ux="artwork-ai-generate"
+                          aria-hidden="true"
+                        />
+                      </ActionButton>
                       <Button
                         size="sm"
                         aria-label={`Add ${candidate.label} to gallery`}
@@ -524,7 +506,10 @@ export function ArtistArtworkGallery({
                         onClick={() => void importCandidate(candidate)}
                       >
                         {busy === `import:${candidate.id}` ? (
-                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                          <Loader2
+                            data-admin-ux="artwork-ai-loading"
+                            className="mr-1.5 h-3.5 w-3.5 animate-spin"
+                          />
                         ) : null}
                         Add to gallery
                       </Button>
@@ -545,10 +530,15 @@ export function ArtistArtworkGallery({
         title={`Delete ${assetToDelete?.label ?? "image"}?`}
         description="This removes the image from the artist gallery. Assigned artwork slots are protected."
         confirmLabel="Delete image"
-        variant="destructive"
-        onConfirm={() => {
-          if (assetToDelete) void deleteAsset(assetToDelete);
+        tone="danger"
+        onConfirm={async () => {
+          if (assetToDelete) await deleteAsset(assetToDelete);
         }}
+        onError={() => {}}
+        eyebrow="Confirm action"
+        consequence={`${
+          assetToDelete?.label ?? "Image"
+        } · removes the image from the artist gallery`}
       />
     </section>
   );

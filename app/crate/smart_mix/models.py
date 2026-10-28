@@ -291,6 +291,9 @@ class TrackMixProfile:
         return payload
 
 
+TRANSITION_CURVES = frozenset({"equal-power", "dj-blend"})
+
+
 @dataclass(frozen=True, slots=True)
 class TransitionContext:
     source: str
@@ -301,6 +304,7 @@ class TransitionContext:
     allow_beatmatch: bool
     allow_tempo_adjustment: bool
     allow_bass_handoff: bool = False
+    allow_long_beatmatch: bool = False
 
     def __post_init__(self) -> None:
         if self.source not in {
@@ -315,7 +319,7 @@ class TransitionContext:
         _require_non_negative_ms("preferred_duration_ms", self.preferred_duration_ms)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "source": self.source,
             "automatic": self.automatic,
             "offline": self.offline,
@@ -325,6 +329,9 @@ class TransitionContext:
             "allowTempoAdjustment": self.allow_tempo_adjustment,
             "allowBassHandoff": self.allow_bass_handoff,
         }
+        if self.allow_long_beatmatch:
+            payload["allowLongBeatmatch"] = True
+        return payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -370,7 +377,7 @@ class TransitionPlan:
             self, "handoff_progress", _clamp_confidence(self.handoff_progress)
         )
         object.__setattr__(self, "confidence", _clamp_confidence(self.confidence))
-        if self.curve != "equal-power":
+        if self.curve not in TRANSITION_CURVES:
             raise ValueError(f"Unsupported transition curve: {self.curve!r}")
         if self.bass_handoff not in {"none", "balanced"}:
             raise ValueError(f"Unsupported bass handoff: {self.bass_handoff!r}")

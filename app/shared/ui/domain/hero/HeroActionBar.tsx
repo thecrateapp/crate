@@ -1,7 +1,9 @@
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { CRATE_ICON_SIZE, Loader2, MoreHorizontal } from "@crate/ui/icons";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { cn } from "@crate/ui/lib/cn";
 
 import { ItemActionMenu } from "../actions/ItemActionMenu";
@@ -15,24 +17,24 @@ import type {
 } from "../actions/types";
 
 export const HERO_PRIMARY_ACTIONS_GROUP_CLASS =
-  "grid grid-cols-2 gap-3 md:flex md:shrink-0 md:items-center md:gap-3";
+  "grid min-w-0 max-w-full grid-cols-2 gap-3 md:flex md:flex-wrap md:items-center md:gap-3";
 
 export const HERO_PRIMARY_ACTION_CLASS =
-  "flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-accent-action px-5 text-sm font-semibold text-accent-action-foreground shadow-action-solid outline-none transition-[background-color,box-shadow] hover:bg-accent-action/90 hover:shadow-action-solid-hover focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-45 md:px-7 md:text-body";
+  "flex min-h-12 min-w-0 max-w-full shrink-0 items-center justify-center gap-2 rounded-full border border-accent-action bg-transparent px-5 text-sm whitespace-normal py-2 font-semibold text-accent-action transition-[color,border-color] hover:border-accent-action-hi hover:text-accent-action-hi disabled:cursor-not-allowed disabled:opacity-45 md:px-7 md:text-body";
 
 export const HERO_NEUTRAL_ACTION_CLASS =
-  "flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-text-primary/[0.08] px-5 text-sm font-semibold text-text-primary shadow-control-inset outline-none transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-text-primary/[0.12] hover:text-accent-action hover:drop-shadow-accent-action focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-45 md:w-auto md:px-7";
+  "flex min-h-12 min-w-0 max-w-full shrink-0 items-center justify-center gap-2 rounded-full bg-text-primary/[0.08] px-5 text-sm whitespace-normal py-2 font-semibold text-text-primary shadow-control-inset transition-[background-color,color,filter,transform] hover:-translate-y-px hover:bg-text-primary/[0.12] hover:text-accent-action hover:drop-shadow-accent-action disabled:cursor-not-allowed disabled:opacity-45 md:w-auto md:px-7";
 
 export const HERO_SECONDARY_ACTION_CLASS =
-  "flex min-h-14 min-w-14 shrink-0 touch-manipulation flex-col items-center justify-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-text-primary/62 outline-none transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action-hover focus-visible:shadow-focus disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
+  "flex min-h-14 min-w-11 max-w-full shrink-0 touch-manipulation flex-col items-center justify-center gap-1 rounded-md px-0 py-1 md:min-w-14 md:px-1.5 text-xs font-medium text-text-primary/62 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action-hover disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:translate-y-0 disabled:hover:drop-shadow-none";
 
 export const HERO_SECONDARY_ACTION_ACTIVE_CLASS =
   "text-accent-action drop-shadow-accent-action";
 
 const SECONDARY_GROUP_CLASS: Record<HeroSecondaryLayout, string> = {
   fixed:
-    "empty:hidden grid grid-cols-5 items-start gap-2 md:ml-auto md:flex md:shrink-0 md:items-center md:gap-4",
-  fill: "empty:hidden grid grid-flow-col auto-cols-fr items-start gap-2 md:ml-auto md:flex md:shrink-0 md:items-center md:gap-4",
+    "empty:hidden min-w-0 max-w-full grid grid-cols-[repeat(5,auto)] justify-between items-start gap-2 md:ml-auto md:flex md:flex-wrap md:items-center md:gap-4",
+  fill: "empty:hidden min-w-0 max-w-full grid grid-flow-col auto-cols-fr items-start gap-2 md:ml-auto md:flex md:flex-wrap md:items-center md:gap-4",
 };
 
 export type HeroPrimaryTone = "accent" | "neutral";
@@ -121,41 +123,45 @@ function HeroActionMenuControl({
         right: "max(1rem, var(--listen-safe-right, 0px))",
       }}
     >
+      <TooltipHint content={moreLabel}>
+        <button
+          ref={controller.triggerRef}
+          type="button"
+          aria-label={moreLabel}
+          aria-haspopup="menu"
+          aria-expanded={controller.open}
+          data-testid="hero-mobile-menu-trigger"
+          onClick={controller.openFromTrigger}
+          onContextMenu={controller.handleContextMenu}
+          className="flex size-11 touch-manipulation items-center justify-center rounded-full text-text-primary/72 transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action-hover"
+        >
+          <MoreHorizontal
+            size={CRATE_ICON_SIZE.navMobile}
+            className="rotate-90"
+            aria-hidden="true"
+          />
+        </button>
+      </TooltipHint>
+    </div>
+  ) : (
+    <TooltipHint content={moreLabel}>
       <button
         ref={controller.triggerRef}
         type="button"
         aria-label={moreLabel}
-        title={moreLabel}
         aria-haspopup="menu"
         aria-expanded={controller.open}
-        data-testid="hero-mobile-menu-trigger"
+        data-testid="hero-menu-trigger"
         onClick={controller.openFromTrigger}
         onContextMenu={controller.handleContextMenu}
-        className="flex size-11 touch-manipulation items-center justify-center rounded-full text-text-primary/72 outline-none transition-[color,filter,transform] hover:-translate-y-px hover:text-accent-action hover:drop-shadow-accent-action-hover focus-visible:shadow-focus"
+        className={HERO_SECONDARY_ACTION_CLASS}
       >
-        <MoreHorizontal
-          size={CRATE_ICON_SIZE.navMobile}
-          className="rotate-90"
-          aria-hidden="true"
-        />
+        <MoreHorizontal size={CRATE_ICON_SIZE.lg} aria-hidden="true" />
+        <MonoLabel as="span" className="text-inherit">
+          {moreLabel}
+        </MonoLabel>
       </button>
-    </div>
-  ) : (
-    <button
-      ref={controller.triggerRef}
-      type="button"
-      aria-label={moreLabel}
-      title={moreLabel}
-      aria-haspopup="menu"
-      aria-expanded={controller.open}
-      data-testid="hero-menu-trigger"
-      onClick={controller.openFromTrigger}
-      onContextMenu={controller.handleContextMenu}
-      className={HERO_SECONDARY_ACTION_CLASS}
-    >
-      <MoreHorizontal size={CRATE_ICON_SIZE.lg} aria-hidden="true" />
-      <span className="max-w-full truncate">{moreLabel}</span>
-    </button>
+    </TooltipHint>
   );
 
   return (
@@ -195,12 +201,21 @@ export function HeroActionBar({
     secondaryActions.length > 0 ||
     Boolean(secondaryLeading) ||
     Boolean(secondaryExtra) ||
-    Boolean(menu);
+    Boolean(
+      menu?.actions.some(
+        (entry) =>
+          entry.type == null ||
+          entry.type === "action" ||
+          entry.type === "disclosure",
+      ),
+    );
+
+  if (!hasPrimary && !hasSecondary) return null;
 
   return (
     <div
       className={cn(
-        "mx-auto flex w-full max-w-content flex-col gap-5 md:flex-row md:items-center md:justify-between md:gap-6",
+        "mx-auto flex min-w-0 w-full max-w-content font-[family-name:var(--font-brand)] flex-col gap-5 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-6",
         className,
       )}
       data-testid="hero-action-bar"
@@ -235,7 +250,9 @@ export function HeroActionBar({
               ) : (
                 action.icon
               )}
-              <span>{action.label}</span>
+              <span className="min-w-0 whitespace-normal wrap-anywhere">
+                {action.label}
+              </span>
             </button>
           ))}
           {primaryExtra}
@@ -249,25 +266,28 @@ export function HeroActionBar({
         >
           {secondaryLeading}
           {secondaryActions.map((action) => (
-            <button
-              key={action.key}
-              type="button"
-              onClick={action.onClick}
-              disabled={action.disabled}
-              aria-label={action.ariaLabel}
-              aria-pressed={
-                action.active === undefined ? undefined : action.active
-              }
-              title={action.title}
-              className={cn(
-                HERO_SECONDARY_ACTION_CLASS,
-                action.active && HERO_SECONDARY_ACTION_ACTIVE_CLASS,
-                action.className,
-              )}
-            >
-              {action.icon}
-              <span className="max-w-full truncate">{action.label}</span>
-            </button>
+            <TooltipHint content={action.title} key={action.key}>
+              <button
+                key={action.key}
+                type="button"
+                onClick={action.onClick}
+                disabled={action.disabled}
+                aria-label={action.ariaLabel}
+                aria-pressed={
+                  action.active === undefined ? undefined : action.active
+                }
+                className={cn(
+                  HERO_SECONDARY_ACTION_CLASS,
+                  action.active && HERO_SECONDARY_ACTION_ACTIVE_CLASS,
+                  action.className,
+                )}
+              >
+                {action.icon}
+                <MonoLabel as="span" className="text-inherit">
+                  {action.label}
+                </MonoLabel>
+              </button>
+            </TooltipHint>
           ))}
           {secondaryExtra}
           {menu ? (

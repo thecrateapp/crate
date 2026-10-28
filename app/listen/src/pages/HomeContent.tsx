@@ -16,10 +16,6 @@ import {
 import type { StatsDashboard } from "@/components/stats/stats-model";
 import { useApi } from "@/hooks/use-api";
 import {
-  getHomeDateString,
-  getHomeGreeting,
-} from "@/components/home/HomeSections";
-import {
   HomeShowPrepSection,
   HomeUpcomingSection,
 } from "@/components/home/HomeUpcomingSections";
@@ -40,17 +36,6 @@ interface HomeSectionProps {
 
 function HomeHero({ page }: HomeSectionProps) {
   const { heroes, currentDiscovery } = page.view;
-  const homeIntro = (
-    <div>
-      <h1 className="text-3xl font-bold text-text-primary">
-        {getHomeGreeting(page.t)}
-      </h1>
-      <p className="mt-1 text-sm text-text-muted">
-        {getHomeDateString(page.i18nLanguage)}
-      </p>
-    </div>
-  );
-
   return (
     <HomeTasteHero
       heroes={heroes}
@@ -59,7 +44,6 @@ function HomeHero({ page }: HomeSectionProps) {
       onOpenArtist={page.openArtist}
       onPlay={(artist) => void page.playHeroArtist(artist)}
       onToggleFollow={(artist) => void page.toggleHeroFollow(artist)}
-      desktopIntro={page.isDesktop ? homeIntro : undefined}
     />
   );
 }

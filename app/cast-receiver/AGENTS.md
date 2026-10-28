@@ -32,7 +32,8 @@ npm run --workspace=app/cast-receiver build && npm run --workspace=app/cast-rece
 - App bundle must stay under 150 KiB gzip excluding CAF (`check:bundle`, also run in the
   Dockerfile and CI).
 - No `@crate/ui`, Tailwind or Listen components here; only TV-safe tokens. Appearance
-  follows the sender's skin/mode from a known token subset, never arbitrary CSS.
+  uses the fixed TV-safe Crate V3 identity and the sender's reduced-motion preference.
+  Legacy skin/mode wire values remain accepted for peer compatibility but do not repaint the UI.
 - The receiver never receives user bearer/refresh tokens; it plays ticketed URLs only.
   Tickets and URLs must be redacted from logs, metrics and Sentry breadcrumbs.
 - The receiver never starts playback on its own after reconnect or restore.

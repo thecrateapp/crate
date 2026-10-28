@@ -1,3 +1,5 @@
+import type { TrackMediaMetadata } from "@/lib/track-media-metadata";
+import type { MoodPreset } from "./explore-browse-types";
 import { api } from "@/lib/api";
 import type { Track } from "@/contexts/PlayerContext";
 import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
@@ -28,7 +30,7 @@ export interface SearchAlbum {
   has_cover: boolean;
 }
 
-export interface SearchTrack {
+export interface SearchTrack extends TrackMediaMetadata {
   id: number;
   entity_uid?: string;
   slug?: string;
@@ -83,10 +85,7 @@ export interface SystemPlaylist {
   is_smart: boolean;
 }
 
-export interface MoodPreset {
-  name: string;
-  track_count: number;
-}
+export type { MoodPreset } from "./explore-browse-types";
 
 export interface ExplorePageData {
   filters: BrowseFilters;
@@ -95,7 +94,7 @@ export interface ExplorePageData {
   recent_global_artists?: GlobalArtist[];
 }
 
-interface PlaylistDetailTrack {
+interface PlaylistDetailTrack extends TrackMediaMetadata {
   id?: number;
   track_id?: number;
   track_entity_uid?: string;

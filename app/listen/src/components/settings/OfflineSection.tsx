@@ -1,148 +1,167 @@
+import { ArtworkSurface } from "@/components/artwork/ArtworkSurface";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { notify } from "@crate/ui/lib/notify";
-
-import {
-  ArrowDownToLine,
-  CRATE_ICON_SIZE,
-  Loader2,
-  RefreshCw,
-  Trash2,
-} from "@crate/ui/icons";
-import { Button } from "@crate/ui/shadcn/button";
-
-import { Section } from "@/components/settings/SettingsPrimitives";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
+import { ErrorState } from "@crate/ui/domain/states";
 import { useOffline } from "@/contexts/OfflineContext";
 import { formatBytes } from "@/lib/utils";
+import { usesNativeFilesystem } from "@/lib/platform";
+import { OfflineDownloadsView } from "./OfflineDownloadsView";
+import { OfflineSettingsView } from "./OfflineSettingsView";
+import { useSettingsOverlay } from "./settings-panel-activity";
 
-export function OfflineSection() {
+export function OfflineSection({ ruled }: { ruled?: boolean } = {}) {
   const { t } = useTranslation();
   const {
     supported: offlineSupported,
+    readOnly,
+    items,
     syncing: offlineSyncing,
     summary: offlineSummary,
     syncAll,
     clearActiveProfile,
   } = useOffline();
+  const [storageQuota, setStorageQuota] = useState<number | null>(null);
+  const [confirmOpen, setConfirmOpen] = useSettingsOverlay();
+  const [clearPending, setClearPending] = useState(false);
+  const [clearError, setClearError] = useState(false);
+  const [clearScope, setClearScope] = useState({
+    itemCount: 0,
+    trackCount: 0,
+    totalBytes: 0,
+  });
+  const clearing = useRef(false);
+  const canWrite = offlineSupported && !readOnly && !offlineSyncing;
+  const canManage = canWrite && offlineSummary.itemCount > 0;
+
+  useEffect(() => {
+    if (!canWrite || (!canManage && !clearPending && !clearError))
+      setConfirmOpen(false);
+  }, [canWrite, canManage, clearPending, clearError, setConfirmOpen]);
+
+  function requestClear() {
+    if (!canWrite || (!canManage && !clearError) || clearing.current) return;
+    if (!clearError) {
+      setClearScope({
+        itemCount: offlineSummary.itemCount,
+        trackCount: offlineSummary.trackCount,
+        totalBytes: offlineSummary.totalBytes,
+      });
+    }
+    setConfirmOpen(true);
+  }
+
+  async function confirmClear() {
+    if (!canWrite || (!canManage && !clearError) || clearing.current) return;
+    clearing.current = true;
+    setClearPending(true);
+    setClearError(false);
+    try {
+      await clearActiveProfile();
+      notify.success(t("settings.offline.toasts.removed"));
+    } catch (error) {
+      setClearError(true);
+      throw error;
+    } finally {
+      clearing.current = false;
+      setClearPending(false);
+    }
+  }
+
+  useEffect(() => {
+    if (usesNativeFilesystem || !navigator.storage?.estimate) return;
+    let disposed = false;
+    void navigator.storage
+      .estimate()
+      .then(({ quota }) => {
+        if (!disposed) {
+          setStorageQuota(
+            quota != null && Number.isFinite(quota) && quota > 0 ? quota : null,
+          );
+        }
+      })
+      .catch(() => {
+        if (!disposed) setStorageQuota(null);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [offlineSummary.totalBytes]);
 
   return (
-    <Section
-      title={t("settings.offline.title")}
-      description={t("settings.offline.subtitle")}
-    >
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-border-quiet/10 bg-text-primary/[0.03] p-4">
-          <div className="text-xs uppercase tracking-eyebrow-wide text-text-primary/40">
-            {t("settings.offline.items")}
-          </div>
-          <div className="mt-2 text-2xl font-semibold text-text-primary">
-            {offlineSummary.itemCount}
-          </div>
-          <p className="mt-1 text-xs text-text-muted">
-            {t("settings.offline.readyItems", {
-              count: offlineSummary.readyItemCount,
-            })}
-            {offlineSummary.errorItemCount
-              ? ` · ${t("settings.offline.needsAttention", {
-                  count: offlineSummary.errorItemCount,
-                })}`
-              : ""}
-          </p>
-        </div>
-        <div className="rounded-xl border border-border-quiet/10 bg-text-primary/[0.03] p-4">
-          <div className="text-xs uppercase tracking-eyebrow-wide text-text-primary/40">
-            {t("common.tracks")}
-          </div>
-          <div className="mt-2 text-2xl font-semibold text-text-primary">
-            {offlineSummary.readyTrackCount}/{offlineSummary.trackCount}
-          </div>
-          <p className="mt-1 text-xs text-text-muted">
-            {t("settings.offline.mirrored")}
-          </p>
-        </div>
-        <div className="rounded-xl border border-border-quiet/10 bg-text-primary/[0.03] p-4">
-          <div className="text-xs uppercase tracking-eyebrow-wide text-text-primary/40">
-            {t("settings.offline.storage")}
-          </div>
-          <div className="mt-2 text-2xl font-semibold text-text-primary">
-            {formatBytes(offlineSummary.totalBytes)}
-          </div>
-          <p className="mt-1 text-xs text-text-muted">
-            {t("settings.offline.footprint")}
-          </p>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-3">
-        <Button
-          variant="secondary"
-          disabled={
-            !offlineSupported ||
-            offlineSyncing ||
-            offlineSummary.itemCount === 0
-          }
-          onClick={() => {
-            void syncAll()
-              .then(() => {
-                notify.success(t("settings.offline.toasts.synced"));
-              })
-              .catch((error) => {
-                notify.error(
-                  (error as Error).message ||
-                    t("settings.offline.toasts.syncFailed"),
-                );
-              });
-          }}
-          className="h-auto rounded-lg border border-accent-action/30 bg-accent-action/10 px-4 py-2 text-accent-action hover:bg-accent-action/15 has-[>svg]:px-4"
-        >
-          {offlineSyncing ? (
-            <Loader2
-              size={CRATE_ICON_SIZE.sm}
-              className="size-4 animate-spin"
-            />
-          ) : (
-            <RefreshCw size={CRATE_ICON_SIZE.sm} className="size-4" />
-          )}
-          {t("settings.offline.syncNow")}
-        </Button>
-        <Button
-          variant="danger-soft"
-          disabled={
-            !offlineSupported ||
-            offlineSyncing ||
-            offlineSummary.itemCount === 0
-          }
-          onClick={() => {
-            void clearActiveProfile()
-              .then(() => {
-                notify.success(t("settings.offline.toasts.removed"));
-              })
-              .catch((error) => {
-                notify.error(
-                  (error as Error).message ||
-                    t("settings.offline.toasts.clearFailed"),
-                );
-              });
-          }}
-          className="h-auto rounded-lg px-4 py-2 text-state-danger has-[>svg]:px-4"
-        >
-          <Trash2 size={CRATE_ICON_SIZE.sm} className="size-4" />
-          {t("settings.offline.removeCopies")}
-        </Button>
-      </div>
-
-      <div className="rounded-lg border border-border-quiet/10 bg-text-primary/[0.03] px-4 py-3 text-sm text-text-muted">
-        <div className="flex items-start gap-3">
-          <ArrowDownToLine
-            size={CRATE_ICON_SIZE.sm}
-            className="mt-0.5 text-text-primary/50"
+    <>
+      <OfflineSettingsView
+        ruled={ruled}
+        supported={offlineSupported}
+        readOnly={readOnly}
+        downloads={
+          <OfflineDownloadsView
+            items={items}
+            renderImage={(image) => (
+              <ArtworkSurface
+                source={image.src}
+                alt={image.alt}
+                className={image.className}
+                fallback={image.fallback}
+                imageProps={{ onError: image.onError }}
+              />
+            )}
           />
-          <div>
-            {offlineSupported
-              ? t("settings.offline.localMirrorDescription")
-              : t("settings.offline.unavailable")}
-          </div>
-        </div>
-      </div>
-    </Section>
+        }
+        syncing={offlineSyncing}
+        clearing={clearPending}
+        summary={offlineSummary}
+        storageQuota={storageQuota}
+        bytesText={formatBytes(offlineSummary.totalBytes)}
+        quotaText={storageQuota != null ? formatBytes(storageQuota) : null}
+        onSync={() => {
+          if (!canManage || clearing.current) return;
+          void syncAll()
+            .then(() => notify.success(t("settings.offline.toasts.synced")))
+            .catch((error: unknown) =>
+              notify.error(
+                (error as Error).message ||
+                  t("settings.offline.toasts.syncFailed"),
+              ),
+            );
+        }}
+        onClear={requestClear}
+      />
+      {clearError && !confirmOpen ? (
+        <ErrorState
+          message={t("settings.offline.toasts.clearFailed")}
+          retryLabel={t("common.retry")}
+          onRetry={canWrite && !clearPending ? requestClear : undefined}
+          className="mt-4"
+        />
+      ) : null}
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        onConfirm={confirmClear}
+        onError={() => setClearError(true)}
+        pending={clearPending}
+        tone="danger"
+        title={t("settings.offline.removeConfirmTitle")}
+        description={t("settings.offline.removeConfirmDescription", {
+          itemCount: clearScope.itemCount,
+          trackCount: clearScope.trackCount,
+          size: formatBytes(clearScope.totalBytes),
+        })}
+        body={
+          clearError ? (
+            <p role="alert" className="text-state-danger-text">
+              {t("settings.offline.toasts.clearFailed")}
+            </p>
+          ) : undefined
+        }
+        confirmLabel={t("settings.offline.removeConfirmAction")}
+        cancelLabel={t("common.cancel")}
+        closeLabel={t("common.close")}
+        ariaLabel={t("settings.offline.removeConfirmTitle")}
+        backdropLabel={t("common.close")}
+      />
+    </>
   );
 }

@@ -1,58 +1,42 @@
-import type { MotionPreference } from "@crate/ui/lib/appearance-types";
-
-const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
-const motionListeners = new Set<() => void>();
-let motionPreference: MotionPreference = "system";
+import {
+  getUiPreferences,
+  setUiPreferences,
+  subscribeUiPreferences,
+  type MotionPreference,
+} from "@crate/ui/lib/interface-preferences";
+import {
+  isMotionBlocked as isDomMotionBlocked,
+  subscribeToMotionAvailability as subscribeToDomMotionAvailability,
+} from "@crate/ui/lib/motion-gate";
 
 export function getMotionPreference(): MotionPreference {
-  return motionPreference;
+  return getUiPreferences().motion;
 }
 
 export function setMotionPreference(preference: MotionPreference): void {
-  if (motionPreference === preference) return;
-  motionPreference = preference;
-  motionListeners.forEach((listener) => listener());
+  setUiPreferences({ motion: preference });
 }
 
 export function isMotionBlocked(
-  preference: MotionPreference = motionPreference,
+  preference: MotionPreference = getMotionPreference(),
 ): boolean {
-  if (
-    typeof document !== "undefined" &&
-    document.visibilityState === "hidden"
-  ) {
-    return true;
-  }
-
-  return (
-    preference === "reduced" ||
-    (typeof document !== "undefined" &&
-      document.documentElement.dataset.crateMotion === "reduced") ||
-    (typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia(REDUCED_MOTION_QUERY).matches)
-  );
+  return preference === "reduced" || isDomMotionBlocked();
 }
 
 export function subscribeToMotionAvailability(
   onChange: () => void,
 ): () => void {
-  if (typeof document !== "undefined") {
-    document.addEventListener("visibilitychange", onChange);
-  }
-  motionListeners.add(onChange);
-
-  const mediaQuery =
-    typeof window !== "undefined" && typeof window.matchMedia === "function"
-      ? window.matchMedia(REDUCED_MOTION_QUERY)
-      : null;
-  mediaQuery?.addEventListener("change", onChange);
+  let previous = getMotionPreference();
+  const unsubscribePreferences = subscribeUiPreferences(() => {
+    const next = getMotionPreference();
+    if (previous === next) return;
+    previous = next;
+    onChange();
+  });
+  const unsubscribeDom = subscribeToDomMotionAvailability(onChange);
 
   return () => {
-    if (typeof document !== "undefined") {
-      document.removeEventListener("visibilitychange", onChange);
-    }
-    motionListeners.delete(onChange);
-    mediaQuery?.removeEventListener("change", onChange);
+    unsubscribePreferences();
+    unsubscribeDom();
   };
 }

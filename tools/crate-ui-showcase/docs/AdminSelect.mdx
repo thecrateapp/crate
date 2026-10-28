@@ -1,0 +1,35 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/AdminSelect.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">AdminSelect</DocHeading>
+<EntryDetails
+  id="composites-adminselect"
+  review="Visual review approved by Diego · 1AR"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+- Select composition with optional searchable list, counts, clearing and an empty state. Its name is historical; both apps consume this shared component.
+- Plain mode uses Select; searchable mode uses the shared Popover/dropdown layer. Counts preserve zero and strings. id/label/describedby/invalid/required reach the actual trigger.
+- Case-insensitive name/alias search; keyboard movement, Enter, Escape and return focus preserve the value contract. Unknown values show the placeholder without mutating state. Apps provide translated text.
+- The approved persistent mockup and Diego's confirmed adjustments are the visual reference. Examples import the actual component; scene CSS does not repair its internals.
+
+<DocHeading as="h2">Real component</DocHeading>
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Plain} />
+
+<Canvas of={Stories.Disabled} />
+
+<Canvas of={Stories.Empty} />
+
+<Canvas of={Stories.UnknownValue} />
+
+<Canvas of={Stories.Validation} />
+
+<Controls of={Stories.Base} />
+
+Consumer adoption and platform QA are separate from this entry and its visual review.

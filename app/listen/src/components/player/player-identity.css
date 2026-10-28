@@ -1,0 +1,11 @@
+.listen-player-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 6vw, 2.2rem);
+  font-weight: 700;
+  line-height: 1.15;
+}

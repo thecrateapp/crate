@@ -1,0 +1,120 @@
+{
+  "items": [
+    {
+      "type": "release",
+      "date": "2026-10-20",
+      "artist": "Costa Norte",
+      "artist_id": 23,
+      "artist_slug": "costa-norte",
+      "title": "Luz de octubre",
+      "album_id": 68,
+      "album_slug": "luz-de-octubre",
+      "subtitle": "Album",
+      "cover_url": "data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" width=\"160\" height=\"160\"%3E%3Crect width=\"160\" height=\"160\" fill=\"%2313343d\"/%3E%3C/svg%3E",
+      "status": "detected",
+      "is_upcoming": true,
+      "tidal_url": "https://example.invalid/tidal/71",
+      "release_id": 71,
+      "genres": ["Ambient"]
+    },
+    {
+      "type": "release",
+      "date": "2026-10-22",
+      "artist": "Costa Norte",
+      "artist_id": 23,
+      "artist_slug": "costa-norte",
+      "title": "Niebla",
+      "album_id": null,
+      "album_slug": null,
+      "subtitle": "Album",
+      "cover_url": "data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" width=\"160\" height=\"160\"%3E%3Crect width=\"160\" height=\"160\" fill=\"%2313343d\"/%3E%3C/svg%3E",
+      "status": "detected",
+      "is_upcoming": true,
+      "tidal_url": null,
+      "release_id": 72,
+      "genres": ["Ambient"]
+    },
+    {
+      "type": "release",
+      "date": "2026-09-15",
+      "artist": "Costa Norte",
+      "artist_id": 23,
+      "artist_slug": "costa-norte",
+      "title": "Archivo",
+      "album_id": 68,
+      "album_slug": "luz-de-octubre",
+      "subtitle": "Album",
+      "cover_url": "data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" width=\"160\" height=\"160\"%3E%3Crect width=\"160\" height=\"160\" fill=\"%2313343d\"/%3E%3C/svg%3E",
+      "status": "downloaded",
+      "is_upcoming": false,
+      "tidal_url": "https://example.invalid/tidal/71",
+      "release_id": 73,
+      "genres": ["Ambient"]
+    },
+    {
+      "type": "release",
+      "date": "2026-10-23",
+      "artist": "Costa Norte",
+      "artist_id": 23,
+      "artist_slug": "costa-norte",
+      "title": "En camino",
+      "album_id": 68,
+      "album_slug": "luz-de-octubre",
+      "subtitle": "Album",
+      "cover_url": "data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" width=\"160\" height=\"160\"%3E%3Crect width=\"160\" height=\"160\" fill=\"%2313343d\"/%3E%3C/svg%3E",
+      "status": "downloading",
+      "is_upcoming": true,
+      "tidal_url": "https://example.invalid/tidal/71",
+      "release_id": 74,
+      "genres": ["Ambient"]
+    },
+    {
+      "type": "show",
+      "date": "2026-10-24",
+      "time": "21:00:00",
+      "artist": "Costa Norte",
+      "artist_id": 23,
+      "artist_slug": "costa-norte",
+      "title": "Costa Norte en directo",
+      "subtitle": "Sala Puerto",
+      "cover_url": "data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" width=\"160\" height=\"160\"%3E%3Crect width=\"160\" height=\"160\" fill=\"%2313343d\"/%3E%3C/svg%3E",
+      "status": "onsale",
+      "is_upcoming": true,
+      "url": "https://example.invalid/tickets/1",
+      "venue": "Sala Puerto",
+      "address_line1": "Calle Muestra 1",
+      "city": "Valencia",
+      "region": "Valencia",
+      "postal_code": "46001",
+      "country": "Spain",
+      "lineup": ["Costa Norte", "Bruma"],
+      "genres": ["Ambient", "Electronic"],
+      "lineup_artists": [
+        {
+          "name": "Costa Norte",
+          "id": 23,
+          "slug": "costa-norte"
+        },
+        {
+          "name": "Bruma"
+        }
+      ]
+    },
+    {
+      "type": "show",
+      "date": "2026-11-04",
+      "artist": "Luz Polar",
+      "title": "Luz Polar en directo",
+      "subtitle": "Sala Centro",
+      "cover_url": null,
+      "status": "onsale",
+      "is_upcoming": true,
+      "venue": "Sala Centro",
+      "city": "Madrid",
+      "region": "Madrid",
+      "country": "Spain",
+      "lineup": [],
+      "genres": ["Rock"]
+    }
+  ]
+}

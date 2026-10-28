@@ -14,7 +14,15 @@ it("opens the add-show panel only for show curators", async () => {
     <AddShowButton onSaved={vi.fn()} />,
   );
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  await userEvent.click(screen.getByRole("button", { name: "Add show" }));
+  const addButton = screen.getByRole("button", { name: "Add show" });
+  expect(addButton).toHaveAttribute("data-size", "icon-lg");
+  expect(addButton).toHaveAttribute("data-variant", "ghost");
+  expect(addButton).not.toHaveAttribute("title");
+  expect(addButton.querySelector("svg")).toHaveAttribute(
+    "aria-hidden",
+    "true",
+  );
+  await userEvent.click(addButton);
   expect(screen.getByRole("dialog")).toHaveTextContent("Add-show panel");
   unmount();
   renderWithAdminProviders(<AddShowButton onSaved={vi.fn()} />, {

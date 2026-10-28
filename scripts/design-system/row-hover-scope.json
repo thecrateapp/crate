@@ -1,0 +1,171 @@
+[
+  {
+    "path": "app/shared/ui/shadcn/table.tsx",
+    "prefix": "border-b border-text-primary/6 transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/shared/ui/primitives/HairlineList.tsx",
+    "prefix": "relative border-b border-border-quiet-subtle",
+    "kind": "row"
+  },
+  {
+    "path": "app/shared/ui/domain/entity/EntityRow.tsx",
+    "prefix": "crate-entity-row item-action-target group/row relative flex min-w-0 flex-wrap items-center rounded-lg text-left transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Playlists.tsx",
+    "kind": "row",
+    "component": "HairlineRow"
+  },
+  {
+    "path": "app/ui/src/pages/I18nReview.tsx",
+    "prefix": "block w-full px-5 py-4 text-left transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/components/shows/ShowCard.tsx",
+    "prefix": "relative w-full overflow-hidden transition-[height,border-color]",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Album.tsx",
+    "prefix": "flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-text-primary transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Album.tsx",
+    "prefix": "flex w-full items-center gap-3 px-4 py-3 text-left text-text-primary transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Download.tsx",
+    "prefix": "group flex items-center gap-3 rounded-md px-3 py-2 transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Download.tsx",
+    "prefix": "flex min-w-0 items-center gap-3 rounded-md px-2 py-2 text-sm text-text-secondary",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Download.tsx",
+    "prefix": "flex items-center gap-2 py-1.5 px-2 rounded",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Download.tsx",
+    "prefix": "flex items-center gap-2 py-1.5 px-2 rounded",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/PlaylistEditor.tsx",
+    "kind": "row",
+    "component": "HairlineRow",
+    "ownerLabel": "Preview track sample"
+  },
+  {
+    "path": "app/ui/src/pages/PlaylistEditor.tsx",
+    "kind": "row",
+    "component": "HairlineRow",
+    "ownerLabel": "Candidate tracks"
+  },
+  {
+    "path": "app/ui/src/pages/NewReleases.tsx",
+    "prefix": "group overflow-hidden p-0",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Logs.tsx",
+    "prefix": "grid gap-3 border-b border-border-quiet px-4 py-3 font-mono text-label transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Artist.tsx",
+    "prefix": "flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-text-primary transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Genres.tsx",
+    "prefix": "flex min-w-0 items-center justify-between gap-3 border-b border-border-quiet py-2 text-left",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/components/track/SimilarTracksPanel.tsx",
+    "kind": "row",
+    "component": "HairlineRow"
+  },
+  {
+    "path": "app/ui/src/components/artist/ArtistTopTracksSection.tsx",
+    "kind": "row",
+    "component": "EntityRow",
+    "ownerLabel": "Library top tracks"
+  },
+  {
+    "path": "app/ui/src/components/artist/ArtistTopTracksSection.tsx",
+    "kind": "row",
+    "component": "EntityRow",
+    "ownerLabel": "Additional Spotify top tracks"
+  },
+  {
+    "path": "app/ui/src/components/shows/ShowCard.tsx",
+    "prefix": "flex min-w-0 cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-xs transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/components/shows/ShowCard.tsx",
+    "prefix": "hover:border-accent-action-hi/40",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/components/shows/ShowManagementRow.tsx",
+    "kind": "row",
+    "component": "UpcomingEventRow"
+  },
+  {
+    "path": "app/ui/src/components/artist/ArtistSetlistSection.tsx",
+    "kind": "row",
+    "component": "HairlineRow"
+  },
+  {
+    "path": "app/ui/src/components/artist/ArtistRow.tsx",
+    "kind": "row",
+    "component": "EntityRow"
+  },
+  {
+    "path": "app/ui/src/components/album/AlbumRow.tsx",
+    "kind": "row",
+    "component": "EntityRow"
+  },
+  {
+    "path": "app/ui/src/components/artist/ArtistOverviewSection.tsx",
+    "kind": "row",
+    "component": "HairlineRow"
+  },
+  {
+    "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+    "prefix": "border-white/6 bg-white/[0.02]",
+    "kind": "row"
+  },
+  {
+    "path": "app/listen/src/pages/StatsCollectionPanels.tsx",
+    "prefix": "flex items-center gap-3 rounded-lg px-2 py-2 transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/components/ui/EventRow.tsx",
+    "prefix": "@container relative w-full min-w-0 overflow-hidden rounded-md border border-border-quiet bg-transparent",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/pages/Tasks.tsx",
+    "prefix": "crate-focus-inset group flex min-w-0 flex-1 items-center gap-3 px-2 py-3 text-left transition-colors",
+    "kind": "row"
+  },
+  {
+    "path": "app/ui/src/components/album/TrackTable.tsx",
+    "prefix": "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
+    "kind": "row"
+  }
+]

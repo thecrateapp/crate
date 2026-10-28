@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -141,7 +141,7 @@ describe("ArtistBioResearchDialog", () => {
     const content = document.querySelector('[data-slot="dialog-content"]');
     expect(body).toHaveClass("flex-1", "overflow-y-auto");
     expect(content).toHaveClass("flex", "flex-col", "overflow-hidden");
-    expect(content).toHaveClass("!max-w-5xl");
+    expect(content).toHaveAttribute("data-overlay-size", "2xl");
   });
 
   it("shows incremental review findings when the existing biography is preserved", async () => {
@@ -234,17 +234,17 @@ describe("ArtistBioResearchDialog", () => {
     await userEvent.click(screen.getByRole("tab", { name: "Review changes" }));
 
     expect(screen.getByTestId("bio-change-added")).toHaveClass(
-      "text-state-success-text",
+      "text-accent-action-hi",
     );
     expect(screen.getByTestId("bio-change-removed")).toHaveClass(
-      "text-state-danger-text",
+      "text-state-warning-text",
       "line-through",
     );
     expect(screen.getByTestId("bio-change-updated")).toHaveTextContent(
       "The band formed in 1995.",
     );
     expect(screen.getByText("The band formed in 1994.")).toHaveClass(
-      "text-state-danger-text",
+      "text-state-warning-text",
       "line-through",
     );
     expect(screen.getByTestId("bio-change-updated")).toHaveClass(
@@ -288,4 +288,34 @@ describe("ArtistBioResearchDialog", () => {
       screen.getByRole("textbox", { name: "Proposed biography" }),
     ).toHaveValue(currentBio);
   });
+});
+
+it("keeps Apply pending and prevents closing until persistence completes", async () => {
+  let finish!: () => void;
+  const pendingSave = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const onOpenChange = vi.fn();
+  render(
+    <ArtistBioResearchDialog
+      open
+      onOpenChange={onOpenChange}
+      artist={artist}
+      currentBio="Old bio"
+      onApply={() => pendingSave}
+    />,
+  );
+  await screen.findByTestId("artist-bio-preview");
+  await userEvent.click(
+    screen.getByRole("button", { name: "Apply biography" }),
+  );
+  await userEvent.keyboard("{Escape}");
+  expect(onOpenChange).not.toHaveBeenCalled();
+  expect(
+    screen.getByRole("dialog", { name: "Research biography with AI" }),
+  ).toBeInTheDocument();
+  await act(async () => {
+    finish();
+  });
+  await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
 });

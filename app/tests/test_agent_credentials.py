@@ -388,3 +388,76 @@ def test_cli_validates_expiry_and_hides_database_exceptions(capsys, monkeypatch)
     assert "database connectivity" in result.err
     assert "private-database-password" not in result.err
     assert result.out == ""
+
+
+def _cli_create(capsys, *arguments):
+    assert (
+        cli.main(["create", "--name", "Agent", "--expires-in-days", "7", *arguments])
+        == 0
+    )
+    return json.loads(capsys.readouterr().out)
+
+
+def _require_approval(principal_id):
+    with read_scope() as session:
+        return session.execute(
+            text("SELECT require_approval FROM agent_principals WHERE id=:id"),
+            {"id": principal_id},
+        ).scalar_one()
+
+
+def test_cli_requires_approval_for_change_grants_or_when_asked(pg_db, capsys):
+    reader = _cli_create(capsys, "--grant", "ops.status.read")
+    assert reader["require_approval"] is False
+    assert _require_approval(reader["principal_id"]) is False
+    asked = _cli_create(capsys, "--grant", "ops.status.read", "--require-approval")
+    assert asked["require_approval"] is True
+    assert _require_approval(asked["principal_id"]) is True
+    writer = _cli_create(
+        capsys, "--grant", "ops.status.read", "--grant", "library.repair.run"
+    )
+    assert writer["require_approval"] is True
+    assert _require_approval(writer["principal_id"]) is True
+
+
+def test_cli_identifies_a_token_from_stdin_without_printing_secrets(
+    pg_db, capsys, monkeypatch
+):
+    import io
+
+    created = _cli_create(capsys, "--grant", "ops.status.read")
+    monkeypatch.setattr("sys.stdin", io.StringIO(created["token"] + "\n"))
+    assert cli.main(["identify"]) == 0
+    output = capsys.readouterr().out
+    assert created["token"] not in output
+    found = json.loads(output)
+    assert found["credential_id"] == created["credential_id"]
+    assert found["principal_id"] == created["principal_id"]
+    assert found["active"] is True
+    credentials.revoke_credential(created["credential_id"])
+    assert credentials.identify_credential(created["token"])["active"] is False
+    monkeypatch.setattr("sys.stdin", io.StringIO("crate_mcp_" + "z" * 43 + "\n"))
+    assert cli.main(["identify"]) == 2
+    assert "does not belong" in capsys.readouterr().err
+
+
+def test_cli_turns_on_approval_for_an_existing_integration(pg_db, capsys):
+    created = _cli_create(capsys, "--grant", "ops.status.read")
+    with read_scope() as session:
+        before = session.execute(
+            text("SELECT policy_revision FROM agent_principals WHERE id=:id"),
+            {"id": created["principal_id"]},
+        ).scalar_one()
+    assert cli.main(["require-approval", created["principal_id"]]) == 0
+    assert json.loads(capsys.readouterr().out)["changed"] is True
+    assert cli.main(["require-approval", created["principal_id"]]) == 0
+    assert json.loads(capsys.readouterr().out)["changed"] is False
+    with read_scope() as session:
+        row = session.execute(
+            text(
+                "SELECT require_approval, policy_revision FROM agent_principals WHERE id=:id"
+            ),
+            {"id": created["principal_id"]},
+        ).one()
+    assert row == (True, before + 1)
+    assert cli.main(["require-approval", str(uuid4())]) == 2

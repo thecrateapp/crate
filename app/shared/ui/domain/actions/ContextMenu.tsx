@@ -11,20 +11,21 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import {
-  Check,
-  ChevronDown,
-  ChevronRight,
-  CRATE_ICON_SIZE,
-} from "@crate/ui/icons";
+import { ChevronDown, ChevronRight, CRATE_ICON_SIZE } from "@crate/ui/icons";
 import {
   AppMenuButton,
   AppPopoverDivider,
 } from "@crate/ui/primitives/AppPopover";
 import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
-import { useHoverCapability } from "@crate/ui/lib/use-hover-capability";
+import {
+  canUseHoverPointer,
+  useHoverCapability,
+} from "@crate/ui/lib/use-hover-capability";
 import { cn } from "@crate/ui/lib/cn";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { MobileActionSheet } from "./MobileActionSheet";
 import type {
   ContextMenuEntry,
@@ -35,6 +36,7 @@ import type {
   ContextMenuProps,
   DesktopMenuEnvironment,
 } from "./types";
+import { focusWithModality } from "@crate/ui/lib/input-modality";
 
 export type {
   ContextMenuEntry,
@@ -47,7 +49,13 @@ export type {
 
 export function detectTouchDominant(): boolean {
   if (typeof window === "undefined") return false;
-  if (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0) {
+  // Touch capacity is not the primary input: desktop Chrome can expose touch
+  // points while its primary pointer is a mouse/trackpad with hover.
+  if (
+    typeof navigator !== "undefined" &&
+    navigator.maxTouchPoints > 0 &&
+    !canUseHoverPointer()
+  ) {
     return true;
   }
   if (typeof window.matchMedia === "function") {
@@ -90,45 +98,47 @@ export function shouldRenderDesktopContextMenu(
   return true;
 }
 
-const DEFAULT_SURFACE_CLASS_NAME = "listen-glass-panel";
-const MENU_ITEM_FOCUS_CLASS_NAME =
-  "focus-visible:shadow-focus focus-visible:outline-none";
+const DEFAULT_SURFACE_CLASS_NAME = "crate-overlay-surface";
+const MENU_ITEM_FOCUS_CLASS_NAME = "crate-focus-inset";
 const MENU_ITEM_SELECTOR = '[role="menuitem"]:not([disabled])';
 
-function syncClampedLabelTitle(element: HTMLElement, label: string) {
-  const clamped =
+function isClampedLabel(element: HTMLElement) {
+  return (
     element.scrollHeight > element.clientHeight ||
-    element.scrollWidth > element.clientWidth;
-  if (clamped) element.title = label;
-  else element.removeAttribute("title");
+    element.scrollWidth > element.clientWidth
+  );
 }
 
 function ContextMenuItemLabel({ label }: { label: string }) {
   const labelRef = useRef<HTMLSpanElement>(null);
-
+  const [clamped, setClamped] = useState(false);
   useLayoutEffect(() => {
-    const element = labelRef.current;
-    if (!element) return;
-    syncClampedLabelTitle(element, label);
-    if (typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() =>
-      syncClampedLabelTitle(element, label),
+    const element = labelRef.current?.querySelector<HTMLElement>(
+      '[data-slot="context-menu-item-label"]',
     );
+    if (!element) return;
+    const measure = () => setClamped(isClampedLabel(element));
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
   }, [label]);
-
   return (
-    <span
-      ref={labelRef}
-      data-slot="context-menu-item-label"
-      className="line-clamp-2 min-w-0 break-words"
-      onPointerEnter={(event) =>
-        syncClampedLabelTitle(event.currentTarget, label)
-      }
-    >
-      {label}
-    </span>
+    <TooltipHint content={clamped ? label : undefined}>
+      <span ref={labelRef} className="min-w-0">
+        <MonoLabel
+          as="span"
+          data-slot="context-menu-item-label"
+          className="line-clamp-2 min-w-0 break-words text-inherit"
+          onPointerEnter={(event) =>
+            setClamped(isClampedLabel(event.currentTarget))
+          }
+        >
+          {label}
+        </MonoLabel>
+      </span>
+    </TooltipHint>
   );
 }
 
@@ -140,7 +150,7 @@ function getMenuItems(container: HTMLElement | null): HTMLElement[] {
 }
 
 function focusMenuItem(item: HTMLElement | undefined) {
-  item?.focus({ preventScroll: true });
+  focusWithModality(item, { preventScroll: true });
 }
 
 function focusFirstMenuItem(container: HTMLElement | null) {
@@ -212,7 +222,7 @@ function useMenuFocusManagement(
         previous !== document.body &&
         document.contains(previous)
       ) {
-        previous.focus({ preventScroll: true });
+        focusWithModality(previous, { preventScroll: true });
       }
     };
   }, [active, mode]);
@@ -262,7 +272,9 @@ function ContextMenuMediaHeaderView({
           imageShape,
         )}
       >
-        {hasImage && renderMediaImage ? (
+        {header.artwork ? (
+          header.artwork
+        ) : hasImage && renderMediaImage ? (
           renderMediaImage({
             src: header.imageUrl || "",
             alt: header.imageAlt ?? header.title,
@@ -300,7 +312,11 @@ function ContextMenuMediaHeaderView({
             className="text-text-primary/35"
           />
         ) : null}
-        {hasImage && renderMediaImage && imageFailed && FallbackIcon ? (
+        {!header.artwork &&
+        hasImage &&
+        renderMediaImage &&
+        imageFailed &&
+        FallbackIcon ? (
           <FallbackIcon
             size={CRATE_ICON_SIZE.xl}
             className="absolute text-text-primary/35"
@@ -437,7 +453,7 @@ function ContextMenuDisclosure({
       aria-label={entry.label}
       className={cn(
         surfaceClassName,
-        "fixed z-app-context-menu w-72 max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] overflow-y-auto rounded-2xl animate-pop-in",
+        "fixed z-app-context-menu w-72 max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] overflow-y-auto",
       )}
       style={{ left: position.left, top: position.top }}
       onKeyDown={handleSubmenuKeyDown}
@@ -538,7 +554,7 @@ function ContextMenuItems({
           return (
             <div
               key={entry.key}
-              className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-text-primary/40"
+              className="crate-overlay-menu-label px-3 pb-1 pt-2"
             >
               {entry.label}
             </div>
@@ -565,13 +581,14 @@ function ContextMenuItems({
             role="menuitem"
             danger={entry.danger}
             disabled={entry.disabled}
+            data-active={entry.active || undefined}
             onClick={(event: ReactMouseEvent<HTMLButtonElement>) => {
               event.stopPropagation();
               handleSelect(entry);
             }}
             className={cn(
               MENU_ITEM_FOCUS_CLASS_NAME,
-              entry.active ? "text-accent-action" : undefined,
+              entry.active ? "text-accent-action-hi" : undefined,
               entry.disabled ? "opacity-50" : undefined,
             )}
           >
@@ -589,12 +606,7 @@ function ContextMenuItems({
               )}
               <ContextMenuItemLabel label={entry.label} />
             </span>
-            {entry.active ? (
-              <Check
-                size={CRATE_ICON_SIZE.md}
-                className="shrink-0 text-accent-action"
-              />
-            ) : null}
+            {entry.active ? <StatusDot /> : null}
           </AppMenuButton>
         );
       })}
@@ -692,7 +704,7 @@ export function ContextMenu({
       onPointerDown={(event) => event.stopPropagation()}
       className={cn(
         surfaceClassName,
-        "fixed z-app-context-menu w-72 max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] origin-top-left overflow-y-auto overflow-x-hidden rounded-2xl animate-pop-in",
+        "fixed z-app-context-menu w-72 max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] origin-top-left overflow-y-auto overflow-x-hidden",
         className,
       )}
       style={style}

@@ -1,28 +1,27 @@
-import { useEffect, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import { Toaster } from "sonner";
-import { LISTEN_APPEARANCE_SETTINGS_ENABLED } from "./app-shell/feature-flags";
+import { toasterConfig } from "@crate/ui/lib/toaster-config";
+import { installFocusRingMotion } from "@crate/ui/lib/focus-ring-motion";
 import { App } from "./App";
 import { I18nProvider } from "./i18n/I18nProvider";
 import { startMediaAccessTicketRefresh } from "./lib/api";
 import { initCapacitor } from "./lib/capacitor";
-import { applyNativeColorMode } from "./lib/capacitor-init";
 import {
   isOfflineMediaCacheName,
   primeOfflineRuntimeProfile,
 } from "./lib/offline";
-import { shouldRegisterServiceWorker, usesMobileShell } from "./lib/platform";
+import { shouldRegisterServiceWorker } from "./lib/platform";
 import { initRuntimeSentry, reportRuntimeError } from "./lib/runtime-sentry";
 import { bootstrapNativeSessionStore } from "./lib/server-store";
 import { renderSecureSessionError } from "./lib/secure-session-error";
 import { syncThemeColor } from "./lib/theme-color";
-import {
-  getAppliedThemeSkin,
-  initializeThemeSkin,
-  subscribeThemeSkin,
-} from "@crate/ui/lib/theme-skin";
+import { applyCrateIdentity } from "@crate/ui/lib/crate-identity";
+import { initializeUiPreferences } from "@crate/ui/lib/interface-preferences";
 import "./index.css";
+
+const disposeFocusRingMotion = installFocusRingMotion();
+import.meta.hot?.dispose(disposeFocusRingMotion);
 
 async function disableDevServiceWorker() {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
@@ -53,37 +52,17 @@ async function disableDevServiceWorker() {
   }
 }
 
-const isCapacitorBuild = import.meta.env.MODE === "capacitor";
-
-function ThemeAwareToaster() {
-  const resolvedMode = useSyncExternalStore(
-    subscribeThemeSkin,
-    () => getAppliedThemeSkin().resolvedMode,
-    () => "dark" as const,
-  );
-
-  useEffect(() => {
-    syncThemeColor(document.documentElement, resolvedMode);
-    void applyNativeColorMode(resolvedMode);
-  }, [resolvedMode]);
-
+function ListenToaster() {
   return (
     <Toaster
-      theme={resolvedMode}
+      {...toasterConfig}
+      theme="dark"
       position="bottom-center"
-      richColors
       mobileOffset={{
         bottom: "calc(var(--listen-mobile-bottom-chrome-height) + 0.75rem)",
       }}
     />
   );
-}
-
-// Load Poppins only on web — iOS/Android use system fonts (San
-// Francisco / Roboto) for a native feel. The mode guard is build-time
-// constant, so Vite drops the font chunk from Capacitor bundles.
-if (!isCapacitorBuild && !usesMobileShell) {
-  import("../../shared/fonts/poppins.css");
 }
 
 function renderApp(): void {
@@ -92,7 +71,7 @@ function renderApp(): void {
       <I18nProvider>
         <App />
       </I18nProvider>
-      <ThemeAwareToaster />
+      <ListenToaster />
     </BrowserRouter>,
   );
 }
@@ -110,10 +89,10 @@ async function bootstrap(): Promise<void> {
   }
 
   startMediaAccessTicketRefresh();
-  const appliedTheme = initializeThemeSkin({
-    ignoreStoredPreferences: !LISTEN_APPEARANCE_SETTINGS_ENABLED,
-  });
-  syncThemeColor(document.documentElement, appliedTheme.resolvedMode);
+  applyCrateIdentity();
+  const disposePreferences = initializeUiPreferences();
+  import.meta.hot?.dispose(disposePreferences);
+  syncThemeColor(document.documentElement);
   await initCapacitor();
   void primeOfflineRuntimeProfile().catch((error) => {
     void reportRuntimeError(error, "offline.profile.prime").catch(

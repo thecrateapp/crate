@@ -218,6 +218,13 @@ def get_crate_playback_tracks(
                         track.artist_name AS artist,
                         track.album_name AS album,
                         track.duration_seconds AS duration,
+                        COALESCE(NULLIF(LOWER(lt.format), ''), preferred_quality.source_payload_json->>'format') AS format,
+                        COALESCE(lt.bitrate, NULLIF(preferred_quality.source_payload_json->>'bitrate', '')::integer) AS bitrate,
+                        COALESCE(lt.sample_rate, NULLIF(preferred_quality.source_payload_json->>'sample_rate', '')::integer) AS sample_rate,
+                        COALESCE(lt.bit_depth, NULLIF(preferred_quality.source_payload_json->>'bit_depth', '')::integer) AS bit_depth,
+                        COALESCE(lt.bpm, NULLIF(preferred_quality.source_payload_json->>'bpm', '')::double precision) AS bpm,
+                        COALESCE(lt.audio_key, preferred_quality.source_payload_json->>'audio_key') AS audio_key,
+                        COALESCE(lt.audio_scale, preferred_quality.source_payload_json->>'audio_scale') AS audio_scale,
                         track.disc_number,
                         track.track_number
                     FROM crate_albums crate_album
@@ -225,6 +232,15 @@ def get_crate_playback_tracks(
                       ON crate.id = crate_album.crate_id
                     JOIN global_catalog_tracks track
                       ON track.global_album_uid = crate_album.global_album_uid
+                    LEFT JOIN library_tracks lt ON lt.id = track.local_track_id
+                    LEFT JOIN LATERAL (
+                        SELECT source_payload_json FROM global_catalog_sources source
+                        WHERE source.entity_type = 'track' AND source.global_entity_uid = track.global_track_uid
+                          AND NOT source.source_stale AND source.source_deleted_at IS NULL
+                        ORDER BY (source.source_kind = 'local') DESC, source.preferred_for_playback DESC,
+                                 source.preferred_for_display DESC, source.updated_at DESC
+                        LIMIT 1
+                    ) preferred_quality ON true
                     WHERE crate_album.crate_id = CAST(:crate_id AS uuid)
                       AND (track.has_local IS TRUE OR track.has_remote IS TRUE)
                     ORDER BY CASE

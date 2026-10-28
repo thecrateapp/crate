@@ -1,6 +1,6 @@
 import type * as React from "react";
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Button } from "./button";
 
@@ -35,31 +35,29 @@ describe("Button", () => {
   it("uses semantic tokens for the default action", () => {
     render(<Button>Save</Button>);
     expect(screen.getByRole("button")).toHaveClass(
-      "bg-accent-action",
-      "text-accent-action-foreground",
+      "border",
+      "border-accent-action",
+      "bg-transparent",
+      "text-accent-action",
     );
   });
 
-  it("offsets the focus ring on the accent-filled default action", () => {
-    render(<Button>Save</Button>);
-    const button = screen.getByRole("button");
-    expect(button).toHaveClass(
-      "focus-visible:outline-solid",
-      "focus-visible:outline-2",
-      "focus-visible:outline-offset-2",
-      "focus-visible:outline-focus-ring",
-    );
-    expect(button).not.toHaveClass("focus-visible:shadow-focus");
+  it("uses a custom hint without a native browser tooltip", async () => {
+    render(<Button title="Save this playlist">Save</Button>);
+    const button = screen.getByRole("button", { name: "Save" });
+    expect(button).not.toHaveAttribute("title");
+    await userEvent.tab();
+    expect(
+      await screen.findByRole("tooltip", { name: "Save this playlist" }),
+    ).toBeVisible();
+    expect(button).toHaveAccessibleName("Save");
   });
 
-  it("keeps the flush focus ring on non-filled variants", () => {
+  it("uses the global focus outline on non-filled variants", () => {
     render(<Button variant="outline">Cancel</Button>);
     const button = screen.getByRole("button");
-    expect(button).toHaveClass(
-      "focus-visible:border-border-focus",
-      "focus-visible:shadow-focus",
-    );
-    expect(button).not.toHaveClass("focus-visible:outline-offset-2");
+    expect(button).toHaveClass("focus-visible:border-border-focus");
+    expect(button).not.toHaveClass("outline-none");
   });
 
   it("applies size data attribute", () => {
@@ -78,6 +76,33 @@ describe("Button", () => {
 });
 
 describe("Button extensions", () => {
+  it.each(["disabled", "loading"] as const)(
+    "blocks %s child links and their handlers",
+    (state) => {
+      const outer = vi.fn();
+      const inner = vi.fn();
+      render(
+        <Button asChild {...{ [state]: true }} onClick={outer}>
+          <a
+            href="#destination"
+            onClick={inner}
+            onClickCapture={inner}
+            onKeyDown={inner}
+          >
+            Unavailable
+          </a>
+        </Button>,
+      );
+      const link = screen.getByRole("link", { name: "Unavailable" });
+      expect(link).toHaveAttribute("aria-disabled", "true");
+      expect(link).toHaveAttribute("tabindex", "-1");
+      expect(fireEvent.click(link)).toBe(false);
+      expect(fireEvent.keyDown(link, { key: "Enter" })).toBe(false);
+      expect(outer).not.toHaveBeenCalled();
+      expect(inner).not.toHaveBeenCalled();
+    },
+  );
+
   it("defaults to type=button", () => {
     render(<Button>Save</Button>);
     expect(screen.getByRole("button")).toHaveAttribute("type", "button");
@@ -150,4 +175,41 @@ describe("Button extensions", () => {
     render(<Button disabled>Off</Button>);
     expect(screen.getByRole("button")).toHaveClass("disabled:opacity-50");
   });
+});
+
+describe("icon-only hover", () => {
+  it.each([
+    ["ghost", "icon"],
+    ["ghost", "icon-xs"],
+    ["ghost", "icon-sm"],
+    ["ghost", "icon-lg"],
+    ["outline", "icon-lg"],
+    ["secondary", "icon-lg"],
+  ] as const)(
+    "highlights the foreground without changing the background for %s %s",
+    (variant, size) => {
+      render(
+        <Button variant={variant} size={size} aria-label="More actions" />,
+      );
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass("hover:text-accent-action-hi");
+      expect(button.className).not.toMatch(/(?:^|\s)(?:dark:)?hover:bg-/);
+    },
+  );
+
+  it("retains the ordinary text button hover", () => {
+    render(<Button variant="ghost">More actions</Button>);
+    expect(screen.getByRole("button")).toHaveClass("hover:bg-surface-control");
+  });
+});
+
+it("preserves an icon-only legacy title as its accessible name", () => {
+  render(
+    <Button size="icon" title="Previous month">
+      <svg aria-hidden="true" />
+    </Button>,
+  );
+  expect(
+    screen.getByRole("button", { name: "Previous month" }),
+  ).not.toHaveAttribute("title");
 });

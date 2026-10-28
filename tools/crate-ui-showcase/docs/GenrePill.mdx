@@ -1,0 +1,30 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/GenrePill.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+
+<DocHeading as="h1">GenrePill</DocHeading>
+
+<EntryDetails id="genre-pill" />
+
+<DocHeading as="h2">Contract</DocHeading>
+
+- Genre name with optional percentage and provenance. Missing percentage, 0 and 100 retain distinct meanings.
+- 12 px text; 32/44 px minimums. Select and remove are independent actions, without nested buttons.
+- Keep this domain component when its musical identity or actions are needed; do not replace it with InfoBadge.
+
+<DocHeading as="h2">Real component</DocHeading>
+
+<Canvas of={Stories.Percentages} />
+
+<Controls />
+
+Diego approved this visual reference at 1AQ. Consumer adoption and platform QA remain separate statuses.
+
+<DocHeading as="h2">Primary and tooltip review amendment</DocHeading>
+
+The full genre name, real percentage and provenance use a custom Tooltip hint instead of a native title. Select/remove actions remain independent; visible percentages and pill geometry are unchanged.
+
+Clickable pills and their remove buttons keep their 32px visible height on touch screens; `crate-touch-target` adds the 44px hit area around them.

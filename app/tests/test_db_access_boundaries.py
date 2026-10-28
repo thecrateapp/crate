@@ -12,7 +12,6 @@ REFACTORED_MODULES = [
     Path("health_check.py"),
     Path("popularity.py"),
     Path("repair.py"),
-    Path("telegram.py"),
     Path("genre_taxonomy_inference.py"),
     Path("api/genres.py"),
     Path("api/radio.py"),
@@ -129,6 +128,26 @@ def test_query_modules_are_read_only():
             findings.append(f"{path.relative_to(DB_ROOT)} -> {', '.join(violations)}")
 
     assert findings == [], "db.queries must remain read-only:\n" + "\n".join(findings)
+
+
+def test_query_modules_do_not_import_jobs():
+    """Read-only queries must not pull in batch write modules and their task deps."""
+    findings: list[str] = []
+    for path in sorted((DB_ROOT / "queries").rglob("*.py")):
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in ast.walk(tree):
+            modules: list[str] = []
+            if isinstance(node, ast.ImportFrom) and node.module:
+                modules = [node.module]
+            elif isinstance(node, ast.Import):
+                modules = [alias.name for alias in node.names]
+            for module in modules:
+                if module == "crate.db.jobs" or module.startswith("crate.db.jobs."):
+                    findings.append(
+                        f"{path.relative_to(DB_ROOT)} -> {module}:{node.lineno}"
+                    )
+
+    assert findings == [], "db.queries must not import db.jobs:\n" + "\n".join(findings)
 
 
 def test_refactored_modules_do_not_use_db_mega_facade():

@@ -150,6 +150,17 @@ def _queue_stats_dashboard_backfill() -> None:
         log.info("Queued %s missing user stats dashboard snapshots", queued)
 
 
+def _queue_instance_listening_backfill() -> None:
+    """Fill the instance listening rollups once when they lack history."""
+    from crate.db.jobs.instance_listening_rollups import (
+        queue_instance_listening_backfill_if_needed,
+    )
+
+    task_id = queue_instance_listening_backfill_if_needed()
+    if task_id:
+        log.info("Queued instance listening rollup backfill %s", task_id)
+
+
 def _queue_artist_top_track_ranking_backfill() -> None:
     """Refresh persisted remote ranks after ranking semantics change."""
     from crate.db.cache_settings import get_setting
@@ -188,6 +199,7 @@ async def lifespan(app: FastAPI):
     _queue_artwork_variant_backfill()
     _queue_artwork_manifest_permission_repair()
     _queue_stats_dashboard_backfill()
+    _queue_instance_listening_backfill()
     _queue_artist_top_track_ranking_backfill()
     from crate.utils import init_musicbrainz
 
@@ -462,7 +474,6 @@ def create_app() -> FastAPI:
     install_trace_id_log_record_factory()
     app.add_middleware(TraceMiddleware)
 
-    from crate.api.setup import router as setup_router
     from crate.api.auth import router as auth_router, admin_router as admin_auth_router
     from crate.api.access_tokens import router as access_tokens_router
     from crate.api.media_access import router as media_access_router
@@ -533,7 +544,6 @@ def create_app() -> FastAPI:
     app.include_router(federation_well_known)
 
     # Auth + management + settings + enrichment BEFORE browse (browse has {name:path} catch-all)
-    app.include_router(setup_router)
     from crate.api.mcp_oauth import router as mcp_oauth_router
 
     app.include_router(mcp_oauth_router)

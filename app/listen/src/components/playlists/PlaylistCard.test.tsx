@@ -27,6 +27,39 @@ function renderWithRoutes(element: ReactElement, options = {}) {
 }
 
 describe("PlaylistCard tile", () => {
+  it("illuminates collection playlist rows on pointer hover without changing tiles", () => {
+    renderWithListenProviders(
+      <PlaylistCard variant="row" name="Night hover" onClick={vi.fn()} />,
+    );
+    expect(
+      screen.getByText("Night hover").closest('[data-slot="entity-row"]'),
+    ).toHaveClass("pointer-fine:hover:bg-accent-action/[0.04]");
+  });
+  it.each(["tile", "featured", "row"] as const)(
+    "uses MonoLabel for %s playlist counts, preserving prose",
+    (variant) => {
+      renderWithListenProviders(
+        <PlaylistCard
+          variant={variant}
+          name="Night music"
+          meta="12 tracks"
+          summary="Birds In Row, High Vis"
+          onClick={vi.fn()}
+        />,
+      );
+      expect(screen.getByText(/12 tracks/)).toHaveClass(
+        "font-mono",
+        "uppercase",
+        "text-label",
+      );
+      expect(screen.getByText("Night music")).not.toHaveClass("uppercase");
+      if (variant === "featured")
+        expect(screen.getByText("Birds In Row, High Vis")).not.toHaveClass(
+          "uppercase",
+        );
+    },
+  );
+
   it("renders the playlist badge as an overlay crate badge", () => {
     renderWithListenProviders(
       <PlaylistCard
@@ -37,8 +70,8 @@ describe("PlaylistCard tile", () => {
       />,
     );
 
-    const badge = screen.getByText("Featured");
-    expect(badge).toHaveClass("crate-badge");
+    const badge = screen.getByText("Featured").closest(".crate-info-badge");
+    expect(badge).toHaveClass("crate-info-badge");
     expect(badge).toHaveAttribute("data-surface", "overlay");
   });
 
@@ -297,7 +330,30 @@ describe("PlaylistCard row", () => {
     expect(api).toHaveBeenCalledWith("/api/playlists/9");
   });
 
-  it("appends extra actions to the inline controls and the menu", async () => {
+  it("shows the playlist artwork in the menu header", async () => {
+    renderWithListenProviders(
+      <PlaylistCard
+        variant="row"
+        playlistId={9}
+        name="Night Drive"
+        trackCount={12}
+        href="/playlist/9"
+        coverDataUrl="data:image/png;base64,AAAA"
+      />,
+    );
+
+    expect(
+      document.querySelectorAll('[data-slot="playlist-artwork"]'),
+    ).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    await screen.findByRole("menu");
+
+    expect(
+      document.querySelectorAll('[data-slot="playlist-artwork"]'),
+    ).toHaveLength(2);
+  });
+
+  it("keeps only Play inline and moves shuffle, follow and extra actions to the menu", async () => {
     const onEdit = vi.fn();
     renderWithListenProviders(
       <PlaylistCard
@@ -306,7 +362,9 @@ describe("PlaylistCard row", () => {
         name="Night Drive"
         trackCount={12}
         href="/playlist/9"
+        detailEndpoint="/api/playlists/9"
         badge="Smart"
+        onToggleFollow={vi.fn()}
         extraActions={[
           { key: "edit", icon: Pencil, title: "Edit", onClick: onEdit },
         ]}
@@ -314,11 +372,15 @@ describe("PlaylistCard row", () => {
     );
 
     expect(screen.getByText("Smart")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-    expect(onEdit).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "Play" })).toBeInTheDocument();
+    for (const name of ["Shuffle", "Edit", "Follow", "Following"])
+      expect(screen.queryByRole("button", { name })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Edit" }));
-    expect(onEdit).toHaveBeenCalledTimes(2);
+    expect(
+      await screen.findByRole("menuitem", { name: /Shuffle/ }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Edit" }));
+    expect(onEdit).toHaveBeenCalledOnce();
   });
 });

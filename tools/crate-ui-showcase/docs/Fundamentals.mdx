@@ -1,0 +1,294 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/Fundamentals.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+
+<DocHeading as="h1">Crate foundations</DocHeading>
+
+<EntryDetails
+  id="fundamentals"
+  review="Visual review approved by Diego · 1AY"
+/>
+
+<DocHeading as="h2">Contract</DocHeading>
+
+- One identity for Admin and Listen. Self-hosted Bricolage Grotesque (display), Roboto (body) and JetBrains Mono faces; token-based colors and surfaces.
+- No selectable visual themes or duplicated hex recipes.
+- Samples and token tables read the real CSS. Scene geometry does not change a component's anatomy.
+
+<DocHeading as="h2">Real component</DocHeading>
+
+<Canvas of={Stories.Colors} />
+<Canvas of={Stories.Typography} />
+<Canvas of={Stories.Spacing} />
+<Canvas of={Stories.Icons} />
+<Canvas of={Stories.Layers} />
+<Canvas of={Stories.Motion} />
+
+The 1AQ reference remains approved. Changes through 1AY are approved; consumer adoption and platform QA remain separate.
+
+<DocHeading as="h2">Form typography roles</DocHeading>
+
+All field captions use MonoLabel (Mono 400, uppercase, 11/15.4 px), including inline Checkbox, Switch and RadioGroup options. Inline is a layout choice, not a different typographic role. Helpers/errors use Mono 400 at 11.5/16.1 px. Editable controls and ordinary readonly output use the brand body face at 400, 15/21 px. Filters and segmented modes use Mono 400 at 12/16 px. Readout keeps its contextual Mono role; StatNumber uses display numerals and a normal-weight Mono caption. Surrounding headings or bold text must not change these defaults.
+
+Bricolage Grotesque and Roboto are packaged for display and body in web, Tauri and Capacitor; JetBrains Mono retains its existing role. General form ranges now use Slider in both apps; playback and EQ retain specialized controls.
+
+## Track metadata columns — local 1BA amendment
+
+The actual Listen TrackRowContent owns fixed slots through the shared row recipe: source quality,
+separate tempo and musical key, duration, like and menu. Missing values leave empty slots instead
+of moving neighboring values. Quality is visible at480px of row space, analysis at620px;
+narrow queues use those same container thresholds. Technical labels keep their existing Mono role
+and InfoBadge anatomy. Explicit flags and remote provenance belong to the identity block.
+The actual-view examples live under Listen/Album and access/TrackMetadata and Reviews/1BA.
+Source depth and rate must come from the individual track; never copy an album's best quality.
+
+The quality slot reserves9.5rem for the complete icon plus source label; tempo/key reserve
+4ch each, duration3.5rem, and each action44px. Duration keeps its existing12px type and fits hour-long
+timestamps; analysis keeps its technical metadata role. Badges retain their24px anatomy. The Listen adapter
+uses Solar Soundwave with the existing tier colors in heroes, rows and the player; source and
+streaming delivery remain distinct. AIFF shares the lossless classification, and invalid numeric
+source details stay absent. See the live Listen/QualityBadge entry for all tiers and origins.
+
+Radio choices reserve their 44 px coarse hit areas without overlap. Long searchable options wrap inside the menu. FormField kind="group" provides the caption and ARIA association without a native label target on a non-labelable group. Existing preview fixture controls use these same components; no new mockup specimens are added.
+
+The actions catalogue now includes Solar Eye Outline for preview actions. ActionButton/ActionLink compose the existing Button recipe; IconButton keeps the compact round/glow role. Coarse targets reserve at least44px in layout.
+
+## Surface roles — 1AT
+
+Canvas is the app background. Card is an opaque standalone object on surface-object with a quiet border and14px panel radius. InstrumentPanel is an unfilled section/figure with a quiet top rule,22px top inset and20px header rhythm. Separator is a1px subtle sibling rule. Artwork controls use the same opaque object surface, without a blur or cast shadow; their geometry and semantic states are independent. Modal/popover/scrim layers retain their dedicated contracts. Do not use Card as a generic replacement for every panel.
+
+The fullscreen player owns a single opaque `surface-canvas` across its header and scrollable body.
+Its header remains transparent: neither a separate toolbar material nor a background gradient
+may split the player surface. Listen's real-player visual regressions also verify safe-area
+clearance, an uncropped disc and reachable controls on short portrait and landscape screens.
+
+## Header roles — 1AU
+
+PageHeader is the ordinary page identity: Bricolage Grotesque600 at24/30px with body subtitle, optional
+MonoLabel text context, artwork and metadata. PageHeaderLayout owns container-aware positioning
+for both apps. SectionHeader is the content/rail role (Bricolage Grotesque700 at18/24/30), with a Mono count.
+PageHero preserves media/artist/editorial/card roles and a compact title option. HeroActionBar
+retains playback actions; ordinary upper-right actions use ActionGroup. BackLink preserves text
+and navigation, with coarse targets occupying real layout space. Sample captions compose
+FormField kind=group; all stacked caption-to-sample gaps are8px. These contracts implement the
+approved mockup and later confirmations; broader page adoption and native QA remain separate.
+
+## Collection and track roles — 1AW
+
+Entity titles use the existing brand body14/500 role; HairlineRow remains12/18. Active entity
+rows own a2px high-accent marker. Selection is separate from current playback. Track quality
+and explicit tags use InfoBadge24/12; technical metadata keeps its own mono role.
+
+Listen TrackRow preserves V2 playback identity across album/playlist, queue, Home recommendations
+and statistics: a white18px glyph in a24px visual slot over the cover, without an accent-filled disc. Track/album/artist artwork is at least48px in every density; the active ring control remains40px. Coarse hit
+areas remain at least44px independently of visible geometry. The layered aura, core,2px ring,
+progress leaf subscription and effects/reduced-motion preferences remain. Diego's1BA amendment
+restores a4% accent hover fill on enabled track rows for fine pointers. Other row families keep
+their existing no-fill policy. Selected/current track rows use the same8%-to-transparent
+selection surface as HairlineRow and a2px high-accent marker. Selection alone never claims
+current playback or changes the title to the current-track color.
+
+Track rows narrower than 480px (phones) drop the duration column and keep Like and More as two
+touching 44px controls, so the title gets about 180px instead of 97px on a 392px screen. Duration
+stays visible in the player and from 480px upwards, as in Tidal, Spotify and Apple Music.
+
+Artwork that has not loaded yet waits on `--surface-placeholder`, the same dark neutral as the
+loading skeletons, never on an accent tint; this covers MediaCover frames and Listen artist initials.
+
+Diego amendment: standalone track/album/artist covers have a48px minimum in every density;
+white18px glyph (24px visual slot) and active ring40px remain smaller than the artwork. Person avatars and
+internal collage tiles retain their separate roles. Legacy raw frames must adopt this minimum.
+
+The minimum-media source guard covers undersized standalone JSX image frames and the existing
+HTML artist-tooltip header. Managed image transport remains owned by Listen; its real-browser
+fixture verifies painted48px frames in both densities. This supplements geometry and contract
+checks; it is not complete native, assistive-technology or route certification.
+
+## Shell and collection amendments — 1AY
+
+Chrome uses the existing fixed canvas/chrome surfaces, quiet scroll hairlines and real44px
+navigation targets. Listen's floating player bar and mobile dock are the documented glass exception:
+neutral surface-chrome frosted with a 24px backdrop blur (18px with 1.18 saturation at ≤480px), with
+no accent tint, gradient or glow. Artist background framing is a Listen presentation decision: Diego approved
+a100px downward image offset with the original fade; it does not change the shared hero height.
+Collection totals sit beside their text tabs using InfoBadge counters, including0. Missing totals
+are omitted. FilterBar supports bottom alignment for labelled fields and adjacent actions.
+Select has a stable12rem base width, capped by its container; forms may request w-full or a fixed
+column width. Tab underlines travel with the spring-snappy curve and a450ms duration; reduced
+motion settles immediately. See Tabs/MovingUnderline and Reviews/1AY/Shell for actual consumers.
+These amendments are approved by Diego in1AY, not a new visual source of truth.
+
+The underline is decorative and2px thick. Its movement never changes focus or panel semantics.
+Browser checks cover stable Select width, field/action alignment and moving/reduced/vertical/RTL
+tab geometry; these checks supplement the component contracts rather than certifying native QA.
+
+## Artist and player review amendments — 1BA
+
+Preserve V2 image scale by role. Artist discography uses MediaGrid comfortable (2/3/4/5 columns,
+16px gap, maximum5) instead of compact; approved48px thumbnails and compact identity avatars
+retain their explicit exceptions. ModalBody fills its panel; the former60ch limit on the
+layout region was drift and must not be restored as a consumer override. See AppModal's
+full-width biography and the artist/player review in both hosts.
+
+Fullscreen lyrics retain the canvas without a colored background gradient in either renderer;
+the retired gradient/backdrop recipes have no remaining consumers. Text, timed lines, seek and
+scroll behavior remain owned by Listen. The player header has no added Now Playing caption.
+EQ access follows runtime capability, independent of whether the effect is enabled; opening
+its existing panel must not enable the effect or change saved gains/preferences.
+
+## Link feedback — 1BD amendment
+
+Links in both apps use the shared `link-meta` / `link-accent` recipes. Hover changes foreground
+color; accent links use the high accent. Diego removed all animated link beams, their generated
+underline layers and their keyframes. Normal and reduced motion share the same feedback.
+Native keyboard focus stays visible; truncated `link-inset` anchors retain an inset outline
+and static underline on focus. This concerns link feedback; tab indicators and player transport
+keep their independent interaction contracts. See the live Foundations/Links story.
+
+Linked StatNumber captions use the same high-accent foreground on hover and keyboard focus,
+with no beam or background. This behavior belongs to StatNumber itself. The numeral and unit
+keep their roles, and readonly metric captions remain subtle gray. See StatNumber/Linked.
+
+The same foreground rule applies to enabled links containing MonoLabel: hover and visible
+keyboard focus use high accent. Informational/disabled labels keep their tone. Context-menu
+options containing an actual MonoLabel share this feedback and keep a transparent hover/focus
+background. Their resting state colors, target sizes and focus outline remain unchanged.
+The menu rule is scoped to actual MonoLabel options; body-text menu items keep their separate
+interaction recipe. Disabled options retain their resting feedback.
+
+Meter reserves its full formatted reading on one line (minimum5ch), with a flexible track; units and separators never wrap and displace adjacent instrument captions. See Components/Data Display/Meter.
+
+Meter owns its narrow layout: below320px available width, captions move above the rail and single-line reading. This keeps localized neighboring instruments aligned without caller overrides.
+
+Loading reserves neutral static blocks for known card/media/table layouts. Generic sections use
+a compact caption/hairline, never table-shaped dash readings. Route delay and motion gates stay
+unchanged. See the four Feedback skeleton entries and LoadingState for actual compositions.
+
+Search loading is an immediate section state: `fullWidth` fills its available panel content width. CatalogSearch names a single requested entity type; global/mixed searches say Finding your music... in the active locale. The 200ms route mark keeps its separate fixed geometry.
+
+Glass recipes declare only the standard `backdrop-filter`; the build adds the `-webkit-` prefix
+where targets need it. A hand-written prefix next to the standard property made the minifier keep
+only the prefixed form, which Chromium (and Android WebView) ignores, so the blur disappeared in
+production.
+
+The Smart Mix disc ring (`spinning-disc-mix-ring`) lights only during an actual Crossfade or
+Beatmatch. Its opacity follows the shared `--listen-crossfade-progress` (in over the first quarter,
+out over the last) and it keeps its last tone while fading. A soft glow pulses once per beat of the
+outgoing track's BPM; without a usable tempo it holds steady. Reduced motion shows the ring with a
+plain fade and no pulse.
+
+The Stats explorer recipe (`stats-explorer-*`) is a hand-built Listen instrument: an overview
+strip with a draggable window, a detail chart whose scale column sizes to its longest localized
+label, and an "In this stretch" panel that moves below the chart in containers under 50rem. Its
+only motion is the one-time opening from today backwards (ease-out-expo); reduced motion renders
+the final state and nothing moves at rest. Its actual view is Listen's StatsExplorerView. Axis
+labels centre on their bucket, except the first and last bucket labels (`data-edge="start"`/`"end"`),
+which anchor inward so they never spill past the chart edge on narrow screens.
+
+Explorer edge handles reach outward only (44px in total on coarse pointers), so even a 16px
+window keeps its body draggable; the press position, not the hit element, chooses move or
+resize. The strip keeps `touch-action: none` above app-level coarse `[tabindex]` rules, or the
+browser cancels the drag to pan. While a new stretch loads, the previous server blocks stay
+dimmed in place; a failed read says so instead of showing an empty stretch.
+
+The explorer replaces Listen's old signal tape on the Stats page; the tape's cursor, tooltip, axis
+and legend recipes (`stats-signal-tape`, `-cursor`, `-tip`, `-axis`, `-legend-*`) are gone. Only the
+bar and mood-line recipes that Home's mini tape still draws remain (`stats-signal-svg`, `-bar`,
+`-mood`), plus the loading skeleton. The Listen/Stats review hosts the explorer's real view and
+panel with local fixtures and no network.
+
+The listening heatmap band (`stats-heatmap-*`) replaces Listen's old heatmap card. It is an HTML
+`role="grid"` of 168 hours where each `role="row"` is its own grid: an aria-hidden weekday column
+plus `repeat(24, minmax(0, 1fr))`, with no subgrid or `display: contents`. A cell's one shared
+style carries `--stats-level` and `--stats-delay`. The level is a `::before` opacity of
+`0.05 + level * 0.95` over `accent-action-hi`, with glow only from level 0.6. Night hours,
+the peak and the current hour are attributes, not inline styles. Night cells get the quiet-subtle
+surface and the night hours get a hairline on the hour axis. The peak and now outlines sit on
+`::after` (the now outline is dashed), so the focus ring stays free. Rows grow from 18px to 24px
+in bands of 40rem or wider. Forced colors show cell borders, the level in `Highlight`, the peak
+outline in `Highlight` and the axis rule under night hours only.
+
+The heatmap's only entrance is a diagonal wave on the first real payload. It waits for its
+section's reveal, and later payloads transition the level's opacity. Reduced motion renders the
+final state. The actual view is Listen's `ListeningHeatmap`. The Listen/Stats review shows it with
+the now hour (personal), with its grid hidden below three Crate Pulse listeners (D30), and with
+a flat zero-minute grid.
+
+Track metadata follows the row's own container, rather than the viewport. Quality appears at
+640px of content width and BPM/key at800px, reserving space for the rank,48px cover and readable
+title. Quality, analysis, duration, like and menu keep their fixed slots; missing values do not
+collapse a column. Narrow rows retain their standard duration/actions layout. Stats rankings
+use the full page width instead of sharing a two-column layout with artist posters. The
+Stats row consistency review and the track metadata review exercise the same production pieces
+at375/640/760/900/1200px; they do not repair the row with scene CSS.
+
+## Approved font pairing — 21 October 2026
+
+Diego approved Bricolage Grotesque + Roboto, preserving JetBrains Mono. This replaces the prior IBM Plex Sans body selection.
+Only font families change: existing sizes, weights, tracking, geometry and colors remain.
+Font packaging checks verify both subsets and their source hashes; browser checks confirm the
+actual loaded faces and the unchanged Mono role.
+Variable normal faces (display 200–800, body 100–900; Latin + Latin Extended) are self-hosted with their OFL notices.
+The shared identity reaches Admin, Listen web, Tauri and Capacitor. Sharing canvases and the
+SVG export script use Roboto. Previous/candidate pairings stay scoped to the comparison.
+
+[Compare the actual components](http://127.0.0.1:5186/review-1be-font-pairings.html?pairing=bricolage-roboto).
+
+The approved Roboto body face uses unmodified variable normal WOFF2 files for Latin and Latin Extended
+(100–900), with its OFL notice and source/hash manifest in `app/shared/fonts/roboto/`.
+`roboto.css` is part of this foundation entry. Listen, Admin, both previews and the Storybook
+manager load that stylesheet locally; the previous Plex pairing remains an isolated specimen.
+
+## Metering and progress reconciliation — October 2026
+
+Meter and ProgressHairline keep one-pixel rails owned by the shared recipe. Meter reports a
+known range with bounded fill, a complete Mono reading and optional limit tick; unavailable
+measurements are named groups, not invented zero percentages. ProgressHairline uses ratios from
+0 to1 and only animates unknown progress while intersecting and motion is allowed. The Radix
+Progress facade takes values from0 to its max (100 by default). Their component entries cover
+these different contracts; callers must not mix their scales or thicken rails locally.
+
+Typography retains a separate `text-meta` token for compact technical metadata. It does not
+replace MonoLabel, informative-badge or filter typography. Compact counts use regular Mono;
+Bricolage display numerals remain an explicit StatNumber role rather than a blanket counter font.
+The Icons story now renders the actual Solar Tag, GripVertical and ArrowDownToLineBold aliases
+inside shared ActionButton controls, with accessible names and the common tooltip/target recipe.
+
+This catalogue reconciliation documents current source. It does not certify all Admin/Listen
+consumers or add a new visual approval. The focused progress/upcoming stories reuse actual
+components; no source geometry or canonical capture was changed.
+
+Token hygiene (2026-10-26): the nine visualizer ribbon stops the consolidated visualizer no
+longer reads were removed from `product.css`; `--visualizer-ribbon-stop-1` remains its active
+gradient. The Stats heatmap night band border uses `--border-quiet`, and the reduced-motion tabs
+indicator rule keys off `[data-crate-motion="reduced"]` like the other recipes. No visual change.
+
+Overlay sizes (2026-10-26): `2xl` (1024px) and `3xl` (1280px) join the overlay width scale for
+dense Admin dialogs such as artist repair and user detail.
+
+Toolbox icon (2026-10-26): the official Solar Toolbox Outline is inlined like Bot, since it was
+added upstream after the installed 2.1.1. Admin uses it for the artist Repair action instead of
+the Tuning glyph, which reads as an equalizer.
+
+Icon library (2026-10-26): the catalogue moved from `@solar-icons/react-perf` 2.1.1, which stopped
+receiving new glyphs, to `@solar-icons/react` 2.3.3 with per-icon imports. Public names and
+`CRATE_ICON_SIZE` are unchanged; Bot and Toolbox now come from the package instead of inlined SVG.
+Icons draw at 1em and take their size through font-size, so caller `size-*` classes still win.
+Six glyphs differ from the previous release: Share, ArchiveDown (Bold), VolumeCross,
+HamburgerMenu, Ticket and MagicStick (now Solar Magic Wand).
+
+Empty states (2026-10-26): `crate-empty-state` centres its content (items and text) with 24px inline
+padding inside any container, and keeps its 32px block padding and 160px minimum. The recipe is
+unlayered, so caller `py-*`, `min-h-*` or alignment utilities have no effect.
+
+Page titles (2026-10-26): `crate-page-title` is the single 800 page-title recipe (Bricolage 800,
+`clamp(2.25rem,4vw,3.75rem)`, display leading, -0.045em, balanced). `data-size="md"` fixes it at
+2.25rem. It declares `font-family: var(--font-display)`, so the Admin font-role policy recognises it as the
+display role. PageHeader and the Admin page titles use it instead of hand-written utility copies.
+
+Text panel tabs scroll without drawing a scrollbar when they overflow, and tighten their gap to 16px at 480px and below so four tabs fit a phone.
+
+`crate-touch-target` gives a compact control an invisible coarse-pointer hit area of at least 44px around its visible box, so touch reach does not change the control's size.

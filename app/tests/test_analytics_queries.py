@@ -230,12 +230,35 @@ class TestArtistAudioByAlbum:
         assert len(rows) == 1
         r = rows[0]
         assert r["album"] == "Audio Album"
+        assert r["year"] == "2021"
         assert r["avg_bpm"] == 130.0
         assert r["avg_energy"] == 0.7
         assert r["avg_danceability"] == 0.5
         assert r["avg_valence"] == 0.4
         assert r["avg_acousticness"] == 0.2
         assert r["avg_loudness"] == -7.0
+
+    def test_release_editions_retain_their_year_for_artwork_identity(self, pg_db):
+        artist = "Versioned Audio Artist"
+        _seed_artist(pg_db, artist)
+        for name, year, bpm in [
+            ("Record (Expanded Edition)", "1973", 110),
+            ("Record (2023 Remastered Edition)", "2023", 140),
+        ]:
+            path = f"/music/{artist}/{year}"
+            album_id = _seed_album(pg_db, artist, name, path=path, year=year)
+            track_path = f"{path}/01.flac"
+            _seed_track(pg_db, album_id, artist, name, "01.flac", path=track_path)
+            with transaction_scope() as session:
+                _set_audio_features(session, track_path, bpm=bpm, energy=0.5)
+
+        from crate.db.queries.analytics_artist import get_artist_audio_by_album
+
+        rows = get_artist_audio_by_album(artist)
+        assert [(row["album"], row["year"], row["avg_bpm"]) for row in rows] == [
+            ("Record (Expanded Edition)", "1973", 110),
+            ("Record (2023 Remastered Edition)", "2023", 140),
+        ]
 
     def test_tracks_without_bpm_excluded(self, pg_db):
         _seed_artist(pg_db, "Partial Audio Artist")

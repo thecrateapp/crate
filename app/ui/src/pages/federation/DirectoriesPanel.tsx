@@ -1,17 +1,16 @@
+import { FormField } from "@crate/ui/primitives/FormField";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
-import { Badge } from "@crate/ui/shadcn/badge";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Button } from "@crate/ui/shadcn/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@crate/ui/shadcn/card";
+import { Card, CardContent, CardHeader } from "@crate/ui/shadcn/card";
 import { Input } from "@crate/ui/shadcn/input";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 interface DirectoryCandidate {
   id: number;
@@ -82,38 +81,51 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
       toast.success("Directory subscription added");
     });
 
-  if (loading)
-    return <p className="text-sm text-white/45">Loading directories…</p>;
+  if (loading) return <LoadingState label="Loading directories" />;
   if (error)
-    return <p className="text-sm text-red-400">Could not load directories.</p>;
+    return (
+      <p role="alert" className="text-sm text-state-warning-text">
+        Could not load directories.
+      </p>
+    );
 
   return (
     <div className="space-y-4">
       {canManage ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Signed directories</CardTitle>
+            <MonoLabel as="h3" tone="accent">
+              Signed directories
+            </MonoLabel>
           </CardHeader>
           <CardContent className="grid gap-2 md:grid-cols-2">
-            <Input
-              aria-label="Directory URL"
-              placeholder="https://directory.example/nodes.json"
-              value={url}
-              onChange={(event) => setUrl(event.target.value)}
-            />
-            <Input
-              aria-label="Trusted key ID"
-              placeholder="Trusted key ID"
-              value={keyId}
-              onChange={(event) => setKeyId(event.target.value)}
-            />
-            <Input
-              aria-label="Trusted Ed25519 public key"
-              placeholder="Trusted Ed25519 public key (base64)"
-              value={publicKey}
-              onChange={(event) => setPublicKey(event.target.value)}
+            <FormField label="Directory URL">
+              <Input
+                aria-label="Directory URL"
+                placeholder="https://directory.example/nodes.json"
+                value={url}
+                onChange={(event) => setUrl(event.target.value)}
+              />
+            </FormField>
+            <FormField label="Trusted key ID">
+              <Input
+                aria-label="Trusted key ID"
+                placeholder="Trusted key ID"
+                value={keyId}
+                onChange={(event) => setKeyId(event.target.value)}
+              />
+            </FormField>
+            <FormField
+              label="Trusted Ed25519 public key"
               className="md:col-span-2"
-            />
+            >
+              <Input
+                aria-label="Trusted Ed25519 public key"
+                placeholder="Trusted Ed25519 public key (base64)"
+                value={publicKey}
+                onChange={(event) => setPublicKey(event.target.value)}
+              />
+            </FormField>
             <Button
               className="md:w-fit"
               disabled={
@@ -131,7 +143,7 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
       ) : null}
 
       {!data?.length ? (
-        <p className="text-sm text-white/45">No directory subscriptions.</p>
+        <EmptyState title="No directory subscriptions" />
       ) : (
         data.map((subscription) => (
           <Card key={subscription.subscription_uid}>
@@ -140,12 +152,22 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{subscription.url}</span>
-                    <Badge variant="secondary">{subscription.state}</Badge>
+                    <InfoBadge
+                      tone={
+                        subscription.state === "active"
+                          ? "success"
+                          : subscription.state === "error"
+                            ? "danger"
+                            : "neutral"
+                      }
+                    >
+                      {subscription.state}
+                    </InfoBadge>
                   </div>
-                  <dl className="mt-2 grid gap-x-4 gap-y-1 text-xs text-white/45 sm:grid-cols-2">
+                  <dl className="mt-2 grid gap-x-4 gap-y-1 text-xs text-text-muted sm:grid-cols-2">
                     <div>
                       <dt className="inline">Trusted key: </dt>
-                      <dd className="inline text-white/70">
+                      <dd className="inline text-text-secondary">
                         {subscription.trusted_keys_json
                           .map((key) => key.key_id)
                           .join(", ")}
@@ -153,13 +175,13 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
                     </div>
                     <div>
                       <dt className="inline">Last verified: </dt>
-                      <dd className="inline text-white/70">
+                      <dd className="inline text-text-secondary">
                         <AbsoluteTime value={subscription.last_success_at} />
                       </dd>
                     </div>
                   </dl>
                   {subscription.last_error_code ? (
-                    <p className="mt-2 text-xs text-red-400">
+                    <p className="mt-2 text-xs text-state-warning-text">
                       {subscription.last_error_code}:{" "}
                       {subscription.last_error_detail}
                     </p>
@@ -210,7 +232,7 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
                     </Button>
                     <Button
                       size="sm"
-                      variant="destructive"
+                      variant="outline"
                       onClick={() => {
                         if (
                           !window.confirm("Delete this directory subscription?")
@@ -234,14 +256,14 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
 
               <div className="space-y-2">
                 {subscription.candidates.length === 0 ? (
-                  <p className="text-xs text-white/45">
+                  <p className="text-xs text-text-muted">
                     No candidates discovered.
                   </p>
                 ) : (
                   subscription.candidates.map((candidate) => (
                     <div
                       key={candidate.id}
-                      className="rounded-xl border border-white/10 p-3"
+                      className="rounded-md border border-border-quiet p-3"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
@@ -249,15 +271,37 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
                             <span className="text-sm font-medium">
                               {candidate.display_name || candidate.node_uid}
                             </span>
-                            <Badge variant="secondary">{candidate.state}</Badge>
+                            <InfoBadge
+                              tone={
+                                candidate.state === "pending"
+                                  ? "warning"
+                                  : candidate.state === "ignored"
+                                    ? "neutral"
+                                    : candidate.state === "stale"
+                                      ? "danger"
+                                      : "info"
+                              }
+                            >
+                              {candidate.state}
+                            </InfoBadge>
                             {candidate.peer_trust_state ? (
-                              <Badge>{candidate.peer_trust_state}</Badge>
+                              <InfoBadge
+                                tone={
+                                  candidate.peer_trust_state === "approved"
+                                    ? "success"
+                                    : candidate.peer_trust_state === "pending"
+                                      ? "warning"
+                                      : "neutral"
+                                }
+                              >
+                                {candidate.peer_trust_state}
+                              </InfoBadge>
                             ) : null}
                           </div>
-                          <div className="mt-1 font-mono text-xs text-white/35">
+                          <div className="mt-1 font-mono text-xs text-text-subtle">
                             {candidate.node_uid}
                           </div>
-                          <div className="text-xs text-white/45">
+                          <div className="text-xs text-text-muted">
                             digest {candidate.descriptor_digest}
                           </div>
                         </div>
@@ -285,7 +329,7 @@ export function DirectoriesPanel({ canManage }: { canManage: boolean }) {
                         ) : null}
                       </div>
                       {candidate.metadata_json.approved_peer_diff ? (
-                        <div className="mt-2 rounded-lg bg-amber-500/10 p-2 text-xs text-amber-300">
+                        <div className="mt-2 rounded-lg bg-state-warning/10 p-2 text-xs text-state-warning-text">
                           Descriptor changed. Review URL/key differences before
                           approving.
                         </div>

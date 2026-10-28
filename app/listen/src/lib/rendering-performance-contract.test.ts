@@ -15,9 +15,27 @@ describe("Listen rendering performance contract", () => {
     );
   });
 
+  it("frosts the mobile dock with neutral chrome and no accent tint", () => {
+    const dock = css.match(/^[.]listen-mobile-dock-glass\s*{([^}]*)}/m)?.[1];
+    expect(dock).toBeDefined();
+    expect(dock).toMatch(/background:\s*var\(--surface-chrome\);/);
+    expect(dock).toMatch(/(?:^|\s)backdrop-filter:\s*blur\(24px\);/);
+    expect(dock).not.toMatch(/-webkit-backdrop-filter/);
+    expect(dock).not.toMatch(/accent|gradient|box-shadow/);
+  });
+
   it("uses a cheaper mobile dock filter on narrow viewports", () => {
     expect(css).toMatch(
       /@media\s*\(max-width:\s*480px\)[\s\S]*?[.]listen-mobile-dock-glass\s*{[^}]*backdrop-filter:\s*blur\(18px\)\s+saturate\(1[.]18\);/,
     );
+  });
+
+  it("leaves backdrop-filter prefixing to the build so Chromium keeps the blur", () => {
+    const recipes = fs.readFileSync(
+      path.resolve("../shared/ui/tokens/recipes.css"),
+      "utf8",
+    );
+    expect(css).not.toMatch(/-webkit-backdrop-filter/);
+    expect(recipes).not.toMatch(/-webkit-backdrop-filter/);
   });
 });

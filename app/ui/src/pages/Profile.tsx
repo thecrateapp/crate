@@ -3,7 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { api, ApiError } from "@/lib/api";
 import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
-import { Badge } from "@crate/ui/shadcn/badge";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { toast } from "sonner";
 import { User, Lock, Link2, Unlink } from "lucide-react";
 
@@ -92,7 +92,7 @@ export function Profile() {
 
   return (
     <div className="max-w-lg">
-      <h1 className="text-2xl font-bold mb-6">Profile</h1>
+      <h1 className="text-2xl font-bold mb-6 font-display">Profile</h1>
 
       {/* Profile info */}
       <div className="bg-card border border-border rounded-md p-6 mb-6">
@@ -109,17 +109,17 @@ export function Profile() {
               {user.name || user.email}
             </div>
             <div className="text-sm text-muted-foreground">{user.email}</div>
-            <Badge variant="secondary" className="mt-1">
-              {user.role}
-            </Badge>
+            <div className="mt-1">
+              <InfoBadge>{user.role}</InfoBadge>
+            </div>
           </div>
         </div>
 
         <form onSubmit={handleSaveProfile} className="space-y-4">
-          <div>
+          <div className="crate-form-field">
             <label
               htmlFor="profile-display-name"
-              className="text-sm text-muted-foreground mb-1 block"
+              className="text-sm text-muted-foreground block"
             >
               Display Name
             </label>
@@ -129,10 +129,10 @@ export function Profile() {
               onChange={(e) => setName(e.target.value)}
             />
           </div>
-          <div>
+          <div className="crate-form-field">
             <label
               htmlFor="profile-username"
-              className="text-sm text-muted-foreground mb-1 block"
+              className="text-sm text-muted-foreground block"
             >
               Username
             </label>
@@ -142,10 +142,10 @@ export function Profile() {
               onChange={(e) => setUsername(e.target.value.replace(/\s+/g, "-"))}
             />
           </div>
-          <div>
+          <div className="crate-form-field">
             <label
               htmlFor="profile-bio"
-              className="text-sm text-muted-foreground mb-1 block"
+              className="text-sm text-muted-foreground block"
             >
               Bio
             </label>
@@ -163,7 +163,7 @@ export function Profile() {
 
       {/* Change password */}
       <div className="bg-card border border-border rounded-md p-6 mb-6">
-        <h2 className="font-semibold mb-4 flex items-center gap-2">
+        <h2 className="font-semibold mb-4 flex items-center gap-2 font-display">
           <Lock size={16} /> Change Password
         </h2>
         <form onSubmit={handleChangePassword} className="space-y-3">
@@ -197,7 +197,7 @@ export function Profile() {
 
       {/* Connected accounts */}
       <div className="bg-card border border-border rounded-md p-6">
-        <h2 className="font-semibold mb-4 flex items-center gap-2">
+        <h2 className="font-semibold mb-4 flex items-center gap-2 font-display">
           <Link2 size={16} /> Connected Accounts
         </h2>
 

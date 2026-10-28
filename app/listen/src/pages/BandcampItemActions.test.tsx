@@ -17,6 +17,29 @@ const errorToast = vi.hoisted(() => vi.fn());
 vi.mock("sonner", () => ({ toast: { error: errorToast } }));
 
 describe("BandcampItemActions", () => {
+  it.each([false, true])(
+    "uses canonical icon-only actions without local button sizing: compact %s",
+    (compact) => {
+      renderWithListenProviders(
+        <BandcampItemActions
+          item={{
+            id: 1,
+            owned: true,
+            downloadable: true,
+            item_url: "https://artist.bandcamp.com",
+          }}
+          busyAction={null}
+          onImport={vi.fn()}
+          compact={compact}
+        />,
+      );
+      const action = screen.getByRole("button", { name: /import/i });
+      expect(action).toHaveClass("size-11");
+      expect(action.textContent).toBe("");
+      expect(action.closest('[data-slot="action-group"]')).toBeInTheDocument();
+    },
+  );
+
   beforeEach(() => {
     mockOpenExternalUrl.mockResolvedValue(undefined);
   });

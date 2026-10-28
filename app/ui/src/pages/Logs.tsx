@@ -1,31 +1,35 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import {
-  AlertTriangle,
-  Bug,
-  Filter,
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
+import {
+  RefreshCw as HeaderRefreshCw,
   Loader2,
   Pause,
   Play,
-  RefreshCw,
-  ScrollText,
-  Search,
-  ShieldAlert,
-  Wifi,
 } from "lucide-react";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
+import { SeverityMeter } from "@/components/admin/status-indicators";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router";
 
 import {
   OpsPageHero,
   OpsPanel,
+  OpsRefreshNotice,
+  OpsSnapshotStatus,
   OpsStatTile,
+  type OpsStreamStatus,
 } from "@/components/admin/ops-surfaces";
 import { AdminSelect } from "@/components/ui/AdminSelect";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
-import { Button } from "@crate/ui/shadcn/button";
-import { Input } from "@crate/ui/shadcn/input";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 import { api } from "@/lib/api";
 import { cn, timeAgo } from "@/lib/utils";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 interface LogEntry {
   id: number;
@@ -45,6 +49,15 @@ interface WorkerInfo {
 }
 
 interface LogsSnapshotData {
+  snapshot: {
+    scope: string;
+    subject_key: string;
+    version: number;
+    built_at?: string | null;
+    stale_after?: string | null;
+    stale: boolean;
+    generation_ms: number;
+  };
   logs: LogEntry[];
   workers: WorkerInfo[];
 }
@@ -60,30 +73,6 @@ const KNOWN_CATEGORIES = [
   "sync",
   "system",
 ];
-
-const LEVEL_META: Record<string, { dot: string; text: string; pill: string }> =
-  {
-    error: {
-      dot: "bg-red-400",
-      text: "text-red-100",
-      pill: "border-red-500/25 bg-red-500/10 text-red-100",
-    },
-    warn: {
-      dot: "bg-amber-400",
-      text: "text-amber-100",
-      pill: "border-amber-500/25 bg-amber-500/10 text-amber-100",
-    },
-    info: {
-      dot: "bg-cyan-400",
-      text: "text-white/80",
-      pill: "border-cyan-400/25 bg-cyan-400/10 text-cyan-100",
-    },
-    debug: {
-      dot: "bg-white/25",
-      text: "text-white/55",
-      pill: "border-white/10 bg-white/[0.04] text-white/55",
-    },
-  };
 
 function formatLogTimestamp(ts: string) {
   try {
@@ -126,32 +115,27 @@ function WorkerTile({
       type="button"
       onClick={onClick}
       className={cn(
-        "rounded-md border bg-black/20 p-3 text-left transition-colors",
+        "rounded-md border bg-raised-surface p-3 text-left transition-colors",
         active
-          ? "border-cyan-400/25 bg-cyan-400/10"
-          : "border-white/8 hover:border-white/16 hover:bg-white/[0.04]",
+          ? "border-accent-action/25 bg-accent-action/10"
+          : "border-border-quiet hover:bg-surface-control",
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
-          <div className="text-sm font-medium text-white">
+          <div className="text-sm font-medium text-text-primary">
             {worker.worker_id}
           </div>
-          <div className="text-xs text-white/40">
+          <div className="text-xs text-text-muted">
             {worker.log_count} log lines seen
           </div>
         </div>
-        <CrateChip
-          className={
-            online
-              ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
-              : ""
-          }
-        >
-          {online ? "Online" : "Idle"}
-        </CrateChip>
+        <StatusDot
+          tone={online ? "on" : "off"}
+          label={online ? "Online" : "Idle"}
+        />
       </div>
-      <div className="mt-3 text-xs text-white/35">
+      <div className="mt-3 text-xs text-text-subtle">
         Last seen {timeAgo(worker.last_seen)}
       </div>
     </button>
@@ -160,36 +144,31 @@ function WorkerTile({
 
 function LogRow({ entry }: { entry: LogEntry }) {
   const level = entry.level.toLowerCase();
-  const meta = LEVEL_META[level] ?? LEVEL_META.info!;
+  const messageTone =
+    level === "debug" ? "text-text-muted" : "text-text-secondary";
   const metadata = metadataPreview(entry.metadata);
 
   return (
     <div
       className={cn(
-        "grid gap-3 border-b border-white/6 px-4 py-3 font-mono text-[11px] transition-colors hover:bg-white/[0.03] md:grid-cols-[78px_68px_minmax(0,1fr)]",
-        level === "error" && "bg-red-500/[0.04]",
+        "grid gap-3 border-b border-border-quiet px-4 py-3 font-mono text-label transition-colors md:grid-cols-[78px_68px_minmax(0,1fr)]",
       )}
     >
-      <div className="text-white/25 tabular-nums">
+      <div className="text-text-subtle tabular-nums">
         {formatLogTimestamp(entry.created_at)}
       </div>
-      <div className="flex items-center gap-2">
-        <span className={cn("h-2 w-2 rounded-full", meta.dot)} />
-        <span className={cn("uppercase tracking-[0.12em]", meta.text)}>
-          {level}
-        </span>
-      </div>
+      <SeverityMeter level={level} label={level} />
       <div className="min-w-0 space-y-1">
-        <div className={cn("break-words leading-5", meta.text)}>
+        <div className={cn("break-words leading-5", messageTone)}>
           {entry.message}
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-[10px] text-white/35">
-          <CrateChip className="font-sans">{entry.category}</CrateChip>
-          <CrateChip className="font-sans">{entry.worker_id}</CrateChip>
+        <div className="flex flex-wrap items-center gap-2 text-label text-text-muted">
+          <InfoBadge>{entry.category}</InfoBadge>
+          <InfoBadge>{entry.worker_id}</InfoBadge>
           {entry.task_id ? (
             <Link
               to={`/tasks?task=${entry.task_id}`}
-              className="font-sans text-primary/70 hover:text-primary"
+              className="font-sans text-accent-action-hi hover:underline"
             >
               Task {entry.task_id.slice(0, 8)}
             </Link>
@@ -197,9 +176,14 @@ function LogRow({ entry }: { entry: LogEntry }) {
           <span>{timeAgo(entry.created_at)}</span>
         </div>
         {metadata ? (
-          <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[10px] text-white/30">
-            {metadata}
-          </div>
+          <details className="min-w-0 text-label text-text-subtle">
+            <summary className="flex min-h-11 cursor-pointer items-center">
+              Inspect metadata
+            </summary>
+            <pre className="max-h-80 overflow-auto whitespace-pre rounded-md border border-border-quiet bg-panel-surface p-3 text-label text-text-secondary">
+              {JSON.stringify(entry.metadata, null, 2)}
+            </pre>
+          </details>
         ) : null}
       </div>
     </div>
@@ -215,6 +199,8 @@ export function Logs() {
   const [workerId, setWorkerId] = useState("");
   const [search, setSearch] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [streamStatus, setStreamStatus] =
+    useState<OpsStreamStatus>("connecting");
   const loadedRef = useRef(false);
   const reconnectTimerRef = useRef<number | null>(null);
 
@@ -240,7 +226,11 @@ export function Logs() {
   }, [fetchSnapshot]);
 
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (!autoRefresh) {
+      setStreamStatus("paused");
+      return;
+    }
+    setStreamStatus("connecting");
     let disposed = false;
     let stream: EventSource | null = null;
 
@@ -249,11 +239,13 @@ export function Logs() {
       stream = new EventSource("/api/admin/logs-stream?limit=100", {
         withCredentials: true,
       });
+      stream.onopen = () => setStreamStatus("live");
       stream.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data) as LogsSnapshotData;
           setSnapshot(payload);
           setError(null);
+          setStreamStatus("live");
           setLoading(false);
           loadedRef.current = true;
         } catch {
@@ -263,6 +255,7 @@ export function Logs() {
       stream.onerror = () => {
         stream?.close();
         stream = null;
+        setStreamStatus("reconnecting");
         if (!disposed) {
           reconnectTimerRef.current = window.setTimeout(connect, 5000);
         }
@@ -322,8 +315,17 @@ export function Logs() {
 
   if (loading && !snapshot) {
     return (
-      <div className="flex justify-center py-16 text-white/45">
-        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+      <div
+        role="status"
+        aria-label="Loading worker logs"
+        aria-busy="true"
+        className="flex justify-center py-16 text-text-muted"
+      >
+        <Loader2
+          data-admin-ux="logs-loading"
+          aria-hidden="true"
+          className="h-5 w-5 animate-spin text-accent-action-hi"
+        />
       </div>
     );
   }
@@ -337,75 +339,86 @@ export function Logs() {
   return (
     <div className="space-y-6">
       <OpsPageHero
-        icon={ScrollText}
         title="Logs"
         description="Live worker stream for enrichment, analysis, sync and system activity. Built for triage, not archaeology."
+        compactActions
         actions={
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={() => setAutoRefresh((current) => !current)}
-            >
-              {autoRefresh ? <Pause size={14} /> : <Play size={14} />}
-              {autoRefresh ? "Pause live" : "Resume live"}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={() => void fetchSnapshot(true)}
-            >
-              <RefreshCw size={14} />
-              Refresh
-            </Button>
-          </>
+          <PageHeaderActions>
+            <>
+              <PageHeaderAction
+                label={autoRefresh ? "Pause live" : "Resume live"}
+                onClick={() => setAutoRefresh((current) => !current)}
+              >
+                {autoRefresh ? (
+                  <Pause
+                    data-admin-ux="live-pause"
+                    aria-hidden="true"
+                    size={14}
+                  />
+                ) : (
+                  <Play
+                    data-admin-ux="live-resume"
+                    aria-hidden="true"
+                    size={14}
+                  />
+                )}
+              </PageHeaderAction>
+              <PageHeaderAction
+                label="Refresh"
+                onClick={() => void fetchSnapshot(true)}
+              >
+                <HeaderRefreshCw
+                  data-admin-ux="header-refresh"
+                  aria-hidden="true"
+                />
+              </PageHeaderAction>
+            </>
+          </PageHeaderActions>
         }
       >
-        <CratePill active icon={ScrollText}>
-          {visibleLogs.length} lines
-        </CratePill>
-        <CratePill icon={Wifi}>
+        <InfoBadge active>{visibleLogs.length} lines</InfoBadge>
+        <InfoBadge>
           {summary.onlineWorkers}/{workers.length} workers online
-        </CratePill>
+        </InfoBadge>
         {summary.errors > 0 ? (
-          <CratePill className="border-red-500/25 bg-red-500/10 text-red-100">
-            {summary.errors} errors
-          </CratePill>
+          <InfoBadge tone="danger">{summary.errors} errors</InfoBadge>
         ) : null}
         {summary.warnings > 0 ? (
-          <CratePill className="border-amber-500/25 bg-amber-500/10 text-amber-100">
-            {summary.warnings} warnings
-          </CratePill>
+          <InfoBadge tone="warning">{summary.warnings} warnings</InfoBadge>
         ) : null}
-        <CratePill>{autoRefresh ? "Live mode" : "Frozen snapshot"}</CratePill>
+        <OpsSnapshotStatus
+          snapshot={snapshot?.snapshot}
+          streamStatus={streamStatus}
+        />
       </OpsPageHero>
+
+      {error && snapshot ? (
+        <OpsRefreshNotice
+          message="Could not refresh worker logs. Showing the last successful snapshot."
+          onRetry={() => void fetchSnapshot(true)}
+        />
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <OpsStatTile
-          icon={ShieldAlert}
           label="Errors"
           value={summary.errors.toLocaleString()}
           caption="Filtered lines at error level"
           tone={summary.errors > 0 ? "danger" : "default"}
         />
         <OpsStatTile
-          icon={AlertTriangle}
           label="Warnings"
           value={summary.warnings.toLocaleString()}
           caption="Things worth checking before they hard-fail"
           tone={summary.warnings > 0 ? "warning" : "default"}
         />
         <OpsStatTile
-          icon={Wifi}
           label="Workers online"
           value={summary.onlineWorkers.toLocaleString()}
           caption={`${workers.length.toLocaleString()} known workers`}
           tone={summary.onlineWorkers > 0 ? "success" : "default"}
         />
         <OpsStatTile
-          icon={Bug}
           label="Info / debug"
           value={(
             summary.infos +
@@ -416,34 +429,35 @@ export function Logs() {
       </div>
 
       <OpsPanel
-        icon={Filter}
         title="Filters"
         description="Shape the stream by severity, worker, category or free-text search without losing the live console feel."
       >
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-          <div className="relative flex-1 min-w-[240px]">
-            <Search
-              size={14}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
-            />
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search messages, workers, task ids or metadata..."
-              className="pl-9"
+          <SearchInput
+            label="Search worker logs"
+            containerClassName="flex-1 min-w-[240px]"
+            value={search}
+            onValueChange={setSearch}
+            placeholder="Search messages, workers, task ids or metadata..."
+          />
+          <div className="crate-form-field max-w-full">
+            <MonoLabel as="span" className="block">
+              Log level
+            </MonoLabel>
+            <SegmentedControl
+              as="radio"
+              label="Log level"
+              value={level}
+              onValueChange={setLevel}
+              items={[
+                { value: "", label: "All levels" },
+                { value: "error", label: "Error" },
+                { value: "warn", label: "Warning" },
+                { value: "info", label: "Info" },
+                { value: "debug", label: "Debug" },
+              ]}
             />
           </div>
-          <AdminSelect
-            value={level}
-            onChange={setLevel}
-            placeholder="All levels"
-            options={[
-              { value: "error", label: "Error" },
-              { value: "warn", label: "Warning" },
-              { value: "info", label: "Info" },
-              { value: "debug", label: "Debug" },
-            ]}
-          />
           <AdminSelect
             value={category}
             onChange={setCategory}
@@ -453,6 +467,7 @@ export function Logs() {
               label: entry,
             }))}
             searchable
+            triggerClassName="min-h-11"
             searchPlaceholder="Filter categories..."
           />
           <AdminSelect
@@ -465,13 +480,13 @@ export function Logs() {
               count: worker.log_count,
             }))}
             searchable
+            triggerClassName="min-h-11"
             searchPlaceholder="Filter workers..."
           />
         </div>
       </OpsPanel>
 
       <OpsPanel
-        icon={Wifi}
         title="Worker roster"
         description="Known workers, their recent heartbeat, and a quick way to isolate one noisy process from the rest."
       >
@@ -491,41 +506,39 @@ export function Logs() {
             ))}
           </div>
         ) : (
-          <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-8 text-center text-sm text-white/35">
-            No worker heartbeat data available yet.
-          </div>
+          <EmptyState message="No worker heartbeat data available yet." />
         )}
       </OpsPanel>
 
       <OpsPanel
-        icon={ScrollText}
         title="Incident stream"
         description="Newest lines first. The console stays readable even when filtered down to one worker or one category."
       >
-        <div className="overflow-hidden rounded-md border border-white/8 bg-[#06080c]">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/6 px-4 py-3">
+        <div className="overflow-hidden rounded-md border border-border-quiet bg-panel-surface">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-quiet px-4 py-3">
             <div className="flex flex-wrap items-center gap-2">
               {level ? (
-                <CrateChip className={LEVEL_META[level]?.pill}>
-                  {level}
-                </CrateChip>
+                <InfoBadge>
+                  <SeverityMeter level={level} label={level} />
+                </InfoBadge>
               ) : null}
-              {category ? <CrateChip>{category}</CrateChip> : null}
-              {workerId ? <CrateChip>{workerId}</CrateChip> : null}
-              {search ? <CrateChip>{search}</CrateChip> : null}
+              {category ? <InfoBadge>{category}</InfoBadge> : null}
+              {workerId ? <InfoBadge>{workerId}</InfoBadge> : null}
+              {search ? <InfoBadge>{search}</InfoBadge> : null}
               {!level && !category && !workerId && !search ? (
-                <CrateChip>All filters open</CrateChip>
+                <InfoBadge>All filters open</InfoBadge>
               ) : null}
             </div>
-            <div className="text-xs text-white/35">
+            <div className="text-xs text-text-muted">
               Showing {visibleLogs.length} of {logs.length} lines
             </div>
           </div>
 
           {visibleLogs.length === 0 ? (
-            <div className="px-4 py-12 text-center text-sm text-white/40">
-              No log lines match the current filters.
-            </div>
+            <EmptyState
+              message="No log lines match the current filters."
+              className="px-4"
+            />
           ) : (
             <div className="max-h-[70vh] overflow-y-auto">
               {visibleLogs.map((entry) => (

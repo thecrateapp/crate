@@ -5,6 +5,7 @@ import { toPlayableTrack } from "@/lib/playable-track";
 type TrackRowDataInput = PlayableTrackInput & {
   track_number?: number | null;
   disabled?: boolean;
+  explicit?: boolean;
 };
 
 export function toTrackRowData(input: TrackRowDataInput): TrackRowData {
@@ -24,7 +25,7 @@ export function toTrackRowData(input: TrackRowDataInput): TrackRowData {
     album_id: track.albumId,
     album_entity_uid: track.albumEntityUid,
     album_slug: track.albumSlug,
-    duration: input.duration ?? undefined,
+    duration: track.duration,
     path: track.path,
     track_number: input.track_number ?? undefined,
     format: track.format,
@@ -45,5 +46,6 @@ export function toTrackRowData(input: TrackRowDataInput): TrackRowData {
     remote_entity_uid: track.remote?.remoteEntityUid,
     availability: input.availability ?? track.remote?.availability,
     disabled: input.disabled,
+    explicit: input.explicit,
   };
 }

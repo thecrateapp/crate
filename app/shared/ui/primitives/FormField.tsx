@@ -7,10 +7,13 @@ import {
 } from "react";
 
 import { cn } from "@crate/ui/lib/cn";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
 
 export interface FormFieldControlProps {
   id: string;
   "aria-describedby"?: string;
+  "aria-labelledby"?: string;
   "aria-invalid"?: true;
   "aria-required"?: true;
 }
@@ -18,6 +21,7 @@ export interface FormFieldControlProps {
 type FormFieldChildProps = {
   id?: string;
   "aria-describedby"?: string;
+  "aria-labelledby"?: string;
   "aria-invalid"?: boolean | "true" | "false";
   "aria-required"?: boolean | "true" | "false";
 };
@@ -30,6 +34,8 @@ export interface FormFieldProps {
   required?: boolean;
   className?: string;
   labelClassName?: string;
+  layout?: "stacked" | "inline";
+  kind?: "control" | "group";
   children:
     | ReactElement<FormFieldChildProps>
     | ((control: FormFieldControlProps) => ReactNode);
@@ -47,6 +53,8 @@ export function FormField({
   required = false,
   className,
   labelClassName,
+  layout = "stacked",
+  kind = "control",
   children,
 }: FormFieldProps) {
   const generatedId = useId();
@@ -55,6 +63,7 @@ export function FormField({
       ? children.props.id
       : undefined;
   const controlId = id ?? childId ?? `${generatedId}-control`;
+  const labelId = `${controlId}-label`;
   const hintId = `${controlId}-hint`;
   const errorId = `${controlId}-error`;
   const showHint = hasContent(hint);
@@ -67,6 +76,7 @@ export function FormField({
 
   const control: FormFieldControlProps = {
     id: controlId,
+    ...(hasContent(label) ? { "aria-labelledby": labelId } : {}),
     ...(describedBy ? { "aria-describedby": describedBy } : {}),
     ...(showError ? { "aria-invalid": true as const } : {}),
     ...(required ? { "aria-required": true as const } : {}),
@@ -79,6 +89,10 @@ export function FormField({
     const existingDescribedBy = children.props["aria-describedby"];
     renderedControl = cloneElement(children, {
       ...control,
+      "aria-labelledby":
+        [children.props["aria-labelledby"], control["aria-labelledby"]]
+          .filter(Boolean)
+          .join(" ") || undefined,
       "aria-describedby":
         [existingDescribedBy, describedBy].filter(Boolean).join(" ") ||
         undefined,
@@ -86,36 +100,40 @@ export function FormField({
     });
   }
 
+  const Caption = kind === "group" ? "div" : "label";
+  const caption = hasContent(label) ? (
+    <Caption
+      id={labelId}
+      {...(kind === "control" ? { htmlFor: controlId } : {})}
+      data-slot="form-field-label"
+      className={cn("font-mono text-label text-text-subtle", labelClassName)}
+    >
+      <MonoLabel as="span" className="text-inherit">
+        {label}
+        {required ? (
+          <span aria-hidden="true" className="ml-0.5 text-state-warning-text">
+            *
+          </span>
+        ) : null}
+      </MonoLabel>
+    </Caption>
+  ) : null;
+
   return (
     <div
       data-slot="form-field"
+      data-layout={layout}
       data-invalid={showError || undefined}
-      className={cn("grid gap-1.5", className)}
+      className={cn("crate-form-field grid gap-2", className)}
     >
-      {hasContent(label) ? (
-        <label
-          htmlFor={controlId}
-          data-slot="form-field-label"
-          className={cn(
-            "text-sm font-medium text-text-primary",
-            showError && "text-state-danger-text",
-            labelClassName,
-          )}
-        >
-          {label}
-          {required ? (
-            <span aria-hidden="true" className="ml-0.5 text-state-danger-text">
-              *
-            </span>
-          ) : null}
-        </label>
-      ) : null}
-      {renderedControl}
+      {layout === "inline" ? renderedControl : null}
+      {caption}
+      {layout === "stacked" ? renderedControl : null}
       {showHint ? (
         <p
           id={hintId}
           data-slot="form-field-hint"
-          className="text-xs text-text-muted"
+          className="crate-form-helper"
         >
           {hint}
         </p>
@@ -125,9 +143,10 @@ export function FormField({
           id={errorId}
           data-slot="form-field-error"
           role="alert"
-          className="text-xs text-state-danger-text"
+          className="crate-form-helper flex items-start gap-2"
         >
-          {error}
+          <StatusDot tone="warn" className="mt-1" />
+          <span>{error}</span>
         </p>
       ) : null}
     </div>

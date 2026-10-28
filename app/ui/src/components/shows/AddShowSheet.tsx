@@ -11,7 +11,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@crate/ui/shadcn/sheet";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { ShowCandidateFields } from "./ShowCandidateFields";
@@ -376,12 +376,12 @@ export function AddShowSheet({
             {status}
           </p>
           {notice ? (
-            <p role="alert" className="text-sm text-state-danger-text">
+            <p role="alert" className="text-sm text-state-warning-text">
               {notice}
             </p>
           ) : null}
           {flow.error ? (
-            <p role="alert" className="text-sm text-state-danger-text">
+            <p role="alert" className="text-sm text-state-warning-text">
               {flow.error}
             </p>
           ) : null}
@@ -453,7 +453,7 @@ export function AddShowSheet({
           title={`Discard ${countLabel(discarded, "unsaved show")}?`}
           description="The draft and its source are cleared. Shows you already saved stay in Crate."
           confirmLabel="Discard"
-          variant="destructive"
+          tone="danger"
           onConfirm={reset}
         />
       </SheetContent>

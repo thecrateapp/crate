@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-import { isMotionBlocked } from "@/lib/motion-availability";
+import { isMotionBlocked } from "../../lib/motion-availability";
 
 const DURATION_MS = 1200;
 

@@ -4,6 +4,7 @@ import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { AdminSelect } from "@/components/ui/AdminSelect";
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { cn } from "@/lib/utils";
 import { missingFields, type RequiredShowField } from "./show-draft";
 import {
@@ -76,9 +77,14 @@ const REQUIRED = new Set<string>([
   "city",
 ] satisfies RequiredShowField[]);
 
-const STATUS_OPTIONS = Object.entries(SHOW_STATUS_LABELS).map(
-  ([value, label]) => ({ value, label }),
-);
+const STATUS_OPTIONS = [
+  "scheduled",
+  "onsale",
+  "offsale",
+  "cancelled",
+  "postponed",
+  "rescheduled",
+].map((value) => ({ value, label: SHOW_STATUS_LABELS[value] ?? value }));
 
 function parseLineup(value: string): string[] {
   return value
@@ -179,7 +185,7 @@ export function ShowCandidateFields({
           aria-describedby={describedBy}
           className={cn(
             "h-9",
-            REQUIRED.has(spec.key) && "aria-invalid:border-state-danger",
+            REQUIRED.has(spec.key) && "aria-invalid:border-state-warning",
           )}
           type={spec.type ?? "text"}
           value={candidate[spec.key] ?? ""}
@@ -240,7 +246,7 @@ export function ShowCandidateFields({
         )}
       </div>
       {missing.length ? (
-        <p id={missingId} className="text-xs text-state-danger-text">
+        <p id={missingId} className="text-xs text-state-warning-text">
           {missingText(missing)}
         </p>
       ) : null}
@@ -312,12 +318,11 @@ export function ShowCandidateFields({
         {candidate.evidence ? (
           <div>
             <p className="font-medium">From the source</p>
-            <p
-              className="line-clamp-3 whitespace-pre-wrap"
-              title={candidate.evidence}
-            >
-              {candidate.evidence}
-            </p>
+            <TooltipHint content={candidate.evidence}>
+              <p className="line-clamp-3 whitespace-pre-wrap">
+                {candidate.evidence}
+              </p>
+            </TooltipHint>
           </div>
         ) : null}
         {source ? (

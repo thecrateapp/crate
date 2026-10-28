@@ -67,3 +67,39 @@ describe("UserConnections", () => {
     expect(screen.getByText("Aún no sigue a nadie.")).toBeVisible();
   });
 });
+
+it("reserves avatar rows instead of a table while loading", () => {
+  vi.mocked(useApi).mockReturnValue({
+    data: null,
+    loading: true,
+    error: null,
+    refetch: vi.fn(),
+  });
+  const { container } = renderWithListenProviders(<UserConnections />, {
+    route: "/users/diego/followers",
+    path: "/users/:username/followers",
+  });
+  expect(screen.getByRole("status")).toHaveAccessibleName();
+  expect(
+    container.querySelectorAll('[data-slot="skeleton-user-row"]'),
+  ).toHaveLength(5);
+  expect(container.querySelector('[data-slot="skeleton-table"]')).toBeNull();
+});
+
+it("keeps failed reads distinct from an empty connections list", () => {
+  const retry = vi.fn();
+  vi.mocked(useApi).mockReturnValue({
+    data: null,
+    loading: false,
+    error: "offline",
+    refetch: retry,
+  });
+  renderWithListenProviders(<UserConnections />, {
+    route: "/users/diego/followers",
+    path: "/users/:username/followers",
+  });
+  expect(screen.getByRole("alert")).toBeVisible();
+  screen.getByRole("button", { name: "Retry" }).click();
+  expect(retry).toHaveBeenCalledOnce();
+  expect(screen.queryByText("No followers yet.")).toBeNull();
+});

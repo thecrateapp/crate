@@ -66,6 +66,24 @@ describe("buildStatsGenreProfile", () => {
 });
 
 describe("SoundProfileCard", () => {
+  it("uses a canonical meter with a true empty rail for a confirmed zero", () => {
+    renderWithListenProviders(
+      <SoundProfileCard
+        profile={{ ...profile, energy: 0 }}
+        skipRate={0}
+        genres={[]}
+      />,
+    );
+    expect(screen.getByRole("meter", { name: "Energy" })).toHaveAttribute(
+      "aria-valuenow",
+      "0",
+    );
+    expect(screen.getByRole("meter", { name: "Energy" })).toHaveAttribute(
+      "aria-valuemax",
+      "1",
+    );
+  });
+
   it("renders shared genre pills with percentages and links to genre pages", () => {
     renderWithListenProviders(
       <SoundProfileCard
@@ -99,8 +117,93 @@ describe("SoundProfileCard", () => {
       />,
     );
 
-    expect(screen.getByTitle("punk rock · 75%")).toHaveClass("genre-pill");
-    expect(screen.getByTitle("post-punk · 25%")).toBeInTheDocument();
+    expect(screen.getByText("punk rock").closest(".genre-pill")!).toHaveClass(
+      "genre-pill",
+    );
+    expect(
+      screen.getByText("post-punk").closest(".genre-pill")!,
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /punk/ })).toBeNull();
+  });
+
+  it("marks the previous sound profile", () => {
+    renderWithListenProviders(
+      <SoundProfileCard
+        profile={profile}
+        previousProfile={{
+          energy: 0.3,
+          danceability: 0,
+          valence: null,
+          bpm: 118,
+        }}
+        favourite={{ title: "Wild Thing", artist: "Converge" }}
+        skipRate={0}
+        genres={[]}
+      />,
+    );
+
+    expect(screen.getByText("Previous period 30%")).toBeInTheDocument();
+    expect(screen.getByText("Previous period 0%")).toBeInTheDocument();
+    expect(screen.getAllByText(/^Previous period/)).toHaveLength(2);
+    expect(
+      screen.getByText("Your most energetic favourite: Wild Thing by Converge"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no previous marker or favourite without them", () => {
+    renderWithListenProviders(
+      <SoundProfileCard profile={profile} skipRate={0} genres={[]} />,
+    );
+
+    expect(screen.queryByText(/^Previous period/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/most energetic favourite/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders unknown audio values as a dash", () => {
+    // R26: the shared Meter shows "n/a" for unknown values, not "—".
+    const { container } = renderWithListenProviders(
+      <SoundProfileCard
+        profile={{ energy: null, danceability: 0, valence: null, bpm: null }}
+        skipRate={0}
+        genres={[]}
+      />,
+    );
+
+    expect(screen.queryByRole("meter", { name: "Energy" })).toBeNull();
+    expect(
+      screen.getByRole("group", { name: "Energy" }),
+    ).toHaveAccessibleDescription("n/a");
+    expect(
+      screen.getByRole("group", { name: "Brightness" }),
+    ).toHaveAccessibleDescription("n/a");
+    expect(screen.getAllByText("n/a")).toHaveLength(2);
+    // only the real zero (movement) and the skip rate read 0%
+    expect(screen.getAllByText("0%")).toHaveLength(2);
+    expect(container.querySelectorAll(".crate-meter-fill")).toHaveLength(1);
+    expect(screen.getByRole("meter", { name: "Movement" })).toHaveAttribute(
+      "aria-valuenow",
+      "0",
+    );
+  });
+
+  it("places the previous marker at the previous value", () => {
+    const { container } = renderWithListenProviders(
+      <SoundProfileCard
+        profile={profile}
+        previousProfile={{
+          energy: 0.3,
+          danceability: 0,
+          valence: null,
+          bpm: null,
+        }}
+        skipRate={0}
+        genres={[]}
+      />,
+    );
+
+    const ticks = container.querySelectorAll<HTMLElement>(".crate-meter-limit");
+    expect(Array.from(ticks, (tick) => tick.style.left)).toEqual(["30%", "0%"]);
   });
 });

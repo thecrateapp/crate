@@ -318,7 +318,7 @@ def test_build_includes_runbooks_native_clients_and_site_sources(repo, tmp_path)
     root, _ = repo
     included = (
         "scripts/deploy.sh",
-        "app/site/src/App.tsx",
+        "app/web/src/pages/install.astro",
         "app/docs/src/App.tsx",
         "app/listen/android/app/src/main/java/app/cratemusic/crate/NativeMix.java",
         "app/listen/ios/App/App/NativeClient.swift",
@@ -614,6 +614,7 @@ from context_server import ContextStore
 root = Path(sys.argv[2])
 os.environ['CRATE_AGENT_INSTANCE_ID'] = 'mode-lab'
 operator_provenance.ROOT = root / 'public'
+operator_provenance.EVIDENCE = root / 'public'
 assert operator_provenance.current_identity()['release_sha'] == 'a' * 40
 store = ContextStore(root / 'active')
 assert store.summary()['availability'] == 'available'

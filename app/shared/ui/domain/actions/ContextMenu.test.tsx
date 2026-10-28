@@ -76,6 +76,65 @@ describe("ContextMenu", () => {
     vi.unstubAllGlobals();
   });
 
+  it.each([true, false])(
+    "uses uppercase MonoLabel options in desktop=%s without changing header case",
+    (desktop) => {
+      isDesktop = desktop;
+      render(
+        <ContextMenu
+          header={header}
+          items={[
+            { key: "play", label: "Play now", onSelect: vi.fn() },
+            {
+              key: "active",
+              label: "Following artist",
+              active: true,
+              onSelect: vi.fn(),
+            },
+            {
+              key: "danger",
+              label: "Remove track",
+              danger: true,
+              onSelect: vi.fn(),
+            },
+            {
+              key: "list",
+              type: "disclosure",
+              label: "Add to playlist",
+              expanded: false,
+              onToggle: vi.fn(),
+              items: [],
+            },
+          ]}
+          menuRef={createRef<HTMLDivElement>()}
+          onClose={vi.fn()}
+          open
+          position={{ x: 12, y: 12 }}
+        />,
+      );
+      for (const name of [
+        "Play now",
+        "Following artist",
+        "Remove track",
+        "Add to playlist",
+      ]) {
+        expect(screen.getByText(name)).toHaveClass(
+          "font-mono",
+          "font-normal",
+          "uppercase",
+          "text-inherit",
+        );
+      }
+      expect(screen.getByText("El Cielo")).not.toHaveClass("uppercase");
+      expect(
+        screen.getByRole("menuitem", { name: "Following artist" }),
+      ).toHaveAttribute("data-active", "true");
+      expect(
+        screen.getByRole("menuitem", { name: "Remove track" }),
+      ).toHaveAttribute("data-danger", "true");
+    },
+  );
+
   it("renders the desktop menu with a media header", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
@@ -94,9 +153,8 @@ describe("ContextMenu", () => {
 
     const menu = screen.getByRole("menu");
     expect(menu).toHaveClass(
-      "listen-glass-panel",
+      "crate-overlay-surface",
       "w-72",
-      "rounded-2xl",
       "z-app-context-menu",
     );
     expect(screen.getByText("El Cielo")).toBeInTheDocument();
@@ -167,6 +225,26 @@ describe("ContextMenu", () => {
     );
 
     expect(screen.getByText("El Cielo")).toBeInTheDocument();
+  });
+
+  it("renders consumer artwork in the header slot instead of the image or icon", () => {
+    render(
+      <ContextMenu
+        header={{
+          ...header,
+          imageUrl: "/cover.jpg",
+          artwork: <span data-testid="header-artwork" />,
+        }}
+        items={actions()}
+        menuRef={createRef<HTMLDivElement>()}
+        onClose={vi.fn()}
+        open
+        position={{ x: 12, y: 12 }}
+      />,
+    );
+
+    expect(screen.getByTestId("header-artwork")).toBeInTheDocument();
+    expect(document.querySelector('img[src="/cover.jpg"]')).toBeNull();
   });
 
   it("delegates media rendering when a consumer supplies an image pipeline", () => {
@@ -285,7 +363,7 @@ describe("ContextMenu", () => {
     );
 
     const dialog = screen.getByRole("dialog");
-    expect(dialog.querySelector(".listen-glass-panel")).toBeInTheDocument();
+    expect(dialog.querySelector(".crate-overlay-panel")).toBeInTheDocument();
     expect(screen.getByText("El Cielo")).toBeInTheDocument();
     expect(
       screen.getByRole("menuitem", { name: /Play now/i }),
@@ -478,7 +556,7 @@ describe("ContextMenu", () => {
     );
 
     expect(screen.getByRole("menuitem", { name: /Play now/i })).toHaveClass(
-      "focus-visible:shadow-focus",
+      "crate-focus-inset",
     );
   });
 
@@ -517,7 +595,7 @@ describe("ContextMenu", () => {
       }
     });
 
-    expect(longText).toHaveAttribute("title", longLabel);
+    expect(longText).not.toHaveAttribute("title");
   });
 
   it("wraps long labels to two lines and exposes the full label when clamped", () => {
@@ -541,7 +619,7 @@ describe("ContextMenu", () => {
     Object.defineProperty(longText, "scrollHeight", { value: 60 });
     Object.defineProperty(longText, "clientHeight", { value: 40 });
     fireEvent.pointerEnter(longText);
-    expect(longText).toHaveAttribute("title", longLabel);
+    expect(longText).not.toHaveAttribute("title");
 
     const shortText = screen.getByText("Play now");
     fireEvent.pointerEnter(shortText);
@@ -653,7 +731,7 @@ describe("ContextMenu", () => {
     expect(parent).toHaveFocus();
   });
 
-  it("adds consumer surface classes on top of the glass panel", () => {
+  it("adds consumer surface classes on top of the shared overlay surface", () => {
     render(
       <ContextMenu
         items={[
@@ -676,13 +754,13 @@ describe("ContextMenu", () => {
 
     const [menu] = screen.getAllByRole("menu");
     expect(menu).toHaveClass("bg-surface-popover");
-    expect(menu).toHaveClass("listen-glass-panel");
+    expect(menu).toHaveClass("crate-overlay-surface");
     const submenu = screen.getByTestId("context-menu-submenu-playlist");
     expect(submenu).toHaveClass("bg-surface-popover");
-    expect(submenu).toHaveClass("listen-glass-panel");
+    expect(submenu).toHaveClass("crate-overlay-surface");
   });
 
-  it("keeps the listen glass surface on the submenu by default", () => {
+  it("keeps the shared overlay surface on the submenu by default", () => {
     render(
       <ContextMenu
         items={[
@@ -703,7 +781,7 @@ describe("ContextMenu", () => {
     );
 
     expect(screen.getByTestId("context-menu-submenu-playlist")).toHaveClass(
-      "listen-glass-panel",
+      "crate-overlay-surface",
     );
   });
 

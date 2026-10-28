@@ -10,24 +10,24 @@ import (
 
 func TestFormatArtistTopTrack(t *testing.T) {
 	row := map[string]any{
-		"id":            int64(42),
-		"title":         "Guided Tour",
-		"artist":        "High Vis",
-		"artist_id":     "artist-1",
-		"artist_slug":   "high-vis",
-		"album":         "Guided Tour",
-		"album_id":      "album-1",
-		"album_slug":    "guided-tour",
-		"duration":      float64(217),
-		"track_number":  float64(3),
-		"format":        "flac",
-		"bpm":           float64(140),
-		"audio_key":     "D",
-		"audio_scale":   "minor",
-		"energy":        float64(0.8),
-		"danceability":  float64(0.4),
-		"valence":       float64(0.3),
-		"bliss_vector":  []float64{0.1, 0.2},
+		"id":           int64(42),
+		"title":        "Guided Tour",
+		"artist":       "High Vis",
+		"artist_id":    "artist-1",
+		"artist_slug":  "high-vis",
+		"album":        "Guided Tour",
+		"album_id":     "album-1",
+		"album_slug":   "guided-tour",
+		"duration":     float64(217),
+		"track_number": float64(3),
+		"format":       "flac",
+		"bpm":          float64(140),
+		"audio_key":    "D",
+		"audio_scale":  "minor",
+		"energy":       float64(0.8),
+		"danceability": float64(0.4),
+		"valence":      float64(0.3),
+		"bliss_vector": []float64{0.1, 0.2},
 	}
 
 	result := formatArtistTopTrack(row)
@@ -56,10 +56,10 @@ func TestFormatArtistTopTrackDefaults(t *testing.T) {
 
 func TestSerializeTrackInfo(t *testing.T) {
 	row := map[string]any{
-		"id":          int64(1),
-		"title":       "Test Track",
-		"storage_id":  "st-123",
-		"path":        "/music/artist/album/track.flac",
+		"id":           int64(1),
+		"title":        "Test Track",
+		"storage_id":   "st-123",
+		"path":         "/music/artist/album/track.flac",
 		"bliss_vector": []float64{0.1, 0.2, 0.4, 0.8},
 	}
 
@@ -600,4 +600,22 @@ func TestDefaultLyrics(t *testing.T) {
 	assert.Equal(t, false, result["has_synced"])
 	assert.Equal(t, "lrclib", result["provider"])
 	assert.Nil(t, result["updated_at"])
+}
+
+func TestTrackListPayloadsPreserveSourceMetadata(t *testing.T) {
+	for _, producer := range []struct {
+		name  string
+		build func(map[string]any) map[string]any
+	}{
+		{name: "artist", build: formatArtistTopTrack},
+		{name: "global search", build: globalTrackSearchPayload},
+	} {
+		t.Run(producer.name, func(t *testing.T) {
+			row := map[string]any{"format": "flac", "bitrate": int64(1200000), "sample_rate": int64(96000), "bit_depth": int64(24), "bpm": float64(99), "audio_key": "D", "audio_scale": "minor", "duration": int64(143), "duration_seconds": int64(143)}
+			payload := producer.build(row)
+			for _, key := range []string{"format", "bitrate", "sample_rate", "bit_depth", "bpm", "audio_key", "audio_scale", "duration"} {
+				assert.Equal(t, row[key], payload[key], key)
+			}
+		})
+	}
 }

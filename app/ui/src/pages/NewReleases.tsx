@@ -1,37 +1,49 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { FilterChip } from "@crate/ui/primitives/FilterChip";
+import { ActionButton, ActionGroup } from "@crate/ui/primitives/ActionGroup";
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
+import { UpcomingEventRow } from "@crate/ui/domain/shows/UpcomingEventRow";
+import { UpcomingDateStamp } from "@crate/ui/domain/shows/UpcomingDateStamp";
+import { MediaCover } from "@crate/ui/domain/media/MediaCover";
 import {
-  CalendarDays,
-  CheckCircle2,
+  CRATE_ICON_SIZE,
   Disc3,
-  Download,
-  LayoutGrid,
-  List,
+  Download as DownloadIcon,
+} from "@crate/ui/icons";
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
+import {
+  List as HeaderList,
+  LayoutGrid as HeaderLayoutGrid,
+  Radar as HeaderRadar,
   Loader2,
-  RefreshCw,
-  Search,
-  Sparkles,
   X,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router";
 import { toast } from "sonner";
 
 import {
   OpsPageHero,
   OpsPanel,
+  OpsSurface,
   OpsStatTile,
 } from "@/components/admin/ops-surfaces";
 import { AdminSelect } from "@/components/ui/AdminSelect";
-import { ActionIconButton } from "@crate/ui/primitives/ActionIconButton";
 import { Button } from "@crate/ui/shadcn/button";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
+import { ListPagination } from "@/components/admin/ListPagination";
+
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
-import { Input } from "@crate/ui/shadcn/input";
 import { api, apiSseUrl } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { albumPagePath, artistPagePath } from "@/lib/library-routes";
 import { waitForTask } from "@/lib/tasks";
 import { useApi } from "@/hooks/use-api";
 import { timeAgo } from "@/lib/utils";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 interface Release {
   id: number;
@@ -47,7 +59,8 @@ interface Release {
   year: string;
   release_date: string | null;
   release_type: string | null;
-  tracks: number;
+  tracks: number | null;
+  available_tracks?: number | null;
   quality: string;
   status: string;
   detected_at: string;
@@ -61,12 +74,9 @@ interface NewReleasesSurface {
 const EMPTY_RELEASES: Release[] = [];
 
 type ViewMode = "timeline" | "grid";
-type StatusFilter =
-  | "all"
-  | "detected"
-  | "downloading"
-  | "downloaded"
-  | "upcoming";
+type StatusFilter = "all" | "detected" | "downloading" | "downloaded";
+type DateFilter = "" | "upcoming" | "released" | "unknown";
+const RELEASES_PAGE_SIZE = 20;
 
 function releaseArtistHref(release: Release) {
   if (release.artist_id == null) return undefined;
@@ -87,60 +97,74 @@ function releaseAlbumHref(release: Release) {
   });
 }
 
-function releaseDateValue(release: Release) {
-  return release.release_date || release.detected_at?.slice(0, 10) || "";
-}
-
 function isUpcomingRelease(release: Release) {
   const date = release.release_date;
   if (!date) return false;
   return date >= new Date().toISOString().slice(0, 10);
 }
 
+function compareRadarDates(left: Release, right: Release) {
+  const bucket = (release: Release) =>
+    !release.release_date ? 2 : isUpcomingRelease(release) ? 0 : 1;
+  const leftBucket = bucket(left);
+  const rightBucket = bucket(right);
+  if (leftBucket !== rightBucket) return leftBucket - rightBucket;
+  if (leftBucket === 0)
+    return (left.release_date || "").localeCompare(right.release_date || "");
+  if (leftBucket === 1)
+    return (right.release_date || "").localeCompare(left.release_date || "");
+  return (right.detected_at || "").localeCompare(left.detected_at || "");
+}
+
 function ReleaseDateBadge({ release }: { release: Release }) {
-  const raw = releaseDateValue(release);
-  if (!raw) {
-    return <span className="text-xs text-white/25">Unknown date</span>;
+  if (release.release_date) {
+    const value = new Date(`${release.release_date}T12:00:00`);
+    const valid =
+      !Number.isNaN(value.getTime()) &&
+      /^\d{4}-\d{2}-\d{2}$/.test(release.release_date) &&
+      value.getFullYear() === Number(release.release_date.slice(0, 4)) &&
+      value.getMonth() + 1 === Number(release.release_date.slice(5, 7)) &&
+      value.getDate() === Number(release.release_date.slice(8, 10));
+    if (valid)
+      return <UpcomingDateStamp date={release.release_date} locale="en-US" />;
+    return (
+      <TooltipHint content={release.release_date}>
+        <span
+          data-slot="upcoming-date-invalid"
+          aria-label="Unknown release date"
+          className="w-14 shrink-0 truncate px-1 text-center font-mono text-label text-text-secondary"
+        >
+          {release.release_date}
+        </span>
+      </TooltipHint>
+    );
   }
-
-  const date = new Date(`${raw}T12:00:00`);
-  if (Number.isNaN(date.getTime())) {
-    return <span className="text-xs text-white/25">{raw}</span>;
-  }
-
   return (
-    <div className="text-center">
-      <div className="text-[10px] uppercase tracking-[0.12em] text-white/30">
-        {date.toLocaleDateString("en-US", { month: "short" })}
-      </div>
-      <div className="text-lg font-semibold leading-none text-white/75">
-        {date.getDate()}
-      </div>
+    <div
+      data-slot="upcoming-date-unknown"
+      className="flex w-14 shrink-0 flex-col items-center justify-center gap-1 px-2"
+      aria-label="Release date unknown"
+    >
+      <MonoLabel as="span">TBA</MonoLabel>
+      <span className="font-display text-2xl font-bold leading-none tracking-display text-text-primary tabular-nums">
+        —
+      </span>
+      <MonoLabel as="span">DATE</MonoLabel>
     </div>
   );
 }
 
-function ReleaseMeta({ release }: { release: Release }) {
-  return (
-    <div className="flex flex-wrap items-center gap-2 text-xs text-white/40">
-      {release.release_type ? (
-        <CrateChip>{release.release_type}</CrateChip>
-      ) : null}
-      {release.quality ? (
-        <CrateChip className="border-emerald-500/25 bg-emerald-500/10 text-emerald-200">
-          {release.quality}
-        </CrateChip>
-      ) : null}
-      {release.year ? <CrateChip>{release.year}</CrateChip> : null}
-      {release.tracks > 0 ? (
-        <CrateChip>{release.tracks} tracks</CrateChip>
-      ) : null}
-      <CrateChip>{timeAgo(release.detected_at)}</CrateChip>
-    </div>
+function releaseTimingLabel(release: Release) {
+  if (!release.release_date) return "Date unconfirmed";
+  if (!isUpcomingRelease(release)) return "Released";
+  const days = Math.ceil(
+    (new Date(`${release.release_date}T00:00:00`).getTime() - Date.now()) /
+      86_400_000,
   );
+  return days <= 0 ? "Release day" : `${days} days to go`;
 }
 
-function ReleaseActions({
+function ReleaseRowActions({
   release,
   onDownload,
   onDismiss,
@@ -149,43 +173,81 @@ function ReleaseActions({
   onDownload?: (id: number) => void;
   onDismiss?: (id: number) => void;
 }) {
-  if (release.status === "downloaded") {
-    return (
-      <CrateChip className="border-emerald-500/25 bg-emerald-500/10 text-emerald-200">
-        Downloaded
-      </CrateChip>
-    );
-  }
-  if (release.status === "downloading") {
-    return (
-      <CrateChip active icon={Loader2}>
-        Downloading
-      </CrateChip>
-    );
-  }
-
+  const downloading = release.status === "downloading";
+  const downloaded = release.status === "downloaded";
   return (
-    <div className="flex items-center gap-2">
-      {release.tidal_url && onDownload ? (
-        <Button
-          size="sm"
-          className="gap-2"
-          onClick={() => onDownload(release.id)}
-        >
-          <Download size={14} />
-          Download
-        </Button>
+    <div className="flex flex-col items-end gap-1">
+      {downloaded ? <InfoBadge tone="success">Downloaded</InfoBadge> : null}
+      {downloading ? (
+        <InfoBadge active>
+          <Loader2
+            aria-hidden="true"
+            data-admin-ux="releases-download-loading"
+            size={12}
+            className="animate-spin"
+          />
+          Downloading
+        </InfoBadge>
       ) : null}
-      {onDismiss ? (
-        <ActionIconButton
-          variant="card"
-          tone="danger"
-          onClick={() => onDismiss(release.id)}
-          title="Dismiss release"
-        >
-          <X size={15} />
-        </ActionIconButton>
+      {!downloaded && !downloading ? (
+        <ActionGroup label={`Actions for ${release.album_title}`}>
+          {release.tidal_url && onDownload ? (
+            <ActionButton
+              label="Download"
+              onClick={() => onDownload(release.id)}
+            >
+              <DownloadIcon
+                size={CRATE_ICON_SIZE.md}
+                data-admin-ux="releases-timeline-download"
+              />
+            </ActionButton>
+          ) : null}
+          {onDismiss ? (
+            <ActionButton
+              label="Dismiss release"
+              onClick={() => onDismiss(release.id)}
+            >
+              <X
+                size={CRATE_ICON_SIZE.md}
+                aria-hidden="true"
+                data-admin-ux="releases-timeline-dismiss"
+              />
+            </ActionButton>
+          ) : null}
+        </ActionGroup>
       ) : null}
+    </div>
+  );
+}
+
+function ReleaseMeta({ release }: { release: Release }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
+      {release.release_type ? (
+        <InfoBadge>{release.release_type}</InfoBadge>
+      ) : null}
+      {release.quality ? (
+        <InfoBadge tone="accent">{release.quality}</InfoBadge>
+      ) : null}
+      {!release.release_date && release.year ? (
+        <InfoBadge>{release.year}</InfoBadge>
+      ) : null}
+      {release.tracks != null && release.tracks > 0 ? (
+        <InfoBadge>{release.tracks} tracks</InfoBadge>
+      ) : null}
+      {release.available_tracks != null ? (
+        <InfoBadge
+          tone={
+            release.tracks != null && release.available_tracks >= release.tracks
+              ? "success"
+              : "accent"
+          }
+          title="Tracks already available in this library"
+        >
+          {release.available_tracks} / {release.tracks ?? "?"} in library
+        </InfoBadge>
+      ) : null}
+      <InfoBadge>{timeAgo(release.detected_at)}</InfoBadge>
     </div>
   );
 }
@@ -199,71 +261,74 @@ function ReleaseTimelineRow({
   onDownload?: (id: number) => void;
   onDismiss?: (id: number) => void;
 }) {
-  const artistHref = releaseArtistHref(release);
   const albumHref = releaseAlbumHref(release);
+  const availability =
+    release.available_tracks != null
+      ? `${release.available_tracks} / ${release.tracks ?? "?"} in library`
+      : null;
 
   return (
-    <div className="group flex flex-col gap-3 rounded-md border border-white/8 bg-black/15 p-4 transition-colors hover:border-white/14 hover:bg-white/[0.04] xl:flex-row xl:items-center">
-      <div className="flex items-center gap-4 xl:w-[320px] xl:flex-shrink-0">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md border border-white/8 bg-white/[0.03]">
-          <ReleaseDateBadge release={release} />
-        </div>
-        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md border border-white/8 bg-white/[0.04]">
-          {release.cover_url ? (
-            <img
-              src={release.cover_url}
-              alt=""
-              className="h-full w-full object-cover"
+    <article
+      data-slot="release-radar-row"
+      aria-label={`${release.album_title} by ${release.artist_name}`}
+      className="item-action-target overflow-hidden rounded-panel border border-border-quiet bg-surface-object transition-colors hover:border-border-interactive"
+    >
+      <UpcomingEventRow
+        artwork={
+          <MediaCover
+            data-admin-ux="releases-timeline-cover"
+            src={release.cover_url}
+            alt=""
+            fallbackIcon={Disc3}
+            iconSize={CRATE_ICON_SIZE.xl}
+            size={88}
+            className="rounded-none"
+          />
+        }
+        href={albumHref}
+        openLabel={albumHref ? release.album_title : undefined}
+        details={
+          <>
+            <span className="block truncate text-caption font-semibold text-text-primary">
+              {release.album_title}
+            </span>
+            <MonoLabel
+              as="span"
+              className="mt-1 block truncate"
+              meta={[
+                release.artist_name,
+                release.release_type,
+                release.quality,
+                release.tracks != null ? `${release.tracks} tracks` : null,
+              ]}
             />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <Disc3 size={18} className="text-white/20" />
-            </div>
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          {albumHref ? (
-            <Link
-              to={albumHref}
-              className="block truncate text-base font-semibold tracking-tight text-white transition-colors hover:text-primary"
+            <TooltipHint
+              content={
+                release.detected_at
+                  ? `Detected ${timeAgo(release.detected_at)}`
+                  : undefined
+              }
             >
-              {release.album_title}
-            </Link>
-          ) : (
-            <div className="truncate text-base font-semibold tracking-tight text-white">
-              {release.album_title}
-            </div>
-          )}
-          {artistHref ? (
-            <Link
-              to={artistHref}
-              className="text-sm text-white/45 transition-colors hover:text-white/80"
-            >
-              {release.artist_name}
-            </Link>
-          ) : (
-            <div className="text-sm text-white/45">{release.artist_name}</div>
-          )}
-        </div>
-      </div>
-
-      <div className="min-w-0 flex-1 space-y-2">
-        <ReleaseMeta release={release} />
-        <div className="text-sm text-white/35">
-          {isUpcomingRelease(release)
-            ? "Upcoming release on the radar"
-            : "Detected by the release monitor and ready for acquisition triage"}
-        </div>
-      </div>
-
-      <div className="flex items-center xl:justify-end">
-        <ReleaseActions
-          release={release}
-          onDownload={onDownload}
-          onDismiss={onDismiss}
-        />
-      </div>
-    </div>
+              <MonoLabel
+                as="span"
+                className="mt-1 block truncate"
+                accent={releaseTimingLabel(release)}
+                meta={[release.status, availability]}
+              />
+            </TooltipHint>
+          </>
+        }
+        date={<ReleaseDateBadge release={release} />}
+        actionsClassName="px-1.5"
+        actions={
+          <ReleaseRowActions
+            release={release}
+            onDownload={onDownload}
+            onDismiss={onDismiss}
+          />
+        }
+      />
+    </article>
   );
 }
 
@@ -280,31 +345,31 @@ function ReleaseGridCard({
   const artistHref = releaseArtistHref(release);
 
   return (
-    <div className="group overflow-hidden rounded-md border border-white/8 bg-black/20 shadow-[0_16px_36px_rgba(0,0,0,0.16)]">
-      <div className="relative aspect-square bg-white/[0.04]">
-        {release.cover_url ? (
-          <img
-            src={release.cover_url}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <Disc3 size={32} className="text-white/20" />
-          </div>
-        )}
+    <OpsSurface
+      as="article"
+      aria-label={`${release.album_title} by ${release.artist_name}`}
+      className="group overflow-hidden p-0"
+    >
+      <div className="relative aspect-square bg-surface-canvas">
+        <MediaCover
+          data-admin-ux="releases-card-cover"
+          src={release.cover_url}
+          alt=""
+          fallbackIcon={Disc3}
+          iconSize={CRATE_ICON_SIZE.xl}
+          size="fill"
+          className="rounded-none"
+        />
 
         <div className="absolute left-3 top-3">
           {release.status === "detected" ? (
-            <CrateChip active>Detected</CrateChip>
+            <InfoBadge active>Detected</InfoBadge>
           ) : null}
           {release.status === "downloading" ? (
-            <CrateChip active>Downloading</CrateChip>
+            <InfoBadge active>Downloading</InfoBadge>
           ) : null}
           {release.status === "downloaded" ? (
-            <CrateChip className="border-emerald-500/25 bg-emerald-500/10 text-emerald-200">
-              Downloaded
-            </CrateChip>
+            <InfoBadge tone="success">Downloaded</InfoBadge>
           ) : null}
         </div>
       </div>
@@ -314,24 +379,24 @@ function ReleaseGridCard({
           {albumHref ? (
             <Link
               to={albumHref}
-              className="block truncate text-sm font-semibold text-white transition-colors hover:text-primary"
+              className="block truncate text-sm font-semibold text-text-primary transition-colors hover:text-accent-action-hi"
             >
               {release.album_title}
             </Link>
           ) : (
-            <div className="truncate text-sm font-semibold text-white">
+            <div className="truncate text-sm font-semibold text-text-primary">
               {release.album_title}
             </div>
           )}
           {artistHref ? (
             <Link
               to={artistHref}
-              className="block truncate text-xs text-white/45 transition-colors hover:text-white/80"
+              className="block truncate text-xs text-text-muted transition-colors hover:text-accent-action-hi"
             >
               {release.artist_name}
             </Link>
           ) : (
-            <div className="truncate text-xs text-white/45">
+            <div className="truncate text-xs text-text-muted">
               {release.artist_name}
             </div>
           )}
@@ -346,23 +411,24 @@ function ReleaseGridCard({
               className="flex-1 gap-2"
               onClick={() => onDownload(release.id)}
             >
-              <Download size={14} />
               Download
             </Button>
           ) : null}
           {release.status === "detected" && onDismiss ? (
-            <ActionIconButton
-              variant="card"
-              tone="danger"
+            <ActionButton
+              label="Dismiss release"
               onClick={() => onDismiss(release.id)}
-              title="Dismiss release"
             >
-              <X size={15} />
-            </ActionIconButton>
+              <X
+                size={CRATE_ICON_SIZE.md}
+                aria-hidden="true"
+                data-admin-ux="releases-grid-dismiss"
+              />
+            </ActionButton>
           ) : null}
         </div>
       </div>
-    </div>
+    </OpsSurface>
   );
 }
 
@@ -374,13 +440,14 @@ function EmptyState({
   description: string;
 }) {
   return (
-    <div className="rounded-md border border-dashed border-white/10 bg-black/15 px-4 py-16 text-center">
-      <Disc3 size={34} className="mx-auto mb-3 text-white/20" />
-      <div className="text-lg font-semibold text-white/80">{title}</div>
-      <div className="mx-auto mt-2 max-w-xl text-sm text-white/40">
+    <OpsSurface role="status" className="px-4 py-16 text-center">
+      <h3 className="font-display text-lg font-semibold text-text-primary">
+        {title}
+      </h3>
+      <p className="mx-auto mt-2 max-w-xl text-sm text-text-muted">
         {description}
-      </div>
-    </div>
+      </p>
+    </OpsSurface>
   );
 }
 
@@ -403,8 +470,10 @@ export function NewReleases() {
   const [checking, setChecking] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("detected");
+  const [dateFilter, setDateFilter] = useState<DateFilter>("");
   const [typeFilter, setTypeFilter] = useState("");
   const [view, setView] = useState<ViewMode>("timeline");
+  const [page, setPage] = useState(1);
   const releases =
     liveSurface?.releases ?? releaseSurface?.releases ?? EMPTY_RELEASES;
 
@@ -448,8 +517,14 @@ export function NewReleases() {
           return false;
         if (statusFilter === "downloaded" && release.status !== "downloaded")
           return false;
-        if (statusFilter === "upcoming" && !isUpcomingRelease(release))
+        if (dateFilter === "upcoming" && !isUpcomingRelease(release))
           return false;
+        if (
+          dateFilter === "released" &&
+          (!release.release_date || isUpcomingRelease(release))
+        )
+          return false;
+        if (dateFilter === "unknown" && release.release_date) return false;
         if (typeFilter && (release.release_type || "unknown") !== typeFilter)
           return false;
         if (!normalized) return true;
@@ -459,8 +534,17 @@ export function NewReleases() {
           .toLowerCase()
           .includes(normalized);
       })
-      .sort((a, b) => releaseDateValue(b).localeCompare(releaseDateValue(a)));
-  }, [releases, search, statusFilter, typeFilter]);
+      .sort(compareRadarDates);
+  }, [releases, search, statusFilter, dateFilter, typeFilter]);
+  const pageCount = Math.max(
+    1,
+    Math.ceil(filtered.length / RELEASES_PAGE_SIZE),
+  );
+  const currentPage = Math.min(page, pageCount);
+  const visibleReleases = filtered.slice(
+    (currentPage - 1) * RELEASES_PAGE_SIZE,
+    currentPage * RELEASES_PAGE_SIZE,
+  );
 
   const stats = useMemo(() => {
     const detected = releases.filter(
@@ -492,6 +576,8 @@ export function NewReleases() {
         toast.success("Release check complete");
         setLiveSurface(null);
         refetch();
+      } else {
+        toast.error(task.error || `Release check ${task.status}`);
       }
     } catch {
       setChecking(false);
@@ -537,82 +623,86 @@ export function NewReleases() {
   return (
     <div className="space-y-6">
       <OpsPageHero
-        icon={Sparkles}
-        title="New Releases"
-        description="Release radar for library artists, with quick triage for what should land next in Crate."
+        title="Release Radar"
+        description="See what is coming, what has already landed, and how much of each album is in the library."
+        compactActions
         actions={
-          <>
-            <div className="flex items-center gap-1 rounded-md border border-white/10 bg-black/20 p-1">
-              <Button
-                variant={view === "timeline" ? "default" : "ghost"}
-                size="sm"
-                className="h-9 px-3"
-                onClick={() => setView("timeline")}
+          <PageHeaderActions>
+            <>
+              <div
+                role="group"
+                aria-label="Release view"
+                className="flex items-center gap-1"
               >
-                <List size={14} className="mr-1.5" />
-                Timeline
-              </Button>
-              <Button
-                variant={view === "grid" ? "default" : "ghost"}
-                size="sm"
-                className="h-9 px-3"
-                onClick={() => setView("grid")}
-              >
-                <LayoutGrid size={14} className="mr-1.5" />
-                Grid
-              </Button>
-            </div>
-            {canCurateReleases ? (
-              <Button
-                size="sm"
-                onClick={checkNow}
-                disabled={checking}
-                className="gap-2"
-              >
-                {checking ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <RefreshCw size={14} />
-                )}
-                {checking ? "Checking…" : "Check now"}
-              </Button>
-            ) : null}
-          </>
+                <PageHeaderAction
+                  label="Timeline"
+                  aria-pressed={view === "timeline"}
+                  onClick={() => setView("timeline")}
+                >
+                  <HeaderList
+                    data-admin-ux="header-timeline"
+                    aria-hidden="true"
+                  />
+                </PageHeaderAction>
+                <PageHeaderAction
+                  label="Grid"
+                  aria-pressed={view === "grid"}
+                  onClick={() => setView("grid")}
+                >
+                  <HeaderLayoutGrid
+                    data-admin-ux="header-grid"
+                    aria-hidden="true"
+                  />
+                </PageHeaderAction>
+              </div>
+              {canCurateReleases ? (
+                <PageHeaderAction
+                  label={checking ? "Checking…" : "Check now"}
+                  onClick={checkNow}
+                  disabled={checking}
+                  aria-busy={checking}
+                >
+                  {checking ? (
+                    <Loader2
+                      size={14}
+                      className="animate-spin"
+                      aria-hidden="true"
+                      data-admin-ux="releases-check-loading"
+                    />
+                  ) : null}
+                  {!checking ? (
+                    <HeaderRadar
+                      data-admin-ux="header-check-now"
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                </PageHeaderAction>
+              ) : null}
+            </>
+          </PageHeaderActions>
         }
-      >
-        <CratePill active icon={Sparkles}>
-          {releases.length} total
-        </CratePill>
-        <CratePill icon={Download}>{stats.detected} need action</CratePill>
-        <CratePill icon={Loader2}>{stats.downloading} downloading</CratePill>
-        <CratePill icon={CheckCircle2}>{stats.downloaded} in library</CratePill>
-        <CratePill icon={CalendarDays}>{stats.upcoming} upcoming</CratePill>
-      </OpsPageHero>
+      />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <OpsStatTile
-          icon={Download}
           label="Needs action"
           value={stats.detected.toLocaleString()}
           caption="Detected releases waiting for a decision"
           tone={stats.detected > 0 ? "primary" : "default"}
         />
         <OpsStatTile
-          icon={Loader2}
           label="Downloading"
           value={stats.downloading.toLocaleString()}
           caption="Acquisition tasks in flight"
           tone={stats.downloading > 0 ? "warning" : "default"}
         />
         <OpsStatTile
-          icon={CheckCircle2}
           label="Downloaded"
           value={stats.downloaded.toLocaleString()}
           caption="Already landed in the library"
           tone={stats.downloaded > 0 ? "success" : "default"}
         />
         <OpsStatTile
-          icon={CalendarDays}
           label="Upcoming"
           value={stats.upcoming.toLocaleString()}
           caption="Future-dated releases still on the radar"
@@ -620,75 +710,123 @@ export function NewReleases() {
       </div>
 
       <OpsPanel
-        icon={Search}
         title="Radar filters"
         description="Search by artist or album, then narrow the radar by acquisition state or release type."
       >
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-          <div className="relative min-w-[260px] flex-1">
-            <Search
-              size={14}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
-            />
-            <Input
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
+          <div className="crate-form-field min-w-0 flex-1">
+            <label htmlFor="releases-search">
+              <MonoLabel as="span">Search releases</MonoLabel>
+            </label>
+            <SearchInput
+              id="releases-search"
+              label="Search releases"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onValueChange={(value) => {
+                setSearch(value);
+                setPage(1);
+              }}
               placeholder="Search artist or album..."
-              className="pl-9"
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <CratePill
+            <FilterChip
               active={statusFilter === "all"}
-              onClick={() => setStatusFilter("all")}
+              onClick={() => {
+                setStatusFilter("all");
+                setPage(1);
+              }}
             >
               All
-            </CratePill>
-            <CratePill
+            </FilterChip>
+            <FilterChip
               active={statusFilter === "detected"}
-              onClick={() => setStatusFilter("detected")}
+              onClick={() => {
+                setStatusFilter("detected");
+                setPage(1);
+              }}
             >
               Needs action
-            </CratePill>
-            <CratePill
+            </FilterChip>
+            <FilterChip
               active={statusFilter === "downloading"}
-              onClick={() => setStatusFilter("downloading")}
+              onClick={() => {
+                setStatusFilter("downloading");
+                setPage(1);
+              }}
             >
               Downloading
-            </CratePill>
-            <CratePill
+            </FilterChip>
+            <FilterChip
               active={statusFilter === "downloaded"}
-              onClick={() => setStatusFilter("downloaded")}
+              onClick={() => {
+                setStatusFilter("downloaded");
+                setPage(1);
+              }}
             >
               Downloaded
-            </CratePill>
-            <CratePill
-              active={statusFilter === "upcoming"}
-              onClick={() => setStatusFilter("upcoming")}
-            >
-              Upcoming
-            </CratePill>
+            </FilterChip>
           </div>
-          <AdminSelect
-            value={typeFilter}
-            onChange={setTypeFilter}
-            options={typeOptions}
-            placeholder="All types"
-            searchable
-            searchPlaceholder="Filter release types..."
-            triggerClassName="min-w-[170px]"
-          />
+          <div className="crate-form-field">
+            <MonoLabel as="span">Release date</MonoLabel>
+            <div
+              role="group"
+              aria-label="Release date"
+              className="flex flex-wrap gap-2"
+            >
+              {[
+                { value: "", label: "Any date" },
+                { value: "upcoming", label: "Upcoming" },
+                { value: "released", label: "Released" },
+                { value: "unknown", label: "Date unknown" },
+              ].map((option) => (
+                <FilterChip
+                  key={option.value}
+                  active={dateFilter === option.value}
+                  onClick={() => {
+                    setDateFilter(option.value as DateFilter);
+                    setPage(1);
+                  }}
+                >
+                  {option.label}
+                </FilterChip>
+              ))}
+            </div>
+          </div>
+          <label className="crate-form-field">
+            <MonoLabel as="span">Release type</MonoLabel>
+            <AdminSelect
+              value={typeFilter}
+              onChange={(value) => {
+                setTypeFilter(value);
+                setPage(1);
+              }}
+              options={typeOptions}
+              placeholder="All types"
+              searchable
+              searchPlaceholder="Filter release types..."
+              triggerClassName="min-h-11 min-w-[170px]"
+            />
+          </label>
         </div>
       </OpsPanel>
 
       <OpsPanel
-        icon={Sparkles}
-        title="Release radar"
-        description="Use timeline when you want to triage in date order, or grid when you need a visual scan of artwork and release types."
+        title="Releases"
+        description="Triage acquisition state independently from release dates and library coverage."
       >
         {loading ? (
-          <div className="flex justify-center py-16 text-white/45">
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          <div
+            role="status"
+            aria-label="Loading releases"
+            className="flex items-center justify-center gap-2 py-16 text-text-muted"
+          >
+            <Loader2
+              aria-hidden="true"
+              data-admin-ux="releases-loading"
+              className="h-5 w-5 animate-spin text-accent-action-hi"
+            />
+            Loading releases
           </div>
         ) : filtered.length === 0 ? (
           <EmptyState
@@ -697,7 +835,7 @@ export function NewReleases() {
           />
         ) : view === "timeline" ? (
           <div className="space-y-3">
-            {filtered.map((release) => (
+            {visibleReleases.map((release) => (
               <ReleaseTimelineRow
                 key={release.id}
                 release={release}
@@ -708,7 +846,7 @@ export function NewReleases() {
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
-            {filtered.map((release) => (
+            {visibleReleases.map((release) => (
               <ReleaseGridCard
                 key={release.id}
                 release={release}
@@ -718,6 +856,15 @@ export function NewReleases() {
             ))}
           </div>
         )}
+        {!loading && filtered.length > 0 ? (
+          <ListPagination
+            label="releases"
+            itemCount={filtered.length}
+            page={currentPage}
+            pageSize={RELEASES_PAGE_SIZE}
+            onPageChange={setPage}
+          />
+        ) : null}
       </OpsPanel>
     </div>
   );

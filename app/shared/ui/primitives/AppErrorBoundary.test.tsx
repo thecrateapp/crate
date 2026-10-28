@@ -27,6 +27,10 @@ describe("AppErrorBoundary", () => {
     );
     expect(screen.getByText("Something went wrong")).toBeInTheDocument();
     expect(screen.getByText("Test error")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveAttribute("data-variant", "page");
+    expect(
+      screen.getByRole("heading", { name: "Something went wrong", level: 1 }),
+    ).toBeInTheDocument();
   });
 
   it("renders custom fallback element", () => {

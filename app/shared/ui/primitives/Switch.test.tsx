@@ -31,18 +31,35 @@ describe("Switch", () => {
     expect(onCheckedChange).not.toHaveBeenCalled();
   });
 
-  it("applies size and focus ring", () => {
+  it("preserves the size prop and shared keyboard outline", () => {
     render(<Switch aria-label="Small" size="sm" />);
-    expect(screen.getByRole("switch")).toHaveClass(
-      "h-5",
-      "w-9",
-      "focus-visible:outline-solid",
-      "focus-visible:outline-2",
-      "focus-visible:outline-offset-2",
-      "focus-visible:outline-focus-ring",
+    expect(screen.getByRole("switch")).toHaveAttribute("data-size", "sm");
+    expect(screen.getByRole("switch")).toHaveClass("crate-form-switch");
+    expect(screen.getByRole("switch")).not.toHaveClass("outline-none");
+  });
+
+  it("toggles with Space and retains native form participation", async () => {
+    const onCheckedChange = vi.fn();
+    render(
+      <form aria-label="Playback settings">
+        <Switch
+          aria-label="Autoplay"
+          name="autoplay"
+          value="enabled"
+          size="md"
+          onCheckedChange={onCheckedChange}
+        />
+      </form>,
     );
-    expect(screen.getByRole("switch")).not.toHaveClass(
-      "focus-visible:shadow-focus",
-    );
+    const control = screen.getByRole("switch", { name: "Autoplay" });
+    expect(control).toHaveAttribute("data-size", "md");
+    await userEvent.tab();
+    expect(control).toHaveFocus();
+    await userEvent.keyboard(" ");
+    expect(control).toHaveAttribute("aria-checked", "true");
+    expect(onCheckedChange).toHaveBeenCalledWith(true);
+    expect(
+      new FormData(screen.getByRole("form") as HTMLFormElement).get("autoplay"),
+    ).toBe("enabled");
   });
 });

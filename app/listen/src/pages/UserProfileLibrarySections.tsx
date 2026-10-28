@@ -1,10 +1,9 @@
-import { Link } from "react-router";
-import {
-  CrateBox,
-  CRATE_ICON_SIZE,
-  Music4,
-  PackagePlus,
-} from "@crate/ui/icons";
+import { CrateBox } from "@crate/ui/icons";
+import { EntityRow } from "@crate/ui/domain/entity";
+import { MediaCover } from "@crate/ui/domain/media/MediaCover";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { CrateAlbumListItem } from "@/components/crates/CrateAlbumListView";
+import { UserProfileLibraryView } from "./UserProfileLibraryView";
 import { useTranslation } from "react-i18next";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
@@ -51,79 +50,72 @@ function ContributionCard({
       albumEntityUid={contribution.album_entity_uid ?? undefined}
       albumSlug={contribution.album_slug ?? undefined}
       cover={coverUrl}
-      meta={t("userProfile.contributions.via", { source })}
+      meta={
+        <MonoLabel as="span">
+          {t("userProfile.contributions.via", { source })}
+        </MonoLabel>
+      }
     />
   );
 }
 
 export function UserProfileLibrary({ data }: { data: PublicProfile }) {
   const { t } = useTranslation();
-  const contributions = data.contributions_preview || [];
   return (
-    <section className="space-y-6">
-      <div className="user-profile-card rounded-panel p-5 sm:p-6">
-        <div className="flex items-center gap-2">
-          <PackagePlus
-            size={CRATE_ICON_SIZE.sm}
-            className="user-profile-accent-icon"
-          />
-          <h2 className="text-lg font-semibold text-text-primary">
-            {t("userProfile.contributions.title")}
-          </h2>
-        </div>
-        <p className="mt-1 text-sm text-text-muted">
-          {t("userProfile.contributions.subtitle")}
-        </p>
-        <div className="mt-4 grid gap-1 sm:grid-cols-2">
-          {contributions.length === 0 ? (
-            <div className="user-profile-empty-state rounded-lg px-4 py-8 text-center text-sm text-text-muted sm:col-span-2">
-              {t("userProfile.contributions.empty")}
-            </div>
-          ) : (
-            contributions
-              .slice(0, 6)
-              .map((contribution) => (
-                <ContributionCard
-                  key={contribution.id}
-                  contribution={contribution}
-                />
-              ))
-          )}
-        </div>
-      </div>
-      <UserProfilePlaylists data={data} />
-      <UserProfileCrates data={data} />
-    </section>
-  );
-}
-
-function UserProfileCrates({ data }: { data: PublicProfile }) {
-  const { t } = useTranslation();
-  const crates = data.public_crates || [];
-
-  return (
-    <div className="user-profile-card rounded-panel p-5 sm:p-6">
-      <div className="flex items-center gap-2">
-        <CrateBox
-          size={CRATE_ICON_SIZE.sm}
-          className="user-profile-accent-icon"
-        />
-        <h2 className="text-lg font-semibold text-text-primary">
-          {t("userProfile.crates.title")}
-        </h2>
-      </div>
-      <div className="mt-4 space-y-3">
-        {crates.length === 0 ? (
-          <div className="user-profile-empty-state rounded-lg px-4 py-8 text-center text-sm text-text-muted">
-            {t("userProfile.crates.empty")}
+    <UserProfileLibraryView
+      contributions={
+        data.contributions_preview?.length ? (
+          <div className="grid min-w-0 gap-1">
+            {data.contributions_preview.slice(0, 6).map((contribution) => (
+              <ContributionCard
+                key={contribution.id}
+                contribution={contribution}
+              />
+            ))}
           </div>
-        ) : (
-          crates.map((crate) => (
-            <UserProfileCrateRow key={crate.id} crate={crate} />
-          ))
-        )}
-      </div>
-    </div>
+        ) : null
+      }
+      playlists={
+        data.public_playlists.length ? (
+          <div className="grid min-w-0 divide-y divide-border-quiet">
+            {data.public_playlists.map((playlist) => (
+              <PlaylistCard
+                key={playlist.id}
+                variant="row"
+                playlistId={playlist.id}
+                name={playlist.name}
+                description={playlist.description ?? undefined}
+                coverDataUrl={playlist.cover_data_url}
+                trackCount={playlist.track_count}
+                meta={[
+                  playlist.total_duration > 0
+                    ? formatTotalDuration(playlist.total_duration)
+                    : null,
+                  playlist.is_collaborative
+                    ? t("userProfile.playlists.collaborative")
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+                href={`/playlist/${playlist.id}`}
+                detailEndpoint={`/api/playlists/${playlist.id}`}
+              />
+            ))}
+          </div>
+        ) : null
+      }
+      crates={
+        data.public_crates?.length ? (
+          <ol className="grid min-w-0 divide-y divide-border-quiet">
+            {data.public_crates.map((crate) => (
+              <CrateAlbumListItem key={crate.id}>
+                <UserProfileCrateRow crate={crate} />
+              </CrateAlbumListItem>
+            ))}
+          </ol>
+        ) : null
+      }
+    />
   );
 }
 
@@ -149,108 +141,48 @@ function UserProfileCrateRow({ crate }: { crate: PublicCrate }) {
   });
 
   return (
-    <div className="user-profile-item flex items-center gap-4 rounded-lg px-4 py-3">
-      <Link
-        to={cratePagePath(crate)}
-        className="flex min-w-0 flex-1 items-center gap-4"
-      >
-        {coverUrl ? (
-          <CrateImage
-            src={coverUrl}
-            alt={firstAlbum?.name ?? ""}
-            className="size-14 rounded-xl object-cover"
-          />
-        ) : (
-          <div className="user-profile-accent-panel user-profile-accent-icon flex size-14 items-center justify-center rounded-xl">
-            <CrateBox size={CRATE_ICON_SIZE.lg} />
-          </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium text-text-primary">
-            {crate.name}
-          </div>
-          <div className="mt-1 text-xs text-text-muted">
-            {t("common.albumCountLabel", {
-              count: crate.album_count,
-            })}
-            {crate.track_count
-              ? ` · ${t("common.trackCountLabel", {
-                  count: crate.track_count,
-                })}`
-              : ""}
-            {crateFollow.followerCount > 0
-              ? ` · ${t("common.followerCountLabel", {
+    <EntityRow
+      title={crate.name}
+      href={cratePagePath(crate)}
+      leading={
+        <MediaCover
+          alt=""
+          src={coverUrl}
+          size={56}
+          fallbackIcon={CrateBox}
+          renderImage={(image) => <CrateImage {...image} />}
+        />
+      }
+      subtitle={crate.description || undefined}
+      meta={
+        <MonoLabel as="span">
+          {[
+            t("common.albumCountLabel", { count: crate.album_count }),
+            crate.track_count
+              ? t("common.trackCountLabel", { count: crate.track_count })
+              : null,
+            crateFollow.followerCount > 0
+              ? t("common.followerCountLabel", {
                   count: crateFollow.followerCount,
-                })}`
-              : ""}
-            {crate.is_collaborative
-              ? ` · ${t("userProfile.crates.collaborative")}`
-              : ""}
-          </div>
-          {crate.description ? (
-            <div className="mt-1 truncate text-xs text-text-muted">
-              {crate.description}
-            </div>
-          ) : null}
-        </div>
-      </Link>
-      {canFollow ? (
-        <CrateFollowButton
-          followed={crateFollow.followed}
-          pending={crateFollow.pending}
-          onToggle={crateFollow.toggle}
-          className="size-11 shrink-0 rounded-full border border-border-quiet text-text-muted hover:text-accent-action"
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function UserProfilePlaylists({ data }: { data: PublicProfile }) {
-  const { t } = useTranslation();
-  return (
-    <div className="user-profile-card rounded-panel p-5 sm:p-6">
-      <div className="flex items-center gap-2">
-        <Music4
-          size={CRATE_ICON_SIZE.sm}
-          className="user-profile-accent-icon"
-        />
-        <h2 className="text-lg font-semibold text-text-primary">
-          {t("userProfile.playlists.title")}
-        </h2>
-      </div>
-      <div className="mt-4 space-y-3">
-        {data.public_playlists.length === 0 ? (
-          <div className="user-profile-empty-state rounded-lg px-4 py-8 text-center text-sm text-text-muted">
-            {t("userProfile.playlists.empty")}
-          </div>
-        ) : (
-          data.public_playlists.map((playlist) => (
-            <PlaylistCard
-              key={playlist.id}
-              variant="row"
-              playlistId={playlist.id}
-              name={playlist.name}
-              description={playlist.description ?? undefined}
-              coverDataUrl={playlist.cover_data_url}
-              trackCount={playlist.track_count}
-              meta={[
-                playlist.total_duration > 0
-                  ? formatTotalDuration(playlist.total_duration)
-                  : null,
-                playlist.is_collaborative
-                  ? t("userProfile.playlists.collaborative")
-                  : null,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-              href={`/playlist/${playlist.id}`}
-              detailEndpoint={`/api/playlists/${playlist.id}`}
-              className="user-profile-item"
-            />
-          ))
-        )}
-      </div>
-    </div>
+                })
+              : null,
+            crate.is_collaborative
+              ? t("userProfile.crates.collaborative")
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </MonoLabel>
+      }
+      trailing={
+        canFollow ? (
+          <CrateFollowButton
+            followed={crateFollow.followed}
+            pending={crateFollow.pending}
+            onToggle={crateFollow.toggle}
+          />
+        ) : undefined
+      }
+    />
   );
 }

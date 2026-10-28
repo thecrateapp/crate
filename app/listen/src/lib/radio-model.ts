@@ -1,8 +1,9 @@
+import type { TrackMediaMetadata } from "@/lib/track-media-metadata";
 import type { Track } from "@/contexts/player-types";
 import { albumCoverApiUrl, artistPhotoApiUrl } from "@/lib/library-routes";
 import { toPlayableTrack } from "@/lib/playable-track";
 
-export interface RadioTrackPayload {
+export interface RadioTrackPayload extends TrackMediaMetadata {
   track_id?: number | null;
   global_track_uid?: string | null;
   global_artist_uid?: string | null;
@@ -30,7 +31,7 @@ export interface RadioTrackPayload {
   bliss_vector?: number[] | null;
 }
 
-export interface ShapedRadioTrack {
+export interface ShapedRadioTrack extends TrackMediaMetadata {
   track_id?: number | null;
   global_track_uid?: string | null;
   global_artist_uid?: string | null;
@@ -108,6 +109,7 @@ export function toRadioTrack(payload: RadioTrackPayload): Track {
 export function toShapedRadioTrack(track: ShapedRadioTrack): Track {
   return toPlayableTrack(
     {
+      ...track,
       id: track.global_track_uid ?? track.track_id,
       global_track_uid: track.global_track_uid,
       global_artist_uid: track.global_artist_uid,

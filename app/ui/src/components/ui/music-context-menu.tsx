@@ -1,3 +1,4 @@
+import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router";
 import { api } from "@/lib/api";
 import {
@@ -6,7 +7,6 @@ import {
   artistPagePath,
 } from "@/lib/library-routes";
 import { toast } from "sonner";
-import { MoveRight, Radar, Trash2 } from "lucide-react";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -49,6 +49,7 @@ export function MusicContextMenu({
   onQuarantineTrack,
 }: MusicContextMenuProps) {
   const navigate = useNavigate();
+  const { hasCapability } = useAuth();
 
   return (
     <ContextMenu>
@@ -104,27 +105,24 @@ export function MusicContextMenu({
           <>
             <ContextMenuSeparator />
             <ContextMenuItem onClick={onFindSimilar} className="text-sm">
-              <Radar size={14} className="mr-2" /> Find Similar
+              Find Similar
             </ContextMenuItem>
           </>
         )}
         {type === "track" && onMoveTrack && (
           <ContextMenuItem onClick={onMoveTrack} className="text-sm">
-            <MoveRight size={14} className="mr-2" /> Move to Album
+            Move to Album
           </ContextMenuItem>
         )}
         {type === "track" && onQuarantineTrack && (
           <>
             <ContextMenuSeparator />
-            <ContextMenuItem
-              onClick={onQuarantineTrack}
-              className="text-sm text-destructive focus:text-destructive"
-            >
-              <Trash2 size={14} className="mr-2" /> Quarantine Track
+            <ContextMenuItem onClick={onQuarantineTrack} className="text-sm">
+              Quarantine Track
             </ContextMenuItem>
           </>
         )}
-        {artistId != null && (
+        {artistId != null && hasCapability("library.metadata.write") && (
           <>
             <ContextMenuSeparator />
             <ContextMenuItem

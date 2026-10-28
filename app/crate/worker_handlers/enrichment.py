@@ -1963,6 +1963,21 @@ def _handle_refresh_probable_setlist(task_id: str, params: dict, config: dict) -
     return result
 
 
+def _handle_refresh_show_probable_setlists(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    del task_id, params, config
+    from crate.db.queries.shows import get_upcoming_shows
+    from crate.setlistfm import (
+        billed_show_artist_names,
+        queue_outdated_show_setlist_refreshes,
+    )
+
+    artist_names = billed_show_artist_names(get_upcoming_shows(limit=5000))
+    queued = queue_outdated_show_setlist_refreshes(artist_names)
+    return {"artist_count": len(artist_names), "queued": len(queued)}
+
+
 ENRICHMENT_TASK_HANDLERS: dict[str, TaskHandler] = {
     "enrich_artist": _handle_enrich_single,
     "enrich_artists": _handle_enrich_artists,
@@ -1975,6 +1990,7 @@ ENRICHMENT_TASK_HANDLERS: dict[str, TaskHandler] = {
     "process_new_content": _handle_process_new_content,
     "compute_completeness": _handle_compute_completeness,
     "refresh_probable_setlist": _handle_refresh_probable_setlist,
+    "refresh_show_probable_setlists": _handle_refresh_show_probable_setlists,
 }
 
 # Completeness uses the shared analysis fan-in coordinator because its child

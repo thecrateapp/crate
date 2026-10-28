@@ -1,0 +1,123 @@
+@import "../../app/shared/fonts/bricolage-grotesque.css";
+@import "../../app/shared/fonts/roboto.css";
+@import "../../app/shared/fonts/jetbrains-mono.css";
+@import "../../app/shared/ui/tokens/index.css";
+@import "tailwindcss";
+@source "../../app/shared/ui";
+@source "../crate-ui-showcase/reviews";
+@source "../../app/listen-desktop/src/components";
+@source "../../app/listen/src/components/dev";
+
+:root {
+  color-scheme: dark;
+}
+body {
+  margin: 0;
+  background: var(--surface-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-brand), sans-serif;
+}
+
+@source "../../app/listen/src/components/cards/TrackRowView.tsx";
+@source "../../app/listen/src/components/cards/TrackRowContent.tsx";
+@source "../../app/listen/src/components/cards/TrackRowPlaybackControl.tsx";
+
+@source "../../app/listen/src/components/layout/topbar/TopBarSearchDropdownView.tsx";
+
+@source "../../app/listen/src/components/layout";
+@source "../../app/listen/src/pages/SearchFormView.tsx";
+
+@source "../../app/listen/src/pages/LibraryLikedView.tsx";
+@source "../../app/listen/src/pages/SearchTrackResultsView.tsx";
+@source "../../app/listen/src/pages/SearchAlbumResultsView.tsx";
+@source "../../app/listen/src/pages/SearchErrorState.tsx";
+
+@source "../../app/listen/src/components/player";
+@source "../../app/listen/src/components/settings/SleepTimerView.tsx";
+
+@source "../../app/listen/src/components/auth";
+@source "../../app/listen/src/components/album";
+@source "../../app/listen/src/components/imports/RemoteImportView.tsx";
+@source "../../app/listen/src/pages/OfflineLibraryView.tsx";
+
+@source "../../app/listen/src/components/artist/ArtistLibraryFrames.tsx";
+@source "../../app/listen/src/components/upcoming/UpcomingShowExpandedView.tsx";
+@source "../../app/listen/src/components/upcoming/UpcomingMonthGroupView.tsx";
+
+@source "../../app/listen/src/components/home/HomeGreeting.tsx";
+@source "../../app/listen/src/components/home/HomeHeroActions.tsx";
+@source "../../app/listen/src/components/library";
+@source "../../app/listen/src/components/crates/CrateIndexGrid.tsx";
+@source "../../app/listen/src/pages/LibraryBandcampHeader.tsx";
+
+@source "../../app/listen/src/components/collections";
+@source "../../app/listen/src/components/crates/CrateForm.tsx";
+@source "../../app/listen/src/components/crates/CrateHeroFrame.tsx";
+@source "../../app/listen/src/components/crates/CrateCoverFlowView.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistHeroView.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistIdentityView.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistTrackSearch.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistComposerTrackList.tsx";
+@source "../../app/listen/src/components/social/CollaboratorSearchView.tsx";
+@source "../../node_modules/@ashishgogula/coverflow/dist";
+@source "../../app/listen/node_modules/@ashishgogula/coverflow/dist";
+
+@source "../../app/listen/src/components/crates/CrateAlbumListView.tsx";
+@source "../../app/listen/src/components/CrateAlbumPickerView.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistListRowView.tsx";
+
+@source "../../app/listen/src/components/search/CatalogSearchView.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistTrackSearchView.tsx";
+@source "../../app/listen/src/components/playlists/PlaylistComposerTrackListView.tsx";
+
+@source "../../app/listen/src/components/explore/ExploreBrowseViews.tsx";
+@source "../../app/listen/src/components/explore/GenreTileView.tsx";
+@source "../../app/listen/src/components/explore/GenreHeroView.tsx";
+
+@source "../../app/listen/src/components/upcoming";
+@source "../../app/listen/src/pages/ShowsPageView.tsx";
+
+@source "../../app/listen/src/components/paths";
+@source "../../app/listen/src/components/radio/RadioStationCardView.tsx";
+@source "../../app/listen/src/pages/RadioPageView.tsx";
+@source "../../app/listen/src/pages/RadioSeedPanelView.tsx";
+@source "../../app/listen/src/pages/RadioStationRailView.tsx";
+@source "../../app/listen/src/pages/PathsPageView.tsx";
+@source "../../app/listen/src/pages/PathEndpointPanelView.tsx";
+@source "../../app/listen/src/pages/PathDetailHeaderView.tsx";
+
+@source "../../app/listen/src/components/settings";
+@source "../../app/listen/src/pages/SettingsPageView.tsx";
+
+@source "../../app/listen/src/components/social";
+@source "../../app/listen/src/pages/PeopleContent.tsx";
+@source "../../app/listen/src/pages/PeopleSummary.tsx";
+@source "../../app/listen/src/pages/PeopleSearch.tsx";
+@source "../../app/listen/src/pages/UserConnectionsView.tsx";
+@source "../../app/listen/src/pages/UserProfileView.tsx";
+@source "../../app/listen/src/pages/UserProfileHero.tsx";
+@source "../../app/listen/src/pages/UserProfileRelationships.tsx";
+@source "../../app/listen/src/pages/UserProfileTaste.tsx";
+@source "../../app/listen/src/pages/UserProfileMatch.tsx";
+@source "../../app/listen/src/pages/UserProfileLibraryView.tsx";
+@source "../../app/listen/src/pages/UserProfileNetworkView.tsx";
+
+@source "../../app/listen/src/components/share/ShareSheetView.tsx";
+@source "../../app/listen/src/components/bandcamp";
+@source "../../app/listen/src/pages/BandcampPageView.tsx";
+@source "../../app/listen/src/pages/UploadView.tsx";
+
+@source "../../app/listen/src/components/stats";
+@source "../../app/listen/src/pages/StatsPageView.tsx";
+@source "../../app/listen/src/pages/StatsSoundProfileView.tsx";
+@source "../../app/listen/src/pages/StatsAnalyticsPrimitives.tsx";
+@source "../../app/listen/src/pages/StatsArtistRankView.tsx";
+
+@source "../../app/listen/src/components/player/EqualizerPanelSections.tsx";
+@source "../../app/listen/src/components/player/EqualizerSmartReadout.tsx";
+@source "../../app/listen/src/components/player/EqualizerAdaptiveReadouts.tsx";
+@source "../../app/listen/src/components/player/EqualizerPanelSurface.tsx";
+
+@source "../../app/listen/src/components/home";
+@source "../../app/listen/src/components/stats/TapeBars.tsx";
+@source "../../app/listen/src/components/upcoming";

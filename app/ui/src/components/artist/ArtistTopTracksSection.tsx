@@ -1,8 +1,13 @@
+import { ArtistDetailSection } from "./ArtistDetailSection";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 import { MusicContextMenu } from "@/components/ui/music-context-menu";
 import type { TopTrack } from "@/hooks/use-artist-data";
-import { PopularityBar } from "@/components/artist/ArtistPageBits";
+import { PopularityBar } from "./ArtistPageBits";
 import { albumCoverApiUrl } from "@/lib/library-routes";
 import { formatCompact, formatDuration, formatDurationMs } from "@/lib/utils";
+import { EntityRow } from "@crate/ui/domain/entity";
+import { TrackList } from "@crate/ui/domain/tracks/TrackList";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
 interface SpotifyTopTrack {
   name: string;
@@ -10,124 +15,108 @@ interface SpotifyTopTrack {
   duration_ms: number;
   popularity: number;
 }
-
 interface ArtistTopTracksSectionProps {
   topTracks: TopTrack[];
   spotifyTopTracks?: SpotifyTopTrack[];
+  withHeading?: boolean;
 }
 
 export function ArtistTopTracksSection({
   topTracks,
   spotifyTopTracks,
+  withHeading = true,
 }: ArtistTopTracksSectionProps) {
-  if (topTracks.length === 0 && !spotifyTopTracks?.length) {
-    return (
-      <div className="text-center py-12 text-muted-foreground">
-        No top tracks available
-      </div>
-    );
-  }
-  const additionalSpotifyTopTracks = (spotifyTopTracks ?? []).reduce<
-    SpotifyTopTrack[]
-  >((tracks, spotifyTrack) => {
-    if (
+  const additional = (spotifyTopTracks ?? []).filter(
+    (spotifyTrack) =>
       !topTracks.some(
         (track) =>
           track.title.toLowerCase() === spotifyTrack.name.toLowerCase(),
-      )
-    ) {
-      tracks.push(spotifyTrack);
-    }
-    return tracks;
-  }, []);
-
-  return (
-    <div>
-      <div className="flex items-center gap-4 px-4 py-2 text-xs text-white/30 border-b border-white/5 mb-1">
-        <span className="w-8 text-right">#</span>
-        <span className="flex-1">Title</span>
-        <span className="w-32 hidden sm:block">Album</span>
-        <span className="w-20 text-right">Duration</span>
-        <span className="w-20 text-right hidden sm:block">Popularity</span>
-        <span className="w-8" />
+      ),
+  );
+  const content =
+    topTracks.length === 0 && additional.length === 0 ? (
+      <EmptyState title="No top tracks available" />
+    ) : (
+      <div className="min-w-0 max-w-4xl space-y-[var(--content-list-gap)]">
+        <TrackList
+          label="Library top tracks"
+          items={topTracks}
+          itemKey={(track) => track.id}
+          renderRow={(track, index) => {
+            const coverUrl =
+              albumCoverApiUrl({
+                albumId: track.album_id,
+                albumSlug: track.album_slug,
+                artistName: track.artist,
+                albumName: track.album,
+              }) || undefined;
+            return (
+              <MusicContextMenu
+                type="track"
+                artist={track.artist}
+                artistId={track.artist_id}
+                artistSlug={track.artist_slug}
+                album={track.album || ""}
+                albumId={track.album_id}
+                albumSlug={track.album_slug}
+                trackId={track.id}
+                trackTitle={track.title}
+                albumCover={coverUrl}
+              >
+                <EntityRow
+                  title={track.title}
+                  rank={index + 1}
+                  subtitle={
+                    track.album ? (
+                      <MonoLabel as="span">{track.album}</MonoLabel>
+                    ) : undefined
+                  }
+                  menuButton="none"
+                  disableItemActionTarget
+                  trailing={
+                    <>
+                      <MonoLabel as="span">
+                        {formatDuration(track.duration)}
+                      </MonoLabel>
+                      {track.listeners ? (
+                        <MonoLabel as="span">
+                          {formatCompact(track.listeners)} listeners
+                        </MonoLabel>
+                      ) : null}
+                    </>
+                  }
+                />
+              </MusicContextMenu>
+            );
+          }}
+        />
+        <TrackList
+          label="Additional Spotify top tracks"
+          items={additional}
+          itemKey={(track) => `${track.name}-${track.album}`}
+          renderRow={(track, index) => (
+            <EntityRow
+              title={track.name}
+              rank={topTracks.length + index + 1}
+              subtitle={<MonoLabel as="span">{track.album}</MonoLabel>}
+              meta={<MonoLabel as="span">Spotify</MonoLabel>}
+              menuButton="none"
+              trailing={
+                <>
+                  <MonoLabel as="span">
+                    {formatDurationMs(track.duration_ms)}
+                  </MonoLabel>
+                  <PopularityBar value={track.popularity} />
+                </>
+              }
+            />
+          )}
+        />
       </div>
-      <div className="space-y-0.5">
-        {topTracks.map((track, index) => {
-          const coverUrl =
-            albumCoverApiUrl({
-              albumId: track.album_id,
-              albumSlug: track.album_slug,
-              artistName: track.artist,
-              albumName: track.album,
-            }) || undefined;
-          return (
-            <MusicContextMenu
-              key={`nd-${track.id}`}
-              type="track"
-              artist={track.artist}
-              artistId={track.artist_id}
-              artistSlug={track.artist_slug}
-              album={track.album || ""}
-              albumId={track.album_id}
-              albumSlug={track.album_slug}
-              trackId={track.id}
-              trackTitle={track.title}
-              albumCover={coverUrl}
-            >
-              <div className="w-full flex items-center gap-4 px-4 py-2 text-left transition-colors group hover:bg-white/5">
-                <span className="w-8 text-right text-sm text-white/30">
-                  {index + 1}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate text-white/90">
-                    {track.title}
-                  </div>
-                </div>
-                <div className="w-32 hidden sm:block text-xs text-white/40 truncate">
-                  {track.album}
-                </div>
-                <div className="w-20 text-right text-xs text-white/30">
-                  {formatDuration(track.duration)}
-                </div>
-                <div className="w-20 text-right hidden sm:block">
-                  {track.listeners ? (
-                    <span className="text-xs text-white/30">
-                      {formatCompact(track.listeners)}
-                    </span>
-                  ) : null}
-                </div>
-                <div className="w-8" />
-              </div>
-            </MusicContextMenu>
-          );
-        })}
-
-        {additionalSpotifyTopTracks.map((spotifyTrack, index) => (
-          <div
-            key={`sp-${spotifyTrack.name}-${spotifyTrack.album}`}
-            className="w-full flex items-center gap-4 px-4 py-2 text-left opacity-60 transition-colors hover:bg-white/5"
-          >
-            <span className="w-8 text-right text-sm text-white/30">
-              {topTracks.length + index + 1}
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm text-white/70 truncate">
-                {spotifyTrack.name}
-              </div>
-            </div>
-            <div className="w-32 hidden sm:block text-xs text-white/40 truncate">
-              {spotifyTrack.album}
-            </div>
-            <div className="w-20 text-right text-xs text-white/30">
-              {formatDurationMs(spotifyTrack.duration_ms)}
-            </div>
-            <div className="w-20 text-right hidden sm:block">
-              <PopularityBar value={spotifyTrack.popularity} />
-            </div>
-            <div className="w-8" />
-          </div>
-        ))}
-      </div>
-    </div>
+    );
+  return withHeading ? (
+    <ArtistDetailSection title="Top Tracks">{content}</ArtistDetailSection>
+  ) : (
+    content
   );
 }

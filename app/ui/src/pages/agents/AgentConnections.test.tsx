@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -102,6 +102,8 @@ function readDefault(path: string, items: AgentIntegration[]) {
   if (path.startsWith(`${base}/oauth-clients`))
     return Promise.resolve(emptyPage);
   if (path.includes("/activity")) return Promise.resolve(emptyPage);
+  if (path === "/api/admin/agent-telegram/bindings")
+    return Promise.resolve({ instance_id: null, items: [] });
   // The sheet reads a connection again after every change.
   const single = items.find((item) => path === `${base}/${item.principal_id}`);
   if (single) return Promise.resolve(single);
@@ -181,6 +183,36 @@ describe("AgentConnections", () => {
     expect(
       apiMock.mock.calls.some(([path]) => String(path).includes("/activity")),
     ).toBe(false);
+  });
+
+  it("offers the service connections to the Telegram approver panel", async () => {
+    const operator: AgentIntegration = {
+      ...integration,
+      principal_id: "service-operator",
+      name: "Crate Operator",
+    };
+    const delegated: AgentIntegration = {
+      ...integration,
+      principal_id: "delegated-one",
+      name: "Desktop app",
+      kind: "delegated",
+      credentials: null,
+      authorizations: [],
+    };
+    apiMock.mockImplementation((path: string) => {
+      if (path === "/api/admin/agent-telegram/bindings")
+        return Promise.resolve({ instance_id: "crate-abc", items: [] });
+      return readDefault(path, [integration, operator, delegated]);
+    });
+    renderWithAdminProviders(<AgentConnections />);
+
+    const select = await screen.findByLabelText("Connection");
+    expect(select).toHaveValue("service-operator");
+    expect(
+      within(select)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["Library reader", "Crate Operator"]);
   });
 
   it("links plan reviewers to the Agents approvals section", async () => {
@@ -588,8 +620,11 @@ describe("AgentConnections", () => {
     expect(document.body).not.toHaveTextContent("library.health.read");
 
     const sheet = await openConnection(user);
-    expect(within(sheet).getByText("Inspect library health")).toHaveAttribute(
-      "title",
+    const permission = within(sheet).getByText("Inspect library health");
+    expect(permission).not.toHaveAttribute("title");
+    fireEvent.keyDown(document, { key: "Tab" });
+    permission.focus();
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
       "library.health.read",
     );
     expect(sheet).not.toHaveTextContent("library.health.read");

@@ -1,5 +1,5 @@
 import { useId, useState, type ReactNode } from "react";
-import { ListChecks } from "lucide-react";
+import {} from "lucide-react";
 import { toast } from "sonner";
 
 import { Switch } from "@crate/ui/primitives/Switch";
@@ -85,7 +85,7 @@ function FeatureRow({
   // Before setup a feature follows server settings, where Music Paths
   // refinement has its own switch; setup keeps that state.
   const checked = snapshot.migrated
-    ? (binding?.enabled ?? false)
+    ? binding?.enabled ?? false
     : snapshot.legacy_actions.find(
         (candidate) => candidate.action_id === action.id,
       )?.legacy_enabled !== false;
@@ -199,7 +199,6 @@ export function FeaturesPanel({
 
   return (
     <OpsPanel
-      icon={ListChecks}
       title="Features"
       description="What each feature sends and which model it uses."
     >
@@ -259,7 +258,7 @@ function FeatureArea({
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="space-y-3">
-      <h3 id={headingId} className="text-sm font-semibold text-white/80">
+      <h3 id={headingId} className="text-sm font-semibold text-white/80 font-display">
         {featureAreaLabel(area)}
       </h3>
       <ul role="list" className="divide-y divide-white/8">

@@ -1,0 +1,40 @@
+---
+import { t } from "../i18n";
+
+interface Props {
+  locale?: string;
+}
+
+const { locale = "en" } = Astro.props;
+---
+
+<footer class="footer">
+  <a class="u-link" href="/why">{t("footer.manifesto", locale)}</a>
+  <nav class="links" aria-label="Footer">
+    <a class="u-link" href="https://github.com/thecrateapp/crate">{t("nav.github", locale)}</a>
+    <a class="u-link" href="https://docs.cratemusic.app">{t("nav.docs", locale)}</a>
+    <a class="u-link" href="https://github.com/thecrateapp/crate/blob/main/LICENSE">{t("footer.license", locale)}</a>
+  </nav>
+</footer>
+
+<style>
+  .footer {
+    position: relative;
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px 30px;
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 40px clamp(20px, 6vw, 96px) 56px;
+    border-top: 1px solid var(--line);
+  }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 30px;
+  }
+</style>

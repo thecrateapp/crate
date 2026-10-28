@@ -400,6 +400,8 @@ def test_catalog_serves_permission_details_and_presets(admin_client):
         "shows_curator",
         "editorial_curator",
         "library_maintainer",
+        "crate_agent",
+        "crate_operator",
     ]
     for preset in body["presets"]:
         assert set(preset) == {"id", "label", "description", "scopes"}

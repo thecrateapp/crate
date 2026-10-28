@@ -1,11 +1,23 @@
+import {
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
+import { OpsPageHero, OpsRefreshNotice } from "@/components/admin/ops-surfaces";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import {
+  RefreshCw as HeaderRefreshCw,
+  Trash2 as HeaderTrash2,
+  Loader2,
+} from "lucide-react";
 import { useEffect, useState } from "react";
-import { ArchiveRestore, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@crate/ui/shadcn/button";
 import { Card } from "@crate/ui/shadcn/card";
 
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { api } from "@/lib/api";
 import { waitForTask } from "@/lib/tasks";
 import { timeAgo } from "@/lib/utils";
@@ -91,6 +103,8 @@ function technicalLine(item: QuarantinedTrack) {
 export function Trash() {
   const [items, setItems] = useState<QuarantinedTrack[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [busyPath, setBusyPath] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<QuarantinedTrack | null>(
     null,
@@ -105,12 +119,15 @@ export function Trash() {
 
   async function load() {
     setLoading(true);
+    setLoadError(null);
     try {
       const payload = await api<QuarantineResponse>(
         "/api/manage/tracks/quarantine",
       );
       setItems(payload.items ?? []);
+      setHasLoaded(true);
     } catch (error) {
+      setLoadError("Could not load quarantined tracks.");
       toast.error(
         error instanceof Error && error.message
           ? error.message
@@ -130,6 +147,7 @@ export function Trash() {
     endpoint: string,
     body: Record<string, unknown>,
     successMessage: string,
+    propagateError = false,
   ) {
     setBusyPath(item.quarantine_path);
     try {
@@ -143,7 +161,7 @@ export function Trash() {
         toast.success(successMessage);
         await load();
       } else {
-        toast.error(task.error || "Track operation failed");
+        throw new Error(task.error || `Track operation ${task.status}`);
       }
     } catch (error) {
       toast.error(
@@ -151,9 +169,9 @@ export function Trash() {
           ? error.message
           : "Track operation failed",
       );
+      if (propagateError) throw error;
     } finally {
       setBusyPath(null);
-      setDeleteTarget(null);
     }
   }
 
@@ -178,6 +196,7 @@ export function Trash() {
         reason: "Manual hard delete from .crate-trash",
       },
       "Quarantined track deleted permanently",
+      true,
     );
   }
 
@@ -206,7 +225,7 @@ export function Trash() {
         toast.success(`Trash emptied${suffix}`);
         await load();
       } else {
-        toast.error(task.error || "Empty trash failed");
+        throw new Error(task.error || `Empty trash ${task.status}`);
       }
     } catch (error) {
       toast.error(
@@ -214,46 +233,46 @@ export function Trash() {
           ? error.message
           : "Empty trash failed",
       );
+      throw error;
     } finally {
       setBulkDeleting(false);
-      setBulkDeleteOpen(false);
     }
   }
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-white/10 bg-card/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
-              <Trash2 size={22} />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">
-                Library Trash
-              </h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Reversible track quarantine. Files live under .crate-trash until
-                restored or deleted permanently.
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
+      <OpsPageHero
+        title="Library Trash"
+        description="Reversible track quarantine. Files live under .crate-trash until restored or deleted permanently."
+        compactActions
+        actions={
+          <PageHeaderActions>
+            <PageHeaderAction
+              label="Refresh"
               type="button"
-              variant="outline"
               disabled={loading || bulkDeleting}
+              aria-busy={loading}
               onClick={() => void load()}
             >
-              <RefreshCw
-                size={15}
-                className={loading ? "mr-2 animate-spin" : "mr-2"}
-              />
-              Refresh
-            </Button>
-            <Button
+              {loading ? (
+                <Loader2
+                  data-admin-ux="trash-refresh-loading"
+                  aria-hidden="true"
+                  size={15}
+                  className="animate-spin"
+                />
+              ) : null}
+              {!loading ? (
+                <HeaderRefreshCw
+                  data-admin-ux="header-refresh"
+                  aria-hidden="true"
+                />
+              ) : null}
+            </PageHeaderAction>
+            <PageHeaderAction
+              label="Empty trash"
               type="button"
-              variant="destructive"
+              aria-busy={bulkDeleting}
               disabled={
                 loading ||
                 items.length === 0 ||
@@ -263,34 +282,43 @@ export function Trash() {
               onClick={() => setBulkDeleteOpen(true)}
             >
               {bulkDeleting ? (
-                <Loader2 size={15} className="mr-2 animate-spin" />
-              ) : (
-                <Trash2 size={15} className="mr-2" />
-              )}
-              Empty trash
-            </Button>
-          </div>
-        </div>
-      </section>
+                <Loader2
+                  data-admin-ux="trash-empty-loading"
+                  aria-hidden="true"
+                  size={15}
+                  className="animate-spin"
+                />
+              ) : null}
+              {!bulkDeleting ? (
+                <HeaderTrash2
+                  data-admin-ux="header-empty-trash"
+                  aria-hidden="true"
+                />
+              ) : null}
+            </PageHeaderAction>
+          </PageHeaderActions>
+        }
+      />
 
-      <Card className="border-white/10 bg-card/70">
-        {loading ? (
-          <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
-            <Loader2 size={16} className="animate-spin" />
-            Loading quarantined tracks...
-          </div>
-        ) : items.length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="text-sm font-medium text-foreground">
-              .crate-trash is empty
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Quarantined tracks will appear here after manual removals or
-              repair actions.
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-white/8">
+      {loadError && hasLoaded ? (
+        <OpsRefreshNotice
+          message={`${loadError} Showing the last successful list.`}
+          onRetry={() => void load()}
+          retrying={loading}
+        />
+      ) : null}
+      {loading && !hasLoaded ? (
+        <LoadingState label="Loading quarantined tracks" />
+      ) : loadError && !hasLoaded ? (
+        <ErrorState message={loadError} onRetry={() => void load()} />
+      ) : items.length === 0 ? (
+        <EmptyState
+          title=".crate-trash is empty"
+          description="Quarantined tracks will appear here after manual removals or repair actions."
+        />
+      ) : (
+        <Card>
+          <div className="divide-y divide-border-quiet">
             {items.map((item) => {
               const busy = busyPath === item.quarantine_path;
               return (
@@ -298,20 +326,20 @@ export function Trash() {
                   key={item.quarantine_path}
                   className="flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between"
                 >
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-white/90">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold text-text-primary">
                       {displayTitle(item)}
                     </div>
                     {metadataLine(item) ? (
-                      <div className="mt-1 truncate text-xs text-white/55">
+                      <div className="mt-1 truncate text-xs text-text-muted">
                         {metadataLine(item)}
                       </div>
                     ) : null}
-                    <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
+                    <div className="mt-1 truncate font-mono text-label text-text-subtle">
                       {item.quarantine_path}
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.14em] text-white/40">
-                      <span>{technicalLine(item)}</span>
+                    <div className="mt-2 font-mono text-label text-text-subtle">
+                      {technicalLine(item)}
                     </div>
                   </div>
                   <div className="flex shrink-0 flex-wrap gap-2">
@@ -320,23 +348,26 @@ export function Trash() {
                       size="sm"
                       variant="outline"
                       disabled={busyPath !== null || bulkDeleting}
+                      aria-busy={busy}
                       onClick={() => void restore(item)}
                     >
                       {busy ? (
-                        <Loader2 size={14} className="mr-2 animate-spin" />
-                      ) : (
-                        <ArchiveRestore size={14} className="mr-2" />
-                      )}
+                        <Loader2
+                          data-admin-ux="trash-row-loading"
+                          aria-hidden="true"
+                          size={14}
+                          className="mr-2 animate-spin"
+                        />
+                      ) : null}
                       Restore
                     </Button>
                     <Button
                       type="button"
                       size="sm"
-                      variant="destructive"
+                      variant="outline"
                       disabled={busyPath !== null || bulkDeleting}
                       onClick={() => setDeleteTarget(item)}
                     >
-                      <Trash2 size={14} className="mr-2" />
                       Delete
                     </Button>
                   </div>
@@ -344,8 +375,8 @@ export function Trash() {
               );
             })}
           </div>
-        )}
-      </Card>
+        </Card>
+      )}
 
       <ConfirmDialog
         open={deleteTarget !== null}
@@ -355,8 +386,17 @@ export function Trash() {
           deleteTarget ? displayTitle(deleteTarget) : "this track"
         }" from .crate-trash? This cannot be undone.`}
         confirmLabel="Delete Permanently"
-        variant="destructive"
-        onConfirm={() => deleteTarget && void hardDelete(deleteTarget)}
+        tone="danger"
+        onConfirm={async () => {
+          if (deleteTarget) await hardDelete(deleteTarget);
+        }}
+        onError={() => undefined}
+        eyebrow="Confirm action"
+        consequence={`${
+          deleteTarget ? displayTitle(deleteTarget) : "Track"
+        } · ${
+          deleteTarget ? formatBytes(deleteTarget.size_bytes) : "—"
+        } · permanently deletes the file from .crate-trash`}
       />
 
       <ConfirmDialog
@@ -369,8 +409,13 @@ export function Trash() {
           totalSizeBytes,
         )}) from .crate-trash? This cannot be undone.`}
         confirmLabel="Empty Trash"
-        variant="destructive"
-        onConfirm={() => void hardDeleteAll()}
+        tone="danger"
+        onConfirm={hardDeleteAll}
+        onError={() => undefined}
+        eyebrow="Confirm action"
+        consequence={`${items.length} tracks · ${formatBytes(
+          totalSizeBytes,
+        )} · permanently deletes files from .crate-trash`}
       />
     </div>
   );

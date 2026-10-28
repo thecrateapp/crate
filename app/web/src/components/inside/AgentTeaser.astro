@@ -1,0 +1,513 @@
+---
+import { ACTORS, APPROVAL_FLOW, APPROVED, FLOW_DONE, PLAN_REF } from "../../content/admin/mcp";
+import { AGENT, CHAT } from "../../content/admin/telegram-agent";
+import { t } from "../../i18n";
+import { planChanges } from "../../scripts/viz/inside-math";
+
+interface Props {
+  locale?: string;
+}
+
+const { locale = "en" } = Astro.props;
+const question = CHAT.find((entry) => entry.kind === "user")!;
+const [diagnose, preview] = CHAT.flatMap((entry) => (entry.kind === "tools" ? [entry.tools] : []));
+const answer = CHAT.find((entry) => entry.kind === "bot")!;
+const changes = planChanges(CHAT.flatMap((entry) => (entry.kind === "page" ? [entry] : [])));
+const gate = APPROVAL_FLOW.findIndex((step) => step.actor === "person");
+const code = (id: string) => APPROVAL_FLOW.find((step) => step.id === id)!.code;
+---
+
+<div
+  class="ag"
+  data-viz="inside-agent"
+  data-gate={gate}
+  data-approved={APPROVED}
+  data-stage="pressed"
+  aria-hidden="true"
+>
+  <ol class="ag-rail">
+    {
+      APPROVAL_FLOW.map((step, index) => (
+        <li class:list={{ gate: index === gate }} data-ag-step={index} data-status={step.status} data-state="done">
+          <i />
+          <span class="actor">{ACTORS[step.actor]}</span>
+          <span class="title">{step.title}</span>
+        </li>
+      ))
+    }
+  </ol>
+
+  <div class="ag-log">
+    <p class="ask" data-at="0">
+      <span class="who">{t("inside.mcp.you", locale)}</span>
+      {question.text}
+    </p>
+    <p class="calls" data-at="0.3">
+      <span class="via">via MCP</span>
+      {diagnose!.map((tool) => <code>{tool}</code>)}
+    </p>
+    <p class="say" data-at="0.65">{answer.text}</p>
+    <p class="calls" data-at="1.3">
+      <span class="via">via MCP</span>
+      {preview!.map((tool) => <code>{tool}</code>)}
+    </p>
+  </div>
+
+  <div class="ag-plan" data-at="2.1">
+    <p class="plan-head">
+      <b>{t("inside.mcp.plan", locale)}</b>
+      <span>{PLAN_REF}</span>
+      <span class="expires">{t("inside.mcp.expires", locale, { minutes: String(AGENT.confirmMinutes) })}</span>
+    </p>
+    <ol class="changes">
+      {
+        changes.map((change, index) => (
+          <li data-at={(2.3 + index * 0.25).toFixed(2)}>
+            <b>{String(index + 1).padStart(2, "0")}</b>
+            <span class="target">{change.target}</span>
+            <span class="change">{change.change}</span>
+          </li>
+        ))
+      }
+    </ol>
+    <div class="decision" data-at="2.8">
+      <span class="check" data-ag-check><svg viewBox="0 0 12 12"><path d="M2.5 6.2 5 8.6 9.6 3.6" /></svg></span>
+      <span class="reviewed">{t("inside.mcp.reviewed", locale, { count: String(changes.length) })}</span>
+      <span class="keys">
+        <span class="key approve" data-ag-approve>{t("inside.mcp.approve", locale)}</span>
+        <span class="key reject">{t("inside.mcp.reject", locale)}</span>
+      </span>
+    </div>
+  </div>
+
+  <p class="ag-foot">
+    <span class="calls" data-at="4.05">
+      <code>{code("apply")}</code>
+      <code>{code("audit")}</code>
+    </span>
+    <span class="status" data-ag-status>{FLOW_DONE}</span>
+  </p>
+
+  <span class="cursor" data-ag-cursor>
+    <svg viewBox="0 0 16 20"><path d="M1.5 1.5v14.2l3.9-3.6 2.6 5.9 2.5-1.1-2.6-5.8h5.4z" /></svg>
+    <span>{t("inside.mcp.you", locale)}</span>
+  </span>
+</div>
+
+<style>
+  .ag {
+    position: relative;
+    display: grid;
+    gap: 16px;
+  }
+
+  .ag-rail {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    --p: 1;
+  }
+
+  .ag-rail::before,
+  .ag-rail::after {
+    content: "";
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    right: calc(100% / 6 - 4px);
+    height: 1px;
+    background: rgba(241, 245, 249, 0.14);
+  }
+
+  .ag-rail::after {
+    background: var(--cyan-hi);
+    transform-origin: left;
+    transform: scaleX(var(--p));
+    transition: transform 0.5s var(--ease-snap);
+  }
+
+  .ag-rail li {
+    display: grid;
+    gap: 3px;
+    justify-items: start;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .ag-rail i {
+    position: relative;
+    z-index: 1;
+    width: 9px;
+    height: 9px;
+    margin-bottom: 6px;
+    border: 1px solid rgba(241, 245, 249, 0.4);
+    border-radius: 50%;
+    background: var(--bg);
+    transition:
+      border-color 0.3s var(--ease-snap),
+      background-color 0.3s var(--ease-snap),
+      box-shadow 0.3s var(--ease-snap);
+  }
+
+  .ag-rail .actor {
+    color: var(--fg-3);
+  }
+
+  .ag-rail .title {
+    color: var(--fg-2);
+    letter-spacing: 0.06em;
+  }
+
+  .ag-rail li[data-state="done"] i {
+    border-color: var(--cyan-hi);
+    background: var(--cyan-hi);
+  }
+
+  .ag-rail li[data-state="active"] i {
+    border-color: var(--cyan-hi);
+    box-shadow: 0 0 0 4px rgba(103, 232, 249, 0.14);
+  }
+
+  .ag-rail li[data-state="active"] .title {
+    color: var(--fg);
+  }
+
+  .ag-rail li.gate .actor {
+    color: var(--amber);
+  }
+
+  .ag-log {
+    display: grid;
+    gap: 10px;
+    align-content: start;
+  }
+
+  .ask,
+  .say,
+  .calls {
+    margin: 0;
+  }
+
+  .ask {
+    justify-self: end;
+    max-width: 82%;
+    padding: 8px 12px;
+    border: 1px solid rgba(103, 232, 249, 0.28);
+    border-radius: 14px 14px 4px 14px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--fg);
+  }
+
+  .who {
+    display: block;
+    margin-bottom: 2px;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--cyan-hi);
+  }
+
+  .say {
+    max-width: 92%;
+    padding-left: 12px;
+    border-left: 1px solid rgba(241, 245, 249, 0.18);
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--fg-2);
+  }
+
+  .calls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .via {
+    margin-right: 4px;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  .calls code {
+    padding: 1px 8px;
+    border: 1px solid rgba(103, 232, 249, 0.3);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    color: var(--cyan-hi);
+  }
+
+  .ag-plan {
+    display: grid;
+    gap: 0;
+    border: 1px solid rgba(241, 245, 249, 0.12);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(241, 245, 249, 0.025), transparent 70%);
+    overflow: hidden;
+  }
+
+  .plan-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 12px;
+    margin: 0;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--fg-2);
+  }
+
+  .plan-head b {
+    font-weight: 400;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--cyan-hi);
+  }
+
+  .expires {
+    margin-left: auto;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--fg-3);
+  }
+
+  .changes {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .changes li {
+    display: grid;
+    grid-template-columns: 2.4ch minmax(0, 0.9fr) minmax(0, 1.4fr);
+    gap: 12px;
+    align-items: baseline;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--line);
+    font-size: 12.5px;
+  }
+
+  .changes b {
+    font-family: var(--mono);
+    font-weight: 400;
+    font-size: 10px;
+    color: var(--fg-3);
+  }
+
+  .target {
+    color: var(--fg);
+  }
+
+  .change {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--fg-2);
+  }
+
+  .decision {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 14px;
+  }
+
+  .check {
+    display: grid;
+    place-items: center;
+    width: 14px;
+    height: 14px;
+    border: 1px solid rgba(241, 245, 249, 0.35);
+    border-radius: 4px;
+    transition:
+      border-color 0.25s var(--ease-snap),
+      background-color 0.25s var(--ease-snap);
+  }
+
+  .check svg {
+    width: 10px;
+    height: 10px;
+    fill: none;
+    stroke: var(--bg);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0;
+    transition: opacity 0.2s var(--ease-snap);
+  }
+
+  .reviewed {
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--fg-2);
+  }
+
+  .keys {
+    display: flex;
+    gap: 6px;
+  }
+
+  .key {
+    padding: 5px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--fg-3);
+    transition:
+      color 0.3s var(--ease-snap),
+      border-color 0.3s var(--ease-snap),
+      background-color 0.3s var(--ease-snap),
+      transform 0.45s var(--spring-snappy);
+  }
+
+  .ag[data-stage="checked"] .check,
+  .ag[data-stage="pressed"] .check {
+    border-color: var(--cyan-hi);
+    background: var(--cyan-hi);
+  }
+
+  .ag[data-stage="checked"] .check svg,
+  .ag[data-stage="pressed"] .check svg {
+    opacity: 1;
+  }
+
+  .ag[data-stage="checked"] .key,
+  .ag[data-stage="pressed"] .key.reject {
+    color: var(--fg-2);
+    border-color: rgba(241, 245, 249, 0.2);
+  }
+
+  .ag[data-stage="checked"] .key.approve {
+    color: var(--cyan-hi);
+    border-color: rgba(103, 232, 249, 0.5);
+  }
+
+  .ag[data-stage="pressed"] .key.approve {
+    color: var(--bg);
+    border-color: var(--cyan-hi);
+    background: var(--cyan-hi);
+    box-shadow: 0 0 18px rgba(103, 232, 249, 0.35);
+  }
+
+  .ag-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+    margin: 0;
+  }
+
+  .status {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--cyan-hi);
+    transition: color 0.3s var(--ease-snap);
+  }
+
+  .status:global(.is-waiting) {
+    color: var(--amber);
+  }
+
+  .cursor {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: none;
+    align-items: flex-start;
+    gap: 4px;
+    pointer-events: none;
+    opacity: 0;
+    transition:
+      transform 0.7s var(--ease-out),
+      opacity 0.3s var(--ease-snap);
+  }
+
+  .cursor svg {
+    width: 13px;
+    height: 16px;
+    fill: var(--fg);
+    stroke: var(--bg);
+    stroke-width: 1;
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
+  }
+
+  .cursor span {
+    margin-top: 12px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--cyan-hi);
+    font-family: var(--mono);
+    font-size: 8.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--bg);
+  }
+
+  .ag:global(.is-live) .cursor {
+    display: flex;
+  }
+
+  .ag:global(.is-live) .cursor:global(.is-on) {
+    opacity: 1;
+  }
+
+  .ag:global(.is-live) [data-at] {
+    opacity: 0;
+    transform: translateY(8px);
+    transition:
+      opacity 0.45s var(--ease-snap),
+      transform 0.6s var(--spring-snappy);
+  }
+
+  .ag:global(.is-live) [data-at]:global(.is-shown) {
+    opacity: 1;
+    transform: none;
+  }
+
+  .ag:global(.is-live) .key:global(.is-tap) {
+    transform: scale(0.94);
+  }
+
+  @media (max-width: 760px) {
+    .ag-rail .actor {
+      display: none;
+    }
+    .ag-rail li {
+      font-size: 8.5px;
+    }
+    .changes li {
+      grid-template-columns: 2.4ch minmax(0, 1fr);
+    }
+    .change {
+      grid-column: 2;
+    }
+    .decision {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+    .keys {
+      grid-column: 1 / -1;
+    }
+    .key {
+      flex: 1;
+      text-align: center;
+    }
+  }
+</style>

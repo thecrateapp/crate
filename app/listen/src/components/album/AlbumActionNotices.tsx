@@ -35,7 +35,7 @@ export function AlbumActionNotices({
       {state.offlineStatusDetail ? (
         <div className="px-4 pb-4 sm:px-6">
           <div className="mx-auto w-full max-w-content">
-            <p className="text-xs text-text-muted">
+            <p role="status" className="font-mono text-xs text-text-muted">
               {state.offlineStatusDetail}
             </p>
           </div>
@@ -44,7 +44,10 @@ export function AlbumActionNotices({
 
       {state.isPreRelease ? (
         <div className="px-4 pb-4 sm:px-6">
-          <div className="mx-auto w-full max-w-content rounded-lg border border-accent-action/15 bg-accent-action/5 px-4 py-3 text-sm text-accent-action/90">
+          <div
+            role="note"
+            className="mx-auto w-full max-w-content rounded-panel border border-border-quiet bg-surface-container px-4 py-3 text-sm text-text-muted"
+          >
             {t("album.prereleaseNotice")}
           </div>
         </div>

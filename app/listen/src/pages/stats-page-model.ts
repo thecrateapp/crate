@@ -1,8 +1,10 @@
 import type {
+  StatsDashboard,
   StatsSelection,
+  StatsStory,
   StatsTrack,
   StatsWindow,
-} from "@/components/stats/stats-model";
+} from "../components/stats/stats-types";
 
 export const STATS_DASHBOARD_LIMITS =
   "tracks_limit=12&artists_limit=10&albums_limit=14&genres_limit=10&replay_limit=36";
@@ -32,9 +34,9 @@ export interface StatsPeriod {
 }
 
 export interface SoundProfile {
-  energy: number;
-  danceability: number;
-  valence: number;
+  energy: number | null;
+  danceability: number | null;
+  valence: number | null;
   bpm: number | null;
 }
 
@@ -106,12 +108,46 @@ export function formatMonthTitle(month: string, locale: string): string {
   });
 }
 
+export interface EnergeticFavourite {
+  title: string;
+  artist: string;
+}
+
+/** The top track with the highest known energy; null when none is analysed. */
+export function pickEnergeticFavourite(
+  items: StatsTrack[],
+): EnergeticFavourite | null {
+  let best: StatsTrack | null = null;
+  for (const item of items) {
+    if (typeof item.energy !== "number") continue;
+    if (!best || item.energy > (best.energy as number)) best = item;
+  }
+  return best ? { title: best.title, artist: best.artist } : null;
+}
+
+/**
+ * The previous reading only compares against the server profile; the
+ * top-track fallback is never a valid reference.
+ */
+export function buildPreviousSoundProfile(
+  story: StatsStory | undefined,
+): SoundProfile | null {
+  const previous = story?.audio_profile ? story.audio_profile_previous : null;
+  if (!previous) return null;
+  return {
+    energy: previous.energy,
+    danceability: previous.danceability,
+    valence: previous.valence,
+    bpm: previous.bpm ?? null,
+  };
+}
+
 export function buildSoundProfile(items: StatsTrack[]): SoundProfile {
   const average = (field: "energy" | "danceability" | "valence") => {
     const values = items
       .map((item) => item[field])
       .filter((value): value is number => typeof value === "number");
-    if (!values.length) return 0;
+    if (!values.length) return null;
     return values.reduce((sum, value) => sum + value, 0) / values.length;
   };
 
@@ -129,4 +165,19 @@ export function buildSoundProfile(items: StatsTrack[]): SoundProfile {
         )
       : null,
   };
+}
+
+/** A cold projection carries placeholder zeros; a versioned cached reading remains usable. */
+export function statsDashboardReadState(
+  dashboard: StatsDashboard | null | undefined,
+  loading: boolean,
+  error: string | null,
+): "ready" | "loading" | "error" {
+  if (dashboard)
+    return dashboard.snapshot?.pending &&
+      dashboard.snapshot.version === 0 &&
+      dashboard.overview.play_count === 0
+      ? "loading"
+      : "ready";
+  return error ? "error" : loading ? "loading" : "ready";
 }

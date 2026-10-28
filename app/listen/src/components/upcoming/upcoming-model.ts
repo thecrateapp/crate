@@ -1,38 +1,8 @@
 import { resolveMaybeApiAssetUrl } from "@/lib/api";
+import type { GenreProfileItem } from "@crate/ui/domain/genres/GenrePill";
 
-export interface UpcomingItem {
-  id?: number;
-  event_key?: string;
-  type: "release" | "show";
-  date: string;
-  time?: string;
-  artist: string;
-  artist_id?: number;
-  artist_slug?: string;
-  album_id?: number;
-  album_slug?: string;
-  title: string;
-  subtitle: string;
-  cover_url: string | null;
-  status: string;
-  is_upcoming: boolean;
-  tidal_url?: string;
-  release_id?: number;
-  url?: string;
-  venue?: string;
-  address_line1?: string;
-  city?: string;
-  region?: string;
-  postal_code?: string;
-  country?: string;
-  country_code?: string;
-  latitude?: number;
-  longitude?: number;
-  lineup?: string[];
-  genres?: string[];
-  probable_setlist?: { title: string; position?: number; frequency?: number }[];
-  user_attending?: boolean;
-}
+import type { UpcomingItem } from "./upcoming-types";
+export type { UpcomingItem } from "./upcoming-types";
 
 export interface ArtistShowEvent {
   id: string;
@@ -53,6 +23,7 @@ export interface ArtistShowEvent {
   image_url?: string;
   lineup?: string[];
   artist_genres?: string[];
+  artist_genre_profile?: GenreProfileItem[];
   latitude?: number;
   longitude?: number;
   probable_setlist?: { title: string; position?: number; frequency?: number }[];
@@ -85,19 +56,11 @@ export function artistShowToUpcomingItem(show: ArtistShowEvent): UpcomingItem {
     longitude: show.longitude,
     lineup: show.lineup,
     genres: show.artist_genres || [],
+    genre_profile: show.artist_genre_profile,
     probable_setlist: show.probable_setlist || [],
     user_attending: show.user_attending,
     is_upcoming: true,
   };
-}
-
-export function itemKey(item: UpcomingItem, index: number): string {
-  return (
-    item.event_key ||
-    `${item.type}-${item.artist}-${item.release_id ?? item.venue ?? index}-${
-      item.date
-    }-${item.time ?? ""}`
-  );
 }
 
 export function canOpenUpcomingRelease(item: UpcomingItem) {
@@ -111,45 +74,6 @@ export function upcomingReleaseBadgeLabel(item: UpcomingItem) {
   return item.is_upcoming ? "Pre-release" : "Released";
 }
 
-export function upcomingCountdown(
-  date: string,
-  time?: string,
-  now: Date = new Date(),
-): { value: number; unit: "days" | "hours" } | null {
-  if (!date) return null;
-  const target = new Date(`${date}T${time || "23:59:59"}`);
-  if (Number.isNaN(target.getTime())) return null;
+export { upcomingCountdown } from "./upcoming-timing-model";
 
-  const millisecondsRemaining = target.getTime() - now.getTime();
-  if (millisecondsRemaining <= 0) return null;
-
-  const hoursRemaining = Math.max(
-    1,
-    Math.ceil(millisecondsRemaining / (60 * 60 * 1000)),
-  );
-  if (hoursRemaining < 48) {
-    return { value: hoursRemaining, unit: "hours" };
-  }
-  return { value: Math.ceil(hoursRemaining / 24), unit: "days" };
-}
-
-export function groupByMonth(
-  items: UpcomingItem[],
-): [string, UpcomingItem[]][] {
-  const groups = new Map<string, UpcomingItem[]>();
-  for (const item of items) {
-    const month = (item.date || "").slice(0, 7) || "Unknown";
-    const existing = groups.get(month) || [];
-    existing.push(item);
-    groups.set(month, existing);
-  }
-  return [...groups.entries()];
-}
-
-export function formatMonthLabel(month: string) {
-  if (month === "Unknown") return "Unknown Date";
-  return new Date(`${month}-15T12:00:00`).toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
-}
+export { itemKey, groupByMonth, formatMonthLabel } from "./upcoming-list-model";

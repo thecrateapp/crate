@@ -38,6 +38,8 @@ describe("RadioGroup", () => {
         <RadioGroupItem value="a" aria-label="A" />
       </RadioGroup>,
     );
-    expect(screen.getByRole("radio")).toHaveClass("focus-visible:shadow-focus");
+    expect(screen.getByRole("radio")).not.toHaveClass(
+      "focus-visible:shadow-focus",
+    );
   });
 });

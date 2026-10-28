@@ -33,6 +33,7 @@ final class NativeContinuationClient {
         final long preferredDurationMs;
         final boolean allowBeatmatch;
         final boolean allowBassHandoff;
+        final boolean allowLongBeatmatch;
         final String delivery;
         final boolean refill;
 
@@ -58,6 +59,32 @@ final class NativeContinuationClient {
             String delivery,
             boolean refill
         ) {
+            this(
+                apiBase,
+                token,
+                expiresAtMs,
+                source,
+                preferredDurationMs,
+                allowBeatmatch,
+                allowBassHandoff,
+                false,
+                delivery,
+                refill
+            );
+        }
+
+        Config(
+            String apiBase,
+            String token,
+            long expiresAtMs,
+            String source,
+            long preferredDurationMs,
+            boolean allowBeatmatch,
+            boolean allowBassHandoff,
+            boolean allowLongBeatmatch,
+            String delivery,
+            boolean refill
+        ) {
             this.apiBase = trimTrailingSlash(apiBase);
             this.token = token == null ? "" : token;
             this.expiresAtMs = expiresAtMs;
@@ -65,6 +92,7 @@ final class NativeContinuationClient {
             this.preferredDurationMs = Math.max(0L, preferredDurationMs);
             this.allowBeatmatch = allowBeatmatch;
             this.allowBassHandoff = allowBeatmatch && allowBassHandoff;
+            this.allowLongBeatmatch = allowBeatmatch && allowLongBeatmatch;
             this.delivery = delivery == null || delivery.isEmpty() ? "original" : delivery;
             this.refill = refill;
         }
@@ -81,6 +109,7 @@ final class NativeContinuationClient {
                 payload.optLong("preferredDurationMs", 0L),
                 payload.optBoolean("allowBeatmatch", false),
                 payload.optBoolean("allowBassHandoff", false),
+                payload.optBoolean("allowLongBeatmatch", false),
                 payload.optString("delivery", ""),
                 payload.optBoolean("refill", false)
             );
@@ -294,6 +323,7 @@ final class NativeContinuationClient {
             .put("allowBeatmatch", config.allowBeatmatch)
             .put("allowTempoAdjustment", config.allowBeatmatch);
         if (config.allowBassHandoff) context.put("allowBassHandoff", true);
+        if (config.allowLongBeatmatch) context.put("allowLongBeatmatch", true);
         return context;
     }
 

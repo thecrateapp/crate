@@ -1,10 +1,12 @@
+import { CrateHeroFrame } from "./CrateHeroFrame";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import type { TFunction } from "i18next";
 import { CRATE_ICON_SIZE, Share2 } from "@crate/ui/icons";
 import { GenrePillRow } from "@crate/ui/domain/genres/GenrePill";
-import { PageHero, type HeroSecondaryAction } from "@crate/ui/domain/hero";
+import { type HeroSecondaryAction } from "@crate/ui/domain/hero";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
 import {
@@ -20,9 +22,6 @@ import { UserProfileLink } from "@/components/social/UserProfileLink";
 import { UserProfileAvatar } from "@/pages/UserProfileAvatar";
 import { genreSlug } from "@/lib/utils";
 import type { CrateDetail } from "@/pages/crates-types";
-
-export const CRATE_SECONDARY_ACTION_CLASS =
-  "min-w-0 px-0 text-2xs md:px-1.5 md:text-xs";
 
 export function CrateHero({
   crate,
@@ -61,82 +60,77 @@ export function CrateHero({
   );
 
   return (
-    <div data-testid="crate-hero">
-      <PageHero
-        variant="media"
-        className="h-auto lg:h-auto"
-        contentClassName={contentClassName}
-        artworkClassName="block aspect-auto w-full overflow-visible rounded-none bg-transparent shadow-none ring-0 sm:w-1/2 lg:w-[58%] lg:max-w-[720px]"
-        titleClassName="max-w-4xl text-2xl"
-        actionsClassName="pt-0"
-        background={{
-          treatment: "blur",
-          render: (className) =>
-            backgroundUrl ? (
-              <CrateImage
-                data-testid="crate-hero-background"
-                src={backgroundUrl}
-                alt=""
-                className={className}
-              />
-            ) : null,
-        }}
-        artwork={
-          <CrateCoverFlow
-            albums={albums}
-            isOrdered={crate.is_ordered}
-            crateName={crate.name}
-            loopEnabled={crate.loop_enabled}
-            coverUrl={coverUrl}
-            onPlayAlbum={onPlayAlbum}
-            playableAlbumUids={playableAlbumUids}
+    <CrateHeroFrame
+      title={crate.name}
+      description={crate.description || undefined}
+      owner={
+        crate.owner_username ? (
+          <UserProfileLink
+            username={crate.owner_username}
+            className="link-meta inline-flex items-center gap-2 self-start text-sm"
+          >
+            {ownerLine}
+          </UserProfileLink>
+        ) : (
+          <span className="inline-flex items-center gap-2 self-start text-sm text-text-muted">
+            {ownerLine}
+          </span>
+        )
+      }
+      metaItems={[
+        <MonoLabel as="span" key="albums">
+          {t("common.albumCountLabel", { count: albums.length })}
+        </MonoLabel>,
+        crate.track_count > 0 ? (
+          <MonoLabel as="span" key="tracks">
+            {t("common.trackCountLabel", { count: crate.track_count })}
+          </MonoLabel>
+        ) : null,
+        followerCount > 0 ? (
+          <MonoLabel as="span" key="followers">
+            {t("common.followerCountLabel", { count: followerCount })}
+          </MonoLabel>
+        ) : null,
+      ]}
+      actions={actions}
+      contentClassName={contentClassName}
+      renderBackground={(className) =>
+        backgroundUrl ? (
+          <CrateImage
+            data-testid="crate-hero-background"
+            src={backgroundUrl}
+            alt=""
+            className={className}
           />
-        }
-        title={crate.name}
-        subtitle={
-          crate.owner_username ? (
-            <UserProfileLink
-              username={crate.owner_username}
-              className="link-meta inline-flex items-center gap-2 self-start text-sm"
-            >
-              {ownerLine}
-            </UserProfileLink>
-          ) : (
-            <span className="inline-flex items-center gap-2 self-start text-sm text-text-muted">
-              {ownerLine}
-            </span>
-          )
-        }
-        meta={[
-          t("common.albumCountLabel", { count: albums.length }),
-          crate.track_count > 0
-            ? t("common.trackCountLabel", { count: crate.track_count })
-            : null,
-          followerCount > 0
-            ? t("common.followerCountLabel", { count: followerCount })
-            : null,
-        ]}
-        metaSeparator="dot"
-        description={crate.description || undefined}
-        actions={actions}
-      >
-        {crate.genre_profile?.length ? (
-          <GenrePillRow
-            items={crate.genre_profile}
-            max={6}
-            className="mt-3 hidden sm:flex"
-            onSelect={(item) =>
-              navigate(
-                `/explore?genre=${encodeURIComponent(
-                  item.slug || genreSlug(item.name),
-                )}`,
-              )
-            }
-          />
-        ) : null}
-        <div aria-hidden="true" className="hidden lg:block lg:h-14" />
-      </PageHero>
-    </div>
+        ) : null
+      }
+      artwork={
+        <CrateCoverFlow
+          albums={albums}
+          isOrdered={crate.is_ordered}
+          crateName={crate.name}
+          loopEnabled={crate.loop_enabled}
+          coverUrl={coverUrl}
+          onPlayAlbum={onPlayAlbum}
+          playableAlbumUids={playableAlbumUids}
+        />
+      }
+    >
+      {crate.genre_profile?.length ? (
+        <GenrePillRow
+          items={crate.genre_profile}
+          max={6}
+          className="mt-3 hidden sm:flex"
+          onSelect={(item) =>
+            navigate(
+              `/explore?genre=${encodeURIComponent(
+                item.slug || genreSlug(item.name),
+              )}`,
+            )
+          }
+        />
+      ) : null}
+    </CrateHeroFrame>
   );
 }
 
@@ -157,6 +151,5 @@ export function crateShareAction(
     title: label,
     disabled: !shareable,
     onClick: onShare,
-    className: CRATE_SECONDARY_ACTION_CLASS,
   };
 }

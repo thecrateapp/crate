@@ -110,7 +110,7 @@ describe("PlaylistHeroSection", () => {
     ).toBeInTheDocument();
   });
 
-  it("uses an explicit mobile hero height so copy sits directly above CTAs", () => {
+  it("uses the shared minimum hero height so long copy cannot be clipped", () => {
     const { container } = renderWithI18n(
       <PlaylistHeroSection
         title="Friday Damage"
@@ -131,7 +131,7 @@ describe("PlaylistHeroSection", () => {
     );
 
     const hero = container.querySelector("section") as HTMLElement;
-    expect(hero).toHaveClass("h-hero-md");
+    expect(hero).toHaveClass("min-h-hero-md");
     expect(hero).not.toHaveClass("min-h-hero-lg");
   });
 
@@ -181,8 +181,10 @@ describe("PlaylistHeroSection", () => {
     const playButton = within(primary).getByRole("button", { name: "Play" });
     expect(playButton).toHaveTextContent("Play");
     expect(playButton).toHaveClass(
-      "shadow-action-solid",
-      "hover:shadow-action-solid-hover",
+      "border",
+      "border-accent-action",
+      "bg-transparent",
+      "text-accent-action",
     );
     const shuffleButton = within(primary).getByRole("button", {
       name: "Shuffle",
@@ -281,7 +283,7 @@ describe("PlaylistHeroSection", () => {
 
     const menu = await screen.findByRole("menu");
     expect(menu).toHaveClass(
-      "listen-glass-panel",
+      "crate-overlay-surface",
       "w-72",
       "z-app-context-menu",
     );

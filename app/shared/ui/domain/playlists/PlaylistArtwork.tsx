@@ -1,5 +1,12 @@
 import { CRATE_ICON_SIZE, ListMusic } from "@crate/ui/icons";
-import type { CSSProperties, ImgHTMLAttributes, Key, ReactNode } from "react";
+import {
+  useState,
+  type ComponentPropsWithRef,
+  type CSSProperties,
+  type ImgHTMLAttributes,
+  type Key,
+  type ReactNode,
+} from "react";
 
 export interface PlaylistArtworkTrack {
   artist?: string;
@@ -14,17 +21,20 @@ export interface PlaylistArtworkTrack {
   album_slug?: string;
 }
 
-export interface PlaylistArtworkImageProps
-  extends ImgHTMLAttributes<HTMLImageElement> {
+export interface PlaylistArtworkImageProps extends ImgHTMLAttributes<HTMLImageElement> {
   key?: Key;
 }
 
-interface PlaylistArtworkProps {
+export interface PlaylistArtworkProps extends Omit<
+  ComponentPropsWithRef<"div">,
+  "children"
+> {
   name?: string;
   coverDataUrl?: string | null;
   tracks?: PlaylistArtworkTrack[];
   className?: string;
   showCrateMark?: boolean;
+  showFallbackIcon?: boolean;
   crateMarkClassName?: string;
   logoSrc?: string;
   buildCoverUrl: (track: PlaylistArtworkTrack) => string | null;
@@ -68,16 +78,23 @@ export function PlaylistArtwork({
   tracks = [],
   className = "",
   showCrateMark = false,
+  showFallbackIcon = true,
   crateMarkClassName,
   logoSrc = "/icons/logo.svg",
   buildCoverUrl,
   renderImage,
+  ...props
 }: PlaylistArtworkProps) {
+  const [failedSources, setFailedSources] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const usableCover =
+    coverDataUrl && !failedSources.has(coverDataUrl) ? coverDataUrl : null;
   const collageSources: string[] = [];
   const collageSourceSet = new Set<string>();
   for (const track of tracks) {
     const source = buildCoverUrl(track);
-    if (source && !collageSourceSet.has(source)) {
+    if (source && !failedSources.has(source) && !collageSourceSet.has(source)) {
       collageSources.push(source);
       collageSourceSet.add(source);
     }
@@ -90,16 +107,29 @@ export function PlaylistArtwork({
   const artworkImage = (props: PlaylistArtworkImageProps) => {
     if (renderImage) return renderImage(props);
     const { key, ...imageProps } = props;
-    return <img key={key} {...imageProps} />;
+    return (
+      <img
+        key={key}
+        {...imageProps}
+        onError={() => {
+          const source = imageProps.src;
+          if (typeof source === "string")
+            setFailedSources((current) => new Set([...current, source]));
+        }}
+      />
+    );
   };
 
-  if (coverDataUrl) {
+  if (usableCover) {
     return (
       <div
+        {...props}
+        data-slot="playlist-artwork"
+        data-layout="cover"
         className={`relative overflow-hidden bg-text-primary/5 ${className}`}
       >
         {artworkImage({
-          src: coverDataUrl,
+          src: usableCover,
           alt: name,
           className: "size-full object-cover",
         })}
@@ -112,6 +142,9 @@ export function PlaylistArtwork({
     if (collageSources.length === 1) {
       return (
         <div
+          {...props}
+          data-slot="playlist-artwork"
+          data-layout="single"
           className={`relative overflow-hidden bg-text-primary/5 ${className}`}
         >
           {artworkImage({
@@ -131,6 +164,11 @@ export function PlaylistArtwork({
 
     return (
       <div
+        role={name ? "img" : undefined}
+        aria-label={name || undefined}
+        {...props}
+        data-slot="playlist-artwork"
+        data-layout="collage"
         className={`relative overflow-hidden bg-text-primary/5 ${className}`}
       >
         <div className={`grid size-full ${collageClassName} gap-[2px]`}>
@@ -154,15 +192,27 @@ export function PlaylistArtwork({
 
   return (
     <div
+      role={name ? "img" : undefined}
+      aria-label={name || undefined}
+      {...props}
+      data-slot="playlist-artwork"
+      data-layout="placeholder"
       className={`playlist-artwork-placeholder relative flex items-center justify-center overflow-hidden ${className}`}
       style={
         {
+          ...props.style,
           "--playlist-artwork-hue-1": String(hue1),
           "--playlist-artwork-hue-2": String(hue2),
         } as CSSProperties
       }
     >
-      <ListMusic size={CRATE_ICON_SIZE.xl} className="text-text-primary/60" />
+      {showFallbackIcon ? (
+        <ListMusic
+          aria-hidden="true"
+          size={CRATE_ICON_SIZE.xl}
+          className="text-text-primary/60"
+        />
+      ) : null}
       {crateMark}
     </div>
   );

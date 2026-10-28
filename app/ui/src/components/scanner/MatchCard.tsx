@@ -1,3 +1,5 @@
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { EntityRow } from "@crate/ui/domain/entity/EntityRow";
 import { Button } from "@crate/ui/shadcn/button";
 import {
   Table,
@@ -32,34 +34,30 @@ interface MatchCardProps {
 
 export function MatchCard({ match, onApply }: MatchCardProps) {
   const sc = match.match_score;
-  const scoreColor =
-    sc >= 70 ? "text-green-500" : sc >= 40 ? "text-yellow-500" : "text-red-500";
-
   return (
-    <div className="bg-card border border-border rounded-md p-4 mb-3 hover:border-primary transition-colors">
-      <div className="flex items-center gap-4 mb-3">
-        <div
-          className={`text-2xl font-bold w-12 text-center flex-shrink-0 ${scoreColor}`}
-        >
-          {sc}
-        </div>
-        <div className="flex-1">
-          <h3 className="font-medium">{match.title}</h3>
-          <div className="text-sm text-muted-foreground">
-            {match.artist} &middot; {match.date || "?"} &middot;{" "}
-            {match.track_count} tracks{" "}
-            {match.country ? `\u00B7 ${match.country}` : ""}
-          </div>
-        </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="border-green-500 text-green-500 hover:bg-green-500 hover:text-white"
-          onClick={onApply}
-        >
-          Apply
-        </Button>
-      </div>
+    <div className="min-w-0 space-y-4 border-b border-border-quiet py-4">
+      <EntityRow
+        title={match.title}
+        subtitle={[
+          match.artist,
+          match.date || "Date unknown",
+          `${match.track_count} tracks`,
+          match.country,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+        menuButton="none"
+        leading={
+          <InfoBadge tone={sc >= 70 ? "accent" : "warning"}>
+            {sc}% match
+          </InfoBadge>
+        }
+        trailing={
+          <Button variant="outline" onClick={onApply}>
+            Apply
+          </Button>
+        }
+      />
       {match.tag_preview && (
         <Table>
           <TableHeader>
@@ -80,7 +78,7 @@ export function MatchCard({ match, onApply }: MatchCardProps) {
                 </TableCell>
                 <TableCell>
                   {p.current_title !== p.new_title ? (
-                    <span className="text-red-500 line-through text-sm">
+                    <span className="text-state-warning-text line-through text-sm">
                       {p.current_title}
                     </span>
                   ) : (
@@ -89,7 +87,7 @@ export function MatchCard({ match, onApply }: MatchCardProps) {
                 </TableCell>
                 <TableCell>
                   {p.current_title !== p.new_title ? (
-                    <span className="text-green-500 text-sm">
+                    <span className="text-accent-action-hi text-sm">
                       {p.new_title}
                     </span>
                   ) : (

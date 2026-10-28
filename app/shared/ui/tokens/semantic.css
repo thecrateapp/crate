@@ -5,14 +5,16 @@
   --text-primary: var(--color-foreground);
   --text-secondary: var(--idle-text);
   --text-muted: var(--color-muted-foreground);
-  --text-subtle: var(--idle-text-subtle);
+  --text-subtle: var(--idle-text-muted);
   --text-faint: color-mix(in srgb, var(--text-primary) 20%, transparent);
   --surface-canvas: var(--surface-app);
   --surface-contrast: var(--text-primary);
   --text-on-contrast: var(--surface-canvas);
   --surface-container: var(--surface-panel);
+  --surface-object: var(--crate-token-surface-card-solid);
   --surface-elevated: var(--surface-raised);
   --surface-overlay: var(--surface-modal);
+  --surface-scrim: color-mix(in srgb, var(--surface-canvas) 72%, transparent);
   --surface-chrome: color-mix(in srgb, var(--surface-canvas) 68%, transparent);
   --surface-glass-accent: color-mix(
     in srgb,
@@ -127,9 +129,11 @@
   --border-quiet: var(--surface-quiet);
   --border-quiet-subtle: var(--surface-quiet-subtle);
   --border-interactive: var(--hover-border);
-  --focus-ring: var(--color-ring);
+  --focus-ring: var(--crate-token-color-ring);
   --accent-action: var(--color-primary);
   --accent-action-foreground: var(--color-primary-foreground);
+  --accent-action-hi: var(--crate-token-color-primary-hi);
+  --accent-action-hi-foreground: var(--crate-token-color-primary-hi-foreground);
   --accent-action-hover: color-mix(
     in srgb,
     var(--accent-action) 90%,
@@ -148,10 +152,11 @@
   --brand-bandcamp-foreground: #7ee7ff;
   --motion-duration-fast: 150ms;
   --motion-duration-normal: 250ms;
-  --font-brand: "Poppins";
+  --font-brand: "Roboto";
+  --font-display-stack: "Bricolage Grotesque", "Roboto", system-ui, sans-serif;
+  --font-mono-stack: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --action-shadow: 0 14px 28px
     color-mix(in srgb, var(--accent-action) 22%, transparent);
-  --focus-shadow: 0 0 0 2px var(--focus-ring);
   --control-inset-shadow: inset 0 1px 0
     color-mix(in srgb, var(--text-primary) 4%, transparent);
   --icon-control-shadow: 0 8px 24px
@@ -264,6 +269,8 @@
   --color-surface-container: var(--surface-container);
   --color-surface-elevated: var(--surface-elevated);
   --color-surface-overlay: var(--surface-overlay);
+  --color-surface-popover: var(--surface-popover);
+  --color-surface-scrim: var(--surface-scrim);
   --color-surface-chrome: var(--surface-chrome);
   --color-surface-canvas-overlay: var(--surface-canvas-overlay);
   --color-surface-quiet: var(--surface-quiet);
@@ -273,6 +280,7 @@
   --color-surface-icon-control: var(--surface-icon-control);
   --color-border-subtle: var(--border-subtle);
   --color-border-quiet: var(--border-quiet);
+  --color-border-quiet-subtle: var(--border-quiet-subtle);
   --color-border-interactive: var(--border-interactive);
   --color-border-focus: var(--focus-ring);
   --color-accent-action: var(--accent-action);
@@ -284,6 +292,8 @@
   --color-state-danger-text: var(--state-danger-text);
   --color-state-info: var(--state-info);
   --color-accent-action-foreground: var(--accent-action-foreground);
+  --color-accent-action-hi: var(--accent-action-hi);
+  --color-accent-action-hi-foreground: var(--accent-action-hi-foreground);
   --color-accent-action-hover: var(--accent-action-hover);
   --color-state-danger-foreground: var(--state-danger-foreground);
   --color-focus-ring: var(--focus-ring);
@@ -292,7 +302,7 @@
     color-mix(in srgb, var(--accent-action) 24%, transparent);
   --shadow-action-solid-hover: 0 0 24px
     color-mix(in srgb, var(--accent-action) 34%, transparent);
-  --shadow-focus: var(--focus-shadow);
+  --shadow-focus: 0 0 0 2px var(--focus-ring);
   --shadow-control-inset: var(--control-inset-shadow);
   --shadow-icon-control: var(--icon-control-shadow);
   --shadow-chrome: var(--chrome-shadow);

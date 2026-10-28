@@ -1,8 +1,7 @@
-import { CRATE_ICON_SIZE, ThumbsDown, ThumbsUp } from "@crate/ui/icons";
 import { useTranslation } from "react-i18next";
-
-import type { RadioMode } from "./radio-model";
-
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import type { RadioMode } from "./radio-types";
 export function RadioSessionStatus({
   activeSession,
   activeMode,
@@ -13,42 +12,23 @@ export function RadioSessionStatus({
   seedLabel: string;
 }) {
   const { t } = useTranslation();
-
-  if (activeMode === "discovery") {
-    return (
-      <div className="radio-session-status rounded-xl px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="radio-session-dot size-2 animate-pulse rounded-full" />
-          <span className="radio-session-label text-sm font-medium">
-            {t("radio.discovery")}
-          </span>
-          <span className="radio-session-muted text-xs">
-            {t("common.playing")}
-          </span>
-        </div>
-      </div>
-    );
-  }
-
   if (!activeSession) return null;
-
   return (
-    <div className="radio-session-status rounded-xl px-4 py-3">
-      <div className="flex items-center gap-2">
-        <div className="radio-session-dot size-2 animate-pulse rounded-full" />
-        <span className="radio-session-label text-sm font-medium">
-          {seedLabel} Radio
-        </span>
-        <span className="radio-session-muted text-xs">
-          {t("common.playing")}
-        </span>
+    <section
+      aria-label={t("common.playing")}
+      className="grid gap-2 border-y border-border-quiet py-4"
+    >
+      <div className="flex flex-wrap items-center gap-3">
+        <StatusDot pulse label={t("common.playing")} />
+        <MonoLabel as="span">
+          {activeMode === "discovery" ? t("radio.discovery") : seedLabel}
+        </MonoLabel>
       </div>
-      <div className="radio-session-muted mt-1.5 flex items-center gap-1 text-xs">
-        <ThumbsUp size={CRATE_ICON_SIZE.nano} />{" "}
-        {t("radio.feedback.likePrefix")}{" "}
-        <ThumbsDown size={CRATE_ICON_SIZE.nano} />{" "}
-        {t("radio.feedback.dislikeSuffix")}
-      </div>
-    </div>
+      {activeMode !== "discovery" && (
+        <p className="text-caption text-text-muted">
+          {t("radio.feedback.likePrefix")} {t("radio.feedback.dislikeSuffix")}
+        </p>
+      )}
+    </section>
   );
 }

@@ -204,7 +204,7 @@ export function ShowConsolidationEditor({
         </p>
       </div>
       {error ? (
-        <p role="alert" className="text-sm text-state-danger-text">
+        <p role="alert" className="text-sm text-state-warning-text">
           {error}
         </p>
       ) : null}

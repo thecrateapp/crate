@@ -116,6 +116,43 @@ def resolve_stats_period(
     )
 
 
+def _same_day_previous_year(value: date) -> date:
+    try:
+        return value.replace(year=value.year - 1)
+    except ValueError:  # Feb 29
+        return value.replace(year=value.year - 1, day=28)
+
+
+def previous_window(period: StatsPeriod) -> tuple[date, date] | None:
+    """Like-for-like comparison window as INCLUSIVE local days ``(first, last)``.
+
+    Note ``period.end`` is EXCLUSIVE (``period_day_filter`` uses ``day < end``),
+    so whole-period windows end at ``start - 1 day`` / ``previous_start``-based
+    last days, never at ``end``. Callers filter with ``day BETWEEN first AND last``.
+
+    - rolling ``Nd``: the N days immediately before ``start``;
+    - current month: first day of the previous month through the same elapsed
+      day, capped at that month's last day;
+    - closed month / closed year: the whole previous month / year;
+    - current year: Jan 1 of the previous year through ``today`` minus one
+      year (Feb 29 maps to Feb 28);
+    - ``all_time``: ``None``.
+    """
+    if period.start is None or period.previous_start is None:
+        return None
+    last_before = period.start - timedelta(days=1)
+    if period.key.startswith("month:"):
+        if not period.provisional:
+            return period.previous_start, last_before
+        elapsed_last = period.previous_start + timedelta(days=period.today.day - 1)
+        return period.previous_start, min(elapsed_last, last_before)
+    if period.key.startswith("year:"):
+        if not period.provisional:
+            return period.previous_start, last_before
+        return period.previous_start, _same_day_previous_year(period.today)
+    return period.previous_start, last_before
+
+
 def period_day_filter(period: StatsPeriod, column: str = "day") -> str:
     clauses = []
     if period.start is not None:
@@ -137,6 +174,7 @@ __all__ = [
     "StatsPeriod",
     "period_day_filter",
     "period_params",
+    "previous_window",
     "resolve_stats_period",
     "user_stats_timezone",
 ]

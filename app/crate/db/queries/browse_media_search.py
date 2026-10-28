@@ -155,11 +155,23 @@ def _track_payload(row: Mapping[Any, Any]) -> dict:
         "album": item["album"],
         "path": item["path"],
         "duration": item["duration"],
+        **{
+            key: item.get(key)
+            for key in (
+                "format",
+                "bitrate",
+                "sample_rate",
+                "bit_depth",
+                "bpm",
+                "audio_key",
+                "audio_scale",
+                "energy",
+                "danceability",
+                "valence",
+            )
+        },
         "year": item.get("year"),
         "genre": item.get("genre"),
-        "bpm": item.get("bpm"),
-        "audio_key": item.get("audio_key"),
-        "audio_scale": item.get("audio_scale"),
         "has_cover": has_cover,
         "cover_url": f"/api/vdj/albums/{album_id}/cover?size=512"
         if album_id is not None and has_cover
@@ -297,7 +309,7 @@ _HYBRID_TRACKS_SQL = text(
                        LIMIT 1
                    )
                ) AS genre,
-               t.format, t.bitrate, COALESCE(NULLIF(t.year, ''), a.year) AS year,
+               t.format, t.bitrate, t.sample_rate, t.bit_depth, COALESCE(NULLIF(t.year, ''), a.year) AS year,
                t.bpm, t.audio_key, t.audio_scale, t.energy,
                t.danceability, t.valence, t.bliss_vector,
                COALESCE(ts_rank(t.search_vector, to_tsquery('simple', :fts_query)), 0) AS fts_rank,

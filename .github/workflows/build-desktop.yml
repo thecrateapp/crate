@@ -256,6 +256,9 @@ jobs:
       - name: Test desktop version resolver
         run: npm run --workspace=app/listen-desktop test:version
 
+      - name: Test stable artifact names
+        run: npm run --workspace=app/listen-desktop test:stable-names
+
       - name: Test Linux glibc compatibility verifier
         if: runner.os == 'Linux'
         run: npm run --workspace=app/listen-desktop test:glibc
@@ -275,7 +278,7 @@ jobs:
       - name: Measure pooled HTTP reuse against API (diagnostic)
         if: github.event_name == 'workflow_dispatch' && inputs.measure_r01_api
         env:
-          CRATE_R01_API_URL: https://api.lespedants.org/api/setup/status
+          CRATE_R01_API_URL: https://api.lespedants.org/api/status
         run: cargo run --locked --release --manifest-path app/listen-desktop/src-tauri/Cargo.toml --example http_pool_bench
 
       - name: Clear stale desktop bundles
@@ -297,7 +300,6 @@ jobs:
           VITE_SENTRY_ENVIRONMENT: production
           VITE_SENTRY_RELEASE: crate-${{ github.sha }}
           VITE_CRATE_CONNECT_FEATURE_ENABLED: ${{ vars.CRATE_CONNECT_FEATURE_ENABLED || 'false' }}
-          VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED: ${{ vars.LISTEN_APPEARANCE_SETTINGS_ENABLED || 'false' }}
         run: |
           version="$CRATE_DESKTOP_VERSION"
           make tauri-build-macos-testers \
@@ -318,7 +320,6 @@ jobs:
           VITE_SENTRY_ENVIRONMENT: production
           VITE_SENTRY_RELEASE: crate-${{ github.sha }}
           VITE_CRATE_CONNECT_FEATURE_ENABLED: ${{ vars.CRATE_CONNECT_FEATURE_ENABLED || 'false' }}
-          VITE_LISTEN_APPEARANCE_SETTINGS_ENABLED: ${{ vars.LISTEN_APPEARANCE_SETTINGS_ENABLED || 'false' }}
         run: |
           if [[ "$RUNNER_OS" == "Windows" && "$CRATE_DESKTOP_MSI_COMPATIBLE" != "true" ]]; then
             npm run --workspace=app/listen-desktop tauri:build:windows:nsis
@@ -856,8 +857,13 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Add stable artifact names
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: node app/listen-desktop/scripts/stable-artifact-names.mjs desktop-artifacts "$CRATE_DESKTOP_VERSION"
+
       - name: Attach desktop artifacts to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v3
         with:
+          body_path: docs/releases/${{ github.ref_name }}.md
           files: desktop-artifacts/*

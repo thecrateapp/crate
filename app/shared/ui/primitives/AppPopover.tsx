@@ -7,7 +7,7 @@ import {
 import { cn } from "@crate/ui/lib/cn";
 
 export const APP_FLOATING_SURFACE_BASE =
-  "rounded-md border border-[var(--idle-border)] bg-popover-surface shadow-popover backdrop-blur-xl animate-pop-in";
+  "crate-overlay-surface rounded-panel border border-border-quiet bg-surface-popover shadow-popover";
 export const APP_POPOVER_SURFACE = `z-app-popover ${APP_FLOATING_SURFACE_BASE}`;
 export const APP_CONTEXT_MENU_SURFACE = `z-app-context-menu ${APP_FLOATING_SURFACE_BASE}`;
 export const APP_DROPDOWN_SURFACE = `z-app-dropdown ${APP_FLOATING_SURFACE_BASE}`;
@@ -41,7 +41,7 @@ export function AppPopoverDivider({
 }: ComponentPropsWithoutRef<"div">) {
   return (
     <div
-      className={cn("my-1 border-t border-[var(--idle-border)]", className)}
+      className={cn("my-1 border-t border-border-quiet-subtle", className)}
       {...props}
     />
   );
@@ -60,11 +60,9 @@ export function AppMenuButton({
   return (
     <button
       type={type}
+      data-danger={danger || undefined}
       className={cn(
-        "flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm transition-colors",
-        danger
-          ? "text-[var(--status-danger-text)] hover:bg-[var(--hover-bg)]"
-          : "text-text-primary hover:bg-[var(--hover-bg)]",
+        "crate-overlay-menu-item flex w-full items-center gap-3 px-3 text-left",
         className,
       )}
       {...props}

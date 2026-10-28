@@ -1,5 +1,5 @@
-import type { TrackInfo } from "@/lib/track-info";
-import { clamp } from "@/lib/utils";
+import type { TrackInfo } from "../../../lib/track-info-data";
+import { clamp } from "../../../lib/utils";
 
 export interface MoodMap {
   [key: string]: number | null | undefined;

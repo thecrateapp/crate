@@ -261,7 +261,7 @@ describe("scopesForUrl", () => {
   it("returns artist bio scope for the cached artist page route", () => {
     expect(
       scopesForUrl("/api/artist-slugs/quicksand/page?top_tracks_count=50"),
-    ).toEqual(["library", "follows", "artist_bio"]);
+    ).toEqual(["library", "follows", "artist_bio", "shows"]);
   });
 
   it("does not add artist bio scope to nested artist album paths", () => {

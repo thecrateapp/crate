@@ -28,13 +28,11 @@ describe("OfflineBadge", () => {
     expect(container.querySelector("svg")).toBeInTheDocument();
   });
 
-  it("renders a rectangular badge with the status color on the icon", () => {
+  it("renders a shared informative badge with the semantic status color", () => {
     const { container } = render(<OfflineBadge state="error" />);
     const badge = container.firstElementChild;
-    expect(badge).toHaveClass("crate-badge", "rounded-md");
-    expect(badge?.className).not.toMatch(/uppercase|rounded-full/);
-    expect(container.querySelector("svg")).toHaveClass(
-      "text-state-danger-text",
-    );
+    expect(badge).toHaveClass("crate-info-badge", "rounded-full");
+    expect(badge?.className).not.toMatch(/uppercase/);
+    expect(badge).toHaveClass("text-state-danger-text");
   });
 });

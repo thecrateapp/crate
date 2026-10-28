@@ -8,6 +8,7 @@ const {
   endCastSessionMock,
   isCastSessionActiveMock,
   isCrateConnectEnabledMock,
+  isMotionBlockedMock,
   isNativeOutputRoutingAvailableMock,
   startCastSessionMock,
   showNativeOutputPickerMock,
@@ -19,6 +20,7 @@ const {
   endCastSessionMock: vi.fn(),
   isCastSessionActiveMock: vi.fn(),
   isCrateConnectEnabledMock: vi.fn(() => true),
+  isMotionBlockedMock: vi.fn(() => false),
   isNativeOutputRoutingAvailableMock: vi.fn(),
   startCastSessionMock: vi.fn(),
   showNativeOutputPickerMock: vi.fn(),
@@ -71,6 +73,10 @@ vi.mock("@/lib/cast-sender", () => ({
   startCastSession: startCastSessionMock,
 }));
 
+vi.mock("@/lib/motion-availability", () => ({
+  isMotionBlocked: isMotionBlockedMock,
+}));
+
 vi.mock("@/lib/crate-connect", async () => {
   const actual = await vi.importActual<typeof import("@/lib/crate-connect")>(
     "@/lib/crate-connect",
@@ -105,6 +111,7 @@ describe("playback targets", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     isCrateConnectEnabledMock.mockReturnValue(true);
+    isMotionBlockedMock.mockReturnValue(false);
     isNativeOutputRoutingAvailableMock.mockReturnValue(false);
     getCastSenderCapabilitiesMock.mockResolvedValue({
       platform: "unsupported",
@@ -641,75 +648,92 @@ describe("playback targets", () => {
     expect(provider.selectTarget).toHaveBeenCalledTimes(1);
   });
 
-  it("loads and starts a Google Cast target for the current track", async () => {
-    getCastSenderCapabilitiesMock.mockResolvedValue({
-      platform: "web",
-      visible: true,
-      available: true,
-      activeSession: false,
-    });
-    const pause = vi.fn();
-    const pauseLocal = vi.fn();
-    const currentTrack = {
-      id: "track-1",
-      libraryTrackId: 7,
-      title: "Track",
-      artist: "Artist",
-    };
-
-    const targets = await googleCastTargetProvider.getTargets({
-      currentTrack,
-      currentTime: 12.4,
-      pause,
-      pauseLocal,
-    });
-
-    expect(targets).toEqual([
-      expect.objectContaining({
-        id: "google-cast:default",
-        kind: "google-cast",
-        name: "Google Cast",
+  it.each([false, true])(
+    "starts Google Cast with fixed Crate identity and reduced motion %s",
+    async (reducedMotion) => {
+      isMotionBlockedMock.mockReturnValue(reducedMotion);
+      getCastSenderCapabilitiesMock.mockResolvedValue({
+        platform: "web",
+        visible: true,
         available: true,
-      }),
-    ]);
+        activeSession: false,
+      });
+      const pause = vi.fn();
+      const pauseLocal = vi.fn();
+      const currentTrack = {
+        id: "track-1",
+        libraryTrackId: 7,
+        title: "Track",
+        artist: "Artist",
+      };
 
-    const target = targets[0];
-    expect(target).toBeDefined();
-    const result = await googleCastTargetProvider.selectTarget(target!, {
-      currentTrack,
-      currentTime: 12.4,
-      currentIndex: 1,
-      queue: [
-        { id: "track-0", libraryTrackId: 6, title: "Before", artist: "Artist" },
+      const targets = await googleCastTargetProvider.getTargets({
         currentTrack,
-      ],
-      repeatMode: "all",
-      shuffle: true,
-      playbackAuthority: "local",
-      pause,
-      pauseLocal,
-    });
+        currentTime: 12.4,
+        pause,
+        pauseLocal,
+      });
 
-    expect(result).toEqual({ ok: true, message: "Casting." });
-    expect(startCastSessionMock).toHaveBeenCalledWith({
-      track: currentTrack,
-      queue: [
-        { id: "track-0", libraryTrackId: 6, title: "Before", artist: "Artist" },
+      expect(targets).toEqual([
+        expect.objectContaining({
+          id: "google-cast:default",
+          kind: "google-cast",
+          name: "Google Cast",
+          available: true,
+        }),
+      ]);
+
+      const target = targets[0];
+      expect(target).toBeDefined();
+      const result = await googleCastTargetProvider.selectTarget(target!, {
         currentTrack,
-      ],
-      currentIndex: 1,
-      currentTime: 12.4,
-      repeatMode: "all",
-      shuffle: true,
-      appearance: expect.objectContaining({
-        contractVersion: 1,
-        skinId: "default",
-      }),
-      targetDeviceId: "google-cast:default",
-    });
-    expect(pauseLocal).toHaveBeenCalledTimes(1);
-    expect(pause).not.toHaveBeenCalled();
-  });
+        currentTime: 12.4,
+        currentIndex: 1,
+        queue: [
+          {
+            id: "track-0",
+            libraryTrackId: 6,
+            title: "Before",
+            artist: "Artist",
+          },
+          currentTrack,
+        ],
+        repeatMode: "all",
+        shuffle: true,
+        playbackAuthority: "local",
+        pause,
+        pauseLocal,
+      });
+
+      expect(result).toEqual({ ok: true, message: "Casting." });
+      expect(startCastSessionMock).toHaveBeenCalledWith({
+        track: currentTrack,
+        queue: [
+          {
+            id: "track-0",
+            libraryTrackId: 6,
+            title: "Before",
+            artist: "Artist",
+          },
+          currentTrack,
+        ],
+        currentIndex: 1,
+        currentTime: 12.4,
+        repeatMode: "all",
+        shuffle: true,
+        appearance: {
+          contractVersion: 1,
+          skinId: "default",
+          preferredMode: "dark",
+          resolvedMode: "dark",
+          reducedMotion,
+        },
+        targetDeviceId: "google-cast:default",
+      });
+      expect(pauseLocal).toHaveBeenCalledTimes(1);
+      expect(pause).not.toHaveBeenCalled();
+    },
+  );
 
   it("keeps Cast unavailable while a Jam owns playback", async () => {
     getCastSenderCapabilitiesMock.mockResolvedValue({

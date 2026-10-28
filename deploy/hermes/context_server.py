@@ -42,11 +42,14 @@ class ContextStore:
     def summary(self) -> dict:
         manifest = self._manifest()
         marker = self.root.parent / "deployment.json"
-        deployment = (
-            json.loads(marker.read_text())
-            if marker.is_file()
-            else {"release_sha": manifest["release_sha"], "state": "verified"}
-        )
+        if marker.is_file():
+            deployment = json.loads(marker.read_text())
+        else:
+            running = os.environ.get("CRATE_RELEASE_SHA", "").strip()
+            deployment = {
+                "release_sha": running or manifest["release_sha"],
+                "state": "verified",
+            }
         observed = deployment.get("release_sha")
         current = (
             observed == manifest["release_sha"]

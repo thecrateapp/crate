@@ -52,7 +52,7 @@ dev: ## Start backend (Postgres + Redis + API + Worker + Readplane + Caddy) and 
 	@-pkill -f "vite.*app/ui" 2>/dev/null || true
 	@-pkill -f "vite.*app/listen" 2>/dev/null || true
 	@-pkill -f "vite.*app/docs" 2>/dev/null || true
-	@-pkill -f "vite.*app/site" 2>/dev/null || true
+	@-pkill -f "astro dev --port 5176" 2>/dev/null || true
 	@docker rm -f $(DEV_CONTAINERS) >/dev/null 2>&1 || true
 	@sleep 0.5
 	@$(MAKE) --no-print-directory _ensure-dev-certs
@@ -64,11 +64,11 @@ dev: ## Start backend (Postgres + Redis + API + Worker + Readplane + Caddy) and 
 	@mkdir -p .vite
 	@npm install --silent 2>/dev/null
 	@cd app/docs && npm install --silent 2>/dev/null; cd ../..
-	@cd app/site && npm install --silent 2>/dev/null; cd ../..
+	@cd app/web && npm install --silent 2>/dev/null; cd ../..
 	@(nohup npm run --workspace=app/ui dev -- --port 5173 --strictPort --host > .vite/admin.log 2>&1 < /dev/null & echo $$! > .vite/admin.pid)
 	@(nohup npm run --workspace=app/listen dev -- --port 5174 --strictPort --host > .vite/listen.log 2>&1 < /dev/null & echo $$! > .vite/listen.pid)
 	@(cd app/docs; nohup npm exec vite -- --port 5175 --strictPort --host > ../../.vite/docs.log 2>&1 < /dev/null & echo $$! > ../../.vite/docs.pid)
-	@(cd app/site; nohup npm exec vite -- --port 5176 --strictPort --host > ../../.vite/site.log 2>&1 < /dev/null & echo $$! > ../../.vite/site.pid)
+	@(cd app/web; nohup npm exec astro -- dev --port 5176 --host > ../../.vite/site.log 2>&1 < /dev/null & echo $$! > ../../.vite/site.pid)
 	@sleep 2
 	@echo ""
 	@echo "  $(GREEN)Admin:$(NC)  https://admin.dev.lespedants.org"
@@ -123,7 +123,7 @@ dev-docs: ## Start only the docs dev server (:5175)
 
 .PHONY: dev-site
 dev-site: ## Start only the site dev server (:5176)
-	@cd app/site && npx vite --port 5176 --host
+	@cd app/web && npx astro dev --port 5176 --host
 
 .PHONY: dev-down
 dev-down: ## Stop everything (backend + frontends)
@@ -147,7 +147,7 @@ dev-down: ## Stop everything (backend + frontends)
 	@-pkill -f "vite.*app/ui" 2>/dev/null || true
 	@-pkill -f "vite.*app/listen" 2>/dev/null || true
 	@-pkill -f "vite.*app/docs" 2>/dev/null || true
-	@-pkill -f "vite.*app/site" 2>/dev/null || true
+	@-pkill -f "astro dev --port 5176" 2>/dev/null || true
 	@echo "$(GREEN)Everything stopped$(NC)"
 
 .PHONY: dev-logs
@@ -178,7 +178,7 @@ dev-rebuild: ## Rebuild and restart everything
 	@-pkill -f "vite.*app/ui" 2>/dev/null || true
 	@-pkill -f "vite.*app/listen" 2>/dev/null || true
 	@-pkill -f "vite.*app/docs" 2>/dev/null || true
-	@-pkill -f "vite.*app/site" 2>/dev/null || true
+	@-pkill -f "astro dev --port 5176" 2>/dev/null || true
 	@docker rm -f $(DEV_CONTAINERS) >/dev/null 2>&1 || true
 	@sleep 0.5
 	@$(DC_DEV) up -d --build --force-recreate
@@ -187,7 +187,7 @@ dev-rebuild: ## Rebuild and restart everything
 	@(nohup npm run --workspace=app/ui dev -- --port 5173 --strictPort --host > .vite/admin.log 2>&1 < /dev/null & echo $$! > .vite/admin.pid)
 	@(nohup npm run --workspace=app/listen dev -- --port 5174 --strictPort --host > .vite/listen.log 2>&1 < /dev/null & echo $$! > .vite/listen.pid)
 	@(nohup npm --prefix app/docs exec vite -- --port 5175 --strictPort --host > .vite/docs.log 2>&1 < /dev/null & echo $$! > .vite/docs.pid)
-	@(nohup npm --prefix app/site exec vite -- --port 5176 --strictPort --host > .vite/site.log 2>&1 < /dev/null & echo $$! > .vite/site.pid)
+	@(cd app/web; nohup npm exec astro -- dev --port 5176 --host > ../../.vite/site.log 2>&1 < /dev/null & echo $$! > ../../.vite/site.pid)
 	@sleep 2
 	@echo "$(GREEN)Everything rebuilt$(NC)"
 
@@ -213,7 +213,7 @@ dev-reset: ## Reset the dev environment (wipe data and stop everything)
 	@-pkill -f "vite.*app/ui" 2>/dev/null || true
 	@-pkill -f "vite.*app/listen" 2>/dev/null || true
 	@-pkill -f "vite.*app/docs" 2>/dev/null || true
-	@-pkill -f "vite.*app/site" 2>/dev/null || true
+	@-pkill -f "astro dev --port 5176" 2>/dev/null || true
 	@echo "$(GREEN)Dev environment reset (data removed)$(NC)"
 
 # ===========================================================================
@@ -770,6 +770,90 @@ _create-dirs:
 	@mkdir -p data/{traefik/local/certs,tidarr,tidalrr,slskd,soulsync/{config,logs},nginx/{html,conf.d,logs}}
 	@mkdir -p media/{music,downloads/{tidal/{incomplete,albums,tracks,playlists,videos},soulseek/incomplete}}
 	@echo "$(GREEN)Directories created$(NC)"
+
+# ===========================================================================
+# CRATE AGENT / CRATE OPERATOR (Telegram agents on the host that runs the stack)
+# ===========================================================================
+
+# AGENT_PROFILE=agent runs Crate Agent, read only (profile agent).
+# AGENT_PROFILE=operator runs Crate Operator: adds deploy/operator/compose.operator.yaml
+# (profile crate-operator), which also recreates crate-api and the workers it overrides.
+# AGENT_COMPOSE_FILES is a COMPOSE_FILE-style list; the official server uses
+# AGENT_COMPOSE_FILES=docker-compose.yaml:docker-compose.project.yaml.
+# AGENT_INIT_FLAGS passes --non-interactive, --replace, --no-start or --no-network.
+AGENT_PROFILE          ?= agent
+AGENT_COMPOSE_FILES    ?= docker-compose.yaml
+AGENT_OPERATOR_OVERLAY ?= deploy/operator/compose.operator.yaml
+AGENT_INIT_FLAGS       ?=
+AGENT_SETUP            := python3 scripts/agent_setup.py
+AGENT_ARGS             := --profile $(AGENT_PROFILE) --compose-files "$(AGENT_COMPOSE_FILES)" --overlay "$(AGENT_OPERATOR_OVERLAY)"
+
+ifeq ($(AGENT_PROFILE),operator)
+AGENT_DC       := COMPOSE_FILE="$(AGENT_COMPOSE_FILES):$(AGENT_OPERATOR_OVERLAY)" $(DC) --profile crate-operator
+AGENT_SERVICES := crate-operator crate-infra-relay crate-operator-supervisor crate-provenance crate-provenance-docker
+AGENT_NAME     := Crate Operator
+AGENT_OTHER    := crate-agent
+else
+AGENT_DC       := COMPOSE_FILE="$(AGENT_COMPOSE_FILES)" $(DC) --profile agent
+AGENT_SERVICES := crate-agent
+AGENT_NAME     := Crate Agent
+AGENT_OTHER    := crate-operator
+endif
+
+.PHONY: _agent-profile
+_agent-profile:
+	@case "$(AGENT_PROFILE)" in agent|operator) ;; \
+		*) echo "$(RED)AGENT_PROFILE must be agent or operator$(NC)"; exit 1 ;; esac
+
+.PHONY: agent-init
+agent-init: _agent-profile ## Guided setup: Telegram, MCP credential, model, approver and alerts (operator), login and smoke test (AGENT_PROFILE=agent|operator)
+	@$(AGENT_SETUP) init $(AGENT_ARGS) $(AGENT_INIT_FLAGS)
+
+.PHONY: agent-up
+agent-up: _agent-profile ## Start Crate Agent or Crate Operator after checking prerequisites (AGENT_PROFILE=agent|operator)
+	@if [ -n "$$(docker ps -q -f name=^$(AGENT_OTHER)$$)" ]; then \
+		echo "$(RED)$(AGENT_OTHER) is running. Never run Crate Agent and Crate Operator together; stop it first$(NC)"; \
+		exit 1; \
+	fi
+	@$(AGENT_SETUP) check $(AGENT_ARGS) || { echo "$(RED)Fix the items above (make agent-init sets them up)$(NC)"; exit 1; }
+ifeq ($(AGENT_PROFILE),operator)
+	@echo "$(YELLOW)Crate Operator recreates crate-api and the workers with the operator overlay$(NC)"
+	@$(AGENT_DC) up -d $$($(AGENT_SETUP) scale-args $(AGENT_ARGS))
+else
+	@$(AGENT_DC) up -d --no-deps $(AGENT_SERVICES)
+endif
+	@echo "$(GREEN)$(AGENT_NAME) is starting. Follow it with make agent-logs$(NC)"
+
+.PHONY: agent-down
+agent-down: _agent-profile ## Stop and remove the agent containers (AGENT_PROFILE=agent|operator)
+	@$(AGENT_DC) rm -sf $(AGENT_SERVICES)
+ifeq ($(AGENT_PROFILE),operator)
+	@echo "$(YELLOW)crate-api and the workers keep the operator overlay until the stack is recreated without it$(NC)"
+endif
+	@echo "$(GREEN)$(AGENT_NAME) stopped$(NC)"
+
+.PHONY: agent-logs
+agent-logs: _agent-profile ## Tail agent logs (AGENT_PROFILE=agent|operator)
+	@$(AGENT_DC) logs -f --tail=200 $(AGENT_SERVICES)
+
+.PHONY: agent-status
+agent-status: _agent-profile ## Show agent containers, health and prerequisite checks (AGENT_PROFILE=agent|operator)
+	@-$(AGENT_DC) ps -a $(AGENT_SERVICES)
+	@echo ""
+	@$(AGENT_SETUP) check $(AGENT_ARGS) || true
+
+.PHONY: agent-model
+agent-model: _agent-profile ## Switch the model and recreate only the agent: PROVIDER=... MODEL=... [BASE_URL=...]
+	@if [ -z "$(PROVIDER)" ]; then echo "$(RED)Usage: make agent-model PROVIDER=<provider> MODEL=<model> [BASE_URL=<url>]$(NC)"; exit 1; fi
+	@$(AGENT_SETUP) model $(AGENT_ARGS) --provider "$(PROVIDER)" --model "$(MODEL)" --base-url "$(BASE_URL)"
+
+.PHONY: agent-auth
+agent-auth: _agent-profile ## Log the agent in to an OAuth model provider (openai-codex, nous)
+	@$(AGENT_SETUP) auth $(AGENT_ARGS)
+
+.PHONY: agent-smoke
+agent-smoke: _agent-profile ## Check MCP discovery and one real model reply from the running agent
+	@$(AGENT_SETUP) smoke $(AGENT_ARGS)
 
 # ===========================================================================
 # DEPLOY (production)

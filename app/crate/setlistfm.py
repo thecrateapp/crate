@@ -10,7 +10,7 @@ from typing import Any, NotRequired, TypedDict
 import requests
 from requests import RequestException
 
-from crate.db.cache_store import delete_cache, get_cache, set_cache
+from crate.db.cache_store import delete_cache, get_cache, get_caches, set_cache
 
 log = logging.getLogger(__name__)
 
@@ -374,6 +374,16 @@ def get_cached_probable_setlist(artist_name: str) -> list[dict] | None:
     return _normalize_cached_songs(cached)
 
 
+def get_cached_probable_setlist_generated_at(artist_name: str) -> str | None:
+    cached = get_cache(
+        _probable_cache_key(artist_name), max_age_seconds=_PROBABLE_TTL_SECONDS
+    )
+    if not isinstance(cached, Mapping):
+        return None
+    generated_at = cached.get("generated_at")
+    return generated_at if isinstance(generated_at, str) and generated_at else None
+
+
 def get_cached_probable_setlist_context(
     artist_name: str,
 ) -> ProbableSetlistContext | None:
@@ -414,6 +424,72 @@ def get_cached_probable_setlist_context(
     if tour_name:
         context["tour_name"] = tour_name
     return context
+
+
+def get_probable_setlist_health(
+    artist_names: Sequence[str],
+) -> dict[str, dict[str, Any]]:
+    """Return cache coverage and freshness for many artists without N+1 reads."""
+    normalized_names: dict[str, str] = {}
+    for raw_name in artist_names:
+        name = _normalized_artist_name(raw_name)
+        if name:
+            normalized_names.setdefault(name.casefold(), name)
+    keys = {
+        artist_key: _probable_cache_key(name)
+        for artist_key, name in normalized_names.items()
+    }
+    cached_values = get_caches(list(keys.values()))
+    now = datetime.now(timezone.utc)
+    result: dict[str, dict[str, Any]] = {}
+
+    for artist_key, cache_key in keys.items():
+        cached = cached_values.get(cache_key)
+        raw_songs = cached.get("songs") if isinstance(cached, Mapping) else cached
+        songs = _normalize_cached_songs(raw_songs)
+        generated_at = (
+            cached.get("generated_at") if isinstance(cached, Mapping) else None
+        )
+        context = cached.get("context") if isinstance(cached, Mapping) else None
+        mode = _clean_text(context.get("mode")) if isinstance(context, Mapping) else ""
+        freshness_seconds = (
+            24 * 60 * 60 if mode == "active_tour" else _PROBABLE_TTL_SECONDS
+        )
+        parsed_at: datetime | None = None
+        if isinstance(generated_at, str):
+            try:
+                parsed_at = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+                if parsed_at.tzinfo is None:
+                    parsed_at = parsed_at.replace(tzinfo=timezone.utc)
+            except ValueError:
+                parsed_at = None
+
+        if not songs:
+            status = "missing"
+        elif parsed_at is None:
+            status = "unknown"
+        elif (now - parsed_at).total_seconds() > freshness_seconds:
+            status = "stale"
+        else:
+            status = "fresh"
+
+        result[artist_key] = {
+            "status": status,
+            "generated_at": parsed_at.isoformat() if parsed_at else None,
+            "song_count": len(songs or []),
+            "source_show_count": (
+                context.get("source_show_count")
+                if isinstance(context, Mapping)
+                else None
+            ),
+            "mode": mode or None,
+            "tour_name": (
+                _clean_text(context.get("tour_name"))
+                if isinstance(context, Mapping)
+                else None
+            ),
+        }
+    return result
 
 
 def queue_probable_setlist_refresh(
@@ -476,6 +552,28 @@ def queue_probable_setlist_refreshes(
     return queued
 
 
+def billed_show_artist_names(shows: Sequence[Mapping[str, Any]]) -> list[str]:
+    """Return each credited artist once, matching the setlist cache key rules."""
+    unique: dict[str, str] = {}
+    for show in shows:
+        for raw_name in [show.get("artist_name"), *(show.get("lineup") or [])]:
+            name = " ".join(str(raw_name or "").split())
+            if name:
+                unique.setdefault(name.casefold(), name)
+    return list(unique.values())
+
+
+def queue_outdated_show_setlist_refreshes(artist_names: list[str]) -> list[str]:
+    """Force refreshes only where a setlist is missing or past its freshness window."""
+    health = get_probable_setlist_health(artist_names)
+    outdated = [
+        name
+        for name in artist_names
+        if health.get(name.casefold(), {}).get("status") in {"missing", "stale"}
+    ]
+    return queue_probable_setlist_refreshes(outdated, force=True)
+
+
 def refresh_probable_setlist(artist_name: str, *, force: bool = False) -> dict:
     """Refresh one probable setlist from a worker-owned provider call."""
     normalized_name = _normalized_artist_name(artist_name)
@@ -528,6 +626,7 @@ def get_probable_setlist(
                 "model_version": _PROBABLE_CACHE_VERSION,
                 "context": context,
                 "songs": result,
+                "generated_at": datetime.now(timezone.utc).isoformat(),
             },
             ttl=cache_ttl,
         )

@@ -33,6 +33,7 @@ const ENABLED_CAPABILITIES: SmartMixCapabilities = {
   androidNativeCrossfade: true,
   androidBeatmatch: true,
   androidBassHandoff: false,
+  androidLongBeatmatch: false,
   plannerVersion: "smart-mix-v2",
 };
 
@@ -185,6 +186,63 @@ describe("SmartMixTransitionPlanner", () => {
 
     const [, , body] = request.mock.calls[0]!;
     expect(body.edges[0].context).not.toHaveProperty("allowBassHandoff");
+  });
+
+  it("asks beatmatch-capable engines for long phrase mixes and keeps the dj-blend curve", async () => {
+    const request = vi.fn().mockResolvedValue({
+      plannerVersion: "smart-mix-v2",
+      plans: [
+        {
+          ...serverPlan(TRACKS[1]!, TRACKS[2]!),
+          mode: "beatmatch",
+          durationMs: 30_000,
+          curve: "dj-blend",
+        },
+      ],
+    });
+    const planner = new SmartMixTransitionPlanner(request);
+
+    const plans = await planner.plan({
+      revision: "queue-revision-long",
+      tracks: TRACKS.slice(0, 3),
+      currentIndex: 1,
+      playSource: PLAYLIST_SOURCE,
+      shuffle: false,
+      offline: false,
+      preferredDurationMs: 4000,
+      capabilities: { ...ENABLED_CAPABILITIES, androidLongBeatmatch: true },
+    });
+
+    const [, , body] = request.mock.calls[0]!;
+    expect(body.edges[0].context).toMatchObject({ allowLongBeatmatch: true });
+    expect(body.edges[0].context.preferredDurationMs).toBe(4000);
+    expect(plans[0]).toMatchObject({
+      mode: "beatmatch",
+      durationMs: 30_000,
+      curve: "dj-blend",
+    });
+  });
+
+  it("does not ask for long mixes from a server that does not offer them", async () => {
+    const request = vi.fn().mockResolvedValue({
+      plannerVersion: "smart-mix-v2",
+      plans: [serverPlan(TRACKS[1]!, TRACKS[2]!)],
+    });
+    const planner = new SmartMixTransitionPlanner(request);
+
+    await planner.plan({
+      revision: "queue-revision-short",
+      tracks: TRACKS.slice(0, 3),
+      currentIndex: 1,
+      playSource: PLAYLIST_SOURCE,
+      shuffle: false,
+      offline: false,
+      preferredDurationMs: 4000,
+      capabilities: ENABLED_CAPABILITIES,
+    });
+
+    const [, , body] = request.mock.calls[0]!;
+    expect(body.edges[0].context).not.toHaveProperty("allowLongBeatmatch");
   });
 
   it("uses local gapless plans for a known album order without network", async () => {
@@ -734,6 +792,7 @@ describe("effective Smart Mix capabilities", () => {
       androidNativeCrossfade: false,
       androidBeatmatch: false,
       androidBassHandoff: false,
+      androidLongBeatmatch: false,
     });
   });
 
@@ -752,6 +811,7 @@ describe("effective Smart Mix capabilities", () => {
     setSmartMixCapabilities({
       ...ENABLED_CAPABILITIES,
       androidBassHandoff: true,
+      androidLongBeatmatch: false,
     });
 
     expect(getSmartMixCapabilities().androidBeatmatch).toBe(false);
@@ -763,6 +823,22 @@ describe("effective Smart Mix capabilities", () => {
     setNativeBeatmatchPreference(true);
     expect(getSmartMixCapabilities().androidBeatmatch).toBe(true);
     expect(getSmartMixCapabilities().androidBassHandoff).toBe(true);
+  });
+
+  it("offers long beatmatch mixes only while beatmatch itself is on", () => {
+    runtime.androidNative = true;
+    setSmartMixCapabilities({
+      ...ENABLED_CAPABILITIES,
+      androidLongBeatmatch: true,
+    });
+
+    expect(getSmartMixCapabilities().androidLongBeatmatch).toBe(false);
+
+    setNativeBeatmatchPreference(true);
+    expect(getSmartMixCapabilities().androidLongBeatmatch).toBe(true);
+
+    setNativeBeatmatchPreference(false);
+    expect(getSmartMixCapabilities().androidLongBeatmatch).toBe(false);
   });
 
   it("never enables bass handoff without the server capability", () => {

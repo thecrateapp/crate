@@ -1,0 +1,28 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/StatusDot.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+
+<DocHeading as="h1">StatusDot</DocHeading>
+
+<EntryDetails id="status-dot" />
+
+<DocHeading as="h2">Contract</DocHeading>
+
+- `on/off/warn` communicate state. Pair with text or an accessible title when the dot appears alone.
+- `pulse` respects motion preferences and visibility through the actual hook.
+- Do not use as heading decoration or as the sole indicator without an accessible meaning.
+
+<DocHeading as="h2">Real component</DocHeading>
+
+<Canvas of={Stories.States} />
+
+<Controls />
+
+Diego approved this visual reference at 1AQ. Consumer adoption and platform QA remain separate statuses.
+
+<DocHeading as="h2">Primary and tooltip review amendment</DocHeading>
+
+Optional title detail uses a custom Tooltip. A dot without visible text retains its named image role via aria-label; the SVG/native browser tooltip is not required for its accessible name.

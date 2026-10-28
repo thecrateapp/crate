@@ -17,7 +17,7 @@ function Tabs({
       data-orientation={orientation}
       orientation={orientation}
       className={cn(
-        "group/tabs flex gap-2 data-[orientation=horizontal]:flex-col",
+        "group/tabs flex min-w-0 gap-4 data-[orientation=horizontal]:flex-col",
         className,
       )}
       {...props}
@@ -25,35 +25,110 @@ function Tabs({
   );
 }
 
-const tabsListVariants = cva(
-  "group/tabs-list inline-flex w-fit items-center justify-center rounded-md p-[4px] text-text-muted group-data-[orientation=horizontal]/tabs:h-11 group-data-[orientation=vertical]/tabs:h-fit group-data-[orientation=vertical]/tabs:flex-col data-[variant=line]:rounded-none",
-  {
-    variants: {
-      variant: {
-        default:
-          "border border-border-quiet bg-text-primary/[0.04] backdrop-blur-sm",
-        line: "gap-1 bg-transparent",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-    },
-  },
-);
+// Both existing variant names share the V3 text-tab recipe.
+const tabsListVariants = cva("crate-tabs-list", {
+  variants: { variant: { default: "", line: "" } },
+  defaultVariants: { variant: "default" },
+});
 
 function TabsList({
   className,
   variant = "default",
+  children,
+  ref,
+  asChild,
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.List> &
   VariantProps<typeof tabsListVariants>) {
+  const list = React.useRef<HTMLDivElement>(null);
+  const indicator = React.useRef<HTMLSpanElement>(null);
+  React.useImperativeHandle(ref, () => list.current!, []);
+  React.useLayoutEffect(() => {
+    const node = list.current;
+    const line = indicator.current;
+    if (!node || !line) return;
+    let disposed = false;
+    let readyFrame = 0;
+    const resize =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(measure)
+        : null;
+    function measure() {
+      if (disposed || !node || !line) return;
+      const active = node.querySelector<HTMLElement>(
+        '[data-slot="tabs-trigger"][data-state="active"]',
+      );
+      if (!active) {
+        delete node.dataset.movingIndicator;
+        return;
+      }
+      const bounds = node.getBoundingClientRect();
+      const tab = active.getBoundingClientRect();
+      const vertical = node.dataset.orientation === "vertical";
+      const rtl = getComputedStyle(node).direction === "rtl";
+      const x =
+        (vertical ? (rtl ? tab.left : tab.right - 2) : tab.left) -
+        bounds.left +
+        node.scrollLeft -
+        node.clientLeft;
+      const y =
+        (vertical ? tab.top : tab.bottom - 2) -
+        bounds.top +
+        node.scrollTop -
+        node.clientTop;
+      line.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+      line.style.width = `${vertical ? 2 : tab.width}px`;
+      line.style.height = `${vertical ? tab.height : 2}px`;
+      node.dataset.movingIndicator = "true";
+      // Track font/count/viewport geometry, not player ticks or React renders.
+      node
+        .querySelectorAll('[data-slot="tabs-trigger"]')
+        .forEach((trigger) => resize?.observe(trigger));
+      if (!node.dataset.indicatorReady && !readyFrame)
+        readyFrame = requestAnimationFrame(() => {
+          node.dataset.indicatorReady = "true";
+        });
+    }
+    const mutation = new MutationObserver(measure);
+    mutation.observe(node, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ["data-state", "data-orientation", "dir"],
+    });
+    resize?.observe(node);
+    window.addEventListener("resize", measure);
+    void document.fonts?.ready.then(measure);
+    measure();
+    return () => {
+      disposed = true;
+      mutation.disconnect();
+      resize?.disconnect();
+      window.removeEventListener("resize", measure);
+      cancelAnimationFrame(readyFrame);
+      delete node.dataset.indicatorReady;
+    };
+  }, [asChild]);
   return (
     <TabsPrimitive.List
+      ref={list}
+      asChild={asChild}
       data-slot="tabs-list"
       data-variant={variant}
       className={cn(tabsListVariants({ variant }), className)}
       {...props}
-    />
+    >
+      {children}
+      {!asChild && (
+        <span
+          ref={indicator}
+          data-slot="tabs-indicator"
+          className="crate-tabs-indicator"
+          aria-hidden="true"
+        />
+      )}
+    </TabsPrimitive.List>
   );
 }
 
@@ -65,10 +140,7 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-3 py-1.5 text-sm font-medium whitespace-nowrap text-text-primary/60 transition-[color,background-color,border-color,box-shadow,opacity] group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start hover:text-text-primary focus-visible:border-text-primary/15 focus-visible:shadow-border-soft focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 group-data-[variant=default]/tabs-list:data-[state=active]:shadow-sm group-data-[variant=line]/tabs-list:data-[state=active]:shadow-none dark:text-text-muted dark:hover:text-text-primary [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-[18px]",
-        "group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent dark:group-data-[variant=line]/tabs-list:data-[state=active]:border-transparent dark:group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent",
-        "data-[state=active]:border-border-quiet data-[state=active]:bg-text-primary/10 data-[state=active]:text-text-primary dark:data-[state=active]:bg-surface-canvas/30 dark:data-[state=active]:text-text-primary",
-        "after:absolute after:bg-text-primary after:opacity-0 after:transition-opacity group-data-[orientation=horizontal]/tabs:after:inset-x-0 group-data-[orientation=horizontal]/tabs:after:bottom-[-5px] group-data-[orientation=horizontal]/tabs:after:h-0.5 group-data-[orientation=vertical]/tabs:after:inset-y-0 group-data-[orientation=vertical]/tabs:after:-right-1 group-data-[orientation=vertical]/tabs:after:w-0.5 group-data-[variant=line]/tabs-list:data-[state=active]:after:opacity-100",
+        "crate-tab-trigger crate-focus-inset font-mono text-eyebrow font-normal tracking-caps uppercase",
         className,
       )}
       {...props}
@@ -83,7 +155,7 @@ function TabsContent({
   return (
     <TabsPrimitive.Content
       data-slot="tabs-content"
-      className={cn("flex-1 outline-none", className)}
+      className={cn("min-w-0 flex-1", className)}
       {...props}
     />
   );

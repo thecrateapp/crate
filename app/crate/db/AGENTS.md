@@ -16,7 +16,7 @@ deploy, testing policy) live in the root `AGENTS.md`; this file only covers the 
 | `orm/`                                                     | SQLAlchemy 2.0 `Mapped` models. `orm/contract.py:ACTIVE_ORM_MODELS` is checked against the live schema                                                                                                                                             |
 | `models/`                                                  | Pydantic output models for DB results                                                                                                                                                                                                              |
 | `schema_sections/`                                         | Idempotent DDL used by `schema_bootstrap.create_schema()` (called by migration `001`) and, for newer features, by the migration itself (`crates_v099/v100/v102.py`)                                                                                |
-| `migrations/versions/`                                     | Alembic revisions `001`..`131`, linear, 3-digit string ids                                                                                                                                                                                         |
+| `migrations/versions/`                                     | Alembic revisions `001`..`135`, linear, 3-digit string ids                                                                                                                                                                                         |
 | `ui_snapshot_*.py`, `snapshot_events.py`                   | `ui_snapshots` read model: `get_or_build_ui_snapshot()` (read, else build + upsert with `source_seq`), `mark_ui_snapshots_stale()`, Redis pub of snapshot versions                                                                                 |
 | `domain_events.py`, `domain_event_outbox.py`               | Transactional outbox: `append_domain_event(..., session=s)` enqueues in the caller's transaction; relay publishes to Redis Streams; projector consumes                                                                                             |
 | `init_db.py`, `core_migrations.py`, `core_provisioning.py` | Startup: advisory lock, `alembic upgrade head`, seeds                                                                                                                                                                                              |
@@ -62,7 +62,9 @@ Each module ends with an explicit `__all__` listing its public names.
 4. Thin facades stay thin: `queries/home.py`, `queries/auth.py`, `queries/genres.py`, `ui_snapshot_store.py`, `ops_snapshot.py`, `repositories/library*.py` facades, etc. must not import SQLAlchemy or open scopes; put SQL in the concrete split module.
 5. Snapshot rebuilds belong in the projector/worker (`get_or_build_ui_snapshot` + domain events), not in HTTP handlers.
 6. Side effects tied to a write (dispatch, events) go through `register_after_commit` or `append_domain_event(session=...)`, never fire-and-forget before commit.
-7. Shipped migrations and their `schema_sections/*_vNNN.py` DDL are immutable.
+7. Shipped migrations and their `schema_sections/*_vNNN.py` DDL are immutable. If two branches
+   introduce the same revision number, preserve the released migration and renumber the unshipped
+   branch migration after the current head.
 
 Performance (library_tracks ~48K rows, hot HTTP paths):
 
@@ -110,6 +112,8 @@ Performance (library_tracks ~48K rows, hot HTTP paths):
 - Day boundaries use `users.timezone`; never bucket listening by UTC date.
 - `rebuild_user_listening_projections` is the reference result. Change the incremental path and the
   rebuild together; `tests/test_user_listening_projections.py` compares them.
+- Instance rollups (`jobs/instance_listening_rollups.py`) follow the same rule: the day rebuild
+  must match `rebuild_instance_listening(None)` (`tests/test_instance_listening_rollups.py`).
 - Stats queries read the projections, never `user_play_events` or `library_tracks` aggregates per
   request.
 
@@ -134,5 +138,13 @@ Performance (library_tracks ~48K rows, hot HTTP paths):
 - `optional_scope(None)` commits; it is not a read scope.
 - Expression indexes are ignored by the ORM unique-set contract; real unique constraints are not.
 - `CREATE INDEX CONCURRENTLY` fails inside a transaction; always wrap in `autocommit_block()`.
+- A failed or interrupted `CREATE INDEX CONCURRENTLY IF NOT EXISTS` leaves an INVALID index that
+  later runs skip, because the name already exists. After deploying migrations `080`
+  (`idx_global_tracks_lower_artist_title_album`) and `135` (`idx_user_track_daily_day`,
+  `idx_user_entity_firsts_key`), check them with
+  `SELECT indexrelid::regclass FROM pg_index WHERE NOT indisvalid;`. Rebuild any index it lists
+  with `REINDEX INDEX CONCURRENTLY <name>`; Alembic will not rerun a revision that is already
+  applied. Without a valid `idx_user_track_daily_day`, the range request's `MIN(day)` probe
+  becomes a sequential scan.
 - The facade (`__init__.py`) imports many modules at once; importing `crate.db` in tests is fine, in runtime code it is a test failure.
 - `conftest.py` comment says the fixture "drops the entire public schema"; it now clones/drops per-test databases instead.

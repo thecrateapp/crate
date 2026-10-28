@@ -67,8 +67,8 @@ async function choose(
   select: string,
   option: string,
 ) {
-  await user.click(within(scope).getByRole("button", { name: select }));
-  await user.click(await screen.findByRole("button", { name: option }));
+  await user.click(within(scope).getByRole("combobox", { name: select }));
+  await user.click(await screen.findByRole("option", { name: option }));
 }
 
 beforeEach(() => {
@@ -338,25 +338,25 @@ describe("FeaturesPanel", () => {
     renderPanel(snapshot);
 
     const sheet = await openSheet(user, "Extract shows from image");
-    await user.click(within(sheet).getByRole("button", { name: "Model" }));
+    await user.click(within(sheet).getByRole("combobox", { name: "Model" }));
     expect(
-      await screen.findByRole("button", { name: "Gemini 3.8 Flash" }),
+      await screen.findByRole("option", { name: "Gemini 3.8 Flash" }),
     ).toBeVisible();
     expect(
-      screen.queryByRole("button", { name: "Gemini 2.5 Flash" }),
+      screen.queryByRole("option", { name: "Gemini 2.5 Flash" }),
     ).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Gemini 3.8 Flash" }));
+    await user.click(screen.getByRole("option", { name: "Gemini 3.8 Flash" }));
     await user.click(
       within(sheet).getByRole("radio", { name: "Use a saved profile" }),
     );
     await user.click(
-      within(sheet).getByRole("button", { name: "Saved profile" }),
+      within(sheet).getByRole("combobox", { name: "Saved profile" }),
     );
     expect(
-      await screen.findByRole("button", { name: /^Poster · / }),
+      await screen.findByRole("option", { name: /^Poster · / }),
     ).toBeVisible();
     expect(
-      screen.queryByRole("button", { name: /^Text Gemini/ }),
+      screen.queryByRole("option", { name: /^Text Gemini/ }),
     ).not.toBeInTheDocument();
   });
 
@@ -380,9 +380,17 @@ describe("FeaturesPanel", () => {
 
     const vision = row("Extract shows from image");
     expect(within(vision).getByText(/Last run/)).toBeVisible();
-    const time = vision.querySelector("time[title]");
+    const time = vision.querySelector("time");
     expect(time).not.toBeNull();
-    expect(time?.getAttribute("title")).toBeTruthy();
+    expect(time).not.toHaveAttribute("title");
+    expect(time).toHaveAttribute(
+      "dateTime",
+      activityFixture.items.find(
+        (item) => item.action_id === "shows.extract.vision",
+      )!.created_at,
+    );
+    expect(time).toHaveAttribute("tabIndex", "0");
+    expect(time).toHaveTextContent(/ago/);
     expect(within(vision).getByText(/Succeeded/)).toBeVisible();
     expect(
       within(row("Propose genre EQ")).getByText("No recent runs"),
@@ -437,12 +445,12 @@ describe("FeaturesPanel", () => {
     renderPanel(migratedSnapshot());
 
     const sheet = await openSheet(user, "Extract shows from image");
-    await user.click(within(sheet).getByRole("button", { name: "Model" }));
+    await user.click(within(sheet).getByRole("combobox", { name: "Model" }));
     expect(
-      await screen.findByRole("button", { name: "Gemini 3.8 Flash" }),
+      await screen.findByRole("option", { name: "Gemini 3.8 Flash" }),
     ).toBeVisible();
     expect(
-      screen.queryByRole("button", { name: "Budget" }),
+      screen.queryByRole("option", { name: "Budget" }),
     ).not.toBeInTheDocument();
   });
 
@@ -595,13 +603,13 @@ describe("FeaturesPanel", () => {
       within(sheet).getByRole("radio", { name: "Use a saved profile" }),
     );
     await user.click(
-      within(sheet).getByRole("button", { name: "Saved profile" }),
+      within(sheet).getByRole("combobox", { name: "Saved profile" }),
     );
     expect(
-      await screen.findByRole("button", { name: /^Poster · / }),
+      await screen.findByRole("option", { name: /^Poster · / }),
     ).toBeVisible();
     expect(
-      screen.queryByRole("button", { name: /^Kept settings/ }),
+      screen.queryByRole("option", { name: /^Kept settings/ }),
     ).not.toBeInTheDocument();
   });
 

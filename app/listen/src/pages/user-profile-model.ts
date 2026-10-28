@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 import type { CrateBadgeTone } from "@crate/ui/primitives/CrateBadge";
-import type { PublicCrate } from "@/pages/crates-types";
+import type { PublicCrate } from "./crates-types";
 
 export interface RelationshipState {
   following: boolean;

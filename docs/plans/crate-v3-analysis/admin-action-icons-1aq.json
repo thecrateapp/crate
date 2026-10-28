@@ -1,0 +1,1242 @@
+{
+  "checkpoint": "1AQ local, pending Diego review",
+  "publishedBase": "d30b1c0244e5f57026dea3f27aacae815c04b41b",
+  "scope": "Admin actions. Explicit18-header migration, playlist rows and Incoming release row actions authorized by Diego. Other proposals retain owning scopes. Shared badge/font normalization also affects Listen separately.",
+  "method": {
+    "productionFilesScanned": 145,
+    "lexicalActionCandidates": 187,
+    "filesWithCandidates": 53,
+    "warning": "Lexical sites include conditional/parent buttons, tabs and unmounted code. Counts are source sites, not rendered controls or migration approval. Current icon import/render counts are evidence, not defects. The refreshed action scan also includes explicit preview actions."
+  },
+  "sourceHashes": {
+    "app/ui/src/components/ImageCropUpload.tsx": "2d9a0b338d53c4ddb150281ac167b83e0e48b125ca9659a45f63a0501fbcb520",
+    "app/ui/src/components/album/TagEditor.tsx": "7e72aec334d12603f5f2cdc0bd69466b8b1ce5c87c101a603c8597353c3118ec",
+    "app/ui/src/components/album/TidalAlbumCard.tsx": "b2cf7415b8e086bb639035725073ac9466529c9a8a882d17f81184ff604d371e",
+    "app/ui/src/components/artist/ArtistArtworkGallery.tsx": "8e766c3783e29caf2d51bbb8727f94a793512d4cb67d002227c178b141ccb4d2",
+    "app/ui/src/components/artist/ArtistHeroSection.tsx": "a71267f397a31566e5289a2596d37fd73ebe2effd1eacc2988fbba8a4fea9bb5",
+    "app/ui/src/components/genres/GenreTaxonomyTree.tsx": "64b3a1f820bdef5ca2ba930bd1d29de19cd94478f271e76085e58481596b046a",
+    "app/ui/src/pages/Analysis.tsx": "239afbe127e363acc703bb16d11e5fb8704310c3f9d17ddcfb3d4c368b842ae2",
+    "app/ui/src/pages/Contributions.tsx": "3bcfa7ece7c76e714513c2cd19e4387ed575687de9d43cbe5fc821fd05a08eb2",
+    "app/ui/src/pages/Dashboard.tsx": "2adbd2090b0cd7d6e9117bd96d5c86f9c4d96e9d37c20a4b82c3f1b7fcfa1e75",
+    "app/ui/src/pages/Discover.tsx": "ac8733fc7d354a96209b9a7dbbcca8c1c1cc6e3e09ef62b6f87d20e0e6578123",
+    "app/ui/src/pages/Download.tsx": "8235c87296c07b86632bba23450a88667d68dc57d24c0abbea128a237c6fa528",
+    "app/ui/src/pages/Genres.tsx": "3be691c9fd182b5fda29f77194abc4a1d75b69f76f5de2f2abbd9ad669f4f3db",
+    "app/ui/src/pages/GlobalCatalog.tsx": "aae2970e9fc6ae1b7cdd6e6e38d80db02de5ec8a576a84b1bde355c5fc176eaf",
+    "app/ui/src/pages/I18nReview.tsx": "3400700031e49690ccd39a29ef784ec2ff0dd417364868e49303667e85466745",
+    "app/ui/src/pages/Logs.tsx": "ed19fe79dcf5619aa32a9237d82ed6069af14a9ee2a244657d32a96830f0455b",
+    "app/ui/src/pages/NewReleases.tsx": "f2dcbe280caed3509d7942329341ebef09cda1bcc087551a10f063f4e3fe31a5",
+    "app/ui/src/pages/PlaylistEditor.tsx": "9c9b9d7ca68a8d082ddf9e5cb73f9bf82022011af30bfe7066f30fd94dce644c",
+    "app/ui/src/pages/Playlists.tsx": "fee09c991369bedad4952fbb2273b091cb4f8de49b2a91226d1526e8a4de21a1",
+    "app/ui/src/pages/Settings.tsx": "247743e17a41fd2a0448de21efac811ff3804e7e07f86e1450ffecc286b65139",
+    "app/ui/src/pages/Stack.tsx": "d85d2fff2b1c486b64aea7d5aba5f83d6cca90e4abf9beb0c7463e1c9b967100",
+    "app/ui/src/pages/SystemHealth.tsx": "299228ab975e73ca25379e634f160ffbe8a4257bcb156de29cc8e8b539c1477b",
+    "app/ui/src/pages/Tasks.tsx": "37a75670d0cabb8e1aa2897fb12357379e96ca9ede95d2937a7eb826937a7510",
+    "app/ui/src/pages/Trash.tsx": "ddb87e50aab3ad69c40564b889c79679c8996f2daf794a5a8b53d1f566d7653e",
+    "app/ui/src/pages/Upcoming.tsx": "17b119e7ae2892d3be9a01f7741bba09f2a741012ff15f2d567ae05e7d5a18e5",
+    "app/ui/src/pages/Users.tsx": "d07aae4e09863092e5fa86ebeffa898eb66eb28f09ce8cfe83e3a014d766bdfe",
+    "app/ui/src/pages/Health.tsx": "8ec95b66ca9ac80bc746a740e96a61b8a96e92a11ad7ea780e1acd06ed486280",
+    "app/ui/src/pages/Bandcamp.tsx": "fac743360ff077b677b3a7be21b8d9426a81ad254a584799a7040dadbaaad7e7",
+    "app/ui/src/pages/Roles.tsx": "d1fc97fa2e78da65cbb19610d147e9fc831db60b5ab631bb0ab520ab0240bd62",
+    "app/ui/src/components/layout/PageHeader.tsx": "7e6fa548ed4c90532b95a6b47014e8ac271a468d73fc425db3e87f02e8fe8fa1",
+    "app/ui/src/components/admin/ops-surfaces.tsx": "1e4567a70bf1ea132181c55872e1d14e823c6047fa459d859b1b544c4b9fcce5"
+  },
+  "reviewedSites": [
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1198,
+      "component": "Button",
+      "label": "aria-label=\"Remove cover\" title=\"Remove cover\"",
+      "existingGlyphs": [
+        "Trash2"
+      ],
+      "recommendedGlyph": "Trash2",
+      "presentation": "icon-only",
+      "status": "implemented-1AQ",
+      "context": "Retirar portada manual"
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1287,
+      "component": "Button",
+      "label": "aria-label={`Remove rule ${index + 1}`} title={`Remove rule ${index + 1}`}",
+      "existingGlyphs": [
+        "Trash2"
+      ],
+      "recommendedGlyph": "Trash2",
+      "presentation": "icon-only",
+      "status": "implemented-1AQ",
+      "context": "Retirar regla"
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1822,
+      "component": "Button",
+      "label": "aria-label={`Remove ${track.title}`} title={`Remove ${track.title}`}",
+      "existingGlyphs": [
+        "Trash2"
+      ],
+      "recommendedGlyph": "Trash2",
+      "presentation": "icon-only",
+      "status": "implemented-1AQ",
+      "context": "Retirar pista de esta playlist"
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 1117,
+      "component": "Button",
+      "label": "aria-label={`Remove rule ${index + 1}`} title={`Remove rule ${index + 1}`}",
+      "existingGlyphs": [
+        "Trash2"
+      ],
+      "recommendedGlyph": "Trash2",
+      "presentation": "icon-only",
+      "status": "implemented-1AQ",
+      "context": "Retirar regla de creación"
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1178,
+      "component": "Button",
+      "label": "uploadingCover ? ( <Loader2 data-admin-ux=\"editor-cover-upload\" aria-hidden=\"true\" size={14} className=\"mr-1 animate-spin\" /> ) : null playlist.cover_data_url ? \"Replace cover\" : \"Upload cover\"",
+      "existingGlyphs": [
+        "Loader2"
+      ],
+      "recommendedGlyph": "Upload",
+      "presentation": "icon-only",
+      "status": "proposal-for-review",
+      "context": "Elegir/reemplazar portada desde archivo"
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1418,
+      "component": "Button",
+      "label": "Add rule",
+      "existingGlyphs": [],
+      "recommendedGlyph": "Plus",
+      "presentation": "icon-only",
+      "status": "proposal-for-review",
+      "context": "Añadir una regla al bloque de reglas"
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 1224,
+      "component": "Button",
+      "label": "Add rule",
+      "existingGlyphs": [],
+      "recommendedGlyph": "Plus",
+      "presentation": "icon-only",
+      "status": "proposal-for-review",
+      "context": "Añadir una regla al compositor"
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1116,
+      "component": "Button",
+      "label": "Delete",
+      "existingGlyphs": [],
+      "recommendedGlyph": "Trash2",
+      "presentation": "icon-only",
+      "status": "proposal-for-review",
+      "context": "Eliminar usuario de esta fila; conservar capacidad y ConfirmDialog"
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 2440,
+      "component": "Button",
+      "label": "Copy link",
+      "existingGlyphs": [],
+      "recommendedGlyph": "Copy",
+      "presentation": "icon-only",
+      "status": "proposal-for-review",
+      "context": "Copiar el enlace de invitación visible; conservar feedback"
+    },
+    {
+      "path": "app/ui/src/pages/Trash.tsx",
+      "line": 351,
+      "component": "Button",
+      "label": "busy ? ( <Loader2 data-admin-ux=\"trash-row-loading\" aria-hidden=\"true\" size={14} className=\"mr-2 animate-spin\" /> ) : null Restore",
+      "existingGlyphs": [
+        "Loader2"
+      ],
+      "recommendedGlyph": "Undo2",
+      "presentation": "icon-only",
+      "status": "proposal-for-review",
+      "context": "Restaurar el elemento de esta fila"
+    },
+    {
+      "path": "app/ui/src/pages/Trash.tsx",
+      "line": 370,
+      "component": "Button",
+      "label": "Delete",
+      "existingGlyphs": [],
+      "recommendedGlyph": "Trash2",
+      "presentation": "icon-only",
+      "status": "proposal-for-review",
+      "context": "Abrir confirmación de borrado permanente de esta fila"
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 707,
+      "component": "PageHeaderAction",
+      "label": "Download release",
+      "existingGlyphs": [
+        "RowDownload"
+      ],
+      "recommendedGlyph": "Download (Solar)",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Adquirir esta release; no exportar un archivo local",
+      "markers": [
+        "upcoming-download"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 1073,
+      "component": "button",
+      "label": "Download",
+      "existingGlyphs": [],
+      "recommendedGlyph": "Download",
+      "presentation": "icon-only",
+      "status": "proposal-for-review",
+      "context": "Adquirir este release desde el detalle"
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 164,
+      "component": "Button",
+      "label": "Download",
+      "existingGlyphs": [],
+      "recommendedGlyph": "Download",
+      "presentation": "icon-only",
+      "status": "proposal-for-review",
+      "context": "Adquirir este álbum sugerido"
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 339,
+      "component": "Button",
+      "label": "Download",
+      "existingGlyphs": [],
+      "recommendedGlyph": "Download",
+      "presentation": "icon-only",
+      "status": "proposal-for-review",
+      "context": "Adquirir este release de catálogo"
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistHeroSection.tsx",
+      "line": 376,
+      "component": "Button",
+      "label": "Edit",
+      "existingGlyphs": [
+        "Pencil"
+      ],
+      "recommendedGlyph": "Pencil",
+      "presentation": "icon-only",
+      "status": "retain-or-align-in-owning-phase",
+      "context": "Editar metadatos del artista"
+    },
+    {
+      "path": "app/ui/src/components/album/TidalAlbumCard.tsx",
+      "line": 71,
+      "component": "button",
+      "label": "aria-label={`Download ${title}`}",
+      "existingGlyphs": [
+        "Download"
+      ],
+      "recommendedGlyph": "Download",
+      "presentation": "icon-only",
+      "status": "retain-or-align-in-owning-phase",
+      "context": "Adquirir álbum de esta tarjeta"
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistArtworkGallery.tsx",
+      "line": 376,
+      "component": "Button",
+      "label": "aria-label={`Delete ${asset.label}`} busy === `delete:${asset.id}` ? ( <Loader2 className=\"h-4 w-4 animate-spin\" /> ) : ( <Trash2 className=\"h-4 w-4\" /> )",
+      "existingGlyphs": [
+        "Loader2",
+        "Trash2"
+      ],
+      "recommendedGlyph": "Trash2",
+      "presentation": "icon-only",
+      "status": "retain-or-align-in-owning-phase",
+      "context": "Eliminar imagen seleccionada de galería"
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+      "line": 502,
+      "component": "button",
+      "label": "title=\"Copy MBID\"",
+      "existingGlyphs": [
+        "Copy"
+      ],
+      "recommendedGlyph": "Copy",
+      "presentation": "icon-only",
+      "status": "retain-or-align-in-owning-phase",
+      "context": "Copiar MBID visible"
+    },
+    {
+      "path": "app/ui/src/components/ImageCropUpload.tsx",
+      "line": 107,
+      "component": "button",
+      "label": "title=\"Upload image\" label ? <span>{label}</span> : null",
+      "existingGlyphs": [
+        "Camera"
+      ],
+      "recommendedGlyph": "Upload",
+      "presentation": "icon-only",
+      "status": "retain-or-align-in-owning-phase",
+      "context": "Abrir selector de archivo; reemplazar Camera si la acción no toma una foto"
+    },
+    {
+      "path": "app/ui/src/components/ImageCropUpload.tsx",
+      "line": 135,
+      "component": "button",
+      "label": "aria-label=\"Close crop dialog\"",
+      "existingGlyphs": [
+        "X"
+      ],
+      "recommendedGlyph": "X",
+      "presentation": "icon-only",
+      "status": "retain-or-align-in-owning-phase",
+      "context": "Cerrar recorte"
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 345,
+      "component": "button",
+      "label": "aria-label={`Remove ${slug}`}",
+      "existingGlyphs": [
+        "X"
+      ],
+      "recommendedGlyph": "X",
+      "presentation": "icon-only",
+      "status": "retain-or-align-in-owning-phase",
+      "context": "Quitar etiqueta de slug en un editor; no borrar entidad"
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 1522,
+      "component": "button",
+      "label": "aria-label={`Remove ${ext}`}",
+      "existingGlyphs": [
+        "X"
+      ],
+      "recommendedGlyph": "X",
+      "presentation": "icon-only",
+      "status": "retain-or-align-in-owning-phase",
+      "context": "Quitar extensión de una lista de valores"
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 1543,
+      "component": "Button",
+      "label": "Add",
+      "existingGlyphs": [
+        "Plus"
+      ],
+      "recommendedGlyph": "Plus",
+      "presentation": "icon-only",
+      "status": "retain-or-align-in-owning-phase",
+      "context": "Añadir extensión al grupo"
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1451,
+      "component": "Button",
+      "label": "aria-label=\"Remove download\"",
+      "existingGlyphs": [
+        "Trash2"
+      ],
+      "recommendedGlyph": "Trash2",
+      "presentation": "icon-only",
+      "status": "retain-or-align-in-owning-phase",
+      "context": "Retirar descarga de la fila"
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1816,
+      "component": "Button",
+      "label": "title=\"Download track\"",
+      "existingGlyphs": [
+        "Download"
+      ],
+      "recommendedGlyph": "Download",
+      "presentation": "icon-only",
+      "status": "retain-or-align-in-owning-phase",
+      "context": "Adquirir pista de esta fila"
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1355,
+      "component": "Button",
+      "label": "title=\"Retry task\"",
+      "existingGlyphs": [
+        "RotateCcw"
+      ],
+      "recommendedGlyph": "RotateCcw",
+      "presentation": "icon-only",
+      "status": "retain-or-align-in-owning-phase",
+      "context": "Reintentar tarea fallida de esta fila"
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1080,
+      "component": "Button",
+      "label": "Refresh",
+      "existingGlyphs": [
+        "RefreshCw"
+      ],
+      "recommendedGlyph": "RefreshCw",
+      "presentation": "icon-only",
+      "status": "retain-or-align-in-owning-phase",
+      "context": "Actualizar diagnóstico de playback"
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1883,
+      "component": "Button",
+      "label": "Refresh",
+      "existingGlyphs": [
+        "RefreshCw"
+      ],
+      "recommendedGlyph": "RefreshCw",
+      "presentation": "icon-only",
+      "status": "retain-or-align-in-owning-phase",
+      "context": "Actualizar snapshot de tareas"
+    },
+    {
+      "path": "app/ui/src/components/album/TagEditor.tsx",
+      "line": 163,
+      "component": "button",
+      "label": "aria-label={`Remove genre ${g}`}",
+      "existingGlyphs": [
+        "X"
+      ],
+      "recommendedGlyph": "X",
+      "presentation": "icon-only",
+      "status": "retain-or-align-in-owning-phase",
+      "context": "Quitar etiqueta de género del formulario"
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 928,
+      "component": "PageHeaderAction",
+      "label": "Duplicate",
+      "existingGlyphs": [
+        "Copy"
+      ],
+      "recommendedGlyph": "Copy",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "editor-duplicate-action"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 935,
+      "component": "PageHeaderAction",
+      "label": "Preview",
+      "existingGlyphs": [
+        "Loader2",
+        "Eye"
+      ],
+      "recommendedGlyph": "Eye",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "editor-preview",
+        "editor-preview-action"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 956,
+      "component": "PageHeaderAction",
+      "label": "smartRulesChanged ? \"Save + generate\" : \"Generate\"",
+      "existingGlyphs": [
+        "Loader2",
+        "ListRestart"
+      ],
+      "recommendedGlyph": "ListRestart",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "editor-generate",
+        "editor-generate-action"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 976,
+      "component": "PageHeaderAction",
+      "label": "Save changes",
+      "existingGlyphs": [
+        "Loader2",
+        "Save"
+      ],
+      "recommendedGlyph": "Save",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "editor-save",
+        "editor-save-action"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Dashboard.tsx",
+      "line": 146,
+      "component": "PageHeaderAction",
+      "label": "Refresh",
+      "existingGlyphs": [
+        "RefreshCw"
+      ],
+      "recommendedGlyph": "RefreshCw",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "header-refresh"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Dashboard.tsx",
+      "line": 156,
+      "component": "PageHeaderAction",
+      "label": "Maintenance",
+      "existingGlyphs": [
+        "Wrench"
+      ],
+      "recommendedGlyph": "Wrench",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "header-maintenance"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 390,
+      "component": "PageHeaderAction",
+      "label": "Refresh",
+      "existingGlyphs": [
+        "RefreshCw"
+      ],
+      "recommendedGlyph": "RefreshCw",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "header-refresh"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 399,
+      "component": "PageHeaderAction",
+      "label": "Backfill fingerprints",
+      "existingGlyphs": [
+        "Loader2",
+        "Fingerprint"
+      ],
+      "recommendedGlyph": "Fingerprint",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "analysis-action-fingerprints",
+        "header-backfill-fingerprints"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 426,
+      "component": "PageHeaderAction",
+      "label": "Recompute popularity",
+      "existingGlyphs": [
+        "Loader2",
+        "TrendingUp"
+      ],
+      "recommendedGlyph": "TrendingUp",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "analysis-action-popularity",
+        "header-recompute-popularity"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 453,
+      "component": "PageHeaderAction",
+      "label": "Recompute bliss",
+      "existingGlyphs": [
+        "Loader2",
+        "Orbit"
+      ],
+      "recommendedGlyph": "Orbit",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "analysis-action-bliss",
+        "header-recompute-bliss"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 480,
+      "component": "PageHeaderAction",
+      "label": "Re-analyze all",
+      "existingGlyphs": [
+        "Loader2",
+        "AudioLines"
+      ],
+      "recommendedGlyph": "AudioLines",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "analysis-action-analysis",
+        "header-re-analyze-all"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 979,
+      "component": "PageHeaderAction",
+      "label": "Refresh metrics",
+      "existingGlyphs": [
+        "RefreshCw"
+      ],
+      "recommendedGlyph": "RefreshCw",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "header-refresh-metrics"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Trash.tsx",
+      "line": 238,
+      "component": "PageHeaderAction",
+      "label": "Refresh",
+      "existingGlyphs": [
+        "Loader2",
+        "RefreshCw"
+      ],
+      "recommendedGlyph": "RefreshCw",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "trash-refresh-loading",
+        "header-refresh"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Trash.tsx",
+      "line": 260,
+      "component": "PageHeaderAction",
+      "label": "Empty trash",
+      "existingGlyphs": [
+        "Loader2",
+        "Trash2"
+      ],
+      "recommendedGlyph": "Trash2",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "trash-empty-loading",
+        "header-empty-trash"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Contributions.tsx",
+      "line": 90,
+      "component": "PageHeaderAction",
+      "label": "Refresh",
+      "existingGlyphs": [
+        "Loader2",
+        "RefreshCw"
+      ],
+      "recommendedGlyph": "RefreshCw",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "contributions-refresh-loading",
+        "header-refresh"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "line": 346,
+      "component": "PageHeaderAction",
+      "label": "Refresh",
+      "existingGlyphs": [
+        "RefreshCw"
+      ],
+      "recommendedGlyph": "RefreshCw",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "header-refresh"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "line": 352,
+      "component": "PageHeaderAction",
+      "label": "recomputing || completenessTaskId !== null\n                    ? \"Recomputing...\"\n                    : \"Recompute gaps\"",
+      "existingGlyphs": [
+        "Loader2",
+        "ChartNoAxesCombined"
+      ],
+      "recommendedGlyph": "ChartNoAxesCombined",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "discovery-recompute-loading",
+        "header-recompute-gaps"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "line": 377,
+      "component": "PageHeaderAction",
+      "label": "Check releases",
+      "existingGlyphs": [
+        "Loader2",
+        "Radar"
+      ],
+      "recommendedGlyph": "Radar",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "discovery-check-loading",
+        "header-check-releases"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/GlobalCatalog.tsx",
+      "line": 166,
+      "component": "PageHeaderAction",
+      "label": "Refresh",
+      "existingGlyphs": [
+        "RefreshCw"
+      ],
+      "recommendedGlyph": "RefreshCw",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "header-refresh"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/GlobalCatalog.tsx",
+      "line": 176,
+      "component": "PageHeaderAction",
+      "label": "Reconcile",
+      "existingGlyphs": [
+        "Loader2",
+        "GitMerge"
+      ],
+      "recommendedGlyph": "GitMerge",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "catalog-incremental-loading",
+        "header-reconcile"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/GlobalCatalog.tsx",
+      "line": 196,
+      "component": "PageHeaderAction",
+      "label": "Full rebuild",
+      "existingGlyphs": [
+        "Loader2",
+        "DatabaseBackup"
+      ],
+      "recommendedGlyph": "DatabaseBackup",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "catalog-full-loading",
+        "header-full-rebuild"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/I18nReview.tsx",
+      "line": 491,
+      "component": "PageHeaderAction",
+      "label": "Refresh",
+      "existingGlyphs": [
+        "Loader2",
+        "RefreshCw"
+      ],
+      "recommendedGlyph": "RefreshCw",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "translations-refresh",
+        "header-refresh"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 323,
+      "component": "PageHeaderAction",
+      "label": "autoRefresh ? \"Pause live\" : \"Resume live\"",
+      "existingGlyphs": [
+        "Pause",
+        "Play"
+      ],
+      "recommendedGlyph": "Pause / Play",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "live-pause",
+        "live-resume"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 341,
+      "component": "PageHeaderAction",
+      "label": "Refresh",
+      "existingGlyphs": [
+        "RefreshCw"
+      ],
+      "recommendedGlyph": "RefreshCw",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "header-refresh"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Stack.tsx",
+      "line": 593,
+      "component": "PageHeaderAction",
+      "label": "Refresh",
+      "existingGlyphs": [
+        "RefreshCw"
+      ],
+      "recommendedGlyph": "RefreshCw",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "header-refresh"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Health.tsx",
+      "line": 643,
+      "component": "PageHeaderAction",
+      "label": "scanning ? \"Scanning...\" : \"Run scan\"",
+      "existingGlyphs": [
+        "Loader2",
+        "ScanSearch"
+      ],
+      "recommendedGlyph": "ScanSearch",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "health-scan-loading",
+        "header-run-scan"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 220,
+      "component": "PageHeaderAction",
+      "label": "Sync collection",
+      "existingGlyphs": [
+        "Loader2",
+        "FolderSync"
+      ],
+      "recommendedGlyph": "FolderSync",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "bandcamp-sync-loading",
+        "header-sync-collection"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 242,
+      "component": "PageHeaderAction",
+      "label": "Refresh Radar",
+      "existingGlyphs": [
+        "Radar"
+      ],
+      "recommendedGlyph": "Radar",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "header-refresh-radar"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 255,
+      "component": "PageHeaderAction",
+      "label": "Backfill URLs",
+      "existingGlyphs": [
+        "Loader2",
+        "Link"
+      ],
+      "recommendedGlyph": "Link",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "bandcamp-backfill-loading",
+        "header-backfill-urls"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 550,
+      "component": "PageHeaderAction",
+      "label": "Timeline",
+      "existingGlyphs": [
+        "List"
+      ],
+      "recommendedGlyph": "List",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "header-timeline"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 560,
+      "component": "PageHeaderAction",
+      "label": "Grid",
+      "existingGlyphs": [
+        "LayoutGrid"
+      ],
+      "recommendedGlyph": "LayoutGrid",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "header-grid"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 572,
+      "component": "PageHeaderAction",
+      "label": "checking ? \"Checking…\" : \"Check now\"",
+      "existingGlyphs": [
+        "Loader2",
+        "Radar"
+      ],
+      "recommendedGlyph": "Radar",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "releases-check-loading",
+        "header-check-now"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 861,
+      "component": "PageHeaderAction",
+      "label": "Invite user",
+      "existingGlyphs": [
+        "MailPlus"
+      ],
+      "recommendedGlyph": "MailPlus",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "header-invite-user"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 870,
+      "component": "PageHeaderAction",
+      "label": "Add user",
+      "existingGlyphs": [
+        "UserPlus"
+      ],
+      "recommendedGlyph": "UserPlus",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "header-add-user"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 307,
+      "component": "PageHeaderAction",
+      "label": "Sync shows",
+      "existingGlyphs": [
+        "Loader2",
+        "CalendarSync"
+      ],
+      "recommendedGlyph": "CalendarSync",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "upcoming-sync",
+        "header-sync-shows"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 329,
+      "component": "PageHeaderAction",
+      "label": "Clear caches",
+      "existingGlyphs": [
+        "Eraser"
+      ],
+      "recommendedGlyph": "Eraser",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "header-clear-caches"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 373,
+      "component": "PageHeaderAction",
+      "label": "New static",
+      "existingGlyphs": [
+        "FilePlus2"
+      ],
+      "recommendedGlyph": "FilePlus2",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "header-new-static"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 387,
+      "component": "PageHeaderAction",
+      "label": "New smart",
+      "existingGlyphs": [
+        "ListPlus"
+      ],
+      "recommendedGlyph": "ListPlus",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Reviewed header action; dynamic name, busy/capability/request unchanged",
+      "markers": [
+        "header-new-smart"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 610,
+      "component": "PageHeaderAction",
+      "label": "`Edit ${playlist.name}`",
+      "existingGlyphs": [
+        "Pencil"
+      ],
+      "recommendedGlyph": "Pencil",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Playlist row action; callback, propagation and final confirmation retained",
+      "markers": [
+        "playlists-open-editor"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 620,
+      "component": "PageHeaderAction",
+      "label": "`${playlist.is_active ? \"Deactivate\" : \"Activate\"} ${playlist.name}`",
+      "existingGlyphs": [
+        "PowerOff",
+        "Power"
+      ],
+      "recommendedGlyph": "PowerOff / Power",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Playlist row action; callback, propagation and final confirmation retained",
+      "markers": [
+        "playlists-deactivate",
+        "playlists-activate"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 639,
+      "component": "PageHeaderAction",
+      "label": "`Delete ${playlist.name}`",
+      "existingGlyphs": [
+        "Trash2"
+      ],
+      "recommendedGlyph": "Trash2",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Playlist row action; callback, propagation and final confirmation retained",
+      "markers": [
+        "playlists-delete"
+      ]
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 693,
+      "component": "PageHeaderAction",
+      "label": "Open album",
+      "markers": [
+        "upcoming-open-album"
+      ],
+      "existingGlyphs": [
+        "ExternalLink"
+      ],
+      "recommendedGlyph": "ExternalLink (Solar)",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Approved Incoming release row; native destination/capability/callback preserved"
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 723,
+      "component": "PageHeaderAction",
+      "label": "Dismiss release",
+      "markers": [
+        "upcoming-dismiss"
+      ],
+      "existingGlyphs": [
+        "X"
+      ],
+      "recommendedGlyph": "X (Solar)",
+      "presentation": "icon-only ghost icon-lg + shared Tooltip",
+      "status": "implemented-1AQ",
+      "context": "Approved Incoming release row; native destination/capability/callback preserved"
+    }
+  ],
+  "keepText": [
+    {
+      "actions": [
+        "Save changes",
+        "Save rules",
+        "Create & open",
+        "Create invite",
+        "Create user",
+        "Save roles",
+        "Save status"
+      ],
+      "reason": "Primary form submission and specific mutation target remain legible; no decorative icon beside the text."
+    },
+    {
+      "actions": [
+        "Generate",
+        "Save + generate",
+        "Generate playlist",
+        "Generate description with AI",
+        "Refine tracklist with AI",
+        "Apply safe fixes",
+        "Apply biography",
+        "Add locked"
+      ],
+      "reason": "Domain behavior, locking, AI and combined side effects need their concrete wording."
+    },
+    {
+      "actions": [
+        "Sync library",
+        "Sync collection",
+        "Refresh Radar",
+        "Sync shows",
+        "Sync MusicBrainz",
+        "Import to library"
+      ],
+      "reason": "These start work or mutate data, rather than refreshing visible reads. A generic refresh arrow hides the distinction."
+    },
+    {
+      "actions": [
+        "Delete permanently",
+        "Delete all",
+        "Cancel all",
+        "Download all missing",
+        "Merge Duplicate",
+        "Repair",
+        "Apply limits"
+      ],
+      "reason": "Bulk/final confirmation, irreversible scope or complex workflows retain explicit action and scope."
+    },
+    {
+      "actions": [
+        "Save translation",
+        "Save to workspace JSON",
+        "Export JSON",
+        "Export rich metadata"
+      ],
+      "reason": "Keep storage destination and output type explicit where adjacent actions would otherwise share an ambiguous glyph."
+    }
+  ],
+  "requirements": [
+    "Shared Button size=icon-lg (44px) or reviewed equivalent; no bespoke geometry",
+    "aria-label and tooltip/title name action plus target; svg aria-hidden",
+    "Preserve capabilities, handlers, payloads, event propagation, confirmations, disabled/busy/loading and focus",
+    "Register each concrete glyph/consumer in the bounded source policy; no blanket icon exemption",
+    "Keep states and selection text; evaluate header actions using the approved header standard, without decorative destination/heading/metric icons."
+  ],
+  "headerActionException": {
+    "approvedBy": "Diego, 2026-10-19; explicit migration of all inventoried headers and playlist rows",
+    "inventory": "admin-header-actions-1aq.json",
+    "presentation": "Shared Button icon-lg ghost44px, upper right, shared Tooltip, descriptive aria-label/title, busy/disabled/pressed/capability preserved",
+    "scope": "Only38header action sites across17pages; Roles read-only layout. Three explicitly requested playlist row controls. keepText groups describe other contexts and final confirmations."
+  },
+  "counts": {
+    "reviewed": 73,
+    "implemented": 48,
+    "proposed": 10,
+    "owningPhase": 15
+  },
+  "anchorRefresh": "After shared normalization and approved Incoming release actions within same1AQ;73reviewed/48implemented/10proposed/15owning-phase. AIButton glyph catalog separately recorded.",
+  "aiGlyph": {
+    "path": "app/ui/src/components/ui/AIButton.tsx",
+    "catalogue": "@crate/ui/icons/Bot",
+    "source": "https://solar-icons.vercel.app/icons?search=robot&icon=bot",
+    "visualPx": 20,
+    "layoutPx": 16,
+    "note": "Separate shared AIButton glyph contract, not another row action. Availability/loading unchanged; Solar Loader2 while busy."
+  }
+}

@@ -1,17 +1,13 @@
-import { useState, useRef, useEffect, useEffectEvent } from "react";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { useState, useRef, useEffect, useEffectEvent, useId } from "react";
 import { useNavigate } from "react-router";
-import {
-  Clock,
-  Disc,
-  Library,
-  Loader2,
-  Music,
-  Search,
-  User,
-  X,
-} from "lucide-react";
+import { Loader2, Search, X } from "lucide-react";
 
-import { AppPopover } from "@crate/ui/primitives/AppPopover";
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+} from "@crate/ui/shadcn/popover";
 import { api } from "@/lib/api";
 import {
   albumCoverApiUrl,
@@ -54,6 +50,7 @@ interface ResultItem {
 interface SearchBarProps {
   inputRef?: React.RefObject<HTMLInputElement | null>;
   onQueryChange?: (query: string) => void;
+  onNavigate?: () => void;
 }
 
 const RECENTS_KEY = "search-recents:v1";
@@ -100,7 +97,7 @@ function SearchResultThumb({ item }: { item: ResultItem }) {
       <img
         src={item.imageUrl}
         alt=""
-        className={`h-8 w-8 shrink-0 object-cover bg-white/5 ${
+        className={`crate-media-thumbnail h-12 w-12 shrink-0 object-cover ${
           item.type === "artist" ? "rounded-md" : "rounded"
         }`}
         onError={(event) => {
@@ -109,31 +106,15 @@ function SearchResultThumb({ item }: { item: ResultItem }) {
       />
     );
   }
-  if (item.type === "artist") {
-    return (
-      <User
-        size={14}
-        className="h-8 w-8 shrink-0 rounded-md bg-white/5 p-2 text-white/30"
-      />
-    );
-  }
-  if (item.type === "album") {
-    return (
-      <Disc
-        size={14}
-        className="h-8 w-8 shrink-0 rounded bg-white/5 p-2 text-white/30"
-      />
-    );
-  }
-  return (
-    <Music
-      size={14}
-      className="h-8 w-8 shrink-0 rounded bg-white/5 p-2 text-white/30"
-    />
-  );
+  return null;
 }
 
-export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
+export function SearchBar({
+  inputRef,
+  onQueryChange,
+  onNavigate,
+}: SearchBarProps) {
+  const inputId = useId();
   const [query, setQuery] = useState("");
   const [localResults, setLocalResults] = useState<LocalResults | null>(null);
   const [open, setOpen] = useState(false);
@@ -144,6 +125,9 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
   const localTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const localCacheRef = useRef<Map<string, LocalResults>>(new Map());
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const internalInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = inputRef ?? internalInputRef;
+  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   const doLocalSearch = useEffectEvent(async (value: string) => {
     onQueryChange?.(value);
@@ -193,19 +177,6 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
     setSelectedIdx(-1);
   }, [localResults]);
 
-  useEffect(() => {
-    function handleClick(event: MouseEvent) {
-      if (
-        wrapperRef.current &&
-        !wrapperRef.current.contains(event.target as Node)
-      ) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
   function addToRecents(value: string) {
     if (value.length < 2) return;
     saveRecent(value);
@@ -218,6 +189,7 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
     setQuery("");
     setOpen(false);
     setSelectedIdx(-1);
+    onNavigate?.();
   }
 
   const items: ResultItem[] = [];
@@ -293,6 +265,23 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (!open) return;
 
+    if (
+      event.key === "Tab" &&
+      !event.shiftKey &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey
+    ) {
+      const first = suggestionsRef.current?.querySelector<HTMLButtonElement>(
+        "button:not([disabled])",
+      );
+      if (first) {
+        event.preventDefault();
+        first.focus();
+        return;
+      }
+    }
+
     if (event.key === "Escape") {
       setOpen(false);
       return;
@@ -336,119 +325,180 @@ export function SearchBar({ inputRef, onQueryChange }: SearchBarProps) {
     setOpen(true);
   }
 
+  function handleSuggestionTab(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey)
+      return;
+    const buttons = suggestionsRef.current?.querySelectorAll<HTMLButtonElement>(
+      "button:not([disabled])",
+    );
+    if (!buttons?.length) return;
+    if (event.shiftKey && event.target === buttons[0]) {
+      event.preventDefault();
+      event.stopPropagation();
+      searchInputRef.current?.focus();
+    } else if (
+      !event.shiftKey &&
+      event.target === buttons[buttons.length - 1]
+    ) {
+      // Restore the DOM tab starting point, then let native Tab reach the next control.
+      // Capture avoids Radix FocusScope's result-to-result loop at this boundary.
+      event.stopPropagation();
+      searchInputRef.current?.focus();
+      setOpen(false);
+    }
+  }
+
   return (
-    <div
-      ref={wrapperRef}
-      className="relative flex-1 md:flex-none md:w-[420px] lg:w-[500px]"
-    >
-      <div className="relative md:origin-right md:transition-transform md:duration-300 md:ease-out md:focus-within:scale-x-[1.06]">
-        <div className="relative flex items-center">
-          <Search
-            size={17}
-            className="pointer-events-none absolute left-4 text-white/40"
-          />
-          {loading ? (
-            <Loader2
-              size={15}
-              className="absolute right-4 animate-spin text-white/40"
-            />
-          ) : null}
-          {!loading && query ? (
-            <button
-              type="button"
-              onClick={() => {
-                setQuery("");
-                setLocalResults(null);
-                inputRef?.current?.focus();
-              }}
-              className="absolute right-4 text-white/30 transition-colors hover:text-white/60"
-              aria-label="Clear search"
-            >
-              <X size={15} />
-            </button>
-          ) : null}
-          <label htmlFor="library-search" className="sr-only">
-            Search library
-          </label>
-          <input
-            ref={inputRef}
-            id="library-search"
-            type="text"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setOpen(true);
-            }}
-            onFocus={handleFocus}
-            onKeyDown={handleKeyDown}
-            placeholder="Search library…"
-            className="h-12 w-full rounded-md border border-white/8 bg-black/25 pl-11 pr-11 text-[15px] text-white outline-none transition-[background-color,border-color,box-shadow] placeholder:text-white/40 focus:border-cyan-400/25 focus:bg-black/40 focus:shadow-[0_0_0_1px_rgba(34,211,238,0.08)]"
-          />
-        </div>
-
-        {showResults ? (
-          <AppPopover className="absolute left-0 right-0 top-full mt-2 max-h-80 overflow-y-auto py-1">
-            <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white/40">
-              In Library
+    <div ref={wrapperRef} className="relative min-w-0 w-full">
+      <Popover
+        open={showResults || showRecents || Boolean(showNoResults)}
+        onOpenChange={setOpen}
+      >
+        <PopoverAnchor asChild>
+          <div className="relative md:origin-right md:transition-transform md:duration-300 md:ease-out md:focus-within:scale-x-[1.06]">
+            <div className="relative flex items-center">
+              <Search
+                data-admin-ux="search-field"
+                aria-hidden="true"
+                size={17}
+                className="pointer-events-none absolute left-4 text-text-subtle"
+              />
+              {loading ? (
+                <Loader2
+                  data-admin-ux="search-loading"
+                  aria-hidden="true"
+                  size={15}
+                  className="absolute right-4 animate-spin text-text-subtle"
+                />
+              ) : null}
+              {!loading && query ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery("");
+                    setLocalResults(null);
+                    searchInputRef.current?.focus();
+                  }}
+                  className="absolute right-0.5 grid size-11 place-items-center text-text-subtle transition-colors hover:text-text-secondary"
+                  aria-label="Clear search"
+                >
+                  <X
+                    data-admin-ux="search-clear"
+                    aria-hidden="true"
+                    size={15}
+                  />
+                </button>
+              ) : null}
+              <label htmlFor={inputId} className="sr-only">
+                Search library
+              </label>
+              <input
+                ref={searchInputRef}
+                id={inputId}
+                type="text"
+                aria-busy={loading || undefined}
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setOpen(true);
+                }}
+                onFocus={handleFocus}
+                onKeyDown={handleKeyDown}
+                placeholder="Search library…"
+                className="h-12 w-full rounded-md border border-border-quiet pl-11 pr-12 text-[15px] text-text-primary transition-[background-color,border-color,box-shadow] placeholder:text-text-subtle focus:border-accent-action/25"
+              />
             </div>
-            {items.map((item, index) => (
-              <button
-                key={`${item.type}-${item.path}`}
-                type="button"
-                onClick={() => go(item.path)}
-                className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
-                  index === selectedIdx ? "bg-white/10" : "hover:bg-white/5"
-                }`}
-              >
-                <SearchResultThumb item={item} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] text-white/80">
-                    {item.label}
-                  </p>
-                  <p className="truncate text-[11px] text-white/40">
-                    {item.sublabel}
-                  </p>
-                </div>
-                <span className="shrink-0 text-[10px] capitalize text-white/20">
-                  {item.type}
-                </span>
-              </button>
-            ))}
-          </AppPopover>
-        ) : null}
-
-        {showRecents ? (
-          <AppPopover className="absolute left-0 right-0 top-full mt-2 py-1">
-            <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white/40">
-              Recent
-            </p>
-            {recents.map((recent, index) => (
-              <button
-                key={recent}
-                type="button"
-                onClick={() => selectRecent(recent)}
-                className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
-                  index === selectedIdx ? "bg-white/10" : "hover:bg-white/5"
-                }`}
-              >
-                <Clock size={12} className="shrink-0 text-white/20" />
-                <span className="truncate text-[13px] text-white/60">
-                  {recent}
-                </span>
-              </button>
-            ))}
-          </AppPopover>
-        ) : null}
-
-        {showNoResults ? (
-          <AppPopover className="absolute left-0 right-0 top-full mt-2 py-6 text-center">
-            <div className="flex items-center justify-center gap-2 text-sm text-white/45">
-              <Library size={14} />
-              No library matches
+          </div>
+        </PopoverAnchor>
+        <PopoverContent
+          ref={suggestionsRef}
+          onKeyDownCapture={handleSuggestionTab}
+          role="region"
+          aria-label="Library search suggestions"
+          layer="dropdown"
+          align="start"
+          sideOffset={8}
+          collisionPadding={8}
+          className="max-h-[min(20rem,var(--radix-popover-content-available-height))] w-[var(--radix-popover-trigger-width)] overflow-y-auto p-0"
+          onOpenAutoFocus={(event) => event.preventDefault()}
+          onCloseAutoFocus={(event) => event.preventDefault()}
+          onEscapeKeyDown={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            searchInputRef.current?.focus();
+            setOpen(false);
+          }}
+          onInteractOutside={(event) => {
+            if (wrapperRef.current?.contains(event.target as Node))
+              event.preventDefault();
+          }}
+        >
+          {showResults ? (
+            <div className="py-1">
+              <MonoLabel tone="accent" className="px-3 py-2">
+                In Library
+              </MonoLabel>
+              {items.map((item, index) => (
+                <button
+                  key={`${item.type}-${item.path}`}
+                  type="button"
+                  onClick={() => go(item.path)}
+                  className={`group flex min-h-11 w-full items-center gap-3 border-l-2 px-3 py-2 text-left transition-colors hover:text-accent-action-hi focus-visible:text-accent-action-hi ${
+                    index === selectedIdx
+                      ? "border-accent-action-hi text-accent-action-hi"
+                      : "border-transparent text-text-primary"
+                  }`}
+                >
+                  <SearchResultThumb item={item} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-caption text-inherit">
+                      {item.label}
+                    </p>
+                    <p className="truncate text-xs text-text-subtle">
+                      {item.sublabel}
+                    </p>
+                  </div>
+                  <MonoLabel as="span" className="shrink-0">
+                    {item.type}
+                  </MonoLabel>
+                </button>
+              ))}
             </div>
-          </AppPopover>
-        ) : null}
-      </div>
+          ) : null}
+
+          {showRecents ? (
+            <div className="py-1">
+              <MonoLabel tone="accent" className="px-3 py-2">
+                Recent
+              </MonoLabel>
+              {recents.map((recent, index) => (
+                <button
+                  key={recent}
+                  type="button"
+                  onClick={() => selectRecent(recent)}
+                  className={`group flex min-h-11 w-full items-center gap-3 border-l-2 px-3 py-2 text-left transition-colors hover:text-accent-action-hi focus-visible:text-accent-action-hi ${
+                    index === selectedIdx
+                      ? "border-accent-action-hi text-accent-action-hi"
+                      : "border-transparent text-text-primary"
+                  }`}
+                >
+                  <span className="truncate text-caption text-inherit">
+                    {recent}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          {showNoResults ? (
+            <div className="py-6 text-center">
+              <div className="flex items-center justify-center gap-2 text-sm text-text-muted">
+                No library matches
+              </div>
+            </div>
+          ) : null}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

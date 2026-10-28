@@ -1,3 +1,6 @@
+import { PlaylistListRowView } from "./PlaylistListRowView";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import {
   memo,
   useCallback,
@@ -11,21 +14,15 @@ import { useTranslation } from "react-i18next";
 import {
   CRATE_ICON_SIZE,
   Play,
-  Shuffle,
   Sparkles,
   type LucideIcon,
 } from "@crate/ui/icons";
 
 import type { ItemActionMenuEntry } from "@crate/ui/domain/actions";
-import {
-  EntityCard,
-  EntityRow,
-  type EntityCardOverlay,
-} from "@crate/ui/domain/entity";
+import { EntityCard, type EntityCardOverlay } from "@crate/ui/domain/entity";
 import { OfflineBadge } from "@crate/ui/domain/offline/OfflineBadge";
-import { FollowHeartButton } from "@crate/ui/primitives/FollowHeartButton";
 import { IconButton } from "@crate/ui/primitives/IconButton";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
+
 import { action } from "@/components/actions/shared";
 import { usePlaylistActionMenu } from "@/components/actions/playlist-actions";
 import {
@@ -69,7 +66,10 @@ export interface PlaylistCardProps {
   description?: string;
   tracks?: PlaylistArtworkTrack[];
   coverDataUrl?: string | null;
+  /** Technical context such as track count or duration. */
   meta?: string;
+  /** Person identity preserves its case beside row metadata. */
+  ownerLabel?: string;
   badge?: string;
   systemPlaylist?: boolean;
   crateManaged?: boolean;
@@ -126,19 +126,6 @@ function tileSurfaceClass(state: OfflineItemState): string | undefined {
   if (isOfflineBusy(state)) return "bg-accent-action/[0.05]";
   if (state === "error") return "bg-state-warning/[0.05]";
   return undefined;
-}
-
-function rowSurfaceClass(state: OfflineItemState): string | undefined {
-  if (state === "ready") {
-    return "bg-accent-action/[0.04] hover:bg-accent-action/[0.08] focus-within:bg-accent-action/[0.08]";
-  }
-  if (isOfflineBusy(state)) {
-    return "bg-accent-action/[0.05] hover:bg-accent-action/[0.09] focus-within:bg-accent-action/[0.09]";
-  }
-  if (state === "error") {
-    return "bg-state-warning/[0.05] hover:bg-state-warning/[0.09] focus-within:bg-state-warning/[0.09]";
-  }
-  return "focus-within:bg-text-primary/5";
 }
 
 function OfflineMeta({
@@ -290,15 +277,38 @@ function PlaylistTileArtwork({
         className={className}
       />
       {badge ? (
-        <CrateBadge
+        <InfoBadge
           surface="overlay"
           icon={Sparkles}
           className="absolute bottom-2 left-2"
         >
           {badge}
-        </CrateBadge>
+        </InfoBadge>
       ) : null}
     </>
+  );
+}
+
+function usePlaylistMenuArtwork({
+  name,
+  coverDataUrl,
+  tracks,
+  crateManaged,
+}: Pick<
+  PlaylistCardProps,
+  "name" | "coverDataUrl" | "tracks" | "crateManaged"
+>) {
+  return useMemo(
+    () => (
+      <PlaylistArtwork
+        name={name}
+        coverDataUrl={coverDataUrl}
+        tracks={tracks}
+        showCrateMark={crateManaged}
+        className="size-full"
+      />
+    ),
+    [coverDataUrl, crateManaged, name, tracks],
   );
 }
 
@@ -307,6 +317,7 @@ function PlaylistTile(props: PlaylistCardProps) {
   const base = usePlaylistCardBase(props);
   const { t, offlineState, offlineMeta } = base;
   const overlay = useCardOverlay(props, base);
+  const menuArtwork = usePlaylistMenuArtwork(props);
   const actionMenu = usePlaylistActionMenu(
     {
       playlistId: props.playlistId,
@@ -320,7 +331,12 @@ function PlaylistTile(props: PlaylistCardProps) {
       onShuffle: props.onShuffle,
       onStartRadio: props.onStartRadio,
     },
-    { title: name, subtitle: description || meta, detail: badge },
+    {
+      title: name,
+      subtitle: description || meta,
+      detail: badge,
+      artwork: menuArtwork,
+    },
   );
 
   return (
@@ -328,7 +344,8 @@ function PlaylistTile(props: PlaylistCardProps) {
       title={name}
       subtitle={
         <>
-          {description || meta}
+          {description ||
+            (meta ? <MonoLabel as="span">{meta}</MonoLabel> : null)}
           <OfflineMeta meta={offlineMeta} state={offlineState} />
         </>
       }
@@ -353,6 +370,7 @@ function PlaylistFeatured(props: PlaylistCardProps) {
   const { name, summary, meta, artworkOnly = false } = props;
   const base = usePlaylistCardBase(props);
   const overlay = useCardOverlay(props, base);
+  const menuArtwork = usePlaylistMenuArtwork(props);
   const actionMenu = usePlaylistActionMenu(
     {
       playlistId: props.playlistId,
@@ -367,6 +385,7 @@ function PlaylistFeatured(props: PlaylistCardProps) {
       title: name,
       subtitle: summary ?? meta,
       detail: summary ? meta : undefined,
+      artwork: menuArtwork,
     },
   );
 
@@ -382,9 +401,9 @@ function PlaylistFeatured(props: PlaylistCardProps) {
       }
       meta={
         meta && !artworkOnly ? (
-          <span className="home-discovery-meta mt-2 block uppercase tracking-eyebrow">
+          <MonoLabel as="span" className="mt-2 block">
             {meta}
-          </span>
+          </MonoLabel>
         ) : undefined
       }
       artwork={props.renderArtwork?.(FEATURED_ARTWORK_CLASS_NAME)}
@@ -405,77 +424,18 @@ function PlaylistFeatured(props: PlaylistCardProps) {
   );
 }
 
-function PlaylistRowActions({
+function PlaylistRowPlay({
   onPlay,
-  onShuffle,
-  playingMode,
-  canFollow,
-  isFollowed,
-  togglingFollow,
-  onToggleFollow,
-  extraActions,
+  loading,
 }: {
-  onPlay?: () => void;
-  onShuffle?: () => void;
-  playingMode: "play" | "shuffle" | null;
-  canFollow: boolean;
-  isFollowed: boolean;
-  togglingFollow: boolean;
-  onToggleFollow: () => void;
-  extraActions?: PlaylistCardExtraAction[];
+  onPlay: () => void;
+  loading: boolean;
 }) {
   const { t } = useTranslation();
   return (
-    <>
-      {onPlay ? (
-        <IconButton
-          label={t("player.play")}
-          onClick={onPlay}
-          loading={playingMode === "play"}
-        >
-          <Play
-            size={CRATE_ICON_SIZE.sm}
-            fill="currentColor"
-            className="ml-0.5"
-          />
-        </IconButton>
-      ) : null}
-      {onShuffle ? (
-        <IconButton
-          label={t("player.shuffle")}
-          onClick={onShuffle}
-          loading={playingMode === "shuffle"}
-        >
-          <Shuffle size={CRATE_ICON_SIZE.sm} />
-        </IconButton>
-      ) : null}
-      {canFollow ? (
-        <FollowHeartButton
-          following={isFollowed}
-          loading={togglingFollow}
-          label={t("common.follow")}
-          labelActive={t("common.following")}
-          title={t(isFollowed ? "common.following" : "common.follow")}
-          iconSize={CRATE_ICON_SIZE.sm}
-          className="size-10 shrink-0 rounded-full"
-          onClick={onToggleFollow}
-        />
-      ) : null}
-      {extraActions?.map((item) => {
-        const Icon = item.icon;
-        return (
-          <IconButton
-            key={item.key}
-            label={item.title}
-            tone={item.tone}
-            loading={item.loading}
-            onClick={() => void item.onClick()}
-          >
-            <Icon size={CRATE_ICON_SIZE.sm} />
-          </IconButton>
-        );
-      })}
-    </>
+    <IconButton label={t("player.play")} onClick={onPlay} loading={loading}>
+      <Play size={CRATE_ICON_SIZE.sm} fill="currentColor" className="ml-0.5" />
+    </IconButton>
   );
 }
 
@@ -485,6 +445,7 @@ function PlaylistRow(props: PlaylistCardProps) {
     name,
     description,
     meta,
+    ownerLabel,
     badge,
     trackCount = 0,
     detailEndpoint,
@@ -517,7 +478,11 @@ function PlaylistRow(props: PlaylistCardProps) {
     [extraActions],
   );
   const trackCountLabel = t("common.trackCountLabel", { count: trackCount });
-  const subtitleText = meta ? `${trackCountLabel} · ${meta}` : trackCountLabel;
+  const contextText = meta ? `${trackCountLabel} · ${meta}` : trackCountLabel;
+  const subtitleText = ownerLabel
+    ? `${contextText} · ${ownerLabel}`
+    : contextText;
+  const menuArtwork = usePlaylistMenuArtwork(props);
   const actionMenu = usePlaylistActionMenu(
     {
       playlistId,
@@ -531,21 +496,32 @@ function PlaylistRow(props: PlaylistCardProps) {
       extraEntries,
       ...playHandlers,
     },
-    { title: name, subtitle: subtitleText, detail: description },
+    {
+      title: name,
+      subtitle: subtitleText,
+      detail: description,
+      artwork: menuArtwork,
+    },
   );
 
   return (
-    <EntityRow
+    <PlaylistListRowView
       title={name}
       titleAccessory={
         <>
-          {badge ? <CrateBadge icon={Sparkles}>{badge}</CrateBadge> : null}
+          {badge ? <InfoBadge icon={Sparkles}>{badge}</InfoBadge> : null}
           <OfflineBadge state={offlineState} compact />
         </>
       }
       subtitle={
         <>
-          {subtitleText}
+          <MonoLabel as="span">{contextText}</MonoLabel>
+          {ownerLabel ? (
+            <>
+              {" "}
+              · <span>{ownerLabel}</span>
+            </>
+          ) : null}
           <OfflineMeta meta={offlineMeta} state={offlineState} />
         </>
       }
@@ -560,18 +536,12 @@ function PlaylistRow(props: PlaylistCardProps) {
         />
       }
       trailing={
-        <PlaylistRowActions
-          onPlay={detailEndpoint ? () => void loadAndPlay("play") : undefined}
-          onShuffle={
-            detailEndpoint ? () => void loadAndPlay("shuffle") : undefined
-          }
-          playingMode={playingMode}
-          canFollow={base.canFollow}
-          isFollowed={Boolean(props.isFollowed)}
-          togglingFollow={base.togglingFollow}
-          onToggleFollow={() => void base.runToggleFollow()}
-          extraActions={extraActions}
-        />
+        detailEndpoint ? (
+          <PlaylistRowPlay
+            onPlay={() => void loadAndPlay("play")}
+            loading={playingMode === "play"}
+          />
+        ) : null
       }
       onOpen={base.handleOpen}
       href={base.href}
@@ -579,7 +549,8 @@ function PlaylistRow(props: PlaylistCardProps) {
       menuLabel={t("actions.menu.more")}
       menuButton="always"
       actionMenu={actionMenu}
-      className={cn(rowSurfaceClass(offlineState), props.className)}
+      offlineState={offlineState}
+      className={props.className}
       classNames={{
         meta: "mt-1 text-text-primary/40",
         trailing: "gap-1",

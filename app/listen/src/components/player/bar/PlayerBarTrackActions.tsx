@@ -9,6 +9,7 @@ interface PlayerBarTrackActionsProps {
   displayTrack: Track;
   isShapedRadioTrack: boolean;
   liked: boolean;
+  likeStateAvailable?: boolean;
   onNextTrack: () => void;
   onToggleLike: () => void;
   shapedRadioSessionId: string | null | undefined;
@@ -18,6 +19,7 @@ export function PlayerBarTrackActions({
   displayTrack,
   isShapedRadioTrack,
   liked,
+  likeStateAvailable = true,
   onNextTrack,
   onToggleLike,
   shapedRadioSessionId,
@@ -28,9 +30,24 @@ export function PlayerBarTrackActions({
     <div className="ml-1 flex shrink-0 items-center gap-0.5">
       <FollowHeartButton
         following={liked}
-        label={t("actions.track.like")}
-        labelActive={t("actions.track.unlike")}
-        title={t(liked ? "actions.track.unlike" : "actions.track.like")}
+        disabled={!likeStateAvailable}
+        label={t(
+          likeStateAvailable
+            ? "actions.track.like"
+            : "library.liked.stateUnavailable",
+        )}
+        labelActive={t(
+          likeStateAvailable
+            ? "actions.track.unlike"
+            : "library.liked.stateUnavailable",
+        )}
+        title={t(
+          likeStateAvailable
+            ? liked
+              ? "actions.track.unlike"
+              : "actions.track.like"
+            : "library.liked.stateUnavailable",
+        )}
         heartTestId="player-bar-like-heart"
         particlesTestId="player-bar-like-particles"
         iconSize={CRATE_ICON_SIZE.md}

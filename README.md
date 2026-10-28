@@ -128,7 +128,7 @@ Go readplane relays remote media without receiving private signing keys.
 - Three-tier cache: L1 in-memory, L2 Redis, L3 PostgreSQL
 - Snapshot-backed admin/listen surfaces warmed by domain events
 - Replayable cache invalidation and home snapshot refreshes for catalog/import changes
-- Telegram bot for status, task control, and playback notifications
+- Telegram control through Crate Agent and Crate Operator (AI assistants over Crate MCP); the operator supervisor pushes failed-task, health and new-release alerts
 
 ## Architecture
 
@@ -194,7 +194,7 @@ The API container mounts the music library as **read-only**. All filesystem modi
 
 **Audio analysis** — Essentia (signal processing), PANNs CNN14 (AudioSet classification), `bliss-rs` (Rust song similarity vectors).
 
-**Infrastructure** — Docker Compose, GHCR images, Traefik, Redis, PostgreSQL, optional slskd and ProtonVPN.
+**Infrastructure** — Docker Compose, GHCR images, Traefik, Redis, PostgreSQL, optional slskd.
 
 ## Quickstart
 
@@ -206,9 +206,18 @@ Fastest path on a Linux/macOS machine with Docker:
 curl -fsSL https://cratemusic.app/install.sh | bash
 ```
 
-The installer asks for the install directory, music library path, access mode,
-and initial admin password. It writes a small self-hosted stack to your machine,
-pulls pre-built GHCR images, and starts Crate with Docker Compose.
+The script downloads `crate`, a step-by-step installer, checks its checksum and
+runs it. The wizard checks Docker, memory, disk and ports, then asks for the music
+library, access mode and admin password, shows a review, starts Crate and waits
+until it answers. A release installer pins the images of its own release
+(`CRATE_IMAGE_TAG=v3.0.0` for installer `v3.0.0`). Run `crate install` again at
+any time to change the installation; it keeps your secrets and manual edits, and
+a newer installer moves the images to its release. `crate configure` sets up
+integrations such as Last.fm, Soulseek or Crate Agent (the Telegram assistant),
+checking each key with its provider, and `crate doctor` checks the whole
+installation. `crate mcp` lets an
+AI agent such as Claude Code or Codex install Crate with you; your API keys go
+into a private local page, never into the chat.
 
 After installation:
 
@@ -245,8 +254,9 @@ curl -fsSL https://cratemusic.app/install.sh \
   | CRATE_ACCESS_MODE=dnsmasq CRATE_DOMAIN=crate.local bash
 ```
 
-Set `CRATE_SKIP_START=1` if you only want the installer to write
-`docker-compose.yaml`, `.env`, and `config.yaml`.
+Set `CRATE_SKIP_START=1` (or pass `--skip-start`) if you only want the installer
+to write `docker-compose.yaml`, `.env`, and `config.yaml`, and `--dry-run` to see
+the plan without writing anything.
 
 ### Local development
 
@@ -265,15 +275,12 @@ git clone https://github.com/thecrateapp/crate.git
 cd crate
 
 cp .env.example .env
-# Open .env and fill in at least:
-#   MEDIA_DIR=./test-music           # or your library path
-#   DATA_DIR=./data
-#   JWT_SECRET=$(openssl rand -hex 32)
+# Optional for development: add the API keys you want to try, for example
 #   LASTFM_APIKEY=<your key>         # https://www.last.fm/api/account/create
-#   DEFAULT_ADMIN_PASSWORD=admin
 ```
 
-Everything else in `.env` is optional and can be filled in later from the admin Settings page.
+The development stack reads `test-music/`, keeps its state in `./data` and seeds
+`admin@cratemusic.app` / `admin`; it needs no other setting.
 
 #### 2. Start the stack
 
@@ -335,35 +342,39 @@ make dev-rebuild     # rebuild images and restart
 
 ## Environment variables
 
-The `.env` file drives both dev and production. Required unless noted.
+Each deployment profile reads its own `.env`
+([Deployment profiles](docs/technical/deployment-profiles.md)):
 
-| Variable                                                                | Required   | Description                                                                                             |
-| ----------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------- |
-| `MEDIA_DIR`                                                             | Yes        | Path to your music library (mounted into API read-only, worker read-write)                              |
-| `DATA_DIR`                                                              | Yes        | Path for persistent state (DB volumes, cache, etc.)                                                     |
-| `DOMAIN`                                                                | Yes (prod) | Base domain used by Traefik (`admin.<DOMAIN>`, `listen.<DOMAIN>`, `api.<DOMAIN>`)                       |
-| `JWT_SECRET`                                                            | Yes        | Secret for JWT tokens                                                                                   |
-| `DEFAULT_ADMIN_PASSWORD`                                                | Yes        | Initial password for the bootstrap admin user                                                           |
-| `LASTFM_APIKEY`                                                         | Yes        | Last.fm API key — used for enrichment and upcoming shows                                                |
-| `LASTFM_API_SECRET`                                                     | No         | Required only for scrobbling                                                                            |
-| `FANART_API_KEY`                                                        | No         | Fanart.tv — artist backgrounds and thumbnails                                                           |
-| `SETLISTFM_API_KEY`                                                     | No         | Setlist.fm — probable concert setlists                                                                  |
-| `SPOTIFY_ID` / `SPOTIFY_SECRET`                                         | No         | Spotify — popularity score                                                                              |
-| `DISCOGS_CONSUMER_KEY` / `DISCOGS_CONSUMER_SECRET`                      | No         | Discogs — catalog numbers and labels                                                                    |
-| `TICKETMASTER_API_KEY`                                                  | No         | Ticketmaster — upcoming shows (primary source)                                                          |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`                             | No         | Google OAuth login                                                                                      |
-| `SLSKD_API_KEY`                                                         | No         | slskd API key (Soulseek integration)                                                                    |
-| `SLSKD_SLSK_USERNAME` / `SLSKD_SLSK_PASSWORD`                           | No         | Soulseek network credentials                                                                            |
-| `CRATE_CREDENTIAL_KEY`                                                  | No         | Stable Fernet key for encrypted external session material. Defaults to JWT-derived key if unset         |
-| `CRATE_USER_INACTIVE_AFTER_DAYS`                                        | No         | Days without login, session or playback activity before the admin label becomes `Inactive` (default 30) |
-| `CRATE_BANDCAMP_COLLECTION_SYNC_*`                                      | No         | Bandcamp collection sync backend, timeout, page size and max pages                                      |
-| `CRATE_BANDCAMP_DOWNLOAD_*`                                             | No         | Bandcamp purchase download backend and timeout                                                          |
-| `CRATE_BANDCAMP_WEB_CREDENTIAL_BRIDGE_*`                                | No         | Optional server-side Bandcamp credential bridge. Disabled by default                                    |
-| `PROTONVPN_USER` / `PROTONVPN_PASS`                                     | No         | Proton VPN credentials for the scraping proxy                                                           |
-| `CRATE_POSTGRES_USER` / `CRATE_POSTGRES_PASSWORD` / `CRATE_POSTGRES_DB` | Yes        | App-level Postgres role                                                                                 |
-| `PUID` / `PGID`                                                         | Yes        | Host UID/GID for file ownership                                                                         |
-| `CRATE_IMAGE_OWNER` / `CRATE_IMAGE_REGISTRY`                            | No         | Container image namespace and registry. Defaults to `thecrateapp` / `ghcr.io`                           |
-| `TZ`                                                                    | Yes        | Timezone (e.g. `Europe/Madrid`)                                                                         |
+| Profile                                    | Who writes `.env`                     | Reference                                                                                                          |
+| ------------------------------------------ | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Home (`docker-compose.home.yaml`)          | `crate install` and `crate configure` | [`deploy/install/integrations.yaml`](deploy/install/integrations.yaml): every variable, with where to get each key |
+| Development (`make dev`)                   | You, optionally                       | API keys only; see the development setup above                                                                     |
+| Project deployment (`docker-compose.yaml`) | Operators                             | [`.env.example`](.env.example)                                                                                     |
+
+The variables most people touch:
+
+| Variable                                           | Description                                                                                                     |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `MUSIC_DIR` (home) / `MEDIA_DIR` (project)         | Music library, read-only for the API and read-write for the workers                                             |
+| `DATA_DIR`                                         | Database, cache and other persistent state                                                                      |
+| `DOMAIN`                                           | Base domain for `admin.`, `listen.` and `api.` hostnames                                                        |
+| `JWT_SECRET`                                       | Signs sessions; `crate install` generates it                                                                    |
+| `DEFAULT_ADMIN_PASSWORD`                           | Password the seeded `admin@cratemusic.app` account gets on first start                                          |
+| `CRATE_CREDENTIAL_KEY`                             | Fernet key that encrypts stored AI and service credentials; required to save them; generated by `crate install` |
+| `LASTFM_APIKEY` / `LASTFM_API_SECRET`              | Last.fm enrichment and scrobbling                                                                               |
+| `FANART_API_KEY`                                   | Fanart.tv artist photos and logos                                                                               |
+| `SETLISTFM_API_KEY`                                | Setlist.fm probable setlists                                                                                    |
+| `SPOTIFY_ID` / `SPOTIFY_SECRET`                    | Spotify popularity and artwork                                                                                  |
+| `DISCOGS_CONSUMER_KEY` / `DISCOGS_CONSUMER_SECRET` | Discogs credits, labels and editions                                                                            |
+| `TICKETMASTER_API_KEY`                             | Ticketmaster upcoming shows                                                                                     |
+| `SLSKD_URL` / `SLSKD_API_KEY`                      | slskd server for Soulseek downloads                                                                             |
+| `SLSKD_SLSK_USERNAME` / `SLSKD_SLSK_PASSWORD`      | Soulseek account for the slskd that Crate runs                                                                  |
+| `CRATE_AGENT_PROVIDER` / `CRATE_AGENT_MODEL`       | Model of Crate Agent, the Telegram assistant (`crate configure agent`)                                          |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`        | Sign in with Google                                                                                             |
+| `CRATE_USER_INACTIVE_AFTER_DAYS`                   | Days without activity before Admin labels a user `Inactive` (default 30)                                        |
+| `CRATE_IMAGE_OWNER` / `CRATE_IMAGE_REGISTRY`       | Container image namespace and registry (default `thecrateapp` / `ghcr.io`)                                      |
+| `PUID` / `PGID`                                    | Host user and group that own the files                                                                          |
+| `TZ`                                               | Timezone, for example `Europe/Madrid`                                                                           |
 
 ## Makefile commands
 
@@ -418,7 +429,6 @@ app/
     health_check.py     Library integrity checks
     repair.py           Auto-repair pipeline
     genre_taxonomy.py   60+ genre graph + BFS expansion
-    lastfm_events.py    Last.fm events scraper (proxied via ProtonVPN)
   ui/                   Admin SPA (React 19 + Vite)
     src/
       pages/            25+ admin pages (Dashboard, Browse, Health, Shows, ...)
@@ -470,4 +480,4 @@ The `crate-cli` Rust CLI computes a 20-dimensional feature vector per track usin
 
 ## License
 
-Private project. Not licensed for redistribution.
+Crate is free software, released under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE).

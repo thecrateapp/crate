@@ -183,6 +183,7 @@ def _handle_refresh_user_listening_stats(
     task_id: str, params: dict, config: dict
 ) -> dict:
     from crate.db.domain_events import append_domain_event
+    from crate.db.repositories.tasks import release_task_dedup_key
     from crate.db.repositories.user_library_aggregate_runner import (
         refresh_user_listening_aggregates,
     )
@@ -191,8 +192,14 @@ def _handle_refresh_user_listening_stats(
     if user_id <= 0:
         return {"ok": False, "error": "Missing user_id"}
 
+    # Plays committed from here on queue a follow-up instead of being
+    # deduplicated against a refresh that has already read the dirty days.
+    release_task_dedup_key(task_id)
+
     p = TaskProgress(phase="stats", phase_count=1, total=1, item=f"user:{user_id}")
     emit_progress(task_id, p, force=True)
+    # Enqueues the instance rollup rebuild for the refreshed days in the same
+    # transaction, so the task exists exactly when the new days are committed.
     refresh_user_listening_aggregates(user_id)
     append_domain_event(
         "user.listening_aggregates.updated",
@@ -204,6 +211,45 @@ def _handle_refresh_user_listening_stats(
         task_id, "info", {"message": f"Listening stats refreshed for user {user_id}"}
     )
     return {"ok": True, "user_id": user_id}
+
+
+def _handle_rebuild_instance_listening_days(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    del config
+    from datetime import date
+
+    from crate.db.jobs.instance_listening_rollups import rebuild_instance_listening
+
+    raw_days = params.get("days")
+    if not isinstance(raw_days, list) or not raw_days:
+        return {"status": "skipped", "reason": "no days"}
+    try:
+        days = sorted({date.fromisoformat(str(day)) for day in raw_days})
+    except ValueError:
+        return {"ok": False, "error": "Invalid days"}
+    keys = params.get("keys")
+    result = rebuild_instance_listening(
+        days, keys if isinstance(keys, dict) else {}, task_id=task_id
+    )
+    return {"ok": True, "days": len(days), **result}
+
+
+def _handle_backfill_instance_listening_rollups(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    del params, config
+    from crate.db.jobs.instance_listening_rollups import rebuild_instance_listening
+
+    p = TaskProgress(phase="stats", phase_count=1, total=1, item="instance")
+    emit_progress(task_id, p, force=True)
+    result = rebuild_instance_listening(None, task_id=task_id)
+    emit_task_event(
+        task_id,
+        "info",
+        {"message": f"Instance listening rollups rebuilt: {result['track_rows']} rows"},
+    )
+    return {"ok": True, **result}
 
 
 def _handle_refresh_home_discovery_snapshot(
@@ -242,7 +288,7 @@ def _handle_refresh_user_stats_dashboard_snapshot(
         month=params.get("month"),
         tracks_limit=int(params.get("tracks_limit") or 12),
         artists_limit=int(params.get("artists_limit") or 10),
-        albums_limit=int(params.get("albums_limit") or 12),
+        albums_limit=int(params.get("albums_limit") or 14),
         genres_limit=int(params.get("genres_limit") or 10),
         replay_limit=int(params.get("replay_limit") or 36),
     )
@@ -265,11 +311,24 @@ def _handle_refresh_instance_stats_dashboard_snapshot(
         month=params.get("month"),
         tracks_limit=int(params.get("tracks_limit") or 12),
         artists_limit=int(params.get("artists_limit") or 10),
-        albums_limit=int(params.get("albums_limit") or 12),
+        albums_limit=int(params.get("albums_limit") or 14),
         genres_limit=int(params.get("genres_limit") or 10),
         replay_limit=int(params.get("replay_limit") or 36),
     )
     broadcast_invalidation("history")
+    return {"ok": True, "window": window}
+
+
+def _handle_refresh_collection_insights(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    del task_id, config
+    from crate.db.collection_insights_surface import refresh_collection_insights
+    from crate.api.cache_events import broadcast_invalidation
+
+    window = str(params.get("window") or "30d")
+    refresh_collection_insights(window=window)
+    broadcast_invalidation("collection-insights")
     return {"ok": True, "window": window}
 
 
@@ -1372,12 +1431,28 @@ def _handle_refresh_smart_mix_coverage(
 # Populate finalizers now that handler functions are defined
 register_parent_finalizer("compute_popularity", _popularity_finalize)
 
+
+def _handle_refresh_dirty_listening_stats(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    from crate.db.repositories.user_library_aggregate_runner import (
+        schedule_dirty_listening_refreshes,
+    )
+
+    user_ids = schedule_dirty_listening_refreshes()
+    return {"ok": True, "users": len(user_ids)}
+
+
 ANALYSIS_TASK_HANDLERS: dict[str, TaskHandler] = {
     "compute_analytics": _handle_compute_analytics,
     "refresh_user_listening_stats": _handle_refresh_user_listening_stats,
+    "refresh_dirty_listening_stats": _handle_refresh_dirty_listening_stats,
+    "rebuild_instance_listening_days": _handle_rebuild_instance_listening_days,
+    "backfill_instance_listening_rollups": _handle_backfill_instance_listening_rollups,
     "refresh_home_discovery_snapshot": _handle_refresh_home_discovery_snapshot,
     "refresh_user_stats_dashboard_snapshot": _handle_refresh_user_stats_dashboard_snapshot,
     "refresh_instance_stats_dashboard_snapshot": _handle_refresh_instance_stats_dashboard_snapshot,
+    "refresh_collection_insights": _handle_refresh_collection_insights,
     "index_genres": _handle_index_genres,
     "infer_genre_taxonomy": _handle_infer_genre_taxonomy,
     "rebuild_genre_taxonomy_proposals": _handle_rebuild_genre_taxonomy_proposals,

@@ -1,5 +1,9 @@
 """User library, listening analytics, and jam schema bootstrap section."""
 
+from crate.db.schema_sections.activity_v132 import (
+    create_instance_listening_rollups_v132_schema,
+)
+
 
 def create_activity_schema(cur) -> None:
     cur.execute("""
@@ -401,3 +405,5 @@ def create_activity_schema(cur) -> None:
     cur.execute(
         "CREATE INDEX IF NOT EXISTS idx_jam_room_events_room ON jam_room_events(room_id, id DESC)"
     )
+
+    create_instance_listening_rollups_v132_schema(cur)

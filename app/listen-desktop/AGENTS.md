@@ -45,6 +45,9 @@ smoke), `test-frontend.yml` (typecheck + vitest) and `test-native-tools.yml`
 Wry warns; validation docs record `cargo clippy --locked --all-targets ... -D warnings`
 as the local bar for first-party code.
 
+The shared Crate V3 identity is fixed. Linux host preferences affect GNOME window-button
+placement only (`linux_desktop_theme_snapshot`); do not reintroduce GTK palette/font overrides.
+
 ## Hard rules
 
 - Always go through `scripts/tauri-cli.mjs` (npm `tauri*` scripts or `make tauri-*`).
@@ -97,3 +100,11 @@ as the local bar for first-party code.
 - Validation evidence and open gates: `docs/testing/tauri-*.md`; OS/webview floors:
   `docs/technical/tauri-desktop-support.md`. Guard tests in Python:
   `app/tests/test_desktop_workflow.py`, `app/tests/test_sentry_desktop_contract.py`.
+
+## File drops — Listen1BD
+
+The main webview uses `dragDropEnabled:false` so native interception does not suppress
+HTML5 file drops (required by WebView2 on Windows). Keep that flag in the Linux window-array
+override as well. Listen UploadView stages `File` objects via its real drop target, then uses
+the existing explicit upload action; there is no native path-reading bridge or broader fs scope.
+The native file picker remains available. `src/lib/file-drop-config.test.ts` guards both hosts.

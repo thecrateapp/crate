@@ -1,12 +1,13 @@
-import { useState, type HTMLAttributes, type ReactNode } from "react";
+import { useState, type ComponentPropsWithRef, type ReactNode } from "react";
 
 import { cn } from "@crate/ui/lib/cn";
 
-export type AvatarSize = "xs" | "sm" | "md" | "lg" | "xl";
+export type AvatarSize = "xs" | "inline" | "sm" | "md" | "lg" | "xl";
 export type AvatarShape = "circle" | "rounded";
 
 const SIZE_CLASS_NAME: Record<AvatarSize, string> = {
   xs: "size-6 text-xs",
+  inline: "size-7 text-xs",
   sm: "size-8 text-xs",
   md: "size-10 text-sm",
   lg: "size-14 text-lg",
@@ -19,7 +20,7 @@ export function getInitials(name?: string | null): string {
   if (!firstWord) return "?";
   const lastWord = words.length > 1 ? words[words.length - 1] : undefined;
   const first = Array.from(firstWord)[0] ?? "";
-  const last = lastWord ? Array.from(lastWord)[0] ?? "" : "";
+  const last = lastWord ? (Array.from(lastWord)[0] ?? "") : "";
   return `${first}${last}`.toUpperCase();
 }
 
@@ -31,7 +32,7 @@ export interface AvatarImageRenderProps {
 }
 
 export interface AvatarProps
-  extends Omit<HTMLAttributes<HTMLSpanElement>, "children"> {
+  extends Omit<ComponentPropsWithRef<"span">, "children"> {
   src?: string | null;
   name?: string | null;
   alt?: string;

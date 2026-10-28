@@ -1,7 +1,7 @@
 """Canonical task type catalog: labels, categories and manual actions.
 
-Single source of truth for task names. Used by API responses, the admin
-task catalog endpoint and the Telegram bot.
+Single source of truth for task names. Used by API responses and the admin
+task catalog endpoint.
 """
 
 from __future__ import annotations
@@ -145,6 +145,9 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     ),
     "compute_completeness": TaskTypeInfo("Discography Completeness", "enrichment"),
     "refresh_probable_setlist": TaskTypeInfo("Probable Setlist Refresh", "enrichment"),
+    "refresh_show_probable_setlists": TaskTypeInfo(
+        "Show Setlist Refresh", "enrichment"
+    ),
     "normalize_artist_bios": TaskTypeInfo("Normalize Artist Bios", "enrichment"),
     "research_artist_bio": TaskTypeInfo("Research Artist Bio", "enrichment"),
     "sync_shows": TaskTypeInfo("Shows Sync", "enrichment"),
@@ -163,6 +166,15 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     "cleanup_invalid_genre_taxonomy": TaskTypeInfo("Taxonomy Cleanup", "enrichment"),
     "compute_analytics": TaskTypeInfo("Library Analytics", "analysis"),
     "refresh_user_listening_stats": TaskTypeInfo("Listening Stats Refresh", "analysis"),
+    "refresh_dirty_listening_stats": TaskTypeInfo(
+        "Pending Listening Stats Sweep", "analysis"
+    ),
+    "rebuild_instance_listening_days": TaskTypeInfo(
+        "Instance Listening Days Rebuild", "analysis"
+    ),
+    "backfill_instance_listening_rollups": TaskTypeInfo(
+        "Instance Listening Backfill", "analysis"
+    ),
     "refresh_home_discovery_snapshot": TaskTypeInfo(
         "Home Discovery Refresh", "analysis"
     ),
@@ -171,6 +183,9 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     ),
     "refresh_instance_stats_dashboard_snapshot": TaskTypeInfo(
         "Instance Stats Refresh", "analysis"
+    ),
+    "refresh_collection_insights": TaskTypeInfo(
+        "Collection Insights Refresh", "analysis"
     ),
     "compute_popularity": TaskTypeInfo("Popularity Update", "analysis"),
     "backfill_track_audio_fingerprints": TaskTypeInfo(
@@ -447,5 +462,5 @@ def task_category(task_type: str) -> str:
 
 
 def task_icon(task_type: str) -> str:
-    """Emoji icon for a task type (Telegram only)."""
+    """Emoji icon for a task type."""
     return TASK_TYPE_ICONS.get(task_type, "\u2699\ufe0f")

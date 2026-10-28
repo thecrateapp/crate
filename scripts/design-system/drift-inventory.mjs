@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, join, relative, resolve } from "node:path";
+import { buildAdminConsistencyInventory } from "./admin-consistency-policy.mjs";
 
 const SOURCE_DIRECTORIES = ["app/listen/src", "app/shared/ui"];
 const SOURCE_EXTENSIONS = new Set([".css", ".js", ".jsx", ".ts", ".tsx"]);
@@ -15,6 +16,16 @@ const RAW_COLOR_PATTERN = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?)\(/gi;
 const FOUNDATION_TOKEN_PATH_PATTERN = /^app\/shared\/ui\/tokens\//;
 const RAW_COLOR_ALLOWLIST = new Map([
   [
+    "app/listen/src/components/paths/path-cover-textures.ts",
+    {
+      pattern: /return \x60rgb\(\$\{/g,
+      owner: "listen-paths",
+      reason:
+        "The cover glow is the measured average colour of the artwork pixels: content, not identity.",
+      reviewBy: "2026-12-31",
+    },
+  ],
+  [
     "app/shared/ui/domain/auth/OAuthButtons.tsx",
     {
       pattern: /fill="#(?:4285F4|34A853|FBBC05|EA4335)"/gi,
@@ -29,7 +40,7 @@ const RAW_COLOR_ALLOWLIST = new Map([
       pattern: /#[0-9a-f]{3,8}\b|rgba?\(/gi,
       owner: "design-system",
       reason:
-        "The typed registry is the sole runtime authority for preset and mode palette values.",
+        "The typed registry is the sole authority for the fixed Crate V3 identity values.",
       reviewBy: "2026-12-31",
     },
   ],
@@ -152,22 +163,22 @@ const INTENTIONAL_DUPLICATE_TOKEN_GROUPS = [
   {
     tokens: ["--surface-contrast", "--state-danger-foreground"],
     reason:
-      "The default skin shares the same value, but cards and destructive controls are separate semantic roles for future skins.",
+      "Cards and destructive controls share a fixed value but retain distinct semantic roles.",
   },
   {
     tokens: ["--brand-logo-start", "--genre-tone-default"],
     reason:
-      "The logo and genre surfaces currently share the action accent while remaining independent theme slots.",
+      "The logo and genre surfaces share the fixed action accent but retain distinct semantic roles.",
   },
   {
     tokens: ["--brand-logo-end", "--jam-focus-border"],
     reason:
-      "The logo gradient and Jam focus border currently share the strong action accent while remaining independent theme slots.",
+      "The logo and Jam focus border share the fixed strong action accent but retain distinct semantic roles.",
   },
 ];
 const SURFACE_ROLE_PATTERNS = [
-  /(?<!-)\b(?<property>border(?:-[a-z-]+)?|outline(?:-[a-z-]+)?)\s*:\s*[^;{}]*?var\(\s*(?<token>--surface-[a-z0-9-]+)(?=\s*[,\)])/gim,
-  /(?<!-)\b(?<property>color|fill|stroke)\s*:\s*[^;{}]*?var\(\s*(?<token>--surface-[a-z0-9-]+)(?=\s*[,\)])/gim,
+  /(?<!-)\b(?<property>border(?:-[a-z-]+)?|outline(?:-[a-z-]+)?)\s*:\s*[^;{}]*?var\(\s*(?<token>--surface-[a-z0-9-]+)(?=\s*[,)])/gim,
+  /(?<!-)\b(?<property>color|fill|stroke)\s*:\s*[^;{}]*?var\(\s*(?<token>--surface-[a-z0-9-]+)(?=\s*[,)])/gim,
 ];
 
 function countMatches(content, pattern) {
@@ -345,10 +356,30 @@ function classifyDuplicateTokenGroups(duplicateTokenGroups) {
 
 function findSurfaceRoleViolations(content) {
   return SURFACE_ROLE_PATTERNS.flatMap((pattern) =>
-    [...content.matchAll(pattern)].map((match) => ({
-      property: match.groups.property,
-      token: match.groups.token,
-    })),
+    [...content.matchAll(pattern)]
+      .filter((match) => {
+        if (
+          match.groups.property !== "color" ||
+          match.groups.token !== "--surface-canvas"
+        ) {
+          return true;
+        }
+        const ruleStart = content.lastIndexOf("{", match.index);
+        const selectorStart =
+          Math.max(
+            content.lastIndexOf("}", ruleStart),
+            content.lastIndexOf("{", ruleStart - 1),
+          ) + 1;
+        const selector = content
+          .slice(selectorStart, ruleStart)
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .trim();
+        return selector !== "::selection";
+      })
+      .map((match) => ({
+        property: match.groups.property,
+        token: match.groups.token,
+      })),
   );
 }
 
@@ -545,8 +576,9 @@ if (
   resolve(process.argv[1]) === resolve(import.meta.filename)
 ) {
   const inventory = buildDriftInventory();
+  const admin = buildAdminConsistencyInventory();
   if (!process.argv.includes("--check")) {
-    console.log(JSON.stringify(inventory, null, 2));
+    console.log(JSON.stringify({ ...inventory, admin }, null, 2));
   }
 
   const results = evaluateDriftBudget(inventory, loadDriftBudget());
@@ -565,6 +597,13 @@ if (
       `drift budget exceeded: ${metric} is ${actual}, budget ${limit}`,
     );
   });
-  if (exceeded.length > 0) process.exit(1);
+  for (const issue of admin.violations)
+    console.error(
+      `Admin consistency: ${issue.path}:${issue.line} ${issue.rule}: ${issue.detail}`,
+    );
+  if (exceeded.length > 0 || admin.violations.length > 0) process.exit(1);
+  console.error(
+    `Admin consistency: ${admin.filesScanned} files, ${admin.pending.length} explicit pending-adoption records`,
+  );
   console.error(`drift budget: ${results.length} metrics within budget`);
 }

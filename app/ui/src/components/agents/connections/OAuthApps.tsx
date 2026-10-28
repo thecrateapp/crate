@@ -1,5 +1,5 @@
 import { useId, useState, type FormEvent } from "react";
-import { AppWindow } from "lucide-react";
+import {} from "lucide-react";
 import { toast } from "sonner";
 
 import { Switch } from "@crate/ui/primitives/Switch";
@@ -16,7 +16,7 @@ import { Textarea } from "@crate/ui/shadcn/textarea";
 
 import { OpsPanel } from "@/components/admin/ops-surfaces";
 import { StatusBadge } from "@/components/admin/StatusBadge";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { api } from "@/lib/api";
 import {
   defaultPresetScopes,
@@ -122,7 +122,7 @@ function OAuthAppDialog({
     >
       <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="font-display">
             {editing ? "Edit app permissions" : "Register OAuth app"}
           </DialogTitle>
           <DialogDescription>
@@ -225,7 +225,7 @@ function OAuthAppRow({
 }) {
   const nameId = useId();
   return (
-    <li className="flex flex-col gap-3 rounded-md border border-white/10 bg-white/[0.02] p-4 md:flex-row md:items-center md:justify-between">
+    <li className="flex flex-col gap-3 rounded-md border border-border-quiet p-4 md:flex-row md:items-center md:justify-between">
       <div className="min-w-0 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <p id={nameId} className="font-medium [overflow-wrap:anywhere]">
@@ -256,7 +256,7 @@ function OAuthAppRow({
         <Button
           type="button"
           size="sm"
-          variant={client.enabled ? "danger-soft" : "outline"}
+          variant="outline"
           aria-describedby={nameId}
           disabled={disabled}
           onClick={onToggle}
@@ -300,7 +300,6 @@ export function OAuthApps({ catalog }: { catalog: AgentCatalog }) {
 
   return (
     <OpsPanel
-      icon={AppWindow}
       title="OAuth apps"
       description="Apps that sign in with a Crate account instead of a token."
       action={
@@ -321,7 +320,7 @@ export function OAuthApps({ catalog }: { catalog: AgentCatalog }) {
         ) : null}
         {clients.error ? (
           <div className="flex flex-wrap items-center gap-3">
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className="text-sm text-state-warning-text">
               {apiErrorText(
                 clients.error,
                 "The OAuth apps could not be loaded.",
@@ -397,7 +396,7 @@ export function OAuthApps({ catalog }: { catalog: AgentCatalog }) {
             : "Agents can sign in with this app again, within the permissions it allows."
         }
         confirmLabel={confirmation?.enabled ? "Disable app" : "Enable app"}
-        variant={confirmation?.enabled ? "destructive" : "default"}
+        tone={confirmation?.enabled ? "danger" : "default"}
         onConfirm={() => {
           const pending = confirmation;
           setConfirmation(null);

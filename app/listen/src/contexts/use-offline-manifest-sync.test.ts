@@ -1,6 +1,15 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const artworkMocks = vi.hoisted(() => ({
+  cache: vi.fn(async () => {}),
+  prune: vi.fn(async () => {}),
+}));
+vi.mock("@/lib/offline-artwork", () => ({
+  cacheOfflineArtwork: artworkMocks.cache,
+  pruneOfflineArtwork: artworkMocks.prune,
+}));
+
 const { apiMock, cacheTrackAssetMock, commitSnapshotMock, snapshotRef } =
   vi.hoisted(() => ({
     apiMock: vi.fn(),
@@ -129,6 +138,33 @@ describe("useOfflineManifestSync", () => {
       contentVersion: "old-version",
       updatedAt: "2026-01-01T00:00:00Z",
       readyAssetKeys: ["track-1"],
+    });
+  });
+
+  it("includes cover sidecars when audio was already cached, and persists metadata for later offline reads", async () => {
+    const manifest = await apiMock();
+    manifest.artwork = { cover_url: "/api/albums/7/cover" };
+    manifest.tracks[0].album_id = 7;
+    apiMock.mockResolvedValue(manifest);
+    const { result } = renderHook(() =>
+      useOfflineManifestSync({
+        supported: true,
+        profileKey: "profile",
+        snapshotRef: snapshotRef as never,
+        transferAbortRef: { current: null },
+        commitSnapshot: commitSnapshotMock,
+      }),
+    );
+    await act(async () => result.current("album", 1, "/manifest"));
+    expect(artworkMocks.cache).toHaveBeenCalledWith(
+      "profile",
+      [{ key: "artwork:album:7", path: "/api/albums/7/cover" }],
+      expect.any(AbortSignal),
+    );
+    expect(snapshotRef.current.items["album:1"]).toMatchObject({
+      artworkVersion: 1,
+      artwork: { cover_url: "/api/albums/7/cover" },
+      state: "ready",
     });
   });
 });

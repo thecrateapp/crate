@@ -47,6 +47,7 @@ describe("TrackList", () => {
       />,
     );
 
+    expect(screen.getByTestId("track-list")).toHaveClass("crate-track-list");
     expect(screen.getByText("1. Track 1")).toBeInTheDocument();
     expect(screen.getByText("3. Track 3")).toBeInTheDocument();
     expect(screen.queryByTestId("virtual-list")).not.toBeInTheDocument();
@@ -126,4 +127,22 @@ describe("TrackList", () => {
     expect(screen.getByText("No tracks")).toBeInTheDocument();
     expect(screen.queryByText("Title")).not.toBeInTheDocument();
   });
+});
+
+it("retains native labels/attributes and a zero header for nonempty data", () => {
+  render(
+    <TrackList
+      items={[{ id: 1, title: "One" }]}
+      itemKey={(row) => row.id}
+      renderRow={(row) => row.title}
+      header={0}
+      aria-label="Album tracks"
+      id="disc-one"
+    />,
+  );
+  expect(screen.getByRole("group", { name: "Album tracks" })).toHaveAttribute(
+    "id",
+    "disc-one",
+  );
+  expect(screen.getByText("0")).toBeVisible();
 });

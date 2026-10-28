@@ -18,6 +18,7 @@ the rules you need when editing it; read the one closest to the files you touch.
 | Desktop app (Tauri)                  | `app/listen-desktop/AGENTS.md`        |
 | Go read plane                        | `app/readplane/AGENTS.md`             |
 | Rust media worker                    | `app/media-worker/AGENTS.md`          |
+| `crate` installer (Go)               | `app/installer/AGENTS.md`             |
 | Cast receiver                        | `app/cast-receiver/AGENTS.md`         |
 | Documentation site                   | `app/docs/AGENTS.md`                  |
 
@@ -37,7 +38,8 @@ crate-ui                 (React 19 + Vite)       → admin web app
 crate-listen             (React 19 + Vite)       → listening app (web PWA + Capacitor iOS/Android)
 crate-listen-desktop     (Tauri 2)               → desktop shell around app/listen
 crate-cast-receiver      (Vite, CAF v3)          → Google Cast receiver
-crate-site / crate-docs  (React 19 + Vite)       → cratemusic.app and technical docs
+crate-site               (Astro)                 → cratemusic.app (app/web)
+crate-docs               (React 19 + Vite)       → technical docs
 crate-postgres           (PostgreSQL 15)         → data
 crate-redis / redis-durable (Redis 7)            → cache, broker, invalidation replay, metrics, domain-event streams
 ```
@@ -64,13 +66,28 @@ crate-redis / redis-durable (Redis 7)            → cache, broker, invalidation
     `isPlaying`); use refs.
 - No emojis in UI text.
 - A component goes into `@crate/ui` only when both admin and Listen use it.
+- V3 uses one visual identity across Listen and Admin: the same tokens, primitives, recipes and
+  interaction rules. Only domain components/workflows differ. Do not add app-specific foundation
+  variants; converge legacy duplicates through the planned migrations.
+- V3 visual source of truth is Diego's approved persistent mockup at localhost:5186, including
+  his subsequently confirmed adjustments. Shared components and Storybook must reproduce it.
+  Flag doubts, visual deviations or mobile sizing conflicts and resolve them with Diego before
+  changing that criterion. Keep the historical app/web@258bbaee pin; do not silently replace it.
 - Keep `app/ui` and `app/listen` as separate apps. Their conventions differ: admin uses `sonner`
-  and `lucide-react`; Listen uses `notify` from `@crate/ui/lib/notify` and `@crate/ui/icons`.
-- Charts use Nivo. recharts is not a dependency.
+  and Solar through `@crate/ui/icons`; Listen uses `notify` from `@crate/ui/lib/notify` and the same icon catalogue. Existing registered Admin Lucide sites migrate by reviewed scope; all new glyph work uses Solar.
+- Charts: Statistical charts (bar, line, pie, scatter, heatmap, radar) use Nivo with the app's
+  token-resolved theme. Instruments (EQ curve, genre wheel, readouts, rails, lanes, gauges, maps,
+  mood map, heatmap band, ticket, crossfade strip, orbit, topology) are hand-built SVG, HTML/CSS,
+  Canvas 2D or WebGL2, following `docs/plans/2026-10-14-crate-v3-design-system.md` §3.5. No new
+  chart libraries; recharts stays out.
 
 ## Testing policy
 
 "If you touch it, you test it."
+
+- During development, run only tests scoped to changed behavior and affected consumers.
+- Run the full validation once at the end of development or the phase, after implementation
+  is stable. Do not repeat full suites during iteration (Diego, 2026-10-16).
 
 - Every refactor, feature or bugfix includes tests covering the changed behaviour.
 - Python: at least one `pytest` case per public function changed. Go: table-driven tests.
@@ -97,7 +114,7 @@ npm run --workspace=app/listen dev           # Listen, :5174 (API_URL overrides 
 npm run --workspace=app/shared/ui build      # @crate/ui dist
 ```
 
-- `app/site` and `app/docs` are not npm workspaces: use `npm ci --prefix app/<name>`.
+- `app/web` and `app/docs` are not npm workspaces: use `npm ci --prefix app/<name>`.
 - Pre-commit hooks (`pre-commit install`) run Ruff, Prettier and ESLint.
 - Local test library: `test-music/` (not committed). Dev seed login `admin@cratemusic.app` /
   `admin` works only against the local stack; it is not valid in production.
@@ -126,6 +143,11 @@ exist locally.
   `api.lespedants.org` (API; `/rest` is the Open Subsonic layer), `cratemusic.app` (site)
 
 ## Skills and references
+
+- Shared visual components have a mandatory live entry in `tools/crate-ui-showcase/`.
+  Every addition or change updates its registry entry and relevant contract/story in the same
+  change. Complete legacy pending coverage before changing that component; do not refresh
+  pending hashes alone. Run `npm run design-system:showcase:check`. See its README and scoped AGENTS.
 
 - Long-form technical docs: `docs/technical/` (rendered by `app/docs`).
 - Backend patterns: `.claude/skills/python-backend.md`.

@@ -48,9 +48,15 @@ vi.mock("@/hooks/use-track-info", () => ({
 }));
 
 vi.mock("@/components/artwork/CrateImage", () => ({
-  CrateImage: (props: React.ImgHTMLAttributes<HTMLImageElement>) => (
-    <img {...props} />
-  ),
+  CrateImage: ({
+    onArtworkStateChange: _state,
+    ...props
+  }: React.ImgHTMLAttributes<HTMLImageElement> & {
+    onArtworkStateChange?: unknown;
+  }) => {
+    void _state;
+    return <img {...props} />;
+  },
 }));
 
 vi.mock("@/lib/palette", () => ({
@@ -72,21 +78,34 @@ vi.mock("react-router", () => ({
 import { InfoTab } from "./InfoTab";
 
 describe("InfoTab", () => {
-  it("uses semantic tokens for analysis surfaces and dynamic artwork palette", async () => {
+  it("uses canonical analysis, source quality and single dynamics readings", async () => {
     const { container } = render(<InfoTab />);
 
     await waitFor(() => {
-      expect(container.querySelector(".info-tab-hero")).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { name: "Track One" }),
+      ).toBeInTheDocument();
     });
 
-    expect(container.querySelector(".info-tab-stat-card")).toBeInTheDocument();
     expect(
-      container.querySelector('.info-tab-metric-fill[data-tone="primary"]'),
+      screen.getByRole("meter", { name: "player.info.metric.energy" }),
+    ).toHaveAttribute("aria-valuenow", "0.8");
+    expect(
+      container.querySelectorAll('[data-slot="instrument-panel"]').length,
+    ).toBeGreaterThan(0);
+    expect(
+      container.querySelector('[data-quality-tier="hi-res"]'),
+    ).toHaveTextContent("Hi-Res 24/96");
+    expect(screen.getAllByText("-8.4")).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", { name: "Track One" }),
     ).toBeInTheDocument();
     expect(
-      container.querySelector('.info-tab-metric-fill[data-tone="warm"]'),
+      screen
+        .getByText("focused")
+        .closest(".genre-pill")!
+        .closest(".genre-pill"),
     ).toBeInTheDocument();
-    expect(screen.getByText("Focused 80%")).toHaveClass("crate-badge");
     expect(container.innerHTML).not.toContain("rgba(");
     expect(container.innerHTML).not.toContain("border-white");
     expect(container.innerHTML).not.toContain("text-white");

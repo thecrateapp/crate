@@ -1,5 +1,6 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useLocation, useNavigate } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/api", async () => {
@@ -30,6 +31,106 @@ import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 import { SearchResults } from "./SearchResults";
 
 describe("SearchResults", () => {
+  it("keeps previous results identified by their query while the next search is pending", async () => {
+    let resolveNext!: (value: unknown) => void;
+    vi.mocked(api).mockReset();
+    const nextResult = new Promise((resolve) => {
+      resolveNext = resolve;
+    });
+    vi.mocked(api).mockImplementation((path) =>
+      path.includes("q=Beta")
+        ? nextResult
+        : Promise.resolve({
+            artists: [],
+            albums: [],
+            tracks: [
+              {
+                title: "Alpha Track",
+                artist: "Alpha",
+                global_track_uid: "alpha",
+                availability: { stream: true },
+              },
+            ],
+          }),
+    );
+    function NextSearch() {
+      const navigate = useNavigate();
+      return (
+        <button onClick={() => void navigate("/search?q=Beta")}>
+          Next search
+        </button>
+      );
+    }
+    const playAll = vi.fn();
+    renderWithListenProviders(
+      <>
+        <SearchResults />
+        <NextSearch />
+      </>,
+      {
+        path: "/search",
+        route: "/search?q=Alpha",
+        playerActions: { playAll },
+      },
+    );
+    await screen.findByText("Alpha Track");
+    await userEvent.click(screen.getByRole("button", { name: "Next search" }));
+    expect(
+      screen.getByRole("heading", { name: 'Results for "Alpha"' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: 'Results for "Beta"' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Finding your music...")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Play all" }));
+    expect(playAll).toHaveBeenLastCalledWith(
+      expect.any(Array),
+      0,
+      expect.objectContaining({ name: "Search: Alpha" }),
+    );
+    resolveNext({
+      artists: [],
+      albums: [],
+      tracks: [
+        {
+          title: "Beta Track",
+          artist: "Beta",
+          global_track_uid: "beta",
+          availability: { stream: true },
+        },
+      ],
+    });
+    await screen.findByText("Beta Track");
+    expect(
+      screen.getByRole("heading", { name: 'Results for "Beta"' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Alpha Track")).not.toBeInTheDocument();
+    expect(screen.queryByText("Finding your music...")).not.toBeInTheDocument();
+  });
+  it("retains other query parameters and the fragment when submitting search", async () => {
+    vi.mocked(api).mockResolvedValue({ artists: [], albums: [], tracks: [] });
+    function LocationReadout() {
+      const location = useLocation();
+      return (
+        <output aria-label="Route">
+          {location.search}
+          {location.hash}
+        </output>
+      );
+    }
+    renderWithListenProviders(
+      <>
+        <SearchResults />
+        <LocationReadout />
+      </>,
+      { path: "/search", route: "/search?node=peer&tag=a&tag=b#results" },
+    );
+    await userEvent.type(screen.getByRole("searchbox"), "Converge");
+    await userEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(screen.getByLabelText("Route")).toHaveTextContent(
+      "?node=peer&tag=a&tag=b&q=Converge#results",
+    );
+  });
   it("offers a functional search form when opened without a query", async () => {
     vi.mocked(api).mockResolvedValue({
       artists: [],
@@ -48,11 +149,12 @@ describe("SearchResults", () => {
     const surface = screen
       .getByRole("heading", { name: "Search" })
       .closest(".shadow-card");
-    expect(surface).not.toBeNull();
-    expect(surface).toHaveClass("shadow-card");
+    expect(surface).toBeNull();
     await user.type(input, "Converge");
     expect(screen.getByRole("button", { name: "Search" })).toHaveClass(
-      "shadow-action",
+      "border",
+      "border-accent-action",
+      "bg-transparent",
     );
     await user.click(screen.getByRole("button", { name: "Search" }));
 
@@ -166,7 +268,9 @@ describe("SearchResults", () => {
     await waitFor(() => {
       expect(screen.getByText("Travel by Telephone")).toBeInTheDocument();
     });
-    expect(screen.getByTitle("Play Travel by Telephone")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Play Travel by Telephone" }),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Remote")).not.toBeInTheDocument();
   });
 

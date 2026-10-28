@@ -1,23 +1,20 @@
-import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import type { ComponentPropsWithRef, ReactNode } from "react";
 
 import { cn } from "@crate/ui/lib/cn";
 
-export type MediaGridDensity = "compact" | "default" | "wide";
+import {
+  MEDIA_GRID_BASE_CLASS_NAME,
+  MEDIA_GRID_DENSITY_CLASS_NAME,
+  type MediaGridDensity,
+} from "@crate/ui/lib/media-layout";
+export type { MediaGridDensity } from "@crate/ui/lib/media-layout";
 
 export interface MediaGridProps
-  extends Omit<ComponentPropsWithoutRef<"div">, "children"> {
+  extends Omit<ComponentPropsWithRef<"div">, "children"> {
   children: ReactNode;
   density?: MediaGridDensity;
   minItemWidth?: number;
 }
-
-const DENSITY_CLASS_NAME: Record<MediaGridDensity, string> = {
-  compact:
-    "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8",
-  default:
-    "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7",
-  wide: "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4",
-};
 
 export function MediaGrid({
   children,
@@ -27,16 +24,25 @@ export function MediaGrid({
   style,
   ...props
 }: MediaGridProps) {
-  const usesMinWidth = minItemWidth !== undefined;
+  const usesMinWidth =
+    minItemWidth !== undefined &&
+    Number.isFinite(minItemWidth) &&
+    minItemWidth > 0;
 
   return (
     <div
       {...props}
+      data-slot="media-grid"
+      role={
+        props.role ??
+        (props["aria-label"] || props["aria-labelledby"] ? "group" : undefined)
+      }
       data-testid="media-grid"
       data-density={usesMinWidth ? undefined : density}
       className={cn(
-        "grid gap-[var(--content-grid-gap)]",
-        usesMinWidth ? null : DENSITY_CLASS_NAME[density],
+        "crate-media-grid min-w-0",
+        MEDIA_GRID_BASE_CLASS_NAME,
+        usesMinWidth ? null : MEDIA_GRID_DENSITY_CLASS_NAME[density],
         className,
       )}
       style={
@@ -45,7 +51,7 @@ export function MediaGrid({
               ...style,
               ["--media-grid-min" as string]: `${minItemWidth}px`,
               gridTemplateColumns:
-                "repeat(auto-fill, minmax(var(--media-grid-min), 1fr))",
+                "repeat(auto-fill, minmax(min(100%, var(--media-grid-min)), 1fr))",
             }
           : style
       }

@@ -159,7 +159,10 @@ from crate.db.repositories.library_contributions import list_user_album_contribu
 from crate.db.instance_stats_dashboard_surface import (
     schedule_instance_stats_dashboard_refresh,
 )
-from crate.db.repositories.tasks import create_task, create_task_dedup
+from crate.db.repositories.tasks import create_task
+from crate.db.repositories.user_library_aggregate_runner import (
+    schedule_user_listening_refresh,
+)
 from crate.user_avatars import (
     AvatarProxyError,
     AvatarUnavailable,
@@ -2307,7 +2310,7 @@ def update_profile(request: Request, body: UpdateProfileRequest):
     if not updated:
         raise HTTPException(status_code=404, detail="User not found")
     if "timezone" in fields:
-        create_task_dedup("refresh_user_listening_stats", {"user_id": user["id"]})
+        schedule_user_listening_refresh(user["id"])
     if "pulse_listed" in fields:
         schedule_instance_stats_dashboard_refresh()
     # Re-issue the short-lived access token with updated display fields.

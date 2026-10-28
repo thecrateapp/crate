@@ -1,5 +1,10 @@
 """MCP permission scopes resolve to human labels, groups, access and presets."""
 
+import json
+from pathlib import Path
+
+import pytest
+
 from crate.agent_access import ALLOWED_GRANTS
 from crate.agent_scope_catalog import (
     _LABELS,
@@ -89,3 +94,90 @@ def test_every_label_is_human_text():
     assert "worker adoption" in SCOPE_DETAILS["ops.runtime.read"].label
     assert SCOPE_DETAILS["library.acquisition.search"].access == "read"
     assert SCOPE_DETAILS["library.acquisition.write"].access == "change"
+
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def _agent_tools(config_name):
+    config = json.loads((ROOT / "deploy/hermes" / config_name).read_text())
+    return config["mcp_servers"]["crate"]["tools"]["include"]
+
+
+def _agent_calls(config_name):
+    calls = [(name, None) for name in _agent_tools(config_name)]
+    if "read_diagnostics" in dict(calls):
+        calls.append(("read_diagnostics", {"source": "worker_logs"}))
+    if "preview_repairs" in dict(calls):
+        calls.append(("preview_repairs", {"issue_ids": [1]}))
+        calls.append(("preview_repairs", {}))
+    return calls
+
+
+def _principal(grants):
+    from crate.agent_access import AgentPrincipal
+
+    return AgentPrincipal(
+        id="principal", credential_id="credential", name="crate-agent", grants=grants
+    )
+
+
+def _preset(preset_id):
+    return next(preset for preset in SCOPE_PRESETS if preset.id == preset_id)
+
+
+@pytest.mark.parametrize(
+    ("preset_id", "config_name"),
+    [
+        ("crate_agent", "config.json"),
+        ("crate_operator", "config.operator.json"),
+    ],
+)
+def test_agent_presets_grant_exactly_what_their_tools_need(preset_id, config_name):
+    from crate.mcp.tools import _allowed
+
+    scopes = frozenset(_preset(preset_id).scopes)
+    assert len(scopes) == len(_preset(preset_id).scopes)
+    calls = _agent_calls(config_name)
+    principal = _principal(scopes)
+    assert [call for call in calls if not _allowed(principal, *call)] == []
+    for scope in scopes:
+        reduced = _principal(scopes - {scope})
+        assert any(not _allowed(reduced, *call) for call in calls), scope
+
+
+def test_crate_agent_preset_matches_the_documented_read_only_grants():
+    from crate.mcp.tools import ACTION_CATALOG, CATALOG, _allowed
+
+    preset = _preset("crate_agent")
+    assert set(preset.scopes) == {
+        "library.health.read",
+        "ops.status.read",
+        "ops.jobs.read",
+        "ops.logs.read",
+        "ops.audit.read",
+        "ops.schedules.read",
+        "ops.runtime.read",
+    }
+    principal = _principal(frozenset(preset.scopes))
+    exposed = {name for name in CATALOG | ACTION_CATALOG if _allowed(principal, name)}
+    assert exposed.isdisjoint(ACTION_CATALOG)
+    assert set(_agent_tools("config.json")) <= exposed
+
+
+def test_crate_operator_preset_excludes_tools_the_runtime_rejects():
+    scopes = set(_preset("crate_operator").scopes)
+    assert "ops.jobs.cancel_pending" not in scopes
+    assert "ops.jobs.manage_instance" not in scopes
+    assert set(_preset("crate_agent").scopes) <= scopes
+
+
+def test_existing_presets_are_unchanged_and_agent_presets_follow_them():
+    assert [preset.id for preset in SCOPE_PRESETS] == [
+        "read_only",
+        "shows_curator",
+        "editorial_curator",
+        "library_maintainer",
+        "crate_agent",
+        "crate_operator",
+    ]

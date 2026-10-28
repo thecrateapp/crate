@@ -1,14 +1,15 @@
-import "../../shared/fonts/poppins.css";
 import "../../listen/src/index.css";
 import "./linux-theme.css";
 
-import { useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import { HashRouter } from "react-router";
 import { Toaster } from "sonner";
+import { installFocusRingMotion } from "@crate/ui/lib/focus-ring-motion";
+import { toasterConfig } from "@crate/ui/lib/toaster-config";
+import { applyCrateIdentity } from "@crate/ui/lib/crate-identity";
+import { initializeUiPreferences } from "@crate/ui/lib/interface-preferences";
 
 import { App } from "@/App";
-import { LISTEN_APPEARANCE_SETTINGS_ENABLED } from "@/app-shell/feature-flags";
 import { I18nProvider } from "@/i18n";
 import { primeOfflineRuntimeProfile } from "@/lib/offline";
 import { isTauriRuntime } from "@/lib/platform";
@@ -17,14 +18,12 @@ import { migrateLegacyTauriOAuthRecords } from "@/lib/capacitor-oauth";
 import { captureRuntimeError, initSentry } from "@/lib/sentry";
 import { bootstrapNativeSessionStore } from "@/lib/server-store";
 import { renderSecureSessionError } from "@/lib/secure-session-error";
-import {
-  getAppliedThemeSkin,
-  initializeThemeSkin,
-  subscribeThemeSkin,
-} from "@crate/ui/lib/theme-skin";
 
 import { initTauriRuntime, startTauriOAuthRuntime } from "./lib/tauri-init";
 import { LinuxWindowTitlebar } from "./components/LinuxWindowTitlebar";
+
+const disposeFocusRingMotion = installFocusRingMotion();
+import.meta.hot?.dispose(disposeFocusRingMotion);
 
 const hasLinuxWindowTitlebar =
   isTauriRuntime &&
@@ -37,19 +36,9 @@ if (hasLinuxWindowTitlebar) {
 
 initTauriRuntime();
 initSentry();
-initializeThemeSkin({
-  ignoreStoredPreferences: !LISTEN_APPEARANCE_SETTINGS_ENABLED,
-});
-
-function ThemeAwareToaster() {
-  const resolvedMode = useSyncExternalStore(
-    subscribeThemeSkin,
-    () => getAppliedThemeSkin().resolvedMode,
-    () => "dark" as const,
-  );
-
-  return <Toaster theme={resolvedMode} position="bottom-center" richColors />;
-}
+applyCrateIdentity();
+const disposePreferences = initializeUiPreferences();
+import.meta.hot?.dispose(disposePreferences);
 
 async function bootstrapDesktopApp(): Promise<void> {
   const root = document.getElementById("root");
@@ -67,16 +56,14 @@ async function bootstrapDesktopApp(): Promise<void> {
   void primeOfflineRuntimeProfile();
   startTauriOAuthRuntime();
   createRoot(root).render(
-    <>
+    <I18nProvider>
       {hasLinuxWindowTitlebar && <LinuxWindowTitlebar />}
       {hasLinuxWindowTitlebar && <div aria-hidden="true" className="h-9" />}
       <HashRouter useTransitions={hasLinuxWindowTitlebar ? false : undefined}>
-        <I18nProvider>
-          <App />
-        </I18nProvider>
-        <ThemeAwareToaster />
+        <App />
+        <Toaster {...toasterConfig} theme="dark" position="bottom-center" />
       </HashRouter>
-    </>,
+    </I18nProvider>,
   );
 }
 

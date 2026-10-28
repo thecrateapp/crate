@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { act, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { AppModal } from "@crate/ui/primitives/AppModal";
 import { renderWithListenProviders } from "@/test/render-with-listen-providers";
 
 import { DIGGING_CHAPTER_MS, DiggingStory } from "./DiggingStory";
@@ -49,6 +51,65 @@ describe("DiggingStory", () => {
     expect(screen.getByText("Chapter One")).toBeInTheDocument();
     fireEvent.keyDown(dialog, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("locks background scrolling, contains Tab and restores the launcher on unmount", () => {
+    const launcher = document.createElement("button");
+    document.body.append(launcher);
+    launcher.focus();
+    const previous = document.body.style.overflow;
+    const { unmount } = renderWithListenProviders(
+      <DiggingStory chapters={chapters} onClose={vi.fn()} />,
+    );
+    expect(document.body.style.overflow).toBe("hidden");
+    const close = screen.getByRole("button", { name: "Close" });
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Tab" });
+    expect(document.activeElement).toBe(close);
+    fireEvent.keyDown(close, { key: "Tab" });
+    expect(document.activeElement).toBe(close);
+    unmount();
+    expect(document.body.style.overflow).toBe(previous);
+    expect(document.activeElement).toBe(launcher);
+    launcher.remove();
+  });
+
+  it("keeps a global share modal locked and focused if navigation unmounts Digging first", () => {
+    const originalBody = document.body.style.overflow,
+      originalHtml = document.documentElement.style.overflow;
+    const launcher = document.createElement("button");
+    document.body.append(launcher);
+    launcher.focus();
+    let change!: (state: { story: boolean; share: boolean }) => void;
+    function Fixture() {
+      const [state, setState] = useState({ story: true, share: false });
+      change = setState;
+      return (
+        <>
+          {state.story ? (
+            <DiggingStory chapters={chapters} onClose={vi.fn()} />
+          ) : null}
+          <AppModal
+            open={state.share}
+            onClose={vi.fn()}
+            ariaLabel="Share music"
+          >
+            <button type="button">Prepare image</button>
+          </AppModal>
+        </>
+      );
+    }
+    renderWithListenProviders(<Fixture />);
+    act(() => change({ story: true, share: true }));
+    act(() => vi.advanceTimersByTime(20));
+    const share = screen.getByRole("dialog", { name: "Share music" });
+    act(() => change({ story: false, share: true }));
+    expect(document.body.style.overflow).toBe("hidden");
+    expect(document.documentElement.style.overflow).toBe("hidden");
+    expect(share.contains(document.activeElement)).toBe(true);
+    act(() => change({ story: false, share: false }));
+    expect(document.body.style.overflow).toBe(originalBody);
+    expect(document.documentElement.style.overflow).toBe(originalHtml);
+    launcher.remove();
   });
 
   it("pauses while the chapter is held down", () => {

@@ -1,30 +1,32 @@
-import { useMemo, useState } from "react";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import {
-  Activity,
-  Archive,
-  AudioWaveform,
-  FileInput,
-  FileJson,
-  Fingerprint,
-  Gauge,
+  PageHeaderAction,
+  PageHeaderActions,
+} from "@/components/layout/PageHeader";
+import {
+  RefreshCw as HeaderRefreshCw,
+  Fingerprint as HeaderFingerprint,
+  TrendingUp as HeaderTrendingUp,
+  Orbit as HeaderOrbit,
+  AudioLines as HeaderAudioLines,
   Loader2,
-  Music,
-  RefreshCw,
-  Sparkles,
-  Tags,
-  Waves,
-  Zap,
 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import {
   OpsPageHero,
   OpsPanel,
+  OpsRefreshNotice,
+  OpsSurface,
   OpsStatTile,
 } from "@/components/admin/ops-surfaces";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
+
 import { SmartMixCoverage } from "@/components/SmartMixCoverage";
-import { CrateChip, CratePill } from "@crate/ui/primitives/CrateBadge";
 import { Button } from "@crate/ui/shadcn/button";
+import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
 import {
   useOpsSnapshot,
   type AnalysisStatusSnapshot,
@@ -82,6 +84,7 @@ function normalizeStatus(
     rich_export_tracks: numberOrZero(status.rich_export_tracks),
     last_analyzed: status.last_analyzed || EMPTY_TRACK,
     last_bliss: status.last_bliss || EMPTY_TRACK,
+    last_fingerprinted: status.last_fingerprinted || EMPTY_TRACK,
   };
 }
 
@@ -93,7 +96,7 @@ function formatPercent(done: number, total: number) {
   return Number(Math.min(raw, 99.9).toFixed(1));
 }
 
-function formatTimestamp(value?: string) {
+function formatTimestamp(value?: string | null) {
   if (!value) return "No recent activity";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "No recent activity";
@@ -101,44 +104,33 @@ function formatTimestamp(value?: string) {
 }
 
 function PipelineCoverage({
-  icon: Icon,
   title,
   done,
   pending,
   active,
   failed,
   total,
-  accentClassName,
   emptyLabel,
 }: {
-  icon: typeof Music;
   title: string;
   done: number;
   pending: number;
   active: number;
   failed: number;
   total: number;
-  accentClassName: string;
   emptyLabel: string;
 }) {
   const percent = formatPercent(done, total);
-  const blocked = failed > 0;
 
   return (
-    <div className="rounded-md border border-white/8 bg-black/20 p-4">
+    <OpsSurface className="@container p-4">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <div
-            className={cn(
-              "flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/[0.05]",
-              accentClassName,
-            )}
-          >
-            <Icon size={16} />
-          </div>
           <div className="space-y-1">
-            <div className="text-sm font-medium text-white">{title}</div>
-            <div className="text-xs text-white/40">
+            <h3 className="font-display text-xl font-bold tracking-tight text-text-primary">
+              {title}
+            </h3>
+            <div className="text-xs text-text-muted">
               {total > 0
                 ? `${done.toLocaleString()} of ${total.toLocaleString()} tracks processed`
                 : emptyLabel}
@@ -146,30 +138,22 @@ function PipelineCoverage({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <CrateChip className="text-[10px]">{percent}% coverage</CrateChip>
-          {active > 0 ? <CrateChip active>{active} active</CrateChip> : null}
+          <InfoBadge>{percent}% coverage</InfoBadge>
+          {active > 0 ? <InfoBadge active>{active} active</InfoBadge> : null}
           {failed > 0 ? (
-            <CrateChip className="border-red-500/25 bg-red-500/10 text-red-200">
-              {failed} failed
-            </CrateChip>
+            <InfoBadge tone="danger">{failed} failed</InfoBadge>
           ) : null}
         </div>
       </div>
 
       <div className="space-y-3">
-        <div className="h-2 overflow-hidden rounded-sm bg-white/[0.06]">
-          <div
-            className={cn(
-              "h-full rounded-sm transition-[width,background-color] duration-500",
-              blocked
-                ? "bg-gradient-to-r from-red-500/60 to-amber-400/70"
-                : accentClassName.replace("text-", "bg-").replace("/80", ""),
-            )}
-            style={{ width: `${Math.min(percent, 100)}%` }}
-          />
-        </div>
+        <ProgressHairline
+          label={`${title} coverage`}
+          value={total > 0 ? done / total : undefined}
+          valueText={`${done} of ${total} tracks processed`}
+        />
 
-        <div className="grid gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 @lg:grid-cols-4">
           <MiniMetric label="Done" value={done.toLocaleString()} />
           <MiniMetric label="Pending" value={pending.toLocaleString()} />
           <MiniMetric label="Active" value={active.toLocaleString()} />
@@ -180,7 +164,7 @@ function PipelineCoverage({
           />
         </div>
       </div>
-    </div>
+    </OpsSurface>
   );
 }
 
@@ -194,18 +178,16 @@ function MiniMetric({
   tone?: "default" | "muted" | "danger";
 }) {
   return (
-    <div className="rounded-sm border border-white/6 bg-black/20 px-3 py-2">
-      <div className="text-[10px] uppercase tracking-[0.12em] text-white/30">
-        {label}
-      </div>
+    <div className="crate-form-field border-t border-border-quiet pt-2">
+      <MonoLabel as="div">{label}</MonoLabel>
       <div
         className={cn(
-          "mt-1 text-sm font-medium",
+          "font-mono text-base font-normal leading-tight tabular-nums",
           tone === "danger"
-            ? "text-red-200"
+            ? "text-state-warning-text"
             : tone === "muted"
-              ? "text-white/55"
-              : "text-white/85",
+              ? "text-text-muted"
+              : "text-text-primary",
         )}
       >
         {value}
@@ -215,90 +197,92 @@ function MiniMetric({
 }
 
 function RecentTrackCard({
-  icon: Icon,
+  kind,
   title,
   track,
 }: {
-  icon: typeof Activity;
+  kind: "analysis" | "bliss" | "fingerprint";
   title: string;
   track:
     | AnalysisStatusSnapshot["last_analyzed"]
-    | AnalysisStatusSnapshot["last_bliss"];
+    | AnalysisStatusSnapshot["last_bliss"]
+    | NonNullable<AnalysisStatusSnapshot["last_fingerprinted"]>;
 }) {
   return (
-    <div className="rounded-md border border-white/8 bg-black/20 p-4">
+    <OpsSurface as="article" aria-label={title} className="@container p-4">
       <div className="mb-4 flex items-start gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/[0.05] text-white/70">
-          <Icon size={16} />
-        </div>
         <div className="space-y-1">
-          <div className="text-sm font-medium text-white">{title}</div>
-          <div className="text-xs text-white/40">
+          <MonoLabel as="h3">{title}</MonoLabel>
+          <div className="font-mono text-label font-normal tabular-nums text-text-subtle">
             {formatTimestamp(track.updated_at)}
           </div>
         </div>
       </div>
 
-      {track.title ? (
+      {track.title || (kind === "fingerprint" && track.updated_at) ? (
         <div className="space-y-3">
           <div>
-            <div className="text-base font-semibold tracking-tight text-white">
-              {track.title}
+            <div className="font-display text-xl font-bold tracking-tight text-text-primary">
+              {track.title || "Untitled track"}
             </div>
-            <div className="text-sm text-white/45">
+            <div className="text-sm text-text-muted">
               {track.artist || "Unknown artist"}
               {track.album ? ` · ${track.album}` : ""}
             </div>
           </div>
 
-          {"bpm" in track ? (
+          {kind === "analysis" && "bpm" in track ? (
             <div className="flex flex-wrap gap-2">
               {track.bpm != null ? (
-                <CrateChip>{Math.round(track.bpm)} BPM</CrateChip>
+                <InfoBadge>{Math.round(track.bpm)} BPM</InfoBadge>
               ) : null}
               {"audio_key" in track && track.audio_key ? (
-                <CrateChip>{track.audio_key}</CrateChip>
+                <InfoBadge>{track.audio_key}</InfoBadge>
               ) : null}
               {"energy" in track && track.energy != null ? (
-                <CrateChip>{Math.round(track.energy * 100)}% energy</CrateChip>
+                <InfoBadge>{Math.round(track.energy * 100)}% energy</InfoBadge>
               ) : null}
               {"danceability" in track && track.danceability != null ? (
-                <CrateChip>
+                <InfoBadge>
                   {Math.round(track.danceability * 100)}% dance
-                </CrateChip>
+                </InfoBadge>
               ) : null}
               {"has_mood" in track ? (
-                <CrateChip
-                  className={
-                    track.has_mood
-                      ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
-                      : "border-amber-500/20 bg-amber-500/10 text-amber-100"
-                  }
-                >
+                <InfoBadge tone={track.has_mood ? "accent" : "neutral"}>
                   {track.has_mood ? "Mood extracted" : "Mood missing"}
-                </CrateChip>
+                </InfoBadge>
               ) : null}
             </div>
-          ) : (
-            <div className="text-sm text-white/45">
+          ) : kind === "bliss" ? (
+            <div className="text-sm text-text-muted">
               Similarity vectors refreshed and ready for related-track features.
             </div>
-          )}
+          ) : kind === "fingerprint" ? (
+            <InfoBadge>
+              {"source" in track && track.source === "chromaprint-v1"
+                ? "Chromaprint"
+                : "source" in track && track.source === "pcm16-md5-v1"
+                  ? "PCM fallback"
+                  : ("source" in track && track.source) || "Source unavailable"}
+            </InfoBadge>
+          ) : null}
         </div>
       ) : (
-        <div className="rounded-sm border border-dashed border-white/10 bg-black/15 px-4 py-6 text-sm text-white/35">
-          No recent output recorded yet.
-        </div>
+        <EmptyState message="No recent output recorded yet." />
       )}
-    </div>
+    </OpsSurface>
   );
 }
 
 export function Analysis() {
   const { data: opsSnapshot, loading, error, refresh } = useOpsSnapshot();
   const rawStatus = opsSnapshot?.analysis ?? null;
+  const report = rawStatus as
+    | (AnalysisStatusSnapshot & { unavailable?: boolean; stale?: boolean })
+    | null;
   const status = useMemo(
-    () => (rawStatus ? normalizeStatus(rawStatus) : null),
+    () =>
+      rawStatus && !report?.unavailable ? normalizeStatus(rawStatus) : null,
     [rawStatus],
   );
   const [activeAction, setActiveAction] = useState<ActionKey>(null);
@@ -355,8 +339,17 @@ export function Analysis() {
 
   if (loading && !status) {
     return (
-      <div className="flex justify-center py-16 text-white/45">
-        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+      <div
+        role="status"
+        aria-label="Loading analysis status"
+        aria-busy="true"
+        className="flex justify-center py-16 text-text-muted"
+      >
+        <Loader2
+          aria-hidden="true"
+          data-admin-ux="analysis-loading"
+          className="h-5 w-5 animate-spin text-accent-action-hi"
+        />
       </div>
     );
   }
@@ -368,7 +361,11 @@ export function Analysis() {
   if (!status) {
     return (
       <ErrorState
-        message="No analysis status available"
+        message={
+          report?.unavailable
+            ? "Analysis worker report is unavailable. Waiting for a worker sample."
+            : "No analysis status available"
+        }
         onRetry={() => void refresh(true)}
       />
     );
@@ -377,169 +374,186 @@ export function Analysis() {
   return (
     <div className="space-y-6">
       <OpsPageHero
-        icon={AudioWaveform}
         title="Analysis"
         description="Audio features, similarity vectors and background processing coverage across the whole library."
+        compactActions
         actions={
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void refresh(true)}
-              className="gap-2"
-            >
-              <RefreshCw size={14} />
-              Refresh
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                queueAction(
-                  "/api/tasks/backfill-track-fingerprints",
-                  "fingerprints",
-                  "Audio fingerprint backfill queued",
-                )
-              }
-              disabled={activeAction !== null}
-              className="gap-2"
-            >
-              {activeAction === "fingerprints" ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Fingerprint size={14} />
-              )}
-              Backfill fingerprints
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                queueAction(
-                  "/api/manage/compute-popularity",
-                  "popularity",
-                  "Popularity recomputation queued",
-                )
-              }
-              disabled={activeAction !== null}
-              className="gap-2"
-            >
-              {activeAction === "popularity" ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Sparkles size={14} />
-              )}
-              Recompute popularity
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                queueAction(
-                  "/api/manage/compute-bliss",
-                  "bliss",
-                  "Bliss recomputation queued",
-                )
-              }
-              disabled={activeAction !== null}
-              className="gap-2"
-            >
-              {activeAction === "bliss" ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Waves size={14} />
-              )}
-              Recompute bliss
-            </Button>
-            <Button
-              size="sm"
-              onClick={() =>
-                queueAction(
-                  "/api/manage/analyze-all",
-                  "analysis",
-                  "Full audio re-analysis queued",
-                )
-              }
-              disabled={activeAction !== null}
-              className="gap-2"
-            >
-              {activeAction === "analysis" ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Zap size={14} />
-              )}
-              Re-analyze all
-            </Button>
-          </>
+          <PageHeaderActions>
+            <>
+              <PageHeaderAction
+                label="Refresh"
+                onClick={() => void refresh(true)}
+              >
+                <HeaderRefreshCw
+                  data-admin-ux="header-refresh"
+                  aria-hidden="true"
+                />
+              </PageHeaderAction>
+              <PageHeaderAction
+                label="Backfill fingerprints"
+                onClick={() =>
+                  queueAction(
+                    "/api/tasks/backfill-track-fingerprints",
+                    "fingerprints",
+                    "Audio fingerprint backfill queued",
+                  )
+                }
+                disabled={activeAction !== null}
+                aria-busy={activeAction === "fingerprints" || undefined}
+              >
+                {activeAction === "fingerprints" ? (
+                  <Loader2
+                    size={14}
+                    aria-hidden="true"
+                    data-admin-ux="analysis-action-fingerprints"
+                    className="animate-spin"
+                  />
+                ) : null}
+                {!(activeAction === "fingerprints") ? (
+                  <HeaderFingerprint
+                    data-admin-ux="header-backfill-fingerprints"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
+              <PageHeaderAction
+                label="Recompute popularity"
+                onClick={() =>
+                  queueAction(
+                    "/api/manage/compute-popularity",
+                    "popularity",
+                    "Popularity recomputation queued",
+                  )
+                }
+                disabled={activeAction !== null}
+                aria-busy={activeAction === "popularity" || undefined}
+              >
+                {activeAction === "popularity" ? (
+                  <Loader2
+                    size={14}
+                    aria-hidden="true"
+                    data-admin-ux="analysis-action-popularity"
+                    className="animate-spin"
+                  />
+                ) : null}
+                {!(activeAction === "popularity") ? (
+                  <HeaderTrendingUp
+                    data-admin-ux="header-recompute-popularity"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
+              <PageHeaderAction
+                label="Recompute bliss"
+                onClick={() =>
+                  queueAction(
+                    "/api/manage/compute-bliss",
+                    "bliss",
+                    "Bliss recomputation queued",
+                  )
+                }
+                disabled={activeAction !== null}
+                aria-busy={activeAction === "bliss" || undefined}
+              >
+                {activeAction === "bliss" ? (
+                  <Loader2
+                    size={14}
+                    aria-hidden="true"
+                    data-admin-ux="analysis-action-bliss"
+                    className="animate-spin"
+                  />
+                ) : null}
+                {!(activeAction === "bliss") ? (
+                  <HeaderOrbit
+                    data-admin-ux="header-recompute-bliss"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
+              <PageHeaderAction
+                label="Re-analyze all"
+                onClick={() =>
+                  queueAction(
+                    "/api/manage/analyze-all",
+                    "analysis",
+                    "Full audio re-analysis queued",
+                  )
+                }
+                disabled={activeAction !== null}
+                aria-busy={activeAction === "analysis" || undefined}
+              >
+                {activeAction === "analysis" ? (
+                  <Loader2
+                    size={14}
+                    aria-hidden="true"
+                    data-admin-ux="analysis-action-analysis"
+                    className="animate-spin"
+                  />
+                ) : null}
+                {!(activeAction === "analysis") ? (
+                  <HeaderAudioLines
+                    data-admin-ux="header-re-analyze-all"
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </PageHeaderAction>
+            </>
+          </PageHeaderActions>
         }
       >
-        <CratePill active icon={Music}>
-          {status.total.toLocaleString()} tracks
-        </CratePill>
-        <CratePill icon={Gauge}>
-          {metrics.analysisPercent}% audio covered
-        </CratePill>
-        <CratePill icon={Waves}>
-          {metrics.blissPercent}% bliss covered
-        </CratePill>
-        <CratePill icon={Fingerprint}>
-          {metrics.fingerprintPercent}% fingerprinted
-        </CratePill>
-        <CratePill icon={FileJson}>
-          {metrics.lyricsPercent}% lyrics cached
-        </CratePill>
-        <CratePill icon={Tags}>
-          {metrics.portableSidecarPercent}% portable albums
-        </CratePill>
-        <CratePill
-          className={
-            status.chromaprint_available
-              ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-100"
-              : "border-amber-500/25 bg-amber-500/10 text-amber-100"
-          }
-        >
+        <InfoBadge active>{status.total.toLocaleString()} tracks</InfoBadge>
+        <InfoBadge>{metrics.analysisPercent}% audio covered</InfoBadge>
+        <InfoBadge>{metrics.blissPercent}% bliss covered</InfoBadge>
+        <InfoBadge>{metrics.fingerprintPercent}% fingerprinted</InfoBadge>
+        <InfoBadge>{metrics.lyricsPercent}% lyrics cached</InfoBadge>
+        <InfoBadge>{metrics.portableSidecarPercent}% portable albums</InfoBadge>
+        <InfoBadge tone={status.chromaprint_available ? "accent" : "warning"}>
           {status.chromaprint_available ? "Chromaprint ready" : "PCM fallback"}
-        </CratePill>
+        </InfoBadge>
         {metrics.activeJobs > 0 ? (
-          <CratePill icon={Activity}>{metrics.activeJobs} active</CratePill>
+          <InfoBadge>{metrics.activeJobs} active</InfoBadge>
         ) : null}
         {metrics.failedJobs > 0 ? (
-          <CratePill className="border-red-500/25 bg-red-500/10 text-red-100">
-            {metrics.failedJobs} failed
-          </CratePill>
+          <InfoBadge tone="danger">{metrics.failedJobs} failed</InfoBadge>
         ) : null}
       </OpsPageHero>
 
+      {error || report?.stale || opsSnapshot?.snapshot?.stale ? (
+        <OpsRefreshNotice
+          message={
+            error
+              ? "Analysis status could not refresh. Showing the last successful snapshot."
+              : "Analysis worker report is outdated. Showing the last available measurements."
+          }
+          onRetry={() => void refresh(true)}
+        />
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <OpsStatTile
-          icon={Music}
           label="Audio Coverage"
           value={`${metrics.analysisPercent}%`}
           caption={`${status.analysis_done.toLocaleString()} analyzed`}
           tone="primary"
         />
         <OpsStatTile
-          icon={Waves}
           label="Bliss Coverage"
           value={`${metrics.blissPercent}%`}
           caption={`${status.bliss_done.toLocaleString()} vectors`}
         />
         <OpsStatTile
-          icon={Fingerprint}
           label="Fingerprint Coverage"
           value={`${metrics.fingerprintPercent}%`}
           caption={`${status.fingerprint_done.toLocaleString()} tracks fingerprinted`}
           tone={status.chromaprint_available ? "success" : "warning"}
         />
         <OpsStatTile
-          icon={FileJson}
           label="Lyrics Cache"
           value={`${metrics.lyricsPercent}%`}
           caption={`${status.lyrics_found.toLocaleString()} tracks with lyrics`}
           tone="success"
         />
         <OpsStatTile
-          icon={Tags}
           label="Portable Metadata"
           value={`${metrics.portableSidecarPercent}%`}
           caption={`${status.portable_audio_tag_tracks.toLocaleString()} tracks tagged`}
@@ -548,44 +562,36 @@ export function Analysis() {
       </div>
 
       <OpsPanel
-        icon={Gauge}
         title="Pipeline coverage"
         description="Track how far each background pipeline has progressed and spot failures before they rot."
       >
         <div className="grid gap-4 xl:grid-cols-3">
           <PipelineCoverage
-            icon={Music}
             title="Audio features"
             done={status.analysis_done}
             pending={status.analysis_pending}
             active={status.analysis_active}
             failed={status.analysis_failed}
             total={status.total}
-            accentClassName="text-primary"
             emptyLabel="Waiting for tracks"
           />
           <PipelineCoverage
-            icon={Waves}
             title="Bliss vectors"
             done={status.bliss_done}
             pending={status.bliss_pending}
             active={status.bliss_active}
             failed={status.bliss_failed}
             total={status.total}
-            accentClassName="text-emerald-300"
             emptyLabel="Waiting for tracks"
           />
-          <div className="rounded-md border border-white/8 bg-black/20 p-4">
+          <OpsSurface className="@container p-4">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/[0.05] text-sky-300">
-                  <Fingerprint size={16} />
-                </div>
                 <div className="space-y-1">
-                  <div className="text-sm font-medium text-white">
+                  <h3 className="font-display text-xl font-bold tracking-tight text-text-primary">
                     Audio fingerprints
-                  </div>
-                  <div className="text-xs text-white/40">
+                  </h3>
+                  <div className="text-xs text-text-muted">
                     {status.total > 0
                       ? `${status.fingerprint_done.toLocaleString()} of ${status.total.toLocaleString()} tracks fingerprinted`
                       : "Waiting for tracks"}
@@ -593,34 +599,29 @@ export function Analysis() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <CrateChip className="text-[10px]">
-                  {metrics.fingerprintPercent}% coverage
-                </CrateChip>
-                <CrateChip
-                  className={
-                    status.chromaprint_available
-                      ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
-                      : "border-amber-500/20 bg-amber-500/10 text-amber-100"
-                  }
+                <InfoBadge>{metrics.fingerprintPercent}% coverage</InfoBadge>
+                <InfoBadge
+                  tone={status.chromaprint_available ? "accent" : "neutral"}
                 >
                   {status.chromaprint_available
                     ? "Chromaprint active"
                     : "PCM fallback"}
-                </CrateChip>
+                </InfoBadge>
               </div>
             </div>
 
             <div className="space-y-3">
-              <div className="h-2 overflow-hidden rounded-sm bg-white/[0.06]">
-                <div
-                  className="h-full rounded-sm bg-sky-400/80 transition-[width,background-color] duration-500"
-                  style={{
-                    width: `${Math.min(metrics.fingerprintPercent, 100)}%`,
-                  }}
-                />
-              </div>
+              <ProgressHairline
+                label="Fingerprint coverage"
+                value={
+                  status.total > 0
+                    ? status.fingerprint_done / status.total
+                    : undefined
+                }
+                valueText={`${status.fingerprint_done} of ${status.total} tracks fingerprinted`}
+              />
 
-              <div className="grid gap-2 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 @lg:grid-cols-4">
                 <MiniMetric
                   label="Done"
                   value={status.fingerprint_done.toLocaleString()}
@@ -640,12 +641,11 @@ export function Analysis() {
                 />
               </div>
             </div>
-          </div>
+          </OpsSurface>
         </div>
       </OpsPanel>
 
       <OpsPanel
-        icon={AudioWaveform}
         title="Smart Mix"
         description="Versioned transition-analysis coverage and bounded backfill controls."
       >
@@ -653,7 +653,6 @@ export function Analysis() {
       </OpsPanel>
 
       <OpsPanel
-        icon={FileJson}
         title="Portable library state"
         description="Lyrics cache, portable sidecars, identity tags and export coverage."
         action={
@@ -670,13 +669,17 @@ export function Analysis() {
                 )
               }
               disabled={activeAction !== null}
+              aria-busy={activeAction === "lyrics" || undefined}
               className="gap-2"
             >
               {activeAction === "lyrics" ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <FileJson size={14} />
-              )}
+                <Loader2
+                  size={14}
+                  aria-hidden="true"
+                  data-admin-ux="analysis-action-lyrics"
+                  className="animate-spin"
+                />
+              ) : null}
               Sync lyrics
             </Button>
             <Button
@@ -691,13 +694,17 @@ export function Analysis() {
                 )
               }
               disabled={activeAction !== null}
+              aria-busy={activeAction === "portable" || undefined}
               className="gap-2"
             >
               {activeAction === "portable" ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Tags size={14} />
-              )}
+                <Loader2
+                  size={14}
+                  aria-hidden="true"
+                  data-admin-ux="analysis-action-portable"
+                  className="animate-spin"
+                />
+              ) : null}
               Write metadata
             </Button>
             <Button
@@ -711,13 +718,17 @@ export function Analysis() {
                 )
               }
               disabled={activeAction !== null}
+              aria-busy={activeAction === "rehydrate" || undefined}
               className="gap-2"
             >
               {activeAction === "rehydrate" ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <FileInput size={14} />
-              )}
+                <Loader2
+                  size={14}
+                  aria-hidden="true"
+                  data-admin-ux="analysis-action-rehydrate"
+                  className="animate-spin"
+                />
+              ) : null}
               Rehydrate
             </Button>
             <Button
@@ -732,36 +743,37 @@ export function Analysis() {
                 )
               }
               disabled={activeAction !== null}
+              aria-busy={activeAction === "richExport" || undefined}
               className="gap-2"
             >
               {activeAction === "richExport" ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Archive size={14} />
-              )}
+                <Loader2
+                  size={14}
+                  aria-hidden="true"
+                  data-admin-ux="analysis-action-richExport"
+                  className="animate-spin"
+                />
+              ) : null}
               Export index
             </Button>
           </>
         }
       >
         <div className="grid gap-4 xl:grid-cols-3">
-          <div className="rounded-md border border-white/8 bg-black/20 p-4">
-            <div className="mb-4 flex items-start justify-between gap-3">
+          <OpsSurface className="@container p-4">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/[0.05] text-violet-200">
-                  <FileJson size={16} />
-                </div>
                 <div className="space-y-1">
-                  <div className="text-sm font-medium text-white">Lyrics</div>
-                  <div className="text-xs text-white/40">
+                  <h3 className="font-display text-xl font-bold tracking-tight text-text-primary">
+                    Lyrics
+                  </h3>
+                  <div className="text-xs text-text-muted">
                     {status.lyrics_cached.toLocaleString()} cached lookups
                     across {status.total.toLocaleString()} tracks
                   </div>
                 </div>
               </div>
-              <CrateChip className="text-[10px]">
-                {metrics.lyricsPercent}% cache
-              </CrateChip>
+              <InfoBadge>{metrics.lyricsPercent}% cache</InfoBadge>
             </div>
             <div className="grid gap-2 sm:grid-cols-3">
               <MiniMetric
@@ -778,29 +790,24 @@ export function Analysis() {
                 tone={status.lyrics_missing > 0 ? "muted" : "default"}
               />
             </div>
-          </div>
+          </OpsSurface>
 
-          <div className="rounded-md border border-white/8 bg-black/20 p-4">
-            <div className="mb-4 flex items-start justify-between gap-3">
+          <OpsSurface className="@container p-4">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/[0.05] text-emerald-200">
-                  <Tags size={16} />
-                </div>
                 <div className="space-y-1">
-                  <div className="text-sm font-medium text-white">
+                  <h3 className="font-display text-xl font-bold tracking-tight text-text-primary">
                     Portable metadata
-                  </div>
-                  <div className="text-xs text-white/40">
+                  </h3>
+                  <div className="text-xs text-text-muted">
                     {status.portable_sidecar_albums.toLocaleString()} sidecars
                     across {status.total_albums.toLocaleString()} albums
                   </div>
                 </div>
               </div>
-              <CrateChip className="text-[10px]">
-                {metrics.portableSidecarPercent}% albums
-              </CrateChip>
+              <InfoBadge>{metrics.portableSidecarPercent}% albums</InfoBadge>
             </div>
-            <div className="grid gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 @lg:grid-cols-4">
               <MiniMetric
                 label="Sidecars"
                 value={status.portable_sidecar_albums.toLocaleString()}
@@ -819,27 +826,24 @@ export function Analysis() {
                 tone={status.portable_tag_errors > 0 ? "danger" : "default"}
               />
             </div>
-          </div>
+          </OpsSurface>
 
-          <div className="rounded-md border border-white/8 bg-black/20 p-4">
-            <div className="mb-4 flex items-start justify-between gap-3">
+          <OpsSurface className="@container p-4">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-white/[0.05] text-sky-200">
-                  <Archive size={16} />
-                </div>
                 <div className="space-y-1">
-                  <div className="text-sm font-medium text-white">
+                  <h3 className="font-display text-xl font-bold tracking-tight text-text-primary">
                     Rich exports
-                  </div>
-                  <div className="text-xs text-white/40">
+                  </h3>
+                  <div className="text-xs text-text-muted">
                     {status.rich_export_albums.toLocaleString()} albums exported
                     as portable packages
                   </div>
                 </div>
               </div>
-              <CrateChip className="text-[10px]">
+              <InfoBadge>
                 {status.rich_export_tracks.toLocaleString()} tracks
-              </CrateChip>
+              </InfoBadge>
             </div>
             <div className="grid gap-2 sm:grid-cols-3">
               <MiniMetric
@@ -855,78 +859,32 @@ export function Analysis() {
                 value={`${metrics.portableTagPercent}%`}
               />
             </div>
-          </div>
+          </OpsSurface>
         </div>
       </OpsPanel>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-        <OpsPanel
-          icon={Activity}
-          title="Recent outputs"
-          description="The freshest material that made it through each pipeline, useful when you want to sanity-check the daemon."
-        >
-          <div className="grid gap-4 xl:grid-cols-2">
-            <RecentTrackCard
-              icon={Music}
-              title="Last analyzed track"
-              track={status.last_analyzed}
-            />
-            <RecentTrackCard
-              icon={Waves}
-              title="Last bliss computation"
-              track={status.last_bliss}
-            />
-          </div>
-        </OpsPanel>
-
-        <OpsPanel
-          icon={Sparkles}
-          title="Operator notes"
-          description="Quick guidance for what to do next when the coverage numbers are not where you expect them."
-        >
-          <div className="space-y-3">
-            <div className="rounded-sm border border-white/6 bg-black/15 p-3">
-              <div className="text-sm font-medium text-white">
-                When to re-run audio analysis
-              </div>
-              <div className="mt-1 text-sm text-white/45">
-                Use it after metadata fixes, mass imports or when failed counts
-                start to climb after library changes.
-              </div>
-            </div>
-            <div className="rounded-sm border border-white/6 bg-black/15 p-3">
-              <div className="text-sm font-medium text-white">
-                When to recompute bliss
-              </div>
-              <div className="mt-1 text-sm text-white/45">
-                Recompute similarity vectors after large acquisitions or if
-                related-track results start feeling stale.
-              </div>
-            </div>
-            <div className="rounded-sm border border-white/6 bg-black/15 p-3">
-              <div className="text-sm font-medium text-white">
-                Popularity jobs
-              </div>
-              <div className="mt-1 text-sm text-white/45">
-                Popularity is now part of the same operational story. Run it
-                after enrichment waves so sorting and smart playlists stay
-                current.
-              </div>
-            </div>
-            <div className="rounded-sm border border-white/6 bg-black/15 p-3">
-              <div className="text-sm font-medium text-white">
-                AcoustID / Chromaprint
-              </div>
-              <div className="mt-1 text-sm text-white/45">
-                Track fingerprints now prefer Chromaprint via{" "}
-                <code>fpcalc</code>. If the runtime cannot see it, Crate falls
-                back to deterministic PCM hashing so identity backfills can
-                still progress.
-              </div>
-            </div>
-          </div>
-        </OpsPanel>
-      </div>
+      <OpsPanel
+        title="Recent outputs"
+        description="The freshest material that made it through each pipeline, useful when you want to sanity-check the daemon."
+      >
+        <div className="grid gap-4 xl:grid-cols-3">
+          <RecentTrackCard
+            kind="analysis"
+            title="Last analyzed track"
+            track={status.last_analyzed}
+          />
+          <RecentTrackCard
+            kind="bliss"
+            title="Last bliss computation"
+            track={status.last_bliss}
+          />
+          <RecentTrackCard
+            kind="fingerprint"
+            title="Last audio fingerprint"
+            track={status.last_fingerprinted ?? EMPTY_TRACK}
+          />
+        </div>
+      </OpsPanel>
     </div>
   );
 }

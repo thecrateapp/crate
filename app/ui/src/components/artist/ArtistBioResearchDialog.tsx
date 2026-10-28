@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { AlertTriangle, ExternalLink, Loader2, RefreshCw } from "lucide-react";
+import { Loader2 } from "@crate/ui/icons";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { toast } from "sonner";
 
 import {
@@ -83,7 +85,7 @@ interface ArtistBioResearchDialogProps {
   onOpenChange: (open: boolean) => void;
   artist: ArtistData;
   currentBio: string;
-  onApply: (bio: string) => Promise<void> | void;
+  onApply: (bio: string) => Promise<void>;
 }
 
 function getProposalParagraphs(result: ResearchResult): string[] {
@@ -152,34 +154,18 @@ function ReviewTabs({
   onChange: (tab: ReviewTab) => void;
 }) {
   return (
-    <div
-      className="flex flex-wrap gap-2 border-b border-border-quiet pb-3"
-      role="tablist"
-      aria-label="Biography research views"
-    >
-      {(["preview", "review", "edit", "sources"] as const).map((tab) => (
-        <button
-          key={tab}
-          type="button"
-          role="tab"
-          aria-selected={activeTab === tab}
-          onClick={() => onChange(tab)}
-          className={
-            activeTab === tab
-              ? "rounded-md bg-accent-action/15 px-3 py-1.5 text-sm font-medium text-accent-action"
-              : "rounded-md px-3 py-1.5 text-sm text-text-muted transition-colors hover:bg-surface-quiet-subtle hover:text-text-secondary-strong"
-          }
-        >
-          {tab === "preview"
-            ? "Listen preview"
-            : tab === "review"
-              ? "Review changes"
-              : tab === "edit"
-                ? "Edit"
-                : "Sources"}
-        </button>
-      ))}
-    </div>
+    <SegmentedControl
+      as="tabs"
+      label="Biography research views"
+      value={activeTab}
+      onValueChange={onChange}
+      items={[
+        { value: "preview", label: "Listen preview" },
+        { value: "review", label: "Review changes" },
+        { value: "edit", label: "Edit" },
+        { value: "sources", label: "Sources" },
+      ]}
+    />
   );
 }
 
@@ -200,10 +186,10 @@ function ResearchSourceList({ sources }: { sources: ResearchSource[] }) {
           href={source.url}
           target="_blank"
           rel="noopener noreferrer nofollow"
-          className="block rounded-md border border-border-quiet-subtle bg-surface-canvas/20 p-3 transition-colors hover:border-border-interactive"
+          className="block border-b border-border-quiet py-3 transition-colors hover:text-accent-action-hi"
         >
           <span className="flex items-center gap-2 text-xs font-medium text-accent-action">
-            {source.title} <ExternalLink size={11} />
+            {source.title}
           </span>
           <span className="mt-1 block line-clamp-3 text-xs leading-relaxed text-text-muted">
             {source.excerpt}
@@ -238,7 +224,7 @@ function ReviewSummary({ result }: { result: ResearchResult }) {
   return (
     <div
       data-testid="artist-bio-review-summary"
-      className="rounded-lg border border-border-quiet-subtle bg-surface-quiet-subtle/40 p-3"
+      className="border-y border-border-quiet py-3"
     >
       <p className="text-sm font-medium text-text-secondary-strong">
         {preserved
@@ -258,9 +244,9 @@ function ReviewSummary({ result }: { result: ResearchResult }) {
                 finding.source_ids?.join(",") ?? ""
               }`}
             >
-              <span className="mr-2 text-xs font-medium uppercase tracking-wide text-accent-action">
+              <MonoLabel as="span" tone="accent" className="mr-2">
                 {finding.kind.split("_").join(" ")}
-              </span>
+              </MonoLabel>
               {finding.summary}
             </li>
           ))}
@@ -290,8 +276,8 @@ function ReviewChanges({ result }: { result: ResearchResult }) {
   return (
     <div className="space-y-3" data-testid="artist-bio-review-changes">
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-muted">
-        <span className="text-state-success-text">Added</span>
-        <span className="text-state-danger-text">Removed</span>
+        <span className="text-accent-action-hi">Added</span>
+        <span className="text-state-warning-text">Removed</span>
         <span className="text-state-warning-text">Updated</span>
       </div>
       <div className="space-y-2 text-sm leading-relaxed">
@@ -307,19 +293,19 @@ function ReviewChanges({ result }: { result: ResearchResult }) {
                 className="rounded-md border border-state-warning bg-state-warning/5 p-3"
               >
                 {change.previous_text ? (
-                  <p className="text-state-danger-text line-through">
+                  <p className="text-state-warning-text line-through">
                     {change.previous_text}
                   </p>
                 ) : null}
-                <p className="mt-1 text-state-success-text">{change.text}</p>
+                <p className="mt-1 text-accent-action-hi">{change.text}</p>
               </div>
             );
           }
           const className =
             change.status === "added"
-              ? "text-state-success-text"
+              ? "text-accent-action-hi"
               : change.status === "removed"
-                ? "text-state-danger-text line-through"
+                ? "text-state-warning-text line-through"
                 : "text-text-secondary-strong";
           return (
             <p
@@ -407,8 +393,14 @@ function ResearchResultContent({
 
       {activeTab === "edit" ? (
         <div className="space-y-4">
-          <label htmlFor="artist-bio-proposal" className="grid gap-2 text-sm">
-            <span className="font-medium text-text-secondary-strong">
+          <label
+            htmlFor="artist-bio-proposal"
+            className="crate-form-field text-sm"
+          >
+            <span
+              data-slot="form-field-label"
+              className="font-medium text-text-secondary-strong"
+            >
               Proposed biography
             </span>
             <Textarea
@@ -481,7 +473,11 @@ function ResearchDialogBody({
           aria-live="polite"
           className="flex items-center gap-3 rounded-lg border border-accent-action/20 bg-accent-action/5 p-5 text-sm text-text-secondary-strong"
         >
-          <Loader2 className="animate-spin text-accent-action" size={18} />
+          <Loader2
+            data-admin-ux="bio-research-loading"
+            className="animate-spin text-accent-action"
+            size={18}
+          />
           Searching MusicBrainz, Wikipedia, Last.fm and official pages, then
           consolidating evidence…
         </div>
@@ -489,13 +485,13 @@ function ResearchDialogBody({
       {error ? (
         <div
           role="alert"
-          className="flex items-start gap-3 rounded-lg border border-state-danger/25 bg-state-danger/5 p-4 text-sm text-state-danger-text"
+          className="flex items-start gap-3 rounded-lg border border-state-warning/25 bg-state-warning/5 p-4 text-sm text-state-warning-text"
         >
-          <AlertTriangle size={17} className="mt-0.5 shrink-0" />
           <div className="space-y-2">
             <p>{error}</p>
             <Button size="sm" variant="outline" onClick={onRetry}>
-              <RefreshCw size={14} className="mr-2" /> Retry research
+              {" "}
+              Retry research
             </Button>
           </div>
         </div>
@@ -577,7 +573,7 @@ export function ArtistBioResearchDialog({
     setApplying(true);
     try {
       await onApply(value);
-      toast.success("Biography proposal applied");
+      toast.success("Biography saved");
       onOpenChange(false);
     } catch (nextError) {
       toast.error(
@@ -591,16 +587,26 @@ export function ArtistBioResearchDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!applying) onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent
-        className="flex h-[min(92dvh,960px)] w-[min(92vw,72rem)] max-h-[min(92dvh,960px)] !max-w-5xl flex-col overflow-hidden"
+        className="flex h-[min(92dvh,960px)] max-h-[min(92dvh,960px)] flex-col overflow-hidden"
+        size="2xl"
         onOpenAutoFocus={() => void runResearch()}
       >
         <DialogHeader className="shrink-0">
-          <DialogTitle>Research biography with AI</DialogTitle>
+          <DialogTitle className="font-display">
+            Research biography with AI
+          </DialogTitle>
           <DialogDescription>
             Internet sources are collected and consolidated into an editable
-            proposal for {artist.name}. Nothing is saved until you apply it.
+            proposal for {artist.name}. Apply biography saves the reviewed text
+            to the library. Other metadata edits remain in the editor until
+            saved.
           </DialogDescription>
         </DialogHeader>
         <ResearchDialogBody
@@ -629,7 +635,11 @@ export function ArtistBioResearchDialog({
             disabled={!result || !proposal.trim() || applying}
           >
             {applying ? (
-              <Loader2 size={14} className="mr-2 animate-spin" />
+              <Loader2
+                data-admin-ux="bio-apply-loading"
+                size={14}
+                className="mr-2 animate-spin"
+              />
             ) : null}
             Apply biography
           </Button>

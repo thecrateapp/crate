@@ -1,0 +1,37 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/FormField.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">FormField</DocHeading>
+<EntryDetails
+  id="primitives-formfield"
+  review="Visual review approved by Diego · 1AR"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+- All captions use the same MonoLabel: JetBrains Mono 400, uppercase, 11/15.4 px and caps tracking. Layout changes placement only, never the typography, color or component.
+- `layout="stacked"` labels the control above; `layout="inline"` places Checkbox/Switch before their caption with a 16 px horizontal gap. Hint/error remain below the caption.
+- One labelable control, or a render prop for composite/group controls. Owns the uppercase Mono caption, actual 8 px gap, optional required mark, hint and warning error.
+- Clone mode preserves child ID, ref, external descriptions and invalid state. Render mode forwards the supplied id/ARIA attributes to the actual control or group.
+- Use output for a readonly value; Input readOnly remains a selectable native text field. Validation and server data stay with the app.
+- Caption text must not be marked `form-field-value`; that slot preserves the case of actual values. Test the visible caption text, including nested spans. The isolated 1AR review includes the exact “First Song · FLAC” checkbox case.
+- The approved persistent mockup and Diego's confirmed adjustments are the visual reference. Examples import the actual component; scene CSS does not repair its internals.
+
+<DocHeading as="h2">Real component</DocHeading>
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Validation} />
+<Canvas of={Stories.InlineChoice} />
+
+<Canvas of={Stories.ReadOnly} />
+
+<Canvas of={Stories.LongLabel} />
+
+<Controls of={Stories.Base} />
+
+Consumer adoption and platform QA are separate from this entry and its visual review.
+
+For RadioGroup and SegmentedControl, set `kind="group"`. Its caption is a div with an ID referenced by the group's aria-labelledby, rather than a native label pointing to a non-labelable div. The cloned or render-prop control retains the generated ID and associated help/error. Single native/Radix button controls retain the ordinary label target. Inline checkbox/switch fields remain ordinary controls.

@@ -1,0 +1,3584 @@
+{
+  "scope": "Imported production JSX sites, not runtime instances. Overrides are candidates; group container styles and reviewed44px targets remain valid.",
+  "baselineCounts": {
+    "Badge": {
+      "Admin": 99,
+      "Listen": 0,
+      "Shared": 0,
+      "overrideCandidates": 39
+    },
+    "CrateChip": {
+      "Admin": 205,
+      "Listen": 1,
+      "Shared": 0,
+      "overrideCandidates": 5
+    },
+    "CratePill": {
+      "Admin": 39,
+      "Listen": 4,
+      "Shared": 0,
+      "overrideCandidates": 6
+    },
+    "SegmentedControl": {
+      "Admin": 14,
+      "Listen": 10,
+      "Shared": 0,
+      "overrideCandidates": 3
+    },
+    "GenrePillRow": {
+      "Admin": 3,
+      "Listen": 4,
+      "Shared": 1,
+      "overrideCandidates": 0
+    },
+    "CrateBadge": {
+      "Admin": 0,
+      "Listen": 51,
+      "Shared": 1,
+      "overrideCandidates": 1
+    },
+    "GenrePill": {
+      "Admin": 1,
+      "Listen": 3,
+      "Shared": 0,
+      "overrideCandidates": 0
+    }
+  },
+  "approvedRecipe": "InfoBadge24px/12px(16px line); FilterChip/SegmentedControl/GenrePill12px32/44px. Counter variant6px horizontal; other informative8px. Generic tokens unchanged.",
+  "counts": {
+    "Badge": {
+      "Admin": 98,
+      "Listen": 0,
+      "Shared": 0,
+      "overrideCandidates": 0
+    },
+    "GenrePillRow": {
+      "Admin": 3,
+      "Listen": 4,
+      "Shared": 1,
+      "overrideCandidates": 0
+    },
+    "InfoBadge": {
+      "Admin": 227,
+      "Listen": 53,
+      "Shared": 1,
+      "overrideCandidates": 0
+    },
+    "SegmentedControl": {
+      "Admin": 14,
+      "Listen": 10,
+      "Shared": 0,
+      "overrideCandidates": 3
+    },
+    "FilterChip": {
+      "Admin": 18,
+      "Listen": 4,
+      "Shared": 0,
+      "overrideCandidates": 5
+    },
+    "GenrePill": {
+      "Admin": 1,
+      "Listen": 3,
+      "Shared": 0,
+      "overrideCandidates": 0
+    }
+  },
+  "sites": [
+    {
+      "path": "app/ui/src/pages/Album.tsx",
+      "line": 346,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Album.tsx",
+      "line": 511,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Album.tsx",
+      "line": 1250,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Album.tsx",
+      "line": 1266,
+      "name": "GenrePillRow",
+      "from": "@/components/genres/GenrePill",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Album.tsx",
+      "line": 1283,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"cursor-pointer hover:bg-primary/20\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 139,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 140,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 142,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 244,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 247,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 250,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 253,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 258,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n                    track.has_mood\n                      ? \"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"\n                      : \"border-border-quiet bg-surface-card text-text-subtle\"\n                  }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 274,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 511,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 512,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 513,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 514,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 515,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 516,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 517,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 521,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 524,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 600,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 601,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n                    status.chromaprint_available\n                      ? \"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"\n                      : \"border-border-quiet bg-surface-card text-text-subtle\"\n                  }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 770,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 802,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Analysis.tsx",
+      "line": 838,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Artist.tsx",
+      "line": 228,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 284,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 368,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 373,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"border-border-quiet bg-surface-card text-text-subtle\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 384,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"border-accent-action/30 bg-accent-action/10 text-accent-action-hi\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 445,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 446,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"bg-accent-action/10 text-accent-action-hi\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 523,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 597,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "{cn(\"capitalize\", importStatusClass(item.status))}",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 633,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "{cn(\n                \"capitalize\",\n                importStatusClass(item.latest_import_status),\n              )}",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Bandcamp.tsx",
+      "line": 642,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Browse.tsx",
+      "line": 415,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Browse.tsx",
+      "line": 428,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Browse.tsx",
+      "line": 441,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Contributions.tsx",
+      "line": 201,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Contributions.tsx",
+      "line": 204,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Contributions.tsx",
+      "line": 206,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Contributions.tsx",
+      "line": 211,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "line": 145,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "line": 148,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "line": 150,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "line": 175,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "line": 180,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "line": 269,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "line": 402,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "line": 405,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "line": 406,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Discover.tsx",
+      "line": 407,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 669,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n                  tidalAuthenticated\n                    ? \"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"\n                    : \"border-state-warning/25 bg-state-warning/10 text-state-warning-text\"\n                }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 678,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n                  activeQueue.length > 0\n                    ? \"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"\n                    : \"\"\n                }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 687,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 688,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 706,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 743,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 762,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 847,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"ml-1\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 855,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"ml-1\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 867,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 879,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1260,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"bg-accent-action/10 text-accent-action-hi border-0\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1426,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n          item.status === \"completed\"\n            ? \"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"\n            : item.status === \"failed\"\n              ? \"border-state-warning/25 bg-state-warning/10 text-state-warning-text\"\n              : item.status === \"wishlist\"\n                ? \"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"\n                : \"\"\n        }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1689,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"bg-accent-action/90 text-white\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1696,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"bg-surface-elevated text-text-secondary\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1749,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1913,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1914,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Download.tsx",
+      "line": 1918,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"bg-accent-action/10 text-accent-action-hi border-accent-action/20\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 336,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"gap-1 border-accent-action/20 bg-accent-action/10 text-accent-action-hi\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 802,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"border-accent-action/20 bg-accent-action/10 text-accent-action-hi\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 806,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 876,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 881,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1033,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1222,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1359,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1360,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1361,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n            (unmappedGenres?.length || 0) > 0\n              ? \"border-state-warning/25 bg-state-warning/10 text-state-warning-text\"\n              : undefined\n          }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1371,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n              invalidTaxonomy.invalid_count > 0\n                ? \"border-state-warning/25 bg-state-warning/10 text-state-warning-text\"\n                : \"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"\n            }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1567,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"border-state-warning/30 bg-state-warning/10 text-state-warning-text\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1573,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"border-state-warning/30 bg-black/10 text-state-warning-text\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1579,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"border-state-warning/30 bg-black/10 text-state-warning-text\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1628,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"border-state-warning/30 bg-state-warning/10 text-state-warning-text\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1659,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"border-state-warning/30 text-state-warning-text\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 1722,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "{\n                              g.mapped\n                                ? \"border-primary/30 bg-primary/10 text-primary\"\n                                : \"border-state-warning/30 bg-state-warning/10 text-state-warning-text\"\n                            }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 2030,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 2031,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 2032,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n            genre.mapped\n              ? \"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"\n              : \"border-state-warning/25 bg-state-warning/10 text-state-warning-text\"\n          }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 2042,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 2045,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Genres.tsx",
+      "line": 2190,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"mt-1\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/GlobalCatalog.tsx",
+      "line": 346,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/GlobalCatalog.tsx",
+      "line": 402,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Health.tsx",
+      "line": 714,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Health.tsx",
+      "line": 724,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Health.tsx",
+      "line": 937,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n                                  SCOPE_TONES[catalogEntry.scope] ||\n                                  SCOPE_TONES.hybrid\n                                }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Health.tsx",
+      "line": 1075,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{executionLaneTone(entry)}",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/I18nReview.tsx",
+      "line": 648,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/I18nReview.tsx",
+      "line": 673,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "{\n                    health.draftCount > 0\n                      ? statusBadgeClass(\"needs_review\")\n                      : statusBadgeClass(\"published\")\n                  }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/I18nReview.tsx",
+      "line": 782,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/I18nReview.tsx",
+      "line": 843,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "{statusBadgeClass(bundle.status)}",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/I18nReview.tsx",
+      "line": 1130,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "{\n            issues.length > 0\n              ? \"border-state-warning/25 bg-state-warning/10 text-state-warning-text\"\n              : \"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"\n          }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/I18nReview.tsx",
+      "line": 1187,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/I18nReview.tsx",
+      "line": 1202,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "{\n        status === \"stale\" || status === \"missing\"\n          ? \"border-state-warning/25 bg-state-warning/10 text-state-warning-text\"\n          : \"border-state-warning/25 bg-state-warning/10 text-state-warning-text\"\n      }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 155,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 156,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 354,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 355,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 359,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 362,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 364,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 420,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 496,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 500,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 501,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 502,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Logs.tsx",
+      "line": 504,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 115,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 118,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 122,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 124,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 126,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 142,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 149,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 294,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 297,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 300,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 598,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 599,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 600,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 601,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 602,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 657,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "\"min-h-11\"",
+      "geometryOrTypeOverride": true
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 664,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "\"min-h-11\"",
+      "geometryOrTypeOverride": true
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 671,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "\"min-h-11\"",
+      "geometryOrTypeOverride": true
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 678,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "\"min-h-11\"",
+      "geometryOrTypeOverride": true
+    },
+    {
+      "path": "app/ui/src/pages/NewReleases.tsx",
+      "line": 685,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "\"min-h-11\"",
+      "geometryOrTypeOverride": true
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 348,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 356,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 360,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"border-state-warning/25 bg-state-warning/10 text-state-warning-text\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 367,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"border-state-warning/25 bg-state-warning/10 text-state-warning-text\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 372,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 398,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 997,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1000,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1001,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1003,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1019,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1020,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1021,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1025,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1027,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1030,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1157,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1286,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1431,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1434,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1438,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1441,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1538,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1541,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1544,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1759,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1810,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/PlaylistEditor.tsx",
+      "line": 1814,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 193,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 197,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"border-state-warning/25 bg-state-warning/10 text-state-warning-text\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 204,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"border-state-warning/25 bg-state-warning/10 text-state-warning-text\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 239,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 461,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 557,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 558,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 562,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 565,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 568,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 586,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 587,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 590,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 595,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 598,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Playlists.tsx",
+      "line": 1116,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Profile.tsx",
+      "line": 112,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"mt-1\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Roles.tsx",
+      "line": 100,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Roles.tsx",
+      "line": 106,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"max-w-full\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Roles.tsx",
+      "line": 141,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"max-w-full text-white/68\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 488,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 491,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 494,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 497,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n                  settings.telegram?.enabled\n                    ? \"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"\n                    : undefined\n                }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 582,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 692,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"border-primary/30 bg-primary/15 text-primary\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 697,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 700,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 704,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 728,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 993,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 1071,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "{`${\n                policy.downloads_allowed_now\n                  ? \"bg-accent-action/10 text-accent-action-hi border-accent-action/20\"\n                  : \"bg-state-warning/10 text-state-warning-text border-state-warning/20\"\n              }`}",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 1249,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 1423,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 1520,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"gap-1\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 1613,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Settings.tsx",
+      "line": 1872,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Stack.tsx",
+      "line": 226,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{state.chip}",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Stack.tsx",
+      "line": 230,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Stack.tsx",
+      "line": 356,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Stack.tsx",
+      "line": 605,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Stack.tsx",
+      "line": 608,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Stack.tsx",
+      "line": 609,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Stack.tsx",
+      "line": 676,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 591,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"shrink-0\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 796,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 823,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 846,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n                        variant.status === \"ready\" ||\n                        variant.status === \"running\"\n                          ? \"border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi\"\n                          : variant.status === \"failed\"\n                            ? \"border-state-warning/20 bg-state-warning/[0.08] text-state-warning-text\"\n                            : \"border-state-warning/20 bg-state-warning/[0.06] text-state-warning-text\"\n                      }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 969,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 991,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 996,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 997,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 999,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n              Number(errorRate) > 1\n                ? \"border-state-warning/25 bg-state-warning/10 text-state-warning-text\"\n                : undefined\n            }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 1010,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 1013,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 1018,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 1023,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/SystemHealth.tsx",
+      "line": 1028,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n              system.resource_pressure.allowed\n                ? \"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"\n                : \"border-state-warning/25 bg-state-warning/10 text-state-warning-text\"\n            }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 502,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 672,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n                EVENT_BADGE_COLORS[event.type] ||\n                \"border-white/10 bg-white/[0.04] text-white/60\"\n              }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 736,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n                EVENT_BADGE_COLORS[event.type] ||\n                \"border-white/10 bg-white/[0.04] text-white/60\"\n              }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 844,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 845,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 846,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 847,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 950,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"border-white/10 bg-black/20 text-white/70\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1058,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n              (runtime?.active ?? 0) > 0\n                ? \"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"\n                : undefined\n            }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1067,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1071,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1074,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"border-state-warning/25 bg-state-warning/10 text-state-warning-text\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1078,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1150,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{variantStatusClass(variant.status)}",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1219,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{status.pill}",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1220,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1329,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{status.pill}",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1330,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{familyMeta.chip}",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1334,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"border-state-warning/20 bg-state-warning/[0.06] text-state-warning-text\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1339,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{highlightMeta.pill}",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1897,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1900,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1901,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1905,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1908,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"border-state-warning/25 bg-state-warning/10 text-state-warning-text\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 1912,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"border-state-warning/25 bg-state-warning/10 text-state-warning-text\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 2007,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Tasks.tsx",
+      "line": 2028,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 398,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 399,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 402,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 403,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 484,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 620,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 775,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 776,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 778,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 780,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 1057,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 1058,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Upcoming.tsx",
+      "line": 1091,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 583,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n          user.online_now\n            ? \"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"\n            : \"border-white/10 bg-white/[0.04] text-white/55\"\n        }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 596,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n          user.listening_now\n            ? \"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"\n            : \"border-white/10 bg-white/[0.04] text-white/55\"\n        }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 605,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 609,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 897,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 898,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n                  counts.online > 0\n                    ? \"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"\n                    : undefined\n                }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 907,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n                  counts.listening > 0\n                    ? \"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"\n                    : undefined\n                }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 916,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 986,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1046,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1068,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "{statusBadgeClass(userStatus(user))}",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1500,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1511,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "{statusBadgeClass(userStatus(detail))}",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1518,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1568,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1579,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"text-white/55\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1587,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"text-white/40\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1601,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1737,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1745,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"text-white/45\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1824,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"border-accent-action/25 bg-accent-action/10 text-accent-action-hi\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1829,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1834,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"text-white/55\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1839,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"text-white/45\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1896,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1902,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1908,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1944,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "{status.className}",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/Users.tsx",
+      "line": 1947,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/album/AlbumCard.tsx",
+      "line": 224,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/album/AlbumHeader.tsx",
+      "line": 390,
+      "name": "GenrePillRow",
+      "from": "@/components/genres/GenrePill",
+      "className": "\"mb-3\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/album/AlbumHeader.tsx",
+      "line": 395,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/album/AlbumHeader.tsx",
+      "line": 397,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/album/AlbumHeader.tsx",
+      "line": 400,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/album/AlbumHeader.tsx",
+      "line": 404,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/album/AlbumRow.tsx",
+      "line": 118,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/album/AudioProfileCard.tsx",
+      "line": 218,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/album/MissingAlbumCard.tsx",
+      "line": 46,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"border-border-quiet text-text-secondary\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/album/RelatedAlbums.tsx",
+      "line": 93,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/album/TagEditor.tsx",
+      "line": 161,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"gap-1\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/album/TagEditor.tsx",
+      "line": 183,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"cursor-pointer hover:bg-primary/20\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/album/TrackTable.tsx",
+      "line": 556,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistArtworkGallery.tsx",
+      "line": 410,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistArtworkGallery.tsx",
+      "line": 480,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistArtworkGallery.tsx",
+      "line": 483,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistCard.tsx",
+      "line": 111,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistCard.tsx",
+      "line": 114,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistCard.tsx",
+      "line": 118,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistCard.tsx",
+      "line": 120,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistCard.tsx",
+      "line": 123,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistCard.tsx",
+      "line": 124,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistDiscographySection.tsx",
+      "line": 92,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistGenreSelector.tsx",
+      "line": 97,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"max-w-[180px] truncate\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistHeroArtworkEditor.tsx",
+      "line": 542,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistHeroArtworkEditor.tsx",
+      "line": 543,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistHeroArtworkEditor.tsx",
+      "line": 544,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistHeroArtworkEditor.tsx",
+      "line": 555,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistHeroArtworkEditor.tsx",
+      "line": 630,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistHeroArtworkEditor.tsx",
+      "line": 1074,
+      "name": "GenrePill",
+      "from": "@crate/ui/domain/genres/GenrePill",
+      "className": "\"max-w-[42vw] backdrop-blur-sm sm:max-w-none\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistHeroSection.tsx",
+      "line": 346,
+      "name": "GenrePillRow",
+      "from": "@/components/genres/GenrePill",
+      "className": "\"mb-3\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistHeroSection.tsx",
+      "line": 350,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistMetadataEditor.tsx",
+      "line": 307,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRepairDialog.tsx",
+      "line": 576,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRepairDialog.tsx",
+      "line": 577,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"border-accent-action/20 bg-accent-action/[0.05] text-accent-action-hi\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRepairDialog.tsx",
+      "line": 580,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRepairDialog.tsx",
+      "line": 582,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRepairDialog.tsx",
+      "line": 703,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRepairDialog.tsx",
+      "line": 704,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n                                item.executable\n                                  ? \"border-accent-action/20 bg-accent-action/[0.06] text-accent-action-hi\"\n                                  : \"border-white/10 bg-white/[0.04] text-white/50\"\n                              }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRepairDialog.tsx",
+      "line": 720,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{\n                                  SCOPE_TONES[item.scope || \"hybrid\"] ||\n                                  SCOPE_TONES.hybrid\n                                }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRepairDialog.tsx",
+      "line": 730,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"border-accent-action/20 bg-accent-action/[0.05] text-accent-action-hi\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRow.tsx",
+      "line": 113,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRow.tsx",
+      "line": 116,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistRow.tsx",
+      "line": 123,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/artist/ArtistShowsSection.tsx",
+      "line": 115,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"border-accent-action/30 text-accent-action-hi\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+      "line": 314,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"border-primary/30 bg-primary/10 text-primary\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+      "line": 321,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "{\n              hasPreset\n                ? \"border-primary/30 bg-primary/10 text-primary\"\n                : \"border-white/15 text-white/55\"\n            }",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+      "line": 336,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "\"border-white/15 text-white/40\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+      "line": 459,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+      "line": 606,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/genres/GenreTaxonomyTree.tsx",
+      "line": 717,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/layout/Sidebar.tsx",
+      "line": 351,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"shrink-0 tabular-nums\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/layout/Sidebar.tsx",
+      "line": 432,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/components/scanner/ScanProgress.tsx",
+      "line": 127,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "{cn(\n              \"\",\n              count > 0\n                ? (ISSUE_COLORS[type] ??\n                    \"text-state-warning-text border-state-warning/40\")\n                : \"text-muted-foreground border-border\",\n            )}",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/federation/AuditPanel.tsx",
+      "line": 27,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/federation/DirectoriesPanel.tsx",
+      "line": 147,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/federation/DirectoriesPanel.tsx",
+      "line": 256,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/federation/DirectoriesPanel.tsx",
+      "line": 258,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/federation/ImportsPanel.tsx",
+      "line": 59,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/federation/PeersPanel.tsx",
+      "line": 43,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/ui/src/pages/federation/SecurityPanel.tsx",
+      "line": 102,
+      "name": "Badge",
+      "from": "@crate/ui/shadcn/badge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/pages/Bandcamp.tsx",
+      "line": 125,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/pages/HomePlaylist.tsx",
+      "line": 248,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"w-fit\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/pages/Library.tsx",
+      "line": 170,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "{TAB_LIST_CLASS_NAME}",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/pages/LibraryBandcampHeader.tsx",
+      "line": 29,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/pages/OfflineLibrary.tsx",
+      "line": 54,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/pages/PlaylistContent.tsx",
+      "line": 41,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/pages/PlaylistContent.tsx",
+      "line": 43,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/pages/PlaylistContent.tsx",
+      "line": 49,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/pages/ShowsContent.tsx",
+      "line": 96,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "\"flex-wrap gap-2 p-0\"",
+      "geometryOrTypeOverride": true
+    },
+    {
+      "path": "app/listen/src/pages/StatsAnalyticsSections.tsx",
+      "line": 75,
+      "name": "GenrePillRow",
+      "from": "@crate/ui/domain/genres/GenrePill",
+      "className": "\"mt-5\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/pages/StatsNarrativeSections.tsx",
+      "line": 80,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/pages/StatsNarrativeSections.tsx",
+      "line": 87,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/pages/Upload.tsx",
+      "line": 197,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/pages/UserProfileHero.tsx",
+      "line": 87,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/pages/UserProfileTaste.tsx",
+      "line": 86,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/album/AlbumHero.tsx",
+      "line": 122,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/album/AlbumHeroContributor.tsx",
+      "line": 71,
+      "name": "GenrePillRow",
+      "from": "@crate/ui/domain/genres/GenrePill",
+      "className": "\"mt-3 hidden sm:flex\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/artist/ArtistCommunitySections.tsx",
+      "line": 48,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/artist/ArtistCommunitySections.tsx",
+      "line": 58,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/cards/AlbumCardParts.tsx",
+      "line": 234,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"absolute bottom-2 left-2 z-10\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/cards/TrackRow.tsx",
+      "line": 177,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/crates/CrateForm.tsx",
+      "line": 123,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/crates/CrateForm.tsx",
+      "line": 141,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/crates/CratePageHeader.tsx",
+      "line": 124,
+      "name": "GenrePillRow",
+      "from": "@crate/ui/domain/genres/GenrePill",
+      "className": "\"mt-3 hidden sm:flex\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/home/HomeHeroContent.tsx",
+      "line": 56,
+      "name": "GenrePill",
+      "from": "@crate/ui/domain/genres/GenrePill",
+      "className": "\"max-w-[42vw] backdrop-blur-sm sm:max-w-none\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/home/HomeSectionCards.tsx",
+      "line": 59,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/home/HomeSectionCards.tsx",
+      "line": 68,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"relative\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/home/HomeShowPrep.tsx",
+      "line": 53,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/home/HomeShowPrep.tsx",
+      "line": 64,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/home/HomeUpcomingFeatureCard.tsx",
+      "line": 165,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"mb-4\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/jam/JamMembersPanel.tsx",
+      "line": 116,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/jam/JamQueueToolbarSections.tsx",
+      "line": 83,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomAutoDjOptions.tsx",
+      "line": 43,
+      "name": "GenrePill",
+      "from": "@crate/ui/domain/genres/GenrePill",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomCard.tsx",
+      "line": 194,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomCard.tsx",
+      "line": 200,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomCard.tsx",
+      "line": 203,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomCard.tsx",
+      "line": 208,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomCreateOptions.tsx",
+      "line": 23,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomHeaderSections.tsx",
+      "line": 82,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomHeaderSections.tsx",
+      "line": 89,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomHeaderSections.tsx",
+      "line": 95,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomHeaderSections.tsx",
+      "line": 108,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomHeaderSections.tsx",
+      "line": 112,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomHeaderSections.tsx",
+      "line": 129,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomHeaderSections.tsx",
+      "line": 134,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomHeaderSections.tsx",
+      "line": 141,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/jam/JamRoomPlaybackSections.tsx",
+      "line": 198,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/player/EqualizerAdaptiveReadouts.tsx",
+      "line": 21,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"tabular-nums\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/player/EqualizerPanelSections.tsx",
+      "line": 71,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/player/EqualizerPanelSections.tsx",
+      "line": 116,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/player/EqualizerPanelSections.tsx",
+      "line": 127,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/player/EqualizerPanelSections.tsx",
+      "line": 154,
+      "name": "FilterChip",
+      "from": "@crate/ui/primitives/FilterChip",
+      "className": "{PRESET_CHIP_CLASS_NAME}",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/player/ExtendedPlayerTabs.tsx",
+      "line": 35,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "\"gap-1.5 p-0\"",
+      "geometryOrTypeOverride": true
+    },
+    {
+      "path": "app/listen/src/components/player/PlaybackTargetPopover.tsx",
+      "line": 230,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{cn(\"mt-0.5\", !target.available && \"text-text-subtle\")}",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/player/PlayerSurfaceModeSwitch.tsx",
+      "line": 45,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "{cn(\n        variant === \"boxed\" ? \"border border-border-subtle p-1\" : \"p-0\",\n        className,\n      )}",
+      "geometryOrTypeOverride": true
+    },
+    {
+      "path": "app/listen/src/components/player/QueueTrackRow.tsx",
+      "line": 59,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/playlists/PlaylistCard.tsx",
+      "line": 294,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"absolute bottom-2 left-2\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/playlists/PlaylistCard.tsx",
+      "line": 543,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/playlists/PlaylistCollaboratorsModal.tsx",
+      "line": 100,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/playlists/PlaylistIdentitySection.tsx",
+      "line": 181,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/radio/RadioStationCard.tsx",
+      "line": 120,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"absolute left-2.5 top-2.5 max-w-[calc(100%-1.25rem)] whitespace-nowrap\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/settings/ConnectDevicesSection.tsx",
+      "line": 237,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/settings/ConnectDevicesSection.tsx",
+      "line": 239,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/settings/InterfacePreferencesSection.tsx",
+      "line": 56,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/social/ProfileHoverCardContent.tsx",
+      "line": 129,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/social/ProfileHoverCardContent.tsx",
+      "line": 133,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "\"mt-3\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/social/ProfileHoverCardContent.tsx",
+      "line": 189,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/stats/StatsGenreTrendCard.tsx",
+      "line": 23,
+      "name": "GenrePill",
+      "from": "@crate/ui/domain/genres/GenrePill",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/stats/StatsPeriodPicker.tsx",
+      "line": 29,
+      "name": "SegmentedControl",
+      "from": "@crate/ui/primitives/SegmentedControl",
+      "className": "\"lg:inline-flex lg:w-auto lg:self-end\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/upcoming/UpcomingShowExpandedView.tsx",
+      "line": 99,
+      "name": "GenrePillRow",
+      "from": "@crate/ui/domain/genres/GenrePill",
+      "className": "\"mt-4\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/layout/topbar/TopBarSearchDropdown.tsx",
+      "line": 127,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/player/bar/QualityBadge.tsx",
+      "line": 65,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{variantClass}",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/player/extended/InfoTabHeroIdentity.tsx",
+      "line": 97,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/listen/src/components/player/extended/InfoTabMood.tsx",
+      "line": 31,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/shared/ui/domain/ArtistBioProfile.tsx",
+      "line": 449,
+      "name": "GenrePillRow",
+      "from": "@crate/ui/domain/genres/GenrePill",
+      "className": "\"mt-3\"",
+      "geometryOrTypeOverride": false
+    },
+    {
+      "path": "app/shared/ui/domain/offline/OfflineBadge.tsx",
+      "line": 71,
+      "name": "InfoBadge",
+      "from": "@crate/ui/primitives/InfoBadge",
+      "className": "{className}",
+      "geometryOrTypeOverride": false
+    }
+  ]
+}

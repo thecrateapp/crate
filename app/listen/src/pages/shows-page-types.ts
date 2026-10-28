@@ -1,4 +1,4 @@
-import type { UpcomingItem } from "@/components/upcoming/UpcomingRows";
+import type { UpcomingItem } from "../components/upcoming/upcoming-types";
 
 export type { UpcomingItem };
 

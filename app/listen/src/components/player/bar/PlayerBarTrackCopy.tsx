@@ -1,8 +1,12 @@
 import type { MouseEventHandler } from "react";
 import { useTranslation } from "react-i18next";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
-import type { CrossfadeTransition } from "@/contexts/player-context";
-import type { PlaySource, Track } from "@/contexts/player-types";
+import type {
+  CrossfadeTransition,
+  PlaySource,
+  Track,
+} from "../../../contexts/player-types";
 
 interface PlayerBarTrackCopyProps {
   displayTrack: Track;
@@ -40,17 +44,23 @@ export function PlayerBarTrackCopy({
           <>
             <div
               className="absolute inset-0"
-              style={{ opacity: 1 - crossfadeProgress }}
+              style={{
+                opacity: `calc(1 - var(--listen-crossfade-progress, ${crossfadeProgress}))`,
+              }}
             >
-              <p className="truncate text-caption font-semibold leading-tight text-text-primary">
+              <p className="truncate text-base font-medium leading-tight text-text-primary">
                 {displayCrossfadeTransition.outgoing.title}
               </p>
               <p className="mt-0.5 truncate text-xs leading-tight text-text-muted">
                 {displayCrossfadeTransition.outgoing.artist}
               </p>
             </div>
-            <div style={{ opacity: crossfadeProgress }}>
-              <p className="truncate text-caption font-semibold leading-tight text-text-primary">
+            <div
+              style={{
+                opacity: `var(--listen-crossfade-progress, ${crossfadeProgress})`,
+              }}
+            >
+              <p className="truncate text-base font-medium leading-tight text-text-primary">
                 {displayCrossfadeTransition.incoming.title}
               </p>
               <p className="mt-0.5 truncate text-xs leading-tight text-text-muted">
@@ -63,7 +73,7 @@ export function PlayerBarTrackCopy({
             {isDesktop && hasAlbum ? (
               <button
                 type="button"
-                className="link-meta block w-fit max-w-full truncate text-left text-caption font-semibold leading-tight text-text-primary"
+                className="link-meta block w-fit max-w-full truncate text-left text-base font-medium leading-tight text-text-primary"
                 onClick={(event) => {
                   event.stopPropagation();
                   onOpenAlbum();
@@ -72,7 +82,7 @@ export function PlayerBarTrackCopy({
                 {displayTrack.title}
               </button>
             ) : (
-              <p className="truncate text-caption font-semibold leading-tight text-text-primary">
+              <p className="truncate text-base font-medium leading-tight text-text-primary">
                 {displayTrack.title}
               </p>
             )}
@@ -101,7 +111,9 @@ export function PlayerBarTrackCopy({
             key={`src-${sourceLabel}`}
             className="animate-fade-in flex min-w-0 items-baseline gap-1 text-xs leading-tight text-text-muted"
           >
-            <span className="shrink-0">{t("player.playingFrom")}</span>
+            <MonoLabel as="span" className="shrink-0">
+              {t("player.playingFrom")}
+            </MonoLabel>
             {displayPlaySource?.href && sourceLabel !== "Discovery Radio" ? (
               <button
                 type="button"

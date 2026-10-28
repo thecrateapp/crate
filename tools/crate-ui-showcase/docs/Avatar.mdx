@@ -1,0 +1,28 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/Avatar.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">Avatar</DocHeading>
+<EntryDetails id="primitives-avatar" review="1AV approved · compact artist sizing under review in 1BA" />
+<DocHeading as="h2">Contract</DocHeading>
+
+The canonical sizes are24/28/32/40/56/80px (xs/inline/sm/md/lg/xl). Circle is the person default; rounded is an explicit existing role. The corresponding fallback text sizes are12/12/12/14/18/24px, semibold body text. The inline28px size preserves the V2 player artist identity; the album artist byline uses xs24px. These small identity avatars are separate from standalone media thumbnails, which keep their48px minimum. No caller needs to repair its internal size. Name uses first/last initials, including Unicode; one-word names use one initial and missing names use ?. Explicit empty alt is decorative. A failed source falls back; a different source can load. Native span attributes/ref forward. renderImage keeps authenticated transport in the app and supplies its final-error callback; the app owns retry before calling it. UserAvatar already adopts this contract through EntityAvatar and CrateImage; no user-size change is made.
+
+The approved mockup and Diego's confirmed amendments are the visual reference. Stories mount
+real shared components. Local1AV evidence is separate from adoption on all routes and native/AT QA.
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Sizes} />
+
+<Canvas of={Stories.Image} />
+
+<Canvas of={Stories.FailedImage} />
+
+<Canvas of={Stories.Decorative} />
+
+<Canvas of={Stories.Rounded} />
+
+<Controls of={Stories.Base} />

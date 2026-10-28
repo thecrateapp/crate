@@ -1,0 +1,23 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/Separator.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">Separator</DocHeading>
+<EntryDetails id="shadcn-separator" review="1AT approved" />
+<DocHeading as="h2">Contract</DocHeading>
+
+One-pixel horizontal or vertical rule, decorative by default with explicit semantic mode.
+
+Horizontal:1px high and full width. Vertical:1px wide and fills an explicitly sized parent. Subtle-border color distinguishes sibling regions; InstrumentPanel owns its quieter top rule. Decorative=true avoids screen-reader noise; decorative=false exposes the native separator role and vertical orientation when needed. Native ref and ARIA pass through. No focus target or click behavior.
+
+The approved persistent mockup and confirmed amendments are the reference. Scene layout never repairs component internals.
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Vertical} />
+
+<Canvas of={Stories.Semantic} />
+
+<Controls of={Stories.Base} />

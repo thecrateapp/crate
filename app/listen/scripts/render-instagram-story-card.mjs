@@ -6,11 +6,9 @@ const WIDTH = 1080;
 const HEIGHT = 1920;
 const CRATE_LOGO_PATH = resolve("app/listen/public/icons/logo.svg");
 const CRATE_LOGO_HREF = resolveSvgHref(CRATE_LOGO_PATH);
-const POPPINS_600_HREF = resolveFontHref(
-  "app/shared/fonts/poppins/poppins-600.woff2",
-);
-const POPPINS_800_HREF = resolveFontHref(
-  "app/shared/fonts/poppins/poppins-800.woff2",
+const BODY_HREF = resolveFontHref("app/shared/fonts/roboto/latin.woff2");
+const BODY_EXT_HREF = resolveFontHref(
+  "app/shared/fonts/roboto/latin-ext.woff2",
 );
 
 const options = parseArgs(process.argv.slice(2));
@@ -117,8 +115,8 @@ function renderStoryCard({ kind, title, subtitle, imageHref }) {
     </clipPath>
   </defs>
   <style>
-    ${renderPoppinsFontFaces()}
-    .font { font-family: Poppins, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    ${renderBodyFontFaces()}
+    .font { font-family: "Roboto", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     .brand { font-weight: 900; letter-spacing: 10px; fill: #f8fafc; }
     .title { font-weight: 900; fill: #111318; }
     .subtitle { font-weight: 800; fill: #62636d; }
@@ -157,16 +155,16 @@ function renderStoryCard({ kind, title, subtitle, imageHref }) {
 `;
 }
 
-function renderPoppinsFontFaces() {
+function renderBodyFontFaces() {
   return `
     ${
-      POPPINS_600_HREF
-        ? `@font-face { font-family: "Poppins"; src: url("${POPPINS_600_HREF}") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; }`
+      BODY_HREF
+        ? `@font-face { font-family: "Roboto"; src: url("${BODY_HREF}") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; font-weight: 100 900; font-style: normal; font-display: swap; }`
         : ""
     }
     ${
-      POPPINS_800_HREF
-        ? `@font-face { font-family: "Poppins"; src: url("${POPPINS_800_HREF}") format("woff2"); font-weight: 800 900; font-style: normal; font-display: swap; }`
+      BODY_EXT_HREF
+        ? `@font-face { font-family: "Roboto"; src: url("${BODY_EXT_HREF}") format("woff2"); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF; font-weight: 100 900; font-style: normal; font-display: swap; }`
         : ""
     }`;
 }

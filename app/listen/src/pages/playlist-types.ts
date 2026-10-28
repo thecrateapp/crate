@@ -1,8 +1,9 @@
+import type { TrackMediaMetadata } from "@/lib/track-media-metadata";
 import type { PlaylistArtworkTrack } from "@/components/playlists/PlaylistArtwork";
 import type { PlaylistComposerTrack } from "@/components/playlists/PlaylistCreateModal";
 import type { CollaborationAccess } from "@/lib/collaboration-access";
 
-export interface PlaylistTrack {
+export interface PlaylistTrack extends TrackMediaMetadata {
   id: number;
   playlist_id: number;
   global_track_uid?: string;

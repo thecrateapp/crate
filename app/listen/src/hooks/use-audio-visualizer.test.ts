@@ -38,6 +38,26 @@ describe("useAudioVisualizer", () => {
     });
   });
 
+  it("samples frames through refs without rerendering its owner", () => {
+    mockGetAnalyserNode.mockReturnValue(createAnalyser());
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    let renders = 0;
+    const { result } = renderHook(() => {
+      renders++;
+      return useAudioVisualizer(true, "one");
+    });
+    const before = renders;
+    act(() => {
+      for (let i = 0; i < 6; i++) frames.shift()?.(0);
+    });
+    expect(result.current.frequenciesDb).toHaveLength(4);
+    expect(renders).toBe(before);
+  });
   it("clears frames from the previous track before sampling the next one", () => {
     const analyser = createAnalyser();
     const frames = new Map<number, FrameRequestCallback>();
@@ -114,4 +134,20 @@ describe("useAudioVisualizer", () => {
 
     expect(requestAnimationFrame).not.toHaveBeenCalled();
   });
+});
+
+it("lets the canvas sample and paint in one loop when sampling is manual", () => {
+  const analyser = createAnalyser();
+  mockGetAnalyserNode.mockReturnValue(analyser);
+  const raf = vi.fn();
+  vi.stubGlobal("requestAnimationFrame", raf);
+  const { result, unmount } = renderHook(() =>
+    useAudioVisualizer(true, "manual", undefined, true),
+  );
+  expect(raf).not.toHaveBeenCalled();
+  const data = result.current.readFrame();
+  expect(data.frequenciesDb).toHaveLength(4);
+  expect(analyser.getFloatFrequencyData).toHaveBeenCalledTimes(1);
+  unmount();
+  vi.unstubAllGlobals();
 });

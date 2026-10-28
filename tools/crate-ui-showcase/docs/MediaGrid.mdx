@@ -1,0 +1,34 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/MediaGrid.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">MediaGrid</DocHeading>
+<EntryDetails
+  id="domain-lists-mediagrid"
+  review="Visual review approved · 1AW"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+Compact, default and wide densities keep the existing responsive column formulas and gap. Loaded media and GridSkeleton reserve the same column geometry. A finite positive `minItemWidth` opts into bounded auto-fill; invalid values fall back to density. Children retain their own native links and actions. Native root attributes, ARIA and refs are forwarded. A labelled root is a group; no grid keyboard interaction model is introduced.
+
+`comfortable` preserves V2 artist-discography image scale: two columns initially, three at640px,
+four at768px, five from1024px with a16px gap. It never adds sixth-to-eighth columns on wider
+screens. ArtistAlbumGroupFrame adopts this density; ordinary collection grids retain their own
+existing density. Image dimensions follow their role and V2 reference, with Diego's confirmed
+48px standalone-thumbnail minimum and24/28px compact-identity exceptions.
+
+The approved mockup and Diego's confirmed adjustments remain the reference. Initial adoption
+and contract evidence do not certify every route or native/AT qualification.
+
+<Canvas of={Stories.Base} />
+<Controls of={Stories.Base} />
+
+<Canvas of={Stories.Compact} />
+
+<Canvas of={Stories.Comfortable} />
+
+<Canvas of={Stories.Wide} />
+
+<Canvas of={Stories.BoundedMinimum} />

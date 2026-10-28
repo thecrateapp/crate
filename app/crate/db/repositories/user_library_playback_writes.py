@@ -7,7 +7,9 @@ from sqlalchemy import text
 from crate.db.cache_store import get_cache, set_cache
 from crate.db.jobs.user_listening_projections import mark_listening_day_dirty
 from crate.db.repositories.user_listening_today import add_listening_today
-from crate.db.repositories.tasks import create_task_dedup
+from crate.db.repositories.user_library_aggregate_runner import (
+    schedule_user_listening_refresh,
+)
 from crate.db.repositories.user_library_shared import (
     emit_user_domain_event,
     resolve_track_reference,
@@ -16,6 +18,8 @@ from crate.db.repositories.user_library_shared import (
 from crate.db.tx import register_after_commit, transaction_scope
 
 _STATS_REFRESH_DEBOUNCE_SECONDS = 300
+_SCROBBLE_MIN_TRACK_SECONDS = 30
+_SCROBBLE_ALWAYS_COUNTS_SECONDS = 240
 log = logging.getLogger(__name__)
 
 
@@ -23,7 +27,7 @@ def _schedule_stats_refresh(user_id: int) -> None:
     debounce_key = f"stats_refresh_debounce:{user_id}"
     if get_cache(debounce_key, max_age_seconds=_STATS_REFRESH_DEBOUNCE_SECONDS):
         return
-    create_task_dedup("refresh_user_listening_stats", {"user_id": user_id})
+    schedule_user_listening_refresh(user_id)
     set_cache(debounce_key, True, ttl=_STATS_REFRESH_DEBOUNCE_SECONDS)
 
 
@@ -64,18 +68,38 @@ def _queue_scrobble(event_id: int) -> None:
         log.warning("Failed to dispatch scrobble follow-up", exc_info=True)
 
 
+def scrobble_eligible(
+    *,
+    played_seconds: float,
+    track_duration_seconds: float | None,
+    was_completed: bool,
+) -> bool:
+    """Last.fm's rule: a track over 30 s, played for half of it or 4 minutes.
+
+    Whether the client saw the track reach its end does not matter. Without a
+    duration only a completed play or 4 minutes of listening count.
+    """
+    played = max(0.0, float(played_seconds or 0))
+    duration = float(track_duration_seconds or 0)
+    if duration <= 0:
+        return was_completed or played >= _SCROBBLE_ALWAYS_COUNTS_SECONDS
+    if duration <= _SCROBBLE_MIN_TRACK_SECONDS:
+        return False
+    return played >= min(duration / 2, _SCROBBLE_ALWAYS_COUNTS_SECONDS)
+
+
 def _schedule_play_event_followups(
     user_id: int,
     *,
     event_id: int,
-    was_completed: bool,
+    scrobble: bool,
 ) -> None:
     try:
         _schedule_stats_refresh(user_id)
     except Exception:
         pass
 
-    if was_completed:
+    if scrobble:
         _queue_scrobble(event_id)
 
 
@@ -316,7 +340,11 @@ def record_play_event(
             lambda: _schedule_play_event_followups(
                 user_id,
                 event_id=int(event_id),
-                was_completed=was_completed,
+                scrobble=scrobble_eligible(
+                    played_seconds=played_seconds,
+                    track_duration_seconds=track_duration_seconds,
+                    was_completed=was_completed,
+                ),
             ),
         )
 
@@ -326,4 +354,5 @@ def record_play_event(
 __all__ = [
     "record_play",
     "record_play_event",
+    "scrobble_eligible",
 ]

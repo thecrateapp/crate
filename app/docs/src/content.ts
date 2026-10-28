@@ -74,6 +74,10 @@ const loaders: Record<string, MarkdownLoader> = {
     import("../../../docs/technical/00-quickstart.md?raw").then(
       (module) => module.default,
     ),
+  "docs/technical/00a-install-with-ai.md": () =>
+    import("../../../docs/technical/00a-install-with-ai.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/00b-development-setup.md": () =>
     import("../../../docs/technical/00b-development-setup.md?raw").then(
       (module) => module.default,
@@ -87,33 +91,33 @@ const loaders: Record<string, MarkdownLoader> = {
       (module) => module.default,
     ),
   "docs/technical/03-worker-tasks-and-background-services.md": () =>
-    import("../../../docs/technical/03-worker-tasks-and-background-services.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/03-worker-tasks-and-background-services.md?raw"
+    ).then((module) => module.default),
   "docs/technical/04-library-storage-sync-and-imports.md": () =>
-    import("../../../docs/technical/04-library-storage-sync-and-imports.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/04-library-storage-sync-and-imports.md?raw"
+    ).then((module) => module.default),
   "docs/technical/05-enrichment-acquisition-and-integrations.md": () =>
-    import("../../../docs/technical/05-enrichment-acquisition-and-integrations.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/05-enrichment-acquisition-and-integrations.md?raw"
+    ).then((module) => module.default),
   "docs/technical/06-audio-analysis-similarity-and-discovery.md": () =>
-    import("../../../docs/technical/06-audio-analysis-similarity-and-discovery.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/06-audio-analysis-similarity-and-discovery.md?raw"
+    ).then((module) => module.default),
   "docs/technical/07-auth-users-social-and-sessions.md": () =>
-    import("../../../docs/technical/07-auth-users-social-and-sessions.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/07-auth-users-social-and-sessions.md?raw"
+    ).then((module) => module.default),
   "docs/technical/08-frontends-admin-and-listen.md": () =>
     import("../../../docs/technical/08-frontends-admin-and-listen.md?raw").then(
       (module) => module.default,
     ),
   "docs/technical/09-playback-realtime-and-subsonic.md": () =>
-    import("../../../docs/technical/09-playback-realtime-and-subsonic.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/09-playback-realtime-and-subsonic.md?raw"
+    ).then((module) => module.default),
   "docs/technical/opensubsonic.md": () =>
     import("../../../docs/technical/opensubsonic.md?raw").then(
       (module) => module.default,
@@ -147,9 +151,9 @@ const loaders: Record<string, MarkdownLoader> = {
       (module) => module.default,
     ),
   "docs/technical/10-development-deployment-and-operations.md": () =>
-    import("../../../docs/technical/10-development-deployment-and-operations.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/10-development-deployment-and-operations.md?raw"
+    ).then((module) => module.default),
   "docs/technical/artist-hero-theming-rollout.md": () =>
     import("../../../docs/technical/artist-hero-theming-rollout.md?raw").then(
       (module) => module.default,
@@ -187,9 +191,9 @@ const loaders: Record<string, MarkdownLoader> = {
       (module) => module.default,
     ),
   "docs/technical/federation-production-acceptance.md": () =>
-    import("../../../docs/technical/federation-production-acceptance.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/federation-production-acceptance.md?raw"
+    ).then((module) => module.default),
   "docs/technical/federation-protocol.md": () =>
     import("../../../docs/technical/federation-protocol.md?raw").then(
       (module) => module.default,
@@ -199,17 +203,17 @@ const loaders: Record<string, MarkdownLoader> = {
       (module) => module.default,
     ),
   "docs/technical/federation-streaming-benchmark.md": () =>
-    import("../../../docs/technical/federation-streaming-benchmark.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/federation-streaming-benchmark.md?raw"
+    ).then((module) => module.default),
   "docs/technical/federation-threat-model.md": () =>
     import("../../../docs/technical/federation-threat-model.md?raw").then(
       (module) => module.default,
     ),
   "docs/technical/federation-upgrade-and-rollback.md": () =>
-    import("../../../docs/technical/federation-upgrade-and-rollback.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/federation-upgrade-and-rollback.md?raw"
+    ).then((module) => module.default),
   "docs/technical/hermes-plan-confirmation.md": () =>
     import("../../../docs/technical/hermes-plan-confirmation.md?raw").then(
       (module) => module.default,
@@ -222,8 +226,16 @@ const loaders: Record<string, MarkdownLoader> = {
     import("../../../docs/technical/crate-operator.md?raw").then(
       (module) => module.default,
     ),
+  "docs/technical/upgrade-v2-to-v3.md": () =>
+    import("../../../docs/technical/upgrade-v2-to-v3.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/technical/operations.md": () =>
     import("../../../docs/technical/operations.md?raw").then(
+      (module) => module.default,
+    ),
+  "docs/technical/crate-agent.md": () =>
+    import("../../../docs/technical/crate-agent.md?raw").then(
       (module) => module.default,
     ),
   "docs/technical/local-media-delivery-slos.md": () =>
@@ -231,9 +243,9 @@ const loaders: Record<string, MarkdownLoader> = {
       (module) => module.default,
     ),
   "docs/technical/listen-design-system-visual-qa.md": () =>
-    import("../../../docs/technical/listen-design-system-visual-qa.md?raw").then(
-      (module) => module.default,
-    ),
+    import(
+      "../../../docs/technical/listen-design-system-visual-qa.md?raw"
+    ).then((module) => module.default),
   "docs/technical/ops-runbook.md": () =>
     import("../../../docs/technical/ops-runbook.md?raw").then(
       (module) => module.default,
@@ -255,29 +267,76 @@ export interface DocEntry extends ManifestDoc {
   load: MarkdownLoader;
 }
 
+export interface DocMeta {
+  verified?: string;
+  audience: string[];
+}
+
 export interface LoadedDoc {
   markdown: string;
   headings: DocHeading[];
+  meta: DocMeta;
 }
 
-function stripFrontmatter(markdown: string): string {
-  if (!markdown.startsWith("---\n")) return markdown;
-  const end = markdown.indexOf("\n---\n", 4);
-  return end === -1 ? markdown : markdown.slice(end + 5).trimStart();
+export function splitFrontmatter(source: string): {
+  frontmatter: string;
+  markdown: string;
+} {
+  if (!source.startsWith("---\n")) return { frontmatter: "", markdown: source };
+  const end = source.indexOf("\n---\n", 4);
+  if (end === -1) return { frontmatter: "", markdown: source };
+  return {
+    frontmatter: source.slice(4, end),
+    markdown: source.slice(end + 5).trimStart(),
+  };
 }
 
-function extractHeadings(markdown: string): DocHeading[] {
+export function parseDocMeta(frontmatter: string): DocMeta {
+  const field = (name: string) =>
+    new RegExp(`^${name}:[ \\t]*(.*)$`, "m").exec(frontmatter)?.[1]?.trim();
+  const audience = field("audience") ?? "";
+  return {
+    verified: field("verified") || undefined,
+    audience: audience
+      .replace(/^\[|\]$/g, "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
+  };
+}
+
+export function headingText(raw: string): string {
+  return raw
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/(\*\*|__)(.+?)\1/g, "$2")
+    .replace(/\s+#+\s*$/, "")
+    .trim();
+}
+
+export function extractHeadings(markdown: string): DocHeading[] {
   const headings: DocHeading[] = [];
   const seen = new Map<string, number>();
+  let fence: string | null = null;
 
   for (const line of markdown.split("\n")) {
+    const fenceMatch = /^\s{0,3}(`{3,}|~{3,})/.exec(line);
+    if (fenceMatch?.[1]) {
+      const marker = fenceMatch[1];
+      if (!fence) fence = marker;
+      else if (marker[0] === fence[0] && marker.length >= fence.length)
+        fence = null;
+      continue;
+    }
+    if (fence) continue;
+
     const match = /^(#{2,4})\s+(.+)$/.exec(line.trim());
     if (!match) continue;
     const hashes = match[1];
     const rawText = match[2];
     if (!hashes || !rawText) continue;
 
-    const text = rawText.trim();
+    const text = headingText(rawText);
     const baseId = slugify(text);
     const duplicate = seen.get(baseId) ?? 0;
     seen.set(baseId, duplicate + 1);
@@ -360,6 +419,23 @@ export const sectionMeta: Record<
   },
 };
 
+export function filterDocs(query: string): Record<DocSection, DocEntry[]> {
+  const term = query.trim().toLowerCase();
+  if (!term) return docsBySection;
+
+  return sections.reduce(
+    (result, section) => {
+      result[section] = docsBySection[section].filter((doc) =>
+        `${doc.title} ${doc.summary} ${doc.keywords.join(" ")}`
+          .toLowerCase()
+          .includes(term),
+      );
+      return result;
+    },
+    {} as Record<DocSection, DocEntry[]>,
+  );
+}
+
 const loadedDocs = new Map<string, Promise<LoadedDoc>>();
 
 export function loadDoc(doc: DocEntry): Promise<LoadedDoc> {
@@ -367,8 +443,12 @@ export function loadDoc(doc: DocEntry): Promise<LoadedDoc> {
   if (existing) return existing;
 
   const pending = doc.load().then((source) => {
-    const markdown = stripFrontmatter(source);
-    return { markdown, headings: extractHeadings(markdown) };
+    const { frontmatter, markdown } = splitFrontmatter(source);
+    return {
+      markdown,
+      headings: extractHeadings(markdown),
+      meta: parseDocMeta(frontmatter),
+    };
   });
   loadedDocs.set(doc.id, pending);
   return pending;

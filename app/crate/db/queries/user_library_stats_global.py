@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import json
 from calendar import month_name
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import text
 
 from crate.db.queries.user_library_shared import _STATS_WINDOWS, normalize_stats_window
 from crate.db.queries.user_library_stats_month import month_bounds, month_period_key
+from crate.db.queries.user_stats_periods import previous_window, resolve_stats_period
 from crate.db.tx import read_scope
 
 
@@ -422,6 +423,11 @@ def _global_top_tracks_from_events(
                             art.slug AS artist_slug,
                             COALESCE(alb_by_id.id, alb_by_name.id) AS album_id,
                             COALESCE(alb_by_id.slug, alb_by_name.slug) AS album_slug,
+                            lt.format,
+                            lt.bitrate,
+                            lt.sample_rate,
+                            lt.bit_depth,
+                            lt.duration,
                             lt.bpm,
                             lt.audio_key,
                             lt.audio_scale,
@@ -471,6 +477,11 @@ def _global_top_tracks_from_events(
                         MAX(artist_slug) AS artist_slug,
                         MAX(album_id) AS album_id,
                         MAX(album_slug) AS album_slug,
+                        MAX(format) AS format,
+                        MAX(bitrate) AS bitrate,
+                        MAX(sample_rate) AS sample_rate,
+                        MAX(bit_depth) AS bit_depth,
+                        MAX(duration) AS duration,
                         MAX(bpm) AS bpm,
                         MAX(audio_key) AS audio_key,
                         MAX(audio_scale) AS audio_scale,
@@ -519,6 +530,11 @@ def get_global_top_tracks(
                                 art.slug AS artist_slug,
                                 COALESCE(alb_by_id.id, alb_by_name.id) AS album_id,
                                 COALESCE(alb_by_id.slug, alb_by_name.slug) AS album_slug,
+                                lt.format,
+                                lt.bitrate,
+                                lt.sample_rate,
+                                lt.bit_depth,
+                                lt.duration,
                                 lt.bpm,
                                 lt.audio_key,
                                 lt.audio_scale,
@@ -562,6 +578,11 @@ def get_global_top_tracks(
                             MAX(artist_slug) AS artist_slug,
                             MAX(album_id) AS album_id,
                             MAX(album_slug) AS album_slug,
+                            MAX(format) AS format,
+                            MAX(bitrate) AS bitrate,
+                            MAX(sample_rate) AS sample_rate,
+                            MAX(bit_depth) AS bit_depth,
+                            MAX(duration) AS duration,
                             MAX(bpm) AS bpm,
                             MAX(audio_key) AS audio_key,
                             MAX(audio_scale) AS audio_scale,
@@ -602,6 +623,11 @@ def get_global_top_tracks(
                                 art.slug AS artist_slug,
                                 COALESCE(alb_by_id.id, alb_by_name.id) AS album_id,
                                 COALESCE(alb_by_id.slug, alb_by_name.slug) AS album_slug,
+                                lt.format,
+                                lt.bitrate,
+                                lt.sample_rate,
+                                lt.bit_depth,
+                                lt.duration,
                                 lt.bpm,
                                 lt.audio_key,
                                 lt.audio_scale,
@@ -640,6 +666,11 @@ def get_global_top_tracks(
                             MAX(artist_slug) AS artist_slug,
                             MAX(album_id) AS album_id,
                             MAX(album_slug) AS album_slug,
+                            MAX(format) AS format,
+                            MAX(bitrate) AS bitrate,
+                            MAX(sample_rate) AS sample_rate,
+                            MAX(bit_depth) AS bit_depth,
+                            MAX(duration) AS duration,
                             MAX(bpm) AS bpm,
                             MAX(audio_key) AS audio_key,
                             MAX(audio_scale) AS audio_scale,
@@ -1158,6 +1189,10 @@ def _rhythm_payload(
     }
 
 
+def _optional_float(row, key: str) -> float | None:
+    return float(row[key]) if row and row[key] is not None else None
+
+
 def _audio_profile_payload(
     *, current_start: datetime | None, current_end: datetime | None = None
 ) -> dict:
@@ -1195,9 +1230,10 @@ def _audio_profile_payload(
             .first()
         )
     return {
-        "energy": float(row["energy"] or 0) if row else 0,
-        "danceability": float(row["danceability"] or 0) if row else 0,
-        "valence": float(row["valence"] or 0) if row else 0,
+        # Unknown analysis is null, not a confirmed zero.
+        "energy": _optional_float(row, "energy"),
+        "danceability": _optional_float(row, "danceability"),
+        "valence": _optional_float(row, "valence"),
         "bpm": round(float(row["bpm"]), 1) if row and row["bpm"] is not None else None,
     }
 
@@ -1373,6 +1409,20 @@ def _monthly_snapshots(months: int = 8) -> list[dict]:
     return snapshots
 
 
+def _previous_audio_profile(window: str, month: str | None) -> dict | None:
+    period = resolve_stats_period("UTC", window=window, month=month)
+    bounds = previous_window(period)
+    if bounds is None:
+        return None
+    first, last = bounds
+    return _audio_profile_payload(
+        current_start=datetime.combine(first, time.min, tzinfo=timezone.utc),
+        current_end=datetime.combine(
+            last + timedelta(days=1), time.min, tzinfo=timezone.utc
+        ),
+    )
+
+
 def get_global_stats_story(window: str = "30d", month: str | None = None) -> dict:
     if month:
         current_start, current_end = month_bounds(month)
@@ -1406,6 +1456,7 @@ def get_global_stats_story(window: str = "30d", month: str | None = None) -> dic
             current_start=current_start,
             current_end=current_end,
         ),
+        "audio_profile_previous": _previous_audio_profile(window, month),
         "monthly_snapshots": _monthly_snapshots(),
     }
 

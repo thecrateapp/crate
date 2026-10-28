@@ -1,0 +1,85 @@
+{
+  "/api/admin/global-catalog/status": {
+    "serving_mode": "global-ready",
+    "state": {
+      "status": "idle"
+    },
+    "counts": {
+      "artists": 24,
+      "albums": 86,
+      "tracks": 760,
+      "sources": 112
+    },
+    "last_run": {
+      "run_id": "sample-run-20261018",
+      "mode": "incremental",
+      "status": "completed",
+      "started_at": "2026-10-18T10:00:00Z",
+      "completed_at": "2026-10-18T10:01:00Z",
+      "source_rows_seen": 118,
+      "sources_upserted": 112,
+      "canonical_created": 6,
+      "canonical_updated": 32,
+      "error": null
+    },
+    "stale_peer_count": 1,
+    "ambiguous_candidate_count": 2
+  },
+  "/api/admin/global-catalog/runs?limit=25": {
+    "items": [
+      {
+        "run_id": "sample-run-20261018",
+        "mode": "incremental",
+        "status": "completed",
+        "started_at": "2026-10-18T10:00:00Z",
+        "completed_at": "2026-10-18T10:01:00Z",
+        "source_rows_seen": 118,
+        "sources_upserted": 112,
+        "canonical_created": 6,
+        "canonical_updated": 32,
+        "error": null
+      },
+      {
+        "run_id": "sample-run-older",
+        "mode": "full",
+        "status": "failed",
+        "started_at": "2026-10-17T09:00:00Z",
+        "completed_at": null,
+        "source_rows_seen": 118,
+        "sources_upserted": 112,
+        "canonical_created": 6,
+        "canonical_updated": 32,
+        "error": "Sample peer unavailable"
+      }
+    ]
+  },
+  "/api/admin/global-catalog/duplicates?limit=50": {
+    "items": [
+      {
+        "entity_type": "album",
+        "match_key": "sample-album:uncertain-match",
+        "source_count": 2,
+        "sources": [
+          {
+            "source_kind": "local",
+            "node_uid": null,
+            "remote_entity_uid": null,
+            "local_entity_uid": "sample-local-41",
+            "global_entity_uid": "sample-global-41",
+            "match_confidence": 0.77,
+            "match_method": "metadata"
+          },
+          {
+            "source_kind": "federation",
+            "node_uid": "sample-peer-2",
+            "remote_entity_uid": "sample-remote-41",
+            "local_entity_uid": null,
+            "global_entity_uid": null,
+            "match_confidence": 0.72,
+            "match_method": "title_artist"
+          }
+        ]
+      }
+    ]
+  }
+}

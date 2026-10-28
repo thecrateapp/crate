@@ -1,3 +1,5 @@
+import { Button } from "@crate/ui/shadcn/button";
+import { PlayerClockProvider } from "./PlayerClock";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -32,17 +34,19 @@ export function PlayerProviderSurface({
   resumeAfterUserGesture,
 }: PlayerProviderSurfaceProps) {
   return (
-    <PlayerActionsContext.Provider value={actionsValue}>
-      <PlayerStateContext.Provider value={stateValue}>
-        <PlayerProgressContext.Provider value={progressValue}>
-          {children}
-          <ContinuePlaybackPrompt />
-          {playbackNeedsUserGesture && currentTrack ? (
-            <ResumePlaybackPrompt onResume={resumeAfterUserGesture} />
-          ) : null}
-        </PlayerProgressContext.Provider>
-      </PlayerStateContext.Provider>
-    </PlayerActionsContext.Provider>
+    <PlayerClockProvider value={progressValue}>
+      <PlayerActionsContext.Provider value={actionsValue}>
+        <PlayerStateContext.Provider value={stateValue}>
+          <PlayerProgressContext.Provider value={progressValue}>
+            {children}
+            <ContinuePlaybackPrompt />
+            {playbackNeedsUserGesture && currentTrack ? (
+              <ResumePlaybackPrompt onResume={resumeAfterUserGesture} />
+            ) : null}
+          </PlayerProgressContext.Provider>
+        </PlayerStateContext.Provider>
+      </PlayerActionsContext.Provider>
+    </PlayerClockProvider>
   );
 }
 
@@ -50,13 +54,9 @@ function ResumePlaybackPrompt({ onResume }: { onResume: () => void }) {
   const { t } = useTranslation();
   return (
     <div className="pointer-events-none fixed inset-x-4 bottom-[calc(var(--listen-player-bottom-offset,5.5rem)+env(safe-area-inset-bottom))] z-app-player-popover flex justify-center sm:bottom-28">
-      <button
-        type="button"
-        className="pointer-events-auto rounded-full border border-accent-action/30 bg-surface-canvas/95 px-4 py-3 text-sm font-semibold text-text-primary backdrop-blur"
-        onClick={onResume}
-      >
+      <Button className="pointer-events-auto" onClick={onResume}>
         {t("player.tapToResume")}
-      </button>
+      </Button>
     </div>
   );
 }

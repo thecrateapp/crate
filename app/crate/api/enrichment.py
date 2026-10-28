@@ -1,3 +1,4 @@
+import json
 import logging
 from collections.abc import Mapping
 from typing import Any
@@ -109,6 +110,19 @@ def _with_probable_setlist(name: str, result: dict) -> dict:
     return enriched
 
 
+def _with_setlist_generated_at(name: str, result: dict) -> dict:
+    setlist = (result or {}).get("setlist")
+    if not isinstance(setlist, dict):
+        return result
+    return {
+        **result,
+        "setlist": {
+            **setlist,
+            "generated_at": setlistfm.get_cached_probable_setlist_generated_at(name),
+        },
+    }
+
+
 def get_artist_enrichment(request: Request, name: str):
     """Get consolidated enrichment data. Returns cached if available, otherwise fetches inline.
     For background enrichment, use POST /api/artists/{artist_id}/enrich which queues a worker task."""
@@ -121,7 +135,7 @@ def get_artist_enrichment(request: Request, name: str):
         enriched_cached = _enrich_enrichment_artist_refs(cached)
         enriched_cached = _with_probable_setlist(name, enriched_cached)
         set_cache(cache_key, enriched_cached)
-        return enriched_cached
+        return _with_setlist_generated_at(name, enriched_cached)
 
     # Try DB persisted data as fallback (survives cache expiry)
     db_artist = get_library_artist(name)
@@ -130,7 +144,7 @@ def get_artist_enrichment(request: Request, name: str):
         if result:
             result = _with_probable_setlist(name, result)
             set_cache(cache_key, result)
-            return result
+            return _with_setlist_generated_at(name, result)
 
     # Fetch inline (first visit)
     result = _enrich_enrichment_artist_refs(_fetch_enrichment(name))
@@ -138,7 +152,7 @@ def get_artist_enrichment(request: Request, name: str):
         # Only cache if we got meaningful data (at least lastfm or spotify)
         if "lastfm" in result or "spotify" in result:
             set_cache(cache_key, result)
-    return result or {}
+    return _with_setlist_generated_at(name, result or {})
 
 
 def get_artist_page_enrichment(name: str) -> dict:
@@ -148,18 +162,46 @@ def get_artist_page_enrichment(name: str) -> dict:
     if cached and isinstance(cached, dict):
         setlist_payload = cached.get("setlist")
         if isinstance(setlist_payload, dict) and _has_probable_setlist(cached):
-            return {"setlist": setlist_payload}
+            return _with_setlist_generated_at(name, {"setlist": setlist_payload})
 
     setlist = setlistfm.get_cached_probable_setlist(name)
     if setlist:
-        return {
-            "setlist": {
-                "probable_setlist": setlist,
-                "total_shows": len(setlist),
-            }
-        }
+        return _with_setlist_generated_at(
+            name,
+            {
+                "setlist": {
+                    "probable_setlist": setlist,
+                    "total_shows": len(setlist),
+                }
+            },
+        )
     setlistfm.queue_probable_setlist_refresh(name)
     return {}
+
+
+def _artist_analysis_payload(rows: list[dict]) -> dict[str, dict]:
+    """Preserve legacy title lookup without dropping same-title tracks."""
+    result: dict[str, dict] = {}
+    for row in rows:
+        entry = dict(row)
+        title = (entry.get("title") or "").lower()
+        track_id = entry.get("track_id")
+        key = title or (f"track:{track_id}" if track_id is not None else "")
+        if not key:
+            continue
+        if key in result:
+            key = (
+                f"track:{track_id}" if track_id is not None else f"{key}#{len(result)}"
+            )
+        mood = entry.pop("mood_json", None)
+        if isinstance(mood, str):
+            try:
+                mood = json.loads(mood)
+            except (ValueError, TypeError):
+                mood = None
+        entry["mood"] = mood
+        result[key] = entry
+    return result
 
 
 @router.get(
@@ -175,23 +217,7 @@ def get_artist_analysis_data(request: Request, artist_id: int):
     if not artist_name:
         raise HTTPException(status_code=404, detail="Not found")
     rows = get_artist_analysis_tracks(artist_name)
-    result = {}
-    for row in rows:
-        title = (row.get("title") or "").lower()
-        if not title:
-            continue
-        entry = dict(row)
-        mood = entry.pop("mood_json", None)
-        if isinstance(mood, str):
-            import json as _json
-
-            try:
-                mood = _json.loads(mood)
-            except Exception:
-                mood = None
-        entry["mood"] = mood
-        result[title] = entry
-    return result
+    return _artist_analysis_payload(rows)
 
 
 @router.get(
@@ -206,23 +232,7 @@ def get_artist_analysis_data_by_entity_uid(request: Request, artist_entity_uid: 
         raise HTTPException(status_code=404, detail="Not found")
     _require_auth(request)
     rows = get_artist_analysis_tracks(artist_name)
-    result = {}
-    for row in rows:
-        title = (row.get("title") or "").lower()
-        if not title:
-            continue
-        entry = dict(row)
-        mood = entry.pop("mood_json", None)
-        if isinstance(mood, str):
-            import json as _json
-
-            try:
-                mood = _json.loads(mood)
-            except Exception:
-                mood = None
-        entry["mood"] = mood
-        result[title] = entry
-    return result
+    return _artist_analysis_payload(rows)
 
 
 @router.get(

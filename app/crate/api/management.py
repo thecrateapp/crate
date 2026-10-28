@@ -43,6 +43,7 @@ from crate.api.schemas.management import (
     LyricsSyncRequest,
     LibraryContributionListResponse,
     MoveRequest,
+    PortableAlbumSidecarResponse,
     PortableMetadataRequest,
     PortableRehydrateRequest,
     RepairCatalogResponse,
@@ -76,6 +77,7 @@ from crate.db.health import (
     resolve_issues_by_type,
 )
 from crate.db.ops_snapshot import get_cached_ops_snapshot
+from crate.db.queries.portable_metadata import get_portable_album_payload
 from crate.db.queries.repair_plans import get_open_repair_issues
 from crate.repair_selection import RepairSelectionError
 from crate.db.queries.management import (
@@ -1480,6 +1482,20 @@ def rebuild_library(request: Request):
     _require_library_maintenance(request)
     task_id = create_task("rebuild_library")
     return {"task_id": task_id}
+
+
+@router.get(
+    "/albums/{album_id}/portable-metadata",
+    response_model=PortableAlbumSidecarResponse,
+    responses=_MANAGEMENT_RESPONSES,
+    summary="Read portable album metadata from the catalog",
+)
+def read_portable_metadata(request: Request, album_id: int):
+    _require_library_import_manager(request)
+    payload = get_portable_album_payload(album_id, include_portable_status=True)
+    if payload is None:
+        raise HTTPException(status_code=404, detail="Album not found")
+    return payload
 
 
 @router.post(

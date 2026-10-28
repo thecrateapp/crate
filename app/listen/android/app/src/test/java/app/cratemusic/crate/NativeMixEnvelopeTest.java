@@ -17,6 +17,42 @@ public class NativeMixEnvelopeTest {
     private static final float STAGING = (float) Math.pow(10.0, STAGING_DB / 20.0);
 
     @Test
+    public void djBlendHoldsBothDecksAtMinusThreeDecibelsThroughTheMiddle() throws Exception {
+        NativeMixAudioProcessor outgoing = processor();
+        NativeMixAudioProcessor incoming = processor();
+        outgoing.startEnvelope(NativeMixAudioProcessor.Role.OUTGOING, 1_000L, 0.0f, Float.NaN, true);
+        incoming.startEnvelope(NativeMixAudioProcessor.Role.INCOMING, 1_000L, 0.0f, Float.NaN, true);
+
+        float[] out = process(outgoing, 1_000);
+        float[] in = process(incoming, 1_000);
+        float half = (float) Math.cos(Math.PI / 4.0);
+
+        assertEquals(1.0f, out[0], 0.001f);
+        assertEquals(0.0f, in[0], 0.001f);
+        for (int index : new int[] {300, 400, 500, 600, 699}) {
+            assertEquals(half, out[index], 0.002f);
+            assertEquals(half, in[index], 0.002f);
+        }
+        assertTrue(out[999] < 0.005f);
+        assertEquals(1.0f, in[999], 0.005f);
+        for (int index = 0; index < 1_000; index += 25) {
+            assertEquals(1.0f, out[index] * out[index] + in[index] * in[index], 0.01f);
+        }
+        assertTrue(maximumStep(out) < 0.01f);
+        assertTrue(maximumStep(in) < 0.01f);
+    }
+
+    @Test
+    public void djBlendProgressEntersHoldsAndExits() {
+        assertEquals(0.0f, NativeMixAudioProcessor.djBlendProgress(0.0f), 0.0f);
+        assertEquals(0.25f, NativeMixAudioProcessor.djBlendProgress(0.15f), 0.0001f);
+        assertEquals(0.5f, NativeMixAudioProcessor.djBlendProgress(0.3f), 0.0001f);
+        assertEquals(0.5f, NativeMixAudioProcessor.djBlendProgress(0.5f), 0.0f);
+        assertEquals(0.75f, NativeMixAudioProcessor.djBlendProgress(0.85f), 0.0001f);
+        assertEquals(1.0f, NativeMixAudioProcessor.djBlendProgress(1.0f), 0.0001f);
+    }
+
+    @Test
     public void outgoingEnvelopeEasesIntoStagingAndFadesOutInFrames() throws Exception {
         NativeMixAudioProcessor processor = processor();
         processor.startEnvelope(NativeMixAudioProcessor.Role.OUTGOING, 1_000L, STAGING_DB);

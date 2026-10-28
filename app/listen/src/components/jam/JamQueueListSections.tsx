@@ -1,3 +1,4 @@
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { type ReactNode } from "react";
 import {
   ArrowDown,
@@ -22,6 +23,7 @@ import { IconButton } from "@crate/ui/primitives/IconButton";
 import { Button } from "@crate/ui/shadcn/button";
 
 import type { JamQueuePanelProps } from "./JamQueueSections";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 const jamQueueItemClassName =
   "jam-queue-item flex items-center gap-3 rounded-lg px-3 py-3";
@@ -54,16 +56,17 @@ function SortableJamQueueItem({
       }}
       className={jamQueueItemClassName}
     >
-      <button
-        type="button"
-        aria-label={dragLabel}
-        title={dragLabel}
-        className="shrink-0 touch-none cursor-grab text-text-muted/60 hover:text-text-primary active:cursor-grabbing"
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical size={CRATE_ICON_SIZE.sm} />
-      </button>
+      <TooltipHint content={dragLabel}>
+        <button
+          type="button"
+          aria-label={dragLabel}
+          className="shrink-0 touch-none cursor-grab text-text-muted/60 hover:text-text-primary active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical size={CRATE_ICON_SIZE.sm} />
+        </button>
+      </TooltipHint>
       {children}
     </div>
   );
@@ -156,10 +159,10 @@ export function JamQueueList(props: JamQueueListProps) {
                   <CrateImage
                     src={track.albumCover}
                     alt=""
-                    className=" size-10 rounded-lg object-cover"
+                    className="crate-media-thumbnail size-12 shrink-0 rounded-lg object-cover"
                   />
                 ) : (
-                  <div className="jam-artwork-placeholder flex size-10 items-center justify-center rounded-lg">
+                  <div className="crate-media-thumbnail jam-artwork-placeholder flex size-12 items-center justify-center rounded-lg">
                     <ListMusic size={CRATE_ICON_SIZE.sm} />
                   </div>
                 )}
@@ -258,22 +261,26 @@ export function JamQueueList(props: JamQueueListProps) {
         </SortableContext>
       </DndContext>
       {queueItems.length === 0 ? (
-        <div className="space-y-3">
-          <p className="text-sm text-text-muted">
-            {t("jam.room.emptyQueuePrefix")} <b>{queuePrimaryActionLabel}</b>{" "}
-            {t("jam.room.emptyQueueSuffix")}
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            size="default"
-            onClick={focusQueueSearch}
-            className="jam-secondary-action inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-text-primary transition-colors has-[>svg]:px-4"
-          >
-            <Search size={CRATE_ICON_SIZE.sm} />
-            {t("jam.room.browseLibrary")}
-          </Button>
-        </div>
+        <EmptyState
+          message={
+            <>
+              {t("jam.room.emptyQueuePrefix")} <b>{queuePrimaryActionLabel}</b>{" "}
+              {t("jam.room.emptyQueueSuffix")}
+            </>
+          }
+          action={
+            <Button
+              type="button"
+              variant="outline"
+              size="default"
+              onClick={focusQueueSearch}
+              className="jam-secondary-action inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-text-primary transition-colors has-[>svg]:px-4"
+            >
+              <Search size={CRATE_ICON_SIZE.sm} />
+              {t("jam.room.browseLibrary")}
+            </Button>
+          }
+        />
       ) : null}
     </div>
   );

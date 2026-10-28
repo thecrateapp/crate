@@ -8,7 +8,7 @@ import type {
   ExtendedPlayerViewActions,
   ExtendedPlayerViewState,
 } from "@/components/player/extended-player-view-types";
-import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
+import { PlayerPanels } from "./PlayerPanels";
 import { triggerHaptic } from "@/lib/haptics";
 
 const TABS = [
@@ -30,33 +30,32 @@ export function ExtendedPlayerTabs({
   t,
 }: ExtendedPlayerTabsProps) {
   return (
-    <div className="flex w-1/2 flex-col bg-surface-canvas">
-      <div className="px-5 pt-5 pb-3">
-        <SegmentedControl
-          as="tabs"
-          variant="tonal"
-          label={t("player.tabsLabel")}
-          value={state.tab}
-          onValueChange={(tab) => {
-            triggerHaptic("selection");
-            actions.onTabChange(tab);
-          }}
-          items={TABS.map((item) => ({
-            value: item.id,
-            label: t(item.labelKey),
-          }))}
-          className="gap-1.5 p-0"
-          itemClassName="h-auto px-3.5 py-1.5 text-[0.75rem] data-[state=active]:bg-surface-control data-[state=active]:text-text-primary data-[state=inactive]:text-text-muted data-[state=inactive]:hover:text-text-secondary"
-        />
-      </div>
-      <div className="flex flex-1 flex-col overflow-hidden px-5 pb-5">
-        {state.tab === "queue" ? <QueueTab /> : null}
-        {state.tab === "suggested" ? <SuggestedTab /> : null}
-        {state.tab === "lyrics" ? (
-          <LyricsTab useAlbumPalette={state.vizCfg.useAlbumPalette} />
-        ) : null}
-        {state.tab === "info" ? <InfoTab /> : null}
-      </div>
+    <div className="flex min-h-0 w-1/2 flex-col bg-surface-canvas pt-5 pb-5">
+      <PlayerPanels
+        value={state.tab}
+        label={t("player.tabsLabel")}
+        onValueChange={(tab) => {
+          triggerHaptic("selection");
+          actions.onTabChange(tab as typeof state.tab);
+        }}
+        items={TABS.map((item) => ({
+          value: item.id,
+          label: t(item.labelKey),
+          content: (
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-5">
+              {item.id === "queue" ? (
+                <QueueTab />
+              ) : item.id === "suggested" ? (
+                <SuggestedTab />
+              ) : item.id === "lyrics" ? (
+                <LyricsTab useAlbumPalette={state.vizCfg.useAlbumPalette} />
+              ) : (
+                <InfoTab />
+              )}
+            </div>
+          ),
+        }))}
+      />
     </div>
   );
 }

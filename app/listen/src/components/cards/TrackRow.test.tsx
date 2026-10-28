@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { PlayerProgressContext } from "@/contexts/player-context";
 import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,7 +8,10 @@ import { TrackRow, type TrackRowData } from "@/components/cards/TrackRow";
 import { useTrackActionEntries } from "@/components/actions/track-actions";
 import { longPress, pressMenuKey } from "@/test/item-action-gestures";
 import { toTrackRowData } from "@/lib/track-row-data";
-import { renderWithListenProviders } from "@/test/render-with-listen-providers";
+import {
+  createMockPlayerProgress,
+  renderWithListenProviders,
+} from "@/test/render-with-listen-providers";
 
 const navigateMock = vi.hoisted(() => vi.fn());
 const toggleTrackLikeMock = vi.hoisted(() => vi.fn(async () => {}));
@@ -119,7 +124,7 @@ describe("TrackRow playback behavior", () => {
     renderWithListenProviders(<TrackRow track={track} />);
 
     const user = userEvent.setup();
-    await user.click(screen.getByTitle("Like track"));
+    await user.click(screen.getByRole("button", { name: "Like track" }));
 
     expect(screen.getByTestId("track-like-particles")).toBeInTheDocument();
     expect(screen.getByTestId("track-like-heart")).toHaveClass(
@@ -474,9 +479,10 @@ describe("TrackRow playback behavior", () => {
       { playerActions, playerState: { isPlaying: true } },
     );
 
-    expect(
-      screen.getByTestId("track-row-playback-progress"),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: "Track One" })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
     expect(screen.queryByText("1")).not.toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
   });
@@ -509,12 +515,10 @@ describe("TrackRow playback behavior", () => {
 
     expect(container.firstElementChild).toHaveClass("track-row");
     expect(container.firstElementChild).toHaveAttribute("data-active", "true");
-    expect(screen.getByTestId("track-row-playback-progress")).toHaveClass(
-      "track-row-playback-progress",
-    );
     expect(
-      screen.getByTestId("track-row-playback-progress").firstElementChild,
-    ).toHaveClass("track-row-playback-aura");
+      container.querySelector(".crate-track-leading-active"),
+    ).toBeInTheDocument();
+    expect(container.querySelector(".crate-track-glyph")).toBeInTheDocument();
   });
 
   it("uses the inset link focus recipe for artist and album links inside the truncated meta line", () => {
@@ -646,7 +650,9 @@ describe("TrackRow playback behavior", () => {
       expect(row).toHaveAttribute("data-density", "compact");
       expect(within(row).getByText("3")).toBeInTheDocument();
       expect(within(row).getByText("12 plays")).toBeInTheDocument();
-      expect(screen.queryByTitle("Like track")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Like track" }),
+      ).not.toBeInTheDocument();
 
       fireEvent.contextMenu(row);
       fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }));
@@ -683,4 +689,115 @@ describe("TrackRow playback behavior", () => {
       ).not.toBeInTheDocument();
     });
   });
+});
+
+describe("V3 row metadata", () => {
+  it("shows only existing analysis as mono Camelot metadata with stable duration", () => {
+    renderWithListenProviders(
+      <TrackRow
+        track={{
+          id: 71,
+          title: "Analysis track",
+          artist: "Artist",
+          bpm: 124,
+          audio_key: "A",
+          audio_scale: "minor",
+          duration: 243,
+          format: "flac",
+          bit_depth: 24,
+          sample_rate: 96000,
+        }}
+      />,
+    );
+    expect(screen.getByText("124")).toHaveClass("crate-track-bpm");
+    expect(screen.getByText("8A")).toHaveClass("crate-track-key");
+    expect(screen.getByText("4:03")).toHaveClass("font-mono", "tabular-nums");
+    expect(
+      screen.getByText("Hi-Res 24/96").closest('[data-slot="info-badge"]'),
+    ).toHaveAttribute("data-quality-tier", "hi-res");
+  });
+  it("keeps unavailable analysis absent rather than inventing zero values", () => {
+    const { container } = renderWithListenProviders(
+      <TrackRow track={{ id: 72, title: "No analysis", artist: "Artist" }} />,
+    );
+    expect(container.querySelector(".crate-track-analysis")).toBeNull();
+  });
+});
+
+it("shows supplied explicit and remote provenance without turning it into a local action", () => {
+  const { container } = renderWithListenProviders(
+    <TrackRow
+      track={{
+        id: "remote-x",
+        title: "Remote",
+        artist: "Artist",
+        origin: "remote",
+        node_uid: "north",
+        node_name: "north.crate",
+        remote_entity_uid: "remote-x",
+        explicit: true,
+        availability: {
+          catalog: true,
+          stream: true,
+          import: true,
+          stale: true,
+        },
+      }}
+    />,
+  );
+  expect(screen.getByText("E")).toHaveTextContent("E");
+  expect(screen.getByText("via north.crate").firstChild).toHaveClass(
+    "crate-track-source-ring",
+  );
+  expect(screen.getByText("via north.crate")).toHaveClass(
+    "crate-track-provenance",
+  );
+  expect(
+    container.querySelector(".crate-track-source-ring"),
+  ).toBeInTheDocument();
+});
+
+it("advances the active row ring from playback progress while retaining its essence", () => {
+  const track = {
+    id: 77,
+    entity_uid: "ring-77",
+    title: "Ring track",
+    artist: "Artist",
+  };
+  function ProgressHarness() {
+    const [currentTime, setCurrentTime] = useState(30);
+    return (
+      <PlayerProgressContext.Provider
+        value={createMockPlayerProgress({ currentTime, duration: 120 })}
+      >
+        <button type="button" onClick={() => setCurrentTime(60)}>
+          Advance playback
+        </button>
+        <TrackRow track={track} />
+      </PlayerProgressContext.Provider>
+    );
+  }
+  renderWithListenProviders(<ProgressHarness />, {
+    playerActions: {
+      currentTrack: {
+        id: "ring-77",
+        entityUid: "ring-77",
+        title: "Ring track",
+        artist: "Artist",
+      },
+    },
+    playerState: { isPlaying: true },
+  });
+  const ring = screen
+    .getByTestId("track-row-playback-progress")
+    .querySelector("circle:last-of-type")!;
+  const before = Number(ring.getAttribute("stroke-dashoffset"));
+  fireEvent.click(screen.getByRole("button", { name: "Advance playback" }));
+  expect(Number(ring.getAttribute("stroke-dashoffset"))).toBeCloseTo(
+    (before * 2) / 3,
+  );
+  expect(screen.getByTestId("track-row-playback-progress")).toHaveAttribute(
+    "aria-hidden",
+    "true",
+  );
 });

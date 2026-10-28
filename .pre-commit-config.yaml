@@ -32,3 +32,10 @@ repos:
         language: system
         files: ^app/ui/.*\.(js|jsx|ts|tsx)$
         pass_filenames: true
+
+      - id: crate-ui-showcase
+        name: crate/ui showcase entries (staged)
+        entry: node scripts/design-system/check-showcase.mjs --staged
+        language: system
+        files: ^(app/shared/(ui|fonts)/|tools/crate-ui-showcase/|scripts/design-system/(check-showcase|showcase-policy)\.mjs)
+        pass_filenames: false

@@ -64,6 +64,7 @@ describe("player engine adapter", () => {
       androidNativeCrossfade: false,
       androidBeatmatch: false,
       androidBassHandoff: false,
+      androidLongBeatmatch: false,
       plannerVersion: null,
     });
   });
@@ -489,6 +490,7 @@ describe("player engine adapter", () => {
         androidNativeCrossfade: true,
         androidBeatmatch: false,
         androidBassHandoff: false,
+        androidLongBeatmatch: false,
         plannerVersion: "smart-mix-v2",
       });
     });
@@ -533,6 +535,7 @@ describe("player engine adapter", () => {
         androidNativeCrossfade: false,
         androidBeatmatch: false,
         androidBassHandoff: false,
+        androidLongBeatmatch: false,
         plannerVersion: null,
       });
       apiMock.mockResolvedValue(null);
@@ -557,6 +560,7 @@ describe("player engine adapter", () => {
         androidNativeCrossfade: true,
         androidBeatmatch: false,
         androidBassHandoff: false,
+        androidLongBeatmatch: false,
         plannerVersion: "smart-mix-v2",
       });
       await snapshot.replanTransitionPlans?.();
@@ -730,6 +734,7 @@ describe("player engine adapter", () => {
         androidNativeCrossfade: false,
         androidBeatmatch: false,
         androidBassHandoff: false,
+        androidLongBeatmatch: false,
         plannerVersion: null,
       });
 

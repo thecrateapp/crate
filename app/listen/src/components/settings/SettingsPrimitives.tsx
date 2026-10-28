@@ -1,26 +1,103 @@
+import { useSettingsOverlay } from "./settings-panel-activity";
 import { useId, type ReactNode } from "react";
 
+import { FormField } from "@crate/ui/primitives/FormField";
+import { Slider } from "@crate/ui/primitives/Slider";
 import { Switch } from "@crate/ui/primitives/Switch";
+import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@crate/ui/shadcn/select";
+
+export function SelectRow<Value extends string>({
+  label,
+  description,
+  value,
+  options,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  description?: string;
+  value: Value;
+  options: readonly { value: Value; label: string; description?: string }[];
+  disabled?: boolean;
+  onChange: (value: Value) => void;
+}) {
+  const optionsId = useId();
+  const selected = options.find((option) => option.value === value);
+  const hint =
+    [description, selected?.description].filter(Boolean).join(" ") || undefined;
+  const [open, setOpen] = useSettingsOverlay();
+  return (
+    <FormField label={label} hint={hint}>
+      {(field) => (
+        <Select
+          open={open}
+          onOpenChange={setOpen}
+          value={value}
+          disabled={disabled}
+          onValueChange={(next) => onChange(next as Value)}
+        >
+          <SelectTrigger {...field}>
+            <SelectValue>{selected?.label}</SelectValue>
+          </SelectTrigger>
+          <SelectContent position="popper">
+            {options.map((option, index) => (
+              <SelectItem
+                key={option.value}
+                value={option.value}
+                textValue={option.label}
+                aria-labelledby={`${optionsId}-${index}-label`}
+                aria-describedby={
+                  option.description ? `${optionsId}-${index}` : undefined
+                }
+              >
+                <span className="grid min-w-0 gap-1 text-left">
+                  <span id={`${optionsId}-${index}-label`}>{option.label}</span>
+                  {option.description ? (
+                    <span
+                      id={`${optionsId}-${index}`}
+                      className="text-caption text-text-muted"
+                    >
+                      {option.description}
+                    </span>
+                  ) : null}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    </FormField>
+  );
+}
 
 export function Section({
   title,
   description,
   children,
+  ruled = true,
 }: {
   title: string;
   description?: string;
   children: ReactNode;
+  ruled?: boolean;
 }) {
   return (
-    <section className="settings-section rounded-panel p-5 sm:p-6">
-      <div className="mb-5">
-        <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
-        {description ? (
-          <p className="mt-1 text-sm text-text-muted">{description}</p>
-        ) : null}
-      </div>
+    <InstrumentPanel
+      ruled={ruled}
+      as="section"
+      headingLevel={2}
+      label={{ children: title, tone: "accent" }}
+      description={description}
+    >
       <div className="space-y-5">{children}</div>
-    </section>
+    </InstrumentPanel>
   );
 }
 
@@ -46,32 +123,30 @@ export function RangeRow({
   onChange: (value: number) => void;
 }) {
   return (
-    <div className={`space-y-2 ${disabled ? "opacity-50" : ""}`}>
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <div className="text-sm font-medium text-text-primary">{label}</div>
-          {description ? (
-            <p className="mt-1 text-xs leading-5 text-text-muted">
-              {description}
-            </p>
-          ) : null}
-        </div>
-        <div className="rounded-full border border-border-quiet/10 bg-text-primary/[0.03] px-2.5 py-1 text-xs text-text-primary/70">
-          {displayValue ?? value}
-        </div>
-      </div>
-      <input
-        type="range"
-        aria-label={label}
+    <FormField
+      label={
+        <span className="flex items-center justify-between gap-4">
+          <span>{label}</span>
+          <span
+            aria-hidden="true"
+            data-slot="form-field-value"
+            className="font-mono font-normal text-label normal-case"
+          >
+            {displayValue ?? value}
+          </span>
+        </span>
+      }
+      hint={description}
+    >
+      <Slider
         min={min}
         max={max}
         step={step}
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="settings-range w-full disabled:cursor-not-allowed"
       />
-    </div>
+    </FormField>
   );
 }
 
@@ -88,28 +163,13 @@ export function ToggleRow({
   disabled?: boolean;
   onChange: (checked: boolean) => void;
 }) {
-  const descriptionId = useId();
-
   return (
-    <div className="flex items-start justify-between gap-4">
-      <div className={disabled ? "opacity-50" : undefined}>
-        <div className="text-sm font-medium text-text-primary">{label}</div>
-        {description ? (
-          <p
-            id={descriptionId}
-            className="mt-1 text-xs leading-5 text-text-muted"
-          >
-            {description}
-          </p>
-        ) : null}
-      </div>
+    <FormField label={label} hint={description} layout="inline">
       <Switch
-        aria-label={label}
-        aria-describedby={description ? descriptionId : undefined}
         checked={checked}
         disabled={disabled}
         onCheckedChange={onChange}
       />
-    </div>
+    </FormField>
   );
 }

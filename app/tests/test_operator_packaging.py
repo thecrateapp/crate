@@ -86,7 +86,7 @@ def test_root_scaffold_is_executable_but_never_activates(monkeypatch):
         assert result["activated"] is False
         assert not (root / "host/.env").exists()
         assert (root / "operator/context/public").is_dir()
-        assert (root / "host/.deploy/hermes.compose.yaml").is_file()
+        assert (root / "host/.deploy/crate-operator.compose.yaml").is_file()
         assert not list((root / "operator/secrets").rglob("*token*"))
         with pytest.raises(ValueError):
             provision.provision(source)
@@ -183,12 +183,79 @@ CRATE_AGENT_INSTANCE_ID=lab
         services["crate-fast-worker"]["environment"]["CRATE_READINESS_QUEUES"] == "fast"
     )
     for name in (
-        "crate-hermes-operator",
+        "crate-operator",
         "crate-infra-relay",
         "crate-operator-supervisor",
     ):
         assert not services[name].get("depends_on")
         assert not services[name].get("ports")
+
+
+def test_operator_overlay_resolves_on_a_new_instance_with_the_base_compose(tmp_path):
+    if not shutil.which("docker"):
+        pytest.skip("Host Docker Compose parser required")
+    repository = Path(__file__).resolve().parents[2]
+    environment = tmp_path / "new-instance.env"
+    environment.write_text(
+        "PUID=1000\nPGID=1000\nDOMAIN=example.invalid\nDATA_DIR=/srv/crate\n"
+        "MEDIA_DIR=/srv/media\nMUSIC_DIR=/srv/media/music\n"
+        "TRAEFIK_HTTP_PORT=8080\nTRAEFIK_HTTPS_PORT=8443\nTIDARR_PORT=8484\n"
+        "NGINX_PORT=8081\nSLSKD_PORT=5030\nSLSKD_LISTEN_PORT=50300\n"
+        "CRATE_OPERATOR_PRINCIPAL_IDS=00000000-0000-0000-0000-000000000001\n"
+        "CRATE_AGENT_INSTANCE_ID=lab\n"
+    )
+    with environment.open("a") as output:
+        for compose in ("docker-compose.yaml", "deploy/operator/compose.operator.yaml"):
+            for key in sorted(
+                set(
+                    re.findall(
+                        r"\$\{([A-Z0-9_]+):\?", (repository / compose).read_text()
+                    )
+                )
+                - {"CRATE_OPERATOR_PRINCIPAL_IDS", "CRATE_AGENT_INSTANCE_ID"}
+            ):
+                output.write(key + "=synthetic-value\n")
+    result = subprocess.run(
+        [
+            "docker",
+            "compose",
+            "--env-file",
+            str(environment),
+            "-f",
+            "docker-compose.yaml",
+            "-f",
+            "deploy/operator/compose.operator.yaml",
+            "--profile",
+            "crate-operator",
+            "config",
+            "--format",
+            "json",
+        ],
+        cwd=repository,
+        env={"PATH": os.environ["PATH"]},
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    services = json.loads(result.stdout)["services"]
+    assert "crate-site" not in services and "crate-docs" not in services
+    operator = services["crate-operator"]
+    assert operator["image"] == "ghcr.io/thecrateapp/crate-agent:latest"
+    sources = {volume["target"]: volume["source"] for volume in operator["volumes"]}
+    assert sources["/opt/data"] == "/srv/crate/crate-operator/home"
+    assert "/opt/crate-hermes" not in sources
+    assert operator["tmpfs"] == ["/etc/hermes:uid=1000,gid=1000,mode=0700"]
+    api = {
+        volume["target"]: volume["source"]
+        for volume in services["crate-api"]["volumes"]
+    }
+    assert api["/run/crate-provenance"] == "/srv/crate/crate-operator/context/public"
+    for name in ("crate-infra-relay", "crate-operator-supervisor"):
+        assert services[name]["image"] == operator["image"]
+        assert services[name]["read_only"] is True
+        assert "/opt/crate-operator" not in {
+            volume["target"] for volume in services[name]["volumes"]
+        }
 
 
 @pytest.mark.parametrize(

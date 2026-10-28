@@ -1,0 +1,246 @@
+---
+import { EXAMPLE_TRACKS, SIDECAR } from "../../content/admin/viz";
+import { mulberry32 } from "../../scripts/field/sources";
+
+const vector = (seed: number) => {
+  if (!seed) return SIDECAR.tracks[0]!.bliss.vector;
+  const random = mulberry32(seed);
+  return Array.from({ length: 20 }, () => Number(((random() * 2 - 1) * 0.5).toFixed(3)));
+};
+const tracks = EXAMPLE_TRACKS.map((track) => ({ ...track, vector: vector(track.seed) }));
+const first = tracks[0]!;
+const lufs = (value: number) => `−${Math.abs(value).toFixed(1)}`;
+const featureNames = Object.keys(first.features) as (keyof typeof first.features)[];
+---
+
+<figure class="readout" data-viz="analysis" data-reveal aria-label="Audio analysis for one track: tempo, key, loudness, dynamic range, five features and a 20-number bliss vector">
+  <header class="viz-bar" data-enter>
+    <p class="viz-label"><b>Analysis</b> example values</p>
+    <p class="viz-label">{SIDECAR.artist.name} · {SIDECAR.album.name}</p>
+  </header>
+
+  <p class="title" data-readout-title>{first.title}</p>
+
+  <dl class="figures">
+    <div>
+      <dt class="viz-label">BPM</dt>
+      <dd data-figure="bpm" data-digits="1">{first.bpm.toFixed(1)}</dd>
+    </div>
+    <div>
+      <dt class="viz-label">Key</dt>
+      <dd><span data-figure-text="camelot">{first.camelot}</span><small data-figure-text="key">{first.key}</small></dd>
+    </div>
+    <div>
+      <dt class="viz-label">Loudness</dt>
+      <dd><span data-figure="loudness" data-digits="1" data-negative>{lufs(first.loudness)}</span><small>LUFS</small></dd>
+    </div>
+    <div>
+      <dt class="viz-label">Dynamic range</dt>
+      <dd><span data-figure="dynamicRange" data-digits="1">{first.dynamicRange.toFixed(1)}</span><small>dB</small></dd>
+    </div>
+  </dl>
+
+  <ul class="features">
+    {
+      featureNames.map((name) => (
+        <li>
+          <span class="viz-label">{name}</span>
+          <i style={`--v:${first.features[name]}`} data-feature-bar={name} />
+          <output data-feature={name}>{first.features[name].toFixed(2)}</output>
+        </li>
+      ))
+    }
+  </ul>
+
+  <div class="bliss">
+    <p class="viz-label"><b>bliss</b> 20 numbers · nearest neighbours in pgvector</p>
+    <ol class="bliss-bars" aria-hidden="true">
+      {first.vector.map((value) => <li style={`--v:${value}`} data-bliss />)}
+    </ol>
+  </div>
+
+  <div class="tracks" role="group" aria-label="Example tracks">
+    {
+      tracks.map((track, index) => (
+        <button
+          type="button"
+          aria-pressed={index === 0 ? "true" : "false"}
+          data-track={JSON.stringify({ ...track, seed: undefined })}
+        >
+          {track.title}
+        </button>
+      ))
+    }
+  </div>
+</figure>
+
+<style>
+  .readout {
+    margin: 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .title {
+    margin: 4vh 0 0;
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(2.2rem, 4.2vw, 3.8rem);
+    line-height: 1;
+    letter-spacing: -0.045em;
+    white-space: nowrap;
+  }
+
+  .figures {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 18px;
+    margin: 4vh 0 0;
+  }
+
+  .figures div {
+    display: grid;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  .figures dd {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.6rem, 2.6vw, 2.4rem);
+    letter-spacing: -0.035em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .figures small {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: var(--fg-3);
+  }
+
+  .features {
+    display: grid;
+    gap: 12px;
+    margin: 4vh 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .features li {
+    display: grid;
+    grid-template-columns: 16ch minmax(0, 1fr) 5ch;
+    gap: 14px;
+    align-items: center;
+  }
+
+  .features i {
+    position: relative;
+    height: 2px;
+    background: var(--line);
+  }
+
+  .features i::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--cyan-hi);
+    transform-origin: left;
+    transform: scaleX(var(--v));
+  }
+
+  .features output {
+    font-family: var(--mono);
+    font-size: 12px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bliss {
+    margin-top: 4vh;
+  }
+
+  .bliss-bars {
+    display: grid;
+    grid-template-columns: repeat(20, minmax(0, 1fr));
+    gap: 4px;
+    height: 120px;
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+    background: linear-gradient(transparent calc(50% - 0.5px), rgba(241, 245, 249, 0.2) calc(50% - 0.5px), rgba(241, 245, 249, 0.2) calc(50% + 0.5px), transparent calc(50% + 0.5px));
+  }
+
+  .bliss-bars li {
+    position: relative;
+  }
+
+  .bliss-bars li::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 50%;
+    border-radius: 2px;
+    background: linear-gradient(var(--cyan-hi), rgba(6, 182, 212, 0.2));
+    transform-origin: top;
+    transform: scaleY(calc(var(--v) * -2));
+  }
+
+  .tracks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 26px;
+  }
+
+  .tracks button {
+    min-height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--fg-2);
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition:
+      color 0.3s var(--ease-snap),
+      border-color 0.3s var(--ease-snap),
+      background-color 0.3s var(--ease-snap),
+      transform 0.45s var(--spring-snappy);
+  }
+
+  .tracks button:active {
+    transform: scale(0.95);
+  }
+
+  .tracks button[aria-pressed="true"] {
+    color: var(--bg);
+    border-color: var(--cyan-hi);
+    background: var(--cyan-hi);
+  }
+
+  @media (max-width: 760px) {
+    .figures {
+      grid-template-columns: 1fr 1fr;
+    }
+    .features li {
+      grid-template-columns: 13ch minmax(0, 1fr) 4ch;
+    }
+    .title {
+      white-space: normal;
+    }
+    .bliss-bars {
+      gap: 2px;
+      height: 90px;
+    }
+  }
+</style>

@@ -4,11 +4,21 @@
   "scripts": {
     "design-system:drift": "node scripts/design-system/drift-inventory.mjs",
     "design-system:layers": "node scripts/design-system/layer-inventory.mjs",
+    "design-system:overrides": "node scripts/design-system/override-inventory.mjs",
     "design-system:tokens:check": "npm run --workspace=app/shared/ui test -- lib/appearance-theme-css.test.ts",
     "design-system:tokens:generate": "CRATE_UPDATE_THEME_TOKENS=1 npm run --workspace=app/shared/ui test -- lib/appearance-theme-css.test.ts",
     "test:appearance": "playwright test --config=playwright.appearance.config.ts",
     "test:listen-visual": "playwright test --config=playwright.listen-visual.config.ts",
-    "test:admin-e2e": "playwright test --config=playwright.admin.config.ts"
+    "test:admin-e2e": "playwright test --config=playwright.admin.config.ts",
+    "design-system:preview": "vite --config tools/design-system-preview/vite.config.mjs",
+    "design-system:preview:build": "vite build --config tools/design-system-preview/vite.config.mjs",
+    "design-system:preview:test": "playwright test --config tools/design-system-preview/playwright.config.mjs",
+    "design-system:storybook": "STORYBOOK_DISABLE_TELEMETRY=1 storybook dev --config-dir tools/crate-ui-showcase/.storybook --host 127.0.0.1 --port 6006 --no-open --ci",
+    "design-system:storybook:build": "STORYBOOK_DISABLE_TELEMETRY=1 storybook build --config-dir tools/crate-ui-showcase/.storybook --output-dir .artifacts/crate-ui-storybook",
+    "design-system:storybook:test": "playwright test --config tools/crate-ui-showcase/playwright.config.mjs",
+    "design-system:showcase:check": "node scripts/design-system/check-showcase.mjs",
+    "design-system:showcase:refresh": "node scripts/design-system/check-showcase.mjs --refresh",
+    "design-system:storybook:typecheck": "tsc --noEmit -p tools/crate-ui-showcase/tsconfig.json"
   },
   "workspaces": [
     "app/cast-receiver",
@@ -20,7 +30,11 @@
   ],
   "devDependencies": {
     "@playwright/test": "^1.63.0",
+    "@storybook/addon-a11y": "10.6.2",
+    "@storybook/addon-docs": "10.6.2",
+    "@storybook/react-vite": "10.6.2",
     "@testing-library/user-event": "^14.6.1",
-    "@vitest/coverage-v8": "^4.1.6"
+    "@vitest/coverage-v8": "^4.1.6",
+    "storybook": "10.6.2"
   }
 }

@@ -1,0 +1,24 @@
+import { Meta, Canvas } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/OverlayCloseButton.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">OverlayCloseButton</DocHeading>
+<EntryDetails
+  id="shadcn-overlay-close-button"
+  review="Web closure · awaiting review"
+/>
+
+<DocHeading as="h2">Contract</DocHeading>
+
+Native forty-pixel close control with accessible injected label, disabled state, ref and focus behavior. Neutral icon actions retain their background on hover and highlight foreground in accent, following the approved global rule. Confirmation/modal owners keep dismissal authority.
+
+The approved mockup and Diego's later amendments are the visual reference. This entry documents actual existing components; native device, assistive technology and complete consumer certification remain separate. No production requests, credentials or persistent preference writes occur here.
+
+<Canvas of={Stories.Base} />
+<Canvas of={Stories.Disabled} />
+
+<DocHeading as="h2">Primary and tooltip review amendment</DocHeading>
+
+An explicit legacy title uses the custom Tooltip hint without forwarding a native title. Close naming, refs, disabled state and foreground-only accent hover remain intact.

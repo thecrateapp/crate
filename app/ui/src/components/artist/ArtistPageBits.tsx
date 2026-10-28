@@ -1,42 +1,37 @@
-import { useState } from "react";
-import { Link } from "react-router";
-
+import type { ReactNode } from "react";
+import { EntityCard } from "@crate/ui/domain/entity";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
 import { artistPagePath, artistPhotoApiUrl } from "@/lib/library-routes";
 
 export function StatCard({
   label,
   value,
-  icon,
 }: {
   label: string;
   value: string;
-  icon: React.ReactNode;
+  /** Legacy callers may supply an icon; statistics are text-only. */
+  icon?: ReactNode;
 }) {
   return (
-    <div className="bg-white/[0.03] border border-white/5 rounded-md px-3 py-2.5">
-      <div className="flex items-center gap-1.5 text-white/40 mb-1">
-        {icon}
-        <span className="text-[11px]">{label}</span>
+    <div className="min-w-0 border-t border-border-quiet py-3">
+      <MonoLabel>{label}</MonoLabel>
+      <div className="mt-2 font-mono text-numeral-sm font-normal tabular-nums text-text-primary">
+        {value}
       </div>
-      <div className="text-sm font-semibold text-white/80">{value}</div>
     </div>
   );
 }
 
 export function PopularityBar({ value }: { value: number }) {
+  const percent = Math.max(0, Math.min(100, value));
   return (
-    <div className="flex items-center gap-1">
-      <div className="w-[40px] h-1 bg-white/10 rounded-md overflow-hidden">
-        <div
-          className="h-full rounded-md"
-          style={{
-            width: `${value}%`,
-            background: "linear-gradient(90deg, #06b6d433, #06b6d4)",
-          }}
-        />
-      </div>
-      <span className="text-[10px] text-white/30">{value}</span>
-    </div>
+    <span className="inline-flex items-center gap-2">
+      <span className="w-10">
+        <ProgressHairline label="Popularity" value={percent / 100} />
+      </span>
+      <MonoLabel as="span">{percent}</MonoLabel>
+    </span>
   );
 }
 
@@ -55,81 +50,40 @@ export function SimilarArtistCard({
   genres?: string[];
   popularity?: number;
 }) {
-  const [imgError, setImgError] = useState(false);
-  const [imgLoaded, setImgLoaded] = useState(false);
-  const letter = name.charAt(0).toUpperCase();
-  const targetPath =
-    id != null
-      ? artistPagePath({ artistId: id, artistSlug: slug, artistName: name })
-      : null;
-  const imageUrl =
-    image ||
-    (id != null
-      ? `${artistPhotoApiUrl({
-          artistId: id,
-          artistSlug: slug,
-          artistName: name,
-        })}?v=stable-similar-photo`
-      : "");
-
-  const content = (
-    <>
-      <div className="w-full aspect-square rounded-md overflow-hidden mb-2 ring-1 ring-white/5 group-hover:ring-primary/30 transition-[box-shadow,transform] duration-300 group-hover:scale-[1.03]">
-        {!imgError && imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={name}
-            loading="lazy"
-            className={`w-full h-full object-cover transition-opacity duration-500 ${
-              imgLoaded ? "opacity-100" : "opacity-0"
-            }`}
-            onLoad={() => setImgLoaded(true)}
-            onError={() => setImgError(true)}
-          />
-        ) : null}
-        {(imgError || !imgLoaded || !imageUrl) && (
-          <div
-            className={`w-full h-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center ${
-              imgLoaded && !imgError && imageUrl ? "hidden" : ""
-            }`}
-          >
-            <span className="text-3xl font-bold text-white/20">{letter}</span>
-          </div>
-        )}
-      </div>
-      <div className="text-sm font-medium text-white/70 group-hover:text-white truncate transition-colors">
-        {name}
-      </div>
-      {genres && genres.length > 0 && (
-        <div className="text-[10px] text-white/30 truncate mt-0.5">
-          {genres.slice(0, 2).join(", ")}
-        </div>
-      )}
-      {popularity != null && popularity > 0 && (
-        <div className="flex justify-center mt-1">
-          <PopularityBar value={popularity} />
-        </div>
-      )}
-    </>
-  );
-
-  if (targetPath) {
-    return (
-      <Link to={targetPath} className="group text-center">
-        {content}
-      </Link>
-    );
-  }
-
+  const local = id != null;
   return (
-    <a
-      href={`https://www.last.fm/music/${encodeURIComponent(name)}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group text-center"
-    >
-      {content}
-    </a>
+    <EntityCard
+      title={name}
+      href={
+        local
+          ? artistPagePath({ artistId: id, artistSlug: slug, artistName: name })
+          : `https://www.last.fm/music/${encodeURIComponent(name)}`
+      }
+      external={!local}
+      openLabel={`Open ${name}`}
+      shape="circle"
+      layout="grid"
+      profileSize="tile"
+      menuButton="none"
+      cover={{
+        src:
+          image ||
+          (local
+            ? `${artistPhotoApiUrl({ artistId: id, artistSlug: slug, artistName: name })}?v=stable-similar-photo`
+            : null),
+        alt: name,
+      }}
+      subtitle={
+        genres?.length ? (
+          <MonoLabel as="span">{genres.slice(0, 2).join(", ")}</MonoLabel>
+        ) : undefined
+      }
+      meta={
+        popularity != null && popularity > 0 ? (
+          <PopularityBar value={popularity} />
+        ) : undefined
+      }
+    />
   );
 }
 

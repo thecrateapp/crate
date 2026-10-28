@@ -92,6 +92,50 @@ def test_l1_hit_respects_stricter_requested_max_age(monkeypatch):
     assert cache_store.get_cache("key", max_age_seconds=10) is None
 
 
+def test_get_caches_reads_many_values_in_one_redis_pipeline(monkeypatch):
+    import uuid
+
+    from crate.db import cache_runtime, cache_store
+
+    keys = [f"setlist:{uuid.uuid4().hex}" for _ in range(2)]
+    values = {f"cache:{key}": json.dumps({"key": key}) for key in keys}
+
+    class ReadPipeline:
+        def __init__(self):
+            self.commands: list[tuple[str, str]] = []
+
+        def get(self, key):
+            self.commands.append(("get", key))
+            return self
+
+        def pttl(self, key):
+            self.commands.append(("pttl", key))
+            return self
+
+        def execute(self):
+            return [
+                values.get(key) if command == "get" else 60_000
+                for command, key in self.commands
+            ]
+
+    class ReadRedis:
+        def __init__(self):
+            self.pipeline_calls = 0
+
+        def pipeline(self, transaction=False):
+            assert transaction is False
+            self.pipeline_calls += 1
+            return ReadPipeline()
+
+    redis = ReadRedis()
+    cache_runtime._mem_cache.clear()
+    monkeypatch.setattr(cache_store, "get_redis", lambda: redis)
+    _forbid_postgres(monkeypatch, cache_store)
+
+    assert cache_store.get_caches(keys) == {key: {"key": key} for key in keys}
+    assert redis.pipeline_calls == 1
+
+
 class _FakeRedisPipeline:
     def __init__(self, redis: "_FakeRedis") -> None:
         self.redis = redis
@@ -188,3 +232,52 @@ def test_smart_mix_plan_caches_skip_postgres_when_redis_is_down(monkeypatch):
     assert cache_store.get_smart_mix_plan_caches([key]) == {}
     cache_store.set_smart_mix_plan_caches({key: {"mode": "adaptive"}})
     assert cache_store.get_smart_mix_plan_caches([key]) == {key: {"mode": "adaptive"}}
+
+
+class _RedisStore:
+    def __init__(self):
+        self.values: dict[str, str] = {}
+        self.ttls: dict[str, int] = {}
+
+    def get(self, key: str):
+        return self.values.get(key)
+
+    def setex(self, key: str, ttl: int, raw: str):
+        self.values[key] = raw
+        self.ttls[key] = ttl
+
+
+def _no_database(*_args, **_kwargs):
+    raise AssertionError("the volatile cache must not open a database scope")
+
+
+def test_volatile_cache_round_trips_through_redis_without_postgres(monkeypatch):
+    from crate.db import cache_runtime, cache_store
+
+    cache_runtime._mem_cache.clear()
+    redis = _RedisStore()
+    monkeypatch.setattr(cache_store, "get_redis", lambda: redis)
+    monkeypatch.setattr(cache_store, "read_scope", _no_database)
+    monkeypatch.setattr(cache_store, "transaction_scope", _no_database)
+
+    cache_store.set_volatile_cache("range", {"top": [1]}, 600)
+    cache_runtime._mem_cache.clear()
+
+    assert redis.ttls["cache:range"] == 600
+    assert cache_store.get_volatile_cache("range", 600) == {"top": [1]}
+
+
+def test_volatile_cache_misses_without_redis_instead_of_reading_postgres(
+    monkeypatch,
+):
+    from crate.db import cache_runtime, cache_store
+
+    cache_runtime._mem_cache.clear()
+    monkeypatch.setattr(cache_store, "get_redis", lambda: None)
+    monkeypatch.setattr(cache_store, "read_scope", _no_database)
+    monkeypatch.setattr(cache_store, "transaction_scope", _no_database)
+
+    cache_store.set_volatile_cache("range", {"top": [1]}, 600)
+    cache_runtime._mem_cache.clear()
+
+    assert cache_store.get_volatile_cache("range", 600) is None

@@ -9,6 +9,7 @@ vi.mock("@/hooks/use-llm", () => ({
   })),
 }));
 import { useActionLLMStatus } from "@/hooks/use-llm";
+import { waitForTask } from "@/lib/tasks";
 import { ArtistArtworkGallery } from "./ArtistArtworkGallery";
 
 vi.mock("@/lib/tasks", () => ({
@@ -343,4 +344,42 @@ it("disables only optional hero analysis when its own action is unavailable", as
     screen.getByRole("button", { name: "Add Candidate to gallery" }),
   ).toBeEnabled();
   expect(useActionLLMStatus).toHaveBeenCalledWith("artwork.hero.analyze");
+});
+
+it("keeps image deletion locked until its worker confirms completion", async () => {
+  let finish!: (result: Awaited<ReturnType<typeof waitForTask>>) => void;
+  vi.mocked(waitForTask).mockReturnValueOnce(
+    new Promise((resolve) => {
+      finish = resolve;
+    }) as ReturnType<typeof waitForTask>,
+  );
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_: unknown, init?: RequestInit) =>
+      Response.json(
+        init?.method === "DELETE"
+          ? { task_id: "pending-image-delete" }
+          : { assets: [{ ...asset, slots: [] }] },
+      ),
+    ),
+  );
+  render(
+    <ArtistArtworkGallery
+      artistId={7}
+      artistName="Converge"
+      canEdit
+      onChanged={vi.fn()}
+    />,
+  );
+  await userEvent.click(
+    await screen.findByRole("button", { name: "Delete Press photo" }),
+  );
+  const confirm = screen.getByRole("button", { name: "Delete image" });
+  await userEvent.click(confirm);
+  expect(confirm).toBeDisabled();
+  expect(screen.getByRole("alertdialog")).toBeVisible();
+  finish({ status: "completed" } as Awaited<ReturnType<typeof waitForTask>>);
+  await waitFor(() =>
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument(),
+  );
 });

@@ -1,6 +1,8 @@
 import re as _re
+from datetime import date
+from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Path, Query, Request
 
 from crate.api.auth import _require_auth
 from crate.api.permissions import require_permission
@@ -24,8 +26,17 @@ from crate.api.schemas.analytics import (
     StatsResponse,
     TimelineResponse,
 )
-from crate.api.schemas.me import StatsDashboardResponse
-from crate.missing import find_missing_albums
+from crate.api.schemas.me import StatsDashboardResponse, StatsRangeResponse
+from crate.api.schemas.collection_insights import CollectionInsightsResponse
+from crate.api.schemas.sonic_insights import SonicNeighborsResponse
+from crate.db.collection_insights_surface import get_collection_insights
+from crate.db.queries.sonic_neighbors import get_sonic_neighbors
+from crate.db.queries.user_library_stats_range import (
+    StatsRangeError,
+    get_instance_stats_range,
+)
+from crate.db.queries.missing_albums import get_artist_album_inventory
+from crate.missing import compare_missing_albums, find_missing_albums
 from crate.api._deps import (
     artist_name_from_entity_uid,
     artist_name_from_id,
@@ -113,7 +124,7 @@ def api_instance_listening_stats_dashboard(
     month: str | None = Query(None, pattern=r"^\d{4}-\d{2}$"),
     tracks_limit: int = Query(12, ge=1, le=50),
     artists_limit: int = Query(10, ge=1, le=50),
-    albums_limit: int = Query(10, ge=1, le=50),
+    albums_limit: int = Query(14, ge=1, le=50),
     genres_limit: int = Query(10, ge=1, le=50),
     replay_limit: int = Query(36, ge=1, le=100),
 ):
@@ -130,6 +141,25 @@ def api_instance_listening_stats_dashboard(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get(
+    "/api/stats/range",
+    response_model=StatsRangeResponse,
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Get an instance-wide listening summary for a date range",
+)
+def api_instance_listening_stats_range(
+    request: Request,
+    start: date = Query(...),
+    end: date = Query(...),
+    limit: int = Query(3, ge=1, le=20),
+):
+    _require_auth(request)
+    try:
+        return get_instance_stats_range(start, end, limit=limit)
+    except StatsRangeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get(
@@ -253,11 +283,13 @@ def api_quality_refresh(request: Request, body: QualityRefreshRequest):
 
 def api_missing_albums(request: Request, artist: str):
     _require_auth(request)
+    inventory = get_artist_album_inventory(artist)
+    if inventory is not None:
+        return compare_missing_albums(inventory["artist"], inventory["local"])
+
     lib = library_path()
-    db_artist = get_library_artist(artist)
     artist_dir = resolve_artist_dir(
         lib,
-        db_artist,
         fallback_name=artist,
         existing_only=True,
     )
@@ -265,8 +297,7 @@ def api_missing_albums(request: Request, artist: str):
         raise HTTPException(status_code=404, detail="Artist not found")
 
     exts = extensions()
-    artist_name = str(db_artist.get("name") or artist) if db_artist else artist
-    result = find_missing_albums(artist_dir, exts, artist_name=artist_name)
+    result = find_missing_albums(artist_dir, exts, artist_name=artist)
     return result
 
 
@@ -350,6 +381,40 @@ def api_artist_stats_by_entity_uid(request: Request, artist_entity_uid: str):
     if not artist_name:
         raise HTTPException(status_code=404, detail="Artist not found")
     return api_artist_stats(request, artist_name)
+
+
+@router.get(
+    "/api/admin/collection-insights",
+    response_model=CollectionInsightsResponse,
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Compare the indexed local collection with registered instance listening",
+)
+def api_collection_insights(
+    request: Request,
+    window: Literal["30d", "90d", "365d"] = Query("30d"),
+    fresh: bool = False,
+):
+    require_permission(request, "library.view")
+    return get_collection_insights(window=window, fresh=fresh)
+
+
+@router.get(
+    "/api/admin/collection-insights/sonic-neighbors/{track_id}",
+    response_model=SonicNeighborsResponse,
+    responses=_ANALYTICS_RESPONSES,
+    summary="Read local Bliss neighbors and their registered listening in the selected period",
+)
+def api_sonic_neighbors(
+    request: Request,
+    track_id: int = Path(..., ge=1),
+    window: Literal["30d", "90d", "365d"] = Query("30d"),
+    limit: int = Query(6, ge=1, le=12),
+):
+    require_permission(request, "library.view")
+    result = get_sonic_neighbors(track_id, window=window, limit=limit)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Local track not found")
+    return result
 
 
 @router.get(

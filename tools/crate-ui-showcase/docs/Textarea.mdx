@@ -1,0 +1,31 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/Textarea.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">Textarea</DocHeading>
+<EntryDetails
+  id="shadcn-textarea"
+  review="Visual review approved by Diego · 1AR"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+- Native multi-line field using the same type, border, surface, focus and validation language as Input.
+- Auto height with the existing 7 rem (112 px at the standard root size) minimum; rows and native resize are preserved. 8 px label gap comes from FormField.
+- Use for long text, not a single-line Input with custom height. Help/error remain associated; readonly and disabled preserve the existing value.
+- The approved persistent mockup and Diego's confirmed adjustments are the visual reference. Examples import the actual component; scene CSS does not repair its internals.
+
+<DocHeading as="h2">Real component</DocHeading>
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Disabled} />
+
+<Canvas of={Stories.ReadOnly} />
+
+<Canvas of={Stories.Invalid} />
+
+<Controls of={Stories.Base} />
+
+Consumer adoption and platform QA are separate from this entry and its visual review.

@@ -1,12 +1,6 @@
-import { bitrateToKbps, type TrackInfo } from "@/lib/track-info";
-
-export type PaletteTriplet = [number, number, number];
+import { bitrateToKbps, type TrackInfo } from "../../../lib/track-info-data";
 
 export type MoodEntry = { label: string; value: number };
-
-export function cssColor(color: PaletteTriplet, alpha = 1) {
-  return `color(srgb ${color.join(" ")} / ${alpha})`;
-}
 
 export function prettyLabel(value: string) {
   return value

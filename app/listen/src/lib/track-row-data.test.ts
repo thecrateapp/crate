@@ -22,3 +22,12 @@ describe("toTrackRowData", () => {
     expect("globalAlbumUid" in row).toBe(false);
   });
 });
+
+it("preserves an explicit flag without inventing one on older rows", () => {
+  expect(
+    toTrackRowData({ id: 1, title: "A", artist: "B", explicit: true }),
+  ).toHaveProperty("explicit", true);
+  expect(
+    toTrackRowData({ id: 1, title: "A", artist: "B" }).explicit,
+  ).toBeUndefined();
+});

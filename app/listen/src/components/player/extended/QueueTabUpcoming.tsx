@@ -1,3 +1,4 @@
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { useTranslation } from "react-i18next";
 
 import type { Track } from "@/contexts/PlayerContext";
@@ -22,9 +23,9 @@ export function QueueTabUpcoming({
 
   return (
     <div className="mb-4">
-      <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wider text-text-muted">
+      <MonoLabel as="p" className="mb-2 px-1">
         {t("player.queue.nextUp", { count: tracks.length })}
-      </p>
+      </MonoLabel>
       {tracks.map((track, i) => {
         const index = currentIndex + 1 + i;
         return (

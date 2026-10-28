@@ -36,6 +36,34 @@ function menuItem() {
 const INTERACTIVE_SELECTOR =
   "button, a[href], input, select, textarea, [role='button'], [tabindex]";
 
+describe.each([EntityCard, EntityRow])("entity selection", (Entity) => {
+  it("announces selection on the callback button independently of playback", () => {
+    const onOpen = vi.fn();
+    const { rerender } = render(
+      <Entity title="Discovery" onOpen={onOpen} pressed={false} active />,
+    );
+    const button = screen.getByRole("button", { name: "Discovery" });
+    expect(button).toHaveAttribute("aria-pressed", "false");
+    expect(button).toHaveAttribute("aria-current", "true");
+    fireEvent.click(button);
+    expect(onOpen).toHaveBeenCalledOnce();
+    rerender(<Entity title="Discovery" onOpen={onOpen} pressed active />);
+    expect(button).toHaveAttribute("aria-pressed", "true");
+    expect(article()).not.toHaveAttribute("aria-pressed");
+  });
+
+  it("retains native link semantics without a toggle state", () => {
+    render(
+      <MemoryRouter>
+        <Entity title="Discovery" href="/albums/discovery" pressed />
+      </MemoryRouter>,
+    );
+    const link = screen.getByRole("link", { name: "Discovery" });
+    expect(link).toHaveAttribute("href", "/albums/discovery");
+    expect(link).not.toHaveAttribute("aria-pressed");
+  });
+});
+
 describe("EntityCard", () => {
   beforeEach(() => {
     isDesktop = false;
@@ -366,7 +394,7 @@ describe("EntityRow", () => {
     expect(article()).toHaveClass("py-1.5");
     expect(
       article().querySelector("[data-testid='media-cover-fallback']"),
-    ).toHaveClass("size-10");
+    ).toHaveClass("size-12");
     expect(screen.getByRole("button", { name: "More actions" })).toHaveClass(
       "size-8",
     );
@@ -487,4 +515,62 @@ describe("EntityAvatar", () => {
     expect(badge).toHaveTextContent("live");
     expect(badge.parentElement).toHaveClass("custom");
   });
+});
+
+it("does not announce selection as the current destination", () => {
+  const view = render(
+    <MemoryRouter>
+      <EntityCard title="Selected album" href="/album" selected />
+    </MemoryRouter>,
+  );
+  expect(
+    screen.getByRole("link", { name: "Selected album" }),
+  ).not.toHaveAttribute("aria-current");
+  view.rerender(
+    <MemoryRouter>
+      <EntityCard title="Selected album" href="/album" selected active />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole("link", { name: "Selected album" })).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+});
+
+it("forwards native article attributes without nesting trailing actions in the primary", () => {
+  render(
+    <EntityRow
+      id="entity-row"
+      aria-describedby="entity-note"
+      title="Zero"
+      meta={0}
+      truncate={false}
+      trailing={<button type="button">Select</button>}
+    />,
+  );
+  expect(screen.getByRole("article")).toHaveAttribute("id", "entity-row");
+  expect(screen.getByRole("article")).toHaveAttribute(
+    "aria-describedby",
+    "entity-note",
+  );
+  expect(screen.getByText("0")).toBeVisible();
+  expect(
+    screen.getByRole("article").querySelector('[data-slot="entity-primary"]'),
+  ).not.toContainElement(screen.getByRole("button", { name: "Select" }));
+});
+
+it("keeps rich identity links inside the title recipe while preserving plain menu identity", () => {
+  render(
+    <EntityRow
+      title="Jane McKay"
+      titleContent={<a href="/users/DJCase">Jane McKay</a>}
+    />,
+  );
+  const link = screen.getByRole("link", { name: "Jane McKay" });
+  expect(link).toHaveAttribute("href", "/users/DJCase");
+  expect(link.parentElement).toHaveClass(
+    "crate-entity-title",
+    "text-sm",
+    "font-medium",
+  );
 });

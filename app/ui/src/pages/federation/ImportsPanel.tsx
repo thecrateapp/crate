@@ -2,12 +2,13 @@ import { toast } from "sonner";
 
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
-import { Badge } from "@crate/ui/shadcn/badge";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { Button } from "@crate/ui/shadcn/button";
 import { Card, CardContent } from "@crate/ui/shadcn/card";
 
 import { PanelState } from "./PanelState";
 import { formatBytes } from "./types";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 
 interface ImportRequest {
   request_id: string;
@@ -45,7 +46,7 @@ export function ImportsPanel({ canManage }: { canManage: boolean }) {
     <PanelState loading={requests.loading} error={requests.error}>
       <div className="space-y-3">
         {(requests.data ?? []).length === 0 ? (
-          <p className="text-sm text-white/45">No remote import requests.</p>
+          <EmptyState title="No remote import requests" />
         ) : (
           requests.data?.map((item) => {
             const pending = item.status === "awaiting_approval";
@@ -56,7 +57,17 @@ export function ImportsPanel({ canManage }: { canManage: boolean }) {
                   <div className="flex justify-between">
                     <p className="font-medium">
                       {item.title}{" "}
-                      <Badge variant="secondary">{item.status}</Badge>
+                      <InfoBadge
+                        tone={
+                          pending
+                            ? "warning"
+                            : item.status === "completed"
+                              ? "success"
+                              : "neutral"
+                        }
+                      >
+                        {item.status}
+                      </InfoBadge>
                     </p>
                     {canManage && pending ? (
                       <div className="flex gap-2">
@@ -70,7 +81,7 @@ export function ImportsPanel({ canManage }: { canManage: boolean }) {
                         </Button>
                         <Button
                           size="sm"
-                          variant="destructive"
+                          variant="outline"
                           onClick={() => void decide(item.request_id, "deny")}
                         >
                           Reject
@@ -80,7 +91,7 @@ export function ImportsPanel({ canManage }: { canManage: boolean }) {
                   </div>
                   <dl className="grid gap-2 text-xs sm:grid-cols-3">
                     <div>
-                      <dt className="text-white/35">Global album</dt>
+                      <dt className="text-text-subtle">Global album</dt>
                       <dd>
                         {typeof globalAlbumUid === "string"
                           ? globalAlbumUid
@@ -88,13 +99,13 @@ export function ImportsPanel({ canManage }: { canManage: boolean }) {
                       </dd>
                     </div>
                     <div>
-                      <dt className="text-white/35">Manifest digest</dt>
+                      <dt className="text-text-subtle">Manifest digest</dt>
                       <dd className="break-all font-mono">
                         {item.manifest_digest ?? "Not fetched yet"}
                       </dd>
                     </div>
                     <div>
-                      <dt className="text-white/35">Received / expected</dt>
+                      <dt className="text-text-subtle">Received / expected</dt>
                       <dd>
                         {formatBytes(item.received_bytes)} /{" "}
                         {item.expected_bytes
@@ -104,7 +115,7 @@ export function ImportsPanel({ canManage }: { canManage: boolean }) {
                     </div>
                   </dl>
                   {item.failure_reason ? (
-                    <p className="text-xs text-red-300">
+                    <p className="text-xs text-state-warning-text">
                       {item.failure_reason}
                     </p>
                   ) : null}

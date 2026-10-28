@@ -89,6 +89,92 @@ def get_cache(key: str, max_age_seconds: int | None = None) -> Any | None:
         return None
 
 
+def get_caches(
+    keys: Sequence[str], max_age_seconds: int | None = None
+) -> dict[str, Any]:
+    """Read many cache entries with one Redis or PostgreSQL round trip."""
+    requested = list(dict.fromkeys(key for key in keys if key))
+    found: dict[str, Any] = {}
+    missing: list[str] = []
+
+    for key in requested:
+        value = _mem_get(key, max_age_seconds=max_age_seconds)
+        if value is None:
+            missing.append(key)
+        else:
+            found[key] = value
+
+    if not missing:
+        return found
+
+    redis_client = get_redis()
+    if redis_client:
+        try:
+            pipeline = redis_client.pipeline(transaction=False)
+            for key in missing:
+                redis_key = f"cache:{key}"
+                pipeline.get(redis_key)
+                pipeline.pttl(redis_key)
+            values = pipeline.execute()
+            redis_missing: list[str] = []
+            pairs = zip(values[::2], values[1::2], strict=True)
+            for key, (raw, remaining_ttl_ms) in zip(missing, pairs, strict=True):
+                if raw is None:
+                    redis_missing.append(key)
+                    continue
+                try:
+                    value = json.loads(raw)
+                except (TypeError, ValueError):
+                    redis_missing.append(key)
+                    continue
+                found[key] = value
+                l1_ttl = _remaining_l1_ttl(
+                    remaining_ttl_ms, max_age_seconds=max_age_seconds
+                )
+                if l1_ttl > 0:
+                    _mem_set(key, value, l1_ttl)
+            missing = redis_missing
+        except Exception:
+            pass
+
+    if not missing:
+        return found
+
+    try:
+        with read_scope() as session:
+            rows = (
+                session.execute(
+                    text(
+                        "SELECT key, value_json, updated_at FROM cache "
+                        "WHERE key = ANY(:keys)"
+                    ),
+                    {"keys": missing},
+                )
+                .mappings()
+                .all()
+            )
+        now = datetime.now(timezone.utc)
+        for row in rows:
+            key = str(row["key"])
+            updated = row["updated_at"]
+            if max_age_seconds is not None:
+                try:
+                    if isinstance(updated, str):
+                        updated = datetime.fromisoformat(updated)
+                    if updated.tzinfo is None:
+                        updated = updated.replace(tzinfo=timezone.utc)
+                    if (now - updated).total_seconds() > max_age_seconds:
+                        continue
+                except (AttributeError, TypeError, ValueError):
+                    continue
+            value = row["value_json"]
+            found[key] = value
+            _mem_set(key, value)
+    except Exception:
+        pass
+    return found
+
+
 def set_cache(key: str, value: Any, ttl: int | None = None) -> None:
     _mem_set(key, value, min(ttl or 86400, 300))
 
@@ -117,6 +203,35 @@ def set_cache(key: str, value: Any, ttl: int | None = None) -> None:
                     "updated_at": now,
                 },
             )
+    except Exception:
+        pass
+
+
+def get_volatile_cache(key: str, max_age_seconds: int) -> Any | None:
+    value = _mem_get(key, max_age_seconds=max_age_seconds)
+    if value is not None:
+        return value
+    redis_client = get_redis()
+    if not redis_client:
+        return None
+    try:
+        raw = redis_client.get(f"cache:{key}")
+    except Exception:
+        return None
+    if raw is None:
+        return None
+    value = json.loads(raw)
+    _mem_set(key, value, min(max_age_seconds, 300))
+    return value
+
+
+def set_volatile_cache(key: str, value: Any, ttl: int) -> None:
+    _mem_set(key, value, min(ttl, 300))
+    redis_client = get_redis()
+    if not redis_client:
+        return
+    try:
+        redis_client.setex(f"cache:{key}", ttl, json.dumps(value, default=str))
     except Exception:
         pass
 
@@ -269,8 +384,11 @@ __all__ = [
     "delete_cache",
     "delete_cache_prefix",
     "get_cache",
+    "get_caches",
     "get_cache_stats",
     "get_smart_mix_plan_caches",
+    "get_volatile_cache",
     "set_cache",
     "set_smart_mix_plan_caches",
+    "set_volatile_cache",
 ]

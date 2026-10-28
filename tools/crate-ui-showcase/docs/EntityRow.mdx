@@ -1,0 +1,41 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/EntityRow.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">EntityRow</DocHeading>
+<EntryDetails
+  id="domain-entity-entityrow"
+  review="Visual review approved · 1AW"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+Default and compact rows share the 48 px minimum cover. Titles retain the body role at 14 px and weight 500, with technical mono metadata. HairlineRow has the separate 12/18 px text-list role. Active rows own a 2 px accent marker; selection remains distinct. Hover never fills the row background. Native article identity, ARIA and refs are forwarded. Full text wraps inside the available width when truncation is disabled. Zero rank and metadata values remain visible. Coarse actions reserve at least 44 px in layout. Menus and trailing controls stay outside the primary destination.
+
+The approved mockup and Diego's confirmed adjustments remain the reference. Initial adoption
+and contract evidence do not certify every route or native/AT qualification.
+
+<Canvas of={Stories.Base} />
+<Controls of={Stories.Base} />
+
+Selection mode uses a native callback button: `pressed` announces its state while `selected` owns the frame treatment. Normal destinations remain native links and never expose a toggle state.
+
+<Canvas of={Stories.SelectionToggle} />
+
+<Canvas of={Stories.Active} />
+
+<Canvas of={Stories.Selected} />
+
+<Canvas of={Stories.Disabled} />
+
+<Canvas of={Stories.FullText} />
+
+<Canvas of={Stories.RichIdentity} />
+
+Optional `titleContent` places a rich identity link inside the existing title recipe. Keep the
+plain `title` for menu identity and artwork alternative text. Never nest another link inside an
+interactive primary destination; member rows use a neutral primary frame, with trailing actions
+independent. Names and handles retain their case. This additive slot changes no visual recipe.
+
+Use an explicit `openLabel` for selection actions; `pressed={false}` keeps an unselected toggle announced, and href destinations do not receive aria-pressed.

@@ -1,3 +1,5 @@
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import {
   CRATE_ICON_SIZE,
   ListMusic,
@@ -15,7 +17,6 @@ import { formatDuration } from "@/lib/utils";
 import type { JamQueueItem } from "@/pages/jam-reducer";
 
 import { HeroActionButton } from "./JamHeroButtons";
-import { CrateBadge } from "@crate/ui/primitives/CrateBadge";
 
 export interface JamNowPlayingProps {
   t: TFunction;
@@ -89,7 +90,7 @@ function JamNowPlayingTrack(props: JamNowPlayingTrackProps) {
           </div>
         )}
         <div className="mt-3 flex items-center gap-3">
-          <div className="jam-progress-track h-1.5 min-w-0 flex-1 overflow-hidden rounded-full">
+          <div className="jam-progress-track h-px min-w-0 flex-1 overflow-hidden rounded-full">
             <div
               className="jam-progress-fill jam-progress-fill-dynamic h-full rounded-full"
               style={
@@ -186,8 +187,8 @@ function JamGuestPlaybackStatus({
   syncStatus,
 }: Pick<JamPlaybackControlsProps, "t" | "syncStatus">) {
   return (
-    <div
-      title={
+    <TooltipHint
+      content={
         syncStatus === "synced"
           ? t("jam.room.syncedWithHost")
           : syncStatus === "drifting"
@@ -195,12 +196,14 @@ function JamGuestPlaybackStatus({
             : t("jam.room.waitingForHost")
       }
     >
-      <CrateBadge size="md" icon={Zap}>
-        {syncStatus === "synced"
-          ? t("jam.room.synced")
-          : t("jam.room.waitingForHost")}
-      </CrateBadge>
-    </div>
+      <div>
+        <InfoBadge icon={Zap}>
+          {syncStatus === "synced"
+            ? t("jam.room.synced")
+            : t("jam.room.waitingForHost")}
+        </InfoBadge>
+      </div>
+    </TooltipHint>
   );
 }
 

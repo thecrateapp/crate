@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Request
+from typing import Annotated, Literal
+
+from fastapi import APIRouter, Query, Request
 
 from crate.api.openapi_responses import AUTH_ERROR_RESPONSES
 from crate.api.permissions import require_permission
@@ -23,12 +25,22 @@ def _require_import_manager(request: Request) -> dict:
 @router.get(
     "/api/imports/pending",
     response_model=ImportPendingResponse,
+    response_model_exclude_none=True,
     responses=AUTH_ERROR_RESPONSES,
-    summary="List pending filesystem imports",
+    summary="List staged filesystem imports by status",
 )
-def api_imports_pending(request: Request):
+def api_imports_pending(
+    request: Request,
+    status: Literal[
+        "pending", "importing", "completed", "imported", "merged", "all"
+    ] = "pending",
+    limit: Annotated[int, Query(ge=1, le=5000)] = 1000,
+):
     _require_import_manager(request)
-    return list_import_queue_items(status="pending")
+    return list_import_queue_items(
+        status=None if status == "all" else status,
+        limit=limit,
+    )
 
 
 @router.post(

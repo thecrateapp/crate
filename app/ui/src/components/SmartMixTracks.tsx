@@ -1,10 +1,16 @@
 import { useEffect, useState } from "react";
-import { Loader2, RefreshCw, Search } from "lucide-react";
+import { Loader2 } from "@crate/ui/icons";
 import { toast } from "sonner";
 
-import { CrateChip } from "@crate/ui/primitives/CrateBadge";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { FilterChip } from "@crate/ui/primitives/FilterChip";
+import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
+import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { Button } from "@crate/ui/shadcn/button";
-import { Input } from "@crate/ui/shadcn/input";
 import {
   Table,
   TableBody,
@@ -15,7 +21,7 @@ import {
 } from "@crate/ui/shadcn/table";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 export type SmartMixTrackFilter =
   | "all"
@@ -154,10 +160,10 @@ export function SmartMixTracks({ counts }: { counts: SmartMixTrackCounts }) {
   }, [searchInput]);
 
   const url = tracksUrl(filter, version, search);
-  const { data, loading, error } = useApi<SmartMixTrackPage>(url);
+  const { data, loading, error, refetch } = useApi<SmartMixTrackPage>(url);
   const extra = more?.url === url ? more : null;
   const tracks = [...(data?.tracks ?? []), ...(extra?.tracks ?? [])];
-  const nextBefore = extra ? extra.nextBefore : data?.nextBefore ?? null;
+  const nextBefore = extra ? extra.nextBefore : (data?.nextBefore ?? null);
   const countsByFilter = filterCounts(counts);
 
   async function loadMore() {
@@ -203,14 +209,12 @@ export function SmartMixTracks({ counts }: { counts: SmartMixTrackCounts }) {
     <div className="space-y-3">
       {counts.versions && counts.versions.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[10px] uppercase tracking-[0.12em] text-white/30">
-            Versions
-          </span>
+          <MonoLabel as="span">Versions</MonoLabel>
           {counts.versions.map((entry) => (
-            <button
+            <FilterChip
               key={entry.analyzerVersion}
-              type="button"
-              aria-pressed={version === entry.analyzerVersion}
+              active={version === entry.analyzerVersion}
+              tone={entry.current ? "neutral" : "warning"}
               onClick={() =>
                 setVersion((current) =>
                   current === entry.analyzerVersion
@@ -219,67 +223,42 @@ export function SmartMixTracks({ counts }: { counts: SmartMixTrackCounts }) {
                 )
               }
             >
-              <CrateChip
-                className={cn(
-                  "text-[10px]",
-                  version === entry.analyzerVersion && "border-primary/60",
-                  !entry.current && "text-amber-200",
-                )}
-              >
-                {entry.analyzerVersion} · {entry.profiles.toLocaleString()}
-                {entry.current ? " · current" : ""}
-              </CrateChip>
-            </button>
+              {entry.analyzerVersion} · {entry.profiles.toLocaleString()}
+              {entry.current ? " · current" : ""}
+            </FilterChip>
           ))}
         </div>
       ) : null}
 
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap gap-1" role="tablist">
-          {FILTERS.map((item) => (
-            <Button
-              key={item.key}
-              type="button"
-              role="tab"
-              aria-selected={filter === item.key}
-              size="sm"
-              variant={filter === item.key ? "default" : "outline"}
-              onClick={() => setFilter(item.key)}
-            >
-              {item.label}
-              {countsByFilter[item.key] != null
-                ? ` · ${countsByFilter[item.key]?.toLocaleString()}`
-                : ""}
-            </Button>
-          ))}
-        </div>
-        <div className="relative lg:w-72">
-          <Search
-            size={14}
-            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-white/35"
-          />
-          <Input
-            aria-label="Search tracks"
-            placeholder="Search title, artist or album"
-            className="pl-8"
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-          />
-        </div>
+        <SegmentedControl<SmartMixTrackFilter>
+          as="radio"
+          label="Smart Mix track status"
+          value={filter}
+          onValueChange={setFilter}
+          items={FILTERS.map((item) => ({
+            value: item.key,
+            label: `${item.label}${countsByFilter[item.key] != null ? ` · ${countsByFilter[item.key]?.toLocaleString()}` : ""}`,
+          }))}
+        />
+        <SearchInput
+          label="Search tracks"
+          placeholder="Search title, artist or album"
+          containerClassName="lg:w-72"
+          value={searchInput}
+          onValueChange={setSearchInput}
+        />
       </div>
 
       {error ? (
-        <div className="rounded-md border border-red-500/20 bg-red-500/8 p-4 text-sm text-red-100">
-          Smart Mix tracks are unavailable.
-        </div>
+        <ErrorState
+          message="Smart Mix tracks are unavailable."
+          onRetry={refetch}
+        />
       ) : loading && !data ? (
-        <div className="flex min-h-24 items-center justify-center text-white/45">
-          <Loader2 className="h-5 w-5 animate-spin text-primary" />
-        </div>
+        <LoadingState label="Loading Smart Mix tracks" />
       ) : tracks.length === 0 ? (
-        <div className="rounded-md border border-white/6 bg-black/20 p-4 text-sm text-white/45">
-          No tracks match these filters.
-        </div>
+        <EmptyState message="No tracks match these filters." />
       ) : (
         <Table>
           <TableHeader>
@@ -296,51 +275,65 @@ export function SmartMixTracks({ counts }: { counts: SmartMixTrackCounts }) {
             {tracks.map((track) => (
               <TableRow key={track.trackId}>
                 <TableCell>
-                  <div className="text-sm text-white/85">
-                    {track.title || "Untitled"}
-                  </div>
-                  <div className="text-xs text-white/40">
+                  <TooltipHint content={track.title || "Untitled"}>
+                    <div
+                      className="max-w-xs truncate text-sm text-text-primary"
+                      tabIndex={0}
+                    >
+                      {track.title || "Untitled"}
+                    </div>
+                  </TooltipHint>
+                  <div className="text-xs text-text-muted">
                     {track.artist || "Unknown artist"}
                     {track.album ? ` · ${track.album}` : ""}
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-wrap items-center gap-1">
-                    <CrateChip
-                      className={cn(
-                        "text-[10px]",
-                        track.status !== "current" && "text-amber-200",
-                      )}
+                    <InfoBadge
+                      tone={track.status === "current" ? "neutral" : "warning"}
                     >
                       {STATUS_LABELS[track.status]}
-                    </CrateChip>
+                    </InfoBadge>
                     {track.analyzerVersion ? (
-                      <CrateChip className="text-[10px]">
-                        {track.analyzerVersion}
-                      </CrateChip>
+                      <InfoBadge>{track.analyzerVersion}</InfoBadge>
                     ) : null}
                     {track.quality ? (
-                      <CrateChip className="text-[10px]">
-                        {track.quality}
-                      </CrateChip>
+                      <InfoBadge>{track.quality}</InfoBadge>
                     ) : null}
                   </div>
                 </TableCell>
-                <TableCell className="text-xs text-white/70">
+                <TableCell className="text-xs text-text-secondary">
                   {formatBpm(track.bpm) ?? "-"}
                   {track.introBpm != null && track.outroBpm != null ? (
-                    <div className="text-white/40">
+                    <div className="text-text-muted">
                       {formatBpm(track.introBpm)} to {formatBpm(track.outroBpm)}
                     </div>
                   ) : null}
                 </TableCell>
-                <TableCell className="text-xs text-white/55">
-                  {formatDate(track.analyzedAt)}
+                <TableCell className="text-xs text-text-muted">
+                  <TooltipHint
+                    content={
+                      track.analyzedAt
+                        ? new Date(track.analyzedAt).toLocaleString()
+                        : undefined
+                    }
+                  >
+                    <time
+                      dateTime={track.analyzedAt ?? undefined}
+                      tabIndex={track.analyzedAt ? 0 : undefined}
+                    >
+                      {formatDate(track.analyzedAt)}
+                    </time>
+                  </TooltipHint>
                 </TableCell>
-                <TableCell className="text-xs text-white/55">
-                  <span title={track.processingError ?? undefined}>
-                    {track.processingState ?? "-"}
-                  </span>
+                <TableCell className="text-xs text-text-muted">
+                  <span>{track.processingState ?? "—"}</span>
+                  {track.processingError ? (
+                    <p className="mt-1 max-w-sm whitespace-normal wrap-anywhere text-state-warning-text">
+                      {track.processingError}
+                    </p>
+                  ) : null}
                 </TableCell>
                 <TableCell className="text-right">
                   <Button
@@ -354,10 +347,12 @@ export function SmartMixTracks({ counts }: { counts: SmartMixTrackCounts }) {
                     onClick={() => void reanalyze(track)}
                   >
                     {reanalyzing === track.trackId ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <RefreshCw size={14} />
-                    )}
+                      <Loader2
+                        data-admin-ux="mix-reanalyze-loading"
+                        size={14}
+                        className="animate-spin"
+                      />
+                    ) : null}
                     {queued.has(track.trackId) ? "Queued" : "Reanalyze track"}
                   </Button>
                 </TableCell>
@@ -378,7 +373,11 @@ export function SmartMixTracks({ counts }: { counts: SmartMixTrackCounts }) {
             onClick={() => void loadMore()}
           >
             {loadingMore ? (
-              <Loader2 size={14} className="animate-spin" />
+              <Loader2
+                data-admin-ux="mix-load-more-loading"
+                size={14}
+                className="animate-spin"
+              />
             ) : null}
             Load more
           </Button>

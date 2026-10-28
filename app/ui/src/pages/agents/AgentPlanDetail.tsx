@@ -1,22 +1,8 @@
 import { useId, useState } from "react";
 import { Link, useParams } from "react-router";
-import {
-  ArrowLeft,
-  AudioWaveform,
-  CalendarDays,
-  Clock,
-  ExternalLink,
-  ListChecks,
-  ListMusic,
-  Server,
-  ShieldCheck,
-  Tags,
-  TriangleAlert,
-  Wrench,
-  type LucideIcon,
-} from "lucide-react";
-
 import { Button } from "@crate/ui/shadcn/button";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 
 import { OpsPanel } from "@/components/admin/ops-surfaces";
 import { RelativeTime } from "@/components/admin/RelativeTime";
@@ -56,26 +42,6 @@ import {
 } from "@/lib/agent-plan-technical";
 
 const base = "/api/admin/agent-plans";
-
-const operationIcons: Record<string, LucideIcon> = {
-  shows_import: CalendarDays,
-  editorial_change: ListMusic,
-  job_retry: ListChecks,
-  job_cancel: ListChecks,
-  schedule_run: Clock,
-  schedule_update: Clock,
-  runtime_update: Server,
-  repair_photo_flag: Wrench,
-  health_check: Wrench,
-  quality_check: Wrench,
-  repairs: Wrench,
-  metadata_update: Tags,
-  enrichment: Tags,
-  library_sync: Tags,
-  metadata_export: Tags,
-  metadata_rehydrate: Tags,
-  analysis: AudioWaveform,
-};
 
 function sourceItems(sources: Record<string, unknown> | undefined) {
   const items: TechnicalItem[] = [];
@@ -168,7 +134,7 @@ function PlanDetail({ planId }: { planId?: string }) {
 
   if (!canReview)
     return (
-      <p className="text-sm text-white/60">
+      <p className="text-sm text-text-muted">
         You do not have permission to review these plans.
       </p>
     );
@@ -181,13 +147,9 @@ function PlanDetail({ planId }: { planId?: string }) {
   if (!item)
     return (
       <div className="space-y-3">
-        {plan.loading ? (
-          <p role="status" className="text-sm text-white/55">
-            Loading plan…
-          </p>
-        ) : null}
+        {plan.loading ? <LoadingState label="Loading plan" /> : null}
         {errorText ? (
-          <p role="alert" className="text-sm text-red-300">
+          <p role="alert" className="text-sm text-state-warning-text">
             {errorText}
           </p>
         ) : null}
@@ -208,13 +170,11 @@ function PlanDetail({ planId }: { planId?: string }) {
   const state = planStateView(item.state, expired);
   const risk = riskView(item.risk);
   const requester = requesterText(item);
-  const Icon = operationIcons[item.operation] ?? ShieldCheck;
   const conflicts = Array.isArray(item.conflicts) ? item.conflicts : [];
 
   return (
     <div className="space-y-5 pb-8">
       <OpsPanel
-        icon={Icon}
         title={planTitle(item)}
         action={
           <>
@@ -225,7 +185,7 @@ function PlanDetail({ planId }: { planId?: string }) {
       >
         <div className="space-y-6">
           <div className="space-y-1 text-sm">
-            <p className="text-white/70">
+            <p className="text-text-secondary">
               Requested by {item.integration_name ?? "Unknown connection"}
               {item.created_at ? (
                 <>
@@ -234,48 +194,35 @@ function PlanDetail({ planId }: { planId?: string }) {
                 </>
               ) : null}
             </p>
-            {requester ? <p className="text-white/55">{requester}</p> : null}
+            {requester ? <p className="text-text-muted">{requester}</p> : null}
           </div>
           {errorText ? (
-            <p role="alert" className="text-sm text-red-300">
+            <p role="alert" className="text-sm text-state-warning-text">
               {errorText}
             </p>
           ) : null}
           <ImpactSummary impact={item.impact} />
           <section aria-labelledby={changesHeadingId} className="space-y-2">
-            <h3
-              id={changesHeadingId}
-              className="text-xs font-semibold uppercase tracking-[0.12em] text-white/40"
-            >
+            <MonoLabel as="h3" id={changesHeadingId}>
               Changes
-            </h3>
+            </MonoLabel>
             <ChangeList plan={item} />
           </section>
           {item.operation === "editorial_change" ? (
             <EditorialChanges plan={item} />
           ) : null}
           {item.executable === false ? (
-            <p
-              role="alert"
-              className="flex items-start gap-2 text-sm text-amber-100"
-            >
-              <TriangleAlert
-                aria-hidden="true"
-                className="mt-0.5 size-4 shrink-0"
-              />
+            <p role="alert" className="text-sm text-state-warning-text">
               This plan contains manual or diagnostic items and cannot be
               executed.
             </p>
           ) : null}
           {conflicts.length > 0 ? (
             <section aria-labelledby={conflictsHeadingId} className="space-y-2">
-              <h3
-                id={conflictsHeadingId}
-                className="text-xs font-semibold uppercase tracking-[0.12em] text-white/40"
-              >
+              <MonoLabel as="h3" id={conflictsHeadingId}>
                 Conflicts
-              </h3>
-              <div className="text-sm text-white/80">
+              </MonoLabel>
+              <div className="text-sm text-text-primary">
                 <StructuredValue value={redactTechnical(conflicts).visible} />
               </div>
             </section>
@@ -284,13 +231,10 @@ function PlanDetail({ planId }: { planId?: string }) {
             aria-labelledby={reversibilityHeadingId}
             className="space-y-1"
           >
-            <h3
-              id={reversibilityHeadingId}
-              className="text-xs font-semibold uppercase tracking-[0.12em] text-white/40"
-            >
+            <MonoLabel as="h3" id={reversibilityHeadingId}>
               Reversibility
-            </h3>
-            <p className="text-sm text-white/70">
+            </MonoLabel>
+            <p className="text-sm text-text-secondary">
               {reversibilityText(item.reversibility)}
             </p>
           </section>
@@ -298,17 +242,13 @@ function PlanDetail({ planId }: { planId?: string }) {
         </div>
       </OpsPanel>
       {awaiting && !canDecide && !complete ? (
-        <p role="alert" className="flex items-start gap-2 text-sm text-red-200">
-          <TriangleAlert
-            aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0"
-          />
+        <p role="alert" className="text-sm text-state-warning-text">
           The complete change list is not available. This plan cannot be
           approved.
         </p>
       ) : null}
       {item.state === "ready" && !expired ? (
-        <p className="text-sm text-white/60">
+        <p className="text-sm text-text-muted">
           Already allowed by this connection&apos;s policy. The agent can apply
           it without approval.
         </p>
@@ -318,7 +258,6 @@ function PlanDetail({ planId }: { planId?: string }) {
         {item.job_id ? (
           <Button variant="ghost" size="sm" asChild>
             <Link to={`/tasks?task=${encodeURIComponent(item.job_id)}`}>
-              <ExternalLink aria-hidden="true" />
               View execution
             </Link>
           </Button>
@@ -343,10 +282,7 @@ function PlanDetail({ planId }: { planId?: string }) {
 function BackToApprovals() {
   return (
     <Button variant="ghost" size="sm" asChild>
-      <Link to="/agents/approvals">
-        <ArrowLeft aria-hidden="true" />
-        Back to approvals
-      </Link>
+      <Link to="/agents/approvals">Back to approvals</Link>
     </Button>
   );
 }

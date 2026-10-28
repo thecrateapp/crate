@@ -156,3 +156,21 @@ it("reloads the selected hero composition after a gallery assignment", async () 
     );
   });
 });
+
+it("keeps artwork controls and gallery in the same first tab section frame", () => {
+  render(<ArtistArtworkSection artistId={7} artistName="Converge" canEdit />);
+  const heading = screen.getByRole("heading", { name: "Artwork" });
+  const section = heading.closest('[data-slot="artist-detail-section"]');
+  expect(section).not.toHaveClass("border-t", "pt-5.5");
+  expect(
+    section?.querySelector('[data-slot="artist-detail-header"]'),
+  ).toHaveClass("min-h-11", "mb-3", "items-center");
+  expect(
+    section?.querySelector('[data-slot="artist-detail-body"]'),
+  ).toContainElement(screen.getByTestId("artwork-gallery"));
+  expect(
+    section?.querySelector('[data-slot="artist-detail-actions"]'),
+  ).toContainElement(
+    screen.getByRole("button", { name: "Backfill eligible artists" }),
+  );
+});

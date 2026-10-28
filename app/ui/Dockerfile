@@ -2,7 +2,9 @@
 # Build context: the repository root. app/ui/Dockerfile.dockerignore limits it
 # to the root manifest and lockfile, app/ui and the shared code the admin
 # imports, so the image installs exactly the workspace lockfile.
-FROM node:22-alpine AS build
+# The bundle is the same on every architecture: build it once on the builder's
+# platform and copy it into each architecture's nginx.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS build
 
 WORKDIR /repo
 

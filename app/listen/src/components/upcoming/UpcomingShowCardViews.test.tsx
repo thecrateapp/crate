@@ -1,4 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 
@@ -42,7 +45,28 @@ describe("UpcomingShowExpandedView", () => {
   it("summarizes distance to show date", () => {
     expect(
       formatShowTimeRemaining(showItem, new Date("2026-06-13T10:00:00")),
-    ).toBe("20 days to go");
+    ).toBe("21 days to go");
+  });
+
+  it.each(["", "invalid", "2026-02-31"])(
+    "omits unknown or impossible countdowns (%s)",
+    (date) => {
+      expect(
+        formatShowTimeRemaining(
+          { ...showItem, date },
+          new Date("2026-06-13T10:00:00"),
+        ),
+      ).toBeNull();
+    },
+  );
+
+  it("uses days rather than switching long countdowns to months", () => {
+    expect(
+      formatShowTimeRemaining(
+        { ...showItem, date: "2026-09-01" },
+        new Date("2026-06-13T10:00:00"),
+      ),
+    ).toBe("81 days to go");
   });
 
   it("builds directions links from coordinates", () => {
@@ -51,7 +75,7 @@ describe("UpcomingShowExpandedView", () => {
     );
   });
 
-  it("renders directions and genre pills in the expanded card", () => {
+  it("renders the ticket header, directions and genre pills", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-13T10:00:00"));
 
@@ -60,6 +84,7 @@ describe("UpcomingShowExpandedView", () => {
         <MemoryRouter>
           <I18nProvider initialLocale="en">
             <UpcomingShowExpandedView
+              artistHref="/artists/converge"
               item={showItem}
               attending
               savingAttendance={false}
@@ -77,11 +102,147 @@ describe("UpcomingShowExpandedView", () => {
     }
 
     expect(screen.queryByRole("button", { name: /close/i })).toBeNull();
-    expect(screen.getByText(/\d+ days? to go/i)).toBeInTheDocument();
-    expect(screen.getByTitle("hardcore")).toBeInTheDocument();
+    expect(screen.getByText(/\d+ days? to go/i)).toHaveClass(
+      "text-accent-action-hi",
+    );
+    const venueLine = screen.getByText("Circolo Magnolia").closest("p");
+    expect(venueLine).toHaveClass("font-mono", "uppercase");
+    expect(venueLine).toHaveTextContent(
+      "Circolo Magnolia · Via Circonvallazione Idroscalo, 41 20054 · Segrate, Milano, Italy",
+    );
+    expect(
+      screen.getByText("hardcore").closest(".genre-pill")!,
+    ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /directions/i })).toHaveAttribute(
       "href",
       expect.stringContaining("maps"),
     );
+  });
+
+  function renderTicket(item: UpcomingItem) {
+    return render(
+      <MemoryRouter>
+        <I18nProvider initialLocale="en">
+          <UpcomingShowExpandedView
+            artistHref="/artists/converge"
+            item={item}
+            attending={false}
+            savingAttendance={false}
+            playingSetlist={false}
+            onToggleAttendance={vi.fn()}
+            onPlaySetlist={vi.fn()}
+            onClose={vi.fn()}
+            showClose={false}
+          />
+        </I18nProvider>
+      </MemoryRouter>,
+    );
+  }
+
+  it("preserves canonical genre percentages, including zero, in the show header", () => {
+    renderTicket({
+      ...showItem,
+      genre_profile: [
+        { name: "Hardcore", slug: "hardcore", percent: 83, source: "tags" },
+        { name: "Mathcore", share: 0 },
+      ],
+    } as UpcomingItem);
+    expect(screen.getByText("hardcore").closest(".genre-pill")!).toHaveClass(
+      "genre-pill",
+    );
+    expect(
+      screen.getByText("mathcore").closest(".genre-pill")!,
+    ).toBeInTheDocument();
+    expect(screen.getByText("83%")).toHaveAttribute(
+      "data-slot",
+      "genre-percent",
+    );
+  });
+
+  it("cuts the notches out of two stacked stubs instead of painting circles", () => {
+    const { container } = renderTicket(showItem);
+
+    const top = container.querySelector(".setlist-ticket-top");
+    const bottom = container.querySelector(".setlist-ticket-bottom");
+    const perforation = container.querySelector(".setlist-ticket-perforation");
+    expect(top).toBeInTheDocument();
+    expect(bottom).toBeInTheDocument();
+    expect(top?.nextElementSibling).toBe(perforation);
+    expect(perforation?.nextElementSibling).toBe(bottom);
+    expect(perforation).toHaveAttribute("aria-hidden", "true");
+    expect(
+      container.querySelector(".rounded-full.bg-surface-canvas"),
+    ).toBeNull();
+  });
+
+  it("renders setlist rows in order and keeps row nodes across refetches", () => {
+    const first: UpcomingItem = {
+      ...showItem,
+      probable_setlist: [
+        { title: "Concubine" },
+        { title: "Dark Horse" },
+        { title: "Concubine" },
+      ],
+    };
+    const { rerender } = renderTicket(first);
+    const list = screen.getByRole("list", { name: "Probable Setlist" });
+    const before = within(list).getAllByRole("listitem");
+    expect(before.map((row) => row.textContent)).toEqual([
+      "01 Concubine",
+      "02 Dark Horse",
+      "03 Concubine",
+    ]);
+    before.forEach((row) => expect(row).toHaveClass("setlist-ticket-row"));
+
+    rerender(
+      <MemoryRouter>
+        <I18nProvider initialLocale="en">
+          <UpcomingShowExpandedView
+            item={{
+              ...first,
+              probable_setlist: [
+                { title: "Concubine", frequency: 0.9 },
+                { title: "Dark Horse", frequency: 0.8 },
+                { title: "Concubine" },
+              ],
+            }}
+            artistHref="/artists/converge"
+            attending={false}
+            savingAttendance={false}
+            playingSetlist={false}
+            onToggleAttendance={vi.fn()}
+            onPlaySetlist={vi.fn()}
+            onClose={vi.fn()}
+            showClose={false}
+          />
+        </I18nProvider>
+      </MemoryRouter>,
+    );
+    const after = within(
+      screen.getByRole("list", { name: "Probable Setlist" }),
+    ).getAllByRole("listitem");
+    after.forEach((row, index) => expect(row).toBe(before[index]));
+  });
+
+  it("staggers the setlist entrance in CSS and turns it off for reduced motion", () => {
+    const css = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), "show-ticket.css"),
+      "utf8",
+    );
+    const rowRule = css.match(/\.setlist-ticket-row \{([^}]*)\}/)?.[1] ?? "";
+
+    expect(rowRule).toContain("animation-name: setlist-ticket-row-in");
+    expect(rowRule).toContain("animation-fill-mode: backwards");
+    expect(rowRule).not.toMatch(/opacity|animation:/);
+    expect(css).toContain(
+      ".setlist-ticket-row:nth-child(2) {\n  animation-delay: 355ms;",
+    );
+    expect(css).toMatch(
+      /\[data-crate-motion="reduced"\] \.setlist-ticket-row \{\s*animation: none;/,
+    );
+    expect(css).toMatch(
+      /@media \(prefers-reduced-motion: reduce\) \{\s*\.setlist-ticket-row \{\s*animation: none;/,
+    );
+    expect(css).toContain("-webkit-mask:");
   });
 });

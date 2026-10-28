@@ -12,13 +12,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "./select";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "./sheet";
 
 describe("semantic surface shadows", () => {
-  it("uses the card shadow token", () => {
+  it("keeps approved cards flat with their solid surface and hairline border", () => {
     render(<Card>Card content</Card>);
 
-    expect(screen.getByText("Card content")).toHaveClass("shadow-card");
+    expect(screen.getByText("Card content")).toHaveClass(
+      "border",
+      "border-border-quiet",
+      "bg-surface-object",
+    );
+    expect(screen.getByText("Card content")).not.toHaveClass("shadow-card");
   });
 
-  it("uses the popover shadow token for select content", () => {
+  it("uses the shared overlay recipe for select content", () => {
     render(
       <Select open defaultValue="one">
         <SelectTrigger aria-label="Select value" />
@@ -29,11 +34,11 @@ describe("semantic surface shadows", () => {
     );
 
     expect(document.querySelector('[data-slot="select-content"]')).toHaveClass(
-      "shadow-popover",
+      "crate-overlay-surface",
     );
   });
 
-  it("uses the modal shadow token", () => {
+  it("uses the shared overlay recipe for modal content", () => {
     render(
       <Dialog open>
         <DialogContent>
@@ -44,10 +49,11 @@ describe("semantic surface shadows", () => {
       </Dialog>,
     );
 
-    expect(screen.getByRole("dialog")).toHaveClass("shadow-modal");
+    expect(screen.getByRole("dialog")).toHaveClass("crate-overlay-panel");
+    expect(screen.getByRole("dialog")).not.toHaveClass("shadow-modal");
   });
 
-  it("uses the sheet shadow token", () => {
+  it("uses the shared overlay recipe for sheet content", () => {
     render(
       <Sheet open>
         <SheetContent>
@@ -58,6 +64,7 @@ describe("semantic surface shadows", () => {
       </Sheet>,
     );
 
-    expect(screen.getByRole("dialog")).toHaveClass("shadow-sheet");
+    expect(screen.getByRole("dialog")).toHaveClass("crate-overlay-panel");
+    expect(screen.getByRole("dialog")).not.toHaveClass("shadow-sheet");
   });
 });

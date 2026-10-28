@@ -1,19 +1,17 @@
-import { useEffect, useState } from "react";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
+import { useLibrarySearch } from "@/hooks/use-library-search";
 import {
-  BarChart3,
-  Disc3,
-  Download,
-  FileText,
-  Loader2,
-  Search,
-} from "lucide-react";
-import { ResponsiveRadar } from "@nivo/radar";
+  formatTrackAnalysis,
+  formatTrackQuality,
+} from "@crate/ui/lib/track-meta";
+import { useState } from "react";
+import { BarChart3, Download, AlignLeft, Loader2 } from "@crate/ui/icons";
 
 import { SimilarTracksPanel } from "@/components/track/SimilarTracksPanel";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
+import { AppModal, ModalBody } from "@crate/ui/primitives/AppModal";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
-import { Badge } from "@crate/ui/shadcn/badge";
 import { Button } from "@crate/ui/shadcn/button";
 import {
   Dialog,
@@ -23,7 +21,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@crate/ui/shadcn/dialog";
-import { Input } from "@crate/ui/shadcn/input";
 
 import {
   Table,
@@ -112,24 +109,13 @@ interface AlbumSearchResult {
   has_cover?: boolean;
 }
 
-interface SearchResponse {
-  albums?: AlbumSearchResult[];
-}
-
-export interface AudioAnalysisTrack {
-  tempo: number | null;
-  key: string | null;
-  scale: string | null;
-  energy: number | null;
-  mood: Record<string, number> | null;
-  danceability: number | null;
-  valence: number | null;
-  acousticness: number | null;
-  instrumentalness: number | null;
-  loudness: number | null;
-  dynamic_range: number | null;
-  spectral_complexity: number | null;
-}
+export type { AudioAnalysisTrack } from "./audio-analysis";
+import { analysisForTrack, type AudioAnalysisTrack } from "./audio-analysis";
+import { AudioProfileCard } from "./AudioProfileCard";
+import { InfoBadge, type InfoBadgeTone } from "@crate/ui/primitives/InfoBadge";
+import { ActionButton, ActionLink } from "@crate/ui/primitives/ActionGroup";
+import { MediaCover } from "@crate/ui/domain/media/MediaCover";
+import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 interface TrackTableProps {
   tracks: Track[];
@@ -150,9 +136,9 @@ function EnergyBar({ value }: { value: number }) {
   const pct = Math.max(0, Math.min(1, value));
   return (
     <div className="flex items-center gap-2">
-      <div className="h-1.5 w-14 overflow-hidden rounded-md bg-primary/10">
+      <div className="h-px w-14 overflow-hidden rounded-full bg-primary/10">
         <div
-          className="h-full rounded-md bg-primary"
+          className="h-full rounded-full bg-primary"
           style={{ width: `${pct * 100}%`, opacity: 0.4 + pct * 0.6 }}
         />
       </div>
@@ -179,9 +165,9 @@ function PopularityBar({
       <Tooltip>
         <TooltipTrigger asChild>
           <div className="flex min-w-[104px] items-center gap-2">
-            <div className="h-1.5 w-14 overflow-hidden rounded-md bg-primary/10">
+            <div className="h-px w-14 overflow-hidden rounded-full bg-primary/10">
               <div
-                className="h-full rounded-md bg-primary"
+                className="h-full rounded-full bg-primary"
                 style={{
                   width: `${pct * 100}%`,
                   opacity: 0.45 + confidencePct * 0.45,
@@ -193,14 +179,11 @@ function PopularityBar({
             </span>
           </div>
         </TooltipTrigger>
-        <TooltipContent
-          side="top"
-          className="border border-white/10 bg-popover-surface text-foreground shadow-[0_20px_48px_rgba(0,0,0,0.34)] backdrop-blur-xl"
-        >
+        <TooltipContent side="top">
           <div className="space-y-1 text-xs">
             <div>Popularity {Math.round(pct * 100)}%</div>
             {confidence != null ? (
-              <div className="text-white/60">
+              <div className="text-text-secondary">
                 Confidence {Math.round(confidencePct * 100)}%
               </div>
             ) : null}
@@ -225,16 +208,11 @@ function formatBytes(bytes: number | null | undefined) {
   }`;
 }
 
-function variantTone(status: string) {
-  if (status === "ready")
-    return "border-emerald-400/35 bg-emerald-400/10 text-emerald-200";
-  if (status === "failed")
-    return "border-red-400/35 bg-red-500/10 text-red-200";
-  if (status === "running")
-    return "border-cyan-400/35 bg-cyan-400/10 text-cyan-200";
-  if (status === "pending")
-    return "border-amber-400/35 bg-amber-400/10 text-amber-200";
-  return "border-white/15 bg-white/[0.04] text-white/50";
+function variantTone(status: string): InfoBadgeTone {
+  if (status === "ready" || status === "running") return "success";
+  if (status === "failed") return "danger";
+  if (status === "pending") return "warning";
+  return "neutral";
 }
 
 function variantLabel(variant: TrackStreamVariant) {
@@ -252,7 +230,7 @@ function TrackVariantBadges({
   variants: TrackStreamVariant[] | undefined;
 }) {
   if (!variants?.length) {
-    return <span className="text-xs text-white/25">None</span>;
+    return <span className="text-xs text-text-subtle">None</span>;
   }
 
   const visible = variants.slice(0, 2);
@@ -262,46 +240,36 @@ function TrackVariantBadges({
         <TooltipTrigger asChild>
           <div className="flex min-w-[112px] flex-wrap gap-1">
             {visible.map((variant) => (
-              <span
-                key={variant.id}
-                className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium leading-none ${variantTone(
-                  variant.status,
-                )}`}
-              >
+              <InfoBadge key={variant.id} tone={variantTone(variant.status)}>
                 {variantLabel(variant)}
-              </span>
+              </InfoBadge>
             ))}
             {variants.length > visible.length ? (
-              <span className="inline-flex items-center rounded-md border border-white/12 bg-white/[0.04] px-1.5 py-0.5 text-[10px] leading-none text-white/45">
+              <InfoBadge variant="counter">
                 +{variants.length - visible.length}
-              </span>
+              </InfoBadge>
             ) : null}
           </div>
         </TooltipTrigger>
-        <TooltipContent
-          side="top"
-          className="w-[260px] border border-white/10 bg-popover-surface text-foreground shadow-[0_20px_48px_rgba(0,0,0,0.34)] backdrop-blur-xl"
-        >
+        <TooltipContent side="top" className="w-72">
           <div className="space-y-2 text-xs">
-            <div className="font-semibold text-white/75">Playback variants</div>
+            <div className="font-semibold text-text-primary">
+              Playback variants
+            </div>
             {variants.map((variant) => (
               <div
                 key={variant.id}
-                className="rounded-md border border-white/8 bg-white/[0.03] px-2 py-2"
+                className="rounded-md border border-border-quiet bg-surface-object px-2 py-2"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium text-white/75">
+                  <span className="font-medium text-text-primary">
                     {variant.preset}
                   </span>
-                  <span
-                    className={`rounded-md border px-1.5 py-0.5 text-[10px] ${variantTone(
-                      variant.status,
-                    )}`}
-                  >
+                  <InfoBadge tone={variantTone(variant.status)}>
                     {variant.status}
-                  </span>
+                  </InfoBadge>
                 </div>
-                <div className="mt-1 text-white/45">
+                <div className="mt-1 text-text-muted">
                   {variantLabel(variant)}
                   {variant.delivery_sample_rate
                     ? ` / ${Math.round(variant.delivery_sample_rate / 1000)}kHz`
@@ -310,12 +278,12 @@ function TrackVariantBadges({
                   {formatBytes(variant.bytes)}
                 </div>
                 {variant.task_status ? (
-                  <div className="mt-1 text-white/30">
+                  <div className="mt-1 text-text-subtle">
                     Task {variant.task_status}
                   </div>
                 ) : null}
                 {variant.error ? (
-                  <div className="mt-1 line-clamp-2 text-red-200/70">
+                  <div className="mt-1 line-clamp-2 text-state-warning-text/70">
                     {variant.error}
                   </div>
                 ) : null}
@@ -339,20 +307,6 @@ function normalizeLyricsStatus(lyrics: TrackLyricsStatus | undefined) {
   return "none";
 }
 
-function lyricsTone(status: string) {
-  if (status === "synced")
-    return "border-amber-300/45 bg-amber-300/10 text-amber-200";
-  if (status === "txt")
-    return "border-cyan-300/40 bg-cyan-300/10 text-cyan-200";
-  return "border-white/10 bg-white/[0.03] text-white/35";
-}
-
-function lyricsLabel(status: string) {
-  if (status === "synced") return "SYNCED";
-  if (status === "txt") return "TXT";
-  return "NONE";
-}
-
 function LyricsBadge({
   lyrics,
   busy = false,
@@ -363,57 +317,26 @@ function LyricsBadge({
   onClick?: () => void;
 }) {
   const status = normalizeLyricsStatus(lyrics);
-  const label = lyricsLabel(status);
-  const actionLabel = busy ? "Syncing lyrics..." : "Sync lyrics for this track";
+  const label =
+    status === "synced" ? "SYNCED" : status === "txt" ? "TXT" : "NONE";
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              if (!busy) onClick?.();
-            }}
-            className={`inline-flex min-w-[68px] items-center justify-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold leading-none transition-colors hover:bg-white/[0.08] disabled:cursor-wait disabled:opacity-70 ${lyricsTone(
-              status,
-            )}`}
-            aria-label={`${actionLabel}: ${label}`}
-          >
-            {busy ? (
-              <Loader2 size={11} className="animate-spin" />
-            ) : (
-              <FileText size={11} />
-            )}
-            {label}
-          </button>
-        </TooltipTrigger>
-        <TooltipContent
-          side="top"
-          className="border border-white/10 bg-popover-surface text-foreground shadow-[0_20px_48px_rgba(0,0,0,0.34)] backdrop-blur-xl"
+    <div className="flex items-center gap-2">
+      <InfoBadge tone={status === "none" ? "neutral" : "accent"}>
+        {label}
+      </InfoBadge>
+      {onClick ? (
+        <ActionButton
+          label={busy ? "Syncing lyrics..." : "Sync lyrics for this track"}
+          loading={busy}
+          onClick={(event) => {
+            event.stopPropagation();
+            onClick();
+          }}
         >
-          <div className="space-y-1 text-xs">
-            <div>
-              {busy
-                ? "Syncing lyrics..."
-                : label === "NONE"
-                  ? "No lyrics cached"
-                  : label === "TXT"
-                    ? "Plain lyrics cached"
-                    : "Synced lyrics cached"}
-            </div>
-            <div className="text-white/50">{actionLabel}</div>
-            {lyrics?.updated_at ? (
-              <div className="text-white/50">
-                Updated {new Date(lyrics.updated_at).toLocaleString()}
-              </div>
-            ) : null}
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+          <AlignLeft data-admin-ux="track-sync-lyrics" aria-hidden="true" />
+        </ActionButton>
+      ) : null}
+    </div>
   );
 }
 
@@ -434,93 +357,58 @@ function MoveTrackDialog({
   onOpenChange: (open: boolean) => void;
   onMove: (targetAlbum: AlbumSearchResult) => void;
 }) {
-  const [query, setQuery] = useState(defaultQuery);
-  const [results, setResults] = useState<AlbumSearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setQuery(defaultQuery);
-    setResults([]);
-  }, [defaultQuery, open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const trimmed = query.trim();
-    if (trimmed.length < 2) {
-      setResults([]);
-      setSearching(false);
-      return;
-    }
-
-    let active = true;
-    setSearching(true);
-    const timer = window.setTimeout(() => {
-      void api<SearchResponse>(
-        `/api/search?q=${encodeURIComponent(trimmed)}&limit=12`,
-      )
-        .then((payload) => {
-          if (!active) return;
-          setResults(payload.albums ?? []);
-        })
-        .catch(() => {
-          if (!active) return;
-          setResults([]);
-          toast.error("Album search failed");
-        })
-        .finally(() => {
-          if (active) setSearching(false);
-        });
-    }, 250);
-
-    return () => {
-      active = false;
-      window.clearTimeout(timer);
-    };
-  }, [open, query]);
+  const {
+    query,
+    setQuery,
+    results,
+    searching,
+    error: searchError,
+    retry: retrySearch,
+  } = useLibrarySearch<AlbumSearchResult>(open, defaultQuery, "albums");
 
   const title = track?.tags.title || track?.filename || "this track";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle>Move Track to Album</DialogTitle>
+          <DialogTitle className="font-display">
+            Move Track to Album
+          </DialogTitle>
           <DialogDescription>
             Queue a worker task to move "{title}" into another album directory.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
-          <label
-            htmlFor="move-track-target"
-            className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
-          >
-            Target album
-          </label>
-          <div className="relative">
-            <Search
-              size={15}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-white/35"
-            />
-            <Input
+          <div className="crate-form-field">
+            <label htmlFor="move-track-target" data-slot="form-field-label">
+              Target album
+            </label>
+            <SearchInput
               id="move-track-target"
+              label="Target album"
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              className="pl-9"
+              onValueChange={setQuery}
               placeholder="Search albums by title or artist"
               autoFocus
             />
           </div>
 
-          <div className="max-h-[320px] overflow-y-auto rounded-lg border border-white/10 bg-black/20">
-            {searching ? (
+          <div className="max-h-[320px] overflow-y-auto rounded-lg border border-border-quiet">
+            {searchError ? (
+              <ErrorState message={searchError} onRetry={retrySearch} />
+            ) : searching ? (
               <div className="flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground">
-                <Loader2 size={15} className="animate-spin" />
+                <Loader2
+                  data-admin-ux="track-move-search-loading"
+                  size={15}
+                  className="animate-spin"
+                />
                 Searching albums...
               </div>
             ) : results.length ? (
-              <div className="divide-y divide-white/8">
+              <div className="divide-y divide-border-quiet">
                 {results.map((album) => {
                   const isCurrentAlbum =
                     currentAlbumId != null && album.id === currentAlbumId;
@@ -532,13 +420,11 @@ function MoveTrackDialog({
                       type="button"
                       disabled={busy || isCurrentAlbum || album.id == null}
                       onClick={() => onMove(album)}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-45"
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors  disabled:cursor-not-allowed disabled:opacity-45"
                     >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-white/45">
-                        <Disc3 size={16} />
-                      </div>
+                      <MediaCover alt={album.name} size={48} />
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium text-white/88">
+                        <div className="truncate text-sm font-medium text-text-primary">
                           {album.name}
                         </div>
                         <div className="truncate text-xs text-muted-foreground">
@@ -546,9 +432,7 @@ function MoveTrackDialog({
                           {album.year ? ` - ${album.year}` : ""}
                         </div>
                       </div>
-                      {isCurrentAlbum ? (
-                        <Badge variant="secondary">Current</Badge>
-                      ) : null}
+                      {isCurrentAlbum ? <InfoBadge>Current</InfoBadge> : null}
                     </button>
                   );
                 })}
@@ -580,137 +464,41 @@ function MoveTrackDialog({
   );
 }
 
-const FEATURE_BARS: { key: keyof AudioAnalysisTrack; label: string }[] = [
-  { key: "danceability", label: "Danceability" },
-  { key: "valence", label: "Valence" },
-  { key: "acousticness", label: "Acousticness" },
-  { key: "instrumentalness", label: "Instrumental" },
-  { key: "energy", label: "Energy" },
-  { key: "spectral_complexity", label: "Complexity" },
-];
-
-function TrackAudioInfo({ track }: { track: AudioAnalysisTrack }) {
-  const hasFeatures = FEATURE_BARS.some(
-    (feature) => track[feature.key] != null,
-  );
-  if (!hasFeatures && track.loudness == null && !track.mood) return null;
-
-  const radarData = FEATURE_BARS.map((feature) => ({
-    feature: feature.label,
-    value: (track[feature.key] as number | null) ?? 0,
-  }));
-  const hasRadar = radarData.some((item) => item.value > 0);
-  const topMoods = track.mood
-    ? Object.entries(track.mood)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
-    : [];
-
+function TrackAudioInfo({
+  track,
+  title,
+}: {
+  track: AudioAnalysisTrack;
+  title: string;
+}) {
+  const [open, setOpen] = useState(false);
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            className="text-muted-foreground hover:text-primary"
-            aria-label="Show audio profile"
-          >
-            <BarChart3 size={13} />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent
-          side="left"
-          className="w-[320px] border border-white/10 bg-popover-surface p-4 text-foreground shadow-[0_24px_64px_rgba(0,0,0,0.42)] backdrop-blur-xl"
+    <>
+      <ActionButton label="Show audio profile" onClick={() => setOpen(true)}>
+        <BarChart3 data-admin-ux="track-audio-profile" aria-hidden="true" />
+      </ActionButton>
+      <AppModal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={<span className="wrap-anywhere">{title} · Audio profile</span>}
+        description="Measured audio features, Smart Mix readiness and similarity references for this track."
+        closeLabel="Close audio profile"
+        size="3xl"
+        panelClassName="max-h-[calc(100dvh-2rem)] min-w-0"
+        headerClassName="shrink-0"
+      >
+        <ModalBody
+          className="min-w-0 px-5 py-5"
+          data-slot="audio-profile-scroll"
         >
-          <div className="mb-2 text-[11px] font-semibold text-white/70">
-            Audio Profile
-          </div>
-          {hasRadar ? (
-            <div className="mx-auto mb-3 h-[200px] w-[200px]">
-              <ResponsiveRadar
-                data={radarData}
-                keys={["value"]}
-                indexBy="feature"
-                maxValue={1}
-                margin={{ top: 20, right: 40, bottom: 20, left: 40 }}
-                gridShape="circular"
-                gridLevels={3}
-                dotSize={4}
-                dotColor="#16161e"
-                dotBorderWidth={1}
-                colors={["#06b6d4"]}
-                fillOpacity={0.2}
-                borderWidth={1}
-                borderColor="#16161e"
-                gridLabelOffset={12}
-                theme={{
-                  text: { fill: "#9ca3af", fontSize: 9 },
-                  grid: { line: { stroke: "#ffffff15" } },
-                  tooltip: {
-                    container: {
-                      background: "#16161e",
-                      color: "#f1f5f9",
-                      borderRadius: "8px",
-                      fontSize: 11,
-                      border: "1px solid #ffffff15",
-                      padding: "6px 10px",
-                    },
-                  },
-                }}
-              />
-            </div>
-          ) : null}
-          <div className="space-y-1">
-            {FEATURE_BARS.map((feature) => {
-              const value = track[feature.key] as number | null;
-              if (value == null) return null;
-              return (
-                <div key={feature.key} className="flex items-center gap-2">
-                  <span className="w-[70px] shrink-0 text-[10px] text-white/50">
-                    {feature.label}
-                  </span>
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-md bg-primary/10">
-                    <div
-                      className="h-full rounded-md bg-primary"
-                      style={{
-                        width: `${Math.round(value * 100)}%`,
-                        opacity: 0.4 + value * 0.6,
-                      }}
-                    />
-                  </div>
-                  <span className="w-[28px] text-right font-mono text-[10px] text-white/40">
-                    {Math.round(value * 100)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-          {track.loudness != null ? (
-            <div className="mt-2 flex items-center gap-2 border-t border-white/5 pt-1.5">
-              <span className="w-[70px] shrink-0 text-[10px] text-white/50">
-                Loudness
-              </span>
-              <span className="font-mono text-[10px] text-white/60">
-                {track.loudness.toFixed(1)} dB
-              </span>
-            </div>
-          ) : null}
-          {topMoods.length > 0 ? (
-            <div className="flex flex-wrap gap-1 pt-2">
-              {topMoods.map(([mood, score]) => (
-                <span
-                  key={mood}
-                  className="rounded-md border border-white/10 bg-white/8 px-1.5 py-0.5 text-[9px] text-white/60"
-                >
-                  {mood} {Math.round(score * 100)}%
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+          <AudioProfileCard
+            analysisData={{ track }}
+            totalTracks={1}
+            presentation="track-dialog"
+          />
+        </ModalBody>
+      </AppModal>
+    </>
   );
 }
 
@@ -770,7 +558,7 @@ export function TrackTable({
         toast.success("Track moved to quarantine");
         await onTrackQuarantined?.();
       } else {
-        toast.error(task.error || "Track quarantine failed");
+        throw new Error(task.error || "Track quarantine failed");
       }
     } catch (error) {
       toast.error(
@@ -778,9 +566,9 @@ export function TrackTable({
           ? error.message
           : "Failed to quarantine track",
       );
+      throw error;
     } finally {
       setQuarantiningTrackKey(null);
-      setPendingQuarantineTrack(null);
     }
   }
 
@@ -828,243 +616,213 @@ export function TrackTable({
   const hasAnalysis =
     analysisData &&
     tracks.some((track) => {
-      const title = (track.tags.title || track.filename).toLowerCase();
-      return analysisData[title] != null;
+      return analysisForTrack(analysisData, track) != null;
     });
 
   return (
     <>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-10 text-right">#</TableHead>
-            <TableHead>Track</TableHead>
-            <TableHead>Format</TableHead>
-            <TableHead>Bitrate</TableHead>
-            <TableHead>Variants</TableHead>
-            <TableHead>Duration</TableHead>
-            <TableHead>Popularity</TableHead>
-            <TableHead>Size</TableHead>
-            {hasAnalysis ? <TableHead>BPM</TableHead> : null}
-            {hasAnalysis ? <TableHead>Key</TableHead> : null}
-            {hasAnalysis ? <TableHead>Energy</TableHead> : null}
-            <TableHead className="w-[86px]">Lyrics</TableHead>
-            {hasAnalysis ? <TableHead className="w-10" /> : null}
-            <TableHead className="w-10" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {tracks.map((track, index) => {
-            const trackId = getTrackId(track);
-            const lyricsSyncKey = getTrackLyricsSyncKey(track);
-            const trackTitle = (
-              track.tags.title || track.filename
-            ).toLowerCase();
-            const analyzedTrack = analysisData
-              ? analysisData[trackTitle] ?? undefined
-              : undefined;
+      <div className="crate-track-table-frame">
+        <Table className="crate-track-table">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-10 text-right">#</TableHead>
+              <TableHead>Track</TableHead>
+              <TableHead className="crate-table-secondary">Format</TableHead>
+              <TableHead className="crate-table-detail crate-table-number">
+                Bitrate
+              </TableHead>
+              <TableHead className="crate-table-detail">Variants</TableHead>
+              <TableHead className="crate-table-number">Duration</TableHead>
+              <TableHead className="crate-table-detail">Popularity</TableHead>
+              <TableHead className="crate-table-detail crate-table-number">
+                Size
+              </TableHead>
+              {hasAnalysis ? (
+                <TableHead className="crate-table-secondary crate-table-number">
+                  BPM · Key
+                </TableHead>
+              ) : null}
 
-            return (
-              <MusicContextMenu
-                key={track.filename}
-                type="track"
-                artist={artist || track.tags.artist || ""}
-                artistId={artistId}
-                artistSlug={artistSlug}
-                album={album || track.tags.album || ""}
-                albumId={albumId}
-                albumSlug={albumSlug}
-                trackId={trackId}
-                trackTitle={track.tags.title || track.filename}
-                albumCover={albumCover}
-                onFindSimilar={
-                  track.path
-                    ? () =>
-                        setSimilarTrack({
-                          path: track.path!,
-                          title: track.tags.title || track.filename,
-                          artist: artist || track.tags.artist || "",
-                        })
-                    : undefined
-                }
-                onMoveTrack={
-                  canQuarantineTracks && (track.id != null || track.entity_uid)
-                    ? () => setPendingMoveTrack(track)
-                    : undefined
-                }
-                onQuarantineTrack={
-                  canQuarantineTracks && (track.id != null || track.entity_uid)
-                    ? () => setPendingQuarantineTrack(track)
-                    : undefined
-                }
-              >
-                <TableRow
-                  aria-busy={
-                    quarantiningTrackKey === trackId ||
-                    movingTrackKey === trackId
-                      ? "true"
+              {hasAnalysis ? (
+                <TableHead className="crate-table-detail">Energy</TableHead>
+              ) : null}
+              <TableHead className="w-[86px]">Lyrics</TableHead>
+              {hasAnalysis ? <TableHead className="w-10" /> : null}
+              <TableHead className="w-10" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {tracks.map((track, index) => {
+              const trackId = getTrackId(track);
+              const lyricsSyncKey = getTrackLyricsSyncKey(track);
+              const analyzedTrack = analysisForTrack(analysisData, track);
+
+              return (
+                <MusicContextMenu
+                  key={track.filename}
+                  type="track"
+                  artist={artist || track.tags.artist || ""}
+                  artistId={artistId}
+                  artistSlug={artistSlug}
+                  album={album || track.tags.album || ""}
+                  albumId={albumId}
+                  albumSlug={albumSlug}
+                  trackId={trackId}
+                  trackTitle={track.tags.title || track.filename}
+                  albumCover={albumCover}
+                  onFindSimilar={
+                    track.path
+                      ? () =>
+                          setSimilarTrack({
+                            path: track.path!,
+                            title: track.tags.title || track.filename,
+                            artist: artist || track.tags.artist || "",
+                          })
                       : undefined
                   }
-                  className={
-                    quarantiningTrackKey === trackId ||
-                    movingTrackKey === trackId
-                      ? "opacity-55"
+                  onMoveTrack={
+                    canQuarantineTracks &&
+                    (track.id != null || track.entity_uid)
+                      ? () => setPendingMoveTrack(track)
+                      : undefined
+                  }
+                  onQuarantineTrack={
+                    canQuarantineTracks &&
+                    (track.id != null || track.entity_uid)
+                      ? () => setPendingQuarantineTrack(track)
                       : undefined
                   }
                 >
-                  <TableCell className="text-right text-xs text-white/30">
-                    {track.tags.tracknumber || index + 1}
-                  </TableCell>
-                  <TableCell>
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium text-white/88">
-                        {track.tags.title || track.filename}
-                      </div>
-                      {track.tags.artist && artist !== track.tags.artist ? (
-                        <div className="truncate text-[11px] text-white/38">
-                          {track.tags.artist}
+                  <TableRow
+                    aria-busy={
+                      quarantiningTrackKey === trackId ||
+                      movingTrackKey === trackId
+                        ? "true"
+                        : undefined
+                    }
+                    className={
+                      quarantiningTrackKey === trackId ||
+                      movingTrackKey === trackId
+                        ? "opacity-55"
+                        : undefined
+                    }
+                  >
+                    <TableCell className="text-right font-mono text-xs tabular-nums text-text-subtle">
+                      {track.tags.tracknumber || index + 1}
+                    </TableCell>
+                    <TableCell>
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-text-primary">
+                          {track.tags.title || track.filename}
                         </div>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {(() => {
-                      const fmt = track.format.replace(".", "").toLowerCase();
-                      const fmtUp = fmt.toUpperCase();
-                      const isLossless = [
-                        "flac",
-                        "alac",
-                        "wav",
-                        "aiff",
-                      ].includes(fmt);
-                      const depth = track.bit_depth || 16;
-                      const rateKhz = track.sample_rate
-                        ? track.sample_rate / 1000
-                        : 44.1;
-                      const rateStr = `${
-                        rateKhz % 1 ? rateKhz.toFixed(1) : rateKhz
-                      }kHz`;
-                      const isHiRes =
-                        isLossless && (depth > 16 || rateKhz > 48);
-                      const label = isLossless
-                        ? `${fmtUp} ${depth}/${rateStr}`
-                        : fmtUp;
-                      return (
-                        <span
-                          className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium leading-none whitespace-nowrap ${
-                            isHiRes
-                              ? "border-amber-400/50 text-amber-300 bg-amber-400/10"
-                              : isLossless
-                                ? "border-cyan-400/40 text-cyan-300 bg-cyan-400/8"
-                                : "border-white/15 text-muted-foreground"
-                          }`}
-                        >
-                          {label}
-                        </span>
-                      );
-                    })()}
-                  </TableCell>
-                  <TableCell className="font-mono text-sm text-muted-foreground">
-                    {formatBitrate(track.bitrate)}
-                  </TableCell>
-                  <TableCell>
-                    <TrackVariantBadges variants={track.stream_variants} />
-                  </TableCell>
-                  <TableCell className="font-mono text-sm text-muted-foreground">
-                    {formatDuration(track.length_sec)}
-                  </TableCell>
-                  <TableCell>
-                    <PopularityBar
-                      score={
-                        track.popularity_score ??
-                        ((track.popularity ?? 0) > 0
-                          ? (track.popularity ?? 0) / 100
-                          : null)
-                      }
-                      confidence={track.popularity_confidence}
-                    />
-                  </TableCell>
-                  <TableCell className="font-mono text-sm text-muted-foreground">
-                    {track.size_mb} MB
-                  </TableCell>
-                  {hasAnalysis ? (
-                    <TableCell className="font-mono text-sm text-muted-foreground">
-                      {analyzedTrack?.tempo != null
-                        ? Math.round(analyzedTrack.tempo)
-                        : null}
+                        {track.tags.artist && artist !== track.tags.artist ? (
+                          <div className="truncate text-xs text-text-muted">
+                            {track.tags.artist}
+                          </div>
+                        ) : null}
+                      </div>
                     </TableCell>
-                  ) : null}
-                  {hasAnalysis ? (
-                    <TableCell>
-                      {analyzedTrack?.key != null ? (
-                        <Badge
-                          variant="outline"
-                          className="px-1.5 py-0 font-mono text-[11px] text-white/60"
-                        >
-                          {analyzedTrack.key}
-                          {analyzedTrack.scale
-                            ? ` ${
-                                analyzedTrack.scale === "major"
-                                  ? "maj"
-                                  : analyzedTrack.scale === "minor"
-                                    ? "min"
-                                    : analyzedTrack.scale
-                              }`
-                            : ""}
-                        </Badge>
-                      ) : null}
+                    <TableCell className="crate-table-secondary">
+                      <span className="crate-track-quality">
+                        {formatTrackQuality(
+                          track.format,
+                          track.bit_depth,
+                          track.sample_rate,
+                        )}
+                      </span>
                     </TableCell>
-                  ) : null}
-                  {hasAnalysis ? (
-                    <TableCell>
-                      {analyzedTrack?.energy != null ? (
-                        <EnergyBar value={analyzedTrack.energy} />
-                      ) : null}
+                    <TableCell className="crate-table-detail font-mono text-xs tabular-nums text-text-muted">
+                      {formatBitrate(track.bitrate)}
                     </TableCell>
-                  ) : null}
-                  <TableCell>
-                    <LyricsBadge
-                      lyrics={track.lyrics}
-                      busy={syncingLyricsTrackKey === lyricsSyncKey}
-                      onClick={
-                        onSyncTrackLyrics
-                          ? () => void onSyncTrackLyrics(track)
-                          : undefined
-                      }
-                    />
-                  </TableCell>
-                  {hasAnalysis ? (
-                    <TableCell>
-                      {analyzedTrack ? (
-                        <TrackAudioInfo track={analyzedTrack} />
-                      ) : null}
+                    <TableCell className="crate-table-detail">
+                      <TrackVariantBadges variants={track.stream_variants} />
                     </TableCell>
-                  ) : null}
-                  <TableCell>
-                    {track.entity_uid || track.id || track.path ? (
-                      <a
-                        href={
-                          trackDownloadApiPath({
-                            entityUid: track.entity_uid,
-                            id: track.id,
-                            path: track.path,
-                          }) || "#"
+                    <TableCell className="font-mono text-xs tabular-nums text-text-muted">
+                      {formatDuration(track.length_sec)}
+                    </TableCell>
+                    <TableCell className="crate-table-detail">
+                      <PopularityBar
+                        score={
+                          track.popularity_score ??
+                          ((track.popularity ?? 0) > 0
+                            ? (track.popularity ?? 0) / 100
+                            : null)
                         }
-                        download
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/5 hover:text-white"
-                        title="Download track"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        <Download size={14} />
-                      </a>
+                        confidence={track.popularity_confidence}
+                      />
+                    </TableCell>
+                    <TableCell className="crate-table-detail font-mono text-xs tabular-nums text-text-muted">
+                      {track.size_mb} MB
+                    </TableCell>
+                    {hasAnalysis ? (
+                      <TableCell className="crate-table-secondary crate-table-number">
+                        <span className="crate-track-analysis">
+                          {formatTrackAnalysis(
+                            analyzedTrack?.smart_mix?.bpm ??
+                              analyzedTrack?.tempo,
+                            analyzedTrack?.smart_mix?.key ?? analyzedTrack?.key,
+                            analyzedTrack?.smart_mix?.scale ??
+                              analyzedTrack?.scale,
+                          ) ?? "—"}
+                        </span>
+                      </TableCell>
                     ) : null}
-                  </TableCell>
-                </TableRow>
-              </MusicContextMenu>
-            );
-          })}
-        </TableBody>
-      </Table>
+                    {hasAnalysis ? (
+                      <TableCell className="crate-table-detail">
+                        {analyzedTrack?.energy != null ? (
+                          <EnergyBar value={analyzedTrack.energy} />
+                        ) : null}
+                      </TableCell>
+                    ) : null}
+                    <TableCell>
+                      <LyricsBadge
+                        lyrics={track.lyrics}
+                        busy={syncingLyricsTrackKey === lyricsSyncKey}
+                        onClick={
+                          onSyncTrackLyrics
+                            ? () => void onSyncTrackLyrics(track)
+                            : undefined
+                        }
+                      />
+                    </TableCell>
+                    {hasAnalysis ? (
+                      <TableCell>
+                        {analyzedTrack ? (
+                          <TrackAudioInfo
+                            track={analyzedTrack}
+                            title={track.tags.title || track.filename}
+                          />
+                        ) : null}
+                      </TableCell>
+                    ) : null}
+                    <TableCell>
+                      {track.entity_uid || track.id || track.path ? (
+                        <ActionLink
+                          label="Download track"
+                          href={
+                            trackDownloadApiPath({
+                              entityUid: track.entity_uid,
+                              id: track.id,
+                              path: track.path,
+                            }) || undefined
+                          }
+                          download
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <Download
+                            data-admin-ux="track-download"
+                            aria-hidden="true"
+                          />
+                        </ActionLink>
+                      ) : null}
+                    </TableCell>
+                  </TableRow>
+                </MusicContextMenu>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
 
       {similarTrack ? (
         <SimilarTracksPanel
@@ -1086,10 +844,16 @@ export function TrackTable({
           "this track"
         }" to .crate-trash and remove it from this album? This is reversible from the filesystem.`}
         confirmLabel="Quarantine Track"
-        variant="destructive"
-        onConfirm={() =>
-          pendingQuarantineTrack && void quarantineTrack(pendingQuarantineTrack)
-        }
+        tone="danger"
+        onConfirm={async () => {
+          if (pendingQuarantineTrack)
+            await quarantineTrack(pendingQuarantineTrack);
+        }}
+        onError={() => {}}
+        eyebrow="Confirm action"
+        consequence={`1 track · ${
+          pendingQuarantineTrack?.size_mb ?? "—"
+        } MB · moves to .crate-trash`}
       />
 
       <MoveTrackDialog

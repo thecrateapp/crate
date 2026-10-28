@@ -1,0 +1,158 @@
+---
+import { artistEntityName, artistEntityUid, ENTITY_NAMESPACES, normalizeText } from "../../lib/entity-uid";
+
+const inputs = ["Sigur Rós", "SIGUR  RÓS "];
+const rows = inputs.map((input) => ({
+  input,
+  normal: normalizeText(input),
+  name: artistEntityName({ name: input }),
+  uid: artistEntityUid({ name: input }),
+}));
+const same = new Set(rows.map((row) => row.uid)).size === 1;
+---
+
+<figure class="uuid" data-viz="steps" data-step-rate="1.3" data-reveal aria-label={`Two spellings of the same artist normalise to "${rows[0]!.normal}" and get the same UUIDv5: ${rows[0]!.uid}`}>
+  <ol class="chain">
+    <li data-step>
+      <span class="viz-label">namespace</span>
+      <code>uuid5(URL, "crate:entity-uids:v1")</code>
+      <code class="out" data-type>{ENTITY_NAMESPACES.root}</code>
+    </li>
+    <li data-step>
+      <span class="viz-label">artist</span>
+      <code>uuid5(root, "artist")</code>
+      <code class="out" data-type>{ENTITY_NAMESPACES.artist}</code>
+    </li>
+  </ol>
+  <ol class="rows">
+    {
+      rows.map((row) => (
+        <li data-step>
+          <span class="input">"{row.input}"</span>
+          <span class="arrow" aria-hidden="true">→</span>
+          <code>{row.name}</code>
+          <span class="arrow" aria-hidden="true">→</span>
+          <code class="out" data-type>{row.uid}</code>
+        </li>
+      ))
+    }
+  </ol>
+  <p class="verdict" data-step>
+    <b>{same ? "Same id" : "Different ids"}</b> on every rebuild and every server · MBID first when there is one
+  </p>
+</figure>
+
+<style>
+  .uuid {
+    margin: 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .chain,
+  .rows {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .chain li {
+    display: grid;
+    grid-template-columns: 11ch minmax(0, 1fr) auto;
+    gap: 16px;
+    align-items: baseline;
+  }
+
+  .rows {
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+  }
+
+  .rows li {
+    display: grid;
+    grid-template-columns: minmax(0, 12ch) auto minmax(0, 14ch) auto minmax(0, 1fr);
+    gap: 12px;
+    align-items: baseline;
+  }
+
+  li,
+  .verdict {
+    transition: opacity 0.35s var(--ease-snap);
+  }
+
+  .uuid:global(.is-running) :is(li, .verdict) {
+    opacity: 0.2;
+  }
+
+  .uuid:global(.is-running) :is(li, .verdict):global(.is-on),
+  .uuid:global(.is-running) :is(li, .verdict):global(.is-done) {
+    opacity: 1;
+  }
+
+  code,
+  .input {
+    overflow: hidden;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--fg-2);
+    white-space: pre;
+    text-overflow: ellipsis;
+  }
+
+  .input {
+    font-family: var(--sans);
+    font-size: 15px;
+    color: var(--fg);
+  }
+
+  .out {
+    min-height: 1.4em;
+    color: var(--cyan-hi);
+  }
+
+  .arrow {
+    color: var(--fg-3);
+  }
+
+  .verdict {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px;
+    margin: 22px 0 0;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--fg-2);
+  }
+
+  .verdict b {
+    padding: 3px 10px;
+    border: 1px solid rgba(103, 232, 249, 0.5);
+    border-radius: 999px;
+    font-weight: 400;
+    color: var(--cyan-hi);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 10.5px;
+  }
+
+  @media (max-width: 760px) {
+    .chain li {
+      grid-template-columns: 1fr;
+      gap: 4px;
+    }
+    .rows li {
+      grid-template-columns: auto auto minmax(0, 1fr);
+    }
+    .rows li .arrow:nth-of-type(2),
+    .rows li .out {
+      grid-column: 1 / -1;
+    }
+    .rows li .arrow:nth-of-type(2) {
+      display: none;
+    }
+  }
+</style>

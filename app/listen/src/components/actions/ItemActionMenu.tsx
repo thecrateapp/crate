@@ -7,7 +7,6 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { CrateImage } from "@/components/artwork/CrateImage";
-import { cn } from "@/lib/utils";
 
 export {
   ItemActionMenuButton,
@@ -33,6 +32,7 @@ export function ItemActionMenu(props: ItemActionMenuProps) {
   const { t } = useTranslation();
   return (
     <ContextMenu
+      surfaceClassName={props.surfaceClassName}
       header={props.header}
       items={props.actions}
       menuRef={props.menuRef}
@@ -48,7 +48,7 @@ export function ContextMenu(props: ContextMenuProps) {
   return (
     <SharedContextMenu
       {...props}
-      className={cn("rounded-panel", props.className)}
+      className={props.className}
       renderMediaImage={renderMediaImage}
     />
   );

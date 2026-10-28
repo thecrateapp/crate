@@ -1,0 +1,263 @@
+---
+import { gallery } from "../content/gallery";
+import { t } from "../i18n";
+
+interface Props {
+  app: "listen" | "admin";
+  locale?: string;
+}
+
+const { app, locale = "en" } = Astro.props;
+const shots = gallery.filter((shot) => shot.app === app);
+const wide = (shot: (typeof shots)[number]) => `${shot.srcSmall} 1280w, ${shot.src} ${shot.width}w`;
+const tall = (shot: (typeof shots)[number]) => `${shot.portraitSmall} 1080w, ${shot.portrait} ${shot.portraitWidth}w`;
+---
+
+<section
+  class="showcase"
+  data-showcase
+  aria-roledescription="carousel"
+  aria-label={t(app === "listen" ? "gallery.label.listen" : "gallery.label.admin", locale)}
+  data-position={t("gallery.position", locale)}
+  data-pause={t("gallery.pause", locale)}
+  data-play={t("gallery.play", locale)}
+>
+  <div class="showcase-frame">
+  <div class="showcase-stage">
+    {
+      shots.map((shot, index) => (
+        <figure
+          class="slide"
+          data-slide
+          data-title={shot.title}
+          data-caption={shot.caption}
+          data-active={index === 0 ? "" : undefined}
+          role="group"
+          aria-roledescription="slide"
+          aria-label={`${index + 1} / ${shots.length}: ${shot.title}`}
+          aria-hidden={index === 0 ? "false" : "true"}
+        >
+          <picture>
+            {index === 0 ? (
+              <source media="(max-width: 700px)" srcset={tall(shot)} sizes="100vw" />
+            ) : (
+              <source media="(max-width: 700px)" data-srcset={tall(shot)} sizes="100vw" />
+            )}
+            {index === 0 ? (
+              <img srcset={wide(shot)} sizes="(min-width: 1480px) 1480px, 100vw" width={shot.width} height={shot.height} alt={shot.alt} decoding="async" />
+            ) : (
+              <img data-srcset={wide(shot)} sizes="(min-width: 1480px) 1480px, 100vw" width={shot.width} height={shot.height} alt={shot.alt} decoding="async" />
+            )}
+          </picture>
+        </figure>
+      ))
+    }
+  </div>
+
+    <div class="card" data-card aria-live="off">
+      <p class="position" data-counter>01 / {String(shots.length).padStart(2, "0")}</p>
+      <p class="card-title" data-card-title>{shots[0]?.title}</p>
+      <p class="card-caption" data-card-caption>{shots[0]?.caption}</p>
+      <div class="controls">
+        <button type="button" data-prev aria-label={t("gallery.previous", locale)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
+        </button>
+        <button type="button" data-autoplay data-state="pause" aria-label={t("gallery.pause", locale)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path class="icon-play" d="M8 5v14l11-7z" />
+            <path class="icon-pause" d="M8 5v14M16 5v14" />
+          </svg>
+        </button>
+        <button type="button" data-next aria-label={t("gallery.next", locale)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" /></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { createShowcase } from "../scripts/gallery/showcase";
+  import { reducedMotion } from "../scripts/motion/env";
+
+  let disposers: (() => void)[] = [];
+
+  document.addEventListener("astro:page-load", () => {
+    disposers.forEach((dispose) => dispose());
+    disposers = [...document.querySelectorAll<HTMLElement>("[data-showcase]")].map((root) => {
+      const template = root.dataset.position ?? "{index} / {count}";
+      return createShowcase(root, {
+        autoplay: !reducedMotion(),
+        labels: {
+          position: (index, count) =>
+            template.replace("{index}", String(index).padStart(2, "0")).replace("{count}", String(count).padStart(2, "0")),
+          pause: root.dataset.pause ?? "",
+          play: root.dataset.play ?? "",
+        },
+      });
+    });
+  });
+</script>
+
+<style>
+  .showcase {
+    position: relative;
+    z-index: 5;
+    padding: 2vh clamp(16px, 4vw, 64px) 8vh;
+  }
+
+  /* No container: the shots share the page colour, so their edges are feathered away and the
+     devices float on the site background. */
+  .showcase-frame {
+    position: relative;
+    width: min(100%, 1480px);
+    margin: 0 auto;
+  }
+
+  .showcase-stage {
+    position: relative;
+    aspect-ratio: 16 / 9;
+  }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    transition: opacity 700ms ease;
+    --fade-x: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent);
+    --fade-y: linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent);
+    -webkit-mask-image: var(--fade-x), var(--fade-y);
+    -webkit-mask-composite: source-in;
+    mask-image: var(--fade-x), var(--fade-y);
+    mask-composite: intersect;
+  }
+
+  .slide[data-active] {
+    opacity: 1;
+  }
+
+  .slide img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .card {
+    position: absolute;
+    right: 6.25%;
+    bottom: 12%;
+    z-index: 2;
+    transform: translateY(50%);
+    width: min(340px, 32%);
+    padding: 16px 18px 14px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: rgba(10, 10, 15, 0.78);
+    backdrop-filter: blur(14px);
+  }
+
+  .card p {
+    margin: 0;
+  }
+
+  .position {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    color: var(--cyan-hi);
+  }
+
+  .card-title {
+    margin-top: 6px !important;
+    font-family: var(--display);
+    font-size: 20px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    color: var(--fg);
+  }
+
+  .card-caption {
+    margin-top: 6px !important;
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--fg-2);
+  }
+
+  .controls {
+    display: flex;
+    gap: 6px;
+    margin-top: 14px;
+  }
+
+  .controls button {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--fg-2);
+    cursor: pointer;
+    transition: border-color 200ms ease, color 200ms ease;
+  }
+
+  .controls svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .controls .icon-play {
+    fill: currentColor;
+    stroke: none;
+  }
+
+  [data-autoplay][data-state="pause"] .icon-play,
+  [data-autoplay][data-state="play"] .icon-pause {
+    display: none;
+  }
+
+  .controls button:hover {
+    border-color: rgba(103, 232, 249, 0.45);
+    color: var(--fg);
+  }
+
+  .controls button:focus-visible {
+    outline: 2px solid var(--cyan-hi);
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 900px) {
+    .card {
+      width: min(320px, 44%);
+    }
+  }
+
+  @media (max-width: 700px) {
+    .showcase-stage {
+      aspect-ratio: 4 / 5;
+    }
+
+    .card {
+      position: static;
+      width: auto;
+      transform: none;
+      margin-top: 4px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .slide,
+    .controls button {
+      transition: none;
+    }
+  }
+</style>

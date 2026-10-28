@@ -88,8 +88,11 @@ def create_credential(
     grants: Iterable[str],
     expires_at: datetime,
     *,
+    require_approval: bool = False,
     session: Session | None = None,
 ) -> IssuedCredential:
+    if not isinstance(require_approval, bool):
+        raise TypeError("Require approval must be a boolean")
     name = name.strip()
     if (
         not name
@@ -108,11 +111,16 @@ def create_credential(
         current.execute(
             text(
                 """
-                INSERT INTO agent_principals (id, name, grants)
-                VALUES (:id, :name, :grants)
+                INSERT INTO agent_principals (id, name, grants, require_approval)
+                VALUES (:id, :name, :grants, :require_approval)
                 """
             ),
-            {"id": principal_id, "name": name, "grants": sorted(grants)},
+            {
+                "id": principal_id,
+                "name": name,
+                "grants": sorted(grants),
+                "require_approval": require_approval,
+            },
         )
         issued = _issue(current, principal_id, name, grants, expires_at)
         _audit(
@@ -159,6 +167,71 @@ def resolve_credential(
         return _impl(session)
     with read_scope() as current:
         return _impl(current)
+
+
+def identify_credential(token: str, *, session: Session | None = None) -> dict | None:
+    """Which credential a stored secret belongs to, whatever its current state."""
+    try:
+        digest = digest_token(token)
+    except ValueError:
+        return None
+
+    def _impl(current: Session) -> dict | None:
+        row = (
+            current.execute(
+                text(
+                    """
+                    SELECT c.id::text AS credential_id, p.id::text AS principal_id,
+                           p.name, p.require_approval,
+                           (c.revoked_at IS NULL AND c.expires_at > NOW() AND p.enabled)
+                               AS active
+                    FROM agent_credentials c
+                    JOIN agent_principals p ON p.id = c.principal_id
+                    WHERE c.token_digest = :digest AND p.kind = 'service'
+                    """
+                ),
+                {"digest": digest},
+            )
+            .mappings()
+            .first()
+        )
+        return dict(row) if row else None
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
+def require_principal_approval(
+    principal_id: str, *, session: Session | None = None
+) -> bool:
+    """Turn on mandatory approval; a policy change invalidates pending plans."""
+    principal_id = _id(principal_id)
+    with optional_scope(session) as current:
+        changed = current.execute(
+            text(
+                """
+                UPDATE agent_principals
+                SET require_approval = TRUE, policy_revision = policy_revision + 1
+                WHERE id = :id AND kind = 'service' AND NOT require_approval
+                RETURNING id
+                """
+            ),
+            {"id": principal_id},
+        ).scalar_one_or_none()
+        if changed is None:
+            exists = current.execute(
+                text(
+                    "SELECT 1 FROM agent_principals WHERE id = :id AND kind = 'service'"
+                ),
+                {"id": principal_id},
+            ).first()
+            if exists is None:
+                raise ValueError("Integration does not exist")
+            return False
+        _audit(current, "agent.principal.approval_required", principal_id, None)
+        return True
 
 
 def list_credentials(*, session: Session | None = None) -> list[dict]:
@@ -281,7 +354,9 @@ def set_principal_enabled(
 
 __all__ = [
     "create_credential",
+    "identify_credential",
     "list_credentials",
+    "require_principal_approval",
     "resolve_credential",
     "revoke_credential",
     "rotate_credential",

@@ -456,6 +456,66 @@ describe("MusicVisualizer", () => {
   // -------------------------------------------------------------------
 
   describe("lifecycle", () => {
+    it("settles and repaints changed static settings without scheduling, and ignores invalidation while stopped or running", () => {
+      const viz = new MusicVisualizer(
+        canvas,
+        analyser as unknown as AnalyserNode,
+        () => playbackState,
+      );
+      viz.glow = 0;
+      viz.scale = 2;
+      viz.color1 = [0.2, 0.3, 0.4];
+      viz.renderStaticFrame();
+      expect((viz as unknown as { renderedGlow: number }).renderedGlow).toBe(0);
+      expect(
+        (viz as unknown as { renderedColor1: number[] }).renderedColor1,
+      ).toEqual([0.2, 0.3, 0.4]);
+      vi.mocked(mockGL.drawElements).mockClear();
+      viz.invalidateFrame();
+      expect(mockGL.drawElements).not.toHaveBeenCalled();
+      viz.invalidateFrame(true);
+      expect(mockGL.drawElements).toHaveBeenCalled();
+      vi.mocked(mockGL.drawElements).mockClear();
+      viz.glow = 10;
+      viz.color1 = [0.8, 0.3, 0.4];
+      viz.invalidateFrame();
+      expect(mockGL.drawElements).toHaveBeenCalled();
+      expect((viz as unknown as { renderedGlow: number }).renderedGlow).toBe(
+        10,
+      );
+      expect(
+        (viz as unknown as { renderedColor1: number[] }).renderedColor1,
+      ).toEqual([0.8, 0.3, 0.4]);
+      expect(window.requestAnimationFrame).not.toHaveBeenCalled();
+      viz.stop();
+      vi.mocked(mockGL.drawElements).mockClear();
+      viz.glow = 5;
+      viz.invalidateFrame();
+      expect(mockGL.drawElements).not.toHaveBeenCalled();
+      viz.start();
+      vi.mocked(mockGL.drawElements).mockClear();
+      viz.glow = 8;
+      viz.invalidateFrame();
+      expect(mockGL.drawElements).not.toHaveBeenCalled();
+      viz.destroy();
+    });
+
+    it("renders a static frame without scheduling and can resume the same renderer", () => {
+      const viz = new MusicVisualizer(
+        canvas,
+        analyser as unknown as AnalyserNode,
+        () => playbackState,
+      );
+      viz.renderStaticFrame();
+      expect(mockGL.drawElements).toHaveBeenCalled();
+      expect(window.requestAnimationFrame).not.toHaveBeenCalled();
+      viz.start();
+      expect(window.requestAnimationFrame).toHaveBeenCalledTimes(1);
+      viz.renderStaticFrame();
+      expect(window.cancelAnimationFrame).toHaveBeenCalled();
+      expect(window.requestAnimationFrame).toHaveBeenCalledTimes(1);
+      viz.destroy();
+    });
     it("start() requests an animation frame", () => {
       const viz = new MusicVisualizer(
         canvas,

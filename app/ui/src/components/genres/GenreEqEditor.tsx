@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { SlidersHorizontal, Save, RotateCcw, Loader2 } from "lucide-react";
+import { Save, RotateCcw, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { AIButton } from "@/components/ui/AIButton";
 import { Button } from "@crate/ui/shadcn/button";
 import { api } from "@/lib/api";
 import { EqBands } from "@crate/ui/domain/player/EqBands";
-import { Badge } from "@crate/ui/shadcn/badge";
-import { useActionLLMStatus } from "@/hooks/use-llm";
+import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { StatusDot } from "@crate/ui/primitives/StatusDot";
+import { Readout } from "@crate/ui/primitives/Readout";
 
 const EQ_BAND_COUNT = 10;
 const FLAT_GAINS: number[] = new Array(EQ_BAND_COUNT).fill(0);
@@ -25,6 +26,9 @@ interface Props {
   initialGains: number[] | null;
   initialResolved: ResolvedPreset | null;
   eqReasoning?: string | null;
+  aiProposalGains?: number[] | null;
+  aiProposalReasoning?: string | null;
+  embedded?: boolean;
   onSaved?: () => void;
 }
 
@@ -42,6 +46,9 @@ export function GenreEqEditor({
   initialGains,
   initialResolved,
   eqReasoning,
+  aiProposalGains = null,
+  aiProposalReasoning = null,
+  embedded = false,
   onSaved,
 }: Props) {
   const seeded = useMemo<number[]>(() => {
@@ -55,16 +62,37 @@ export function GenreEqEditor({
   const [gains, setGains] = useState<number[]>(seeded);
   const [saving, setSaving] = useState(false);
   const [clearing, setClearing] = useState(false);
-  const [generating, setGenerating] = useState(false);
   const [reasoning, setReasoning] = useState(eqReasoning || "");
-  const llmAvailable =
-    useActionLLMStatus("genres.eq.propose")?.available ?? false;
+  const motionAllowed = useMotionAllowed();
 
   useEffect(() => {
     setGains(seeded);
   }, [seeded]);
 
+  useEffect(() => {
+    setReasoning(
+      aiProposalGains?.length === EQ_BAND_COUNT
+        ? aiProposalReasoning || ""
+        : eqReasoning || "",
+    );
+  }, [canonicalSlug, eqReasoning, aiProposalGains, aiProposalReasoning]);
+
+  useEffect(() => {
+    if (aiProposalGains?.length !== EQ_BAND_COUNT) return;
+    setGains([...aiProposalGains]);
+    if (aiProposalReasoning) setReasoning(aiProposalReasoning);
+  }, [aiProposalGains, aiProposalReasoning]);
+
   const dirty = !arraysEqual(gains, seeded);
+  const aiProposalStaged =
+    dirty &&
+    aiProposalGains?.length === EQ_BAND_COUNT &&
+    arraysEqual(gains, aiProposalGains);
+  const syncStatus = dirty
+    ? aiProposalStaged
+      ? "AI proposal · unsaved"
+      : "Unsaved changes"
+    : "In sync with database";
   const hasOwnPreset = initialGains !== null;
   const inherited = !hasOwnPreset && initialResolved?.source === "inherited";
 
@@ -108,94 +136,78 @@ export function GenreEqEditor({
     }
   };
 
-  const generateWithAI = async () => {
-    if (generating) return;
-    setGenerating(true);
-    try {
-      const result = await api<{ gains: number[]; reasoning: string }>(
-        `/api/genres/${canonicalSlug}/generate-eq?apply=true`,
-        "POST",
-      );
-      setGains(result.gains);
-      setReasoning(result.reasoning);
-      toast.success(`AI generated EQ for ${canonicalName}`);
-      onSaved?.();
-    } catch {
-      toast.error("AI generation failed");
-    } finally {
-      setGenerating(false);
-    }
-  };
-
   return (
-    <div className="rounded-md border border-white/12 bg-black/15 p-5">
+    <div
+      className={
+        embedded
+          ? "min-w-0"
+          : "rounded-md border border-border-quiet bg-raised-surface p-5"
+      }
+    >
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <SlidersHorizontal size={14} className="text-primary" />
-          <h2 className="text-sm font-semibold">Equalizer preset</h2>
-          <button
+          {embedded ? (
+            <span className="text-sm font-medium text-text-secondary">
+              10-band curve · {canonicalName}
+            </span>
+          ) : (
+            <MonoLabel
+              as="h2"
+              accent="Equalizer preset"
+              meta={[canonicalName]}
+            />
+          )}
+          <Button
             type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Reset sliders to flat"
+            title="Reset sliders to flat"
             onClick={() => setGains([...FLAT_GAINS])}
             disabled={saving || clearing}
-            title="Reset sliders to flat"
-            className="rounded-md p-1 text-white/30 transition-colors hover:bg-white/5 hover:text-white/60 disabled:opacity-30"
+            className="text-text-subtle hover:text-text-secondary disabled:opacity-30"
           >
-            <RotateCcw size={12} />
-          </button>
+            <RotateCcw aria-hidden="true" />
+          </Button>
         </div>
-        {hasOwnPreset ? (
-          <Badge
-            variant="outline"
-            className="border-primary/40 bg-primary/10 text-primary"
-          >
-            Direct preset
-          </Badge>
+        {aiProposalStaged ? (
+          <StatusDot tone="warn" label="AI proposal · unsaved" />
+        ) : hasOwnPreset ? (
+          <StatusDot label="Direct preset" />
         ) : inherited && initialResolved ? (
-          <Badge
-            variant="outline"
-            className="border-white/15 bg-black/15 text-white/80"
-          >
-            Inherits from {initialResolved.name}
-          </Badge>
+          <StatusDot
+            tone="off"
+            label={`Inherits from ${initialResolved.name}`}
+          />
         ) : (
-          <Badge
-            variant="outline"
-            className="border-amber-500/30 bg-amber-500/10 text-amber-100"
-          >
-            No preset
-          </Badge>
+          <StatusDot tone="warn" label="No preset" />
         )}
       </div>
 
-      <p className="mb-4 text-xs leading-5 text-white/55">
+      <p className="mb-4 text-xs leading-5 text-text-muted">
         {reasoning ||
           'Curve applied when a track in this genre plays with "Genre Adaptive" on. Saving stores gains on this taxonomy node directly. Clearing drops back to the first ancestor that has a preset.'}
       </p>
 
-      <div className="rounded-md border border-white/10 bg-black/30 p-3">
-        <EqBands gains={gains} onBandChange={updateBand} trackHeight={112} />
+      <div className="border-t border-border-quiet pt-4">
+        <EqBands
+          gains={gains}
+          onBandChange={updateBand}
+          animate={motionAllowed}
+          trackClassName="h-28"
+        />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-        <div className="text-[11px] text-white/45">
-          {dirty ? "Unsaved changes" : "In sync with database"}
-        </div>
+        <Readout announcement={syncStatus} minWidthCh={24}>
+          {syncStatus}
+        </Readout>
         <div className="flex flex-wrap gap-2">
-          {llmAvailable && (
-            <AIButton
-              actionId="genres.eq.propose"
-              onClick={generateWithAI}
-              loading={generating}
-              disabled={saving || clearing}
-            >
-              Generate EQ preset with AI
-            </AIButton>
-          )}
           <Button
             size="sm"
             variant="outline"
             onClick={clearPreset}
-            disabled={saving || clearing || generating || !hasOwnPreset}
+            disabled={saving || clearing || !hasOwnPreset}
             className="text-xs"
           >
             {clearing ? (
@@ -208,7 +220,7 @@ export function GenreEqEditor({
           <Button
             size="sm"
             onClick={save}
-            disabled={saving || clearing || generating || !dirty}
+            disabled={saving || clearing || !dirty}
             className="text-xs"
           >
             {saving ? (

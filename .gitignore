@@ -70,7 +70,9 @@ worktrees/
 
 # Non-canonical local documentation and personal editor state.
 # Canonical docs are declared in docs/manifest.json.
-docs/plans/
+docs/plans/*
+!docs/plans/2026-10-1*-crate-v3-*.md
+!docs/plans/crate-v3-analysis/
 docs/roadmaps/
 docs/archive/
 docs/audits/

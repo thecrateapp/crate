@@ -2,6 +2,17 @@
 
 Scope: everything under `app/ui/`. Platform rules (DB, workers, deploy, testing policy) live in the root `AGENTS.md`; this file only adds admin-specific guidance. Shared UI rules live in `app/shared/AGENTS.md`.
 
+V3 shares one identity, tokens, primitives, recipes and interaction rules with the other app.
+Only domain components/workflows differ; do not add app-specific foundation variants. Bootstrap
+uses `@crate/ui/lib/crate-identity` and `@crate/ui/lib/interface-preferences`.
+
+## Visual reviews
+
+Before implementing or reviewing an Admin page's visual changes, follow the reusable
+[Admin UI visual review guide and checklist](./ADMIN_UI_REVIEW_CHECKLIST.md). Listen is the
+primary visual reference; reuse `@crate/ui` components when available, and add new shared
+components there only when both Admin and Listen use them.
+
 ## Directory map
 
 ```
@@ -14,8 +25,8 @@ src/contexts/              AuthContext (cookie session + capabilities), OpsSnaps
 src/hooks/                 use-api, use-sse, use-task-events, use-task-poll, use-notifications, use-llm, use-keyboard
 src/lib/                   api.ts (client instance), library-routes.ts / utils.ts (wrap app/shared/web), tasks, sentry
 src/test/                  render-with-admin-providers.tsx (MemoryRouter + mocked AuthContext)
-index.html                 Sets data-surface="glass" on <html>
-src/index.css              Imports Poppins, @crate/ui tokens, Tailwind; @source "../../shared/ui"
+index.html                 Shared fixed V3 identity; no material selector
+src/index.css              Imports Roboto, @crate/ui tokens, Tailwind; @source "../../shared/ui"
 ```
 
 ## Hard rules
@@ -24,10 +35,54 @@ src/index.css              Imports Poppins, @crate/ui tokens, Tailwind; @source 
 - Auth is cookie-based (`/api/auth/me`, `/api/auth/heartbeat` with `app_id: "admin-web"`, `/api/auth/logout`). No bearer tokens, no localStorage tokens. Gate UI by capability via `useAuth().hasCapability(...)` / `hasAnyCapability(...)`, not by role name.
 - Every route must be gated: `CapabilityRoute anyOf={[...]}` in `App.tsx`, and the matching `navItems` entry in `Sidebar.tsx` must declare the same `capabilities`.
 - Pages are named exports (`export function Tasks()`); `App.tsx` maps them with `lazy(() => import(...).then(m => ({ default: m.X })))`.
-- Surface is glass (`index.html`). Do not set `data-surface="solid"` on admin subtrees and do not hardcode card backgrounds; use token classes (`bg-card`, `border-border`, `text-foreground`). The surface colors the admin uses (`card`, `secondary`, `muted`, `accent`, `border`, `input`) are registered in `src/index.css` with `@theme reference`, so they generate in the admin build and still follow `[data-surface]`. To use another one (`bg-popover`, `text-card-foreground`, ...), register it there first; `src/surface-tokens.test.ts` fails otherwise.
-- Charts: Nivo only (`@nivo/*` already in package.json, bundled into the `charts-vendor` chunk by `vite.config.ts`). recharts is not installed in app/ui; do not add it.
-- Icons: `lucide-react` is the admin convention. Toasts: `toast` from `sonner`.
+- Surfaces share the fixed solid Crate V3 identity with Listen. Do not add material selectors or
+  hardcode card backgrounds; use shared token classes (`bg-card`, `border-border`, `text-foreground`).
+- Charts: Statistical charts (bar, line, pie, scatter, heatmap, radar) use Nivo with the app's token-resolved theme. Instruments (EQ curve, genre wheel, readouts, rails, lanes, gauges, maps, mood map, heatmap band, ticket, crossfade strip, orbit, topology) are hand-built SVG, HTML/CSS, Canvas 2D or WebGL2, following `docs/plans/2026-10-14-crate-v3-design-system.md` §3.5. No new chart libraries; recharts stays out. `@nivo/*` is already in package.json, bundled into the `charts-vendor` chunk by `vite.config.ts`; recharts is not installed in app/ui.
+- V3 target: almost all Admin icons are retired, including redundant icons beside labelled
+  actions/navigation. Use text, numerals, rules and dots with state words. Only reviewed functional
+  exceptions remain, sourced from `lucide-react`; preserve accessible names and keyboard/touch
+  behaviour. Diego confirmed on 2026-10-17 that conventional UX glyphs stay: back/forward,
+  collapse/expand, menu/close/search, etc. Record actual retained sites in the migrated scope;
+  this does not retain redundant glyphs beside page destinations, labelled actions or metrics.
+  Diego added on 2026-10-19: conventional basic item actions such as Remove may be icon-only,
+  with a descriptive accessible name/title and the shared 44px target. Header actions follow the
+  approved compact recipe below; ambiguous domain operations and final confirmations keep text.
+  See the reviewed action inventory
+  in docs/plans/2026-10-19-crate-v3-admin-action-icons.md; proposals are not blanket migrations.
+  Task 1b.8 / DS §1.7 owns the migration, which is not completed globally.
+  Toasts: `toast` from `sonner`.
+- Page header actions use shared Button `variant="ghost"` / `size="icon-lg"`, shared Tooltip,
+  descriptive aria-label/title and aria-hidden glyphs, aligned at the upper right. Keep busy,
+  disabled, capability and dynamic action names. Back navigation stays outside the identity
+  block; narrow layouts respond to available container width without compressing the title.
+  PlaylistEditor is the approved reference (Copy, Eye, ListRestart, Save). Follow
+  docs/plans/2026-10-19-crate-v3-admin-header-actions.md and register concrete glyph sites;
+  Diego explicitly authorized all18inventoried headers and playlist row actions in local1AQ.
+  Other proposals are not a mass-migration instruction or a new backend contract. Use the Admin
+  PageHeader composition (now a compatibility adapter to shared ActionGroup/ActionButton). Repeated-row tooltips name only the action (Edit/Delete/Activate/
+  Deactivate); accessible labels retain the object. Avoid duplicate Card + row padding.
+  Disabled icon actions must still expose their tooltip by pointer/keyboard while their native
+  Button remains disabled. Keep that Button node stable across busy/availability changes.
+- Categorical form fields use the shared Select even with few choices; Category, Match and Sort
+  in playlist creation/editor are the first explicit 1AQ sites. Filters and binary state toggles
+  keep their chips. Preserve values/defaults and register reviewed short form Select sites in
+  the shared source policy. Do not mass-migrate earlier consumers outside their checkpoints.
+- Input and Select share the form recipe: 40px with a fine pointer, 44px with a coarse pointer.
+  Preserve equal heights within form rows; do not force individual fields to 44px with local
+  overrides. Basic action buttons keep their shared 44px target.
 - No emojis in UI text.
+- Sidebar destinations and section captions use the shared uppercase MonoLabel. Section captions
+  use its accent tone; destinations change foreground to accent on hover without a background fill.
+  Keep the active marker, counters, capability gates and 44px navigation targets in all presentations.
+
+## Typography roles
+
+- Bricolage Grotesque is for page titles, section headings and entity titles.
+- Roboto is for readable copy, form values, buttons and general interface text. In Admin,
+  `font-sans` resolves to the Roboto brand face.
+- JetBrains Mono is for MonoLabel and other uppercase labels, compact metadata, numbers and
+  tables, dates, technical states and identifiers. Keep its supplied weight at400.
+- Keep these roles consistent instead of choosing a face by component or page.
 
 ## Snapshot streams and SSE
 
@@ -80,8 +135,25 @@ CI (`.github/workflows/test-frontend.yml`) runs lint, typecheck, test and build 
 
 ## Pitfalls
 
-- `src/components/ui/` still holds local copies of `AdminSelect`, `confirm-dialog`, `card-skeleton`, `grid-skeleton`, `table-skeleton`, `error-state`, `image-lightbox`, `star-rating`, `QrCodeImage`, while equivalents exist in `@crate/ui/composites/*` and `@crate/ui/primitives/*`. Check `@crate/ui` before adding another local variant; do not create a third copy.
-- `src/components/shows/ShowCard.tsx` is a local copy; `@crate/ui/domain/shows/ShowCard` is the shared one.
+- `src/components/ui/` still holds local copies of `image-lightbox`, `star-rating`, `QrCodeImage`, while equivalents exist in `@crate/ui/composites/*` and `@crate/ui/primitives/*`. AdminSelect and the three skeleton subpaths re-export shared implementations; the dead local ErrorState is removed in Task 1b.4. Route fallbacks use shared LoadingState. Confirmations use `@crate/ui/composites/ConfirmDialog`; its local copy retired in Task 1b.1. Check `@crate/ui` before adding another local variant; do not create a third copy.
+- `src/components/shows/ShowCard.tsx` is Admin-local; the unused shared ShowCard was removed in Task 1.12. `@crate/ui/domain/shows/show-types` remains shared and used by Shows.
 - Large pages (`Tasks.tsx` ~2200 lines, `Download.tsx` ~2000, `Health.tsx` ~1200) own their own streams. Extract hooks rather than adding more effects inline.
 - Do not trigger heavy recomputation from the UI (aggregate counts, snapshot rebuilds). If data is missing, it belongs in a snapshot/projector change on the backend.
 - Filesystem-mutating actions (tags, delete, move) must call endpoints that enqueue worker tasks; track progress with `use-task-events` / `use-progress-toast`.
+
+Informative labels use shared `InfoBadge` (Mono12/16,24px,3px8px padding); standalone
+numeric counters use its `counter` variant (6px inline inset). FilterChip and SegmentedControl
+use12px with32/44px minimums; GenrePill remains the musical-domain component. Shadcn Badge
+retains its API with the common informative recipe. No local type/geometry overrides; see
+`docs/plans/2026-10-19-crate-v3-ui-labels.md`. This local1AQ rule supersedes earlier16px tags.
+
+## Official icon language — Diego, 2026-10-19
+
+Solar through `@crate/ui/icons` is the official icon set for Admin and Listen. New and newly
+reviewed glyph sites use that catalogue. Earlier registered Lucide sites remain bounded until
+migration in their owning groups; this is not a claim that all Admin glyphs have migrated.
+AIButton now uses the exact official Solar Bot Outline, with a16px layout slot scaled visually
+to20px, keeping button geometry. The catalogue carries the exact upstream Bot SVG because the
+installed Solar2.1.1 predates this newly added icon. Do not substitute Sparkles for AI actions.
+Field captions use the shared uppercase recipe; mark non-label captions explicitly with
+`data-slot="form-field-label"`. Preserve case in values, badges, filters and helper copy.

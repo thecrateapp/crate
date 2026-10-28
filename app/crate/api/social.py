@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from crate.api.auth import _require_auth
@@ -16,7 +18,7 @@ from crate.api.schemas.social import (
     SocialUnfollowResponse,
     SocialUserRelationResponse,
 )
-from crate.api.schemas.me import StatsDashboardResponse
+from crate.api.schemas.me import StatsDashboardResponse, StatsRangeResponse
 from crate.api.me import _get_cached_stats_dashboard
 from crate.db.queries.social import (
     get_followers,
@@ -28,6 +30,10 @@ from crate.db.queries.social import (
     get_public_user_profile_by_username,
     get_relationship_state,
     search_users,
+)
+from crate.db.queries.user_library_stats_range import (
+    StatsRangeError,
+    get_public_user_stats_range,
 )
 from crate.db.queries.crates import get_public_crates_for_user
 from crate.db.repositories.social import (
@@ -248,6 +254,29 @@ def social_profile_stats_dashboard(
             for key, value in get_affinity(viewer["id"], profile["id"]).items()
             if key in {"affinity_score", "affinity_band", "affinity_reasons"}
         }
+    return payload
+
+
+@router.get(
+    "/api/users/{username}/stats/range",
+    response_model=StatsRangeResponse,
+    responses=_SOCIAL_RESPONSES,
+    summary="Listening summary for a date range",
+)
+def social_profile_stats_range(
+    request: Request,
+    username: str,
+    start: date = Query(...),
+    end: date = Query(...),
+    limit: int = Query(3, ge=1, le=20),
+):
+    _require_auth(request)
+    try:
+        payload = get_public_user_stats_range(username, start, end, limit=limit)
+    except StatsRangeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if payload is None:
+        raise HTTPException(status_code=404, detail="User not found")
     return payload
 
 

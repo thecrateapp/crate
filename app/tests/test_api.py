@@ -577,7 +577,9 @@ class TestArtistDetailAPI:
         mock_artist.assert_called_once()
         mock_info.assert_called_once_with("Tool")
         mock_top_tracks.assert_called_once_with("Tool", count=12)
-        mock_shows.assert_called_once_with(user_id=1, name="Tool", limit=12, country="")
+        mock_shows.assert_called_once_with(
+            user_id=1, name="Tool", limit=12, country="", location=None
+        )
         mock_top_artists.assert_called_once_with(1, window="30d", limit=12)
         mock_enrichment.assert_called_once_with("Tool")
         mock_set_cache.assert_called_once()
@@ -1087,10 +1089,23 @@ class TestImportsAPI:
                 "status": "pending",
             }
         ]
-        with patch("crate.api.imports.list_import_queue_items", return_value=pending):
+        with patch(
+            "crate.api.imports.list_import_queue_items", return_value=pending
+        ) as mock_list:
             resp = test_app.get("/api/imports/pending")
             assert resp.status_code == 200
             assert resp.json() == pending
+            mock_list.assert_called_once_with(status="pending", limit=1000)
+
+    def test_imports_queue_lists_all_statuses_with_a_bounded_limit(self, test_app):
+        with patch(
+            "crate.api.imports.list_import_queue_items", return_value=[]
+        ) as mock_list:
+            resp = test_app.get("/api/imports/pending?status=all&limit=200")
+
+        assert resp.status_code == 200
+        assert resp.json() == []
+        mock_list.assert_called_once_with(status=None, limit=200)
 
     def test_imports_import_queues_worker_task(self, test_app):
         with patch(
@@ -2085,7 +2100,12 @@ class TestShowsAPI:
                 "city": "Sevilla",
                 "country": "Spain",
                 "country_code": "ES",
-                "lineup": ["Converge"],
+                "lineup": [
+                    "Converge",
+                    "Support Act",
+                    "  support   act ",
+                    "CONVERGE",
+                ],
             }
         ]
         refs = {"converge": {"id": 7, "slug": "converge"}}
@@ -2099,7 +2119,21 @@ class TestShowsAPI:
             patch("crate.api.browse_artist._lookup_artist_refs", return_value=refs),
             patch(
                 "crate.api.browse_artist._show_lineup_artists",
-                return_value=[{"name": "Converge", "id": 7, "slug": "converge"}],
+                return_value=[
+                    {"name": "Converge", "id": 7, "slug": "converge"},
+                    {"name": "Support Act"},
+                ],
+            ),
+            patch(
+                "crate.setlistfm.get_probable_setlist_health",
+                return_value={
+                    "converge": {
+                        "status": "fresh",
+                        "generated_at": "2026-10-22T10:00:00+00:00",
+                        "song_count": 12,
+                    },
+                    "support act": {"status": "stale", "song_count": 8},
+                },
             ),
         ):
             resp = test_app.get("/api/shows/cached?limit=5")
@@ -2108,6 +2142,142 @@ class TestShowsAPI:
         data = resp.json()
         assert data["events"][0]["id"] == "62"
         assert data["events"][0]["artist_slug"] == "converge"
+        assert data["setlist_coverage"] == {
+            "artist_count": 2,
+            "fresh": 1,
+            "stale": 1,
+            "missing": 0,
+            "unknown": 0,
+            "queued": None,
+        }
+        assert (
+            data["events"][0]["lineup_artists"][0]["probable_setlist_status"] == "fresh"
+        )
+        assert (
+            data["events"][0]["lineup_artists"][1]["probable_setlist_status"] == "stale"
+        )
+
+    def test_network_artist_card_adds_the_next_show(self, test_app):
+        card = {
+            "name": "Pixies",
+            "in_library": True,
+            "artist_id": 7,
+            "artist_slug": "pixies",
+            "album_count": 7,
+            "track_count": 96,
+            "listeners": 4_400_000,
+            "genres": ["alternative rock"],
+            "linked_by": [],
+        }
+        show = {
+            "date": "2027-05-01",
+            "venue": "Viejas Arena",
+            "city": "San Diego",
+            "country": "United States",
+            "url": "https://tickets.example/pixies",
+        }
+        with (
+            patch(
+                "crate.api.browse_artist.get_network_artist_card", return_value=card
+            ) as get_card,
+            patch(
+                "crate.api.browse_artist.db_get_shows", return_value=[show]
+            ) as get_shows,
+        ):
+            resp = test_app.get("/api/network/artist-card?name=%20Pixies%20")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["album_count"] == 7
+        assert data["next_show"] == {
+            "date": "2027-05-01",
+            "venue": "Viejas Arena",
+            "city": "San Diego",
+            "country": "United States",
+            "url": "https://tickets.example/pixies",
+        }
+        get_card.assert_called_once_with("Pixies")
+        assert get_shows.call_args.kwargs == {"artist_name": "Pixies", "limit": 1}
+
+    def test_cached_shows_filters_by_artist_in_the_query(self, test_app):
+        with (
+            patch("crate.api.browse_artist.db_get_shows", return_value=[]) as shows,
+            patch("crate.api.browse_artist.get_all_artist_genre_map", return_value={}),
+            patch("crate.api.browse_artist._lookup_artist_refs", return_value={}),
+            patch("crate.setlistfm.get_probable_setlist_health", return_value={}),
+        ):
+            resp = test_app.get("/api/shows/cached?limit=50&artist=Pixies")
+            unfiltered = test_app.get("/api/shows/cached?limit=50")
+
+        assert resp.status_code == 200
+        assert unfiltered.status_code == 200
+        assert shows.call_args_list[0].kwargs == {"artist_name": "Pixies", "limit": 50}
+        assert shows.call_args_list[1].kwargs == {"artist_name": None, "limit": 50}
+
+    def test_refresh_show_setlists_delegates_outdated_artists_to_one_worker_task(
+        self, test_app
+    ):
+        shows = [
+            {
+                "artist_name": "Main Act",
+                "lineup": ["Main Act", "Support Act", " support   act "],
+            },
+            {"artist_name": "Another Act", "lineup": ["Another Act"]},
+            {"artist_name": "Legacy Act", "lineup": []},
+        ]
+        with (
+            patch("crate.api.browse_artist.db_get_shows", return_value=shows),
+            patch(
+                "crate.setlistfm.get_probable_setlist_health",
+                return_value={
+                    "main act": {"status": "fresh"},
+                    "support act": {"status": "missing"},
+                    "another act": {"status": "stale"},
+                    "legacy act": {"status": "unknown"},
+                },
+            ),
+            patch(
+                "crate.api.browse_artist.create_task_dedup", return_value="task-1"
+            ) as create_task,
+            patch("crate.setlistfm.queue_probable_setlist_refreshes") as queue,
+        ):
+            response = test_app.post("/api/shows/probable-setlists/refresh")
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "artist_count": 4,
+            "fresh": 1,
+            "stale": 1,
+            "missing": 1,
+            "unknown": 1,
+            "queued": 2,
+        }
+        create_task.assert_called_once_with(
+            "refresh_show_probable_setlists",
+            {},
+            dedup_key="probable-setlists:shows",
+        )
+        queue.assert_not_called()
+
+    def test_refresh_show_setlists_queues_nothing_when_no_setlist_is_outdated(
+        self, test_app
+    ):
+        with (
+            patch(
+                "crate.api.browse_artist.db_get_shows",
+                return_value=[{"artist_name": "Main Act", "lineup": []}],
+            ),
+            patch(
+                "crate.setlistfm.get_probable_setlist_health",
+                return_value={"main act": {"status": "unknown"}},
+            ),
+            patch("crate.api.browse_artist.create_task_dedup") as create_task,
+        ):
+            response = test_app.post("/api/shows/probable-setlists/refresh")
+
+        assert response.status_code == 200
+        assert response.json()["queued"] == 0
+        create_task.assert_not_called()
 
 
 class TestAdminLogsAPI:
@@ -2153,6 +2323,86 @@ class TestAdminLogsAPI:
 
 
 class TestAdminMetricsAPI:
+    def test_governor_snapshot_reads_the_persisted_worker_sample(self, test_app):
+        sample = {
+            "enabled": True,
+            "allowed": False,
+            "reason": "load 0.93>0.85",
+            "defer_seconds": 300,
+            "sampled_by": "crate-worker",
+            "snapshot": {"load_ratio": 0.93},
+            "limits": {"load_ratio": 0.85},
+            "gauges": [
+                {
+                    "id": "load_ratio",
+                    "label": "Load ratio",
+                    "value": 0.93,
+                    "unit": "",
+                    "limit": 0.85,
+                    "scale": 1.2,
+                    "over": True,
+                }
+            ],
+            "updated_at": "2026-10-22T09:30:00+00:00",
+        }
+
+        with patch(
+            "crate.db.ops_runtime.get_ops_runtime_state", return_value=sample
+        ) as read_sample:
+            response = test_app.get("/api/admin/governor")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["available"] is True
+        assert data["stale"] is False
+        assert data["sampled_by"] == "crate-worker"
+        assert data["gauges"][0]["over"] is True
+        read_sample.assert_called_once_with("resource_governor", max_age_seconds=45)
+
+    def test_governor_snapshot_marks_last_known_worker_sample_stale(self, test_app):
+        sample = {
+            "enabled": True,
+            "allowed": True,
+            "sampled_by": "crate-worker",
+            "gauges": [],
+            "updated_at": "2026-10-22T09:00:00+00:00",
+        }
+
+        with patch(
+            "crate.db.ops_runtime.get_ops_runtime_state",
+            side_effect=[None, sample],
+        ) as read_sample:
+            response = test_app.get("/api/admin/governor")
+
+        assert response.status_code == 200
+        assert response.json()["available"] is True
+        assert response.json()["stale"] is True
+        assert read_sample.call_count == 2
+
+    def test_system_metrics_use_the_persisted_governor_sample(self):
+        from crate.api.admin_metrics import _build_metrics_system
+
+        sample = {
+            "enabled": True,
+            "allowed": True,
+            "snapshot": {"load_ratio": 0.12},
+        }
+        with (
+            patch("crate.storage_health.collect_storage_health", return_value={}),
+            patch(
+                "crate.db.engine.get_pool_runtime", return_value={"configured": False}
+            ),
+            patch("crate.analysis_daemon.get_analysis_status", return_value={}),
+            patch("crate.db.ops_runtime.get_ops_runtime_state", return_value=sample),
+            patch(
+                "crate.media_worker_progress.get_media_worker_runtime", return_value={}
+            ),
+            patch("crate.health_check.artwork_variant_health_sample", return_value={}),
+        ):
+            result = _build_metrics_system()
+
+        assert result["resource_pressure"] == sample
+
     def test_metrics_dashboard_uses_clean_http_metric_series(self, test_app):
         summary_specs: dict[str, tuple[str, int]] = {}
         recent_calls: list[str] = []
@@ -2209,6 +2459,41 @@ class TestAdminMetricsAPI:
 
 
 class TestHealthAPI:
+    def test_portable_album_metadata_reads_catalog_payload(self, test_app):
+        payload = {
+            "schema_version": 1,
+            "artist": {"name": "Artist"},
+            "album": {"id": 27, "name": "Album"},
+            "tracks": [{"title": "Track"}],
+            "portable_metadata": {
+                "sidecar_path": None,
+                "sidecar_written_at": None,
+                "audio_tags_written_at": None,
+                "tracks": 1,
+                "tags_written": 1,
+                "tag_errors": 0,
+                "export_path": None,
+                "exported_at": None,
+                "updated_at": None,
+            },
+        }
+        with patch(
+            "crate.api.management.get_portable_album_payload", return_value=payload
+        ) as mock_read:
+            response = test_app.get("/api/manage/albums/27/portable-metadata")
+
+        assert response.status_code == 200
+        assert response.json() == payload
+        mock_read.assert_called_once_with(27, include_portable_status=True)
+
+    def test_portable_album_metadata_returns_404_for_unknown_album(self, test_app):
+        with patch(
+            "crate.api.management.get_portable_album_payload", return_value=None
+        ):
+            response = test_app.get("/api/manage/albums/999999/portable-metadata")
+
+        assert response.status_code == 404
+
     def test_album_metadata_tasks_accept_entity_uid_scope(self, test_app):
         album_uid = "11111111-2222-4333-8444-555555555555"
 

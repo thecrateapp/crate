@@ -4,10 +4,6 @@ import {
   storePendingOAuthProviderError,
 } from "@/lib/capacitor-oauth";
 import { isIosRuntime, isNative, platform } from "@/lib/capacitor-runtime";
-import {
-  getAppliedThemeSkin,
-  type ResolvedColorMode,
-} from "@crate/ui/lib/theme-skin";
 
 let viewportFallbackInitialized = false;
 let keyboardInitialized = false;
@@ -102,7 +98,7 @@ async function initializeCapacitor(): Promise<string | null> {
   await initKeyboardHandling();
 
   try {
-    await applyNativeColorMode(getAppliedThemeSkin().resolvedMode);
+    await applyNativeStatusBarStyle();
     await StatusBar.setOverlaysWebView({ overlay: true });
     if (platform === "android") {
       await StatusBar.setBackgroundColor({ color: "#00000000" });
@@ -189,15 +185,13 @@ async function retryPendingOAuthExchange(): Promise<void> {
   }
 }
 
-export async function applyNativeColorMode(
-  mode: ResolvedColorMode,
-): Promise<void> {
+export async function applyNativeStatusBarStyle(): Promise<void> {
   if (!isNative) return;
 
   try {
     const { StatusBar, Style } = await import("@capacitor/status-bar");
     await StatusBar.setStyle({
-      style: mode === "dark" ? Style.Dark : Style.Light,
+      style: Style.Dark,
     });
   } catch {
     // Native status-bar support is best-effort across Capacitor shells.

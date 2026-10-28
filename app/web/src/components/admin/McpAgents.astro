@@ -1,0 +1,677 @@
+---
+import {
+  ACCESS,
+  CONNECT,
+  LIMITS,
+  LIMITS_NOTE,
+  MCP,
+  MCP_HEADINGS,
+  NEVER,
+  NEVER_LABEL,
+  OAUTH_CONNECT,
+  OPT_IN,
+  OWN_AI,
+  SAFETY,
+  TOOL_FAMILIES,
+  TOOL_KINDS,
+} from "../../content/admin/mcp";
+import {
+  ACCESS as AGENT_ACCESS,
+  ACQUISITION_RULES,
+  APPROVAL_RULES,
+  DISABLED,
+  DISABLED_LABEL,
+  AGENT,
+  AGENT_HEADINGS,
+  MODELS,
+  PROFILES,
+  SETUP,
+  SUPERVISOR,
+} from "../../content/admin/telegram-agent";
+import ScaleFigures from "../architecture/ScaleFigures.astro";
+import FeatureList from "../FeatureList.astro";
+import StatusBadge from "../StatusBadge.astro";
+import ApprovalFlow from "../viz/ApprovalFlow.astro";
+import AgentChat from "../viz/AgentChat.astro";
+---
+
+<div class="mcp">
+  <section class="block" aria-labelledby="mcp-tools">
+    <header class="block-head" data-reveal>
+      <h3 id="mcp-tools" data-enter>{MCP_HEADINGS.tools}</h3>
+      <p class="viz-label" data-enter style="--d:80ms">{MCP_HEADINGS.toolsCount}</p>
+    </header>
+    <ul class="families" data-reveal>
+      {
+        TOOL_FAMILIES.map((family, index) => (
+          <li style={`--i:${index}`}>
+            <div class="family-head">
+              <h4>{family.title}</h4>
+              <span class:list={["kind", family.kind]}>{TOOL_KINDS[family.kind]}</span>
+            </div>
+            <div class="family-body">
+              <p>{family.body}</p>
+              <ul class="tools" aria-label={`${family.title} tools`}>
+                {family.tools.map((tool) => (
+                  <li>
+                    <code>{tool}</code>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </li>
+        ))
+      }
+    </ul>
+    <div class="never" data-reveal>
+      <p class="viz-label" data-enter>{NEVER_LABEL}</p>
+      <ul data-enter style="--d:80ms">
+        {NEVER.map((item) => <li>{item}</li>)}
+      </ul>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="mcp-safety">
+    <header class="block-head" data-reveal>
+      <h3 id="mcp-safety" data-enter>{MCP_HEADINGS.safety}</h3>
+    </header>
+    <div class="viz-band">
+      <ApprovalFlow />
+    </div>
+    <FeatureList items={SAFETY} />
+  </section>
+
+  <section class="block" aria-labelledby="mcp-access">
+    <header class="block-head" data-reveal>
+      <h3 id="mcp-access" data-enter>{MCP_HEADINGS.access}</h3>
+    </header>
+    <ScaleFigures figures={LIMITS} note={LIMITS_NOTE} />
+    <div class="access">
+      <FeatureList items={ACCESS} />
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="mcp-connect">
+    <header class="block-head" data-reveal>
+      <h3 id="mcp-connect" data-enter>{MCP_HEADINGS.connect}</h3>
+      <p class="opt-in" data-enter style="--d:80ms">
+        <StatusBadge kind="opt-in" />
+        <span>{OPT_IN}</span>
+      </p>
+    </header>
+    <ol class="connect" data-reveal>
+      {
+        CONNECT.map((step, index) => (
+          <li style={`--i:${index}`}>
+            <span class="n">{String(index + 1).padStart(2, "0")}</span>
+            <h4>{step.title}</h4>
+            <p>{step.body}</p>
+          </li>
+        ))
+      }
+    </ol>
+    <div class="connect-foot" data-reveal>
+      <p data-enter>
+        {OAUTH_CONNECT.register} <code>{OAUTH_CONNECT.discovery}</code>{OAUTH_CONNECT.consent}
+      </p>
+      <p class="endpoint" data-enter style="--d:80ms">
+        <span class="viz-label">{MCP_HEADINGS.endpoint}</span>
+        <code>{MCP.endpoint}</code>
+      </p>
+    </div>
+  </section>
+
+  <section class="block" id="telegram-agent" aria-labelledby="telegram-agent-title">
+    <header class="block-head" data-reveal>
+      <h3 id="telegram-agent-title" data-enter>{AGENT_HEADINGS.title}</h3>
+      <p class="opt-in" data-enter style="--d:80ms">
+        <StatusBadge kind="opt-in" />
+        <span>{AGENT_HEADINGS.optIn}</span>
+      </p>
+    </header>
+    <div class="agent-lede" data-reveal>
+      {
+        AGENT_HEADINGS.lede.map((paragraph, index) => (
+          <p data-enter style={`--d:${index * 80}ms`}>
+            {paragraph}
+          </p>
+        ))
+      }
+    </div>
+    <div class="viz-band">
+      <AgentChat />
+    </div>
+
+    <p class="viz-label sub" data-reveal data-enter>{AGENT_HEADINGS.profiles}</p>
+    <ul class="profiles" data-reveal>
+      {
+        PROFILES.map((profile, index) => (
+          <li style={`--i:${index}`} data-profile={profile.id}>
+            <div class="profile-head">
+              <h4>{profile.title}</h4>
+              <StatusBadge kind={profile.status} />
+            </div>
+            <p>{profile.summary}</p>
+            <ul class="scope" aria-label={`${profile.title} scope`}>
+              {profile.scope.map((item) => (
+                <li>{item}</li>
+              ))}
+            </ul>
+            {profile.id === "agent" ? (
+              <div class="guard">
+                <p class="viz-label">{DISABLED_LABEL}</p>
+                <ul class="disabled">
+                  {DISABLED.map((item) => (
+                    <li>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div class="guard">
+                <p class="viz-label">{AGENT_HEADINGS.approval}</p>
+                <ul class="rules">
+                  {APPROVAL_RULES.map((rule) => (
+                    <li>{rule}</li>
+                  ))}
+                </ul>
+                <p class="viz-label">{AGENT_HEADINGS.acquisition}</p>
+                <ul class="rules">
+                  {ACQUISITION_RULES.map((rule) => (
+                    <li>{rule}</li>
+                  ))}
+                </ul>
+                <p class="supervisor">{SUPERVISOR}</p>
+              </div>
+            )}
+          </li>
+        ))
+      }
+    </ul>
+
+    <dl class="agent-facts" data-reveal>
+      <div style="--i:0">
+        <dt>{AGENT_ACCESS.title}</dt>
+        <dd>{AGENT_ACCESS.body}</dd>
+      </div>
+      <div style="--i:1">
+        <dt>{MODELS.title}</dt>
+        <dd>
+          <span>{MODELS.body} <code>{MODELS.command}</code></span>
+          <ul class="scope providers" aria-label="Providers with an API key">
+            {MODELS.providers.map((provider) => (
+              <li>{provider}</li>
+            ))}
+          </ul>
+        </dd>
+      </div>
+    </dl>
+
+    <p class="viz-label sub" data-reveal data-enter>{AGENT_HEADINGS.setup}</p>
+    <ol class="connect" data-reveal>
+      {
+        SETUP.map((step, index) => (
+          <li style={`--i:${index}`}>
+            <span class="n">{String(index + 1).padStart(2, "0")}</span>
+            <h4>{step.title}</h4>
+            <code class="cmd">{step.code}</code>
+            <p>{step.body}</p>
+          </li>
+        ))
+      }
+    </ol>
+    <div class="connect-foot" data-reveal>
+      <a class="u-link guide" href={AGENT.guide.href} data-enter>
+        {AGENT.guide.label} <span aria-hidden="true">&rarr;</span>
+      </a>
+    </div>
+  </section>
+
+  <section class="block related" aria-labelledby="mcp-related">
+    <header class="block-head" data-reveal>
+      <h3 id="mcp-related" data-enter>{MCP_HEADINGS.related}</h3>
+    </header>
+    <FeatureList items={[OWN_AI]} />
+  </section>
+</div>
+
+<style>
+  .block + .block {
+    margin-top: 14vh;
+  }
+
+  .block-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px 32px;
+    margin-bottom: 4vh;
+  }
+
+  .block-head h3 {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(2rem, 4vw, 3.6rem);
+    line-height: 0.95;
+    letter-spacing: -0.045em;
+    text-wrap: balance;
+  }
+
+  .families,
+  .tools,
+  .never ul,
+  .connect,
+  .profiles,
+  .scope,
+  .disabled,
+  .rules {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .families > li {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 12px clamp(24px, 5vw, 80px);
+    padding: 26px 0 30px;
+    border-top: 1px solid var(--line);
+  }
+
+  :global(:where(html.js)) .families > li,
+  :global(:where(html.js)) .connect > li,
+  :global(:where(html.js)) .profiles > li,
+  :global(:where(html.js)) .agent-facts > div {
+    opacity: 0;
+  }
+
+  .is-in > li,
+  .agent-facts.is-in > div {
+    animation: enter-up 0.7s var(--spring-snappy) both;
+    animation-delay: calc(var(--i, 0) * 70ms);
+  }
+
+  .family-head {
+    display: grid;
+    align-content: start;
+    justify-items: start;
+    gap: 12px;
+  }
+
+  h4 {
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.25rem, 1.7vw, 1.6rem);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  .kind {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  .kind.read {
+    color: var(--cyan-hi);
+  }
+
+  .kind.approval {
+    color: var(--fg);
+  }
+
+  .family-body {
+    display: grid;
+    gap: 16px;
+  }
+
+  .family-body p,
+  .connect p,
+  .connect-foot > p:first-child {
+    margin: 0;
+    max-width: 60ch;
+    font-size: clamp(0.98rem, 1.1vw, 1.08rem);
+    line-height: 1.7;
+    color: var(--fg-2);
+  }
+
+  .tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .tools code,
+  .endpoint code {
+    display: inline-block;
+    padding: 3px 9px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    color: var(--fg);
+  }
+
+  .never {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px 24px;
+    padding: 24px 0 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .never ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+  }
+
+  .never li {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--fg-2);
+    text-decoration: line-through;
+    text-decoration-color: rgba(241, 245, 249, 0.45);
+  }
+
+  .access {
+    margin-top: 4vh;
+  }
+
+  .opt-in {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    margin: 0;
+    font-size: 0.98rem;
+    line-height: 1.5;
+    color: var(--fg-2);
+  }
+
+  .connect-foot > p:first-child code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    display: inline-block;
+    max-width: 100%;
+    color: var(--fg);
+    overflow-wrap: anywhere;
+  }
+
+  .connect {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .connect > li {
+    display: grid;
+    align-content: start;
+    gap: 14px;
+    padding: 26px clamp(20px, 3vw, 40px) 30px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .connect > li + li {
+    padding-left: clamp(20px, 3vw, 40px);
+    border-left: 1px solid var(--line);
+  }
+
+  .n {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(2.6rem, 4.6vw, 4.2rem);
+    line-height: 0.85;
+    letter-spacing: -0.05em;
+    color: var(--cyan-hi);
+  }
+
+  .connect-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px 48px;
+    margin-top: 4vh;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+  }
+
+  .endpoint {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 0;
+  }
+
+  .endpoint code {
+    border-color: rgba(103, 232, 249, 0.35);
+    font-size: 13px;
+    color: var(--cyan-hi);
+  }
+
+  .agent-lede {
+    display: grid;
+    gap: 14px;
+    margin-bottom: 7vh;
+  }
+
+  .agent-lede p,
+  .profiles > li > p,
+  .agent-facts dd {
+    margin: 0;
+    max-width: 60ch;
+    font-size: clamp(0.98rem, 1.1vw, 1.08rem);
+    line-height: 1.7;
+    color: var(--fg-2);
+  }
+
+  .agent-lede p:first-child {
+    max-width: 34ch;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.35rem, 2.2vw, 2rem);
+    line-height: 1.2;
+    letter-spacing: -0.025em;
+    color: var(--fg);
+    text-wrap: balance;
+  }
+
+  .sub {
+    margin-bottom: 18px;
+  }
+
+  .profiles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-bottom: 9vh;
+  }
+
+  .profiles > li {
+    display: grid;
+    align-content: start;
+    gap: 18px;
+    padding: 26px clamp(20px, 3vw, 40px) 30px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .profiles > li + li {
+    padding-left: clamp(20px, 3vw, 40px);
+    border-left: 1px solid var(--line);
+  }
+
+  .profile-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+  }
+
+  .scope {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .scope li {
+    padding: 3px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--fg);
+  }
+
+  .guard {
+    display: grid;
+    gap: 12px;
+    padding-top: 18px;
+    border-top: 1px dashed rgba(241, 245, 249, 0.14);
+  }
+
+  .disabled {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+  }
+
+  .disabled li {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--fg-2);
+    text-decoration: line-through;
+    text-decoration-color: rgba(241, 245, 249, 0.45);
+  }
+
+  .rules {
+    display: grid;
+    gap: 8px;
+  }
+
+  .rules + .viz-label {
+    margin-top: 8px;
+  }
+
+  .rules li {
+    position: relative;
+    padding-left: 18px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--fg-2);
+  }
+
+  .rules li::before {
+    content: "";
+    position: absolute;
+    top: 0.8em;
+    left: 0;
+    width: 8px;
+    height: 1px;
+    background: var(--cyan-hi);
+  }
+
+  .supervisor {
+    margin: 8px 0 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--fg);
+  }
+
+  .agent-facts {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 12px clamp(24px, 5vw, 80px);
+    margin: 0 0 9vh;
+  }
+
+  .agent-facts > div {
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .agent-facts dt {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.25rem, 1.7vw, 1.6rem);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  .agent-facts dd {
+    display: grid;
+    gap: 14px;
+  }
+
+  .agent-facts dd code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    color: var(--cyan-hi);
+  }
+
+  .providers li {
+    color: var(--cyan-hi);
+    border-color: rgba(103, 232, 249, 0.3);
+  }
+
+  .connect .cmd {
+    justify-self: start;
+    max-width: 100%;
+    padding: 3px 10px;
+    border: 1px solid rgba(103, 232, 249, 0.35);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--cyan-hi);
+    overflow-wrap: anywhere;
+  }
+
+  .guide {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    color: var(--cyan-hi);
+  }
+
+  @media (max-width: 760px) {
+    .profiles,
+    .agent-facts {
+      grid-template-columns: 1fr;
+    }
+    .profiles > li,
+    .profiles > li + li {
+      padding: 22px 0 24px;
+      border-left: 0;
+    }
+    .families > li {
+      grid-template-columns: 1fr;
+      padding: 22px 0 24px;
+    }
+    .connect {
+      grid-template-columns: 1fr;
+    }
+    .connect > li,
+    .connect > li + li {
+      padding: 22px 0 24px;
+      border-left: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .is-in > li,
+    .agent-facts.is-in > div {
+      animation: fade-in 0.3s linear both;
+    }
+  }
+</style>

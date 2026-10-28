@@ -160,7 +160,7 @@ describe("ArtistPageSections", () => {
     ).toBeInTheDocument();
   });
 
-  it("uses compact CTA corners for the attended show actions", () => {
+  it("uses solid Card and canonical actions for the attended show", () => {
     render(
       <MemoryRouter>
         <I18nProvider initialLocale="en">
@@ -191,10 +191,10 @@ describe("ArtistPageSections", () => {
 
     expect(
       screen.getByRole("button", { name: "Play probable setlist" }),
-    ).toHaveClass("rounded-lg");
+    ).toHaveAttribute("data-slot", "button");
     expect(
       screen.getByRole("button", { name: "View show details" }),
-    ).toHaveClass("rounded-lg");
+    ).toHaveAttribute("data-slot", "button");
   });
 
   it("groups albums, EPs, compilations, live albums, and other releases", () => {
@@ -277,6 +277,22 @@ describe("ArtistPageSections", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Other Releases" }),
+    ).toBeInTheDocument();
+  });
+  it("uses canonical section headers and keeps zero related-artist match as data", () => {
+    render(
+      <MemoryRouter>
+        <I18nProvider initialLocale="en">
+          <RelatedArtistsSection
+            artists={[{ name: "Tenue", match: 0, id: 3 }]}
+          />
+        </I18nProvider>
+      </MemoryRouter>,
+    );
+    expect(
+      screen
+        .getByRole("heading", { name: "Related Artists" })
+        .closest('[data-testid="section-header"]'),
     ).toBeInTheDocument();
   });
 });

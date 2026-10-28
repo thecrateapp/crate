@@ -1,11 +1,27 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getQualityBadge,
   getTrackQualityBadge,
   shouldFetchTrackQualityInfo,
 } from "@/components/player/bar/player-bar-utils";
 
 describe("player quality badge mapping", () => {
+  it("uses the same lossless classification for AIFF rows and the player", () => {
+    expect(
+      getQualityBadge({ format: "aiff", bitDepth: 16, sampleRate: 44100 }),
+    ).toMatchObject({ label: "AIFF 16/44.1", tier: "lossless" });
+  });
+
+  it("keeps malformed source numbers out of the displayed quality", () => {
+    expect(
+      getQualityBadge({
+        format: " .FLAC ",
+        bitDepth: Number.NaN,
+        sampleRate: -1,
+      }),
+    ).toEqual({ label: "FLAC", detail: "", tier: "lossless" });
+  });
   it("classifies AAC 320 tracks as high quality", () => {
     expect(
       getTrackQualityBadge({
@@ -76,3 +92,14 @@ describe("player quality badge mapping", () => {
     );
   });
 });
+
+it.each([320, 320000])(
+  "renders the same quality for %s source bitrate units",
+  (bitrate) => {
+    expect(getQualityBadge({ format: "mp3", bitrate })).toEqual({
+      label: "MP3 320",
+      detail: "320 kbps",
+      tier: "high",
+    });
+  },
+);

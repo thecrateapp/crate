@@ -1,14 +1,32 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveReceiverAppearance } from "./appearance";
+import {
+  DEFAULT_RECEIVER_APPEARANCE,
+  resolveReceiverAppearance,
+} from "./appearance";
 
-describe("receiver appearance", () => {
+const CRATE_APPEARANCE = {
+  skinId: "default",
+  mode: "dark",
+  accent: "#67e8f9",
+  cssVariables: {
+    "--receiver-accent": "#67e8f9",
+    "--receiver-background": "#0a0a0f",
+    "--receiver-foreground": "#f1f5f9",
+    "--receiver-muted": "#999ca0",
+    "--receiver-panel": "#0d0e14",
+  },
+};
+
+describe("receiver Crate identity", () => {
   it.each([
-    ["default", "dark", "#16b8d4"],
-    ["default", "light", "#087f95"],
-    ["crate-red", "dark", "#ff4059"],
-    ["crate-red", "light", "#d71936"],
-  ] as const)("maps %s in %s mode", (skinId, resolvedMode, accent) => {
+    ["default", "dark"],
+    ["default", "light"],
+    ["crate-red", "dark"],
+    ["crate-red", "light"],
+    ["crateRed", "light"],
+    ["untrusted-skin", "dark"],
+  ] as const)("normalizes legacy %s in %s mode", (skinId, resolvedMode) => {
     expect(
       resolveReceiverAppearance({
         contractVersion: 1,
@@ -17,23 +35,29 @@ describe("receiver appearance", () => {
         resolvedMode,
         reducedMotion: false,
       }),
-    ).toMatchObject({ skinId, mode: resolvedMode, accent });
+    ).toEqual({ ...CRATE_APPEARANCE, reducedMotion: false });
   });
 
-  it("falls back to the default skin and preserves reduced motion", () => {
+  it("keeps the v1 default shape with fixed dark values", () => {
+    expect(DEFAULT_RECEIVER_APPEARANCE).toEqual({
+      contractVersion: 1,
+      skinId: "default",
+      preferredMode: "dark",
+      resolvedMode: "dark",
+      reducedMotion: false,
+    });
+  });
+
+  it("preserves reduced motion without using received colors as chrome", () => {
     expect(
       resolveReceiverAppearance({
         contractVersion: 1,
         skinId: "untrusted-skin",
         preferredMode: "system",
-        resolvedMode: "dark",
+        resolvedMode: "light",
         reducedMotion: true,
-        artworkPalette: ["url(javascript:alert(1))"],
+        artworkPalette: ["url(javascript:alert(1))", "#ff0000"],
       }),
-    ).toMatchObject({
-      skinId: "default",
-      mode: "dark",
-      reducedMotion: true,
-    });
+    ).toEqual({ ...CRATE_APPEARANCE, reducedMotion: true });
   });
 });

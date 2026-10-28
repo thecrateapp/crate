@@ -14,9 +14,15 @@ it("opens the merge panel only for show curators", async () => {
     <MergeShowsButton onMerged={vi.fn()} />,
   );
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  await userEvent.click(
-    screen.getByRole("button", { name: "Merge duplicates" }),
+  const mergeButton = screen.getByRole("button", { name: "Merge duplicates" });
+  expect(mergeButton).toHaveAttribute("data-size", "icon-lg");
+  expect(mergeButton).toHaveAttribute("data-variant", "ghost");
+  expect(mergeButton).not.toHaveAttribute("title");
+  expect(mergeButton.querySelector("svg")).toHaveAttribute(
+    "aria-hidden",
+    "true",
   );
+  await userEvent.click(mergeButton);
   expect(screen.getByRole("dialog")).toHaveTextContent("Merge panel");
   unmount();
   renderWithAdminProviders(<MergeShowsButton onMerged={vi.fn()} />, {

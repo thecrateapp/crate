@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crate · Hero A · Signal Lock</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      #field {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 0;
+        display: block;
+      }
+
+      .hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        background: radial-gradient(
+          120% 90% at 0% 40%,
+          rgba(10, 10, 15, 0.92) 0%,
+          rgba(10, 10, 15, 0.6) 38%,
+          rgba(10, 10, 15, 0) 70%
+        );
+        pointer-events: none;
+      }
+
+      #overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 2;
+        pointer-events: none;
+        width: 100%;
+        height: 100%;
+      }
+
+      #overlay line {
+        stroke: var(--cyan-hi);
+        stroke-width: 1;
+        stroke-dasharray: 3 5;
+        opacity: 0;
+      }
+
+      .reticle {
+        position: fixed;
+        z-index: 3;
+        left: 0;
+        top: 0;
+        width: 46px;
+        height: 46px;
+        margin: -23px 0 0 -23px;
+        pointer-events: none;
+        opacity: 0;
+      }
+
+      .reticle svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+      }
+
+      .reticle svg path {
+        fill: none;
+        stroke: var(--cyan-hi);
+        stroke-width: 1.25;
+      }
+
+      .reticle .dot {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 6px;
+        height: 6px;
+        margin: -3px 0 0 -3px;
+        border-radius: 50%;
+        background: var(--cyan-hi);
+        box-shadow: 0 0 14px var(--cyan-hi);
+      }
+
+      .reticle .readout {
+        position: absolute;
+        left: 58px;
+        top: -6px;
+        white-space: pre;
+        line-height: 1.7;
+        padding: 6px 10px;
+        border-left: 1px solid rgba(103, 232, 249, 0.6);
+        background: rgba(10, 10, 15, 0.55);
+      }
+
+      .status {
+        position: fixed;
+        z-index: 4;
+        right: clamp(16px, 4vw, 48px);
+        bottom: clamp(48px, 7vh, 72px);
+        text-align: right;
+        line-height: 1.9;
+      }
+
+      .status .live::before {
+        content: "";
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        margin-right: 8px;
+        border-radius: 50%;
+        background: var(--cyan-hi);
+        box-shadow: 0 0 8px var(--cyan-hi);
+        vertical-align: 1px;
+      }
+
+      .next-section {
+        z-index: 10;
+      }
+
+      .screen-frame {
+        opacity: 0;
+        transform: scale(0.92);
+        background-color: rgba(10, 10, 15, 0.85);
+      }
+
+      @media (max-width: 640px) {
+        .reticle .readout {
+          left: auto;
+          right: 58px;
+          border-left: 0;
+          border-right: 1px solid rgba(103, 232, 249, 0.6);
+          text-align: right;
+        }
+        .status,
+        .reticle,
+        #overlay {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="proto-nav">
+      <a class="brand" href="index.html"><img src="../../public/icons/logo.svg" alt="" />Crate</a>
+      <div class="links-right">
+        <a href="#">Listen</a><a href="#">Admin</a><a href="#">Architecture</a><a href="#">Developers</a><a href="#">GitHub</a>
+      </div>
+    </header>
+
+    <canvas id="field" aria-hidden="true"></canvas>
+    <svg id="overlay" aria-hidden="true"><line id="path-line" x1="0" y1="0" x2="0" y2="0" /></svg>
+    <div class="reticle" aria-hidden="true">
+      <svg viewBox="0 0 46 46">
+        <path d="M1 13 V1 H13 M33 1 H45 V13 M45 33 V45 H33 M13 45 H1 V33" />
+      </svg>
+      <span class="dot"></span>
+      <div class="readout hud-label"></div>
+    </div>
+
+    <section class="hero">
+      <div class="hud-frame"></div>
+      <div class="hero-copy"></div>
+    </section>
+
+    <div class="status hud-label" aria-hidden="true">
+      <div class="live">Field lock</div>
+      <div>48,213 tracks · bliss 20d → 3d</div>
+      <div id="field-cam">cam z 3.40</div>
+    </div>
+
+    <section class="next-section">
+      <div class="screen-frame">
+        <span class="hud-label">// 01 Library · screencast</span>
+        <span class="hud-label">[ chapter video ]</span>
+      </div>
+    </section>
+
+    <div class="proto-tag">Prototype A · Signal Lock · synthetic data</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"></script>
+    <script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+    <script type="module">
+      import { mountHero, playIntro, reducedMotion, scrambleText } from "./hero.js";
+
+      mountHero(document.querySelector(".hero-copy"), document.querySelector(".hud-frame"));
+      playIntro({ delay: 350 });
+
+      const { gsap, ScrollTrigger } = window;
+      gsap.registerPlugin(ScrollTrigger);
+
+      if (!reducedMotion) {
+        const lenis = new window.Lenis({ lerp: 0.09 });
+        lenis.on("scroll", ScrollTrigger.update);
+        gsap.ticker.add((time) => lenis.raf(time * 1000));
+        gsap.ticker.lagSmoothing(0);
+      }
+
+      const isMobile = window.matchMedia("(max-width: 640px)").matches;
+      const POINT_COUNT = isMobile ? 14000 : 48000;
+      const CLUSTERS = 16;
+
+      function gaussian() {
+        let u = 0;
+        let v = 0;
+        while (u === 0) u = Math.random();
+        while (v === 0) v = Math.random();
+        return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+      }
+
+      const centers = Array.from({ length: CLUSTERS }, () => {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        const radius = 0.55 + Math.random() * 0.75;
+        return [
+          radius * Math.sin(phi) * Math.cos(theta),
+          radius * Math.sin(phi) * Math.sin(theta) * 0.6,
+          radius * Math.cos(phi),
+          0.1 + Math.random() * 0.22,
+        ];
+      });
+
+      const positions = new Float32Array(POINT_COUNT * 3);
+      const seeds = new Float32Array(POINT_COUNT);
+      for (let i = 0; i < POINT_COUNT; i++) {
+        let x;
+        let y;
+        let z;
+        if (i % 9 === 0) {
+          const a = centers[Math.floor(Math.random() * CLUSTERS)];
+          const b = centers[Math.floor(Math.random() * CLUSTERS)];
+          const t = Math.random();
+          x = a[0] + (b[0] - a[0]) * t + gaussian() * 0.035;
+          y = a[1] + (b[1] - a[1]) * t + gaussian() * 0.035;
+          z = a[2] + (b[2] - a[2]) * t + gaussian() * 0.035;
+        } else {
+          const c = centers[i % CLUSTERS];
+          x = c[0] + gaussian() * c[3];
+          y = c[1] + gaussian() * c[3] * 0.8;
+          z = c[2] + gaussian() * c[3];
+        }
+        positions.set([x, y, z], i * 3);
+        seeds[i] = Math.random();
+      }
+
+      const canvas = document.getElementById("field");
+      const gl = canvas.getContext("webgl2", { antialias: false, alpha: false });
+
+      const vertexSource = `#version 300 es
+        in vec3 aPos;
+        in float aSeed;
+        uniform mat4 uMVP;
+        uniform float uTime;
+        uniform float uScale;
+        uniform vec3 uFocus;
+        out float vAlpha;
+        out float vHot;
+        void main() {
+          vec3 p = aPos + 0.006 * vec3(
+            sin(uTime * 0.7 + aSeed * 40.0),
+            cos(uTime * 0.6 + aSeed * 31.0),
+            sin(uTime * 0.5 + aSeed * 17.0));
+          gl_Position = uMVP * vec4(p, 1.0);
+          float depth = max(gl_Position.w, 0.05);
+          float near = smoothstep(0.35, 0.0, distance(aPos, uFocus));
+          vHot = near;
+          vAlpha = clamp(1.6 / depth, 0.08, 1.0) * (0.35 + aSeed * 0.65);
+          gl_PointSize = uScale * (0.7 + aSeed * 1.1 + near * 2.2) / depth;
+        }`;
+
+      const fragmentSource = `#version 300 es
+        precision mediump float;
+        in float vAlpha;
+        in float vHot;
+        out vec4 outColor;
+        void main() {
+          vec2 d = gl_PointCoord - 0.5;
+          float r = length(d);
+          if (r > 0.5) discard;
+          float soft = smoothstep(0.5, 0.0, r);
+          vec3 cyan = vec3(0.024, 0.714, 0.831);
+          vec3 hi = vec3(0.404, 0.91, 0.976);
+          vec3 color = mix(cyan, hi, vHot * 0.9 + soft * 0.25);
+          outColor = vec4(color * soft * vAlpha * (1.0 + vHot * 1.6), 1.0);
+        }`;
+
+      function compile(type, source) {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+          throw new Error(gl.getShaderInfoLog(shader));
+        }
+        return shader;
+      }
+
+      const program = gl.createProgram();
+      gl.attachShader(program, compile(gl.VERTEX_SHADER, vertexSource));
+      gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fragmentSource));
+      gl.linkProgram(program);
+      gl.useProgram(program);
+
+      function attribute(name, data, size) {
+        const buffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+        const location = gl.getAttribLocation(program, name);
+        gl.enableVertexAttribArray(location);
+        gl.vertexAttribPointer(location, size, gl.FLOAT, false, 0, 0);
+      }
+      attribute("aPos", positions, 3);
+      attribute("aSeed", seeds, 1);
+
+      const uMVP = gl.getUniformLocation(program, "uMVP");
+      const uTime = gl.getUniformLocation(program, "uTime");
+      const uScale = gl.getUniformLocation(program, "uScale");
+      const uFocus = gl.getUniformLocation(program, "uFocus");
+
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE);
+
+      function perspective(fov, aspect, near, far) {
+        const f = 1 / Math.tan(fov / 2);
+        const nf = 1 / (near - far);
+        return [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) * nf, -1, 0, 0, 2 * far * near * nf, 0];
+      }
+
+      function lookAt(eye, target) {
+        let z = [eye[0] - target[0], eye[1] - target[1], eye[2] - target[2]];
+        const zl = Math.hypot(...z);
+        z = z.map((v) => v / zl);
+        let x = [z[2], 0, -z[0]];
+        const xl = Math.hypot(...x);
+        x = x.map((v) => v / xl);
+        const y = [
+          z[1] * x[2] - z[2] * x[1],
+          z[2] * x[0] - z[0] * x[2],
+          z[0] * x[1] - z[1] * x[0],
+        ];
+        return [
+          x[0], y[0], z[0], 0,
+          x[1], y[1], z[1], 0,
+          x[2], y[2], z[2], 0,
+          -(x[0] * eye[0] + x[1] * eye[1] + x[2] * eye[2]),
+          -(y[0] * eye[0] + y[1] * eye[1] + y[2] * eye[2]),
+          -(z[0] * eye[0] + z[1] * eye[1] + z[2] * eye[2]),
+          1,
+        ];
+      }
+
+      function multiply(a, b) {
+        const out = new Array(16).fill(0);
+        for (let col = 0; col < 4; col++) {
+          for (let row = 0; row < 4; row++) {
+            for (let k = 0; k < 4; k++) out[col * 4 + row] += a[k * 4 + row] * b[col * 4 + k];
+          }
+        }
+        return out;
+      }
+
+      function project(matrix, p) {
+        const x = matrix[0] * p[0] + matrix[4] * p[1] + matrix[8] * p[2] + matrix[12];
+        const y = matrix[1] * p[0] + matrix[5] * p[1] + matrix[9] * p[2] + matrix[13];
+        const w = matrix[3] * p[0] + matrix[7] * p[1] + matrix[11] * p[2] + matrix[15];
+        return {
+          x: ((x / w) * 0.5 + 0.5) * innerWidth,
+          y: (1 - ((y / w) * 0.5 + 0.5)) * innerHeight,
+          w,
+        };
+      }
+
+      const state = { scroll: 0, yaw: 0, pitch: 0, targetYaw: 0, targetPitch: 0 };
+      let mvp = new Array(16).fill(0);
+
+      function resize() {
+        const dpr = Math.min(devicePixelRatio, 2);
+        canvas.width = innerWidth * dpr;
+        canvas.height = innerHeight * dpr;
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.uniform1f(uScale, (isMobile ? 5.5 : 7.5) * dpr);
+      }
+      resize();
+      addEventListener("resize", resize);
+
+      addEventListener("pointermove", (event) => {
+        state.targetYaw = (event.clientX / innerWidth - 0.5) * 0.5;
+        state.targetPitch = (event.clientY / innerHeight - 0.5) * 0.3;
+      });
+
+      const camLabel = document.getElementById("field-cam");
+      const reticle = document.querySelector(".reticle");
+      const readout = reticle.querySelector(".readout");
+      const line = document.getElementById("path-line");
+      const KEYS = ["8A", "9A", "5B", "11A", "2A", "7B", "4A", "12B"];
+      let focusIndex = 0;
+      let previousIndex = null;
+
+      function pointAt(index) {
+        return positions.subarray(index * 3, index * 3 + 3);
+      }
+
+      function lockNext() {
+        let candidate = 0;
+        for (let attempt = 0; attempt < 60; attempt++) {
+          candidate = Math.floor(Math.random() * POINT_COUNT);
+          const screen = project(mvp, pointAt(candidate));
+          const minX = isMobile ? innerWidth * 0.3 : innerWidth * 0.55;
+          if (
+            screen.w > 0 &&
+            screen.x > minX &&
+            screen.x < innerWidth - 240 &&
+            screen.y > 140 &&
+            screen.y < innerHeight - 160
+          ) {
+            break;
+          }
+        }
+        previousIndex = focusIndex;
+        focusIndex = candidate;
+        const bpm = 84 + Math.floor(Math.random() * 90);
+        const key = KEYS[Math.floor(Math.random() * KEYS.length)];
+        const lufs = (-6 - Math.random() * 8).toFixed(1);
+        const energy = Math.random().toFixed(2);
+        scrambleText(
+          readout,
+          `TRK ${String(candidate).padStart(5, "0")}\n${bpm} BPM · ${key}\n${lufs} LUFS · E ${energy}`,
+          620,
+        );
+        gsap.fromTo(reticle, { opacity: 0, scale: 1.8 }, { opacity: 1, scale: 1, duration: 0.5, ease: "expo.out" });
+        gsap.fromTo(line, { opacity: 0.75 }, { opacity: 0, duration: 2.4, ease: "power1.in" });
+      }
+
+      function render(time) {
+        const t = time / 1000;
+        state.yaw += (state.targetYaw - state.yaw) * 0.04;
+        state.pitch += (state.targetPitch - state.pitch) * 0.04;
+
+        const orbit = t * 0.035 + state.yaw;
+        const distance = 3.4 - state.scroll * 3.05;
+        const shift = isMobile ? 0 : -0.75 * (1 - state.scroll);
+        const right = [Math.cos(orbit), 0, -Math.sin(orbit)];
+        const target = [right[0] * shift, 0, right[2] * shift];
+        const eye = [
+          target[0] + Math.sin(orbit) * distance,
+          0.35 + state.pitch * 2 - state.scroll * 0.2,
+          target[2] + Math.cos(orbit) * distance,
+        ];
+        mvp = multiply(perspective(0.9, innerWidth / innerHeight, 0.05, 50), lookAt(eye, target));
+
+        gl.clearColor(0.039, 0.039, 0.059, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.uniformMatrix4fv(uMVP, false, mvp);
+        gl.uniform1f(uTime, t);
+        gl.uniform3fv(uFocus, pointAt(focusIndex));
+        gl.drawArrays(gl.POINTS, 0, POINT_COUNT);
+
+        const screen = project(mvp, pointAt(focusIndex));
+        reticle.style.transform = `translate(${screen.x}px, ${screen.y}px)`;
+        if (previousIndex !== null) {
+          const from = project(mvp, pointAt(previousIndex));
+          line.setAttribute("x1", from.x);
+          line.setAttribute("y1", from.y);
+          line.setAttribute("x2", screen.x);
+          line.setAttribute("y2", screen.y);
+        }
+        camLabel.textContent = `cam z ${distance.toFixed(2)} · yaw ${(orbit % 6.283).toFixed(2)}`;
+      }
+
+      if (reducedMotion) {
+        render(0);
+      } else {
+        let running = true;
+        const loop = (time) => {
+          if (running && !document.hidden) render(time);
+          requestAnimationFrame(loop);
+        };
+        requestAnimationFrame(loop);
+        setTimeout(() => {
+          lockNext();
+          setInterval(lockNext, 2800);
+        }, 1800);
+
+        ScrollTrigger.create({
+          trigger: ".hero",
+          start: "top top",
+          end: "bottom top",
+          scrub: true,
+          onUpdate: (self) => {
+            state.scroll = self.progress;
+            running = self.progress < 0.999;
+            gsap.set(".hero-copy", { opacity: 1 - self.progress * 1.6, y: -self.progress * 120 });
+            gsap.set(["#overlay", ".status"], { opacity: 1 - self.progress * 2.2 });
+            reticle.style.visibility = self.progress > 0.45 ? "hidden" : "visible";
+          },
+        });
+
+        gsap.to(".screen-frame", {
+          opacity: 1,
+          scale: 1,
+          ease: "none",
+          scrollTrigger: { trigger: ".next-section", start: "top 85%", end: "top 25%", scrub: true },
+        });
+        gsap.to("#field", {
+          opacity: 0.25,
+          ease: "none",
+          scrollTrigger: { trigger: ".next-section", start: "top 60%", end: "top top", scrub: true },
+        });
+      }
+    </script>
+  </body>
+</html>

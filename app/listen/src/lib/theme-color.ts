@@ -1,23 +1,16 @@
-import type { ResolvedColorMode } from "@crate/ui/lib/theme-skin";
-import { getAppearanceThemeColor } from "@crate/ui/lib/appearance-token-registry";
+import { CRATE_IDENTITY_VARIABLES } from "@crate/ui/lib/appearance-token-registry";
 
-export function readThemeColor(
-  root: HTMLElement,
-  mode: ResolvedColorMode,
-): string {
+export function readThemeColor(root: HTMLElement): string {
   const computed = getComputedStyle(root);
   return (
     computed.getPropertyValue("--crate-token-surface-app").trim() ||
     computed.getPropertyValue("--surface-app").trim() ||
-    getAppearanceThemeColor("default", mode)
+    CRATE_IDENTITY_VARIABLES["--crate-token-surface-app"]
   );
 }
 
-export function syncThemeColor(
-  root: HTMLElement,
-  mode: ResolvedColorMode,
-): string {
-  const color = readThemeColor(root, mode);
+export function syncThemeColor(root: HTMLElement): string {
+  const color = readThemeColor(root);
   const meta = root.ownerDocument.querySelector<HTMLMetaElement>(
     'meta[name="theme-color"]',
   );

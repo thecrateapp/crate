@@ -4,6 +4,7 @@ import type { StatsTape } from "@/components/stats/stats-model";
 import {
   TAPE_HEIGHT,
   buildTapeModel,
+  musicAgeShareYear,
   tapeIndexAt,
 } from "@/components/stats/stats-tape-model";
 
@@ -95,5 +96,38 @@ describe("tapeIndexAt", () => {
     expect(tapeIndexAt(-5, 100, 10)).toBe(0);
     expect(tapeIndexAt(55, 100, 10)).toBe(5);
     expect(tapeIndexAt(200, 100, 10)).toBe(9);
+  });
+});
+
+describe("musicAgeShareYear", () => {
+  const tape = (start: string, end: string): StatsTape => ({
+    granularity: "day",
+    start,
+    end,
+    points: [],
+    mood: [],
+    peaks: [],
+    months: [],
+  });
+
+  it("is the year of the period's last day (the tape end is exclusive)", () => {
+    expect(musicAgeShareYear(tape("2023-01-01", "2024-01-01"), 2026)).toBe(
+      2023,
+    );
+    expect(musicAgeShareYear(tape("2025-03-01", "2025-04-01"), 2026)).toBe(
+      2025,
+    );
+    expect(musicAgeShareYear(tape("2026-09-22", "2026-10-22"), 2026)).toBe(
+      2026,
+    );
+    // A rolling window that started last year still ends this year.
+    expect(musicAgeShareYear(tape("2025-10-22", "2026-01-02"), 2026)).toBe(
+      2026,
+    );
+  });
+
+  it("falls back to the given year without a tape", () => {
+    expect(musicAgeShareYear(null, 2026)).toBe(2026);
+    expect(musicAgeShareYear(undefined, 2027)).toBe(2027);
   });
 });

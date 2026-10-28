@@ -1,9 +1,9 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { ClipboardCheck } from "lucide-react";
 import { Link } from "react-router";
 
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { Button } from "@crate/ui/shadcn/button";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 
 import { OpsPanel } from "@/components/admin/ops-surfaces";
 import { RelativeTime } from "@/components/admin/RelativeTime";
@@ -40,7 +40,7 @@ export function AgentApprovals() {
 
   if (!canReview) {
     return (
-      <p className="text-sm text-white/60">
+      <p className="text-sm text-text-muted">
         You do not have permission to review these plans.
       </p>
     );
@@ -48,7 +48,6 @@ export function AgentApprovals() {
 
   return (
     <OpsPanel
-      icon={ClipboardCheck}
       title="Approvals"
       description="Review agent-proposed changes before they run, or look back at plans that were already decided or expired."
       action={
@@ -117,13 +116,11 @@ function ApprovalsList({ view }: { view: PlanView }) {
   return (
     <div className="space-y-3">
       {loading && items.length === 0 ? (
-        <p role="status" className="text-sm text-white/55">
-          Loading agent plans…
-        </p>
+        <LoadingState label="Loading agent plans" />
       ) : null}
       {error ? (
         <div className="flex flex-wrap items-center gap-3">
-          <p role="alert" className="text-sm text-red-300">
+          <p role="alert" className="text-sm text-state-warning-text">
             {apiErrorText(error, "The plans could not be loaded.")}
           </p>
           <Button
@@ -139,7 +136,7 @@ function ApprovalsList({ view }: { view: PlanView }) {
         </div>
       ) : null}
       {!loading && !error && items.length === 0 ? (
-        <p className="text-sm text-white/55">{emptyMessage}</p>
+        <p className="text-sm text-text-muted">{emptyMessage}</p>
       ) : null}
       {items.length > 0 ? (
         <ul className="space-y-3">
@@ -191,18 +188,18 @@ function ApprovalRow({
         to={`/agents/approvals/${encodeURIComponent(item.plan_id)}`}
         aria-labelledby={titleId}
         aria-describedby={`${detailsId} ${statusId}`}
-        className="flex flex-col gap-2 rounded-md border border-white/10 bg-white/[0.02] p-4 transition-colors hover:bg-white/5 md:flex-row md:items-center md:justify-between"
+        className="flex flex-col gap-2 rounded-md border border-border-quiet bg-card p-4 transition-colors hover:bg-accent-action/[0.04] focus-visible:bg-accent-action/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring md:flex-row md:items-center md:justify-between"
       >
         <div className="space-y-1">
-          <p id={titleId} className="font-medium text-white">
+          <p id={titleId} className="font-medium text-text-primary">
             {title}
           </p>
           <div id={detailsId} className="space-y-1">
-            <p className="text-sm text-white/55">
+            <p className="text-sm text-text-muted">
               {item.integration_name ?? "Unknown connection"} ·{" "}
               {connectionKindLabel(item.integration_kind)}
             </p>
-            <p className="text-sm text-white/45">
+            <p className="text-sm text-text-muted">
               Requested <RelativeTime value={item.created_at} now={now} />
             </p>
           </div>
@@ -211,7 +208,7 @@ function ApprovalRow({
           <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
           <StatusBadge tone={risk.tone}>{risk.label}</StatusBadge>
           {view === "pending" ? (
-            <span className="text-sm text-white/45">
+            <span className="text-sm text-text-muted">
               Expires <RelativeTime value={item.expires_at} now={now} />
             </span>
           ) : null}

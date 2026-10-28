@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ActionIconButton, ActionIconLink } from "./ActionIconButton";
 
@@ -71,7 +71,7 @@ describe("ActionIconButton", () => {
 
   it("shows a visible focus ring", () => {
     render(<ActionIconButton aria-label="Focus">Icon</ActionIconButton>);
-    expect(screen.getByRole("button")).toHaveClass(
+    expect(screen.getByRole("button")).not.toHaveClass(
       "focus-visible:shadow-focus",
     );
   });
@@ -84,6 +84,23 @@ describe("ActionIconButton", () => {
 });
 
 describe("ActionIconLink", () => {
+  it("blocks disabled links without executing the callback", () => {
+    const click = vi.fn();
+    render(
+      <ActionIconLink
+        href="#destination"
+        disabled
+        onClick={click}
+        onClickCapture={click}
+      >
+        Open
+      </ActionIconLink>,
+    );
+    const link = screen.getByRole("link", { name: "Open" });
+    expect(link).toHaveAttribute("tabindex", "-1");
+    expect(fireEvent.click(link)).toBe(false);
+    expect(click).not.toHaveBeenCalled();
+  });
   it("renders as anchor", () => {
     render(<ActionIconLink href="/path">Link</ActionIconLink>);
     expect(screen.getByRole("link")).toHaveAttribute("href", "/path");
@@ -98,4 +115,27 @@ describe("ActionIconLink", () => {
     render(<ActionIconLink>Link</ActionIconLink>);
     expect(screen.getByRole("link")).toHaveAttribute("href", "#");
   });
+});
+
+it("renders contextual hints without native titles on buttons and links", async () => {
+  const { container } = render(
+    <>
+      <ActionIconButton title="Edit album" aria-label="Edit">
+        <svg />
+      </ActionIconButton>
+      <ActionIconLink href="#album" title="Open album" aria-label="Open">
+        <svg />
+      </ActionIconLink>
+    </>,
+  );
+  expect(container.querySelector("[title]")).toBeNull();
+  await userEvent.tab();
+  expect(
+    await screen.findByRole("tooltip", { name: "Edit album" }),
+  ).toBeVisible();
+  await userEvent.keyboard("{Escape}");
+  await userEvent.tab();
+  expect(
+    await screen.findByRole("tooltip", { name: "Open album" }),
+  ).toBeVisible();
 });

@@ -1,15 +1,12 @@
 import { useState } from "react";
-import {
-  AudioLines,
-  Loader2,
-  Pause,
-  Play,
-  RotateCcw,
-  Square,
-} from "lucide-react";
+import { Loader2 } from "@crate/ui/icons";
 import { toast } from "sonner";
 
-import { CrateChip } from "@crate/ui/primitives/CrateBadge";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { ProgressHairline } from "@crate/ui/primitives/ProgressHairline";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
+import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { Button } from "@crate/ui/shadcn/button";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
@@ -64,11 +61,9 @@ type BackfillAction = "start" | "pause" | "cancel" | "resume";
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-sm border border-white/6 bg-black/20 px-3 py-2">
-      <div className="text-[10px] uppercase tracking-[0.12em] text-white/30">
-        {label}
-      </div>
-      <div className="mt-1 text-sm font-medium text-white/85">
+    <div className="min-w-0 border-t border-border-quiet py-3">
+      <MonoLabel as="div">{label}</MonoLabel>
+      <div className="mt-2 font-mono text-numeral-sm tabular-nums text-text-primary">
         {value.toLocaleString()}
       </div>
     </div>
@@ -111,18 +106,15 @@ export function SmartMixCoverage() {
   }
 
   if (loading && !data) {
-    return (
-      <div className="flex min-h-40 items-center justify-center text-white/45">
-        <Loader2 className="h-5 w-5 animate-spin text-primary" />
-      </div>
-    );
+    return <LoadingState label="Loading Smart Mix coverage" />;
   }
 
   if (error || !data) {
     return (
-      <div className="rounded-md border border-red-500/20 bg-red-500/8 p-4 text-sm text-red-100">
-        Smart Mix coverage is unavailable.
-      </div>
+      <ErrorState
+        message="Smart Mix coverage is unavailable."
+        onRetry={refetch}
+      />
     );
   }
 
@@ -131,27 +123,18 @@ export function SmartMixCoverage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/10 text-primary">
-            <AudioLines size={17} />
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <MonoLabel as="span" tone="accent">
+              Smart Mix profiles
+            </MonoLabel>
+            <InfoBadge>{percent}% coverage</InfoBadge>
+            <InfoBadge>{data.analyzerVersion}</InfoBadge>
+            <InfoBadge>profile v{data.profileVersion}</InfoBadge>
           </div>
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-white">
-                Smart Mix profiles
-              </span>
-              <CrateChip>{percent}% coverage</CrateChip>
-              <CrateChip className="text-[10px]">
-                {data.analyzerVersion}
-              </CrateChip>
-              <CrateChip className="text-[10px]">
-                profile v{data.profileVersion}
-              </CrateChip>
-            </div>
-            <div className="text-xs text-white/40">
-              {data.currentProfiles.toLocaleString()} current profiles across{" "}
-              {data.totalTracks.toLocaleString()} eligible tracks.
-            </div>
+          <div className="text-xs text-text-muted">
+            {data.currentProfiles.toLocaleString()} current profiles across{" "}
+            {data.totalTracks.toLocaleString()} eligible tracks.
           </div>
         </div>
 
@@ -164,10 +147,11 @@ export function SmartMixCoverage() {
               onClick={() => void runAction("start")}
             >
               {activeAction === "start" ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Play size={14} />
-              )}
+                <Loader2
+                  data-admin-ux="mix-start-loading"
+                  className="animate-spin"
+                />
+              ) : null}
               Start backfill
             </Button>
           ) : null}
@@ -179,10 +163,11 @@ export function SmartMixCoverage() {
               onClick={() => void runAction("resume")}
             >
               {activeAction === "resume" ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <RotateCcw size={14} />
-              )}
+                <Loader2
+                  data-admin-ux="mix-resume-loading"
+                  className="animate-spin"
+                />
+              ) : null}
               Resume backfill
             </Button>
           ) : null}
@@ -196,24 +181,26 @@ export function SmartMixCoverage() {
                 onClick={() => void runAction("pause")}
               >
                 {activeAction === "pause" ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Pause size={14} />
-                )}
+                  <Loader2
+                    data-admin-ux="mix-pause-loading"
+                    className="animate-spin"
+                  />
+                ) : null}
                 Pause backfill
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 text-red-200"
+                className="gap-2 text-state-warning-text"
                 disabled={activeAction !== null}
                 onClick={() => void runAction("cancel")}
               >
                 {activeAction === "cancel" ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Square size={14} />
-                )}
+                  <Loader2
+                    data-admin-ux="mix-cancel-loading"
+                    className="animate-spin"
+                  />
+                ) : null}
                 Cancel backfill
               </Button>
             </>
@@ -221,14 +208,13 @@ export function SmartMixCoverage() {
         </div>
       </div>
 
-      <div className="h-2 overflow-hidden rounded-sm bg-white/[0.06]">
-        <div
-          className="h-full rounded-sm bg-primary transition-[width] duration-500"
-          style={{ width: `${percent}%` }}
-        />
-      </div>
+      <ProgressHairline
+        label="Smart Mix profile coverage"
+        value={percent / 100}
+        valueText={`${percent}% of eligible tracks have current profiles`}
+      />
 
-      <div className="grid gap-2 sm:grid-cols-4 lg:grid-cols-8">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,8rem),1fr))] gap-x-4 gap-y-2">
         <Metric
           label="Full"
           value={data.currentQuality?.full ?? data.quality.full}

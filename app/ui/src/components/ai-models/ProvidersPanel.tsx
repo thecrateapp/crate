@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Server } from "lucide-react";
+import {} from "lucide-react";
 
 import { Button } from "@crate/ui/shadcn/button";
 
@@ -24,7 +24,6 @@ export function ProvidersPanel({
 
   return (
     <OpsPanel
-      icon={Server}
       title="Providers"
       description="Connections Crate uses to reach model providers. Refreshing models never runs a model."
       action={

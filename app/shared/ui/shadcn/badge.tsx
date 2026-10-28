@@ -2,10 +2,16 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Slot } from "radix-ui";
 
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import { cn } from "@crate/ui/lib/cn";
+import {
+  INFO_BADGE_CLASS,
+  infoBadgeText,
+  infoBadgeContent,
+} from "@crate/ui/primitives/InfoBadge";
 
 const badgeVariants = cva(
-  "inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-md border px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-[background-color,color,border-color,box-shadow] focus-visible:border-text-primary/15 focus-visible:shadow-border-soft aria-invalid:border-state-danger [&>svg]:pointer-events-none [&>svg]:size-3",
+  `${INFO_BADGE_CLASS} transition-colors aria-invalid:border-state-danger [&>svg]:pointer-events-none [&>svg]:size-3`,
   {
     variants: {
       variant: {
@@ -32,18 +38,24 @@ function Badge({
   className,
   variant = "default",
   asChild = false,
+  children,
+  title,
   ...props
 }: React.ComponentProps<"span"> &
   VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
   const Comp = asChild ? Slot.Root : "span";
 
   return (
-    <Comp
-      data-slot="badge"
-      data-variant={variant}
-      className={cn(badgeVariants({ variant }), className)}
-      {...props}
-    />
+    <TooltipHint content={title ?? (infoBadgeText(children) || undefined)}>
+      <Comp
+        data-slot="badge"
+        data-variant={variant}
+        className={cn(badgeVariants({ variant }), className)}
+        {...props}
+      >
+        {asChild ? children : infoBadgeContent(children, true)}
+      </Comp>
+    </TooltipHint>
   );
 }
 

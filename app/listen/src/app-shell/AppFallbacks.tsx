@@ -1,17 +1,16 @@
 import { Suspense, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 
-import { CrateLoader } from "@/components/ui/CrateLoader";
-
+// Keep the shell exports stable while retiring their former spinner visuals.
 export function RouteSpinner() {
-  return <CrateLoader variant="compact" className="py-20" />;
+  const { t } = useTranslation();
+  return <LoadingState variant="route" label={t("common.loading")} />;
 }
 
 export function AuthSpinner() {
-  return (
-    <div className="flex min-h-dvh items-center justify-center bg-surface-canvas">
-      <CrateLoader variant="screen" />
-    </div>
-  );
+  const { t } = useTranslation();
+  return <LoadingState variant="screen" label={t("common.loading")} />;
 }
 
 export function DeferredRoute({ children }: { children: ReactNode }) {

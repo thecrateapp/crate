@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router";
 
@@ -20,6 +20,10 @@ import {
   type PlaylistActions,
 } from "@/pages/playlist-actions";
 import type { PlaylistData, PlaylistMember } from "@/pages/playlist-types";
+import {
+  createPlaylistTrackEditSession,
+  type PlaylistTrackEditSession,
+} from "./persist-playlist-tracks";
 
 export interface PlaylistPageController extends PlaylistActions {
   data: PlaylistData | undefined;
@@ -29,6 +33,7 @@ export interface PlaylistPageController extends PlaylistActions {
   editableTracks: ReturnType<typeof buildPlaylistEditableTracks>;
   editorOpen: boolean;
   error: unknown;
+  status?: number | null;
   filterQuery: string;
   filteredTracks: PlaylistData["tracks"];
   leaving: boolean;
@@ -62,7 +67,7 @@ export function usePlaylistPageController(): PlaylistPageController {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { data, loading, error, refetch } = useApi<PlaylistData>(
+  const { data, loading, error, status, refetch } = useApi<PlaylistData>(
     id ? `/api/playlists/${id}` : null,
     "GET",
     undefined,
@@ -78,7 +83,27 @@ export function usePlaylistPageController(): PlaylistPageController {
     getPlaylistRecord,
     togglePlaylistOffline,
   } = useOffline();
-  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorSession, setEditorSession] = useState<{
+    id: number;
+    tracks: ReturnType<typeof buildPlaylistEditableTracks>;
+    trackEdits: PlaylistTrackEditSession;
+  } | null>(null);
+  const editorOpen =
+    editorSession != null && editorSession.id === resolvedData?.id;
+  useEffect(() => setEditorSession(null), [id]);
+  function setEditorOpen(open: boolean) {
+    if (open && resolvedData) {
+      setEditorSession({
+        id: resolvedData.id,
+        tracks: buildPlaylistEditableTracks(resolvedData, t),
+        trackEdits: createPlaylistTrackEditSession(),
+      });
+    } else {
+      setEditorSession((session) =>
+        session?.id === resolvedData?.id ? null : session,
+      );
+    }
+  }
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -93,10 +118,13 @@ export function usePlaylistPageController(): PlaylistPageController {
     () => buildPlaylistPlayerTracks(resolvedData),
     [resolvedData],
   );
-  const editableTracks = useMemo(
+  const latestEditableTracks = useMemo(
     () => buildPlaylistEditableTracks(resolvedData, t),
     [resolvedData, t],
   );
+  const editableTracks = editorOpen
+    ? editorSession.tracks
+    : latestEditableTracks;
   const filteredTracks = useMemo(
     () => filterPlaylistTracks(resolvedData?.tracks ?? [], deferredFilterQuery),
     [resolvedData?.tracks, deferredFilterQuery],
@@ -139,6 +167,7 @@ export function usePlaylistPageController(): PlaylistPageController {
     t,
     togglePlaylistOffline,
     togglingFollow,
+    trackEditSession: editorOpen ? editorSession.trackEdits : undefined,
   });
 
   return {
@@ -150,6 +179,7 @@ export function usePlaylistPageController(): PlaylistPageController {
     editableTracks,
     editorOpen,
     error,
+    status,
     filterQuery,
     filteredTracks,
     leaving,

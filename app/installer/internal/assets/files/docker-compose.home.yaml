@@ -1,0 +1,794 @@
+name: crate
+
+networks:
+  crate:
+    name: crate
+
+x-logging: &default-logging
+  driver: local
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+x-crate-env: &crate-env
+  TZ: ${TZ:-UTC}
+  CRATE_CONFIG: /app/config.yaml
+  DATA_DIR: /data
+  CACHE_DIR: /cache
+  DOMAIN: ${DOMAIN:-localhost}
+  CRATE_LISTEN_PUBLIC_BASE_URL: ${CRATE_LISTEN_PUBLIC_BASE_URL:-https://listen.${DOMAIN:-localhost}}
+  CRATE_PUBLIC_API_BASE_URL: ${CRATE_PUBLIC_API_BASE_URL:-}
+  CRATE_INSTANCE_NAME: ${CRATE_INSTANCE_NAME:-}
+  CRATE_FEDERATION_SUBJECT_SECRET: ${CRATE_FEDERATION_SUBJECT_SECRET:-}
+  CRATE_FEDERATION_CURSOR_SECRET: ${CRATE_FEDERATION_CURSOR_SECRET:-}
+  CRATE_POSTGRES_USER: ${CRATE_POSTGRES_USER:-crate}
+  CRATE_POSTGRES_PASSWORD: ${CRATE_POSTGRES_PASSWORD:-crate}
+  CRATE_POSTGRES_DB: ${CRATE_POSTGRES_DB:-crate}
+  CRATE_POSTGRES_HOST: crate-postgres
+  POSTGRES_SUPERUSER_USER: ${POSTGRES_SUPERUSER_USER:-crate}
+  POSTGRES_SUPERUSER_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-crate}
+  POSTGRES_SUPERUSER_DB: ${POSTGRES_SUPERUSER_DB:-crate}
+  JWT_SECRET: ${JWT_SECRET:-change-me}
+  DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-admin}
+  REDIS_URL: redis://:${REDIS_PASSWORD}@crate-redis:6379/0
+  REDIS_CACHE_URL: redis://:${REDIS_PASSWORD}@crate-redis:6379/0
+  REDIS_DURABLE_URL: redis://:${REDIS_PASSWORD}@crate-redis-durable:6379/0
+  CRATE_METRICS_REDIS_TTL_SECONDS: ${CRATE_METRICS_REDIS_TTL_SECONDS:-86400}
+  CRATE_STREAM_CACHE_MAX_BYTES: ${CRATE_STREAM_CACHE_MAX_BYTES:-12884901888}
+  CRATE_STREAM_CACHE_LOW_WATERMARK_BYTES: ${CRATE_STREAM_CACHE_LOW_WATERMARK_BYTES:-10737418240}
+  CRATE_STREAM_CACHE_MAX_IDLE_SECONDS: ${CRATE_STREAM_CACHE_MAX_IDLE_SECONDS:-2592000}
+  CRATE_STREAM_CACHE_ORPHAN_GRACE_SECONDS: ${CRATE_STREAM_CACHE_ORPHAN_GRACE_SECONDS:-3600}
+  CRATE_STREAM_CACHE_CLEANUP_MAX_FILES: ${CRATE_STREAM_CACHE_CLEANUP_MAX_FILES:-100000}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+  APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-}
+  APPLE_TEAM_ID: ${APPLE_TEAM_ID:-}
+  APPLE_KEY_ID: ${APPLE_KEY_ID:-}
+  APPLE_PRIVATE_KEY: ${APPLE_PRIVATE_KEY:-}
+  OLLAMA_URL: ${OLLAMA_URL:-}
+  LLM_PROVIDER: ${LLM_PROVIDER:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  AUDIOMUSE_GEMINI_API_KEY: ${AUDIOMUSE_GEMINI_API_KEY:-}
+  CRATE_READPLANE_SERVICE_TOKEN: ${CRATE_READPLANE_SERVICE_TOKEN:?CRATE_READPLANE_SERVICE_TOKEN must be set}
+  CRATE_FEDERATION_IMPORT_MAX_BYTES: ${CRATE_FEDERATION_IMPORT_MAX_BYTES:-100000000000}
+  CRATE_FEDERATION_IMPORT_PEER_RESERVED_BYTES: ${CRATE_FEDERATION_IMPORT_PEER_RESERVED_BYTES:-100000000000}
+  CRATE_FEDERATION_IMPORT_GLOBAL_RESERVED_BYTES: ${CRATE_FEDERATION_IMPORT_GLOBAL_RESERVED_BYTES:-250000000000}
+  CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES: ${CRATE_FEDERATION_IMPORT_FREE_HEADROOM_BYTES:-10737418240}
+  CRATE_FEDERATION_IMPORT_LEASE_SECONDS: ${CRATE_FEDERATION_IMPORT_LEASE_SECONDS:-18000}
+
+x-ai-credential-env: &ai-credential-env
+  CRATE_CREDENTIAL_KEY: ${CRATE_CREDENTIAL_KEY:-}
+  CRATE_CREDENTIAL_PREVIOUS_KEYS: ${CRATE_CREDENTIAL_PREVIOUS_KEYS:-}
+
+x-crate-enrichment-env: &crate-enrichment-env
+  LASTFM_APIKEY: ${LASTFM_APIKEY:-}
+  LASTFM_API_SECRET: ${LASTFM_API_SECRET:-}
+  FANART_API_KEY: ${FANART_API_KEY:-}
+  SPOTIFY_ID: ${SPOTIFY_ID:-}
+  SPOTIFY_SECRET: ${SPOTIFY_SECRET:-}
+  SETLISTFM_API_KEY: ${SETLISTFM_API_KEY:-}
+  SETLISTFM_SHOWS_SYNC_ENABLED: ${SETLISTFM_SHOWS_SYNC_ENABLED:-false}
+  SETLISTFM_SHOWS_SYNC_MAX_ARTISTS: ${SETLISTFM_SHOWS_SYNC_MAX_ARTISTS:-100}
+  DISCOGS_CONSUMER_KEY: ${DISCOGS_CONSUMER_KEY:-}
+  DISCOGS_CONSUMER_SECRET: ${DISCOGS_CONSUMER_SECRET:-}
+  TICKETMASTER_API_KEY: ${TICKETMASTER_API_KEY:-}
+  SLSKD_URL: ${SLSKD_URL:-}
+  SLSKD_API_KEY: ${SLSKD_API_KEY:-}
+
+x-worker-resource-env: &worker-resource-env
+  CRATE_RESOURCE_GOVERNOR_ENABLED: ${CRATE_RESOURCE_GOVERNOR_ENABLED:-true}
+  CRATE_RESOURCE_MAX_LOAD_RATIO: ${CRATE_RESOURCE_MAX_LOAD_RATIO:-0.85}
+  CRATE_RESOURCE_MAX_IOWAIT_PERCENT: ${CRATE_RESOURCE_MAX_IOWAIT_PERCENT:-25}
+  CRATE_RESOURCE_MAX_SWAP_PERCENT: ${CRATE_RESOURCE_MAX_SWAP_PERCENT:-30}
+  CRATE_RESOURCE_MIN_SWAP_USED_MB: ${CRATE_RESOURCE_MIN_SWAP_USED_MB:-512}
+  CRATE_RESOURCE_MIN_MEMORY_AVAILABLE_PERCENT: ${CRATE_RESOURCE_MIN_MEMORY_AVAILABLE_PERCENT:-15}
+  CRATE_RESOURCE_MAX_ACTIVE_USERS: ${CRATE_RESOURCE_MAX_ACTIVE_USERS:-0}
+  CRATE_RESOURCE_MAX_ACTIVE_STREAMS: ${CRATE_RESOURCE_MAX_ACTIVE_STREAMS:-0}
+  CRATE_RESOURCE_DEFER_SECONDS: ${CRATE_RESOURCE_DEFER_SECONDS:-300}
+  CRATE_MAINTENANCE_WINDOW_ENABLED: ${CRATE_MAINTENANCE_WINDOW_ENABLED:-true}
+  CRATE_MAINTENANCE_WINDOW_START: ${CRATE_MAINTENANCE_WINDOW_START:-02:00}
+  CRATE_MAINTENANCE_WINDOW_END: ${CRATE_MAINTENANCE_WINDOW_END:-07:00}
+  CRATE_MAINTENANCE_WINDOW_FINGERPRINT_LIMIT: ${CRATE_MAINTENANCE_WINDOW_FINGERPRINT_LIMIT:-1000}
+
+x-worker-native-env: &worker-native-env
+  NUMBA_CACHE_DIR: /tmp/numba_cache
+  OMP_NUM_THREADS: ${CRATE_WORKER_NATIVE_THREADS:-1}
+  OPENBLAS_NUM_THREADS: ${CRATE_WORKER_NATIVE_THREADS:-1}
+  MKL_NUM_THREADS: ${CRATE_WORKER_NATIVE_THREADS:-1}
+  NUMEXPR_NUM_THREADS: ${CRATE_WORKER_NATIVE_THREADS:-1}
+  VECLIB_MAXIMUM_THREADS: ${CRATE_WORKER_NATIVE_THREADS:-1}
+  TORCH_NUM_THREADS: ${CRATE_WORKER_NATIVE_THREADS:-1}
+  NUMBA_NUM_THREADS: ${CRATE_WORKER_NATIVE_THREADS:-1}
+  CRATE_FFMPEG_THREADS: ${CRATE_WORKER_FFMPEG_THREADS:-1}
+
+services:
+  traefik:
+    logging: *default-logging
+    image: traefik:latest
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - --log.level=INFO
+      - --log.filePath=
+    security_opt:
+      - "no-new-privileges:true"
+    environment:
+      TZ: ${TZ:-UTC}
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:-}
+    ports:
+      - "${TRAEFIK_HTTP_PORT:-80}:80"
+      - "${TRAEFIK_HTTPS_PORT:-443}:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${DATA_DIR}/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ${DATA_DIR}/traefik/acme.json:/acme.json
+      - ${DATA_DIR}/traefik/conf:/conf
+      - ./deploy/traefik/federation-readplane.yml:/conf/crate-federation-readplane.yml:ro
+      - ${DATA_DIR}/traefik/logs:/var/log/traefik
+    networks:
+      - crate
+    labels:
+      traefik.enable: true
+      traefik.docker.network: crate
+      traefik.http.services.traefik.loadbalancer.server.port: 80
+      traefik.http.routers.traefik-secure.rule: Host(`traefik.${DOMAIN:-localhost}`)
+      traefik.http.routers.traefik-secure.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
+      traefik.http.routers.traefik-secure.tls: ${TRAEFIK_TLS_ENABLED:-true}
+      traefik.http.routers.traefik-secure.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
+      traefik.http.routers.traefik-secure.service: api@internal
+
+  # Soulseek client, started with COMPOSE_PROFILES=soulseek. Crate reaches it
+  # at http://slskd:5030 and imports what lands in DOWNLOADS_DIR.
+  slskd:
+    logging: *default-logging
+    image: slskd/slskd:latest
+    container_name: crate-slskd
+    restart: unless-stopped
+    profiles: [soulseek]
+    user: ${PUID:-1000}:${PGID:-1000}
+    environment:
+      TZ: ${TZ:-UTC}
+      SLSKD_REMOTE_CONFIGURATION: "true"
+      SLSKD_SHARED_DIR: /music
+      SLSKD_DOWNLOADS_DIR: /downloads
+      SLSKD_INCOMPLETE_DIR: /downloads/incomplete
+      SLSKD_WEB_AUTHENTICATION_API_KEYS_CRATE: ${SLSKD_API_KEY:-}
+      SLSKD_SLSK_USERNAME: ${SLSKD_SLSK_USERNAME:-}
+      SLSKD_SLSK_PASSWORD: ${SLSKD_SLSK_PASSWORD:-}
+    volumes:
+      - ${DATA_DIR}/slskd:/app
+      - ${MUSIC_DIR}:/music:ro
+      - ${DOWNLOADS_DIR}:/downloads
+    ports:
+      - "${SLSKD_LISTEN_PORT:-50300}:50300"
+    networks:
+      - crate
+
+  crate-redis:
+    logging: *default-logging
+    image: redis:7-alpine
+    container_name: crate-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 512mb --maxmemory-policy volatile-lru --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "$${REDIS_PASSWORD}" ping | grep PONG']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - ${DATA_DIR}/redis:/data
+    networks:
+      - crate
+
+  crate-redis-durable:
+    logging: *default-logging
+    image: redis:7-alpine
+    container_name: crate-redis-durable
+    restart: unless-stopped
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory 384mb --maxmemory-policy noeviction --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD-SHELL", 'redis-cli -a "$${REDIS_PASSWORD}" ping | grep PONG']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - ${DATA_DIR}/redis-durable:/data
+    networks:
+      - crate
+
+  crate-postgres:
+    logging: *default-logging
+    image: pgvector/pgvector:pg15
+    container_name: crate-postgres
+    restart: unless-stopped
+    mem_limit: 1g
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - pg_stat_statements.max=10000
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - track_io_timing=on
+      - -c
+      - log_min_duration_statement=1000
+      - -c
+      - log_lock_waits=on
+      - -c
+      - log_line_prefix=%m [%p] %q%u@%d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_SUPERUSER_USER:-crate}"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    environment:
+      POSTGRES_USER: ${POSTGRES_SUPERUSER_USER:-crate}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-crate}
+      POSTGRES_DB: ${POSTGRES_SUPERUSER_DB:-crate}
+    volumes:
+      - ${DATA_DIR}/postgres:/var/lib/postgresql/data
+    networks:
+      - crate
+
+  crate-media-worker:
+    logging: *default-logging
+    image: ${CRATE_MEDIA_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-media-worker:${CRATE_IMAGE_TAG:-latest}}
+    container_name: crate-media-worker
+    restart: unless-stopped
+    user: ${PUID:-1000}:${PGID:-1000}
+    environment:
+      TZ: ${TZ:-UTC}
+      DATA_DIR: /data
+      CRATE_MEDIA_WORKER_ADDR: 0.0.0.0:8687
+      REDIS_URL: redis://:${REDIS_PASSWORD}@crate-redis:6379/0
+    volumes:
+      - ${MUSIC_DIR}:/music:ro
+      - ${DATA_DIR}/crate:/data
+    depends_on:
+      crate-redis:
+        condition: service_healthy
+    networks:
+      - crate
+    mem_limit: 256m
+    mem_reservation: 64m
+    cpus: "0.25"
+
+  crate-api:
+    logging: *default-logging
+    image: ${CRATE_API_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-api:${CRATE_IMAGE_TAG:-latest}}
+    container_name: crate-api
+    restart: unless-stopped
+    user: ${PUID:-1000}:${PGID:-1000}
+    group_add:
+      - "${DOCKER_GID:-988}"
+    environment:
+      <<: [*crate-env, *crate-enrichment-env, *ai-credential-env]
+      CRATE_RUNTIME: api
+      CRATE_MCP_ENABLED: ${CRATE_MCP_ENABLED:-false}
+      CRATE_MCP_ACTIONS_ENABLED: ${CRATE_MCP_ACTIONS_ENABLED:-false}
+      CRATE_MCP_OAUTH_ENABLED: ${CRATE_MCP_OAUTH_ENABLED:-false}
+      CRATE_MCP_OAUTH_ISSUER: ${CRATE_MCP_OAUTH_ISSUER:-}
+      CRATE_MCP_OAUTH_ALLOW_LOCALHOST: ${CRATE_MCP_OAUTH_ALLOW_LOCALHOST:-false}
+      CRATE_MCP_ALLOWED_HOSTS: ${CRATE_MCP_ALLOWED_HOSTS:-}
+      CRATE_SMART_MIX_ENABLED: ${CRATE_SMART_MIX_ENABLED:-false}
+      CRATE_ANDROID_NATIVE_CROSSFADE_ENABLED: ${CRATE_ANDROID_NATIVE_CROSSFADE_ENABLED:-false}
+      CRATE_ANDROID_BEATMATCH_ENABLED: ${CRATE_ANDROID_BEATMATCH_ENABLED:-false}
+      CRATE_ANDROID_BASS_HANDOFF_ENABLED: ${CRATE_ANDROID_BASS_HANDOFF_ENABLED:-false}
+      CRATE_MCP_ALLOWED_ORIGINS: ${CRATE_MCP_ALLOWED_ORIGINS:-}
+      CRATE_MCP_ADMIN_ORIGINS: ${CRATE_MCP_ADMIN_ORIGINS:-}
+      CRATE_MCP_OPS_FRESH_SECONDS: ${CRATE_MCP_OPS_FRESH_SECONDS:-60}
+      CRATE_MCP_OPS_STALE_SECONDS: ${CRATE_MCP_OPS_STALE_SECONDS:-300}
+      CRATE_MCP_HEARTBEAT_FRESH_SECONDS: ${CRATE_MCP_HEARTBEAT_FRESH_SECONDS:-60}
+      CRATE_MCP_HEALTH_FRESH_SECONDS: ${CRATE_MCP_HEALTH_FRESH_SECONDS:-86400}
+      CRATE_MCP_HEALTH_STALE_SECONDS: ${CRATE_MCP_HEALTH_STALE_SECONDS:-604800}
+      CRATE_SSE_REDIS_MAX_CONNECTIONS: ${CRATE_SSE_REDIS_MAX_CONNECTIONS:-128}
+      CRATE_MEDIA_WORKER_URL: http://crate-media-worker:8687
+      CRATE_MEDIA_WORKER_MAX_ACTIVE: ${CRATE_MEDIA_WORKER_MAX_ACTIVE:-1}
+    volumes:
+      - ${CRATE_CONFIG_FILE:-./app/config.yaml}:/app/config.yaml:ro
+      - ${MUSIC_DIR}:/music:ro
+      - ${DATA_DIR}/crate:/data
+      - ${CACHE_DIR:-./data/cache}:/cache:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "${CRATE_API_PORT:-8585}:8585"
+    depends_on:
+      crate-postgres:
+        condition: service_healthy
+      crate-redis:
+        condition: service_healthy
+      crate-redis-durable:
+        condition: service_healthy
+      crate-media-worker:
+        condition: service_started
+    networks:
+      - crate
+    mem_limit: 768m
+    mem_reservation: 256m
+    cpus: "1.0"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8585/api/status', timeout=5).read()",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      traefik.enable: true
+      traefik.docker.network: crate
+      traefik.http.routers.crate-api.rule: Host(`api.${DOMAIN:-localhost}`)
+      traefik.http.routers.crate-api.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
+      traefik.http.routers.crate-api.middlewares: crate-api-compress@docker
+      traefik.http.routers.crate-api-access-token.rule: Host(`api.${DOMAIN:-localhost}`) && HeaderRegexp(`Authorization`, `^Bearer\s+crv_`)
+      traefik.http.routers.crate-api-access-token.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
+      traefik.http.routers.crate-api-access-token.priority: 150
+      traefik.http.routers.crate-api-access-token.service: crate-api
+      traefik.http.routers.crate-api-access-token.tls: ${TRAEFIK_TLS_ENABLED:-true}
+      traefik.http.routers.crate-api-access-token.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
+      traefik.http.routers.crate-api-vdj-artwork.rule: Host(`api.${DOMAIN:-localhost}`) && (Method(`GET`) || Method(`HEAD`)) && PathPrefix(`/api/vdj/albums/`)
+      traefik.http.routers.crate-api-vdj-artwork.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
+      traefik.http.routers.crate-api-vdj-artwork.priority: 130
+      traefik.http.routers.crate-api-vdj-artwork.service: crate-api
+      traefik.http.routers.crate-api-vdj-artwork.tls: ${TRAEFIK_TLS_ENABLED:-true}
+      traefik.http.routers.crate-api-vdj-artwork.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
+      traefik.http.routers.crate-api-vdj-media.rule: Host(`api.${DOMAIN:-localhost}`) && (Method(`GET`) || Method(`HEAD`)) && PathPrefix(`/api/vdj/tracks/`)
+      traefik.http.routers.crate-api-vdj-media.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
+      traefik.http.routers.crate-api-vdj-media.priority: 140
+      traefik.http.routers.crate-api-vdj-media.service: crate-api
+      traefik.http.routers.crate-api-vdj-media.tls: ${TRAEFIK_TLS_ENABLED:-true}
+      traefik.http.routers.crate-api-vdj-media.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
+      traefik.http.services.crate-api.loadbalancer.server.port: 8585
+      traefik.http.routers.crate-api.tls: ${TRAEFIK_TLS_ENABLED:-true}
+      traefik.http.routers.crate-api.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
+      traefik.http.middlewares.crate-api-compress.compress: true
+      traefik.http.middlewares.crate-api-compress.compress.encodings: gzip,br
+      traefik.http.middlewares.crate-api-compress.compress.minResponseBodyBytes: 1024
+      traefik.http.middlewares.crate-api-compress.compress.excludedContentTypes: text/event-stream,audio/mpeg,audio/flac,audio/x-flac,audio/mp4,audio/aac,audio/ogg,video/mp4,application/octet-stream,application/zip,application/x-zip-compressed,image/jpeg,image/png,image/webp,image/avif
+    command: ["api"]
+
+  crate-readplane:
+    logging: *default-logging
+    image: ${CRATE_READPLANE_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-readplane:${CRATE_IMAGE_TAG:-latest}}
+    container_name: crate-readplane
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-UTC}
+      READPLANE_ADDR: :8686
+      CRATE_POSTGRES_USER: ${CRATE_POSTGRES_USER:-crate}
+      CRATE_POSTGRES_PASSWORD: ${CRATE_POSTGRES_PASSWORD:-crate}
+      CRATE_POSTGRES_DB: ${CRATE_POSTGRES_DB:-crate}
+      CRATE_POSTGRES_HOST: crate-postgres
+      CRATE_POSTGRES_PORT: 5432
+      REDIS_URL: redis://:${REDIS_PASSWORD}@crate-redis:6379/0
+      REDIS_CACHE_URL: redis://:${REDIS_PASSWORD}@crate-redis:6379/0
+      REDIS_DURABLE_URL: redis://:${REDIS_PASSWORD}@crate-redis-durable:6379/0
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      READPLANE_ENABLED: ${READPLANE_ENABLED:-true}
+      READPLANE_ENABLE_SSE: ${READPLANE_ENABLE_SSE:-true}
+      READPLANE_ROUTE_MODE: ${READPLANE_ROUTE_MODE:-active}
+      READPLANE_FALLBACK_ENABLED: ${READPLANE_FALLBACK_ENABLED:-true}
+      READPLANE_FEDERATION_PROXY_ENABLED: ${READPLANE_FEDERATION_PROXY_ENABLED:-true}
+      CRATE_READPLANE_SERVICE_TOKEN: ${CRATE_READPLANE_SERVICE_TOKEN:?CRATE_READPLANE_SERVICE_TOKEN must be set}
+      READPLANE_FEDERATION_CONTROL_TIMEOUT_MS: ${READPLANE_FEDERATION_CONTROL_TIMEOUT_MS:-2000}
+      READPLANE_FEDERATION_CONNECT_TIMEOUT_MS: ${READPLANE_FEDERATION_CONNECT_TIMEOUT_MS:-5000}
+      READPLANE_FEDERATION_HEADER_TIMEOUT_MS: ${READPLANE_FEDERATION_HEADER_TIMEOUT_MS:-10000}
+      API_FALLBACK_BASE: http://crate-api:8585
+      READPLANE_MAX_DB_CONNS: ${READPLANE_MAX_DB_CONNS:-8}
+      READPLANE_MIN_DB_CONNS: ${READPLANE_MIN_DB_CONNS:-1}
+      READPLANE_QUERY_TIMEOUT_MS: ${READPLANE_QUERY_TIMEOUT_MS:-800}
+      READPLANE_SNAPSHOT_MAX_AGE_SECONDS: ${READPLANE_SNAPSHOT_MAX_AGE_SECONDS:-600}
+      READPLANE_STALE_MAX_AGE_SECONDS: ${READPLANE_STALE_MAX_AGE_SECONDS:-3600}
+      READPLANE_STATS_SNAPSHOT_MAX_AGE_SECONDS: ${READPLANE_STATS_SNAPSHOT_MAX_AGE_SECONDS:-300}
+      READPLANE_STATS_STALE_MAX_AGE_SECONDS: ${READPLANE_STATS_STALE_MAX_AGE_SECONDS:-86400}
+      READPLANE_SESSION_TOUCH_INTERVAL_SECONDS: ${READPLANE_SESSION_TOUCH_INTERVAL_SECONDS:-60}
+      READPLANE_LOCAL_MEDIA_ENABLED: ${READPLANE_LOCAL_MEDIA_ENABLED:-false}
+      READPLANE_MUSIC_ROOT: /music
+      READPLANE_CACHE_ROOT: /cache
+    volumes:
+      - ${MUSIC_DIR}:/music:ro
+      - ${CACHE_DIR:-./data/cache}:/cache:ro
+    depends_on:
+      crate-postgres:
+        condition: service_healthy
+      crate-redis:
+        condition: service_healthy
+      crate-redis-durable:
+        condition: service_healthy
+      crate-api:
+        condition: service_healthy
+    networks:
+      - crate
+    mem_limit: 128m
+    mem_reservation: 32m
+    cpus: "0.25"
+    labels:
+      traefik.enable: true
+      traefik.docker.network: crate
+      traefik.http.routers.crate-readplane-interactive.rule: Host(`api.${DOMAIN:-localhost}`) && (Method(`GET`) || Method(`HEAD`)) && (PathPrefix(`/api/catalog/`) || PathPrefix(`/api/me/home/`) || PathPrefix(`/api/me/albums`) || PathPrefix(`/api/me/follows`) || PathPrefix(`/api/genres`) || PathPrefix(`/api/artists/`) || PathPrefix(`/api/artist-slugs/`) || PathPrefix(`/api/albums/`) || Path(`/api/auth/me`) || Path(`/api/me`) || Path(`/api/me/history`) || Path(`/api/me/likes`) || Path(`/api/me/stats/dashboard`) || Path(`/api/search`) || Path(`/api/favorites`))
+      traefik.http.routers.crate-readplane-interactive.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
+      traefik.http.routers.crate-readplane-interactive.middlewares: crate-api-compress@docker
+      traefik.http.routers.crate-readplane-interactive.priority: 100
+      traefik.http.routers.crate-readplane-interactive.service: crate-readplane-interactive@file
+      traefik.http.routers.crate-readplane-interactive.tls: ${TRAEFIK_TLS_ENABLED:-true}
+      traefik.http.routers.crate-readplane-interactive.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
+      traefik.http.routers.crate-readplane-sse.rule: Host(`api.${DOMAIN:-localhost}`) && Method(`GET`) && (Path(`/api/cache/events`) || Path(`/api/me/home/discovery-stream`))
+      traefik.http.routers.crate-readplane-sse.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
+      traefik.http.routers.crate-readplane-sse.priority: 120
+      traefik.http.routers.crate-readplane-sse.service: crate-readplane-sse@file
+      traefik.http.routers.crate-readplane-sse.tls: ${TRAEFIK_TLS_ENABLED:-true}
+      traefik.http.routers.crate-readplane-sse.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
+      traefik.http.routers.crate-readplane-stream.rule: Host(`api.${DOMAIN:-localhost}`) && (Method(`GET`) || Method(`HEAD`)) && (PathPrefix(`/api/federation/remote/streams/`) || PathPrefix(`/api/tracks/`))
+      traefik.http.routers.crate-readplane-stream.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
+      traefik.http.routers.crate-readplane-stream.priority: 110
+      traefik.http.routers.crate-readplane-stream.tls: ${TRAEFIK_TLS_ENABLED:-true}
+      traefik.http.routers.crate-readplane-stream.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
+      traefik.http.routers.crate-readplane-stream.service: crate-readplane-stream@file
+      traefik.http.services.crate-readplane.loadbalancer.server.port: 8686
+
+  crate-worker:
+    logging: *default-logging
+    image: ${CRATE_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}}
+    container_name: crate-worker
+    restart: unless-stopped
+    user: ${PUID:-1000}:${PGID:-1000}
+    environment:
+      <<:
+        [
+          *crate-env,
+          *ai-credential-env,
+          *crate-enrichment-env,
+          *worker-resource-env,
+          *worker-native-env,
+        ]
+      CRATE_RUNTIME: worker
+      CRATE_MCP_ENABLED: ${CRATE_MCP_ENABLED:-false}
+      CRATE_MCP_ACTIONS_ENABLED: ${CRATE_MCP_ACTIONS_ENABLED:-false}
+      CRATE_MCP_OAUTH_ENABLED: ${CRATE_MCP_OAUTH_ENABLED:-false}
+      CRATE_MCP_OAUTH_ISSUER: ${CRATE_MCP_OAUTH_ISSUER:-}
+      CRATE_MCP_OAUTH_ALLOW_LOCALHOST: ${CRATE_MCP_OAUTH_ALLOW_LOCALHOST:-false}
+      CRATE_WORKER_PROCESSES: ${CRATE_WORKER_PROCESSES:-3}
+      FAST_WORKER_PROCESSES: ${FAST_WORKER_PROCESSES:-2}
+      MAINTENANCE_WORKER_PROCESSES: ${MAINTENANCE_WORKER_PROCESSES:-1}
+      ANALYSIS_WORKER_PROCESSES: ${ANALYSIS_WORKER_PROCESSES:-1}
+      PLAYBACK_WORKER_PROCESSES: ${PLAYBACK_WORKER_PROCESSES:-1}
+      CRATE_LEGACY_POOL_MAXCONN: ${CRATE_WORKER_LEGACY_POOL_MAXCONN:-4}
+      CRATE_SQLALCHEMY_POOL_SIZE: ${CRATE_WORKER_SQLALCHEMY_POOL_SIZE:-2}
+      CRATE_SQLALCHEMY_MAX_OVERFLOW: ${CRATE_WORKER_SQLALCHEMY_MAX_OVERFLOW:-1}
+    volumes:
+      - ${CRATE_CONFIG_FILE:-./app/config.yaml}:/app/config.yaml:ro
+      - ${MUSIC_DIR}:/music
+      - ${DOWNLOADS_DIR}:/downloads/soulseek
+      - ${DATA_DIR}/crate:/data
+      - ${CACHE_DIR:-./data/cache}:/cache
+    depends_on:
+      crate-postgres:
+        condition: service_healthy
+      crate-redis:
+        condition: service_healthy
+      crate-redis-durable:
+        condition: service_healthy
+    networks:
+      - crate
+    mem_limit: 1536m
+    mem_reservation: 512m
+    cpus: "0.75"
+    command:
+      [
+        "worker",
+        "--queues",
+        "default",
+        "--processes",
+        "${CRATE_WORKER_PROCESSES:-3}",
+        "--no-daemons",
+        "--no-projector",
+      ]
+
+  crate-fast-worker:
+    logging: *default-logging
+    extends:
+      service: crate-worker
+    container_name: crate-fast-worker
+    depends_on:
+      crate-postgres:
+        condition: service_healthy
+      crate-redis:
+        condition: service_healthy
+      crate-redis-durable:
+        condition: service_healthy
+    mem_limit: 768m
+    mem_reservation: 256m
+    cpus: "0.35"
+    command:
+      [
+        "worker",
+        "--queues",
+        "fast",
+        "--processes",
+        "${FAST_WORKER_PROCESSES:-2}",
+        "--no-service-loop",
+        "--no-daemons",
+        "--no-projector",
+        "--no-telegram",
+      ]
+
+  crate-projector:
+    logging: *default-logging
+    image: ${CRATE_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}}
+    container_name: crate-projector
+    restart: unless-stopped
+    user: ${PUID:-1000}:${PGID:-1000}
+    environment:
+      <<: *crate-env
+      CRATE_RUNTIME: projector
+      CRATE_MCP_ENABLED: ${CRATE_MCP_ENABLED:-false}
+      CRATE_PROJECTOR_INTERVAL_SECONDS: ${CRATE_PROJECTOR_INTERVAL_SECONDS:-5}
+      CRATE_PROJECTOR_BATCH_LIMIT: ${CRATE_PROJECTOR_BATCH_LIMIT:-200}
+      CRATE_LEGACY_POOL_MAXCONN: ${PROJECTOR_LEGACY_POOL_MAXCONN:-2}
+      CRATE_SQLALCHEMY_POOL_SIZE: ${PROJECTOR_SQLALCHEMY_POOL_SIZE:-1}
+      CRATE_SQLALCHEMY_MAX_OVERFLOW: ${PROJECTOR_SQLALCHEMY_MAX_OVERFLOW:-1}
+    volumes:
+      - ${CRATE_CONFIG_FILE:-./app/config.yaml}:/app/config.yaml:ro
+      - ${MUSIC_DIR}:/music:ro
+      - ${DATA_DIR}/crate:/data
+    depends_on:
+      crate-postgres:
+        condition: service_healthy
+      crate-redis:
+        condition: service_healthy
+      crate-redis-durable:
+        condition: service_healthy
+    networks:
+      - crate
+    mem_limit: 512m
+    mem_reservation: 128m
+    cpus: "0.25"
+    command: ["projector"]
+
+  crate-maintenance-worker:
+    logging: *default-logging
+    image: ${CRATE_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}}
+    container_name: crate-maintenance-worker
+    restart: unless-stopped
+    user: ${PUID:-1000}:${PGID:-1000}
+    environment:
+      <<:
+        [
+          *crate-env,
+          *ai-credential-env,
+          *crate-enrichment-env,
+          *worker-resource-env,
+          *worker-native-env,
+        ]
+      CRATE_RUNTIME: worker
+      CRATE_MCP_ENABLED: ${CRATE_MCP_ENABLED:-false}
+      CRATE_MCP_ACTIONS_ENABLED: ${CRATE_MCP_ACTIONS_ENABLED:-false}
+      CRATE_MCP_OAUTH_ENABLED: ${CRATE_MCP_OAUTH_ENABLED:-false}
+      CRATE_MCP_OAUTH_ISSUER: ${CRATE_MCP_OAUTH_ISSUER:-}
+      CRATE_MCP_OAUTH_ALLOW_LOCALHOST: ${CRATE_MCP_OAUTH_ALLOW_LOCALHOST:-false}
+      CRATE_LEGACY_POOL_MAXCONN: ${MAINTENANCE_LEGACY_POOL_MAXCONN:-2}
+      CRATE_SQLALCHEMY_POOL_SIZE: ${MAINTENANCE_SQLALCHEMY_POOL_SIZE:-1}
+      CRATE_SQLALCHEMY_MAX_OVERFLOW: ${MAINTENANCE_SQLALCHEMY_MAX_OVERFLOW:-1}
+    volumes:
+      - ${CRATE_CONFIG_FILE:-./app/config.yaml}:/app/config.yaml:ro
+      - ${MUSIC_DIR}:/music
+      - ${DATA_DIR}/crate:/data
+      - ${CACHE_DIR:-./data/cache}:/cache
+    depends_on:
+      crate-postgres:
+        condition: service_healthy
+      crate-redis:
+        condition: service_healthy
+      crate-redis-durable:
+        condition: service_healthy
+    networks:
+      - crate
+    mem_limit: 1g
+    mem_reservation: 384m
+    cpus: "0.5"
+    command:
+      [
+        "worker",
+        "--queues",
+        "maintenance",
+        "--processes",
+        "${MAINTENANCE_WORKER_PROCESSES:-1}",
+        "--no-service-loop",
+        "--no-daemons",
+        "--no-projector",
+        "--no-telegram",
+      ]
+
+  crate-analysis-worker:
+    logging: *default-logging
+    image: ${CRATE_ANALYSIS_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-analysis-worker:${CRATE_IMAGE_TAG:-latest}}
+    container_name: crate-analysis-worker
+    restart: unless-stopped
+    user: ${PUID:-1000}:${PGID:-1000}
+    environment:
+      <<:
+        [
+          *crate-env,
+          *worker-resource-env,
+          *worker-native-env,
+          *ai-credential-env,
+        ]
+      CRATE_RUNTIME: worker
+      CRATE_LEGACY_POOL_MAXCONN: ${ANALYSIS_LEGACY_POOL_MAXCONN:-2}
+      CRATE_SQLALCHEMY_POOL_SIZE: ${ANALYSIS_SQLALCHEMY_POOL_SIZE:-1}
+      CRATE_SQLALCHEMY_MAX_OVERFLOW: ${ANALYSIS_SQLALCHEMY_MAX_OVERFLOW:-1}
+    volumes:
+      - ${CRATE_CONFIG_FILE:-./app/config.yaml}:/app/config.yaml:ro
+      - ${MUSIC_DIR}:/music:ro
+      - ${DATA_DIR}/crate:/data
+    depends_on:
+      crate-postgres:
+        condition: service_healthy
+      crate-redis:
+        condition: service_healthy
+      crate-redis-durable:
+        condition: service_healthy
+    networks:
+      - crate
+    mem_limit: 2g
+    mem_reservation: 768m
+    cpus: "0.75"
+    command:
+      [
+        "worker",
+        "--queues",
+        "heavy",
+        "--processes",
+        "${ANALYSIS_WORKER_PROCESSES:-1}",
+        "--no-service-loop",
+        "--no-projector",
+        "--no-telegram",
+      ]
+
+  crate-playback-worker:
+    logging: *default-logging
+    image: ${CRATE_PLAYBACK_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-playback-worker:${CRATE_IMAGE_TAG:-latest}}
+    container_name: crate-playback-worker
+    restart: unless-stopped
+    user: ${PUID:-1000}:${PGID:-1000}
+    environment:
+      <<: [*crate-env, *worker-native-env]
+      CRATE_RUNTIME: worker
+      CRATE_STREAM_TRANSCODE_MAX_CONCURRENT: ${STREAM_TRANSCODE_MAX_CONCURRENT:-1}
+      CRATE_LEGACY_POOL_MAXCONN: ${PLAYBACK_LEGACY_POOL_MAXCONN:-2}
+      CRATE_SQLALCHEMY_POOL_SIZE: ${PLAYBACK_SQLALCHEMY_POOL_SIZE:-1}
+      CRATE_SQLALCHEMY_MAX_OVERFLOW: ${PLAYBACK_SQLALCHEMY_MAX_OVERFLOW:-1}
+    volumes:
+      - ${CRATE_CONFIG_FILE:-./app/config.yaml}:/app/config.yaml:ro
+      - ${MUSIC_DIR}:/music:ro
+      - ${DATA_DIR}/crate:/data
+      - ${CACHE_DIR:-./data/cache}:/cache
+    depends_on:
+      crate-postgres:
+        condition: service_healthy
+      crate-redis:
+        condition: service_healthy
+      crate-redis-durable:
+        condition: service_healthy
+    networks:
+      - crate
+    mem_limit: 1g
+    mem_reservation: 384m
+    cpus: "1.0"
+    command:
+      [
+        "worker",
+        "--queues",
+        "playback",
+        "--processes",
+        "${PLAYBACK_WORKER_PROCESSES:-1}",
+        "--no-service-loop",
+        "--no-daemons",
+        "--no-projector",
+        "--no-telegram",
+      ]
+
+  crate-ui:
+    logging: *default-logging
+    image: ${CRATE_UI_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-ui:${CRATE_IMAGE_TAG:-latest}}
+    container_name: crate-ui
+    restart: unless-stopped
+    depends_on:
+      crate-api:
+        condition: service_healthy
+    ports:
+      - "${CRATE_ADMIN_PORT:-8580}:80"
+    networks:
+      - crate
+    labels:
+      traefik.enable: true
+      traefik.docker.network: crate
+      traefik.http.routers.admin.rule: Host(`admin.${DOMAIN:-localhost}`)
+      traefik.http.routers.admin.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
+      traefik.http.services.admin.loadbalancer.server.port: 80
+      traefik.http.routers.admin.tls: ${TRAEFIK_TLS_ENABLED:-true}
+      traefik.http.routers.admin.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
+
+  crate-listen:
+    logging: *default-logging
+    image: ${CRATE_LISTEN_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-listen:${CRATE_IMAGE_TAG:-latest}}
+    container_name: crate-listen
+    restart: unless-stopped
+    depends_on:
+      crate-api:
+        condition: service_healthy
+    ports:
+      - "${CRATE_LISTEN_PORT:-8581}:80"
+    networks:
+      - crate
+    labels:
+      traefik.enable: true
+      traefik.docker.network: crate
+      traefik.http.routers.listen.rule: Host(`listen.${DOMAIN:-localhost}`)
+      traefik.http.routers.listen.entryPoints: ${TRAEFIK_SECURE_ENTRYPOINT:-websecure}
+      traefik.http.services.listen.loadbalancer.server.port: 80
+      traefik.http.routers.listen.tls: ${TRAEFIK_TLS_ENABLED:-true}
+      traefik.http.routers.listen.tls.certresolver: ${TRAEFIK_CERT_RESOLVER-}
+      traefik.http.middlewares.crate-auth.forwardAuth.address: http://crate-api:8585/api/auth/verify
+      traefik.http.middlewares.crate-auth.forwardAuth.trustForwardHeader: true
+      traefik.http.middlewares.crate-auth.forwardAuth.authResponseHeaders: Remote-User,Remote-Name,Remote-Role
+      traefik.http.middlewares.crate-auth-soft.forwardAuth.address: http://crate-api:8585/api/auth/verify-soft
+      traefik.http.middlewares.crate-auth-soft.forwardAuth.trustForwardHeader: true
+      traefik.http.middlewares.crate-auth-soft.forwardAuth.authResponseHeaders: Remote-User,Remote-Name,Remote-Role
+
+  crate-agent:
+    profiles: [agent]
+    logging: *default-logging
+    image: ${CRATE_AGENT_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-agent:${CRATE_IMAGE_TAG:-latest}}
+    container_name: crate-agent
+    restart: unless-stopped
+    mem_limit: 1g
+    cpus: 0.50
+    pids_limit: 192
+    security_opt:
+      - "no-new-privileges:true"
+    environment:
+      HERMES_UID: ${PUID:-1000}
+      HERMES_GID: ${PGID:-1000}
+      HERMES_HOME: /opt/data
+      HERMES_TIMEZONE: ${TZ:-UTC}
+      TZ: ${TZ:-UTC}
+      HERMES_MANAGED_DIR: /etc/hermes
+      CRATE_MCP_URL: ${CRATE_AGENT_MCP_URL:-http://crate-api:8585/mcp}
+      CRATE_MCP_HOST: ${CRATE_AGENT_MCP_HOST:-api.${DOMAIN}}
+      CRATE_AGENT_PROVIDER: ${CRATE_AGENT_PROVIDER:-}
+      CRATE_AGENT_MODEL: ${CRATE_AGENT_MODEL:-}
+      CRATE_AGENT_BASE_URL: ${CRATE_AGENT_BASE_URL:-}
+      CRATE_RELEASE_SHA: ${CRATE_RELEASE_SHA:-}
+    volumes:
+      - ${DATA_DIR}/crate-agent/home:/opt/data
+      - ${DATA_DIR}/crate-agent/secrets:/run/crate-hermes-secrets:ro
+      - ${DATA_DIR}/crate-agent/context:/opt/crate-context:ro
+    # The runtime renders the managed policy here on every start; console edits
+    # under the home cannot override it.
+    tmpfs:
+      - /etc/hermes:uid=${PUID:-1000},gid=${PGID:-1000},mode=0700
+    command: ["python3", "/opt/crate-hermes/runtime.py"]
+    healthcheck:
+      test: ["CMD", "python3", "/opt/crate-hermes/runtime.py", "--health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 180s
+      retries: 3
+    networks:
+      - crate
+    labels:
+      traefik.enable: false

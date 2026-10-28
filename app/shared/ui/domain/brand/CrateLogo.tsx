@@ -36,13 +36,12 @@ export function CrateLogo({
   const gradients = PATHS.map(
     (_, index) => `crate-logo-${instanceId}-${index}`,
   );
-  const titleId = `crate-logo-title-${instanceId}`;
 
   return (
     <svg
       {...props}
       aria-hidden={title ? undefined : true}
-      aria-labelledby={title ? titleId : undefined}
+      aria-label={title}
       className={cn("crate-logo", className)}
       data-crate-logo-effects={effects ? "on" : "off"}
       data-crate-logo-motion={reducedMotion ? "reduced" : "system"}
@@ -53,7 +52,6 @@ export function CrateLogo({
       xmlns="http://www.w3.org/2000/svg"
       fill="none"
     >
-      {title ? <title id={titleId}>{title}</title> : null}
       <defs>
         {gradients.map((id, index) => (
           <linearGradient key={id} id={id} x1="18%" y1="0%" x2="82%" y2="100%">

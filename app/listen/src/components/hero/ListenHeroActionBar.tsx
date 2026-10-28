@@ -19,8 +19,6 @@ export interface ListenHeroActionBarProps
   menu?: ListenHeroActionMenu;
 }
 
-const MENU_SURFACE_CLASS_NAME = "listen-glass-panel";
-
 function renderMediaImage({ src, ...props }: ContextMenuMediaImageProps) {
   return <CrateImage {...props} source={src} />;
 }
@@ -40,7 +38,6 @@ export function ListenHeroActionBar({
           ? {
               ...menu,
               sheetLabel: t("actions.menu.sheetLabel"),
-              surfaceClassName: MENU_SURFACE_CLASS_NAME,
               renderMediaImage,
             }
           : undefined

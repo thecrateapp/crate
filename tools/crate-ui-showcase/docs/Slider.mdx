@@ -1,0 +1,26 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/Slider.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">Slider</DocHeading>
+<EntryDetails id="slider" review="Visual review approved by Diego · 1AR" />
+<DocHeading as="h2">Contract</DocHeading>
+
+- General horizontal numeric range; use Input number when exact typed entry is required.
+- 2 px quiet rail, 8 px high-accent thumb, transparent surface and 40/44 px fine/coarse target. Keyboard focus, disabled opacity and warning state belong to the recipe.
+- Native min/max/step, Home/End/arrows, ref, name/form value and onChange are preserved. Mouse/touch/keyboard commit callbacks remain caller-owned. Playback progress, beam, volume and EQ controls keep their specialized contracts.
+- The approved persistent mockup and Diego's confirmed adjustments are the visual reference. Examples import the actual component; scene CSS does not repair its internals.
+
+<DocHeading as="h2">Real component</DocHeading>
+
+<Canvas of={Stories.Base} />
+
+<Canvas of={Stories.Disabled} />
+
+<Canvas of={Stories.Invalid} />
+
+<Controls of={Stories.Base} />
+
+Consumer adoption and platform QA are separate from this entry and its visual review.

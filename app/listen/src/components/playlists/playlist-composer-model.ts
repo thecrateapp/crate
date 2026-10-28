@@ -1,6 +1,11 @@
+import {
+  trackAlbumIdentity,
+  type CatalogTrack,
+  type TrackAlbumIdentity,
+} from "../search/catalog-search-model";
 import { arrayMove } from "@dnd-kit/sortable";
 
-export interface PlaylistComposerTrack {
+export interface PlaylistComposerTrack extends TrackAlbumIdentity {
   entityUid?: string;
   globalTrackUid?: string;
   title: string;
@@ -13,20 +18,13 @@ export interface PlaylistComposerTrack {
   playlistPosition?: number;
 }
 
-export interface SearchTrackResult {
-  id?: number | string;
-  entity_uid?: string;
-  global_track_uid?: string;
-  globalTrackUid?: string;
-  global_uid?: string;
-  title: string;
-  artist: string;
+export interface SearchTrackResult extends CatalogTrack {
   album: string;
-  path?: string | null;
   duration: number;
 }
 
 export function getTrackKey(track: PlaylistComposerTrack): string {
+  if (track.playlistEntryId != null) return `entry:${track.playlistEntryId}`;
   if (track.globalTrackUid) return `global:${track.globalTrackUid}`;
   if (track.entityUid) return `entity:${track.entityUid}`;
   if (track.libraryTrackId != null) return `id:${track.libraryTrackId}`;
@@ -51,6 +49,7 @@ export function toComposerTrack(
   track: SearchTrackResult,
 ): PlaylistComposerTrack {
   return {
+    ...trackAlbumIdentity(track),
     globalTrackUid: searchTrackGlobalUid(track),
     entityUid: track.entity_uid,
     libraryTrackId: typeof track.id === "number" ? track.id : undefined,

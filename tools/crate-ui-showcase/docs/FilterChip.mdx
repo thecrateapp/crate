@@ -1,0 +1,24 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/FilterChip.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+
+<DocHeading as="h1">FilterChip</DocHeading>
+
+<EntryDetails id="filter-chip" review="Visual review approved by Diego · 1AR" />
+
+<DocHeading as="h2">Contract</DocHeading>
+
+- An independent toggle uses `aria-pressed`; `variant=action` is an ordinary action button. Categorical form fields use Select.
+- Mono 400 at 12/16 px; 32 px visible height on every pointer, with an invisible 44 px coarse-pointer hit area so chips do not grow on touch screens; native disabled behavior.
+- The interactive story supports Space activation and reset. Do not turn this filter into content navigation.
+
+<DocHeading as="h2">Real component</DocHeading>
+
+<Canvas of={Stories.Interactive} />
+
+<Controls />
+
+The 1AQ reference remains approved. This entry has 1AR changes pending review; consumer adoption and platform QA remain separate.

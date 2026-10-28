@@ -1,3 +1,4 @@
+import { TooltipHint } from "@crate/ui/shadcn/tooltip";
 import {
   forwardRef,
   useEffect,
@@ -40,17 +41,24 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
       clearLabel = "Clear search",
       onClear,
       onChange,
+      onCompositionStart,
+      onCompositionEnd,
       className,
       containerClassName,
       disabled,
+      readOnly,
       ...props
     },
     ref,
   ) {
     const [uncontrolledValue, setUncontrolledValue] = useState(defaultValue);
+    const [composing, setComposing] = useState(false);
     const isControlled = controlledValue !== undefined;
     const value = isControlled ? controlledValue : uncontrolledValue;
-    const pendingEmission = useMemo(() => ({ value }), [value]);
+    const pendingEmission = useMemo(
+      () => ({ value, composing }),
+      [value, composing],
+    );
     const debouncedEmission = useDebouncedValue(pendingEmission, debounceMs);
     const lastEmittedRef = useRef(value);
     const onDebouncedChangeRef = useRef(onDebouncedChange);
@@ -61,6 +69,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     }, [onDebouncedChange]);
 
     useEffect(() => {
+      if (debouncedEmission.composing) return;
       const next = debouncedEmission.value;
       if (next === lastEmittedRef.current) return;
       lastEmittedRef.current = next;
@@ -87,7 +96,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
       innerRef.current?.focus();
     };
 
-    const showClear = clearable && value.length > 0 && !disabled;
+    const showClear = clearable && value.length > 0 && !disabled && !readOnly;
 
     return (
       <div
@@ -97,7 +106,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
         <Search
           aria-hidden="true"
           size={CRATE_ICON_SIZE.sm}
-          className="pointer-events-none absolute top-1/2 left-3.5 z-10 -translate-y-1/2 text-text-muted"
+          className="pointer-events-none absolute top-1/2 left-3.5 z-10 -translate-y-1/2 text-text-subtle"
         />
         <Input
           ref={(node) => {
@@ -109,24 +118,34 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           aria-label={label}
           value={value}
           onChange={handleChange}
+          onCompositionStart={(event) => {
+            setComposing(true);
+            onCompositionStart?.(event);
+          }}
+          onCompositionEnd={(event) => {
+            setComposing(false);
+            onCompositionEnd?.(event);
+          }}
           disabled={disabled}
+          readOnly={readOnly}
           className={cn(
             "pl-10 [&::-webkit-search-cancel-button]:appearance-none",
-            showClear && "pr-10",
+            showClear && "pr-11 pointer-coarse:pr-12",
             className,
           )}
           {...props}
         />
         {showClear ? (
-          <button
-            type="button"
-            aria-label={clearLabel}
-            title={clearLabel}
-            onClick={handleClear}
-            className="absolute top-1/2 right-2 z-10 inline-flex size-7 -translate-y-1/2 items-center justify-center rounded-full text-text-muted outline-none transition-colors hover:text-text-primary focus-visible:shadow-focus"
-          >
-            <X aria-hidden="true" size={CRATE_ICON_SIZE.sm} />
-          </button>
+          <TooltipHint content={clearLabel}>
+            <button
+              type="button"
+              aria-label={clearLabel}
+              onClick={handleClear}
+              className="crate-form-search-clear absolute top-1/2 right-1 z-10 inline-flex -translate-y-1/2 items-center justify-center rounded-full text-text-subtle transition-colors hover:text-text-primary"
+            >
+              <X aria-hidden="true" size={CRATE_ICON_SIZE.sm} />
+            </button>
+          </TooltipHint>
         ) : null}
       </div>
     );

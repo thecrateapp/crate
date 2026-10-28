@@ -1,8 +1,10 @@
 import { useId, useState } from "react";
-import { Plug, Plus, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { Link } from "react-router";
 
 import { Button } from "@crate/ui/shadcn/button";
+import { ActionButton } from "@crate/ui/primitives/ActionGroup";
+import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 
 import { OpsPanel } from "@/components/admin/ops-surfaces";
 import { RelativeTime } from "@/components/admin/RelativeTime";
@@ -10,6 +12,7 @@ import { StatusBadge } from "@/components/admin/StatusBadge";
 import { ConnectAgentDialog } from "@/components/agents/connections/ConnectAgentDialog";
 import { ConnectionSheet } from "@/components/agents/connections/ConnectionSheet";
 import { OAuthApps } from "@/components/agents/connections/OAuthApps";
+import { TelegramApprovers } from "@/components/agents/connections/TelegramApprovers";
 import { useCursorList } from "@/components/agents/connections/use-cursor-list";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
@@ -78,7 +81,7 @@ function ConnectionRow({
         aria-labelledby={nameId}
         aria-describedby={`${detailsId} ${statusId}`}
         onClick={onOpen}
-        className="flex w-full flex-col gap-2 rounded-md border border-white/10 bg-white/[0.02] p-4 text-left transition-colors hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring md:flex-row md:items-center md:justify-between"
+        className="flex w-full flex-col gap-2 rounded-md border border-border-quiet bg-card p-4 text-left transition-colors hover:bg-accent-action/[0.04] focus-visible:bg-accent-action/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring md:flex-row md:items-center md:justify-between"
       >
         <span className="block min-w-0 space-y-1">
           <span
@@ -138,6 +141,7 @@ export function AgentConnections() {
   const [selected, setSelected] = useState<AgentIntegration | null>(null);
   // Remounting the OAuth apps panel reloads its list from the first page.
   const [oauthGeneration, setOauthGeneration] = useState(0);
+  const [approverGeneration, setApproverGeneration] = useState(0);
 
   if (!canManage) {
     return (
@@ -150,9 +154,9 @@ export function AgentConnections() {
   // The sheet shows the freshest copy: the one it re-read after a change
   // (patched into the list as well) or the list's own after a reload.
   const current = selected
-    ? connections.items.find(
+    ? (connections.items.find(
         (item) => item.principal_id === selected.principal_id,
-      ) ?? selected
+      ) ?? selected)
     : null;
   const error = catalog.error
     ? catalog.error
@@ -170,6 +174,7 @@ export function AgentConnections() {
     connections.reload();
     catalog.refetch();
     setOauthGeneration((value) => value + 1);
+    setApproverGeneration((value) => value + 1);
   }
 
   function connectionChanged(fresh: AgentIntegration) {
@@ -201,37 +206,28 @@ export function AgentConnections() {
               <Link to="/agents/approvals">Review plans</Link>
             </Button>
           ) : null}
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="Refresh connections"
-            onClick={refreshAll}
-          >
+          <ActionButton label="Refresh connections" onClick={refreshAll}>
             <RefreshCw className="size-4" aria-hidden="true" />
-          </Button>
+          </ActionButton>
           <Button disabled={!catalog.data} onClick={() => setConnectOpen(true)}>
-            <Plus className="size-4" aria-hidden="true" />
             Connect an agent
           </Button>
         </div>
       </div>
 
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm text-state-warning-text">
           {apiErrorText(error, "The connections could not be loaded.")}
         </p>
       ) : null}
 
       <OpsPanel
-        icon={Plug}
         title="Connections"
         description="Agents that can reach Crate with a token or through an OAuth sign-in."
       >
         <div className="space-y-3">
           {listLoading ? (
-            <p role="status" className="text-sm text-muted-foreground">
-              Loading connections…
-            </p>
+            <LoadingState label="Loading connections" />
           ) : null}
           {!listLoading && !error && connections.items.length === 0 ? (
             <p className="text-sm text-muted-foreground">
@@ -276,6 +272,15 @@ export function AgentConnections() {
           ) : null}
         </div>
       </OpsPanel>
+
+      {!listLoading ? (
+        <TelegramApprovers
+          key={approverGeneration}
+          connections={connections.items.filter(
+            (item) => item.kind === "service",
+          )}
+        />
+      ) : null}
 
       {catalog.data ? (
         <OAuthApps key={oauthGeneration} catalog={catalog.data} />

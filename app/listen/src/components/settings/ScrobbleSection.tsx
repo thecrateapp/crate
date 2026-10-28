@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { notify } from "@crate/ui/lib/notify";
-import { Button } from "@crate/ui/shadcn/button";
-import { Input } from "@crate/ui/shadcn/input";
 
-import { Section, ToggleRow } from "@/components/settings/SettingsPrimitives";
+import {
+  ScrobbleSettingsView,
+  type ScrobbleStatus,
+} from "./ScrobbleSettingsView";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { AUTH_TOKEN_EVENT } from "@/lib/auth-session";
@@ -17,25 +18,13 @@ import {
 } from "@/lib/native-lastfm-oauth";
 import { isTauriRuntime } from "@/lib/platform";
 import { SERVER_STORE_EVENT } from "@/lib/server-store";
-import { cn } from "@/lib/utils";
-
-const CONNECT_BUTTON_CLASS_NAME =
-  "h-auto bg-accent-action/15 px-4 py-2 text-xs text-accent-action hover:bg-accent-action/25";
-const DISCONNECT_BUTTON_CLASS_NAME =
-  "h-auto border-0 bg-state-danger/15 px-4 py-2 text-xs text-state-danger hover:bg-state-danger/25";
-const CANCEL_BUTTON_CLASS_NAME =
-  "h-auto bg-text-primary/5 px-4 py-2 text-xs text-text-muted hover:bg-text-primary/10";
-
-interface ScrobbleProviderStatus {
-  connected: boolean;
-  username?: string;
-}
-
-type ScrobbleStatus = Record<string, ScrobbleProviderStatus>;
 
 export function ScrobbleSection() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [refreshAttempt, setRefreshAttempt] = useState(0);
   const [status, setStatus] = useState<ScrobbleStatus>({});
   const [lbToken, setLbToken] = useState("");
   const [connecting, setConnecting] = useState<string | null>(null);
@@ -66,15 +55,31 @@ export function ScrobbleSection() {
   }, [user?.id]);
 
   useEffect(() => {
-    void Promise.allSettled([
-      api<ScrobbleStatus>("/api/me/scrobble/status").then(setStatus),
+    let active = true;
+    setLoading(true);
+    setLoadError(false);
+    void Promise.all([
+      api<ScrobbleStatus>("/api/me/scrobble/status"),
       api<{ remote_scrobbling_enabled: boolean }>(
         "/api/me/scrobble/preferences",
-      ).then((preference) =>
-        setRemoteScrobblingEnabled(preference.remote_scrobbling_enabled),
       ),
-    ]);
-  }, []);
+    ])
+      .then(([nextStatus, preference]) => {
+        if (active) {
+          setStatus(nextStatus);
+          setRemoteScrobblingEnabled(preference.remote_scrobbling_enabled);
+        }
+      })
+      .catch(() => {
+        if (active) setLoadError(true);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [refreshAttempt]);
 
   const updateRemoteScrobbling = async (enabled: boolean) => {
     const previous = remoteScrobblingEnabled;
@@ -143,8 +148,15 @@ export function ScrobbleSection() {
   };
 
   const handleNativeLastfmCancel = async () => {
-    await cancelNativeLastfmLink(user?.id);
-    setNativeLastfmPending(false);
+    setConnecting("lastfm");
+    try {
+      await cancelNativeLastfmLink(user?.id);
+      setNativeLastfmPending(false);
+    } catch {
+      notify.error(t("settings.scrobbling.toasts.cancelFailed"));
+    } finally {
+      setConnecting(null);
+    }
   };
 
   const handleLastfmCallback = useCallback(
@@ -189,6 +201,7 @@ export function ScrobbleSection() {
   };
 
   const handleDisconnect = async (provider: string) => {
+    setConnecting(provider);
     try {
       await api(`/api/me/scrobble/${provider}`, "DELETE");
       setStatus((previous) => ({
@@ -202,6 +215,8 @@ export function ScrobbleSection() {
       );
     } catch {
       notify.error(t("common.toasts.disconnectFailed"));
+    } finally {
+      setConnecting(null);
     }
   };
 
@@ -215,150 +230,25 @@ export function ScrobbleSection() {
     }
   }, [handleLastfmCallback]);
 
-  const lastfm = status.lastfm;
-  const listenbrainz = status.listenbrainz;
-
   return (
-    <Section
-      title={t("settings.scrobbling.title")}
-      description={t("settings.scrobbling.description")}
-    >
-      <div className={savingRemotePreference ? "opacity-70" : undefined}>
-        <ToggleRow
-          label={t("settings.scrobbling.remotePlays")}
-          description={t("settings.scrobbling.remotePlaysDescription")}
-          checked={remoteScrobblingEnabled}
-          onChange={(enabled) => void updateRemoteScrobbling(enabled)}
-        />
-      </div>
-
-      <div className="flex items-center justify-between">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-text-primary">Last.fm</p>
-          {lastfm?.connected ? (
-            <p className="text-xs text-state-success">
-              {lastfm.username
-                ? t("settings.scrobbling.connectedAs", {
-                    username: lastfm.username,
-                  })
-                : t("common.connected")}
-            </p>
-          ) : (
-            <p className="text-xs text-text-muted">
-              {t("common.notConnected")}
-            </p>
-          )}
-        </div>
-        {lastfm?.connected ? (
-          <Button
-            variant="danger-soft"
-            shape="pill"
-            onClick={() => handleDisconnect("lastfm")}
-            className={DISCONNECT_BUTTON_CLASS_NAME}
-          >
-            {t("common.disconnect")}
-          </Button>
-        ) : isTauriRuntime && nativeLastfmPending ? (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              shape="pill"
-              onClick={() => void handleNativeLastfmComplete()}
-              disabled={connecting === "lastfm"}
-              className={CONNECT_BUTTON_CLASS_NAME}
-            >
-              {connecting === "lastfm"
-                ? t("common.connecting")
-                : t("settings.scrobbling.finishConnection")}
-            </Button>
-            <Button
-              variant="ghost"
-              shape="pill"
-              onClick={() => void handleNativeLastfmCancel()}
-              disabled={connecting === "lastfm"}
-              className={CANCEL_BUTTON_CLASS_NAME}
-            >
-              {t("settings.scrobbling.cancelConnection")}
-            </Button>
-          </div>
-        ) : (
-          <Button
-            variant="secondary"
-            shape="pill"
-            onClick={handleLastfmConnect}
-            disabled={connecting === "lastfm"}
-            className={CONNECT_BUTTON_CLASS_NAME}
-          >
-            {connecting === "lastfm"
-              ? t("common.connecting")
-              : t("common.connect")}
-          </Button>
-        )}
-      </div>
-
-      {isTauriRuntime && nativeLastfmPending ? (
-        <p className="text-xs text-text-muted" aria-live="polite">
-          {t("settings.scrobbling.nativeAuthPending")}
-        </p>
-      ) : null}
-
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-text-primary">ListenBrainz</p>
-          {listenbrainz?.connected ? (
-            <p className="text-xs text-state-success">
-              {listenbrainz.username
-                ? t("settings.scrobbling.connectedAs", {
-                    username: listenbrainz.username,
-                  })
-                : t("common.connected")}
-            </p>
-          ) : (
-            <p className="text-xs text-text-muted">
-              {t("common.notConnected")}
-            </p>
-          )}
-        </div>
-        {listenbrainz?.connected ? (
-          <Button
-            variant="danger-soft"
-            shape="pill"
-            onClick={() => handleDisconnect("listenbrainz")}
-            className={DISCONNECT_BUTTON_CLASS_NAME}
-          >
-            {t("common.disconnect")}
-          </Button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Input
-              type="text"
-              value={lbToken}
-              onChange={(event) => setLbToken(event.target.value)}
-              placeholder={t("settings.scrobbling.apiToken")}
-              aria-label={t("settings.scrobbling.apiToken")}
-              className="h-9 w-36 rounded-lg border-border-quiet/10 bg-text-primary/5 px-3 py-0 shadow-none backdrop-blur-none focus-visible:border-accent-action/50 md:text-base"
-              onKeyDown={(event) => {
-                if (
-                  !event.nativeEvent.isComposing &&
-                  event.nativeEvent.keyCode !== 229 &&
-                  event.key === "Enter"
-                ) {
-                  void handleListenBrainzConnect();
-                }
-              }}
-            />
-            <Button
-              variant="secondary"
-              shape="pill"
-              onClick={handleListenBrainzConnect}
-              disabled={connecting === "listenbrainz" || !lbToken.trim()}
-              className={cn(CONNECT_BUTTON_CLASS_NAME, "h-9 py-0")}
-            >
-              {connecting === "listenbrainz" ? "..." : t("common.connect")}
-            </Button>
-          </div>
-        )}
-      </div>
-    </Section>
+    <ScrobbleSettingsView
+      status={status}
+      loading={loading}
+      loadError={loadError}
+      onRetry={() => setRefreshAttempt((attempt) => attempt + 1)}
+      remoteScrobblingEnabled={remoteScrobblingEnabled}
+      savingRemotePreference={savingRemotePreference}
+      onRemoteChange={(enabled) => void updateRemoteScrobbling(enabled)}
+      lbToken={lbToken}
+      onTokenChange={setLbToken}
+      connecting={connecting}
+      nativeLastfmPending={nativeLastfmPending}
+      isTauriRuntime={isTauriRuntime}
+      onLastfmConnect={() => void handleLastfmConnect()}
+      onNativeComplete={() => void handleNativeLastfmComplete()}
+      onNativeCancel={() => void handleNativeLastfmCancel()}
+      onListenBrainzConnect={() => void handleListenBrainzConnect()}
+      onDisconnect={(provider) => void handleDisconnect(provider)}
+    />
   );
 }

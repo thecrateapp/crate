@@ -1,0 +1,104 @@
+.artist-network {
+  container-type: inline-size;
+  min-width: 0;
+  margin: 0;
+}
+
+.artist-network-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 4fr);
+  gap: clamp(24px, 3vw, 48px);
+  align-items: start;
+  margin-top: 12px;
+}
+
+.artist-network-stage {
+  position: relative;
+  min-width: 0;
+}
+
+.artist-network-inspector {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 16px;
+  border-left: 1px solid var(--border-quiet);
+  padding-left: clamp(16px, 1.7vw, 26px);
+}
+
+@container (width < 760px) {
+  .artist-network-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .artist-network-inspector {
+    border-left: 0;
+    border-top: 1px solid var(--border-quiet);
+    padding-left: 0;
+    padding-top: 20px;
+  }
+}
+
+.artist-network-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 14px 0;
+  border-top: 1px solid var(--border-quiet);
+  border-bottom: 1px solid var(--border-quiet);
+}
+
+.artist-network-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px 18px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-quiet);
+  color: var(--text-muted);
+  font-family: var(--font-mono-stack);
+  font-size: var(--type-meta-size);
+  letter-spacing: 0.04em;
+}
+
+.artist-network-key__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.artist-network-key__mark {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+}
+
+.artist-network-key__mark--library {
+  background: var(--accent-action);
+}
+
+.artist-network-key__mark--missing {
+  border: 1px solid var(--border-interactive);
+  background: var(--surface-object);
+}
+
+.artist-network-key__mark--shows {
+  border: 1.5px dashed var(--state-warning-text);
+}
+
+.artist-network-key__mark--expanded {
+  background: var(--accent-action);
+  box-shadow:
+    0 0 0 2px var(--surface-canvas),
+    0 0 0 3px var(--accent-action-hi);
+}
+
+.artist-network-key__line {
+  display: inline-block;
+  width: 22px;
+  border-top: 1.5px solid var(--accent-action-hi);
+}

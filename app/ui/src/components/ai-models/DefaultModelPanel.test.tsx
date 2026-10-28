@@ -109,8 +109,8 @@ function withoutOverrides(snapshot: Snapshot): Snapshot {
 }
 
 async function choose(user: UserEvent, select: string, option: string) {
-  await user.click(screen.getByRole("button", { name: select }));
-  await user.click(await screen.findByRole("button", { name: option }));
+  await user.click(screen.getByRole("combobox", { name: select }));
+  await user.click(await screen.findByRole("option", { name: option }));
 }
 
 beforeEach(() => {
@@ -544,30 +544,30 @@ describe("DefaultModelPanel", () => {
     );
 
     await choose(user, "Connection", "Studio");
-    expect(screen.getByRole("button", { name: "Model" })).toHaveTextContent(
+    expect(screen.getByRole("combobox", { name: "Model" })).toHaveTextContent(
       "Choose a model",
     );
-    await user.click(screen.getByRole("button", { name: "Model" }));
+    await user.click(screen.getByRole("combobox", { name: "Model" }));
     expect(
-      screen.queryByRole("button", { name: "Pending" }),
+      screen.queryByRole("option", { name: "Pending" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Chat" }),
+      screen.queryByRole("option", { name: "Chat" }),
     ).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Vision" }));
+    await user.click(screen.getByRole("option", { name: "Vision" }));
     await choose(user, "Reasoning", "High");
-    expect(screen.getByRole("button", { name: "Reasoning" })).toHaveTextContent(
-      "High",
-    );
+    expect(
+      screen.getByRole("combobox", { name: "Reasoning" }),
+    ).toHaveTextContent("High");
 
     await choose(user, "Model", "Budget");
-    const reasoning = screen.getByRole("button", { name: "Reasoning" });
+    const reasoning = screen.getByRole("combobox", { name: "Reasoning" });
     expect(reasoning).toHaveTextContent("Provider default");
     await user.click(reasoning);
-    const menu = await screen.findByRole("dialog");
+    const menu = await screen.findByRole("listbox");
     expect(
       within(menu)
-        .getAllByRole("button")
+        .getAllByRole("option")
         .map((option) => option.textContent),
     ).toEqual(["Provider default", "Off", "On", "Thinking: 100 tokens"]);
   });
@@ -598,7 +598,7 @@ describe("DefaultModelPanel", () => {
     );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByText(/Current default: gemini-3.8-flash/)).toBeVisible();
-    expect(screen.getByRole("button", { name: "Model" })).toHaveTextContent(
+    expect(screen.getByRole("combobox", { name: "Model" })).toHaveTextContent(
       "Gemini 3.8 Flash",
     );
   });
@@ -822,7 +822,7 @@ describe("DefaultModelPanel", () => {
       screen.queryByRole("button", { name: "Use for all features" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Model" }),
+      screen.queryByRole("combobox", { name: "Model" }),
     ).not.toBeInTheDocument();
   });
 });

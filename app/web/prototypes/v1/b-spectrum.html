@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crate · Hero B · Spectrum</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="shared.css" />
+    <style>
+      #spectrum {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 0;
+      }
+
+      .hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+        background:
+          repeating-linear-gradient(0deg, rgba(10, 10, 15, 0.55) 0 1px, transparent 1px 3px),
+          radial-gradient(110% 80% at 0% 45%, rgba(10, 10, 15, 0.9) 0%, rgba(10, 10, 15, 0.45) 45%, rgba(10, 10, 15, 0) 75%);
+      }
+
+      .scan {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 18vh;
+        z-index: 2;
+        pointer-events: none;
+        background: linear-gradient(rgba(103, 232, 249, 0), rgba(103, 232, 249, 0.05), rgba(103, 232, 249, 0));
+        animation: scan 7s linear infinite;
+      }
+
+      @keyframes scan {
+        from { transform: translateY(-20vh); }
+        to { transform: translateY(120vh); }
+      }
+
+      .h1-wrap {
+        position: relative;
+      }
+
+      .h1-wrap .slice {
+        position: absolute;
+        inset: 0;
+        margin: 0;
+        pointer-events: none;
+        opacity: 0;
+        color: var(--cyan-hi);
+      }
+
+      .decks {
+        position: absolute;
+        z-index: 4;
+        right: clamp(16px, 4vw, 48px);
+        top: clamp(96px, 16vh, 150px);
+        width: 280px;
+        display: grid;
+        gap: 18px;
+      }
+
+      .deck {
+        border-left: 1px solid rgba(103, 232, 249, 0.3);
+        padding: 4px 0 4px 14px;
+        line-height: 1.9;
+        background: rgba(10, 10, 15, 0.4);
+      }
+
+      .deck .title {
+        color: var(--fg);
+        opacity: 0.85;
+      }
+
+      .deck.active {
+        border-left-color: var(--cyan-hi);
+      }
+
+      .row {
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .xfade {
+        position: relative;
+        height: 18px;
+        margin-top: 8px;
+        border-top: 1px solid rgba(103, 232, 249, 0.25);
+      }
+
+      .xfade .knob {
+        position: absolute;
+        top: -5px;
+        left: 0;
+        width: 2px;
+        height: 10px;
+        background: var(--cyan-hi);
+        box-shadow: 0 0 10px var(--cyan-hi);
+      }
+
+      .beats {
+        display: flex;
+        gap: 6px;
+        margin-top: 6px;
+      }
+
+      .beats span {
+        width: 10px;
+        height: 4px;
+        background: rgba(103, 232, 249, 0.18);
+      }
+
+      .beats span.on {
+        background: var(--cyan-hi);
+        box-shadow: 0 0 8px var(--cyan-hi);
+      }
+
+      .screen-frame {
+        opacity: 0;
+        transform: scaleY(0.02);
+      }
+
+      @media (max-width: 1100px) {
+        .decks {
+          position: relative;
+          z-index: 10;
+          right: auto;
+          top: auto;
+          width: auto;
+          grid-template-columns: 1fr 1fr;
+          padding: 0 clamp(16px, 5vw, 72px) 48px;
+        }
+        .decks .xfade-wrap {
+          grid-column: 1 / -1;
+          order: 3;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="proto-nav">
+      <a class="brand" href="index.html"><img src="../../public/icons/logo.svg" alt="" />Crate</a>
+      <div class="links-right">
+        <a href="#">Listen</a><a href="#">Admin</a><a href="#">Architecture</a><a href="#">Developers</a><a href="#">GitHub</a>
+      </div>
+    </header>
+
+    <section class="hero">
+      <canvas id="spectrum" aria-hidden="true"></canvas>
+      <div class="scan" aria-hidden="true"></div>
+      <div class="hud-frame"></div>
+      <div class="hero-copy"></div>
+      <aside class="decks hud-label" aria-hidden="true">
+        <div class="deck active" id="deck-a">
+          <div class="title">Deck A · playing</div>
+          <div class="row"><span>BPM</span><span data-field="bpm">124.0</span></div>
+          <div class="row"><span>Key</span><span data-field="key">8A</span></div>
+          <div class="row"><span>Loudness</span><span data-field="lufs">-8.4 LUFS</span></div>
+          <div class="row"><span>Energy</span><span data-field="energy">0.71</span></div>
+          <div class="beats"><span></span><span></span><span></span><span></span></div>
+        </div>
+        <div class="xfade-wrap">
+          <div class="row"><span>Smart mix</span><span id="xfade-label">outro cue in 6.0 s</span></div>
+          <div class="xfade"><span class="knob"></span></div>
+        </div>
+        <div class="deck" id="deck-b">
+          <div class="title">Deck B · cued</div>
+          <div class="row"><span>BPM</span><span data-field="bpm">126.0</span></div>
+          <div class="row"><span>Key</span><span data-field="key">9A</span></div>
+          <div class="row"><span>Loudness</span><span data-field="lufs">-7.9 LUFS</span></div>
+          <div class="row"><span>Energy</span><span data-field="energy">0.78</span></div>
+          <div class="row"><span>Harmonic</span><span data-field="harmonic">adjacent · 0.80</span></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="next-section">
+      <div class="screen-frame">
+        <span class="hud-label">// 01 Library · screencast</span>
+        <span class="hud-label">[ chapter video ]</span>
+      </div>
+    </section>
+
+    <div class="proto-tag">Prototype B · Spectrum · synthetic signal</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"></script>
+    <script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+    <script type="module">
+      import { mountHero, playIntro, reducedMotion, scrambleText } from "./hero.js";
+
+      const copyRoot = document.querySelector(".hero-copy");
+      mountHero(copyRoot, document.querySelector(".hud-frame"));
+
+      const h1 = copyRoot.querySelector("h1");
+      const wrap = document.createElement("div");
+      wrap.className = "h1-wrap";
+      h1.replaceWith(wrap);
+      wrap.appendChild(h1);
+      const slices = [0, 1].map(() => {
+        const slice = document.createElement("h1");
+        slice.className = "slice";
+        slice.setAttribute("aria-hidden", "true");
+        slice.textContent = "Crate is not a streaming service.";
+        wrap.appendChild(slice);
+        return slice;
+      });
+
+      playIntro({ delay: 250 });
+
+      const { gsap, ScrollTrigger } = window;
+      gsap.registerPlugin(ScrollTrigger);
+
+      if (!reducedMotion) {
+        const lenis = new window.Lenis({ lerp: 0.09 });
+        lenis.on("scroll", ScrollTrigger.update);
+        gsap.ticker.add((time) => lenis.raf(time * 1000));
+        gsap.ticker.lagSmoothing(0);
+      }
+
+      const BANDS = 24;
+      const canvas = document.getElementById("spectrum");
+      const ctx = canvas.getContext("2d");
+      const levels = new Float32Array(BANDS);
+      const peaks = new Float32Array(BANDS);
+      const state = { amplitude: 1, bpm: 124 };
+
+      function resize() {
+        const dpr = Math.min(devicePixelRatio, 2);
+        canvas.width = canvas.clientWidth * dpr;
+        canvas.height = canvas.clientHeight * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      resize();
+      addEventListener("resize", resize);
+
+      function bandTarget(band, beatPhase, barPhase, t) {
+        const low = 1 - band / BANDS;
+        const kick = Math.exp(-beatPhase * 7) * Math.max(0, 1 - band / 5);
+        const onSnare = (barPhase > 0.25 && barPhase < 0.3) || (barPhase > 0.75 && barPhase < 0.8);
+        const snare = onSnare ? 0.55 * Math.max(0, 1 - Math.abs(band - 10) / 8) : 0;
+        const hat = Math.exp(-((beatPhase + 0.5) % 1) * 12) * Math.max(0, (band - 15) / 9);
+        const body =
+          0.32 + 0.38 * low + 0.12 * Math.sin(t * 0.9 + band * 0.7) + 0.08 * Math.sin(t * 2.3 + band * 1.9);
+        return Math.min(1, body * 0.7 + kick * 0.9 + snare + hat * 0.7 + Math.random() * 0.05);
+      }
+
+      const beatDots = [...document.querySelectorAll(".beats span")];
+      let lastBeat = -1;
+
+      function sliceTitle() {
+        slices.forEach((element, index) => {
+          const top = Math.random() * 70;
+          const height = 6 + Math.random() * 14;
+          gsap.fromTo(
+            element,
+            {
+              opacity: 0.85,
+              x: (index ? -1 : 1) * (6 + Math.random() * 10),
+              clipPath: `inset(${top}% 0 ${100 - top - height}% 0)`,
+            },
+            { opacity: 0, x: 0, duration: 0.18, ease: "steps(3)" },
+          );
+        });
+      }
+
+      function draw(time) {
+        const t = time / 1000;
+        const beatLength = 60 / state.bpm;
+        const beatIndex = Math.floor(t / beatLength);
+        const beatPhase = (t % beatLength) / beatLength;
+        const barPhase = ((t / beatLength) % 4) / 4;
+
+        if (beatIndex !== lastBeat) {
+          lastBeat = beatIndex;
+          beatDots.forEach((dot, index) => dot.classList.toggle("on", index === beatIndex % 4));
+          if (beatIndex % 8 === 0 && beatIndex > 4) sliceTitle();
+        }
+
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
+        ctx.clearRect(0, 0, width, height);
+        const gap = Math.max(4, width * 0.006);
+        const barWidth = (width - gap * (BANDS + 1)) / BANDS;
+        const maxHeight = height * 0.82;
+
+        for (let band = 0; band < BANDS; band++) {
+          const target = bandTarget(band, beatPhase, barPhase, t) * state.amplitude;
+          levels[band] += (target - levels[band]) * (target > levels[band] ? 0.55 : 0.12);
+          peaks[band] = Math.max(peaks[band] - 0.006, levels[band]);
+
+          const x = gap + band * (barWidth + gap);
+          const barHeight = levels[band] * maxHeight;
+          const gradient = ctx.createLinearGradient(0, height, 0, height - barHeight);
+          gradient.addColorStop(0, "rgba(6, 182, 212, 0.05)");
+          gradient.addColorStop(1, "rgba(6, 182, 212, 0.42)");
+          ctx.fillStyle = gradient;
+          ctx.fillRect(x, height - barHeight, barWidth, barHeight);
+
+          ctx.fillStyle = "rgba(10, 10, 15, 0.55)";
+          for (let y = height - 6; y > height - barHeight; y -= 6) {
+            ctx.fillRect(x, y, barWidth, 1.5);
+          }
+
+          ctx.fillStyle = "rgba(103, 232, 249, 0.9)";
+          ctx.fillRect(x, height - peaks[band] * maxHeight - 3, barWidth, 2);
+        }
+      }
+
+      const deckA = document.getElementById("deck-a");
+      const deckB = document.getElementById("deck-b");
+      const knob = document.querySelector(".xfade .knob");
+      const xfadeLabel = document.getElementById("xfade-label");
+      const KEYS = ["8A", "9A", "7A", "8B", "10A", "5A"];
+      let active = deckA;
+      let cued = deckB;
+      let cycleStart = performance.now();
+      const CYCLE_MS = 9000;
+      const FADE_MS = 3000;
+
+      function loadTrack(deck, fromKey) {
+        const key = KEYS[Math.floor(Math.random() * KEYS.length)];
+        const values = {
+          bpm: (118 + Math.random() * 12).toFixed(1),
+          key,
+          lufs: `${(-6 - Math.random() * 5).toFixed(1)} LUFS`,
+          energy: (0.5 + Math.random() * 0.45).toFixed(2),
+          harmonic: key === fromKey ? "same key · 1.00" : "adjacent · 0.80",
+        };
+        for (const [field, value] of Object.entries(values)) {
+          const element = deck.querySelector(`[data-field="${field}"]`);
+          if (element) scrambleText(element, value, 500);
+        }
+      }
+
+      function tickDecks(now) {
+        const elapsed = now - cycleStart;
+        const fadeStart = CYCLE_MS - FADE_MS;
+        if (elapsed < fadeStart) {
+          xfadeLabel.textContent = `outro cue in ${((fadeStart - elapsed) / 1000).toFixed(1)} s`;
+          knob.style.left = active === deckA ? "0%" : "calc(100% - 2px)";
+          return;
+        }
+        if (elapsed < CYCLE_MS) {
+          const progress = (elapsed - fadeStart) / FADE_MS;
+          const position = active === deckA ? progress : 1 - progress;
+          knob.style.left = `calc(${position * 100}% - ${position * 2}px)`;
+          xfadeLabel.textContent = `equal-power fade ${(progress * 100).toFixed(0)}%`;
+          return;
+        }
+        [active, cued] = [cued, active];
+        active.classList.add("active");
+        cued.classList.remove("active");
+        active.querySelector(".title").textContent = `Deck ${active === deckA ? "A" : "B"} · playing`;
+        cued.querySelector(".title").textContent = `Deck ${cued === deckA ? "A" : "B"} · cued`;
+        active.appendChild(document.querySelector(".beats"));
+        state.bpm = Number(active.querySelector('[data-field="bpm"]').textContent) || 124;
+        loadTrack(cued, active.querySelector('[data-field="key"]').textContent);
+        cycleStart = now;
+      }
+
+      if (reducedMotion) {
+        for (let band = 0; band < BANDS; band++) {
+          levels[band] = bandTarget(band, 0.5, 0.1, 0);
+          peaks[band] = levels[band];
+        }
+        draw(0);
+      } else {
+        let visible = true;
+        new IntersectionObserver(([entry]) => (visible = entry.isIntersecting)).observe(canvas);
+        const loop = (time) => {
+          if (visible && !document.hidden) {
+            draw(time);
+            tickDecks(time);
+          }
+          requestAnimationFrame(loop);
+        };
+        requestAnimationFrame(loop);
+
+        ScrollTrigger.create({
+          trigger: ".hero",
+          start: "top top",
+          end: "bottom top",
+          scrub: true,
+          onUpdate: (self) => {
+            state.amplitude = 1 - self.progress * 0.95;
+            gsap.set(".hero-copy, .decks", { opacity: 1 - self.progress * 1.5, y: -self.progress * 100 });
+          },
+        });
+
+        gsap
+          .timeline({
+            scrollTrigger: { trigger: ".next-section", start: "top 90%", end: "top 20%", scrub: true },
+          })
+          .to(".screen-frame", { opacity: 1, duration: 0.2, ease: "none" })
+          .to(".screen-frame", { scaleY: 1, duration: 0.8, ease: "power2.out" });
+      }
+    </script>
+  </body>
+</html>

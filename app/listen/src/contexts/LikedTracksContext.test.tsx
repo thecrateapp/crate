@@ -26,6 +26,8 @@ function Probe() {
     <div>
       <output>{liked ? "liked" : "not-liked"}</output>
       <span>{likes.loading ? "loading" : "idle"}</span>
+      <span>{likes.hasLoaded ? "known" : "unknown"}</span>
+      {likes.error ? <span role="alert">{likes.error}</span> : null}
       <button onClick={() => void likes.refetch()}>refetch</button>
       <button
         onClick={() =>
@@ -130,5 +132,21 @@ describe("LikedTracksProvider global identity", () => {
 
     await waitFor(() => expect(screen.getByText("idle")).toBeInTheDocument());
     expect(screen.getByText("liked")).toBeInTheDocument();
+  });
+
+  it("keeps initial likes unknown after failure and recovers on retry", async () => {
+    apiMock.mockRejectedValueOnce(new Error("offline"));
+    const user = userEvent.setup();
+    render(
+      <LikedTracksProvider>
+        <Probe />
+      </LikedTracksProvider>,
+    );
+    await screen.findByRole("alert");
+    expect(screen.getByText("unknown")).toBeInTheDocument();
+    apiMock.mockResolvedValueOnce([]);
+    await user.click(screen.getByRole("button", { name: "refetch" }));
+    await screen.findByText("known");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

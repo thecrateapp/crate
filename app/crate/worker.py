@@ -77,7 +77,6 @@ def run_worker(config: dict):
     start_service_loop = bool(config.get("worker_service_loop", True))
     start_analysis_daemons = bool(config.get("worker_analysis_daemons", True))
     start_projector = bool(config.get("worker_projector", True))
-    start_telegram = bool(config.get("worker_telegram", True))
 
     init_db()
     init_musicbrainz()
@@ -144,18 +143,6 @@ def run_worker(config: dict):
         log.info("Projector daemon started")
     else:
         log.info("Projector daemon disabled for queues: %s", ",".join(queues))
-
-    # Start Telegram bot
-    if start_telegram:
-        from crate.telegram import telegram_bot_loop
-
-        telegram_thread = threading.Thread(
-            target=telegram_bot_loop,
-            args=(config,),
-            daemon=True,
-            name="telegram-bot",
-        )
-        telegram_thread.start()
 
     # Start Dramatiq workers via CLI (this manages its own process pool)
     dramatiq_cmd = [
@@ -247,6 +234,28 @@ def _run_periodic_cleanup(config: dict | None = None) -> None:
         _cleanup_federation_imports(config)
 
 
+def _refresh_analysis_runtime_state() -> None:
+    """Publish analysis coverage and latest successful outputs off the HTTP path."""
+    from crate.analysis_daemon import get_analysis_status
+    from crate.db.ops_runtime import set_ops_runtime_state
+    from crate.db.queries.management import (
+        get_last_analyzed_track,
+        get_last_bliss_track,
+        get_last_fingerprinted_track,
+    )
+
+    status = get_analysis_status()
+    set_ops_runtime_state(
+        "analysis_status",
+        {
+            **status,
+            "last_analyzed": get_last_analyzed_track(),
+            "last_bliss": get_last_bliss_track(),
+            "last_fingerprinted": get_last_fingerprinted_track(),
+        },
+    )
+
+
 def _run_service_loop(config: dict, stop_event: threading.Event):
     """Background thread: scheduler checks, watcher, zombie cleanup, import queue."""
     import time as _time
@@ -271,10 +280,12 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
     last_cleanup = 0
     last_status_update = 0
     last_analysis_status_update = 0
+    last_health_update = 0
     last_metrics_flush = 0
     last_shadow_backfill = 0
     last_media_worker_bridge = 0
     last_jam_auto_dj = 0
+    last_governor_sample = 0
 
     while not stop_event.is_set():
         now = _time.time()
@@ -306,7 +317,11 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
             try:
                 from crate.importer import ImportQueue
                 from crate.config import load_config
+                from crate.db.import_queue_mutations import (
+                    release_orphaned_import_claims,
+                )
 
+                release_orphaned_import_claims()
                 queue = ImportQueue(load_config())
                 count = len(queue.refresh_pending_state())
                 set_cache("imports_pending", {"count": count})
@@ -447,28 +462,35 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
             except Exception:
                 pass
 
+        # Sample the governor in the worker process so the UI sees the same
+        # runtime policy and resource limits that gate background work.
+        if now - last_governor_sample > 15:
+            last_governor_sample = now
+            try:
+                from crate.db.ops_runtime import set_ops_runtime_state
+                from crate.resource_governor import build_governor_surface
+
+                set_ops_runtime_state("resource_governor", build_governor_surface())
+            except Exception:
+                log.debug("Resource governor sample failed", exc_info=True)
+
         # Analysis coverage is expensive to compute; refresh it off the HTTP path.
         if now - last_analysis_status_update > 120:
             last_analysis_status_update = now
             try:
-                from crate.analysis_daemon import get_analysis_status
-                from crate.db.ops_runtime import set_ops_runtime_state
-                from crate.db.queries.management import (
-                    get_last_analyzed_track,
-                    get_last_bliss_track,
-                )
-
-                status = get_analysis_status()
-                set_ops_runtime_state(
-                    "analysis_status",
-                    {
-                        **status,
-                        "last_analyzed": get_last_analyzed_track(),
-                        "last_bliss": get_last_bliss_track(),
-                    },
-                )
+                _refresh_analysis_runtime_state()
             except Exception:
                 log.debug("Analysis status refresh failed", exc_info=True)
+
+        if now - last_health_update > 120:
+            last_health_update = now
+            try:
+                from crate.alerting import evaluate_health
+                from crate.db.ops_runtime import set_ops_runtime_state
+
+                set_ops_runtime_state("health", evaluate_health().snapshot())
+            except Exception:
+                log.debug("Health snapshot refresh failed", exc_info=True)
 
         # Metrics flush every 5 minutes
         if now - last_metrics_flush > 300:
@@ -575,9 +597,13 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         (
             "compute_analytics",
             "refresh_user_listening_stats",
+            "refresh_dirty_listening_stats",
+            "rebuild_instance_listening_days",
+            "backfill_instance_listening_rollups",
             "refresh_home_discovery_snapshot",
             "refresh_user_stats_dashboard_snapshot",
             "refresh_instance_stats_dashboard_snapshot",
+            "refresh_collection_insights",
             "index_genres",
             "infer_genre_taxonomy",
             "rebuild_genre_taxonomy_proposals",
@@ -639,6 +665,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "process_new_content",
             "compute_completeness",
             "refresh_probable_setlist",
+            "refresh_show_probable_setlists",
             "normalize_artist_bios",
             "research_artist_bio",
         ),

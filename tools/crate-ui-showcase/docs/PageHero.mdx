@@ -1,0 +1,53 @@
+import { Meta, Canvas, Controls } from "@storybook/addon-docs/blocks";
+import * as Stories from "../stories/PageHero.stories";
+import { EntryDetails } from "../components/Catalogue";
+import { DocHeading } from "../components/DocHeading";
+
+<Meta of={Stories} />
+<DocHeading as="h1">PageHero</DocHeading>
+<EntryDetails
+  id="domain-hero-pagehero"
+  review="Visual review approved · 1AU and 1AX"
+/>
+<DocHeading as="h2">Contract</DocHeading>
+
+Media, artist, editorial and card hero identity with injected artwork/actions.
+
+Preserve four roles rather than force one card/header anatomy. Bricolage Grotesque700 media/artist titles keep30/36px; editorial uses36/60px at800weight; card uses30px700. The compact title role is24/36px and replaces AlbumHero's local size override. Default hero heights are minimums so long titles remain readable. The inner frame stretches through the used hero height before bottom-aligning identity; a percentage height inside a min-height-only parent collapses that frame and can place headings under Listen’s overlay header. Regression coverage includes media, artist and editorial roles; height=content keeps an existing content-sized composition free of those minimums (CrateHero, including empty collections). Default artwork shapes, hiding, backgrounds and action placement remain compatible. Text eyebrows use MonoLabel; rich eyebrows and metadata keep their supplied semantics;0is visible, null/false/empty entries are omitted and separators remain decorative. The named region references its real h1. Background renderers are decorative and isolated from content; actions remain outside media heroes and inside card heroes. No page data/hooks in shared. Native safe-area, image and playback composition remain app-owned; their later reconciliation is separate.
+
+The approved mockup and Diego’s confirmed amendments are the visual reference. Shared components own their contracts; stories add layout only. Consumer adoption and native/AT/phase QA remain separate.
+
+<Canvas of={Stories.Media} />
+
+<Canvas of={Stories.Artist} />
+
+<Canvas of={Stories.Editorial} />
+
+<Canvas of={Stories.Card} />
+
+<Canvas of={Stories.Compact} />
+
+<Canvas of={Stories.LongContent} />
+
+<Canvas of={Stories.Background} />
+
+<Canvas of={Stories.PlainContext} />
+
+<Canvas of={Stories.ContentHeight} />
+
+<Controls of={Stories.Media} />
+
+<Canvas of={Stories.OverlayHeader} />
+
+Placement and artwork options (2026-10-26):
+
+- `inset="none"` drops the centred max width and page padding from content and actions, for Admin
+  pages whose shell already pads the content edge.
+- `bleed` cancels the Listen page gutter so an editorial hero reaches the viewport edges; its
+  actions stay in page flow below it.
+- `artworkSize` keeps the two approved album scales: `lg` for Listen (200/240/280px, centred on
+  mobile) and `md` for Admin (144/192/224px). Both are visible on mobile.
+- `artworkFrame="none"` removes the frame when the supplied artwork draws its own.
+
+Callers do not rebuild these with `contentClassName`, `actionsClassName` or `artworkClassName`.
+Listen's album mobile choreography and the Crate cover flow remain product composition.

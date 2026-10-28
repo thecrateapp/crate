@@ -13,7 +13,7 @@ from crate.api.openapi_responses import (
     error_response,
     merge_responses,
 )
-from crate.api.permissions import require_permission
+from crate.api.permissions import has_capability, require_permission
 from crate.api.schemas.genres import (
     EqPresetUpdateResponse,
     GenreDeleteResponse,
@@ -23,6 +23,10 @@ from crate.api.schemas.genres import (
     GenreTaxonomyAliasesUpdateRequest,
     GenreTaxonomyAliasesUpdateResponse,
     GenreTaxonomyCoverUpdateResponse,
+    GenreTaxonomyFacetsUpdateRequest,
+    GenreTaxonomyFacetsUpdateResponse,
+    GenreTaxonomyRawTagClassificationUpdateRequest,
+    GenreTaxonomyRawTagClassificationUpdateResponse,
     GenreTaxonomyNodeProposalApplyRequest,
     GenreTaxonomyNodeProposalApplyResponse,
     GenreTaxonomyNodeProposalResponse,
@@ -48,6 +52,7 @@ from crate.db.genres import (
     set_genre_eq_gains,
 )
 from crate.db.queries.genres_library_detail import get_genre_upcoming_shows
+from crate.db.cache_store import get_volatile_cache, set_volatile_cache
 from crate.db.queries.tasks import list_tasks
 from crate.db.repositories.auth import get_user_by_id
 from crate.db.repositories.tasks import create_task
@@ -58,6 +63,13 @@ from crate.db.repositories.genres_taxonomy_edges import (
 )
 from crate.db.repositories.genres_taxonomy_metadata import (
     update_genre_taxonomy_node_metadata,
+)
+from crate.db.repositories.genres_taxonomy_facets import (
+    replace_genre_taxonomy_facets,
+)
+from crate.db.repositories.genres_taxonomy_raw_tags import (
+    clear_raw_genre_classification,
+    update_raw_genre_classification as save_raw_genre_classification,
 )
 from crate.db.repositories.genres_taxonomy_nodes import upsert_genre_taxonomy_node
 from crate.db.repositories.genres_delete import (
@@ -76,6 +88,9 @@ from crate.genre_taxonomy import (
 from crate.genre_taxonomy_proposals import build_genre_taxonomy_node_proposal
 
 router = APIRouter(prefix="/api/genres", tags=["genres"])
+
+_TAXONOMY_TREE_CACHE_KEY = "genres:taxonomy-tree:v1"
+_TAXONOMY_TREE_CACHE_TTL = 300
 
 _GENRE_RESPONSES = merge_responses(
     AUTH_ERROR_RESPONSES,
@@ -300,6 +315,35 @@ def list_unmapped_genres(request: Request, limit: int = Query(24, ge=1, le=200))
     return get_unmapped_genres(limit=limit)
 
 
+@router.put(
+    "/taxonomy/raw-tags/{slug}/classification",
+    response_model=GenreTaxonomyRawTagClassificationUpdateResponse,
+    responses=_GENRE_ADMIN_RESPONSES,
+    summary="Classify an unmapped library genre tag and assign facet values",
+)
+def update_raw_tag_classification(
+    request: Request,
+    slug: str,
+    body: GenreTaxonomyRawTagClassificationUpdateRequest,
+):
+    _require_genre_curator(request)
+    raw_slug = _normalize_taxonomy_slug(slug)
+    if not raw_slug:
+        raise HTTPException(status_code=400, detail="Slug is required")
+    try:
+        result = save_raw_genre_classification(
+            raw_slug,
+            body.classification,
+            [facet.model_dump() for facet in body.facets],
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    if result is None:
+        raise HTTPException(status_code=404, detail="Unmapped genre tag not found")
+    _broadcast_genre_taxonomy_changed(f"genre-tag:{raw_slug}")
+    return {"ok": True, **result}
+
+
 @router.get(
     "/taxonomy/invalid",
     response_model=GenreTaxonomyInvalidStatusResponse,
@@ -359,22 +403,38 @@ def rebuild_taxonomy_proposal(
     summary="Full taxonomy tree with parent/children refs, EQ preset status, and counts",
 )
 def taxonomy_tree(request: Request):
-    _require_auth(request)
-    from crate.genre_taxonomy import get_genre_catalog, resolve_genre_eq_preset
-    from crate.db.genres import get_all_genres
+    user = _require_auth(request)
+    if not has_capability(user, "curation.genres.write"):
+        cached = get_volatile_cache(_TAXONOMY_TREE_CACHE_KEY, _TAXONOMY_TREE_CACHE_TTL)
+        if cached is not None:
+            return cached
+    tree = _build_taxonomy_tree()
+    set_volatile_cache(_TAXONOMY_TREE_CACHE_KEY, tree, _TAXONOMY_TREE_CACHE_TTL)
+    return tree
 
+
+def _build_taxonomy_tree() -> dict:
+    from crate.genre_taxonomy import (
+        get_core_taxonomy_descriptor,
+        get_genre_catalog,
+        resolve_genre_eq_preset,
+    )
+    from crate.db.genres import get_all_genres
+    from crate.db.queries.genres_taxonomy_admin_stats import (
+        get_genre_taxonomy_admin_stats,
+    )
+
+    core_taxonomy = get_core_taxonomy_descriptor()
+    core_slugs = {genre["slug"] for genre in core_taxonomy["genres"]}
+    release = core_taxonomy.get("release") or {}
     catalog = get_genre_catalog()
     genre_list = get_all_genres()
-    counts: dict[str, dict[str, int]] = {}
+    stats_by_slug = get_genre_taxonomy_admin_stats(list(catalog))
     mbids: dict[str, str | None] = {}
     wikidata_urls: dict[str, str | None] = {}
     for g in genre_list:
         cs = g.get("canonical_slug")
         if cs:
-            existing = counts.get(cs, {"artist_count": 0, "album_count": 0})
-            existing["artist_count"] += g.get("artist_count") or 0
-            existing["album_count"] += g.get("album_count") or 0
-            counts[cs] = existing
             if g.get("musicbrainz_mbid"):
                 mbids[cs] = g["musicbrainz_mbid"]
             if g.get("wikidata_url"):
@@ -384,7 +444,17 @@ def taxonomy_tree(request: Request):
     top_level_slugs = []
     for slug, meta in catalog.items():
         preset = resolve_genre_eq_preset(slug)
-        c = counts.get(slug, {"artist_count": 0, "album_count": 0})
+        c = {
+            "artist_count": 0,
+            "album_count": 0,
+            "track_count": 0,
+            "raw_tag_count": 0,
+            "mapped_raw_tags": [],
+            "catalog_track_count": 0,
+            "catalog_track_share_pct": 0.0,
+            "listening_share_90d_pct": None,
+            **stats_by_slug.get(slug, {}),
+        }
         children = sorted(s for s, m in catalog.items() if slug in m.get("parents", []))
         influences = sorted(
             s for s, m in catalog.items() if slug in m.get("influenced_by", [])
@@ -395,7 +465,9 @@ def taxonomy_tree(request: Request):
         node = {
             "slug": slug,
             "name": meta["name"],
+            "origin": "core" if slug in core_slugs else "overlay",
             "description": meta.get("description") or None,
+            "cover_url": genre_cover_public_url(slug),
             "musicbrainz_mbid": mbids.get(slug),
             "wikidata_url": wikidata_urls.get(slug),
             "top_level": meta.get("top_level", False),
@@ -407,8 +479,15 @@ def taxonomy_tree(request: Request):
             "fusion_of_slugs": meta.get("fusion_of", []),
             "fusion_genre_slugs": fusion_genres,
             "alias_names": meta.get("aliases", []),
+            "facets": meta.get("facets", []),
             "artist_count": c["artist_count"],
             "album_count": c["album_count"],
+            "track_count": c["track_count"],
+            "raw_tag_count": c["raw_tag_count"],
+            "mapped_raw_tags": c["mapped_raw_tags"],
+            "catalog_track_count": c["catalog_track_count"],
+            "catalog_track_share_pct": c["catalog_track_share_pct"],
+            "listening_share_90d_pct": c["listening_share_90d_pct"],
             "eq_gains": list(preset["gains"]) if preset else None,
             "eq_preset_source": preset["source"] if preset else None,
             "eq_preset_inherited_from": preset.get("slug")
@@ -419,7 +498,17 @@ def taxonomy_tree(request: Request):
         if meta.get("top_level", False):
             top_level_slugs.append(slug)
 
-    return {"nodes": nodes, "top_level_slugs": sorted(top_level_slugs)}
+    return {
+        "nodes": nodes,
+        "top_level_slugs": sorted(top_level_slugs),
+        "core_taxonomy": {
+            "taxonomy_id": core_taxonomy["taxonomy_id"],
+            "version": core_taxonomy["version"],
+            "digest": core_taxonomy["digest"],
+            "signature_valid": bool(release.get("valid")),
+            "key_id": release.get("key_id"),
+        },
+    }
 
 
 @router.patch(
@@ -450,6 +539,35 @@ def update_taxonomy_node(
     invalidate_runtime_taxonomy_cache(broadcast=True)
     _broadcast_genre_taxonomy_changed(f"genre:{canonical_slug}")
     return {"ok": True, "slug": canonical_slug}
+
+
+@router.put(
+    "/taxonomy/{slug}/facets",
+    response_model=GenreTaxonomyFacetsUpdateResponse,
+    responses=_GENRE_ADMIN_RESPONSES,
+    summary="Replace the non-hierarchical facet assignments for a taxonomy genre",
+)
+def update_taxonomy_facets(
+    request: Request,
+    slug: str,
+    body: GenreTaxonomyFacetsUpdateRequest,
+):
+    _require_genre_curator(request)
+    canonical_slug = _normalize_taxonomy_slug(slug)
+    if not canonical_slug:
+        raise HTTPException(status_code=400, detail="Slug is required")
+    if not get_genre_taxonomy_node_id(canonical_slug):
+        raise HTTPException(status_code=404, detail="Genre not found in taxonomy")
+    try:
+        facets = replace_genre_taxonomy_facets(
+            canonical_slug,
+            [facet.model_dump() for facet in body.facets],
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    invalidate_runtime_taxonomy_cache(broadcast=True)
+    _broadcast_genre_taxonomy_changed(f"genre:{canonical_slug}")
+    return {"ok": True, "slug": canonical_slug, "facets": facets}
 
 
 @router.post(
@@ -555,6 +673,7 @@ def apply_taxonomy_node_proposal(
         "create_node",
         "alias_existing",
         "delete_marginal",
+        "classify_facet",
         "needs_review",
     }:
         raise HTTPException(status_code=400, detail="Unsupported proposal action")
@@ -563,6 +682,39 @@ def apply_taxonomy_node_proposal(
             status_code=400,
             detail="This proposal still needs curator review before applying",
         )
+
+    if action == "classify_facet":
+        if body.source_kind != "raw_genre":
+            raise HTTPException(
+                status_code=400,
+                detail="Only unmapped raw genre tags can be classified as facets",
+            )
+        if not body.facets:
+            raise HTTPException(
+                status_code=422,
+                detail="A facet proposal must include at least one dimension and value",
+            )
+        try:
+            result = save_raw_genre_classification(
+                raw_slug,
+                "facet",
+                [facet.model_dump() for facet in body.facets],
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        if result is None:
+            raise HTTPException(status_code=404, detail="Unmapped genre tag not found")
+        _broadcast_genre_taxonomy_changed(f"genre-tag:{raw_slug}")
+        return {
+            "ok": True,
+            "slug": raw_slug,
+            "action": action,
+            "classification": result["classification"],
+            "facets": result["facets"],
+            "applied_aliases": [],
+            "skipped_aliases": [],
+            "relation_results": [],
+        }
 
     applied_aliases: list[str] = []
     skipped_aliases: list[str] = []
@@ -580,6 +732,9 @@ def apply_taxonomy_node_proposal(
                 applied_aliases.append(alias)
             else:
                 skipped_aliases.append(alias)
+
+        if applied_aliases:
+            clear_raw_genre_classification(raw_slug)
 
         invalidate_runtime_taxonomy_cache(broadcast=True)
         _broadcast_genre_taxonomy_changed(f"genre:{raw_slug}", f"genre:{target_slug}")
@@ -608,6 +763,9 @@ def apply_taxonomy_node_proposal(
             applied_aliases.append(alias)
         else:
             skipped_aliases.append(alias)
+
+    if applied_aliases:
+        clear_raw_genre_classification(raw_slug)
 
     for relation in body.relations:
         relation_type = (relation.relation_type or "").strip().lower()

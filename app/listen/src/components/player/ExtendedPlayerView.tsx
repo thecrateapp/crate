@@ -1,6 +1,8 @@
+import { useRef } from "react";
+import { useModalFocus } from "@crate/ui/lib/use-modal-focus";
 import { cn } from "@crate/ui/lib/cn";
 
-import { PlayerSeekBar } from "@/components/player/bar/PlayerSeekBar";
+import { PlayerProgressLeaf } from "./bar/PlayerProgressLeaf";
 import { PlayerTrackIdentity } from "@/components/player/PlayerTrackIdentity";
 import { ExtendedPlayerArtwork } from "@/components/player/ExtendedPlayerArtwork";
 import { ExtendedPlayerHeader } from "@/components/player/ExtendedPlayerHeader";
@@ -34,8 +36,6 @@ function ExtendedPlayerTrackDetails({
         onArtistAvatarError={markArtistPhotoFailed}
         onArtistClick={actions.goToArtist}
         artistClickable={state.artistClickable}
-        titleClassName="text-xl leading-tight"
-        albumClassName="text-sm"
       />
       {state.vizCfg.trackVizProfile.hasAnalysis &&
       state.vizCfg.trackVizProfile.summary ? (
@@ -43,14 +43,13 @@ function ExtendedPlayerTrackDetails({
           {state.vizCfg.trackVizProfile.summary}
         </p>
       ) : null}
-      <PlayerSeekBar
+      <PlayerProgressLeaf
         className="mx-auto mt-5 w-full max-w-[420px]"
-        currentTime={state.displayedTime}
+        time={state.displayedTime}
         duration={state.displayedDuration}
         onSeek={actions.seek}
         disabled={state.jamQueueLocked}
         showTimes
-        variant="glow"
       />
     </div>
   );
@@ -66,8 +65,21 @@ export function ExtendedPlayerView({
   markArtistPhotoFailed,
   open,
 }: ExtendedPlayerViewProps) {
+  const surfaceRef = useRef<HTMLDivElement>(null);
+  useModalFocus({
+    active: open,
+    panelRef: surfaceRef,
+    containFocus: false,
+    onEscape: actions.onEscape,
+  });
   return (
     <div
+      ref={surfaceRef}
+      data-app-modal-panel="true"
+      data-modal-depth={-1}
+      tabIndex={-1}
+      inert={!open}
+      aria-hidden={!open}
       className={cn(
         "z-app-extended-player fixed inset-0 flex bg-surface-canvas pb-[94px] transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] will-change-transform",
         open

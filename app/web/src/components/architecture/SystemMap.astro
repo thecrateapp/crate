@@ -1,0 +1,213 @@
+---
+import { edges, nodes, type Layout } from "../../content/architecture/map";
+import { edgePath, viewBox, type Rect } from "../../lib/system-map";
+
+interface Props {
+  id: string;
+  variant: "full" | "trace";
+  title?: string;
+  description?: string;
+}
+
+const { id, variant, title, description } = Astro.props;
+const full = variant === "full";
+const visible = nodes.filter((node) => full || node.inTrace !== false);
+const ids = new Set(visible.map((node) => node.id));
+const type = {
+  wide: { name: 26, meta: [46, 61] },
+  tall: { name: 22, meta: [39, 53] },
+};
+
+const layouts = (["wide", "tall"] as Layout[]).map((layout) => {
+  const rects = new Map<string, Rect>(visible.map((node) => [node.id, node.layout[layout]]));
+  return {
+    layout,
+    box: viewBox([...rects.values()], 6),
+    edges: edges
+      .filter((edge) => ids.has(edge.from) && ids.has(edge.to) && (!edge.only || edge.only === layout))
+      .map((edge) => ({ ...edge, d: edgePath(rects.get(edge.from)!, rects.get(edge.to)!) })),
+    groups: visible.filter((node) => node.kind === "group").map((node) => ({ ...node, rect: node.layout[layout] })),
+    boxes: visible.filter((node) => node.kind !== "group").map((node) => ({ ...node, rect: node.layout[layout] })),
+  };
+});
+---
+
+{
+  layouts.map(({ layout, box, edges: paths, groups, boxes }) => (
+    <svg
+      class:list={["map", `map-${layout}`, `is-${variant}`]}
+      viewBox={box}
+      role={full ? "img" : undefined}
+      aria-labelledby={full ? `${id}-${layout}-title ${id}-${layout}-desc` : undefined}
+      aria-hidden={full ? undefined : "true"}
+    >
+      {full && <title id={`${id}-${layout}-title`}>{title}</title>}
+      {full && <desc id={`${id}-${layout}-desc`}>{description}</desc>}
+      {groups.map((group) => (
+        <g class="group" transform={`translate(${group.rect.x} ${group.rect.y})`}>
+          <rect width={group.rect.w} height={group.rect.h} rx="14" />
+          <text class="group-name" x="16" y="22">
+            {group.name}
+          </text>
+        </g>
+      ))}
+      <g class="edges">
+        {paths.map((edge) => (
+          <path class:list={["edge", edge.fallback && "is-fallback"]} d={edge.d} />
+        ))}
+      </g>
+      {!full && (
+        <g class="edges-hl">
+          {paths.map((edge) => (
+            <path class="edge-hl" data-edge={edge.id} d={edge.d} pathLength="1" />
+          ))}
+        </g>
+      )}
+      {boxes.map((node) => (
+        <g class:list={["node", `is-${node.kind}`]} data-node={node.id} transform={`translate(${node.rect.x} ${node.rect.y})`}>
+          <rect width={node.rect.w} height={node.rect.h} rx="10" />
+          <text class="name" x="14" y={full ? type[layout].name : node.rect.h / 2 + 4}>
+            {node.name}
+          </text>
+          {full && node.meta && (
+            <text class="meta" x="14" y={type[layout].meta[0]}>
+              {node.meta}
+            </text>
+          )}
+          {full && (node.memory || node.mount) && (
+            <text class="meta" x="14" y={type[layout].meta[1]}>
+              {node.memory}
+              {node.memory && node.mount && " · "}
+              {node.mount && <tspan class={`mount-${node.mount}`}>/music {node.mount}</tspan>}
+            </text>
+          )}
+        </g>
+      ))}
+      {!full && <circle class="trace-dot" r="5" cx="0" cy="0" />}
+    </svg>
+  ))
+}
+
+<style>
+  .map {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+    font-family: var(--mono);
+  }
+
+  .map-tall {
+    display: none;
+  }
+
+  .group rect {
+    fill: rgba(241, 245, 249, 0.015);
+    stroke: var(--line);
+    stroke-dasharray: 2 5;
+  }
+
+  .group-name {
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    fill: var(--fg-3);
+  }
+
+  .edge {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.18);
+    stroke-width: 1.25;
+  }
+
+  .edge.is-fallback {
+    stroke-dasharray: 4 5;
+  }
+
+  .edge-hl {
+    fill: none;
+    stroke: var(--cyan-hi);
+    stroke-width: 2;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+  }
+
+  .edge-hl.is-past {
+    stroke-opacity: 0.4;
+  }
+
+  .node rect {
+    fill: #0d0e14;
+    stroke: rgba(241, 245, 249, 0.16);
+    transition:
+      stroke 0.4s var(--ease-snap),
+      fill 0.4s var(--ease-snap);
+  }
+
+  .node.is-client rect {
+    fill: var(--bg);
+    stroke-dasharray: 3 4;
+  }
+
+  .node.is-store rect {
+    stroke: rgba(103, 232, 249, 0.3);
+  }
+
+  .name {
+    font-size: 13px;
+    fill: var(--fg);
+  }
+
+  .meta {
+    font-size: 10.5px;
+    fill: var(--fg-2);
+  }
+
+  .mount-rw {
+    fill: var(--cyan-hi);
+  }
+
+  .mount-ro {
+    fill: var(--fg-3);
+  }
+
+  .is-trace .name {
+    fill: var(--fg-2);
+    transition: fill 0.4s var(--ease-snap);
+  }
+
+  .node.is-past rect {
+    stroke: rgba(103, 232, 249, 0.45);
+  }
+
+  .node.is-on rect {
+    stroke: var(--cyan-hi);
+    fill: #0b1d24;
+  }
+
+  .node.is-on .name,
+  .node.is-past .name {
+    fill: var(--fg);
+  }
+
+  .trace-dot {
+    fill: var(--cyan-hi);
+    opacity: 0;
+    filter: drop-shadow(0 0 6px var(--cyan-hi));
+  }
+
+  @media (max-width: 760px) {
+    .map-wide {
+      display: none;
+    }
+    .map-tall {
+      display: block;
+    }
+    .name {
+      font-size: 12px;
+    }
+    .meta {
+      font-size: 10px;
+    }
+  }
+</style>
