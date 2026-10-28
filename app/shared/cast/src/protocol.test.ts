@@ -187,6 +187,47 @@ describe("Cast protocol", () => {
     ).toEqual({ ok: false, error: "INVALID_MESSAGE" });
   });
 
+  it.each([undefined, false, true])(
+    "accepts the optional media-finished flag %s",
+    (mediaFinished) => {
+      const result = parseCastProtocolMessage({
+        version: 1,
+        messageId: "finished-1",
+        type: "receiver.status",
+        sessionId: "session-1",
+        queueRevision: 8,
+        stateSeq: 44,
+        currentIndex: 2,
+        currentTime: 98.9,
+        playerState: "IDLE",
+        consecutiveFailures: 0,
+        ...(mediaFinished === undefined ? {} : { mediaFinished }),
+      });
+      expect(result).toMatchObject({
+        ok: true,
+        value: { ...(mediaFinished === undefined ? {} : { mediaFinished }) },
+      });
+    },
+  );
+
+  it("rejects a non-boolean media-finished flag", () => {
+    expect(
+      parseCastProtocolMessage({
+        version: 1,
+        messageId: "finished-1",
+        type: "receiver.status",
+        sessionId: "session-1",
+        queueRevision: 8,
+        stateSeq: 44,
+        currentIndex: 2,
+        currentTime: 98.9,
+        playerState: "IDLE",
+        consecutiveFailures: 0,
+        mediaFinished: "true",
+      }),
+    ).toEqual({ ok: false, error: "INVALID_MESSAGE" });
+  });
+
   it("rejects unsupported protocol versions", () => {
     expect(
       parseCastProtocolMessage({

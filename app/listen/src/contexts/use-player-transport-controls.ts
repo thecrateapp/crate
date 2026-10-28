@@ -43,6 +43,10 @@ function shouldUseImmediateTransportAction(): boolean {
 }
 
 export interface UsePlayerTransportControlsParams {
+  cancelQueuePreparation?: () => void;
+  resumePendingQueue?: () => boolean;
+  resetPlaybackIntelligence?: () => void;
+  resumePlaybackIntelligence?: () => void;
   queueRef: MutableRefObject<Track[]>;
   isPlayingRef: MutableRefObject<boolean>;
   bufferingIntentRef: MutableRefObject<boolean>;
@@ -57,6 +61,10 @@ export interface UsePlayerTransportControlsParams {
 }
 
 export function usePlayerTransportControls({
+  cancelQueuePreparation,
+  resumePendingQueue,
+  resetPlaybackIntelligence,
+  resumePlaybackIntelligence,
   queueRef,
   isPlayingRef,
   bufferingIntentRef,
@@ -70,6 +78,8 @@ export function usePlayerTransportControls({
   silenceGaplessEngine,
 }: UsePlayerTransportControlsParams) {
   const pauseLocal = useCallback(() => {
+    cancelQueuePreparation?.();
+    resetPlaybackIntelligence?.();
     void cancelNativeMediaSessionResume();
     cancelSoftInterruption();
     bufferingIntentRef.current = false;
@@ -83,6 +93,7 @@ export function usePlayerTransportControls({
     }
     gpPause();
   }, [
+    resetPlaybackIntelligence,
     bufferingIntentRef,
     cancelSoftInterruption,
     commitIsBuffering,
@@ -90,6 +101,8 @@ export function usePlayerTransportControls({
   ]);
 
   const resumeLocal = useCallback(() => {
+    if (resumePendingQueue?.()) return;
+    resumePlaybackIntelligence?.();
     if (!queueRef.current.length) return;
     markNativeMediaSessionPlayingIntent();
     cancelSoftInterruption();
@@ -116,6 +129,7 @@ export function usePlayerTransportControls({
       gpPlay();
     });
   }, [
+    resumePlaybackIntelligence,
     bufferingIntentRef,
     cancelSoftInterruption,
     commitIsBuffering,
@@ -125,6 +139,8 @@ export function usePlayerTransportControls({
 
   const pause = useCallback(
     (options?: PlayerPauseOptions) => {
+      cancelQueuePreparation?.();
+      resetPlaybackIntelligence?.();
       if (!options?.preserveNativeResume) {
         void cancelNativeMediaSessionResume();
       }
@@ -162,6 +178,8 @@ export function usePlayerTransportControls({
       });
     },
     [
+      cancelQueuePreparation,
+      resetPlaybackIntelligence,
       bufferingIntentRef,
       cancelSoftInterruption,
       commitIsBuffering,
@@ -171,6 +189,8 @@ export function usePlayerTransportControls({
   );
 
   const resume = useCallback(() => {
+    if (resumePendingQueue?.()) return;
+    resumePlaybackIntelligence?.();
     if (!queueRef.current.length) return;
     markNativeMediaSessionPlayingIntent();
     if (isCastSessionActive()) {
@@ -208,6 +228,7 @@ export function usePlayerTransportControls({
       gpPlay();
     });
   }, [
+    resumePlaybackIntelligence,
     bufferingIntentRef,
     cancelSoftInterruption,
     commitIsBuffering,

@@ -1174,6 +1174,196 @@ describe("cast sender", () => {
     expect(nativeQueueNextMock).toHaveBeenCalledOnce();
   });
 
+  async function prepareGuardedNativeQueue(sessionId = "guard-session") {
+    runtimeMock.isNative = true;
+    vi.stubEnv("VITE_CAST_CUSTOM_RECEIVER_ENABLED", "true");
+    vi.stubEnv("VITE_CAST_RECEIVER_APP_ID", "ABCD1234");
+    nativeCapabilitiesMock.mockResolvedValue({
+      platform: "native",
+      visible: true,
+      available: true,
+      activeSession: false,
+      receiverApplicationId: "ABCD1234",
+    });
+    nativeRequestSessionMock.mockResolvedValue({ ok: true });
+    nativeQueueInsertMock.mockResolvedValue({ ok: true });
+    nativeQueueJumpToMock.mockResolvedValue({ ok: true });
+    nativeGetQueueSnapshotMock.mockResolvedValue({
+      available: true,
+      items: [{ stableId: "track-1-1", itemId: 41 }],
+    });
+    const track = {
+      id: "track-1",
+      libraryTrackId: 1,
+      title: "Track",
+      artist: "Artist",
+    };
+    const initial = {
+      session_id: sessionId,
+      lease: "lease",
+      bootstrap_url: `https://api.example/cast/${sessionId}`,
+      receiver_application_id: "ABCD1234",
+      queue: {
+        revision: 0,
+        state_seq: 0,
+        current_index: 0,
+        current_time: 0,
+        repeat_mode: "off" as const,
+        shuffle: false,
+        items: [
+          {
+            item_id: "track-1-1",
+            track_id: 1,
+            title: "Track",
+            artist: "Artist",
+            content_type: "audio/mpeg",
+            stream_url: "https://api.example/track",
+            metadata_url: "https://api.example/track/meta",
+          },
+        ],
+      },
+    };
+    apiMock
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValue({ mutation_status: "applied" });
+    await startCastSession({ track });
+    return { initial, track };
+  }
+
+  it("drops cancelled append and advance operations while they await an earlier mutation", async () => {
+    const { initial, track } = await prepareGuardedNativeQueue();
+    let ack!: (value: unknown) => void;
+    apiMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          ack = resolve;
+        }),
+    );
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ...initial,
+            protocol_version: 1,
+            queue: { ...initial.queue, revision: 1 },
+          }),
+          { status: 200 },
+        ),
+    );
+    const update = {
+      queue: [track],
+      currentIndex: 0,
+      repeatMode: "off" as const,
+      shuffle: false,
+    };
+    const first = syncCustomCastQueue(update);
+    await vi.waitFor(() => expect(apiMock).toHaveBeenCalledTimes(2));
+    let current = true;
+    const append = syncCustomCastQueue(update, () => current);
+    const advance = castQueueJumpTo(1, () => current);
+    current = false;
+    ack({ mutation_status: "applied" });
+    await expect(first).resolves.toEqual({ ok: true });
+    await expect(append).resolves.toMatchObject({ ok: false });
+    await expect(advance).resolves.toMatchObject({ ok: false });
+    expect(apiMock).toHaveBeenCalledTimes(2);
+    expect(nativeQueueJumpToMock).not.toHaveBeenCalled();
+  });
+
+  it("ignores an old mutation ACK after a different Cast source is started", async () => {
+    const { initial, track } = await prepareGuardedNativeQueue("guard-old");
+    let ack!: (value: unknown) => void;
+    apiMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          ack = resolve;
+        }),
+    );
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ...initial,
+            protocol_version: 1,
+            queue: { ...initial.queue, revision: 1 },
+          }),
+          { status: 200 },
+        ),
+    );
+    const pending = syncCustomCastQueue({
+      queue: [track],
+      currentIndex: 0,
+      repeatMode: "off",
+      shuffle: false,
+    });
+    await vi.waitFor(() => expect(apiMock).toHaveBeenCalledTimes(2));
+    apiMock.mockResolvedValueOnce({
+      ...initial,
+      session_id: "guard-new",
+      bootstrap_url: "https://api.example/cast/guard-new",
+    });
+    await startCastSession({ track });
+    ack({ mutation_status: "applied" });
+    await expect(pending).resolves.toMatchObject({ ok: false });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(nativeQueueInsertMock).not.toHaveBeenCalled();
+    expect(nativeGetQueueSnapshotMock).not.toHaveBeenCalled();
+  });
+
+  it("does not send receiver commands when cancelled during its snapshot ACK", async () => {
+    const { initial, track } = await prepareGuardedNativeQueue();
+    const extra = {
+      item_id: "track-2-1",
+      track_id: 2,
+      title: "Two",
+      artist: "Artist",
+      content_type: "audio/mpeg",
+      stream_url: "https://api.example/two",
+      metadata_url: "https://api.example/two/meta",
+    };
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          ...initial,
+          protocol_version: 1,
+          queue: {
+            ...initial.queue,
+            revision: 1,
+            items: [...initial.queue.items, extra],
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+    let snapshot!: (value: unknown) => void;
+    nativeGetQueueSnapshotMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          snapshot = resolve;
+        }),
+    );
+    let current = true;
+    const pending = syncCustomCastQueue(
+      {
+        queue: [track, { ...track, id: "two", libraryTrackId: 2 }],
+        currentIndex: 0,
+        repeatMode: "off",
+        shuffle: false,
+      },
+      () => current,
+    );
+    await vi.waitFor(() =>
+      expect(nativeGetQueueSnapshotMock).toHaveBeenCalledOnce(),
+    );
+    current = false;
+    snapshot({
+      available: true,
+      items: [{ stableId: "track-1-1", itemId: 41 }],
+    });
+    await expect(pending).resolves.toMatchObject({ ok: false });
+    expect(nativeQueueInsertMock).not.toHaveBeenCalled();
+  });
+
   it("separates disconnect from stopping and revoking custom Cast", async () => {
     vi.stubEnv("VITE_CAST_CUSTOM_RECEIVER_ENABLED", "true");
     vi.stubEnv("VITE_CAST_RECEIVER_APP_ID", "ABCD1234");
@@ -1403,6 +1593,7 @@ describe("cast sender", () => {
 
     expect(listener).toHaveBeenLastCalledWith({
       active: true,
+      playerState: "PLAYING",
       currentTime: 12.5,
       duration: 180,
       isBuffering: false,
@@ -1508,6 +1699,30 @@ describe("cast sender", () => {
         isPlaying: false,
       }),
     );
+    onMessage?.(
+      "urn:x-cast:app.cratemusic.crate.v1",
+      JSON.stringify({
+        version: 1,
+        messageId: "status-10",
+        type: "receiver.status",
+        sessionId: "session-status",
+        queueRevision: 4,
+        stateSeq: 10,
+        currentIndex: 1,
+        currentTime: 98.9,
+        playerState: "IDLE",
+        mediaFinished: true,
+        consecutiveFailures: 0,
+      }),
+    );
+    expect(listener).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        mediaFinished: true,
+        currentTime: 98.9,
+        playerState: "IDLE",
+        isPlaying: false,
+      }),
+    );
     unsubscribe();
     expect(session.removeMessageListener).toHaveBeenCalledOnce();
   });
@@ -1594,6 +1809,7 @@ describe("cast sender", () => {
 
     expect(listener).toHaveBeenLastCalledWith({
       active: true,
+      playerState: "PLAYING",
       currentIndex: 2,
       currentTime: 3,
       duration: 180,
@@ -1601,6 +1817,32 @@ describe("cast sender", () => {
       isPlaying: true,
       volume: 0.6,
     });
+    nativeProtocolMessageListeners[nativeProtocolMessageListeners.length - 1]?.(
+      {
+        namespace: "urn:x-cast:app.cratemusic.crate.v1",
+        message: JSON.stringify({
+          version: 1,
+          messageId: "native-finished",
+          type: "receiver.status",
+          sessionId: "native-status",
+          queueRevision: 3,
+          stateSeq: 2,
+          currentIndex: 2,
+          currentTime: 98.9,
+          playerState: "IDLE",
+          mediaFinished: true,
+          consecutiveFailures: 0,
+        }),
+      },
+    );
+    expect(listener).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        mediaFinished: true,
+        currentTime: 98.9,
+        playerState: "IDLE",
+        isPlaying: false,
+      }),
+    );
     unsubscribe();
   });
 

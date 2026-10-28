@@ -13,8 +13,16 @@ export const SMART_PLAYLIST_SUGGESTION_BATCH_SIZE = 12;
  * state mutations and only exposes domain primitives.
  */
 export interface PlaybackIntelligenceActions {
+  synchronizeContinuation?: () => Promise<void>;
+  publishContinuationCursor?: (
+    source: PlaySource,
+    authoritative?: boolean,
+  ) => void | Promise<void>;
   /** Append tracks to the end of the queue, de-duplicated against queue + recent. */
-  appendTracks: (tracks: Track[]) => void;
+  appendTracks: (
+    tracks: Track[],
+    isCurrent?: () => boolean,
+  ) => number | Promise<number>;
   /**
    * Insert a suggestion (marked isSuggested) right after the current index.
    * No-op if the slot is already a suggestion or duplicate.
@@ -25,12 +33,26 @@ export interface PlaybackIntelligenceActions {
    * continues into newly fetched tracks). Used when the user hits next
    * at the end of an infinite-playback album/playlist.
    */
-  appendAndAdvance: (tracks: Track[]) => void;
+  appendAndAdvance: (
+    tracks: Track[],
+    isCurrent?: () => boolean,
+  ) => number | Promise<number>;
   /** Show the buffering spinner without committing a new track. */
   setBuffering: (buffering: boolean) => void;
 }
 
+export interface PlaybackQueueReadiness {
+  ready: boolean;
+  generation: number;
+  resumePending?: () => void;
+}
+
 export interface PlaybackIntelligenceOptions {
+  queueReadinessRef?: MutableRefObject<PlaybackQueueReadiness>;
+  stateRefs?: Pick<
+    PlaybackIntelligenceRefs,
+    "queueRef" | "currentIndexRef" | "playSourceRef"
+  >;
   repeat: RepeatMode;
   queue: Track[];
   currentIndex: number;
@@ -45,6 +67,7 @@ export interface PlaybackIntelligenceOptions {
 }
 
 export interface PlaybackIntelligenceRefs {
+  queueReadinessRef?: MutableRefObject<PlaybackQueueReadiness>;
   currentIndexRef: MutableRefObject<number>;
   playSourceRef: MutableRefObject<PlaySource | null>;
   queueRef: MutableRefObject<Track[]>;

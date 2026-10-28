@@ -189,16 +189,43 @@ def playback_continuation(
     user = _require_continuation_token(request)
     descriptor = get_continuation_descriptor(int(user["access_token_id"]))
     if not descriptor:
-        return PlaybackContinuationResponse(tracks=[], plans=[], exhausted=True)
+        return PlaybackContinuationResponse(
+            tracks=[], plans=[], exhausted=True, status="exhausted"
+        )
     known = {str(uid) for uid in payload.recent_entity_uids}
     if payload.after_track_entity_uid:
         known.add(str(payload.after_track_entity_uid))
-    rows, exhausted = continuation_radio_tracks(
-        descriptor,
-        user=user,
-        limit=payload.limit,
-        exclude_entity_uids=known,
-    )
+    batch = None
+    if payload.batch_index is not None and descriptor.get("sessionId"):
+        from crate.api.radio import indexed_continuation_batch
+
+        batch = indexed_continuation_batch(
+            descriptor,
+            user=user,
+            limit=payload.limit,
+            buffer_refs=[
+                *(
+                    str(uid)
+                    for uid in reversed(payload.recent_entity_uids)
+                    if uid != payload.after_track_entity_uid
+                ),
+                *(
+                    [str(payload.after_track_entity_uid)]
+                    if payload.after_track_entity_uid
+                    else []
+                ),
+            ],
+            batch_index=payload.batch_index,
+            revision=payload.revision,
+        )
+        rows, exhausted = batch["tracks"], batch["exhausted"]
+    else:
+        rows, exhausted = continuation_radio_tracks(
+            descriptor,
+            user=user,
+            limit=payload.limit,
+            exclude_entity_uids=known,
+        )
     tracks = [
         track
         for track in (_continuation_track(row, payload.delivery) for row in rows)
@@ -220,6 +247,18 @@ def playback_continuation(
         tracks=tracks,
         plans=_plan_transition_edges(edges) if edges else [],
         exhausted=exhausted,
+        status=(
+            batch["status"]
+            if batch
+            else "ok"
+            if tracks
+            else "exhausted"
+            if exhausted
+            else "retryable_empty"
+        ),
+        sessionId=batch["session_id"] if batch else None,
+        batchIndex=batch.get("batch_index") if batch else None,
+        revision=batch["revision"] if batch else 1,
     )
 
 

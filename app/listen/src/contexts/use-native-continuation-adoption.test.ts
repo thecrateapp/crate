@@ -1,7 +1,10 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-const engineMock = vi.hoisted(() => ({ takeAppendedTracks: vi.fn() }));
+const engineMock = vi.hoisted(() => ({
+  takeAppendedTracks: vi.fn(),
+  getContinuationCursor: vi.fn(),
+}));
 vi.mock("@/lib/android-native-engine", () => ({
   androidNativeEngine: engineMock,
   shouldUseAndroidNativePlayer: () => true,
@@ -80,4 +83,117 @@ describe("useNativeContinuationAdoption", () => {
       adoptTracks.mock.calls[0]![0].map((track: { id: string }) => track.id),
     ).toEqual(["uid-seeded"]);
   });
+});
+
+it("does not adopt a previous native session while the next queue is being prepared", async () => {
+  engineMock.takeAppendedTracks.mockResolvedValue([shapedEntry]);
+  engineMock.getContinuationCursor.mockReturnValue({
+    sessionId: "session-A",
+    batchIndex: 2,
+    revision: 1,
+  });
+  const source = {
+    type: "album" as const,
+    name: "B",
+    radio: {
+      seedType: "album" as const,
+      seedId: 2,
+      continuationSessionId: "session-B",
+      continuationBatchIndex: 0,
+    },
+  };
+  const adoptTracks = vi.fn();
+  const { result } = renderHook(() =>
+    useNativeContinuationAdoption({
+      adoptTracks,
+      queueRef: { current: [] },
+      playSourceRef: { current: source },
+    }),
+  );
+  await act(async () => result.current());
+  expect(adoptTracks).not.toHaveBeenCalled();
+  expect(source.radio.continuationBatchIndex).toBe(0);
+});
+
+it("does not read or adopt native continuation while a replacement engine queue is pending", async () => {
+  engineMock.takeAppendedTracks.mockClear();
+  const adoptTracks = vi.fn();
+  const queueReadinessRef = { current: { ready: false, generation: 2 } };
+  const { result } = renderHook(() =>
+    useNativeContinuationAdoption({
+      queueReadinessRef,
+      adoptTracks,
+      queueRef: { current: [] },
+    }),
+  );
+  await act(async () => {
+    await result.current();
+  });
+  expect(engineMock.takeAppendedTracks).not.toHaveBeenCalled();
+  expect(adoptTracks).not.toHaveBeenCalled();
+});
+
+it("never rewinds confirmed foreground progress from an older native snapshot", async () => {
+  engineMock.takeAppendedTracks.mockResolvedValue([]);
+  engineMock.getContinuationCursor.mockReturnValue({
+    sessionId: "session",
+    batchIndex: 0,
+    revision: 1,
+  });
+  const source = {
+    type: "album" as const,
+    name: "Album",
+    radio: {
+      seedType: "album" as const,
+      seedId: 1,
+      continuationSessionId: "session",
+      continuationBatchIndex: 2,
+      continuationRevision: 1,
+    },
+  };
+  const { result } = renderHook(() =>
+    useNativeContinuationAdoption({
+      adoptTracks: vi.fn(),
+      queueRef: { current: [] },
+      playSourceRef: { current: source },
+    }),
+  );
+  await act(async () => {
+    await result.current();
+  });
+  expect(source.radio.continuationBatchIndex).toBe(2);
+});
+
+it("does not merge a cursor or tracks from a different session revision", async () => {
+  engineMock.takeAppendedTracks.mockResolvedValue([shapedEntry]);
+  engineMock.getContinuationCursor.mockReturnValue({
+    sessionId: "session",
+    batchIndex: 8,
+    revision: 1,
+  });
+  const source = {
+    type: "album" as const,
+    name: "Album",
+    radio: {
+      seedType: "album" as const,
+      seedId: 1,
+      continuationSessionId: "session",
+      continuationBatchIndex: 2,
+      continuationRevision: 2,
+    },
+  };
+  const adoptTracks = vi.fn();
+  const { result } = renderHook(() =>
+    useNativeContinuationAdoption({
+      adoptTracks,
+      queueRef: { current: [] },
+      playSourceRef: { current: source },
+    }),
+  );
+  await act(async () => {
+    await result.current();
+  });
+  expect(source.radio.continuationBatchIndex).toBe(2);
+  expect(source.radio.continuationRevision).toBe(2);
+  expect(adoptTracks).not.toHaveBeenCalled();
 });

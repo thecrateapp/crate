@@ -102,23 +102,24 @@ export function HomePlaylist() {
 
   const playerTracks = useMemo(() => {
     if (!data?.tracks?.length) return [];
-    return data.tracks.map((track): Track =>
-      toPlayableTrack(track, {
-        cover:
-          track.artist && track.album
-            ? albumCoverApiUrl(
-                {
-                  albumId: track.album_id || undefined,
-                  albumEntityUid: track.album_entity_uid || undefined,
-                  artistEntityUid: track.artist_entity_uid || undefined,
-                  albumSlug: track.album_slug || undefined,
-                  artistName: track.artist,
-                  albumName: track.album,
-                },
-                { size: 512 },
-              ) || undefined
-            : undefined,
-      }),
+    return data.tracks.map(
+      (track): Track =>
+        toPlayableTrack(track, {
+          cover:
+            track.artist && track.album
+              ? albumCoverApiUrl(
+                  {
+                    albumId: track.album_id || undefined,
+                    albumEntityUid: track.album_entity_uid || undefined,
+                    artistEntityUid: track.artist_entity_uid || undefined,
+                    albumSlug: track.album_slug || undefined,
+                    artistName: track.artist,
+                    albumName: track.album,
+                  },
+                  { size: 512 },
+                ) || undefined
+              : undefined,
+        }),
     );
   }, [data]);
 
@@ -145,6 +146,7 @@ export function HomePlaylist() {
       type: "playlist",
       name: data.name,
       id: data.id,
+      radio: { seedType: "playlist", seedId: data.id },
     });
   }
 
@@ -154,6 +156,7 @@ export function HomePlaylist() {
       type: "playlist",
       name: data.name,
       id: data.id,
+      radio: { seedType: "playlist", seedId: data.id },
     });
   }
 

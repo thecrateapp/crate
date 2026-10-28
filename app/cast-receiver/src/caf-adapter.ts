@@ -20,7 +20,7 @@ export interface CafAdapterHandlers {
   onError?(event: CafEvent): void;
   onCurrentItem?(itemId: string): void;
   onLoad?(data: CrateLoadData): void;
-  onPlayerState?(state: CastPlayerState): void;
+  onPlayerState?(state: CastPlayerState, mediaFinished?: boolean): void;
   onProgress?(progress: { currentTime: number; duration: number }): void;
   onProtocolMessage?(message: CastProtocolMessage): void;
   onQueueChange?(queueData: unknown): void;
@@ -124,8 +124,11 @@ export function createCafAdapter({
         runtime.framework.messages.MessageType.LOAD,
         loadInterceptor,
       );
+      bindEvent(eventTypes.MEDIA_FINISHED, () => {
+        publishCurrentItem();
+        handlers.onPlayerState?.("IDLE", true);
+      });
       for (const [type, state] of [
-        [eventTypes.MEDIA_FINISHED, "IDLE"],
         [eventTypes.PAUSE, "PAUSED"],
         [eventTypes.PLAYING, "PLAYING"],
         [eventTypes.PLAYER_LOADING, "BUFFERING"],

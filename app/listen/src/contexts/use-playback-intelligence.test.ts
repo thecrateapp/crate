@@ -1,329 +1,104 @@
-import { renderHook, act } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("@/lib/radio", () => ({
-  fetchRadioContinuation: vi.fn(),
-  fetchInfiniteContinuation: vi.fn(),
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, expect, it, vi } from "vitest";
+import type { PlaySource, Track } from "./player-types";
+vi.mock("@/lib/radio", () => ({ fetchInfiniteContinuation: vi.fn() }));
+vi.mock("@/lib/radio-continuation", () => ({
+  fetchContinuationBatch: vi.fn(),
+  acknowledgeContinuationBatch: vi.fn(),
 }));
-
-import * as radio from "@/lib/radio";
+vi.mock("@/lib/android-native-engine", () => ({
+  shouldUseAndroidNativePlayer: () => false,
+}));
+import { fetchContinuationBatch } from "@/lib/radio-continuation";
 import { usePlaybackIntelligence } from "./use-playback-intelligence";
-import type { PlaySource, RepeatMode, Track } from "./player-types";
-
-const mockRadioCont = vi.mocked(radio.fetchRadioContinuation);
-const mockInfiniteCont = vi.mocked(radio.fetchInfiniteContinuation);
-
-const TRACK_A: Track = { id: "a", title: "A", artist: "X" };
-const TRACK_B: Track = { id: "b", title: "B", artist: "Y" };
-const TRACK_C: Track = { id: "c", title: "C", artist: "Z" };
-
-function makeActions() {
+const track: Track = { id: "a", title: "A", artist: "X" };
+const next: Track = { id: "b", title: "B", artist: "Y" };
+function options() {
   return {
-    appendTracks: vi.fn(),
-    insertSuggestionAfterCurrent: vi.fn(),
-    appendAndAdvance: vi.fn(),
-    setBuffering: vi.fn(),
-  };
-}
-
-// Extra padding tracks so the prefetch effect doesn't auto-fire
-// (threshold: fetch when remainingUpcoming <= 3). Manual tests of
-// continueInfinitePlayback want a full buffer so they can control the
-// timing of the single fetch.
-const PAD: Track[] = Array.from({ length: 10 }, (_, i) => ({
-  id: `pad-${i}`,
-  title: `Pad ${i}`,
-  artist: "Pad",
-}));
-
-function baseOptions(
-  overrides: Partial<Parameters<typeof usePlaybackIntelligence>[0]> = {},
-) {
-  const actions = makeActions();
-  const playSourceRadio: PlaySource = {
-    type: "album",
-    name: "Album",
-    id: 42,
-    radio: { seedType: "album", seedId: 42 },
-  };
-  return {
-    opts: {
-      repeat: "off" as RepeatMode,
-      queue: [TRACK_A, ...PAD],
-      currentIndex: 0,
-      isPlaying: false,
-      playSource: playSourceRadio,
-      shuffle: false,
-      infinitePlaybackEnabled: true,
-      smartPlaylistSuggestionsEnabled: false,
-      smartPlaylistSuggestionsCadence: 3,
-      recentlyPlayed: [],
-      actions,
-      ...overrides,
+    repeat: "off" as const,
+    queue: [track],
+    currentIndex: 0,
+    isPlaying: true,
+    playSource: {
+      type: "album",
+      name: "Album",
+      radio: { seedType: "album", seedId: 42 },
+    } as PlaySource,
+    shuffle: false,
+    infinitePlaybackEnabled: true,
+    smartPlaylistSuggestionsEnabled: false,
+    smartPlaylistSuggestionsCadence: 3,
+    recentlyPlayed: [],
+    actions: {
+      appendTracks: vi.fn().mockResolvedValue(1),
+      appendAndAdvance: vi.fn().mockResolvedValue(1),
+      setBuffering: vi.fn(),
+      insertSuggestionAfterCurrent: vi.fn(),
     },
-    actions,
   };
 }
-
 beforeEach(() => {
-  mockRadioCont.mockReset();
-  mockInfiniteCont.mockReset();
+  vi.clearAllMocks();
+  vi.mocked(fetchContinuationBatch).mockResolvedValue({
+    tracks: [next],
+    status: "ok",
+    batchIndex: 0,
+    revision: 1,
+  });
 });
-
-afterEach(() => {
-  vi.clearAllTimers();
+it("composes a single shared refill owner for an Infinite album", async () => {
+  const opts = options();
+  renderHook(() => usePlaybackIntelligence(opts));
+  await act(async () => {});
+  expect(fetchContinuationBatch).toHaveBeenCalledOnce();
+  expect(opts.actions.appendTracks).toHaveBeenCalledOnce();
 });
-
-describe("continueInfinitePlayback", () => {
-  it.each(["all", "one"] as const)(
-    "does not refill an album while repeat is %s",
-    async (repeat) => {
-      const { opts, actions } = baseOptions({
-        queue: [TRACK_A],
-        currentIndex: 0,
-      });
-      mockInfiniteCont.mockResolvedValue([TRACK_B]);
-      const options = { ...opts, repeat };
-      const { result } = renderHook(() => usePlaybackIntelligence(options));
-      expect(result.current.continueInfinitePlayback()).toBe(false);
-      await act(async () => {});
-      expect(mockInfiniteCont).not.toHaveBeenCalled();
-      expect(actions.appendTracks).not.toHaveBeenCalled();
-    },
+it("also continues shaped radios at EOF", async () => {
+  const opts = options();
+  opts.playSource = {
+    type: "radio",
+    name: "Radio",
+    radio: { seedType: "discovery", shapedSessionId: "s" },
+  };
+  const { result } = renderHook(() => usePlaybackIntelligence(opts));
+  act(() => {
+    expect(result.current.continueInfinitePlayback()).toBe(true);
+  });
+  await act(async () => {});
+  expect(opts.actions.appendAndAdvance).toHaveBeenCalledOnce();
+});
+it("exposes cancellation to Pause, Stop and source replacement", async () => {
+  vi.mocked(fetchContinuationBatch).mockImplementation(
+    () => new Promise(() => {}),
   );
-
-  it("cancels a pending album refill when repeat-all is enabled", async () => {
-    const { opts, actions } = baseOptions({
-      queue: [TRACK_A],
-      currentIndex: 0,
-    });
-    let complete!: (tracks: Track[]) => void;
-    mockInfiniteCont.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          complete = resolve;
-        }),
-    );
-    const { rerender } = renderHook(
-      ({ repeat }: { repeat: RepeatMode }) =>
-        usePlaybackIntelligence({ ...opts, repeat }),
-      {
-        initialProps: { repeat: "off" as RepeatMode },
-      },
-    );
-    expect(mockInfiniteCont).toHaveBeenCalledOnce();
-    rerender({ repeat: "all" });
-    await act(async () => {
-      complete([TRACK_B]);
-    });
-    expect(actions.appendTracks).not.toHaveBeenCalled();
-  });
-
-  it("returns false when infinite playback is disabled", () => {
-    const { opts } = baseOptions({ infinitePlaybackEnabled: false });
-    const { result } = renderHook(() => usePlaybackIntelligence(opts));
-    expect(result.current.continueInfinitePlayback()).toBe(false);
-  });
-
-  it("returns false when shuffle is on", () => {
-    const { opts } = baseOptions({ shuffle: true });
-    const { result } = renderHook(() => usePlaybackIntelligence(opts));
-    expect(result.current.continueInfinitePlayback()).toBe(false);
-  });
-
-  it("returns false when playSource is radio (not album/playlist)", () => {
-    const { opts } = baseOptions({
-      playSource: {
-        type: "radio",
-        name: "R",
-        radio: { seedType: "track", seedId: 1 },
-      },
-    });
-    const { result } = renderHook(() => usePlaybackIntelligence(opts));
-    expect(result.current.continueInfinitePlayback()).toBe(false);
-  });
-
-  it("returns false when there's no radio seed", () => {
-    const { opts } = baseOptions({
-      playSource: { type: "album", name: "A", id: 1 },
-    });
-    const { result } = renderHook(() => usePlaybackIntelligence(opts));
-    expect(result.current.continueInfinitePlayback()).toBe(false);
-  });
-
-  it("returns true and calls setBuffering then appendAndAdvance on success", async () => {
-    const { opts, actions } = baseOptions();
-    mockInfiniteCont.mockResolvedValue([TRACK_B, TRACK_C]);
-
-    const { result } = renderHook(() => usePlaybackIntelligence(opts));
-
-    let returned = false;
-    await act(async () => {
-      returned = result.current.continueInfinitePlayback();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    expect(returned).toBe(true);
-    expect(actions.setBuffering).toHaveBeenCalledWith(true);
-    expect(actions.appendAndAdvance).toHaveBeenCalledWith([TRACK_B, TRACK_C]);
-  });
-
-  it("clears buffering when the fetch returns no tracks", async () => {
-    const { opts, actions } = baseOptions();
-    mockInfiniteCont.mockResolvedValue([]);
-
-    const { result } = renderHook(() => usePlaybackIntelligence(opts));
-
-    await act(async () => {
-      result.current.continueInfinitePlayback();
-      // Let the mocked fetch resolve + all then() chains settle.
-      await new Promise((r) => setTimeout(r, 0));
-      await new Promise((r) => setTimeout(r, 0));
-    });
-
-    expect(actions.setBuffering).toHaveBeenCalledWith(true);
-    expect(actions.setBuffering).toHaveBeenCalledWith(false);
-    expect(actions.appendAndAdvance).not.toHaveBeenCalled();
-  });
-
-  it("clears buffering and logs when the fetch rejects", async () => {
-    const { opts, actions } = baseOptions();
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    mockInfiniteCont.mockRejectedValue(new Error("boom"));
-
-    const { result } = renderHook(() => usePlaybackIntelligence(opts));
-
-    await act(async () => {
-      result.current.continueInfinitePlayback();
-      // Let the mocked fetch resolve + all then() chains settle.
-      await new Promise((r) => setTimeout(r, 0));
-      await new Promise((r) => setTimeout(r, 0));
-    });
-
-    expect(actions.setBuffering).toHaveBeenCalledWith(false);
-    expect(warnSpy).toHaveBeenCalled();
-    warnSpy.mockRestore();
-  });
-
-  it("filters tracks already in queue or recently played", async () => {
-    const { opts, actions } = baseOptions({
-      queue: [TRACK_A, ...PAD],
-      recentlyPlayed: [TRACK_B],
-    });
-    // Fetch returns one already in queue (A), one recently played (B),
-    // one genuinely new (C).
-    mockInfiniteCont.mockResolvedValue([TRACK_A, TRACK_B, TRACK_C]);
-
-    const { result } = renderHook(() => usePlaybackIntelligence(opts));
-
-    await act(async () => {
-      result.current.continueInfinitePlayback();
-      // Let the mocked fetch resolve + all then() chains settle.
-      await new Promise((r) => setTimeout(r, 0));
-      await new Promise((r) => setTimeout(r, 0));
-    });
-
-    expect(actions.appendAndAdvance).toHaveBeenCalledWith([TRACK_C]);
-  });
-
-  it("clears buffering when all fetched tracks are duplicates", async () => {
-    const { opts, actions } = baseOptions({ queue: [TRACK_A, ...PAD] });
-    mockInfiniteCont.mockResolvedValue([TRACK_A]);
-
-    const { result } = renderHook(() => usePlaybackIntelligence(opts));
-
-    await act(async () => {
-      result.current.continueInfinitePlayback();
-      // Let the mocked fetch resolve + all then() chains settle.
-      await new Promise((r) => setTimeout(r, 0));
-      await new Promise((r) => setTimeout(r, 0));
-    });
-
-    expect(actions.setBuffering).toHaveBeenCalledWith(false);
-    expect(actions.appendAndAdvance).not.toHaveBeenCalled();
-  });
+  const opts = options();
+  const { result } = renderHook(() => usePlaybackIntelligence(opts));
+  await act(async () => {});
+  act(() => result.current.resetPlaybackIntelligence());
+  expect(vi.mocked(fetchContinuationBatch).mock.calls[0]?.[2].aborted).toBe(
+    true,
+  );
+  expect(result.current.recoverAtEnd()).toBe(false);
 });
 
-describe("radio refill effect", () => {
-  it("fetches when isPlaying + radio source + queue low", async () => {
-    mockRadioCont.mockResolvedValue([TRACK_B]);
-    const { opts, actions } = baseOptions({
-      playSource: {
-        type: "radio",
-        name: "R",
-        radio: { seedType: "track", seedId: 1 },
-      },
-      isPlaying: true,
-      queue: [TRACK_A],
-      currentIndex: 0,
-    });
-
-    renderHook(() => usePlaybackIntelligence(opts));
-
-    await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    expect(mockRadioCont).toHaveBeenCalled();
-    expect(actions.appendTracks).toHaveBeenCalledWith([TRACK_B]);
-  });
-
-  it("does nothing when not playing", async () => {
-    const { opts, actions } = baseOptions({
-      playSource: {
-        type: "radio",
-        name: "R",
-        radio: { seedType: "track", seedId: 1 },
-      },
-      isPlaying: false,
-    });
-
-    renderHook(() => usePlaybackIntelligence(opts));
-
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    expect(mockRadioCont).not.toHaveBeenCalled();
-    expect(actions.appendTracks).not.toHaveBeenCalled();
-  });
-});
-
-describe("album continuation prefetch", () => {
-  it("appends near-end continuation tracks without advancing playback", async () => {
-    mockInfiniteCont.mockResolvedValue([TRACK_B]);
-    const { opts, actions } = baseOptions({
-      queue: [TRACK_A, TRACK_C],
-      currentIndex: 0,
-    });
-
-    renderHook(() => usePlaybackIntelligence(opts));
-
-    await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    expect(mockInfiniteCont).toHaveBeenCalled();
-    expect(actions.appendTracks).toHaveBeenCalledWith([
-      { ...TRACK_B, isAutoplayContinuation: true },
-    ]);
-    expect(actions.appendAndAdvance).not.toHaveBeenCalled();
-  });
-});
-
-describe("resetPlaybackIntelligence", () => {
-  it("aborts in-flight fetches and clears signatures", async () => {
-    mockInfiniteCont.mockImplementation(() => new Promise(() => {})); // never resolves
-    const { opts } = baseOptions();
-
-    const { result } = renderHook(() => usePlaybackIntelligence(opts));
-
-    act(() => {
-      result.current.continueInfinitePlayback();
-    });
-    expect(() => result.current.resetPlaybackIntelligence()).not.toThrow();
-  });
+it("uses committed state refs even before the next React render catches up", async () => {
+  const opts = options();
+  const replacement = {
+    ...opts.playSource,
+    name: "Replacement",
+    radio: { seedType: "album" as const, seedId: 55 },
+  };
+  const replacementTrack = { ...track, id: "replacement" };
+  const stateRefs = {
+    queueRef: { current: [replacementTrack] },
+    currentIndexRef: { current: 0 },
+    playSourceRef: { current: replacement },
+  };
+  renderHook(() => usePlaybackIntelligence({ ...opts, stateRefs }));
+  await act(async () => {});
+  expect(fetchContinuationBatch).toHaveBeenCalledWith(
+    replacement,
+    [replacementTrack],
+    expect.any(AbortSignal),
+  );
 });

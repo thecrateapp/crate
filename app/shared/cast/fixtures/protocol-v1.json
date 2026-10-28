@@ -26,5 +26,18 @@
     "currentTime": 42.5,
     "playerState": "PLAYING",
     "consecutiveFailures": 0
+  },
+  "receiverFinished": {
+    "version": 1,
+    "messageId": "finished-1",
+    "type": "receiver.status",
+    "sessionId": "11111111-1111-1111-1111-111111111111",
+    "queueRevision": 4,
+    "stateSeq": 14,
+    "currentIndex": 1,
+    "currentTime": 98.9,
+    "playerState": "IDLE",
+    "mediaFinished": true,
+    "consecutiveFailures": 0
   }
 }

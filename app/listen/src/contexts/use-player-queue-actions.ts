@@ -1,4 +1,6 @@
 import {
+  useCallback,
+  useRef,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
@@ -22,6 +24,8 @@ import { usePlayerQueueStateActions } from "@/contexts/use-player-queue-state-ac
 import { usePlayerStartActions } from "@/contexts/use-player-start-actions";
 import { usePlayerTransportControls } from "@/contexts/use-player-transport-controls";
 
+import type { PlaybackQueueReadiness } from "./playback-intelligence-model";
+
 function silenceGaplessEngine() {
   gpPause();
   gpStop();
@@ -36,6 +40,7 @@ function stopNativeEngineIfAvailable(context: string) {
 }
 
 interface UsePlayerQueueActionsParams {
+  queueReadinessRef?: MutableRefObject<PlaybackQueueReadiness>;
   queueRef: MutableRefObject<Track[]>;
   jamQueueLockedRef: MutableRefObject<boolean>;
   currentIndexRef: MutableRefObject<number>;
@@ -70,6 +75,7 @@ interface UsePlayerQueueActionsParams {
   cancelSoftInterruption: () => void;
   cancelRestoreAutoplay: () => void;
   resetPlaybackIntelligence: () => void;
+  resumePlaybackIntelligence?: () => void;
   continueInfinitePlayback: () => boolean;
   clearPrevRestartLatch: () => void;
   commitQueue: (queue: Track[]) => void;
@@ -97,6 +103,7 @@ interface UsePlayerQueueActionsParams {
 }
 
 export function usePlayerQueueActions({
+  queueReadinessRef,
   queueRef,
   jamQueueLockedRef,
   currentIndexRef,
@@ -128,6 +135,7 @@ export function usePlayerQueueActions({
   cancelSoftInterruption,
   cancelRestoreAutoplay,
   resetPlaybackIntelligence,
+  resumePlaybackIntelligence,
   continueInfinitePlayback,
   clearPrevRestartLatch,
   commitQueue,
@@ -143,7 +151,30 @@ export function usePlayerQueueActions({
   publishConnectState,
   playbackDeliveryPolicy,
 }: UsePlayerQueueActionsParams) {
+  const fallbackReadinessRef = useRef<PlaybackQueueReadiness>({
+    ready: true,
+    generation: 0,
+  });
+  const readinessRef = queueReadinessRef ?? fallbackReadinessRef;
+  const cancelQueuePreparation = useCallback(() => {
+    if (!readinessRef.current.ready) readinessRef.current.generation++;
+  }, [readinessRef]);
+  const resumePendingQueue = useCallback(() => {
+    const pending = readinessRef.current.resumePending;
+    if (readinessRef.current.ready || !pending) return false;
+    pending();
+    return true;
+  }, [readinessRef]);
+  const resetQueuePlayback = useCallback(() => {
+    cancelQueuePreparation();
+    readinessRef.current.resumePending = undefined;
+    readinessRef.current.ready = true;
+    resetPlaybackIntelligence();
+  }, [cancelQueuePreparation, readinessRef, resetPlaybackIntelligence]);
   const { play, playAll } = usePlayerStartActions({
+    queueReadinessRef: readinessRef,
+    isPlayingRef,
+    resumePlaybackIntelligence,
     queueRef,
     currentIndexRef,
     jamQueueLockedRef,
@@ -218,7 +249,7 @@ export function usePlayerQueueActions({
       flushCurrentPlayEvent,
       cancelSoftInterruption,
       cancelRestoreAutoplay,
-      resetPlaybackIntelligence,
+      resetPlaybackIntelligence: resetQueuePlayback,
       commitQueue,
       commitCurrentIndex,
       commitCurrentTime,
@@ -239,6 +270,10 @@ export function usePlayerQueueActions({
     setVolume,
     setPlaybackRate,
   } = usePlayerTransportControls({
+    cancelQueuePreparation,
+    resumePendingQueue,
+    resetPlaybackIntelligence,
+    resumePlaybackIntelligence,
     queueRef,
     isPlayingRef,
     bufferingIntentRef,

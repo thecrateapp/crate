@@ -304,7 +304,14 @@ from crate.api.schemas.playlists import (
     PlaylistTrackResponse,
     PlaylistTracksAddedResponse,
 )
-from crate.api.schemas.radio import RadioResponse, RadioSession, RadioTrack
+from crate.api.schemas.radio import (
+    RadioBatchResponse,
+    RadioNextRequest,
+    RadioStartRequest,
+    RadioResponse,
+    RadioSession,
+    RadioTrack,
+)
 from crate.api.schemas.settings import (
     AboutInfoResponse,
     CacheClearResponse,
@@ -672,6 +679,9 @@ __all__ = [
     "SetlistPlaylistResponse",
     "QueueClearResponse",
     "QueueUpdateRequest",
+    "RadioBatchResponse",
+    "RadioNextRequest",
+    "RadioStartRequest",
     "RadioResponse",
     "RadioSession",
     "RadioTrack",

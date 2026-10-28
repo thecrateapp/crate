@@ -263,3 +263,16 @@ describe("usePlayerEngineCallbacks", () => {
     expect(options.pendingRestoreTimeRef.current).toBe(0);
   });
 });
+
+it("natural EOF delegates to continuation even after the engine emits pause", () => {
+  const options = createOptions();
+  options.isPlayingRef.current = false;
+  const continueInfinitePlayback = vi.fn(() => true);
+  renderHook(() =>
+    usePlayerEngineCallbacks({ ...options, continueInfinitePlayback }),
+  );
+  options.callbacksRef.current.onAllFinished?.();
+  expect(continueInfinitePlayback).toHaveBeenCalledOnce();
+  expect(options.bufferingIntentRef.current).toBe(true);
+  expect(options.commitIsBuffering).not.toHaveBeenCalledWith(false);
+});

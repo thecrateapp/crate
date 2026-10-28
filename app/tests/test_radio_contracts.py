@@ -5,10 +5,13 @@ from unittest.mock import patch
 
 class TestRadioApiContracts:
     def test_global_radio_dislike_accepts_a_canonical_track_uid(self, test_app):
-        with patch(
-            "crate.radio_engine.radio_feedback",
-            return_value={"status": "ok", "effect": "exclusion_added"},
-        ) as feedback:
+        with (
+            patch("crate.radio_engine.get_session_user_id", return_value=1),
+            patch(
+                "crate.radio_engine.radio_feedback",
+                return_value={"status": "ok", "effect": "exclusion_added"},
+            ) as feedback,
+        ):
             resp = test_app.post(
                 "/api/radio/feedback",
                 json={
@@ -292,3 +295,86 @@ class TestRadioApiContracts:
         ):
             resp = test_app.get("/api/artists/7/radio?limit=101")
         assert resp.status_code == 422
+
+
+def test_indexed_radio_contracts_are_named_and_cookie_authenticated(test_app):
+    paths = test_app.get("/openapi.json").json()["paths"]
+    for path in ("/api/radio/start", "/api/radio/next"):
+        operation = paths[path]["post"]
+        assert operation["tags"] == ["radio"]
+        assert {"cookieAuth": []} in operation["security"]
+        assert operation["responses"]["200"]["content"]["application/json"]["schema"][
+            "$ref"
+        ].endswith("/RadioBatchResponse")
+
+
+def test_indexed_next_resolves_proxy_identity_and_rejects_missing_id(
+    test_app, monkeypatch
+):
+    from crate.api import radio
+    from crate import radio_continuation
+
+    calls = []
+    monkeypatch.setattr(
+        radio, "_require_auth", lambda _: {"id": None, "email": "proxy@test.invalid"}
+    )
+    monkeypatch.setattr(radio, "get_user_by_email", lambda _: None)
+    monkeypatch.setattr(
+        radio_continuation,
+        "next_batch",
+        lambda *args, **kwargs: (
+            calls.append(kwargs)
+            or {
+                "session_id": "s",
+                "tracks": [],
+                "status": "retryable_empty",
+                "exhausted": False,
+            }
+        ),
+    )
+    assert (
+        test_app.post(
+            "/api/radio/next", json={"session_id": "s", "batch_index": 1}
+        ).status_code
+        == 401
+    )
+    assert calls == []
+    monkeypatch.setattr(radio, "get_user_by_email", lambda _: {"id": 7})
+    assert (
+        test_app.post(
+            "/api/radio/next", json={"session_id": "s", "batch_index": 1}
+        ).status_code
+        == 200
+    )
+    assert calls[0]["user_id"] == 7
+
+
+def test_legacy_shaped_start_does_not_expose_a_private_playlist(test_app, monkeypatch):
+    from crate.api import radio
+
+    monkeypatch.setattr(
+        radio,
+        "get_playlist_for_radio",
+        lambda _: {"scope": "user", "user_id": 999, "name": "Private"},
+    )
+    monkeypatch.setattr(radio, "_require_auth", lambda _: {"id": 1, "role": "user"})
+    response = test_app.post(
+        "/api/radio/start", json={"seed_type": "playlist", "seed_value": "42"}
+    )
+    assert response.status_code == 403
+    assert "Private" not in response.text
+
+
+def test_native_seeded_descriptor_cannot_use_a_redis_internal_key(test_app):
+    response = test_app.post(
+        "/api/playback/continuation-token",
+        json={
+            "descriptor": {
+                "kind": "seeded_radio",
+                "seedType": "album",
+                "seedId": "42",
+                "sessionId": "s:lock",
+            }
+        },
+    )
+    assert response.status_code == 422

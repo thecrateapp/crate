@@ -111,6 +111,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private final NativeContinuationPolicy continuationPolicy =
         new NativeContinuationPolicy();
     private final NativeContinuationPolicy refillPolicy = new NativeContinuationPolicy();
+    private final Runnable refillRetry = this::maybeRefillQueue;
+    private final Runnable planRetry = this::maybeRequestContinuation;
+    private String refillSessionId = "";
+    private int refillBatchIndex;
+    private int refillRevision = 1;
     private static final int REFILL_BATCH = 10;
     private static final int MAX_APPENDED_LOG = 200;
     private final List<JSObject> appendedLog = new ArrayList<>();
@@ -261,6 +266,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
                 @Override
                 public void beforePause() {
+                    cancelContinuationRequests();
                     cancelNativeTransition("media_session_pause");
                     if (!handlingInterruption) {
                         if (interruptionCoordinator != null) {
@@ -272,6 +278,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
                 @Override
                 public void beforeStop() {
+                    cancelContinuationRequests();
                     cancelNativeTransition("media_session_stop");
                     if (interruptionCoordinator != null) {
                         interruptionCoordinator.onUserPause();
@@ -290,6 +297,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
                 @Override
                 public void beforeRepeatModeChange(int repeatMode) {
+                    cancelContinuationRequests();
                     deckAPlayer.setRepeatMode(repeatMode);
                     deckBPlayer.setRepeatMode(repeatMode);
                     if (mixController != null) {
@@ -407,6 +415,10 @@ public class CrateNativePlaybackService extends MediaSessionService {
         player.addListener(new Player.Listener() {
             @Override
             public void onIsPlayingChanged(boolean isPlaying) {
+                if (isPlaying) {
+                    maybeRefillQueue();
+                    maybeRequestContinuation();
+                }
                 emitPosition();
                 syncPositionTicker();
                 syncNativeMixTicker();
@@ -434,7 +446,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
                     emit("bufferingChanged", payload);
                 }
                 if (playbackState == Player.STATE_ENDED) {
-                    abandonPlaybackFocus();
+                    maybeRefillQueue();
+                    if (!canContinuePlayback()) abandonPlaybackFocus();
                     emit("queueEnded", basePayload());
                 }
             }
@@ -1203,6 +1216,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
 
     @Override
     public void onDestroy() {
+        cancelContinuationRequests();
+        continuationConfig = null;
         continuationExecutor.shutdownNow();
         pcmBusMixer.release();
         stopPositionTicker();
@@ -1293,6 +1308,10 @@ public class CrateNativePlaybackService extends MediaSessionService {
     ) {
         if (player == null) return;
         // Physical deck callbacks may publish immediately: retire the old execution first.
+        cancelContinuationRequests();
+        continuationConfig = null;
+        refillSessionId = "";
+        refillBatchIndex = 0;
         cancelNativeTransition("queue_replaced");
         resumeAuthorizationPending = false;
         resumeAuthorizationIntent = null;
@@ -1375,24 +1394,64 @@ public class CrateNativePlaybackService extends MediaSessionService {
     public void setContinuationConfig(
         @Nullable NativeContinuationClient.Config config
     ) {
+        cancelContinuationRequests();
+        if (config != null) {
+            refillBatchIndex = config.nextBatchIndex(refillSessionId, refillRevision, refillBatchIndex);
+            refillSessionId = config.sessionId;
+            refillRevision = config.revision;
+        }
         continuationConfig = config;
-        continuationPolicy.reset();
-        refillPolicy.reset();
         maybeRequestContinuation();
         maybeRefillQueue();
     }
 
     public void setAppInForeground(boolean foreground) {
         appInForeground = foreground;
+        cancelContinuationRequests();
         if (!foreground) {
             maybeRequestContinuation();
             maybeRefillQueue();
         }
     }
 
+    private void cancelContinuationRequests() {
+        mainHandler.removeCallbacks(refillRetry);
+        mainHandler.removeCallbacks(planRetry);
+        refillPolicy.reset();
+        continuationPolicy.reset();
+    }
+
+    private boolean canContinuePlayback() {
+        NativeContinuationClient.Config config = continuationConfig;
+        return player != null && player.getPlayWhenReady()
+            && player.getRepeatMode() == Player.REPEAT_MODE_OFF
+            && config != null && config.refill
+            && config.isUsable(System.currentTimeMillis());
+    }
+
+    private void scheduleContinuationRetry(NativeContinuationPolicy policy, Runnable retry) {
+        mainHandler.removeCallbacks(retry);
+        long delayMs = policy.retryDelayMs(SystemClock.elapsedRealtime());
+        if (delayMs >= 0L && !appInForeground && player != null && player.getPlayWhenReady()) {
+            mainHandler.postDelayed(retry, delayMs);
+        }
+    }
+
+    private void invalidateContinuationAuthorization() {
+        cancelContinuationRequests();
+        continuationConfig = null;
+        refillPolicy.onUnauthorized();
+        continuationPolicy.onUnauthorized();
+        emit("continuationAuthorizationRequired", basePayload());
+    }
+
     private void maybeRefillQueue() {
         NativeContinuationClient.Config config = continuationConfig;
-        if (player == null) return;
+        if (config != null && config.refill && !config.isUsable(System.currentTimeMillis())) {
+            invalidateContinuationAuthorization();
+            return;
+        }
+        if (!canContinuePlayback()) return;
         boolean configured =
             config != null && config.refill && config.isUsable(System.currentTimeMillis());
         if (
@@ -1408,32 +1467,46 @@ public class CrateNativePlaybackService extends MediaSessionService {
         }
         String revision = queueState.revision();
         List<NativeTrack> queue = queueState.snapshot();
+        long generation = refillPolicy.generation();
+        int batchIndex = refillBatchIndex;
+        int batchRevision = refillRevision;
+        int activeIndex = Math.max(0, player.getCurrentMediaItemIndex());
         continuationExecutor.execute(() -> {
-            NativeContinuationClient.Continuation result =
-                continuationClient.fetchContinuation(config, queue, REFILL_BATCH);
-            mainHandler.post(() -> applyRefill(revision, result));
+            NativeContinuationClient.Continuation result = continuationClient.fetchContinuation(
+                config, queue.subList(Math.min(activeIndex, queue.size()), queue.size()),
+                REFILL_BATCH, batchIndex, batchRevision
+            );
+            mainHandler.post(() -> applyRefill(revision, generation, batchIndex, result));
         });
     }
 
     private void applyRefill(
         String revision,
+        long generation,
+        int batchIndex,
         NativeContinuationClient.Continuation result
     ) {
+        if (!revision.equals(queueState.revision()) || !refillPolicy.acceptsResult(generation)) return;
         if (result.outcome == NativeContinuationClient.Outcome.UNAUTHORIZED) {
-            refillPolicy.onUnauthorized();
+            invalidateContinuationAuthorization();
             Log.i(NativeMixAudioProcessor.QOE_TAG, "continuation refill unauthorized");
             return;
         }
         if (result.outcome == NativeContinuationClient.Outcome.FAILED) {
             refillPolicy.onFailure(SystemClock.elapsedRealtime());
+            scheduleContinuationRetry(refillPolicy, refillRetry);
             Log.i(NativeMixAudioProcessor.QOE_TAG, "continuation refill failed");
             return;
         }
+        refillBatchIndex = result.batchIndex >= 0 || "retryable_empty".equals(result.status)
+            ? result.batchIndex + 1 : batchIndex + 1;
+        refillRevision = result.revision;
         if (result.tracks.isEmpty()) {
             if (result.exhausted) {
                 refillPolicy.onExhausted();
             } else {
-                refillPolicy.onSuccess();
+                refillPolicy.onFailure(SystemClock.elapsedRealtime());
+                scheduleContinuationRetry(refillPolicy, refillRetry);
             }
             Log.i(
                 NativeMixAudioProcessor.QOE_TAG,
@@ -1442,8 +1515,9 @@ public class CrateNativePlaybackService extends MediaSessionService {
             return;
         }
         refillPolicy.onSuccess();
-        if (!revision.equals(queueState.revision())) return;
         int before = queueState.size();
+        boolean ended = player != null && player.getPlaybackState() == Player.STATE_ENDED;
+        boolean resume = ended && canContinuePlayback();
         appendTracks(revision, result.tracks);
         if (queueState.size() == before) return;
         recordAppended(revision, result);
@@ -1451,6 +1525,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
             revision,
             resolveTransitionPlans(queueState.snapshot(), result.plans)
         );
+        if (resume && player != null) {
+            player.seekTo(before, 0L);
+            player.prepare();
+            player.play();
+        }
         publishMixState();
         Log.i(
             NativeMixAudioProcessor.QOE_TAG,
@@ -1497,14 +1576,20 @@ public class CrateNativePlaybackService extends MediaSessionService {
             }
         }
         JSObject result = new JSObject();
-        result.put("revision", appendedLogRevision);
+        result.put("revision", revision != null && revision.equals(queueState.revision())
+            ? revision : appendedLogRevision);
         result.put("tracks", tracks);
+        if (revision != null && revision.equals(queueState.revision()) && !refillSessionId.isEmpty()) {
+            result.put("continuationSessionId", refillSessionId);
+            result.put("continuationBatchIndex", refillBatchIndex);
+            result.put("continuationRevision", refillRevision);
+        }
         return result;
     }
 
     private void maybeRequestContinuation() {
         NativeContinuationClient.Config config = continuationConfig;
-        if (player == null) return;
+        if (player == null || !player.getPlayWhenReady()) return;
         int currentIndex = player.getCurrentMediaItemIndex();
         boolean configured =
             config != null && config.isUsable(System.currentTimeMillis());
@@ -1532,6 +1617,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         }
         String revision = queueState.revision();
         List<NativeTrack> tracks = queueState.snapshot();
+        long generation = continuationPolicy.generation();
         continuationExecutor.execute(() -> {
             NativeContinuationClient.Result result = continuationClient.fetchPlans(
                 config,
@@ -1539,22 +1625,25 @@ public class CrateNativePlaybackService extends MediaSessionService {
                 window.fromIndex,
                 window.edgeCount
             );
-            mainHandler.post(() -> applyContinuationResult(revision, tracks, result));
+            mainHandler.post(() -> applyContinuationResult(revision, generation, tracks, result));
         });
     }
 
     private void applyContinuationResult(
         String revision,
+        long generation,
         List<NativeTrack> tracks,
         NativeContinuationClient.Result result
     ) {
+        if (!revision.equals(queueState.revision()) || !continuationPolicy.acceptsResult(generation)) return;
         if (result.outcome == NativeContinuationClient.Outcome.UNAUTHORIZED) {
-            continuationPolicy.onUnauthorized();
+            invalidateContinuationAuthorization();
             Log.i(NativeMixAudioProcessor.QOE_TAG, "continuation unauthorized");
             return;
         }
         if (result.outcome == NativeContinuationClient.Outcome.FAILED) {
             continuationPolicy.onFailure(SystemClock.elapsedRealtime());
+            scheduleContinuationRetry(continuationPolicy, planRetry);
             Log.i(NativeMixAudioProcessor.QOE_TAG, "continuation failed");
             return;
         }
@@ -1850,6 +1939,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     public void pause() {
+        cancelContinuationRequests();
         restoredPlayWhenReady = false;
         if (resumeAuthorizationPending) {
             resumeAuthorizationIntent = currentResumeAuthorizationIntent()
@@ -1865,6 +1955,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     public void stopPlayback() {
+        cancelContinuationRequests();
         restoredPlayWhenReady = false;
         if (resumeAuthorizationPending) {
             resumeAuthorizationIntent = currentResumeAuthorizationIntent()
@@ -1944,6 +2035,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
     }
 
     public void setRepeat(String repeat) {
+        cancelContinuationRequests();
         if (player != null) {
             int repeatMode = toRepeatMode(repeat);
             deckAPlayer.setRepeatMode(repeatMode);

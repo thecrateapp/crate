@@ -179,6 +179,9 @@ type PlaybackStateOptions = {
 };
 
 export interface UseNativePlaybackEventBridgeParams {
+  recoverAtEnd?: () => boolean;
+  resumePlaybackIntelligence?: () => void;
+  resetPlaybackIntelligence?: () => void;
   adoptNativeAppendedTracks?: () => Promise<void>;
   applyNativePosition: (event: EnginePositionEvent) => void;
   applyNativeState: (
@@ -213,6 +216,9 @@ export interface UseNativePlaybackEventBridgeParams {
 }
 
 export function useNativePlaybackEventBridge({
+  recoverAtEnd,
+  resumePlaybackIntelligence,
+  resetPlaybackIntelligence,
   adoptNativeAppendedTracks,
   applyNativePosition,
   applyNativeState,
@@ -337,8 +343,12 @@ export function useNativePlaybackEventBridge({
         const endedTrack = queueRef.current[currentIndexRef.current];
         clearNativeBufferingWatchdog();
         flushCurrentPlayEvent("completed", endedTrack);
-        bufferingIntentRef.current = false;
         commitIsPlaying(false);
+        if (recoverAtEnd?.()) {
+          bufferingIntentRef.current = true;
+          return;
+        }
+        bufferingIntentRef.current = false;
         commitIsBuffering(false);
         return;
       }
@@ -391,6 +401,7 @@ export function useNativePlaybackEventBridge({
       }
     },
     [
+      recoverAtEnd,
       applyNativePosition,
       applyNativeState,
       applyNativeTrackChange,
@@ -441,7 +452,12 @@ export function useNativePlaybackEventBridge({
       applyNativePosition(event),
   );
   const onNativeState = useEffectEvent(
-    (event: Parameters<typeof applyNativeState>[0]) => applyNativeState(event),
+    (event: Parameters<typeof applyNativeState>[0]) => {
+      if (isNativeEventStale(event)) return;
+      applyNativeState(event);
+      if (event.isPlaying) resumePlaybackIntelligence?.();
+      else if (event.playbackState === "paused") resetPlaybackIntelligence?.();
+    },
   );
   const onNativeTrackChange = useEffectEvent(
     (event: Parameters<typeof applyNativeTrackChange>[0]) =>

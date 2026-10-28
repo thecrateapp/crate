@@ -1,3 +1,12 @@
+import { useEffect } from "react";
+import {
+  androidNativeEngine,
+  shouldUseAndroidNativePlayer,
+} from "@/lib/android-native-engine";
+import { continuationDescriptor } from "@/lib/playback-continuation";
+import { getEffectivePlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
+import { getSmartMixCapabilities } from "@/lib/smart-mix";
+
 import { usePlaybackIntelligence } from "@/contexts/use-playback-intelligence";
 import { usePlaybackPersistence } from "@/contexts/use-playback-persistence";
 import { usePlayerEngineCallbacks } from "@/contexts/use-player-engine-callbacks";
@@ -48,6 +57,7 @@ export function usePlayerPlaybackRuntime({
     smartCrossfadeEnabledRef,
     effectiveCrossfadeMsRef,
     queueRef,
+    queueReadinessRef,
     currentIndexRef,
     currentTrackRef,
     isPlayingRef,
@@ -207,6 +217,9 @@ export function usePlayerPlaybackRuntime({
     appendIntelligenceTracks,
     insertSuggestionAfterCurrent,
   } = usePlayerIntelligenceActions({
+    queueReadinessRef,
+    repeatRef,
+    shuffleRef,
     advanceCursorTo,
     commitIsBuffering,
     commitIsPlaying,
@@ -221,32 +234,62 @@ export function usePlayerPlaybackRuntime({
     unshuffledQueueRef,
   });
 
-  const { continueInfinitePlayback, resetPlaybackIntelligence } =
-    usePlaybackIntelligence({
-      repeat,
-      queue,
-      currentIndex,
-      isPlaying,
-      playSource,
-      shuffle,
-      infinitePlaybackEnabled,
-      smartPlaylistSuggestionsEnabled,
-      smartPlaylistSuggestionsCadence,
-      recentlyPlayed,
-      actions: {
-        appendTracks: appendIntelligenceTracks,
-        insertSuggestionAfterCurrent,
-        appendAndAdvance,
-        setBuffering: commitIsBuffering,
-      },
-    });
-
   const adoptNativeAppendedTracks = useNativeContinuationAdoption({
+    queueReadinessRef,
     adoptTracks: adoptNativeTracks,
     queueRef,
+    playSourceRef,
+  });
+
+  const {
+    continueInfinitePlayback,
+    recoverAtEnd,
+    resumePlaybackIntelligence,
+    resetPlaybackIntelligence,
+  } = usePlaybackIntelligence({
+    queueReadinessRef,
+    stateRefs: { queueRef, playSourceRef, currentIndexRef },
+    repeat,
+    queue,
+    currentIndex,
+    isPlaying,
+    playSource,
+    shuffle,
+    infinitePlaybackEnabled,
+    smartPlaylistSuggestionsEnabled,
+    smartPlaylistSuggestionsCadence,
+    recentlyPlayed,
+    actions: {
+      synchronizeContinuation: adoptNativeAppendedTracks,
+      publishContinuationCursor: (source, authoritative) => {
+        const radio = source.radio;
+        if (
+          !shouldUseAndroidNativePlayer() ||
+          source !== playSourceRef.current ||
+          !radio?.continuationSessionId ||
+          !queueReadinessRef.current.ready
+        )
+          return;
+        return androidNativeEngine.setContinuationCursor(
+          {
+            sessionId: radio.continuationSessionId,
+            batchIndex: radio.continuationBatchIndex ?? 0,
+            revision: radio.continuationRevision ?? 1,
+          },
+          authoritative,
+        );
+      },
+      appendTracks: appendIntelligenceTracks,
+      insertSuggestionAfterCurrent,
+      appendAndAdvance,
+      setBuffering: commitIsBuffering,
+    },
   });
 
   useNativePlaybackRuntime({
+    recoverAtEnd,
+    resumePlaybackIntelligence,
+    resetPlaybackIntelligence,
     adoptNativeAppendedTracks,
     beginSoftInterruption,
     bufferingIntentRef,
@@ -274,6 +317,47 @@ export function usePlayerPlaybackRuntime({
     setMixState,
     shuffleRef,
   });
+
+  useEffect(() => {
+    if (!shouldUseAndroidNativePlayer() || !queueReadinessRef.current.ready)
+      return;
+    const capabilities = getSmartMixCapabilities();
+    void androidNativeEngine
+      .setContinuationContext({
+        source: shuffle
+          ? "shuffle"
+          : playSource?.type === "radio"
+            ? "radio"
+            : "infinite",
+        preferredDurationMs: effectiveCrossfadeMsRef.current,
+        allowBeatmatch: capabilities.androidBeatmatch,
+        allowBassHandoff: capabilities.androidBassHandoff,
+        allowLongBeatmatch: capabilities.androidLongBeatmatch,
+        delivery: getEffectivePlaybackDeliveryPolicy(playbackDeliveryPolicy),
+        descriptor:
+          repeat === "off"
+            ? continuationDescriptor(playSource, {
+                shuffle,
+                infinite: infinitePlaybackEnabled,
+              })
+            : null,
+      })
+      .catch((error) =>
+        console.warn(
+          "[native-player] continuation configuration failed:",
+          error,
+        ),
+      );
+  }, [
+    playSource,
+    repeat,
+    shuffle,
+    infinitePlaybackEnabled,
+    smartCrossfadeEnabled,
+    playbackDeliveryPolicy,
+    effectiveCrossfadeMsRef,
+    queueReadinessRef,
+  ]);
 
   usePlayerPreferenceRuntime({
     currentIndex,
@@ -310,6 +394,8 @@ export function usePlayerPlaybackRuntime({
     allowAutoplayRestore: !connectEnabled,
   });
   usePlayerEngineCallbacks({
+    resumePlaybackIntelligence,
+    continueInfinitePlayback: recoverAtEnd,
     callbacksRef,
     crossfadeTimerRef,
     currentIndexRef,
@@ -357,6 +443,8 @@ export function usePlayerPlaybackRuntime({
     cancelRestoreAutoplay,
     cancelSoftInterruption,
     continueInfinitePlayback,
+    recoverAtEnd,
+    resumePlaybackIntelligence,
     flushCurrentPlayEvent,
     markSeekPosition,
     pullFromEngine,

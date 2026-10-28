@@ -141,6 +141,7 @@ export interface CastReceiverStatusMessage extends CastSessionMessageBase {
   currentIndex: number;
   currentTime: number;
   playerState: CastPlayerState;
+  mediaFinished?: boolean;
   consecutiveFailures: number;
   error?: CastReceiverError;
 }
@@ -586,6 +587,8 @@ export function parseCastProtocolMessage(
       !isNonNegativeInteger(value.currentIndex) ||
       !isNonNegativeNumber(value.currentTime) ||
       !PLAYER_STATES.has(value.playerState as CastPlayerState) ||
+      (value.mediaFinished !== undefined &&
+        typeof value.mediaFinished !== "boolean") ||
       !isNonNegativeInteger(value.consecutiveFailures)
     ) {
       return { ok: false, error: "INVALID_MESSAGE" };
@@ -600,6 +603,9 @@ export function parseCastProtocolMessage(
         currentIndex: value.currentIndex,
         currentTime: value.currentTime,
         playerState: value.playerState as CastPlayerState,
+        ...(value.mediaFinished === undefined
+          ? {}
+          : { mediaFinished: value.mediaFinished }),
         consecutiveFailures: value.consecutiveFailures,
         ...(error === undefined ? {} : { error }),
       },

@@ -22,6 +22,20 @@ final class NativeContinuationPolicy {
     private boolean exhausted;
     private int failures;
     private long retryAtMs;
+    private long generation;
+
+    long generation() {
+        return generation;
+    }
+
+    boolean acceptsResult(long requestGeneration) {
+        return inFlight && requestGeneration == generation;
+    }
+
+    long retryDelayMs(long nowMs) {
+        if (unauthorized || exhausted || inFlight || retryAtMs == 0L) return -1L;
+        return Math.max(0L, retryAtMs - nowMs);
+    }
 
     @Nullable
     Window nextRequest(
@@ -85,6 +99,7 @@ final class NativeContinuationPolicy {
     }
 
     void reset() {
+        generation++;
         inFlight = false;
         unauthorized = false;
         exhausted = false;

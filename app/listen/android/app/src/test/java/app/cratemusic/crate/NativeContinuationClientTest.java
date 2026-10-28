@@ -295,6 +295,106 @@ public class NativeContinuationClientTest {
     }
 
     @Test
+    public void retriesTheSameBatchIndexWithoutConsumingItOnAnHttpFailure() throws Exception {
+        NativeContinuationClient.Config config = NativeContinuationClient.Config.fromJson(
+            new JSONObject().put("token", "crv_token").put("apiBase", "https://api.example")
+                .put("sessionId", "radio-1").put("batchIndex", 4).put("revision", 1)
+        );
+        RecordingTransport transport = new RecordingTransport();
+        NativeContinuationClient client = new NativeContinuationClient(transport);
+        transport.response = new NativeContinuationClient.Response(503, "");
+        assertEquals(NativeContinuationClient.Outcome.FAILED,
+            client.fetchContinuation(config, tracks, 10, 4, 1).outcome);
+        assertEquals(4, new JSONObject(transport.body).getInt("batchIndex"));
+        transport.response = new NativeContinuationClient.Response(200,
+            "{\"tracks\":[],\"plans\":[],\"status\":\"retryable_empty\","
+                + "\"sessionId\":\"radio-1\",\"batchIndex\":4,\"revision\":1}");
+        NativeContinuationClient.Continuation result = client.fetchContinuation(config, tracks, 10, 4, 1);
+        assertEquals(4, new JSONObject(transport.body).getInt("batchIndex"));
+        assertEquals(1, new JSONObject(transport.body).getInt("revision"));
+        assertEquals(NativeContinuationClient.Outcome.PLANNED, result.outcome);
+        assertEquals(4, result.batchIndex);
+        assertEquals("radio-1", result.sessionId);
+        assertFalse(result.exhausted);
+    }
+
+    @Test
+    public void rejectsAResponseForAnotherSessionOrBatch() throws Exception {
+        NativeContinuationClient.Config config = NativeContinuationClient.Config.fromJson(
+            new JSONObject().put("token", "crv_token").put("apiBase", "https://api.example")
+                .put("sessionId", "radio-1").put("batchIndex", 4).put("revision", 1)
+        );
+        RecordingTransport transport = new RecordingTransport();
+        NativeContinuationClient client = new NativeContinuationClient(transport);
+        transport.response = new NativeContinuationClient.Response(200,
+            "{\"tracks\":[],\"plans\":[],\"batchIndex\":3,\"revision\":1}");
+        assertEquals(NativeContinuationClient.Outcome.FAILED,
+            client.fetchContinuation(config, tracks, 10, 4, 1).outcome);
+        transport.response = new NativeContinuationClient.Response(200,
+            "{\"tracks\":[],\"plans\":[],\"batchIndex\":4,\"sessionId\":\"radio-2\",\"revision\":1}");
+        assertEquals(NativeContinuationClient.Outcome.FAILED,
+            client.fetchContinuation(config, tracks, 10, 4, 1).outcome);
+    }
+
+    @Test
+    public void acceptsTheServerCursorWhenHandoffRequestsAnOutOfOrderBatch() throws Exception {
+        NativeContinuationClient.Config config = NativeContinuationClient.Config.fromJson(
+            new JSONObject().put("token", "crv_token").put("apiBase", "https://api.example")
+                .put("sessionId", "radio-1").put("batchIndex", 4).put("revision", 1)
+        );
+        RecordingTransport transport = new RecordingTransport();
+        transport.response = new NativeContinuationClient.Response(200,
+            "{\"tracks\":[],\"plans\":[],\"status\":\"retryable_empty\","
+                + "\"sessionId\":\"radio-1\",\"batchIndex\":2,\"revision\":1}");
+        NativeContinuationClient.Continuation result = new NativeContinuationClient(transport)
+            .fetchContinuation(config, tracks, 10, 4, 1);
+        assertEquals(NativeContinuationClient.Outcome.PLANNED, result.outcome);
+        assertEquals(2, result.batchIndex);
+    }
+
+    @Test
+    public void understandsExplicitExpiredAndAuthorizationStatuses() throws Exception {
+        NativeContinuationClient.Continuation expired = NativeContinuationClient.parseContinuation(
+            "{\"status\":\"exhausted\",\"tracks\":[],\"plans\":[]}", REFILL_CONFIG, tracks);
+        assertTrue(expired.exhausted);
+        NativeContinuationClient.Continuation auth = NativeContinuationClient.parseContinuation(
+            "{\"status\":\"auth_required\",\"tracks\":[],\"plans\":[]}", REFILL_CONFIG, tracks);
+        assertEquals(NativeContinuationClient.Outcome.UNAUTHORIZED, auth.outcome);
+    }
+
+    @Test
+    public void deduplicatesAgainstTheActiveBufferAndWithinTheBatch() throws Exception {
+        JSONObject duplicate = new JSONObject().put("id", "uid-5").put("entityUid", "uid-5")
+            .put("url", "/stream/uid-5");
+        JSONObject fresh = new JSONObject().put("id", "uid-6").put("entityUid", "uid-6")
+            .put("url", "/stream/uid-6");
+        String response = new JSONObject().put("tracks", new JSONArray()
+            .put(duplicate).put(fresh).put(fresh)).toString();
+        NativeContinuationClient.Continuation result = NativeContinuationClient.parseContinuation(
+            response, REFILL_CONFIG, tracks);
+        assertEquals(1, result.tracks.size());
+        assertEquals("uid-6", result.tracks.get(0).entityUid);
+    }
+
+    @Test
+    public void onlyAnAuthoritativeServerCursorCanRewindTheNativeBatch() throws Exception {
+        JSONObject payload = new JSONObject().put("token", "crv_token")
+            .put("sessionId", "session-1").put("batchIndex", 6).put("revision", 1);
+        NativeContinuationClient.Config ordinary = NativeContinuationClient.Config.fromJson(payload);
+        assertEquals(10, ordinary.nextBatchIndex("session-1", 1, 10));
+        NativeContinuationClient.Config authoritative = NativeContinuationClient.Config.fromJson(
+            payload.put("authoritativeCursor", true)
+        );
+        int next = authoritative.nextBatchIndex("session-1", 1, 10);
+        assertEquals(6, next);
+        JSONObject body = NativeContinuationClient.continuationBody(authoritative, tracks, 10, next, 1);
+        assertEquals(6, body.getInt("batchIndex"));
+        assertFalse(body.has("authoritativeCursor"));
+        assertEquals(6, ordinary.nextBatchIndex("another-session", 1, 10));
+        assertEquals(6, ordinary.nextBatchIndex("session-1", 2, 10));
+    }
+
+    @Test
     public void aTokenIsUsableOnlyBeforeItExpires() {
         assertTrue(CONFIG.isUsable(1_999_999L));
         assertFalse(CONFIG.isUsable(2_000_000L));

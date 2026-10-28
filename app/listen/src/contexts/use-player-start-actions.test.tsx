@@ -14,7 +14,10 @@ vi.mock("@/contexts/player-engine-adapter", () => ({
 }));
 
 vi.mock("@/lib/android-native-engine", () => ({
-  androidNativeEngine: { loadQueue: mocks.loadQueue },
+  androidNativeEngine: {
+    loadQueue: mocks.loadQueue,
+    setContinuationContext: vi.fn().mockResolvedValue(undefined),
+  },
   shouldUseAndroidNativePlayer: () => true,
 }));
 

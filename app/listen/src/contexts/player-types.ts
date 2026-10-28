@@ -86,6 +86,9 @@ interface RadioSession {
   seedPath?: string | null;
   seedStorageId?: string | null;
   shapedSessionId?: string | null;
+  continuationSessionId?: string;
+  continuationBatchIndex?: number;
+  continuationRevision?: number;
 }
 
 export interface PlaySource {

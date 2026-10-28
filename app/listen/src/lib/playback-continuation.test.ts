@@ -111,7 +111,12 @@ describe("getPlaybackContinuationToken", () => {
         },
         off,
       ),
-    ).toEqual({ kind: "shaped_radio", sessionId: "radio-1" });
+    ).toEqual({
+      kind: "shaped_radio",
+      sessionId: "radio-1",
+      batchIndex: 1,
+      revision: 1,
+    });
     expect(
       continuationDescriptor(
         {
@@ -121,7 +126,16 @@ describe("getPlaybackContinuationToken", () => {
         },
         off,
       ),
-    ).toEqual({ kind: "seeded_radio", seedType: "track", seedId: "uid-4" });
+    ).toEqual(
+      expect.objectContaining({
+        kind: "seeded_radio",
+        seedType: "track",
+        seedId: "uid-4",
+        sessionId: expect.any(String),
+        batchIndex: 0,
+        revision: 1,
+      }),
+    );
     expect(
       continuationDescriptor(
         {
@@ -131,7 +145,16 @@ describe("getPlaybackContinuationToken", () => {
         },
         infinite,
       ),
-    ).toEqual({ kind: "seeded_radio", seedType: "playlist", seedId: "7" });
+    ).toEqual(
+      expect.objectContaining({
+        kind: "seeded_radio",
+        seedType: "playlist",
+        seedId: "7",
+        sessionId: expect.any(String),
+        batchIndex: 0,
+        revision: 1,
+      }),
+    );
     expect(
       continuationDescriptor(
         {
@@ -141,11 +164,13 @@ describe("getPlaybackContinuationToken", () => {
         },
         infinite,
       ),
-    ).toEqual({
-      kind: "seeded_radio",
-      seedType: "home_playlist",
-      seedId: "daily",
-    });
+    ).toEqual(
+      expect.objectContaining({
+        kind: "seeded_radio",
+        seedType: "home_playlist",
+        seedId: "daily",
+      }),
+    );
     expect(
       continuationDescriptor(
         {
@@ -165,9 +190,57 @@ describe("getPlaybackContinuationToken", () => {
         },
         { shuffle: true, infinite: true },
       ),
-    ).toBeNull();
+    ).toEqual(
+      expect.objectContaining({
+        kind: "seeded_radio",
+        seedType: "album",
+        seedId: "3",
+        batchIndex: 0,
+      }),
+    );
     expect(
       continuationDescriptor({ type: "queue", name: "Queue" }, infinite),
     ).toBeNull();
   });
+});
+
+it("reuses a token while its indexed cursor advances and can explicitly revoke the cache", async () => {
+  vi.resetModules();
+  apiMock.mockReset();
+  apiMock.mockResolvedValue({
+    token: "crv_indexed",
+    expiresAt: "2099-01-01T00:00:00Z",
+  });
+  const { getPlaybackContinuationToken, invalidatePlaybackContinuationToken } =
+    await import("./playback-continuation");
+  const descriptor = {
+    kind: "shaped_radio" as const,
+    sessionId: "s",
+    batchIndex: 1,
+    revision: 1,
+  };
+  await getPlaybackContinuationToken(descriptor);
+  await getPlaybackContinuationToken({ ...descriptor, batchIndex: 2 });
+  expect(apiMock).toHaveBeenCalledOnce();
+  invalidatePlaybackContinuationToken();
+  await getPlaybackContinuationToken({ ...descriptor, batchIndex: 2 });
+  expect(apiMock).toHaveBeenCalledTimes(2);
+});
+
+it("rejects a late token response after logout invalidates authorization", async () => {
+  vi.resetModules();
+  apiMock.mockReset();
+  let complete!: (value: { token: string; expiresAt: string }) => void;
+  apiMock.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        complete = resolve;
+      }),
+  );
+  const { getPlaybackContinuationToken, invalidatePlaybackContinuationToken } =
+    await import("./playback-continuation");
+  const pending = getPlaybackContinuationToken();
+  invalidatePlaybackContinuationToken();
+  complete({ token: "crv_old", expiresAt: "2099-01-01T00:00:00Z" });
+  await expect(pending).rejects.toThrow("authorization changed");
 });

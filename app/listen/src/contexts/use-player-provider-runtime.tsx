@@ -57,6 +57,7 @@ export function usePlayerProviderRuntime(children: ReactNode) {
     setShuffleState,
     setVolumeState,
     queueRef,
+    queueReadinessRef,
     jamQueueLockedRef,
     currentIndexRef,
     repeatRef,
@@ -85,7 +86,17 @@ export function usePlayerProviderRuntime(children: ReactNode) {
     commitIsBuffering,
   } = runtimeState;
 
+  const refillCallbacksRef = useRef<{
+    recover: () => boolean;
+    cancel: () => void;
+    resume: () => void;
+  }>({ recover: () => false, cancel: () => {}, resume: () => {} });
   const castActive = useCastPlaybackRuntime({
+    queueRef,
+    onQueueEnded: () => refillCallbacksRef.current.recover(),
+    onDisconnect: () => refillCallbacksRef.current.cancel(),
+    onPause: () => refillCallbacksRef.current.cancel(),
+    onResume: () => refillCallbacksRef.current.resume(),
     commitCurrentIndex,
     commitCurrentTime,
     commitDuration,
@@ -127,6 +138,8 @@ export function usePlayerProviderRuntime(children: ReactNode) {
     cancelRestoreAutoplay,
     cancelSoftInterruption,
     continueInfinitePlayback,
+    recoverAtEnd,
+    resumePlaybackIntelligence,
     flushCurrentPlayEvent,
     markSeekPosition,
     pendingRestoreTimeRef,
@@ -141,6 +154,11 @@ export function usePlayerProviderRuntime(children: ReactNode) {
     connectEnabled,
     runtime: runtimeState,
   });
+  refillCallbacksRef.current = {
+    recover: recoverAtEnd,
+    cancel: resetPlaybackIntelligence,
+    resume: resumePlaybackIntelligence,
+  };
   // NOTE: no gpSetShuffle effect. Shuffle is handled in React by reordering
   // the queue in toggleShuffle(); the engine always plays sequentially.
   //
@@ -175,6 +193,7 @@ export function usePlayerProviderRuntime(children: ReactNode) {
     reorderQueue,
     syncJamQueue,
   } = usePlayerQueueActions({
+    queueReadinessRef,
     queueRef,
     jamQueueLockedRef,
     currentIndexRef,
@@ -206,6 +225,7 @@ export function usePlayerProviderRuntime(children: ReactNode) {
     cancelSoftInterruption,
     cancelRestoreAutoplay,
     resetPlaybackIntelligence,
+    resumePlaybackIntelligence,
     continueInfinitePlayback,
     clearPrevRestartLatch,
     commitQueue,

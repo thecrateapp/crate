@@ -154,6 +154,10 @@ function currentWebCastPlaybackState(
   const currentIndex = status?.currentIndex ?? cafCurrentIndex;
   return {
     active: true,
+    playerState: status?.playerState ?? playerState,
+    ...(status?.mediaFinished === undefined
+      ? {}
+      : { mediaFinished: status.mediaFinished }),
     ...(currentIndex !== undefined && currentIndex >= 0
       ? { currentIndex }
       : {}),
@@ -302,8 +306,11 @@ function subscribeNativeCastPlaybackState(
     const currentTime = finiteNonNegative(
       receiverTime ?? nativeState?.currentTime,
     );
+    const mediaFinished = status?.mediaFinished ?? nativeState?.mediaFinished;
     const state: CastPlaybackState = {
       active: nativeState?.active ?? true,
+      playerState: status?.playerState ?? nativeState?.playerState,
+      ...(mediaFinished === undefined ? {} : { mediaFinished }),
       ...(status?.currentIndex !== undefined
         ? { currentIndex: status.currentIndex }
         : nativeState?.currentIndex !== undefined
@@ -732,12 +739,28 @@ function castCommand(
   return new Promise((resolve, reject) => run(resolve, reject));
 }
 
+function guardedCastQueueOperation(isCurrent: () => boolean): () => boolean {
+  isCustomCastSessionActive();
+  const generation = castLifecycleGeneration;
+  const sessionId = activeCrateCastSessionId;
+  return () =>
+    isCurrent() &&
+    isCurrentCastLifecycle(generation) &&
+    sessionId === activeCrateCastSessionId;
+}
+
+function assertCastQueueCurrent(isCurrent: () => boolean): void {
+  if (!isCurrent()) throw new Error("Cast queue operation was cancelled.");
+}
+
 async function applyCustomQueueDelta(
   previous: CastPlaybackSessionResponse["queue"],
   next: CastPlaybackSessionResponse["queue"],
+  isCurrent: () => boolean,
 ): Promise<void> {
+  assertCastQueueCurrent(isCurrent);
   if (isNative) {
-    await applyNativeCustomQueueDelta(previous, next);
+    await applyNativeCustomQueueDelta(previous, next, isCurrent);
     return;
   }
 
@@ -770,6 +793,7 @@ async function applyCustomQueueDelta(
       await castCommand((resolve, reject) =>
         media.queueRemoveItems(request, resolve, reject),
       );
+      assertCastQueueCurrent(isCurrent);
     }
   }
 
@@ -783,6 +807,7 @@ async function applyCustomQueueDelta(
     };
     const built = buildWebQueueLoad(syntheticSession, chromeCast);
     const insertItem = async (position: number): Promise<void> => {
+      assertCastQueueCurrent(isCurrent);
       const itemId = inserted[position];
       if (!itemId) return;
       const index = nextIds.indexOf(itemId);
@@ -797,6 +822,7 @@ async function applyCustomQueueDelta(
         await castCommand((resolve, reject) =>
           media.queueInsertItems(request, resolve, reject),
         );
+        assertCastQueueCurrent(isCurrent);
       }
       await insertItem(position + 1);
     };
@@ -819,6 +845,7 @@ async function applyCustomQueueDelta(
     await castCommand((resolve, reject) =>
       media.queueReorderItems(request, resolve, reject),
     );
+    assertCastQueueCurrent(isCurrent);
   }
 
   if (next.repeat_mode !== previous.repeat_mode) {
@@ -843,22 +870,28 @@ function assertNativeCastResult(result: CastStartResult): void {
 async function getReadyNativeQueueSnapshot(
   plugin: NativeCastPlugin,
   remainingAttempts = 3,
+  isCurrent: () => boolean = () => true,
 ): Promise<Awaited<ReturnType<NativeCastPlugin["getQueueSnapshot"]>>> {
+  assertCastQueueCurrent(isCurrent);
   const snapshot = await plugin.getQueueSnapshot();
+  assertCastQueueCurrent(isCurrent);
   if (snapshot.available) return snapshot;
   if (remainingAttempts <= 1) {
     throw new Error("Native Cast queue is not ready.");
   }
   await new Promise<void>((resolve) => window.setTimeout(resolve, 100));
-  return getReadyNativeQueueSnapshot(plugin, remainingAttempts - 1);
+  return getReadyNativeQueueSnapshot(plugin, remainingAttempts - 1, isCurrent);
 }
 
 async function applyNativeCustomQueueDelta(
   previous: CastPlaybackSessionResponse["queue"],
   next: CastPlaybackSessionResponse["queue"],
+  isCurrent: () => boolean,
 ): Promise<void> {
+  assertCastQueueCurrent(isCurrent);
   const plugin = getNativeCast();
-  const snapshot = await getReadyNativeQueueSnapshot(plugin);
+  const snapshot = await getReadyNativeQueueSnapshot(plugin, 3, isCurrent);
+  assertCastQueueCurrent(isCurrent);
   const numericByStableId = new Map(
     snapshot.items.map((item) => [item.stableId, item.itemId]),
   );
@@ -876,6 +909,7 @@ async function applyNativeCustomQueueDelta(
     assertNativeCastResult(
       await plugin.queueRemove({ itemIds: removedNumericIds }),
     );
+    assertCastQueueCurrent(isCurrent);
   }
 
   const survivingDesiredOrder = nextIds
@@ -892,6 +926,7 @@ async function applyNativeCustomQueueDelta(
     assertNativeCastResult(
       await plugin.queueReorder({ itemIds: survivingDesiredOrder }),
     );
+    assertCastQueueCurrent(isCurrent);
   }
 
   if (inserted.length) {
@@ -909,6 +944,7 @@ async function applyNativeCustomQueueDelta(
       ]),
     );
     const insertItem = async (position: number): Promise<void> => {
+      assertCastQueueCurrent(isCurrent);
       const itemId = inserted[position];
       if (!itemId) return;
       const item = itemsById.get(itemId);
@@ -927,6 +963,7 @@ async function applyNativeCustomQueueDelta(
           ...(insertBefore === undefined ? {} : { insertBefore }),
         }),
       );
+      assertCastQueueCurrent(isCurrent);
       await insertItem(position + 1);
     };
     await insertItem(0);
@@ -939,7 +976,8 @@ async function applyNativeCustomQueueDelta(
   }
 }
 
-async function requireActiveCustomQueue() {
+async function requireActiveCustomQueue(isCurrent: () => boolean) {
+  assertCastQueueCurrent(isCurrent);
   if (!isCustomCastSessionActive() || !activeCrateCastSessionId) {
     throw new Error("No active Crate Cast queue.");
   }
@@ -953,6 +991,7 @@ async function requireActiveCustomQueue() {
     const scoped = await loadScopedCastPlaybackSession(
       activeCrateCastBootstrapUrl,
     );
+    assertCastQueueCurrent(isCurrent);
     activeCrateCastQueue = scoped.queue;
   }
   return {
@@ -964,10 +1003,13 @@ async function requireActiveCustomQueue() {
 
 async function syncCustomCastQueueNow(
   update: CustomCastQueueUpdate,
+  isCurrent: () => boolean,
 ): Promise<CastStartResult> {
   const { queue, repeatMode, shuffle } = update;
   try {
-    const active = await requireActiveCustomQueue();
+    assertCastQueueCurrent(isCurrent);
+    const active = await requireActiveCustomQueue(isCurrent);
+    assertCastQueueCurrent(isCurrent);
     const mutationId = crypto.randomUUID();
     let request = buildCastQueueUpdateRequest(
       queue,
@@ -980,8 +1022,10 @@ async function syncCustomCastQueueNow(
     try {
       await updateCastPlaybackSession(active.sessionId, request);
     } catch (error) {
+      assertCastQueueCurrent(isCurrent);
       if (!(error instanceof ApiError) || error.status !== 409) throw error;
       const latest = await loadScopedCastPlaybackSession(active.bootstrapUrl);
+      assertCastQueueCurrent(isCurrent);
       request = {
         ...request,
         expected_revision: latest.queue.revision,
@@ -993,8 +1037,11 @@ async function syncCustomCastQueueNow(
       };
       await updateCastPlaybackSession(active.sessionId, request);
     }
+    assertCastQueueCurrent(isCurrent);
     const scoped = await loadScopedCastPlaybackSession(active.bootstrapUrl);
-    await applyCustomQueueDelta(active.queue, scoped.queue);
+    assertCastQueueCurrent(isCurrent);
+    await applyCustomQueueDelta(active.queue, scoped.queue, isCurrent);
+    assertCastQueueCurrent(isCurrent);
     activeCrateCastQueue = scoped.queue;
     emitCastSessionChanged();
     return { ok: true };
@@ -1009,8 +1056,12 @@ async function syncCustomCastQueueNow(
 
 export function syncCustomCastQueue(
   update: CustomCastQueueUpdate,
+  isCurrent: () => boolean = () => true,
 ): Promise<CastStartResult> {
-  return enqueueCastQueueOperation(() => syncCustomCastQueueNow(update));
+  const guarded = guardedCastQueueOperation(isCurrent);
+  return enqueueCastQueueOperation(() =>
+    syncCustomCastQueueNow(update, guarded),
+  );
 }
 
 function enqueueCastQueueOperation(
@@ -1026,7 +1077,13 @@ function enqueueCastQueueOperation(
 
 function castQueueCommandNow(
   command: "next" | "previous" | { index: number },
+  isCurrent: () => boolean,
 ): Promise<CastStartResult> {
+  if (!isCurrent())
+    return Promise.resolve({
+      ok: false,
+      message: "Cast queue operation was cancelled.",
+    });
   if (isNative) {
     if (!isCustomCastSessionActive()) {
       return Promise.resolve({
@@ -1035,9 +1092,20 @@ function castQueueCommandNow(
       });
     }
     const plugin = getNativeCast();
-    if (command === "next") return plugin.queueNext();
-    if (command === "previous") return plugin.queuePrevious();
-    return plugin.queueJumpTo({ index: Math.max(0, command.index) });
+    const result =
+      command === "next"
+        ? plugin.queueNext()
+        : command === "previous"
+          ? plugin.queuePrevious()
+          : plugin.queueJumpTo({ index: Math.max(0, command.index) });
+    return result.then((value) =>
+      isCurrent()
+        ? value
+        : {
+            ok: false,
+            message: "Cast queue operation was cancelled.",
+          },
+    );
   }
 
   const media = currentWebCastMedia();
@@ -1048,7 +1116,12 @@ function castQueueCommandNow(
     });
   }
   return new Promise((resolve) => {
-    const success = () => resolve({ ok: true });
+    const success = () =>
+      resolve(
+        isCurrent()
+          ? { ok: true }
+          : { ok: false, message: "Cast queue operation was cancelled." },
+      );
     const failure = (error: unknown) =>
       resolve({
         ok: false,
@@ -1074,8 +1147,10 @@ function castQueueCommandNow(
 
 function castQueueCommand(
   command: "next" | "previous" | { index: number },
+  isCurrent: () => boolean = () => true,
 ): Promise<CastStartResult> {
-  return enqueueCastQueueOperation(() => castQueueCommandNow(command));
+  const guarded = guardedCastQueueOperation(isCurrent);
+  return enqueueCastQueueOperation(() => castQueueCommandNow(command, guarded));
 }
 
 export function castQueueNext(): Promise<CastStartResult> {
@@ -1086,8 +1161,11 @@ export function castQueuePrevious(): Promise<CastStartResult> {
   return castQueueCommand("previous");
 }
 
-export function castQueueJumpTo(index: number): Promise<CastStartResult> {
-  return castQueueCommand({ index });
+export function castQueueJumpTo(
+  index: number,
+  isCurrent: () => boolean = () => true,
+): Promise<CastStartResult> {
+  return castQueueCommand({ index }, isCurrent);
 }
 
 async function castControl(

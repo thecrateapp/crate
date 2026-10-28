@@ -22,7 +22,10 @@ import {
   beginNativePlaybackIntent,
   cancelNativePlaybackRecoveryIntent,
 } from "@/lib/native-playback-intent";
-import { getPlaybackContinuationToken } from "@/lib/playback-continuation";
+import {
+  getPlaybackContinuationToken,
+  invalidatePlaybackContinuationToken,
+} from "@/lib/playback-continuation";
 import {
   getSmartMixCapabilities,
   keepServerPlans,
@@ -90,12 +93,22 @@ type CrateNativePlaybackPlugin = {
           allowLongBeatmatch: boolean;
           delivery: string;
           refill: boolean;
+          sessionId?: string;
+          batchIndex?: number;
+          revision?: number;
+          authoritativeCursor?: boolean;
         },
   ): Promise<void>;
   getAppendedTracks(options: {
     revision: string;
     afterSequence: number;
-  }): Promise<{ revision: string; tracks?: EngineAppendedTrack[] }>;
+  }): Promise<{
+    revision: string;
+    tracks?: EngineAppendedTrack[];
+    continuationSessionId?: string;
+    continuationBatchIndex?: number;
+    continuationRevision?: number;
+  }>;
   appendTracks(options: {
     revision: string;
     tracks: EngineTrack[];
@@ -130,6 +143,10 @@ type CrateNativePlaybackPlugin = {
     gains: number[];
     rampMs?: number;
   }): Promise<EngineState>;
+  addListener(
+    event: "continuationAuthorizationRequired",
+    listener: (event: { revision: string }) => void,
+  ): Promise<PluginListenerHandle>;
   addListener<K extends EngineEventName>(
     event: K,
     listener: EngineEventListener<K>,
@@ -247,6 +264,37 @@ export class AndroidNativeEngine implements PlaybackEngine {
   private installedPlans: EngineTransitionPlan[] = [];
   private continuationContext: EngineContinuationContext | undefined;
   private adoptedSequence = 0;
+  private continuationGeneration = 0;
+  private backgroundContinuationConfigured = false;
+  private continuationExpiresAtMs = 0;
+  private repeatMode: EngineRepeatMode = "off";
+  private continuationAuthorizationRenewed = false;
+  private continuationAuthorizationListener: PluginListenerHandle | undefined;
+  private continuationListenerPromise: Promise<void> | undefined;
+  private continuationCursor: {
+    sessionId: string;
+    batchIndex: number;
+    revision: number;
+  } | null = null;
+  private readonly clearContinuationAuthorization = () => {
+    this.queueGeneration += 1;
+    this.planInstallGeneration += 1;
+    this.continuationGeneration += 1;
+    this.backgroundContinuationConfigured = false;
+    this.continuationContext = undefined;
+    this.continuationCursor = null;
+    invalidatePlaybackContinuationToken();
+    if (isAndroidNativePlayerAvailable()) {
+      void Promise.resolve(nativePlayback.setContinuation({ token: "" })).catch(
+        (error) => {
+          console.warn(
+            "[native-playback] continuation authorization not cleared:",
+            error,
+          );
+        },
+      );
+    }
+  };
 
   constructor() {
     subscribeSmartMixCapabilities((capabilities) => {
@@ -265,6 +313,10 @@ export class AndroidNativeEngine implements PlaybackEngine {
       window.addEventListener("crate:app-resumed", () => {
         void this.configureContinuation();
       });
+      window.addEventListener(
+        "crate:auth-runtime-reset",
+        this.clearContinuationAuthorization,
+      );
     }
   }
 
@@ -398,7 +450,15 @@ export class AndroidNativeEngine implements PlaybackEngine {
     this.replanTransitionPlans = replanTransitionPlans;
     this.installedPlans = [];
     this.continuationContext = continuation;
+    this.continuationCursor = null;
+    this.backgroundContinuationConfigured = false;
+    this.repeatMode = queue.repeat;
+    this.continuationAuthorizationRenewed = false;
+    this.continuationGeneration += 1;
     this.adoptedSequence = 0;
+    await this.ensureContinuationAuthorizationListener();
+    if (generation !== this.queueGeneration)
+      throw new Error("Native queue load superseded");
     this.queueMixRequested = queue.crossfadeMs > 0;
     this.appliedCrossfadeMs = effectiveNativeCrossfadeMs(queue.crossfadeMs);
     const state = await nativePlayback.setQueue({
@@ -431,6 +491,33 @@ export class AndroidNativeEngine implements PlaybackEngine {
     if (result.revision !== revision || revision !== this.queueRevision) {
       return [];
     }
+    const descriptor = this.continuationContext?.descriptor;
+    const cursorRevision = result.continuationRevision ?? 1;
+    if (
+      descriptor?.sessionId &&
+      result.continuationSessionId === descriptor.sessionId &&
+      cursorRevision !== (descriptor.revision ?? 1)
+    )
+      return [];
+    if (
+      descriptor?.sessionId &&
+      result.continuationSessionId === descriptor.sessionId &&
+      typeof result.continuationBatchIndex === "number"
+    ) {
+      const known = this.continuationCursor;
+      this.continuationCursor = {
+        sessionId: descriptor.sessionId,
+        batchIndex: Math.max(
+          known?.sessionId === descriptor.sessionId &&
+            known.revision === cursorRevision
+            ? known.batchIndex
+            : 0,
+          descriptor.batchIndex ?? (descriptor.kind === "shaped_radio" ? 1 : 0),
+          result.continuationBatchIndex,
+        ),
+        revision: cursorRevision,
+      };
+    }
     const tracks = result.tracks ?? [];
     for (const track of tracks) {
       this.adoptedSequence = Math.max(this.adoptedSequence, track.sequence);
@@ -438,21 +525,103 @@ export class AndroidNativeEngine implements PlaybackEngine {
     return tracks;
   }
 
-  private async configureContinuation(): Promise<void> {
+  getContinuationCursor() {
+    return this.continuationCursor;
+  }
+
+  hasBackgroundContinuation(): boolean {
+    return (
+      this.backgroundContinuationConfigured &&
+      this.repeatMode === "off" &&
+      Date.now() < this.continuationExpiresAtMs
+    );
+  }
+
+  async setContinuationCursor(
+    cursor: { sessionId: string; batchIndex: number; revision: number },
+    authoritative = false,
+  ): Promise<void> {
     const context = this.continuationContext;
+    if (
+      !context?.descriptor ||
+      context.descriptor.sessionId !== cursor.sessionId
+    )
+      return;
+    const known = this.continuationCursor;
+    const sameRevision =
+      known?.sessionId === cursor.sessionId &&
+      known.revision === cursor.revision;
+    const batchIndex =
+      !authoritative && sameRevision
+        ? Math.max(known.batchIndex, cursor.batchIndex)
+        : cursor.batchIndex;
+    this.continuationCursor = { ...cursor, batchIndex };
+    this.continuationContext = {
+      ...context,
+      descriptor: { ...context.descriptor, ...cursor, batchIndex },
+    };
+    await this.configureContinuation(authoritative);
+  }
+
+  async setContinuationContext(
+    context?: EngineContinuationContext,
+  ): Promise<void> {
+    this.continuationContext = context;
+    await this.configureContinuation();
+  }
+
+  private async ensureContinuationAuthorizationListener(): Promise<void> {
+    if (!this.continuationListenerPromise) {
+      this.continuationListenerPromise = (async () => {
+        this.continuationAuthorizationListener =
+          await nativePlayback.addListener(
+            "continuationAuthorizationRequired",
+            (event) => {
+              if (
+                event.revision !== this.queueRevision ||
+                !this.continuationContext
+              )
+                return;
+              this.backgroundContinuationConfigured = false;
+              invalidatePlaybackContinuationToken();
+              if (this.continuationAuthorizationRenewed) return;
+              this.continuationAuthorizationRenewed = true;
+              void this.configureContinuation();
+            },
+          );
+      })();
+    }
+    await this.continuationListenerPromise;
+  }
+
+  private async configureContinuation(
+    authoritativeCursor = false,
+  ): Promise<void> {
+    const context = this.continuationContext;
+    const generation = ++this.continuationGeneration;
     try {
       if (
         !context ||
         (!this.queueMixRequested && context.descriptor === null) ||
         (typeof navigator !== "undefined" && navigator.onLine === false)
       ) {
+        this.backgroundContinuationConfigured = false;
         await nativePlayback.setContinuation({ token: "" });
         return;
       }
       const continuationToken = await getPlaybackContinuationToken(
         context.descriptor,
       );
-      if (context !== this.continuationContext) return;
+      if (
+        context !== this.continuationContext ||
+        generation !== this.continuationGeneration
+      )
+        return;
+      const descriptor = context.descriptor;
+      const cursor =
+        descriptor?.sessionId === this.continuationCursor?.sessionId
+          ? this.continuationCursor
+          : null;
       await nativePlayback.setContinuation({
         ...continuationToken,
         source: context.source,
@@ -461,9 +630,31 @@ export class AndroidNativeEngine implements PlaybackEngine {
         allowBassHandoff: context.allowBassHandoff,
         allowLongBeatmatch: context.allowLongBeatmatch,
         delivery: context.delivery,
-        refill: context.descriptor !== null,
+        refill: context.descriptor !== null && this.repeatMode === "off",
+        ...(authoritativeCursor ? { authoritativeCursor: true } : {}),
+        ...(descriptor?.sessionId
+          ? {
+              sessionId: descriptor.sessionId,
+              batchIndex: Math.max(
+                cursor?.batchIndex ?? 0,
+                descriptor.batchIndex ??
+                  (descriptor.kind === "shaped_radio" ? 1 : 0),
+              ),
+              revision: cursor?.revision ?? descriptor.revision ?? 1,
+            }
+          : {}),
       });
+      if (
+        generation === this.continuationGeneration &&
+        context === this.continuationContext
+      ) {
+        this.backgroundContinuationConfigured =
+          descriptor !== null && this.repeatMode === "off";
+        this.continuationExpiresAtMs = continuationToken.expiresAtMs;
+      }
     } catch (error) {
+      if (generation === this.continuationGeneration)
+        this.backgroundContinuationConfigured = false;
       console.warn("[native-playback] continuation not configured:", error);
     }
   }
@@ -566,8 +757,11 @@ export class AndroidNativeEngine implements PlaybackEngine {
   }
 
   async setRepeat(repeat: EngineRepeatMode): Promise<EngineState> {
+    this.repeatMode = repeat;
     await this.ensureReady();
-    return nativePlayback.setRepeat({ repeat });
+    const state = await nativePlayback.setRepeat({ repeat });
+    await this.configureContinuation();
+    return state;
   }
 
   async setCrossfadeMs(crossfadeMs: number): Promise<EngineState> {
@@ -652,6 +846,14 @@ export class AndroidNativeEngine implements PlaybackEngine {
   }
 
   async destroy(): Promise<void> {
+    this.clearContinuationAuthorization();
+    window.removeEventListener(
+      "crate:auth-runtime-reset",
+      this.clearContinuationAuthorization,
+    );
+    await this.continuationAuthorizationListener?.remove();
+    this.continuationAuthorizationListener = undefined;
+    this.continuationListenerPromise = undefined;
     cancelNativePlaybackRecoveryIntent("stop");
     await this.ensureReady();
     await nativePlayback.stop();

@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -38,11 +38,16 @@ const {
 import { usePlayerQueueActions } from "@/contexts/use-player-queue-actions";
 import type { Track } from "@/contexts/player-types";
 import * as gaplessPlayer from "@/lib/gapless-player";
+import {
+  toStartupEngineTracks,
+  toStartupEngineQueueSnapshot,
+} from "@/contexts/player-engine-adapter";
 
 vi.mock("@/contexts/player-engine-adapter", () => ({
   toFreshEngineTrack: vi.fn(async (track: Track) => ({
     url: track.path || track.id,
   })),
+  toStartupEngineQueueSnapshot: vi.fn(),
   toStartupEngineTracks: vi.fn(async (tracks: Track[]) =>
     tracks.map((track) => ({ url: track.path || track.id })),
   ),
@@ -52,6 +57,7 @@ vi.mock("@/lib/android-native-engine", () => ({
   androidNativeEngine: {
     insertTrack: androidInsertTrackMock,
     loadQueue: androidLoadQueueMock,
+    setContinuationContext: vi.fn().mockResolvedValue(undefined),
     removeTrack: androidRemoveTrackMock,
     stop: vi.fn(),
   },
@@ -202,6 +208,162 @@ describe("usePlayerQueueActions", () => {
     expect(params.publishConnectState).toHaveBeenCalledWith({
       claimActive: true,
     });
+  });
+
+  it("keeps the replacement queue unready until URLs and the engine are installed", async () => {
+    let resolve!: (
+      tracks: Awaited<ReturnType<typeof toStartupEngineTracks>>,
+    ) => void;
+    vi.mocked(toStartupEngineTracks).mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    const queueReadinessRef = { current: { ready: true, generation: 0 } };
+    const params = {
+      ...createParams(),
+      queueReadinessRef,
+      resumePlaybackIntelligence: vi.fn(),
+    };
+    params.queueRef.current = [TRACK];
+    params.isPlayingRef.current = true;
+    params.commitQueue.mockImplementation((tracks) => {
+      params.queueRef.current = tracks;
+    });
+    const replacement = { ...TRACK, id: "B", title: "B" };
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+    act(() =>
+      result.current.playAll([replacement], 0, { type: "album", name: "B" }),
+    );
+    expect(queueReadinessRef.current.ready).toBe(false);
+    expect(gaplessPlayer.loadQueue).not.toHaveBeenCalled();
+    await act(async () => {
+      resolve([{ id: "B", url: "B", title: "B", artist: "Artist" }]);
+    });
+    expect(queueReadinessRef.current.ready).toBe(true);
+    expect(params.queueRef.current).toEqual([replacement]);
+    expect(params.resumePlaybackIntelligence).toHaveBeenCalled();
+  });
+
+  it.each(["pause", "replace", "clear"])(
+    "does not activate an obsolete URL preparation after %s",
+    async (action) => {
+      let resolve!: (
+        tracks: Awaited<ReturnType<typeof toStartupEngineTracks>>,
+      ) => void;
+      vi.mocked(toStartupEngineTracks).mockImplementationOnce(
+        () =>
+          new Promise((done) => {
+            resolve = done;
+          }),
+      );
+      const params = createParams();
+      const { result } = renderHook(() => usePlayerQueueActions(params));
+      act(() =>
+        result.current.playAll([TRACK], 0, { type: "album", name: "B" }),
+      );
+      if (action === "pause") act(() => result.current.pause());
+      else if (action === "clear") act(() => result.current.clearQueue());
+      else
+        act(() =>
+          result.current.playAll([{ ...TRACK, id: "C" }], 0, {
+            type: "album",
+            name: "C",
+          }),
+        );
+      await act(async () => {});
+      const priorLoads = vi.mocked(gaplessPlayer.loadQueue).mock.calls.length;
+      const priorPlays = vi.mocked(gaplessPlayer.play).mock.calls.length;
+      await act(async () => {
+        resolve([{ id: "B", url: "B", title: "B", artist: "Artist" }]);
+      });
+      expect(gaplessPlayer.loadQueue).toHaveBeenCalledTimes(priorLoads);
+      expect(gaplessPlayer.play).toHaveBeenCalledTimes(priorPlays);
+    },
+  );
+
+  it("restarts a cancelled preparation on explicit Resume without playing the previous engine queue", async () => {
+    let resolve!: (
+      tracks: Awaited<ReturnType<typeof toStartupEngineTracks>>,
+    ) => void;
+    vi.mocked(toStartupEngineTracks).mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    );
+    const params = createParams();
+    params.queueRef.current = [TRACK];
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+    act(() =>
+      result.current.playAll([{ ...TRACK, id: "B" }], 0, {
+        type: "album",
+        name: "B",
+      }),
+    );
+    act(() => result.current.pause());
+    act(() => result.current.resume());
+    await act(async () => {});
+    expect(gaplessPlayer.loadQueue).toHaveBeenCalledOnce();
+    expect(gaplessPlayer.play).toHaveBeenCalledOnce();
+    expect(gaplessPlayer.fadeInAndPlay).not.toHaveBeenCalled();
+    await act(async () => {
+      resolve([{ id: "B", url: "B", title: "B", artist: "Artist" }]);
+    });
+    expect(gaplessPlayer.loadQueue).toHaveBeenCalledOnce();
+    expect(gaplessPlayer.play).toHaveBeenCalledOnce();
+  });
+
+  it("waits for the native queue ACK before declaring a replacement ready", async () => {
+    shouldUseAndroidNativePlayerMock.mockReturnValue(true);
+    let resolveSnapshot!: (
+      value: Awaited<ReturnType<typeof toStartupEngineQueueSnapshot>>,
+    ) => void;
+    let resolveLoad!: (value: undefined) => void;
+    vi.mocked(toStartupEngineQueueSnapshot).mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolveSnapshot = done;
+        }),
+    );
+    androidLoadQueueMock.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolveLoad = done;
+        }),
+    );
+    const queueReadinessRef = { current: { ready: true, generation: 0 } };
+    const params = {
+      ...createParams(),
+      queueReadinessRef,
+      resumePlaybackIntelligence: vi.fn(),
+    };
+    params.isPlayingRef.current = true;
+    const { result } = renderHook(() => usePlayerQueueActions(params));
+    act(() => result.current.playAll([TRACK], 0, { type: "album", name: "B" }));
+    expect(queueReadinessRef.current.ready).toBe(false);
+    expect(androidLoadQueueMock).not.toHaveBeenCalled();
+    await act(async () => {
+      resolveSnapshot({
+        revision: "B",
+        tracks: [],
+        currentIndex: 0,
+        positionMs: 0,
+        autoplay: true,
+        repeat: "off",
+        crossfadeMs: 0,
+        volume: 1,
+      });
+    });
+    expect(androidLoadQueueMock).toHaveBeenCalledOnce();
+    expect(queueReadinessRef.current.ready).toBe(false);
+    expect(params.resumePlaybackIntelligence).not.toHaveBeenCalled();
+    await act(async () => {
+      resolveLoad(undefined);
+    });
+    expect(queueReadinessRef.current.ready).toBe(true);
+    expect(params.resumePlaybackIntelligence).toHaveBeenCalledOnce();
   });
 
   it("keeps local queue mutations disabled while a Jam session owns playback", () => {

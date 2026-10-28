@@ -95,6 +95,8 @@ export interface CastStartResult {
 }
 
 export interface CastPlaybackState {
+  playerState?: string;
+  mediaFinished?: boolean;
   active: boolean;
   currentIndex?: number;
   currentTime: number;

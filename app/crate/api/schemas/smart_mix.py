@@ -205,6 +205,8 @@ class TransitionPlanBatchResponse(SmartMixApiModel):
 
 
 class ContinuationDescriptor(SmartMixRequestModel):
+    batch_index: int | None = Field(default=None, alias="batchIndex", ge=0)
+    revision: int | None = Field(default=None, ge=1)
     kind: Literal["shaped_radio", "seeded_radio"]
     session_id: str | None = Field(
         default=None, alias="sessionId", min_length=1, max_length=128
@@ -220,6 +222,8 @@ class ContinuationDescriptor(SmartMixRequestModel):
     def _require_kind_fields(self) -> "ContinuationDescriptor":
         if self.kind == "shaped_radio" and not self.session_id:
             raise ValueError("shaped_radio needs sessionId")
+        if self.kind == "seeded_radio" and self.session_id:
+            self.session_id = str(UUID(self.session_id))
         if self.kind == "seeded_radio" and not (self.seed_type and self.seed_id):
             raise ValueError("seeded_radio needs seedType and seedId")
         return self
@@ -230,6 +234,8 @@ class PlaybackContinuationTokenRequest(SmartMixRequestModel):
 
 
 class PlaybackContinuationRequest(SmartMixRequestModel):
+    batch_index: int | None = Field(default=None, alias="batchIndex", ge=0)
+    revision: int = Field(default=1, ge=1)
     planner_version: Literal["smart-mix-v2"] = Field(alias="plannerVersion")
     after_track_entity_uid: UUID | None = Field(
         default=None, alias="afterTrackEntityUid"
@@ -256,6 +262,10 @@ class ContinuationTrackResponse(SmartMixApiModel):
 
 
 class PlaybackContinuationResponse(SmartMixApiModel):
+    status: Literal["ok", "retryable_empty", "exhausted", "auth_required"] = "ok"
+    session_id: str | None = Field(default=None, alias="sessionId")
+    batch_index: int | None = Field(default=None, alias="batchIndex")
+    revision: int = 1
     tracks: list[ContinuationTrackResponse]
     plans: list[TransitionPlanResponse]
     exhausted: bool

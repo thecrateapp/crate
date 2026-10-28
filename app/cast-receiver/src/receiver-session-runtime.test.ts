@@ -144,16 +144,16 @@ describe("receiver session runtime", () => {
     await runtime.flushState();
 
     expect(publishState).toHaveBeenNthCalledWith(1, loadData.bootstrapUrl, {
-      stateSeq: 8,
-      currentIndex: 0,
-      currentTime: 18,
-    });
-    expect(publishState).toHaveBeenNthCalledWith(2, loadData.bootstrapUrl, {
       stateSeq: 9,
       currentIndex: 0,
       currentTime: 18,
     });
-    expect(store.getSnapshot().stateSeq).toBe(9);
+    expect(publishState).toHaveBeenNthCalledWith(2, loadData.bootstrapUrl, {
+      stateSeq: 10,
+      currentIndex: 0,
+      currentTime: 18,
+    });
+    expect(store.getSnapshot().stateSeq).toBe(10);
     expect(JSON.stringify(sendProtocolMessage.mock.calls)).not.toContain(
       "private-lease",
     );
@@ -174,6 +174,35 @@ describe("receiver session runtime", () => {
       2,
       loadData.bootstrapUrl,
       expect.objectContaining({ stateSeq: 9 }),
+    );
+  });
+
+  it("publishes explicit EOF with sampled progress and clears it on pause", async () => {
+    const { runtime, sendProtocolMessage } = setup();
+    await runtime.load(loadData);
+    runtime.playerState("PLAYING");
+    runtime.progress({ currentTime: 98.9, duration: 100 });
+    runtime.playerState("IDLE", true);
+    expect(sendProtocolMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        type: "receiver.status",
+        currentTime: 98.9,
+        playerState: "IDLE",
+        mediaFinished: true,
+        stateSeq: 9,
+      }),
+    );
+    await runtime.flushState();
+    expect(sendProtocolMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({ mediaFinished: true, stateSeq: 10 }),
+    );
+    runtime.playerState("PAUSED");
+    expect(sendProtocolMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        playerState: "PAUSED",
+        mediaFinished: false,
+        stateSeq: 11,
+      }),
     );
   });
 

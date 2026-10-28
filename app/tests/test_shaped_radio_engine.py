@@ -1,3 +1,22 @@
+from contextlib import contextmanager
+from types import SimpleNamespace
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def fake_session_lease(monkeypatch):
+    from crate import radio_continuation
+
+    @contextmanager
+    def lock(session_id):
+        yield SimpleNamespace(
+            name=f"radio:session:{session_id}:lock", owned=lambda: True
+        )
+
+    monkeypatch.setattr(radio_continuation, "session_lock", lock)
+
+
 def _vector(value: float) -> list[float]:
     return [value] * 20
 
@@ -119,7 +138,7 @@ def test_start_radio_releases_database_sessions_before_scoring(monkeypatch):
         radio_engine, "load_feedback_history", fake_load_feedback_history
     )
     monkeypatch.setattr(radio_engine, "_generate_batch", fake_generate_batch)
-    monkeypatch.setattr(radio_engine, "_save_session", lambda _session: None)
+    monkeypatch.setattr(radio_engine, "_save_session", lambda _session, **_kwargs: None)
 
     result = radio_engine.start_radio(7, seed_type="track", seed_value="1")
 
@@ -313,7 +332,7 @@ def test_global_radio_like_uses_the_canonical_track_vector(monkeypatch):
     saved: list[dict] = []
     monkeypatch.setattr(radio_engine, "_load_session", lambda _: session)
     monkeypatch.setattr(
-        radio_engine, "_save_session", lambda value: saved.append(value)
+        radio_engine, "_save_session", lambda value, **_kwargs: saved.append(value)
     )
     monkeypatch.setattr(
         radio_engine,
@@ -355,7 +374,7 @@ def test_radio_feedback_delegates_target_shaping_to_queue_engine(monkeypatch):
     captured: dict = {}
 
     monkeypatch.setattr(radio_engine, "_load_session", lambda _session_id: session)
-    monkeypatch.setattr(radio_engine, "_save_session", lambda _session: None)
+    monkeypatch.setattr(radio_engine, "_save_session", lambda _session, **_kwargs: None)
     monkeypatch.setattr(
         radio_engine, "get_track_bliss_vector", lambda _track_id: vector
     )
@@ -397,7 +416,7 @@ def test_global_radio_dislike_excludes_a_remote_track_without_local_vector(monke
         "global_cursor": 0,
     }
     monkeypatch.setattr(radio_engine, "_load_session", lambda _: session)
-    monkeypatch.setattr(radio_engine, "_save_session", lambda _: None)
+    monkeypatch.setattr(radio_engine, "_save_session", lambda _, **_kwargs: None)
 
     result = radio_engine.radio_feedback(
         "global-session",
@@ -450,7 +469,7 @@ def test_next_tracks_marks_global_radio_session_exhausted(monkeypatch):
     monkeypatch.setattr(
         radio_engine,
         "_save_session",
-        lambda value: saved.append(dict(value)),
+        lambda value, **_kwargs: saved.append(dict(value)),
     )
 
     result = radio_engine.next_tracks("session", count=1)
@@ -1048,7 +1067,9 @@ def test_next_tracks_resaves_session_to_refresh_ttl(monkeypatch):
         radio_engine, "_generate_batch", lambda _session, _count: [{"track_id": 3}]
     )
     monkeypatch.setattr(
-        radio_engine, "_save_session", lambda value: saved.append(dict(value))
+        radio_engine,
+        "_save_session",
+        lambda value, **_kwargs: saved.append(dict(value)),
     )
 
     result = radio_engine.next_tracks("session", count=1)

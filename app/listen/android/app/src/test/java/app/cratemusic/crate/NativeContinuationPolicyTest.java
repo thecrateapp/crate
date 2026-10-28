@@ -107,4 +107,29 @@ public class NativeContinuationPolicyTest {
         policy.reset();
         assertTrue(policy.nextRefill(false, true, 49, 50, 600_000L));
     }
+
+    @Test
+    public void exposesTheRetryDeadlineWithoutAnotherTrackEvent() {
+        assertTrue(policy.nextRefill(false, true, 49, 50, 1_000L));
+        policy.onFailure(1_000L);
+
+        assertEquals(10_000L, policy.retryDelayMs(1_000L));
+        assertEquals(1L, policy.retryDelayMs(10_999L));
+        assertEquals(0L, policy.retryDelayMs(11_000L));
+        assertTrue(policy.nextRefill(false, true, 49, 50, 11_000L));
+        policy.onSuccess();
+        assertEquals(-1L, policy.retryDelayMs(11_000L));
+    }
+
+    @Test
+    public void resettingTheConfigurationRejectsResultsFromThePreviousGeneration() {
+        assertTrue(policy.nextRefill(false, true, 49, 50, 0L));
+        long generation = policy.generation();
+        assertTrue(policy.acceptsResult(generation));
+
+        policy.reset();
+        assertFalse(policy.acceptsResult(generation));
+        assertTrue(policy.nextRefill(false, true, 49, 50, 0L));
+        assertTrue(policy.acceptsResult(policy.generation()));
+    }
 }

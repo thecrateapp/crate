@@ -81,6 +81,7 @@ export function createReceiverSessionRuntime({
   let checkpointWrites = Promise.resolve();
   let mediaAttempts = 0;
   let consecutiveFailedItems = 0;
+  let mediaFinished = false;
 
   function messageBase() {
     return {
@@ -102,6 +103,7 @@ export function createReceiverSessionRuntime({
       currentIndex: snapshot.currentIndex,
       currentTime: progress.currentTime,
       playerState: playerStateForPhase(snapshot.phase),
+      mediaFinished,
       consecutiveFailures: consecutiveFailedItems,
       ...(error ? { error } : {}),
     };
@@ -181,6 +183,7 @@ export function createReceiverSessionRuntime({
   }
 
   async function load(data: CrateLoadData): Promise<void> {
+    mediaFinished = false;
     const generation = ++loadGeneration;
     store.dispatch({ type: "load-started", sessionId: data.sessionId });
     try {
@@ -272,6 +275,7 @@ export function createReceiverSessionRuntime({
     const snapshot = store.getSnapshot();
     const previous = snapshot.items[snapshot.currentIndex];
     if (previous?.itemId === itemId) return;
+    mediaFinished = false;
     accrueCheckpoint(store.progress.getSnapshot().currentTime);
     const completed = Boolean(
       previous?.duration &&
@@ -286,9 +290,14 @@ export function createReceiverSessionRuntime({
     void flushState();
   }
 
-  function playerState(state: CastPlayerState) {
+  function playerState(state: CastPlayerState, finished = false) {
+    mediaFinished = state === "IDLE" && finished;
     accrueCheckpoint(store.progress.getSnapshot().currentTime);
     store.dispatch({ type: "player-state", state });
+    store.dispatch({
+      type: "state-seq",
+      stateSeq: store.getSnapshot().stateSeq + 1,
+    });
     if (state === "PLAYING") {
       mediaAttempts = 0;
       consecutiveFailedItems = 0;
@@ -297,6 +306,7 @@ export function createReceiverSessionRuntime({
   }
 
   function mediaError() {
+    mediaFinished = false;
     mediaAttempts += 1;
     const itemId =
       store.getSnapshot().items[store.getSnapshot().currentIndex]?.itemId;

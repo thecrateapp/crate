@@ -216,6 +216,19 @@ describe("CAF adapter", () => {
     );
   });
 
+  it("distinguishes MEDIA_FINISHED from an explicit pause", () => {
+    const fake = createFakeRuntime();
+    const onPlayerState = vi.fn();
+    createCafAdapter({
+      runtime: fake.runtime,
+      handlers: { onPlayerState },
+    }).start();
+    fake.event("MEDIA_FINISHED");
+    fake.event("PAUSE");
+    expect(onPlayerState).toHaveBeenNthCalledWith(1, "IDLE", true);
+    expect(onPlayerState).toHaveBeenNthCalledWith(2, "PAUSED");
+  });
+
   it("retries or skips the current CAF queue item in place", () => {
     const fake = createFakeRuntime();
     const adapter = createCafAdapter({ runtime: fake.runtime, handlers: {} });
