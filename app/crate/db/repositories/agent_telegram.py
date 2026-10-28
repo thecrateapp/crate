@@ -12,7 +12,7 @@ from sqlalchemy import text
 
 from crate.agent_access import actions_enabled, authorization_context
 from crate.agent_diagnostics import DiagnosticError
-from crate.agent_operation_catalog import OPERATIONS
+from crate.agent_operation_catalog import OPERATIONS, plan_ttl_minutes
 from crate.agent_telegram import plan_pages
 from crate.db.repositories import agent_plans as plans
 from crate.db.repositories import agent_requests as requests
@@ -337,6 +337,11 @@ def request_confirmation(
             raise DiagnosticError(
                 "FORBIDDEN", "Plan belongs to another integration authorization"
             )
+        if not plan["unexpired"]:
+            raise DiagnosticError(
+                "PLAN_STALE",
+                "The plan expired before approval was requested; prepare it again",
+            )
         if (
             not policy["require_approval"]
             or not plan["approval_required"]
@@ -364,7 +369,11 @@ def request_confirmation(
                     "STATE_CONFLICT",
                     "Confirmation is bound to its original credential and apply choice",
                 )
-            return {"confirmation_id": existing["id"], "state": existing["state"]}
+            return {
+                "confirmation_id": existing["id"],
+                "state": existing["state"],
+                "page_count": len(existing["pages"]),
+            }
         if plan["state"] != "awaiting_approval":
             raise DiagnosticError("STATE_CONFLICT", "Plan is not awaiting approval")
         binding = (
@@ -399,7 +408,7 @@ def request_confirmation(
         current.execute(
             text("""INSERT INTO agent_telegram_confirmations
             (id,binding_id,plan_id,credential_id,origin,identity,pages,apply_after_approval,apply_key,expires_at)
-            VALUES (:id,:binding,:plan,:credential,CAST(:origin AS jsonb),CAST(:identity AS jsonb),CAST(:pages AS jsonb),:apply,:key,LEAST(:expiry,NOW()+INTERVAL '15 minutes'))"""),
+            VALUES (:id,:binding,:plan,:credential,CAST(:origin AS jsonb),CAST(:identity AS jsonb),CAST(:pages AS jsonb),:apply,:key,LEAST(:expiry,NOW()+make_interval(mins => :ttl_minutes)))"""),
             {
                 "id": confirmation_id,
                 "binding": binding["id"],
@@ -418,6 +427,7 @@ def request_confirmation(
                 "apply": apply_after_approval,
                 "key": "telegram:" + confirmation_id,
                 "expiry": plan["expires_at"],
+                "ttl_minutes": plan_ttl_minutes(plan["operation"]),
             },
         )
         return {

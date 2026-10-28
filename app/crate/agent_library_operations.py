@@ -88,6 +88,23 @@ def _envelope(data):
     }
 
 
+def _present_for_approval(job, published):
+    from crate.db.repositories.agent_telegram import request_confirmation
+
+    execution = published.get("execution") or {}
+    if execution.get("status") != "prepared":
+        return
+    try:
+        request_confirmation(
+            jobs.requests._principal_for_job(job),
+            execution["plan_id"],
+            execution["plan_version"],
+            apply_after_approval=True,
+        )
+    except DiagnosticError:
+        return
+
+
 def execute_operation_job(task_id: str, config: dict) -> dict:
     from crate.worker_handlers import is_cancelled
 
@@ -186,7 +203,9 @@ def execute_operation_job(task_id: str, config: dict) -> dict:
                 raise DiagnosticError(
                     "INVALID_ARGUMENT", "Operation has no lockable local targets"
                 )
-            return jobs.publish_plan(task_id, compiled)
+            published = jobs.publish_plan(task_id, compiled)
+            _present_for_approval(job, published)
+            return published
         if not jobs.start_operation_effect(task_id):
             return jobs.finish_operation(
                 task_id,

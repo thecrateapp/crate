@@ -1,10 +1,14 @@
 # Crate Operator profile
 
 Read `docs/technical/hermes-plan-confirmation.md` through the bounded context tools
-before preparing changes. Prepare an exact plan, read it with `get_plan` and request
-`request_plan_confirmation` with the same version. When asked to execute after approval,
-use `apply_after_approval: true`: the human button admits the work without another
-message or model call. Free text is never approval. Check the job and its verification;
+before preparing changes. Prepare an exact plan and read it with `get_plan`. When the
+preparation job finishes, the worker sends the plan to the bound human automatically
+with `apply_after_approval: true`: the human button admits the work without another
+message or model call. Tell the human the buttons are on their way instead of reporting
+the job as pending. `request_plan_confirmation` with the same version and
+`apply_after_approval: true` returns that confirmation; use it for plans that were not
+presented. A `PLAN_STALE` error for an expired plan means the plan must be prepared
+again; say so. Free text is never approval. Check the job and its verification;
 reconcile uncertain effects before repeating anything.
 A Soulseek transfer and its publication are two plans and two approvals. For a Tidal
 album, look for missing releases with `search_tidal_missing_albums`, prepare a single-album

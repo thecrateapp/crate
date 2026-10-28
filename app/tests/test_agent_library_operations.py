@@ -807,3 +807,131 @@ def test_delegated_prepare_plan_and_effect_keep_live_oauth_context(
     result = operations.execute_operation_job(queued["job_id"], world["config"])
     assert result["execution"]["error_code"] == "FORBIDDEN"
     assert world["adapter"]["effects"] == []
+
+
+@pytest.fixture
+def bound_world(operation_world, human_actor, monkeypatch):
+    from crate.db.repositories import agent_telegram as telegram
+
+    monkeypatch.setenv("CRATE_AGENT_INSTANCE_ID", "test-instance")
+    change(
+        "UPDATE agent_principals SET require_approval=TRUE WHERE id=:id",
+        {"id": operation_world["principal"].id},
+    )
+    telegram.bind_human(human_actor, operation_world["principal"].id, 123)
+    return operation_world
+
+
+def _confirmations(plan_id):
+    with read_scope() as session:
+        return (
+            session.execute(
+                text(
+                    """
+                    SELECT id, apply_after_approval,
+                           EXTRACT(EPOCH FROM expires_at - created_at) AS window
+                    FROM agent_telegram_confirmations WHERE plan_id=:id
+                    """
+                ),
+                {"id": plan_id},
+            )
+            .mappings()
+            .all()
+        )
+
+
+def _plan_window(plan_id):
+    return scalar(
+        "SELECT EXTRACT(EPOCH FROM expires_at - created_at) FROM agent_repair_plans WHERE id=:id",
+        {"id": plan_id},
+    )
+
+
+def _prepare_health_check(world):
+    world["adapter"]["compiled"]["document"]["operation"] = "health_check"
+    queued = operations.prepare_operation(
+        world["principal"],
+        "health_check",
+        {"artist_uid": UID, "check_types": ["duplicate_tracks"]},
+        "prepare-health",
+    )["data"]
+    start_task(queued["job_id"])
+    result = operations.execute_operation_job(queued["job_id"], world["config"])
+    assert result["execution"]["status"] == "prepared", result
+    return result["plan"]
+
+
+def test_prepared_plan_is_presented_to_the_bound_human_with_apply(bound_world):
+    from crate.db.repositories import agent_telegram as telegram
+
+    plan = _prepared(bound_world)
+
+    rows = _confirmations(plan["plan_id"])
+    assert [row["apply_after_approval"] for row in rows] == [True]
+    again = telegram.request_confirmation(
+        bound_world["principal"],
+        plan["plan_id"],
+        plan["plan_version"],
+        apply_after_approval=True,
+    )
+    assert again["confirmation_id"] == rows[0]["id"]
+    with pytest.raises(DiagnosticError) as error:
+        telegram.request_confirmation(
+            bound_world["principal"],
+            plan["plan_id"],
+            plan["plan_version"],
+            apply_after_approval=False,
+        )
+    assert error.value.code == "STATE_CONFLICT"
+
+
+def test_unbound_principal_still_prepares_without_presentation(
+    operation_world, monkeypatch
+):
+    monkeypatch.setenv("CRATE_AGENT_INSTANCE_ID", "test-instance")
+    change(
+        "UPDATE agent_principals SET require_approval=TRUE WHERE id=:id",
+        {"id": operation_world["principal"].id},
+    )
+
+    plan = _prepared(operation_world)
+
+    assert plan["state"] == "awaiting_approval"
+    assert _confirmations(plan["plan_id"]) == []
+
+
+def test_inspection_plans_and_buttons_stay_valid_for_an_hour(bound_world, monkeypatch):
+    monkeypatch.setitem(
+        operations._ADAPTERS, "health_check", operations._ADAPTERS[OPERATION]
+    )
+
+    metadata_plan = _prepared(bound_world)
+    health_plan = _prepare_health_check(bound_world)
+
+    assert round(_plan_window(metadata_plan["plan_id"])) == 15 * 60
+    assert round(_plan_window(health_plan["plan_id"])) == 60 * 60
+    assert round(_confirmations(health_plan["plan_id"])[0]["window"]) == 60 * 60
+    assert round(_confirmations(metadata_plan["plan_id"])[0]["window"]) == 15 * 60
+
+
+def test_expired_plan_confirmation_reports_that_it_must_be_prepared_again(
+    bound_world,
+):
+    from crate.db.repositories import agent_telegram as telegram
+
+    plan = _prepared(bound_world)
+    change(
+        "UPDATE agent_repair_plans SET expires_at = NOW() - INTERVAL '1 minute' WHERE id=:id",
+        {"id": plan["plan_id"]},
+    )
+
+    with pytest.raises(DiagnosticError) as error:
+        telegram.request_confirmation(
+            bound_world["principal"],
+            plan["plan_id"],
+            plan["plan_version"],
+            apply_after_approval=True,
+        )
+
+    assert error.value.code == "PLAN_STALE"
+    assert "expired" in str(error.value)

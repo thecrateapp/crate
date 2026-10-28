@@ -28,6 +28,12 @@ OPERATIONS = {
     "metadata_rehydrate": ("library.metadata.rehydrate", "library.metadata.write"),
 }
 
+INSPECTION_OPERATIONS = frozenset({"health_check", "quality_check"})
+
+
+def plan_ttl_minutes(operation: str | None) -> int:
+    return 60 if operation in INSPECTION_OPERATIONS else 15
+
 
 def operation_grant(operation: str) -> str:
     from crate.agent_diagnostics import DiagnosticError
