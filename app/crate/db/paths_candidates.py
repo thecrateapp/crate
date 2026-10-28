@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from crate.db.queries.paths import find_anchor_track_row, find_candidate_rows
+from crate.track_versions import track_song_identity
 
 _MAX_CONSECUTIVE_SAME_ARTIST = 2
 _ARTIST_REPEAT_PENALTY = 2.0
@@ -33,9 +34,17 @@ def _find_anchor_track(
     endpoint_value: str,
     target_vec: list[float],
     exclude: set[int],
+    *,
+    exclude_song_keys: set[tuple[str, str]] | None = None,
 ) -> dict | None:
     """Find the best track that belongs to the endpoint (artist/album/genre)."""
-    return find_anchor_track_row(endpoint_type, endpoint_value, target_vec, exclude)
+    return find_anchor_track_row(
+        endpoint_type,
+        endpoint_value,
+        target_vec,
+        exclude,
+        exclude_song_keys=exclude_song_keys,
+    )
 
 
 def _coerce_float(value) -> float | None:
@@ -163,11 +172,40 @@ def _find_best_candidate(
     genre_overlap=lambda *_args, **_kwargs: 0.0,
     candidate_pool_size: int = _CANDIDATE_POOL_SIZE,
     recent_tracks: list[dict] | None = None,
+    exclude_song_keys: set[tuple[str, str]] | None = None,
 ) -> dict | None:
     """Find the best track near ``target`` using hybrid bliss/affinity scoring."""
-    rows = find_candidate_rows(target, exclude_ids, limit=candidate_pool_size)
+    query_exclude = set(exclude_ids)
+    pool_size = min(240, max(1, candidate_pool_size))
+    all_rows = []
+    for _ in range(3):
+        rows = find_candidate_rows(
+            target, query_exclude, limit=pool_size, use_track_artist=True
+        )
+        all_rows.extend(rows)
+        selected = _select_best_candidate_from_rows(
+            rows,
+            target,
+            exclude_ids,
+            exclude_titles,
+            recent_artists,
+            sim_graph,
+            genre_map,
+            member_graph,
+            target_artists,
+            artist_affinity=artist_affinity,
+            genre_overlap=genre_overlap,
+            recent_tracks=recent_tracks,
+            exclude_song_keys=exclude_song_keys,
+        )
+        if selected:
+            return selected
+        if len(rows) < pool_size:
+            break
+        query_exclude.update(row["id"] for row in rows)
+        pool_size = min(240, pool_size * 4)
     return _select_best_candidate_from_rows(
-        rows,
+        all_rows,
         target,
         exclude_ids,
         exclude_titles,
@@ -179,6 +217,8 @@ def _find_best_candidate(
         artist_affinity=artist_affinity,
         genre_overlap=genre_overlap,
         recent_tracks=recent_tracks,
+        exclude_song_keys=exclude_song_keys,
+        max_consecutive=None,
     )
 
 
@@ -196,6 +236,8 @@ def _select_best_candidate_from_rows(
     artist_affinity=lambda *_args, **_kwargs: 0.0,
     genre_overlap=lambda *_args, **_kwargs: 0.0,
     recent_tracks: list[dict] | None = None,
+    exclude_song_keys: set[tuple[str, str]] | None = None,
+    max_consecutive: int | None = _MAX_CONSECUTIVE_SAME_ARTIST,
 ) -> dict | None:
     """Rank a prefetched candidate pool without going back to Postgres."""
     if not rows:
@@ -218,14 +260,16 @@ def _select_best_candidate_from_rows(
 
         if title_key in exclude_titles:
             continue
+        if track_song_identity(candidate) in (exclude_song_keys or set()):
+            continue
 
-        if recent_artists:
+        if recent_artists and max_consecutive is not None:
             consecutive = sum(
                 1
                 for recent_artist in reversed(recent_artists)
                 if recent_artist == artist
             )
-            if consecutive >= _MAX_CONSECUTIVE_SAME_ARTIST:
+            if consecutive >= max_consecutive:
                 continue
 
         bliss_norm = distance / max_dist

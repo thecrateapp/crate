@@ -17,6 +17,7 @@ from crate.db.repositories.paths import (
     create_music_path_record,
     update_music_path_tracks,
 )
+from crate.db.queries.recommendation_context import load_endpoint_contexts
 
 
 def compute_scene_path(
@@ -102,6 +103,13 @@ def build_music_path_plan(
         return None
 
     waypoint_vecs, resolved_waypoints = resolve_waypoints(waypoints)
+    endpoint_contexts = load_endpoint_contexts(
+        [
+            (origin_type, origin_value),
+            *((waypoint["type"], waypoint["value"]) for waypoint in resolved_waypoints),
+            (dest_type, dest_value),
+        ]
+    )
     tracks = compute_path(
         origin_type,
         origin_value,
@@ -111,6 +119,7 @@ def build_music_path_plan(
         dest_vec,
         step_count,
         waypoint_vecs or None,
+        endpoint_contexts=endpoint_contexts,
     )
     return {
         "origin_label": origin_label,

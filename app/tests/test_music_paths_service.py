@@ -74,9 +74,10 @@ def test_waypoints_preserve_acoustic_fallback_and_skip_ai(monkeypatch):
         "resolve_bliss_centroid",
         lambda kind, value: [1.0, 2.0] if value != "missing" else None,
     )
+    monkeypatch.setattr(service, "load_endpoint_contexts", lambda endpoints: [])
     calls = []
     monkeypatch.setattr(
-        service, "compute_path", lambda *a: calls.append(a) or [{"track_id": 8}]
+        service, "compute_path", lambda *a, **k: calls.append(a) or [{"track_id": 8}]
     )
     waypoints = [
         {"type": "genre", "value": "punk"},
