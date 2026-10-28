@@ -7,6 +7,7 @@ import type { ContextMenuHeader } from "@crate/ui/domain/actions";
 import { EntityRow } from "@crate/ui/domain/entity";
 import { PlayButton } from "@crate/ui/domain/media/PlayButton";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
+import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useListenEntityMenu } from "@/components/actions/entity-menu";
 import {
   buildPathActions,
@@ -78,7 +79,14 @@ export const PathRow = memo(function PathRow({
           ]}
         />
       }
-      meta={<MonoLabel as="span">{route}</MonoLabel>}
+      meta={
+        <span className="flex flex-wrap items-center gap-2">
+          <MonoLabel as="span">{route}</MonoLabel>
+          {path.is_partial ? (
+            <InfoBadge tone="warning">{t("paths.warnings.partial")}</InfoBadge>
+          ) : null}
+        </span>
+      }
       leading={
         <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-accent-action/10 text-accent-action">
           <Route size={CRATE_ICON_SIZE.sm} />

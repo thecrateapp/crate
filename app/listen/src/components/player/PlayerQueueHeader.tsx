@@ -1,16 +1,19 @@
 import { ActionButton } from "@crate/ui/primitives/ActionGroup";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { CRATE_ICON_SIZE, X } from "@crate/ui/icons";
+import { Link } from "react-router";
 export function PlayerQueueHeader({
   title,
   summary,
   source,
+  sourceHref,
   closeLabel,
   onClose,
 }: {
   title: string;
   summary: string;
   source?: string | null;
+  sourceHref?: string | null;
   closeLabel: string;
   onClose: () => void;
 }) {
@@ -24,7 +27,15 @@ export function PlayerQueueHeader({
       </div>
       <p className="font-mono text-xs text-text-muted">{summary}</p>
       {source ? (
-        <p className="mt-2 truncate text-xs text-text-subtle">{source}</p>
+        <p className="mt-2 truncate text-xs text-text-subtle">
+          {sourceHref ? (
+            <Link to={sourceHref} onClick={onClose}>
+              {source}
+            </Link>
+          ) : (
+            source
+          )}
+        </p>
       ) : null}
     </header>
   );

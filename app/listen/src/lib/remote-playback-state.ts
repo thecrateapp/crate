@@ -172,6 +172,8 @@ export function compactPlaySource(
   playSource: PlaySource | null,
 ): CompactPlaySource | null {
   if (!playSource) return null;
+  if (playSource.type === "path")
+    return { type: "queue", name: playSource.name };
   return {
     type: playSource.type,
     name: playSource.name,

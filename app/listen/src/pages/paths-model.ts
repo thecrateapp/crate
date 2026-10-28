@@ -14,9 +14,14 @@ export interface PathSummary {
   step_count: number;
   track_count: number;
   created_at: string;
+  is_partial?: boolean;
+  generated_step_count?: number;
+  warnings?: { code: string; [key: string]: unknown }[];
 }
 
 export interface PathTrack extends TrackMediaMetadata {
+  playable?: boolean;
+  path?: string | null;
   step: number;
   progress: number;
   track_id: number;

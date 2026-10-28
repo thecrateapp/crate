@@ -1,14 +1,28 @@
 import { useMemo } from "react";
 
 import { TrackRow } from "@/components/cards/TrackRow";
-import type { PlaySource } from "@/contexts/PlayerContext";
+import { createPathPlaySource } from "@/components/player/player-source";
+import { useTranslation } from "react-i18next";
 import { toTrackRowData } from "@/lib/track-row-data";
 import type { PathDetail } from "./paths-model";
+import { usePlayerActions } from "@/contexts/PlayerContext";
+import { getPathPlayback } from "./path-playback";
 
 export function PathTrackList({ path }: { path: PathDetail }) {
-  const rows = useMemo(() => path.tracks.map(toTrackRowData), [path.tracks]);
-  const playSource = useMemo<PlaySource>(
-    () => ({ type: "queue", name: path.name, href: `/paths/${path.id}` }),
+  const { t } = useTranslation();
+  const { playAll, playSource: currentSource } = usePlayerActions();
+  const isCurrentPath =
+    currentSource?.type === "path" &&
+    String(currentSource.id) === String(path.id);
+  const rows = useMemo(
+    () =>
+      path.tracks.map((track) =>
+        toTrackRowData({ ...track, disabled: track.playable === false }),
+      ),
+    [path.tracks],
+  );
+  const playSource = useMemo(
+    () => createPathPlaySource(path),
     [path.id, path.name],
   );
 
@@ -22,8 +36,18 @@ export function PathTrackList({ path }: { path: PathDetail }) {
             showCoverThumb
             showArtist
             showAlbum
-            queueTracks={rows}
             playSource={playSource}
+            isActiveOverride={isCurrentPath ? undefined : false}
+            onPlayOverride={() => {
+              const playback = getPathPlayback(path, index);
+              if (playback)
+                playAll(playback.tracks, playback.index, playback.source);
+            }}
+            disabledLabel={
+              track.playable === false
+                ? t("paths.warnings.trackUnavailable")
+                : undefined
+            }
           />
         </div>
       ))}

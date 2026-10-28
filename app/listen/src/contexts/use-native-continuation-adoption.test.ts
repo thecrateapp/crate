@@ -64,6 +64,33 @@ describe("nativeAppendedTrackToTrack", () => {
 });
 
 describe("useNativeContinuationAdoption", () => {
+  it("does not adopt stale native radio continuations into a finite saved path", async () => {
+    engineMock.takeAppendedTracks.mockResolvedValue([shapedEntry]);
+    engineMock.getContinuationCursor.mockReturnValue({
+      sessionId: "previous-radio",
+      batchIndex: 2,
+      revision: 1,
+    });
+    const adoptTracks = vi.fn();
+    const { result } = renderHook(() =>
+      useNativeContinuationAdoption({
+        adoptTracks,
+        queueRef: { current: [] },
+        playSourceRef: {
+          current: {
+            type: "path",
+            name: "Saved journey",
+            id: 77,
+            href: "/paths/77",
+          },
+        },
+      }),
+    );
+
+    await act(async () => result.current());
+
+    expect(adoptTracks).not.toHaveBeenCalled();
+  });
   it("adopts appended tracks the queue does not have yet", async () => {
     engineMock.takeAppendedTracks.mockResolvedValue([shapedEntry, seededEntry]);
     const adoptTracks = vi.fn();

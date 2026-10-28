@@ -58,6 +58,7 @@ export const TrackRow = memo(function TrackRow({
   extraActions,
   showLike = true,
   showDuration = true,
+  disabledLabel,
 }: TrackRowProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -170,8 +171,11 @@ export const TrackRow = memo(function TrackRow({
               />
             ) : null}
             {model.disabled ? (
-              <InfoBadge icon={Clock} tone="neutral">
-                {t("trackRow.soon")}
+              <InfoBadge
+                icon={disabledLabel ? undefined : Clock}
+                tone={disabledLabel ? "warning" : "neutral"}
+              >
+                {disabledLabel || t("trackRow.soon")}
               </InfoBadge>
             ) : null}
           </>

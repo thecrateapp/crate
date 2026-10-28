@@ -3727,6 +3727,30 @@
     "sourceHash": "sha256:0e8de5ec97017cdec772b54731af189a95a3f45c4a2923f01f3d56905334de58",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
   },
+  "paths.warnings.incomplete": {
+    "sourceHash": "sha256:1d15e4ffb35ce6ce8a824b99ff1bb0aadd0349612410f2265b1c0eb867848076",
+    "reviewedAt": "2026-10-28T22:58:27.665Z"
+  },
+  "paths.warnings.noneAvailable": {
+    "sourceHash": "sha256:0184618b5beaef73e9e7b0714ba89e4b35909f939a3dec071aa61b4296785b94",
+    "reviewedAt": "2026-10-28T22:58:27.665Z"
+  },
+  "paths.warnings.partial": {
+    "sourceHash": "sha256:9cb708738d970edf7cca5041e5129a04fd6563134ef0c3e815db1c559ac243a4",
+    "reviewedAt": "2026-10-28T22:58:27.665Z"
+  },
+  "paths.warnings.partialDetail": {
+    "sourceHash": "sha256:af43eb0b8e989543a5c7e21b3ae410acb02d55be5dee645510743fe166bf1891",
+    "reviewedAt": "2026-10-28T22:58:27.665Z"
+  },
+  "paths.warnings.trackUnavailable": {
+    "sourceHash": "sha256:4ea940bcc284898a809e46125e170c6dc13ce094f10b3c943b10e39632bcdd70",
+    "reviewedAt": "2026-10-28T22:58:27.665Z"
+  },
+  "paths.warnings.unavailable": {
+    "sourceHash": "sha256:944c2aa8e17f62b7e5b12fd5f007af40751a56de3011f176921a1b2469fceb93",
+    "reviewedAt": "2026-10-28T22:58:27.665Z"
+  },
   "people.fallback.you": {
     "sourceHash": "sha256:bd10d2be7cafc3c1aa0fe53e7d6fc3f2addab7dbde64df05eb067f841c7a58ec",
     "reviewedAt": "2026-07-07T15:39:22.141Z"
@@ -5034,6 +5058,10 @@
   "playlistComposer.emptyTracks": {
     "sourceHash": "sha256:edfcaa77cd5fbba0d25aedf8111775b83b770a0f2cbd24969c122856e9867804",
     "reviewedAt": "2026-10-27T14:07:07.856Z"
+  },
+  "playlistComposer.emptyTracksTitle": {
+    "sourceHash": "sha256:56af7a1ff522fe454148278c97e04b116b9e283460d76d153e255a0787e3ef73",
+    "reviewedAt": "2026-10-28T22:58:27.665Z"
   },
   "playlistComposer.namePlaceholder": {
     "sourceHash": "sha256:17e51cba1c7111b8e7b9886e160616c8577c663cad1dc112514e46d14feadb9b",

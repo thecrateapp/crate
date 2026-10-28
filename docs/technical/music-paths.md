@@ -213,9 +213,46 @@ remain ephemeral validation context; they add no queries or persisted payload.
 Errors, obsolete context and proposals without an improvement retain the
 deterministic result.
 
-## Remaining checkpoints
+## Checkpoint 3.5: finite playback and visible warnings
 
-- 3.5: explicit finite `path` playback source and warning presentation in Listen.
+Listen identifies these queues with `type: "path"`, their path ID, name and
+canonical route link. List playback, detail headers, covers and track rows use
+one queue conversion. It preserves the saved order while skipping currently
+unavailable tracks, maps a clicked step to the playable index, and starts at the
+first available track from the header. A single-track partial path keeps the
+same source. A row resumes existing playback only when both the track and path
+identity match; an album or another path cannot retain its old continuation.
 
-PR3 is stacked on PR2 (#301). Evaluate representative journeys and review partial
-path warnings before publication; merge and deployment are separate steps.
+The local playback source survives queue persistence and produces path play-event
+attribution with no playlist context. Path sources have no continuation
+descriptor even when Infinite Playback or shuffle is enabled. Existing explicit
+repeat controls retain their behavior. Connect peers receive a generic queue
+name without a path ID or radio metadata; the Cast track/queue protocol and
+native transition enums are unchanged. The queue's path link opens its own
+detail page.
+
+Listen uses existing warning badges and status text to distinguish an incomplete
+generation from later track unavailability. Rows and cover steps indicate
+unavailability and cannot start that step; cover-strip keyboard focus remains
+usable. Empty playable queues disable playback. The messages are translated in
+all seven catalogs.
+
+## Final checkpoint and remaining gates
+
+The [catalog validation checkpoint](../../app/tests/fixtures/recommendations/music-paths-validation-review.md)
+records five read-only probes with the final validator. Genre-20 journeys are
+complete in both directions. A 100-track forward request returns 97 tracks with
+`is_partial: true` and `insufficient_tracks`. Track and album journeys with a
+waypoint preserve their anchors and report complete results. All have unique
+song families; the requested waypoint resolves without requiring a played
+recording by that artist.
+
+These are individual planning samples, not p95 acceptance. The forward genre-20
+probe takes 2.337 s, above the two-second target. Acoustic probes take 8–9 s
+while the expected cosine index remains absent in production. No index,
+migration, cache entry, play event or saved path was written by this evaluation.
+Representative post-index acoustic and end-to-end HTTP timings remain open.
+
+PR3 is stacked on PR2 (#301). Review the revised musical lists and partial-path
+presentation before publication. Full Linux CI runs once at the stable phase
+end; merge and deployment remain separate steps.

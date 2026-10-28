@@ -73,6 +73,20 @@ describe("compactTrackReference", () => {
 });
 
 describe("compactPlaySource", () => {
+  it("sends a finite generic queue to peers that do not understand path sources", () => {
+    const source: PlaySource = {
+      type: "path",
+      name: "Punk to Electronic",
+      id: 77,
+      href: "/paths/77",
+    };
+
+    expect(compactPlaySource(source)).toEqual({
+      type: "queue",
+      name: "Punk to Electronic",
+    });
+  });
+
   it("drops route hrefs from playback source snapshots", () => {
     const source: PlaySource = {
       type: "album",

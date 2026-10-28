@@ -75,6 +75,7 @@ interface TrackRowPlaylistOption {
 }
 
 export interface TrackRowProps {
+  disabledLabel?: string;
   role?: "row" | "group";
   track: TrackRowData;
   index?: number;

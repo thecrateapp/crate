@@ -91,7 +91,7 @@ interface RadioSession {
 }
 
 export interface PlaySource {
-  type: "album" | "crate" | "playlist" | "radio" | "track" | "queue";
+  type: "album" | "crate" | "playlist" | "radio" | "track" | "queue" | "path";
   name: string;
   id?: string | number | null;
   href?: string | null;

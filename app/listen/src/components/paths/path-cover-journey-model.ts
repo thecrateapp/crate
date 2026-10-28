@@ -1,6 +1,7 @@
 import { albumCoverAssetPath } from "../../../../shared/web/library-routes";
 import type { PathTrack } from "../../pages/paths-model";
 export interface PathCoverStep {
+  playable?: boolean;
   index: number;
   title: string;
   artist: string;
@@ -19,6 +20,7 @@ const PRELOAD_RADIUS = 2;
 const NEUTRAL = { energy: 0.5, valence: 0.5, danceability: 0.5, bpm: 120 };
 export function buildPathCoverSteps(tracks: PathTrack[]): PathCoverStep[] {
   return tracks.map((track, index) => ({
+    playable: track.playable,
     index,
     title: track.title,
     artist: track.artist,

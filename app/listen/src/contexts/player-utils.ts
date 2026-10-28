@@ -111,6 +111,7 @@ const PERSISTED_PLAY_SOURCE_TYPES = new Set<PlaySource["type"]>([
   "radio",
   "track",
   "queue",
+  "path",
 ]);
 
 function persistablePlaySource(value: unknown): PlaySource | null {

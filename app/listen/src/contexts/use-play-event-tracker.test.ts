@@ -33,6 +33,27 @@ afterEach(() => {
 });
 
 describe("usePlayEventTracker — explicit lifecycle", () => {
+  it("attributes saved-path playback to its path without a playlist context", () => {
+    const { result } = setup();
+    const source: PlaySource = {
+      type: "path",
+      id: 77,
+      name: "Saved journey",
+      href: "/paths/77",
+    };
+    act(() => result.current.startSession(TRACK_A, source));
+    act(() => result.current.recordProgress(1));
+    act(() => result.current.flushCurrentPlayEvent("completed", TRACK_A));
+
+    expect(mockPost).toHaveBeenCalledOnce();
+    expect(mockPost.mock.calls[0]![1]).toMatchObject({
+      track_id: 1,
+      play_source_type: "path",
+      play_source_id: "77",
+      play_source_name: "Saved journey",
+      context_playlist_id: null,
+    });
+  });
   it("flushCurrentPlayEvent is a no-op before any startSession", () => {
     const { result } = setup();
     act(() => {

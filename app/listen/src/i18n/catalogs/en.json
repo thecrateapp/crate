@@ -2133,5 +2133,11 @@
   "player.mix.label": "Transition",
   "player.mix.gapless": "Gapless",
   "player.mix.paused": "Paused",
-  "player.mix.buffering": "Buffering"
+  "player.mix.buffering": "Buffering",
+  "paths.warnings.partial": "Partial path",
+  "paths.warnings.partialDetail": "Only {generated} of {requested} tracks could be selected.",
+  "paths.warnings.incomplete": "This journey could not be completed as requested.",
+  "paths.warnings.unavailable": "{count, plural, one {# saved track is unavailable and will be skipped.} other {# saved tracks are unavailable and will be skipped.}}",
+  "paths.warnings.trackUnavailable": "Unavailable",
+  "paths.warnings.noneAvailable": "None of the saved tracks are available to play."
 }

@@ -7,9 +7,8 @@ import { PathsPageView } from "./PathsPageView";
 
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
-import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
-import { albumCoverApiUrl } from "@/lib/library-routes";
-import { toPlayableTrack } from "@/lib/playable-track";
+import { usePlayerActions } from "@/contexts/PlayerContext";
+import { getPathPlayback } from "./path-playback";
 import { PathRow } from "@/components/paths/PathRow";
 
 import { EndpointPanel } from "./PathsParts";
@@ -55,26 +54,12 @@ export function Paths() {
   const playPath = async (pathId: number) => {
     try {
       const detail = await api<PathDetail>(`/api/paths/${pathId}`);
-      const tracks: Track[] = detail.tracks.map((track) =>
-        toPlayableTrack(track, {
-          cover:
-            track.album_id || track.album_entity_uid
-              ? albumCoverApiUrl(
-                  {
-                    albumId: track.album_id,
-                    albumEntityUid: track.album_entity_uid,
-                    artistEntityUid: track.artist_entity_uid,
-                  },
-                  { size: 512 },
-                )
-              : undefined,
-        }),
-      );
-      playAll(tracks, 0, {
-        type: "playlist",
-        name: detail.name,
-        id: detail.id,
-      });
+      const playback = getPathPlayback(detail);
+      if (!playback) {
+        notify.error(t("paths.warnings.noneAvailable"));
+        return;
+      }
+      playAll(playback.tracks, playback.index, playback.source);
     } catch {
       notify.error(t("paths.toasts.loadFailed"));
     }

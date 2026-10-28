@@ -9,6 +9,7 @@ export function PathDetailHeaderView({
   origin,
   destination,
   count,
+  playableCount = count,
   regenerating,
   onPlay,
   onRegenerate,
@@ -18,6 +19,7 @@ export function PathDetailHeaderView({
   origin: string;
   destination: string;
   count: number;
+  playableCount?: number;
   regenerating: boolean;
   onPlay: () => void;
   onRegenerate: () => void;
@@ -37,7 +39,7 @@ export function PathDetailHeaderView({
           <PlayButton
             size="md"
             label={t("player.play")}
-            disabled={!count}
+            disabled={!playableCount}
             onClick={onPlay}
           />
           <ActionGroup>

@@ -37,7 +37,7 @@ vi.mock("@/components/paths/PathCoverJourney", () => ({
 }));
 vi.mock("./PathDetailParts", () => ({ PathTrackList: () => null }));
 import { PathDetail } from "./PathDetail";
-it("plays Path 123 as a finite queue with its own link and no playlist attribution", () => {
+it("plays Path 123 with its own finite path source and navigation", () => {
   render(
     <MemoryRouter initialEntries={["/paths/123"]}>
       <Routes>
@@ -47,7 +47,11 @@ it("plays Path 123 as a finite queue with its own link and no playlist attributi
   );
   fireEvent.click(screen.getByRole("button", { name: "Play path" }));
   const source = playAll.mock.calls[0]![2];
-  expect(source).toEqual({ type: "queue", name: "A to B", href: "/paths/123" });
-  expect(source.id).toBeUndefined();
+  expect(source).toEqual({
+    type: "path",
+    id: 123,
+    name: "A to B",
+    href: "/paths/123",
+  });
   expect(source.radio).toBeUndefined();
 });
