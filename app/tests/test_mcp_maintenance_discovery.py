@@ -139,7 +139,7 @@ def test_operation_catalog_describes_real_tools_and_only_supported_repairs(
             )
             checks = {item["check_type"]: item for item in payload["data"]["checks"]}
             assert checks.keys() == REPAIR_CATALOG_BY_CHECK.keys()
-            assert len(checks) == 17
+            assert len(checks) == 19
             assert checks["has_photo_desync"]["mcp_support"] == "automatic"
             for item in checks.values():
                 assert item["mcp_support"] in {"automatic", "manual", "unavailable"}

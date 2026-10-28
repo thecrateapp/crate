@@ -111,6 +111,24 @@ export const HEALTH_CHECKS: HealthCheck[] = [
     confirm: true,
   },
   {
+    id: "edition_overlap",
+    label: "Overlapping Editions",
+    description:
+      "Two editions of the same release share most of their tracks; keep, quarantine or dismiss each one",
+    risk: "safe",
+    scope: "db",
+    confirm: false,
+  },
+  {
+    id: "album_split_folders",
+    label: "Split Album Folders",
+    description:
+      "An album has tracks stored outside its own folder; run the artist layout fix to consolidate them",
+    risk: "safe",
+    scope: "db",
+    confirm: false,
+  },
+  {
     id: "shadow_quality_tracks",
     label: "Lower Quality Copies",
     description:

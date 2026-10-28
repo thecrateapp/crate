@@ -68,7 +68,7 @@ describe("health checks copied from the repair catalog", () => {
         confirm,
       })),
     ).toEqual(fromSource);
-    expect(HEALTH_CHECKS).toHaveLength(17);
+    expect(HEALTH_CHECKS).toHaveLength(19);
   });
 
   it("uses the labels and descriptions from the admin Health page", () => {
