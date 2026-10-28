@@ -1,8 +1,8 @@
 # Crate
 
 Self-hosted music platform with enrichment, analysis, streaming, acquisition, federation and a
-snapshot-backed read plane. Production manages roughly 900 artists, 4,400 albums, 48K tracks and
-1.2 TB of audio.
+snapshot-backed read plane. Production manages roughly 1,050 artists, 10,900 albums, 138K tracks and
+4 TB of audio.
 
 This file holds the platform-wide rules. Each part of the monorepo has a scoped `AGENTS.md` with
 the rules you need when editing it; read the one closest to the files you touch.
