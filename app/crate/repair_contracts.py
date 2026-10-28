@@ -22,6 +22,8 @@ _MANUAL = {
     "unindexed_files": "Unindexed discovery may merge folders and enrich an artist. Use an explicit library sync plan for already indexed entities.",
     "folder_naming": "Legacy naming collisions can delete lower quality files and non-audio contents; resolve the collision in Admin.",
     "missing_cover": "A cover must be selected and staged with verified identity and bytes before an automatic write is safe.",
+    "edition_overlap": "Overlapping editions can both be intended; keep, quarantine or dismiss each edition from the album view.",
+    "album_split_folders": "Tracks outside their album folder need the artist layout fix in Admin, which moves files under review.",
 }
 _CONDITIONAL = {
     "duplicate_albums": "Automatic only for indexed copies with stable UIDs; quarantine marks duplicate album rows and preserves all audio.",

@@ -151,6 +151,22 @@ REPAIR_CATALOG: tuple[RepairCatalogEntry, ...] = (
         supports_global_scope=False,
     ),
     RepairCatalogEntry(
+        "edition_overlap",
+        "_check_edition_overlap",
+        None,
+        "manual",
+        "safe",
+        "db",
+    ),
+    RepairCatalogEntry(
+        "album_split_folders",
+        "_check_album_split_folders",
+        None,
+        "manual",
+        "safe",
+        "db",
+    ),
+    RepairCatalogEntry(
         "shadow_quality_tracks",
         "_check_shadow_quality_tracks",
         "_fix_shadow_quality_tracks",

@@ -2,6 +2,7 @@ import { useLibrarySearch } from "@/hooks/use-library-search";
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useApi } from "@/hooks/use-api";
+import { useHealthDiagnosis } from "@/hooks/use-health-diagnosis";
 import {
   useTopTracks,
   useArtistEnrichment,
@@ -1428,6 +1429,13 @@ function ArtistPageView({ model }: { model: ArtistPageReadyModel }) {
     applyBioResearchProposal,
     mergeArtistInto,
   } = model;
+  const { diagnose, diagnosing } = useHealthDiagnosis({
+    endpoint: artistManagementApiPath(
+      { artistId: data.id, artistEntityUid: data.entity_uid },
+      "health-recheck",
+    ),
+    onFinished: refetch,
+  });
   return (
     <div className="min-w-0 space-y-6">
       <ArtistHeroSection
@@ -1485,6 +1493,8 @@ function ArtistPageView({ model }: { model: ArtistPageReadyModel }) {
             : undefined
         }
         onRepair={() => void repairArtist()}
+        onDiagnose={() => void diagnose()}
+        diagnosing={diagnosing}
         onEditMetadata={() => setShowMetadataEditor(true)}
         metadataAction={metadataAction}
         onSyncLyrics={() => void queueArtistMetadataAction("lyrics")}

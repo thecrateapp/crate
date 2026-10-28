@@ -13,6 +13,8 @@ MANUAL_CHECKS = {
     "unindexed_files",
     "folder_naming",
     "missing_cover",
+    "edition_overlap",
+    "album_split_folders",
 }
 AUTOMATIC_CHECKS = {
     "fk_orphan_albums",
@@ -41,7 +43,7 @@ DESTRUCTIVE_CHECKS = {
 
 def test_repair_contract_catalog_has_one_complete_contract_for_every_check():
     contracts = repair_contracts()
-    assert len(contracts) == 17
+    assert len(contracts) == 19
     assert {entry["check_type"] for entry in contracts} == set(REPAIR_CATALOG_BY_CHECK)
     assert MANUAL_CHECKS | AUTOMATIC_CHECKS == set(REPAIR_CATALOG_BY_CHECK)
     assert not MANUAL_CHECKS & AUTOMATIC_CHECKS

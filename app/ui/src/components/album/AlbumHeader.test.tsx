@@ -9,7 +9,9 @@ import { api } from "@/lib/api";
 import { waitForTask } from "@/lib/tasks";
 vi.mock("@/lib/api", () => ({ api: vi.fn() }));
 vi.mock("@/lib/tasks", () => ({ waitForTask: vi.fn() }));
-vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
+}));
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api).mockResolvedValue({ task_id: "album-task" });
@@ -182,4 +184,47 @@ it("keeps the hero and action inset on the same Admin content edge", () => {
   const actions = screen.getByRole("group", { name: "Album actions" });
   expect(actions.parentElement).toHaveClass("py-4");
   expect(actions.parentElement).not.toHaveClass("p-4");
+});
+
+describe("AlbumHeader diagnosis", () => {
+  it("runs the album's artist health checks and offers to review findings", async () => {
+    const { toast } = await import("sonner");
+    vi.mocked(api).mockResolvedValue({ task_id: "diagnosis-task" });
+    vi.mocked(waitForTask).mockResolvedValue({
+      status: "completed",
+      result: { issue_count: 2 },
+    } as Awaited<ReturnType<typeof waitForTask>>);
+    renderHeader(
+      <AlbumHeader
+        {...baseProps}
+        artistId={9}
+        artistSlug="type-o-negative"
+        canDiagnose
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Diagnose" }));
+
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith(
+        "Diagnosis found 2 issues",
+        expect.objectContaining({
+          action: expect.objectContaining({ label: "Review" }),
+        }),
+      ),
+    );
+    expect(api).toHaveBeenCalledWith(
+      "/api/manage/albums/1/health-recheck",
+      "POST",
+    );
+    expect(waitForTask).toHaveBeenCalledWith("diagnosis-task", 300000);
+  });
+
+  it("hides the diagnosis action without the repair capability", () => {
+    renderHeader(<AlbumHeader {...baseProps} isAdmin canDiagnose={false} />);
+
+    expect(
+      screen.queryByRole("button", { name: "Diagnose" }),
+    ).not.toBeInTheDocument();
+  });
 });

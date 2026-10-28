@@ -69,6 +69,16 @@ def describe_health_issue(check_type: str, details: dict[str, Any] | None) -> st
             position = d.get("track_number")
             label = f"#{position} " if position else ""
             return f"{who}: {label}'{d.get('title')}' appears {d.get('count', 2)} times"
+        case "edition_overlap":
+            return (
+                f"{who}: {d.get('shared_tracks')}/{d.get('track_count')} tracks "
+                f"also in '{d.get('edition')}'"
+            )
+        case "album_split_folders":
+            return (
+                f"{who}: {d.get('foreign_track_count')} tracks outside the album "
+                f"folder, across {len(d.get('folders', []))} folders"
+            )
         case "shadow_quality_tracks":
             formats = ", ".join(str(f) for f in d.get("formats", [])[:3])
             return f"{who}: lower quality copies alongside the album ({formats})"

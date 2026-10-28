@@ -653,7 +653,7 @@ const approvedLibraryControls = new Map<string, number>([
   ],
   [
     "app/ui/src/components/album/AlbumHeader.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
-    4,
+    5,
   ],
   [
     "app/ui/src/components/album/AlbumHeader.tsx:@crate/ui/primitives/ActionGroup:ActionLink",
@@ -817,7 +817,7 @@ const approvedLibraryControls = new Map<string, number>([
   ],
   [
     "app/ui/src/components/artist/ArtistHeroSection.tsx:@crate/ui/primitives/ActionGroup:ActionButton",
-    10,
+    11,
   ],
   [
     "app/ui/src/components/artist/ArtistHeroSection.tsx:@/components/genres/GenrePill:GenrePillRow",
@@ -1133,6 +1133,7 @@ const approvedUx = new Map([
   ["ArtistHeroSection:artist-write-metadata", ["@crate/ui/icons", "Tag"]],
   ["ArtistHeroSection:artist-export-metadata", ["@crate/ui/icons", "Archive"]],
   ["ArtistHeroSection:artist-repair", ["@crate/ui/icons", "Toolbox"]],
+  ["ArtistHeroSection:artist-diagnose", ["@crate/ui/icons", "Activity"]],
   ["ArtistHeroSection:artist-merge", ["@crate/ui/icons", "Link"]],
   ["ArtistHeroSection:artist-delete", ["@crate/ui/icons", "Trash2"]],
   [
@@ -1180,6 +1181,7 @@ const approvedUx = new Map([
   ["AlbumHeader:album-sync-lyrics", ["@crate/ui/icons", "AlignLeft"]],
   ["AlbumHeader:album-write-metadata", ["@crate/ui/icons", "Save"]],
   ["AlbumHeader:album-export-metadata", ["@crate/ui/icons", "Share2"]],
+  ["AlbumHeader:album-diagnose", ["@crate/ui/icons", "Activity"]],
   ["AlbumCard:album-cover-loading", ["@crate/ui/icons", "Loader2"]],
   ["AlbumCard:album-cover-search", ["@crate/ui/icons", "ImagePlus"]],
   ["ImageCropUpload:crop-upload", ["@crate/ui/icons", "Camera"]],

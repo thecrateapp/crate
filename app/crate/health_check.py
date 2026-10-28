@@ -18,6 +18,7 @@ from crate.db.queries.health import (
     get_all_albums,
     get_all_albums_for_covers,
     get_all_artists,
+    get_album_title_sets,
     get_all_track_paths,
     get_artists_with_folder,
     get_artists_with_photo,
@@ -26,6 +27,7 @@ from crate.db.queries.health import (
     get_orphan_albums,
     get_orphan_tracks,
     get_shadow_quality_tracks,
+    get_split_album_folders,
     get_tracks_sample,
     get_tracks_tag_sample,
     get_zombie_artists,
@@ -48,9 +50,11 @@ from crate.worker_handlers.migration import (
 log = logging.getLogger(__name__)
 
 ARTIST_SCOPED_CHECKS = (
+    "album_split_folders",
     "artist_layout_fix",
     "duplicate_albums",
     "duplicate_tracks",
+    "edition_overlap",
     "has_photo_desync",
 )
 
@@ -142,6 +146,18 @@ class LibraryHealthCheck:
                     issues.extend(
                         self._duplicate_track_issues(
                             get_duplicate_tracks(artist_name=artist_name)
+                        )
+                    )
+                elif check_type == "edition_overlap":
+                    issues.extend(
+                        self._edition_overlap_issues(
+                            get_album_title_sets(artist_name=artist_name)
+                        )
+                    )
+                elif check_type == "album_split_folders":
+                    issues.extend(
+                        self._split_folder_issues(
+                            get_split_album_folders(artist_name=artist_name)
                         )
                     )
                 elif check_type == "has_photo_desync":
@@ -591,6 +607,43 @@ class LibraryHealthCheck:
                     "tracks": r.get("tracks", []),
                     "fingerprinted_count": r.get("fingerprinted_count", 0),
                     "missing_fingerprint_count": r.get("missing_fingerprint_count", 0),
+                },
+            }
+            for r in rows
+        ]
+
+    def _check_edition_overlap(self) -> list[dict]:
+        return self._edition_overlap_issues(get_album_title_sets())
+
+    def _edition_overlap_issues(self, albums: list[dict]) -> list[dict]:
+        from crate.album_editions import edition_overlaps
+
+        return [
+            {
+                "check": "edition_overlap",
+                "severity": "low",
+                "auto_fixable": False,
+                "details": overlap,
+            }
+            for overlap in edition_overlaps(albums)
+        ]
+
+    def _check_album_split_folders(self) -> list[dict]:
+        return self._split_folder_issues(get_split_album_folders())
+
+    def _split_folder_issues(self, rows: list[dict]) -> list[dict]:
+        return [
+            {
+                "check": "album_split_folders",
+                "severity": "medium",
+                "auto_fixable": False,
+                "details": {
+                    "artist": r["artist"],
+                    "album": r["album"],
+                    "album_id": r["album_id"],
+                    "album_path": r["album_path"],
+                    "folders": list(r["folders"]),
+                    "foreign_track_count": r["foreign_track_count"],
                 },
             }
             for r in rows
