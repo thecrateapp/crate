@@ -7,7 +7,8 @@ from typing import Any, Callable
 
 import requests
 
-from crate.db.repositories.lyrics import get_cached_lyrics, store_lyrics
+from crate.db.repositories.lyrics import get_cached_lyrics, merge_lyrics
+from crate.lyrics_cache_policy import has_lyrics, is_fresh
 
 log = logging.getLogger(__name__)
 
@@ -51,7 +52,7 @@ def fetch_and_store_lrclib_lyrics(
         headers={"User-Agent": "Crate/1.0"},
     )
     if resp.status_code == 404:
-        return store_lyrics(
+        return merge_lyrics(
             artist,
             title,
             synced_lyrics=None,
@@ -65,7 +66,7 @@ def fetch_and_store_lrclib_lyrics(
         raise RuntimeError(f"lrclib returned HTTP {resp.status_code}")
 
     data = resp.json()
-    return store_lyrics(
+    return merge_lyrics(
         artist,
         title,
         synced_lyrics=data.get("syncedLyrics"),
@@ -86,10 +87,13 @@ def get_or_fetch_lyrics(
     force: bool = False,
     max_age_seconds: int | None = LYRICS_TTL_SECONDS,
 ) -> dict[str, str | None]:
-    if not force:
-        cached = get_cached_lyrics(artist, title, max_age_seconds=max_age_seconds)
-        if cached is not None:
-            return _response_payload(cached)
+    cached = get_cached_lyrics(artist, title, max_age_seconds=None)
+    if (
+        not force
+        and cached is not None
+        and is_fresh(cached.get("updated_at"), max_age_seconds)
+    ):
+        return _response_payload(cached)
 
     try:
         stored = fetch_and_store_lrclib_lyrics(
@@ -101,7 +105,7 @@ def get_or_fetch_lyrics(
         return _response_payload(stored)
     except Exception:
         log.debug("Lyrics fetch failed for %s - %s", artist, title, exc_info=True)
-        return {"syncedLyrics": None, "plainLyrics": None}
+        return _response_payload(cached if has_lyrics(cached) else None)
 
 
 def _track_title(track: dict[str, Any]) -> str:

@@ -102,7 +102,12 @@ describe("AlbumHeader", () => {
 });
 
 it.each([
-  ["Lyrics", "lyrics", "/api/manage/sync-lyrics", { album_id: 1, limit: 500 }],
+  [
+    "Lyrics",
+    "lyrics",
+    "/api/manage/sync-lyrics",
+    { album_id: 1, refresh_mode: "due", limit: 500 },
+  ],
   [
     "Metadata",
     "portable",

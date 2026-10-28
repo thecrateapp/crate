@@ -621,7 +621,8 @@ def _emit_lyrics_track_event(task_id: str, data: dict) -> None:
 
 def _handle_sync_lyrics(task_id: str, params: dict, config: dict) -> dict:
     from crate.db.queries.lyrics import list_tracks_for_lyrics
-    from crate.lyrics import sync_lyrics_for_tracks
+    from crate.lyrics import LYRICS_TTL_SECONDS, sync_lyrics_for_tracks
+    from crate.lyrics_cache_policy import normalize_refresh_mode
 
     artist = params.get("artist")
     album_id = params.get("album_id")
@@ -629,6 +630,7 @@ def _handle_sync_lyrics(task_id: str, params: dict, config: dict) -> dict:
     track_id = params.get("track_id")
     track_entity_uid = params.get("track_entity_uid")
     force = bool(params.get("force", False))
+    refresh_mode = normalize_refresh_mode(params.get("refresh_mode"))
     limit = int(params.get("limit") or 500)
     delay_seconds = float(params.get("delay_seconds", 0.2))
     album_id = int(album_id) if album_id is not None else None
@@ -641,7 +643,8 @@ def _handle_sync_lyrics(task_id: str, params: dict, config: dict) -> dict:
         track_id=track_id,
         track_entity_uid=str(track_entity_uid) if track_entity_uid else None,
         limit=limit,
-        only_missing=not force,
+        refresh_mode="all" if force else refresh_mode,
+        max_age_seconds=LYRICS_TTL_SECONDS,
     )
     progress = TaskProgress(phase="lyrics", phase_count=1, total=len(tracks))
     emit_progress(task_id, progress, force=True)
@@ -656,6 +659,7 @@ def _handle_sync_lyrics(task_id: str, params: dict, config: dict) -> dict:
             "track_id": track_id,
             "track_entity_uid": track_entity_uid,
             "force": force,
+            "refresh_mode": refresh_mode,
         },
     )
 
@@ -671,7 +675,7 @@ def _handle_sync_lyrics(task_id: str, params: dict, config: dict) -> dict:
 
     result = sync_lyrics_for_tracks(
         tracks,
-        force=force,
+        force=force or refresh_mode == "upgrade",
         delay_seconds=delay_seconds,
         progress_callback=_lyrics_progress,
         cancel_callback=lambda: is_cancelled(task_id),

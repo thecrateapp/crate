@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
+from datetime import datetime, timedelta, timezone
+from typing import Any, Literal
 
 from sqlalchemy import text
 
@@ -15,9 +16,16 @@ def list_tracks_for_lyrics(
     track_id: int | None = None,
     track_entity_uid: str | None = None,
     limit: int = 500,
-    only_missing: bool = True,
+    refresh_mode: Literal["missing", "due", "upgrade", "all"] = "missing",
+    max_age_seconds: int = 86400 * 30,
+    now: datetime | None = None,
 ) -> list[dict[str, Any]]:
+    if refresh_mode not in ("missing", "due", "upgrade", "all"):
+        raise ValueError(f"unknown lyrics refresh mode: {refresh_mode}")
     safe_limit = min(max(int(limit or 500), 1), 5000)
+    fresh_after = (now or datetime.now(timezone.utc)) - timedelta(
+        seconds=max_age_seconds
+    )
     with read_scope() as session:
         rows = (
             session.execute(
@@ -48,7 +56,7 @@ def list_tracks_for_lyrics(
                   AND (:track_id IS NULL OR lt.id = :track_id)
                   AND (:track_entity_uid IS NULL OR lt.entity_uid::text = :track_entity_uid)
                   AND (
-                      :only_missing = FALSE
+                      :refresh_mode = 'all'
                       OR NOT EXISTS (
                           SELECT 1
                           FROM track_lyrics lyr
@@ -68,6 +76,13 @@ def list_tracks_for_lyrics(
                                     )
                                 )
                             )
+                            AND CASE :refresh_mode
+                                WHEN 'missing' THEN
+                                    COALESCE(NULLIF(trim(lyr.synced_lyrics), ''), NULLIF(trim(lyr.plain_lyrics), '')) IS NOT NULL
+                                    OR lyr.updated_at >= :fresh_after
+                                WHEN 'due' THEN lyr.updated_at >= :fresh_after
+                                ELSE NULLIF(trim(lyr.synced_lyrics), '') IS NOT NULL
+                            END
                       )
                   )
                 ORDER BY
@@ -86,7 +101,8 @@ def list_tracks_for_lyrics(
                     "album_entity_uid": album_entity_uid,
                     "track_id": track_id,
                     "track_entity_uid": track_entity_uid,
-                    "only_missing": only_missing,
+                    "refresh_mode": refresh_mode,
+                    "fresh_after": fresh_after,
                     "limit": safe_limit,
                 },
             )

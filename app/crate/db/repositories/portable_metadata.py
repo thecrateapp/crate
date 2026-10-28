@@ -12,7 +12,7 @@ from crate.db.repositories.library_upserts import (
     upsert_artist,
     upsert_track,
 )
-from crate.db.repositories.lyrics import store_lyrics
+from crate.db.repositories.lyrics import merge_lyrics
 from crate.db.tx import read_scope, transaction_scope
 
 
@@ -550,7 +550,7 @@ def rehydrate_album_payload(payload: dict[str, Any]) -> dict[str, Any]:
                 )
 
     for item in lyrics_to_store:
-        store_lyrics(
+        merge_lyrics(
             item["artist"],
             item["title"],
             synced_lyrics=item.get("synced_lyrics"),

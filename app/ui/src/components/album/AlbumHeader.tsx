@@ -196,7 +196,7 @@ export function AlbumHeader({
         const response = await api<{ task_id: string }>(
           "/api/manage/sync-lyrics",
           "POST",
-          { ...albumReference, limit: 500 },
+          { ...albumReference, refresh_mode: "due", limit: 500 },
         );
         onMetadataTaskQueued?.(action, response.task_id);
         toast.success("Lyrics sync queued");
