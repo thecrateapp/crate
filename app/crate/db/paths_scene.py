@@ -7,7 +7,7 @@ import hashlib
 import math
 import re
 import uuid
-from collections import defaultdict
+from collections import defaultdict, deque
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TypedDict
@@ -369,11 +369,34 @@ def _canonical_slug(value: str) -> str:
     return resolve_genre_slug(value) or slugify_genre(value)
 
 
+def _genre_depths(
+    catalog: Mapping[str, Mapping], children: Mapping[str, set[str]]
+) -> dict[str, int]:
+    depths = {
+        slug: 0
+        for slug, meta in catalog.items()
+        if not any(parent in catalog for parent in meta.get("parents", []) or [])
+    }
+    pending = deque(depths)
+    while pending:
+        parent = pending.popleft()
+        for child in children.get(parent, set()):
+            if child not in depths:
+                depths[child] = depths[parent] + 1
+                pending.append(child)
+    return depths
+
+
+def _specificity_jump(left: str, right: str, depths: Mapping[str, int]) -> int:
+    return max(0, abs(depths.get(left, 0) - depths.get(right, 0)) - 1)
+
+
 def _genre_neighbors(
     slug: str,
     catalog: Mapping[str, Mapping],
     influenced_genres: Mapping[str, set[str]],
     children: Mapping[str, set[str]],
+    depths: Mapping[str, int],
 ) -> list[tuple[str, float]]:
     meta = catalog.get(slug) or {}
     neighbors: dict[str, float] = {}
@@ -388,13 +411,13 @@ def _genre_neighbors(
     for child in children.get(slug, set()):
         add(child, 1.0)
     for influence in meta.get("influenced_by", []) or []:
-        add(influence, 1.0)
+        add(influence, 1.0 + _specificity_jump(slug, influence, depths))
     for influenced in influenced_genres.get(slug, set()):
-        add(influenced, 1.0)
+        add(influenced, 1.0 + _specificity_jump(slug, influenced, depths))
     for fusion in meta.get("fusion_of", []) or []:
-        add(fusion, 1.6)
+        add(fusion, 1.6 + _specificity_jump(slug, fusion, depths))
     for related in meta.get("related", []) or []:
-        add(related, 2.5)
+        add(related, 2.5 + _specificity_jump(slug, related, depths))
 
     return sorted(neighbors.items(), key=lambda item: (item[1], item[0]))
 
@@ -420,6 +443,7 @@ def build_scene_genre_route(origin_slug: str, dest_slug: str) -> list[str]:
         for influence in meta.get("influenced_by", []) or []:
             influenced_genres[influence].add(slug)
 
+    depths = _genre_depths(catalog, children)
     queue: list[tuple[float, str]] = [(0.0, origin)]
     distances: dict[str, float] = {origin: 0.0}
     previous: dict[str, str] = {}
@@ -432,7 +456,7 @@ def build_scene_genre_route(origin_slug: str, dest_slug: str) -> list[str]:
             continue
 
         for neighbor, edge_cost in _genre_neighbors(
-            slug, catalog, influenced_genres, children
+            slug, catalog, influenced_genres, children, depths
         ):
             candidate_distance = distance + edge_cost
             if candidate_distance >= distances.get(neighbor, float("inf")):
@@ -455,6 +479,7 @@ def build_scene_genre_route(origin_slug: str, dest_slug: str) -> list[str]:
         catalog,
         influenced_genres=influenced_genres,
         children=children,
+        depths=depths,
     )
 
 
@@ -464,6 +489,7 @@ def _insert_direct_scene_bridge(
     *,
     influenced_genres: Mapping[str, set[str]],
     children: Mapping[str, set[str]],
+    depths: Mapping[str, int],
 ) -> list[str]:
     if len(route) != 2:
         return route
@@ -474,14 +500,18 @@ def _insert_direct_scene_bridge(
     candidates = [
         slug
         for slug in sorted(origin_links & dest_links)
-        if slug not in {origin, destination}
+        if slug in catalog and slug not in {origin, destination}
     ]
     if not candidates:
         return route
 
     bridge = max(
         candidates,
-        key=lambda slug: _bridge_score(slug, origin, destination, catalog),
+        key=lambda slug: (
+            -_specificity_jump(origin, slug, depths)
+            - _specificity_jump(slug, destination, depths),
+            *_bridge_score(slug, origin, destination, catalog),
+        ),
     )
     return [origin, bridge, destination]
 
@@ -1031,8 +1061,15 @@ def _destination_adjacent_genres(destination: str, *, previous_slug: str) -> lis
     if not candidates:
         return []
 
+    depths = _genre_depths(catalog, children)
     return sorted(
-        [slug for slug in candidates if slug in catalog and slug != destination],
+        [
+            slug
+            for slug in candidates
+            if slug in catalog
+            and slug != destination
+            and not _specificity_jump(destination, slug, depths)
+        ],
         key=lambda slug: (
             -_destination_adjacent_score(slug, destination, previous_slug, catalog),
             related_order.get(slug, 999),
@@ -1137,7 +1174,9 @@ def _artist_route_score(
 
 
 def _expand_route_slots(route: list[str], step_count: int) -> list[str]:
-    target_count = max(len(route), step_count)
+    if not route:
+        return []
+    target_count = max(1, step_count)
     if target_count <= 1:
         return route[:1]
     if len(route) == 1:

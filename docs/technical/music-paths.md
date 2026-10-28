@@ -153,6 +153,30 @@ The [checkpoint 3.3 listening review](../../app/tests/fixtures/recommendations/m
 contains the controlled A/B/C/D lists. Approval is pending, especially for the
 strong punk-to-japanoise transition.
 
+## Revised bridge checkpoint
+
+The former punk → Japanoise → industrial shortcut treated historical influence
+as an equally cheap link between broad scenes. Routing now charges for a
+cultural link that skips more than one hierarchy level, using minimum distance
+to a hierarchy root. Parent/child links retain their existing cost. Depths use
+one breadth-first pass; cycles and dangling metadata cannot invent a route.
+Direct bridges must exist in the catalog, and optional long-path expansions
+apply the same continuity criterion before selecting their extras.
+
+The observed route is now punk → punk-rock → new-wave → electronic, with the
+reverse route also valid. A 100-track reverse journey no longer reintroduces
+Japanoise in its optional expansion. Explicit noise endpoints and cultural
+links without alternatives remain supported. No taxonomy or radio weights
+change. Route guides interpolate to exactly the requested slot budget, retaining
+endpoints when there is room for both; unavailable candidates can still shorten
+the result.
+
+The [revised listening checkpoint](../../app/tests/fixtures/recommendations/music-paths-bridge-review.md)
+contains both 20-track lists and the unchanged Citizen reference. These are
+single probes: 2.979/2.605 s for the genre routes and 4.710 s for the 100-track
+reverse journey. They establish neither a p95 nor musical approval. The
+Propagandhi → New Order boundary remains highlighted for listening review.
+
 ## Remaining checkpoints
 
 - 3.4: shared deterministic validation and safe optional AI refinements, with

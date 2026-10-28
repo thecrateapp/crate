@@ -1,5 +1,8 @@
 # Music Paths: checkpoints 3.1–3.3 catalog review
 
+Historical comparison: Diego rejected the punk-to-Japanoise bridge. See the
+[revised bridge checkpoint](music-paths-bridge-review.md) for its replacement.
+
 **Status: musical approval pending.** This checkpoint covers batched endpoint context, anchor/coherence work and seven-day rotation. Checkpoints 3.4/3.5 and remaining QA/performance are still pending.
 
 Production was accessed through an isolated read-only process. The planner used local sources, a neutral listener, disabled AI and synthetic completed listens. No listening session, play event or Music Path was persisted. These are recommendation lists for review, not evidence of musical correctness.
