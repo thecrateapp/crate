@@ -26,7 +26,7 @@ def rule(**kwargs):
         subsystem="analysis",
         tool="get_observability_summary",
         source_path=("data", "sources", "worker"),
-        **kwargs,
+        **{"notify_after_seconds": 0, **kwargs},
     )
 
 

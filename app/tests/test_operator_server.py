@@ -32,6 +32,7 @@ def setup(tmp_path):
         "get_observability_summary",
         ("data", "sources", "worker"),
         trigger_samples=1,
+        notify_after_seconds=0,
     )
     supervisor = Supervisor(state, "lab", [rule])
     yield state, supervisor

@@ -6,7 +6,7 @@ import json
 import math
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 
 from .state import LIMITS, CapacityError, enqueue, event, prune
 
@@ -21,6 +21,7 @@ DIGEST_SEEN = 200
 DIGEST_GROUPS = 20
 DIGEST_ROWS = 5
 IDENTIFIER = re.compile(r"[a-zA-Z0-9_.-]{1,80}\Z")
+AVAILABILITY_NOTIFY_AFTER = 300
 JOB_FIELDS = (
     "id",
     "status",
@@ -75,6 +76,7 @@ class Rule:
     trigger_samples: int = 2
     recovery_samples: int = 2
     cooldown_seconds: int = 0
+    notify_after_seconds: int | None = None
     detail_field: tuple = ()
     group_field: tuple = ()
     row_fields: tuple = ()
@@ -97,6 +99,11 @@ class Rule:
             or not 0 <= self.cooldown_seconds <= 86400
         ):
             raise ValueError("Invalid cooldown bound")
+        if self.notify_after_seconds is not None and (
+            type(self.notify_after_seconds) is not int
+            or not 0 <= self.notify_after_seconds <= 86400
+        ):
+            raise ValueError("Invalid notification delay bound")
         for path in (
             self.source_path,
             self.field,
@@ -158,6 +165,12 @@ class Rule:
             raise ValueError(
                 "Only bounded no-argument inventory/summary/Smart Mix polling supported"
             )
+
+    @property
+    def notify_delay(self):
+        if self.notify_after_seconds is not None:
+            return self.notify_after_seconds
+        return AVAILABILITY_NOTIFY_AFTER if self.kind == "availability" else 0
 
     @property
     def request_key(self):
@@ -259,6 +272,98 @@ def _detail(value):
     except (TypeError, ValueError):
         return None
     return value if len(raw) <= 1000 else None
+
+
+def _number(value):
+    return f"{round(value, 1):g}"
+
+
+def _duration(seconds):
+    seconds = max(0, int(seconds))
+    if seconds < 90:
+        return f"{seconds} s"
+    minutes = round(seconds / 60)
+    if minutes < 90:
+        return f"{minutes} min"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours} h {minutes} min" if minutes else f"{hours} h"
+
+
+def _title(rule, key):
+    if rule is None:
+        return key.split("/", 1)[-1]
+    return (
+        f"{rule.subsystem.replace('-', ' ').capitalize()}: {rule.id.replace('-', ' ')}"
+    )
+
+
+def _condition(rule, evidence, severity, resolved):
+    value = evidence.get("value")
+    numeric = type(value) in {int, float}
+    if resolved:
+        if rule is not None and rule.kind in {"high", "low", "progress"} and numeric:
+            return f"back to {_number(value)}"
+        return (
+            "available again"
+            if rule is None or rule.kind == "availability"
+            else "recovered"
+        )
+    if rule is None or rule.kind == "availability":
+        return "stale" if evidence.get("availability") == "stale" else "unavailable"
+    if value is None:
+        return "has no valid reading"
+    if rule.kind in {"high", "low"} and numeric:
+        limit = (
+            rule.critical
+            if severity == "critical" and rule.critical is not None
+            else rule.threshold
+        )
+        return f"{_number(value)} (limit {_number(limit)})"
+    if rule.kind == "drift":
+        return f"running {value}, expected {rule.expected}"
+    if rule.kind == "progress" and numeric:
+        return f"stalled at {_number(value)}"
+    if rule.kind == "stuck" and numeric:
+        return f"stuck for {_duration(value)}"
+    return str(value)[:128]
+
+
+def _detail_text(detail):
+    if isinstance(detail, list) and all(
+        isinstance(item, dict) and "name" in item for item in detail
+    ):
+        parts = []
+        for item in detail[:5]:
+            value = item.get("value")
+            suffix = f" {_number(value)}" if type(value) in {int, float} else ""
+            parts.append(f"{item['name']}{suffix}")
+        return ", ".join(parts)
+    return json.dumps(detail, sort_keys=True)[:300]
+
+
+def format_incident(rule, incident, transition, now):
+    evidence = incident["evidence"][-1] if incident["evidence"] else {}
+    severity = incident["severity"]
+    resolved = transition == "resolved"
+    label = "RESOLVED" if resolved else severity.upper()
+    if transition == "silence_expired":
+        label += " (silence expired)"
+    lines = [
+        f"Crate {label} · {_title(rule, incident['key'])} "
+        f"{_condition(rule, evidence, severity, resolved)}"
+    ]
+    opened = incident["opened_at"]
+    if resolved:
+        lines.append(f"Lasted {_duration(now - opened)}")
+    else:
+        since = f"Since {datetime.fromtimestamp(opened, UTC).strftime('%H:%M UTC')}"
+        if now - opened >= 60:
+            since += f" ({_duration(now - opened)})"
+        lines.append(since)
+    if not resolved and evidence.get("detail"):
+        lines.append(_detail_text(evidence["detail"]))
+    lines.append(f"{incident['key']} · rev {incident['revision']}")
+    return "\n".join(lines)
 
 
 def _row(rule, row):
@@ -387,6 +492,9 @@ class Supervisor:
         if len({rule.request_key for rule in rules}) > 8:
             raise ValueError("At most eight distinct observation requests per cycle")
         self.state, self.instance, self.rules = state, instance, rules
+        self._rules_by_key = {
+            f"{instance}/{rule.subsystem}/{rule.id}": rule for rule in rules
+        }
         self._human_callback_secret = human_callback_secret
         if human_callback_secret is not None and (
             not isinstance(human_callback_secret, bytes)
@@ -433,10 +541,11 @@ class Supervisor:
                     incident["evidence"] = (
                         incident["evidence"] + [{"polled_at": now, **evidence}]
                     )[-LIMITS["evidence"] :]
-                    if (
-                        incident.get("deferred")
-                        and now - incident["notified_at"] >= rule.cooldown_seconds
+                    if incident.get("deferred") and now >= incident.get(
+                        "deliver_at",
+                        (incident.get("notified_at") or 0) + rule.cooldown_seconds,
                     ):
+                        incident.pop("deliver_at", None)
                         self._deliver(data, incident, incident.pop("deferred"), now)
                 if duplicate:
                     continue
@@ -475,7 +584,12 @@ class Supervisor:
                         }
                         data["incidents"][key] = incident
                         self._notify(
-                            data, incident, "opened", now, rule.cooldown_seconds
+                            data,
+                            incident,
+                            "opened",
+                            now,
+                            rule.cooldown_seconds,
+                            rule.notify_delay,
                         )
                     elif severity == "critical" and incident["severity"] != "critical":
                         incident.update(
@@ -540,7 +654,7 @@ class Supervisor:
                 coverage_gaps=gaps,
             )
 
-    def _notify(self, data, incident, transition, now, cooldown=0):
+    def _notify(self, data, incident, transition, now, cooldown=0, delay=0):
         event(
             data,
             "incident_" + transition,
@@ -551,19 +665,30 @@ class Supervisor:
             },
             now,
         )
+        if incident.get("deferred"):
+            # A pending notice already carries the current severity when it is
+            # delivered; one resolved before delivery was never worth a message.
+            if transition == "resolved":
+                incident.pop("deferred")
+                incident.pop("deliver_at", None)
+            return
         last = incident.get("notified_at")
-        if transition == "opened" and last is not None and now - last < cooldown:
-            incident["deferred"] = transition
-            return
-        if incident.pop("deferred", None) and transition == "resolved":
-            return
+        if transition == "opened":
+            deliver_at = incident["opened_at"] + delay
+            if last is not None:
+                deliver_at = max(deliver_at, last + cooldown)
+            if deliver_at > now:
+                incident.update(deferred=transition, deliver_at=deliver_at)
+                return
         self._deliver(data, incident, transition, now)
 
     def _deliver(self, data, incident, transition, now):
         if (incident.get("silence") or {}).get("expires_at", 0) <= now:
             enqueue(
                 data,
-                f"{incident['key']} {transition}; severity={incident['severity']}; evidence={json.dumps(incident['evidence'][-1], sort_keys=True)}",
+                format_incident(
+                    self._rules_by_key.get(incident["key"]), incident, transition, now
+                ),
                 now,
                 incident=incident["key"],
             )

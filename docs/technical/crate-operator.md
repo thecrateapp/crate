@@ -167,6 +167,22 @@ notifies again for an outstanding incident. A silence suppresses notification
 only, including already queued messages, and retains all incident/event data.
 An acknowledgement records human ownership and expires; it is not a silence.
 
+An incident message waits `notify_after_seconds` after the incident opens:
+300 seconds for `availability` rules, so evidence gaps while services restart
+stay quiet, and 0 for metric rules. An incident that resolves inside that window
+sends nothing; one that escalates inside it is delivered once, with its current
+severity. Messages are plain text: severity and condition, when it started or how
+long it lasted, the breach detail when present, the incident key with its revision
+(the values `/crate_ack` and `/crate_silence` take), and a final `ref` line with the
+logical alert ID.
+
+```text
+Crate CRITICAL · Version: release evidence unavailable
+Since 09:58 UTC (5 min)
+crate-484ec15a1082/version/release-evidence · rev 2
+ref 743a9bdaea154cf7b788a54f83b98d84
+```
+
 The service bearer exposes only these bounded surfaces:
 
 | Route                                 | Contract                                                                                                                        |
