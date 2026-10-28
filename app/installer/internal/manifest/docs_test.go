@@ -101,10 +101,10 @@ func TestReadmeOnlyDocumentsRealVariables(t *testing.T) {
 		t.Fatal(err)
 	}
 	section := string(data)
-	start := strings.Index(section, "## Environment variables")
-	end := strings.Index(section, "## Makefile commands")
+	start := strings.Index(section, "## Configuration")
+	end := strings.Index(section, "## Repository map")
 	if start < 0 || end < start {
-		t.Fatal("README lost its Environment variables section")
+		t.Fatal("README lost its Configuration section")
 	}
 	var names []string
 	for _, match := range regexp.MustCompile("`([A-Z][A-Z0-9_]{2,})`").FindAllStringSubmatch(section[start:end], -1) {
