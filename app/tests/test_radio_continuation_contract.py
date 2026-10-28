@@ -243,13 +243,17 @@ def test_same_index_in_other_session_is_independent(batches):
     )
 
 
-def test_buffer_context_uses_last_actual_track_without_changing_the_anchor(monkeypatch):
+@pytest.mark.parametrize("rotation", [True, False])
+def test_buffer_context_uses_last_actual_track_without_changing_the_anchor(
+    monkeypatch, rotation
+):
+    monkeypatch.setenv("CRATE_RADIO_ROTATION_ENABLED", str(rotation).lower())
     from crate.db.queries import radio_continuation
 
     monkeypatch.setattr(
         radio_continuation,
         "get_buffer_context",
-        lambda refs: [
+        lambda refs, **_kwargs: [
             {
                 "track_id": 7,
                 "title": "Playing",
@@ -300,7 +304,10 @@ def test_seeded_session_id_cannot_overwrite_another_session_lock(batches):
         start_batch(session_id=f"{SESSION_ID}:lock", user_id=42)
 
 
-def test_global_fallback_excludes_buffer_by_local_and_canonical_identity():
+def test_global_fallback_excludes_buffer_by_local_and_canonical_identity(monkeypatch):
+    monkeypatch.setattr(
+        "crate.db.queries.radio_continuation.get_buffer_context", lambda refs: []
+    )
     rows = [
         {"global_track_uid": "g1", "entity_uid": "e1", "track_id": 1},
         {"global_track_uid": "g2", "entity_uid": "e2", "track_id": 2},

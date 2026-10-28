@@ -176,7 +176,7 @@ def next_batch(
             expected = int(session.get("batch_index", 0)) + 1
             if batch_index != expected:
                 return _empty(session_id, "retryable_empty", batch_index=expected - 1)
-            engine._apply_buffer_context(session, buffer_refs or [])
+            engine._apply_buffer_context(session, buffer_refs)
             return _commit(
                 session, engine._advance_radio(session, count), batch_index, lease
             )

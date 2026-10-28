@@ -174,8 +174,8 @@ def test_generation_uses_explicit_clock_and_session_without_global_randomness(
 def test_generation_rejects_external_io(monkeypatch, small_snapshot, boundary):
     real_generate = radio_engine._generate_batch
 
-    def generate_with_accidental_io(session, count):
-        tracks = real_generate(session, count)
+    def generate_with_accidental_io(session, count, **kwargs):
+        tracks = real_generate(session, count, **kwargs)
         if boundary == "database":
             from crate.db.tx import read_scope
 
@@ -304,3 +304,12 @@ def test_report_cli_reproduces_results_across_processes_and_host_settings():
     assert reports[0] == reports[1]
     assert [report["name"] for report in reports[0]] == ["citizen", "concubine"]
     assert all(len(report["sessions"]) == 3 for report in reports[0])
+
+
+def test_completed_listen_scenario_rotates_and_remains_reproducible(monkeypatch):
+    monkeypatch.setenv("CRATE_RADIO_ROTATION_ENABLED", "true")
+    snapshot = json.loads((_FIXTURE_DIR / "citizen.json").read_text())
+    report = evaluate_snapshot(snapshot, simulate_listens=True)
+    assert report == evaluate_snapshot(snapshot, simulate_listens=True)
+    assert report["listening_scenario"] == "completed batches between sessions"
+    assert report["overlap"][0]["shared_song_count"] < snapshot["batch_size"]

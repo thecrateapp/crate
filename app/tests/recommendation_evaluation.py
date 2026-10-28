@@ -10,12 +10,13 @@ import argparse
 import json
 from contextlib import ExitStack
 from copy import deepcopy
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from itertools import combinations
 from pathlib import Path
 from unittest.mock import patch
 
 from crate import radio_engine
+from crate.recommendation_policy import canonical_key
 from crate.db.paths_similarity import make_radio_genre_overlap_scorer
 from crate.queue_engine import candidate_artist_key, candidate_song_key, generation_seed
 
@@ -30,7 +31,11 @@ def _forbid_io(*_args, **_kwargs):
 
 
 def generate_snapshot_batch(
-    snapshot: dict, *, session_id: str, reference_day: str | None = None
+    snapshot: dict,
+    *,
+    session_id: str,
+    reference_day: str | None = None,
+    recent_plays: dict | None = None,
 ) -> dict:
     """Run the real engine on independent copies, with explicit day and session seeds."""
     if snapshot["schema_version"] != 1:
@@ -66,6 +71,14 @@ def generate_snapshot_batch(
         stack.enter_context(
             patch.object(radio_engine, "_load_radio_graphs", load_graphs)
         )
+        if hasattr(radio_engine, "history_for_candidates"):
+            stack.enter_context(
+                patch.object(
+                    radio_engine,
+                    "history_for_candidates",
+                    lambda *_args, **_kwargs: deepcopy(recent_plays or {}),
+                )
+            )
         stack.enter_context(
             patch.object(
                 radio_engine,
@@ -86,7 +99,13 @@ def generate_snapshot_batch(
             "redis.client.Pipeline.execute",
         ):
             stack.enter_context(patch(target, _forbid_io))
-        tracks = radio_engine._generate_batch(session, count=snapshot["batch_size"])
+        tracks = radio_engine._generate_batch(
+            session,
+            count=snapshot["batch_size"],
+            now=datetime.combine(
+                date.fromisoformat(reference_day), datetime.min.time(), timezone.utc
+            ),
+        )
 
     return {
         "session_id": session_id,
@@ -156,18 +175,34 @@ def coherence_metrics(snapshot: dict, tracks: list[dict]) -> dict:
 
 
 def evaluate_snapshot(
-    snapshot: dict, *, session_ids: tuple[str, ...] = _SESSION_IDS
+    snapshot: dict,
+    *,
+    session_ids: tuple[str, ...] = _SESSION_IDS,
+    simulate_listens: bool = False,
 ) -> dict:
-    """Report independent starts on consecutive fixed days, without listening history."""
+    """Report fixed-day starts, optionally marking previous batches as completed listens."""
     start_day = date.fromisoformat(snapshot["reference_day"])
-    sessions = [
-        generate_snapshot_batch(
+    sessions = []
+    history = {}
+    for index, value in enumerate(session_ids):
+        day = (start_day + timedelta(days=index)).isoformat()
+        batch = generate_snapshot_batch(
             snapshot,
             session_id=value,
-            reference_day=(start_day + timedelta(days=index)).isoformat(),
+            reference_day=day,
+            recent_plays=history,
         )
-        for index, value in enumerate(session_ids)
-    ]
+        sessions.append(batch)
+        if simulate_listens:
+            for track in batch["tracks"]:
+                if (key := canonical_key(track)) is not None:
+                    history[key] = {
+                        "last_significant_play_at": datetime.fromisoformat(
+                            day + "T12:00:00+00:00"
+                        ),
+                        "frequency": history.get(key, {}).get("frequency", 0) + 1,
+                        "completed": history.get(key, {}).get("completed", 0) + 1,
+                    }
     for session in sessions:
         session["coherence"] = coherence_metrics(snapshot, session["tracks"])
         session["tracks"] = [
@@ -183,6 +218,9 @@ def evaluate_snapshot(
         "reference_day": snapshot["reference_day"],
         "requested_batch_size": snapshot["batch_size"],
         "candidate_count": len(snapshot["candidate_rows"]),
+        "listening_scenario": "completed batches between sessions"
+        if simulate_listens
+        else "no listens",
         "genre_metric_note": "Artist genres are a metadata proxy, not a musical verdict.",
         "sessions": sessions,
         "overlap": [
@@ -199,11 +237,17 @@ def evaluate_snapshot(
 def _main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("snapshots", nargs="*", type=Path)
+    parser.add_argument("--simulate-listens", action="store_true")
     args = parser.parse_args()
     paths = args.snapshots or [
         _FIXTURE_DIR / f"{name}.json" for name in ("citizen", "concubine")
     ]
-    reports = [evaluate_snapshot(json.loads(path.read_text())) for path in paths]
+    reports = [
+        evaluate_snapshot(
+            json.loads(path.read_text()), simulate_listens=args.simulate_listens
+        )
+        for path in paths
+    ]
     print(json.dumps(reports, indent=2, ensure_ascii=False))
 
 

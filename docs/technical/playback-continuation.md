@@ -2,8 +2,8 @@
 
 Infinite album/playlist playback and radio share the shaped radio session engine.
 The original source remains attached to play events; Music Paths play as finite
-queues and do not claim a playlist ID. Recommendation weights and seven-day
-cross-session rotation are outside this change.
+queues and do not claim a playlist ID. Seeded radios use significant-listen
+history to rotate songs across sessions without changing musical weights or drift.
 
 ## Indexed batches
 
@@ -53,12 +53,55 @@ the existing transition target using the profile's weight, preserving likes and
 the original seed as the musical anchor. Buffered artists and titles also join
 the repetition controls.
 Infinite also works with shuffle; repeat-one/all keeps priority.
-Local buffer metadata is loaded with one indexed batch query.
+Local and global buffer metadata is loaded with one indexed batch query.
 Native continuation filters known, duplicate and explicitly unplayable tracks
 before deriving status, without changing the replayable batch. An empty filtered
 batch is retryable unless the source is exhausted or authorization is required.
 Radio start/next preserve nullable track fields for legacy parsers; station
 responses continue omitting absent optional metadata.
+
+## Seven-day radio rotation
+
+`CRATE_RADIO_ROTATION_ENABLED` defaults to `true`. Set it to `false` and recreate
+the API container to restore legacy retrieval and ranking without rebuilding
+the image. The same setting is forwarded by the production and development
+Compose configurations.
+
+A play is significant when completed, or after `min(30 seconds, 50% of a positive
+track duration)`; unknown duration uses 30 seconds. One batched read uses the
+listener's last seven days of raw events, including the UTC window boundaries.
+Local IDs, entity IDs, global IDs and song variants resolve to the shared song
+identity. Brief playback, generation and prefetch do not create cooldowns.
+The existing event ingestion and projections are unchanged.
+
+The radio retains its seed artist/track context. Fresh songs within 0.05 of the
+best existing musical score are chosen with the session's deterministic RNG.
+The penalty belongs to songs, not whole artists. Recently heard songs remain
+eligible when there are no comparable fresh alternatives, including small or
+fully cooled catalogs. Discovery mode and Music Paths retain their policies.
+
+The retrieval counts eligible song families after active-buffer and dislike
+exclusions. It can expand once within the seed's artist/genre neighborhood;
+it never fills a short rotating seeded pool with an unrelated global Bliss
+fallback. Recent history starts with a bounded 420-row pool and doubled
+per-artist SQL caps. A diverse shortlist retains fresh options and cooled
+quality anchors before sequential scoring. Catalog-only global radios expand
+within their source artist/album, bounded to 5,000 tracks, before recovering
+recently heard songs.
+
+Explicit `buffer_refs=[]` means the client knows its buffer is empty. A supplied
+buffer replaces historical hard exclusions; songs already in it remain excluded
+by identity and family. Omitted/null `buffer_refs` preserves conservative session
+progress. Global cursor reset is scoped to the request that supplied a buffer,
+so a later omitted buffer cannot replay the last batch. A temporarily blocking
+buffer keeps the session retryable.
+
+The sanitized [checkpoint comparison](../../app/tests/fixtures/recommendations/rotation-review.md)
+contains Citizen/Concubine lists before and after simulated completed listens.
+Representative buffer lookup plus generation measured 210.055 ms p95 for Citizen
+and 195.742 ms for Concubine (25 warm-cache samples per seed, three data SELECTs).
+These exclude HTTP/Redis overhead; endpoint p95 remains a release check. A
+separate representative history lookup measured 14.099 ms p95 in one query.
 
 ## Playback lifecycle
 

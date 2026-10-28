@@ -46,6 +46,10 @@ def smart_mix_enabled() -> bool:
     return _env_enabled("CRATE_SMART_MIX_ENABLED")
 
 
+def radio_rotation_enabled() -> bool:
+    return _env_enabled("CRATE_RADIO_ROTATION_ENABLED", default=True)
+
+
 def android_native_crossfade_enabled() -> bool:
     return _env_enabled("CRATE_ANDROID_NATIVE_CROSSFADE_ENABLED")
 

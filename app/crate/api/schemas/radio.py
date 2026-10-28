@@ -95,14 +95,14 @@ class RadioStartRequest(BaseModel):
     seed_value: str | None = None
     session_id: UUID | None = None
     count: int = Field(default=20, ge=1, le=50)
-    buffer_refs: list[str] = Field(default_factory=list, max_length=200)
+    buffer_refs: list[str] | None = Field(default=None, max_length=200)
 
 
 class RadioNextRequest(BaseModel):
     session_id: UUID
     count: int = Field(default=20, ge=1, le=50)
     batch_index: int | None = Field(default=None, ge=1)
-    buffer_refs: list[str] = Field(default_factory=list, max_length=200)
+    buffer_refs: list[str] | None = Field(default=None, max_length=200)
 
 
 class RadioBatchResponse(BaseModel):

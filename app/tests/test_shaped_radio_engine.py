@@ -15,6 +15,7 @@ def fake_session_lease(monkeypatch):
         )
 
     monkeypatch.setattr(radio_continuation, "session_lock", lock)
+    monkeypatch.setattr("crate.radio_engine.history_for_candidates", lambda *a, **k: {})
 
 
 def _vector(value: float) -> list[float]:
@@ -848,6 +849,7 @@ def test_artist_radio_uses_graph_pool_instead_of_global_bliss(monkeypatch):
         seed_genres,
         limit,
         session=None,
+        optimized=False,
     ):
         captured["seed_artists"] = seed_artists
         captured["similar_artist_keys"] = similar_artist_keys
@@ -961,6 +963,7 @@ def test_album_radio_uses_contextual_pool_and_excludes_seed_tracks(monkeypatch):
         seed_genres,
         limit,
         session=None,
+        optimized=False,
     ):
         captured["exclude_ids"] = set(exclude_ids)
         captured["seed_artists"] = seed_artists
