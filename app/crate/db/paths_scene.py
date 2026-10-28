@@ -9,12 +9,14 @@ import re
 import uuid
 from collections import defaultdict
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import TypedDict
 
 from crate.db.home_taste_guardrails import track_version_penalty
 from crate.db.queries.paths import load_artist_radio_graphs
 from crate.genre_taxonomy import get_genre_catalog, resolve_genre_slug, slugify_genre
 from crate.track_versions import track_song_identity
+from crate.recommendation_policy import fresh_path_candidates
 
 _MIN_MEMBERSHIP_SCORE = 0.60
 _ANCHOR_MEMBERSHIP_FLOOR = 0.70
@@ -72,6 +74,295 @@ _LOW_SIGNAL_TITLE_RE = re.compile(
     r"\b(intro|interlude|outro|reprise|skit|spoken word|voice memo|announcement|commentary)\b",
     re.IGNORECASE,
 )
+
+
+@dataclass(slots=True)
+class _SceneTrackSignals:
+    row: dict  # Retain the row so its identity cannot be reused during planning.
+    membership: float
+    artist_popularity: float
+    track_popularity: float
+    affinity: float
+    catalog_depth: float
+    relation: float
+    curation: float
+    audio_completeness: float
+    energy: float | None
+    bpm: float | None
+    key: str
+    scale: str
+    vector: list[float]
+    vector_norm: float
+
+
+@dataclass(slots=True)
+class _SceneDestinationSignals:
+    row: dict
+    connection: float
+    genre_overlap: float
+    local_penalty: float
+    gravity: float
+
+
+class _SceneScorer:
+    """Reuse immutable candidate signals and transitions within one planning call."""
+
+    def __init__(self):
+        self._signals: dict[int, _SceneTrackSignals] = {}
+        self._previous_track: dict | None = None
+        self._track_scores: dict[int, float] = {}
+        self._transitions: dict[int, float] = {}
+        self._connections: dict[int, tuple[dict, float]] = {}
+        self._connection_graphs: tuple[Mapping, Mapping] | None = None
+        self._row_slugs: dict[int, tuple[Mapping, set[str]]] = {}
+        self._profile_slugs: dict[int, tuple[Mapping, set[str]]] = {}
+        self._song_keys: dict[int, tuple[dict, tuple[str, str] | None]] = {}
+        self._destination_context: tuple[object, ...] | None = None
+        self._destination_scores: dict[int, _SceneDestinationSignals] = {}
+
+    def _prepare_context(self, previous_track: dict | None) -> None:
+        if previous_track is not self._previous_track:
+            self._previous_track = previous_track
+            self._track_scores.clear()
+            self._transitions.clear()
+            self._connections.clear()
+
+    def row_genre_slugs(self, row: Mapping) -> set[str]:
+        key = id(row)
+        if key not in self._row_slugs:
+            self._row_slugs[key] = (row, _row_genre_slugs(row))
+        return self._row_slugs[key][1]
+
+    def profile_genre_slugs(self, profile: Mapping | None) -> set[str]:
+        if profile is None:
+            return set()
+        key = id(profile)
+        if key not in self._profile_slugs:
+            self._profile_slugs[key] = (profile, _profile_genre_slugs(profile))
+        return self._profile_slugs[key][1]
+
+    def song_key(self, row: dict) -> tuple[str, str] | None:
+        key = id(row)
+        if key not in self._song_keys:
+            self._song_keys[key] = (row, track_song_identity(row))
+        return self._song_keys[key][1]
+
+    def artist_connection_score(
+        self,
+        row: dict,
+        previous_track: dict | None,
+        artist_similarity_graph: Mapping[str, Mapping[str, float]],
+        shared_members_graph: Mapping[str, set[str]],
+    ) -> float:
+        self._prepare_context(previous_track)
+        graphs = (artist_similarity_graph, shared_members_graph)
+        if self._connection_graphs is None or any(
+            old is not new for old, new in zip(self._connection_graphs, graphs)
+        ):
+            self._connection_graphs = graphs
+            self._connections.clear()
+        key = id(row)
+        if key not in self._connections:
+            self._connections[key] = (
+                row,
+                _artist_connection_score(
+                    row, previous_track, artist_similarity_graph, shared_members_graph
+                ),
+            )
+        return self._connections[key][1]
+
+    def _destination_signals(
+        self,
+        row: dict,
+        destination_track: dict,
+        destination_profile: Mapping | None,
+        artist_similarity_graph: Mapping[str, Mapping[str, float]],
+        shared_members_graph: Mapping[str, set[str]],
+    ) -> _SceneDestinationSignals:
+        context = (
+            destination_track,
+            destination_profile,
+            artist_similarity_graph,
+            shared_members_graph,
+        )
+        if self._destination_context is None or any(
+            old is not new for old, new in zip(self._destination_context, context)
+        ):
+            self._destination_context = context
+            self._destination_scores.clear()
+        key = id(row)
+        if key not in self._destination_scores:
+            connection = _artist_connection_score(
+                row, destination_track, artist_similarity_graph, shared_members_graph
+            )
+            overlap = _destination_genre_overlap(
+                row, destination_track, destination_profile, scorer=self
+            )
+            geography = _destination_geography_score(
+                row, destination_track, destination_profile
+            )
+            era = _destination_era_score(row, destination_track, destination_profile)
+            penalty = _local_scene_penalty(
+                row,
+                destination_track=destination_track,
+                destination_profile=destination_profile,
+                connection_score=connection,
+                genre_overlap=overlap,
+                scorer=self,
+            )
+            self._destination_scores[key] = _SceneDestinationSignals(
+                row=row,
+                connection=connection,
+                genre_overlap=overlap,
+                local_penalty=penalty,
+                gravity=(
+                    (0.48 * connection)
+                    + (0.34 * overlap)
+                    + (0.10 * geography)
+                    + (0.08 * era)
+                    - (0.38 * penalty)
+                ),
+            )
+        return self._destination_scores[key]
+
+    def destination_gravity_score(
+        self,
+        row: dict,
+        *,
+        destination_track: dict | None,
+        destination_profile: Mapping | None,
+        path_progress: float,
+        artist_similarity_graph: Mapping[str, Mapping[str, float]],
+        shared_members_graph: Mapping[str, set[str]],
+    ) -> float:
+        if not destination_track:
+            return 0.0
+        signals = self._destination_signals(
+            row,
+            destination_track,
+            destination_profile,
+            artist_similarity_graph,
+            shared_members_graph,
+        )
+        progress_weight = 0.35 + (0.65 * (_bounded_float(path_progress) ** 1.25))
+        return progress_weight * signals.gravity
+
+    def should_skip_lateral_destination_candidate(
+        self,
+        row: dict,
+        *,
+        destination_track: dict | None,
+        destination_profile: Mapping | None,
+        path_progress: float,
+        artist_similarity_graph: Mapping[str, Mapping[str, float]],
+        shared_members_graph: Mapping[str, set[str]],
+    ) -> bool:
+        if not destination_track or path_progress < 0.30:
+            return False
+        signals = self._destination_signals(
+            row,
+            destination_track,
+            destination_profile,
+            artist_similarity_graph,
+            shared_members_graph,
+        )
+        return (
+            signals.local_penalty >= 1.0
+            and signals.connection < 0.3
+            and signals.genre_overlap <= 0.30
+        )
+
+    def signals(self, row: dict) -> _SceneTrackSignals:
+        key = id(row)
+        if key not in self._signals:
+            vector = _coerce_vector(row.get("bliss_vector"))
+            self._signals[key] = _SceneTrackSignals(
+                row=row,
+                membership=_membership_score(row),
+                artist_popularity=_artist_popularity(row),
+                track_popularity=_track_popularity(row),
+                affinity=_user_affinity(row),
+                catalog_depth=_catalog_depth_score(row),
+                relation=_relation_score(row),
+                curation=_curation_quality(row),
+                audio_completeness=_audio_completeness(row),
+                energy=_coerce_float(row.get("energy")),
+                bpm=_coerce_float(row.get("bpm")),
+                key=str(row.get("audio_key") or "").strip().casefold(),
+                scale=str(row.get("audio_scale") or "").strip().casefold(),
+                vector=vector,
+                vector_norm=math.sqrt(sum(value * value for value in vector)),
+            )
+        return self._signals[key]
+
+    def track_score(self, row: dict, previous_track: dict | None = None) -> float:
+        self._prepare_context(previous_track)
+        key = id(row)
+        if key not in self._track_scores:
+            signals = self.signals(row)
+            self._track_scores[key] = (
+                0.35 * signals.track_popularity
+                + 0.30 * signals.affinity
+                + 0.15 * signals.membership
+                + 0.10 * signals.curation
+                + 0.10 * signals.audio_completeness
+                + 0.12 * self.audio_transition_score(row, previous_track)
+            )
+        return self._track_scores[key]
+
+    def artist_score(self, row: dict) -> float:
+        signals = self.signals(row)
+        return (
+            0.42 * signals.membership
+            + 0.33 * signals.artist_popularity
+            + 0.12 * signals.catalog_depth
+            + 0.08 * signals.relation
+            + 0.05 * signals.affinity
+        )
+
+    def user_affinity(self, row: dict) -> float:
+        return self.signals(row).affinity
+
+    def track_popularity(self, row: dict) -> float:
+        return self.signals(row).track_popularity
+
+    def audio_transition_score(self, row: dict, previous_track: dict | None) -> float:
+        self._prepare_context(previous_track)
+        if not previous_track:
+            return 0.0
+        key = id(row)
+        if key in self._transitions:
+            return self._transitions[key]
+        current, previous = self.signals(row), self.signals(previous_track)
+        scores: list[float] = []
+        for left, right, scale in (
+            (current.energy, previous.energy, 1.0),
+            (current.bpm, previous.bpm, 60.0),
+        ):
+            if left is not None and right is not None:
+                scores.append(max(0.0, min(1.0, 1.0 - (abs(left - right) / scale))))
+        if current.key and previous.key:
+            if current.key == previous.key and current.scale == previous.scale:
+                scores.append(1.0)
+            elif current.key == previous.key:
+                scores.append(0.82)
+            elif current.scale and current.scale == previous.scale:
+                scores.append(0.62)
+            else:
+                scores.append(0.45)
+        if (
+            current.vector
+            and previous.vector
+            and len(current.vector) == len(previous.vector)
+            and not (current.vector_norm <= 0 or previous.vector_norm <= 0)
+        ):
+            dot = sum(
+                left * right for left, right in zip(current.vector, previous.vector)
+            )
+            cosine = dot / (current.vector_norm * previous.vector_norm)
+            scores.append(max(0.0, min(1.0, (cosine + 1.0) / 2.0)))
+        self._transitions[key] = sum(scores) / len(scores) if scores else 0.0
+        return self._transitions[key]
 
 
 def _canonical_slug(value: str) -> str:
@@ -261,6 +552,9 @@ def build_scene_path_from_candidates(
     shared_members_graph: Mapping[str, set[str]] | None = None,
     max_repeat_per_artist: int = _MAX_REPEAT_PER_ARTIST,
     selection_seed: str | None = None,
+    recent_song_keys: set[tuple[str, str]] | None = None,
+    previous_song_keys: set[tuple[str, str]] | None = None,
+    previous_track_ids: set[int] | None = None,
 ) -> list[dict]:
     """Build a culturally coherent path from genre-scoped track candidates."""
     if not route:
@@ -271,6 +565,7 @@ def build_scene_path_from_candidates(
     used_song_keys: set[tuple[str, str]] = set()
     used_artists: dict[str, int] = {}
     path: list[dict] = []
+    scorer = _SceneScorer()
     similarity_graph = artist_similarity_graph or {}
     member_graph = shared_members_graph or {}
 
@@ -288,6 +583,10 @@ def build_scene_path_from_candidates(
             shared_members_graph=member_graph,
             max_repeat_per_artist=max_repeat_per_artist,
             selection_seed=_slot_seed(selection_seed, index, genre_slug),
+            recent_song_keys=recent_song_keys,
+            previous_song_keys=previous_song_keys,
+            previous_track_ids=previous_track_ids,
+            scorer=scorer,
         )
         if track is None:
             continue
@@ -307,11 +606,15 @@ def build_artist_scene_path_from_candidates(
     shared_members_graph: Mapping[str, set[str]] | None = None,
     destination_profile: Mapping | None = None,
     selection_seed: str | None = None,
+    recent_song_keys: set[tuple[str, str]] | None = None,
+    previous_song_keys: set[tuple[str, str]] | None = None,
+    previous_track_ids: set[int] | None = None,
 ) -> list[dict]:
     """Build an artist-to-artist scene path with fixed endpoint anchors."""
     if len(route) < 2:
         return []
 
+    scorer = _SceneScorer()
     similarity_graph = artist_similarity_graph or {}
     member_graph = shared_members_graph or {}
     used_ids: set[int] = set()
@@ -327,6 +630,10 @@ def build_artist_scene_path_from_candidates(
         is_anchor=True,
         max_repeat_per_artist=_ARTIST_PATH_REPEAT_PER_ARTIST,
         selection_seed=_slot_seed(selection_seed, 0, route[0]),
+        recent_song_keys=recent_song_keys,
+        previous_song_keys=previous_song_keys,
+        previous_track_ids=previous_track_ids,
+        scorer=scorer,
     )
     if origin_track is None:
         return []
@@ -344,6 +651,10 @@ def build_artist_scene_path_from_candidates(
         shared_members_graph=member_graph,
         max_repeat_per_artist=_ARTIST_PATH_REPEAT_PER_ARTIST,
         selection_seed=_slot_seed(selection_seed, len(route) - 1, route[-1]),
+        recent_song_keys=recent_song_keys,
+        previous_song_keys=previous_song_keys,
+        previous_track_ids=previous_track_ids,
+        scorer=scorer,
     )
     if destination_track is None:
         return []
@@ -372,6 +683,10 @@ def build_artist_scene_path_from_candidates(
             destination_profile=destination_profile,
             path_progress=path_progress,
             selection_seed=_slot_seed(selection_seed, slot_index + 1, genre_slug),
+            recent_song_keys=recent_song_keys,
+            previous_song_keys=previous_song_keys,
+            previous_track_ids=previous_track_ids,
+            scorer=scorer,
         )
         if track is None and len(middle_tracks) + 2 < step_count:
             track = _select_track_for_genre(
@@ -390,6 +705,10 @@ def build_artist_scene_path_from_candidates(
                 destination_profile=destination_profile,
                 path_progress=path_progress,
                 selection_seed=_slot_seed(selection_seed, slot_index + 1, genre_slug),
+                recent_song_keys=recent_song_keys,
+                previous_song_keys=previous_song_keys,
+                previous_track_ids=previous_track_ids,
+                scorer=scorer,
             )
         if track is None:
             continue
@@ -434,6 +753,10 @@ def compute_scene_path(
     dest_value: str,
     step_count: int = 20,
     user_id: int | None = None,
+    recent_song_keys: set[tuple[str, str]] | None = None,
+    previous_song_keys: set[tuple[str, str]] | None = None,
+    previous_track_ids: set[int] | None = None,
+    selection_seed: str | None = None,
 ) -> list[dict] | None:
     """Compatibility entry point for the service orchestration."""
     from crate.music_paths import compute_scene_path as implementation
@@ -445,6 +768,10 @@ def compute_scene_path(
         dest_value=dest_value,
         step_count=step_count,
         user_id=user_id,
+        recent_song_keys=recent_song_keys,
+        previous_song_keys=previous_song_keys,
+        previous_track_ids=previous_track_ids,
+        selection_seed=selection_seed,
     )
 
 
@@ -456,6 +783,10 @@ def prepare_scene_path(
     dest_value: str,
     step_count: int = 20,
     user_id: int | None = None,
+    recent_song_keys: set[tuple[str, str]] | None = None,
+    previous_song_keys: set[tuple[str, str]] | None = None,
+    previous_track_ids: set[int] | None = None,
+    selection_seed: str | None = None,
 ) -> dict | None:
     """Load and compute deterministic scene candidates without invoking AI."""
     if origin_type == "artist" and dest_type == "artist":
@@ -464,6 +795,10 @@ def prepare_scene_path(
             dest_value=dest_value,
             step_count=step_count,
             user_id=user_id,
+            recent_song_keys=recent_song_keys,
+            previous_song_keys=previous_song_keys,
+            previous_track_ids=previous_track_ids,
+            selection_seed=selection_seed,
         )
 
     if origin_type != "genre" or dest_type != "genre":
@@ -490,7 +825,12 @@ def prepare_scene_path(
         step_count=step_count,
         artist_similarity_graph=artist_similarity_graph,
         shared_members_graph=shared_members_graph,
-        selection_seed=uuid.uuid4().hex,
+        selection_seed=selection_seed
+        if selection_seed is not None
+        else uuid.uuid4().hex,
+        recent_song_keys=recent_song_keys,
+        previous_song_keys=previous_song_keys,
+        previous_track_ids=previous_track_ids,
     )
     if len(tracks) < 2:
         return None
@@ -510,6 +850,10 @@ def _prepare_artist_scene_path(
     dest_value: str,
     step_count: int,
     user_id: int | None,
+    recent_song_keys: set[tuple[str, str]] | None = None,
+    previous_song_keys: set[tuple[str, str]] | None = None,
+    previous_track_ids: set[int] | None = None,
+    selection_seed: str | None = None,
 ) -> dict | None:
     from crate.db.queries.paths_scene_queries import (
         get_artist_scene_profile,
@@ -561,7 +905,12 @@ def _prepare_artist_scene_path(
         artist_similarity_graph=artist_similarity_graph,
         shared_members_graph=shared_members_graph,
         destination_profile=dest_profile,
-        selection_seed=uuid.uuid4().hex,
+        selection_seed=selection_seed
+        if selection_seed is not None
+        else uuid.uuid4().hex,
+        recent_song_keys=recent_song_keys,
+        previous_song_keys=previous_song_keys,
+        previous_track_ids=previous_track_ids,
     )
     if len(tracks) < 2:
         return None
@@ -852,14 +1201,23 @@ def _select_track_for_genre(
     destination_profile: Mapping | None = None,
     path_progress: float = 0.0,
     selection_seed: str | None = None,
+    recent_song_keys: set[tuple[str, str]] | None = None,
+    previous_song_keys: set[tuple[str, str]] | None = None,
+    previous_track_ids: set[int] | None = None,
+    scorer: _SceneScorer | None = None,
 ) -> dict | None:
+    scorer = scorer or _SceneScorer()
+    similarity_graph = (
+        artist_similarity_graph if artist_similarity_graph is not None else {}
+    )
+    member_graph = shared_members_graph if shared_members_graph is not None else {}
     artist_groups: dict[str, list[dict]] = defaultdict(list)
     excluded_keys = excluded_artist_keys or set()
     previous_artist_key = _artist_key(previous_track) if previous_track else ""
     for row in rows:
         if int(row.get("id") or 0) in used_ids:
             continue
-        song_key = track_song_identity(row)
+        song_key = scorer.song_key(row)
         if (
             used_song_keys is not None
             and song_key is not None
@@ -881,47 +1239,71 @@ def _select_track_for_genre(
             continue
         if used_artists.get(artist_key, 0) >= max_repeat_per_artist:
             continue
-        if _should_skip_lateral_destination_candidate(
+        if scorer.should_skip_lateral_destination_candidate(
             row,
             destination_track=destination_track,
             destination_profile=destination_profile,
             path_progress=path_progress,
-            artist_similarity_graph=artist_similarity_graph or {},
-            shared_members_graph=shared_members_graph or {},
+            artist_similarity_graph=similarity_graph,
+            shared_members_graph=member_graph,
         ):
             continue
         artist_groups[artist_key].append(row)
 
     best: tuple[float, dict] | None = None
+    ranked: list[tuple[dict, float, float]] = []
     for artist_key, artist_rows in artist_groups.items():
         track = _select_artist_track(
             artist_rows,
             previous_track=previous_track,
             selection_seed=selection_seed,
+            recent_song_keys=recent_song_keys,
+            previous_song_keys=previous_song_keys,
+            previous_track_ids=previous_track_ids,
+            scorer=scorer,
         )
-        score = _artist_score(track)
+        artist_score = scorer.artist_score(track)
+        score = artist_score
         repeat_count = used_artists.get(artist_key, 0)
+        repeat_penalty = 0.0
         if repeat_count:
-            score -= 0.18 if _artist_score(track) >= 0.75 else 0.45
-        score += _track_score(track, previous_track) * 0.18
-        score += 0.18 * _artist_connection_score(
+            repeat_penalty = 0.18 if artist_score >= 0.75 else 0.45
+            score -= repeat_penalty
+        score += scorer.track_score(track, previous_track) * 0.18
+        score += 0.18 * scorer.artist_connection_score(
             track,
             previous_track,
-            artist_similarity_graph or {},
-            shared_members_graph or {},
+            similarity_graph,
+            member_graph,
         )
-        score += 0.65 * _destination_gravity_score(
+        score += 0.65 * scorer.destination_gravity_score(
             track,
             destination_track=destination_track,
             destination_profile=destination_profile,
             path_progress=path_progress,
-            artist_similarity_graph=artist_similarity_graph or {},
-            shared_members_graph=shared_members_graph or {},
+            artist_similarity_graph=similarity_graph,
+            shared_members_graph=member_graph,
         )
+        affinity = scorer.user_affinity(track)
+        quality = score - (0.05 + 0.18 * 0.30) * affinity
+        if repeat_count:
+            musical_artist_score = artist_score - 0.05 * affinity
+            quality += repeat_penalty - (0.18 if musical_artist_score >= 0.75 else 0.45)
+        ranked.append((track, score, quality))
         if best is None or score > best[0]:
             best = (score, track)
 
-    return dict(best[1]) if best else None
+    if best is None:
+        return None
+    pool = fresh_path_candidates(
+        [(row, quality) for row, _score, quality in ranked],
+        preferred=best[1],
+        recent_song_keys=recent_song_keys,
+        previous_song_keys=previous_song_keys,
+        previous_track_ids=previous_track_ids,
+    )
+    scores = {row["id"]: score for row, score, _quality in ranked}
+    return dict(max(pool, key=lambda row: scores[row["id"]]))
 
 
 def _select_artist_track(
@@ -929,19 +1311,50 @@ def _select_artist_track(
     *,
     previous_track: dict | None,
     selection_seed: str | None,
+    recent_song_keys: set[tuple[str, str]] | None = None,
+    previous_song_keys: set[tuple[str, str]] | None = None,
+    previous_track_ids: set[int] | None = None,
+    scorer: _SceneScorer | None = None,
 ) -> dict:
+    scorer = scorer or _SceneScorer()
     ranked = sorted(
         rows,
-        key=lambda row: _track_score(row, previous_track),
+        key=lambda row: scorer.track_score(row, previous_track),
         reverse=True,
     )
-    strongest_user_track = max(ranked, key=_user_affinity)
-    if _user_affinity(strongest_user_track) >= _STRONG_USER_AFFINITY_THRESHOLD:
+    strongest_user_track = max(ranked, key=scorer.user_affinity)
+    strong_affinity = (
+        scorer.user_affinity(strongest_user_track) >= _STRONG_USER_AFFINITY_THRESHOLD
+    )
+    fatigued = (recent_song_keys or set()) | (previous_song_keys or set())
+    if (
+        strong_affinity
+        and scorer.song_key(strongest_user_track) not in fatigued
+        and strongest_user_track["id"] not in (previous_track_ids or set())
+    ):
         return strongest_user_track
+    preferred = strongest_user_track if strong_affinity else ranked[0]
+    pool = fresh_path_candidates(
+        [
+            (
+                row,
+                scorer.track_score(row, previous_track)
+                - 0.30 * scorer.user_affinity(row),
+            )
+            for row in ranked
+        ],
+        preferred=preferred,
+        recent_song_keys=recent_song_keys,
+        previous_song_keys=previous_song_keys,
+        previous_track_ids=previous_track_ids,
+    )
+    ranked = sorted(
+        pool, key=lambda row: scorer.track_score(row, previous_track), reverse=True
+    )
     if not selection_seed:
         return ranked[0]
 
-    top_score = _track_score(ranked[0], previous_track)
+    top_score = scorer.track_score(ranked[0], previous_track)
     score_floor = max(
         top_score * _TRACK_VARIETY_SCORE_FLOOR_RATIO,
         top_score - _TRACK_VARIETY_SCORE_FLOOR_DROP,
@@ -949,7 +1362,7 @@ def _select_artist_track(
     pool = [
         row
         for row in ranked[:_TRACK_VARIETY_POOL_SIZE]
-        if _track_score(row, previous_track) >= score_floor
+        if scorer.track_score(row, previous_track) >= score_floor
     ]
     if not pool:
         pool = ranked[:1]
@@ -960,6 +1373,7 @@ def _select_artist_track(
             row,
             previous_track=previous_track,
             selection_seed=selection_seed,
+            scorer=scorer,
         ),
     )
 
@@ -969,11 +1383,13 @@ def _seeded_track_choice_score(
     *,
     previous_track: dict | None,
     selection_seed: str,
+    scorer: _SceneScorer | None = None,
 ) -> float:
+    scorer = scorer or _SceneScorer()
     return (
-        0.72 * _track_score(row, previous_track)
-        + 0.12 * _track_popularity(row)
-        + 0.08 * _audio_transition_score(row, previous_track)
+        0.72 * scorer.track_score(row, previous_track)
+        + 0.12 * scorer.track_popularity(row)
+        + 0.08 * scorer.audio_transition_score(row, previous_track)
         + 0.16 * _stable_track_jitter(row, selection_seed)
     )
 
@@ -1203,10 +1619,16 @@ def _destination_genre_overlap(
     row: dict,
     destination_track: dict,
     destination_profile: Mapping | None,
+    *,
+    scorer: _SceneScorer | None = None,
 ) -> float:
-    row_slugs = _row_genre_slugs(row)
-    destination_slugs = _profile_genre_slugs(destination_profile) | _row_genre_slugs(
-        destination_track
+    row_slugs = scorer.row_genre_slugs(row) if scorer else _row_genre_slugs(row)
+    destination_slugs = (
+        scorer.profile_genre_slugs(destination_profile)
+        | scorer.row_genre_slugs(destination_track)
+        if scorer
+        else _profile_genre_slugs(destination_profile)
+        | _row_genre_slugs(destination_track)
     )
     if not row_slugs or not destination_slugs:
         return 0.0
@@ -1280,6 +1702,7 @@ def _local_scene_penalty(
     destination_profile: Mapping | None,
     connection_score: float,
     genre_overlap: float,
+    scorer: _SceneScorer | None = None,
 ) -> float:
     if connection_score >= 0.3 or genre_overlap >= 0.55:
         return 0.0
@@ -1296,7 +1719,7 @@ def _local_scene_penalty(
         if country
     }
     row_country = _country_code(row.get("artist_country") or row.get("country"))
-    slugs = _row_genre_slugs(row)
+    slugs = scorer.row_genre_slugs(row) if scorer else _row_genre_slugs(row)
     has_local_slug = any(
         part in _LOCAL_SCENE_SLUG_PARTS for slug in slugs for part in slug.split("-")
     )

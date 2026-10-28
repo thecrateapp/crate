@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import re
+import random
 
 from crate.db.queries.paths import find_anchor_track_row, find_candidate_rows
 from crate.track_versions import track_song_identity
+from crate.recommendation_policy import PATH_RECENCY_QUALITY_BAND, fresh_path_candidates
 
 _MAX_CONSECUTIVE_SAME_ARTIST = 2
 _ARTIST_REPEAT_PENALTY = 2.0
@@ -36,6 +38,10 @@ def _find_anchor_track(
     exclude: set[int],
     *,
     exclude_song_keys: set[tuple[str, str]] | None = None,
+    recent_song_keys: set[tuple[str, str]] | None = None,
+    previous_song_keys: set[tuple[str, str]] | None = None,
+    previous_track_ids: set[int] | None = None,
+    selection_seed: str | None = None,
 ) -> dict | None:
     """Find the best track that belongs to the endpoint (artist/album/genre)."""
     return find_anchor_track_row(
@@ -44,6 +50,10 @@ def _find_anchor_track(
         target_vec,
         exclude,
         exclude_song_keys=exclude_song_keys,
+        recent_song_keys=recent_song_keys,
+        previous_song_keys=previous_song_keys,
+        previous_track_ids=previous_track_ids,
+        selection_seed=selection_seed,
     )
 
 
@@ -173,18 +183,23 @@ def _find_best_candidate(
     candidate_pool_size: int = _CANDIDATE_POOL_SIZE,
     recent_tracks: list[dict] | None = None,
     exclude_song_keys: set[tuple[str, str]] | None = None,
+    recent_song_keys: set[tuple[str, str]] | None = None,
+    previous_song_keys: set[tuple[str, str]] | None = None,
+    previous_track_ids: set[int] | None = None,
+    selection_seed: str | None = None,
 ) -> dict | None:
     """Find the best track near ``target`` using hybrid bliss/affinity scoring."""
     query_exclude = set(exclude_ids)
     pool_size = min(240, max(1, candidate_pool_size))
     all_rows = []
+    fatigued = (recent_song_keys or set()) | (previous_song_keys or set())
     for _ in range(3):
         rows = find_candidate_rows(
             target, query_exclude, limit=pool_size, use_track_artist=True
         )
         all_rows.extend(rows)
         selected = _select_best_candidate_from_rows(
-            rows,
+            all_rows,
             target,
             exclude_ids,
             exclude_titles,
@@ -197,8 +212,16 @@ def _find_best_candidate(
             genre_overlap=genre_overlap,
             recent_tracks=recent_tracks,
             exclude_song_keys=exclude_song_keys,
+            recent_song_keys=recent_song_keys,
+            previous_song_keys=previous_song_keys,
+            previous_track_ids=previous_track_ids,
+            selection_seed=selection_seed,
         )
-        if selected:
+        if (
+            selected
+            and track_song_identity(selected) not in fatigued
+            and selected["id"] not in (previous_track_ids or set())
+        ):
             return selected
         if len(rows) < pool_size:
             break
@@ -219,6 +242,10 @@ def _find_best_candidate(
         recent_tracks=recent_tracks,
         exclude_song_keys=exclude_song_keys,
         max_consecutive=None,
+        recent_song_keys=recent_song_keys,
+        previous_song_keys=previous_song_keys,
+        previous_track_ids=previous_track_ids,
+        selection_seed=selection_seed,
     )
 
 
@@ -238,6 +265,10 @@ def _select_best_candidate_from_rows(
     recent_tracks: list[dict] | None = None,
     exclude_song_keys: set[tuple[str, str]] | None = None,
     max_consecutive: int | None = _MAX_CONSECUTIVE_SAME_ARTIST,
+    recent_song_keys: set[tuple[str, str]] | None = None,
+    previous_song_keys: set[tuple[str, str]] | None = None,
+    previous_track_ids: set[int] | None = None,
+    selection_seed: str | None = None,
 ) -> dict | None:
     """Rank a prefetched candidate pool without going back to Postgres."""
     if not rows:
@@ -250,6 +281,7 @@ def _select_best_candidate_from_rows(
     best: dict | None = None
     best_score = float("inf")
     track_context = _latest_track_context(recent_tracks)
+    ranked: list[tuple[dict, float]] = []
 
     for candidate, distance in scored_rows:
         if candidate.get("id") in exclude_ids:
@@ -292,12 +324,36 @@ def _select_best_candidate_from_rows(
         if artist in [recent_artist for recent_artist in recent_artists[-2:]]:
             score *= _ARTIST_REPEAT_PENALTY
 
+        candidate["distance"] = distance
+        ranked.append((candidate, score))
         if score < best_score:
             best_score = score
             best = candidate
             best["distance"] = distance
 
     if best:
+        pool = fresh_path_candidates(
+            [(row, -score) for row, score in ranked],
+            preferred=best,
+            recent_song_keys=recent_song_keys,
+            previous_song_keys=previous_song_keys,
+            previous_track_ids=previous_track_ids,
+        )
+        scores = {row["id"]: score for row, score in ranked}
+        if selection_seed is not None:
+            floor = min(scores[row["id"]] for row in pool) + PATH_RECENCY_QUALITY_BAND
+            pool = [row for row in pool if scores[row["id"]] <= floor]
+            fatigued = (recent_song_keys or set()) | (previous_song_keys or set())
+            fresh = [
+                row
+                for row in pool
+                if track_song_identity(row) not in fatigued
+                and row["id"] not in (previous_track_ids or set())
+            ]
+            pool = sorted(fresh or pool, key=lambda row: row["id"])
+            best = random.Random(selection_seed).choice(pool)
+        else:
+            best = min(pool, key=lambda row: scores[row["id"]])
         best["bliss_vector"] = (
             list(best["bliss_vector"]) if best.get("bliss_vector") else None
         )

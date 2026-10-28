@@ -2,6 +2,13 @@
 
 from __future__ import annotations
 
+import uuid
+from datetime import datetime, timezone
+
+from crate.recommendation_policy import RECENT_PLAY_WINDOW, canonical_key
+
+from crate.db.queries.recommendation_history import history_for_candidates
+
 from crate.db.paths_compute import (
     compute_path,
     resolve_bliss_centroid,
@@ -28,6 +35,10 @@ def compute_scene_path(
     dest_value: str,
     step_count: int = 20,
     user_id: int | None = None,
+    recent_song_keys: set[tuple[str, str]] | None = None,
+    previous_song_keys: set[tuple[str, str]] | None = None,
+    previous_track_ids: set[int] | None = None,
+    selection_seed: str | None = None,
 ) -> list[dict] | None:
     """Load deterministic candidates, close DB scopes, then refine the path."""
     prepared = prepare_scene_path(
@@ -37,6 +48,10 @@ def compute_scene_path(
         dest_value=dest_value,
         step_count=step_count,
         user_id=user_id,
+        recent_song_keys=recent_song_keys,
+        previous_song_keys=previous_song_keys,
+        previous_track_ids=previous_track_ids,
+        selection_seed=selection_seed,
     )
     if prepared is None:
         return None
@@ -76,7 +91,28 @@ def build_music_path_plan(
     waypoints: list[dict] | None = None,
     step_count: int = 20,
     user_id: int | None = None,
+    selection_seed: str | None = None,
+    now: datetime | None = None,
+    previous_tracks: list[dict] | None = None,
 ) -> dict | None:
+    now = now or datetime.now(timezone.utc)
+    selection_seed = selection_seed if selection_seed is not None else uuid.uuid4().hex
+    history = (
+        history_for_candidates(user_id, None, now - RECENT_PLAY_WINDOW, now=now)
+        if user_id is not None
+        else {}
+    )
+    recent_song_keys = set(history)
+    previous_song_keys = {
+        key
+        for track in previous_tracks or []
+        if (key := canonical_key(track)) is not None
+    }
+    previous_track_ids = {
+        track_id
+        for track in previous_tracks or []
+        if (track_id := track.get("track_id", track.get("id"))) is not None
+    }
     origin_label = resolve_endpoint_label(origin_type, origin_value)
     dest_label = resolve_endpoint_label(dest_type, dest_value)
 
@@ -88,6 +124,10 @@ def build_music_path_plan(
             dest_value=dest_value,
             step_count=step_count,
             user_id=user_id,
+            recent_song_keys=recent_song_keys,
+            previous_song_keys=previous_song_keys,
+            previous_track_ids=previous_track_ids,
+            selection_seed=selection_seed,
         )
         if scene_tracks:
             return {
@@ -120,6 +160,10 @@ def build_music_path_plan(
         step_count,
         waypoint_vecs or None,
         endpoint_contexts=endpoint_contexts,
+        recent_song_keys=recent_song_keys,
+        previous_song_keys=previous_song_keys,
+        previous_track_ids=previous_track_ids,
+        selection_seed=selection_seed,
     )
     return {
         "origin_label": origin_label,
@@ -196,6 +240,7 @@ def regenerate_music_path(path_id: int, user_id: int) -> dict | None:
         waypoints=path["waypoints"],
         step_count=path["step_count"],
         user_id=user_id,
+        previous_tracks=path.get("tracks") or [],
     )
     if not plan:
         return None

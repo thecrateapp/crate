@@ -16,12 +16,36 @@ from crate.track_versions import track_song_identity
 
 
 def _resolve_path_anchors(
-    origin_type, origin_value, origin_vec, dest_type, dest_value, dest_vec
+    origin_type,
+    origin_value,
+    origin_vec,
+    dest_type,
+    dest_value,
+    dest_vec,
+    *,
+    recent_song_keys=None,
+    previous_song_keys=None,
+    previous_track_ids=None,
+    selection_seed=None,
 ):
     def find(kind, value, vector, other=None):
         excluded = {other["id"]} if other else set()
         key = track_song_identity(other) if other else None
-        options = {"exclude_song_keys": {key}} if key is not None else {}
+        options: dict = {"exclude_song_keys": {key}} if key is not None else {}
+        if kind != "track" and (
+            recent_song_keys
+            or previous_song_keys
+            or previous_track_ids
+            or selection_seed is not None
+        ):
+            options.update(
+                recent_song_keys=recent_song_keys,
+                previous_song_keys=previous_song_keys,
+                previous_track_ids=previous_track_ids,
+                selection_seed=f"{selection_seed}:{kind}:{value}"
+                if selection_seed is not None
+                else None,
+            )
         return _find_anchor_track(kind, value, vector, excluded, **options)
 
     if dest_type == "track" and origin_type != "track":
@@ -63,6 +87,10 @@ def compute_path(
     waypoint_vecs: list[list[float]] | None = None,
     *,
     endpoint_contexts: list[dict] | None = None,
+    recent_song_keys: set[tuple[str, str]] | None = None,
+    previous_song_keys: set[tuple[str, str]] | None = None,
+    previous_track_ids: set[int] | None = None,
+    selection_seed: str | None = None,
 ) -> list[dict]:
     """Compute a music path through bliss vector space."""
     sim_graph = _load_artist_similarity_graph()
@@ -140,7 +168,16 @@ def compute_path(
 
     path_tracks: list[dict] = []
     first, last = _resolve_path_anchors(
-        origin_type, origin_value, origin_vec, dest_type, dest_value, dest_vec
+        origin_type,
+        origin_value,
+        origin_vec,
+        dest_type,
+        dest_value,
+        dest_vec,
+        recent_song_keys=recent_song_keys,
+        previous_song_keys=previous_song_keys,
+        previous_track_ids=previous_track_ids,
+        selection_seed=selection_seed,
     )
     if first:
         path_tracks.append(make_entry(first, 0, 0.0))
@@ -186,6 +223,12 @@ def compute_path(
             genre_overlap=genre_scorers[segment_index],
             recent_tracks=recent_tracks,
             exclude_song_keys=used_song_keys,
+            recent_song_keys=recent_song_keys,
+            previous_song_keys=previous_song_keys,
+            previous_track_ids=previous_track_ids,
+            selection_seed=f"{selection_seed}:{global_step}"
+            if selection_seed is not None
+            else None,
         )
         if track:
             path_tracks.append(make_entry(track, global_step, global_progress))

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
+import random
 
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 
 from crate.db.bliss_vectors import to_pgvector_literal
 from crate.db.queries.playable_media_filters import (
@@ -13,6 +15,44 @@ from crate.db.queries.playable_media_filters import (
 from crate.db.queries.paths_shared import array_distance_sql
 from crate.db.tx import optional_scope, read_scope
 from crate.track_versions import track_song_identity
+from crate.recommendation_policy import PATH_RECENCY_QUALITY_BAND, fresh_path_candidates
+
+
+@contextmanager
+def _path_hnsw_settings(current, *, limit: int, enabled: bool, restore: bool):
+    if not enabled:
+        yield
+        return
+    previous = (
+        current.execute(
+            text("""
+                SELECT current_setting('hnsw.ef_search', true) AS ef_search,
+                       current_setting('hnsw.iterative_scan', true) AS iterative_scan
+            """)
+        )
+        .mappings()
+        .one()
+        if restore
+        else None
+    )
+    sql_failed = False
+    try:
+        current.execute(text(f"SET LOCAL hnsw.ef_search = {min(1000, max(40, limit))}"))
+        current.execute(text("SET LOCAL hnsw.iterative_scan = strict_order"))
+        yield
+    except DBAPIError:
+        # The caller must roll back an aborted transaction; preserve its SQL error.
+        sql_failed = True
+        raise
+    finally:
+        if previous is not None and not sql_failed:
+            current.execute(
+                text("""
+                    SELECT set_config('hnsw.ef_search', :ef_search, true),
+                           set_config('hnsw.iterative_scan', :iterative_scan, true)
+                """),
+                dict(previous),
+            )
 
 
 def _normalize_track_row(row) -> dict | None:
@@ -26,14 +66,46 @@ def _normalize_track_row(row) -> dict | None:
     return data
 
 
-def _eligible_anchor_row(rows, exclude_song_keys):
-    for row in rows:
-        track = _normalize_track_row(row)
-        if track is not None and track_song_identity(track) not in (
-            exclude_song_keys or set()
-        ):
-            return track
-    return None
+def _eligible_anchor_row(
+    rows,
+    exclude_song_keys,
+    *,
+    recent_song_keys=None,
+    previous_song_keys=None,
+    previous_track_ids=None,
+    selection_seed=None,
+):
+    eligible = [
+        track
+        for row in rows
+        if (track := _normalize_track_row(row)) is not None
+        and track_song_identity(track) not in (exclude_song_keys or set())
+    ]
+    if not eligible:
+        return None
+    scores = {track["id"]: float(track.get("distance") or 0.0) for track in eligible}
+    preferred = min(eligible, key=lambda track: scores[track["id"]])
+    pool = fresh_path_candidates(
+        [(track, -scores[track["id"]]) for track in eligible],
+        preferred=preferred,
+        recent_song_keys=recent_song_keys,
+        previous_song_keys=previous_song_keys,
+        previous_track_ids=previous_track_ids,
+    )
+    if selection_seed is not None:
+        floor = min(scores[track["id"]] for track in pool) + PATH_RECENCY_QUALITY_BAND
+        pool = [track for track in pool if scores[track["id"]] <= floor]
+        fatigued = (recent_song_keys or set()) | (previous_song_keys or set())
+        fresh = [
+            track
+            for track in pool
+            if track_song_identity(track) not in fatigued
+            and track["id"] not in (previous_track_ids or set())
+        ]
+        return random.Random(selection_seed).choice(
+            sorted(fresh or pool, key=lambda track: track["id"])
+        )
+    return min(pool, key=lambda track: scores[track["id"]])
 
 
 def find_anchor_track_row(
@@ -44,19 +116,46 @@ def find_anchor_track_row(
     *,
     session=None,
     exclude_song_keys: set[tuple[str, str]] | None = None,
+    recent_song_keys: set[tuple[str, str]] | None = None,
+    previous_song_keys: set[tuple[str, str]] | None = None,
+    previous_track_ids: set[int] | None = None,
+    selection_seed: str | None = None,
 ) -> dict | None:
+    policy: dict = {}
+    if endpoint_type != "track":
+        policy = {
+            "recent_song_keys": recent_song_keys,
+            "previous_song_keys": previous_song_keys,
+            "previous_track_ids": previous_track_ids,
+            "selection_seed": selection_seed,
+        }
+    broad_pool = (
+        exclude_song_keys
+        or recent_song_keys
+        or previous_song_keys
+        or previous_track_ids
+        or selection_seed is not None
+    )
     probe_vector = to_pgvector_literal(target_vec)
     probe_array = list(target_vec)
     exclude_clause = "AND t.id != ALL(:exclude)" if exclude else ""
     params: dict = {
         "probe_vector": probe_vector,
         "probe_array": probe_array,
-        "anchor_limit": 240 if exclude_song_keys and endpoint_type != "track" else 1,
+        "anchor_limit": 240 if broad_pool and endpoint_type != "track" else 1,
     }
     if exclude:
         params["exclude"] = list(exclude)
 
-    with nullcontext(session) if session is not None else read_scope() as current:
+    with (
+        nullcontext(session) if session is not None else read_scope() as current,
+        _path_hnsw_settings(
+            current,
+            limit=params["anchor_limit"],
+            enabled=endpoint_type != "track",
+            restore=session is not None,
+        ),
+    ):
         if endpoint_type == "track":
             row = _eligible_anchor_row(
                 current.execute(
@@ -92,6 +191,7 @@ def find_anchor_track_row(
                 .mappings()
                 .all(),
                 exclude_song_keys,
+                **policy,
             )
             return row
 
@@ -154,6 +254,7 @@ def find_anchor_track_row(
             .mappings()
             .all(),
             exclude_song_keys,
+            **policy,
         )
 
         if not row:
@@ -186,6 +287,7 @@ def find_anchor_track_row(
                 .mappings()
                 .all(),
                 exclude_song_keys,
+                **policy,
             )
 
     return row
@@ -209,7 +311,12 @@ def find_candidate_rows(
         exclude_clause = "AND t.id != ALL(:exclude)"
         params["exclude"] = list(exclude_ids)
 
-    with nullcontext(session) if session is not None else read_scope() as s:
+    with (
+        nullcontext(session) if session is not None else read_scope() as s,
+        _path_hnsw_settings(
+            s, limit=int(limit), enabled=use_track_artist, restore=session is not None
+        ),
+    ):
         s.execute(text("SET LOCAL ivfflat.probes = 10"))
         rows = (
             s.execute(

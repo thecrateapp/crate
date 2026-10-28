@@ -65,9 +65,96 @@ Conflicting explicit endpoints can still produce a partial journey; checkpoint
 Acoustic candidate queries opt into performer identity. The generic query default
 and both seeded-radio query implementations retain their previous behavior.
 
+## Checkpoint 3.3: seven-day novelty
+
+Creating or regenerating a journey reads significant listening history once for
+the preceding seven days. Generation itself never writes listening history.
+Regeneration also treats the previous path's song families and track IDs as a
+soft preference to avoid, including older paths whose artist metadata differs
+from the current performer metadata.
+
+Fresh alternatives must be within 0.05 of the best musical quality score. User
+affinity does not hide otherwise comparable alternatives after a song has been
+heard, but strong affinity remains effective without listening fatigue. Explicit
+track endpoints remain fixed. When the catalog has no comparable fresh choice,
+the planner can reuse a recently heard song instead of breaking the journey.
+
+Both scene and acoustic planning receive the same history and selection seed.
+An internal fixed seed supports reproducible evaluation; each normal generation
+gets a new seed. Reading or replaying a saved path does not read history, rotate
+tracks or reorder the saved sequence.
+
+Scene candidate reads aggregate performer genres once rather than once per
+track. Relation counts group normalized artist names before joining, preventing
+case variants from duplicating candidates. Musical scoring caches belong to one
+generation and reuse only candidate signals and fixed context. Previous-track
+transitions, destination progress and repeat penalties retain their dynamic
+inputs. Exact score, path-order and concurrent-generation checks cover this
+optimization; radio selection keeps its existing query defaults and weights.
+
+### Cosine index repair
+
+Revision 027 already specifies an HNSW cosine index for track embeddings. A
+read-only production investigation found that index missing, causing nearest
+queries to scan the catalog. Revision 139 restores the original index
+concurrently, preserves an existing healthy index, and rebuilds an invalid or
+not-ready index left by an interrupted attempt. It verifies validity before
+completing. Its downgrade preserves the index owned by revision 027.
+
+Acoustic candidate queries and flexible anchors configure `hnsw.ef_search` for
+their requested batch and enable transaction-local `hnsw.iterative_scan =
+strict_order`. This prevents a 60/240-row expansion from stopping at the default
+40-neighbor search window, including when exclusions and playability filters
+discard nearby rows. Explicit track anchors and generic/radio query defaults
+remain unchanged. See the [pgvector filtering and iterative scan
+documentation](https://github.com/pgvector/pgvector#iterative-index-scans).
+Shared sessions regain their previous HNSW settings after each helper call;
+errors do not commit or roll back the caller's transaction. Iterative scans
+require pgvector 0.8 or later (observed production: 0.8.5; test fixture: 0.8.6).
+
+HNSW is approximate: restoring it can change nearest-neighbor pools compared with
+a full scan. The local representative-vector checks verify expansion capacity
+and sampled recall, rather than guaranteeing identical neighbors for every
+possible vector. Full acoustic path latency still needs validation with the
+index available in the deployment environment.
+
+The migration has only been exercised in disposable test databases. No production
+index or application deployment has been changed during these checkpoints.
+
+### Performance checkpoint
+
+The production catalog measurement used a neutral synthetic listener, disabled
+AI, read-only connections and a repeatable snapshot. Timings include in-process
+planning and normal taxonomy revision checks, with a warm taxonomy cache; they
+exclude HTTP transport and Redis overhead. No user events or saved paths were
+written. The catalog supplied 137,698 playable embeddings.
+
+| Journey            | Requested / returned | Samples |     p50 |     p95 | Maximum |
+| ------------------ | -------------------: | ------: | ------: | ------: | ------: |
+| Citizen → Converge |              20 / 20 |      25 | 1.535 s | 1.667 s | 1.703 s |
+| Citizen → Converge |            100 / 100 |      25 | 4.412 s | 4.800 s | 6.275 s |
+| Punk → Electronic  |              20 / 20 |       1 |       — |       — | 2.078 s |
+| Punk → Electronic  |             100 / 97 |      25 | 4.022 s | 4.367 s | 4.382 s |
+
+Both endpoints remained present and there were no duplicate song families.
+The 20-step genre case exceeds the two-second target in its first sample, so
+it has no accepted p95. A single diagnostic profile attributes most of its time
+to candidate SQL and musical graph loading. The shorter 97-track result needs
+checkpoint 3.4's partial-path warning rather than being presented as complete.
+
+A local test with the anonymous real-vector corpus verifies the missing index's
+query-plan improvement and filtered expansion capacity. This is an index
+microbenchmark on different hardware, not acceptance of full acoustic-path
+latency. Full acoustic planning and end-to-end HTTP latency remain release
+checks. Sanitized measurements and environments are in
+[`music-paths-evaluation.json`](../../app/tests/fixtures/recommendations/music-paths-evaluation.json).
+
+The [checkpoint 3.3 listening review](../../app/tests/fixtures/recommendations/music-paths-review.md)
+contains the controlled A/B/C/D lists. Approval is pending, especially for the
+strong punk-to-japanoise transition.
+
 ## Remaining checkpoints
 
-- 3.3: seven-day novelty on create/regenerate; stable saved-path reads/replay.
 - 3.4: shared deterministic validation and safe optional AI refinements, with
   additive warnings for partial paths.
 - 3.5: explicit finite `path` playback source and warning presentation in Listen.

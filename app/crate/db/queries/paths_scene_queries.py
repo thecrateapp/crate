@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
+
 from sqlalchemy import text
 
 from crate.genre_taxonomy import resolve_genre_slug, slugify_genre
@@ -9,7 +11,18 @@ from crate.db.queries.playable_media_filters import (
     playable_media_params,
     playable_track_clause,
 )
-from crate.db.tx import optional_scope
+from crate.db.tx import optional_scope, read_scope
+
+
+_ARTIST_GENRES_CTE = """
+    artist_genre_metadata AS MATERIALIZED (
+        SELECT ag.artist_name,
+               ARRAY_AGG(DISTINCT g.slug ORDER BY g.slug) AS artist_genre_slugs
+        FROM artist_genres ag
+        JOIN genres g ON g.id = ag.genre_id
+        GROUP BY ag.artist_name
+    )
+"""
 
 
 def _normalize_track_row(row) -> dict | None:
@@ -130,12 +143,12 @@ def list_artist_scene_anchor_candidates(
 ) -> list[dict]:
     """Return candidate endpoint tracks for one artist with user and canonical signals."""
     effective_user_id = int(user_id or 0)
-    with optional_scope(session) as s:
+    with nullcontext(session) if session is not None else read_scope() as s:
         rows = (
             s.execute(
                 text(
                     f"""
-                    WITH target_artist AS (
+                    WITH {_ARTIST_GENRES_CTE}, target_artist AS (
                         SELECT id, name, entity_uid, listeners, spotify_popularity,
                                popularity_score, album_count, track_count,
                                country, area, formed
@@ -162,7 +175,7 @@ def list_artist_scene_anchor_candidates(
                         LIMIT 1
                     ),
                     artist_relation_counts AS (
-                        SELECT artist_name, COUNT(*)::DOUBLE PRECISION AS relation_count
+                        SELECT LOWER(artist_name) AS artist_name, COUNT(*)::DOUBLE PRECISION AS relation_count
                         FROM (
                             SELECT artist_name, similar_name
                             FROM artist_similarities
@@ -170,17 +183,18 @@ def list_artist_scene_anchor_candidates(
                             SELECT similar_name AS artist_name, artist_name AS similar_name
                             FROM artist_similarities
                         ) rel
-                        GROUP BY artist_name
+                        GROUP BY LOWER(artist_name)
                     )
                     SELECT
                         t.id,
                         t.entity_uid,
                         t.title,
-                        a.artist,
+                        t.artist,
+                        a.artist AS album_artist,
                         a.name AS album,
                         t.album_id,
                         a.entity_uid::text AS album_entity_uid,
-                        ta.entity_uid::text AS artist_entity_uid,
+                        performer.entity_uid::text AS artist_entity_uid,
                         t.duration, t.format, t.bitrate, t.sample_rate, t.bit_depth,
                         t.year,
                         t.bpm,
@@ -193,14 +207,14 @@ def list_artist_scene_anchor_candidates(
                         0.0 AS distance,
                         pg.slug AS genre_slug,
                         1.0::DOUBLE PRECISION AS membership_score,
-                        ta.listeners AS artist_listeners,
-                        ta.spotify_popularity AS artist_spotify_popularity,
-                        ta.popularity_score AS artist_popularity_score,
-                        ta.album_count AS artist_album_count,
-                        ta.track_count AS artist_track_count,
-                        ta.country AS artist_country,
-                        ta.area AS artist_area,
-                        ta.formed AS artist_formed,
+                        performer.listeners AS artist_listeners,
+                        performer.spotify_popularity AS artist_spotify_popularity,
+                        performer.popularity_score AS artist_popularity_score,
+                        performer.album_count AS artist_album_count,
+                        performer.track_count AS artist_track_count,
+                        performer.country AS artist_country,
+                        performer.area AS artist_area,
+                        performer.formed AS artist_formed,
                         COALESCE(ags.artist_genre_slugs, ARRAY[]::TEXT[])
                             AS artist_genre_slugs,
                         LEAST(
@@ -221,16 +235,11 @@ def list_artist_scene_anchor_candidates(
                     FROM target_artist ta
                     JOIN library_albums a ON a.artist = ta.name
                     JOIN library_tracks t ON t.album_id = a.id
+                    LEFT JOIN library_artists performer ON performer.name = t.artist
                     LEFT JOIN primary_genre pg ON TRUE
                     LEFT JOIN artist_relation_counts arc
-                      ON LOWER(arc.artist_name) = LOWER(ta.name)
-                    LEFT JOIN LATERAL (
-                        SELECT ARRAY_AGG(DISTINCT g2.slug ORDER BY g2.slug)
-                            AS artist_genre_slugs
-                        FROM artist_genres ag2
-                        JOIN genres g2 ON g2.id = ag2.genre_id
-                        WHERE ag2.artist_name = ta.name
-                    ) ags ON TRUE
+                      ON LOWER(arc.artist_name) = LOWER(performer.name)
+                    LEFT JOIN artist_genre_metadata ags ON ags.artist_name = performer.name
                     LEFT JOIN user_track_stats uts
                       ON uts.user_id = :user_id
                      AND uts.stat_window = 'all_time'
@@ -299,13 +308,13 @@ def list_scene_path_candidates(
     effective_user_id = int(user_id or 0)
     result: dict[str, list[dict]] = {}
 
-    with optional_scope(session) as s:
+    with nullcontext(session) if session is not None else read_scope() as s:
         for slug in dict.fromkeys(genre_slugs):
             rows = (
                 s.execute(
                     text(
                         f"""
-                    WITH target_node AS (
+                    WITH {_ARTIST_GENRES_CTE}, target_node AS (
                         SELECT id
                         FROM genre_taxonomy_nodes
                         WHERE slug = :genre_slug
@@ -332,7 +341,7 @@ def list_scene_path_candidates(
                         GROUP BY ag.artist_name
                     ),
                     artist_relation_counts AS (
-                        SELECT artist_name, COUNT(*)::DOUBLE PRECISION AS relation_count
+                        SELECT LOWER(artist_name) AS artist_name, COUNT(*)::DOUBLE PRECISION AS relation_count
                         FROM (
                             SELECT artist_name, similar_name
                             FROM artist_similarities
@@ -340,18 +349,19 @@ def list_scene_path_candidates(
                             SELECT similar_name AS artist_name, artist_name AS similar_name
                             FROM artist_similarities
                         ) rel
-                        GROUP BY artist_name
+                        GROUP BY LOWER(artist_name)
                     ),
                     ranked_candidates AS (
                         SELECT
                             t.id,
                             t.entity_uid,
                             t.title,
-                            a.artist,
+                            t.artist,
+                            a.artist AS album_artist,
                             a.name AS album,
                             t.album_id,
                             a.entity_uid::text AS album_entity_uid,
-                            ar.entity_uid::text AS artist_entity_uid,
+                            performer.entity_uid::text AS artist_entity_uid,
                             t.duration, t.format, t.bitrate, t.sample_rate, t.bit_depth,
                             t.year,
                             t.bpm,
@@ -364,14 +374,14 @@ def list_scene_path_candidates(
                             0.0 AS distance,
                             :genre_slug AS genre_slug,
                             am.membership_score,
-                            ar.listeners AS artist_listeners,
-                            ar.spotify_popularity AS artist_spotify_popularity,
-                            ar.popularity_score AS artist_popularity_score,
-                            ar.album_count AS artist_album_count,
-                            ar.track_count AS artist_track_count,
-                            ar.country AS artist_country,
-                            ar.area AS artist_area,
-                            ar.formed AS artist_formed,
+                            performer.listeners AS artist_listeners,
+                            performer.spotify_popularity AS artist_spotify_popularity,
+                            performer.popularity_score AS artist_popularity_score,
+                            performer.album_count AS artist_album_count,
+                            performer.track_count AS artist_track_count,
+                            performer.country AS artist_country,
+                            performer.area AS artist_area,
+                            performer.formed AS artist_formed,
                             COALESCE(ags.artist_genre_slugs, ARRAY[]::TEXT[])
                                 AS artist_genre_slugs,
                             LEAST(
@@ -390,7 +400,7 @@ def list_scene_path_candidates(
                             COALESCE(uts.complete_play_count, 0) AS user_complete_play_count,
                             (ult.track_id IS NOT NULL OR global_like.global_track_uid IS NOT NULL) AS is_liked,
                             ROW_NUMBER() OVER (
-                                PARTITION BY LOWER(ar.name)
+                                PARTITION BY LOWER(t.artist)
                                 ORDER BY
                                     t.popularity_score DESC NULLS LAST,
                                     t.lastfm_top_rank ASC NULLS LAST,
@@ -403,15 +413,10 @@ def list_scene_path_candidates(
                         JOIN library_artists ar ON ar.name = am.artist_name
                         JOIN library_albums a ON a.artist = am.artist_name
                         JOIN library_tracks t ON t.album_id = a.id
+                        LEFT JOIN library_artists performer ON performer.name = t.artist
                         LEFT JOIN artist_relation_counts arc
-                          ON LOWER(arc.artist_name) = LOWER(am.artist_name)
-                        LEFT JOIN LATERAL (
-                            SELECT ARRAY_AGG(DISTINCT g2.slug ORDER BY g2.slug)
-                                AS artist_genre_slugs
-                            FROM artist_genres ag2
-                            JOIN genres g2 ON g2.id = ag2.genre_id
-                            WHERE ag2.artist_name = ar.name
-                        ) ags ON TRUE
+                          ON LOWER(arc.artist_name) = LOWER(performer.name)
+                        LEFT JOIN artist_genre_metadata ags ON ags.artist_name = performer.name
                         LEFT JOIN user_track_stats uts
                           ON uts.user_id = :user_id
                          AND uts.stat_window = 'all_time'

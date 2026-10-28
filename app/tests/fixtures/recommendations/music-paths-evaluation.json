@@ -1,0 +1,2183 @@
+{
+  "checkpoint_scope": "PR3 checkpoints 3.1–3.3; not final PR acceptance",
+  "status": "Awaiting musical review; checkpoints 3.4/3.5 and QA/performance gates remain",
+  "methodology": {
+    "production_access": "Isolated Python process; all owned DB connections forced READ ONLY; recommendation comparisons use one REPEATABLE READ snapshot",
+    "persistent_mutations": 0,
+    "repository_changes_by_evaluator": 0,
+    "ai": "disabled; no models, sessions, events, cache writes or persisted Music Paths",
+    "listener": "Neutral synthetic listener; never actual user listening history",
+    "rotation_history": "A completed synthetically; same selection seed in A/B/C/D; seven-day window",
+    "benchmark": "25 serial warm samples for passing first probes only; no full test suite or parallel load",
+    "timing_scope": "In-process planning, excluding HTTP transport; normal taxonomy revision checks may occur",
+    "query_count_note": "The long artist run has ranges of15–18 and16–19 read-only queries; increases ofthree are consistent with taxonomy refreshes, rather than a fixed query count.",
+    "musical_metrics": "Adjacent BPM deltas and cosine distances are proxies; coverage reported separately; no musical correctness percentage",
+    "soft_preferences": "Recent/previous songs are soft preferences inside comparable quality tiers; zero repeats are not promised"
+  },
+  "source_hashes": {
+    "scene_benchmark": {
+      "crate.recommendation_policy": "6f55cd53c92187ededd8eda41dacda6ec02b749b5f8c8f75aef7b45530a346fe",
+      "crate.db.queries.recommendation_history": "0722f2b10ce85e44c2427277fedc2fbc5971036a12312731b844298ac1cba9c6",
+      "crate.db.queries.recommendation_context": "3ec2b54b0c4275ddff1449cbdfef7ec35e19272395c6d9ed267519f5ce8d2c6b",
+      "crate.db.queries.paths_endpoint_queries": "b5b284b8c249a728793ffcac2ed0458c066582488cba2b7c643fe79de7658586",
+      "crate.db.queries.paths_artist_graph_queries": "f067c6b9a5f2ee06975ea0cde60e7f589469b3a390b6e2fe6a5afd40940fa9cf",
+      "crate.db.queries.artist_bliss_centroids": "af945a3d191b141475709de93883ffaa21cf5869ea04c896af24749e66329139",
+      "crate.db.queries.paths_bliss_candidate_queries": "091955901859df5095524d224ab43b776b0d8262ec0d4e5e547e954a67d29a4b",
+      "crate.db.queries.paths_scene_queries": "00971f23e6daf86df918db12d230d02ed04b3c24947a92fe8e2f6fc239c51376",
+      "crate.db.paths_similarity": "b786d020d2f9ed222cf0b5568858f58afae145331424e71034bb6afec2d447c4",
+      "crate.db.paths_vectors": "9d7bd8a925e54833a89d1b86764ee38b84803cf3aef19966c34e80ca062a577f",
+      "crate.db.paths_candidates": "1b58d7f62f8a9fafff5e3f6a52a28e73e4845db849ce38c8e62fcafcc8b9c5e6",
+      "crate.db.paths_path_builder": "c05084f9f293a98e3802d0707e74ef2bb97c6381de289fd9f10f9b0600f65ae2",
+      "crate.db.paths_scene": "cb37ebf155897d7b22b3b8d06b82a7b9f9f17b9cd29e5c6a3bb79bc336398734",
+      "crate.music_paths": "dff5eea18b64d0520139a0f8f6c15c0659c4dbe4a5f088ea4f820b92506a33a5"
+    },
+    "scene_rotation": {
+      "crate.recommendation_policy": "6f55cd53c92187ededd8eda41dacda6ec02b749b5f8c8f75aef7b45530a346fe",
+      "crate.db.queries.recommendation_history": "0722f2b10ce85e44c2427277fedc2fbc5971036a12312731b844298ac1cba9c6",
+      "crate.db.queries.recommendation_context": "3ec2b54b0c4275ddff1449cbdfef7ec35e19272395c6d9ed267519f5ce8d2c6b",
+      "crate.db.queries.paths_endpoint_queries": "b5b284b8c249a728793ffcac2ed0458c066582488cba2b7c643fe79de7658586",
+      "crate.db.queries.paths_artist_graph_queries": "f067c6b9a5f2ee06975ea0cde60e7f589469b3a390b6e2fe6a5afd40940fa9cf",
+      "crate.db.queries.artist_bliss_centroids": "af945a3d191b141475709de93883ffaa21cf5869ea04c896af24749e66329139",
+      "crate.db.queries.paths_bliss_candidate_queries": "acb0d4fb517b55cada7b97412b1f0119c35315bb7e47a425166f12eac656e3a1",
+      "crate.db.queries.paths_scene_queries": "00971f23e6daf86df918db12d230d02ed04b3c24947a92fe8e2f6fc239c51376",
+      "crate.db.paths_similarity": "b786d020d2f9ed222cf0b5568858f58afae145331424e71034bb6afec2d447c4",
+      "crate.db.paths_vectors": "9d7bd8a925e54833a89d1b86764ee38b84803cf3aef19966c34e80ca062a577f",
+      "crate.db.paths_candidates": "1b58d7f62f8a9fafff5e3f6a52a28e73e4845db849ce38c8e62fcafcc8b9c5e6",
+      "crate.db.paths_path_builder": "c05084f9f293a98e3802d0707e74ef2bb97c6381de289fd9f10f9b0600f65ae2",
+      "crate.db.paths_scene": "cb37ebf155897d7b22b3b8d06b82a7b9f9f17b9cd29e5c6a3bb79bc336398734",
+      "crate.music_paths": "dff5eea18b64d0520139a0f8f6c15c0659c4dbe4a5f088ea4f820b92506a33a5"
+    },
+    "differing_modules_between_benchmark_and_rotation": [
+      "crate.db.queries.paths_bliss_candidate_queries"
+    ]
+  },
+  "scene_performance": [
+    {
+      "case": "citizen-to-converge",
+      "requested_steps": 20,
+      "duration_ms": 1609.957,
+      "data_selects": 15,
+      "metrics": {
+        "returned_steps": 20,
+        "duplicate_track_ids": 0,
+        "origin_family_occurrences": 1,
+        "destination_family_occurrences": 1,
+        "duplicate_song_families": 0,
+        "missing_song_identity": 0,
+        "unique_artists": 20,
+        "origin_preserved": true,
+        "destination_preserved": true,
+        "mean_adjacent_bpm_delta": 21.452632,
+        "bpm_transition_coverage": 1.0,
+        "mean_adjacent_bliss_cosine_distance": 0.017129,
+        "bliss_transition_coverage": 1.0
+      },
+      "budget_met": true,
+      "benchmark": {
+        "samples": 25,
+        "p50_ms": 1534.726,
+        "p95_ms": 1666.874,
+        "max_ms": 1703.009,
+        "data_selects_min": 15,
+        "data_selects_max": 18,
+        "median_sql_ms": 1146.733,
+        "sample_durations_ms": [
+          1703.009, 1587.742, 1543.254, 1381.691, 1402.212, 1504.318, 1374.317,
+          1407.747, 1534.726, 1656.031, 1401.824, 1661.47, 1635.756, 1575.386,
+          1648.708, 1441.386, 1511.912, 1414.054, 1464.487, 1451.448, 1581.168,
+          1659.985, 1666.874, 1391.621, 1628.563
+        ]
+      }
+    },
+    {
+      "case": "citizen-to-converge",
+      "requested_steps": 100,
+      "duration_ms": 4059.819,
+      "data_selects": 16,
+      "metrics": {
+        "returned_steps": 100,
+        "duplicate_track_ids": 0,
+        "origin_family_occurrences": 1,
+        "destination_family_occurrences": 1,
+        "duplicate_song_families": 0,
+        "missing_song_identity": 0,
+        "unique_artists": 100,
+        "origin_preserved": true,
+        "destination_preserved": true,
+        "mean_adjacent_bpm_delta": 34.881818,
+        "bpm_transition_coverage": 1.0,
+        "mean_adjacent_bliss_cosine_distance": 0.019869,
+        "bliss_transition_coverage": 1.0
+      },
+      "budget_met": true,
+      "benchmark": {
+        "samples": 25,
+        "p50_ms": 4411.519,
+        "p95_ms": 4799.894,
+        "max_ms": 6275.222,
+        "data_selects_min": 16,
+        "data_selects_max": 19,
+        "median_sql_ms": 1719.682,
+        "sample_durations_ms": [
+          3832.335, 3841.257, 4123.094, 4497.258, 4491.995, 4799.47, 4702.58,
+          4384.969, 4453.056, 4450.779, 4412.873, 6275.222, 4586.072, 4372.981,
+          4357.441, 4216.764, 4422.989, 4411.519, 4799.894, 4356.919, 4379.968,
+          4286.719, 4461.132, 4379.793, 4299.777
+        ]
+      }
+    },
+    {
+      "case": "punk-to-electronic",
+      "requested_steps": 20,
+      "duration_ms": 2078.139,
+      "data_selects": 10,
+      "metrics": {
+        "returned_steps": 20,
+        "duplicate_track_ids": 0,
+        "origin_family_occurrences": 1,
+        "destination_family_occurrences": 1,
+        "duplicate_song_families": 0,
+        "missing_song_identity": 0,
+        "unique_artists": 18,
+        "origin_preserved": true,
+        "destination_preserved": true,
+        "mean_adjacent_bpm_delta": 24.931579,
+        "bpm_transition_coverage": 1.0,
+        "mean_adjacent_bliss_cosine_distance": 0.058981,
+        "bliss_transition_coverage": 1.0
+      },
+      "budget_met": false,
+      "benchmark": null
+    },
+    {
+      "case": "punk-to-electronic",
+      "requested_steps": 100,
+      "duration_ms": 3983.84,
+      "data_selects": 13,
+      "metrics": {
+        "returned_steps": 97,
+        "duplicate_track_ids": 0,
+        "origin_family_occurrences": 1,
+        "destination_family_occurrences": 1,
+        "duplicate_song_families": 0,
+        "missing_song_identity": 0,
+        "unique_artists": 88,
+        "origin_preserved": true,
+        "destination_preserved": true,
+        "mean_adjacent_bpm_delta": 28.05625,
+        "bpm_transition_coverage": 1.0,
+        "mean_adjacent_bliss_cosine_distance": 0.040914,
+        "bliss_transition_coverage": 1.0
+      },
+      "budget_met": true,
+      "benchmark": {
+        "samples": 25,
+        "p50_ms": 4022.268,
+        "p95_ms": 4366.713,
+        "max_ms": 4382.175,
+        "data_selects_min": 13,
+        "data_selects_max": 13,
+        "median_sql_ms": 1963.724,
+        "sample_durations_ms": [
+          4190.002, 4010.394, 4034.769, 4276.85, 3999.47, 4210.163, 3826.89,
+          4003.584, 3886.576, 3782.748, 3989.938, 3872.666, 4071.37, 3750.834,
+          4128.144, 4108.026, 4006.48, 3831.467, 3986.467, 4100.758, 4227.725,
+          4366.713, 4022.268, 4382.175, 4109.544
+        ]
+      }
+    }
+  ],
+  "scene_rotation_review": [
+    {
+      "case": "citizen-to-converge",
+      "origin": "CITIZEN",
+      "destination": "Converge",
+      "variants": [
+        {
+          "letter": "A",
+          "description": "Neutral reference",
+          "metrics": {
+            "returned_steps": 20,
+            "duplicate_track_ids": 0,
+            "origin_family_occurrences": 1,
+            "destination_family_occurrences": 1,
+            "duplicate_song_families": 0,
+            "missing_song_identity": 0,
+            "unique_artists": 20,
+            "origin_preserved": true,
+            "destination_preserved": true,
+            "mean_adjacent_bpm_delta": 24.310526,
+            "bpm_transition_coverage": 1.0,
+            "mean_adjacent_bliss_cosine_distance": 0.021916,
+            "bliss_transition_coverage": 1.0
+          },
+          "fresh_against_history": 20,
+          "repeated_from_history": 0,
+          "new_against_previous": null,
+          "repeated_from_previous": null,
+          "novelty_denominator": 20,
+          "tracks": [
+            {
+              "position": 1,
+              "artist": "CITIZEN",
+              "title": "The Night I Drove Alone",
+              "stage": "pop-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 2,
+              "artist": "Turnover",
+              "title": "Dizzy On the Comedown",
+              "stage": "pop-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 3,
+              "artist": "Title Fight",
+              "title": "Where Am I?",
+              "stage": "pop-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 4,
+              "artist": "Joyce Manor",
+              "title": "Leather Jacket",
+              "stage": "pop-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 5,
+              "artist": "Tigers Jaw",
+              "title": "Between Your Band and the Other Band",
+              "stage": "pop-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 6,
+              "artist": "Descendents",
+              "title": "Good Good Things",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 7,
+              "artist": "Hüsker Dü",
+              "title": "Something I Learned Today",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 8,
+              "artist": "Propagandhi",
+              "title": "Less Talk, More Rock",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 9,
+              "artist": "Rancid",
+              "title": "Radio",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 10,
+              "artist": "Dropkick Murphys",
+              "title": "I'm Shipping Up To Boston",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 11,
+              "artist": "Jawbreaker",
+              "title": "Jet Black",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 12,
+              "artist": "The Clash",
+              "title": "Rudie Can't Fail",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 13,
+              "artist": "The Jam",
+              "title": "Going Underground",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 14,
+              "artist": "Stiff Little Fingers",
+              "title": "Wasted Life",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 15,
+              "artist": "The Undertones",
+              "title": "My Perfect Cousin",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 16,
+              "artist": "Black Flag",
+              "title": "Rise Above",
+              "stage": "hardcore-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 17,
+              "artist": "Minor Threat",
+              "title": "I Don't Wanna Hear It",
+              "stage": "hardcore-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 18,
+              "artist": "Dag Nasty",
+              "title": "I’ve Heard",
+              "stage": "hardcore-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 19,
+              "artist": "Circle Jerks",
+              "title": "Red Tape",
+              "stage": "hardcore-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 20,
+              "artist": "Converge",
+              "title": "Phoenix in Flight",
+              "stage": "hardcore-punk",
+              "review_flags": ["fresh"]
+            }
+          ]
+        },
+        {
+          "letter": "B",
+          "description": "After listening to all of A",
+          "metrics": {
+            "returned_steps": 20,
+            "duplicate_track_ids": 0,
+            "origin_family_occurrences": 1,
+            "destination_family_occurrences": 1,
+            "duplicate_song_families": 0,
+            "missing_song_identity": 0,
+            "unique_artists": 20,
+            "origin_preserved": true,
+            "destination_preserved": true,
+            "mean_adjacent_bpm_delta": 31.942105,
+            "bpm_transition_coverage": 1.0,
+            "mean_adjacent_bliss_cosine_distance": 0.022938,
+            "bliss_transition_coverage": 1.0
+          },
+          "fresh_against_history": 19,
+          "repeated_from_history": 1,
+          "new_against_previous": null,
+          "repeated_from_previous": null,
+          "novelty_denominator": 20,
+          "tracks": [
+            {
+              "position": 1,
+              "artist": "CITIZEN",
+              "title": "How Does It Feel?",
+              "stage": "pop-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 2,
+              "artist": "Turnover",
+              "title": "Like Slow Disappearing",
+              "stage": "pop-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 3,
+              "artist": "Title Fight",
+              "title": "Lefty",
+              "stage": "pop-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 4,
+              "artist": "Modern Baseball",
+              "title": "Fine, Great",
+              "stage": "pop-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 5,
+              "artist": "Joyce Manor",
+              "title": "Falling in Love Again",
+              "stage": "pop-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 6,
+              "artist": "Descendents",
+              "title": "Hope",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 7,
+              "artist": "Hüsker Dü",
+              "title": "Don't Want to Know If You Are Lonely",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 8,
+              "artist": "Propagandhi",
+              "title": "Ska Sucks",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 9,
+              "artist": "Dropkick Murphys",
+              "title": "The State Of Massachusetts",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 10,
+              "artist": "Rancid",
+              "title": "Out of Control",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 11,
+              "artist": "Jawbreaker",
+              "title": "Boxcar",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 12,
+              "artist": "The Clash",
+              "title": "London Calling",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 13,
+              "artist": "Stiff Little Fingers",
+              "title": "Suspect Device",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 14,
+              "artist": "The Jam",
+              "title": "Town Called Malice",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 15,
+              "artist": "N8NOFACE",
+              "title": "Say Goodbye",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 16,
+              "artist": "Dag Nasty",
+              "title": "Circles",
+              "stage": "hardcore-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 17,
+              "artist": "Minor Threat",
+              "title": "I Don't Wanna Hear It",
+              "stage": "hardcore-punk",
+              "review_flags": ["heard in synthetic history"]
+            },
+            {
+              "position": 18,
+              "artist": "Black Flag",
+              "title": "Six Pack",
+              "stage": "hardcore-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 19,
+              "artist": "Bad Brains",
+              "title": "Banned in D.C.",
+              "stage": "hardcore-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 20,
+              "artist": "Converge",
+              "title": "Hell to Pay",
+              "stage": "hardcore-punk",
+              "review_flags": ["fresh"]
+            }
+          ]
+        },
+        {
+          "letter": "C",
+          "description": "Regenerate B without any new listening",
+          "metrics": {
+            "returned_steps": 20,
+            "duplicate_track_ids": 0,
+            "origin_family_occurrences": 1,
+            "destination_family_occurrences": 1,
+            "duplicate_song_families": 0,
+            "missing_song_identity": 0,
+            "unique_artists": 20,
+            "origin_preserved": true,
+            "destination_preserved": true,
+            "mean_adjacent_bpm_delta": 40.310526,
+            "bpm_transition_coverage": 1.0,
+            "mean_adjacent_bliss_cosine_distance": 0.024743,
+            "bliss_transition_coverage": 1.0
+          },
+          "fresh_against_history": 15,
+          "repeated_from_history": 5,
+          "new_against_previous": 19,
+          "repeated_from_previous": 1,
+          "novelty_denominator": 20,
+          "tracks": [
+            {
+              "position": 1,
+              "artist": "CITIZEN",
+              "title": "Sleep",
+              "stage": "pop-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 2,
+              "artist": "Turnover",
+              "title": "I Would Hate You If I Could",
+              "stage": "pop-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 3,
+              "artist": "Joyce Manor",
+              "title": "Heart Tattoo",
+              "stage": "pop-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 4,
+              "artist": "Tigers Jaw",
+              "title": "The Sun",
+              "stage": "pop-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 5,
+              "artist": "Title Fight",
+              "title": "Numb, But I Still Feel It",
+              "stage": "pop-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 6,
+              "artist": "Hüsker Dü",
+              "title": "Pink Turns to Blue",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 7,
+              "artist": "Descendents",
+              "title": "'Merican",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 8,
+              "artist": "Rancid",
+              "title": "Time Bomb",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 9,
+              "artist": "Propagandhi",
+              "title": "Less Talk, More Rock",
+              "stage": "punk",
+              "review_flags": ["heard in synthetic history"]
+            },
+            {
+              "position": 10,
+              "artist": "Dropkick Murphys",
+              "title": "Rose Tattoo",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 11,
+              "artist": "Jawbreaker",
+              "title": "Jet Black",
+              "stage": "punk",
+              "review_flags": ["heard in synthetic history"]
+            },
+            {
+              "position": 12,
+              "artist": "The Clash",
+              "title": "Lost in the Supermarket",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 13,
+              "artist": "The Jam",
+              "title": "The Eton Rifles",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 14,
+              "artist": "Stiff Little Fingers",
+              "title": "Wasted Life",
+              "stage": "punk",
+              "review_flags": ["heard in synthetic history"]
+            },
+            {
+              "position": 15,
+              "artist": "The Undertones",
+              "title": "My Perfect Cousin",
+              "stage": "punk",
+              "review_flags": ["heard in synthetic history"]
+            },
+            {
+              "position": 16,
+              "artist": "Black Flag",
+              "title": "Spray Paint",
+              "stage": "hardcore-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 17,
+              "artist": "Minor Threat",
+              "title": "Minor Threat",
+              "stage": "hardcore-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 18,
+              "artist": "Dag Nasty",
+              "title": "I’ve Heard",
+              "stage": "hardcore-punk",
+              "review_flags": ["heard in synthetic history"]
+            },
+            {
+              "position": 19,
+              "artist": "Bad Brains",
+              "title": "Attitude",
+              "stage": "hardcore-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 20,
+              "artist": "Converge",
+              "title": "Hell to Pay",
+              "stage": "hardcore-punk",
+              "review_flags": ["in previous generation B"]
+            }
+          ]
+        },
+        {
+          "letter": "D",
+          "description": "After listening to all of A and B",
+          "metrics": {
+            "returned_steps": 20,
+            "duplicate_track_ids": 0,
+            "origin_family_occurrences": 1,
+            "destination_family_occurrences": 1,
+            "duplicate_song_families": 0,
+            "missing_song_identity": 0,
+            "unique_artists": 20,
+            "origin_preserved": true,
+            "destination_preserved": true,
+            "mean_adjacent_bpm_delta": 40.310526,
+            "bpm_transition_coverage": 1.0,
+            "mean_adjacent_bliss_cosine_distance": 0.024743,
+            "bliss_transition_coverage": 1.0
+          },
+          "fresh_against_history": 14,
+          "repeated_from_history": 6,
+          "new_against_previous": 19,
+          "repeated_from_previous": 1,
+          "novelty_denominator": 20,
+          "tracks": [
+            {
+              "position": 1,
+              "artist": "CITIZEN",
+              "title": "Sleep",
+              "stage": "pop-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 2,
+              "artist": "Turnover",
+              "title": "I Would Hate You If I Could",
+              "stage": "pop-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 3,
+              "artist": "Joyce Manor",
+              "title": "Heart Tattoo",
+              "stage": "pop-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 4,
+              "artist": "Tigers Jaw",
+              "title": "The Sun",
+              "stage": "pop-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 5,
+              "artist": "Title Fight",
+              "title": "Numb, But I Still Feel It",
+              "stage": "pop-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 6,
+              "artist": "Hüsker Dü",
+              "title": "Pink Turns to Blue",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 7,
+              "artist": "Descendents",
+              "title": "'Merican",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 8,
+              "artist": "Rancid",
+              "title": "Time Bomb",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 9,
+              "artist": "Propagandhi",
+              "title": "Less Talk, More Rock",
+              "stage": "punk",
+              "review_flags": ["heard in synthetic history"]
+            },
+            {
+              "position": 10,
+              "artist": "Dropkick Murphys",
+              "title": "Rose Tattoo",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 11,
+              "artist": "Jawbreaker",
+              "title": "Jet Black",
+              "stage": "punk",
+              "review_flags": ["heard in synthetic history"]
+            },
+            {
+              "position": 12,
+              "artist": "The Clash",
+              "title": "Lost in the Supermarket",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 13,
+              "artist": "The Jam",
+              "title": "The Eton Rifles",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 14,
+              "artist": "Stiff Little Fingers",
+              "title": "Wasted Life",
+              "stage": "punk",
+              "review_flags": ["heard in synthetic history"]
+            },
+            {
+              "position": 15,
+              "artist": "The Undertones",
+              "title": "My Perfect Cousin",
+              "stage": "punk",
+              "review_flags": ["heard in synthetic history"]
+            },
+            {
+              "position": 16,
+              "artist": "Black Flag",
+              "title": "Spray Paint",
+              "stage": "hardcore-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 17,
+              "artist": "Minor Threat",
+              "title": "Minor Threat",
+              "stage": "hardcore-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 18,
+              "artist": "Dag Nasty",
+              "title": "I’ve Heard",
+              "stage": "hardcore-punk",
+              "review_flags": ["heard in synthetic history"]
+            },
+            {
+              "position": 19,
+              "artist": "Bad Brains",
+              "title": "Attitude",
+              "stage": "hardcore-punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 20,
+              "artist": "Converge",
+              "title": "Hell to Pay",
+              "stage": "hardcore-punk",
+              "review_flags": [
+                "heard in synthetic history",
+                "in previous generation B"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "punk-to-electronic",
+      "origin": "Punk",
+      "destination": "Electronic",
+      "variants": [
+        {
+          "letter": "A",
+          "description": "Neutral reference",
+          "metrics": {
+            "returned_steps": 20,
+            "duplicate_track_ids": 0,
+            "origin_family_occurrences": 1,
+            "destination_family_occurrences": 1,
+            "duplicate_song_families": 0,
+            "missing_song_identity": 0,
+            "unique_artists": 18,
+            "origin_preserved": true,
+            "destination_preserved": true,
+            "mean_adjacent_bpm_delta": 33.989474,
+            "bpm_transition_coverage": 1.0,
+            "mean_adjacent_bliss_cosine_distance": 0.033428,
+            "bliss_transition_coverage": 1.0
+          },
+          "fresh_against_history": 20,
+          "repeated_from_history": 0,
+          "new_against_previous": null,
+          "repeated_from_previous": null,
+          "novelty_denominator": 20,
+          "tracks": [
+            {
+              "position": 1,
+              "artist": "The Clash",
+              "title": "Rock the Casbah (Remastered)",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 2,
+              "artist": "The Jam",
+              "title": "Town Called Malice",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 3,
+              "artist": "Stiff Little Fingers",
+              "title": "Here We Are Nowhere",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 4,
+              "artist": "The Undertones",
+              "title": "Here Comes the Summer",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 5,
+              "artist": "Merzbow",
+              "title": "Ultra Marine Blues",
+              "stage": "japanoise",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 6,
+              "artist": "Masonna",
+              "title": "Untitled 1",
+              "stage": "japanoise",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 7,
+              "artist": "Prurient",
+              "title": "Mice Giant Mask",
+              "stage": "japanoise",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 8,
+              "artist": "Masonna",
+              "title": "Untitled 7",
+              "stage": "japanoise",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 9,
+              "artist": "Merzbow",
+              "title": "Woodpecker No. 2",
+              "stage": "japanoise",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 10,
+              "artist": "John Wiese",
+              "title": "Garden Path Sentence",
+              "stage": "japanoise",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 11,
+              "artist": "Nine Inch Nails",
+              "title": "Mr. Self Destruct",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 12,
+              "artist": "The Young Gods",
+              "title": "Kissing the Sun",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 13,
+              "artist": "Skinny Puppy",
+              "title": "Assimilate",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 14,
+              "artist": "Front Line Assembly",
+              "title": "Mindphaser",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 15,
+              "artist": "Einstürzende Neubauten",
+              "title": "Tanz Debil",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 16,
+              "artist": "Throbbing Gristle",
+              "title": "What a Day",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 17,
+              "artist": "M83",
+              "title": "My Tears Are Becoming a Sea",
+              "stage": "electronic",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 18,
+              "artist": "Caribou",
+              "title": "Home",
+              "stage": "electronic",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 19,
+              "artist": "Four Tet",
+              "title": "Unspoken",
+              "stage": "electronic",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 20,
+              "artist": "Aphex Twin",
+              "title": "Xtal",
+              "stage": "electronic",
+              "review_flags": ["fresh"]
+            }
+          ]
+        },
+        {
+          "letter": "B",
+          "description": "After listening to all of A",
+          "metrics": {
+            "returned_steps": 20,
+            "duplicate_track_ids": 0,
+            "origin_family_occurrences": 1,
+            "destination_family_occurrences": 1,
+            "duplicate_song_families": 0,
+            "missing_song_identity": 0,
+            "unique_artists": 18,
+            "origin_preserved": true,
+            "destination_preserved": true,
+            "mean_adjacent_bpm_delta": 28.189474,
+            "bpm_transition_coverage": 1.0,
+            "mean_adjacent_bliss_cosine_distance": 0.034358,
+            "bliss_transition_coverage": 1.0
+          },
+          "fresh_against_history": 19,
+          "repeated_from_history": 1,
+          "new_against_previous": null,
+          "repeated_from_previous": null,
+          "novelty_denominator": 20,
+          "tracks": [
+            {
+              "position": 1,
+              "artist": "Dropkick Murphys",
+              "title": "The State Of Massachusetts",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 2,
+              "artist": "Rancid",
+              "title": "Time Bomb",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 3,
+              "artist": "The Clash",
+              "title": "Lost in the Supermarket",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 4,
+              "artist": "The Jam",
+              "title": "The Eton Rifles",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 5,
+              "artist": "Masonna",
+              "title": "Untitled VIII",
+              "stage": "japanoise",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 6,
+              "artist": "Merzbow",
+              "title": "Worms Plastic Earthbound",
+              "stage": "japanoise",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 7,
+              "artist": "Prurient",
+              "title": "Jean Jacket",
+              "stage": "japanoise",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 8,
+              "artist": "Masonna",
+              "title": "Part I",
+              "stage": "japanoise",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 9,
+              "artist": "Merzbow",
+              "title": "Woodpecker No. 2",
+              "stage": "japanoise",
+              "review_flags": ["heard in synthetic history"]
+            },
+            {
+              "position": 10,
+              "artist": "John Wiese",
+              "title": "Bleskam (Action Sphere/Maya)",
+              "stage": "japanoise",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 11,
+              "artist": "Nine Inch Nails",
+              "title": "Only",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 12,
+              "artist": "The Young Gods",
+              "title": "Skinflowers",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 13,
+              "artist": "Einstürzende Neubauten",
+              "title": "Die Interimsliebenden",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 14,
+              "artist": "Throbbing Gristle",
+              "title": "Hamburger Lady",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 15,
+              "artist": "Skinny Puppy",
+              "title": "Smothered Hope",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 16,
+              "artist": "Front Line Assembly",
+              "title": "The Blade",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 17,
+              "artist": "M83",
+              "title": "Midnight City",
+              "stage": "electronic",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 18,
+              "artist": "Kavinsky",
+              "title": "Grand Canyon",
+              "stage": "electronic",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 19,
+              "artist": "Daft Punk",
+              "title": "Digital Love",
+              "stage": "electronic",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 20,
+              "artist": "The Chemical Brothers",
+              "title": "Galvanize",
+              "stage": "electronic",
+              "review_flags": ["fresh"]
+            }
+          ]
+        },
+        {
+          "letter": "C",
+          "description": "Regenerate B without any new listening",
+          "metrics": {
+            "returned_steps": 20,
+            "duplicate_track_ids": 0,
+            "origin_family_occurrences": 1,
+            "destination_family_occurrences": 1,
+            "duplicate_song_families": 0,
+            "missing_song_identity": 0,
+            "unique_artists": 18,
+            "origin_preserved": true,
+            "destination_preserved": true,
+            "mean_adjacent_bpm_delta": 44.131579,
+            "bpm_transition_coverage": 1.0,
+            "mean_adjacent_bliss_cosine_distance": 0.056468,
+            "bliss_transition_coverage": 1.0
+          },
+          "fresh_against_history": 17,
+          "repeated_from_history": 3,
+          "new_against_previous": 19,
+          "repeated_from_previous": 1,
+          "novelty_denominator": 20,
+          "tracks": [
+            {
+              "position": 1,
+              "artist": "Descendents",
+              "title": "Hope",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 2,
+              "artist": "Rancid",
+              "title": "Radio",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 3,
+              "artist": "Dropkick Murphys",
+              "title": "I'm Shipping Up To Boston",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 4,
+              "artist": "The Clash",
+              "title": "Should I Stay or Should I Go (Remastered)",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 5,
+              "artist": "Prurient",
+              "title": "S.T.D. Cocks",
+              "stage": "japanoise",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 6,
+              "artist": "Masonna",
+              "title": "Part Xxiv",
+              "stage": "japanoise",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 7,
+              "artist": "Merzbow",
+              "title": "Ultra Marine Blues",
+              "stage": "japanoise",
+              "review_flags": ["heard in synthetic history"]
+            },
+            {
+              "position": 8,
+              "artist": "Masonna",
+              "title": "Untitled 7",
+              "stage": "japanoise",
+              "review_flags": ["heard in synthetic history"]
+            },
+            {
+              "position": 9,
+              "artist": "Merzbow",
+              "title": "Woodpecker No. 2",
+              "stage": "japanoise",
+              "review_flags": [
+                "heard in synthetic history",
+                "in previous generation B"
+              ]
+            },
+            {
+              "position": 10,
+              "artist": "John Wiese",
+              "title": "Higashiikebukuro Bouquet Divisions",
+              "stage": "japanoise",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 11,
+              "artist": "The Young Gods",
+              "title": "Our House",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 12,
+              "artist": "Einstürzende Neubauten",
+              "title": "Sabrina",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 13,
+              "artist": "Throbbing Gristle",
+              "title": "Hot on the Heels of Love",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 14,
+              "artist": "Skinny Puppy",
+              "title": "Worlock",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 15,
+              "artist": "Front Line Assembly",
+              "title": "Angriff",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 16,
+              "artist": "Nine Inch Nails",
+              "title": "March Of The Pigs",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 17,
+              "artist": "M83",
+              "title": "Wait",
+              "stage": "electronic",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 18,
+              "artist": "Kavinsky",
+              "title": "Nightcall",
+              "stage": "electronic",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 19,
+              "artist": "Daft Punk",
+              "title": "Aerodynamic",
+              "stage": "electronic",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 20,
+              "artist": "The Prodigy",
+              "title": "Breathe",
+              "stage": "electronic",
+              "review_flags": ["fresh"]
+            }
+          ]
+        },
+        {
+          "letter": "D",
+          "description": "After listening to all of A and B",
+          "metrics": {
+            "returned_steps": 20,
+            "duplicate_track_ids": 0,
+            "origin_family_occurrences": 1,
+            "destination_family_occurrences": 1,
+            "duplicate_song_families": 0,
+            "missing_song_identity": 0,
+            "unique_artists": 18,
+            "origin_preserved": true,
+            "destination_preserved": true,
+            "mean_adjacent_bpm_delta": 44.131579,
+            "bpm_transition_coverage": 1.0,
+            "mean_adjacent_bliss_cosine_distance": 0.056468,
+            "bliss_transition_coverage": 1.0
+          },
+          "fresh_against_history": 17,
+          "repeated_from_history": 3,
+          "new_against_previous": 19,
+          "repeated_from_previous": 1,
+          "novelty_denominator": 20,
+          "tracks": [
+            {
+              "position": 1,
+              "artist": "Descendents",
+              "title": "Hope",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 2,
+              "artist": "Rancid",
+              "title": "Radio",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 3,
+              "artist": "Dropkick Murphys",
+              "title": "I'm Shipping Up To Boston",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 4,
+              "artist": "The Clash",
+              "title": "Should I Stay or Should I Go (Remastered)",
+              "stage": "punk",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 5,
+              "artist": "Prurient",
+              "title": "S.T.D. Cocks",
+              "stage": "japanoise",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 6,
+              "artist": "Masonna",
+              "title": "Part Xxiv",
+              "stage": "japanoise",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 7,
+              "artist": "Merzbow",
+              "title": "Ultra Marine Blues",
+              "stage": "japanoise",
+              "review_flags": ["heard in synthetic history"]
+            },
+            {
+              "position": 8,
+              "artist": "Masonna",
+              "title": "Untitled 7",
+              "stage": "japanoise",
+              "review_flags": ["heard in synthetic history"]
+            },
+            {
+              "position": 9,
+              "artist": "Merzbow",
+              "title": "Woodpecker No. 2",
+              "stage": "japanoise",
+              "review_flags": [
+                "heard in synthetic history",
+                "in previous generation B"
+              ]
+            },
+            {
+              "position": 10,
+              "artist": "John Wiese",
+              "title": "Higashiikebukuro Bouquet Divisions",
+              "stage": "japanoise",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 11,
+              "artist": "The Young Gods",
+              "title": "Our House",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 12,
+              "artist": "Einstürzende Neubauten",
+              "title": "Sabrina",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 13,
+              "artist": "Throbbing Gristle",
+              "title": "Hot on the Heels of Love",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 14,
+              "artist": "Skinny Puppy",
+              "title": "Worlock",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 15,
+              "artist": "Front Line Assembly",
+              "title": "Angriff",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 16,
+              "artist": "Nine Inch Nails",
+              "title": "March Of The Pigs",
+              "stage": "industrial",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 17,
+              "artist": "M83",
+              "title": "Wait",
+              "stage": "electronic",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 18,
+              "artist": "Kavinsky",
+              "title": "Nightcall",
+              "stage": "electronic",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 19,
+              "artist": "Daft Punk",
+              "title": "Aerodynamic",
+              "stage": "electronic",
+              "review_flags": ["fresh"]
+            },
+            {
+              "position": 20,
+              "artist": "The Prodigy",
+              "title": "Breathe",
+              "stage": "electronic",
+              "review_flags": ["fresh"]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "sql_parity": {
+    "all_rows_and_order_identical": true,
+    "genre_pool_rows": 595,
+    "anchor_rows": 48,
+    "comparison": "Case-normalized old query versus preaggregated query in same snapshot",
+    "before_ms": 3610.848,
+    "after_ms": 1173.792,
+    "ordered_rows_sha256": "a9d141d7f2bf93d2c3b2a6dcbaef411a6a95d713ea46dd93a2841153772af58c"
+  },
+  "cpu_equivalence": {
+    "read_only": true,
+    "history": "neutral listener 0; no historical events emitted or written",
+    "cases": [
+      {
+        "requested_steps": 20,
+        "pool_rows": 595,
+        "pool_load_ms": 1021.634,
+        "cpu_ms": {
+          "before_second_cpu_cache": 375.574,
+          "after_second_cpu_cache": 140.749
+        },
+        "ordered_output_identical": true,
+        "returned_steps": 20,
+        "source_hash": "cb37ebf155897d7b22b3b8d06b82a7b9f9f17b9cd29e5c6a3bb79bc336398734",
+        "pure_selection_data_queries": 0
+      },
+      {
+        "requested_steps": 100,
+        "pool_rows": 3195,
+        "pool_load_ms": 1463.558,
+        "cpu_ms": {
+          "before_second_cpu_cache": 6973.852,
+          "after_second_cpu_cache": 2442.016
+        },
+        "ordered_output_identical": true,
+        "returned_steps": 100,
+        "source_hash": "cb37ebf155897d7b22b3b8d06b82a7b9f9f17b9cd29e5c6a3bb79bc336398734",
+        "pure_selection_data_queries": 0
+      }
+    ]
+  },
+  "single_genre20_profile": {
+    "profiled_total_ms": 2430.541,
+    "profiled_sql_ms": 1694.686,
+    "queries": [
+      {
+        "kind": "significant_history",
+        "duration_ms": 6.123,
+        "rows": 0,
+        "genre": null
+      },
+      {
+        "kind": "endpoint_or_catalog_read",
+        "duration_ms": 0.537,
+        "rows": 1,
+        "genre": null
+      },
+      {
+        "kind": "endpoint_or_catalog_read",
+        "duration_ms": 0.165,
+        "rows": 1,
+        "genre": null
+      },
+      {
+        "kind": "scene_candidates",
+        "duration_ms": 617.514,
+        "rows": 160,
+        "genre": "punk"
+      },
+      {
+        "kind": "scene_candidates",
+        "duration_ms": 75.793,
+        "rows": 66,
+        "genre": "japanoise"
+      },
+      {
+        "kind": "scene_candidates",
+        "duration_ms": 317.588,
+        "rows": 160,
+        "genre": "industrial"
+      },
+      {
+        "kind": "scene_candidates",
+        "duration_ms": 635.806,
+        "rows": 160,
+        "genre": "electronic"
+      },
+      {
+        "kind": "artist_graph",
+        "duration_ms": 23.831,
+        "rows": 39906,
+        "genre": null
+      },
+      {
+        "kind": "genre_graph_or_endpoint",
+        "duration_ms": 4.842,
+        "rows": 5010,
+        "genre": null
+      },
+      {
+        "kind": "member_graph",
+        "duration_ms": 12.486,
+        "rows": 5457,
+        "genre": null
+      }
+    ],
+    "stage_cumulative_ms": {
+      "candidate_pool_loading": 1671.6,
+      "artist_graph_loading_and_construction": 390.748,
+      "selection_with_profiler": 340.174
+    }
+  },
+  "scarce_synthetic_fixture": {
+    "scope": "Pure local synthetic catalog fixture; six canonical songs, three genres; no production catalog is modified or masked",
+    "database_queries": 0,
+    "cases": [
+      {
+        "requested_steps": 20,
+        "all_candidates_recent_and_previous": false,
+        "returned_steps": 6,
+        "duplicate_song_families": 0,
+        "origin_genre_preserved": true,
+        "destination_genre_preserved": true,
+        "duration_ms": 0.994,
+        "ordered_fixture_titles": [
+          "Fixture song 1",
+          "Fixture song 2",
+          "Fixture song 3",
+          "Fixture song 4",
+          "Fixture song 5",
+          "Fixture song 6"
+        ]
+      },
+      {
+        "requested_steps": 20,
+        "all_candidates_recent_and_previous": true,
+        "returned_steps": 6,
+        "duplicate_song_families": 0,
+        "origin_genre_preserved": true,
+        "destination_genre_preserved": true,
+        "duration_ms": 0.684,
+        "ordered_fixture_titles": [
+          "Fixture song 1",
+          "Fixture song 2",
+          "Fixture song 3",
+          "Fixture song 4",
+          "Fixture song 5",
+          "Fixture song 6"
+        ]
+      },
+      {
+        "requested_steps": 100,
+        "all_candidates_recent_and_previous": false,
+        "returned_steps": 6,
+        "duplicate_song_families": 0,
+        "origin_genre_preserved": true,
+        "destination_genre_preserved": true,
+        "duration_ms": 0.636,
+        "ordered_fixture_titles": [
+          "Fixture song 1",
+          "Fixture song 2",
+          "Fixture song 3",
+          "Fixture song 4",
+          "Fixture song 5",
+          "Fixture song 6"
+        ]
+      },
+      {
+        "requested_steps": 100,
+        "all_candidates_recent_and_previous": true,
+        "returned_steps": 6,
+        "duplicate_song_families": 0,
+        "origin_genre_preserved": true,
+        "destination_genre_preserved": true,
+        "duration_ms": 0.658,
+        "ordered_fixture_titles": [
+          "Fixture song 1",
+          "Fixture song 2",
+          "Fixture song 3",
+          "Fixture song 4",
+          "Fixture song 5",
+          "Fixture song 6"
+        ]
+      }
+    ]
+  },
+  "acoustic_earlier_probe": {
+    "status": "Earlier pre-final tuning measurements, no accepted p95 and no repeated acoustic probes after missing-index diagnosis",
+    "cases": [
+      {
+        "case": "concubine-to-botch",
+        "origin": "Concubine — Converge",
+        "destination": "To Our Friends in the Great White North — Botch",
+        "waypoint_labels": [],
+        "requested_steps": 20,
+        "initial_probe_ms": 9063.105,
+        "data_selects": 29,
+        "metrics": {
+          "returned_steps": 20,
+          "duplicate_song_families": 0,
+          "missing_song_identity": 0,
+          "unique_artists": 15,
+          "origin_preserved": true,
+          "destination_preserved": true,
+          "mean_adjacent_bpm_delta": 38.052941,
+          "bpm_transition_coverage": 0.8947368421052632,
+          "mean_adjacent_bliss_cosine_distance": 0.000611,
+          "bliss_transition_coverage": 1.0
+        },
+        "tracks": [
+          {
+            "artist": "Converge",
+            "title": "Concubine"
+          },
+          {
+            "artist": "Year of the Knife",
+            "title": "Final Tears"
+          },
+          {
+            "artist": "Code Orange",
+            "title": "Bind You"
+          },
+          {
+            "artist": "Despised Icon",
+            "title": "Purgatory"
+          },
+          {
+            "artist": "Job For A Cowboy",
+            "title": "Grinding Wheels of Ophanim"
+          },
+          {
+            "artist": "Bucket",
+            "title": "Age of Ape and Men"
+          },
+          {
+            "artist": "Trap Them",
+            "title": "Sanitations"
+          },
+          {
+            "artist": "Converge",
+            "title": "Distance and Meaning (Live)"
+          },
+          {
+            "artist": "Car Bomb",
+            "title": "Secrets Within (Live)"
+          },
+          {
+            "artist": "Gojira",
+            "title": "This Emptiness"
+          },
+          {
+            "artist": "Converge",
+            "title": "For You"
+          },
+          {
+            "artist": "Between The Buried And Me",
+            "title": "Destructo Spin (2020 Remix / Remaster)"
+          },
+          {
+            "artist": "Meshuggah",
+            "title": "Stengah (Remastered 2006)"
+          },
+          {
+            "artist": "Converge",
+            "title": "Last Light"
+          },
+          {
+            "artist": "Mastodon",
+            "title": "Ghost of Karelia (Live at Brixton)"
+          },
+          {
+            "artist": "Viva Belgrado",
+            "title": "Erida"
+          },
+          {
+            "artist": "Meshuggah",
+            "title": "Violent Sleep of Reason"
+          },
+          {
+            "artist": "Car Bomb",
+            "title": "Blackened Battery (Live)"
+          },
+          {
+            "artist": "Life's Question",
+            "title": "Prayer For My Old Man"
+          },
+          {
+            "artist": "Botch",
+            "title": "To Our Friends in the Great White North"
+          }
+        ]
+      },
+      {
+        "case": "concubine-to-botch",
+        "origin": "Concubine — Converge",
+        "destination": "To Our Friends in the Great White North — Botch",
+        "waypoint_labels": [],
+        "requested_steps": 100,
+        "initial_probe_ms": 41316.83,
+        "data_selects": 109,
+        "metrics": {
+          "returned_steps": 100,
+          "duplicate_song_families": 0,
+          "missing_song_identity": 0,
+          "unique_artists": 61,
+          "origin_preserved": true,
+          "destination_preserved": true,
+          "mean_adjacent_bpm_delta": 30.729474,
+          "bpm_transition_coverage": 0.9595959595959596,
+          "mean_adjacent_bliss_cosine_distance": 0.000588,
+          "bliss_transition_coverage": 1.0
+        },
+        "tracks": []
+      },
+      {
+        "case": "jane-doe-to-romans-via-dillinger",
+        "origin": "Jane Doe — Converge",
+        "destination": "We Are the Romans — Botch",
+        "waypoint_labels": ["The Dillinger Escape Plan"],
+        "requested_steps": 20,
+        "initial_probe_ms": 8441.508,
+        "data_selects": 31,
+        "metrics": {
+          "returned_steps": 20,
+          "duplicate_song_families": 0,
+          "missing_song_identity": 0,
+          "unique_artists": 19,
+          "origin_preserved": true,
+          "destination_preserved": true,
+          "mean_adjacent_bpm_delta": 28.078947,
+          "bpm_transition_coverage": 1.0,
+          "mean_adjacent_bliss_cosine_distance": 0.000728,
+          "bliss_transition_coverage": 1.0
+        },
+        "tracks": [
+          {
+            "artist": "Converge",
+            "title": "The Broken Vow"
+          },
+          {
+            "artist": "The Ocean",
+            "title": "Equinox"
+          },
+          {
+            "artist": "Gojira",
+            "title": "Liquid Fire"
+          },
+          {
+            "artist": "Between The Buried And Me",
+            "title": "Roboturner"
+          },
+          {
+            "artist": "The Armed",
+            "title": "Local Millionaire"
+          },
+          {
+            "artist": "Botch",
+            "title": "One Twenty Two (Live)"
+          },
+          {
+            "artist": "Killer Be Killed",
+            "title": "Face Down"
+          },
+          {
+            "artist": "Incendiary",
+            "title": "Dissension"
+          },
+          {
+            "artist": "Higher Power",
+            "title": "Staring At The Sun"
+          },
+          {
+            "artist": "Defeater",
+            "title": "Blood in My Veins"
+          },
+          {
+            "artist": "Sumac",
+            "title": "Image of Control (II)"
+          },
+          {
+            "artist": "Envy",
+            "title": "Chacun de tes pas"
+          },
+          {
+            "artist": "The Blood Brothers",
+            "title": "Cecilia and the Silhouette Saloon"
+          },
+          {
+            "artist": "Car Bomb",
+            "title": "Lower the Blade"
+          },
+          {
+            "artist": "Ninjaspy",
+            "title": "Out of Tampons"
+          },
+          {
+            "artist": "These Arms are Snakes",
+            "title": "Crazy Woman Dirty Train"
+          },
+          {
+            "artist": "Jungle Rot",
+            "title": "Killing Spree"
+          },
+          {
+            "artist": "Norma Jean",
+            "title": "1,000,000 Watts"
+          },
+          {
+            "artist": "Cave In",
+            "title": "Ebola"
+          },
+          {
+            "artist": "Botch",
+            "title": "Transitions from Persona to Object (Demo)"
+          }
+        ]
+      },
+      {
+        "case": "jane-doe-to-romans-via-dillinger",
+        "origin": "Jane Doe — Converge",
+        "destination": "We Are the Romans — Botch",
+        "waypoint_labels": ["The Dillinger Escape Plan"],
+        "requested_steps": 100,
+        "initial_probe_ms": 39932.49,
+        "data_selects": 111,
+        "metrics": {
+          "returned_steps": 100,
+          "duplicate_song_families": 0,
+          "missing_song_identity": 0,
+          "unique_artists": 68,
+          "origin_preserved": true,
+          "destination_preserved": true,
+          "mean_adjacent_bpm_delta": 40.106186,
+          "bpm_transition_coverage": 0.9797979797979798,
+          "mean_adjacent_bliss_cosine_distance": 0.000584,
+          "bliss_transition_coverage": 1.0
+        },
+        "tracks": []
+      }
+    ]
+  },
+  "cosine_index_diagnostic": {
+    "production_schema_version": "138",
+    "expected_cosine_hnsw_index_missing": true,
+    "declared_since_migration": "027",
+    "production_candidate_jit_on_ms": 526.406,
+    "production_candidate_jit_off_ms": 472.009,
+    "local_anonymous_vector_fixture": {
+      "row_count": 137698,
+      "playable_count": 137698,
+      "samples_per_variant": 25,
+      "local_environment": {
+        "docker_image": "pgvector/pgvector:pg15",
+        "image_id": "sha256:a625400c9c19c92c0438d511240541004eb6e87874f36a46cf55636aabe645c6",
+        "architecture": "arm64",
+        "postgres_version": "15.19",
+        "pgvector_version": "0.8.6",
+        "container_memory_limit_mb": 512,
+        "container_shared_memory_mb": 192,
+        "client_latency_includes_local_driver_and_tcp": true
+      },
+      "production_versions": {
+        "postgres_version": "15.18 (Debian 15.18-1.pgdg12+1)",
+        "pgvector_version": "0.8.5"
+      },
+      "index_build_ms": 11514.13,
+      "variants": {
+        "without_cosine_index": {
+          "median_ms": 10.583,
+          "p95_ms": 12.352,
+          "min_ms": 9.448,
+          "max_ms": 13.52,
+          "mean_top15_overlap_with_exact": 1.0,
+          "plan_execution_ms": 11.665
+        },
+        "with_cosine_index": {
+          "median_ms": 0.419,
+          "p95_ms": 0.712,
+          "min_ms": 0.3,
+          "max_ms": 0.823,
+          "mean_top15_overlap_with_exact": 1.0,
+          "plan_execution_ms": 0.17
+        }
+      },
+      "limitations": [
+        "Local ARM64 Docker fixture differs from production hardware and PostgreSQL/pgvector patch versions.",
+        "Uses anonymous position identifiers and real vectors plus exact playability flags, with no joins or metadata hydration.",
+        "Mean top15 overlap is measured for 25 probes and does not establish universal ANN recall or musical correctness.",
+        "These times cannot be substituted for complete Music Paths endpoint latency."
+      ]
+    },
+    "ann_expansion_capacity": {
+      "scope": "Local anonymous real-vector corpus; expansion capacity only, not endpoint timing",
+      "default_settings": {
+        "hnsw.ef_search": "40",
+        "hnsw.iterative_scan": "off"
+      },
+      "cases": [
+        {
+          "mode": "default",
+          "requested_limit": 15,
+          "returned_rows": 15,
+          "overlap_with_exact": 1.0,
+          "query_and_explain_ms": 12.581,
+          "indexes_used": ["idx_benchmark_embedding_cosine_hnsw"]
+        },
+        {
+          "mode": "default",
+          "requested_limit": 60,
+          "returned_rows": 40,
+          "overlap_with_exact": 0.6666666666666666,
+          "query_and_explain_ms": 2.179,
+          "indexes_used": ["idx_benchmark_embedding_cosine_hnsw"]
+        },
+        {
+          "mode": "default",
+          "requested_limit": 240,
+          "returned_rows": 40,
+          "overlap_with_exact": 0.16666666666666666,
+          "query_and_explain_ms": 1.46,
+          "indexes_used": ["idx_benchmark_embedding_cosine_hnsw"]
+        },
+        {
+          "mode": "ef_search_240",
+          "requested_limit": 15,
+          "returned_rows": 15,
+          "overlap_with_exact": 1.0,
+          "query_and_explain_ms": 8.206,
+          "indexes_used": ["idx_benchmark_embedding_cosine_hnsw"]
+        },
+        {
+          "mode": "ef_search_240",
+          "requested_limit": 60,
+          "returned_rows": 60,
+          "overlap_with_exact": 1.0,
+          "query_and_explain_ms": 6.419,
+          "indexes_used": ["idx_benchmark_embedding_cosine_hnsw"]
+        },
+        {
+          "mode": "ef_search_240",
+          "requested_limit": 240,
+          "returned_rows": 240,
+          "overlap_with_exact": 1.0,
+          "query_and_explain_ms": 3.34,
+          "indexes_used": ["idx_benchmark_embedding_cosine_hnsw"]
+        }
+      ]
+    },
+    "ann_filtered_expansion_capacity": {
+      "scope": "Local real anonymous vector fixture; exact nearest neighbors excluded to exercise ANN postfiltering",
+      "production_mutations": 0,
+      "cases": [
+        {
+          "mode": "default",
+          "excluded_nearest_neighbors": 40,
+          "requested_limit": 15,
+          "returned_rows": 1
+        },
+        {
+          "mode": "default",
+          "excluded_nearest_neighbors": 40,
+          "requested_limit": 240,
+          "returned_rows": 1
+        },
+        {
+          "mode": "default",
+          "excluded_nearest_neighbors": 240,
+          "requested_limit": 15,
+          "returned_rows": 0
+        },
+        {
+          "mode": "default",
+          "excluded_nearest_neighbors": 240,
+          "requested_limit": 240,
+          "returned_rows": 0
+        },
+        {
+          "mode": "ef_only",
+          "excluded_nearest_neighbors": 40,
+          "requested_limit": 15,
+          "returned_rows": 15
+        },
+        {
+          "mode": "ef_only",
+          "excluded_nearest_neighbors": 40,
+          "requested_limit": 240,
+          "returned_rows": 209
+        },
+        {
+          "mode": "ef_only",
+          "excluded_nearest_neighbors": 240,
+          "requested_limit": 15,
+          "returned_rows": 9
+        },
+        {
+          "mode": "ef_only",
+          "excluded_nearest_neighbors": 240,
+          "requested_limit": 240,
+          "returned_rows": 9
+        },
+        {
+          "mode": "ef_and_iterative",
+          "excluded_nearest_neighbors": 40,
+          "requested_limit": 15,
+          "returned_rows": 15
+        },
+        {
+          "mode": "ef_and_iterative",
+          "excluded_nearest_neighbors": 40,
+          "requested_limit": 240,
+          "returned_rows": 240
+        },
+        {
+          "mode": "ef_and_iterative",
+          "excluded_nearest_neighbors": 240,
+          "requested_limit": 15,
+          "returned_rows": 15
+        },
+        {
+          "mode": "ef_and_iterative",
+          "excluded_nearest_neighbors": 240,
+          "requested_limit": 240,
+          "returned_rows": 240
+        }
+      ]
+    }
+  },
+  "review_findings": [
+    "Punk→electronic still crosses punk→japanoise→industrial→electronic; A has The Undertones “Here Comes the Summer” immediately followed by Merzbow “Ultra Marine Blues”. Listening review is required.",
+    "The resolved Dillinger artist waypoint is vector/context guidance; the earlier twenty-song album route contains no Dillinger song.",
+    "The genre route requested100 and returned97 without duplicated families. Explicit partial-result metadata is part of pending checkpoint3.4.",
+    "BPM deltas rise in some regeneration lists; this is a review signal, not a proof of incoherence."
+  ],
+  "remaining_gates": [
+    "Musical review of these lists and genre transitions.",
+    "Checkpoint3.4 generation metadata and warnings.",
+    "Checkpoint3.5 evaluation and remaining scoped QA.",
+    "Genre20 single probe exceeded2s; no25-sample p95 was claimed.",
+    "End-to-end acoustic performance after index deployment and route-scoped ANN expansion settings."
+  ]
+}

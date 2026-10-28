@@ -605,6 +605,10 @@ def test_scene_path_uses_unseen_artists_before_repeating_and_never_consecutively
 def test_music_path_planning_uses_scene_engine_before_acoustic_fallback(monkeypatch):
     from crate import music_paths as paths_service_planning
 
+    monkeypatch.setattr(
+        paths_service_planning, "history_for_candidates", lambda *a, **k: {}
+    )
+
     scene_tracks = [
         {
             "step": 0,
