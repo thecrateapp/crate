@@ -2,12 +2,12 @@ import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useState } from "react";
 import { Link } from "react-router";
 import {
-  Activity,
   Bot,
   Download,
   AlignLeft,
   Save,
   Share2,
+  Shield,
 } from "@crate/ui/icons";
 import { PageHero } from "@crate/ui/domain/hero";
 import { MediaCover } from "@crate/ui/domain/media/MediaCover";
@@ -402,7 +402,7 @@ export function AlbumHeader({
                 onClick={() => void diagnose()}
                 loading={diagnosing}
               >
-                <Activity data-admin-ux="album-diagnose" aria-hidden="true" />
+                <Shield data-admin-ux="album-diagnose" aria-hidden="true" />
               </ActionButton>
             ) : null}
             {children}

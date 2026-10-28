@@ -12,7 +12,6 @@ import { ArtistHeroFrame } from "@crate/ui/domain/ArtistHeroFrame";
 import { ActionButton, ActionGroup } from "@crate/ui/primitives/ActionGroup";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import {
-  Activity,
   AlignLeft,
   Archive,
   AudioLines,
@@ -20,6 +19,7 @@ import {
   ListMusic,
   Pencil,
   RefreshCw,
+  Shield,
   Toolbox,
   Tag,
   Trash2,
@@ -239,7 +239,7 @@ export function ArtistHeroSection({
           onClick={onDiagnose}
           loading={diagnosing}
         >
-          <Activity data-admin-ux="artist-diagnose" aria-hidden="true" />
+          <Shield data-admin-ux="artist-diagnose" aria-hidden="true" />
         </ActionButton>
       ) : null}
       {canMerge && onMerge ? (
