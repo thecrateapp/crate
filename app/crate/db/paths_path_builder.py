@@ -5,12 +5,13 @@ from __future__ import annotations
 from crate.db.paths_candidates import _find_anchor_track, _find_best_candidate
 from crate.db.paths_similarity import (
     _artist_affinity,
-    _genre_overlap,
     _load_artist_genres,
     _load_artist_similarity_graph,
     _load_shared_members_graph,
+    make_path_genre_overlap_scorer,
 )
-from crate.db.paths_vectors import _lerp, resolve_endpoint_label
+from crate.db.paths_vectors import _lerp
+from crate.db.queries.recommendation_context import load_endpoint_contexts
 
 
 def compute_path(
@@ -41,9 +42,13 @@ def compute_path(
     used_titles: set[str] = set()
     recent_artists: list[str] = []
 
-    origin_label = resolve_endpoint_label(origin_type, origin_value)
-    dest_label = resolve_endpoint_label(dest_type, dest_value)
-    target_artists = [origin_label, dest_label]
+    contexts = load_endpoint_contexts(
+        [(origin_type, origin_value), (dest_type, dest_value)]
+    )
+    target_artists = list(
+        dict.fromkeys(artist for context in contexts for artist in context["artists"])
+    )
+    genre_overlap = make_path_genre_overlap_scorer(genre_map, contexts)
 
     def make_entry(track: dict, step: int, progress: float) -> dict:
         title_key = f"{track['artist']}::{track['title']}"
@@ -118,7 +123,7 @@ def compute_path(
                 member_graph,
                 target_artists,
                 artist_affinity=_artist_affinity,
-                genre_overlap=_genre_overlap,
+                genre_overlap=genre_overlap,
             )
             if track:
                 path_tracks.append(make_entry(track, global_step, global_progress))
