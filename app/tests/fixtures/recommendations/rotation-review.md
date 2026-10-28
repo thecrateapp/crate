@@ -105,4 +105,4 @@ A separate representative history benchmark (48,004 tracks, 100,001 events, 1,25
 
 ## Review gate
 
-Implementation and scoped checks are complete. Review the B/C lists with Diego before publishing PR2. PR2 remains stacked on PR #299; merge, deployment and Music Paths changes are outside this checkpoint.
+Implementation and scoped checks are complete. Diego approved the B/C lists and publication of PR2 on 2026-10-28. PR2 remains stacked on PR #299; merge, deployment and Music Paths changes are outside this checkpoint.

@@ -73,4 +73,4 @@ The first nine Concubine picks match the previously reviewed example. The refere
 
 ## Review checkpoint
 
-Diego approved these references on 2026-10-28. Significant-listen history, bounded candidate expansion and seven-day rotation are implemented in PR2. Review the new lists in [rotation-review.md](rotation-review.md) before publishing. Musical weights, drift settings, ingestion behavior and application UI remain unchanged.
+Diego approved these references and the new lists in [rotation-review.md](rotation-review.md) on 2026-10-28, authorizing publication of PR2. Significant-listen history, bounded candidate expansion and seven-day rotation are implemented. Musical weights, drift settings, ingestion behavior and application UI remain unchanged.
