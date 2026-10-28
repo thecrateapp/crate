@@ -221,6 +221,7 @@ function NodeDetailPanel({
   >({});
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [proposal, setProposal] = useState<TaxonomyNodeProposal | null>(null);
+  const [proposalVersion, setProposalVersion] = useState(0);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [coverBroken, setCoverBroken] = useState(false);
   const [coverVersion, setCoverVersion] = useState(0);
@@ -267,6 +268,25 @@ function NodeDetailPanel({
     onRefetch?.();
   };
 
+  const metadataChanged =
+    descriptionDraft !== (node.description ?? "") ||
+    topLevelDraft !== node.top_level;
+
+  const settleProposal = (
+    applied: (current: TaxonomyNodeProposal) => TaxonomyNodeProposal,
+  ) => {
+    setProposal((current) => {
+      if (!current) return current;
+      const next = applied(current);
+      const pending =
+        next.description ||
+        next.aliases.length > 0 ||
+        next.relations.length > 0 ||
+        next.eq_gains?.length === 10;
+      return pending ? next : null;
+    });
+  };
+
   const saveMetadata = async () => {
     setSavingKey("metadata");
     try {
@@ -275,6 +295,7 @@ function NodeDetailPanel({
         top_level: topLevelDraft,
       });
       toast.success("Genre metadata saved");
+      settleProposal((current) => ({ ...current, description: "" }));
       onRefetch?.();
     } catch {
       toast.error("Failed to save genre metadata");
@@ -316,6 +337,15 @@ function NodeDetailPanel({
       } else {
         toast.success("Taxonomy relationships saved");
       }
+      const saved = new Set<string>(
+        changedRelations.map((config) => config.key),
+      );
+      settleProposal((current) => ({
+        ...current,
+        relations: current.relations.filter(
+          (relation) => !saved.has(relation.relation_type),
+        ),
+      }));
       onRefetch?.();
     } catch {
       toast.error(
@@ -373,12 +403,72 @@ function NodeDetailPanel({
       } else if (skippedCount > 0) {
         toast.warning("No aliases applied");
       }
+      settleProposal((current) => ({ ...current, aliases: [] }));
       onRefetch?.();
     } catch {
       toast.error("Failed to apply aliases");
     } finally {
       setSavingKey(null);
     }
+  };
+
+  const applyProposal = async () => {
+    if (!proposal) return;
+    setSavingKey("apply-proposal");
+    const failed: string[] = [];
+    const attempt = async (label: string, write: () => Promise<unknown>) => {
+      try {
+        await write();
+      } catch {
+        failed.push(label);
+      }
+    };
+    if (metadataChanged) {
+      await attempt("description", () =>
+        api(`/api/genres/taxonomy/${node.slug}`, "PATCH", {
+          description: descriptionDraft,
+          top_level: topLevelDraft,
+        }),
+      );
+    }
+    for (const config of changedRelations) {
+      await attempt(config.label.toLowerCase(), () =>
+        api(`/api/genres/taxonomy/${node.slug}/relations`, "PUT", {
+          relation_type: config.key,
+          target_slugs: relationDrafts[config.key] ?? [],
+        }),
+      );
+    }
+    if (proposal.aliases.length > 0) {
+      await attempt("aliases", () =>
+        api(`/api/genres/taxonomy/${node.slug}/aliases`, "PUT", {
+          alias_names: proposal.aliases,
+        }),
+      );
+    }
+    if (proposal.eq_gains?.length === 10) {
+      const gains = proposal.eq_gains;
+      await attempt("EQ curve", () =>
+        api(`/api/genres/${node.slug}/eq-preset`, "PATCH", { gains }),
+      );
+    }
+    setSavingKey(null);
+    onRefetch?.();
+    if (failed.length > 0) {
+      toast.error(`Could not apply: ${failed.join(", ")}`);
+      return;
+    }
+    setProposal(null);
+    setProposalVersion((version) => version + 1);
+    toast.success(`AI proposal applied to ${node.name}`);
+  };
+
+  const discardProposal = () => {
+    setDescriptionDraft(node.description ?? "");
+    setTopLevelDraft(node.top_level);
+    setRelationDrafts({});
+    setProposal(null);
+    setProposalVersion((version) => version + 1);
   };
 
   const deleteNode = async () => {
@@ -605,6 +695,21 @@ function NodeDetailPanel({
           <GenreManagementSection
             title="Editorial Data"
             description="Maintain the canonical description, cover and taxonomy role. AI enrichment stages suggestions for review."
+            actions={
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={savingKey !== null || !metadataChanged}
+                onClick={saveMetadata}
+              >
+                {savingKey === "metadata" ? (
+                  <Loader2 size={13} className="mr-1 animate-spin" />
+                ) : (
+                  <Save size={13} className="mr-1" />
+                )}
+                Save editorial data
+              </Button>
+            }
           >
             <div className="grid gap-4 sm:grid-cols-[minmax(180px,240px)_minmax(0,1fr)]">
               <div className="crate-form-field">
@@ -686,9 +791,31 @@ function NodeDetailPanel({
                 </MonoLabel>
                 <p className="mb-0 mt-2 text-sm leading-5 text-text-muted">
                   {proposal.eq_gains?.length === 10
-                    ? "Description, relationships and the 10-band EQ curve are staged for review. Save each section when it is ready; AI never writes these changes automatically."
-                    : "Description and relationship suggestions are staged for review. Save each section when it is ready; AI never writes these changes automatically."}
+                    ? "Description, relationships and the 10-band EQ curve are staged for review. Apply the whole proposal, save sections one by one, or discard it; AI never writes these changes automatically."
+                    : "Description and relationship suggestions are staged for review. Apply the whole proposal, save sections one by one, or discard it; AI never writes these changes automatically."}
                 </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    disabled={savingKey !== null}
+                    onClick={applyProposal}
+                  >
+                    {savingKey === "apply-proposal" ? (
+                      <Loader2 size={13} className="mr-1 animate-spin" />
+                    ) : (
+                      <Save size={13} className="mr-1" />
+                    )}
+                    Apply proposal
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={savingKey !== null}
+                    onClick={discardProposal}
+                  >
+                    Discard
+                  </Button>
+                </div>
                 {proposal.reasoning ? (
                   <p className="mb-0 mt-2">{proposal.reasoning}</p>
                 ) : null}
@@ -729,6 +856,7 @@ function NodeDetailPanel({
             description="Set the curve applied to tracks in this genre when Genre Adaptive is enabled."
           >
             <GenreEqEditor
+              key={`${node.slug}:${proposalVersion}`}
               canonicalSlug={node.slug}
               canonicalName={node.name}
               initialGains={
@@ -755,7 +883,14 @@ function NodeDetailPanel({
               aiProposalGains={proposal?.eq_gains ?? null}
               aiProposalReasoning={proposal?.eq_reasoning ?? null}
               embedded
-              onSaved={onRefetch}
+              onSaved={() => {
+                settleProposal((current) => ({
+                  ...current,
+                  eq_gains: undefined,
+                  eq_reasoning: undefined,
+                }));
+                onRefetch?.();
+              }}
             />
           </GenreManagementSection>
         ) : null}

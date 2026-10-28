@@ -444,6 +444,135 @@ describe("GenreTaxonomyTree", () => {
     expect(apiMock).toHaveBeenCalledTimes(1);
   });
 
+  async function stageHardcoreProposal() {
+    llmStatusMock.mockReturnValue({ available: true });
+    apiMock.mockResolvedValueOnce({
+      description: "A forceful hardcore offshoot with metallic riffs.",
+      aliases: ["hc"],
+      relations: [
+        {
+          relation_type: "parent",
+          target_slugs: ["punk"],
+          confidence: 0.91,
+          reasoning: "The local scene lineage supports this parent.",
+        },
+      ],
+      eq_gains: [1, 2, 1, 0, -1, 0, 1, 2, 1, 0],
+      eq_reasoning: "Shape the low mids and add presence.",
+      reasoning: "The local catalog points to punk lineage.",
+    });
+    renderTree({ canCurate: true });
+    fireEvent.click(screen.getByText("Hardcore"));
+    fireEvent.click(screen.getByRole("button", { name: "Enrich with AI" }));
+    await screen.findByText("Enrichment proposal ready to review");
+  }
+
+  it("applies every staged part of the AI proposal at once", async () => {
+    await stageHardcoreProposal();
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply proposal" }));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByText("Enrichment proposal ready to review"),
+      ).not.toBeInTheDocument(),
+    );
+    expect(apiMock).toHaveBeenCalledWith(
+      "/api/genres/taxonomy/hardcore",
+      "PATCH",
+      {
+        description: "A forceful hardcore offshoot with metallic riffs.",
+        top_level: true,
+      },
+    );
+    expect(apiMock).toHaveBeenCalledWith(
+      "/api/genres/taxonomy/hardcore/relations",
+      "PUT",
+      { relation_type: "parent", target_slugs: ["punk"] },
+    );
+    expect(apiMock).toHaveBeenCalledWith(
+      "/api/genres/taxonomy/hardcore/aliases",
+      "PUT",
+      { alias_names: ["hc"] },
+    );
+    expect(apiMock).toHaveBeenCalledWith(
+      "/api/genres/hardcore/eq-preset",
+      "PATCH",
+      { gains: [1, 2, 1, 0, -1, 0, 1, 2, 1, 0] },
+    );
+    expect(screen.getByTestId("eq-editor")).toHaveAttribute(
+      "data-ai-gains",
+      "",
+    );
+  });
+
+  it("keeps the proposal and names the parts that failed to apply", async () => {
+    await stageHardcoreProposal();
+    apiMock.mockImplementation((path: string) =>
+      path.endsWith("/eq-preset")
+        ? Promise.reject(new Error("offline"))
+        : Promise.resolve({}),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply proposal" }));
+
+    const { toast } = await import("sonner");
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("Could not apply: EQ curve"),
+    );
+    expect(
+      screen.getByText("Enrichment proposal ready to review"),
+    ).toBeInTheDocument();
+  });
+
+  it("discards the proposal and restores the saved values", async () => {
+    await stageHardcoreProposal();
+    const calls = apiMock.mock.calls.length;
+
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+
+    expect(
+      screen.queryByText("Enrichment proposal ready to review"),
+    ).not.toBeInTheDocument();
+    expect(
+      document.querySelector<HTMLTextAreaElement>("#genre-description")?.value,
+    ).toBe("Fast, direct, and loud.");
+    expect(screen.getByTestId("eq-editor")).toHaveAttribute(
+      "data-ai-gains",
+      "",
+    );
+    expect(apiMock.mock.calls.length).toBe(calls);
+  });
+
+  it("stops highlighting a staged section once that section is saved", async () => {
+    await stageHardcoreProposal();
+    expect(screen.getByText(/AI 91%/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save relationships" }));
+
+    await waitFor(() =>
+      expect(screen.queryByText(/AI 91%/)).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByText("Enrichment proposal ready to review"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Save editorial data" }),
+    );
+
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        "/api/genres/taxonomy/hardcore",
+        "PATCH",
+        {
+          description: "A forceful hardcore offshoot with metallic riffs.",
+          top_level: true,
+        },
+      ),
+    );
+  });
+
   it("preserves dirty metadata and relationships while refreshing clean fields of the same genre", async () => {
     const freshTree = {
       ...taxonomyTree,
