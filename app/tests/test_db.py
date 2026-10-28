@@ -3037,6 +3037,85 @@ class TestLibraryCRUD:
             pg_db.get_library_album("Amenra", "Mass I (Remastered)")["track_count"] == 6
         )
 
+    def test_canonical_edition_folder_never_adopts_a_sibling_by_release_group(
+        self, pg_db
+    ):
+        from crate.db.tx import transaction_scope
+
+        pg_db.upsert_artist({"name": "Type O Negative"})
+        standard_uid = str(uuid4())
+        special_uid = str(uuid4())
+        release_group = str(uuid4())
+        special_release = str(uuid4())
+        standard_id = pg_db.upsert_album(
+            {
+                "artist": "Type O Negative",
+                "name": "October Rust",
+                "entity_uid": standard_uid,
+                "path": f"/music/artist/{standard_uid}",
+                "track_count": 15,
+            }
+        )
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    "UPDATE library_albums SET musicbrainz_albumid = :release, "
+                    "musicbrainz_releasegroupid = :group WHERE id = :id"
+                ),
+                {"release": special_release, "group": release_group, "id": standard_id},
+            )
+
+        special_id = pg_db.upsert_album(
+            {
+                "artist": "Type O Negative",
+                "name": "October Rust (Special Edition)",
+                "entity_uid": special_uid,
+                "path": f"/music/artist/{special_uid}",
+                "track_count": 18,
+                "musicbrainz_albumid": special_release,
+                "musicbrainz_releasegroupid": release_group,
+            }
+        )
+
+        assert special_id != standard_id
+        standard = pg_db.get_library_album("Type O Negative", "October Rust")
+        special = pg_db.get_library_album(
+            "Type O Negative", "October Rust (Special Edition)"
+        )
+        assert str(standard["entity_uid"]) == standard_uid
+        assert standard["path"] == f"/music/artist/{standard_uid}"
+        assert str(special["entity_uid"]) == special_uid
+        assert special["track_count"] == 18
+
+    def test_legacy_folder_still_follows_its_release_when_moved(self, pg_db):
+        pg_db.upsert_artist({"name": "Amenra"})
+        release = str(uuid4())
+        album_id = pg_db.upsert_album(
+            {
+                "artist": "Amenra",
+                "name": "Mass VI",
+                "path": "/music/Amenra/Mass VI",
+                "track_count": 6,
+                "musicbrainz_albumid": release,
+            }
+        )
+
+        moved_id = pg_db.upsert_album(
+            {
+                "artist": "Amenra",
+                "name": "Mass VI",
+                "path": "/music/Amenra/2017 - Mass VI",
+                "track_count": 6,
+                "musicbrainz_albumid": release,
+            }
+        )
+
+        assert moved_id == album_id
+        assert (
+            pg_db.get_library_album("Amenra", "Mass VI")["path"]
+            == "/music/Amenra/2017 - Mass VI"
+        )
+
     def test_upsert_track(self, pg_db):
         from crate.db.tx import transaction_scope
 

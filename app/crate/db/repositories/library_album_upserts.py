@@ -59,7 +59,11 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
             existing = s.execute(
                 select(*existing_columns).where(entity_match).limit(1)
             ).first()
-        if existing is None and (requested_mbid or requested_rgid):
+        if (
+            existing is None
+            and requested_entity_uid is None
+            and (requested_mbid or requested_rgid)
+        ):
             existing = s.execute(
                 select(*existing_columns)
                 .where(
@@ -71,6 +75,15 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
                         if requested_rgid
                         else false(),
                     )
+                )
+                .limit(1)
+            ).first()
+        elif existing is None and requested_mbid:
+            existing = s.execute(
+                select(*existing_columns)
+                .where(
+                    LibraryAlbum.musicbrainz_albumid == requested_mbid,
+                    func.lower(LibraryAlbum.name) == str(data["name"]).lower(),
                 )
                 .limit(1)
             ).first()
