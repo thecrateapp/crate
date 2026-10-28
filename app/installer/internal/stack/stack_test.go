@@ -3,6 +3,7 @@ package stack
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -127,5 +128,52 @@ func TestParseServicesAcceptsBothComposeFormats(t *testing.T) {
 	}
 	if services, err := ParseServices("  "); err != nil || services != nil {
 		t.Errorf("empty output: %+v, %v", services, err)
+	}
+}
+
+type failingUpRunner struct {
+	recordingRunner
+	created string
+}
+
+func (r *failingUpRunner) Output(_ context.Context, name string, args ...string) (string, error) {
+	r.calls = append(r.calls, name+" "+strings.Join(args, " "))
+	return r.created, nil
+}
+
+func (r *failingUpRunner) Stream(ctx context.Context, w io.Writer, dir, name string, args ...string) error {
+	r.recordingRunner.Stream(ctx, w, dir, name, args...)
+	if strings.Contains(strings.Join(args, " "), " up -d") {
+		return errors.New("compose up failed")
+	}
+	return nil
+}
+
+func TestAFailedUpStartsTheServicesItLeftCreated(t *testing.T) {
+	runner := &failingUpRunner{created: "crate-api\ncrate-worker\n"}
+	s := Stack{Run: runner, Compose: []string{"docker", "compose"}, Dir: "/srv/crate"}
+
+	err := s.Up(context.Background(), &bytes.Buffer{})
+
+	if err == nil || !strings.Contains(err.Error(), "crate-api, crate-worker") {
+		t.Fatalf("error = %v", err)
+	}
+	calls := strings.Join(runner.calls, "\n")
+	if !strings.Contains(calls, "ps --all --status created --format {{.Service}}") {
+		t.Fatalf("created services were not listed:\n%s", calls)
+	}
+	if !strings.HasSuffix(calls, "start crate-api crate-worker") {
+		t.Fatalf("created services were not started:\n%s", calls)
+	}
+}
+
+func TestAFailedUpWithNothingCreatedReturnsTheOriginalError(t *testing.T) {
+	runner := &failingUpRunner{}
+	s := Stack{Run: runner, Compose: []string{"docker", "compose"}, Dir: "/srv/crate"}
+
+	err := s.Up(context.Background(), &bytes.Buffer{})
+
+	if err == nil || err.Error() != "compose up failed" {
+		t.Fatalf("error = %v", err)
 	}
 }

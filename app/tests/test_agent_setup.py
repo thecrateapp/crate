@@ -420,6 +420,59 @@ def test_start_refuses_to_run_both_profiles(tmp_path):
         )
 
 
+class _FailingOperatorUp:
+    """Compose aborts the operator up after recreating crate-api and a worker."""
+
+    def __init__(self, created="crate-api\ncrate-worker\n"):
+        self.calls, self.created = [], created
+
+    def __call__(self, argv, **kwargs):
+        from types import SimpleNamespace
+
+        self.calls.append(list(argv))
+        if argv[:2] == ["docker", "inspect"]:
+            return SimpleNamespace(stdout="false", returncode=0)
+        if "up" in argv:
+            raise self.setup.SetupError("docker compose -f docker-compose.yaml failed")
+        if "ps" in argv:
+            return SimpleNamespace(stdout=self.created, returncode=0)
+        return SimpleNamespace(stdout="", returncode=0)
+
+
+def test_a_failed_operator_up_starts_what_compose_left_created(tmp_path):
+    setup = _setup()
+    runner = _FailingOperatorUp()
+    runner.setup = setup
+
+    with pytest.raises(setup.SetupError, match="crate-api, crate-worker"):
+        setup.start(_args(tmp_path, profile="operator"), _settings(tmp_path), runner)
+
+    listing = next(call for call in runner.calls if "ps" in call)
+    assert listing[-6:] == ["ps", "-a", "--status", "created", "--format", "{{.Name}}"]
+    assert runner.calls[-1] == ["docker", "start", "crate-api", "crate-worker"]
+
+
+def test_a_failed_operator_up_with_nothing_created_keeps_the_original_error(tmp_path):
+    setup = _setup()
+    runner = _FailingOperatorUp(created="")
+    runner.setup = setup
+
+    with pytest.raises(setup.SetupError) as raised:
+        setup.start(_args(tmp_path, profile="operator"), _settings(tmp_path), runner)
+
+    assert "started the services" not in str(raised.value)
+    assert not any(call[:2] == ["docker", "start"] for call in runner.calls)
+
+
+def test_make_agent_up_starts_through_the_setup_script():
+    makefile = (ROOT / "Makefile").read_text()
+    target = makefile[makefile.index("agent-up: _agent-profile") :]
+    target = target[: target.index("\n.PHONY:")]
+
+    assert "@$(AGENT_SETUP) up $(AGENT_ARGS)" in target
+    assert "$(AGENT_DC) up" not in target
+
+
 def test_model_switch_updates_env_and_recreates_only_the_agent(tmp_path):
     setup = _setup()
     secrets = tmp_path / "data/crate-agent/secrets"
