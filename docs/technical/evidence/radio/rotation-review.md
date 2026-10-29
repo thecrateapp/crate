@@ -38,7 +38,7 @@ Genre overlap is a weighted artist-metadata proxy with the existing ancestor tax
 
 ## Lists for listening review
 
-A is the approved reference listed in [README.md](README.md). B and C are the new sessions:
+A is the approved reference listed in [baselines.md](baselines.md). B and C are the new sessions:
 
 ### Citizen — artist radio
 

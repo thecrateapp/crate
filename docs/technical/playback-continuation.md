@@ -96,7 +96,7 @@ progress. Global cursor reset is scoped to the request that supplied a buffer,
 so a later omitted buffer cannot replay the last batch. A temporarily blocking
 buffer keeps the session retryable.
 
-The sanitized [checkpoint comparison](../../app/tests/fixtures/recommendations/rotation-review.md)
+The sanitized [checkpoint comparison](evidence/radio/rotation-review.md)
 contains Citizen/Concubine lists before and after simulated completed listens.
 Representative buffer lookup plus generation measured 210.055 ms p95 for Citizen
 and 195.742 ms for Concubine (25 warm-cache samples per seed, three data SELECTs).

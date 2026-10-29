@@ -10,3 +10,7 @@ docs/testing/measurements/tauri-r03-r05-offline-windows-2026-10-01-run-369355055
 
 # Generated from the typed registry; design-system:tokens:check verifies exact output.
 app/shared/ui/tokens/themes.css
+
+# Keep complete recommendation records and numerical vectors compact.
+app/tests/fixtures/recommendations/citizen.json
+app/tests/fixtures/recommendations/concubine.json
