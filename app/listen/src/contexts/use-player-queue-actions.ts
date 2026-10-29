@@ -162,9 +162,27 @@ export function usePlayerQueueActions({
   const resumePendingQueue = useCallback(() => {
     const pending = readinessRef.current.resumePending;
     if (readinessRef.current.ready || !pending) return false;
-    pending();
+    const source = playSourceRef.current;
+    const preparation = pending();
+    const generation = readinessRef.current.generation;
+    if (preparation) {
+      void preparation
+        .then((recovered) => {
+          if (
+            recovered &&
+            isPlayingRef.current &&
+            generation === readinessRef.current.generation &&
+            readinessRef.current.ready &&
+            source === playSourceRef.current
+          )
+            resumePlaybackIntelligence?.();
+        })
+        .catch((error) => {
+          console.error("[gapless] failed to resume queue recovery:", error);
+        });
+    }
     return true;
-  }, [readinessRef]);
+  }, [isPlayingRef, playSourceRef, readinessRef, resumePlaybackIntelligence]);
   const resetQueuePlayback = useCallback(() => {
     cancelQueuePreparation();
     readinessRef.current.resumePending = undefined;

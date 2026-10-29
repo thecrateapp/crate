@@ -44,10 +44,11 @@ export interface PlaybackIntelligenceActions {
 export interface PlaybackQueueReadiness {
   ready: boolean;
   generation: number;
-  resumePending?: () => void;
+  resumePending?: () => void | Promise<boolean>;
 }
 
 export interface PlaybackIntelligenceOptions {
+  isSoftInterrupted?: () => boolean;
   queueReadinessRef?: MutableRefObject<PlaybackQueueReadiness>;
   stateRefs?: Pick<
     PlaybackIntelligenceRefs,

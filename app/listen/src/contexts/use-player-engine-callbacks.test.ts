@@ -213,6 +213,60 @@ describe("usePlayerEngineCallbacks", () => {
     expect(options.onActivePlaybackStarted).toHaveBeenCalledTimes(1);
   });
 
+  it("clears soft interruption before waking refill on recovered playback", () => {
+    const options = createOptions();
+    let interrupted = true;
+    let resumedWhileInterrupted: boolean | undefined;
+    options.cancelSoftInterruption.mockImplementation(() => {
+      interrupted = false;
+    });
+    const resumePlaybackIntelligence = vi.fn(() => {
+      resumedWhileInterrupted = interrupted;
+    });
+    renderHook(() =>
+      usePlayerEngineCallbacks({ ...options, resumePlaybackIntelligence }),
+    );
+
+    options.callbacksRef.current.onPlay?.("/stream/a?media_ticket=fresh");
+
+    expect(resumePlaybackIntelligence).toHaveBeenCalledOnce();
+    expect(resumedWhileInterrupted).toBe(false);
+    expect(options.commitIsPlaying).toHaveBeenCalledWith(true);
+  });
+
+  it("preserves an active soft interruption at EOF without delegating to refill", () => {
+    const options = createOptions();
+    let interrupted = true;
+    options.isSoftInterrupted.mockImplementation(() => interrupted);
+    options.cancelSoftInterruption.mockImplementation(() => {
+      interrupted = false;
+    });
+    const continueInfinitePlayback = vi.fn(() => !interrupted);
+    renderHook(() =>
+      usePlayerEngineCallbacks({ ...options, continueInfinitePlayback }),
+    );
+
+    options.callbacksRef.current.onAllFinished?.();
+
+    expect(interrupted).toBe(true);
+    expect(options.cancelSoftInterruption).not.toHaveBeenCalled();
+    expect(continueInfinitePlayback).not.toHaveBeenCalled();
+  });
+
+  it("delegates ordinary EOF to refill when there is no soft interruption", () => {
+    const options = createOptions();
+    const continueInfinitePlayback = vi.fn(() => true);
+    renderHook(() =>
+      usePlayerEngineCallbacks({ ...options, continueInfinitePlayback }),
+    );
+
+    options.callbacksRef.current.onAllFinished?.();
+
+    expect(continueInfinitePlayback).toHaveBeenCalledOnce();
+    expect(options.bufferingIntentRef.current).toBe(true);
+    expect(options.commitIsPlaying).toHaveBeenCalledWith(false);
+  });
+
   it("refreshes visualizer consumers when the active analyser is invalidated", () => {
     const options = createOptions();
     renderHook(() => usePlayerEngineCallbacks(options));

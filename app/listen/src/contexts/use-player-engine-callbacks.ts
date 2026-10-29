@@ -180,7 +180,6 @@ export function usePlayerEngineCallbacks({
     },
     onPlay: () => {
       if (isCastSessionActive()) return;
-      resumePlaybackIntelligence?.();
       if (playbackRequestStartedAtRef.current !== null) {
         recordPlaybackStarted(
           Math.max(0, Date.now() - playbackRequestStartedAtRef.current),
@@ -190,6 +189,7 @@ export function usePlayerEngineCallbacks({
       resumeAfterReloadRef.current = false;
       cancelRestoreAutoplay();
       cancelSoftInterruption();
+      resumePlaybackIntelligence?.();
       commitIsPlaying(true);
       commitIsBuffering(false);
       bufferingIntentRef.current = false;
@@ -277,7 +277,7 @@ export function usePlayerEngineCallbacks({
       );
     },
     onAllFinished: () => {
-      if (isCastSessionActive()) return;
+      if (isCastSessionActive() || isSoftInterrupted()) return;
       resumeAfterReloadRef.current = false;
       cancelRestoreAutoplay();
       cancelSoftInterruption();

@@ -36,7 +36,9 @@ const {
 }));
 
 import { usePlayerQueueActions } from "@/contexts/use-player-queue-actions";
-import type { Track } from "@/contexts/player-types";
+import { usePlayerTrackRecovery } from "@/contexts/use-player-track-recovery";
+import type { PlaybackQueueReadiness } from "@/contexts/playback-intelligence-model";
+import type { PlaySource, Track } from "@/contexts/player-types";
 import * as gaplessPlayer from "@/lib/gapless-player";
 import {
   toStartupEngineTracks,
@@ -169,6 +171,16 @@ function createParams() {
 describe("usePlayerQueueActions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(toStartupEngineTracks)
+      .mockReset()
+      .mockImplementation(async (tracks) =>
+        tracks.map((track) => ({
+          id: track.id,
+          title: track.title,
+          artist: track.artist,
+          url: track.path || track.id,
+        })),
+      );
     castPauseMock.mockResolvedValue({ ok: true });
     castPlayMock.mockResolvedValue({ ok: true });
     castSeekMock.mockResolvedValue({ ok: true });
@@ -311,6 +323,249 @@ describe("usePlayerQueueActions", () => {
     await act(async () => {
       resolve([{ id: "B", url: "B", title: "B", artist: "Artist" }]);
     });
+    expect(gaplessPlayer.loadQueue).toHaveBeenCalledOnce();
+    expect(gaplessPlayer.play).toHaveBeenCalledOnce();
+  });
+
+  it("recovers the preparation barrier after Pause cancels ticket recovery and Resume renews the current queue", async () => {
+    let resolveOldTickets!: (
+      tracks: Awaited<ReturnType<typeof toStartupEngineTracks>>,
+    ) => void;
+    vi.mocked(toStartupEngineTracks)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveOldTickets = resolve;
+          }),
+      )
+      .mockResolvedValueOnce([
+        {
+          id: TRACK.id,
+          url: "/stream/current?media_ticket=renewed-after-resume",
+          title: TRACK.title,
+          artist: TRACK.artist,
+        },
+      ]);
+    vi.mocked(gaplessPlayer.fadeInAndPlay).mockResolvedValue("applied");
+    const queueReadinessRef: { current: PlaybackQueueReadiness } = {
+      current: { ready: true, generation: 4 },
+    };
+    const params = {
+      ...createParams(),
+      queueReadinessRef,
+      playSourceRef: {
+        current: { type: "album", name: "Album" } as PlaySource | null,
+      },
+      buildEngineUrls: vi.fn((tracks: Track[], urls?: string[]) =>
+        tracks.map((track, index) => urls?.[index] ?? track.path ?? track.id),
+      ),
+      resumePlaybackIntelligence: vi.fn(),
+    };
+    params.queueRef.current = [TRACK];
+    params.isPlayingRef.current = true;
+    const { result } = renderHook(() => ({
+      recovery: usePlayerTrackRecovery({
+        ...params,
+        effectiveCrossfadeMsRef: { current: 0 },
+      }),
+      actions: usePlayerQueueActions(params),
+    }));
+    const recovery = result.current.recovery.recoverActiveTrackRef.current();
+    expect(queueReadinessRef.current.ready).toBe(false);
+
+    act(() => result.current.actions.pause({ immediate: true }));
+    await act(async () => {
+      resolveOldTickets([
+        {
+          id: TRACK.id,
+          url: "/stream/current?media_ticket=cancelled-recovery",
+          title: TRACK.title,
+          artist: TRACK.artist,
+        },
+      ]);
+      expect(await recovery).toBe(false);
+    });
+    expect(gaplessPlayer.loadQueue).not.toHaveBeenCalled();
+    expect(gaplessPlayer.play).not.toHaveBeenCalled();
+    expect(gaplessPlayer.fadeInAndPlay).not.toHaveBeenCalled();
+
+    await act(async () => result.current.actions.resume());
+
+    expect(gaplessPlayer.fadeInAndPlay).not.toHaveBeenCalled();
+    expect(gaplessPlayer.loadQueue).toHaveBeenCalledWith(
+      ["/stream/current?media_ticket=renewed-after-resume"],
+      0,
+      expect.any(Object),
+    );
+    expect(gaplessPlayer.play).toHaveBeenCalledOnce();
+    expect(queueReadinessRef.current.ready).toBe(true);
+    expect(params.resumePlaybackIntelligence).toHaveBeenCalled();
+  });
+
+  it("lets Resume's fresh recovery finish before the cancelled recovery without changing its queue or position", async () => {
+    type EngineTracks = Awaited<ReturnType<typeof toStartupEngineTracks>>;
+    let resolveOld!: (tracks: EngineTracks) => void;
+    let resolveNew!: (tracks: EngineTracks) => void;
+    const oldTickets = new Promise<EngineTracks>((resolve) => {
+      resolveOld = resolve;
+    });
+    const newTickets = new Promise<EngineTracks>((resolve) => {
+      resolveNew = resolve;
+    });
+    vi.mocked(toStartupEngineTracks)
+      .mockReturnValueOnce(oldTickets)
+      .mockReturnValueOnce(newTickets);
+    vi.mocked(gaplessPlayer.fadeInAndPlay).mockResolvedValue("applied");
+    const queueReadinessRef: { current: PlaybackQueueReadiness } = {
+      current: { ready: true, generation: 4 },
+    };
+    const source: PlaySource = { type: "album", name: "Album" };
+    const queue = [TRACK];
+    const params = {
+      ...createParams(),
+      queueReadinessRef,
+      playSourceRef: { current: source as PlaySource | null },
+      buildEngineUrls: vi.fn((tracks: Track[], urls?: string[]) =>
+        tracks.map((track, index) => urls?.[index] ?? track.path ?? track.id),
+      ),
+      resumePlaybackIntelligence: vi.fn(),
+    };
+    params.queueRef.current = queue;
+    params.currentTimeRef.current = 42;
+    params.isPlayingRef.current = true;
+    const { result } = renderHook(() => ({
+      recovery: usePlayerTrackRecovery({
+        ...params,
+        effectiveCrossfadeMsRef: { current: 0 },
+      }),
+      actions: usePlayerQueueActions(params),
+    }));
+    const obsoleteRecovery =
+      result.current.recovery.recoverActiveTrackRef.current();
+    act(() => result.current.actions.pause({ immediate: true }));
+    const cancelledGeneration = queueReadinessRef.current.generation;
+    act(() => result.current.actions.resume());
+    const engineTrack = {
+      id: TRACK.id,
+      title: TRACK.title,
+      artist: TRACK.artist,
+      url: "/stream/current?media_ticket=resume-winner",
+    };
+    await act(async () => resolveNew([engineTrack]));
+    const winnerReadiness = { ...queueReadinessRef.current };
+    const winnerLoadCount = vi.mocked(gaplessPlayer.loadQueue).mock.calls
+      .length;
+    const winnerPlayCount = vi.mocked(gaplessPlayer.play).mock.calls.length;
+
+    await act(async () => {
+      resolveOld([
+        { ...engineTrack, url: "/stream/current?media_ticket=cancelled-old" },
+      ]);
+      expect(await obsoleteRecovery).toBe(false);
+    });
+
+    expect(winnerReadiness.ready).toBe(true);
+    expect(winnerReadiness.generation).toBeGreaterThan(cancelledGeneration);
+    expect(queueReadinessRef.current).toEqual(winnerReadiness);
+    expect(winnerLoadCount).toBe(1);
+    expect(winnerPlayCount).toBe(1);
+    expect(gaplessPlayer.loadQueue).toHaveBeenCalledExactlyOnceWith(
+      [engineTrack.url],
+      0,
+      expect.any(Object),
+    );
+    expect(gaplessPlayer.seekTo).toHaveBeenCalledExactlyOnceWith(42_000);
+    expect(gaplessPlayer.play).toHaveBeenCalledOnce();
+    expect(gaplessPlayer.fadeInAndPlay).not.toHaveBeenCalled();
+    expect(params.queueRef.current).toBe(queue);
+    expect(params.currentIndexRef.current).toBe(0);
+    expect(params.currentTimeRef.current).toBe(42);
+    expect(params.playSourceRef.current).toBe(source);
+  });
+
+  it("does not wake refill when Pause arrives after Resume installed its queue but before play resolves", async () => {
+    type EngineTracks = Awaited<ReturnType<typeof toStartupEngineTracks>>;
+    let resolveOld!: (tracks: EngineTracks) => void;
+    const oldTickets = new Promise<EngineTracks>((resolve) => {
+      resolveOld = resolve;
+    });
+    const freshTrack = {
+      id: TRACK.id,
+      title: TRACK.title,
+      artist: TRACK.artist,
+      url: "/stream/current?media_ticket=play-pending",
+    };
+    vi.mocked(toStartupEngineTracks)
+      .mockReturnValueOnce(oldTickets)
+      .mockResolvedValueOnce([freshTrack]);
+    const queueReadinessRef: { current: PlaybackQueueReadiness } = {
+      current: { ready: true, generation: 4 },
+    };
+    const params = {
+      ...createParams(),
+      queueReadinessRef,
+      playSourceRef: {
+        current: { type: "album", name: "Album" } as PlaySource | null,
+      },
+      buildEngineUrls: vi.fn((tracks: Track[], urls?: string[]) =>
+        tracks.map((track, index) => urls?.[index] ?? track.path ?? track.id),
+      ),
+      resumePlaybackIntelligence: vi.fn(),
+    };
+    params.queueRef.current = [TRACK];
+    params.isPlayingRef.current = true;
+    params.commitIsPlaying.mockImplementation((playing: boolean) => {
+      params.isPlayingRef.current = playing;
+    });
+    vi.mocked(gaplessPlayer.pause)
+      .mockImplementationOnce(() => params.commitIsPlaying(false))
+      .mockImplementationOnce(() => params.commitIsPlaying(false));
+    let completePlay!: (
+      outcome: Awaited<ReturnType<typeof gaplessPlayer.play>>,
+    ) => void;
+    const playAccepted = new Promise<
+      Awaited<ReturnType<typeof gaplessPlayer.play>>
+    >((resolve) => {
+      completePlay = resolve;
+    });
+    vi.mocked(gaplessPlayer.play).mockImplementationOnce(() => {
+      params.commitIsPlaying(true);
+      return playAccepted;
+    });
+    const { result } = renderHook(() => ({
+      recovery: usePlayerTrackRecovery({
+        ...params,
+        effectiveCrossfadeMsRef: { current: 0 },
+      }),
+      actions: usePlayerQueueActions(params),
+    }));
+    const obsoleteRecovery =
+      result.current.recovery.recoverActiveTrackRef.current();
+    act(() => result.current.actions.pause({ immediate: true }));
+    await act(async () => result.current.actions.resume());
+    expect(gaplessPlayer.loadQueue).toHaveBeenCalledOnce();
+    expect(queueReadinessRef.current.ready).toBe(true);
+    const installedGeneration = queueReadinessRef.current.generation;
+    const resumesBeforePause =
+      params.resumePlaybackIntelligence.mock.calls.length;
+
+    act(() => result.current.actions.pause({ immediate: true }));
+    expect(params.isPlayingRef.current).toBe(false);
+    expect(queueReadinessRef.current.generation).toBe(installedGeneration);
+    await act(async () => {
+      completePlay("applied");
+      resolveOld([
+        { ...freshTrack, url: "/stream/current?media_ticket=cancelled-old" },
+      ]);
+      expect(await obsoleteRecovery).toBe(false);
+    });
+
+    expect(params.resumePlaybackIntelligence).toHaveBeenCalledTimes(
+      resumesBeforePause,
+    );
+    expect(params.isPlayingRef.current).toBe(false);
+    expect(queueReadinessRef.current.ready).toBe(true);
+    expect(queueReadinessRef.current.generation).toBe(installedGeneration);
     expect(gaplessPlayer.loadQueue).toHaveBeenCalledOnce();
     expect(gaplessPlayer.play).toHaveBeenCalledOnce();
   });

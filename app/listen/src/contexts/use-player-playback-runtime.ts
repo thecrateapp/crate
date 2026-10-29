@@ -144,6 +144,7 @@ export function usePlayerPlaybackRuntime({
       effectiveCrossfadeMsRef,
       lastNonZeroVolumeRef,
       playSourceRef,
+      queueReadinessRef,
       queueRef,
       repeatRef,
       shuffleRef,
@@ -247,6 +248,7 @@ export function usePlayerPlaybackRuntime({
     resumePlaybackIntelligence,
     resetPlaybackIntelligence,
   } = usePlaybackIntelligence({
+    isSoftInterrupted,
     queueReadinessRef,
     stateRefs: { queueRef, playSourceRef, currentIndexRef },
     repeat,

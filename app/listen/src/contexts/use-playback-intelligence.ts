@@ -8,6 +8,7 @@ import { usePlaybackRefillRuntime } from "./use-playback-refill-runtime";
 import { usePlaybackSuggestions } from "./use-playback-suggestions";
 
 export function usePlaybackIntelligence({
+  isSoftInterrupted,
   queueReadinessRef,
   stateRefs,
   queue,
@@ -65,6 +66,7 @@ export function usePlaybackIntelligence({
     resume: resumePlaybackIntelligence,
     reset: resetContinuation,
   } = usePlaybackRefillRuntime({
+    isSoftInterrupted,
     repeat,
     currentIndex,
     infinitePlaybackEnabled,

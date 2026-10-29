@@ -33,6 +33,7 @@ type Options = Pick<
   | "repeat"
   | "shuffle"
   | "infinitePlaybackEnabled"
+  | "isSoftInterrupted"
 > & { refs: PlaybackIntelligenceRefs };
 
 export function usePlaybackRefillRuntime(options: Options) {
@@ -96,6 +97,7 @@ export function usePlaybackRefillRuntime(options: Options) {
     const o = latest.current;
     if (
       !supported() ||
+      o.isSoftInterrupted?.() ||
       o.refs.queueReadinessRef?.current.ready === false ||
       runtime.suspended ||
       runtime.terminal ||
@@ -128,6 +130,7 @@ export function usePlaybackRefillRuntime(options: Options) {
       generation === runtime.generation &&
       isSameQueue() &&
       supported() &&
+      !latest.current.isSoftInterrupted?.() &&
       !runtime.suspended;
     const deadline = setTimeout(() => {
       if (runtime.inFlight !== controller) return;
@@ -206,7 +209,17 @@ export function usePlaybackRefillRuntime(options: Options) {
       } else schedule();
     } finally {
       clearTimeout(deadline);
-      if (runtime.inFlight === controller) runtime.inFlight = null;
+      if (runtime.inFlight === controller) {
+        runtime.inFlight = null;
+        if (
+          generation === runtime.generation &&
+          source === latest.current.refs.playSourceRef.current &&
+          queueGeneration !==
+            latest.current.refs.queueReadinessRef?.current.generation &&
+          runtime.timer === null
+        )
+          runRef.current();
+      }
     }
   }, [schedule, supported]);
   useLayoutEffect(() => {
@@ -218,6 +231,7 @@ export function usePlaybackRefillRuntime(options: Options) {
   const continueInfinitePlayback = useCallback(() => {
     if (
       !supported() ||
+      latest.current.isSoftInterrupted?.() ||
       latest.current.refs.queueReadinessRef?.current.ready === false ||
       state.current.terminal ||
       nativeOwnsBackgroundRefill()
