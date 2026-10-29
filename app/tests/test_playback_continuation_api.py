@@ -400,3 +400,75 @@ def test_indexed_native_request_uses_buffer_tail_and_preserves_empty_status(
     assert response.json()["status"] == "retryable_empty"
     assert response.json()["batchIndex"] == 0
     assert calls[0]["buffer_refs"] == [str(playing), str(tail)]
+
+
+def test_legacy_native_lease_failure_returns_conflict_with_retry_after(
+    test_app, monkeypatch
+):
+    from crate.api import smart_mix
+
+    from tests.test_radio_contracts import _contended_radio_store
+
+    session_id = str(uuid.uuid4())
+    redis = _contended_radio_store(monkeypatch, session_id, user_id=42)
+    monkeypatch.setattr(
+        smart_mix,
+        "get_continuation_descriptor",
+        lambda _token_id: {"kind": "shaped_radio", "sessionId": session_id},
+    )
+
+    with (
+        patch("crate.api.auth.AuthMiddleware.resolve_user", _continuation_user()),
+        redis.lock(f"radio:session:{session_id}:lock", timeout=5),
+    ):
+        response = test_app.post(
+            "/api/playback/continuation",
+            json={"plannerVersion": "smart-mix-v2", "context": _CONTEXT},
+        )
+
+    assert response.status_code == 409
+    assert response.headers["retry-after"] == "1"
+
+
+@pytest.mark.parametrize("batch_index,cursor", [(0, -1), (4, 3)])
+def test_indexed_native_contention_preserves_the_committed_cursor(
+    test_app, monkeypatch, batch_index, cursor
+):
+    from crate.api import radio, smart_mix
+
+    from tests.test_radio_contracts import _contended_radio_store
+
+    session_id = str(uuid.uuid4())
+    redis = _contended_radio_store(
+        monkeypatch, session_id, existing=batch_index > 0, user_id=42
+    )
+    monkeypatch.setattr(
+        smart_mix,
+        "get_continuation_descriptor",
+        lambda _token_id: {
+            "kind": "seeded_radio",
+            "seedType": "album",
+            "seedId": "12",
+            "sessionId": session_id,
+        },
+    )
+    monkeypatch.setattr(radio, "get_album_for_radio", lambda _album_id: {"id": 12})
+    with (
+        patch("crate.api.auth.AuthMiddleware.resolve_user", _continuation_user()),
+        redis.lock(f"radio:session:{session_id}:lock", timeout=5),
+    ):
+        response = test_app.post(
+            "/api/playback/continuation",
+            json={
+                "plannerVersion": "smart-mix-v2",
+                "context": _CONTEXT,
+                "batchIndex": batch_index,
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["tracks"] == []
+    assert response.json()["plans"] == []
+    assert response.json()["status"] == "retryable_empty"
+    assert response.json()["exhausted"] is False
+    assert response.json()["batchIndex"] == cursor

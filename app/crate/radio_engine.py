@@ -822,9 +822,12 @@ def radio_feedback(
     from crate.radio_continuation import session_lock
 
     with session_lock(session_id) as lease:
-        return _radio_feedback(
+        result, feedback = _radio_feedback(
             session_id, track_id, action, global_track_uid=global_track_uid, lease=lease
         )
+    if feedback is not None:
+        persist_radio_feedback(**feedback)
+    return result
 
 
 def _radio_feedback(
@@ -834,11 +837,11 @@ def _radio_feedback(
     *,
     global_track_uid: str | None = None,
     lease=None,
-) -> dict | None:
-    """Process like/dislike feedback — updates session AND persists to DB."""
+) -> tuple[dict | None, dict | None]:
+    """Update the session and return local feedback to persist after the lease."""
     session = _load_session(session_id)
     if not session:
-        return None
+        return None, None
 
     vec = get_track_bliss_vector(track_id) if track_id is not None else None
     if not vec and global_track_uid:
@@ -854,8 +857,8 @@ def _radio_feedback(
                 excluded.append(global_track_uid)
                 session["excluded_global_track_uids"] = excluded
                 _save_session(session, lease=lease)
-            return {"status": "ok", "effect": "exclusion_added"}
-        return {"status": "ok", "effect": "none"}
+            return {"status": "ok", "effect": "exclusion_added"}, None
+        return {"status": "ok", "effect": "none"}, None
 
     if action == "like":
         session.setdefault("liked_vectors", []).append(vec)
@@ -873,25 +876,31 @@ def _radio_feedback(
         session.setdefault("disliked_vectors", []).append(vec)
         effect = "exclusion_added"
     else:
-        return {"status": "ok", "effect": "none"}
+        return {"status": "ok", "effect": "none"}, None
 
     _save_session(session, lease=lease)
 
-    if track_id is not None:
-        persist_radio_feedback(
-            user_id=session["user_id"],
-            track_id=track_id,
-            action=action,
-            bliss_vector=vec,
-            session_seed=session.get("seed_label", ""),
-        )
+    feedback = (
+        {
+            "user_id": session["user_id"],
+            "track_id": track_id,
+            "action": action,
+            "bliss_vector": vec,
+            "session_seed": session.get("seed_label", ""),
+        }
+        if track_id is not None
+        else None
+    )
 
-    return {
-        "status": "ok",
-        "effect": effect,
-        "liked_count": len(session["liked_vectors"]),
-        "disliked_count": len(session["disliked_vectors"]),
-    }
+    return (
+        {
+            "status": "ok",
+            "effect": effect,
+            "liked_count": len(session["liked_vectors"]),
+            "disliked_count": len(session["disliked_vectors"]),
+        },
+        feedback,
+    )
 
 
 def _global_track_feedback_vector(

@@ -19,6 +19,12 @@ cross-session rotation are outside this change.
 - Session progress and the replayable batch commit atomically in Redis under a
   per-session lock. Every writer, including feedback, legacy next and deletion,
   watches the lock token so it cannot commit after losing its lease.
+- Lease contention or loss returns `retryable_empty` with the committed session
+  cursor and revision, or replays the requested batch if it already committed.
+  A start with no committed session returns cursor `-1`, so the next request
+  still starts at batch zero. Legacy continuation, feedback and deletion return
+  HTTP 409 with `Retry-After: 1`. Unrelated failures remain errors. Local feedback
+  is persisted after releasing the session lock.
 - Sessions and batch payloads have a 24-hour TTL. A 48-hour marker prevents a
   recently expired or discarded session from being silently recreated at batch
   zero. A missing continuation session returns `exhausted`.
@@ -66,15 +72,18 @@ Automated coverage includes duplicate/concurrent requests, replay after lost
 responses, session ownership and expiry, Redis lease loss before/during commit,
 EOF during fetch/append, empty and deduplicated batches, reconnect, pause, source
 replacement, native handoff, preference changes, and queued Cast cancellation.
-The Redis contracts can also run against a **dedicated disposable** Redis:
+The lease recovery contracts run against Redis 7 through Testcontainers by
+default. CI supplies a dedicated Redis service. To use another **dedicated
+disposable** Redis:
 
 ```bash
 cd app
 CRATE_TEST_RADIO_REDIS_URL=redis://127.0.0.1:16379/0 \
-  ../.venv/bin/python -m pytest tests/test_radio_continuation_contract.py -q
+  ../.venv/bin/python -m pytest tests/test_radio_lease_recovery.py -q
 ```
 
-The fixture clears that database. Never point it at application Redis.
+Each test uses a unique session UUID and removes only that session's keys; the
+fixture does not flush the database. Never point it at application Redis.
 
 Before release, review on the Xiaomi with crossfade off/on, screen off, a brief
 network outage, slow EOF refill and pause during a request; verify automatic

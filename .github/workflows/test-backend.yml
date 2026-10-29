@@ -107,6 +107,15 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4, 5, 6, 7, 8]
     services:
+      radio-redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
       postgres:
         image: pgvector/pgvector:pg15
         env:
@@ -143,6 +152,7 @@ jobs:
 
       - name: Run test shard with coverage
         env:
+          CRATE_TEST_RADIO_REDIS_URL: redis://127.0.0.1:6379/0
           CRATE_POSTGRES_USER: crate
           CRATE_POSTGRES_PASSWORD: crate
           CRATE_POSTGRES_HOST: localhost

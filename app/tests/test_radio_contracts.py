@@ -1,6 +1,10 @@
 """Regression contracts for unified radio endpoints."""
 
+import json
 from unittest.mock import patch
+from uuid import uuid4
+
+import pytest
 
 
 class TestRadioApiContracts:
@@ -378,3 +382,79 @@ def test_native_seeded_descriptor_cannot_use_a_redis_internal_key(test_app):
         },
     )
     assert response.status_code == 422
+
+
+def _contended_radio_store(monkeypatch, session_id, *, existing=True, user_id=1):
+    from crate import radio_engine
+
+    from tests.test_radio_continuation_contract import MemoryRedis
+
+    redis = MemoryRedis()
+    lock_factory = redis.lock
+    monkeypatch.setattr(
+        redis,
+        "lock",
+        lambda name, **kwargs: lock_factory(
+            name, **{**kwargs, "blocking_timeout": 0.01}
+        ),
+    )
+    monkeypatch.setattr(radio_engine, "_redis", lambda: redis)
+    if existing:
+        redis.setex(
+            f"radio:session:{session_id}",
+            60,
+            json.dumps(
+                {
+                    "id": session_id,
+                    "user_id": user_id,
+                    "track_count": 20,
+                    "batch_index": 3,
+                    "revision": 1,
+                }
+            ),
+        )
+    return redis
+
+
+@pytest.mark.parametrize("operation", ["next", "feedback", "delete"])
+def test_legacy_radio_lease_failure_returns_conflict_with_retry_after(
+    test_app, monkeypatch, operation
+):
+    session_id = str(uuid4())
+    redis = _contended_radio_store(monkeypatch, session_id)
+    with redis.lock(f"radio:session:{session_id}:lock", timeout=5):
+        if operation == "next":
+            response = test_app.post(
+                "/api/radio/next", json={"session_id": session_id, "count": 1}
+            )
+        elif operation == "feedback":
+            response = test_app.post(
+                "/api/radio/feedback",
+                json={"session_id": session_id, "track_id": 7, "action": "like"},
+            )
+        else:
+            response = test_app.delete(f"/api/radio/session/{session_id}")
+
+    assert response.status_code == 409
+    assert response.headers["retry-after"] == "1"
+
+
+@pytest.mark.parametrize("operation,cursor", [("start", -1), ("next", 3)])
+def test_indexed_radio_contention_returns_a_retryable_committed_cursor(
+    test_app, monkeypatch, operation, cursor
+):
+    session_id = str(uuid4())
+    redis = _contended_radio_store(
+        monkeypatch, session_id, existing=operation == "next"
+    )
+    payload = {"session_id": session_id, "count": 1}
+    if operation == "next":
+        payload["batch_index"] = 4
+    with redis.lock(f"radio:session:{session_id}:lock", timeout=5):
+        response = test_app.post(f"/api/radio/{operation}", json=payload)
+
+    assert response.status_code == 200
+    assert response.json()["tracks"] == []
+    assert response.json()["status"] == "retryable_empty"
+    assert response.json()["exhausted"] is False
+    assert response.json()["batch_index"] == cursor

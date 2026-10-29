@@ -48,6 +48,14 @@ _RADIO_RESPONSES = merge_responses(
         422: error_response("The route parameters failed validation."),
     },
 )
+_RADIO_SESSION_RESPONSES = merge_responses(
+    AUTH_ERROR_RESPONSES,
+    {
+        409: error_response(
+            "The radio session is busy or its lease expired; retry the request."
+        )
+    },
+)
 
 
 def _escape_like(value: str) -> str:
@@ -562,12 +570,13 @@ def api_radio_start(request: Request, body: RadioStartRequest):
     "/api/radio/next",
     response_model=RadioBatchResponse,
     response_model_exclude_none=True,
-    responses=AUTH_ERROR_RESPONSES,
+    responses=_RADIO_SESSION_RESPONSES,
     summary="Get next batch of radio tracks",
 )
 def api_radio_next(request: Request, body: RadioNextRequest):
     user = _require_auth(request)
     from crate.radio_engine import get_session_user_id, next_tracks
+    from crate.radio_continuation import RadioLeaseLost
 
     if body.batch_index is not None:
         from crate.radio_continuation import next_batch
@@ -582,7 +591,14 @@ def api_radio_next(request: Request, body: RadioNextRequest):
         )
     if get_session_user_id(body.session_id) != _continuation_user_id(user):
         return JSONResponse({"error": "Session not found or expired"}, status_code=404)
-    result = next_tracks(body.session_id, body.count)
+    try:
+        result = next_tracks(body.session_id, body.count)
+    except RadioLeaseLost as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Radio session is busy; retry the request",
+            headers={"Retry-After": "1"},
+        ) from exc
     if not result:
         return JSONResponse({"error": "Session not found or expired"}, status_code=404)
     return result
@@ -590,22 +606,30 @@ def api_radio_next(request: Request, body: RadioNextRequest):
 
 @router.post(
     "/api/radio/feedback",
-    responses=AUTH_ERROR_RESPONSES,
+    responses=_RADIO_SESSION_RESPONSES,
     summary="Like or dislike a radio track to shape the session",
 )
 def api_radio_feedback(request: Request, body: RadioFeedbackRequest):
     user = _require_auth(request)
     from crate.radio_engine import radio_feedback, get_session_user_id
+    from crate.radio_continuation import RadioLeaseLost
 
     if get_session_user_id(body.session_id) != _continuation_user_id(user):
         raise HTTPException(status_code=404, detail="Session not found or expired")
 
-    result = radio_feedback(
-        body.session_id,
-        body.track_id,
-        body.action,
-        global_track_uid=body.global_track_uid,
-    )
+    try:
+        result = radio_feedback(
+            body.session_id,
+            body.track_id,
+            body.action,
+            global_track_uid=body.global_track_uid,
+        )
+    except RadioLeaseLost as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Radio session is busy; retry the request",
+            headers={"Retry-After": "1"},
+        ) from exc
     if not result:
         return JSONResponse({"error": "Session not found or expired"}, status_code=404)
     return result
@@ -625,16 +649,25 @@ def api_radio_can_discover(request: Request):
 
 @router.delete(
     "/api/radio/session/{session_id}",
-    responses=AUTH_ERROR_RESPONSES,
+    responses=_RADIO_SESSION_RESPONSES,
     summary="End a radio session",
 )
 def api_radio_end_session(request: Request, session_id: str):
     user = _require_auth(request)
     from crate.radio_engine import _delete_session, get_session_user_id
+    from crate.radio_continuation import RadioLeaseLost
 
     if get_session_user_id(session_id) != _continuation_user_id(user):
         raise HTTPException(status_code=404, detail="Session not found or expired")
 
-    if _delete_session(session_id):
+    try:
+        deleted = _delete_session(session_id)
+    except RadioLeaseLost as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Radio session is busy; retry the request",
+            headers={"Retry-After": "1"},
+        ) from exc
+    if deleted:
         return {"status": "ended"}
     return JSONResponse({"error": "Session not found"}, status_code=404)

@@ -220,12 +220,21 @@ def playback_continuation(
         )
         rows, exhausted = batch["tracks"], batch["exhausted"]
     else:
-        rows, exhausted = continuation_radio_tracks(
-            descriptor,
-            user=user,
-            limit=payload.limit,
-            exclude_entity_uids=known,
-        )
+        from crate.radio_continuation import RadioLeaseLost
+
+        try:
+            rows, exhausted = continuation_radio_tracks(
+                descriptor,
+                user=user,
+                limit=payload.limit,
+                exclude_entity_uids=known,
+            )
+        except RadioLeaseLost as exc:
+            raise HTTPException(
+                status_code=409,
+                detail="Radio session is busy; retry the request",
+                headers={"Retry-After": "1"},
+            ) from exc
     tracks = [
         track
         for track in (_continuation_track(row, payload.delivery) for row in rows)

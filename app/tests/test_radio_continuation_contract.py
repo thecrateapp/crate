@@ -1,7 +1,6 @@
 """Indexed batches remain stable across retries and competing consumers."""
 
 import json
-import os
 from uuid import uuid4
 import threading
 import time
@@ -30,10 +29,22 @@ class MemoryRedis:
 
     @contextmanager
     def lock(self, name, **kwargs):
+        from redis.exceptions import LockError
+
         with self.guard:
             lock = self.locks.setdefault(name, threading.Lock())
-        with lock:
+        blocking_timeout = kwargs.get("blocking_timeout")
+        acquired = (
+            lock.acquire(timeout=blocking_timeout)
+            if blocking_timeout is not None
+            else lock.acquire()
+        )
+        if not acquired:
+            raise LockError("Unable to acquire lock within the time specified")
+        try:
             yield type("Lease", (), {"owned": lambda self: True, "name": name})()
+        finally:
+            lock.release()
 
     def pipeline(self, **kwargs):
         return MemoryPipeline(self)
@@ -82,13 +93,7 @@ class MemoryPipeline:
 
 @pytest.fixture
 def batches(monkeypatch):
-    if os.environ.get("CRATE_TEST_RADIO_REDIS_URL"):
-        from redis import Redis
-
-        redis = Redis.from_url(os.environ["CRATE_TEST_RADIO_REDIS_URL"])
-        redis.flushdb()  # A dedicated disposable test container, never the application Redis.
-    else:
-        redis = MemoryRedis()
+    redis = MemoryRedis()
     monkeypatch.setattr(radio_engine, "_redis", lambda: redis)
     generated = []
 
@@ -295,7 +300,6 @@ def test_expired_writer_cannot_overwrite_or_delete_a_newer_session(
     monkeypatch, writer, lost_after_owned_check, batches
 ):
     from types import SimpleNamespace
-    from redis.exceptions import WatchError
     from crate import radio_continuation
 
     redis, _ = batches
@@ -344,20 +348,32 @@ def test_expired_writer_cannot_overwrite_or_delete_a_newer_session(
 
     monkeypatch.setattr(radio_engine, "_generate_batch", generate)
     monkeypatch.setattr(radio_engine, "get_track_bliss_vector", vector)
-    monkeypatch.setattr(radio_engine, "persist_radio_feedback", lambda **_kwargs: None)
-    error = WatchError if lost_after_owned_check else RuntimeError
-    with pytest.raises(error):
-        if writer == "indexed":
-            radio_continuation.next_batch("s", user_id=42, batch_index=1)
-        elif writer == "next":
-            radio_engine.next_tracks("s", count=1)
-        elif writer == "feedback":
-            radio_engine.radio_feedback("s", 7, "like")
-        else:
-            radio_engine._delete_session("s")
+    persisted = []
+    monkeypatch.setattr(
+        radio_engine,
+        "persist_radio_feedback",
+        lambda **kwargs: persisted.append(kwargs),
+    )
+    if writer == "indexed":
+        result = radio_continuation.next_batch("s", user_id=42, batch_index=1)
+        assert result["status"] == "retryable_empty"
+        assert result["exhausted"] is False
+        assert result["tracks"] == []
+        assert result["batch_index"] == 2
+    else:
+        with pytest.raises(Exception) as caught:
+            if writer == "next":
+                radio_engine.next_tracks("s", count=1)
+            elif writer == "feedback":
+                radio_engine.radio_feedback("s", 7, "like")
+            else:
+                radio_engine._delete_session("s")
+        assert type(caught.value).__name__ == "RadioLeaseLost"
+        assert isinstance(caught.value, radio_continuation.RadioLeaseLost)
     assert json.loads(redis.get(session_key)) == newer
     assert redis.get(session_key + ":batch:1") is None
     assert redis.get(session_key + ":started") is None
+    assert persisted == []
 
 
 def test_delete_session_commits_tombstone_and_deletion_together(batches):
@@ -365,3 +381,17 @@ def test_delete_session_commits_tombstone_and_deletion_together(batches):
     assert radio_engine._delete_session("s") is True
     assert redis.get("radio:session:s") is None
     assert redis.get("radio:session:s:started") in ("1", b"1")
+
+
+def test_memory_lock_respects_blocking_timeout_and_releases_after_error():
+    from redis.exceptions import LockError
+
+    redis = MemoryRedis()
+    with (
+        redis.lock("synthetic-lock", blocking_timeout=0.01),
+        pytest.raises(LockError),
+        redis.lock("synthetic-lock", blocking_timeout=0.01),
+    ):
+        pytest.fail("contending test lock must not enter")
+    with redis.lock("synthetic-lock", blocking_timeout=0.01) as lease:
+        assert lease.owned()
