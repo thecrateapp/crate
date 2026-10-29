@@ -122,6 +122,7 @@ _RADIO_ARTIST_SESSION_LIMITS = {
     "contextual": 4,
     "track": 3,
 }
+_RADIO_TARGET_BLENDS = {"track": 0.10, "contextual": 0.08, "discovery": 0.15}
 _RADIO_VARIANT_SCORE_PENALTY = 0.06
 _DISCOVERY_RADIO_SOURCE_PENALTY = {
     "similar": -0.06,
@@ -762,7 +763,23 @@ def _apply_buffer_context(session: dict, refs: list[str]) -> None:
     # The final reference is the end of the pending buffer, not the current song.
     if rows:
         session["recent_tracks"] = [_recent_track_context(row) for row in rows[-5:]]
-        session["current_target"] = list(rows[-1]["bliss_vector"])
+        session["recent_artists"] = [row["artist"] for row in rows[-3:]]
+        session["used_titles"] = list(
+            dict.fromkeys(
+                [*session.get("used_titles", []), *(_title_key(row) for row in rows)]
+            )
+        )
+        vector = rows[-1].get("bliss_vector")
+        target = (
+            session.get("current_target")
+            or session.get("initial_target")
+            or session.get("seed_vector")
+        )
+        if vector and target and len(vector) == len(target):
+            profile = _radio_profile(session.get("seed_type"))
+            session["current_target"] = _lerp(
+                target, vector, _RADIO_TARGET_BLENDS[profile]
+            )
 
 
 def _advance_radio(session: dict, count: int) -> dict:
@@ -911,7 +928,7 @@ def _too_close_to_disliked(candidate: dict, disliked_vecs: list[list[float]]) ->
 
 def _recent_track_context(candidate: dict) -> dict:
     return {
-        "track_id": candidate.get("id"),
+        "track_id": candidate.get("id", candidate.get("track_id")),
         "artist": candidate.get("artist"),
         "title": candidate.get("title"),
         "bpm": candidate.get("bpm"),
@@ -1521,13 +1538,7 @@ def _generate_batch(
 
         cand_vec = candidate.get("bliss_vector")
         if cand_vec:
-            if radio_profile == "track":
-                target_blend = 0.10
-            elif radio_profile == "contextual":
-                target_blend = 0.08
-            else:
-                target_blend = 0.15
-            target = _lerp(target, cand_vec, target_blend)
+            target = _lerp(target, cand_vec, _RADIO_TARGET_BLENDS[radio_profile])
             seed_vector = session.get("seed_vector")
             if seed_vector:
                 if radio_profile == "track":

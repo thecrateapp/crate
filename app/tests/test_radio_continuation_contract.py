@@ -239,13 +239,16 @@ def test_buffer_context_uses_last_actual_track_without_changing_the_anchor(monke
         ],
     )
     session = {
+        "seed_type": "track",
         "seed_vector": [0.5, 0.5],
         "initial_target": [0.5, 0.5],
+        "current_target": [0.6, 0.4],
         "used_track_ids": [5],
     }
     radio_engine._apply_buffer_context(session, ["playing", "tail"])
-    assert session["current_target"] == [0.0, 1.0]
+    assert session["current_target"] == pytest.approx([0.54, 0.46])
     assert session["seed_vector"] == [0.5, 0.5]
+    assert session["initial_target"] == [0.5, 0.5]
     assert session["used_track_ids"] == [5, 7, 8]
     assert session["recent_tracks"][-1]["bpm"] == 160
 
