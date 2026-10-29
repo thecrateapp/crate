@@ -12,7 +12,10 @@ from crate.db.queries.playable_media_filters import (
     playable_media_params,
     playable_track_clause,
 )
-from crate.db.queries.paths_shared import array_distance_sql
+from crate.db.queries.paths_shared import (
+    _canonical_reference_params,
+    array_distance_sql,
+)
 from crate.db.tx import optional_scope, read_scope
 from crate.track_versions import track_song_identity
 from crate.recommendation_policy import PATH_RECENCY_QUALITY_BAND, fresh_path_candidates
@@ -173,20 +176,24 @@ def find_anchor_track_row(
                     LEFT JOIN library_artists ar ON ar.name = t.artist
                     WHERE t.bliss_vector IS NOT NULL
                       AND (
-                        CAST(t.id AS text) = :track_ref
-                        OR (t.entity_uid IS NOT NULL AND CAST(t.entity_uid AS text) = :track_ref)
+                        t.id = CAST(:reference_id AS bigint)
+                        OR t.entity_uid = CAST(:reference_uid AS uuid)
                       )
                       AND {playable_track_clause("t", "a")}
                       {exclude_clause}
                     ORDER BY
                       CASE
-                        WHEN CAST(t.id AS text) = :track_ref THEN 0
+                        WHEN t.id = CAST(:reference_id AS bigint) THEN 0
                         ELSE 1
                       END
                     LIMIT :anchor_limit
                     """
                     ),
-                    {**params, "track_ref": endpoint_value, **playable_media_params()},
+                    {
+                        **params,
+                        **_canonical_reference_params(endpoint_value),
+                        **playable_media_params(),
+                    },
                 )
                 .mappings()
                 .all(),
