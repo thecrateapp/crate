@@ -217,11 +217,13 @@ def find_anchor_track_row(
             ) IN (a.artist, t.artist)"""
             params["scope_ref"] = endpoint_value
         elif endpoint_type == "album":
-            scope_clause = """AND (
-                CAST(t.album_id AS text) = :scope_ref
-                OR (a.entity_uid IS NOT NULL AND CAST(a.entity_uid AS text) = :scope_ref)
+            scope_clause = """AND t.album_id IN (
+                SELECT id
+                FROM library_albums
+                WHERE id = CAST(:reference_id AS bigint)
+                   OR entity_uid = CAST(:reference_uid AS uuid)
             )"""
-            params["scope_ref"] = endpoint_value
+            params.update(_canonical_reference_params(endpoint_value))
         elif endpoint_type == "genre":
             scope_clause = """AND EXISTS (
                 SELECT 1 FROM artist_genres ag
