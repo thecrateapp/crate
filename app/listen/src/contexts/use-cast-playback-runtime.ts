@@ -75,21 +75,14 @@ export function useCastPlaybackRuntime({
           !state.isPlaying &&
           !state.isBuffering &&
           (state.mediaFinished ??
-            (state.duration > 0 &&
-              state.currentTime >= state.duration - 0.5)) &&
+            (state.duration > 0 && state.currentTime >= state.duration - 2)) &&
           state.currentIndex ===
             (callbacks.current.queueRef?.current.length ?? 0) - 1;
-        if (
-          state.playerState === "PAUSED" ||
-          (wasPlaying.current &&
-            !state.isPlaying &&
-            !state.isBuffering &&
-            !ended)
-        )
-          callbacks.current.onPause?.();
+        if (state.playerState === "PAUSED") callbacks.current.onPause?.();
         if (!wasPlaying.current && state.isPlaying)
           callbacks.current.onResume?.();
-        wasPlaying.current = state.isPlaying;
+        if (state.isPlaying || state.playerState === "PAUSED" || ended)
+          wasPlaying.current = state.isPlaying;
         if (state.currentIndex !== undefined) {
           commitCurrentIndex(state.currentIndex);
         }

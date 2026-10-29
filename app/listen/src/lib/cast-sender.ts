@@ -53,6 +53,8 @@ const CAST_SENDER_SCRIPT =
   "https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1";
 const CAST_SESSION_CHANGED_EVENT = "crate:cast-session-changed";
 const DEFAULT_CAST_RECEIVER_APPLICATION_ID = "CC1AD845";
+const CAST_QUEUE_ACK_TIMEOUT_MS = 10_000;
+const CAST_QUEUE_APPEND_TIMEOUT_MS = 30_000;
 
 let webCastReady: Promise<boolean> | null = null;
 let webCastInitializedReceiverId: string | null = null;
@@ -64,6 +66,7 @@ let nativeCastReceiverApplicationId: string | null = null;
 let activeCrateCastSessionId: string | null = null;
 let activeCrateCastBootstrapUrl: string | null = null;
 let activeCrateCastQueue: CastPlaybackSessionResponse["queue"] | null = null;
+let uncertainCrateCastSessionId: string | null = null;
 let castQueueOperationTail: Promise<void> = Promise.resolve();
 let castLifecycleGeneration = 0;
 let castLifecycleIntent: "disconnect" | "start" | "stop" = "stop";
@@ -401,6 +404,7 @@ function adoptNativeCastSession(event: {
   activeCrateCastSessionId = null;
   activeCrateCastBootstrapUrl = null;
   activeCrateCastQueue = null;
+  uncertainCrateCastSessionId = null;
   if (event.active && event.sessionId?.trim() && event.bootstrapUrl?.trim()) {
     activeCrateCastSessionId = event.sessionId;
     activeCrateCastBootstrapUrl = event.bootstrapUrl;
@@ -733,10 +737,32 @@ function customQueueItemId(item: {
   return typeof itemId === "string" ? itemId : null;
 }
 
+function castAcknowledgement<T>(request: Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(
+      () => reject(new Error("Cast queue acknowledgement timed out.")),
+      CAST_QUEUE_ACK_TIMEOUT_MS,
+    );
+    request.then(
+      (result) => {
+        clearTimeout(timeout);
+        resolve(result);
+      },
+      (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
+}
+
 function castCommand(
   run: (resolve: () => void, reject: (error: unknown) => void) => void,
 ): Promise<void> {
-  return new Promise((resolve, reject) => run(resolve, reject));
+  uncertainCrateCastSessionId = activeCrateCastSessionId;
+  return castAcknowledgement(
+    new Promise<void>((resolve, reject) => run(resolve, reject)),
+  );
 }
 
 function guardedCastQueueOperation(isCurrent: () => boolean): () => boolean {
@@ -768,6 +794,11 @@ async function applyCustomQueueDelta(
   const chromeCast = castWindow()?.chrome?.cast;
   if (!media || !chromeCast)
     throw new Error("Custom Cast queue is unavailable.");
+  if (
+    media.items == null &&
+    uncertainCrateCastSessionId === activeCrateCastSessionId
+  )
+    throw new Error("Cast queue needs a receiver snapshot before retrying.");
 
   const numericByStableId = new Map(
     (media.items ?? [])
@@ -777,7 +808,10 @@ async function applyCustomQueueDelta(
           Boolean(entry[0]) && typeof entry[1] === "number",
       ),
   );
-  const previousIds = previous.items.map((item) => item.item_id);
+  const previousIds =
+    media.items == null
+      ? previous.items.map((item) => item.item_id)
+      : [...numericByStableId.keys()];
   const nextIds = next.items.map((item) => item.item_id);
   const previousIdSet = new Set(previousIds);
   const nextIdSet = new Set(nextIds);
@@ -873,7 +907,7 @@ async function getReadyNativeQueueSnapshot(
   isCurrent: () => boolean = () => true,
 ): Promise<Awaited<ReturnType<NativeCastPlugin["getQueueSnapshot"]>>> {
   assertCastQueueCurrent(isCurrent);
-  const snapshot = await plugin.getQueueSnapshot();
+  const snapshot = await castAcknowledgement(plugin.getQueueSnapshot());
   assertCastQueueCurrent(isCurrent);
   if (snapshot.available) return snapshot;
   if (remainingAttempts <= 1) {
@@ -895,7 +929,7 @@ async function applyNativeCustomQueueDelta(
   const numericByStableId = new Map(
     snapshot.items.map((item) => [item.stableId, item.itemId]),
   );
-  const previousIds = previous.items.map((item) => item.item_id);
+  const previousIds = snapshot.items.map((item) => item.stableId);
   const nextIds = next.items.map((item) => item.item_id);
   const previousIdSet = new Set(previousIds);
   const nextIdSet = new Set(nextIds);
@@ -907,7 +941,9 @@ async function applyNativeCustomQueueDelta(
     .filter((itemId): itemId is number => itemId !== undefined);
   if (removedNumericIds.length) {
     assertNativeCastResult(
-      await plugin.queueRemove({ itemIds: removedNumericIds }),
+      await castAcknowledgement(
+        plugin.queueRemove({ itemIds: removedNumericIds }),
+      ),
     );
     assertCastQueueCurrent(isCurrent);
   }
@@ -924,7 +960,9 @@ async function applyNativeCustomQueueDelta(
     survivingDesiredOrder.join(",") !== survivingCurrentOrder.join(",")
   ) {
     assertNativeCastResult(
-      await plugin.queueReorder({ itemIds: survivingDesiredOrder }),
+      await castAcknowledgement(
+        plugin.queueReorder({ itemIds: survivingDesiredOrder }),
+      ),
     );
     assertCastQueueCurrent(isCurrent);
   }
@@ -958,10 +996,12 @@ async function applyNativeCustomQueueDelta(
         .map((candidate) => numericByStableId.get(candidate))
         .find((candidate) => candidate !== undefined);
       assertNativeCastResult(
-        await plugin.queueInsert({
-          items: [item],
-          ...(insertBefore === undefined ? {} : { insertBefore }),
-        }),
+        await castAcknowledgement(
+          plugin.queueInsert({
+            items: [item],
+            ...(insertBefore === undefined ? {} : { insertBefore }),
+          }),
+        ),
       );
       assertCastQueueCurrent(isCurrent);
       await insertItem(position + 1);
@@ -971,7 +1011,9 @@ async function applyNativeCustomQueueDelta(
 
   if (next.repeat_mode !== previous.repeat_mode) {
     assertNativeCastResult(
-      await plugin.queueSetRepeatMode({ repeatMode: next.repeat_mode }),
+      await castAcknowledgement(
+        plugin.queueSetRepeatMode({ repeatMode: next.repeat_mode }),
+      ),
     );
   }
 }
@@ -1043,6 +1085,7 @@ async function syncCustomCastQueueNow(
     await applyCustomQueueDelta(active.queue, scoped.queue, isCurrent);
     assertCastQueueCurrent(isCurrent);
     activeCrateCastQueue = scoped.queue;
+    uncertainCrateCastSessionId = null;
     emitCastSessionChanged();
     return { ok: true };
   } catch (error) {
@@ -1059,15 +1102,35 @@ export function syncCustomCastQueue(
   isCurrent: () => boolean = () => true,
 ): Promise<CastStartResult> {
   const guarded = guardedCastQueueOperation(isCurrent);
-  return enqueueCastQueueOperation(() =>
-    syncCustomCastQueueNow(update, guarded),
+  return enqueueCastQueueOperation(
+    (current) => syncCustomCastQueueNow(update, current),
+    guarded,
+    CAST_QUEUE_APPEND_TIMEOUT_MS,
   );
 }
 
 function enqueueCastQueueOperation(
-  operation: () => Promise<CastStartResult>,
+  operation: (isCurrent: () => boolean) => Promise<CastStartResult>,
+  isCurrent: () => boolean,
+  timeoutMs: number,
 ): Promise<CastStartResult> {
-  const result = castQueueOperationTail.then(operation);
+  const result = castQueueOperationTail.then(async () => {
+    let active = true;
+    const current = () => active && isCurrent();
+    let timeout: ReturnType<typeof setTimeout>;
+    const deadline = new Promise<CastStartResult>((resolve) => {
+      timeout = setTimeout(() => {
+        active = false;
+        resolve({ ok: false, message: "Cast queue operation timed out." });
+      }, timeoutMs);
+    });
+    try {
+      return await Promise.race([operation(current), deadline]);
+    } finally {
+      active = false;
+      clearTimeout(timeout!);
+    }
+  });
   castQueueOperationTail = result.then(
     () => undefined,
     () => undefined,
@@ -1150,7 +1213,11 @@ function castQueueCommand(
   isCurrent: () => boolean = () => true,
 ): Promise<CastStartResult> {
   const guarded = guardedCastQueueOperation(isCurrent);
-  return enqueueCastQueueOperation(() => castQueueCommandNow(command, guarded));
+  return enqueueCastQueueOperation(
+    (current) => castQueueCommandNow(command, current),
+    guarded,
+    CAST_QUEUE_ACK_TIMEOUT_MS,
+  );
 }
 
 export function castQueueNext(): Promise<CastStartResult> {
@@ -1278,6 +1345,7 @@ export async function disconnectCastSession(): Promise<CastStartResult> {
         activeCrateCastSessionId = null;
         activeCrateCastBootstrapUrl = null;
         activeCrateCastQueue = null;
+        uncertainCrateCastSessionId = null;
         emitCastSessionChanged();
       }
       return result;
@@ -1299,6 +1367,7 @@ export async function disconnectCastSession(): Promise<CastStartResult> {
     activeCrateCastSessionId = null;
     activeCrateCastBootstrapUrl = null;
     activeCrateCastQueue = null;
+    uncertainCrateCastSessionId = null;
     emitCastSessionChanged();
     return { ok: true };
   } catch (error) {
@@ -1334,6 +1403,7 @@ export async function stopCastSession(): Promise<CastStartResult> {
       activeCrateCastSessionId = null;
       activeCrateCastBootstrapUrl = null;
       activeCrateCastQueue = null;
+      uncertainCrateCastSessionId = null;
       emitCastSessionChanged();
       if (!result.ok) return result;
     } catch (error) {
@@ -1350,6 +1420,7 @@ export async function stopCastSession(): Promise<CastStartResult> {
       activeCrateCastSessionId = null;
       activeCrateCastBootstrapUrl = null;
       activeCrateCastQueue = null;
+      uncertainCrateCastSessionId = null;
       emitCastSessionChanged();
     } catch (error) {
       return {
@@ -1481,6 +1552,7 @@ export async function startCastSession(
           activeCrateCastSessionId = castSession.session_id;
           activeCrateCastBootstrapUrl = castSession.bootstrap_url;
           activeCrateCastQueue = castSession.queue;
+          uncertainCrateCastSessionId = null;
           emitCastSessionChanged();
           return result;
         }
@@ -1510,6 +1582,7 @@ export async function startCastSession(
       activeCrateCastSessionId = castSession.session_id;
       activeCrateCastBootstrapUrl = castSession.bootstrap_url;
       activeCrateCastQueue = castSession.queue;
+      uncertainCrateCastSessionId = null;
       nativeCastSessionActive = false;
       emitCastSessionChanged();
       const targetName = castSessionName(webSession);

@@ -73,7 +73,8 @@ vi.mock("@capacitor/core", () => ({
   }),
 }));
 
-vi.mock("@/lib/api", () => ({
+vi.mock("@/lib/api", async () => ({
+  ApiError: (await import("../../../shared/web/api")).ApiError,
   api: apiMock,
   apiUrl: (path: string) => `https://crate.test${path}`,
   ensureMediaAccessUrl: ensureMediaAccessUrlMock,
@@ -105,6 +106,7 @@ import {
   stopCastSession,
   subscribeCastPlaybackState,
   syncCustomCastQueue,
+  type CastStartResult,
 } from "@/lib/cast-sender";
 
 describe("cast sender", () => {
@@ -1188,6 +1190,9 @@ describe("cast sender", () => {
     nativeRequestSessionMock.mockResolvedValue({ ok: true });
     nativeQueueInsertMock.mockResolvedValue({ ok: true });
     nativeQueueJumpToMock.mockResolvedValue({ ok: true });
+    nativeQueueRemoveMock.mockResolvedValue({ ok: true });
+    nativeQueueReorderMock.mockResolvedValue({ ok: true });
+    nativeQueueSetRepeatModeMock.mockResolvedValue({ ok: true });
     nativeGetQueueSnapshotMock.mockResolvedValue({
       available: true,
       items: [{ stableId: "track-1-1", itemId: 41 }],
@@ -1229,6 +1234,709 @@ describe("cast sender", () => {
     await startCastSession({ track });
     return { initial, track };
   }
+
+  async function prepareDeadlineWebQueue() {
+    runtimeMock.isNative = false;
+    vi.stubEnv("VITE_CAST_CUSTOM_RECEIVER_ENABLED", "true");
+    vi.stubEnv("VITE_CAST_RECEIVER_APP_ID", "ABCD1234");
+    const queueLoad = vi.fn(
+      (
+        _items: unknown[],
+        _repeat: string,
+        _index: number,
+        _time: number,
+        _customData: unknown,
+        success: () => void,
+      ) => success(),
+    );
+    const media = {
+      items: [
+        {
+          itemId: 41,
+          media: { customData: { crateCast: { itemId: "track-1-1" } } },
+        },
+      ],
+      media: {
+        customData: {
+          crateCast: {
+            protocolVersion: 1,
+            sessionId: "deadline-web",
+            bootstrapUrl: "https://api.example/cast/deadline-web",
+          },
+        },
+      },
+      queueInsertItems: vi.fn<
+        (
+          request: unknown,
+          success: () => void,
+          failure: (error: unknown) => void,
+        ) => void
+      >((_request, success) => success()),
+      queueRemoveItems: vi.fn((_request: unknown, success: () => void) =>
+        success(),
+      ),
+      queueReorderItems: vi.fn((_request: unknown, success: () => void) =>
+        success(),
+      ),
+      queueSetRepeatMode: vi.fn((_mode: unknown, success: () => void) =>
+        success(),
+      ),
+      queueNext: vi.fn((success: () => void) => success()),
+      queuePrev: vi.fn((success: () => void) => success()),
+    };
+    const session = {
+      getMediaSession: () => media,
+      getSessionObj: () => ({ queueLoad }),
+    };
+    const context = {
+      setOptions: vi.fn(),
+      getCurrentSession: () => session,
+      requestSession: async () => session,
+      endCurrentSession: vi.fn(),
+    };
+    class MediaInfo {
+      customData?: unknown;
+      metadata?: unknown;
+      constructor(
+        public contentId: string,
+        public contentType: string,
+      ) {}
+    }
+    class QueueItem {
+      autoplay?: boolean;
+      constructor(public media: MediaInfo) {}
+    }
+    class QueueInsertItemsRequest {
+      insertBefore?: number;
+      constructor(public items: QueueItem[]) {}
+    }
+    Object.assign(window, {
+      cast: { framework: { CastContext: { getInstance: () => context } } },
+      chrome: {
+        cast: {
+          AutoJoinPolicy: { ORIGIN_SCOPED: "origin_scoped" },
+          Image: class {},
+          media: {
+            DEFAULT_MEDIA_RECEIVER_APP_ID: "CC1AD845",
+            MediaInfo,
+            MusicTrackMediaMetadata: class {},
+            QueueItem,
+            QueueInsertItemsRequest,
+            QueueRemoveItemsRequest: class {},
+            QueueReorderItemsRequest: class {},
+            RepeatMode: { OFF: "OFF", ALL: "ALL", SINGLE: "SINGLE" },
+          },
+        },
+      },
+    });
+    const initial = {
+      session_id: "deadline-web",
+      lease: "lease",
+      bootstrap_url: "https://api.example/cast/deadline-web",
+      receiver_application_id: "ABCD1234",
+      queue: {
+        revision: 0,
+        state_seq: 0,
+        current_index: 0,
+        current_time: 0,
+        repeat_mode: "off" as const,
+        shuffle: false,
+        items: [
+          {
+            item_id: "track-1-1",
+            track_id: 1,
+            title: "Track",
+            artist: "Artist",
+            content_type: "audio/mpeg",
+            stream_url: "https://api.example/track",
+            metadata_url: "https://api.example/track/meta",
+          },
+        ],
+      },
+    };
+    const track = {
+      id: "track-1",
+      libraryTrackId: 1,
+      title: "Track",
+      artist: "Artist",
+    };
+    apiMock
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValue({ mutation_status: "applied" });
+    await expect(startCastSession({ track })).resolves.toMatchObject({
+      ok: true,
+    });
+    return { initial, track, media };
+  }
+
+  function appendFixture(
+    initial: Awaited<ReturnType<typeof prepareGuardedNativeQueue>>["initial"],
+  ) {
+    const extra = {
+      item_id: "track-2-1",
+      track_id: 2,
+      title: "Two",
+      artist: "Artist",
+      content_type: "audio/mpeg",
+      stream_url: "https://api.example/two",
+      metadata_url: "https://api.example/two/meta",
+    };
+    const scoped = {
+      ...initial,
+      protocol_version: 1,
+      queue: {
+        ...initial.queue,
+        revision: 1,
+        items: [...initial.queue.items, extra],
+      },
+    };
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      async () => new Response(JSON.stringify(scoped), { status: 200 }),
+    );
+    return {
+      scoped,
+      update: {
+        queue: [
+          {
+            id: "track-1",
+            libraryTrackId: 1,
+            title: "Track",
+            artist: "Artist",
+          },
+          { id: "track-2", libraryTrackId: 2, title: "Two", artist: "Artist" },
+        ],
+        currentIndex: 0,
+        repeatMode: "off" as const,
+        shuffle: false,
+      },
+    };
+  }
+
+  it("accepts a normal native append ACK before its deadline and cancels the timeout", async () => {
+    vi.useFakeTimers();
+    const { initial } = await prepareGuardedNativeQueue("ack-control");
+    const { update } = appendFixture(initial);
+    let ack!: (result: CastStartResult) => void;
+    nativeQueueInsertMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          ack = resolve;
+        }),
+    );
+    const changed = vi.fn();
+    const unsubscribe = onCastSessionChanged(changed);
+    const pending = syncCustomCastQueue(update);
+    try {
+      await vi.advanceTimersByTimeAsync(0);
+      expect(nativeQueueInsertMock).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(9_000);
+      ack({ ok: true });
+      await expect(pending).resolves.toEqual({ ok: true });
+      expect(changed).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(changed).toHaveBeenCalledOnce();
+    } finally {
+      ack?.({ ok: true });
+      await pending;
+      unsubscribe();
+    }
+  });
+
+  it("expires a lost native append ACK and ignores it while a later skip awaits its own ACK", async () => {
+    vi.useFakeTimers();
+    const { initial } = await prepareGuardedNativeQueue("lost-native-ack");
+    const { update } = appendFixture(initial);
+    let ackAppend!: (result: CastStartResult) => void;
+    let ackSkip!: (result: CastStartResult) => void;
+    nativeQueueInsertMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          ackAppend = resolve;
+        }),
+    );
+    nativeQueueNextMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          ackSkip = resolve;
+        }),
+    );
+    const changed = vi.fn();
+    const unsubscribe = onCastSessionChanged(changed);
+    let appendResult: CastStartResult | undefined;
+    let skipResult: CastStartResult | undefined;
+    const pending = syncCustomCastQueue(update).then((result) => {
+      appendResult = result;
+      return result;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    const skip = castQueueNext().then((result) => {
+      skipResult = result;
+      return result;
+    });
+    try {
+      await vi.advanceTimersByTimeAsync(10_100);
+      expect(appendResult).toMatchObject({ ok: false });
+      expect(nativeQueueNextMock).toHaveBeenCalledOnce();
+      expect(skipResult).toBeUndefined();
+      ackAppend({ ok: true });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(changed).not.toHaveBeenCalled();
+      expect(skipResult).toBeUndefined();
+      expect(appendResult).toMatchObject({ ok: false });
+      ackSkip({ ok: true });
+      await expect(skip).resolves.toEqual({ ok: true });
+    } finally {
+      ackAppend?.({ ok: true });
+      await pending;
+      await vi.advanceTimersByTimeAsync(0);
+      ackSkip?.({ ok: true });
+      await skip;
+      unsubscribe();
+    }
+  });
+
+  it("expires a lost web append callback so queued skips are not blocked", async () => {
+    vi.useFakeTimers();
+    const { initial, media } = await prepareDeadlineWebQueue();
+    const { update } = appendFixture(initial);
+    let ack!: () => void;
+    media.queueInsertItems.mockImplementationOnce((_request, success) => {
+      ack = success;
+    });
+    const changed = vi.fn();
+    const unsubscribe = onCastSessionChanged(changed);
+    let appendResult: CastStartResult | undefined;
+    let skipResult: CastStartResult | undefined;
+    const pending = syncCustomCastQueue(update).then((result) => {
+      appendResult = result;
+      return result;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    const skip = castQueueNext().then((result) => {
+      skipResult = result;
+      return result;
+    });
+    try {
+      await vi.advanceTimersByTimeAsync(10_100);
+      expect(appendResult).toMatchObject({ ok: false });
+      expect(skipResult).toEqual({ ok: true });
+      expect(media.queueNext).toHaveBeenCalledOnce();
+      ack();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(changed).not.toHaveBeenCalled();
+      expect(appendResult).toMatchObject({ ok: false });
+    } finally {
+      ack?.();
+      await pending;
+      await skip;
+      unsubscribe();
+    }
+  });
+
+  it("expires a lost native snapshot ACK before inserting or committing its queue", async () => {
+    vi.useFakeTimers();
+    const { initial } = await prepareGuardedNativeQueue("lost-snapshot-ack");
+    const { update } = appendFixture(initial);
+    let ack!: () => void;
+    nativeGetQueueSnapshotMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          ack = () =>
+            resolve({
+              available: true,
+              items: [{ stableId: "track-1-1", itemId: 41 }],
+            });
+        }),
+    );
+    nativeQueueNextMock.mockResolvedValue({ ok: true });
+    const changed = vi.fn();
+    const unsubscribe = onCastSessionChanged(changed);
+    let outcome: CastStartResult | undefined;
+    let skipResult: CastStartResult | undefined;
+    const pending = syncCustomCastQueue(update).then((result) => {
+      outcome = result;
+      return result;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    const skip = castQueueNext().then((result) => {
+      skipResult = result;
+      return result;
+    });
+    try {
+      await vi.advanceTimersByTimeAsync(10_100);
+      expect(outcome).toMatchObject({ ok: false });
+      expect(skipResult).toEqual({ ok: true });
+      ack();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(nativeQueueInsertMock).not.toHaveBeenCalled();
+      expect(changed).not.toHaveBeenCalled();
+    } finally {
+      ack?.();
+      await pending;
+      await skip;
+      unsubscribe();
+    }
+  });
+
+  it("bounds the complete append even when every earlier transport stage makes slow progress", async () => {
+    vi.useFakeTimers();
+    const { initial } = await prepareGuardedNativeQueue(
+      "append-total-deadline",
+    );
+    const { update, scoped } = appendFixture(initial);
+    apiMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => resolve({ mutation_status: "applied" }), 9_000);
+        }),
+    );
+    vi.mocked(globalThis.fetch).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(
+            () =>
+              resolve(new Response(JSON.stringify(scoped), { status: 200 })),
+            9_000,
+          );
+        }),
+    );
+    nativeGetQueueSnapshotMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(
+            () =>
+              resolve({
+                available: true,
+                items: [{ stableId: "track-1-1", itemId: 41 }],
+              }),
+            9_000,
+          );
+        }),
+    );
+    let ack!: (result: CastStartResult) => void;
+    nativeQueueInsertMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          ack = resolve;
+        }),
+    );
+    let outcome: CastStartResult | undefined;
+    const pending = syncCustomCastQueue(update).then((result) => {
+      outcome = result;
+      return result;
+    });
+    try {
+      await vi.advanceTimersByTimeAsync(30_100);
+      expect(outcome).toMatchObject({ ok: false });
+    } finally {
+      await vi.advanceTimersByTimeAsync(30_000);
+      ack?.({ ok: true });
+      await pending;
+    }
+  });
+
+  it("releases queued navigation when the append API acknowledgement never arrives", async () => {
+    vi.useFakeTimers();
+    const { initial } = await prepareGuardedNativeQueue("lost-api-ack");
+    const { update } = appendFixture(initial);
+    let ack!: (result: unknown) => void;
+    apiMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          ack = resolve;
+        }),
+    );
+    nativeQueueNextMock.mockResolvedValue({ ok: true });
+    const changed = vi.fn();
+    const unsubscribe = onCastSessionChanged(changed);
+    let outcome: CastStartResult | undefined;
+    let skipResult: CastStartResult | undefined;
+    const pending = syncCustomCastQueue(update).then((result) => {
+      outcome = result;
+      return result;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    const skip = castQueueNext().then((result) => {
+      skipResult = result;
+      return result;
+    });
+    try {
+      await vi.advanceTimersByTimeAsync(30_100);
+      expect(outcome).toMatchObject({ ok: false });
+      expect(skipResult).toEqual({ ok: true });
+      ack({ mutation_status: "applied" });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(nativeQueueInsertMock).not.toHaveBeenCalled();
+      expect(changed).not.toHaveBeenCalled();
+    } finally {
+      ack?.({ mutation_status: "applied" });
+      await pending;
+      await skip;
+      unsubscribe();
+    }
+  });
+
+  it("releases queued navigation when the append bootstrap read never completes", async () => {
+    vi.useFakeTimers();
+    const { initial } = await prepareGuardedNativeQueue("lost-bootstrap-read");
+    const { update, scoped } = appendFixture(initial);
+    let ack!: () => void;
+    vi.mocked(globalThis.fetch).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          ack = () =>
+            resolve(new Response(JSON.stringify(scoped), { status: 200 }));
+        }),
+    );
+    nativeQueueNextMock.mockResolvedValue({ ok: true });
+    const changed = vi.fn();
+    const unsubscribe = onCastSessionChanged(changed);
+    let outcome: CastStartResult | undefined;
+    let skipResult: CastStartResult | undefined;
+    const pending = syncCustomCastQueue(update).then((result) => {
+      outcome = result;
+      return result;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    const skip = castQueueNext().then((result) => {
+      skipResult = result;
+      return result;
+    });
+    try {
+      await vi.advanceTimersByTimeAsync(30_100);
+      expect(outcome).toMatchObject({ ok: false });
+      expect(skipResult).toEqual({ ok: true });
+      ack();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(nativeQueueInsertMock).not.toHaveBeenCalled();
+      expect(changed).not.toHaveBeenCalled();
+    } finally {
+      ack?.();
+      await pending;
+      await skip;
+      unsubscribe();
+    }
+  });
+
+  it.each(["native", "web"] as const)(
+    "expires a lost %s navigation ACK and releases the next command",
+    async (platform) => {
+      vi.useFakeTimers();
+      let ack!: () => void;
+      if (platform === "native") {
+        await prepareGuardedNativeQueue("lost-navigation-ack");
+        nativeQueueNextMock.mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              ack = () => resolve({ ok: true });
+            }),
+        );
+        nativeQueuePreviousMock.mockResolvedValue({ ok: true });
+      } else {
+        const { media } = await prepareDeadlineWebQueue();
+        media.queueNext.mockImplementationOnce((success) => {
+          ack = success;
+        });
+      }
+      let outcome: CastStartResult | undefined;
+      let previousResult: CastStartResult | undefined;
+      const pending = castQueueNext().then((result) => {
+        outcome = result;
+        return result;
+      });
+      const previous = castQueuePrevious().then((result) => {
+        previousResult = result;
+        return result;
+      });
+      try {
+        await vi.advanceTimersByTimeAsync(10_100);
+        expect(outcome).toMatchObject({ ok: false });
+        expect(previousResult).toEqual({ ok: true });
+        ack();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(outcome).toMatchObject({ ok: false });
+        expect(previousResult).toEqual({ ok: true });
+      } finally {
+        ack?.();
+        await pending;
+        await previous;
+      }
+    },
+  );
+
+  it("reconciles native stable IDs before retrying an insertion whose ACK was lost", async () => {
+    const { initial } = await prepareGuardedNativeQueue(
+      "applied-native-lost-ack",
+    );
+    const { update } = appendFixture(initial);
+    const receiverItems = [{ stableId: "track-1-1", itemId: 41 }];
+    nativeGetQueueSnapshotMock.mockImplementation(async () => ({
+      available: true,
+      items: receiverItems.map((item) => ({ ...item })),
+    }));
+    let loseAck = true;
+    nativeQueueInsertMock.mockImplementation(
+      async ({ items }: { items: Array<{ stableId: string }> }) => {
+        receiverItems.push(
+          ...items.map((item) => ({
+            stableId: item.stableId,
+            itemId: 41 + receiverItems.length,
+          })),
+        );
+        if (loseAck) {
+          loseAck = false;
+          return {
+            ok: false,
+            message: "Receiver inserted the item but its ACK was lost",
+          };
+        }
+        return { ok: true };
+      },
+    );
+
+    await expect(syncCustomCastQueue(update)).resolves.toMatchObject({
+      ok: false,
+    });
+    await expect(syncCustomCastQueue(update)).resolves.toMatchObject({
+      ok: true,
+    });
+
+    expect(receiverItems.map((item) => item.stableId)).toEqual([
+      "track-1-1",
+      "track-2-1",
+    ]);
+    expect(nativeQueueInsertMock).toHaveBeenCalledOnce();
+  });
+
+  it("reconciles web receiver IDs before retrying an insertion whose ACK was lost", async () => {
+    const { initial, media } = await prepareDeadlineWebQueue();
+    const { update } = appendFixture(initial);
+    let loseAck = true;
+    media.queueInsertItems.mockImplementation((request, success, failure) => {
+      const inserted = request as {
+        items: Array<{ media: (typeof media.items)[number]["media"] }>;
+      };
+      media.items.push(
+        ...inserted.items.map((item) => ({
+          itemId: 41 + media.items.length,
+          media: item.media,
+        })),
+      );
+      if (loseAck) {
+        loseAck = false;
+        failure(new Error("Receiver inserted the item but its ACK was lost"));
+      } else success();
+    });
+
+    await expect(syncCustomCastQueue(update)).resolves.toMatchObject({
+      ok: false,
+    });
+    await expect(syncCustomCastQueue(update)).resolves.toMatchObject({
+      ok: true,
+    });
+
+    expect(
+      media.items.map((item) => item.media.customData.crateCast.itemId),
+    ).toEqual(["track-1-1", "track-2-1"]);
+    expect(media.queueInsertItems).toHaveBeenCalledOnce();
+  });
+
+  it.each(["unavailable", "empty"] as const)(
+    "allows a confirmed web append with an %s snapshot while distinguishing an empty receiver queue",
+    async (snapshot) => {
+      const { initial, media } = await prepareDeadlineWebQueue();
+      const { update } = appendFixture(initial);
+      Object.defineProperty(media, "items", {
+        configurable: true,
+        writable: true,
+        value: snapshot === "unavailable" ? undefined : [],
+      });
+
+      await expect(syncCustomCastQueue(update)).resolves.toMatchObject({
+        ok: true,
+      });
+
+      const insertedIds = media.queueInsertItems.mock.calls.flatMap(
+        ([request]) => {
+          const inserted = request as {
+            items: Array<{
+              media: { customData: { crateCast: { itemId: string } } };
+            }>;
+          };
+          return inserted.items.map(
+            (item) => item.media.customData.crateCast.itemId,
+          );
+        },
+      );
+      expect(insertedIds).toEqual(
+        snapshot === "unavailable" ? ["track-2-1"] : ["track-1-1", "track-2-1"],
+      );
+    },
+  );
+
+  it("waits for a real web snapshot after an applied insert loses its ACK instead of duplicating or falsely committing", async () => {
+    vi.useFakeTimers();
+    const { initial, media } = await prepareDeadlineWebQueue();
+    const { update } = appendFixture(initial);
+    const receiverItems = media.items;
+    let acknowledgeOldInsert: (() => void) | undefined;
+    let loseFirstAck = true;
+    media.queueInsertItems.mockImplementation((request, success) => {
+      const inserted = request as {
+        items: Array<{ media: (typeof receiverItems)[number]["media"] }>;
+      };
+      receiverItems.push(
+        ...inserted.items.map((item) => ({
+          itemId: 41 + receiverItems.length,
+          media: item.media,
+        })),
+      );
+      if (loseFirstAck) {
+        loseFirstAck = false;
+        acknowledgeOldInsert = success;
+        Object.defineProperty(media, "items", {
+          configurable: true,
+          writable: true,
+          value: undefined,
+        });
+      } else success();
+    });
+    const changed = vi.fn();
+    const unsubscribe = onCastSessionChanged(changed);
+    const pending = syncCustomCastQueue(update);
+    try {
+      await vi.advanceTimersByTimeAsync(10_100);
+      await expect(pending).resolves.toMatchObject({ ok: false });
+      await expect(syncCustomCastQueue(update)).resolves.toMatchObject({
+        ok: false,
+      });
+
+      expect(media.queueInsertItems).toHaveBeenCalledOnce();
+      expect(
+        receiverItems.map((item) => item.media.customData.crateCast.itemId),
+      ).toEqual(["track-1-1", "track-2-1"]);
+      expect(changed).not.toHaveBeenCalled();
+      acknowledgeOldInsert?.();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(changed).not.toHaveBeenCalled();
+      await expect(syncCustomCastQueue(update)).resolves.toMatchObject({
+        ok: false,
+      });
+      expect(media.queueInsertItems).toHaveBeenCalledOnce();
+      expect(changed).not.toHaveBeenCalled();
+
+      Object.defineProperty(media, "items", { value: receiverItems });
+      await expect(syncCustomCastQueue(update)).resolves.toMatchObject({
+        ok: true,
+      });
+      expect(media.queueInsertItems).toHaveBeenCalledOnce();
+      expect(changed).toHaveBeenCalledOnce();
+    } finally {
+      acknowledgeOldInsert?.();
+      await pending;
+      unsubscribe();
+    }
+  });
 
   it("drops cancelled append and advance operations while they await an earlier mutation", async () => {
     const { initial, track } = await prepareGuardedNativeQueue();
