@@ -5,6 +5,7 @@ import androidx.annotation.Nullable;
 final class NativeContinuationPolicy {
     static final int MIN_PLANNED_EDGES = 3;
     static final int MAX_EDGES = 32;
+    static final long MAX_ENDED_WAIT_MS = 60_000L;
     private static final long[] BACKOFF_MS = {10_000L, 30_000L, 60_000L, 300_000L};
 
     static final class Window {
@@ -23,6 +24,7 @@ final class NativeContinuationPolicy {
     private int failures;
     private long retryAtMs;
     private long generation;
+    private long endedAtMs = -1L;
 
     long generation() {
         return generation;
@@ -30,6 +32,32 @@ final class NativeContinuationPolicy {
 
     boolean acceptsResult(long requestGeneration) {
         return inFlight && requestGeneration == generation;
+    }
+
+    boolean isTerminal() {
+        return unauthorized || exhausted;
+    }
+
+    void invalidateInFlight() {
+        generation++;
+        inFlight = false;
+    }
+
+    void onPlaybackEnded(long nowMs) {
+        if (endedAtMs < 0L) endedAtMs = nowMs;
+    }
+
+    boolean endedDeadlineExpired(long nowMs) {
+        return endedAtMs >= 0L && nowMs - endedAtMs >= MAX_ENDED_WAIT_MS;
+    }
+
+    long remainingEndedWaitMs(long nowMs) {
+        if (endedAtMs < 0L) return -1L;
+        return Math.max(0L, MAX_ENDED_WAIT_MS - (nowMs - endedAtMs));
+    }
+
+    void clearEndedDeadline() {
+        endedAtMs = -1L;
     }
 
     long retryDelayMs(long nowMs) {
@@ -99,11 +127,11 @@ final class NativeContinuationPolicy {
     }
 
     void reset() {
-        generation++;
-        inFlight = false;
+        invalidateInFlight();
         unauthorized = false;
         exhausted = false;
         failures = 0;
         retryAtMs = 0L;
+        clearEndedDeadline();
     }
 }
