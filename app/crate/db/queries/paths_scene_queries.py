@@ -301,44 +301,46 @@ def list_scene_path_candidates(
     limit_per_genre: int = 100,
     session=None,
 ) -> dict[str, list[dict]]:
-    """Return genre-scoped track candidates with canonical and user signals."""
+    """Return genre-scoped candidates in one read while preserving each pool's ranking."""
     if not genre_slugs:
         return {}
 
-    effective_user_id = int(user_id or 0)
-    result: dict[str, list[dict]] = {}
-
+    requested_genres = list(dict.fromkeys(genre_slugs))
+    result: dict[str, list[dict]] = {slug: [] for slug in requested_genres}
     with nullcontext(session) if session is not None else read_scope() as s:
-        for slug in dict.fromkeys(genre_slugs):
-            rows = (
-                s.execute(
-                    text(
-                        f"""
-                    WITH {_ARTIST_GENRES_CTE}, target_node AS (
-                        SELECT id
-                        FROM genre_taxonomy_nodes
-                        WHERE slug = :genre_slug
-                        LIMIT 1
+        rows = (
+            s.execute(
+                text(
+                    f"""
+                    WITH {_ARTIST_GENRES_CTE}, requested_genres AS (
+                        SELECT UNNEST(CAST(:genre_slugs AS TEXT[])) AS genre_slug
+                    ),
+                    target_nodes AS (
+                        SELECT n.id, requested.genre_slug
+                        FROM requested_genres requested
+                        JOIN genre_taxonomy_nodes n ON n.slug = requested.genre_slug
                     ),
                     target_genres AS (
-                        SELECT g.id, 1.0::DOUBLE PRECISION AS membership_multiplier
-                        FROM genres g
-                        WHERE g.slug = :genre_slug
+                        SELECT g.id, requested.genre_slug,
+                               1.0::DOUBLE PRECISION AS membership_multiplier
+                        FROM requested_genres requested
+                        JOIN genres g ON g.slug = requested.genre_slug
                         UNION ALL
-                        SELECT g.id, CAST(:alias_membership_multiplier AS DOUBLE PRECISION)
-                        FROM genres g
-                        JOIN genre_taxonomy_aliases gta
-                          ON gta.alias_slug = g.slug
-                        WHERE gta.genre_id IN (SELECT id FROM target_node)
-                          AND g.slug != :genre_slug
+                        SELECT g.id, target.genre_slug,
+                               CAST(:alias_membership_multiplier AS DOUBLE PRECISION)
+                        FROM target_nodes target
+                        JOIN genre_taxonomy_aliases gta ON gta.genre_id = target.id
+                        JOIN genres g ON g.slug = gta.alias_slug
+                        WHERE g.slug != target.genre_slug
                     ),
                     artist_memberships AS (
                         SELECT
+                            tg.genre_slug,
                             ag.artist_name,
                             MAX(ag.weight * tg.membership_multiplier)::DOUBLE PRECISION AS membership_score
                         FROM artist_genres ag
                         JOIN target_genres tg ON tg.id = ag.genre_id
-                        GROUP BY ag.artist_name
+                        GROUP BY tg.genre_slug, ag.artist_name
                     ),
                     artist_relation_counts AS (
                         SELECT LOWER(artist_name) AS artist_name, COUNT(*)::DOUBLE PRECISION AS relation_count
@@ -372,7 +374,7 @@ def list_scene_path_candidates(
                             t.valence,
                             t.bliss_vector,
                             0.0 AS distance,
-                            :genre_slug AS genre_slug,
+                            am.genre_slug AS genre_slug,
                             am.membership_score,
                             performer.listeners AS artist_listeners,
                             performer.spotify_popularity AS artist_spotify_popularity,
@@ -400,7 +402,7 @@ def list_scene_path_candidates(
                             COALESCE(uts.complete_play_count, 0) AS user_complete_play_count,
                             (ult.track_id IS NOT NULL OR global_like.global_track_uid IS NOT NULL) AS is_liked,
                             ROW_NUMBER() OVER (
-                                PARTITION BY LOWER(t.artist)
+                                PARTITION BY am.genre_slug, LOWER(t.artist)
                                 ORDER BY
                                     t.popularity_score DESC NULLS LAST,
                                     t.lastfm_top_rank ASC NULLS LAST,
@@ -439,44 +441,50 @@ def list_scene_path_candidates(
                         WHERE t.bliss_vector IS NOT NULL
                           AND am.membership_score >= :min_membership_score
                           AND {playable_track_clause("t", "a")}
-                    )
-                    SELECT
-                        *
-                    FROM ranked_candidates
-                    WHERE artist_track_rank <= :per_artist_limit
-                    ORDER BY
-                        membership_score DESC NULLS LAST,
-                        artist_popularity_score DESC NULLS LAST,
-                        artist_listeners DESC NULLS LAST,
-                        artist_spotify_popularity DESC NULLS LAST,
-                        artist_track_rank ASC,
-                        track_popularity_score DESC NULLS LAST,
-                        lastfm_top_rank ASC NULLS LAST,
-                        lastfm_playcount DESC NULLS LAST,
-                        rating DESC NULLS LAST,
-                        id ASC
-                    LIMIT :limit
-                    """
                     ),
-                    {
-                        "genre_slug": slug,
-                        "user_id": effective_user_id,
-                        "alias_membership_multiplier": 0.70,
-                        "min_membership_score": 0.45,
-                        "per_artist_limit": _tracks_per_artist_limit(limit_per_genre),
-                        "limit": int(limit_per_genre),
-                        **playable_media_params(),
-                    },
-                )
-                .mappings()
-                .all()
+                    ranked_pools AS (
+                        SELECT *, ROW_NUMBER() OVER (
+                            PARTITION BY genre_slug
+                            ORDER BY
+                                membership_score DESC NULLS LAST,
+                                artist_popularity_score DESC NULLS LAST,
+                                artist_listeners DESC NULLS LAST,
+                                artist_spotify_popularity DESC NULLS LAST,
+                                artist_track_rank ASC,
+                                track_popularity_score DESC NULLS LAST,
+                                lastfm_top_rank ASC NULLS LAST,
+                                lastfm_playcount DESC NULLS LAST,
+                                rating DESC NULLS LAST,
+                                id ASC
+                        ) AS _candidate_rank
+                        FROM ranked_candidates
+                        WHERE artist_track_rank <= :per_artist_limit
+                    )
+                    SELECT *
+                    FROM ranked_pools
+                    WHERE _candidate_rank <= :limit
+                    ORDER BY genre_slug, _candidate_rank
+                    """
+                ),
+                {
+                    "genre_slugs": requested_genres,
+                    "user_id": int(user_id or 0),
+                    "alias_membership_multiplier": 0.70,
+                    "min_membership_score": 0.45,
+                    "per_artist_limit": _tracks_per_artist_limit(limit_per_genre),
+                    "limit": int(limit_per_genre),
+                    **playable_media_params(),
+                },
             )
-            result[slug] = [
-                normalized
-                for row in rows
-                if (normalized := _normalize_track_row(row)) is not None
-            ]
+            .mappings()
+            .all()
+        )
 
+    for row in rows:
+        normalized = _normalize_track_row(row)
+        if normalized is not None:
+            normalized.pop("_candidate_rank", None)
+            result[normalized["genre_slug"]].append(normalized)
     return result
 
 
