@@ -1,6 +1,6 @@
 {
   "measured_date": "2026-10-29",
-  "status": "scene_latency_verified_acoustic_pending",
+  "status": "scene_latency_verified",
   "reference_commit": "c6f4efb1d7748a6fd1d3423376f63ae65bc4cdf5",
   "source_commit": "0c947f84ee6ab28e651850f119b2ef54dd01b6eb",
   "seed": "musical-rotation-controlled",

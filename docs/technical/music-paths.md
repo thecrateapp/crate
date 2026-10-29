@@ -116,12 +116,32 @@ HNSW is approximate: restoring it can change nearest-neighbor pools compared wit
 a full scan. The local representative-vector checks verify expansion capacity
 and sampled recall, rather than guaranteeing identical neighbors for every
 possible vector. Full acoustic path latency still needs validation with the
-index available in the deployment environment.
+index available in the deployment environment; the representative local
+full-planning verification is recorded below.
 
 The migration has only been exercised in disposable test databases. No production
 index or application deployment has been changed during these checkpoints.
 
-### Performance checkpoint
+### Indexable endpoint references and scoped album anchors
+
+Track labels, vectors and anchors compare native ID/UUID columns with typed
+parameters. The former column-to-text comparisons caused six full track scans
+per track-to-track journey, accounting for 84–95% of its observed planning time.
+The parser preserves the former exact textual matching: canonical signed IDs
+within BIGINT range and canonical lowercase UUIDs. Leading zeros, whitespace,
+alternate UUID spellings and oversized values do not become new aliases.
+
+Album anchors resolve their native album ID/UUID in a subquery and restrict
+tracks by the existing `album_id` index before ordering by the existing
+distance. This avoids a global HNSW traversal for a tiny explicit album scope.
+On the representative replica, the former plan visited about 21,000 tracks and
+returned only 10/11 of the 12/21 eligible album tracks; native scoping recovers
+the complete pools. The same scope applies to embedding and array fallback,
+with the same caps, eligibility, exclusions, history and anchor selection.
+Recovered candidates can change a flexible anchor relative to the truncated
+ANN pool. No new index or planner override is required by these query changes.
+
+### Historical performance checkpoint (before scene batching)
 
 The production catalog measurement used a neutral synthetic listener, disabled
 AI, read-only connections and a repeatable snapshot. Timings include in-process
@@ -142,16 +162,77 @@ it has no accepted p95. A single diagnostic profile attributes most of its time
 to candidate SQL and musical graph loading. The shorter 97-track result needs
 checkpoint 3.4's partial-path warning rather than being presented as complete.
 
-A local test with the anonymous real-vector corpus verifies the missing index's
-query-plan improvement and filtered expansion capacity. This is an index
-microbenchmark on different hardware, not acceptance of full acoustic-path
-latency. Full acoustic planning and end-to-end HTTP latency remain release
-checks. Sanitized measurements and environments are in
+A local test at this historical checkpoint used the anonymous real-vector corpus
+to verify query-plan improvement and filtered expansion capacity. That index
+microbenchmark did not establish full acoustic-path latency. Subsequent complete
+planning measurements are recorded below; end-to-end HTTP remains a release
+check. The historical measurements and environments are in
 [`music-paths-evaluation.json`](../../app/tests/fixtures/recommendations/music-paths-evaluation.json).
 
 The historical [checkpoint 3.3 comparison](../../app/tests/fixtures/recommendations/music-paths-review.md)
 retains the controlled A/B/C/D evidence, including the rejected punk-to-Japanoise
 shortcut. Its revised replacement is documented below.
+
+### Scene latency checkpoint
+
+Candidate pools for all requested genres now use one SQL statement per
+`list_scene_path_candidates` invocation. Per-genre limits, performer ranking,
+membership and join cardinality retain their previous behavior. A production
+read-only comparison verifies 5,326 complete rows in the same order and identical
+whole plans for Citizen → Converge and both punk/electronic directions at 20
+and 100 requested songs. Musical weights, history and radio behavior do not
+change.
+
+Serial measurements with the actual helper scopes meet both planning budgets:
+
+| Journey            | Requested / returned | Samples |     p95 |
+| ------------------ | -------------------: | ------: | ------: |
+| Citizen → Converge |              20 / 20 |      25 | 1.447 s |
+| Punk → Electronic  |              20 / 20 |      25 | 1.554 s |
+| Electronic → Punk  |              20 / 20 |      25 | 1.607 s |
+| Citizen → Converge |            100 / 100 |      25 | 4.179 s |
+| Punk → Electronic  |             100 / 97 |      25 | 3.604 s |
+
+These are in-process, warm-taxonomy measurements with synchronous Redis reads
+included, a neutral synthetic listener and real empty history queries. They
+exclude initial warmup, HTTP, authentication and response serialization/transport.
+The forward 97-track result remains unchanged and reports `insufficient_tracks`.
+See the [latency checkpoint](../../app/tests/fixtures/recommendations/music-paths-latency-review.md)
+for full distributions, source hashes, parity checks, reproduction and limits.
+
+### Indexed acoustic latency checkpoint
+
+The complete planner also passes on a disposable full-catalog replica with
+revision 139 and the indexable endpoint/album queries. All cases use 25 serial
+samples with different fixed seeds, real helper scopes and empty synthetic
+history, without AI.
+
+| Journey                                                     | Requested / returned |     p95 |
+| ----------------------------------------------------------- | -------------------: | ------: |
+| Concubine → To Our Friends in the Great White North         |              20 / 20 | 0.163 s |
+| Concubine → To Our Friends in the Great White North         |            100 / 100 | 0.472 s |
+| Jane Doe → We Are the Romans, via The Dillinger Escape Plan |              20 / 20 | 0.152 s |
+| Jane Doe → We Are the Romans, via The Dillinger Escape Plan |            100 / 100 | 0.368 s |
+
+All samples retain endpoints and requested counts, with no duplicate track IDs
+or recognized canonical song families. Three track-100 samples include one
+punctuation-only title without a canonical family key, limiting that check.
+No 20-song case has warnings. Some 100-song cases retain quality
+warnings despite generating all 100 songs; the persisted report distinguishes
+the actual count and includes the warning codes.
+
+The replica contains the real catalog/embeddings, graphs, mapping cardinality
+and original indexes, with anonymized paths and empty user tables. PostgreSQL
+15.18, pgvector 0.8.5, locale and planner settings match the source inventory;
+heap page extents are calibrated independently of timings. It is a fresh
+logical restore on Apple M5/arm64 rather than the production Intel/x86_64 host,
+so these are local in-process percentiles, not production or HTTP percentiles.
+
+The [latency checkpoint](../../app/tests/fixtures/recommendations/music-paths-latency-review.md)
+records distributions, warmups, failed intermediate attempts, recall, query
+plans, source audit and musical review limits. The acoustic gate is verified
+against a representative indexed catalog; production index installation and
+HTTP timing remain deployment/release checks.
 
 ## Revised bridge checkpoint
 
@@ -247,11 +328,14 @@ waypoint preserve their anchors and report complete results. All have unique
 song families; the requested waypoint resolves without requiring a played
 recording by that artist.
 
-These are individual planning samples, not p95 acceptance. The forward genre-20
-probe takes 2.337 s, above the two-second target. Acoustic probes take 8–9 s
+Those historical validation probes are individual planning samples, not p95
+acceptance. The subsequent scene latency checkpoint above closes the former
+genre-20 gate without changing its musical lists. Acoustic probes take 8–9 s
 while the expected cosine index remains absent in production. No index,
-migration, cache entry, play event or saved path was written by this evaluation.
-Representative post-index acoustic and end-to-end HTTP timings remain open.
+migration, cache entry, play event or saved path was written by that evaluation.
+The representative indexed-acoustic checkpoint above closes that local planning
+gate. Production timings after index installation and end-to-end HTTP remain
+deployment/release checks.
 
 PR3 is stacked on PR2 (#301). Review the revised musical lists and partial-path
 presentation before publication. Full Linux CI runs once at the stable phase
