@@ -235,11 +235,14 @@ def playback_continuation(
                 detail="Radio session is busy; retry the request",
                 headers={"Retry-After": "1"},
             ) from exc
-    tracks = [
-        track
-        for track in (_continuation_track(row, payload.delivery) for row in rows)
-        if track is not None
-    ]
+    tracks = []
+    seen = set(known)
+    for row in rows:
+        track = _continuation_track(row, payload.delivery)
+        if track is None or str(track.entity_uid) in seen:
+            continue
+        seen.add(str(track.entity_uid))
+        tracks.append(track)
     chain = (
         [str(payload.after_track_entity_uid)] if payload.after_track_entity_uid else []
     )
@@ -257,10 +260,10 @@ def playback_continuation(
         plans=_plan_transition_edges(edges) if edges else [],
         exhausted=exhausted,
         status=(
-            batch["status"]
-            if batch
-            else "ok"
+            "ok"
             if tracks
+            else "auth_required"
+            if batch and batch["status"] == "auth_required"
             else "exhausted"
             if exhausted
             else "retryable_empty"
@@ -272,6 +275,8 @@ def playback_continuation(
 
 
 def _continuation_track(row: dict, delivery: str) -> ContinuationTrackResponse | None:
+    if row.get("playable") is False:
+        return None
     entity_uid = row.get("track_entity_uid") or row.get("entity_uid")
     if not entity_uid:
         return None

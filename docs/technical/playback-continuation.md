@@ -9,8 +9,10 @@ cross-session rotation are outside this change.
 
 - `POST /api/radio/start` accepts an optional client-generated UUID `session_id`,
   a bounded `count` and `buffer_refs` in playback order. Its first batch is zero.
-- `POST /api/radio/next` accepts an optional `batch_index` and `revision`.
-  Existing sessions started without an index begin continuation at batch one.
+- `POST /api/radio/next` requires a UUID `session_id` and accepts an optional
+  `batch_index` and `revision`. UUIDs are normalized before session lookup;
+  malformed IDs receive HTTP 422. Existing sessions started without an index
+  begin continuation at batch one.
 - Indexed responses preserve tracks and add `status`, `revision` and
   `batch_index`. Status is `ok`, `retryable_empty`, `exhausted` or `auth_required`.
 - A transport error is an error, not an empty success. Retrying uses the same
@@ -25,6 +27,10 @@ cross-session rotation are outside this change.
   still starts at batch zero. Legacy continuation, feedback and deletion return
   HTTP 409 with `Retry-After: 1`. Unrelated failures remain errors. Local feedback
   is persisted after releasing the session lock.
+- Only the two latest indexed batches are retained. Pruning commits in the same
+  Redis transaction as progress. Retrying a pruned start for a live, owned
+  session returns its authoritative cursor without regenerating batch zero.
+  Deletion removes all cached batches atomically and preserves the expiry marker.
 - Sessions and batch payloads have a 24-hour TTL. A 48-hour marker prevents a
   recently expired or discarded session from being silently recreated at batch
   zero. A missing continuation session returns `exhausted`.
@@ -35,6 +41,11 @@ The buffer is excluded by canonical/local identity. Its final track supplies
 local transition context, while the original seed remains the musical anchor.
 Infinite also works with shuffle; repeat-one/all keeps priority.
 Local buffer metadata is loaded with one indexed batch query.
+Native continuation filters known, duplicate and explicitly unplayable tracks
+before deriving status, without changing the replayable batch. An empty filtered
+batch is retryable unless the source is exhausted or authorization is required.
+Radio start/next preserve nullable track fields for legacy parsers; station
+responses continue omitting absent optional metadata.
 
 ## Playback lifecycle
 

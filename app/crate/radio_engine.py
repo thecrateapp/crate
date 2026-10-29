@@ -197,10 +197,15 @@ def get_session_user_id(session_id: str) -> int | None:
 def _delete_session(session_id: str) -> bool:
     from crate.radio_continuation import leased_pipeline, session_lock
 
-    with session_lock(session_id) as lease, leased_pipeline(lease) as pipe:
-        pipe.set(f"{_session_key(session_id)}:started", "1", ex=_SESSION_TTL * 2)
-        pipe.delete(_session_key(session_id))
-        return pipe.execute()[-1] > 0
+    with session_lock(session_id) as lease:
+        key = _session_key(session_id)
+        batch_keys = list(_redis().scan_iter(match=f"{key}:batch:*"))
+        with leased_pipeline(lease) as pipe:
+            pipe.set(f"{key}:started", "1", ex=_SESSION_TTL * 2)
+            pipe.delete(key)
+            if batch_keys:
+                pipe.delete(*batch_keys)
+            return pipe.execute()[1] > 0
 
 
 def _queue_intent_payload(intent: QueueIntent) -> dict:

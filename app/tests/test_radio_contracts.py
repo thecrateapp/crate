@@ -6,6 +6,8 @@ from uuid import uuid4
 
 import pytest
 
+SESSION_ID = "11111111-1111-4111-8111-111111111111"
+
 
 class TestRadioApiContracts:
     def test_global_radio_dislike_accepts_a_canonical_track_uid(self, test_app):
@@ -19,7 +21,7 @@ class TestRadioApiContracts:
             resp = test_app.post(
                 "/api/radio/feedback",
                 json={
-                    "session_id": "session-1",
+                    "session_id": SESSION_ID,
                     "global_track_uid": "global-track-1",
                     "action": "dislike",
                 },
@@ -28,13 +30,13 @@ class TestRadioApiContracts:
         assert resp.status_code == 200
         assert resp.json()["effect"] == "exclusion_added"
         feedback.assert_called_once_with(
-            "session-1", None, "dislike", global_track_uid="global-track-1"
+            SESSION_ID, None, "dislike", global_track_uid="global-track-1"
         )
 
     def test_radio_feedback_requires_a_local_or_global_track_reference(self, test_app):
         resp = test_app.post(
             "/api/radio/feedback",
-            json={"session_id": "session-1", "action": "dislike"},
+            json={"session_id": SESSION_ID, "action": "dislike"},
         )
 
         assert resp.status_code == 422
@@ -329,7 +331,7 @@ def test_indexed_next_resolves_proxy_identity_and_rejects_missing_id(
         lambda *args, **kwargs: (
             calls.append(kwargs)
             or {
-                "session_id": "s",
+                "session_id": SESSION_ID,
                 "tracks": [],
                 "status": "retryable_empty",
                 "exhausted": False,
@@ -338,7 +340,7 @@ def test_indexed_next_resolves_proxy_identity_and_rejects_missing_id(
     )
     assert (
         test_app.post(
-            "/api/radio/next", json={"session_id": "s", "batch_index": 1}
+            "/api/radio/next", json={"session_id": SESSION_ID, "batch_index": 1}
         ).status_code
         == 401
     )
@@ -346,7 +348,7 @@ def test_indexed_next_resolves_proxy_identity_and_rejects_missing_id(
     monkeypatch.setattr(radio, "get_user_by_email", lambda _: {"id": 7})
     assert (
         test_app.post(
-            "/api/radio/next", json={"session_id": "s", "batch_index": 1}
+            "/api/radio/next", json={"session_id": SESSION_ID, "batch_index": 1}
         ).status_code
         == 200
     )
@@ -377,7 +379,7 @@ def test_native_seeded_descriptor_cannot_use_a_redis_internal_key(test_app):
                 "kind": "seeded_radio",
                 "seedType": "album",
                 "seedId": "42",
-                "sessionId": "s:lock",
+                "sessionId": f"{SESSION_ID}:lock",
             }
         },
     )

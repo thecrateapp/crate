@@ -6,10 +6,16 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from fnmatch import fnmatchcase
 
 import pytest
 
 from crate import radio_engine
+
+SESSION_ID = "11111111-1111-4111-8111-111111111111"
+OTHER_SESSION_ID = "22222222-2222-4222-8222-222222222222"
+SESSION_KEY = f"radio:session:{SESSION_ID}"
+OTHER_SESSION_KEY = f"radio:session:{OTHER_SESSION_ID}"
 
 
 class MemoryRedis:
@@ -21,8 +27,13 @@ class MemoryRedis:
     def get(self, key):
         return self.values.get(key)
 
-    def delete(self, key):
-        return self.values.pop(key, None) is not None
+    def delete(self, *keys):
+        return sum(self.values.pop(key, None) is not None for key in keys)
+
+    def scan_iter(self, match=None, **_kwargs):
+        for key in tuple(self.values):
+            if match is None or fnmatchcase(key, match):
+                yield key
 
     def setex(self, key, ttl, value):
         self.values[key] = value
@@ -71,8 +82,8 @@ class MemoryPipeline:
     def set(self, key, value, **kwargs):
         self.pending.append(("set", key, value, kwargs.get("ex")))
 
-    def delete(self, key):
-        self.pending.append(("delete", key, None, None))
+    def delete(self, *keys):
+        self.pending.append(("delete", keys, None, None))
 
     def execute(self):
         from redis.exceptions import WatchError
@@ -86,7 +97,7 @@ class MemoryPipeline:
                     self.redis.setex(key, ttl, value)
                     result.append(True)
                 else:
-                    result.append(int(self.redis.delete(key)))
+                    result.append(self.redis.delete(*key))
             self.pending.clear()
             return result
 
@@ -105,9 +116,9 @@ def batches(monkeypatch):
     monkeypatch.setattr(radio_engine, "_generate_batch", generate)
     monkeypatch.setattr(radio_engine, "_apply_buffer_context", lambda *args: None)
     redis.setex(
-        "radio:session:s",
+        SESSION_KEY,
         86400,
-        json.dumps({"id": "s", "user_id": 42, "track_count": 20}),
+        json.dumps({"id": SESSION_ID, "user_id": 42, "track_count": 20}),
     )
     return redis, generated
 
@@ -116,13 +127,13 @@ def test_repeated_index_and_restart_only_generate_once(batches):
     from crate.radio_continuation import next_batch
 
     redis, generated = batches
-    first = next_batch("s", user_id=42, batch_index=1, count=5)
-    second = next_batch("s", user_id=42, batch_index=1, count=5)
+    first = next_batch(SESSION_ID, user_id=42, batch_index=1, count=5)
+    second = next_batch(SESSION_ID, user_id=42, batch_index=1, count=5)
     assert first == second
     assert first["batch_index"] == 1
     assert first["status"] == "ok"
     assert generated == [20]
-    assert json.loads(redis.get("radio:session:s"))["track_count"] == 21
+    assert json.loads(redis.get(SESSION_KEY))["track_count"] == 21
 
 
 def test_concurrent_same_index_is_atomic(batches):
@@ -131,7 +142,8 @@ def test_concurrent_same_index_is_atomic(batches):
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = list(
             pool.map(
-                lambda _: next_batch("s", user_id=42, batch_index=1, count=5), range(2)
+                lambda _: next_batch(SESSION_ID, user_id=42, batch_index=1, count=5),
+                range(2),
             )
         )
     assert results[0] == results[1]
@@ -142,16 +154,18 @@ def test_foreign_user_and_expired_session_cannot_read_a_cached_batch(batches):
     from crate.radio_continuation import next_batch
 
     redis, _ = batches
-    next_batch("s", user_id=42, batch_index=1, count=5)
-    assert next_batch("s", user_id=7, batch_index=1)["status"] == "exhausted"
-    redis.delete("radio:session:s")
-    assert next_batch("s", user_id=42, batch_index=1)["status"] == "exhausted"
+    next_batch(SESSION_ID, user_id=42, batch_index=1, count=5)
+    assert next_batch(SESSION_ID, user_id=7, batch_index=1)["status"] == "exhausted"
+    redis.delete(SESSION_KEY)
+    assert next_batch(SESSION_ID, user_id=42, batch_index=1)["status"] == "exhausted"
 
 
 def test_out_of_order_index_does_not_advance(batches):
     from crate.radio_continuation import next_batch
 
-    assert next_batch("s", user_id=42, batch_index=3)["status"] == "retryable_empty"
+    assert (
+        next_batch(SESSION_ID, user_id=42, batch_index=3)["status"] == "retryable_empty"
+    )
     assert batches[1] == []
 
 
@@ -159,14 +173,15 @@ def test_empty_batch_is_retryable_and_next_index_can_progress(batches, monkeypat
     from crate.radio_continuation import next_batch
 
     monkeypatch.setattr(radio_engine, "_generate_batch", lambda *args: [])
-    result = next_batch("s", user_id=42, batch_index=1)
+    result = next_batch(SESSION_ID, user_id=42, batch_index=1)
     assert result["status"] == "retryable_empty"
     assert result["exhausted"] is False
     monkeypatch.setattr(
         radio_engine, "_generate_batch", lambda *args: [{"title": "Recovered"}]
     )
     assert (
-        next_batch("s", user_id=42, batch_index=2)["tracks"][0]["title"] == "Recovered"
+        next_batch(SESSION_ID, user_id=42, batch_index=2)["tracks"][0]["title"]
+        == "Recovered"
     )
 
 
@@ -174,7 +189,8 @@ def test_wrong_revision_does_not_advance(batches):
     from crate.radio_continuation import next_batch
 
     assert (
-        next_batch("s", user_id=42, batch_index=1, revision=2)["status"] == "exhausted"
+        next_batch(SESSION_ID, user_id=42, batch_index=1, revision=2)["status"]
+        == "exhausted"
     )
     assert batches[1] == []
 
@@ -210,13 +226,16 @@ def test_same_index_in_other_session_is_independent(batches):
 
     redis, _ = batches
     redis.setex(
-        "radio:session:other",
+        OTHER_SESSION_KEY,
         86400,
-        json.dumps({"id": "other", "user_id": 42, "track_count": 100}),
+        json.dumps({"id": OTHER_SESSION_ID, "user_id": 42, "track_count": 100}),
     )
-    assert next_batch("s", user_id=42, batch_index=1)["tracks"][0]["track_id"] == 21
     assert (
-        next_batch("other", user_id=42, batch_index=1)["tracks"][0]["track_id"] == 101
+        next_batch(SESSION_ID, user_id=42, batch_index=1)["tracks"][0]["track_id"] == 21
+    )
+    assert (
+        next_batch(OTHER_SESSION_ID, user_id=42, batch_index=1)["tracks"][0]["track_id"]
+        == 101
     )
 
 
@@ -264,7 +283,9 @@ def test_proxy_without_resolved_id_cannot_own_a_session(batches):
     assert (
         start_batch(session_id=str(uuid4()), user_id=None)["status"] == "auth_required"
     )
-    assert next_batch("s", user_id=None, batch_index=1)["status"] == "auth_required"
+    assert (
+        next_batch(SESSION_ID, user_id=None, batch_index=1)["status"] == "auth_required"
+    )
     assert batches[1] == []
 
 
@@ -272,7 +293,7 @@ def test_seeded_session_id_cannot_overwrite_another_session_lock(batches):
     from crate.radio_continuation import start_batch
 
     with pytest.raises(ValueError):
-        start_batch(session_id="s:lock", user_id=42)
+        start_batch(session_id=f"{SESSION_ID}:lock", user_id=42)
 
 
 def test_global_fallback_excludes_buffer_by_local_and_canonical_identity():
@@ -303,9 +324,9 @@ def test_expired_writer_cannot_overwrite_or_delete_a_newer_session(
     from crate import radio_continuation
 
     redis, _ = batches
-    session_key = "radio:session:s"
+    session_key = SESSION_KEY
     old = {
-        "id": "s",
+        "id": SESSION_ID,
         "user_id": 42,
         "track_count": 20,
         "batch_index": 0,
@@ -355,7 +376,7 @@ def test_expired_writer_cannot_overwrite_or_delete_a_newer_session(
         lambda **kwargs: persisted.append(kwargs),
     )
     if writer == "indexed":
-        result = radio_continuation.next_batch("s", user_id=42, batch_index=1)
+        result = radio_continuation.next_batch(SESSION_ID, user_id=42, batch_index=1)
         assert result["status"] == "retryable_empty"
         assert result["exhausted"] is False
         assert result["tracks"] == []
@@ -363,11 +384,11 @@ def test_expired_writer_cannot_overwrite_or_delete_a_newer_session(
     else:
         with pytest.raises(Exception) as caught:
             if writer == "next":
-                radio_engine.next_tracks("s", count=1)
+                radio_engine.next_tracks(SESSION_ID, count=1)
             elif writer == "feedback":
-                radio_engine.radio_feedback("s", 7, "like")
+                radio_engine.radio_feedback(SESSION_ID, 7, "like")
             else:
-                radio_engine._delete_session("s")
+                radio_engine._delete_session(SESSION_ID)
         assert type(caught.value).__name__ == "RadioLeaseLost"
         assert isinstance(caught.value, radio_continuation.RadioLeaseLost)
     assert json.loads(redis.get(session_key)) == newer
@@ -378,9 +399,9 @@ def test_expired_writer_cannot_overwrite_or_delete_a_newer_session(
 
 def test_delete_session_commits_tombstone_and_deletion_together(batches):
     redis, _ = batches
-    assert radio_engine._delete_session("s") is True
-    assert redis.get("radio:session:s") is None
-    assert redis.get("radio:session:s:started") in ("1", b"1")
+    assert radio_engine._delete_session(SESSION_ID) is True
+    assert redis.get(SESSION_KEY) is None
+    assert redis.get(f"{SESSION_KEY}:started") in ("1", b"1")
 
 
 def test_memory_lock_respects_blocking_timeout_and_releases_after_error():

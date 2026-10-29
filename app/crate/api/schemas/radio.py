@@ -99,7 +99,7 @@ class RadioStartRequest(BaseModel):
 
 
 class RadioNextRequest(BaseModel):
-    session_id: str = Field(min_length=1, max_length=128)
+    session_id: UUID
     count: int = Field(default=20, ge=1, le=50)
     batch_index: int | None = Field(default=None, ge=1)
     revision: int = Field(default=1, ge=1)

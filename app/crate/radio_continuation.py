@@ -101,6 +101,8 @@ def _commit(session: dict, result: dict, index: int, lease) -> dict:
             ex=engine._SESSION_TTL,
         )
         pipe.set(f"{key}:started", "1", ex=engine._SESSION_TTL * 2)
+        if index >= 2:
+            pipe.delete(f"{key}:batch:{index - 2}")
         pipe.execute()
     return result
 
@@ -127,7 +129,14 @@ def start_batch(
                 cached = engine._redis().get(
                     f"{engine._session_key(session_id)}:batch:0"
                 )
-                return json.loads(cached) if cached else _empty(session_id)
+                if cached:
+                    return json.loads(cached)
+                return _empty(
+                    session_id,
+                    "retryable_empty",
+                    batch_index=int(session.get("batch_index", 0)),
+                    revision=session.get("revision", 1),
+                )
             if engine._redis().get(f"{engine._session_key(session_id)}:started"):
                 return _empty(session_id)
             created = engine._create_radio(
@@ -159,6 +168,7 @@ def next_batch(
 ) -> dict:
     if user_id is None:
         return _empty(session_id, "auth_required")
+    session_id = str(UUID(session_id))
     try:
         with session_lock(session_id) as lease:
             session = engine._load_session(session_id)

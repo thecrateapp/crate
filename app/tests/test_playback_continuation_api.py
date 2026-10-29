@@ -301,7 +301,12 @@ def test_seeded_playlist_continuation_respects_playlist_ownership(monkeypatch):
 def test_radio_next_rejects_another_users_session(test_app, monkeypatch):
     import crate.radio_engine as radio_engine
 
-    monkeypatch.setattr(radio_engine, "get_session_user_id", lambda session_id: 999)
+    session_id = "11111111-1111-4111-8111-111111111111"
+    monkeypatch.setattr(
+        radio_engine,
+        "get_session_user_id",
+        lambda value: 999 if value == session_id else None,
+    )
     monkeypatch.setattr(
         radio_engine,
         "next_tracks",
@@ -309,7 +314,7 @@ def test_radio_next_rejects_another_users_session(test_app, monkeypatch):
     )
 
     response = test_app.post(
-        "/api/radio/next", json={"session_id": "radio-1", "count": 5}
+        "/api/radio/next", json={"session_id": session_id, "count": 5}
     )
 
     assert response.status_code == 404

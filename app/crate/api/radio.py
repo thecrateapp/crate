@@ -528,7 +528,6 @@ class RadioFeedbackRequest(BaseModel):
 @router.post(
     "/api/radio/start",
     response_model=RadioBatchResponse,
-    response_model_exclude_none=True,
     responses=AUTH_ERROR_RESPONSES,
     summary="Start a shaped radio session",
 )
@@ -569,7 +568,6 @@ def api_radio_start(request: Request, body: RadioStartRequest):
 @router.post(
     "/api/radio/next",
     response_model=RadioBatchResponse,
-    response_model_exclude_none=True,
     responses=_RADIO_SESSION_RESPONSES,
     summary="Get next batch of radio tracks",
 )
@@ -578,21 +576,22 @@ def api_radio_next(request: Request, body: RadioNextRequest):
     from crate.radio_engine import get_session_user_id, next_tracks
     from crate.radio_continuation import RadioLeaseLost
 
+    session_id = str(body.session_id)
     if body.batch_index is not None:
         from crate.radio_continuation import next_batch
 
         return next_batch(
-            body.session_id,
+            session_id,
             user_id=_continuation_user_id(user),
             batch_index=body.batch_index,
             revision=body.revision,
             count=body.count,
             buffer_refs=body.buffer_refs,
         )
-    if get_session_user_id(body.session_id) != _continuation_user_id(user):
+    if get_session_user_id(session_id) != _continuation_user_id(user):
         return JSONResponse({"error": "Session not found or expired"}, status_code=404)
     try:
-        result = next_tracks(body.session_id, body.count)
+        result = next_tracks(session_id, body.count)
     except RadioLeaseLost as exc:
         raise HTTPException(
             status_code=409,
