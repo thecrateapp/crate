@@ -169,6 +169,29 @@ function createParams() {
 }
 
 describe("usePlayerQueueActions", () => {
+  it.each(["prev", "jumpTo"] as const)(
+    "wakes refill with a user gesture after %s selects another track",
+    (action) => {
+      const resumePlaybackIntelligence = vi.fn(() => false);
+      const params = { ...createParams(), resumePlaybackIntelligence };
+      params.queueRef.current = [TRACK, { ...TRACK, id: "track-2" }];
+      params.currentIndexRef.current = 1;
+      params.advanceCursorTo.mockImplementation((index: number) => {
+        params.currentIndexRef.current = index;
+      });
+      const { result } = renderHook(() => usePlayerQueueActions(params));
+      act(() => {
+        if (action === "jumpTo") result.current.jumpTo(0);
+        else result.current.prev();
+      });
+      expect(params.currentIndexRef.current).toBe(0);
+      expect(resumePlaybackIntelligence).toHaveBeenCalledWith({
+        userGesture: true,
+      });
+      expect(params.resetPlaybackIntelligence).not.toHaveBeenCalled();
+    },
+  );
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(toStartupEngineTracks)

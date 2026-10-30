@@ -248,6 +248,7 @@ export function usePlayerQueueActions({
     advanceCursorTo,
     startTrackerSession,
     continueInfinitePlayback,
+    resumePlaybackIntelligence,
     playbackDeliveryPolicy,
   });
 

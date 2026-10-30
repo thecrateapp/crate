@@ -736,6 +736,59 @@ describe("refill handoff after stream recovery", () => {
 });
 
 describe("bounded EOF refill", () => {
+  it("keeps Resume consumed when its run settles the existing EOF synchronously", async () => {
+    const harness = setup(false);
+    fetchBatch.mockReturnValue(new Promise(() => {}));
+    const { result } = renderHook(() => usePlaybackRefillRuntime(harness.opts));
+    act(() => {
+      result.current.continueInfinitePlayback();
+    });
+    await flush();
+    harness.refs.queueRef.current = [a, b];
+    harness.refs.currentIndexRef.current = 1;
+    let consumed: boolean | undefined;
+    act(() => {
+      consumed = result.current.resume();
+    });
+    expect(consumed).toBe(true);
+  });
+
+  it("resumes normal prefetch after a user selects another track following unavailability", async () => {
+    const harness = setup(false);
+    harness.refs.queueRef.current = [b, a];
+    harness.refs.currentIndexRef.current = 1;
+    harness.opts.queue = harness.refs.queueRef.current;
+    fetchBatch.mockRejectedValue(new Error("offline transport"));
+    const onUnavailable = vi.fn();
+    Object.assign(harness.refs.actionsRef.current, { onUnavailable });
+    const { result, rerender } = renderHook(
+      ({ index, playing }) =>
+        usePlaybackRefillRuntime({
+          ...harness.opts,
+          currentIndex: index,
+          isPlaying: playing,
+        }),
+      { initialProps: { index: 1, playing: false } },
+    );
+    act(() => {
+      result.current.continueInfinitePlayback();
+    });
+    await flush();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    expect(onUnavailable).toHaveBeenCalledOnce();
+    fetchBatch.mockResolvedValue(batch([{ ...b, id: "c" }]));
+    harness.refs.currentIndexRef.current = 0;
+    rerender({ index: 0, playing: true });
+    act(() => {
+      expect(result.current.resume({ userGesture: true })).toBe(false);
+    });
+    await flush();
+    expect(harness.actions.appendTracks).toHaveBeenCalledOnce();
+    expect(harness.actions.appendAndAdvance).not.toHaveBeenCalled();
+  });
+
   const online = (value: boolean) =>
     Object.defineProperty(navigator, "onLine", {
       configurable: true,
