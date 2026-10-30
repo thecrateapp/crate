@@ -128,5 +128,6 @@ fixture does not flush the database. Never point it at application Redis.
 Before release, review on the Xiaomi with crossfade off/on, screen off, a brief
 network outage, slow EOF refill and pause during a request; verify automatic
 append on a physical Cast receiver and the same EOF cases in web/Tauri.
-Representative-catalog latency measurements are still pending. Lost Cast ACK
+Representative-catalog measurements must identify the complete stack, installed
+indexes, HTTP boundary, data-query counts and total SQL round trips. Lost Cast ACK
 reconciliation has automated coverage; physical receiver QA remains necessary.
