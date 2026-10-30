@@ -41,7 +41,7 @@ SMOOTH_FIT_WEIGHTS = TransitionFitWeights(
 class PlannerPolicy:
     version: int = 2
     identifier: str = "smart-mix-v2"
-    rules_revision: int = 6
+    rules_revision: int = 7
     minimum_bpm_confidence: float = 0.75
     minimum_tempo_stability: float = 0.80
     minimum_beatmatch_beats: int = 8
@@ -72,6 +72,7 @@ class PlannerPolicy:
     level_rise_limit_db: float = 9.0
     level_drop_tolerance_db: float = 3.0
     level_drop_limit_db: float = 15.0
+    fade_reference_db: float = 6.0
     brightness_tolerance: float = 0.15
     silence_tolerance_ms: int = 1_500
     silence_limit_ms: int = 8_000

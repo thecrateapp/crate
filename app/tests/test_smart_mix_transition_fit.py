@@ -16,6 +16,7 @@ from crate.smart_mix.transition_fit import (
     TransitionEdges,
     beatmatch_affinity,
     genre_beatmatch_prior,
+    level_jump_db,
     pair_genre_prior,
     score_transition_fit,
 )
@@ -114,6 +115,33 @@ def test_loudness_jumps_up_are_penalised_harder_than_drops() -> None:
     assert drop.level == pytest.approx(1.0 - (14.0 - 3.0) / 12.0, abs=1e-4)
     assert flat.level == 1.0
     assert rise.overall < drop.overall < flat.overall
+
+
+def test_a_fade_out_is_measured_against_the_body_of_the_outgoing_track() -> None:
+    fade_out = _edges(outro_lufs=-26.0, integrated_lufs=-10.0)
+    quiet_song = _edges(outro_lufs=-21.0, integrated_lufs=-20.0)
+    normal_entry = _edges(intro_lufs=-9.0)
+    loud_entry = _edges(intro_lufs=-2.0)
+
+    after_fade = score_transition_fit(fade_out, normal_entry, beatmatch_affinity=0.0)
+    after_quiet_song = score_transition_fit(
+        quiet_song, normal_entry, beatmatch_affinity=0.0
+    )
+    loud_after_fade = score_transition_fit(fade_out, loud_entry, beatmatch_affinity=0.0)
+
+    assert level_jump_db(fade_out, normal_entry) == 1.0
+    assert after_fade.level == 1.0
+    assert level_jump_db(quiet_song, normal_entry) == 12.0
+    assert after_quiet_song.level == 0.0
+    assert level_jump_db(fade_out, loud_entry) == 8.0
+    assert loud_after_fade.level < 0.2
+
+
+def test_a_short_tail_dip_is_not_treated_as_a_fade() -> None:
+    dip = _edges(outro_lufs=-14.0, integrated_lufs=-10.0)
+
+    assert level_jump_db(dip, _edges(intro_lufs=-9.0)) == 5.0
+    assert level_jump_db(_edges(outro_lufs=-26.0), _edges(intro_lufs=-9.0)) == 17.0
 
 
 def test_unaccredited_loudness_falls_back_to_edge_energy() -> None:
@@ -273,7 +301,7 @@ def _candidate(
 
 def test_compatible_ranking_follows_the_requested_context() -> None:
     rock = frozenset({"rock"})
-    seed = _candidate("seed", rock)
+    seed = _candidate("seed", rock, integrated_lufs=-19.0)
     cold_open = _candidate(
         "cold-open",
         rock,

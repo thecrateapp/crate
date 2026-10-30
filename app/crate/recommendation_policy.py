@@ -20,18 +20,36 @@ PATH_FEATURED_ARTIST_PATTERN = (
     r"(?:\s+|\s*[(\[]\s*)(?:feat|ft|featuring)\.?\s+.+?[)\]]?\s*$"
 )
 _FEATURED_ARTIST_RE = re.compile(PATH_FEATURED_ARTIST_PATTERN, re.IGNORECASE)
+_CREDIT_SEPARATOR_RE = re.compile(r"\s*(?:,|&|\+|\bx\b|\bwith\b|\band\b)\s*", re.I)
 
 
 def path_artist_key(row: dict) -> str:
-    """Lowercase the full name, stripping only explicit featured-artist credits.
+    """Lowercase the principal artist, stripping explicit featured-artist credits.
 
-    Keep &, x, with and commas: they can be part of a band's actual name.
-    Lowercase matches the SQL quota key without folding distinct names together.
+    Rows from the catalog carry ``principal_artist``: the credited name when it is a
+    library artist, otherwise the album owner. Other rows fall back to the album
+    artist only when it is one of the credited names, so a band named "X & Y" stays
+    whole while "Owner, Guest" collapses onto its owner.
     """
-    name = str(row.get("artist") or row.get("album_artist") or "").strip(
+    name = str(row.get("principal_artist") or _credited_principal(row)).strip(
         PATH_ARTIST_TRIM_CHARS
     )
     return _FEATURED_ARTIST_RE.sub("", name).strip(PATH_ARTIST_TRIM_CHARS).lower()
+
+
+def _credited_principal(row: dict) -> str:
+    artist = str(row.get("artist") or "").strip(PATH_ARTIST_TRIM_CHARS)
+    album_artist = str(row.get("album_artist") or "").strip(PATH_ARTIST_TRIM_CHARS)
+    if not artist:
+        return album_artist
+    if album_artist and artist.casefold() != album_artist.casefold():
+        credited = {
+            part.strip(PATH_ARTIST_TRIM_CHARS).casefold()
+            for part in _CREDIT_SEPARATOR_RE.split(_FEATURED_ARTIST_RE.sub("", artist))
+        }
+        if album_artist.casefold() in credited:
+            return album_artist
+    return artist
 
 
 def significant_play_threshold(duration: float | None) -> float:

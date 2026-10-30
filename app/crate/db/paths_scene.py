@@ -17,11 +17,14 @@ from crate.db.queries.paths import load_artist_radio_graphs
 from crate.genre_taxonomy import get_genre_catalog, resolve_genre_slug, slugify_genre
 from crate.track_versions import track_song_identity
 from crate.recommendation_policy import fresh_path_candidates, path_artist_key
+from crate.config import transition_fit_enabled
+from crate.smart_mix.transition_fit import RowTransitionScorer
 
 _MIN_MEMBERSHIP_SCORE = 0.60
 _ANCHOR_MEMBERSHIP_FLOOR = 0.70
 _MAX_REPEAT_PER_ARTIST = 2
 _ARTIST_PATH_REPEAT_PER_ARTIST = 1
+_MAX_TRACKS_PER_ALBUM = 2
 _ARTIST_PROFILE_GENRE_LIMIT = 5
 _LONG_ARTIST_ROUTE_STEP_COUNT = 32
 _TRACK_VARIETY_POOL_SIZE = 10
@@ -108,6 +111,9 @@ class _SceneScorer:
     """Reuse immutable candidate signals and transitions within one planning call."""
 
     def __init__(self):
+        self._transition_fit = (
+            RowTransitionScorer() if transition_fit_enabled() else None
+        )
         self._signals: dict[int, _SceneTrackSignals] = {}
         self._previous_track: dict | None = None
         self._track_scores: dict[int, float] = {}
@@ -335,13 +341,24 @@ class _SceneScorer:
             return self._transitions[key]
         current, previous = self.signals(row), self.signals(previous_track)
         scores: list[float] = []
+        fit = (
+            self._transition_fit.fit(previous_track, row)
+            if self._transition_fit is not None
+            else None
+        )
+        if fit is not None:
+            scores.append(fit)
         for left, right, scale in (
-            (current.energy, previous.energy, 1.0),
-            (current.bpm, previous.bpm, 60.0),
+            ()
+            if fit is not None
+            else (
+                (current.energy, previous.energy, 1.0),
+                (current.bpm, previous.bpm, 60.0),
+            )
         ):
             if left is not None and right is not None:
                 scores.append(max(0.0, min(1.0, 1.0 - (abs(left - right) / scale))))
-        if current.key and previous.key:
+        if fit is None and current.key and previous.key:
             if current.key == previous.key and current.scale == previous.scale:
                 scores.append(1.0)
             elif current.key == previous.key:
@@ -594,6 +611,7 @@ def build_scene_path_from_candidates(
     used_ids: set[int] = set()
     used_song_keys: set[tuple[str, str]] = set()
     used_artists: dict[str, int] = {}
+    used_albums: dict[str, int] = {}
     path: list[dict] = []
     scorer = _SceneScorer()
     similarity_graph = artist_similarity_graph or {}
@@ -607,6 +625,7 @@ def build_scene_path_from_candidates(
             used_ids=used_ids,
             used_song_keys=used_song_keys,
             used_artists=used_artists,
+            used_albums=used_albums,
             is_anchor=index == 0 or index == len(slot_genres) - 1,
             previous_track=previous_track,
             artist_similarity_graph=similarity_graph,
@@ -619,8 +638,27 @@ def build_scene_path_from_candidates(
             scorer=scorer,
         )
         if track is None:
+            track = _select_track_for_genre(
+                genre_slug,
+                candidates_by_genre.get(genre_slug, []),
+                used_ids=used_ids,
+                used_song_keys=used_song_keys,
+                used_artists=used_artists,
+                used_albums=None,
+                is_anchor=index == 0 or index == len(slot_genres) - 1,
+                previous_track=previous_track,
+                artist_similarity_graph=similarity_graph,
+                shared_members_graph=member_graph,
+                max_repeat_per_artist=max_repeat_per_artist,
+                selection_seed=_slot_seed(selection_seed, index, genre_slug),
+                recent_song_keys=recent_song_keys,
+                previous_song_keys=previous_song_keys,
+                previous_track_ids=previous_track_ids,
+                scorer=scorer,
+            )
+        if track is None:
             continue
-        _mark_used(track, used_ids, used_artists, used_song_keys)
+        _mark_used(track, used_ids, used_artists, used_song_keys, used_albums)
         path.append(track)
 
     return path
@@ -650,6 +688,7 @@ def build_artist_scene_path_from_candidates(
     used_ids: set[int] = set()
     used_song_keys: set[tuple[str, str]] = set()
     used_artists: dict[str, int] = {}
+    used_albums: dict[str, int] = {}
 
     origin_track = _select_track_for_genre(
         route[0],
@@ -657,6 +696,7 @@ def build_artist_scene_path_from_candidates(
         used_ids=used_ids,
         used_song_keys=used_song_keys,
         used_artists=used_artists,
+        used_albums=used_albums,
         is_anchor=True,
         max_repeat_per_artist=_ARTIST_PATH_REPEAT_PER_ARTIST,
         selection_seed=_slot_seed(selection_seed, 0, route[0]),
@@ -667,7 +707,7 @@ def build_artist_scene_path_from_candidates(
     )
     if origin_track is None:
         return []
-    _mark_used(origin_track, used_ids, used_artists, used_song_keys)
+    _mark_used(origin_track, used_ids, used_artists, used_song_keys, used_albums)
 
     destination_track = _select_track_for_genre(
         route[-1],
@@ -675,6 +715,7 @@ def build_artist_scene_path_from_candidates(
         used_ids=used_ids,
         used_song_keys=used_song_keys,
         used_artists=used_artists,
+        used_albums=used_albums,
         is_anchor=True,
         previous_track=origin_track,
         artist_similarity_graph=similarity_graph,
@@ -688,7 +729,7 @@ def build_artist_scene_path_from_candidates(
     )
     if destination_track is None:
         return []
-    _mark_used(destination_track, used_ids, used_artists, used_song_keys)
+    _mark_used(destination_track, used_ids, used_artists, used_song_keys, used_albums)
 
     middle_tracks: list[dict] = []
     previous_track = origin_track
@@ -703,6 +744,7 @@ def build_artist_scene_path_from_candidates(
             used_ids=used_ids,
             used_song_keys=used_song_keys,
             used_artists=used_artists,
+            used_albums=used_albums,
             is_anchor=False,
             previous_track=previous_track,
             artist_similarity_graph=similarity_graph,
@@ -725,6 +767,7 @@ def build_artist_scene_path_from_candidates(
                 used_ids=used_ids,
                 used_song_keys=used_song_keys,
                 used_artists=used_artists,
+                used_albums=used_albums,
                 is_anchor=False,
                 previous_track=previous_track,
                 artist_similarity_graph=similarity_graph,
@@ -740,9 +783,41 @@ def build_artist_scene_path_from_candidates(
                 previous_track_ids=previous_track_ids,
                 scorer=scorer,
             )
+        for fallback_genre in (
+            genre_slug,
+            _previous_route_genre(selection_route, genre_slug),
+        ):
+            if track is not None or not fallback_genre:
+                break
+            if len(middle_tracks) + 2 >= step_count:
+                break
+            track = _select_track_for_genre(
+                fallback_genre,
+                candidates_by_genre.get(fallback_genre, []),
+                used_ids=used_ids,
+                used_song_keys=used_song_keys,
+                used_artists=used_artists,
+                used_albums=None,
+                is_anchor=False,
+                previous_track=previous_track,
+                artist_similarity_graph=similarity_graph,
+                shared_members_graph=member_graph,
+                max_repeat_per_artist=_MAX_REPEAT_PER_ARTIST,
+                excluded_artist_keys=endpoint_artist_keys,
+                destination_track=destination_track,
+                destination_profile=destination_profile,
+                path_progress=path_progress,
+                selection_seed=_slot_seed(
+                    selection_seed, slot_index + 1, fallback_genre
+                ),
+                recent_song_keys=recent_song_keys,
+                previous_song_keys=previous_song_keys,
+                previous_track_ids=previous_track_ids,
+                scorer=scorer,
+            )
         if track is None:
             continue
-        _mark_used(track, used_ids, used_artists, used_song_keys)
+        _mark_used(track, used_ids, used_artists, used_song_keys, used_albums)
         middle_tracks.append(track)
         previous_track = track
 
@@ -1212,6 +1287,7 @@ def _make_path_entry(track: dict, index: int, total: int, requested_steps: int) 
         "title": track["title"],
         "artist": track["artist"],
         "album_artist": track.get("album_artist"),
+        "principal_artist": track.get("principal_artist"),
         "artist_entity_uid": track.get("artist_entity_uid"),
         "album": track.get("album"),
         "album_id": track.get("album_id"),
@@ -1243,6 +1319,7 @@ def _select_track_for_genre(
     used_ids: set[int],
     used_song_keys: set[tuple[str, str]] | None = None,
     used_artists: dict[str, int],
+    used_albums: dict[str, int] | None = None,
     is_anchor: bool,
     previous_track: dict | None = None,
     artist_similarity_graph: Mapping[str, Mapping[str, float]] | None = None,
@@ -1290,6 +1367,8 @@ def _select_track_for_genre(
         if artist_key and artist_key == previous_artist_key:
             continue
         if used_artists.get(artist_key, 0) >= max_repeat_per_artist:
+            continue
+        if used_albums is not None and _album_blocked(row, previous_track, used_albums):
             continue
         if scorer.should_skip_lateral_destination_candidate(
             row,
@@ -1480,6 +1559,7 @@ def _mark_used(
     used_ids: set[int],
     used_artists: dict[str, int],
     used_song_keys: set[tuple[str, str]] | None = None,
+    used_albums: dict[str, int] | None = None,
 ) -> None:
     used_ids.add(int(track["id"]))
     song_key = track_song_identity(track)
@@ -1487,6 +1567,37 @@ def _mark_used(
         used_song_keys.add(song_key)
     artist_key = _artist_key(track)
     used_artists[artist_key] = used_artists.get(artist_key, 0) + 1
+    album_key = _album_key(track)
+    if album_key and used_albums is not None:
+        used_albums[album_key] = used_albums.get(album_key, 0) + 1
+
+
+def _previous_route_genre(route: list[str], genre_slug: str) -> str | None:
+    index = route.index(genre_slug) if genre_slug in route else 0
+    return route[index - 1] if index > 0 else None
+
+
+def _album_blocked(
+    row: dict, previous_track: dict | None, used_albums: dict[str, int]
+) -> bool:
+    album_key = _album_key(row)
+    if not album_key:
+        return False
+    if previous_track and album_key == _album_key(previous_track):
+        return True
+    return used_albums.get(album_key, 0) >= _MAX_TRACKS_PER_ALBUM
+
+
+def _album_key(row: dict) -> str:
+    album_id = row.get("album_id")
+    if album_id is not None:
+        return f"id:{album_id}"
+    album = str(row.get("album") or "").strip().casefold()
+    return (
+        f"name:{str(row.get('album_artist') or '').strip().casefold()}::{album}"
+        if album
+        else ""
+    )
 
 
 def _artist_score(row: dict) -> float:

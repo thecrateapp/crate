@@ -15,6 +15,10 @@ from crate.db.queries.playable_media_filters import (
     playable_media_params,
     playable_track_clause,
 )
+from crate.db.queries.smart_mix_transition_edges import (
+    transition_edge_join,
+    transition_edge_select,
+)
 from crate.db.tx import optional_scope, read_scope
 
 
@@ -67,7 +71,7 @@ def _normalize_track_row(row) -> dict | None:
     if not row:
         return None
     data = dict(row)
-    data.pop("_artist_metadata_name", None)
+    data["principal_artist"] = data.pop("_artist_metadata_name", None)
     for key in ("entity_uid", "album_entity_uid", "artist_entity_uid"):
         if data.get(key) is not None:
             data[key] = str(data[key])
@@ -317,10 +321,12 @@ def list_artist_scene_anchor_candidates(
                     {_ARTIST_GENRES_CTE}
                     SELECT candidates.*,
                            COALESCE(ags.artist_genre_slugs, ARRAY[]::TEXT[])
-                               AS artist_genre_slugs
+                               AS artist_genre_slugs,
+                           {transition_edge_select("mp")}
                     FROM anchor_candidates candidates
                     LEFT JOIN artist_genre_metadata ags
                       ON ags.artist_name = candidates._artist_metadata_name
+                    {transition_edge_join("candidates", "mp")}
                     ORDER BY
                         candidates.user_play_count DESC,
                         candidates.is_liked DESC,
@@ -481,7 +487,7 @@ def list_scene_path_candidates(
                             (ult.track_id IS NOT NULL OR global_like.local_track_id IS NOT NULL) AS is_liked,
                             ROW_NUMBER() OVER (
                                 PARTITION BY am.genre_slug, COALESCE(performer.principal_artist_key, LOWER(BTRIM(REGEXP_REPLACE(
-                                    BTRIM(COALESCE(NULLIF(t.artist, ''), a.artist, ''), :path_artist_trim_chars),
+                                    BTRIM(COALESCE(NULLIF(ar.name, ''), a.artist, ''), :path_artist_trim_chars),
                                     :path_artist_pattern, '', 'i'
                                 ), :path_artist_trim_chars)))
                                 ORDER BY
@@ -542,10 +548,12 @@ def list_scene_path_candidates(
                     {_ARTIST_GENRES_CTE}
                     SELECT candidates.*,
                            COALESCE(ags.artist_genre_slugs, ARRAY[]::TEXT[])
-                               AS artist_genre_slugs
+                               AS artist_genre_slugs,
+                           {transition_edge_select("mp")}
                     FROM limited_candidates candidates
                     LEFT JOIN artist_genre_metadata ags
                       ON ags.artist_name = candidates._artist_metadata_name
+                    {transition_edge_join("candidates", "mp")}
                     ORDER BY genre_slug, _candidate_rank
                     """
                 ),
