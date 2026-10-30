@@ -281,10 +281,11 @@ def test_batched_read_reuses_uncommitted_session_without_finishing_it(pg_db):
         )
 
 
-def test_stats_join_cardinality_is_preserved_before_per_artist_ranking(
+def test_stats_aliases_do_not_duplicate_tracks_before_per_artist_ranking(
     candidate_catalog,
 ):
     first = candidate_catalog["tracks"][0]
+    second = candidate_catalog["tracks"][1]
     with transaction_scope() as session:
         session.execute(
             text("""
@@ -300,9 +301,11 @@ def test_stats_join_cardinality_is_preserved_before_per_artist_ranking(
         ["batch-punk", "batch-wave"], user_id=1, limit_per_genre=13
     )
     for rows in result.values():
+        assert len({row["id"] for row in rows}) == len(rows)
         top = rows[:2]
-        assert [row["id"] for row in top] == [first["id"], first["id"]]
-        assert {row["user_play_count"] for row in top} == {5, 11}
+        assert [row["id"] for row in top] == [first["id"], second["id"]]
+        assert [row["user_play_count"] for row in top] == [5, 9]
+        assert [row["user_complete_play_count"] for row in top] == [3, 7]
         assert [row["artist_track_rank"] for row in top] == [1, 2]
 
 
