@@ -147,10 +147,18 @@ def test_primary_artist_lowercase_preserves_distinct_sharp_s_band_names():
     )
 
 
-def test_scene_cap_keeps_complete_collaboration_names_separate_from_their_members(
+def test_scene_cap_keeps_library_band_names_separate_from_their_members(
     identity_catalog,
 ):
     catalog = identity_catalog
+    for name in _COMPLETE_COLLABORATION_NAMES:
+        catalog["session"].execute(
+            text(
+                "INSERT INTO library_artists (name, entity_uid) "
+                "VALUES (:name, gen_random_uuid())"
+            ),
+            {"name": name},
+        )
     artists = ["X", *_COMPLETE_COLLABORATION_NAMES]
     for index, artist in enumerate(
         artist for name in artists for artist in (name, name)
@@ -163,6 +171,47 @@ def test_scene_cap_keeps_complete_collaboration_names_separate_from_their_member
         artist.casefold(): 2 for artist in artists
     }
     assert len({row["id"] for row in rows}) == len(artists) * 2
+
+
+def test_scene_cap_folds_unregistered_guest_credits_onto_the_album_owner(
+    identity_catalog,
+):
+    catalog = identity_catalog
+    credits = ["X", "X, Guest", "Guest, X", "X & Other Guest", "Alias"]
+    for index, artist in enumerate(credits):
+        _add_track(catalog, artist, index)
+
+    rows = _rows(catalog, "scene")
+
+    assert {row["principal_artist"] for row in rows} == {"X"}
+    assert Counter(_artist_key(row) for row in rows) == {"x": 2}
+
+
+@pytest.mark.parametrize(
+    ("credit", "album_artist", "expected"),
+    [
+        ("Flying Lotus, Thom Yorke", "Flying Lotus", "flying lotus"),
+        ("Erykah Badu, Flying Lotus", "Flying Lotus", "flying lotus"),
+        ("Erik Urano, Flat Erik, hidden jayeem", "Erik Urano", "erik urano"),
+        ("Berri Txarrak & KOP", "Berri Txarrak", "berri txarrak"),
+        (
+            "Crosby, Stills, Nash & Young",
+            "Crosby, Stills, Nash & Young",
+            "crosby, stills, nash & young",
+        ),
+        ("Simon & Garfunkel", "Various Artists", "simon & garfunkel"),
+        ("Captain Murphy", "Flying Lotus", "captain murphy"),
+    ],
+)
+def test_saved_entries_without_a_principal_use_the_credited_album_owner(
+    credit, album_artist, expected
+):
+    row = {"artist": credit, "album_artist": album_artist}
+
+    assert path_artist_key(row) == expected
+    assert (
+        path_artist_key({**row, "principal_artist": "Flying Lotus"}) == "flying lotus"
+    )
 
 
 def _add_stats(catalog, track_id, uid, *, identity, plays, completions):
