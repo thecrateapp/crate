@@ -16,6 +16,10 @@ from crate.db.queries.paths_shared import (
     _canonical_reference_params,
     array_distance_sql,
 )
+from crate.db.queries.smart_mix_transition_edges import (
+    transition_edge_join,
+    transition_edge_select,
+)
 from crate.db.tx import optional_scope, read_scope
 from crate.track_versions import track_song_identity
 from crate.recommendation_policy import PATH_RECENCY_QUALITY_BAND, fresh_path_candidates
@@ -340,10 +344,12 @@ def find_candidate_rows(
                        t.bpm, t.audio_key, t.audio_scale, t.energy,
                        t.danceability, t.valence,
                        t.bliss_vector,
+                       {transition_edge_select("mp")},
                        (t.bliss_embedding <=> CAST(:probe_vector AS vector(20))) AS distance
                 FROM library_tracks t
                 JOIN library_albums a ON a.id = t.album_id
                 LEFT JOIN library_artists ar ON ar.name = {artist_column}
+                {transition_edge_join("t", "mp")}
                 WHERE t.bliss_embedding IS NOT NULL
                 AND {playable_track_clause("t", "a")}
                 {exclude_clause}
@@ -371,10 +377,12 @@ def find_candidate_rows(
                            t.bpm, t.audio_key, t.audio_scale, t.energy,
                            t.danceability, t.valence,
                            t.bliss_vector,
+                           {transition_edge_select("mp")},
                            {fallback_distance} AS distance
                     FROM library_tracks t
                     JOIN library_albums a ON a.id = t.album_id
                     LEFT JOIN library_artists ar ON ar.name = {artist_column}
+                    {transition_edge_join("t", "mp")}
                     WHERE t.bliss_vector IS NOT NULL
                     AND {playable_track_clause("t", "a")}
                     {exclude_clause}
@@ -458,21 +466,26 @@ picked AS MATERIALIZED (
               * :artist_pick_multiplier
     ) picks
 )
-SELECT t.id, t.entity_uid, t.title, a.artist,
-       a.name AS album, t.album_id, a.entity_uid::text AS album_entity_uid,
-       ar.entity_uid::text AS artist_entity_uid,
-       t.duration, t.format, t.bitrate, t.sample_rate, t.bit_depth, t.year,
-       t.bpm, t.audio_key, t.audio_scale, t.energy,
-       t.danceability, t.valence, t.bliss_vector,
-       COALESCE(t.bliss_embedding <=> CAST(:probe_vector AS vector(20)), 1.0) AS distance,
-       CASE p.radio_source_rank WHEN 0 THEN 'seed' WHEN 1 THEN 'similar' ELSE 'genre' END AS radio_source,
-       p.radio_source_rank, p.artist_pick
-FROM picked p
-JOIN library_tracks t ON t.id = p.id
-JOIN library_albums a ON a.id = t.album_id
-LEFT JOIN library_artists ar ON ar.name = a.artist
-ORDER BY p.radio_source_rank, p.artist_pick, distance, t.id
-LIMIT :limit
+SELECT ranked.*, {transition_edge_select("mp")}
+FROM (
+    SELECT t.id, t.entity_uid, t.title, a.artist,
+           a.name AS album, t.album_id, a.entity_uid::text AS album_entity_uid,
+           ar.entity_uid::text AS artist_entity_uid,
+           t.duration, t.format, t.bitrate, t.sample_rate, t.bit_depth, t.year,
+           t.bpm, t.audio_key, t.audio_scale, t.energy,
+           t.danceability, t.valence, t.bliss_vector,
+           COALESCE(t.bliss_embedding <=> CAST(:probe_vector AS vector(20)), 1.0) AS distance,
+           CASE p.radio_source_rank WHEN 0 THEN 'seed' WHEN 1 THEN 'similar' ELSE 'genre' END AS radio_source,
+           p.radio_source_rank, p.artist_pick
+    FROM picked p
+    JOIN library_tracks t ON t.id = p.id
+    JOIN library_albums a ON a.id = t.album_id
+    LEFT JOIN library_artists ar ON ar.name = a.artist
+    ORDER BY p.radio_source_rank, p.artist_pick, distance, t.id
+    LIMIT :limit
+) ranked
+{transition_edge_join("ranked", "mp")}
+ORDER BY ranked.radio_source_rank, ranked.artist_pick, ranked.distance, ranked.id
     """
 
 
@@ -586,15 +599,21 @@ def find_seeded_radio_candidate_rows(
                       )
                       AND NOT (LOWER(a.artist) = ANY(:excluded_artist_keys))
                 )
-                SELECT *
-                FROM ranked
-                WHERE artist_pick <= CASE
-                    WHEN radio_source = 'seed' THEN 4
-                    WHEN radio_source = 'similar' THEN 6
-                    ELSE 2
-                END
-                ORDER BY radio_source_rank, artist_pick, distance
-                LIMIT :limit
+                SELECT limited.*, {transition_edge_select("mp")}
+                FROM (
+                    SELECT *
+                    FROM ranked
+                    WHERE artist_pick <= CASE
+                        WHEN radio_source = 'seed' THEN 4
+                        WHEN radio_source = 'similar' THEN 6
+                        ELSE 2
+                    END
+                    ORDER BY radio_source_rank, artist_pick, distance
+                    LIMIT :limit
+                ) limited
+                {transition_edge_join("limited", "mp")}
+                ORDER BY limited.radio_source_rank, limited.artist_pick,
+                         limited.distance, limited.id
                 """
                 ),
                 {**params, **playable_media_params()},
