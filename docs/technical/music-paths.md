@@ -172,10 +172,23 @@ trim whitespace, remove an explicit trailing `feat`, `ft` or `featuring` credit
 The feature-credit pattern is shared between Python and PostgreSQL. Lowercase
 preserves distinct names such as `Straße` and `Strasse`.
 
-Keep `&`, `x`, `with` and commas as part of the name: these separators also occur
-in actual band and duo names, including `Florence + the Machine` and `Sunn O)))`.
-Splitting collaborations without authoritative artist credits would merge
-unrelated performers. Track display credits remain intact.
+The principal artist is the credited name when it is a library artist, so band and
+duo names with `&`, `x`, `with` or commas (`Florence + the Machine`, `Crosby,
+Stills, Nash & Young`) stay whole. A credit that is not a library artist, such as
+`Flying Lotus, Thom Yorke`, an alias like `Captain Murphy`, or `Erik Urano, Flat
+Erik, …`, belongs to the album owner. Without that rule, guest credits counted as
+new artists and one artist could fill a dozen consecutive steps. Saved entries
+without the catalog field use the album artist only when it is one of the credited
+names. Track display credits remain intact.
+
+Scene paths take at most two tracks from one album and never two in a row. When a
+scene runs out of eligible artists, the slot first relaxes the repeat and album
+limits, then borrows from the previous scene in the route, so the path keeps its
+requested length without repeating the destination artist.
+
+Scene transitions use the Smart Mix transition fit between consecutive tracks when
+both have a current profile (see [playback continuation](playback-continuation.md)),
+and the coarse energy, tempo and key signals otherwise.
 
 Candidate statistics select one record per track ID or entity UID. An exact
 track-ID match takes precedence over a UID fallback; duplicate projections do
