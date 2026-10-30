@@ -1,0 +1,12 @@
+{
+  "artist_foreign_keys": [
+    {
+      "validated": true,
+      "definition": "FOREIGN KEY (artist) REFERENCES library_artists(name)"
+    }
+  ],
+  "case_only_omissions": 0,
+  "orphan_album_owners": 0,
+  "transaction_read_only": "on",
+  "checked_at": "2026-10-29T18:50:55.183921+00:00"
+}

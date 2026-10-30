@@ -2,8 +2,8 @@
 
 Infinite album/playlist playback and radio share the shaped radio session engine.
 The original source remains attached to play events; Music Paths play as finite
-queues and do not claim a playlist ID. Recommendation weights and seven-day
-cross-session rotation are outside this change.
+queues and do not claim a playlist ID. Seeded radios use significant-listen
+history to rotate songs across sessions without changing musical weights or drift.
 
 ## Indexed batches
 
@@ -53,12 +53,69 @@ the existing transition target using the profile's weight, preserving likes and
 the original seed as the musical anchor. Buffered artists and titles also join
 the repetition controls.
 Infinite also works with shuffle; repeat-one/all keeps priority.
-Local buffer metadata is loaded with one indexed batch query.
+Local and global buffer metadata is loaded with one indexed batch query.
 Native continuation filters known, duplicate and explicitly unplayable tracks
 before deriving status, without changing the replayable batch. An empty filtered
 batch is retryable unless the source is exhausted or authorization is required.
 Radio start/next preserve nullable track fields for legacy parsers; station
 responses continue omitting absent optional metadata.
+
+## Seven-day radio rotation
+
+`CRATE_RADIO_ROTATION_ENABLED` defaults to `true`. Set it to `false` and recreate
+the API container to restore legacy retrieval and ranking without rebuilding
+the image. The same setting is forwarded by the production and development
+Compose configurations.
+
+A play is significant when completed, or after `min(30 seconds, 50% of a positive
+track duration)`; unknown duration uses 30 seconds. One batched read uses the
+listener's last seven days of raw events, including the UTC window boundaries.
+Local IDs, entity IDs, global IDs and song variants resolve to the shared song
+identity. Brief playback, generation and prefetch do not create cooldowns.
+The existing event ingestion and projections are unchanged.
+
+The radio retains its seed artist/track context. When the best candidate is cooled,
+fresh songs within 0.05 of its existing musical score are chosen with the session's
+deterministic RNG. A fresh best candidate keeps the existing minimum-score choice;
+unrelated listening history does not introduce random variation.
+The penalty belongs to songs, not whole artists. Recently heard songs remain
+eligible when there are no comparable fresh alternatives, including small or
+fully cooled catalogs. Discovery mode and Music Paths retain their policies.
+
+The retrieval counts eligible song families after active-buffer and dislike
+exclusions. It can expand once within the seed's artist/genre neighborhood;
+it never fills a short rotating seeded pool with an unrelated global Bliss
+fallback. Recent history starts with a bounded 420-row pool and doubled
+per-artist SQL caps. A diverse shortlist retains fresh options and cooled
+quality anchors before sequential scoring. Catalog-only global radios expand
+within their source artist/album, bounded to 5,000 tracks, before recovering
+recently heard songs.
+
+The session retains the latest 500 delivered canonical song families as a cooled
+layer, including songs skipped before a significant listen. Re-delivery promotes
+the family within that bounded ledger; replaying a committed batch does not change
+it. Artist counts accumulate across refills. Significant seven-day history remains
+independent of delivery, and both sources prefer comparable fresh alternatives.
+
+Explicit `buffer_refs=[]` means the client knows its buffer is empty. Supplied
+buffer tracks and song families are hard exclusions alongside the original seed;
+updating the buffer preserves delivered-song memory and artist counts. Omitted/null
+buffers retain conservative progress. Historical ID parameters are capped at 50,
+while Python checks retain the complete active-buffer and seed exclusions. Candidate
+expansion adds only bounded exclusions from its retrieved pool.
+
+The global catalog cursor advances across refills. Once its source is fully loaded,
+a known released buffer permits cooled fallback without rewinding that cursor.
+If every available family is blocked by the active buffer or explicit exclusions,
+the empty result is exhausted rather than an endless retryable response.
+
+The sanitized [checkpoint comparison](evidence/radio/rotation-review.md)
+contains Citizen/Concubine lists before and after simulated completed listens.
+The historical checkpoint records buffer lookup and generation measurements.
+Current endpoint and history budgets are rechecked against the approximately
+138K-track catalog before closing this stack. Album ownership equivalence and
+the shared availability filters are documented in the
+[retrieval check](evidence/radio/album-ownership.md).
 
 ## Playback lifecycle
 

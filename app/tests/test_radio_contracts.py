@@ -9,6 +9,32 @@ import pytest
 SESSION_ID = "11111111-1111-4111-8111-111111111111"
 
 
+@pytest.mark.parametrize("endpoint", ["start", "next"])
+@pytest.mark.parametrize("explicit_empty", [False, True])
+def test_indexed_radio_http_distinguishes_omitted_and_empty_buffer(
+    test_app, endpoint, explicit_empty
+):
+    sid = str(uuid4())
+    body = {"session_id": sid}
+    body.update({"mode": "discovery"} if endpoint == "start" else {"batch_index": 1})
+    if explicit_empty:
+        body["buffer_refs"] = []
+    reply = {
+        "session_id": sid,
+        "tracks": [],
+        "status": "retryable_empty",
+        "revision": 1,
+        "batch_index": 0,
+    }
+    with patch(
+        f"crate.radio_continuation.{'start_batch' if endpoint == 'start' else 'next_batch'}",
+        return_value=reply,
+    ) as dispatch:
+        response = test_app.post(f"/api/radio/{endpoint}", json=body)
+    assert response.status_code == 200
+    assert dispatch.call_args.kwargs["buffer_refs"] == ([] if explicit_empty else None)
+
+
 class TestRadioApiContracts:
     def test_global_radio_dislike_accepts_a_canonical_track_uid(self, test_app):
         with (

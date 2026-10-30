@@ -21,6 +21,7 @@ def _session(**overrides):
         "disliked_vectors": [],
         "used_track_ids": [5],
         "used_titles": ["previous artist::previous song"],
+        "delivered_song_keys": [["previous artist", "previous song"]],
         "recent_artists": ["Stale Artist"],
         "recent_tracks": [{"track_id": 5, "bpm": 90}],
         "track_count": 20,
@@ -68,11 +69,16 @@ def test_buffer_blends_last_track_with_existing_target_by_radio_profile(
     assert session["liked_vectors"] == [[0.9, 0.1]]
 
 
-def test_buffer_replaces_stale_tail_context_and_adds_all_titles_for_repetition(
+@pytest.mark.parametrize("rotation", [False, True])
+def test_buffer_replaces_stale_tail_context_and_preserves_delivered_memory(
     monkeypatch,
+    rotation,
 ):
+    monkeypatch.setenv("CRATE_RADIO_ROTATION_ENABLED", str(rotation).lower())
     rows = [_buffer_row(index, vector=[0.0, 1.0]) for index in range(1, 8)]
-    monkeypatch.setattr(context_queries, "get_buffer_context", lambda _refs: rows)
+    monkeypatch.setattr(
+        context_queries, "get_buffer_context", lambda _refs, **_kw: rows
+    )
     session = _session(used_track_ids=[5, 1])
 
     radio_engine._apply_buffer_context(session, [str(index) for index in range(1, 8)])
@@ -82,10 +88,11 @@ def test_buffer_replaces_stale_tail_context_and_adds_all_titles_for_repetition(
         for row in rows[-5:]
     ]
     assert session["recent_artists"] == ["Artist 5", "Artist 6", "Artist 7"]
-    assert set(session["used_titles"]) == {
-        "previous artist::previous song",
-        *(f"artist {index}::song {index}" for index in range(1, 8)),
-    }
+    titles = {f"artist {index}::song {index}" for index in range(1, 8)}
+    if not rotation:
+        titles.add("previous artist::previous song")
+    assert set(session["used_titles"]) == titles
+    assert session["delivered_song_keys"] == [["previous artist", "previous song"]]
     assert session["used_track_ids"] == [5, 1, 2, 3, 4, 6, 7]
 
 
@@ -158,11 +165,30 @@ def test_buffer_without_a_vector_keeps_the_existing_target(monkeypatch, missing_
 
 
 @pytest.mark.parametrize("refs", [[], ["unresolved"]], ids=["empty", "unresolved"])
-def test_buffer_without_resolved_tracks_does_not_reset_session(monkeypatch, refs):
-    monkeypatch.setattr(context_queries, "get_buffer_context", lambda _refs: [])
+@pytest.mark.parametrize("rotation", [False, True])
+def test_buffer_without_resolved_tracks_keeps_target_and_delivered_memory(
+    monkeypatch,
+    refs,
+    rotation,
+):
+    monkeypatch.setenv("CRATE_RADIO_ROTATION_ENABLED", str(rotation).lower())
+    monkeypatch.setattr(context_queries, "get_buffer_context", lambda _refs, **_kw: [])
     session = _session()
     original = deepcopy(session)
 
     radio_engine._apply_buffer_context(session, refs)
 
-    assert session == original
+    for key in (
+        "current_target",
+        "initial_target",
+        "seed_vector",
+        "liked_vectors",
+        "disliked_vectors",
+        "delivered_song_keys",
+    ):
+        assert session[key] == original[key]
+    if rotation:
+        assert session["buffer_refs"] == refs
+        assert session["buffer_track_ids"] == []
+    else:
+        assert session == original

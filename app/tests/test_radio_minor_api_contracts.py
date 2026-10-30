@@ -20,9 +20,12 @@ from tests.test_playback_continuation_api import (
 from tests.test_radio_continuation_contract import MemoryRedis
 
 
+@pytest.mark.parametrize("rotation_enabled", [True, False], ids=["rotation", "legacy"])
 def test_legacy_global_radio_reports_exhaustion_consistently_on_start_and_next(
-    test_app, monkeypatch
+    test_app, monkeypatch, rotation_enabled
 ):
+    monkeypatch.setenv("CRATE_RADIO_ROTATION_ENABLED", str(rotation_enabled).lower())
+    monkeypatch.setattr(radio_engine, "history_for_candidates", lambda *_a, **_k: {})
     redis = MemoryRedis()
     monkeypatch.setattr(radio_engine, "_redis", lambda: redis)
     monkeypatch.setattr(radio_engine, "_resolve_seed", lambda *_args: None)

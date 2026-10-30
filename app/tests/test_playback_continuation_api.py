@@ -221,18 +221,21 @@ def test_shaped_continuation_skips_known_and_repeated_tracks(monkeypatch):
     known = str(uuid.uuid4())
     fresh = str(uuid.uuid4())
     monkeypatch.setattr(radio_engine, "get_session_user_id", lambda session_id: 42)
-    monkeypatch.setattr(
-        radio_engine,
-        "next_tracks",
-        lambda session_id, count: {
+
+    def next_tracks(session_id, count, *, exclude_entity_uids):
+        assert session_id == "radio-1"
+        assert count == 5
+        assert exclude_entity_uids == {known}
+        return {
             "tracks": [
                 {"entity_uid": known, "title": "Known"},
                 {"entity_uid": fresh, "title": "Fresh"},
                 {"entity_uid": fresh, "title": "Fresh again"},
                 {"title": "No uid"},
             ]
-        },
-    )
+        }
+
+    monkeypatch.setattr(radio_engine, "next_tracks", next_tracks)
 
     rows, exhausted = radio.continuation_radio_tracks(
         {"kind": "shaped_radio", "sessionId": "radio-1"},

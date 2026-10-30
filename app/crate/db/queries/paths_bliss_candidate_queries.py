@@ -4,6 +4,7 @@ from sqlalchemy import text
 
 from crate.db.bliss_vectors import to_pgvector_literal
 from crate.db.queries.playable_media_filters import (
+    playable_album_clause,
     playable_media_params,
     playable_track_clause,
 )
@@ -249,6 +250,86 @@ def find_candidate_rows(
     return normalized_rows
 
 
+def _optimized_seeded_radio_sql(exclude_clause: str) -> str:
+    # OFFSET 0 keeps playback checks after popularity ordering and before each
+    # artist cap. Only eligible picks need their paths, vectors and metadata.
+    return f"""
+WITH genre_artists AS (
+    SELECT LOWER(ag.artist_name) AS artist_key
+    FROM artist_genres ag
+    JOIN genres g ON g.id = ag.genre_id
+    WHERE LOWER(g.name) = ANY(:seed_genres)
+       OR LOWER(g.slug) = ANY(:seed_genres)
+    GROUP BY LOWER(ag.artist_name)
+),
+context_artists AS MATERIALIZED (
+    SELECT ar.name, LOWER(ar.name) AS artist_key,
+           CASE WHEN LOWER(ar.name) = ANY(:seed_artist_keys) THEN 0
+                WHEN LOWER(ar.name) = ANY(:similar_artist_keys) THEN 1
+                ELSE 2 END AS radio_source_rank
+    FROM library_artists ar
+    WHERE (LOWER(ar.name) = ANY(:seed_artist_keys)
+           OR LOWER(ar.name) = ANY(:similar_artist_keys)
+           OR LOWER(ar.name) IN (SELECT artist_key FROM genre_artists))
+      AND NOT (LOWER(ar.name) = ANY(:excluded_artist_keys))
+      AND LOWER(ar.name) <> '.crate-trash'
+),
+artist_albums AS MATERIALIZED (
+    SELECT ca.artist_key, ca.radio_source_rank, array_agg(a.id) AS album_ids
+    FROM context_artists ca
+    CROSS JOIN LATERAL (
+        SELECT a.id FROM library_albums a
+        WHERE a.artist = ca.name
+          AND {playable_album_clause("a")}
+        OFFSET 0
+    ) a
+    GROUP BY ca.artist_key, ca.radio_source_rank
+),
+picked AS MATERIALIZED (
+    SELECT picks.id, aa.radio_source_rank,
+           ROW_NUMBER() OVER (PARTITION BY aa.artist_key ORDER BY picks.plays DESC, picks.rating DESC, picks.id) AS artist_pick
+    FROM artist_albums aa
+    CROSS JOIN LATERAL (
+        SELECT ordered.id, ordered.plays, ordered.rating
+        FROM (
+            SELECT t.id,
+                   COALESCE(t.lastfm_playcount,0) AS plays, COALESCE(t.rating,0) AS rating
+            FROM library_tracks t
+            WHERE t.album_id = ANY(aa.album_ids)
+              AND t.bliss_vector IS NOT NULL
+              {exclude_clause}
+            ORDER BY COALESCE(t.lastfm_playcount,0) DESC, COALESCE(t.rating,0) DESC, t.id
+            OFFSET 0
+        ) ordered
+        CROSS JOIN LATERAL (
+            SELECT t.id FROM library_tracks t
+            WHERE t.id = ordered.id
+              AND {playable_track_clause("t", None)}
+            OFFSET 0
+        ) playable
+        ORDER BY ordered.plays DESC, ordered.rating DESC, ordered.id
+        LIMIT (CASE aa.radio_source_rank WHEN 0 THEN 4 WHEN 1 THEN 6 ELSE 2 END)
+              * :artist_pick_multiplier
+    ) picks
+)
+SELECT t.id, t.entity_uid, t.title, a.artist,
+       a.name AS album, t.album_id, a.entity_uid::text AS album_entity_uid,
+       ar.entity_uid::text AS artist_entity_uid,
+       t.duration, t.format, t.bitrate, t.sample_rate, t.bit_depth, t.year,
+       t.bpm, t.audio_key, t.audio_scale, t.energy,
+       t.danceability, t.valence, t.bliss_vector,
+       COALESCE(t.bliss_embedding <=> CAST(:probe_vector AS vector(20)), 1.0) AS distance,
+       CASE p.radio_source_rank WHEN 0 THEN 'seed' WHEN 1 THEN 'similar' ELSE 'genre' END AS radio_source,
+       p.radio_source_rank, p.artist_pick
+FROM picked p
+JOIN library_tracks t ON t.id = p.id
+JOIN library_albums a ON a.id = t.album_id
+LEFT JOIN library_artists ar ON ar.name = a.artist
+ORDER BY p.radio_source_rank, p.artist_pick, distance, t.id
+LIMIT :limit
+    """
+
+
 def find_seeded_radio_candidate_rows(
     target: list[float],
     exclude_ids: set[int],
@@ -258,8 +339,11 @@ def find_seeded_radio_candidate_rows(
     seed_genres: list[str] | None = None,
     excluded_artist_keys: list[str] | None = None,
     limit: int,
+    optimized: bool = False,
+    artist_pick_multiplier: int = 1,
     session=None,
 ) -> list[dict]:
+    """Fetch contextual candidates, with an opt-in plan and stable ID tie breaks."""
     seed_artist_keys = [
         artist.lower().strip() for artist in (seed_artists or []) if artist
     ]
@@ -286,16 +370,24 @@ def find_seeded_radio_candidate_rows(
         "excluded_artist_keys": excluded_keys or ["__no_excluded_artist__"],
         "limit": int(limit),
     }
+    if optimized:
+        params["artist_pick_multiplier"] = min(4, max(1, int(artist_pick_multiplier)))
     if exclude_ids:
         exclude_clause = "AND t.id != ALL(:exclude)"
         params["exclude"] = list(exclude_ids)
 
     with optional_scope(session) as s:
-        s.execute(text("SET LOCAL ivfflat.probes = 10"))
+        s.execute(
+            text(
+                "SET LOCAL jit = off" if optimized else "SET LOCAL ivfflat.probes = 10"
+            )
+        )
         rows = (
             s.execute(
                 text(
-                    f"""
+                    _optimized_seeded_radio_sql(exclude_clause)
+                    if optimized
+                    else f"""
                 WITH genre_artists AS (
                     SELECT LOWER(ag.artist_name) AS artist_key
                     FROM artist_genres ag
