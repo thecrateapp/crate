@@ -11,6 +11,8 @@ depends_on = None
 
 def upgrade() -> None:
     with op.get_context().autocommit_block():
+        op.execute("SET maintenance_work_mem = '256MB'")
+        op.execute("SET max_parallel_maintenance_workers = 0")
         connection = op.get_bind()
         invalid = connection.execute(
             text("""

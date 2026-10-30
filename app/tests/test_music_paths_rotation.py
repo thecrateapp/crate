@@ -296,9 +296,18 @@ def test_regeneration_forwards_saved_tracks_without_creating_listens(monkeypatch
         "step_count": 5,
         "tracks": deepcopy(previous),
     }
+    stored = deepcopy(path)
     plans, writes = [], []
+
+    def update(path_id, user_id, tracks, *, generation_metadata, waypoints):
+        writes.append((path_id, user_id, tracks))
+        stored["tracks"] = deepcopy(tracks)
+        stored["waypoints"] = deepcopy(waypoints)
+        stored.update(deepcopy(generation_metadata))
+        return True
+
     monkeypatch.setattr(
-        service, "get_music_path", lambda path_id, user_id, **kwargs: deepcopy(path)
+        service, "get_music_path", lambda path_id, user_id, **kwargs: deepcopy(stored)
     )
     monkeypatch.setattr(
         service,
@@ -307,11 +316,7 @@ def test_regeneration_forwards_saved_tracks_without_creating_listens(monkeypatch
             plans.append(kwargs) or {"tracks": replacement, "resolved_waypoints": []}
         ),
     )
-    monkeypatch.setattr(
-        service,
-        "update_music_path_tracks",
-        lambda *args, **kwargs: writes.append(args) or True,
-    )
+    monkeypatch.setattr(service, "update_music_path_tracks", update)
 
     result = service.regenerate_music_path(3, 1)
 
@@ -470,9 +475,9 @@ def test_flexible_acoustic_anchor_rotates_while_explicit_track_is_preserved(
     compilation_rotation_catalog, monkeypatch
 ):
     album, tracks, vector = compilation_rotation_catalog
-    monkeypatch.setattr(acoustic, "_load_artist_similarity_graph", lambda: {})
-    monkeypatch.setattr(acoustic, "_load_shared_members_graph", lambda: {})
-    monkeypatch.setattr(acoustic, "_load_artist_genres", lambda: {})
+    monkeypatch.setattr(acoustic, "_load_artist_similarity_graph", lambda **_kwargs: {})
+    monkeypatch.setattr(acoustic, "_load_shared_members_graph", lambda **_kwargs: {})
+    monkeypatch.setattr(acoustic, "_load_artist_genres", lambda **_kwargs: {})
     path = acoustic.compute_path(
         "album",
         str(album),
@@ -606,9 +611,9 @@ def test_flexible_anchor_relegates_previous_ids_with_renamed_metadata(
     compilation_rotation_catalog, monkeypatch
 ):
     album, tracks, vector = compilation_rotation_catalog
-    monkeypatch.setattr(acoustic, "_load_artist_similarity_graph", lambda: {})
-    monkeypatch.setattr(acoustic, "_load_shared_members_graph", lambda: {})
-    monkeypatch.setattr(acoustic, "_load_artist_genres", lambda: {})
+    monkeypatch.setattr(acoustic, "_load_artist_similarity_graph", lambda **_kwargs: {})
+    monkeypatch.setattr(acoustic, "_load_shared_members_graph", lambda **_kwargs: {})
+    monkeypatch.setattr(acoustic, "_load_artist_genres", lambda **_kwargs: {})
     path = acoustic.compute_path(
         "album",
         str(album),

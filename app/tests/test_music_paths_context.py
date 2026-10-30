@@ -17,7 +17,7 @@ def test_acoustic_path_uses_real_artists_and_specific_endpoint_genres(monkeypatc
     ]
     calls, scored = [], []
 
-    def load(endpoints):
+    def load(endpoints, **_kwargs):
         calls.append(endpoints)
         return deepcopy(contexts)
 
@@ -34,10 +34,10 @@ def test_acoustic_path_uses_real_artists_and_specific_endpoint_genres(monkeypatc
         return None
 
     monkeypatch.setattr(builder, "load_endpoint_contexts", load, raising=False)
-    monkeypatch.setattr(builder, "_load_artist_similarity_graph", lambda: {})
-    monkeypatch.setattr(builder, "_load_shared_members_graph", lambda: {})
-    monkeypatch.setattr(builder, "_load_artist_genres", lambda: genre_map)
-    monkeypatch.setattr(builder, "_find_anchor_track", lambda *args: None)
+    monkeypatch.setattr(builder, "_load_artist_similarity_graph", lambda **_kwargs: {})
+    monkeypatch.setattr(builder, "_load_shared_members_graph", lambda **_kwargs: {})
+    monkeypatch.setattr(builder, "_load_artist_genres", lambda **_kwargs: genre_map)
+    monkeypatch.setattr(builder, "_find_anchor_track", lambda *args, **_kwargs: None)
     monkeypatch.setattr(builder, "_find_best_candidate", select)
     monkeypatch.setattr(
         builder, "resolve_endpoint_label", lambda *a: "Title — Artist", raising=False

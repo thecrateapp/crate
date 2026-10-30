@@ -16,7 +16,7 @@ from crate.db.home_taste_guardrails import track_version_penalty
 from crate.db.queries.paths import load_artist_radio_graphs
 from crate.genre_taxonomy import get_genre_catalog, resolve_genre_slug, slugify_genre
 from crate.track_versions import track_song_identity
-from crate.recommendation_policy import fresh_path_candidates
+from crate.recommendation_policy import fresh_path_candidates, path_artist_key
 
 _MIN_MEMBERSHIP_SCORE = 0.60
 _ANCHOR_MEMBERSHIP_FLOOR = 0.70
@@ -1211,6 +1211,7 @@ def _make_path_entry(track: dict, index: int, total: int, requested_steps: int) 
         "entity_uid": entity_uid,
         "title": track["title"],
         "artist": track["artist"],
+        "album_artist": track.get("album_artist"),
         "artist_entity_uid": track.get("artist_entity_uid"),
         "album": track.get("album"),
         "album_id": track.get("album_id"),
@@ -1418,6 +1419,14 @@ def _select_artist_track(
     if not pool:
         pool = ranked[:1]
 
+    fresh = [
+        row
+        for row in pool
+        if scorer.song_key(row) not in fatigued
+        and row["id"] not in (previous_track_ids or set())
+    ]
+    pool = fresh or pool
+
     return max(
         pool,
         key=lambda row: _seeded_track_choice_score(
@@ -1502,7 +1511,7 @@ def _track_score(row: dict, previous_track: dict | None = None) -> float:
 
 
 def _artist_key(row: dict) -> str:
-    return str(row.get("artist") or "").strip().casefold()
+    return path_artist_key(row)
 
 
 def _membership_score(row: dict) -> float:

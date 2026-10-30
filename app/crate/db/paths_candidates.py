@@ -7,9 +7,13 @@ import random
 
 from crate.db.queries.paths import find_anchor_track_row, find_candidate_rows
 from crate.track_versions import track_song_identity
-from crate.recommendation_policy import PATH_RECENCY_QUALITY_BAND, fresh_path_candidates
+from crate.recommendation_policy import (
+    MAX_CONSECUTIVE_SAME_ARTIST as _MAX_CONSECUTIVE_SAME_ARTIST,
+    PATH_RECENCY_QUALITY_BAND,
+    fresh_path_candidates,
+    path_artist_key,
+)
 
-_MAX_CONSECUTIVE_SAME_ARTIST = 2
 _ARTIST_REPEAT_PENALTY = 2.0
 _CANDIDATE_POOL_SIZE = 15
 
@@ -42,6 +46,7 @@ def _find_anchor_track(
     previous_song_keys: set[tuple[str, str]] | None = None,
     previous_track_ids: set[int] | None = None,
     selection_seed: str | None = None,
+    session=None,
 ) -> dict | None:
     """Find the best track that belongs to the endpoint (artist/album/genre)."""
     return find_anchor_track_row(
@@ -54,6 +59,7 @@ def _find_anchor_track(
         previous_song_keys=previous_song_keys,
         previous_track_ids=previous_track_ids,
         selection_seed=selection_seed,
+        session=session,
     )
 
 
@@ -187,6 +193,7 @@ def _find_best_candidate(
     previous_song_keys: set[tuple[str, str]] | None = None,
     previous_track_ids: set[int] | None = None,
     selection_seed: str | None = None,
+    session=None,
 ) -> dict | None:
     """Find the best track near ``target`` using hybrid bliss/affinity scoring."""
     query_exclude = set(exclude_ids)
@@ -195,7 +202,11 @@ def _find_best_candidate(
     fatigued = (recent_song_keys or set()) | (previous_song_keys or set())
     for _ in range(3):
         rows = find_candidate_rows(
-            target, query_exclude, limit=pool_size, use_track_artist=True
+            target,
+            query_exclude,
+            limit=pool_size,
+            use_track_artist=True,
+            session=session,
         )
         all_rows.extend(rows)
         selected = _select_best_candidate_from_rows(
@@ -241,7 +252,6 @@ def _find_best_candidate(
         genre_overlap=genre_overlap,
         recent_tracks=recent_tracks,
         exclude_song_keys=exclude_song_keys,
-        max_consecutive=None,
         recent_song_keys=recent_song_keys,
         previous_song_keys=previous_song_keys,
         previous_track_ids=previous_track_ids,
@@ -281,12 +291,14 @@ def _select_best_candidate_from_rows(
     best: dict | None = None
     best_score = float("inf")
     track_context = _latest_track_context(recent_tracks)
+    recent_artist_keys = [path_artist_key({"artist": name}) for name in recent_artists]
     ranked: list[tuple[dict, float]] = []
 
     for candidate, distance in scored_rows:
         if candidate.get("id") in exclude_ids:
             continue
         artist = candidate["artist"]
+        artist_key = path_artist_key(candidate)
         title = candidate["title"]
         title_key = f"{artist}::{title}".lower()
 
@@ -295,12 +307,12 @@ def _select_best_candidate_from_rows(
         if track_song_identity(candidate) in (exclude_song_keys or set()):
             continue
 
-        if recent_artists and max_consecutive is not None:
-            consecutive = sum(
-                1
-                for recent_artist in reversed(recent_artists)
-                if recent_artist == artist
-            )
+        if artist_key and max_consecutive is not None:
+            consecutive = 0
+            for recent_artist_key in reversed(recent_artist_keys):
+                if recent_artist_key != artist_key:
+                    break
+                consecutive += 1
             if consecutive >= max_consecutive:
                 continue
 
@@ -321,7 +333,7 @@ def _select_best_candidate_from_rows(
             + _curation_penalty(candidate)
         )
 
-        if artist in [recent_artist for recent_artist in recent_artists[-2:]]:
+        if artist_key and artist_key in recent_artist_keys[-2:]:
             score *= _ARTIST_REPEAT_PENALTY
 
         candidate["distance"] = distance

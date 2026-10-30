@@ -1,6 +1,7 @@
 """Service orchestration and compatibility contracts for Music Paths."""
 
 import ast
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -25,20 +26,26 @@ def test_services_plan_with_owner_before_persistence(monkeypatch, operation):
         resolved_waypoints=[],
         tracks=[{"track_id": 9}],
     )
+    stored = deepcopy(path)
+
+    def update(path_id, user_id, tracks, *, generation_metadata, waypoints):
+        assert plans[0]["user_id"] == user_id
+        writes.append((path_id, user_id, tracks))
+        stored["tracks"] = deepcopy(tracks)
+        stored["waypoints"] = deepcopy(waypoints)
+        stored.update(deepcopy(generation_metadata))
+        return True
+
     monkeypatch.setattr(
         service, "build_music_path_plan", lambda *a, **k: plans.append(k) or plan
     )
-    monkeypatch.setattr(service, "get_music_path", lambda *a, **k: path.copy())
+    monkeypatch.setattr(service, "get_music_path", lambda *a, **k: deepcopy(stored))
     monkeypatch.setattr(
         service,
         "create_music_path_record",
         lambda **k: writes.append(k) or {"id": 7, "created_at": "today"},
     )
-    monkeypatch.setattr(
-        service,
-        "update_music_path_tracks",
-        lambda *a, **kwargs: writes.append(a) or True,
-    )
+    monkeypatch.setattr(service, "update_music_path_tracks", update)
     if operation == "create":
         from crate.db.paths_service_writes import create_music_path
 

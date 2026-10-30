@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from math import isfinite
+import re
 
 from crate.track_versions import track_song_identity
 
@@ -9,6 +10,16 @@ RECENT_PLAY_WINDOW = timedelta(days=7)
 SIGNIFICANT_PLAY_SECONDS = 30.0
 SIGNIFICANT_PLAY_RATIO = 0.5
 PATH_RECENCY_QUALITY_BAND = 0.05
+MAX_CONSECUTIVE_SAME_ARTIST = 2
+_FEATURED_ARTIST_RE = re.compile(
+    r"(?:\s+|\s*[(\[]\s*)(?:feat|ft|featuring)\.?\s+.+?[)\]]?\s*$",
+    re.IGNORECASE,
+)
+
+
+def path_artist_key(row: dict) -> str:
+    name = str(row.get("artist") or row.get("album_artist") or "").strip()
+    return _FEATURED_ARTIST_RE.sub("", name).strip().casefold()
 
 
 def significant_play_threshold(duration: float | None) -> float:
@@ -69,6 +80,7 @@ def fresh_path_candidates(
 
 
 __all__ = [
+    "MAX_CONSECUTIVE_SAME_ARTIST",
     "PATH_RECENCY_QUALITY_BAND",
     "RECENT_PLAY_WINDOW",
     "SIGNIFICANT_PLAY_RATIO",
@@ -76,5 +88,6 @@ __all__ = [
     "canonical_key",
     "fresh_path_candidates",
     "is_significant_play",
+    "path_artist_key",
     "significant_play_threshold",
 ]

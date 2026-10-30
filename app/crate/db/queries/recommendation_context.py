@@ -81,7 +81,7 @@ _CONTEXT_SQL = """
 def _positive_id(value: str) -> int | None:
     try:
         number = int(value)
-        return number if 0 < number <= 2**63 - 1 else None
+        return number if 0 < number <= 2**63 - 1 and str(number) == value else None
     except ValueError:
         return None
 

@@ -458,3 +458,35 @@ def test_cached_refinement_revalidates_current_rotation_policy_without_another_m
     assert len(cache) == 1
     assert model_calls == [1]
     assert before == (tracks, candidate)
+
+
+def test_regeneration_response_reports_playability_like_the_saved_get(
+    saved_catalog, test_app, monkeypatch
+):
+    row = _record(saved_catalog, metadata=_metadata(len(saved_catalog)))
+    planned = [
+        {key: value for key, value in track.items() if key != "playable"}
+        for track in saved_catalog
+    ]
+    monkeypatch.setattr(
+        service,
+        "build_music_path_plan",
+        lambda *_args, **_kwargs: {
+            "tracks": deepcopy(planned),
+            "resolved_waypoints": [],
+            **_metadata(len(planned)),
+        },
+    )
+
+    regenerated = test_app.post(f"/api/paths/{row['id']}/regenerate")
+    saved = test_app.get(f"/api/paths/{row['id']}")
+
+    assert regenerated.status_code == saved.status_code == 200
+    expected_ids = [track["track_id"] for track in saved_catalog]
+    assert [track["track_id"] for track in regenerated.json()["tracks"]] == expected_ids
+    assert [track["track_id"] for track in saved.json()["tracks"]] == expected_ids
+    assert all(track["playable"] is True for track in saved.json()["tracks"])
+    assert all("playable" in track for track in regenerated.json()["tracks"])
+    assert [track["playable"] for track in regenerated.json()["tracks"]] == [
+        track["playable"] for track in saved.json()["tracks"]
+    ]

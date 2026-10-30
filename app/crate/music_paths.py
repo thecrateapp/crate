@@ -332,7 +332,6 @@ def regenerate_music_path(path_id: int, user_id: int) -> dict | None:
     if not plan:
         return None
 
-    metadata = _generation_metadata(plan, path["step_count"])
     if not update_music_path_tracks(
         path_id,
         user_id,
@@ -344,10 +343,7 @@ def regenerate_music_path(path_id: int, user_id: int) -> dict | None:
     ):
         return None
 
-    path["tracks"] = plan["tracks"]
-    path["waypoints"] = plan["resolved_waypoints"]
-    path.update(metadata)
-    return path
+    return get_music_path(path_id, user_id)
 
 
 def preview_music_path(

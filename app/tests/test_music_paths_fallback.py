@@ -40,9 +40,9 @@ def _install_builder(monkeypatch, origin, destination, rows):
         return deepcopy([row for row in rows if row["id"] not in exclude_ids][:limit])
 
     monkeypatch.setattr(builder, "_find_anchor_track", anchor)
-    monkeypatch.setattr(builder, "_load_artist_similarity_graph", lambda: {})
-    monkeypatch.setattr(builder, "_load_shared_members_graph", lambda: {})
-    monkeypatch.setattr(builder, "_load_artist_genres", lambda: {})
+    monkeypatch.setattr(builder, "_load_artist_similarity_graph", lambda **_kwargs: {})
+    monkeypatch.setattr(builder, "_load_shared_members_graph", lambda **_kwargs: {})
+    monkeypatch.setattr(builder, "_load_artist_genres", lambda **_kwargs: {})
     monkeypatch.setattr(
         builder,
         "load_endpoint_contexts",
@@ -295,7 +295,7 @@ def test_waypoint_segments_change_artist_and_genre_context_without_forcing_visit
         )
         return _row(100 + len(observations), vector=list(target))
 
-    monkeypatch.setattr(builder, "_load_artist_genres", lambda: genre_map)
+    monkeypatch.setattr(builder, "_load_artist_genres", lambda **_kwargs: genre_map)
     monkeypatch.setattr(
         paths_similarity, "_expand_genre_weights", lambda values: values
     )
@@ -428,17 +428,20 @@ def test_real_album_destination_skips_the_origins_nearest_live_version(
                     },
                 ).scalar_one()
             )
-    monkeypatch.setattr(builder, "_load_artist_similarity_graph", lambda: {})
-    monkeypatch.setattr(builder, "_load_shared_members_graph", lambda: {})
-    monkeypatch.setattr(builder, "_load_artist_genres", lambda: {})
+    monkeypatch.setattr(builder, "_load_artist_similarity_graph", lambda **_kwargs: {})
+    monkeypatch.setattr(builder, "_load_shared_members_graph", lambda **_kwargs: {})
+    monkeypatch.setattr(builder, "_load_artist_genres", lambda **_kwargs: {})
     monkeypatch.setattr(builder, "_find_best_candidate", lambda *args, **kwargs: None)
     contexts = [
         {"artists": ["Seed Artist"], "genre_weights": {}, "genre_signals": []}
     ] * 2
-    statements = []
+    statements, operational_statements = [], []
 
     def record(_conn, _cursor, statement, *_args):
-        if statement.lstrip().upper().startswith(("SELECT", "WITH")):
+        normalized = " ".join(statement.lower().split())
+        if normalized.startswith(("select current_setting(", "select set_config(")):
+            operational_statements.append(statement)
+        elif normalized.startswith(("select", "with")):
             statements.append(statement)
 
     engine = get_engine()
@@ -460,6 +463,7 @@ def test_real_album_destination_skips_the_origins_nearest_live_version(
     assert [row["track_id"] for row in path] == [track_ids[0], track_ids[2]]
     assert path[-1]["progress"] == 1.0
     assert len(statements) <= 2
+    assert len(operational_statements) <= 2
 
 
 @pytest.fixture

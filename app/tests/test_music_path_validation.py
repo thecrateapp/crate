@@ -123,7 +123,7 @@ def test_generation_validation_detects_duplicate_song_families(path_tracks):
 
     report = _validation().validate_music_path(path_tracks, requested_steps=3)
 
-    assert report["is_partial"] is True
+    assert report["is_partial"] is False
     assert "duplicate_song" in _warning_codes(report)
 
 
@@ -216,7 +216,7 @@ def test_regeneration_retries_requested_waypoint_until_it_resolves_and_after_los
 
     def observe(_conn, _cursor, statement, _params, _context, _many):
         if statement.lstrip().upper().startswith(("SELECT", "WITH")):
-            reads.append(statement)
+            reads.append((statement, dict(_params)))
 
     engine = get_engine()
     event.listen(engine, "before_cursor_execute", observe)
@@ -224,7 +224,15 @@ def test_regeneration_retries_requested_waypoint_until_it_resolves_and_after_los
         retried = service.regenerate_music_path(created["id"], 1)
     finally:
         event.remove(engine, "before_cursor_execute", observe)
-    assert len(reads) == 1
+    assert len(reads) == 2, (
+        "Load the saved plan, then reload availability after the write"
+    )
+    assert reads[0][0] == reads[1][0]
+    assert "FROM music_paths" in reads[0][0]
+    assert all(
+        params["id"] == created["id"] and params["user_id"] == 1
+        for _statement, params in reads
+    )
     assert retried["is_partial"] is True
     assert _warning_codes(retried) == {"unresolved_waypoint"}
     assert retried["waypoints"] == []
@@ -318,12 +326,14 @@ def test_legacy_regeneration_retains_existing_resolved_waypoint_references(
     assert "_requested_waypoints" not in regenerated
 
 
-def test_generation_validation_rejects_progress_beyond_the_destination(path_tracks):
+def test_generation_validation_warns_about_progress_without_marking_a_complete_path_partial(
+    path_tracks,
+):
     path_tracks[1]["progress"] = 1.2
 
     report = _validation().validate_music_path(path_tracks, requested_steps=3)
 
-    assert report["is_partial"] is True
+    assert report["is_partial"] is False
     assert "invalid_progress" in _warning_codes(report)
 
 
@@ -497,7 +507,7 @@ def test_mixed_acoustic_genre_endpoint_uses_reserved_anchor_identity(monkeypatch
         "_load_artist_genres",
         "_load_shared_members_graph",
     ):
-        monkeypatch.setattr(builder, name, lambda: {})
+        monkeypatch.setattr(builder, name, lambda **_kwargs: {})
     monkeypatch.setattr(
         builder, "_resolve_path_anchors", lambda *a, **k: (origin, destination)
     )
@@ -738,7 +748,7 @@ def test_generation_validation_reports_nonadjacent_artist_repeat_limit_only_for_
     policy = {"max_repeat_per_artist": 2} if with_scene_cap else {}
     report = _validation().validate_music_path(tracks, requested_steps=8, **policy)
 
-    assert report["is_partial"] is with_scene_cap
+    assert report["is_partial"] is False
     assert ("artist_repeat_limit" in _warning_codes(report)) is with_scene_cap
 
 

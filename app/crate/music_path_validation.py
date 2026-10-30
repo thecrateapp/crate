@@ -5,7 +5,11 @@ from __future__ import annotations
 from math import isfinite
 
 from crate.genre_taxonomy import slugify_genre
-from crate.recommendation_policy import fresh_path_candidates
+from crate.recommendation_policy import (
+    MAX_CONSECUTIVE_SAME_ARTIST,
+    fresh_path_candidates,
+    path_artist_key,
+)
 from crate.track_versions import track_song_identity
 
 
@@ -15,7 +19,7 @@ def _track_id(track: dict):
 
 
 def _artist(track: dict) -> str:
-    return str(track.get("artist") or "").strip().casefold()
+    return path_artist_key(track)
 
 
 def _genre(track: dict) -> str:
@@ -96,6 +100,7 @@ def validate_music_path(
     artist_counts: dict[str, int] = {}
     previous_progress = -1.0
     previous_artist = ""
+    consecutive_artist_count = 0
     for index, track in enumerate(tracks):
         family, track_id = track_song_identity(track), _track_id(track)
         if (track_id is not None and track_id in used_ids) or (
@@ -125,15 +130,12 @@ def validate_music_path(
             and artist_counts[artist] > max_repeat_per_artist
         ):
             warnings.append({"code": "artist_repeat_limit", "position": index})
-        if artist and artist == previous_artist:
+        consecutive_artist_count = (
+            consecutive_artist_count + 1 if artist and artist == previous_artist else 1
+        )
+        if artist and consecutive_artist_count > MAX_CONSECUTIVE_SAME_ARTIST:
             warnings.append({"code": "repeated_artist", "position": index})
         previous_artist = artist
-        if (
-            track.get("genre_slug")
-            and track.get("path_genre")
-            and slugify_genre(str(track["path_genre"])) != _genre(track)
-        ):
-            warnings.append({"code": "scene_mismatch", "position": index})
 
     requested = [
         (w.get("type"), str(w.get("value"))) for w in requested_waypoints or []
@@ -149,7 +151,19 @@ def validate_music_path(
     if resolved != expected_order:
         warnings.append({"code": "invalid_waypoint_order"})
     return {
-        "is_partial": bool(warnings),
+        "is_partial": any(
+            warning["code"]
+            in {
+                "insufficient_tracks",
+                "excess_tracks",
+                "missing_origin",
+                "missing_destination",
+                "unavailable_track",
+                "unresolved_waypoint",
+                "invalid_waypoint_order",
+            }
+            for warning in warnings
+        ),
         "generated_step_count": len(tracks),
         "warnings": warnings,
     }
