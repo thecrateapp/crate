@@ -121,7 +121,7 @@ def continuation_radio_tracks(
         session_id = descriptor["sessionId"]
         if user_id is None or get_session_user_id(session_id) != user_id:
             return [], True
-        result = next_tracks(session_id, min(50, fetch))
+        result = next_tracks(session_id, limit, exclude_entity_uids=exclude_entity_uids)
         if not result:
             return [], True
         rows = result.get("tracks") or []
