@@ -28,6 +28,7 @@ TRANSITION_EDGE_COLUMNS = (
     "key_camelot",
     "intro_lufs",
     "outro_lufs",
+    "integrated_lufs",
     "measurement_version",
     "intro_energy",
     "outro_energy",
@@ -114,6 +115,7 @@ class TransitionEdges:
     camelot: str | None = None
     intro_lufs: float | None = None
     outro_lufs: float | None = None
+    integrated_lufs: float | None = None
     accredited_loudness: bool = False
     intro_energy: float | None = None
     outro_energy: float | None = None
@@ -137,6 +139,7 @@ class TransitionEdges:
             camelot=profile.camelot,
             intro_lufs=profile.intro_lufs,
             outro_lufs=profile.outro_lufs,
+            integrated_lufs=profile.integrated_lufs,
             accredited_loudness=profile.measurement_version == MEASUREMENT_VERSION,
             intro_energy=profile.intro_energy,
             outro_energy=profile.outro_energy,
@@ -169,6 +172,7 @@ class TransitionEdges:
             camelot=value("key_camelot"),
             intro_lufs=_optional_float(value("intro_lufs")),
             outro_lufs=_optional_float(value("outro_lufs")),
+            integrated_lufs=_optional_float(value("integrated_lufs")),
             accredited_loudness=value("measurement_version") == MEASUREMENT_VERSION,
             intro_energy=_optional_float(value("intro_energy")),
             outro_energy=_optional_float(value("outro_energy")),
@@ -483,7 +487,7 @@ def _level_score(
     incoming: TransitionEdges,
     policy: PlannerPolicy,
 ) -> float:
-    jump = _level_jump_db(outgoing, incoming)
+    jump = _level_jump_db(outgoing, incoming, policy)
     if jump is None:
         return policy.neutral_dimension_score
     if jump >= 0.0:
@@ -495,9 +499,18 @@ def _level_score(
     )
 
 
+def level_jump_db(
+    outgoing: TransitionEdges,
+    incoming: TransitionEdges,
+    policy: PlannerPolicy = PLANNER_POLICY,
+) -> float | None:
+    return _level_jump_db(outgoing, incoming, policy)
+
+
 def _level_jump_db(
     outgoing: TransitionEdges,
     incoming: TransitionEdges,
+    policy: PlannerPolicy,
 ) -> float | None:
     if (
         outgoing.outro_lufs is not None
@@ -505,12 +518,22 @@ def _level_jump_db(
         and outgoing.accredited_loudness
         and incoming.accredited_loudness
     ):
-        return float(incoming.intro_lufs) - float(outgoing.outro_lufs)
+        return float(incoming.intro_lufs) - _outgoing_reference_lufs(outgoing, policy)
     if outgoing.outro_energy is not None and incoming.intro_energy is not None:
         return (
             float(incoming.intro_energy) - float(outgoing.outro_energy)
         ) * _ENERGY_DB_RANGE
     return None
+
+
+def _outgoing_reference_lufs(edges: TransitionEdges, policy: PlannerPolicy) -> float:
+    outro = float(edges.outro_lufs or 0.0)
+    if (
+        edges.integrated_lufs is not None
+        and outro < float(edges.integrated_lufs) - policy.fade_reference_db
+    ):
+        return float(edges.integrated_lufs)
+    return outro
 
 
 def _brightness_score(
@@ -620,6 +643,7 @@ __all__ = [
     "beatmatch_affinity",
     "genre_beatmatch_prior",
     "harmonic_score",
+    "level_jump_db",
     "normalized_tempo",
     "pair_genre_prior",
     "score_transition_fit",

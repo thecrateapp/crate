@@ -23,6 +23,7 @@ from crate.smart_mix.transition_fit import (
     TRANSITION_EDGE_COLUMNS,
     TRANSITION_EDGE_PREFIX,
     TransitionEdges,
+    level_jump_db,
 )
 
 _FIXTURE_DIR = Path(__file__).parent / "fixtures" / "recommendations"
@@ -205,8 +206,13 @@ def coherence_metrics(snapshot: dict, tracks: list[dict]) -> dict:
 
 
 def seam_metrics(tracks: list[dict], mix_edges: dict[int, dict]) -> dict:
-    """Describe consecutive seams from captured edges, independent of the ranking score."""
-    jumps: list[float] = []
+    """Describe consecutive seams from captured edges, independent of the ranking score.
+
+    The perceived jump compares the next intro with the outgoing outro, or with the
+    outgoing body loudness when the outro is a fade; the raw jump always uses the outro.
+    """
+    perceived: list[float] = []
+    raw: list[float] = []
     brightness: list[float] = []
     silences: list[float] = []
     for outgoing, incoming in zip(tracks, tracks[1:]):
@@ -214,8 +220,11 @@ def seam_metrics(tracks: list[dict], mix_edges: dict[int, dict]) -> dict:
         right = TransitionEdges.from_row(mix_edges.get(incoming["track_id"], {}))
         if left is None or right is None:
             continue
+        jump = level_jump_db(left, right)
+        if jump is not None:
+            perceived.append(jump)
         if left.outro_lufs is not None and right.intro_lufs is not None:
-            jumps.append(right.intro_lufs - left.outro_lufs)
+            raw.append(right.intro_lufs - left.outro_lufs)
         if left.outro_density is not None and right.intro_density is not None:
             brightness.append(abs(right.intro_density - left.outro_density))
         if (
@@ -230,9 +239,11 @@ def seam_metrics(tracks: list[dict], mix_edges: dict[int, dict]) -> dict:
         return round(sum(values) / len(values), 4) if values else None
 
     return {
-        "measured_seams": len(jumps),
-        "mean_abs_level_jump_db": mean([abs(value) for value in jumps]),
-        "level_rises_over_6_db": sum(value > 6.0 for value in jumps),
+        "measured_seams": len(perceived),
+        "mean_abs_level_jump_db": mean([abs(value) for value in perceived]),
+        "level_rises_over_6_db": sum(value > 6.0 for value in perceived),
+        "mean_abs_raw_edge_jump_db": mean([abs(value) for value in raw]),
+        "raw_edge_rises_over_6_db": sum(value > 6.0 for value in raw),
         "mean_brightness_gap": mean(brightness),
         "mean_gap_seconds": mean(silences),
     }

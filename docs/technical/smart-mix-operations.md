@@ -92,7 +92,7 @@ Los valores siguientes son los del código revisado, no valores descubiertos en 
 | `BEAT_GRID_FORMAT`              | `delta-ms-v1`        | Formato de beat grid                                     |
 | `PLANNER_IDENTIFIER`            | `smart-mix-v2`       | Identificador del lote de planes y de capabilities       |
 | `PLANNER_POLICY_VERSION`        | `2`                  | Versión numérica de cada plan individual                 |
-| `PLANNER_POLICY.rules_revision` | `6`                  | Revisión interna de reglas incluida en la clave de caché |
+| `PLANNER_POLICY.rules_revision` | `7`                  | Revisión interna de reglas incluida en la clave de caché |
 
 Cambiar reglas no implica necesariamente cambiar el identificador público del planner:
 la clave de caché incorpora ambas cosas.
@@ -202,7 +202,9 @@ afinidad de beatmatch α:
   beatmatch con las mismas reglas que el planner, nivel de borde, brillo, silencio y
   continuidad de danceability/valence.
 - **Entrada suave** (α = 0): salto de nivel entre los 5 s finales y los 5 s iniciales (LUFS
-  acreditados o, si no, energía de borde), con subidas penalizadas antes que bajadas; brillo
+  acreditados o, si no, energía de borde), con subidas penalizadas antes que bajadas; si el
+  outro del saliente es un fade (más de 6 dB bajo su loudness integrado), la referencia es ese
+  loudness integrado; brillo
   espectral de borde; silencio entre pistas; pulso laxo (cero al 25 %, mitad/doble incluidos);
   armonía con poco peso; continuidad de danceability/valence.
 
