@@ -306,6 +306,15 @@ def find_anchor_track_row(
     return row
 
 
+def _with_transition_edges(candidates_sql: str) -> str:
+    return f"""
+    SELECT nearest.*, {transition_edge_select("mp")}
+    FROM ({candidates_sql}) nearest
+    {transition_edge_join("nearest", "mp")}
+    ORDER BY nearest.distance, nearest.id
+    """
+
+
 def find_candidate_rows(
     target: list[float],
     exclude_ids: set[int],
@@ -335,7 +344,7 @@ def find_candidate_rows(
         rows = (
             s.execute(
                 text(
-                    f"""
+                    _with_transition_edges(f"""
                 SELECT t.id, t.entity_uid, t.title, {artist_column} AS artist,
                        {album_artist_column}
                        a.name AS album, t.album_id, a.entity_uid::text AS album_entity_uid,
@@ -344,18 +353,16 @@ def find_candidate_rows(
                        t.bpm, t.audio_key, t.audio_scale, t.energy,
                        t.danceability, t.valence,
                        t.bliss_vector,
-                       {transition_edge_select("mp")},
                        (t.bliss_embedding <=> CAST(:probe_vector AS vector(20))) AS distance
                 FROM library_tracks t
                 JOIN library_albums a ON a.id = t.album_id
                 LEFT JOIN library_artists ar ON ar.name = {artist_column}
-                {transition_edge_join("t", "mp")}
                 WHERE t.bliss_embedding IS NOT NULL
                 AND {playable_track_clause("t", "a")}
                 {exclude_clause}
                 ORDER BY t.bliss_embedding <=> CAST(:probe_vector AS vector(20))
                 LIMIT {int(limit)}
-                """
+                """)
                 ),
                 {**params, **playable_media_params()},
             )
@@ -368,7 +375,7 @@ def find_candidate_rows(
             rows = (
                 s.execute(
                     text(
-                        f"""
+                        _with_transition_edges(f"""
                     SELECT t.id, t.entity_uid, t.title, {artist_column} AS artist,
                        {album_artist_column}
                            a.name AS album, t.album_id, a.entity_uid::text AS album_entity_uid,
@@ -377,18 +384,16 @@ def find_candidate_rows(
                            t.bpm, t.audio_key, t.audio_scale, t.energy,
                            t.danceability, t.valence,
                            t.bliss_vector,
-                           {transition_edge_select("mp")},
                            {fallback_distance} AS distance
                     FROM library_tracks t
                     JOIN library_albums a ON a.id = t.album_id
                     LEFT JOIN library_artists ar ON ar.name = {artist_column}
-                    {transition_edge_join("t", "mp")}
                     WHERE t.bliss_vector IS NOT NULL
                     AND {playable_track_clause("t", "a")}
                     {exclude_clause}
                     ORDER BY {fallback_distance}
                     LIMIT {int(limit)}
-                    """
+                    """)
                     ),
                     {**params, **playable_media_params()},
                 )
