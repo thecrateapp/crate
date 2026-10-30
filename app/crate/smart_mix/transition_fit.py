@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Any, Iterable, Literal, Mapping
 
 from crate.smart_mix.camelot import CamelotRelationship, camelot_relationship
@@ -71,6 +72,7 @@ _GENRE_BEATMATCH_PRIORS: tuple[tuple[str, float], ...] = (
     ("emo", 0.15),
     ("electro", 0.8),
     ("disco", 0.8),
+    ("dancehall", 0.4),
     ("dance", 0.75),
     ("synthwave", 0.6),
     ("trap", 0.65),
@@ -327,7 +329,7 @@ def _genre_prior(genre: str) -> float | None:
     if not normalized:
         return None
     for keyword, prior in _GENRE_BEATMATCH_PRIORS:
-        if keyword in normalized:
+        if re.search(rf"(?<![a-z]){re.escape(keyword)}", normalized):
             return prior
     return None
 
