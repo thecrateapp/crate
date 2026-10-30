@@ -199,7 +199,13 @@ def _delete_session(session_id: str) -> bool:
 
     with session_lock(session_id) as lease:
         key = _session_key(session_id)
-        batch_keys = list(_redis().scan_iter(match=f"{key}:batch:*"))
+        session = _load_session(session_id)
+        batch_index = session.get("batch_index", -1) if session else -1
+        batch_keys = [
+            f"{key}:batch:{index}"
+            for index in (batch_index - 1, batch_index)
+            if index >= 0
+        ]
         with leased_pipeline(lease) as pipe:
             pipe.set(f"{key}:started", "1", ex=_SESSION_TTL * 2)
             pipe.delete(key)
@@ -642,6 +648,8 @@ def _create_radio(
                     "mode": mode,
                     "seed_label": global_seed["seed_label"],
                     "tracks": tracks,
+                    "exhausted": session["global_exhausted"],
+                    "status": "exhausted" if session["global_exhausted"] else "ok",
                 }
             return None
         seed_vec, seed_label, seed_context = resolved_seed
@@ -798,6 +806,7 @@ def _advance_radio(session: dict, count: int) -> dict:
         "global_exhausted"
     ):
         result["exhausted"] = True
+        result["status"] = "exhausted"
     return result
 
 

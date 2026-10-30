@@ -474,7 +474,12 @@ def test_next_tracks_marks_global_radio_session_exhausted(monkeypatch):
 
     result = radio_engine.next_tracks("session", count=1)
 
-    assert result == {"session_id": "session", "tracks": [], "exhausted": True}
+    assert result == {
+        "session_id": "session",
+        "tracks": [],
+        "exhausted": True,
+        "status": "exhausted",
+    }
     assert saved
     assert saved[0]["global_exhausted"] is True
 

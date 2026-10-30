@@ -120,14 +120,21 @@ def test_pruned_start_batch_resyncs_a_live_owner_without_recreating_the_session(
 
 
 @pytest.mark.parametrize("session_present", [True, False], ids=["live", "expired"])
-def test_delete_cleans_all_its_cached_batches_atomically_and_keeps_the_tombstone(
+def test_delete_cleans_retained_batches_without_scanning_and_keeps_the_tombstone(
     radio_store, monkeypatch, session_present
 ):
     if session_present:
         _seed(radio_store, batch_index=12)
-    batch_keys = {f"{radio_store.key}:batch:{index}" for index in (0, 1, 12, 997)}
-    for index in (0, 1, 12, 997):
+    retained = (11, 12) if session_present else ()
+    batch_keys = {f"{radio_store.key}:batch:{index}" for index in retained}
+    for index in retained:
         _cached(radio_store, index)
+    scan_iter = radio_store.redis.scan_iter
+    monkeypatch.setattr(
+        radio_store.redis,
+        "scan_iter",
+        lambda **_kwargs: pytest.fail("Session deletion must not scan Redis"),
+    )
     foreign_key = f"radio:session:{uuid4()}"
     foreign_keys = [foreign_key, f"{foreign_key}:batch:12", f"{foreign_key}:started"]
     for key in foreign_keys:
@@ -147,6 +154,7 @@ def test_delete_cleans_all_its_cached_batches_atomically_and_keeps_the_tombstone
             radio_store.redis.get(key) == b"foreign-session" for key in foreign_keys
         )
     finally:
+        monkeypatch.setattr(radio_store.redis, "scan_iter", scan_iter)
         radio_store.redis.delete(*foreign_keys)
 
 

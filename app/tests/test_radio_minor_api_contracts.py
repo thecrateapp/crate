@@ -20,6 +20,34 @@ from tests.test_playback_continuation_api import (
 from tests.test_radio_continuation_contract import MemoryRedis
 
 
+def test_legacy_global_radio_reports_exhaustion_consistently_on_start_and_next(
+    test_app, monkeypatch
+):
+    redis = MemoryRedis()
+    monkeypatch.setattr(radio_engine, "_redis", lambda: redis)
+    monkeypatch.setattr(radio_engine, "_resolve_seed", lambda *_args: None)
+    monkeypatch.setattr(
+        radio_engine,
+        "_resolve_global_seed_tracks",
+        lambda *_args, **_kwargs: {"seed_label": "Empty radio", "tracks": []},
+    )
+    monkeypatch.setattr(radio, "_continuation_user_id", lambda _user: 42)
+    monkeypatch.setattr(radio, "_validate_continuation_seed", lambda *_args: None)
+
+    start = test_app.post(
+        "/api/radio/start", json={"seed_type": "artist", "seed_value": "remote"}
+    )
+    assert start.status_code == 200
+    first = start.json()
+    following = test_app.post(
+        "/api/radio/next", json={"session_id": first["session_id"]}
+    )
+    assert following.status_code == 200
+    assert first["tracks"] == following.json()["tracks"] == []
+    assert first["exhausted"] is following.json()["exhausted"] is True
+    assert first["status"] == following.json()["status"] == "exhausted"
+
+
 def test_next_request_normalizes_an_uppercase_uuid():
     session_id = str(uuid4())
 
