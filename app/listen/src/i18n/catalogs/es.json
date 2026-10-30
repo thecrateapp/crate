@@ -2133,5 +2133,12 @@
   "player.mix.label": "Transición",
   "player.mix.gapless": "Gapless",
   "player.mix.paused": "En pausa",
-  "player.mix.buffering": "Cargando audio"
+  "player.mix.buffering": "Cargando audio",
+  "paths.warnings.partial": "Ruta parcial",
+  "paths.warnings.partialDetail": "Solo se han podido seleccionar {generated} de {requested} temas.",
+  "paths.warnings.incomplete": "No se ha podido completar esta ruta tal como la pediste.",
+  "paths.warnings.quality": "Algunas transiciones pueden resultar menos fluidas o variadas.",
+  "paths.warnings.unavailable": "{count, plural, one {# tema guardado no está disponible y se omitirá.} other {# temas guardados no están disponibles y se omitirán.}}",
+  "paths.warnings.trackUnavailable": "No disponible",
+  "paths.warnings.noneAvailable": "Ninguno de los temas guardados está disponible para reproducir."
 }

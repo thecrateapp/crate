@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from contextlib import contextmanager, nullcontext
+import random
+
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 
 from crate.db.bliss_vectors import to_pgvector_literal
 from crate.db.queries.playable_media_filters import (
@@ -8,8 +12,50 @@ from crate.db.queries.playable_media_filters import (
     playable_media_params,
     playable_track_clause,
 )
-from crate.db.queries.paths_shared import array_distance_sql
+from crate.db.queries.paths_shared import (
+    _canonical_reference_params,
+    array_distance_sql,
+)
 from crate.db.tx import optional_scope, read_scope
+from crate.track_versions import track_song_identity
+from crate.recommendation_policy import PATH_RECENCY_QUALITY_BAND, fresh_path_candidates
+
+
+@contextmanager
+def _path_hnsw_settings(current, *, limit: int, enabled: bool, restore: bool):
+    if not enabled:
+        yield
+        return
+    previous = (
+        current.execute(
+            text("""
+                SELECT current_setting('hnsw.ef_search', true) AS ef_search,
+                       current_setting('hnsw.iterative_scan', true) AS iterative_scan
+            """)
+        )
+        .mappings()
+        .one()
+        if restore
+        else None
+    )
+    sql_failed = False
+    try:
+        current.execute(text(f"SET LOCAL hnsw.ef_search = {min(1000, max(40, limit))}"))
+        current.execute(text("SET LOCAL hnsw.iterative_scan = strict_order"))
+        yield
+    except DBAPIError:
+        # The caller must roll back an aborted transaction; preserve its SQL error.
+        sql_failed = True
+        raise
+    finally:
+        if previous is not None and not sql_failed:
+            current.execute(
+                text("""
+                    SELECT set_config('hnsw.ef_search', :ef_search, true),
+                           set_config('hnsw.iterative_scan', :iterative_scan, true)
+                """),
+                dict(previous),
+            )
 
 
 def _normalize_track_row(row) -> dict | None:
@@ -23,26 +69,102 @@ def _normalize_track_row(row) -> dict | None:
     return data
 
 
+def _eligible_anchor_row(
+    rows,
+    exclude_song_keys,
+    *,
+    recent_song_keys=None,
+    previous_song_keys=None,
+    previous_track_ids=None,
+    selection_seed=None,
+):
+    eligible = [
+        track
+        for row in rows
+        if (track := _normalize_track_row(row)) is not None
+        and track_song_identity(track) not in (exclude_song_keys or set())
+    ]
+    if not eligible:
+        return None
+    scores = {track["id"]: float(track.get("distance") or 0.0) for track in eligible}
+    preferred = min(eligible, key=lambda track: scores[track["id"]])
+    pool = fresh_path_candidates(
+        [(track, -scores[track["id"]]) for track in eligible],
+        preferred=preferred,
+        recent_song_keys=recent_song_keys,
+        previous_song_keys=previous_song_keys,
+        previous_track_ids=previous_track_ids,
+    )
+    if selection_seed is not None:
+        floor = min(scores[track["id"]] for track in pool) + PATH_RECENCY_QUALITY_BAND
+        pool = [track for track in pool if scores[track["id"]] <= floor]
+        fatigued = (recent_song_keys or set()) | (previous_song_keys or set())
+        fresh = [
+            track
+            for track in pool
+            if track_song_identity(track) not in fatigued
+            and track["id"] not in (previous_track_ids or set())
+        ]
+        return random.Random(selection_seed).choice(
+            sorted(fresh or pool, key=lambda track: track["id"])
+        )
+    return min(pool, key=lambda track: scores[track["id"]])
+
+
 def find_anchor_track_row(
     endpoint_type: str,
     endpoint_value: str,
     target_vec: list[float],
     exclude: set[int],
+    *,
+    session=None,
+    exclude_song_keys: set[tuple[str, str]] | None = None,
+    recent_song_keys: set[tuple[str, str]] | None = None,
+    previous_song_keys: set[tuple[str, str]] | None = None,
+    previous_track_ids: set[int] | None = None,
+    selection_seed: str | None = None,
 ) -> dict | None:
+    policy: dict = {}
+    if endpoint_type != "track":
+        policy = {
+            "recent_song_keys": recent_song_keys,
+            "previous_song_keys": previous_song_keys,
+            "previous_track_ids": previous_track_ids,
+            "selection_seed": selection_seed,
+        }
+    broad_pool = (
+        exclude_song_keys
+        or recent_song_keys
+        or previous_song_keys
+        or previous_track_ids
+        or selection_seed is not None
+    )
     probe_vector = to_pgvector_literal(target_vec)
     probe_array = list(target_vec)
     exclude_clause = "AND t.id != ALL(:exclude)" if exclude else ""
-    params: dict = {"probe_vector": probe_vector, "probe_array": probe_array}
+    params: dict = {
+        "probe_vector": probe_vector,
+        "probe_array": probe_array,
+        "anchor_limit": 240 if broad_pool and endpoint_type != "track" else 1,
+    }
     if exclude:
         params["exclude"] = list(exclude)
 
-    with read_scope() as session:
+    with (
+        nullcontext(session) if session is not None else read_scope() as current,
+        _path_hnsw_settings(
+            current,
+            limit=params["anchor_limit"],
+            enabled=endpoint_type != "track",
+            restore=session is not None,
+        ),
+    ):
         if endpoint_type == "track":
-            row = (
-                session.execute(
+            row = _eligible_anchor_row(
+                current.execute(
                     text(
                         f"""
-                    SELECT t.id, t.entity_uid, t.title, a.artist, a.name AS album,
+                    SELECT t.id, t.entity_uid, t.title, t.artist, a.artist AS album_artist, a.name AS album,
                            t.album_id, a.entity_uid::text AS album_entity_uid,
                            ar.entity_uid::text AS artist_entity_uid,
                            t.duration, t.format, t.bitrate, t.sample_rate, t.bit_depth, t.year,
@@ -51,30 +173,37 @@ def find_anchor_track_row(
                            t.bliss_vector, 0.0 AS distance
                     FROM library_tracks t
                     JOIN library_albums a ON a.id = t.album_id
-                    LEFT JOIN library_artists ar ON ar.name = a.artist
+                    LEFT JOIN library_artists ar ON ar.name = t.artist
                     WHERE t.bliss_vector IS NOT NULL
                       AND (
-                        CAST(t.id AS text) = :track_ref
-                        OR (t.entity_uid IS NOT NULL AND CAST(t.entity_uid AS text) = :track_ref)
+                        t.id = CAST(:reference_id AS bigint)
+                        OR t.entity_uid = CAST(:reference_uid AS uuid)
                       )
                       AND {playable_track_clause("t", "a")}
+                      {exclude_clause}
                     ORDER BY
                       CASE
-                        WHEN CAST(t.id AS text) = :track_ref THEN 0
+                        WHEN t.id = CAST(:reference_id AS bigint) THEN 0
                         ELSE 1
                       END
-                    LIMIT 1
+                    LIMIT :anchor_limit
                     """
                     ),
-                    {"track_ref": endpoint_value, **playable_media_params()},
+                    {
+                        **params,
+                        **_canonical_reference_params(endpoint_value),
+                        **playable_media_params(),
+                    },
                 )
                 .mappings()
-                .first()
+                .all(),
+                exclude_song_keys,
+                **policy,
             )
-            return _normalize_track_row(row)
+            return row
 
         if endpoint_type == "artist":
-            scope_clause = """AND a.artist = (
+            scope_clause = """AND (
                 SELECT name
                 FROM library_artists
                 WHERE CAST(id AS text) = :scope_ref
@@ -85,29 +214,32 @@ def find_anchor_track_row(
                     ELSE 1
                   END
                 LIMIT 1
-            )"""
+            ) IN (a.artist, t.artist)"""
             params["scope_ref"] = endpoint_value
         elif endpoint_type == "album":
-            scope_clause = """AND (
-                CAST(t.album_id AS text) = :scope_ref
-                OR (a.entity_uid IS NOT NULL AND CAST(a.entity_uid AS text) = :scope_ref)
+            scope_clause = """AND t.album_id IN (
+                SELECT id
+                FROM library_albums
+                WHERE id = CAST(:reference_id AS bigint)
+                   OR entity_uid = CAST(:reference_uid AS uuid)
             )"""
-            params["scope_ref"] = endpoint_value
+            params.update(_canonical_reference_params(endpoint_value))
         elif endpoint_type == "genre":
-            scope_clause = """AND a.artist IN (
-                SELECT ag.artist_name FROM artist_genres ag
+            scope_clause = """AND EXISTS (
+                SELECT 1 FROM artist_genres ag
                 JOIN genres g ON g.id = ag.genre_id
                 WHERE g.slug = :scope_slug
+                  AND ag.artist_name IN (a.artist, t.artist)
             )"""
             params["scope_slug"] = endpoint_value
         else:
             scope_clause = ""
 
-        row = (
-            session.execute(
+        row = _eligible_anchor_row(
+            current.execute(
                 text(
                     f"""
-                SELECT t.id, t.entity_uid, t.title, a.artist, a.name AS album,
+                SELECT t.id, t.entity_uid, t.title, t.artist, a.artist AS album_artist, a.name AS album,
                        t.album_id, a.entity_uid::text AS album_entity_uid,
                        ar.entity_uid::text AS artist_entity_uid,
                        t.duration, t.format, t.bitrate, t.sample_rate, t.bit_depth, t.year,
@@ -117,28 +249,30 @@ def find_anchor_track_row(
                        (t.bliss_embedding <=> CAST(:probe_vector AS vector(20))) AS distance
                 FROM library_tracks t
                 JOIN library_albums a ON a.id = t.album_id
-                LEFT JOIN library_artists ar ON ar.name = a.artist
+                LEFT JOIN library_artists ar ON ar.name = t.artist
                 WHERE t.bliss_embedding IS NOT NULL
                 AND {playable_track_clause("t", "a")}
                 {scope_clause}
                 {exclude_clause}
                 ORDER BY t.bliss_embedding <=> CAST(:probe_vector AS vector(20))
-                LIMIT 1
+                LIMIT :anchor_limit
                 """
                 ),
                 {**params, **playable_media_params()},
             )
             .mappings()
-            .first()
+            .all(),
+            exclude_song_keys,
+            **policy,
         )
 
         if not row:
             fallback_distance = array_distance_sql("t.bliss_vector")
-            row = (
-                session.execute(
+            row = _eligible_anchor_row(
+                current.execute(
                     text(
                         f"""
-                    SELECT t.id, t.entity_uid, t.title, a.artist, a.name AS album,
+                    SELECT t.id, t.entity_uid, t.title, t.artist, a.artist AS album_artist, a.name AS album,
                            t.album_id, a.entity_uid::text AS album_entity_uid,
                            ar.entity_uid::text AS artist_entity_uid,
                            t.duration, t.format, t.bitrate, t.sample_rate, t.bit_depth, t.year,
@@ -148,22 +282,24 @@ def find_anchor_track_row(
                            {fallback_distance} AS distance
                     FROM library_tracks t
                     JOIN library_albums a ON a.id = t.album_id
-                    LEFT JOIN library_artists ar ON ar.name = a.artist
+                    LEFT JOIN library_artists ar ON ar.name = t.artist
                     WHERE t.bliss_vector IS NOT NULL
                     AND {playable_track_clause("t", "a")}
                     {scope_clause}
                     {exclude_clause}
                     ORDER BY {fallback_distance}
-                    LIMIT 1
+                    LIMIT :anchor_limit
                     """
                     ),
                     {**params, **playable_media_params()},
                 )
                 .mappings()
-                .first()
+                .all(),
+                exclude_song_keys,
+                **policy,
             )
 
-    return _normalize_track_row(row)
+    return row
 
 
 def find_candidate_rows(
@@ -172,7 +308,10 @@ def find_candidate_rows(
     *,
     limit: int,
     session=None,
+    use_track_artist: bool = False,
 ) -> list[dict]:
+    artist_column = "t.artist" if use_track_artist else "a.artist"
+    album_artist_column = "a.artist AS album_artist," if use_track_artist else ""
     probe_vector = to_pgvector_literal(target)
     probe_array = list(target)
 
@@ -182,13 +321,19 @@ def find_candidate_rows(
         exclude_clause = "AND t.id != ALL(:exclude)"
         params["exclude"] = list(exclude_ids)
 
-    with optional_scope(session) as s:
+    with (
+        nullcontext(session) if session is not None else read_scope() as s,
+        _path_hnsw_settings(
+            s, limit=int(limit), enabled=use_track_artist, restore=session is not None
+        ),
+    ):
         s.execute(text("SET LOCAL ivfflat.probes = 10"))
         rows = (
             s.execute(
                 text(
                     f"""
-                SELECT t.id, t.entity_uid, t.title, a.artist,
+                SELECT t.id, t.entity_uid, t.title, {artist_column} AS artist,
+                       {album_artist_column}
                        a.name AS album, t.album_id, a.entity_uid::text AS album_entity_uid,
                        ar.entity_uid::text AS artist_entity_uid,
                        t.duration, t.format, t.bitrate, t.sample_rate, t.bit_depth, t.year,
@@ -198,7 +343,7 @@ def find_candidate_rows(
                        (t.bliss_embedding <=> CAST(:probe_vector AS vector(20))) AS distance
                 FROM library_tracks t
                 JOIN library_albums a ON a.id = t.album_id
-                LEFT JOIN library_artists ar ON ar.name = a.artist
+                LEFT JOIN library_artists ar ON ar.name = {artist_column}
                 WHERE t.bliss_embedding IS NOT NULL
                 AND {playable_track_clause("t", "a")}
                 {exclude_clause}
@@ -218,7 +363,8 @@ def find_candidate_rows(
                 s.execute(
                     text(
                         f"""
-                    SELECT t.id, t.entity_uid, t.title, a.artist,
+                    SELECT t.id, t.entity_uid, t.title, {artist_column} AS artist,
+                       {album_artist_column}
                            a.name AS album, t.album_id, a.entity_uid::text AS album_entity_uid,
                            ar.entity_uid::text AS artist_entity_uid,
                            t.duration, t.format, t.bitrate, t.sample_rate, t.bit_depth, t.year,
@@ -228,7 +374,7 @@ def find_candidate_rows(
                            {fallback_distance} AS distance
                     FROM library_tracks t
                     JOIN library_albums a ON a.id = t.album_id
-                    LEFT JOIN library_artists ar ON ar.name = a.artist
+                    LEFT JOIN library_artists ar ON ar.name = {artist_column}
                     WHERE t.bliss_vector IS NOT NULL
                     AND {playable_track_clause("t", "a")}
                     {exclude_clause}

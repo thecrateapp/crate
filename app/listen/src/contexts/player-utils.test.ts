@@ -95,7 +95,15 @@ afterEach(() => {
 });
 
 describe("getStoredQueue / saveQueue round-trip", () => {
-  it.each(["album", "crate", "playlist", "radio", "track", "queue"] as const)(
+  it.each([
+    "album",
+    "crate",
+    "playlist",
+    "radio",
+    "track",
+    "queue",
+    "path",
+  ] as const)(
     "retains the %s playback origin across a persisted session",
     (type) => {
       const playSource: PlaySource = {

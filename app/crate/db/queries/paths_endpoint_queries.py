@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
+from crate.db.queries.paths_shared import _canonical_reference_params
 from crate.db.tx import optional_scope
 
 
@@ -20,18 +21,18 @@ def fetch_bliss_vectors_for_endpoint(
                     FROM library_tracks
                     WHERE bliss_vector IS NOT NULL
                       AND (
-                        CAST(id AS text) = :value
-                        OR (entity_uid IS NOT NULL AND CAST(entity_uid AS text) = :value)
+                        id = CAST(:reference_id AS bigint)
+                        OR entity_uid = CAST(:reference_uid AS uuid)
                       )
                     ORDER BY
                       CASE
-                        WHEN CAST(id AS text) = :value THEN 0
+                        WHEN id = CAST(:reference_id AS bigint) THEN 0
                         ELSE 1
                       END
                     LIMIT 1
                     """
                     ),
-                    {"value": value},
+                    _canonical_reference_params(value),
                 )
                 .mappings()
                 .first()
@@ -125,17 +126,17 @@ def resolve_endpoint_label(endpoint_type: str, value: str, *, session=None) -> s
                         """
                     SELECT title, artist
                     FROM library_tracks
-                    WHERE CAST(id AS text) = :value
-                       OR (entity_uid IS NOT NULL AND CAST(entity_uid AS text) = :value)
+                    WHERE id = CAST(:reference_id AS bigint)
+                       OR entity_uid = CAST(:reference_uid AS uuid)
                     ORDER BY
                       CASE
-                        WHEN CAST(id AS text) = :value THEN 0
+                        WHEN id = CAST(:reference_id AS bigint) THEN 0
                         ELSE 1
                       END
                     LIMIT 1
                     """
                     ),
-                    {"value": value},
+                    _canonical_reference_params(value),
                 )
                 .mappings()
                 .first()

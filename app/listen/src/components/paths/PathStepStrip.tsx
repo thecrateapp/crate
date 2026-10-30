@@ -111,12 +111,14 @@ export function PathStepStrip({
               }}
               tabIndex={index === roving ? 0 : -1}
               aria-current={index === activeStep ? "step" : undefined}
-              aria-label={t("paths.journey.stepAction", {
+              aria-disabled={step.playable === false || undefined}
+              aria-label={`${t("paths.journey.stepAction", {
                 step: index + 1,
                 title: step.title,
                 artist: step.artist,
-              })}
+              })}${step.playable === false ? `. ${t("paths.warnings.trackUnavailable")}` : ""}`}
               onClick={() => {
+                if (step.playable === false) return;
                 setCursor(index);
                 onSelect(index);
               }}

@@ -123,6 +123,28 @@ def _genre_jaccard(
     return intersection / union if union > 0 else 0.0
 
 
+def make_path_genre_overlap_scorer(
+    genre_map: dict[str, dict[str, float]], contexts: list[dict]
+) -> Callable[[str, list[str], dict[str, dict[str, float]]], float]:
+    targets = [
+        _expand_genre_weights(context["genre_weights"])
+        for context in contexts
+        if context.get("genre_weights")
+    ]
+    candidate_genres: dict[str, dict[str, float]] = {}
+
+    def score(candidate_artist, _target_artists, _genre_map):
+        key = candidate_artist.lower()
+        if key not in candidate_genres:
+            candidate_genres[key] = _expand_genre_weights(genre_map.get(key, {}))
+        return max(
+            (_genre_jaccard(candidate_genres[key], target) for target in targets),
+            default=0.0,
+        )
+
+    return score
+
+
 def make_radio_genre_overlap_scorer(
     genre_map: dict[str, dict[str, float]],
     target_artists: list[str],
@@ -234,5 +256,6 @@ __all__ = [
     "_load_artist_genres",
     "_load_artist_similarity_graph",
     "_load_shared_members_graph",
+    "make_path_genre_overlap_scorer",
     "make_radio_genre_overlap_scorer",
 ]

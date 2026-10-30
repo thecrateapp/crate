@@ -16,6 +16,7 @@ def path_input():
         _track(i, title=str(i), artist=f"Artist {i}", genre_slug="rock")
         for i in (1, 2, 3)
     ]
+    tracks[1]["bpm"] = 180.0
     return dict(
         origin_label="Origin",
         dest_label="Destination",

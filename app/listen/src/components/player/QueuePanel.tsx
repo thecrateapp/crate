@@ -6,7 +6,7 @@ import { useIsDesktop } from "@crate/ui/lib/use-breakpoint";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { PlayerQueueHeader } from "./PlayerQueueHeader";
 import { PlayerQueueFrame } from "./PlayerQueueFrame";
-import { getPlaySourceLabel } from "./player-source";
+import { getPlaySourceLabel, getPlaySourceHref } from "./player-source";
 import { formatPlayerTime } from "./bar/player-bar-utils";
 import { usePlayerActions } from "@/contexts/PlayerContext";
 import { JamQueueLockedNotice } from "@/components/player/JamQueueLockedNotice";
@@ -50,6 +50,7 @@ export const QueuePanel = memo(function QueuePanel({
         onClose={onClose}
         summary={`${t("common.trackCount", { count: queue.length })} · ${formatPlayerTime(queue.reduce((sum, track) => sum + (Number.isFinite(track.duration) && track.duration! > 0 ? track.duration! : 0), 0))}`}
         source={getPlaySourceLabel(playSource)}
+        sourceHref={getPlaySourceHref(playSource)}
       />
 
       {jamQueueLocked ? <JamQueueLockedNotice /> : null}

@@ -7,32 +7,15 @@ import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { notify } from "@crate/ui/lib/notify";
 import { PathCoverJourney } from "@/components/paths/PathCoverJourney";
 import { PathDetailHeaderView } from "./PathDetailHeaderView";
-import { usePlayerState } from "@/contexts/PlayerContext";
+import { usePlayerActions, usePlayerState } from "@/contexts/PlayerContext";
 
 import { CrateLoader } from "@/components/ui/CrateLoader";
-import { usePlayerActions, type Track } from "@/contexts/PlayerContext";
 import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
-import { albumCoverApiUrl } from "@/lib/library-routes";
-import { toPlayableTrack } from "@/lib/playable-track";
+import { getPathPlayback } from "./path-playback";
+import { PathWarnings } from "./PathWarnings";
 import { PathTrackList } from "./PathDetailParts";
-import type { PathDetail as PathData, PathTrack } from "./paths-model";
-
-function mapToPlayerTrack(track: PathTrack): Track {
-  return toPlayableTrack(track, {
-    cover:
-      track.album_id || track.album_entity_uid
-        ? albumCoverApiUrl(
-            {
-              albumId: track.album_id,
-              albumEntityUid: track.album_entity_uid,
-              artistEntityUid: track.artist_entity_uid,
-            },
-            { size: 512 },
-          )
-        : undefined,
-  });
-}
+import type { PathDetail as PathData } from "./paths-model";
 
 export function PathDetail() {
   const { t } = useTranslation();
@@ -45,24 +28,24 @@ export function PathDetail() {
     status,
     refetch,
   } = useApi<PathData>(`/api/paths/${id}`);
-  const { playAll, currentTrack } = usePlayerActions();
+  const { playAll, currentTrack, playSource } = usePlayerActions();
   const [regenerating, setRegenerating] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const { isPlaying } = usePlayerState();
 
-  const activeStep =
-    path?.tracks.findIndex(
-      (track) => currentTrack?.libraryTrackId === track.track_id,
-    ) ?? -1;
+  const isCurrentPath =
+    playSource?.type === "path" && String(playSource.id) === String(path?.id);
+  const activeStep = isCurrentPath
+    ? (path?.tracks.findIndex(
+        (track) => currentTrack?.libraryTrackId === track.track_id,
+      ) ?? -1)
+    : -1;
 
   const playFromStep = useCallback(
-    (startIndex: number) => {
+    (startIndex?: number) => {
       if (!path) return;
-      playAll(path.tracks.map(mapToPlayerTrack), startIndex, {
-        type: "queue",
-        name: path.name,
-        href: `/paths/${path.id}`,
-      });
+      const playback = getPathPlayback(path, startIndex);
+      if (playback) playAll(playback.tracks, playback.index, playback.source);
     },
     [path, playAll],
   );
@@ -107,12 +90,16 @@ export function PathDetail() {
           origin={path.origin.label}
           destination={path.destination.label}
           count={path.tracks.length}
+          playableCount={
+            path.tracks.filter((track) => track.playable !== false).length
+          }
           regenerating={regenerating}
-          onPlay={() => playFromStep(0)}
+          onPlay={() => playFromStep()}
           onRegenerate={() => void regenerate()}
           onDelete={() => setConfirmingDelete(true)}
         />
       </div>
+      <PathWarnings path={path} />
       <div className="mb-6">
         <PathCoverJourney
           key={path.id}

@@ -128,10 +128,16 @@
 .path-step-thumb[data-past] .crate-media-cover {
   opacity: 0.55;
 }
-.path-step-thumb[data-focused] .crate-media-cover,
-.path-step-thumb:hover .crate-media-cover {
+.path-step-thumb:not([aria-disabled="true"])[data-focused] .crate-media-cover,
+.path-step-thumb:not([aria-disabled="true"]):hover .crate-media-cover {
   border-color: var(--accent-action-hi);
   opacity: 1;
+}
+.path-step-thumb[aria-disabled="true"] {
+  cursor: default;
+}
+.path-step-thumb[aria-disabled="true"] .crate-media-cover {
+  opacity: 0.55;
 }
 .path-step-thumb:focus-visible {
   outline: 2px solid var(--accent-action-hi);

@@ -1,6 +1,7 @@
 """Write-side persistence for music paths."""
 
 import json
+from contextlib import nullcontext
 from datetime import datetime, timezone
 
 from sqlalchemy import text
@@ -25,18 +26,22 @@ def create_music_path_record(
     waypoints: list[dict],
     step_count: int,
     tracks: list[dict],
+    generation_metadata: dict | None = None,
+    session=None,
 ) -> dict | None:
-    with transaction_scope() as session:
+    with (
+        nullcontext(session) if session is not None else transaction_scope() as current
+    ):
         row = (
-            session.execute(
+            current.execute(
                 text(
                     """
                 INSERT INTO music_paths
                     (user_id, name, origin_type, origin_value, origin_label,
-                     dest_type, dest_value, dest_label, waypoints, step_count, tracks)
+                     dest_type, dest_value, dest_label, waypoints, step_count, tracks, generation_metadata)
                 VALUES
                     (:user_id, :name, :origin_type, :origin_value, :origin_label,
-                     :dest_type, :dest_value, :dest_label, CAST(:waypoints AS jsonb), :step_count, CAST(:tracks AS jsonb))
+                     :dest_type, :dest_value, :dest_label, CAST(:waypoints AS jsonb), :step_count, CAST(:tracks AS jsonb), CAST(:generation_metadata AS jsonb))
                 RETURNING id, created_at
                 """
                 ),
@@ -52,6 +57,7 @@ def create_music_path_record(
                     "waypoints": json.dumps(waypoints),
                     "step_count": step_count,
                     "tracks": json.dumps(tracks),
+                    "generation_metadata": json.dumps(generation_metadata or {}),
                 },
             )
             .mappings()
@@ -69,13 +75,26 @@ def delete_music_path(path_id: int, user_id: int) -> bool:
         return _rowcount(result) > 0
 
 
-def update_music_path_tracks(path_id: int, user_id: int, tracks: list[dict]) -> bool:
-    with transaction_scope() as session:
-        result = session.execute(
+def update_music_path_tracks(
+    path_id: int,
+    user_id: int,
+    tracks: list[dict],
+    *,
+    generation_metadata: dict | None = None,
+    waypoints: list[dict] | None = None,
+    session=None,
+) -> bool:
+    with (
+        nullcontext(session) if session is not None else transaction_scope() as current
+    ):
+        result = current.execute(
             text(
                 """
                 UPDATE music_paths
-                SET tracks = CAST(:tracks AS jsonb), updated_at = :now
+                SET tracks = CAST(:tracks AS jsonb),
+                    generation_metadata = CAST(:generation_metadata AS jsonb),
+                    waypoints = COALESCE(CAST(:waypoints AS jsonb), waypoints),
+                    updated_at = :now
                 WHERE id = :id AND user_id = :user_id
                 """
             ),
@@ -83,6 +102,8 @@ def update_music_path_tracks(path_id: int, user_id: int, tracks: list[dict]) -> 
                 "id": path_id,
                 "user_id": user_id,
                 "tracks": json.dumps(tracks),
+                "generation_metadata": json.dumps(generation_metadata or {}),
+                "waypoints": json.dumps(waypoints) if waypoints is not None else None,
                 "now": datetime.now(timezone.utc),
             },
         )

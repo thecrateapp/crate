@@ -88,6 +88,33 @@ describe("Music paths pages", () => {
     });
   });
 
+  it("plays a saved path from the list without attributing it to a playlist", async () => {
+    const playAll = vi.fn();
+    mockUseApi.mockReturnValue({
+      data: [{ ...pathDetail, track_count: pathDetail.tracks.length }],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    vi.mocked(api).mockResolvedValue(pathDetail);
+    renderWithListenProviders(<Paths />, {
+      route: "/paths",
+      path: "/paths",
+      playerActions: { playAll },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+
+    await waitFor(() => expect(playAll).toHaveBeenCalledOnce());
+    expect(api).toHaveBeenCalledWith("/api/paths/77");
+    expect(playAll).toHaveBeenCalledWith(expect.any(Array), 0, {
+      type: "path",
+      id: 77,
+      name: pathDetail.name,
+      href: "/paths/77",
+    });
+  });
+
   it("localizes the path builder chrome", () => {
     renderWithListenProviders(<Paths />, {
       route: "/paths",
@@ -154,10 +181,315 @@ describe("Music paths pages", () => {
       }),
     );
     expect(playAll).toHaveBeenCalledWith(expect.any(Array), 1, {
-      type: "queue",
+      type: "path",
+      id: 77,
       name: pathDetail.name,
       href: "/paths/77",
     });
+  });
+
+  it("retains the finite path source when the saved path contains a single track", () => {
+    const play = vi.fn();
+    const playAll = vi.fn();
+    mockUseApi.mockReturnValue({
+      data: {
+        ...pathDetail,
+        step_count: 20,
+        generated_step_count: 1,
+        is_partial: true,
+        warnings: [{ code: "insufficient_tracks", expected: 20, actual: 1 }],
+        tracks: [pathDetail.tracks[0]!],
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    renderWithListenProviders(<PathDetail />, {
+      route: "/paths/77",
+      path: "/paths/:id",
+      playerActions: { play, playAll },
+    });
+
+    fireEvent.click(screen.getByRole("row", { name: "Track One" }));
+
+    expect(play).not.toHaveBeenCalled();
+    expect(playAll).toHaveBeenCalledWith(
+      [expect.objectContaining({ libraryTrackId: 1, title: "Track One" })],
+      0,
+      {
+        type: "path",
+        id: 77,
+        name: pathDetail.name,
+        href: "/paths/77",
+      },
+    );
+    expect(api).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      label: "an album",
+      playing: true,
+      source: { type: "album" as const, id: 7, name: "Album" },
+    },
+    {
+      label: "an album",
+      playing: false,
+      source: { type: "album" as const, id: 7, name: "Album" },
+    },
+    {
+      label: "another path",
+      playing: true,
+      source: {
+        type: "path" as const,
+        id: 88,
+        name: "Other journey",
+        href: "/paths/88",
+      },
+    },
+    {
+      label: "another path",
+      playing: false,
+      source: {
+        type: "path" as const,
+        id: 88,
+        name: "Other journey",
+        href: "/paths/88",
+      },
+    },
+  ])(
+    "starts this path when its matching track belongs to $label (playing=$playing)",
+    ({ source, playing }) => {
+      const playAll = vi.fn();
+      const pause = vi.fn();
+      const resume = vi.fn();
+      renderWithListenProviders(<PathDetail />, {
+        route: "/paths/77",
+        path: "/paths/:id",
+        playerActions: {
+          currentTrack: createMockTrack({
+            id: "1",
+            libraryTrackId: 1,
+            title: "Track One",
+            artist: "Artist One",
+          }),
+          playSource: source,
+          playAll,
+          pause,
+          resume,
+        },
+        playerState: { isPlaying: playing },
+      });
+
+      expect(
+        screen.getByRole("row", { name: "Track One" }),
+      ).not.toHaveAttribute("aria-current");
+      expect(
+        screen.getByRole("button", {
+          name: "Play step 1: Track One by Artist One",
+        }),
+      ).not.toHaveAttribute("aria-current");
+      fireEvent.click(screen.getByRole("row", { name: "Track One" }));
+
+      expect(pause).not.toHaveBeenCalled();
+      expect(resume).not.toHaveBeenCalled();
+      expect(playAll).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({ libraryTrackId: 1 }),
+          expect.objectContaining({ libraryTrackId: 2 }),
+        ],
+        0,
+        { type: "path", id: 77, name: pathDetail.name, href: "/paths/77" },
+      );
+    },
+  );
+
+  it.each([
+    { playing: true, pathId: 77 },
+    { playing: false, pathId: "77" },
+  ])(
+    "toggles the matching active track only inside the same path (playing=$playing, id=$pathId)",
+    ({ playing, pathId }) => {
+      const playAll = vi.fn();
+      const pause = vi.fn();
+      const resume = vi.fn();
+      renderWithListenProviders(<PathDetail />, {
+        route: "/paths/77",
+        path: "/paths/:id",
+        playerActions: {
+          currentTrack: createMockTrack({
+            id: "1",
+            libraryTrackId: 1,
+            title: "Track One",
+            artist: "Artist One",
+          }),
+          playSource: {
+            type: "path",
+            id: pathId,
+            name: pathDetail.name,
+            href: "/paths/77",
+          },
+          playAll,
+          pause,
+          resume,
+        },
+        playerState: { isPlaying: playing },
+      });
+
+      expect(screen.getByRole("row", { name: "Track One" })).toHaveAttribute(
+        "aria-current",
+        "true",
+      );
+      expect(
+        screen.getByRole("button", {
+          name: "Play step 1: Track One by Artist One",
+        }),
+      ).toHaveAttribute("aria-current", "step");
+      fireEvent.click(screen.getByRole("row", { name: "Track One" }));
+
+      expect(playAll).not.toHaveBeenCalled();
+      expect(playing ? pause : resume).toHaveBeenCalledOnce();
+      expect(playing ? resume : pause).not.toHaveBeenCalled();
+    },
+  );
+
+  it("skips unavailable saved tracks for header playback and remaps clicked rows", () => {
+    const playAll = vi.fn();
+    const sparse = {
+      ...pathDetail,
+      tracks: [
+        { ...pathDetail.tracks[0]!, playable: false },
+        { ...pathDetail.tracks[1]!, playable: true },
+        {
+          ...pathDetail.tracks[1]!,
+          track_id: 3,
+          step: 3,
+          title: "Track Three",
+          playable: false,
+        },
+        {
+          ...pathDetail.tracks[1]!,
+          track_id: 4,
+          step: 4,
+          title: "Track Four",
+          playable: true,
+        },
+      ],
+    };
+    const before = structuredClone(sparse);
+    mockUseApi.mockReturnValue({
+      data: sparse,
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    renderWithListenProviders(<PathDetail />, {
+      route: "/paths/77",
+      path: "/paths/:id",
+      playerActions: { playAll },
+    });
+
+    const unavailable = screen.getByRole("row", { name: "Track One" });
+    expect(unavailable).toHaveAttribute("data-disabled", "true");
+    expect(unavailable).toHaveAttribute("tabindex", "-1");
+    expect(within(unavailable).queryByText("Soon")).not.toBeInTheDocument();
+    expect(within(unavailable).getByText(/unavailable/i)).toBeInTheDocument();
+    fireEvent.click(unavailable);
+    expect(playAll).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      within(screen.getByTestId("page-header")).getByRole("button", {
+        name: "Play",
+      }),
+    );
+    expect(playAll).toHaveBeenLastCalledWith(
+      [
+        expect.objectContaining({ libraryTrackId: 2 }),
+        expect.objectContaining({ libraryTrackId: 4 }),
+      ],
+      0,
+      expect.objectContaining({ type: "path", id: 77 }),
+    );
+    fireEvent.click(screen.getByRole("row", { name: "Track Four" }));
+    expect(playAll).toHaveBeenLastCalledWith(
+      [
+        expect.objectContaining({ libraryTrackId: 2 }),
+        expect.objectContaining({ libraryTrackId: 4 }),
+      ],
+      1,
+      expect.objectContaining({ type: "path", id: 77 }),
+    );
+    expect(sparse).toEqual(before);
+    expect(api).not.toHaveBeenCalled();
+  });
+
+  it("keeps unavailable cover steps inspectable but never starts playback from them", () => {
+    const playAll = vi.fn();
+    mockUseApi.mockReturnValue({
+      data: {
+        ...pathDetail,
+        tracks: pathDetail.tracks.map((track) => ({
+          ...track,
+          playable: false,
+        })),
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    renderWithListenProviders(<PathDetail />, {
+      route: "/paths/77",
+      path: "/paths/:id",
+      playerActions: { playAll },
+    });
+
+    expect(
+      within(screen.getByTestId("page-header")).getByRole("button", {
+        name: "Play",
+      }),
+    ).toBeDisabled();
+    const step = screen.getByRole("button", {
+      name: /^Play step 2: Track Two by Artist Two/,
+    });
+    expect(step).toHaveAttribute("aria-disabled", "true");
+    expect(step).toHaveAccessibleName(/unavailable/i);
+    fireEvent.click(step);
+    expect(playAll).not.toHaveBeenCalled();
+    expect(api).not.toHaveBeenCalled();
+  });
+
+  it("presents partial generation and later availability separately without regenerating", () => {
+    mockUseApi.mockReturnValue({
+      data: {
+        ...pathDetail,
+        step_count: 5,
+        generated_step_count: 2,
+        is_partial: true,
+        warnings: [{ code: "insufficient_tracks", expected: 5, actual: 2 }],
+        tracks: pathDetail.tracks.map((track, index) => ({
+          ...track,
+          playable: index !== 0,
+        })),
+      },
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    renderWithListenProviders(<PathDetail />, {
+      route: "/paths/77",
+      path: "/paths/:id",
+    });
+
+    expect(
+      screen.getByText("Only 2 of 5 tracks could be selected."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("1 saved track is unavailable and will be skipped."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("error-state")).not.toBeInTheDocument();
+    expect(screen.getByRole("row", { name: "Track Two" })).toBeInTheDocument();
+    expect(api).not.toHaveBeenCalled();
   });
 
   it("follows actual player track changes without passively scrolling the page", () => {
@@ -167,6 +499,12 @@ describe("Music paths pages", () => {
       return (
         <PlayerActionsContext.Provider
           value={createMockPlayerActions({
+            playSource: {
+              type: "path",
+              id: 77,
+              name: pathDetail.name,
+              href: "/paths/77",
+            },
             currentTrack: createMockTrack({
               id: `track-${trackId}`,
               libraryTrackId: trackId,
@@ -333,7 +671,12 @@ describe("Music paths pages", () => {
         expect.objectContaining({ title: "Track Two" }),
       ],
       1,
-      { type: "queue", name: "Punk to Post-hardcore", href: "/paths/77" },
+      {
+        type: "path",
+        id: 77,
+        name: "Punk to Post-hardcore",
+        href: "/paths/77",
+      },
     );
 
     fireEvent.contextMenu(row);

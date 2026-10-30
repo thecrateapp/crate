@@ -1,6 +1,7 @@
 """Service orchestration and compatibility contracts for Music Paths."""
 
 import ast
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -25,18 +26,26 @@ def test_services_plan_with_owner_before_persistence(monkeypatch, operation):
         resolved_waypoints=[],
         tracks=[{"track_id": 9}],
     )
+    stored = deepcopy(path)
+
+    def update(path_id, user_id, tracks, *, generation_metadata, waypoints):
+        assert plans[0]["user_id"] == user_id
+        writes.append((path_id, user_id, tracks))
+        stored["tracks"] = deepcopy(tracks)
+        stored["waypoints"] = deepcopy(waypoints)
+        stored.update(deepcopy(generation_metadata))
+        return True
+
     monkeypatch.setattr(
         service, "build_music_path_plan", lambda *a, **k: plans.append(k) or plan
     )
-    monkeypatch.setattr(service, "get_music_path", lambda *a: path.copy())
+    monkeypatch.setattr(service, "get_music_path", lambda *a, **k: deepcopy(stored))
     monkeypatch.setattr(
         service,
         "create_music_path_record",
         lambda **k: writes.append(k) or {"id": 7, "created_at": "today"},
     )
-    monkeypatch.setattr(
-        service, "update_music_path_tracks", lambda *a: writes.append(a) or True
-    )
+    monkeypatch.setattr(service, "update_music_path_tracks", update)
     if operation == "create":
         from crate.db.paths_service_writes import create_music_path
 
@@ -74,9 +83,10 @@ def test_waypoints_preserve_acoustic_fallback_and_skip_ai(monkeypatch):
         "resolve_bliss_centroid",
         lambda kind, value: [1.0, 2.0] if value != "missing" else None,
     )
+    monkeypatch.setattr(service, "load_endpoint_contexts", lambda endpoints: [])
     calls = []
     monkeypatch.setattr(
-        service, "compute_path", lambda *a: calls.append(a) or [{"track_id": 8}]
+        service, "compute_path", lambda *a, **k: calls.append(a) or [{"track_id": 8}]
     )
     waypoints = [
         {"type": "genre", "value": "punk"},

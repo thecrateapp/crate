@@ -2133,5 +2133,12 @@
   "player.mix.label": "Übergang",
   "player.mix.gapless": "Nahtlos",
   "player.mix.paused": "Pausiert",
-  "player.mix.buffering": "Audio wird geladen"
+  "player.mix.buffering": "Audio wird geladen",
+  "paths.warnings.partial": "Unvollständiger Pfad",
+  "paths.warnings.partialDetail": "Es konnten nur {generated} von {requested} Titeln ausgewählt werden.",
+  "paths.warnings.incomplete": "Dieser Pfad konnte nicht wie gewünscht abgeschlossen werden.",
+  "paths.warnings.quality": "Manche Übergänge sind möglicherweise weniger fließend oder abwechslungsreich.",
+  "paths.warnings.unavailable": "{count, plural, one {# gespeicherter Titel ist nicht verfügbar und wird übersprungen.} other {# gespeicherte Titel sind nicht verfügbar und werden übersprungen.}}",
+  "paths.warnings.trackUnavailable": "Nicht verfügbar",
+  "paths.warnings.noneAvailable": "Keiner der gespeicherten Titel ist zur Wiedergabe verfügbar."
 }

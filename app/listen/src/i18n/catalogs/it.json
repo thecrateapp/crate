@@ -2133,5 +2133,12 @@
   "player.mix.label": "Transizione",
   "player.mix.gapless": "Senza pause",
   "player.mix.paused": "In pausa",
-  "player.mix.buffering": "Caricamento audio"
+  "player.mix.buffering": "Caricamento audio",
+  "paths.warnings.partial": "Percorso parziale",
+  "paths.warnings.partialDetail": "È stato possibile selezionare solo {generated} brani su {requested}.",
+  "paths.warnings.incomplete": "Non è stato possibile completare questo percorso come richiesto.",
+  "paths.warnings.quality": "Alcune transizioni potrebbero essere meno fluide o varie.",
+  "paths.warnings.unavailable": "{count, plural, one {# brano salvato non è disponibile e verrà saltato.} other {# brani salvati non sono disponibili e verranno saltati.}}",
+  "paths.warnings.trackUnavailable": "Non disponibile",
+  "paths.warnings.noneAvailable": "Nessuno dei brani salvati è disponibile per la riproduzione."
 }

@@ -431,7 +431,7 @@ describe("Upload file progress", () => {
     fireEvent.click(screen.getByRole("button", { name: "Import to library" }));
     await waitFor(() => expect(api).toHaveBeenCalledTimes(2));
     const bar = screen.getByRole("progressbar", { name: "large.flac" });
-    expect(bar).toHaveAttribute("aria-valuenow", "0");
+    await waitFor(() => expect(bar).toHaveAttribute("aria-valuenow", "0"));
     expect(bar).toHaveAttribute(
       "aria-valuetext",
       expect.stringMatching(/0.*80/),

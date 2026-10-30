@@ -37,6 +37,10 @@ def refine_music_path_with_llm(
     tracks: list[dict],
     candidates_by_genre: Mapping[str, list[dict]],
     actor_id: int | None = None,
+    recent_song_keys: set[tuple[str, str]] | None = None,
+    previous_song_keys: set[tuple[str, str]] | None = None,
+    previous_track_ids: set[int] | None = None,
+    validation_context: dict | None = None,
 ) -> list[dict]:
     """Review outside DB scopes; any unavailable or stale review keeps the path."""
     if len(tracks) < _MIN_TRACKS_FOR_REFINEMENT:
@@ -84,7 +88,13 @@ def refine_music_path_with_llm(
             )
         _revalidate_refinement(call)
         return _apply_replacements(
-            tracks, alternatives, response.replacements[:_MAX_REPLACEMENTS]
+            tracks,
+            alternatives,
+            response.replacements[:_MAX_REPLACEMENTS],
+            recent_song_keys=recent_song_keys,
+            previous_song_keys=previous_song_keys,
+            previous_track_ids=previous_track_ids,
+            validation_context=validation_context,
         )
     except Exception:
         # Provider errors can contain private prompt/response data. Do not log them.

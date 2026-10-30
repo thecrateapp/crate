@@ -2133,5 +2133,12 @@
   "player.mix.label": "Trantsizioa",
   "player.mix.gapless": "Etenik gabe",
   "player.mix.paused": "Pausatuta",
-  "player.mix.buffering": "Audioa kargatzen"
+  "player.mix.buffering": "Audioa kargatzen",
+  "paths.warnings.partial": "Ibilbide partziala",
+  "paths.warnings.partialDetail": "Eskatutako {requested} abestietatik {generated} baino ezin izan dira hautatu.",
+  "paths.warnings.incomplete": "Ezin izan da ibilbide hau eskatu bezala osatu.",
+  "paths.warnings.quality": "Trantsizio batzuk ez dira hain leunak edo askotarikoak izango.",
+  "paths.warnings.unavailable": "{count, plural, one {Gordetako abesti # ez dago erabilgarri eta saltatu egingo da.} other {Gordetako # abesti ez daude erabilgarri eta saltatu egingo dira.}}",
+  "paths.warnings.trackUnavailable": "Ez dago erabilgarri",
+  "paths.warnings.noneAvailable": "Gordetako abestietako bat ere ez dago erreproduzitzeko erabilgarri."
 }

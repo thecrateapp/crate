@@ -23,6 +23,41 @@ afterEach(() => {
   delete document.documentElement.dataset.crateMotion;
 });
 describe("path cover journey", () => {
+  it("keeps unavailable steps in roving focus but rejects pointer and keyboard playback", async () => {
+    const user = userEvent.setup();
+    const play = vi.fn();
+    renderJourney(
+      <PathCoverJourneyView
+        steps={steps
+          .slice(0, 3)
+          .map((step, index) => ({ ...step, playable: index !== 1 }))}
+        origin="A"
+        destination="B"
+        activeStep={0}
+        currentTrackKey="track-1"
+        onPlay={play}
+      />,
+    );
+
+    const unavailable = screen.getByRole("button", {
+      name: /^Play step 2: Track 2 by Coast/,
+    });
+    expect(unavailable).toHaveAttribute("aria-disabled", "true");
+    expect(unavailable).toHaveAccessibleName(/unavailable/i);
+    expect(stepButton(1)).not.toHaveAccessibleName(/unavailable/i);
+    fireEvent.click(unavailable);
+    expect(play).not.toHaveBeenCalled();
+    stepButton(1).focus();
+    await user.keyboard("{ArrowRight}");
+    expect(unavailable).toHaveFocus();
+    expect(unavailable).toHaveAttribute("tabindex", "0");
+    await user.keyboard("{Enter}");
+    expect(play).not.toHaveBeenCalled();
+    expect(screen.getByText("1 of 3")).toBeInTheDocument();
+    await user.keyboard("{ArrowRight}{Enter}");
+    expect(play).toHaveBeenCalledWith(2);
+    expect(screen.getByText("3 of 3")).toBeInTheDocument();
+  });
   it("follows actual track changes and ignores play/pause", () => {
     const view = (active: number, playing: boolean) => (
       <PathCoverJourneyView

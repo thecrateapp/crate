@@ -5,6 +5,30 @@ const apiBaseMock = vi.hoisted(() => vi.fn(() => "https://api.example"));
 vi.mock("@/lib/api", () => ({ api: apiMock, getApiBase: apiBaseMock }));
 
 describe("getPlaybackContinuationToken", () => {
+  it.each([
+    { shuffle: false, infinite: false },
+    { shuffle: false, infinite: true },
+    { shuffle: true, infinite: false },
+    { shuffle: true, infinite: true },
+  ])(
+    "keeps a saved path finite with continuation preferences %j",
+    async (preferences) => {
+      const { continuationDescriptor } = await load();
+      const { transitionSource } = await import("@/lib/smart-mix");
+      const source = {
+        type: "path" as const,
+        name: "Saved journey",
+        id: 77,
+        href: "/paths/77",
+      };
+
+      expect(continuationDescriptor(source, preferences)).toBeNull();
+      expect(transitionSource(source, preferences.shuffle)).toBe(
+        preferences.shuffle ? "shuffle" : "manual",
+      );
+      expect(apiMock).not.toHaveBeenCalled();
+    },
+  );
   afterEach(() => {
     vi.useRealTimers();
     vi.resetModules();
