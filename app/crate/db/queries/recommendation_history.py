@@ -14,31 +14,7 @@ from crate.recommendation_policy import (
 )
 
 _HISTORY_SQL = """
-    WITH requested_globals AS MATERIALIZED (
-        SELECT global_track_uid, local_track_id, local_track_entity_uid,
-               canonical_title, artist_name
-        FROM global_catalog_tracks
-        WHERE global_track_uid = ANY(CAST(:global_uids AS uuid[]))
-    ), candidate_tracks AS MATERIALIZED (
-        SELECT lt.artist, lt.title
-        FROM library_tracks lt
-        WHERE lt.id = ANY(CAST(:track_ids AS bigint[]))
-        UNION ALL
-        SELECT lt.artist, lt.title
-        FROM library_tracks lt
-        WHERE lt.entity_uid = ANY(CAST(:entity_uids AS uuid[]))
-        UNION ALL
-        SELECT lt.artist, lt.title
-        FROM requested_globals gct
-        JOIN library_tracks lt ON lt.id = gct.local_track_id
-        UNION ALL
-        SELECT lt.artist, lt.title
-        FROM requested_globals gct
-        JOIN library_tracks lt ON lt.entity_uid = gct.local_track_entity_uid
-        UNION ALL
-        SELECT gct.artist_name, gct.canonical_title
-        FROM requested_globals gct
-    ), significant_events AS MATERIALIZED (
+    WITH significant_events AS MATERIALIZED (
         SELECT track_id, track_entity_uid, global_track_uid,
                artist, title, ended_at, was_completed
         FROM user_play_events
@@ -60,6 +36,57 @@ _HISTORY_SQL = """
                   )
               )
           )
+    ), global_refs AS MATERIALIZED (
+        SELECT global_track_uid
+        FROM significant_events WHERE global_track_uid IS NOT NULL
+        UNION
+        SELECT UNNEST(CAST(:global_uids AS uuid[]))
+    ), catalog_globals AS MATERIALIZED (
+        SELECT global_track_uid, local_track_id, local_track_entity_uid,
+               canonical_title, artist_name
+        FROM global_catalog_tracks
+        WHERE global_track_uid = ANY(ARRAY(SELECT global_track_uid FROM global_refs))
+    ), requested_globals AS MATERIALIZED (
+        SELECT * FROM catalog_globals
+        WHERE global_track_uid = ANY(CAST(:global_uids AS uuid[]))
+    ), track_id_refs AS MATERIALIZED (
+        SELECT track_id FROM significant_events WHERE track_id IS NOT NULL
+        UNION
+        SELECT UNNEST(CAST(:track_ids AS bigint[]))
+        UNION
+        SELECT local_track_id FROM catalog_globals WHERE local_track_id IS NOT NULL
+    ), track_entity_refs AS MATERIALIZED (
+        SELECT track_entity_uid FROM significant_events WHERE track_entity_uid IS NOT NULL
+        UNION
+        SELECT UNNEST(CAST(:entity_uids AS uuid[]))
+        UNION
+        SELECT local_track_entity_uid FROM catalog_globals
+        WHERE local_track_entity_uid IS NOT NULL
+    ), catalog_by_id AS MATERIALIZED (
+        SELECT id, artist, title
+        FROM library_tracks
+        WHERE id = ANY(ARRAY(SELECT track_id FROM track_id_refs))
+    ), catalog_by_entity AS MATERIALIZED (
+        SELECT entity_uid, artist, title
+        FROM library_tracks
+        WHERE entity_uid = ANY(ARRAY(SELECT track_entity_uid FROM track_entity_refs))
+    ), candidate_tracks AS MATERIALIZED (
+        SELECT artist, title FROM catalog_by_id
+        WHERE id = ANY(CAST(:track_ids AS bigint[]))
+        UNION
+        SELECT artist, title FROM catalog_by_entity
+        WHERE entity_uid = ANY(CAST(:entity_uids AS uuid[]))
+        UNION
+        SELECT lt.artist, lt.title
+        FROM requested_globals gct
+        JOIN catalog_by_id lt ON lt.id = gct.local_track_id
+        UNION
+        SELECT lt.artist, lt.title
+        FROM requested_globals gct
+        JOIN catalog_by_entity lt ON lt.entity_uid = gct.local_track_entity_uid
+        UNION
+        SELECT gct.artist_name, gct.canonical_title
+        FROM requested_globals gct
     )
     SELECT 'candidate' AS row_kind, artist, title,
            NULL::timestamptz AS ended_at, FALSE AS was_completed
@@ -74,24 +101,12 @@ _HISTORY_SQL = """
                     NULLIF(gct.canonical_title, ''), e.title) AS title,
            e.ended_at, e.was_completed
     FROM significant_events e
-    LEFT JOIN LATERAL (
-        SELECT artist, title FROM library_tracks WHERE id = e.track_id LIMIT 1
-    ) by_id ON TRUE
-    LEFT JOIN LATERAL (
-        SELECT artist, title FROM library_tracks
-        WHERE entity_uid = e.track_entity_uid LIMIT 1
-    ) by_entity ON TRUE
-    LEFT JOIN LATERAL (
-        SELECT artist_name, canonical_title, local_track_entity_uid, local_track_id
-        FROM global_catalog_tracks WHERE global_track_uid = e.global_track_uid LIMIT 1
-    ) gct ON TRUE
-    LEFT JOIN LATERAL (
-        SELECT artist, title FROM library_tracks
-        WHERE entity_uid = gct.local_track_entity_uid LIMIT 1
-    ) global_by_entity ON TRUE
-    LEFT JOIN LATERAL (
-        SELECT artist, title FROM library_tracks WHERE id = gct.local_track_id LIMIT 1
-    ) global_by_id ON TRUE
+    LEFT JOIN catalog_by_id by_id ON by_id.id = e.track_id
+    LEFT JOIN catalog_by_entity by_entity ON by_entity.entity_uid = e.track_entity_uid
+    LEFT JOIN catalog_globals gct ON gct.global_track_uid = e.global_track_uid
+    LEFT JOIN catalog_by_entity global_by_entity
+      ON global_by_entity.entity_uid = gct.local_track_entity_uid
+    LEFT JOIN catalog_by_id global_by_id ON global_by_id.id = gct.local_track_id
 """
 
 
@@ -145,8 +160,9 @@ def history_for_candidates(
 ) -> dict[tuple[str, str], dict]:
     """Read significant event history, independent of listening projections.
 
-    Catalog references resolve in one batch. Event work is bounded by the user's
-    significant events in [since, now]: O(candidates + significant window events).
+    Catalog metadata resolves once per distinct ID/UUID in one batch. Event work
+    is bounded by the user's significant events in [since, now]:
+    O(candidates + significant window events).
     Matching uses the shared Python song identity so Unicode normalization and
     version families stay consistent. Pass None to preload radio's seven-day
     window before candidate retrieval, returning every significant song key in

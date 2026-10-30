@@ -365,3 +365,145 @@ def test_candidates_without_valid_ids_or_song_identity_do_not_query_events(monke
         "unknown",
     ]
     assert recommendation_history.history_for_candidates(1, refs, SINCE, now=NOW) == {}
+
+
+@pytest.fixture
+def repeated_history_catalog(pg_db):
+    songs = [
+        _seed_song(title=f"Work Song {index}", artist="History Work Artist")
+        for index in range(12)
+    ]
+    with transaction_scope() as session:
+        session.execute(
+            text("""
+                INSERT INTO library_tracks
+                    (entity_uid, artist, album, filename, title, path, duration)
+                SELECT md5('history-work-local-' || n)::uuid, 'Unrelated Artist',
+                       'Unrelated Album', n || '.flac', 'Unrelated Song ' || n,
+                       '/music/history-work/' || n || '.flac', 180
+                FROM generate_series(1, 8000) n
+            """)
+        )
+        session.execute(
+            text("""
+                INSERT INTO global_catalog_tracks
+                    (global_track_uid, global_artist_uid, canonical_title,
+                     normalized_title, artist_name)
+                SELECT md5('history-work-global-' || n)::uuid, source.global_artist_uid,
+                       'Unrelated Song ' || n, 'unrelated song ' || n, 'Unrelated Artist'
+                FROM generate_series(1, 8000) n
+                CROSS JOIN global_catalog_tracks source
+                WHERE source.global_track_uid = CAST(:global_uid AS uuid)
+            """),
+            {"global_uid": songs[0]["global_track_uid"]},
+        )
+        _events(
+            *[
+                {
+                    "track_id": song["id"],
+                    "track_entity_uid": song["entity_uid"],
+                    "global_track_uid": song["global_track_uid"],
+                    "artist": "Obsolete event artist",
+                    "title": "Obsolete event title",
+                    "ended_at": NOW - timedelta(minutes=repeat),
+                    "completed": repeat % 3 == 0,
+                }
+                for song in songs
+                for repeat in range(120)
+            ],
+            session=session,
+        )
+        for table in ("library_tracks", "global_catalog_tracks", "user_play_events"):
+            session.execute(text(f"ANALYZE {table}"))
+    return songs
+
+
+@pytest.mark.parametrize("preload_window", [False, True], ids=["candidates", "preload"])
+def test_history_catalog_work_is_bounded_by_distinct_references(
+    repeated_history_catalog, preload_window
+):
+    from crate.db.queries.recommendation_history import history_for_candidates
+
+    songs = repeated_history_catalog
+    captured = []
+
+    def capture(_conn, statement, _many, params, _options):
+        captured.append((statement, params))
+
+    with read_scope() as session:
+        connection = session.connection()
+        event.listen(connection, "before_execute", capture)
+        try:
+            result = history_for_candidates(
+                1, None if preload_window else songs, SINCE, now=NOW, session=session
+            )
+        finally:
+            event.remove(connection, "before_execute", capture)
+        assert len(captured) == 1
+        assert result == {
+            ("history work artist", f"work song {index}"): {
+                "last_significant_play_at": NOW,
+                "frequency": 120,
+                "completed": 40,
+            }
+            for index in range(len(songs))
+        }
+        statement, params = captured[0]
+        plan = session.execute(
+            text("EXPLAIN (ANALYZE, FORMAT JSON) " + str(statement)), params
+        ).scalar_one()[0]["Plan"]
+
+    scans = []
+    pending = [plan]
+    while pending:
+        node = pending.pop()
+        if node.get("Relation Name") in ("library_tracks", "global_catalog_tracks"):
+            scans.append(node)
+        pending.extend(node.get("Plans", []))
+    assert scans
+    catalog_work = sum(
+        max(
+            1,
+            node["Actual Rows"]
+            + node.get("Rows Removed by Filter", 0)
+            + node.get("Rows Removed by Index Recheck", 0),
+        )
+        * node["Actual Loops"]
+        for node in scans
+    )
+    # Several keyed access paths are allowed for each distinct ID/UID, not per play.
+    distinct_references = 3 * len(songs)
+    assert catalog_work <= 8 * distinct_references, [
+        (
+            node["Node Type"],
+            node["Relation Name"],
+            node["Actual Rows"],
+            node["Actual Loops"],
+        )
+        for node in scans
+    ]
+
+
+def test_catalog_precedence_preserves_unicode_and_version_families(pg_db):
+    from crate.db.queries.recommendation_history import history_for_candidates
+
+    song = _seed_song(artist="Björk", title="L’Été")
+    other = _seed_song(artist="Wrong Artist", title="Wrong Song")
+    _events(
+        {
+            "track_id": song["id"],
+            "track_entity_uid": other["entity_uid"],
+            "global_track_uid": other["global_track_uid"],
+            "artist": "Obsolete Artist",
+            "title": "Obsolete Song",
+        },
+        {"artist": "BJÖRK", "title": "L'Été (Live)", "completed": True},
+    )
+
+    assert history_for_candidates(1, [song], SINCE, now=NOW) == {
+        ("björk", "lété"): {
+            "last_significant_play_at": NOW - timedelta(days=1),
+            "frequency": 2,
+            "completed": 1,
+        }
+    }
