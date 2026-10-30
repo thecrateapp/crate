@@ -70,6 +70,19 @@ final class CrateMixPlayer extends ForwardingSimpleBasePlayer {
         if (playWhenReady && !commandInterceptor.beforePlay()) {
             return Futures.immediateVoidFuture();
         }
+        if (
+            playWhenReady &&
+            activePlayer.getPlaybackState() == Player.STATE_ENDED &&
+            activePlayer.getMediaItemCount() > 0
+        ) {
+            int index = activePlayer.getCurrentMediaItemIndex();
+            commandInterceptor.beforeSeek(
+                index,
+                0L,
+                Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM
+            );
+            activePlayer.seekTo(index, 0L);
+        }
         if (!playWhenReady) {
             commandInterceptor.beforePause();
         }
