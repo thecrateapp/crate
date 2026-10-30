@@ -412,10 +412,12 @@ def list_scene_path_candidates(
                         ) rel
                         GROUP BY LOWER(artist_name)
                     ),
-                    artist_primary_keys AS MATERIALIZED (
-                        SELECT name,
+                    path_performers AS MATERIALIZED (
+                        SELECT id, name, entity_uid, listeners, spotify_popularity,
+                               popularity_score, album_count, track_count,
+                               country, area, formed,
                                LOWER(BTRIM(REGEXP_REPLACE(
-                                   BTRIM(name, :path_artist_trim_chars),
+                                   BTRIM(NULLIF(name, ''), :path_artist_trim_chars),
                                    :path_artist_pattern, '', 'i'
                                ), :path_artist_trim_chars)) AS principal_artist_key
                         FROM library_artists
@@ -478,7 +480,7 @@ def list_scene_path_candidates(
                             COALESCE(uts_id.complete_play_count, uts_uid.complete_play_count, 0) AS user_complete_play_count,
                             (ult.track_id IS NOT NULL OR global_like.local_track_id IS NOT NULL) AS is_liked,
                             ROW_NUMBER() OVER (
-                                PARTITION BY am.genre_slug, COALESCE(primary_key.principal_artist_key, LOWER(BTRIM(REGEXP_REPLACE(
+                                PARTITION BY am.genre_slug, COALESCE(performer.principal_artist_key, LOWER(BTRIM(REGEXP_REPLACE(
                                     BTRIM(COALESCE(NULLIF(t.artist, ''), a.artist, ''), :path_artist_trim_chars),
                                     :path_artist_pattern, '', 'i'
                                 ), :path_artist_trim_chars)))
@@ -494,8 +496,7 @@ def list_scene_path_candidates(
                         JOIN library_artists ar ON ar.name = am.artist_name
                         JOIN library_albums a ON a.artist = am.artist_name
                         JOIN library_tracks t ON t.album_id = a.id
-                        LEFT JOIN library_artists performer ON performer.name = t.artist
-                        LEFT JOIN artist_primary_keys primary_key ON primary_key.name = NULLIF(t.artist, '')
+                        LEFT JOIN path_performers performer ON performer.name = t.artist
                         LEFT JOIN artist_relation_counts arc
                           ON arc.artist_name = LOWER(
                               CASE WHEN performer.id IS NULL THEN ar.name ELSE performer.name END
