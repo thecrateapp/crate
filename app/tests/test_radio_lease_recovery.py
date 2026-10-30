@@ -65,7 +65,6 @@ def _seed(store, **overrides):
         "user_id": 42,
         "track_count": 20,
         "batch_index": 0,
-        "revision": 1,
         "initial_target": [0.2, 0.8],
         "current_target": [0.2, 0.8],
         "liked_vectors": [],
@@ -83,7 +82,6 @@ def _cached(store, index):
         "status": "ok",
         "exhausted": False,
         "batch_index": index,
-        "revision": 1,
     }
     store.redis.setex(f"{store.key}:batch:{index}", 60, json.dumps(result))
     return result

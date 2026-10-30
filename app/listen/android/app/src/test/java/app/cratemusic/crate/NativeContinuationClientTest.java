@@ -298,20 +298,20 @@ public class NativeContinuationClientTest {
     public void retriesTheSameBatchIndexWithoutConsumingItOnAnHttpFailure() throws Exception {
         NativeContinuationClient.Config config = NativeContinuationClient.Config.fromJson(
             new JSONObject().put("token", "crv_token").put("apiBase", "https://api.example")
-                .put("sessionId", "radio-1").put("batchIndex", 4).put("revision", 1)
+                .put("sessionId", "radio-1").put("batchIndex", 4)
         );
         RecordingTransport transport = new RecordingTransport();
         NativeContinuationClient client = new NativeContinuationClient(transport);
         transport.response = new NativeContinuationClient.Response(503, "");
         assertEquals(NativeContinuationClient.Outcome.FAILED,
-            client.fetchContinuation(config, tracks, 10, 4, 1).outcome);
+            client.fetchContinuation(config, tracks, 10, 4).outcome);
         assertEquals(4, new JSONObject(transport.body).getInt("batchIndex"));
         transport.response = new NativeContinuationClient.Response(200,
             "{\"tracks\":[],\"plans\":[],\"status\":\"retryable_empty\","
-                + "\"sessionId\":\"radio-1\",\"batchIndex\":4,\"revision\":1}");
-        NativeContinuationClient.Continuation result = client.fetchContinuation(config, tracks, 10, 4, 1);
+                + "\"sessionId\":\"radio-1\",\"batchIndex\":4}");
+        NativeContinuationClient.Continuation result = client.fetchContinuation(config, tracks, 10, 4);
         assertEquals(4, new JSONObject(transport.body).getInt("batchIndex"));
-        assertEquals(1, new JSONObject(transport.body).getInt("revision"));
+        assertFalse(new JSONObject(transport.body).has("revision"));
         assertEquals(NativeContinuationClient.Outcome.PLANNED, result.outcome);
         assertEquals(4, result.batchIndex);
         assertEquals("radio-1", result.sessionId);
@@ -322,32 +322,32 @@ public class NativeContinuationClientTest {
     public void rejectsAResponseForAnotherSessionOrBatch() throws Exception {
         NativeContinuationClient.Config config = NativeContinuationClient.Config.fromJson(
             new JSONObject().put("token", "crv_token").put("apiBase", "https://api.example")
-                .put("sessionId", "radio-1").put("batchIndex", 4).put("revision", 1)
+                .put("sessionId", "radio-1").put("batchIndex", 4)
         );
         RecordingTransport transport = new RecordingTransport();
         NativeContinuationClient client = new NativeContinuationClient(transport);
         transport.response = new NativeContinuationClient.Response(200,
-            "{\"tracks\":[],\"plans\":[],\"batchIndex\":3,\"revision\":1}");
+            "{\"tracks\":[],\"plans\":[],\"batchIndex\":3}");
         assertEquals(NativeContinuationClient.Outcome.FAILED,
-            client.fetchContinuation(config, tracks, 10, 4, 1).outcome);
+            client.fetchContinuation(config, tracks, 10, 4).outcome);
         transport.response = new NativeContinuationClient.Response(200,
-            "{\"tracks\":[],\"plans\":[],\"batchIndex\":4,\"sessionId\":\"radio-2\",\"revision\":1}");
+            "{\"tracks\":[],\"plans\":[],\"batchIndex\":4,\"sessionId\":\"radio-2\"}");
         assertEquals(NativeContinuationClient.Outcome.FAILED,
-            client.fetchContinuation(config, tracks, 10, 4, 1).outcome);
+            client.fetchContinuation(config, tracks, 10, 4).outcome);
     }
 
     @Test
     public void acceptsTheServerCursorWhenHandoffRequestsAnOutOfOrderBatch() throws Exception {
         NativeContinuationClient.Config config = NativeContinuationClient.Config.fromJson(
             new JSONObject().put("token", "crv_token").put("apiBase", "https://api.example")
-                .put("sessionId", "radio-1").put("batchIndex", 4).put("revision", 1)
+                .put("sessionId", "radio-1").put("batchIndex", 4)
         );
         RecordingTransport transport = new RecordingTransport();
         transport.response = new NativeContinuationClient.Response(200,
             "{\"tracks\":[],\"plans\":[],\"status\":\"retryable_empty\","
-                + "\"sessionId\":\"radio-1\",\"batchIndex\":2,\"revision\":1}");
+                + "\"sessionId\":\"radio-1\",\"batchIndex\":2}");
         NativeContinuationClient.Continuation result = new NativeContinuationClient(transport)
-            .fetchContinuation(config, tracks, 10, 4, 1);
+            .fetchContinuation(config, tracks, 10, 4);
         assertEquals(NativeContinuationClient.Outcome.PLANNED, result.outcome);
         assertEquals(2, result.batchIndex);
     }
@@ -379,19 +379,46 @@ public class NativeContinuationClientTest {
     @Test
     public void onlyAnAuthoritativeServerCursorCanRewindTheNativeBatch() throws Exception {
         JSONObject payload = new JSONObject().put("token", "crv_token")
-            .put("sessionId", "session-1").put("batchIndex", 6).put("revision", 1);
+            .put("sessionId", "session-1").put("batchIndex", 6);
         NativeContinuationClient.Config ordinary = NativeContinuationClient.Config.fromJson(payload);
-        assertEquals(10, ordinary.nextBatchIndex("session-1", 1, 10));
+        assertEquals(10, ordinary.nextBatchIndex("session-1", 10));
         NativeContinuationClient.Config authoritative = NativeContinuationClient.Config.fromJson(
             payload.put("authoritativeCursor", true)
         );
-        int next = authoritative.nextBatchIndex("session-1", 1, 10);
+        int next = authoritative.nextBatchIndex("session-1", 10);
         assertEquals(6, next);
-        JSONObject body = NativeContinuationClient.continuationBody(authoritative, tracks, 10, next, 1);
+        JSONObject body = NativeContinuationClient.continuationBody(authoritative, tracks, 10, next);
         assertEquals(6, body.getInt("batchIndex"));
         assertFalse(body.has("authoritativeCursor"));
-        assertEquals(6, ordinary.nextBatchIndex("another-session", 1, 10));
-        assertEquals(6, ordinary.nextBatchIndex("session-1", 2, 10));
+        assertEquals(6, ordinary.nextBatchIndex("another-session", 10));
+    }
+
+    @Test
+    public void revisionRemovalDoesNotSendAnObsoleteNumericRevision() throws Exception {
+        NativeContinuationClient.Config config = NativeContinuationClient.Config.fromJson(
+            new JSONObject().put("token", "crv_token").put("apiBase", "https://api.example")
+                .put("sessionId", "session-1").put("batchIndex", 4).put("revision", 99)
+        );
+
+        JSONObject body = NativeContinuationClient.continuationBody(config, tracks, 10, 4);
+
+        assertEquals(4, body.getInt("batchIndex"));
+        assertEquals("uid-5", body.getString("afterTrackEntityUid"));
+        assertFalse(body.has("revision"));
+    }
+
+    @Test
+    public void revisionRemovalKeepsTheSameSessionMonotonicDespiteAnObsoleteExtra() throws Exception {
+        JSONObject payload = new JSONObject().put("token", "crv_token")
+            .put("sessionId", "session-1").put("batchIndex", 6).put("revision", 99);
+        NativeContinuationClient.Config ordinary = NativeContinuationClient.Config.fromJson(payload);
+        assertEquals(10, ordinary.nextBatchIndex("session-1", 10));
+        assertEquals(6, ordinary.nextBatchIndex("new-session", 10));
+
+        NativeContinuationClient.Config authoritative = NativeContinuationClient.Config.fromJson(
+            payload.put("authoritativeCursor", true)
+        );
+        assertEquals(6, authoritative.nextBatchIndex("session-1", 10));
     }
 
     @Test

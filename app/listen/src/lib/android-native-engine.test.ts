@@ -1007,7 +1007,6 @@ describe("android native engine flags", () => {
         kind: "shaped_radio" as const,
         sessionId: "session-1",
         batchIndex: 4,
-        revision: 1,
       };
       await engine.setContinuationContext({ ...context, descriptor });
       expect(nativePlaybackMock.setContinuation).toHaveBeenLastCalledWith(
@@ -1015,7 +1014,6 @@ describe("android native engine flags", () => {
           refill: true,
           sessionId: "session-1",
           batchIndex: 4,
-          revision: 1,
         }),
       );
       nativePlaybackMock.setRepeat.mockResolvedValue(state);
@@ -1028,6 +1026,123 @@ describe("android native engine flags", () => {
         expect.objectContaining({ refill: true }),
       );
       expect(nativePlaybackMock.setQueue).toHaveBeenCalledTimes(1);
+    });
+
+    it("revision removal: configures native refill without a numeric session revision", async () => {
+      const engine = await loadQueue(0);
+      await engine.setContinuationContext({
+        ...context,
+        descriptor: {
+          kind: "shaped_radio",
+          sessionId: "session-1",
+          batchIndex: 2,
+        },
+      });
+
+      expect(nativePlaybackMock.setContinuation).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          sessionId: "session-1",
+          batchIndex: 2,
+          refill: true,
+        }),
+      );
+      expect(
+        nativePlaybackMock.setContinuation.mock.calls[
+          nativePlaybackMock.setContinuation.mock.calls.length - 1
+        ]?.[0],
+      ).not.toHaveProperty("revision");
+      expect(nativePlaybackMock.setQueue.mock.calls[0]?.[0].revision).toBe(
+        "queue-rev-1",
+      );
+    });
+
+    it("revision removal: adopts a same-session native cursor while preserving the string queue guard", async () => {
+      const engine = await loadQueue(0);
+      await engine.setContinuationContext({
+        ...context,
+        descriptor: {
+          kind: "shaped_radio",
+          sessionId: "session-1",
+          batchIndex: 2,
+        },
+      });
+      const entry = {
+        sequence: 3,
+        id: "uid-9",
+        entityUid: "uid-9",
+        durationMs: 180000,
+        source: { entity_uid: "uid-9" },
+      };
+      nativePlaybackMock.getAppendedTracks.mockResolvedValueOnce({
+        revision: state.revision,
+        continuationSessionId: "session-1",
+        continuationBatchIndex: 6,
+        continuationRevision: 99,
+        tracks: [entry],
+      });
+
+      expect(await engine.takeAppendedTracks()).toEqual([entry]);
+      expect(engine.getContinuationCursor()).toEqual({
+        sessionId: "session-1",
+        batchIndex: 6,
+      });
+      nativePlaybackMock.getAppendedTracks.mockResolvedValueOnce({
+        revision: "old-queue",
+        continuationSessionId: "session-1",
+        continuationBatchIndex: 9,
+        tracks: [entry],
+      });
+      expect(await engine.takeAppendedTracks()).toEqual([]);
+      expect(engine.getContinuationCursor()).toEqual({
+        sessionId: "session-1",
+        batchIndex: 6,
+      });
+      expect(nativePlaybackMock.getAppendedTracks).toHaveBeenLastCalledWith({
+        revision: state.revision,
+        afterSequence: 3,
+      });
+    });
+
+    it("revision removal: only an authoritative cursor can rewind the same native session", async () => {
+      const engine = await loadQueue(0);
+      await engine.setContinuationContext({
+        ...context,
+        descriptor: {
+          kind: "shaped_radio",
+          sessionId: "session-1",
+          batchIndex: 2,
+        },
+      });
+      await engine.setContinuationCursor(
+        JSON.parse('{"sessionId":"session-1","batchIndex":10,"revision":1}'),
+      );
+      await engine.setContinuationCursor(
+        JSON.parse('{"sessionId":"session-1","batchIndex":6,"revision":99}'),
+      );
+      expect(engine.getContinuationCursor()).toEqual({
+        sessionId: "session-1",
+        batchIndex: 10,
+      });
+      await engine.setContinuationCursor(
+        JSON.parse('{"sessionId":"session-1","batchIndex":6,"revision":99}'),
+        true,
+      );
+      expect(engine.getContinuationCursor()).toEqual({
+        sessionId: "session-1",
+        batchIndex: 6,
+      });
+      expect(nativePlaybackMock.setContinuation).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          sessionId: "session-1",
+          batchIndex: 6,
+          authoritativeCursor: true,
+        }),
+      );
+      expect(
+        nativePlaybackMock.setContinuation.mock.calls[
+          nativePlaybackMock.setContinuation.mock.calls.length - 1
+        ]?.[0],
+      ).not.toHaveProperty("revision");
     });
 
     it("owns background refill only after a usable native configuration is installed", async () => {
@@ -1066,7 +1181,6 @@ describe("android native engine flags", () => {
           kind: "shaped_radio",
           sessionId: "session-1",
           batchIndex: 2,
-          revision: 1,
         },
       });
       nativePlaybackMock.getAppendedTracks.mockResolvedValue({
@@ -1074,13 +1188,11 @@ describe("android native engine flags", () => {
         tracks: [],
         continuationSessionId: "session-1",
         continuationBatchIndex: 6,
-        continuationRevision: 1,
       });
       expect(await engine.takeAppendedTracks()).toEqual([]);
       expect(engine.getContinuationCursor()).toEqual({
         sessionId: "session-1",
         batchIndex: 6,
-        revision: 1,
       });
       await engine.setContinuationContext({
         ...context,
@@ -1088,7 +1200,6 @@ describe("android native engine flags", () => {
           kind: "shaped_radio",
           sessionId: "session-1",
           batchIndex: 2,
-          revision: 1,
         },
       });
       expect(nativePlaybackMock.setContinuation).toHaveBeenLastCalledWith(
@@ -1106,34 +1217,29 @@ describe("android native engine flags", () => {
           seedId: "42",
           sessionId: "session-1",
           batchIndex: 0,
-          revision: 1,
         },
       });
       for (const batchIndex of [1, 2]) {
         await engine.setContinuationCursor({
           sessionId: "session-1",
           batchIndex,
-          revision: 1,
         });
         nativePlaybackMock.getAppendedTracks.mockResolvedValue({
           revision: state.revision,
           tracks: [],
           continuationSessionId: "session-1",
           continuationBatchIndex: 0,
-          continuationRevision: 1,
         });
         await engine.takeAppendedTracks();
         expect(engine.getContinuationCursor()).toEqual({
           sessionId: "session-1",
           batchIndex,
-          revision: 1,
         });
       }
       expect(nativePlaybackMock.setContinuation).toHaveBeenLastCalledWith(
         expect.objectContaining({
           sessionId: "session-1",
           batchIndex: 2,
-          revision: 1,
           refill: true,
         }),
       );
@@ -1150,16 +1256,14 @@ describe("android native engine flags", () => {
           seedId: "42",
           sessionId: "session-1",
           batchIndex: 10,
-          revision: 1,
         },
       });
       await engine.setContinuationCursor({
         sessionId: "session-1",
         batchIndex: 10,
-        revision: 1,
       });
       await engine.setContinuationCursor(
-        { sessionId: "session-1", batchIndex: 6, revision: 1 },
+        { sessionId: "session-1", batchIndex: 6 },
         true,
       );
       nativePlaybackMock.getAppendedTracks.mockResolvedValue({
@@ -1167,19 +1271,16 @@ describe("android native engine flags", () => {
         tracks: [],
         continuationSessionId: "session-1",
         continuationBatchIndex: 6,
-        continuationRevision: 1,
       });
       await engine.takeAppendedTracks();
       expect(engine.getContinuationCursor()).toEqual({
         sessionId: "session-1",
         batchIndex: 6,
-        revision: 1,
       });
       expect(nativePlaybackMock.setContinuation).toHaveBeenLastCalledWith(
         expect.objectContaining({
           sessionId: "session-1",
           batchIndex: 6,
-          revision: 1,
           authoritativeCursor: true,
         }),
       );

@@ -95,7 +95,6 @@ type CrateNativePlaybackPlugin = {
           refill: boolean;
           sessionId?: string;
           batchIndex?: number;
-          revision?: number;
           authoritativeCursor?: boolean;
         },
   ): Promise<void>;
@@ -107,7 +106,6 @@ type CrateNativePlaybackPlugin = {
     tracks?: EngineAppendedTrack[];
     continuationSessionId?: string;
     continuationBatchIndex?: number;
-    continuationRevision?: number;
   }>;
   appendTracks(options: {
     revision: string;
@@ -274,7 +272,6 @@ export class AndroidNativeEngine implements PlaybackEngine {
   private continuationCursor: {
     sessionId: string;
     batchIndex: number;
-    revision: number;
   } | null = null;
   private readonly clearContinuationAuthorization = () => {
     this.queueGeneration += 1;
@@ -492,13 +489,6 @@ export class AndroidNativeEngine implements PlaybackEngine {
       return [];
     }
     const descriptor = this.continuationContext?.descriptor;
-    const cursorRevision = result.continuationRevision ?? 1;
-    if (
-      descriptor?.sessionId &&
-      result.continuationSessionId === descriptor.sessionId &&
-      cursorRevision !== (descriptor.revision ?? 1)
-    )
-      return [];
     if (
       descriptor?.sessionId &&
       result.continuationSessionId === descriptor.sessionId &&
@@ -508,14 +498,10 @@ export class AndroidNativeEngine implements PlaybackEngine {
       this.continuationCursor = {
         sessionId: descriptor.sessionId,
         batchIndex: Math.max(
-          known?.sessionId === descriptor.sessionId &&
-            known.revision === cursorRevision
-            ? known.batchIndex
-            : 0,
+          known?.sessionId === descriptor.sessionId ? known.batchIndex : 0,
           descriptor.batchIndex ?? (descriptor.kind === "shaped_radio" ? 1 : 0),
           result.continuationBatchIndex,
         ),
-        revision: cursorRevision,
       };
     }
     const tracks = result.tracks ?? [];
@@ -538,7 +524,7 @@ export class AndroidNativeEngine implements PlaybackEngine {
   }
 
   async setContinuationCursor(
-    cursor: { sessionId: string; batchIndex: number; revision: number },
+    cursor: { sessionId: string; batchIndex: number },
     authoritative = false,
   ): Promise<void> {
     const context = this.continuationContext;
@@ -548,17 +534,15 @@ export class AndroidNativeEngine implements PlaybackEngine {
     )
       return;
     const known = this.continuationCursor;
-    const sameRevision =
-      known?.sessionId === cursor.sessionId &&
-      known.revision === cursor.revision;
+    const sameSession = known?.sessionId === cursor.sessionId;
     const batchIndex =
-      !authoritative && sameRevision
+      !authoritative && sameSession
         ? Math.max(known.batchIndex, cursor.batchIndex)
         : cursor.batchIndex;
-    this.continuationCursor = { ...cursor, batchIndex };
+    this.continuationCursor = { sessionId: cursor.sessionId, batchIndex };
     this.continuationContext = {
       ...context,
-      descriptor: { ...context.descriptor, ...cursor, batchIndex },
+      descriptor: { ...context.descriptor, ...this.continuationCursor },
     };
     await this.configureContinuation(authoritative);
   }
@@ -640,7 +624,6 @@ export class AndroidNativeEngine implements PlaybackEngine {
                 descriptor.batchIndex ??
                   (descriptor.kind === "shaped_radio" ? 1 : 0),
               ),
-              revision: cursor?.revision ?? descriptor.revision ?? 1,
             }
           : {}),
       });

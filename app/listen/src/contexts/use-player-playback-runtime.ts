@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { notify } from "@crate/ui/lib/notify";
 import {
   androidNativeEngine,
   shouldUseAndroidNativePlayer,
@@ -36,6 +38,7 @@ export function usePlayerPlaybackRuntime({
   connectEnabled: boolean;
   runtime: PlayerPlaybackRuntimeState;
 }) {
+  const { t } = useTranslation();
   const {
     queue,
     currentIndex,
@@ -262,6 +265,8 @@ export function usePlayerPlaybackRuntime({
     smartPlaylistSuggestionsCadence,
     recentlyPlayed,
     actions: {
+      onUnavailable: () =>
+        notify.info(t("player.toasts.continuationUnavailable")),
       synchronizeContinuation: adoptNativeAppendedTracks,
       publishContinuationCursor: (source, authoritative) => {
         const radio = source.radio;
@@ -276,7 +281,6 @@ export function usePlayerPlaybackRuntime({
           {
             sessionId: radio.continuationSessionId,
             batchIndex: radio.continuationBatchIndex ?? 0,
-            revision: radio.continuationRevision ?? 1,
           },
           authoritative,
         );

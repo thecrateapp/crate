@@ -51,7 +51,6 @@ def _empty(session_id: str, status: str = "exhausted", **extra) -> dict:
         "tracks": [],
         "status": status,
         "exhausted": status == "exhausted",
-        "revision": 1,
         **extra,
     }
 
@@ -73,14 +72,12 @@ def _recover_batch(session_id: str, user_id: int, index: int) -> dict:
         session_id,
         "retryable_empty",
         batch_index=int(session.get("batch_index", 0)),
-        revision=session.get("revision", 1),
     )
 
 
 def _commit(session: dict, result: dict, index: int, lease) -> dict:
     result = {
         **result,
-        "revision": session.get("revision", 1),
         "batch_index": index,
         "exhausted": bool(result.get("exhausted")),
     }
@@ -135,7 +132,6 @@ def start_batch(
                     session_id,
                     "retryable_empty",
                     batch_index=int(session.get("batch_index", 0)),
-                    revision=session.get("revision", 1),
                 )
             if engine._redis().get(f"{engine._session_key(session_id)}:started"):
                 return _empty(session_id)
@@ -151,7 +147,6 @@ def start_batch(
             if not created:
                 return _empty(session_id)
             session, result = created
-            session["revision"] = 1
             return _commit(session, result, 0, lease)
     except RadioLeaseLost:
         return _recover_batch(session_id, user_id, 0)
@@ -162,7 +157,6 @@ def next_batch(
     *,
     user_id: int,
     batch_index: int,
-    revision: int = 1,
     count: int = 20,
     buffer_refs: list[str] | None = None,
 ) -> dict:
@@ -172,11 +166,7 @@ def next_batch(
     try:
         with session_lock(session_id) as lease:
             session = engine._load_session(session_id)
-            if (
-                not session
-                or session["user_id"] != user_id
-                or revision != session.get("revision", 1)
-            ):
+            if not session or session["user_id"] != user_id:
                 return _empty(session_id)
             cached = engine._redis().get(
                 f"{engine._session_key(session_id)}:batch:{batch_index}"

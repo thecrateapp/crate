@@ -13,6 +13,7 @@ export const SMART_PLAYLIST_SUGGESTION_BATCH_SIZE = 12;
  * state mutations and only exposes domain primitives.
  */
 export interface PlaybackIntelligenceActions {
+  onUnavailable?: () => void;
   synchronizeContinuation?: () => Promise<void>;
   publishContinuationCursor?: (
     source: PlaySource,
@@ -45,6 +46,10 @@ export interface PlaybackQueueReadiness {
   ready: boolean;
   generation: number;
   resumePending?: () => void | Promise<boolean>;
+}
+
+export interface PlaybackResumeOptions {
+  userGesture?: boolean;
 }
 
 export interface PlaybackIntelligenceOptions {

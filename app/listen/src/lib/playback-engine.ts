@@ -75,7 +75,6 @@ export type EngineContinuationDescriptor =
       kind: "shaped_radio";
       sessionId: string;
       batchIndex?: number;
-      revision?: number;
     }
   | {
       kind: "seeded_radio";
@@ -83,7 +82,6 @@ export type EngineContinuationDescriptor =
       seedId: string;
       sessionId?: string;
       batchIndex?: number;
-      revision?: number;
     };
 
 export interface EngineContinuationContext {

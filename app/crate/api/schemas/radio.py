@@ -102,7 +102,6 @@ class RadioNextRequest(BaseModel):
     session_id: UUID
     count: int = Field(default=20, ge=1, le=50)
     batch_index: int | None = Field(default=None, ge=1)
-    revision: int = Field(default=1, ge=1)
     buffer_refs: list[str] = Field(default_factory=list, max_length=200)
 
 
@@ -111,7 +110,6 @@ class RadioBatchResponse(BaseModel):
     tracks: list[RadioTrack]
     mode: str | None = None
     seed_label: str | None = None
-    revision: int = 1
     batch_index: int | None = None
     status: Literal["ok", "retryable_empty", "exhausted", "auth_required"] = "ok"
     exhausted: bool = False

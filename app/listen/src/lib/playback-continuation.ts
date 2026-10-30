@@ -70,7 +70,6 @@ export function continuationDescriptor(
   const cursor = {
     sessionId,
     batchIndex: radio.continuationBatchIndex,
-    revision: radio.continuationRevision,
   };
   if (source.type === "radio") {
     if (radio.shapedSessionId) {

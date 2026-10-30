@@ -1371,6 +1371,7 @@
   "actions.playlist.toasts.removedFromLibrary": "Rimossa dalla tua libreria",
   "player.loading": "Caricamento player...",
   "player.toasts.updateLikedTracksFailed": "Impossibile aggiornare i brani preferiti",
+  "player.toasts.continuationUnavailable": "Impossibile continuare la riproduzione. Premi Riproduci per riprovare.",
   "player.queue.nothingQueued": "Nessun brano in coda",
   "player.lyrics.loading": "Caricamento testo...",
   "player.lyrics.unavailable": "Testo non disponibile",

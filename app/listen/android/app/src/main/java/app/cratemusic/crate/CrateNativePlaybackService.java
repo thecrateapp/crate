@@ -116,7 +116,6 @@ public class CrateNativePlaybackService extends MediaSessionService {
     private final Runnable endedPlaybackTimeout = this::settleEndedPlayback;
     private String refillSessionId = "";
     private int refillBatchIndex;
-    private int refillRevision = 1;
     private static final int REFILL_BATCH = 10;
     private static final int MAX_APPENDED_LOG = 200;
     private final List<JSObject> appendedLog = new ArrayList<>();
@@ -1410,9 +1409,8 @@ public class CrateNativePlaybackService extends MediaSessionService {
     ) {
         cancelContinuationRequests();
         if (config != null) {
-            refillBatchIndex = config.nextBatchIndex(refillSessionId, refillRevision, refillBatchIndex);
+            refillBatchIndex = config.nextBatchIndex(refillSessionId, refillBatchIndex);
             refillSessionId = config.sessionId;
-            refillRevision = config.revision;
         }
         continuationConfig = config;
         settleEndedPlayback();
@@ -1512,12 +1510,11 @@ public class CrateNativePlaybackService extends MediaSessionService {
         List<NativeTrack> queue = queueState.snapshot();
         long generation = refillPolicy.generation();
         int batchIndex = refillBatchIndex;
-        int batchRevision = refillRevision;
         int activeIndex = Math.max(0, player.getCurrentMediaItemIndex());
         continuationExecutor.execute(() -> {
             NativeContinuationClient.Continuation result = continuationClient.fetchContinuation(
                 config, queue.subList(Math.min(activeIndex, queue.size()), queue.size()),
-                REFILL_BATCH, batchIndex, batchRevision
+                REFILL_BATCH, batchIndex
             );
             mainHandler.post(() -> applyRefill(revision, generation, batchIndex, result));
         });
@@ -1544,7 +1541,6 @@ public class CrateNativePlaybackService extends MediaSessionService {
         }
         refillBatchIndex = result.batchIndex >= 0 || "retryable_empty".equals(result.status)
             ? result.batchIndex + 1 : batchIndex + 1;
-        refillRevision = result.revision;
         if (result.tracks.isEmpty()) {
             if (result.exhausted) {
                 refillPolicy.onExhausted();
@@ -1627,7 +1623,6 @@ public class CrateNativePlaybackService extends MediaSessionService {
         if (revision != null && revision.equals(queueState.revision()) && !refillSessionId.isEmpty()) {
             result.put("continuationSessionId", refillSessionId);
             result.put("continuationBatchIndex", refillBatchIndex);
-            result.put("continuationRevision", refillRevision);
         }
         return result;
     }

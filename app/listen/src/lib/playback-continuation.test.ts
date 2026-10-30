@@ -115,7 +115,6 @@ describe("getPlaybackContinuationToken", () => {
       kind: "shaped_radio",
       sessionId: "radio-1",
       batchIndex: 1,
-      revision: 1,
     });
     expect(
       continuationDescriptor(
@@ -133,7 +132,6 @@ describe("getPlaybackContinuationToken", () => {
         seedId: "uid-4",
         sessionId: expect.any(String),
         batchIndex: 0,
-        revision: 1,
       }),
     );
     expect(
@@ -152,7 +150,6 @@ describe("getPlaybackContinuationToken", () => {
         seedId: "7",
         sessionId: expect.any(String),
         batchIndex: 0,
-        revision: 1,
       }),
     );
     expect(
@@ -217,7 +214,6 @@ it("reuses a token while its indexed cursor advances and can explicitly revoke t
     kind: "shaped_radio" as const,
     sessionId: "s",
     batchIndex: 1,
-    revision: 1,
   };
   await getPlaybackContinuationToken(descriptor);
   await getPlaybackContinuationToken({ ...descriptor, batchIndex: 2 });
@@ -243,4 +239,34 @@ it("rejects a late token response after logout invalidates authorization", async
   invalidatePlaybackContinuationToken();
   complete({ token: "crv_old", expiresAt: "2099-01-01T00:00:00Z" });
   await expect(pending).rejects.toThrow("authorization changed");
+});
+
+it("revision removal: describes and authorizes continuation without a numeric revision", async () => {
+  vi.resetModules();
+  apiMock.mockReset();
+  apiMock.mockResolvedValue({
+    token: "crv_cursor",
+    expiresAt: "2099-01-01T00:00:00Z",
+  });
+  const { continuationDescriptor, getPlaybackContinuationToken } = await import(
+    "./playback-continuation"
+  );
+  const descriptor = continuationDescriptor(
+    {
+      type: "radio",
+      name: "Radio",
+      radio: { seedType: "track", seedId: 7, shapedSessionId: "session" },
+    },
+    { shuffle: false, infinite: true },
+  );
+
+  await getPlaybackContinuationToken(descriptor);
+
+  expect(descriptor).toEqual({
+    kind: "shaped_radio",
+    sessionId: "session",
+    batchIndex: 1,
+  });
+  expect(apiMock.mock.calls[0]?.[2]).toEqual({ descriptor });
+  expect(apiMock.mock.calls[0]?.[2].descriptor).not.toHaveProperty("revision");
 });

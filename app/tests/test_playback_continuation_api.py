@@ -131,7 +131,6 @@ def test_continuation_without_descriptor_is_exhausted(test_app, monkeypatch):
         "plans": [],
         "exhausted": True,
         "status": "exhausted",
-        "revision": 1,
     }
 
 
@@ -386,7 +385,6 @@ def test_indexed_native_request_uses_buffer_tail_and_preserves_empty_status(
             "status": "retryable_empty",
             "session_id": "s",
             "batch_index": 0,
-            "revision": 1,
         }
 
     monkeypatch.setattr(radio, "indexed_continuation_batch", indexed)

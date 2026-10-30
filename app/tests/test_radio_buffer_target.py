@@ -11,7 +11,7 @@ from crate.db.queries import radio_continuation as context_queries
 
 def _session(**overrides):
     return {
-        "id": "buffer-session",
+        "id": "33333333-3333-4333-8333-333333333333",
         "user_id": 42,
         "seed_type": "track",
         "seed_vector": [0.5, 0.5],
@@ -96,7 +96,9 @@ def test_like_target_survives_next_batch_with_pending_buffer(monkeypatch):
     redis = MemoryRedis()
     monkeypatch.setattr(radio_engine, "_redis", lambda: redis)
     session = _session(current_target=[0.2, 0.8], liked_vectors=[])
-    redis.setex("radio:session:buffer-session", 86400, json.dumps(session))
+    redis.setex(
+        "radio:session:33333333-3333-4333-8333-333333333333", 86400, json.dumps(session)
+    )
     monkeypatch.setattr(
         radio_engine, "get_track_bliss_vector", lambda _track_id: [0.9, 0.1]
     )
@@ -114,18 +116,24 @@ def test_like_target_survives_next_batch_with_pending_buffer(monkeypatch):
 
     monkeypatch.setattr(radio_engine, "_generate_batch", generate)
 
-    feedback = radio_engine.radio_feedback("buffer-session", 7, "like")
-    shaped = json.loads(redis.get("radio:session:buffer-session"))
+    feedback = radio_engine.radio_feedback(
+        "33333333-3333-4333-8333-333333333333", 7, "like"
+    )
+    shaped = json.loads(redis.get("radio:session:33333333-3333-4333-8333-333333333333"))
     assert feedback["effect"] == "target_shifted"
     assert shaped["current_target"] == pytest.approx([0.256, 0.744])
 
     result = next_batch(
-        "buffer-session", user_id=42, batch_index=1, count=1, buffer_refs=["8"]
+        "33333333-3333-4333-8333-333333333333",
+        user_id=42,
+        batch_index=1,
+        count=1,
+        buffer_refs=["8"],
     )
 
     assert result["status"] == "ok"
     assert received_sessions[0]["current_target"] == pytest.approx([0.2304, 0.7696])
-    saved = json.loads(redis.get("radio:session:buffer-session"))
+    saved = json.loads(redis.get("radio:session:33333333-3333-4333-8333-333333333333"))
     assert saved["current_target"] == pytest.approx([0.2304, 0.7696])
     assert saved["liked_vectors"] == [[0.9, 0.1]]
     assert saved["seed_vector"] == [0.5, 0.5]

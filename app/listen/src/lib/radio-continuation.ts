@@ -6,7 +6,6 @@ export interface ContinuationBatch {
   tracks: Track[];
   status: "ok" | "retryable_empty" | "exhausted" | "auth_required";
   batchIndex: number | undefined;
-  revision: number;
 }
 
 function sessionUuid(): string {
@@ -28,7 +27,6 @@ export function ensureContinuationSession(source: PlaySource): string | null {
   if (!radio) return null;
   radio.continuationSessionId ??= radio.shapedSessionId ?? sessionUuid();
   radio.continuationBatchIndex ??= radio.shapedSessionId ? 1 : 0;
-  radio.continuationRevision ??= 1;
   return radio.continuationSessionId;
 }
 
@@ -53,7 +51,6 @@ export async function fetchContinuationBatch(
     tracks: ShapedRadioTrack[];
     status: ContinuationBatch["status"];
     batch_index?: number;
-    revision: number;
   }>(
     index === 0 ? "/api/radio/start" : "/api/radio/next",
     "POST",
@@ -72,7 +69,7 @@ export async function fetchContinuationBatch(
               radio.seedEntityUid ?? radio.seedId ?? radio.seedPath ?? "",
             ),
           }
-        : { batch_index: index, revision: radio.continuationRevision ?? 1 }),
+        : { batch_index: index }),
     },
     { signal },
   );
@@ -80,7 +77,6 @@ export async function fetchContinuationBatch(
     tracks: data.tracks.map(toShapedRadioTrack),
     status: data.status,
     batchIndex: data.batch_index,
-    revision: data.revision,
   };
 }
 
@@ -89,6 +85,9 @@ export function acknowledgeContinuationBatch(
   batch: ContinuationBatch,
 ): void {
   if (!source.radio || batch.batchIndex === undefined) return;
-  source.radio.continuationBatchIndex = batch.batchIndex + 1;
-  source.radio.continuationRevision = batch.revision;
+  const nextIndex = batch.batchIndex + 1;
+  source.radio.continuationBatchIndex =
+    batch.status === "retryable_empty"
+      ? nextIndex
+      : Math.max(source.radio.continuationBatchIndex ?? 0, nextIndex);
 }

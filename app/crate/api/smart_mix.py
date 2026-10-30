@@ -216,7 +216,6 @@ def playback_continuation(
                 ),
             ],
             batch_index=payload.batch_index,
-            revision=payload.revision,
         )
         rows, exhausted = batch["tracks"], batch["exhausted"]
     else:
@@ -270,7 +269,6 @@ def playback_continuation(
         ),
         sessionId=batch["session_id"] if batch else None,
         batchIndex=batch.get("batch_index") if batch else None,
-        revision=batch["revision"] if batch else 1,
     )
 
 

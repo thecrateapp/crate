@@ -10,19 +10,21 @@ cross-session rotation are outside this change.
 - `POST /api/radio/start` accepts an optional client-generated UUID `session_id`,
   a bounded `count` and `buffer_refs` in playback order. Its first batch is zero.
 - `POST /api/radio/next` requires a UUID `session_id` and accepts an optional
-  `batch_index` and `revision`. UUIDs are normalized before session lookup;
+  `batch_index`. UUIDs are normalized before session lookup;
   malformed IDs receive HTTP 422. Existing sessions started without an index
   begin continuation at batch one.
-- Indexed responses preserve tracks and add `status`, `revision` and
+- Indexed responses preserve tracks and add `status` and
   `batch_index`. Status is `ok`, `retryable_empty`, `exhausted` or `auth_required`.
 - A transport error is an error, not an empty success. Retrying uses the same
   index; confirmed empty or deduplicated batches advance the cursor and retry
-  with backoff. An out-of-order request returns the authoritative cursor.
+  with backoff. Successful replays never rewind a client's next-batch cursor.
+  A `retryable_empty` response carries an authoritative cursor and can resync it
+  backwards after an out-of-order request or lease recovery.
 - Session progress and the replayable batch commit atomically in Redis under a
   per-session lock. Every writer, including feedback, legacy next and deletion,
   watches the lock token so it cannot commit after losing its lease.
 - Lease contention or loss returns `retryable_empty` with the committed session
-  cursor and revision, or replays the requested batch if it already committed.
+  cursor, or replays the requested batch if it already committed.
   A start with no committed session returns cursor `-1`, so the next request
   still starts at batch zero. Legacy continuation, feedback and deletion return
   HTTP 409 with `Retry-After: 1`. Unrelated failures remain errors. Local feedback
@@ -37,8 +39,16 @@ cross-session rotation are outside this change.
 - Ownership is checked before replaying a cached batch. Proxy identities must
   resolve to a real user ID. Private playlist access is checked at session start.
 
-The buffer is excluded by canonical/local identity. Its final track supplies
-local transition context, while the original seed remains the musical anchor.
+Continuation uses the session UUID and batch cursor, without a numeric session
+revision. Native continuation rejects the removed `revision` field with HTTP
+422, so native clients must be updated alongside the server. The legacy
+`/api/radio/next` schema continues ignoring extra fields. String queue revisions,
+configuration generations and native event sequences remain separate guards.
+
+The buffer is excluded by canonical/local identity. Its final track blends into
+the existing transition target using the profile's weight, preserving likes and
+the original seed as the musical anchor. Buffered artists and titles also join
+the repetition controls.
 Infinite also works with shuffle; repeat-one/all keeps priority.
 Local buffer metadata is loaded with one indexed batch query.
 Native continuation filters known, duplicate and explicitly unplayable tracks
@@ -53,14 +63,29 @@ The JavaScript runtime owns foreground refill, including EOF recovery, bounded
 request deadlines, retries independent of progress ticks, and online/visibility
 wakeups. Explicit pause, stop and source replacement invalidate pending work.
 No response from an old generation can append or resume the new queue.
+Stream recovery suspends refill, installs fresh media URLs for the current queue
+and restores readiness only for its own preparation generation. Queue changes
+while URLs resolve are prepared again before loading the engine.
 Refill waits until a newly selected queue has finished media preparation and
 has been installed in its playback engine, so the previous queue cannot supply
 the new seed context.
+
+EOF recovery stops waiting after five transport failures or 60 seconds under
+JavaScript ownership. It clears buffering, shows one translated notice and waits
+for an explicit Play gesture before retrying. Prefetch failures do not interrupt
+a track already playing. Online and visibility wakeups respect the retry backoff;
+authorization and exhausted results remain terminal. A confirmed append/advance
+ends the EOF wait before cursor publication, whose acknowledgement is bounded to
+10 seconds and cannot undo the incorporated batch.
 
 Android takes background ownership only after valid native continuation
 configuration has been installed. It schedules its own retries and checks queue
 revision and configuration generation before applying any result. Foreground
 JavaScript adopts native additions and the server cursor before requesting more.
+An existing JavaScript EOF deadline is suspended while native owns continuation.
+On return, adoption and a bounded native-state read confirm whether playback
+advanced before JavaScript can fetch or advance again. A confirmed new active
+track retires the old wait; otherwise foreground EOF recovery remains available.
 Toggling Infinite/repeat updates configuration without reloading the track.
 Foreground native appends reserve queue positions until their ACK; a failure
 removes only those reservations. A confirmed append advances its cursor even
@@ -75,7 +100,11 @@ Custom Cast appends synchronize the receiver before reporting progress locally.
 Queued mutations and navigation recheck source/session/lifecycle guards before
 sending commands. Explicit remote `PAUSED` is distinct from EOF. The optional protocol-v1
 `mediaFinished` signal carries actual EOF even when the last progress reading
-is late.
+is late. Intermediate `IDLE` events preserve playback intent; old receivers use
+a two-second EOF margin only when they omit `mediaFinished`. Cast mutation ACKs
+expire after 10 seconds and full append preparation after 30 seconds. An uncertain
+append requires a real receiver snapshot before retrying, preventing duplicates
+after a lost ACK. Late acknowledgements cannot commit a newer operation.
 
 ## Validation and remaining review
 
@@ -100,4 +129,4 @@ Before release, review on the Xiaomi with crossfade off/on, screen off, a brief
 network outage, slow EOF refill and pause during a request; verify automatic
 append on a physical Cast receiver and the same EOF cases in web/Tauri.
 Representative-catalog latency measurements are still pending. Lost Cast ACK
-reconciliation remains outside this PR, as specified in the implementation plan.
+reconciliation has automated coverage; physical receiver QA remains necessary.

@@ -410,7 +410,7 @@ describe("web track recovery queue consistency", () => {
     const recovery = result.current.recoverActiveTrackRef.current();
 
     await act(async () => {
-      refill.resolve({ tracks: [c], status: "ok", batchIndex: 1, revision: 1 });
+      refill.resolve({ tracks: [c], status: "ok", batchIndex: 1 });
     });
     await act(async () => {
       tickets.resolve([resolvedTrack(a), resolvedTrack(b)]);

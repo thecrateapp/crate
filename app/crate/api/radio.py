@@ -152,7 +152,6 @@ def indexed_continuation_batch(
     limit: int,
     buffer_refs: list[str],
     batch_index: int,
-    revision: int,
 ) -> dict:
     from crate.radio_continuation import start_batch, next_batch
 
@@ -173,7 +172,6 @@ def indexed_continuation_batch(
         session_id,
         user_id=_continuation_user_id(user),
         batch_index=batch_index,
-        revision=revision,
         count=limit,
         buffer_refs=buffer_refs,
     )
@@ -584,7 +582,6 @@ def api_radio_next(request: Request, body: RadioNextRequest):
             session_id,
             user_id=_continuation_user_id(user),
             batch_index=body.batch_index,
-            revision=body.revision,
             count=body.count,
             buffer_refs=body.buffer_refs,
         )

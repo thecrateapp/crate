@@ -411,7 +411,6 @@ def _contended_radio_store(monkeypatch, session_id, *, existing=True, user_id=1)
                     "user_id": user_id,
                     "track_count": 20,
                     "batch_index": 3,
-                    "revision": 1,
                 }
             ),
         )

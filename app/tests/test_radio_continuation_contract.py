@@ -185,14 +185,18 @@ def test_empty_batch_is_retryable_and_next_index_can_progress(batches, monkeypat
     )
 
 
-def test_wrong_revision_does_not_advance(batches):
+def test_batch_cursor_advances_without_a_numeric_revision(batches):
     from crate.radio_continuation import next_batch
 
-    assert (
-        next_batch(SESSION_ID, user_id=42, batch_index=1, revision=2)["status"]
-        == "exhausted"
-    )
-    assert batches[1] == []
+    result = next_batch(SESSION_ID, user_id=42, batch_index=1)
+
+    assert result["status"] == "ok"
+    assert result["batch_index"] == 1
+    assert "revision" not in result
+    saved = json.loads(batches[0].get(SESSION_KEY))
+    assert saved["batch_index"] == 1
+    assert "revision" not in saved
+    assert batches[1] == [20]
 
 
 def test_start_retry_keeps_the_first_batch_and_expiry_does_not_recreate(

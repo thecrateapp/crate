@@ -90,7 +90,6 @@ it("does not adopt a previous native session while the next queue is being prepa
   engineMock.getContinuationCursor.mockReturnValue({
     sessionId: "session-A",
     batchIndex: 2,
-    revision: 1,
   });
   const source = {
     type: "album" as const,
@@ -138,7 +137,6 @@ it("never rewinds confirmed foreground progress from an older native snapshot", 
   engineMock.getContinuationCursor.mockReturnValue({
     sessionId: "session",
     batchIndex: 0,
-    revision: 1,
   });
   const source = {
     type: "album" as const,
@@ -148,7 +146,6 @@ it("never rewinds confirmed foreground progress from an older native snapshot", 
       seedId: 1,
       continuationSessionId: "session",
       continuationBatchIndex: 2,
-      continuationRevision: 1,
     },
   };
   const { result } = renderHook(() =>
@@ -164,12 +161,12 @@ it("never rewinds confirmed foreground progress from an older native snapshot", 
   expect(source.radio.continuationBatchIndex).toBe(2);
 });
 
-it("does not merge a cursor or tracks from a different session revision", async () => {
+it("revision removal: adopts the same session cursor and tracks despite an obsolete numeric extra", async () => {
   engineMock.takeAppendedTracks.mockResolvedValue([shapedEntry]);
   engineMock.getContinuationCursor.mockReturnValue({
     sessionId: "session",
     batchIndex: 8,
-    revision: 1,
+    revision: 99,
   });
   const source = {
     type: "album" as const,
@@ -179,7 +176,6 @@ it("does not merge a cursor or tracks from a different session revision", async 
       seedId: 1,
       continuationSessionId: "session",
       continuationBatchIndex: 2,
-      continuationRevision: 2,
     },
   };
   const adoptTracks = vi.fn();
@@ -193,7 +189,51 @@ it("does not merge a cursor or tracks from a different session revision", async 
   await act(async () => {
     await result.current();
   });
+  expect(source.radio.continuationBatchIndex).toBe(8);
+  expect(source.radio).not.toHaveProperty("continuationRevision");
+  expect(adoptTracks).toHaveBeenCalledOnce();
+  expect(adoptTracks.mock.calls[0]?.[0][0].id).toBe("uid-shaped");
+});
+
+it("revision removal: keeps the generation guard while native tracks are in flight", async () => {
+  let complete!: (entries: (typeof shapedEntry)[]) => void;
+  engineMock.takeAppendedTracks.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        complete = resolve;
+      }),
+  );
+  engineMock.getContinuationCursor.mockReturnValue({
+    sessionId: "session",
+    batchIndex: 8,
+  });
+  const source = {
+    type: "radio" as const,
+    name: "Radio",
+    radio: {
+      seedType: "track" as const,
+      continuationSessionId: "session",
+      continuationBatchIndex: 2,
+    },
+  };
+  const readiness = { current: { ready: true, generation: 2 } };
+  const adoptTracks = vi.fn();
+  const { result } = renderHook(() =>
+    useNativeContinuationAdoption({
+      queueReadinessRef: readiness,
+      adoptTracks,
+      queueRef: { current: [] },
+      playSourceRef: { current: source },
+    }),
+  );
+
+  await act(async () => {
+    const pending = result.current();
+    readiness.current.generation++;
+    complete([shapedEntry]);
+    await pending;
+  });
+
   expect(source.radio.continuationBatchIndex).toBe(2);
-  expect(source.radio.continuationRevision).toBe(2);
   expect(adoptTracks).not.toHaveBeenCalled();
 });

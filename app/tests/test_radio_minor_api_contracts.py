@@ -164,7 +164,6 @@ def _indexed_batch(monkeypatch, rows, *, exhausted=False, status="ok"):
         "status": status,
         "exhausted": exhausted,
         "batch_index": 1,
-        "revision": 1,
     }
     calls = []
     monkeypatch.setattr(

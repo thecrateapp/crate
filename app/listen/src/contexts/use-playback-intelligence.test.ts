@@ -44,7 +44,6 @@ beforeEach(() => {
     tracks: [next],
     status: "ok",
     batchIndex: 0,
-    revision: 1,
   });
 });
 it("composes a single shared refill owner for an Infinite album", async () => {
@@ -133,7 +132,7 @@ it("appends an in-flight batch using only committed actions during a suspended r
     rerender({ actions: pendingActions, suspended: true });
   });
   await act(async () => {
-    resolve({ tracks: [next], status: "ok", batchIndex: 0, revision: 1 });
+    resolve({ tracks: [next], status: "ok", batchIndex: 0 });
   });
 
   expect(opts.actions.appendTracks).toHaveBeenCalledOnce();
@@ -168,7 +167,7 @@ it("keeps an in-flight batch eligible when a repeat change has not committed", a
     rerender({ repeat: "one", suspended: true });
   });
   await act(async () => {
-    resolve({ tracks: [next], status: "ok", batchIndex: 0, revision: 1 });
+    resolve({ tracks: [next], status: "ok", batchIndex: 0 });
   });
 
   expect(opts.actions.appendTracks).toHaveBeenCalledOnce();

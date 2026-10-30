@@ -27,7 +27,6 @@ it("retries a lost first batch with the same session then advances only on ackno
     tracks: [],
     status: "retryable_empty",
     batch_index: 0,
-    revision: 1,
   });
   const batch = await fetchContinuationBatch(source, [], signal);
   expect(vi.mocked(api).mock.calls[0]![2]).toMatchObject({
@@ -43,13 +42,12 @@ it("retries a lost first batch with the same session then advances only on ackno
     tracks: [],
     status: "retryable_empty",
     batch_index: 1,
-    revision: 1,
   });
   await fetchContinuationBatch(source, [], signal);
   expect(api).toHaveBeenLastCalledWith(
     "/api/radio/next",
     "POST",
-    expect.objectContaining({ session_id: id, batch_index: 1, revision: 1 }),
+    expect.objectContaining({ session_id: id, batch_index: 1 }),
     { signal },
   );
 });
@@ -63,7 +61,6 @@ it("joins an existing shaped radio at batch one and uses the buffer tail", async
     tracks: [],
     status: "retryable_empty",
     batch_index: 1,
-    revision: 1,
   });
   await fetchContinuationBatch(
     source,
@@ -94,7 +91,6 @@ it("uses the shaped home-playlist seed, retaining source intent", async () => {
     tracks: [],
     status: "retryable_empty",
     batch_index: 0,
-    revision: 1,
   });
   await fetchContinuationBatch(source, [], new AbortController().signal);
   expect(api).toHaveBeenCalledWith(
@@ -127,4 +123,104 @@ it("creates a valid UUID for HTTP LAN environments without randomUUID", () => {
     if (original) Object.defineProperty(crypto, "randomUUID", original);
     else delete (crypto as { randomUUID?: Crypto["randomUUID"] }).randomUUID;
   }
+});
+
+it("revision removal: ensures a session and cursor without adding a numeric revision", () => {
+  const source: PlaySource = {
+    type: "radio",
+    name: "Radio",
+    radio: { seedType: "track", seedId: 7, shapedSessionId: "session" },
+  };
+
+  expect(ensureContinuationSession(source)).toBe("session");
+  expect(source.radio?.continuationBatchIndex).toBe(1);
+  expect(source.radio).not.toHaveProperty("continuationRevision");
+});
+
+it("revision removal: fetch sends only the session cursor and does not publish an obsolete extra", async () => {
+  const source: PlaySource = {
+    type: "radio",
+    name: "Radio",
+    radio: { seedType: "track", seedId: 7, shapedSessionId: "session" },
+  };
+  vi.mocked(api).mockResolvedValue({
+    tracks: [],
+    status: "retryable_empty",
+    batch_index: 4,
+    revision: 99,
+  });
+
+  const batch = await fetchContinuationBatch(
+    source,
+    [],
+    new AbortController().signal,
+  );
+
+  expect(vi.mocked(api).mock.calls[0]?.[2]).toMatchObject({
+    session_id: "session",
+    batch_index: 1,
+    buffer_refs: [],
+  });
+  expect(vi.mocked(api).mock.calls[0]?.[2]).not.toHaveProperty("revision");
+  expect(batch).toMatchObject({ batchIndex: 4, status: "retryable_empty" });
+  expect(batch).not.toHaveProperty("revision");
+});
+
+it("revision removal: acknowledgement advances the cursor without copying an obsolete extra", () => {
+  const source: PlaySource = {
+    type: "radio",
+    name: "Radio",
+    radio: { seedType: "track", continuationSessionId: "session" },
+  };
+  const batch = JSON.parse(
+    '{"tracks":[],"status":"ok","batchIndex":4,"revision":99}',
+  );
+
+  acknowledgeContinuationBatch(source, batch);
+
+  expect(source.radio?.continuationSessionId).toBe("session");
+  expect(source.radio?.continuationBatchIndex).toBe(5);
+  expect(source.radio).not.toHaveProperty("continuationRevision");
+});
+
+it("cursor recovery: an ok replay cannot rewind the next requested batch", () => {
+  const source: PlaySource = {
+    type: "radio",
+    name: "Radio",
+    radio: {
+      seedType: "track",
+      continuationSessionId: "session",
+      continuationBatchIndex: 10,
+    },
+  };
+  const replay = JSON.parse(
+    '{"tracks":[{"id":"replayed-track","title":"Replay","artist":"Band"}],"status":"ok","batchIndex":4,"revision":99}',
+  );
+
+  acknowledgeContinuationBatch(source, replay);
+
+  expect(source.radio?.continuationSessionId).toBe("session");
+  expect(source.radio?.continuationBatchIndex).toBe(10);
+  expect(source.radio).not.toHaveProperty("continuationRevision");
+});
+
+it("cursor recovery: a retryable empty response resyncs the next request to the server cursor", () => {
+  const source: PlaySource = {
+    type: "radio",
+    name: "Radio",
+    radio: {
+      seedType: "track",
+      continuationSessionId: "session",
+      continuationBatchIndex: 10,
+    },
+  };
+  const resync = JSON.parse(
+    '{"tracks":[],"status":"retryable_empty","batchIndex":4,"revision":99}',
+  );
+
+  acknowledgeContinuationBatch(source, resync);
+
+  expect(source.radio?.continuationSessionId).toBe("session");
+  expect(source.radio?.continuationBatchIndex).toBe(5);
+  expect(source.radio).not.toHaveProperty("continuationRevision");
 });

@@ -24,7 +24,10 @@ import { usePlayerQueueStateActions } from "@/contexts/use-player-queue-state-ac
 import { usePlayerStartActions } from "@/contexts/use-player-start-actions";
 import { usePlayerTransportControls } from "@/contexts/use-player-transport-controls";
 
-import type { PlaybackQueueReadiness } from "./playback-intelligence-model";
+import type {
+  PlaybackQueueReadiness,
+  PlaybackResumeOptions,
+} from "./playback-intelligence-model";
 
 function silenceGaplessEngine() {
   gpPause();
@@ -75,7 +78,9 @@ interface UsePlayerQueueActionsParams {
   cancelSoftInterruption: () => void;
   cancelRestoreAutoplay: () => void;
   resetPlaybackIntelligence: () => void;
-  resumePlaybackIntelligence?: () => void;
+  resumePlaybackIntelligence?: (
+    options?: PlaybackResumeOptions,
+  ) => boolean | void;
   continueInfinitePlayback: () => boolean;
   clearPrevRestartLatch: () => void;
   commitQueue: (queue: Track[]) => void;
@@ -175,7 +180,7 @@ export function usePlayerQueueActions({
             readinessRef.current.ready &&
             source === playSourceRef.current
           )
-            resumePlaybackIntelligence?.();
+            resumePlaybackIntelligence?.({ userGesture: true });
         })
         .catch((error) => {
           console.error("[gapless] failed to resume queue recovery:", error);

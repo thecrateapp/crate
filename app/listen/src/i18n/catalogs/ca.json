@@ -1371,6 +1371,7 @@
   "actions.playlist.toasts.removedFromLibrary": "Eliminada de la teva biblioteca",
   "player.loading": "Carregant el reproductor...",
   "player.toasts.updateLikedTracksFailed": "No s’han pogut actualitzar les cançons favorites",
+  "player.toasts.continuationUnavailable": "No s’ha pogut continuar la reproducció. Prem Reprodueix per tornar-ho a provar.",
   "player.queue.nothingQueued": "Res a la cua",
   "player.lyrics.loading": "Carregant la lletra...",
   "player.lyrics.unavailable": "No hi ha lletra disponible",

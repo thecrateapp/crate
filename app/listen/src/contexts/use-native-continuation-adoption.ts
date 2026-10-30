@@ -58,10 +58,7 @@ export function useNativeContinuationAdoption({
     const cursor = androidNativeEngine.getContinuationCursor();
     if (
       playSourceRef &&
-      (!expectedSession ||
-        !cursor ||
-        cursor.sessionId !== expectedSession ||
-        cursor.revision !== (source?.radio?.continuationRevision ?? 1))
+      (!expectedSession || !cursor || cursor.sessionId !== expectedSession)
     )
       return;
     const radio = playSourceRef?.current?.radio;
@@ -75,7 +72,6 @@ export function useNativeContinuationAdoption({
         radio.continuationBatchIndex ?? (radio.shapedSessionId ? 1 : 0),
         cursor.batchIndex,
       );
-      radio.continuationRevision = cursor.revision;
     }
     if (appended.length === 0) return;
     const known = new Set(queueRef.current.map((track) => track.id));

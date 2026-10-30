@@ -399,7 +399,9 @@ describe("usePlayerQueueActions", () => {
     );
     expect(gaplessPlayer.play).toHaveBeenCalledOnce();
     expect(queueReadinessRef.current.ready).toBe(true);
-    expect(params.resumePlaybackIntelligence).toHaveBeenCalled();
+    expect(params.resumePlaybackIntelligence).toHaveBeenCalledWith({
+      userGesture: true,
+    });
   });
 
   it("lets Resume's fresh recovery finish before the cancelled recovery without changing its queue or position", async () => {

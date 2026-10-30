@@ -41,7 +41,6 @@ final class NativeContinuationClient {
         final boolean authoritativeCursor;
         final String sessionId;
         final int batchIndex;
-        final int revision;
 
         Config(
             String apiBase,
@@ -92,19 +91,18 @@ final class NativeContinuationClient {
             boolean refill
         ) {
             this(apiBase, token, expiresAtMs, source, preferredDurationMs, allowBeatmatch,
-                allowBassHandoff, allowLongBeatmatch, delivery, refill, "", 0, 1, false);
+                allowBassHandoff, allowLongBeatmatch, delivery, refill, "", 0, false);
         }
 
         private Config(
             String apiBase, String token, long expiresAtMs, String source,
             long preferredDurationMs, boolean allowBeatmatch, boolean allowBassHandoff,
             boolean allowLongBeatmatch, String delivery, boolean refill,
-            String sessionId, int batchIndex, int revision, boolean authoritativeCursor
+            String sessionId, int batchIndex, boolean authoritativeCursor
         ) {
             this.authoritativeCursor = authoritativeCursor;
             this.sessionId = sessionId;
             this.batchIndex = Math.max(0, batchIndex);
-            this.revision = Math.max(1, revision);
             this.apiBase = trimTrailingSlash(apiBase);
             this.token = token == null ? "" : token;
             this.expiresAtMs = expiresAtMs;
@@ -134,13 +132,12 @@ final class NativeContinuationClient {
                 payload.optBoolean("refill", false),
                 payload.optString("sessionId", ""),
                 payload.optInt("batchIndex", 0),
-                payload.optInt("revision", 1),
                 payload.optBoolean("authoritativeCursor", false)
             );
         }
 
-        int nextBatchIndex(String previousSessionId, int previousRevision, int previousBatchIndex) {
-            return !authoritativeCursor && sessionId.equals(previousSessionId) && revision == previousRevision
+        int nextBatchIndex(String previousSessionId, int previousBatchIndex) {
+            return !authoritativeCursor && sessionId.equals(previousSessionId)
                 ? Math.max(previousBatchIndex, batchIndex) : batchIndex;
         }
 
@@ -178,7 +175,6 @@ final class NativeContinuationClient {
         final String status;
         final String sessionId;
         final int batchIndex;
-        final int revision;
 
         Continuation(
             Outcome outcome,
@@ -187,18 +183,17 @@ final class NativeContinuationClient {
             List<JSONObject> plans,
             boolean exhausted
         ) {
-            this(outcome, tracks, sources, plans, exhausted, "", -1, 1, "ok");
+            this(outcome, tracks, sources, plans, exhausted, "", -1, "ok");
         }
 
         Continuation(
             Outcome outcome, List<NativeTrack> tracks, List<String> sources,
             List<JSONObject> plans, boolean exhausted, String sessionId,
-            int batchIndex, int revision, String status
+            int batchIndex, String status
         ) {
             this.status = status;
             this.sessionId = sessionId;
             this.batchIndex = batchIndex;
-            this.revision = revision;
             this.outcome = outcome;
             this.tracks = tracks;
             this.sources = sources;
@@ -265,17 +260,17 @@ final class NativeContinuationClient {
     }
 
     Continuation fetchContinuation(Config config, List<NativeTrack> queue, int limit) {
-        return fetchContinuation(config, queue, limit, config.batchIndex, config.revision);
+        return fetchContinuation(config, queue, limit, config.batchIndex);
     }
 
     Continuation fetchContinuation(
-        Config config, List<NativeTrack> queue, int limit, int batchIndex, int revision
+        Config config, List<NativeTrack> queue, int limit, int batchIndex
     ) {
         try {
             Response response = transport.post(
                 config.apiBase + CONTINUATION_PATH,
                 config.token,
-                continuationBody(config, queue, limit, batchIndex, revision).toString()
+                continuationBody(config, queue, limit, batchIndex).toString()
             );
             if (response.status == 401 || response.status == 403) {
                 return Continuation.failed(Outcome.UNAUTHORIZED);
@@ -287,7 +282,6 @@ final class NativeContinuationClient {
             if (
                 (result.batchIndex >= 0 && result.batchIndex != batchIndex
                     && !("retryable_empty".equals(result.status) && result.tracks.isEmpty())) ||
-                result.revision != revision ||
                 (!result.sessionId.isEmpty() && !config.sessionId.isEmpty()
                     && !result.sessionId.equals(config.sessionId))
             ) return Continuation.failed(Outcome.FAILED);
@@ -299,11 +293,11 @@ final class NativeContinuationClient {
 
     static JSONObject continuationBody(Config config, List<NativeTrack> queue, int limit)
         throws JSONException {
-        return continuationBody(config, queue, limit, config.batchIndex, config.revision);
+        return continuationBody(config, queue, limit, config.batchIndex);
     }
 
     static JSONObject continuationBody(
-        Config config, List<NativeTrack> queue, int limit, int batchIndex, int revision
+        Config config, List<NativeTrack> queue, int limit, int batchIndex
     ) throws JSONException {
         JSONArray recent = new JSONArray();
         String after = "";
@@ -322,7 +316,7 @@ final class NativeContinuationClient {
             .put("context", edgeContext(config));
         if (!after.isEmpty()) body.put("afterTrackEntityUid", after);
         if (!config.sessionId.isEmpty()) {
-            body.put("batchIndex", batchIndex).put("revision", revision);
+            body.put("batchIndex", batchIndex);
         }
         return body;
     }
@@ -390,7 +384,6 @@ final class NativeContinuationClient {
             response.optBoolean("exhausted", false) || "exhausted".equals(status),
             response.optString("sessionId", config.sessionId),
             response.optInt("batchIndex", -1),
-            response.optInt("revision", config.revision),
             status
         );
     }

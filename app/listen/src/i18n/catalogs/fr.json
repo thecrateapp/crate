@@ -1371,6 +1371,7 @@
   "actions.playlist.toasts.removedFromLibrary": "Retirée de votre bibliothèque",
   "player.loading": "Chargement du lecteur...",
   "player.toasts.updateLikedTracksFailed": "Impossible de mettre à jour les titres aimés",
+  "player.toasts.continuationUnavailable": "Impossible de poursuivre la lecture. Appuyez sur Lire pour réessayer.",
   "player.queue.nothingQueued": "Rien en file",
   "player.lyrics.loading": "Chargement des paroles...",
   "player.lyrics.unavailable": "Paroles indisponibles",

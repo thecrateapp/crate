@@ -23,7 +23,6 @@ const batch = (tracks = [b]): ContinuationBatch => ({
   tracks,
   status: tracks.length ? "ok" : "retryable_empty",
   batchIndex: 1,
-  revision: 1,
 });
 function setup(playing = true) {
   const interruption = { current: false };
@@ -339,7 +338,7 @@ describe("shared refill lifecycle", () => {
     expect(fetchBatch).toHaveBeenCalledTimes(2);
     expect(fetchBatch.mock.calls[0]![2].aborted).toBe(true);
   });
-  it("recovers on online without waiting for a track event", async () => {
+  it("recovers on online at the retry deadline without waiting for a track event", async () => {
     Object.defineProperty(navigator, "onLine", {
       configurable: true,
       value: false,
@@ -353,6 +352,10 @@ describe("shared refill lifecycle", () => {
     });
     await act(async () => {
       window.dispatchEvent(new Event("online"));
+    });
+    expect(fetchBatch).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
     });
     expect(fetchBatch).toHaveBeenCalledOnce();
   });
@@ -515,7 +518,6 @@ it("publishes the acknowledged cursor after each foreground batch", async () => 
   vi.mocked(acknowledgeContinuationBatch).mockImplementation(
     (source, batch) => {
       source.radio!.continuationBatchIndex = batch.batchIndex! + 1;
-      source.radio!.continuationRevision = batch.revision;
     },
   );
   fetchBatch
@@ -731,4 +733,439 @@ describe("refill handoff after stream recovery", () => {
     expect(fetchBatch).toHaveBeenCalledTimes(2);
     expect(actions.appendAndAdvance).toHaveBeenCalledOnce();
   });
+});
+
+describe("bounded EOF refill", () => {
+  const online = (value: boolean) =>
+    Object.defineProperty(navigator, "onLine", {
+      configurable: true,
+      value,
+    });
+  beforeEach(() => {
+    online(true);
+  });
+  afterEach(() => {
+    online(true);
+  });
+
+  function setupEof(playing = false) {
+    const harness = setup(playing);
+    const onUnavailable = vi.fn();
+    const refs = {
+      ...harness.refs,
+      actionsRef: { current: { ...harness.actions, onUnavailable } },
+    };
+    const rendered = renderHook(
+      ({ source }) =>
+        usePlaybackRefillRuntime({ ...harness.opts, refs, playSource: source }),
+      { initialProps: { source: harness.opts.playSource } },
+    );
+    const start = () => {
+      expect(rendered.result.current.continueInfinitePlayback()).toBe(true);
+    };
+    const gesture = () => {
+      const resume = rendered.result.current.resume as (options?: {
+        userGesture?: boolean;
+      }) => boolean | void;
+      return resume({ userGesture: true });
+    };
+    return { ...harness, ...rendered, refs, onUnavailable, start, gesture };
+  }
+
+  async function setupPendingCursorPublish() {
+    const { acknowledgeContinuationBatch: acknowledge } = await vi.importActual<
+      typeof import("@/lib/radio-continuation")
+    >("@/lib/radio-continuation");
+    vi.mocked(acknowledgeContinuationBatch).mockImplementation(acknowledge);
+    const harness = setup(false);
+    const source = harness.opts.playSource;
+    Object.assign(source.radio!, {
+      continuationSessionId: "cursor-session",
+      continuationBatchIndex: 1,
+    });
+    let finishPublish!: () => void;
+    const publishContinuationCursor = vi
+      .fn<(source: PlaySource, authoritative?: boolean) => Promise<void>>()
+      .mockResolvedValue(undefined)
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finishPublish = resolve;
+          }),
+      );
+    const onUnavailable = vi.fn();
+    const refs = {
+      ...harness.refs,
+      actionsRef: {
+        current: {
+          ...harness.actions,
+          publishContinuationCursor,
+          onUnavailable,
+        },
+      },
+    };
+    harness.actions.appendAndAdvance.mockImplementation(
+      async (tracks: Track[], isCurrent: () => boolean) => {
+        if (!isCurrent()) return 0;
+        const nextIndex = refs.queueRef.current.length;
+        refs.queueRef.current = [...refs.queueRef.current, ...tracks];
+        refs.currentIndexRef.current = nextIndex;
+        harness.actions.setBuffering(false);
+        return tracks.length;
+      },
+    );
+    fetchBatch.mockResolvedValueOnce(batch());
+    const rendered = renderHook(() =>
+      usePlaybackRefillRuntime({ ...harness.opts, refs }),
+    );
+    const start = () => {
+      expect(rendered.result.current.continueInfinitePlayback()).toBe(true);
+    };
+    return {
+      ...harness,
+      ...rendered,
+      refs,
+      source,
+      publishContinuationCursor,
+      onUnavailable,
+      finishPublish: () => finishPublish(),
+      start,
+    };
+  }
+
+  it("ends EOF waiting as soon as playback advances even when publishing its cursor is pending", async () => {
+    const {
+      result,
+      refs,
+      actions,
+      onUnavailable,
+      publishContinuationCursor,
+      finishPublish,
+      start,
+      unmount,
+    } = await setupPendingCursorPublish();
+    try {
+      act(start);
+      await flush();
+      expect(refs.queueRef.current.map((track) => track.id)).toEqual([
+        "a",
+        "b",
+      ]);
+      expect(refs.currentIndexRef.current).toBe(1);
+      expect(actions.setBuffering).toHaveBeenLastCalledWith(false);
+      expect(publishContinuationCursor).toHaveBeenCalledOnce();
+      let consumed: boolean | void = undefined;
+      act(() => {
+        consumed = result.current.resume();
+      });
+      expect.soft(consumed).toBe(false);
+
+      await act(async () => vi.advanceTimersByTimeAsync(60_000));
+
+      expect(onUnavailable).not.toHaveBeenCalled();
+      expect(actions.appendAndAdvance).toHaveBeenCalledOnce();
+    } finally {
+      unmount();
+      await act(async () => finishPublish());
+    }
+  });
+
+  it("releases lost cursor bookkeeping within ten seconds so the next EOF fetches the next batch once", async () => {
+    const {
+      refs,
+      source,
+      actions,
+      onUnavailable,
+      publishContinuationCursor,
+      finishPublish,
+      start,
+      unmount,
+    } = await setupPendingCursorPublish();
+    const next: Track = { id: "c", title: "C", artist: "C" };
+    let finishBatch: ((value: ContinuationBatch) => void) | undefined;
+    const requestedCursors: unknown[] = [];
+    fetchBatch.mockImplementationOnce(
+      (requestedSource) =>
+        new Promise((resolve) => {
+          requestedCursors.push({
+            source: requestedSource,
+            sessionId: requestedSource.radio?.continuationSessionId,
+            batchIndex: requestedSource.radio?.continuationBatchIndex,
+          });
+          finishBatch = resolve;
+        }),
+    );
+    try {
+      act(start);
+      await flush();
+      expect(actions.appendAndAdvance).toHaveBeenCalledOnce();
+      expect(source.radio?.continuationBatchIndex).toBe(2);
+      await act(async () => vi.advanceTimersByTimeAsync(9_999));
+      act(start);
+      await flush();
+      expect(fetchBatch).toHaveBeenCalledOnce();
+      await act(async () => vi.advanceTimersByTimeAsync(1));
+
+      expect(fetchBatch).toHaveBeenCalledTimes(2);
+      expect(requestedCursors).toEqual([
+        { source, sessionId: "cursor-session", batchIndex: 2 },
+      ]);
+      expect(fetchBatch.mock.calls[1]![0]).toBe(source);
+      expect(fetchBatch.mock.calls[1]![1].map((track) => track.id)).toEqual([
+        "b",
+      ]);
+      await act(async () => finishBatch!({ ...batch([next]), batchIndex: 2 }));
+      expect(refs.queueRef.current.map((track) => track.id)).toEqual([
+        "a",
+        "b",
+        "c",
+      ]);
+      expect(refs.currentIndexRef.current).toBe(2);
+      expect(source.radio).toMatchObject({
+        continuationSessionId: "cursor-session",
+        continuationBatchIndex: 3,
+      });
+      expect(acknowledgeContinuationBatch).toHaveBeenCalledTimes(2);
+      expect(publishContinuationCursor).toHaveBeenCalledTimes(2);
+
+      await act(async () => finishPublish());
+
+      expect(actions.appendAndAdvance).toHaveBeenCalledTimes(2);
+      expect(actions.appendTracks).not.toHaveBeenCalled();
+      expect(fetchBatch).toHaveBeenCalledTimes(2);
+      expect(source.radio).toMatchObject({
+        continuationSessionId: "cursor-session",
+        continuationBatchIndex: 3,
+      });
+      expect(onUnavailable).not.toHaveBeenCalled();
+    } finally {
+      unmount();
+      await act(async () => {
+        finishPublish();
+        finishBatch?.({ ...batch([next]), batchIndex: 2 });
+      });
+    }
+  });
+
+  it.each(["transport", "offline"])(
+    "ends EOF buffering after five %s failures and waits for a gesture without duplicate notices",
+    async (failure) => {
+      fetchBatch.mockRejectedValue(new Error("network unavailable"));
+      if (failure === "offline") online(false);
+      const { result, actions, onUnavailable, start } = setupEof();
+      act(start);
+      await flush();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(14_999);
+      });
+      expect(onUnavailable).not.toHaveBeenCalled();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+
+      expect(onUnavailable).toHaveBeenCalledOnce();
+      expect(actions.setBuffering).toHaveBeenLastCalledWith(false);
+      const attempts = fetchBatch.mock.calls.length;
+      if (failure === "transport") expect(attempts).toBe(5);
+      online(true);
+      await act(async () => {
+        result.current.resume();
+        expect(result.current.continueInfinitePlayback()).toBe(false);
+        document.dispatchEvent(new Event("visibilitychange"));
+        window.dispatchEvent(new Event("online"));
+        await vi.advanceTimersByTimeAsync(120_000);
+      });
+      expect(fetchBatch).toHaveBeenCalledTimes(attempts);
+      expect(actions.appendAndAdvance).not.toHaveBeenCalled();
+      expect(onUnavailable).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("bounds total EOF waiting at sixty seconds even when HTTP requests never settle", async () => {
+    fetchBatch.mockImplementation(() => new Promise(() => {}));
+    const { refs, actions, onUnavailable, start } = setupEof();
+    const currentUnavailable = vi.fn();
+    act(start);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(59_999);
+    });
+    refs.actionsRef.current.onUnavailable = currentUnavailable;
+    expect(onUnavailable).not.toHaveBeenCalled();
+    expect(currentUnavailable).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+
+    expect(currentUnavailable).toHaveBeenCalledOnce();
+    expect(onUnavailable).not.toHaveBeenCalled();
+    expect(actions.setBuffering).toHaveBeenLastCalledWith(false);
+    expect(
+      fetchBatch.mock.calls[fetchBatch.mock.calls.length - 1]![2].aborted,
+    ).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("a gesture retries an unavailable EOF attempt and advances only after a fresh batch arrives", async () => {
+    fetchBatch.mockRejectedValue(new Error("server down"));
+    const { refs, actions, onUnavailable, start, gesture } = setupEof();
+    act(start);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    expect(onUnavailable).toHaveBeenCalledOnce();
+    let resolveBatch!: (value: ContinuationBatch) => void;
+    fetchBatch.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveBatch = resolve;
+        }),
+    );
+    actions.appendAndAdvance.mockImplementation(
+      async (tracks: Track[], isCurrent: () => boolean) => {
+        if (!isCurrent()) return 0;
+        refs.queueRef.current = [...refs.queueRef.current, ...tracks];
+        refs.currentIndexRef.current = 1;
+        actions.setBuffering(false);
+        return tracks.length;
+      },
+    );
+    let consumed: boolean | void = undefined;
+    act(() => {
+      consumed = gesture();
+    });
+    await flush();
+
+    expect(consumed).toBe(true);
+    expect(fetchBatch).toHaveBeenCalledTimes(6);
+    expect(actions.appendAndAdvance).not.toHaveBeenCalled();
+    expect(refs.currentIndexRef.current).toBe(0);
+    await act(async () => resolveBatch(batch()));
+    expect(refs.queueRef.current.map((track) => track.id)).toEqual(["a", "b"]);
+    expect(refs.currentIndexRef.current).toBe(1);
+    expect(actions.appendTracks).not.toHaveBeenCalled();
+    expect(actions.setBuffering).toHaveBeenLastCalledWith(false);
+    expect(onUnavailable).toHaveBeenCalledOnce();
+  });
+
+  it("consumes Resume while EOF already waits for a batch without restarting the current track", async () => {
+    let finish!: (value: ContinuationBatch) => void;
+    fetchBatch.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const { result, actions, start } = setupEof();
+    act(start);
+    let consumed: boolean | void = undefined;
+    act(() => {
+      consumed = result.current.resume();
+    });
+    await act(async () => finish(batch()));
+
+    expect(consumed).toBe(true);
+    expect(fetchBatch).toHaveBeenCalledOnce();
+    expect(actions.appendAndAdvance).toHaveBeenCalledOnce();
+    expect(actions.appendTracks).not.toHaveBeenCalled();
+  });
+
+  it("does not stop a playing track or notify when only prefetch keeps failing", async () => {
+    fetchBatch.mockRejectedValue(new Error("prefetch failed"));
+    const { actions, onUnavailable } = setupEof(true);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120_000);
+    });
+
+    expect(fetchBatch).toHaveBeenCalled();
+    expect(actions.setBuffering).not.toHaveBeenCalled();
+    expect(actions.appendAndAdvance).not.toHaveBeenCalled();
+    expect(onUnavailable).not.toHaveBeenCalled();
+  });
+
+  it.each(["pause", "source", "dispose"])(
+    "%s cancels the EOF deadline without notifying an obsolete attempt",
+    async (change) => {
+      let finish!: (value: ContinuationBatch) => void;
+      fetchBatch.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      );
+      const { result, refs, actions, onUnavailable, start, rerender, unmount } =
+        setupEof();
+      act(start);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+      act(() => {
+        if (change === "pause") result.current.reset();
+        if (change === "dispose") unmount();
+        if (change === "source") {
+          const replacement: PlaySource = {
+            type: "album",
+            name: "Other",
+            radio: { seedType: "album", seedId: 99 },
+          };
+          refs.playSourceRef.current = replacement;
+          rerender({ source: replacement });
+        }
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(120_000);
+        finish(batch());
+      });
+
+      expect(onUnavailable).not.toHaveBeenCalled();
+      expect(actions.appendTracks).not.toHaveBeenCalled();
+      expect(actions.appendAndAdvance).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
+  it.each(["exhausted", "auth_required"] as const)(
+    "keeps %s terminal instead of treating it as a retryable transport limit",
+    async (status) => {
+      fetchBatch.mockResolvedValue({ ...batch([]), status });
+      const { result, onUnavailable, start, gesture } = setupEof();
+      act(start);
+      await flush();
+      await act(async () => {
+        gesture();
+        window.dispatchEvent(new Event("online"));
+        await vi.advanceTimersByTimeAsync(120_000);
+      });
+
+      expect(result.current.recoverAtEnd()).toBe(false);
+      expect(fetchBatch).toHaveBeenCalledOnce();
+      expect(onUnavailable).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["visibilitychange", "online"])(
+    "%s cannot advance the retry deadline",
+    async (event) => {
+      fetchBatch.mockRejectedValueOnce(
+        new Error("temporary transport failure"),
+      );
+      setupEof(true);
+      await flush();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500);
+        (event === "online" ? window : document).dispatchEvent(
+          new Event(event),
+        );
+      });
+
+      expect(fetchBatch).toHaveBeenCalledOnce();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(499);
+      });
+      expect(fetchBatch).toHaveBeenCalledOnce();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(fetchBatch).toHaveBeenCalledTimes(2);
+    },
+  );
 });
