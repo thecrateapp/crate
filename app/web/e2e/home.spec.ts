@@ -19,18 +19,9 @@ test.describe("hero", () => {
     await expect(page.locator("canvas#field")).toHaveCount(1);
   });
 
-  test("shows a scroll cue that fades once the visitor scrolls", async ({
-    page,
-  }) => {
+  test("has no scroll cue", async ({ page }) => {
     await page.goto("/");
-    const cue = page.locator(".scroll-cue");
-    await expect(cue).toHaveCSS("opacity", "1", { timeout: 5000 });
-
-    await page.evaluate(() => scrollTo(0, 200));
-    await expect(cue).toHaveCSS("opacity", "0");
-
-    await page.evaluate(() => scrollTo(0, 0));
-    await expect(cue).toHaveCSS("opacity", "1");
+    await expect(page.locator(".scroll-cue")).toHaveCount(0);
   });
 
   test("hands the particle mark over to the solid logo and back on scroll", async ({
@@ -46,6 +37,47 @@ test.describe("hero", () => {
 
     await page.evaluate(() => scrollTo(0, 0));
     await expect(solid).toHaveCSS("opacity", "1", { timeout: 8000 });
+  });
+
+  test("clears the particle field before Inside Crate comes into view", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.locator(".mark-solid")).toHaveCSS("opacity", "1", {
+      timeout: 8000,
+    });
+    await page.evaluate(() => {
+      const inside = document.querySelector(".inside")!;
+      scrollTo(
+        0,
+        inside.getBoundingClientRect().top + scrollY - innerHeight + 1,
+      );
+    });
+    await expect(page.locator("canvas#field")).toHaveCSS("opacity", "0");
+  });
+
+  test("forms the manifesto from the particle field and hands it over to the real text", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const statement = page.locator(".statement");
+    await expect(statement).toHaveClass(/has-particles/, { timeout: 8000 });
+    const text = statement.locator("p").first();
+    const at = (share: number) =>
+      page.evaluate((s) => {
+        const top =
+          document.querySelector(".statement p")!.getBoundingClientRect().top +
+          scrollY;
+        scrollTo(0, top - innerHeight * s);
+      }, share);
+
+    await at(0.6);
+    await expect(page.locator("canvas#field")).toHaveCSS("opacity", "1");
+    await expect(text).toHaveCSS("opacity", "0");
+
+    await at(0.15);
+    await expect(page.locator("canvas#field")).toHaveCSS("opacity", "0");
+    await expect(text).toHaveCSS("opacity", "1");
   });
 
   test("leads the top navigation with the manifesto", async ({ page }) => {
@@ -76,6 +108,7 @@ test.describe("hero", () => {
     await expect(page.locator(".mark-static")).toHaveCSS("opacity", "1", {
       timeout: 5000,
     });
+    await expect(page.locator(".statement")).not.toHaveClass(/has-particles/);
   });
 
   test("falls back to the static mark while the WebGL context is lost", async ({
@@ -111,6 +144,15 @@ test.describe("hero", () => {
 
   test.describe("reduced motion", () => {
     test.use({ reducedMotion: "reduce" });
+
+    test("shows the manifesto as plain text", async ({ page }) => {
+      await page.goto("/");
+      await page.waitForTimeout(1500);
+      const statement = page.locator(".statement");
+      await expect(statement).not.toHaveClass(/has-particles/);
+      await statement.locator("p").first().scrollIntoViewIfNeeded();
+      await expect(statement.locator("p").first()).toHaveCSS("opacity", "1");
+    });
 
     test("keeps the static mark and leaves the words in place", async ({
       page,

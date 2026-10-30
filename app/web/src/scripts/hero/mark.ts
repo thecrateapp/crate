@@ -8,6 +8,7 @@ import {
   loadLibraryCloud,
   sampleImage,
 } from "../field/sources";
+import { buildTextTargets, collectWords } from "../field/text";
 import { finePointer, isMobile, reducedMotion } from "../motion/env";
 import { splitWords } from "../motion/split-words";
 
@@ -18,7 +19,7 @@ export function initHero(): () => void {
   const copy = document.querySelector<HTMLElement>(".hero-copy");
   const staticMark = document.querySelector<HTMLElement>(".mark-static");
   const solidMark = document.querySelector<HTMLElement>(".mark-solid");
-  const cue = document.querySelector<HTMLElement>(".scroll-cue");
+  const statement = document.querySelector<HTMLElement>(".statement");
   if (!canvas || !copy) return () => {};
 
   copy.querySelectorAll<HTMLElement>("[data-split]").forEach((element) => {
@@ -32,14 +33,6 @@ export function initHero(): () => void {
     650,
   );
   let disposed = false;
-  if (cue) {
-    const toggleCue = () => cue.classList.toggle("is-hidden", scrollY > 24);
-    toggleCue();
-    addEventListener("scroll", toggleCue, {
-      passive: true,
-      signal: listeners.signal,
-    });
-  }
   let frame = 0;
   let field: Field | null = null;
 
@@ -76,10 +69,12 @@ export function initHero(): () => void {
       isMobile: mobile,
       onContextLost() {
         canvas.style.visibility = "hidden";
+        statement?.classList.remove("has-particles");
         showStatic();
       },
       onContextRestored() {
         canvas.style.visibility = "";
+        if (textReady) statement?.classList.add("has-particles");
         if (staticMark) gsap.to(staticMark, { opacity: 0, duration: 0.6 });
       },
     });
@@ -93,9 +88,44 @@ export function initHero(): () => void {
       if (real && !disposed) active.setPositions(real);
     });
 
+    let textReady = false;
+    let textTimer = 0;
+
+    async function prepareText() {
+      if (!statement) return;
+      await document.fonts.ready;
+      if (disposed) return;
+      statement.classList.add("has-particles");
+      ScrollTrigger.refresh();
+      const paragraphs = [...statement.querySelectorAll<HTMLElement>("p")];
+      const points = buildTextTargets(collectWords(paragraphs), count);
+      if (disposed) return;
+      if (!points) {
+        statement.classList.remove("has-particles");
+        textReady = false;
+        return;
+      }
+      active.setText(points);
+      textReady = true;
+      apply();
+    }
+
+    prepareText().catch(() => statement?.classList.remove("has-particles"));
+    addEventListener(
+      "resize",
+      () => {
+        clearTimeout(textTimer);
+        textTimer = window.setTimeout(() => {
+          if (textReady) prepareText();
+        }, 250);
+      },
+      { signal: listeners.signal },
+    );
+
     const state = {
       morph: 0,
       dive: 0,
+      text: 0,
       yaw: 0,
       pitch: 0,
       targetYaw: 0,
@@ -109,7 +139,7 @@ export function initHero(): () => void {
       state.pitch += (state.targetPitch - state.pitch) * 0.05;
       const orbit =
         state.yaw + state.dive * 1.1 + Math.sin(t * 0.25) * 0.04 * state.morph;
-      const distance = 3.3 - state.dive * 2.5;
+      const distance = 3.3 - state.dive * 1.2;
       const eye: Vec3 = [
         Math.sin(orbit) * distance,
         0.15 + state.pitch,
@@ -128,6 +158,8 @@ export function initHero(): () => void {
         center,
         settled,
         fade: solid,
+        text: textReady ? state.text : 0,
+        scroll: scrollY,
       });
       if (solidMark) placeSolid(eye, orbit, distance, solid);
     }
@@ -177,13 +209,16 @@ export function initHero(): () => void {
       intro: 0,
       hero: 0,
       statement: 0,
+      handoff: 0,
       screen: 0,
     };
-    const apply = () => {
-      const opacity = mix.intro * (1 - 0.84 * mix.statement) * (1 - mix.screen);
+    function apply() {
+      const fade = textReady ? mix.handoff : mix.statement;
+      const opacity = mix.intro * (1 - fade) * (1 - mix.screen);
+      statement?.style.setProperty("--handoff", mix.handoff.toFixed(3));
       gsap.set(canvas, { opacity });
       state.visible = opacity > 0.001;
-    };
+    }
 
     ctx.add(() => {
       gsap.to(mix, {
@@ -218,21 +253,38 @@ export function initHero(): () => void {
         },
       });
 
-      for (const [trigger, key, end] of [
-        [".statement", "statement", "top 45%"],
-        [".screencast", "screen", "top 30%"],
-        [".film, .get", "screen", "top 30%"],
+      if (statement) {
+        const form = ({ progress }: ScrollTrigger) => {
+          state.text = progress;
+        };
+        ScrollTrigger.create({
+          trigger: statement.querySelector("p") ?? statement,
+          start: "top 90%",
+          end: "top 45%",
+          scrub: true,
+          onUpdate: form,
+          onRefresh: form,
+        });
+      }
+
+      for (const [trigger, key, start, end] of [
+        [".statement", "statement", "top bottom", "top 45%"],
+        [".statement p", "handoff", "top 35%", "top 22%"],
+        [".screencast", "screen", "top bottom", "top 30%"],
+        [".inside, .film, .get", "screen", "top 102%", "top bottom"],
       ] as const) {
         if (!document.querySelector(trigger)) continue;
+        const follow = ({ progress }: ScrollTrigger) => {
+          mix[key] = progress;
+          apply();
+        };
         ScrollTrigger.create({
           trigger,
-          start: "top bottom",
+          start,
           end,
           scrub: true,
-          onUpdate: ({ progress }) => {
-            mix[key] = progress;
-            apply();
-          },
+          onUpdate: follow,
+          onRefresh: follow,
         });
       }
     });
@@ -241,6 +293,8 @@ export function initHero(): () => void {
   return () => {
     disposed = true;
     clearTimeout(entry);
+    statement?.classList.remove("has-particles");
+    statement?.style.removeProperty("--handoff");
     cancelAnimationFrame(frame);
     listeners.abort();
     ctx.revert();

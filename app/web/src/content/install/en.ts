@@ -51,7 +51,7 @@ export interface InstallPage extends PageIntro {
 
 export const install: InstallPage = {
   meta: {
-    title: "Install — Crate",
+    title: "Install · Crate",
     description:
       "Install Crate with one command on Linux or macOS with Docker. A seven-step wizard checks the machine, asks a few questions, shows every file before it writes one and starts Crate.",
   },

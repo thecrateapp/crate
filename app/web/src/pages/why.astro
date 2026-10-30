@@ -8,7 +8,7 @@ if (!entry) throw new Error("Missing manifesto entry for en");
 const { Content } = await render(entry);
 ---
 
-<Base title={`${entry.data.title} — Crate`} description={entry.data.description}>
+<Base title={`${entry.data.title} · Crate`} description={entry.data.description}>
   <article class="why">
     <header class="why-head" data-reveal>
       <a class="u-link back" href="/" data-enter>&larr; {t("page.back")}</a>

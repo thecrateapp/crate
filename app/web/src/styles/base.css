@@ -16,6 +16,10 @@ body {
   overflow-x: clip;
 }
 
+body {
+  background: transparent;
+}
+
 body::after {
   content: "";
   position: fixed;
@@ -464,17 +468,6 @@ html.menu-open body {
   gap: 7vh;
 }
 
-.statement .row {
-  display: grid;
-  grid-template-columns: 80px 1fr;
-  gap: 24px;
-  align-items: baseline;
-}
-
-.statement .row .eyebrow {
-  padding-top: 0.6em;
-}
-
 .statement p:not(.eyebrow) {
   margin: 0;
   font-family: var(--display);
@@ -488,6 +481,19 @@ html.menu-open body {
 
 .statement p:not(.eyebrow) .hl {
   color: var(--cyan-hi);
+}
+
+.statement.has-particles {
+  padding-bottom: calc(12vh + 22vh);
+}
+
+.statement.has-particles p {
+  opacity: var(--handoff, 0);
+}
+
+.statement.has-particles .w {
+  transform: none !important;
+  transition: none;
 }
 
 .explore {
@@ -628,10 +634,6 @@ html.menu-open body {
   }
   :where(html.js) .menu-toggle {
     display: inline-flex;
-  }
-  .statement .row {
-    grid-template-columns: 1fr;
-    gap: 10px;
   }
   .explore a {
     flex-direction: column;

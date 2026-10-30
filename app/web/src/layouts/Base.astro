@@ -9,9 +9,10 @@ interface Props {
   title: string;
   description: string;
   locale?: string;
+  backdrop?: "full" | "dim";
 }
 
-const { title, description, locale = "en" } = Astro.props;
+const { title, description, locale = "en", backdrop = "dim" } = Astro.props;
 ---
 
 <!doctype html>
@@ -37,6 +38,23 @@ const { title, description, locale = "en" } = Astro.props;
     <ClientRouter />
   </head>
   <body>
+    <div class:list={["backdrop", `is-${backdrop}`]} aria-hidden="true">
+      <picture>
+        <source
+          media="(max-aspect-ratio: 3/4)"
+          srcset="/backdrop/shop-portrait-720.jpg 720w, /backdrop/shop-portrait-1080.jpg 1080w"
+          sizes="100vw"
+        />
+        <img
+          src="/backdrop/shop-1920.jpg"
+          srcset="/backdrop/shop-1280.jpg 1280w, /backdrop/shop-1920.jpg 1920w"
+          sizes="100vw"
+          alt=""
+          decoding="async"
+          fetchpriority="high"
+        />
+      </picture>
+    </div>
     <a class="skip" href="#main">Skip to content</a>
     <Nav locale={locale} />
     <main id="main"><slot /></main>
@@ -44,7 +62,54 @@ const { title, description, locale = "en" } = Astro.props;
   </body>
 </html>
 
+<script>
+  import { initHoverScramble } from "../../../shared/web/scramble";
+  import { initBackdrop } from "../scripts/motion/backdrop";
+  import { reducedMotion } from "../scripts/motion/env";
+  import { mountOnPage } from "../scripts/motion/page";
+
+  mountOnPage(".backdrop.is-full", initBackdrop);
+  mountOnPage("[data-hover-scramble]", () => initHoverScramble({ reducedMotion: reducedMotion() }));
+</script>
+
 <style>
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  .backdrop img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 62%;
+  }
+
+  .backdrop::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 110% 90% at 50% 55%, transparent 45%, rgba(10, 10, 15, 0.82) 100%);
+  }
+
+  .backdrop.is-full::after {
+    background:
+      linear-gradient(
+        rgb(10 10 15 / calc(var(--shade, 0) * 0.5)),
+        rgb(10 10 15 / calc(var(--shade, 0) * 0.86)) 70%
+      ),
+      radial-gradient(ellipse 110% 90% at 50% 55%, transparent 45%, rgba(10, 10, 15, 0.82) 100%);
+  }
+
+  .backdrop.is-dim::after {
+    background:
+      linear-gradient(rgba(10, 10, 15, 0.5), rgba(10, 10, 15, 0.86) 70%),
+      radial-gradient(ellipse 110% 90% at 50% 55%, transparent 45%, rgba(10, 10, 15, 0.82) 100%);
+  }
+
   .skip {
     position: fixed;
     top: 12px;

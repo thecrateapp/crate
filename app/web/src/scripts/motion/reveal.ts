@@ -7,7 +7,7 @@ export function initReveals(root: ParentNode = document): () => void {
         observer.unobserve(entry.target);
       }
     },
-    { threshold: 0.2, rootMargin: "0px 0px -8% 0px" },
+    { threshold: 0, rootMargin: "0px 0px -8% 0px" },
   );
   root
     .querySelectorAll("[data-reveal]")

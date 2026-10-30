@@ -1,4 +1,4 @@
-@import "../../shared/fonts/poppins.css";
+@import "../../shared/fonts/roboto.css";
 @import "@fontsource/jetbrains-mono/400.css";
 @import "tailwindcss";
 
@@ -15,8 +15,7 @@
 
 @font-face {
   font-family: "Bricolage Grotesque";
-  src: url("/fonts/bricolage-grotesque-latin-opsz-normal.woff2")
-    format("woff2");
+  src: url("/fonts/bricolage-grotesque-latin-opsz-normal.woff2") format("woff2");
   font-weight: 200 800;
   font-display: swap;
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
@@ -36,8 +35,8 @@
   --cyan: #06b6d4;
   --cyan-hi: #67e8f9;
   --amber: #fbbf24;
-  --display: "Bricolage Grotesque", "Poppins", system-ui, sans-serif;
-  --sans: "Poppins", system-ui, sans-serif;
+  --display: "Bricolage Grotesque", "Roboto", system-ui, sans-serif;
+  --sans: "Roboto", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --nav-h: 68px;
 
@@ -78,6 +77,37 @@ body {
 
 html {
   scroll-padding-top: calc(var(--nav-h) + 24px);
+}
+
+body {
+  background: transparent;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.backdrop img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 62%;
+}
+
+.backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(10, 10, 15, 0.5), rgba(10, 10, 15, 0.86) 70%),
+    radial-gradient(
+      ellipse 110% 90% at 50% 55%,
+      transparent 45%,
+      rgba(10, 10, 15, 0.82) 100%
+    );
 }
 
 body::after {
@@ -268,8 +298,10 @@ html.menu-open body {
   position: relative;
   color: var(--fg-2);
   text-decoration: none;
-  font-size: 13px;
-  letter-spacing: 0.01em;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   transition: color 0.3s var(--ease-snap);
   animation: fade-in 0.5s var(--ease-out) both;
   animation-delay: calc(80ms + var(--i, 0) * 60ms);
@@ -280,7 +312,9 @@ html.menu-open body {
   color: var(--fg);
 }
 
-.nav-links a.is-current {
+.nav-links a.is-current,
+.nav-links a.is-accent,
+.menu-site a.is-accent {
   color: var(--cyan-hi);
 }
 
@@ -346,11 +380,12 @@ html.menu-open body {
   border-top: 1px solid var(--line);
   color: var(--fg);
   text-decoration: none;
-  font-family: var(--display);
-  font-weight: 700;
-  font-size: 1.4rem;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
+  font-family: var(--mono);
+  font-weight: 400;
+  font-size: clamp(1rem, 4.4vw, 1.25rem);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1.2;
 }
 
 .menu-site a.is-current {

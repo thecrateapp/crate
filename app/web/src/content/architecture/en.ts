@@ -40,7 +40,7 @@ export interface ArchitecturePage extends PageIntro {
 
 export const architecture: ArchitecturePage = {
   meta: {
-    title: "Architecture — Crate",
+    title: "Architecture · Crate",
     description:
       "How Crate is built: a FastAPI core with a Go read plane in front, workers that own every write, a transactional outbox feeding Redis Streams, and the decisions behind them.",
   },

@@ -6,7 +6,7 @@ export interface AdminPage extends PageIntro {
 
 export const admin: AdminPage = {
   meta: {
-    title: "Admin — Crate",
+    title: "Admin · Crate",
     description:
       "Library health checks, staged imports, acquisition, enrichment, a signed genre taxonomy, analysis coverage, live operations, and opt-in AI agents over MCP and in Telegram for your Crate server.",
   },

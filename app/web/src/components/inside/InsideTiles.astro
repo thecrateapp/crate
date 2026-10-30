@@ -74,9 +74,7 @@ const tiles = [
     tiles.map((tile, index) => (
       <li style={`--i:${index}`} data-tile={tile.id}>
         <a href={tile.href}>
-          <span class="viz-label">
-            <b>{String(index + 1).padStart(2, "0")}</b> {tile.title}
-          </span>
+          <span class="viz-label">{tile.title}</span>
           <span class="lead">{tile.lead}</span>
           <span class="art" aria-hidden="true">
             {tile.id === "eq" && (

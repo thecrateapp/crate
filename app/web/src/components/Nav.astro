@@ -24,7 +24,7 @@ const links = [
   <nav class="links" aria-label="Primary">
     {
       links.map((link, index) => (
-        <a href={link.href} class:list={{ "is-accent": link.accent }} style={`--i:${index}`}>
+        <a href={link.href} class:list={{ "is-accent": link.accent }} style={`--i:${index}`} data-hover-scramble>
           {link.label}
         </a>
       ))

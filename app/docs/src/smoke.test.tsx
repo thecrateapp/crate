@@ -16,6 +16,11 @@ import App from "./App";
 beforeEach(() => {
   vi.spyOn(window, "scrollTo").mockImplementation(() => {});
   Element.prototype.scrollIntoView = () => {};
+  window.matchMedia = ((query: string) => ({
+    matches: query.includes("pointer: fine"),
+    addEventListener() {},
+    removeEventListener() {},
+  })) as unknown as typeof window.matchMedia;
 });
 
 afterEach(() => {
@@ -295,6 +300,60 @@ describe("docs app", () => {
         .getByRole("link", { name: "Docs" })
         .getAttribute("aria-current"),
     ).toBe("true");
+  });
+
+  it("matches the website navigation, with the manifesto first and Install highlighted", () => {
+    render(<App />);
+
+    const primary = screen.getByRole("navigation", { name: "Primary" });
+    const labels = within(primary)
+      .getAllByRole("link")
+      .map((link) => link.textContent);
+    expect(labels).toEqual([
+      "Manifesto",
+      "Listen",
+      "Admin",
+      "Architecture",
+      "Developers",
+      "Install",
+      "Docs",
+      "GitHub",
+    ]);
+    const install = within(primary).getByRole("link", { name: "Install" });
+    expect(install.getAttribute("href")).toBe("https://cratemusic.app/install");
+    expect(install.className).toContain("is-accent");
+  });
+
+  it("shows the website's record shop backdrop behind the docs", () => {
+    const { container } = render(<App />);
+
+    const backdrop = container.querySelector(".backdrop");
+    expect(backdrop?.getAttribute("aria-hidden")).toBe("true");
+    expect(backdrop?.querySelector("img")?.getAttribute("src")).toBe(
+      "/backdrop/shop-1920.jpg",
+    );
+  });
+
+  it("scrambles the mono navigation labels on hover like the website", () => {
+    render(<App />);
+
+    const primary = screen.getByRole("navigation", { name: "Primary" });
+    const listen = within(primary).getByRole("link", { name: "Listen" });
+    const label = listen.querySelector<HTMLElement>("[data-hover-scramble]");
+    expect(label?.textContent).toBe("Listen");
+
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(performance, "now").mockReturnValue(0);
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+
+    fireEvent.mouseOver(listen, { relatedTarget: document.body });
+    expect(frames).toHaveLength(1);
+    for (let now = 16; frames.length; now += 16) frames.shift()!(now);
+
+    expect(label?.textContent).toBe("Listen");
   });
 
   it("marks the current document in the sidebar", async () => {
