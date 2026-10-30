@@ -95,6 +95,7 @@ _CONTEXTUAL_RADIO_DRIFT_SIGMA = 0.004
 _TRACK_RADIO_DRIFT_SIGMA = 0.008
 _GRAPH_CACHE_TTL_SECONDS = 3600
 _DB_EXCLUDE_ID_LIMIT = 50
+_DELIVERED_SONG_LIMIT = 500
 _SEEDED_RADIO_SIMILAR_LIMIT = 24
 _SEEDED_RADIO_CANDIDATE_POOL_SIZE = 140
 _RADIO_EXPANDED_POOL_SIZE = 420
@@ -588,8 +589,6 @@ def _generate_global_batch(session: dict, count: int = _BATCH_SIZE) -> list[dict
     cursor = int(session.get("global_cursor") or 0)
     rotation = radio_rotation_enabled()
     known_buffer = rotation and session.pop("buffer_context_known", False)
-    if known_buffer:
-        cursor = 0
     excluded = set(session.get("excluded_global_track_uids") or [])
     buffer_refs = set(session.get("buffer_refs") or [])
     buffer_songs = (
@@ -610,6 +609,8 @@ def _generate_global_batch(session: dict, count: int = _BATCH_SIZE) -> list[dict
         history = history_for_candidates(
             session["user_id"], None, now - RECENT_PLAY_WINDOW, now=now
         )
+    delivered = _delivered_song_keys(session) if rotation else []
+    cooled = set(history) | set(delivered)
     fresh_songs = (
         {
             canonical_key(track) or ("", str(track.get("global_track_uid")))
@@ -617,7 +618,7 @@ def _generate_global_batch(session: dict, count: int = _BATCH_SIZE) -> list[dict
             if not _global_track_in_buffer(track, buffer_refs)
             and track.get("global_track_uid") not in excluded
             and canonical_key(track) not in buffer_songs
-            and canonical_key(track) not in history
+            and canonical_key(track) not in cooled
         }
         if rotation
         else set()
@@ -635,38 +636,52 @@ def _generate_global_batch(session: dict, count: int = _BATCH_SIZE) -> list[dict
             if _global_track_in_buffer(track, buffer_refs)
             and (key := canonical_key(track)) is not None
         )
-    if rotation and history:
+    if rotation and cooled and cursor < len(tracks):
         pending = tracks[cursor:]
         # Catalog-only fallback queues contain the seed artist/album, not scored neighbors.
         tracks = (
             tracks[:cursor]
-            + [t for t in pending if canonical_key(t) not in history]
-            + [t for t in pending if canonical_key(t) in history]
+            + [t for t in pending if canonical_key(t) not in cooled]
+            + [t for t in pending if canonical_key(t) in cooled]
         )
         session["global_tracks"] = tracks
     selected: list[dict] = []
-    while cursor < len(tracks) and len(selected) < count:
-        track = tracks[cursor]
-        cursor += 1
-        if _global_track_in_buffer(track, buffer_refs):
-            continue
-        if track.get("global_track_uid") in excluded:
-            continue
-        song_key = canonical_key(track)
-        if rotation and song_key is not None and song_key in buffer_songs:
-            continue
-        selected.append(track)
-        if rotation and song_key is not None:
-            buffer_songs.add(song_key)
+
+    def select(pool):
+        nonlocal cursor
+        for track in pool:
+            if len(selected) >= count:
+                break
+            cursor += 1
+            if _global_track_in_buffer(track, buffer_refs):
+                continue
+            if track.get("global_track_uid") in excluded:
+                continue
+            song_key = canonical_key(track)
+            if rotation and song_key is not None and song_key in buffer_songs:
+                continue
+            selected.append(track)
+            if rotation and song_key is not None:
+                buffer_songs.add(song_key)
+
+    select(tracks[cursor:])
+    if known_buffer and not selected and session.get("global_source_exhausted"):
+        recency = {key: index for index, key in enumerate(delivered)}
+
+        def cooling_order(track):
+            key = canonical_key(track)
+            return key in cooled, recency.get(key, -1) if key is not None else -1
+
+        select(sorted(tracks, key=cooling_order))
     session["global_cursor"] = cursor
     queue_exhausted = session["global_cursor"] >= len(tracks)
     session["global_exhausted"] = bool(
-        queue_exhausted and session.get("global_source_exhausted")
+        queue_exhausted
+        and session.get("global_source_exhausted")
+        and (not rotation or not selected)
     )
-    if known_buffer and any(
-        track.get("global_track_uid") not in excluded for track in tracks
-    ):
-        session["global_exhausted"] = False
+    if rotation:
+        _record_delivered_songs(session, selected)
     return [_global_radio_track_payload(track) for track in selected]
 
 
@@ -869,19 +884,19 @@ def _apply_buffer_context(session: dict, refs: list[str] | None) -> None:
         return
     if rotation:
         session["buffer_refs"] = list(refs)
-        session["used_track_ids"] = [
+        session["buffer_track_ids"] = [
             int(row["track_id"]) for row in rows if row.get("track_id") is not None
         ]
+        session["used_track_ids"] = list(
+            dict.fromkeys(
+                [*session.get("used_track_ids", []), *session["buffer_track_ids"]]
+            )
+        )[-_DELIVERED_SONG_LIMIT:]
         session["used_titles"] = [_title_key(row) for row in rows]
         session["used_song_keys"] = sorted(
             {key for row in rows if (key := _song_key(row))}
+            | set(session.get("seed_song_keys") or [])
         )
-        counts: dict[str, int] = {}
-        for row in rows:
-            key = _artist_key(row)
-            if key:
-                counts[key] = counts.get(key, 0) + 1
-        session["used_artist_counts"] = counts
     else:
         session["used_track_ids"] = list(
             dict.fromkeys(
@@ -1088,6 +1103,26 @@ def _db_exclude_ids(used_track_ids: list[int]) -> set[int]:
     return set(used_track_ids[-_DB_EXCLUDE_ID_LIMIT:])
 
 
+def _delivered_song_keys(session: dict) -> list[tuple[str, str]]:
+    return [
+        (key[0], key[1])
+        for key in session.get("delivered_song_keys") or []
+        if isinstance(key, (list, tuple)) and len(key) == 2
+    ][-_DELIVERED_SONG_LIMIT:]
+
+
+def _record_delivered_songs(session: dict, tracks: list[dict]) -> None:
+    delivered = dict.fromkeys(_delivered_song_keys(session))
+    for track in tracks:
+        key = canonical_key(track)
+        if key is not None:
+            delivered.pop(key, None)
+            delivered[key] = None
+    session["delivered_song_keys"] = [
+        list(key) for key in list(delivered)[-_DELIVERED_SONG_LIMIT:]
+    ]
+
+
 def _title_key(candidate: dict) -> str:
     artist_key = _artist_key(candidate)
     title_key = canonical_track_title_key(str(candidate.get("title") or ""))
@@ -1242,11 +1277,8 @@ def _seeded_radio_candidate_rows(
         return []
 
     rotation = radio_rotation_enabled()
-    exclude_ids = (
-        set(used_track_ids + seed_track_ids)
-        if rotation
-        else _db_exclude_ids(used_track_ids + seed_track_ids)
-    )
+    hard_ids = set(used_track_ids + seed_track_ids)
+    exclude_ids = _db_exclude_ids(used_track_ids + seed_track_ids)
     limit = min(
         _SEEDED_RADIO_CANDIDATE_POOL_SIZE,
         max(_RADIO_CANDIDATE_POOL_SIZE, count * _RADIO_PREFETCH_MULTIPLIER * 2),
@@ -1273,7 +1305,7 @@ def _seeded_radio_candidate_rows(
                 [
                     row
                     for row in values
-                    if row.get("id") not in exclude_ids
+                    if row.get("id") not in hard_ids
                     and _song_key(row) not in (used_song_keys or set())
                     and not _too_close_to_disliked(row, disliked_vectors or [])
                 ]
@@ -1605,7 +1637,7 @@ def _select_radio_candidate_from_rows(
     if candidate_scores is not None:
         candidate_scores.extend(ranked)
 
-    if best and rotation_history:
+    if best and rotation_history and canonical_key(best) in rotation_history:
         fresh = [
             (candidate, distance)
             for candidate, score, distance in ranked
@@ -1649,19 +1681,29 @@ def _generate_batch(
     )
     used_track_ids = list(session["used_track_ids"])
     seed_track_ids = [int(track_id) for track_id in session.get("seed_track_ids") or []]
-    if (
-        radio_rotation_enabled()
-        and isinstance(session.get("buffer_refs"), list)
-        and session.get("mode") != "discovery"
-    ):
-        seed_track_ids = []
-    used_ids = set(used_track_ids) | set(seed_track_ids)
-    used_titles = set(session["used_titles"])
+    rotation = radio_rotation_enabled() and session.get("mode") != "discovery"
+    hard_track_ids = (
+        list(session.get("buffer_track_ids") or [])
+        if rotation and isinstance(session.get("buffer_refs"), list)
+        else list(_db_exclude_ids(used_track_ids))
+        if rotation
+        else used_track_ids
+    )
+    used_ids = set(hard_track_ids) | set(seed_track_ids)
+    used_titles = (
+        set(session["used_titles"])
+        if not rotation or isinstance(session.get("buffer_refs"), list)
+        else set()
+    )
     used_song_keys = {
         str(song_key)
         for song_key in (session.get("used_song_keys") or [])
         if str(song_key or "").strip()
     }
+    if rotation:
+        used_song_keys = set(session.get("seed_song_keys") or []) | (
+            used_song_keys if isinstance(session.get("buffer_refs"), list) else set()
+        )
     session_artist_counts = _normalize_artist_counts(
         session.get("used_artist_counts") or {}
     )
@@ -1702,13 +1744,14 @@ def _generate_batch(
             now=now,
             session=db_session,
         )
+        history = {**dict.fromkeys(_delivered_song_keys(session)), **history}
         rotation_options = {"rotation_history": history, "rng": rng}
 
     tracks: list[dict] = []
     if is_seeded_context_radio:
         candidate_rows = _seeded_radio_candidate_rows(
             target,
-            used_track_ids,
+            hard_track_ids,
             seed_track_ids,
             seed_artists,
             seed_genres,
@@ -1994,6 +2037,9 @@ def _generate_batch(
 
     # Update session state
     session["used_track_ids"] = used_track_ids
+    if rotation:
+        session["used_track_ids"] = used_track_ids[-_DELIVERED_SONG_LIMIT:]
+        _record_delivered_songs(session, tracks)
     session["used_titles"] = list(used_titles)
     session["used_song_keys"] = sorted(used_song_keys)
     session["used_artist_counts"] = session_artist_counts

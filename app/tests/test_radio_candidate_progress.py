@@ -1,5 +1,5 @@
-from copy import deepcopy
 import json
+from copy import deepcopy
 from pathlib import Path
 
 from crate import radio_engine
@@ -31,14 +31,15 @@ def _retrieve(monkeypatch, rows, used_ids, **kwargs):
     return result, calls
 
 
-def test_retrieval_excludes_all_used_ids_instead_of_only_last_fifty(monkeypatch):
+def test_retrieval_bounds_historical_id_parameters_without_emptying_the_pool(
+    monkeypatch,
+):
     monkeypatch.setenv("CRATE_RADIO_ROTATION_ENABLED", "true")
     rows, calls = _retrieve(
         monkeypatch, [_row(i) for i in range(1, 221)], list(range(1, 141))
     )
     assert len(rows) >= 20
-    assert all(row["id"] > 140 for row in rows)
-    assert set(range(1, 141)) <= calls[0][0]
+    assert all(len(excluded) <= 50 for excluded, _limit in calls)
 
 
 def test_candidate_pool_expands_when_rows_are_ineligible_song_families(monkeypatch):
@@ -117,7 +118,7 @@ def test_recent_history_widens_the_candidate_pool_in_one_query(
     assert calls[0][1] > 120
 
 
-def test_active_buffer_replaces_historical_exclusions_and_keeps_seed_anchor(
+def test_active_buffer_keeps_cooled_memory_artist_counts_and_seed_exclusions(
     monkeypatch,
 ):
     monkeypatch.setenv("CRATE_RADIO_ROTATION_ENABLED", "true")
@@ -130,24 +131,34 @@ def test_active_buffer_replaces_historical_exclusions_and_keeps_seed_anchor(
         "used_titles": ["old::song"],
         "used_song_keys": ["old::song"],
         "seed_song_keys": ["seed::song"],
+        "delivered_song_keys": [["old", "song"]],
+        "used_artist_counts": {"old": 4},
     }
     radio_engine._apply_buffer_context(session, ["201"])
-    assert session["used_track_ids"] == [201]
-    assert set(session["used_song_keys"]) == {radio_engine._song_key(row)}
+    assert 201 in session["used_track_ids"]
+    assert radio_engine._song_key(row) in session["used_song_keys"]
+    assert session["delivered_song_keys"] == [["old", "song"]]
+    assert session["used_artist_counts"].get("old") == 4
     assert session["seed_song_keys"] == ["seed::song"]
     assert session["used_titles"] == [radio_engine._title_key(row)]
 
 
-def test_explicit_empty_buffer_releases_old_exclusions(monkeypatch):
+def test_explicit_empty_buffer_keeps_delivered_memory_counts_and_seed(monkeypatch):
     monkeypatch.setenv("CRATE_RADIO_ROTATION_ENABLED", "true")
     session = {
         "used_track_ids": [7],
         "used_titles": ["a::song"],
         "used_song_keys": ["a::song"],
+        "seed_track_ids": [1],
+        "seed_song_keys": ["seed::song"],
+        "delivered_song_keys": [["a", "song"]],
+        "used_artist_counts": {"a": 3},
     }
     radio_engine._apply_buffer_context(session, [])
-    assert session["used_track_ids"] == []
-    assert session["used_song_keys"] == session["used_titles"] == []
+    assert session["delivered_song_keys"] == [["a", "song"]]
+    assert session["used_artist_counts"] == {"a": 3}
+    assert session["seed_track_ids"] == [1]
+    assert session["seed_song_keys"] == ["seed::song"]
     assert session["buffer_refs"] == []
 
 

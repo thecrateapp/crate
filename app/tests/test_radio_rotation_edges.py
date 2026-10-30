@@ -176,7 +176,7 @@ def test_global_expansion_preserves_consumed_prefix_after_rotation(monkeypatch):
 
 
 @pytest.mark.parametrize("buffer_refs", [[], ["global-1"]])
-def test_global_single_track_remains_retryable_with_known_buffer(
+def test_global_single_track_recovers_when_released_and_exhausts_when_buffered(
     monkeypatch, buffer_refs
 ):
     monkeypatch.setenv("CRATE_RADIO_ROTATION_ENABLED", "true")
@@ -197,7 +197,7 @@ def test_global_single_track_remains_retryable_with_known_buffer(
     assert [track["global_track_uid"] for track in result] == (
         [] if buffer_refs else ["global-1"]
     )
-    assert state["global_exhausted"] is False
+    assert state["global_exhausted"] is bool(buffer_refs)
 
 
 @pytest.mark.parametrize("rotation", [True, False])
@@ -287,3 +287,10 @@ def test_global_known_buffer_is_consumed_by_its_own_request(
         "global-2",
         "global-3",
     ]
+    assert radio_engine._generate_global_batch(state, 1) == []
+    assert state["global_exhausted"] is True
+
+    radio_engine._apply_buffer_context(state, [])
+    recovered = radio_engine._generate_global_batch(state, 1)
+    assert [row["global_track_uid"] for row in recovered] == ["global-1"]
+    assert state["global_cursor"] == 4
