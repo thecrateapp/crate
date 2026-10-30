@@ -19,6 +19,7 @@ import {
   useParams,
 } from "react-router";
 
+import { initHoverScramble } from "../../shared/web/scramble";
 import { MarkdownArticle } from "@/components/MarkdownArticle";
 import {
   docsBySection,
@@ -38,10 +39,12 @@ const SITE = "https://cratemusic.app";
 const GITHUB = "https://github.com/thecrateapp/crate";
 
 const siteLinks = [
+  { href: `${SITE}/why`, label: "Manifesto" },
   { href: `${SITE}/listen`, label: "Listen" },
   { href: `${SITE}/admin`, label: "Admin" },
   { href: `${SITE}/architecture`, label: "Architecture" },
   { href: `${SITE}/developers`, label: "Developers" },
+  { href: `${SITE}/install`, label: "Install", accent: true },
   { href: "/", label: "Docs", docs: true },
   { href: GITHUB, label: "GitHub" },
 ];
@@ -63,17 +66,39 @@ function SiteLinks({ onNavigate }: { onNavigate?: () => void }) {
         onClick={onNavigate}
         style={{ "--i": index } as CSSProperties}
       >
-        {link.label}
+        <span data-hover-scramble>{link.label}</span>
       </Link>
     ) : (
       <a
         key={link.label}
         href={link.href}
+        className={link.accent ? "is-accent" : undefined}
         style={{ "--i": index } as CSSProperties}
       >
-        {link.label}
+        <span data-hover-scramble>{link.label}</span>
       </a>
     ),
+  );
+}
+
+function Backdrop() {
+  return (
+    <div className="backdrop" aria-hidden="true">
+      <picture>
+        <source
+          media="(max-aspect-ratio: 3/4)"
+          srcSet="/backdrop/shop-portrait-720.jpg 720w, /backdrop/shop-portrait-1080.jpg 1080w"
+          sizes="100vw"
+        />
+        <img
+          src="/backdrop/shop-1920.jpg"
+          srcSet="/backdrop/shop-1280.jpg 1280w, /backdrop/shop-1920.jpg 1920w"
+          sizes="100vw"
+          alt=""
+          decoding="async"
+        />
+      </picture>
+    </div>
   );
 }
 
@@ -464,7 +489,7 @@ function DocMetaLine({ doc, loaded }: { doc: DocEntry; loaded?: LoadedDoc }) {
     <div className="doc-meta">
       <p className="eyebrow">
         <Link to={`/${doc.section}`}>
-          <b>{sectionMeta[doc.section].label}</b>
+          <b data-hover-scramble>{sectionMeta[doc.section].label}</b>
         </Link>
         {details.join(" · ")}
       </p>
@@ -474,7 +499,7 @@ function DocMetaLine({ doc, loaded }: { doc: DocEntry; loaded?: LoadedDoc }) {
         target="_blank"
         rel="noreferrer"
       >
-        View source
+        <span data-hover-scramble>View source</span>
       </a>
     </div>
   );
@@ -629,8 +654,17 @@ function AppShell() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  useEffect(
+    () =>
+      initHoverScramble({
+        reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+      }),
+    [],
+  );
+
   return (
     <div className="docs-shell">
+      <Backdrop />
       <a className="skip-link" href="#content">
         Skip to content
       </a>
