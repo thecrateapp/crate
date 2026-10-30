@@ -8,8 +8,9 @@ from sqlalchemy import text
 from sqlalchemy.sql.elements import TextClause
 
 from crate.db.tx import read_scope
-from crate.smart_mix.compatible import CompatibleTrackCandidate
+from crate.smart_mix.compatible import CompatibleTrackCandidate, seed_tempo_window
 from crate.smart_mix.models import TrackMixProfile
+from crate.smart_mix.transition_fit import TransitionFitMode
 
 
 CANDIDATE_WINDOW_FACTOR = 2
@@ -140,9 +141,12 @@ _CANDIDATE_SQL = text(
           AND profile.bpm IS NOT NULL
           AND (
               :seed_bpm IS NULL
-              OR profile.bpm BETWEEN :seed_bpm * 0.88 AND :seed_bpm * 1.12
-              OR profile.bpm BETWEEN :seed_bpm * 0.44 AND :seed_bpm * 0.56
-              OR profile.bpm BETWEEN :seed_bpm * 1.76 AND :seed_bpm * 2.24
+              OR profile.bpm BETWEEN :seed_bpm * (1.0 - :tempo_window)
+                                 AND :seed_bpm * (1.0 + :tempo_window)
+              OR profile.bpm BETWEEN :seed_bpm * 0.5 * (1.0 - :tempo_window)
+                                 AND :seed_bpm * 0.5 * (1.0 + :tempo_window)
+              OR profile.bpm BETWEEN :seed_bpm * 2.0 * (1.0 - :tempo_window)
+                                 AND :seed_bpm * 2.0 * (1.0 + :tempo_window)
           )
           AND (
               :seed_energy IS NULL
@@ -201,6 +205,7 @@ def get_compatible_track_inputs(
     entity_uid: str,
     *,
     max_candidates: int = 500,
+    mode: TransitionFitMode = "auto",
 ) -> tuple[CompatibleTrackCandidate | None, list[CompatibleTrackCandidate]]:
     capped_candidates = max(1, min(int(max_candidates), 500))
     with read_scope() as session:
@@ -219,6 +224,7 @@ def get_compatible_track_inputs(
                     "seed_track_id": seed.track_id,
                     "seed_bpm": seed.profile.bpm,
                     "seed_energy": seed.profile.global_energy,
+                    "tempo_window": seed_tempo_window(seed, mode=mode),
                     "max_candidates": capped_candidates,
                     "candidate_window": capped_candidates * CANDIDATE_WINDOW_FACTOR,
                 },

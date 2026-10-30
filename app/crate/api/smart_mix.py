@@ -97,22 +97,25 @@ def compatible_tracks(
     scope: Literal["local"] = Query(default="local"),
     limit: int = Query(default=20, ge=1, le=100),
     planner_version: Literal["smart-mix-v2"] = Query(default="smart-mix-v2"),
+    context: Literal["auto", "beatmatch", "smooth"] = Query(default="auto"),
 ) -> CompatibleTracksResponse:
     _require_vdj_scope(request, "vdj.smart_mix.read")
     seed, candidates = get_compatible_track_inputs(
         str(entity_uid),
         max_candidates=500,
+        mode=context,
     )
     if seed is None or seed.profile.quality is MixProfileQuality.UNAVAILABLE:
         raise HTTPException(
             status_code=404,
             detail="Track or Smart Mix profile not found",
         )
-    ranked = rank_compatible_tracks(seed, candidates, limit=limit)
+    ranked = rank_compatible_tracks(seed, candidates, limit=limit, mode=context)
     return CompatibleTracksResponse(
         seed_track_entity_uid=seed.track_entity_uid,
         scope=scope,
         planner_version=planner_version,
+        context=context,
         items=[
             CompatibleTrackResponse(
                 track_id=item.track_id,
@@ -134,6 +137,13 @@ def compatible_tracks(
                     valence=item.score_breakdown.valence,
                     bliss=item.score_breakdown.bliss,
                     genre=item.score_breakdown.genre,
+                    transition=item.score_breakdown.transition,
+                    beatmatch_affinity=item.score_breakdown.beatmatch_affinity,
+                    beatmatchable=item.score_breakdown.beatmatchable,
+                    tempo_flow=item.score_breakdown.tempo_flow,
+                    level=item.score_breakdown.level,
+                    brightness=item.score_breakdown.brightness,
+                    silence=item.score_breakdown.silence,
                 ),
                 fallback_reasons=list(item.fallback_reasons),
             )

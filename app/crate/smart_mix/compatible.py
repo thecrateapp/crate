@@ -8,6 +8,11 @@ from typing import Iterable, Sequence
 from crate.smart_mix.models import MixProfileQuality, TrackMixProfile
 from crate.smart_mix.planner import CompatibilityScore, score_compatibility
 from crate.smart_mix.policy import PLANNER_POLICY, PlannerPolicy
+from crate.smart_mix.transition_fit import (
+    TransitionFitMode,
+    genre_beatmatch_prior,
+    pair_genre_prior,
+)
 
 
 _VARIANT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
@@ -72,10 +77,13 @@ def rank_compatible_tracks(
     candidates: Iterable[CompatibleTrackCandidate],
     *,
     limit: int,
+    mode: TransitionFitMode = "auto",
     policy: PlannerPolicy = PLANNER_POLICY,
 ) -> list[CompatibleTrackResult]:
     capped_limit = max(1, min(int(limit), 100))
     seed_variant = _variant(seed.title)
+    seed_prior = genre_beatmatch_prior(seed.genres)
+    fixed_affinity = {"beatmatch": 1.0, "smooth": 0.0}.get(mode)
     scored: list[tuple[CompatibleTrackCandidate, CompatibleTrackResult]] = []
     for candidate in candidates:
         if (
@@ -92,6 +100,10 @@ def rank_compatible_tracks(
                 candidate.bliss_vector,
             ),
             genre_similarity=_genre_similarity(seed.genres, candidate.genres),
+            beatmatch_affinity=fixed_affinity,
+            genre_prior=pair_genre_prior(
+                seed_prior, genre_beatmatch_prior(candidate.genres)
+            ),
             policy=policy,
         )
         fallback_reasons = _fallback_reasons(candidate, breakdown, policy)
@@ -228,8 +240,29 @@ def _genre_similarity(
     return len(left & right) / len(union) if union else None
 
 
+def seed_tempo_window(
+    seed: CompatibleTrackCandidate,
+    *,
+    mode: TransitionFitMode = "auto",
+    policy: PlannerPolicy = PLANNER_POLICY,
+) -> float:
+    if mode == "beatmatch":
+        return policy.strict_tempo_tolerance
+    if mode == "smooth":
+        return policy.relaxed_tempo_tolerance
+    prior = genre_beatmatch_prior(seed.genres)
+    if prior is None:
+        prior = policy.default_beatmatch_prior
+    return (
+        policy.strict_tempo_tolerance
+        if prior >= 0.5
+        else policy.relaxed_tempo_tolerance
+    )
+
+
 __all__ = [
     "CompatibleTrackCandidate",
     "CompatibleTrackResult",
     "rank_compatible_tracks",
+    "seed_tempo_window",
 ]

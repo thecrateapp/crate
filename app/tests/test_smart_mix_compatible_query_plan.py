@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import uuid
 
+import pytest
 from sqlalchemy import text
 
 from crate.db.queries.smart_mix_compatible import (
@@ -109,6 +110,7 @@ def test_production_scale_candidate_query_uses_profile_indexes(
         "seed_track_id": _track_id(seed_uid),
         "seed_bpm": 120.0,
         "seed_energy": 0.7,
+        "tempo_window": 0.12,
         "max_candidates": 500,
         "candidate_window": 1_000,
     }
@@ -124,6 +126,44 @@ def test_production_scale_candidate_query_uses_profile_indexes(
     encoded = json.dumps(raw_plan)
     assert "idx_track_mix_profiles_compatible_" in encoded
     assert not _has_profile_seq_scan(raw_plan)
+
+
+@pytest.mark.parametrize(
+    ("mode", "expects_wide_tempo"),
+    [("beatmatch", False), ("smooth", True), ("auto", True)],
+)
+def test_smooth_context_widens_the_tempo_prefilter(
+    pg_db,
+    tmp_path: Path,
+    mode: str,
+    expects_wide_tempo: bool,
+) -> None:
+    del pg_db
+    seed_uid = _seed_tracks(tmp_path, count=520)
+
+    seed, candidates = get_compatible_track_inputs(
+        seed_uid,
+        max_candidates=500,
+        mode=mode,
+    )
+
+    assert seed is not None
+    wide = [
+        item
+        for item in candidates
+        if item.profile.bpm is not None
+        and 0.12
+        < min(
+            abs(item.profile.bpm / factor / 120.0 - 1.0) for factor in (0.5, 1.0, 2.0)
+        )
+    ]
+    assert bool(wide) is expects_wide_tempo
+    assert all(
+        min(abs(item.profile.bpm / factor / 120.0 - 1.0) for factor in (0.5, 1.0, 2.0))
+        <= 0.25 + 1e-9
+        for item in candidates
+        if item.profile.bpm is not None
+    )
 
 
 def _seed_tracks(tmp_path: Path, *, count: int) -> str:

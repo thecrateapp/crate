@@ -4,7 +4,6 @@ from dataclasses import dataclass
 import math
 from typing import Literal, cast
 
-from crate.smart_mix.camelot import CamelotRelationship, camelot_relationship
 from crate.smart_mix.models import (
     MixProfileQuality,
     TrackMixProfile,
@@ -13,7 +12,14 @@ from crate.smart_mix.models import (
     TransitionMode,
     TransitionPlan,
 )
+from crate.smart_mix import transition_fit
 from crate.smart_mix.policy import PLANNER_POLICY, PlannerPolicy
+from crate.smart_mix.transition_fit import (
+    TransitionEdges,
+    normalized_tempo,
+    score_transition_fit,
+    tempo_ratio,
+)
 from crate.smart_mix.versions import MEASUREMENT_VERSION
 
 
@@ -39,8 +45,15 @@ class CompatibilityScore:
     valence: float
     bliss: float
     genre: float
+    transition: float
+    beatmatch_affinity: float
+    beatmatchable: bool
+    tempo_flow: float
+    level: float
+    brightness: float
+    silence: float
 
-    def to_dict(self) -> dict[str, float | int | str]:
+    def to_dict(self) -> dict[str, float | int | str | bool]:
         return {
             "plannerVersion": self.planner_version,
             "overall": self.overall,
@@ -53,6 +66,13 @@ class CompatibilityScore:
             "valence": self.valence,
             "bliss": self.bliss,
             "genre": self.genre,
+            "transition": self.transition,
+            "beatmatchAffinity": self.beatmatch_affinity,
+            "beatmatchable": self.beatmatchable,
+            "tempoFlow": self.tempo_flow,
+            "level": self.level,
+            "brightness": self.brightness,
+            "silence": self.silence,
         }
 
 
@@ -62,26 +82,32 @@ def score_compatibility(
     *,
     bliss_similarity: float | None = None,
     genre_similarity: float | None = None,
+    beatmatch_affinity: float | None = None,
+    genre_prior: float | None = None,
     policy: PlannerPolicy = PLANNER_POLICY,
 ) -> CompatibilityScore:
-    tempo = _tempo_score(outgoing.bpm, incoming.bpm)
-    relationship = camelot_relationship(outgoing.camelot, incoming.camelot)
-    harmonic = _harmonic_score(relationship, policy)
-    energy = _continuity_score(outgoing.outro_energy, incoming.intro_energy, policy)
-    danceability = _continuity_score(
-        outgoing.danceability,
-        incoming.danceability,
-        policy,
+    outgoing_edges = TransitionEdges.from_profile(outgoing)
+    incoming_edges = TransitionEdges.from_profile(incoming)
+    affinity = (
+        beatmatch_affinity
+        if beatmatch_affinity is not None
+        else transition_fit.beatmatch_affinity(
+            outgoing_edges,
+            incoming_edges,
+            genre_prior=genre_prior,
+            policy=policy,
+        )
     )
-    valence = _continuity_score(outgoing.valence, incoming.valence, policy)
+    fit = score_transition_fit(
+        outgoing_edges,
+        incoming_edges,
+        beatmatch_affinity=affinity,
+        policy=policy,
+    )
     bliss = _optional_score(bliss_similarity, policy)
     genre = _optional_score(genre_similarity, policy)
     overall = (
-        tempo * policy.tempo_weight
-        + harmonic * policy.harmonic_weight
-        + energy * policy.energy_weight
-        + danceability * policy.danceability_weight
-        + valence * policy.valence_weight
+        fit.overall * (1.0 - policy.bliss_weight - policy.genre_weight)
         + bliss * policy.bliss_weight
         + genre * policy.genre_weight
     )
@@ -89,14 +115,29 @@ def score_compatibility(
         planner_version=policy.version,
         overall=_round_score(overall),
         signal_confidence=_signal_confidence(outgoing, incoming),
-        tempo=_round_score(tempo),
-        harmonic=_round_score(harmonic),
-        harmonic_relationship=cast(HarmonicRelationshipValue, relationship.value),
-        energy=_round_score(energy),
-        danceability=_round_score(danceability),
-        valence=_round_score(valence),
+        tempo=fit.tempo,
+        harmonic=fit.harmonic,
+        harmonic_relationship=cast(
+            HarmonicRelationshipValue, fit.harmonic_relationship
+        ),
+        energy=_round_score(
+            _continuity_score(outgoing.outro_energy, incoming.intro_energy, policy)
+        ),
+        danceability=_round_score(
+            _continuity_score(outgoing.danceability, incoming.danceability, policy)
+        ),
+        valence=_round_score(
+            _continuity_score(outgoing.valence, incoming.valence, policy)
+        ),
         bliss=_round_score(bliss),
         genre=_round_score(genre),
+        transition=fit.overall,
+        beatmatch_affinity=fit.beatmatch_affinity,
+        beatmatchable=fit.beatmatchable,
+        tempo_flow=fit.tempo_flow,
+        level=fit.level,
+        brightness=fit.brightness,
+        silence=fit.silence,
     )
 
 
@@ -148,7 +189,9 @@ def plan_transition(
         )
 
     fallback_reason = _beatmatch_fallback_reason(outgoing, incoming, context, policy)
-    compatibility = score_compatibility(outgoing, incoming, policy=policy)
+    compatibility = score_compatibility(
+        outgoing, incoming, beatmatch_affinity=1.0, policy=policy
+    )
     requested_ms = _transition_duration(context.preferred_duration_ms, policy)
     outgoing_gain_db = _safe_deck_gain(outgoing, 0.0, policy)
     incoming_gain_db = _safe_deck_gain(
@@ -192,7 +235,9 @@ def plan_transition(
                     window.incoming_cue_ms,
                     tempo_ratio,
                 ),
-                confidence=min(compatibility.overall, compatibility.signal_confidence),
+                confidence=min(
+                    compatibility.transition, compatibility.signal_confidence
+                ),
                 outgoing_gain_db=outgoing_gain_db,
                 incoming_gain_db=incoming_gain_db,
                 bass_handoff="balanced" if context.allow_bass_handoff else "none",
@@ -484,13 +529,6 @@ def _previous_beat(profile: TrackMixProfile, position_ms: int) -> int:
     return int(anchor_ms + beats * beat_ms)
 
 
-def _tempo_ratio(outgoing_bpm: float | None, incoming_bpm: float | None) -> float:
-    if not outgoing_bpm or not incoming_bpm:
-        return 1.0
-    normalized_incoming = _normalized_tempo(float(outgoing_bpm), float(incoming_bpm))
-    return float(outgoing_bpm) / normalized_incoming
-
-
 def _long_beatmatch_window(
     outgoing: TrackMixProfile,
     incoming: TrackMixProfile,
@@ -551,7 +589,7 @@ def _has_beat_reference(
 
 
 def _cue_tempo_ratio(outgoing: TrackMixProfile, incoming: TrackMixProfile) -> float:
-    return _tempo_ratio(_outro_beat(outgoing)[0], _intro_beat(incoming)[0])
+    return tempo_ratio(_outro_beat(outgoing)[0], _intro_beat(incoming)[0])
 
 
 def _intro_beat(profile: TrackMixProfile) -> tuple[float | None, int | None]:
@@ -564,31 +602,6 @@ def _outro_beat(profile: TrackMixProfile) -> tuple[float | None, int | None]:
     if profile.outro_bpm and profile.outro_beat_ms is not None:
         return profile.outro_bpm, profile.outro_beat_ms
     return profile.bpm, profile.downbeat_anchor_ms
-
-
-def _normalized_tempo(reference_bpm: float, candidate_bpm: float) -> float:
-    options = (candidate_bpm * 0.5, candidate_bpm, candidate_bpm * 2.0)
-    return min(options, key=lambda value: abs(value - reference_bpm))
-
-
-def _tempo_score(outgoing_bpm: float | None, incoming_bpm: float | None) -> float:
-    if not outgoing_bpm or not incoming_bpm:
-        return 0.5
-    difference = abs(_tempo_ratio(outgoing_bpm, incoming_bpm) - 1.0)
-    return max(0.0, 1.0 - difference / 0.12)
-
-
-def _harmonic_score(
-    relationship: CamelotRelationship,
-    policy: PlannerPolicy,
-) -> float:
-    return {
-        CamelotRelationship.SAME: policy.harmonic_same_score,
-        CamelotRelationship.RELATIVE: policy.harmonic_relative_score,
-        CamelotRelationship.ADJACENT: policy.harmonic_adjacent_score,
-        CamelotRelationship.INCOMPATIBLE: policy.harmonic_incompatible_score,
-        CamelotRelationship.UNKNOWN: policy.harmonic_unknown_score,
-    }[relationship]
 
 
 def _continuity_score(
@@ -680,7 +693,7 @@ def _beat_phase_offset(
     ):
         return 0
     outgoing_beat_ms = 60_000.0 / outgoing_bpm
-    incoming_beat_ms = 60_000.0 / _normalized_tempo(outgoing_bpm, incoming_bpm)
+    incoming_beat_ms = 60_000.0 / normalized_tempo(outgoing_bpm, incoming_bpm)
     outgoing_phase_ms = (outgoing_cue_ms - outgoing_reference_ms) % outgoing_beat_ms
     incoming_phase_ms = (
         (incoming_cue_ms - incoming_reference_ms) % incoming_beat_ms
