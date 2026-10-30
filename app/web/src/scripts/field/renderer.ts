@@ -11,6 +11,7 @@ const VERTEX = `#version 300 es
   in vec3 aPos;
   in vec3 aTarget;
   in float aSeed;
+  in vec3 aText;
   uniform mat4 uMVP;
   uniform float uTime;
   uniform float uScale;
@@ -20,8 +21,14 @@ const VERTEX = `#version 300 es
   uniform vec3 uCenter;
   uniform float uSettled;
   uniform float uFade;
+  uniform float uText;
+  uniform vec2 uView;
+  uniform float uScroll;
+  uniform float uTextSize;
   out float vAlpha;
   out float vHot;
+  out float vText;
+  out float vInk;
   void main() {
     float m = clamp(uMorph * 1.25 - aSeed * 0.25, 0.0, 1.0);
     m = m * m * (3.0 - 2.0 * m);
@@ -47,12 +54,29 @@ const VERTEX = `#version 300 es
     vHot = max(near, hot);
     vAlpha = clamp(1.5 / depth, 0.06, 1.0) * (0.3 + aSeed * 0.7) * (1.0 + hot * 0.8) * (1.0 - uFade);
     gl_PointSize = min(uScale * (0.6 + aSeed * 1.1 + near * 2.4 + flight * 0.7 + flash * 1.2) / depth, uScale * 3.0);
+    vText = 0.0;
+    vInk = aText.z;
+    if (uText > 0.0) {
+      vec2 dest = vec2(aText.x / uView.x * 2.0 - 1.0, 1.0 - (aText.y - uScroll) / uView.y * 2.0);
+      float order = clamp((dest.x + 1.0) * 0.5, 0.0, 1.0) * 0.25 + clamp((1.0 - dest.y) * 0.5, 0.0, 1.0) * 0.25 + aSeed * 0.15;
+      float k = clamp((uText - order) / 0.35, 0.0, 1.0);
+      k = k * k * (3.0 - 2.0 * k);
+      vec2 scatter = (vec2(aSeed, fract(aSeed * 7.31)) - 0.5) * 4.0;
+      vec2 from = gl_Position.w > 0.05 ? gl_Position.xy / gl_Position.w : dest + scatter;
+      gl_Position = vec4(mix(from, dest, k), 0.0, 1.0);
+      gl_PointSize = mix(gl_PointSize, uTextSize, k);
+      vAlpha = mix(vAlpha, 0.9 + aSeed * 0.1, k);
+      vHot = mix(vHot, 0.0, k);
+      vText = k;
+    }
   }`;
 
 const FRAGMENT = `#version 300 es
   precision mediump float;
   in float vAlpha;
   in float vHot;
+  in float vText;
+  in float vInk;
   out vec4 outColor;
   void main() {
     float r = length(gl_PointCoord - 0.5);
@@ -61,7 +85,9 @@ const FRAGMENT = `#version 300 es
     vec3 cyan = vec3(0.024, 0.714, 0.831);
     vec3 hi = vec3(0.404, 0.91, 0.976);
     vec3 color = mix(cyan, hi, vHot * 0.9 + soft * 0.2);
-    outColor = vec4(color * soft * vAlpha * (1.0 + vHot * 1.8), 1.0);
+    color = mix(color, mix(vec3(0.945, 0.961, 0.976), hi, vInk), vText);
+    vec3 light = color * soft * vAlpha * (1.0 + vHot * 1.8);
+    outColor = vec4(light, max(light.r, max(light.g, light.b)));
   }`;
 
 const UNIFORMS = [
@@ -74,6 +100,10 @@ const UNIFORMS = [
   "uCenter",
   "uSettled",
   "uFade",
+  "uText",
+  "uView",
+  "uScroll",
+  "uTextSize",
 ] as const;
 
 export interface FieldOptions {
@@ -97,6 +127,8 @@ export interface RenderOptions {
   center?: Vec3;
   settled?: number;
   fade?: number;
+  text?: number;
+  scroll?: number;
 }
 
 export interface Field {
@@ -106,6 +138,7 @@ export interface Field {
   pointAt(index: number, morph?: number): Vec3;
   resize(): void;
   setPositions(positions: Float32Array): void;
+  setText(points: Float32Array): void;
   dispose(): void;
 }
 
@@ -115,7 +148,7 @@ export function createField(
 ): Field | null {
   const gl = canvas.getContext("webgl2", {
     antialias: false,
-    alpha: false,
+    alpha: true,
     powerPreference: "high-performance",
   });
   if (!gl) return null;
@@ -210,6 +243,7 @@ function buildField(
     ["aPos", positions, 3],
     ["aTarget", targets, 3],
     ["aSeed", seeds, 1],
+    ["aText", new Float32Array(count * 3), 3],
   ];
   let gpu = createResources(gl, attributes);
   if (!gpu) return null;
@@ -228,6 +262,8 @@ function buildField(
     if (!gpu) return;
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.uniform1f(gpu.u.uScale, (isMobile ? mobileScale : pointScale) * dpr);
+    gl.uniform2f(gpu.u.uView, canvas.clientWidth, canvas.clientHeight);
+    gl.uniform1f(gpu.u.uTextSize, (isMobile ? 1.8 : 2) * dpr);
   }
   resize();
   addEventListener("resize", resize);
@@ -266,6 +302,8 @@ function buildField(
     center = [0, 0, 0],
     settled = -1,
     fade = 0,
+    text = 0,
+    scroll = 0,
   }: RenderOptions) {
     morphNow = morph;
     multiply(
@@ -281,7 +319,7 @@ function buildField(
     );
     if (!gpu) return;
     const { u } = gpu;
-    gl.clearColor(0.039, 0.039, 0.059, 1);
+    gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.uniformMatrix4fv(u.uMVP, false, mvp);
     gl.uniform1f(u.uTime, time);
@@ -291,6 +329,8 @@ function buildField(
     gl.uniform3fv(u.uCenter, center);
     gl.uniform1f(u.uSettled, settled);
     gl.uniform1f(u.uFade, fade);
+    gl.uniform1f(u.uText, text);
+    gl.uniform1f(u.uScroll, scroll);
     gl.drawArrays(gl.POINTS, 0, drawn);
   }
 
@@ -314,6 +354,15 @@ function buildField(
     uploadBase();
   }
 
+  function setText(points: Float32Array) {
+    const data = new Float32Array(count * 3);
+    data.set(points.subarray(0, Math.min(points.length, data.length)));
+    attributes[3][1] = data;
+    if (!gpu) return;
+    gl.bindBuffer(gl.ARRAY_BUFFER, gpu.buffers.get("aText")!);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, data);
+  }
+
   function dispose() {
     canvas.removeEventListener("webglcontextlost", contextLost);
     canvas.removeEventListener("webglcontextrestored", contextRestored);
@@ -323,5 +372,14 @@ function buildField(
     gl.getExtension("WEBGL_lose_context")?.loseContext();
   }
 
-  return { count, render, project, pointAt, resize, setPositions, dispose };
+  return {
+    count,
+    render,
+    project,
+    pointAt,
+    resize,
+    setPositions,
+    setText,
+    dispose,
+  };
 }

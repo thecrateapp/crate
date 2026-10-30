@@ -11,11 +11,8 @@ const rows = [t("statement.1", locale), t("statement.2", locale), t("statement.3
 
 <section class="statement">
   {
-    rows.map((text, index) => (
+    rows.map((text) => (
       <div class="row" data-reveal>
-        <p class="eyebrow" data-enter>
-          0{index + 1}
-        </p>
         <p data-split style="--step:14ms" set:html={text} />
       </div>
     ))

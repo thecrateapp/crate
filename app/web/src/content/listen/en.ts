@@ -61,7 +61,7 @@ export interface ListenPage {
 
 export const listen: ListenPage = {
   meta: {
-    title: "Listen — Crate",
+    title: "Listen · Crate",
     description:
       "Gapless playback, Smart Mix with beatmatched transitions on Android, Radio and Paths built on audio analysis, offline mirrors, federation and apps for desktop, Android and the web.",
   },

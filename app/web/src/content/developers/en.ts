@@ -32,7 +32,7 @@ const DOCS = "https://docs.cratemusic.app";
 
 export const developers: DevelopersPage = {
   meta: {
-    title: "Developers — Crate",
+    title: "Developers · Crate",
     description:
       "Crate's REST and OpenSubsonic APIs, personal access tokens, Smart Mix endpoints, local development and how to contribute.",
   },

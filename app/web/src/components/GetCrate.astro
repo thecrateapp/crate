@@ -18,14 +18,14 @@ const platforms = [...new Set(downloads.map((download) => download.platform))].m
   <h2 class="display" id="get-title" data-enter>{t("get.title", locale)}</h2>
 
   <div class="block" data-enter style="--d:120ms">
-    <p class="eyebrow"><b>01</b> / {t("get.server", locale)}</p>
+    <p class="eyebrow">{t("get.server", locale)}</p>
     <InstallCommand locale={locale} />
     <p class="note">{t("get.requirements", locale)}</p>
     <a class="u-link" href="/install">{t("get.docs", locale)}</a>
   </div>
 
   <div class="block" data-enter style="--d:220ms">
-    <p class="eyebrow"><b>02</b> / {t("get.clients", locale)}</p>
+    <p class="eyebrow">{t("get.clients", locale)}</p>
     <dl class="apps">
       {
         platforms.map(({ platform, builds }) => (

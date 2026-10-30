@@ -14,7 +14,7 @@ const number = (index: number) => String(index).padStart(2, "0");
         <li>
           <a href={`#${item.id}`} tabindex="-1">
             <b>{number(item.index)}</b>
-            <span>{item.title}</span>
+            <span data-hover-scramble>{item.title}</span>
           </a>
         </li>
       ))

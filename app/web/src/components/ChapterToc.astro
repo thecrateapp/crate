@@ -16,7 +16,7 @@ const number = (index: number) => String(index).padStart(2, "0");
       items.map((item) => (
         <li>
           <a class="u-link" href={`#${item.id}`}>
-            <b>{number(item.index)}</b> {item.title}
+            <b>{number(item.index)}</b> <span data-hover-scramble>{item.title}</span>
           </a>
         </li>
       ))

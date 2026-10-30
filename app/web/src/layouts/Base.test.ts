@@ -19,3 +19,20 @@ describe("Base layout", () => {
     expect(html).toContain("<p>body</p>");
   });
 });
+
+describe("Base backdrop", () => {
+  it("dims the record shop by default and shows it in full when a page asks", async () => {
+    const container = await AstroContainer.create();
+    const props = { title: "T", description: "D" };
+
+    const dim = await container.renderToString(Base, { props });
+    const full = await container.renderToString(Base, {
+      props: { ...props, backdrop: "full" },
+    });
+
+    expect(dim).toMatch(/class="backdrop is-dim/);
+    expect(full).toMatch(/class="backdrop is-full/);
+    expect(full).toContain('media="(max-aspect-ratio: 3/4)"');
+    expect(full).toContain("/backdrop/shop-1920.jpg");
+  });
+});
