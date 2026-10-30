@@ -50,6 +50,7 @@ export interface PlaybackQueueReadiness {
 
 export interface PlaybackResumeOptions {
   userGesture?: boolean;
+  selection?: boolean;
 }
 
 export interface PlaybackIntelligenceOptions {

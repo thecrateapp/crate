@@ -485,7 +485,10 @@ export function usePlaybackRefillRuntime(options: Options) {
         runtime.needsGesture = false;
         runtime.suspended = false;
         const refs = latest.current.refs;
-        if (refs.currentIndexRef.current < refs.queueRef.current.length - 1) {
+        if (
+          intent.selection ||
+          refs.currentIndexRef.current < refs.queueRef.current.length - 1
+        ) {
           runRef.current();
           return false;
         }

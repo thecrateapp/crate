@@ -187,6 +187,7 @@ describe("usePlayerQueueActions", () => {
       expect(params.currentIndexRef.current).toBe(0);
       expect(resumePlaybackIntelligence).toHaveBeenCalledWith({
         userGesture: true,
+        selection: true,
       });
       expect(params.resetPlaybackIntelligence).not.toHaveBeenCalled();
     },

@@ -91,7 +91,7 @@ export function usePlayerNavigationActions({
       const outgoing = queueRef.current[currentIndexRef.current];
       flushCurrentPlayEvent("skipped", outgoing);
       advanceCursorTo(targetIndex);
-      resumePlaybackIntelligence?.({ userGesture: true });
+      resumePlaybackIntelligence?.({ userGesture: true, selection: true });
       const incoming = queueRef.current[targetIndex];
       if (incoming) startTrackerSession(incoming, playSourceRef.current);
     },
