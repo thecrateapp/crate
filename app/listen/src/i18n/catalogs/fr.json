@@ -2137,6 +2137,7 @@
   "paths.warnings.partial": "Parcours partiel",
   "paths.warnings.partialDetail": "Seuls {generated} titres sur {requested} ont pu être sélectionnés.",
   "paths.warnings.incomplete": "Ce parcours n’a pas pu être terminé comme demandé.",
+  "paths.warnings.quality": "Certaines transitions peuvent être moins fluides ou variées.",
   "paths.warnings.unavailable": "{count, plural, one {# titre enregistré est indisponible et sera ignoré.} other {# titres enregistrés sont indisponibles et seront ignorés.}}",
   "paths.warnings.trackUnavailable": "Indisponible",
   "paths.warnings.noneAvailable": "Aucun des titres enregistrés n’est disponible à la lecture."

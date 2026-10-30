@@ -3743,6 +3743,10 @@
     "sourceHash": "sha256:af43eb0b8e989543a5c7e21b3ae410acb02d55be5dee645510743fe166bf1891",
     "reviewedAt": "2026-10-28T22:58:27.665Z"
   },
+  "paths.warnings.quality": {
+    "sourceHash": "sha256:9bc9df6d349e4a8130931548b10a5f351598cca883bb6f2389647dd8204b5be2",
+    "reviewedAt": "2026-10-30T07:28:02.630Z"
+  },
   "paths.warnings.trackUnavailable": {
     "sourceHash": "sha256:4ea940bcc284898a809e46125e170c6dc13ce094f10b3c943b10e39632bcdd70",
     "reviewedAt": "2026-10-28T22:58:27.665Z"

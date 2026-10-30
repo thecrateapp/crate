@@ -39,8 +39,12 @@ describe("path cover journey", () => {
       />,
     );
 
-    const unavailable = stepButton(2);
+    const unavailable = screen.getByRole("button", {
+      name: /^Play step 2: Track 2 by Coast/,
+    });
     expect(unavailable).toHaveAttribute("aria-disabled", "true");
+    expect(unavailable).toHaveAccessibleName(/unavailable/i);
+    expect(stepButton(1)).not.toHaveAccessibleName(/unavailable/i);
     fireEvent.click(unavailable);
     expect(play).not.toHaveBeenCalled();
     stepButton(1).focus();

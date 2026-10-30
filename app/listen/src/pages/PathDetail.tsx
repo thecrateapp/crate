@@ -28,15 +28,18 @@ export function PathDetail() {
     status,
     refetch,
   } = useApi<PathData>(`/api/paths/${id}`);
-  const { playAll, currentTrack } = usePlayerActions();
+  const { playAll, currentTrack, playSource } = usePlayerActions();
   const [regenerating, setRegenerating] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const { isPlaying } = usePlayerState();
 
-  const activeStep =
-    path?.tracks.findIndex(
-      (track) => currentTrack?.libraryTrackId === track.track_id,
-    ) ?? -1;
+  const isCurrentPath =
+    playSource?.type === "path" && String(playSource.id) === String(path?.id);
+  const activeStep = isCurrentPath
+    ? (path?.tracks.findIndex(
+        (track) => currentTrack?.libraryTrackId === track.track_id,
+      ) ?? -1)
+    : -1;
 
   const playFromStep = useCallback(
     (startIndex?: number) => {

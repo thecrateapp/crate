@@ -7,10 +7,18 @@ export function PathWarnings({ path }: { path: PathDetail }) {
   const unavailable = path.tracks.filter(
     (track) => track.playable === false,
   ).length;
-  if (!path.is_partial && !unavailable) return null;
+  const qualityWarnings = path.warnings?.some((warning) =>
+    [
+      "duplicate_song",
+      "repeated_artist",
+      "artist_repeat_limit",
+      "invalid_progress",
+    ].includes(warning.code),
+  );
+  if (!path.is_partial && !unavailable && !qualityWarnings) return null;
   const generated = path.generated_step_count ?? path.tracks.length;
   return (
-    <div className="mb-6 space-y-2" role="status">
+    <div className="mb-6 space-y-2">
       {path.is_partial ? (
         <>
           <InfoBadge tone="warning">{t("paths.warnings.partial")}</InfoBadge>
@@ -23,6 +31,9 @@ export function PathWarnings({ path }: { path: PathDetail }) {
             )}
           </p>
         </>
+      ) : null}
+      {qualityWarnings ? (
+        <p className="text-sm text-text-muted">{t("paths.warnings.quality")}</p>
       ) : null}
       {unavailable ? (
         <p className="text-sm text-text-muted">

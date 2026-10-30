@@ -281,6 +281,14 @@ describe("Music paths pages", () => {
         playerState: { isPlaying: playing },
       });
 
+      expect(
+        screen.getByRole("row", { name: "Track One" }),
+      ).not.toHaveAttribute("aria-current");
+      expect(
+        screen.getByRole("button", {
+          name: "Play step 1: Track One by Artist One",
+        }),
+      ).not.toHaveAttribute("aria-current");
       fireEvent.click(screen.getByRole("row", { name: "Track One" }));
 
       expect(pause).not.toHaveBeenCalled();
@@ -296,9 +304,12 @@ describe("Music paths pages", () => {
     },
   );
 
-  it.each([true, false])(
-    "toggles the matching active track only inside the same path (playing=%s)",
-    (playing) => {
+  it.each([
+    { playing: true, pathId: 77 },
+    { playing: false, pathId: "77" },
+  ])(
+    "toggles the matching active track only inside the same path (playing=$playing, id=$pathId)",
+    ({ playing, pathId }) => {
       const playAll = vi.fn();
       const pause = vi.fn();
       const resume = vi.fn();
@@ -314,7 +325,7 @@ describe("Music paths pages", () => {
           }),
           playSource: {
             type: "path",
-            id: 77,
+            id: pathId,
             name: pathDetail.name,
             href: "/paths/77",
           },
@@ -325,6 +336,15 @@ describe("Music paths pages", () => {
         playerState: { isPlaying: playing },
       });
 
+      expect(screen.getByRole("row", { name: "Track One" })).toHaveAttribute(
+        "aria-current",
+        "true",
+      );
+      expect(
+        screen.getByRole("button", {
+          name: "Play step 1: Track One by Artist One",
+        }),
+      ).toHaveAttribute("aria-current", "step");
       fireEvent.click(screen.getByRole("row", { name: "Track One" }));
 
       expect(playAll).not.toHaveBeenCalled();
@@ -429,9 +449,10 @@ describe("Music paths pages", () => {
       }),
     ).toBeDisabled();
     const step = screen.getByRole("button", {
-      name: "Play step 2: Track Two by Artist Two",
+      name: /^Play step 2: Track Two by Artist Two/,
     });
     expect(step).toHaveAttribute("aria-disabled", "true");
+    expect(step).toHaveAccessibleName(/unavailable/i);
     fireEvent.click(step);
     expect(playAll).not.toHaveBeenCalled();
     expect(api).not.toHaveBeenCalled();
@@ -459,13 +480,13 @@ describe("Music paths pages", () => {
       path: "/paths/:id",
     });
 
-    const statuses = screen.getAllByRole("status");
     expect(
-      statuses.some((status) => /2.*5/.test(status.textContent || "")),
-    ).toBe(true);
+      screen.getByText("Only 2 of 5 tracks could be selected."),
+    ).toBeInTheDocument();
     expect(
-      statuses.some((status) => /unavailable/i.test(status.textContent || "")),
-    ).toBe(true);
+      screen.getByText("1 saved track is unavailable and will be skipped."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.queryByTestId("error-state")).not.toBeInTheDocument();
     expect(screen.getByRole("row", { name: "Track Two" })).toBeInTheDocument();
     expect(api).not.toHaveBeenCalled();
@@ -478,6 +499,12 @@ describe("Music paths pages", () => {
       return (
         <PlayerActionsContext.Provider
           value={createMockPlayerActions({
+            playSource: {
+              type: "path",
+              id: 77,
+              name: pathDetail.name,
+              href: "/paths/77",
+            },
             currentTrack: createMockTrack({
               id: `track-${trackId}`,
               libraryTrackId: trackId,

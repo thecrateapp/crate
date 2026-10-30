@@ -2137,6 +2137,7 @@
   "paths.warnings.partial": "Ruta parcial",
   "paths.warnings.partialDetail": "Només s’han pogut seleccionar {generated} de {requested} temes.",
   "paths.warnings.incomplete": "No s’ha pogut completar aquesta ruta tal com l’has demanada.",
+  "paths.warnings.quality": "Algunes transicions poden resultar menys fluides o variades.",
   "paths.warnings.unavailable": "{count, plural, one {# tema desat no està disponible i s’ometrà.} other {# temes desats no estan disponibles i s’ometran.}}",
   "paths.warnings.trackUnavailable": "No disponible",
   "paths.warnings.noneAvailable": "Cap dels temes desats està disponible per reproduir."
