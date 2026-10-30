@@ -1,7 +1,9 @@
 # Music Paths: latency closure checkpoint
 
-Measured on 2026-10-29, stacked on PR2. Scene planning on production and indexed
-acoustic planning on the local catalog replica meet the approved budgets.
+> Historical capture: this report describes its recorded source snapshot before the reviewed fixes. Its measurements, warnings and approval notes do not validate the current implementation. See the [evidence index](README.md) and [current behavior](../../music-paths.md).
+
+Captured on 2026-10-29 from the recorded source snapshots. The scene and indexed
+acoustic runs met their budgets for those historical implementations.
 These are distinct environments; local acoustic measurements are not production
 or HTTP percentiles. Scene sources are frozen at `0c947f84`; final acoustic
 sources at `586b855e`.
@@ -22,7 +24,7 @@ The 97-song forward result and its `insufficient_tracks` warning also occur in
 the reference implementation. Optimization does not silently fill it with
 weaker or unrelated songs.
 
-Candidate retrieval now requests all scene pools in one SQL statement per helper
+The captured candidate retrieval requested all scene pools in one SQL statement per helper
 invocation, preserving
 each genre's cap, per-performer ranking and existing join cardinality. Three
 representative pool comparisons cover **5,326 complete rows** with identical
@@ -36,9 +38,7 @@ weights, routing, history, radio and fallback policies are unchanged.
 ### Method and boundaries
 
 - All planning helpers execute their real read scopes against the production
-  catalog: 137,764 tracks, PostgreSQL 15.18 and pgvector 0.8.5. The earlier
-  PostgreSQL row estimate was stale; the exported snapshot provides the actual
-  count.
+  catalog, with PostgreSQL 15.18 and pgvector 0.8.5. Exact source inventory counts are omitted from this historical record.
 - An isolated process loads the 21 verified local sources without deploying
   them. Every connection forces read-only transactions; a second guard rejects
   DML/DDL. AI, saved-path persistence and cache writes are blocked. No forbidden
@@ -59,7 +59,7 @@ weights, routing, history, radio and fallback policies are unchanged.
   `redis_commands` records commands seen across the process, including warmup;
   it does not attribute them to individual timed samples.
 - p95 is the nearest rank `ceil(0.95 × n)` of 25 samples, with no interpolation
-  or discarded slow samples. Full distributions and source hashes are in the
+  or discarded slow samples. Historical percentile summaries and source hashes are in the
   [sanitized evidence](music-paths-latency-evaluation.json).
 - A combined 100-song run lost its distribution after an SSH reset. It is
   excluded completely; each case was repeated in a separate process, saving
@@ -155,35 +155,26 @@ every equivalent edition.
    and recover the complete pools. Candidate recovery can change a flexible
    anchor relative to the truncated ANN pool.
 
-The failed distribution and first album probe are retained. Final measurements
+The earlier diagnostic outcomes remain summarized in the acoustic artifact; bulky embedded histories are omitted. Final measurements
 follow these code changes; none of the failed or slow samples is relabeled or
-silently discarded. All final durations are stored, with four separate warmup
+silently discarded. Per-case percentile summaries are retained, with four separate warmup
 calls (0.188/0.329/0.170/0.334 s). No further code changes occurred during the
 final run.
 
 ### Replica, methodology and limits
 
-The consistent read-only export contains 137,764 tracks, 137,710 embeddings,
-musical metadata, taxonomy/artist graphs and 130,271 global mappings, including
-the real duplicated mapping. It contains no audio or user history, likes,
-statistics or private settings. Anonymous paths preserve byte lengths and
-playability structure. The benchmark uses real SQL, graphs and helper scopes,
-a synthetic neutral listener, empty history queries and explicitly disabled AI.
-Connections enforce read-only access and Redis uses a local read-only ACL.
+The historical read-only logical export retained musical metadata, real
+embeddings, taxonomy/artist graphs and mapping multiplicity. It contained no
+audio or user history, likes, statistics or private settings. Anonymous paths
+preserved byte lengths and playability structure. Exact catalog inventories,
+source hardware, physical-layout measurements and production planner settings
+are omitted.
 
-PostgreSQL 15.18, pgvector 0.8.5, locale `en_US.utf8`/UTF8, planner settings and
-the 129 original indexes match the source inventory. Native HNSW settings are
-changed only by the product's normal transaction-local helpers. The track heap
-extent is calibrated to the source's 1,451,720,704 bytes and the global mapping
-heap to 122,798,080 bytes, independently of timings. This is a fresh restore
-with anonymization, fillfactor and deleted anonymous padding, not a physical
-backup: live tuple placement, index packing and sampled statistics can differ.
-
-The local host is Apple M5/arm64 with 16 GiB RAM; Docker has 10 CPUs and about
-7.8 GiB, and this PostgreSQL container is capped at 1.5 GiB. The source runs
-on an Intel i7-7700/x86_64 with eight CPUs visible to the API. Hardware, VM I/O,
-cache behavior and physical differences prevent extrapolating these numbers
-to production.
+The local replica used PostgreSQL 15.18 and pgvector 0.8.5. It was a fresh
+anonymized logical restore with independently calibrated heap extents, not a
+physical backup. Live tuple placement, index packing, sampled statistics,
+contention and transport differ, so its local in-process percentiles cannot be
+extrapolated to production or HTTP latency.
 
 The clock surrounds `build_music_path_plan` with normal helper scopes. A single
 warmup precedes each case/count, followed by 25 serial samples using
@@ -201,7 +192,7 @@ The audit distinguishes the 22 source files checked at startup from modules
 actually imported, verifies the participating sources, and retains this
 incident without changing or repeating timing samples.
 
-Full distributions, environments, source fingerprints, query plans, recall,
+Historical percentile summaries, environments, source fingerprints, query plans, recall,
 failure history and warnings are in the
 [acoustic evidence](music-paths-acoustic-index-evaluation.json). No index,
 migration, application deployment or user data has been changed in production.
@@ -227,8 +218,7 @@ with the new scope.
 
 The prior [catalog validation checkpoint](music-paths-validation-review.md)
 retains the historical musical lists and unindexed probes. This checkpoint
-closes the measured scene and representative indexed-acoustic planning gates.
+recorded the historical scene and indexed-acoustic planning results. Those results do not close the new review benchmark.
 Musical listening approval, production measurements after index installation,
 HTTP measurements and the once-only final Linux CI remain separate checks.
-Only scoped tests ran during this cut. PR3 has not been published, merged or
-deployed.
+Only scoped tests ran during the captured cut. This report does not establish current publication, CI, merge or deployment status.

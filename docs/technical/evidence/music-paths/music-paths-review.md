@@ -1,9 +1,11 @@
 # Music Paths: checkpoints 3.1–3.3 catalog review
 
+> Historical capture: this report describes its recorded source snapshot before the reviewed fixes. Its measurements, warnings and approval notes do not validate the current implementation. See the [evidence index](README.md) and [current behavior](../../music-paths.md).
+
 Historical comparison: Diego rejected the punk-to-Japanoise bridge. See the
 [revised bridge checkpoint](music-paths-bridge-review.md) for its replacement.
 
-**Status: musical approval pending.** This checkpoint covers batched endpoint context, anchor/coherence work and seven-day rotation. Checkpoints 3.4/3.5 and remaining QA/performance are still pending.
+**Recorded review status:** musical approval was pending at this capture, which covered endpoint context, anchor/coherence work and seven-day rotation. Later captures and the current behavior are linked from the evidence index.
 
 Production was accessed through an isolated read-only process. The planner used local sources, a neutral listener, disabled AI and synthetic completed listens. No listening session, play event or Music Path was persisted. These are recommendation lists for review, not evidence of musical correctness.
 
@@ -313,7 +315,7 @@ Waypoint: The Dillinger Escape Plan.
 |  19 | Cave In                   | Ebola                                     |
 |  20 | Botch                     | Transitions from Persona to Object (Demo) |
 
-## Remaining gates
+## Gates recorded at capture
 
 - Review the actual musical transitions, especially punk→japanoise.
 - Complete checkpoints 3.4/3.5 and remaining scoped QA.
@@ -321,4 +323,4 @@ Waypoint: The Dillinger Escape Plan.
 - Measure complete acoustic paths after the cosine-index repair and route-scoped ANN expansion fix are deployed.
 - Do not infer zero repetition or a percentage of musical correctness from these results.
 
-The sanitized measurements, source hashes and environments are recorded in [music-paths-evaluation.json](music-paths-evaluation.json). Implementation details are in [Music Paths](../../../../docs/technical/music-paths.md).
+The sanitized measurements, source hashes and environments are recorded in [music-paths-evaluation.json](music-paths-evaluation.json). Implementation details are in [Music Paths](../../music-paths.md).

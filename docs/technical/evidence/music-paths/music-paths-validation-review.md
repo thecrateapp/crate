@@ -1,5 +1,7 @@
 # Music Paths: final checkpoint 3.4 catalog verification
 
+> Historical capture: this report describes its recorded source snapshot before the reviewed fixes. Its measurements, warnings and approval notes do not validate the current implementation. See the [evidence index](README.md) and [current behavior](../../music-paths.md).
+
 Status: five isolated read-only planning probes passed metadata/structural checks. These are single samples, not p95 acceptance, persistence/API migration coverage or musical approval. No deployment was performed.
 
 The process loaded the current local source snapshot, including `crate.music_path_validation` before the service and the corresponding adapters. Every database connection was forced read-only. AI, cache writes, saved-path reads and persistence calls were guarded off. Redis issued only `GET`/`PING`; no forbidden operation was attempted. Source fingerprints are recorded in the accompanying JSON.

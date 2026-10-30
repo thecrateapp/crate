@@ -1,5 +1,7 @@
 # Music Paths: revised genre bridge, 20-step checkpoint
 
+> Historical capture: this report describes its recorded source snapshot before the reviewed fixes. Its measurements, warnings and approval notes do not validate the current implementation. See the [evidence index](README.md) and [current behavior](../../music-paths.md).
+
 Status: provisional listening review. The route source is frozen separately; every other recommendation module comes from commit 808ef151. Checkpoint 3.4 metadata is not included in these measurements.
 
 The evaluation ran in an isolated read-only process with an empty synthetic history, the fixed seed `musical-rotation-controlled` and AI disabled. Redis accepted only reads (`GET`/`PING`); no write was attempted. These are single probes, not p95 measurements.
