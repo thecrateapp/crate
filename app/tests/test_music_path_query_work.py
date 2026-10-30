@@ -178,13 +178,13 @@ def metadata_catalog(pg_db):
     return target_artist_id, tracks, genre_ids["Unrelated"]
 
 
-def _metadata_rows(session, query, target_artist_id):
+def _metadata_rows(session, query, target_artist_id, *, user_id=None):
     if query == "anchor":
         return paths_scene_queries.list_artist_scene_anchor_candidates(
-            str(target_artist_id), limit=24, session=session
+            str(target_artist_id), limit=24, user_id=user_id, session=session
         )
     return paths_scene_queries.list_scene_path_candidates(
-        ["work-chosen"], limit_per_genre=24, session=session
+        ["work-chosen"], limit_per_genre=24, user_id=user_id, session=session
     )["work-chosen"]
 
 
@@ -283,3 +283,163 @@ def test_scene_genre_metadata_aggregation_is_bounded_by_eligible_candidates(
             "returned_candidate_tracks": len(after),
             "genres_per_candidate": 3,
         }
+
+
+@pytest.fixture
+def global_like_catalog(metadata_catalog):
+    target_artist_id, tracks, _ = metadata_catalog
+    with transaction_scope() as session:
+        user_id = session.execute(
+            text("""
+                INSERT INTO users (email, created_at)
+                VALUES ('global-work@example.test', NOW())
+                RETURNING id
+            """)
+        ).scalar_one()
+        noise_ids = list(
+            session.execute(
+                text("""
+                    INSERT INTO library_tracks (
+                        album_id, artist, album, filename, title, path,
+                        duration, format, bliss_vector, popularity_score
+                    )
+                    SELECT source.album_id, source.artist, source.album,
+                           'global-work-' || n || '.flac', 'Global Work Song ' || n,
+                           '/music/metadata-work/global-' || n || '.flac',
+                           180, 'flac', source.bliss_vector, 0.001
+                    FROM library_tracks source CROSS JOIN generate_series(1, 400) n
+                    WHERE source.id = :source_id
+                    RETURNING id
+                """),
+                {"source_id": tracks["Z Work Target"][0]},
+            ).scalars()
+        )
+        session.execute(
+            text("""
+                INSERT INTO global_catalog_artists (
+                    global_artist_uid, canonical_name, sort_name, normalized_name
+                )
+                SELECT gen_random_uuid(), name, name, LOWER(name)
+                FROM library_artists WHERE name = ANY(:names)
+            """),
+            {"names": list(tracks)},
+        )
+        session.execute(text("ANALYZE library_tracks"))
+    all_ids = [track_id for ids in tracks.values() for track_id in ids] + noise_ids
+    return target_artist_id, tracks, all_ids, user_id
+
+
+def _add_global_aliases(session, track_ids):
+    return {
+        row["local_track_id"]: str(row["global_track_uid"])
+        for row in session.execute(
+            text("""
+                INSERT INTO global_catalog_tracks (
+                    global_track_uid, global_artist_uid, canonical_title,
+                    normalized_title, artist_name, album_name, local_track_id,
+                    duration_seconds, has_local
+                )
+                SELECT gen_random_uuid(), artist.global_artist_uid, track.title,
+                       LOWER(track.title), track.artist, track.album, track.id,
+                       180, TRUE
+                FROM library_tracks track
+                JOIN global_catalog_artists artist
+                  ON artist.canonical_name = track.artist
+                WHERE track.id = ANY(:ids)
+                RETURNING local_track_id, global_track_uid
+            """),
+            {"ids": track_ids},
+        ).mappings()
+    }
+
+
+def _global_catalog_rows_visited(plan):
+    return sum(
+        max(
+            1,
+            node["Actual Rows"]
+            + node.get("Rows Removed by Filter", 0)
+            + node.get("Rows Removed by Index Recheck", 0),
+        )
+        * node["Actual Loops"]
+        for node in _nodes(plan)
+        if node.get("Relation Name") == "global_catalog_tracks"
+    )
+
+
+@pytest.mark.parametrize("query", ["anchor", "scene"])
+@pytest.mark.parametrize("has_global_like", [False, True])
+def test_scene_global_like_catalog_work_is_bounded_by_likes_and_output_candidates(
+    global_like_catalog, query, has_global_like
+):
+    target_artist_id, tracks, all_ids, user_id = global_like_catalog
+    with transaction_scope() as session:
+        before = _metadata_rows(session, query, target_artist_id, user_id=user_id)
+        aliases = _add_global_aliases(session, all_ids)
+        liked_track_id = tracks["Z Work Target"][0]
+        if has_global_like:
+            session.execute(
+                text("""
+                    INSERT INTO user_global_track_likes (user_id, global_track_uid)
+                    VALUES (:user_id, CAST(:uid AS uuid))
+                """),
+                {"user_id": user_id, "uid": aliases[liked_track_id]},
+            )
+        session.execute(text("ANALYZE global_catalog_tracks"))
+        session.execute(text("ANALYZE user_global_track_likes"))
+        recorded = MagicMock(wraps=session)
+
+        after = _metadata_rows(recorded, query, target_artist_id, user_id=user_id)
+
+        expected = [
+            {**row, "is_liked": has_global_like and row["id"] == liked_track_id}
+            for row in before
+        ]
+        assert after == expected
+        assert len({row["id"] for row in after}) == len(after)
+        assert all(row["membership_score"] == 1 for row in after)
+        select_calls = [
+            call
+            for call in recorded.execute.call_args_list
+            if str(call.args[0]).lstrip().upper().startswith(("SELECT", "WITH"))
+        ]
+        assert len(select_calls) == 1
+        call = select_calls[0]
+        plan = _explain(session, call.args[0], call.args[1])
+        work = _global_catalog_rows_visited(plan)
+        assert work <= len(after) + int(has_global_like), {
+            "global_catalog_rows_visited": work,
+            "returned_candidates": len(after),
+            "user_global_likes": int(has_global_like),
+            "eligible_local_tracks": len(all_ids),
+        }
+
+
+@pytest.mark.parametrize("query", ["anchor", "scene"])
+def test_scene_global_like_aliases_do_not_duplicate_tracks_or_change_pool_ranking(
+    global_like_catalog, query
+):
+    target_artist_id, tracks, _, user_id = global_like_catalog
+    liked_track_id = tracks["Z Work Target"][0]
+    with transaction_scope() as session:
+        before = _metadata_rows(session, query, target_artist_id, user_id=user_id)
+        aliases = [
+            _add_global_aliases(session, [liked_track_id])[liked_track_id]
+            for _ in range(3)
+        ]
+        session.execute(
+            text("""
+                INSERT INTO user_global_track_likes (user_id, global_track_uid)
+                SELECT :user_id, uid
+                FROM UNNEST(CAST(:uids AS uuid[])) uid
+            """),
+            {"user_id": user_id, "uids": aliases[:2]},
+        )
+
+        after = _metadata_rows(session, query, target_artist_id, user_id=user_id)
+
+        assert any(row["id"] == liked_track_id and row["is_liked"] for row in after)
+        assert len({row["id"] for row in after}) == len(after)
+        assert after == [
+            {**row, "is_liked": row["id"] == liked_track_id} for row in before
+        ]

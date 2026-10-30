@@ -25,6 +25,17 @@ _ARTIST_GENRES_CTE = """
     )
 """
 
+_USER_GLOBAL_LIKES_CTE = """
+    user_global_likes AS MATERIALIZED (
+        SELECT DISTINCT global_track.local_track_id
+        FROM user_global_track_likes liked
+        JOIN global_catalog_tracks global_track
+          ON global_track.global_track_uid = liked.global_track_uid
+        WHERE liked.user_id = :user_id
+          AND global_track.local_track_id IS NOT NULL
+    )
+"""
+
 
 def _normalize_track_row(row) -> dict | None:
     if not row:
@@ -150,7 +161,7 @@ def list_artist_scene_anchor_candidates(
             s.execute(
                 text(
                     f"""
-                    WITH target_artist AS (
+                    WITH {_USER_GLOBAL_LIKES_CTE}, target_artist AS (
                         SELECT id, name, entity_uid, listeners, spotify_popularity,
                                popularity_score, album_count, track_count,
                                country, area, formed
@@ -243,7 +254,7 @@ def list_artist_scene_anchor_candidates(
                             t.rating,
                             COALESCE(uts.play_count, 0) AS user_play_count,
                             COALESCE(uts.complete_play_count, 0) AS user_complete_play_count,
-                            (ult.track_id IS NOT NULL OR global_like.global_track_uid IS NOT NULL) AS is_liked
+                            (ult.track_id IS NOT NULL OR global_like.local_track_id IS NOT NULL) AS is_liked
                         FROM target_artist ta
                         JOIN library_albums a ON a.artist = ta.name
                         JOIN library_tracks t ON t.album_id = a.id
@@ -267,16 +278,13 @@ def list_artist_scene_anchor_candidates(
                         LEFT JOIN user_liked_tracks ult
                           ON ult.user_id = :user_id
                          AND ult.track_id = t.id
-                        LEFT JOIN global_catalog_tracks global_track
-                          ON global_track.local_track_id = t.id
-                        LEFT JOIN user_global_track_likes global_like
-                          ON global_like.user_id = :user_id
-                         AND global_like.global_track_uid = global_track.global_track_uid
+                        LEFT JOIN user_global_likes global_like
+                          ON global_like.local_track_id = t.id
                         WHERE t.bliss_vector IS NOT NULL
                           AND {playable_track_clause("t", "a")}
                         ORDER BY
                             COALESCE(uts.play_count, 0) DESC,
-                            (ult.track_id IS NOT NULL OR global_like.global_track_uid IS NOT NULL) DESC,
+                            (ult.track_id IS NOT NULL OR global_like.local_track_id IS NOT NULL) DESC,
                             t.popularity_score DESC NULLS LAST,
                             t.lastfm_top_rank ASC NULLS LAST,
                             t.lastfm_playcount DESC NULLS LAST,
@@ -346,7 +354,7 @@ def list_scene_path_candidates(
             s.execute(
                 text(
                     f"""
-                    WITH requested_genres AS (
+                    WITH {_USER_GLOBAL_LIKES_CTE}, requested_genres AS (
                         SELECT UNNEST(CAST(:genre_slugs AS TEXT[])) AS genre_slug
                     ),
                     target_nodes AS (
@@ -443,7 +451,7 @@ def list_scene_path_candidates(
                             t.rating,
                             COALESCE(uts.play_count, 0) AS user_play_count,
                             COALESCE(uts.complete_play_count, 0) AS user_complete_play_count,
-                            (ult.track_id IS NOT NULL OR global_like.global_track_uid IS NOT NULL) AS is_liked,
+                            (ult.track_id IS NOT NULL OR global_like.local_track_id IS NOT NULL) AS is_liked,
                             ROW_NUMBER() OVER (
                                 PARTITION BY am.genre_slug, LOWER(t.artist)
                                 ORDER BY
@@ -477,11 +485,8 @@ def list_scene_path_candidates(
                         LEFT JOIN user_liked_tracks ult
                           ON ult.user_id = :user_id
                          AND ult.track_id = t.id
-                        LEFT JOIN global_catalog_tracks global_track
-                          ON global_track.local_track_id = t.id
-                        LEFT JOIN user_global_track_likes global_like
-                          ON global_like.user_id = :user_id
-                         AND global_like.global_track_uid = global_track.global_track_uid
+                        LEFT JOIN user_global_likes global_like
+                          ON global_like.local_track_id = t.id
                         WHERE t.bliss_vector IS NOT NULL
                           AND am.membership_score >= :min_membership_score
                           AND {playable_track_clause("t", "a")}
