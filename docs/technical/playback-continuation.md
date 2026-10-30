@@ -117,6 +117,20 @@ Current endpoint and history budgets are rechecked against the approximately
 the shared availability filters are documented in the
 [retrieval check](evidence/radio/album-ownership.md).
 
+## Transition fit
+
+`CRATE_TRANSITION_FIT_ENABLED` defaults to `true`. Seeded radio and Music Paths then
+replace the coarse BPM, key and energy penalties with the Smart Mix transition fit
+between the track that plays last and each candidate: edge loudness, brightness,
+silence between tracks, tempo and key, weighted for beatmatch or for a smooth entry
+according to genre and rhythm evidence (see
+[Smart Mix operations](smart-mix-operations.md)). Candidate queries load the profile
+edges in the same statement; a context track restored from the client buffer costs
+at most one indexed lookup per batch. A candidate without a current profile gets a
+neutral seam; when the playing track has no profile, every candidate keeps the coarse
+penalties. Set it to `false` and recreate the API container to restore the previous
+ranking. Measurements: [radio transition fit](evidence/radio/transition-fit.md).
+
 ## Playback lifecycle
 
 The JavaScript runtime owns foreground refill, including EOF recovery, bounded

@@ -14,6 +14,8 @@ app/shared/ui/tokens/themes.css
 # Keep complete recommendation records and numerical vectors compact.
 app/tests/fixtures/recommendations/citizen.json
 app/tests/fixtures/recommendations/concubine.json
+app/tests/fixtures/recommendations/citizen.mix_edges.json
+app/tests/fixtures/recommendations/concubine.mix_edges.json
 
 # Keep historical measurement summaries and complete musical records compact.
 docs/technical/evidence/music-paths/*.json

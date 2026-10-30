@@ -6,6 +6,7 @@ import re
 import random
 
 from crate.db.queries.paths import find_anchor_track_row, find_candidate_rows
+from crate.smart_mix.transition_fit import RowTransitionScorer
 from crate.track_versions import track_song_identity
 from crate.recommendation_policy import (
     MAX_CONSECUTIVE_SAME_ARTIST as _MAX_CONSECUTIVE_SAME_ARTIST,
@@ -24,6 +25,7 @@ _W_BPM = 0.09
 _W_KEY = 0.05
 _W_ENERGY = 0.08
 _W_ERA = 0.03
+_W_TRANSITION = 0.30
 
 _LOW_SIGNAL_TITLE_RE = re.compile(
     r"\b(intro|interlude|outro|reprise|skit|spoken word|voice memo|voicemail|announcement|commentary)\b",
@@ -118,6 +120,22 @@ def _key_penalty(candidate: dict, context: dict | None) -> float:
     return 0.65
 
 
+def _audio_transition_penalty(
+    candidate: dict,
+    context: dict | None,
+    transition_scorer: RowTransitionScorer | None = None,
+) -> float:
+    if transition_scorer is not None:
+        fit = transition_scorer.fit(context, candidate)
+        if fit is not None:
+            return _W_TRANSITION * (1.0 - fit)
+    return (
+        _W_BPM * _bpm_penalty(candidate, context)
+        + _W_KEY * _key_penalty(candidate, context)
+        + _W_ENERGY * _energy_penalty(candidate, context)
+    )
+
+
 def _energy_penalty(candidate: dict, context: dict | None) -> float:
     if not context:
         return 0.0
@@ -193,6 +211,7 @@ def _find_best_candidate(
     previous_song_keys: set[tuple[str, str]] | None = None,
     previous_track_ids: set[int] | None = None,
     selection_seed: str | None = None,
+    transition_scorer: RowTransitionScorer | None = None,
     session=None,
 ) -> dict | None:
     """Find the best track near ``target`` using hybrid bliss/affinity scoring."""
@@ -227,6 +246,7 @@ def _find_best_candidate(
             previous_song_keys=previous_song_keys,
             previous_track_ids=previous_track_ids,
             selection_seed=selection_seed,
+            transition_scorer=transition_scorer,
         )
         if (
             selected
@@ -256,6 +276,7 @@ def _find_best_candidate(
         previous_song_keys=previous_song_keys,
         previous_track_ids=previous_track_ids,
         selection_seed=selection_seed,
+        transition_scorer=transition_scorer,
     )
 
 
@@ -279,6 +300,7 @@ def _select_best_candidate_from_rows(
     previous_song_keys: set[tuple[str, str]] | None = None,
     previous_track_ids: set[int] | None = None,
     selection_seed: str | None = None,
+    transition_scorer: RowTransitionScorer | None = None,
 ) -> dict | None:
     """Rank a prefetched candidate pool without going back to Postgres."""
     if not rows:
@@ -326,9 +348,7 @@ def _select_best_candidate_from_rows(
             _W_BLISS * bliss_norm
             + _W_ARTIST_AFFINITY * (1.0 - affinity)
             + _W_GENRE_OVERLAP * (1.0 - overlap)
-            + _W_BPM * _bpm_penalty(candidate, track_context)
-            + _W_KEY * _key_penalty(candidate, track_context)
-            + _W_ENERGY * _energy_penalty(candidate, track_context)
+            + _audio_transition_penalty(candidate, track_context, transition_scorer)
             + _W_ERA * _era_penalty(candidate, track_context)
             + _curation_penalty(candidate)
         )
@@ -374,6 +394,8 @@ def _select_best_candidate_from_rows(
 
 
 __all__ = [
+    "_W_TRANSITION",
+    "_audio_transition_penalty",
     "_find_anchor_track",
     "_find_best_candidate",
     "_select_best_candidate_from_rows",

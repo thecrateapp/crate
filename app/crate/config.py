@@ -50,6 +50,10 @@ def radio_rotation_enabled() -> bool:
     return _env_enabled("CRATE_RADIO_ROTATION_ENABLED", default=True)
 
 
+def transition_fit_enabled() -> bool:
+    return _env_enabled("CRATE_TRANSITION_FIT_ENABLED", default=True)
+
+
 def android_native_crossfade_enabled() -> bool:
     return _env_enabled("CRATE_ANDROID_NATIVE_CROSSFADE_ENABLED")
 

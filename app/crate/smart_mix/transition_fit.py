@@ -257,6 +257,78 @@ def score_transition_fit(
     )
 
 
+class RowTransitionScorer:
+    def __init__(
+        self,
+        genre_map: Mapping[str, Mapping[str, float]] | None = None,
+        *,
+        policy: PlannerPolicy = PLANNER_POLICY,
+    ) -> None:
+        self._genre_map = genre_map or {}
+        self._policy = policy
+        self._edges: dict[Any, TransitionEdges | None] = {}
+        self._priors: dict[str, float | None] = {}
+        self._fits: dict[tuple[Any, Any], float | None] = {}
+
+    def fit(
+        self,
+        outgoing: Mapping[str, Any] | None,
+        incoming: Mapping[str, Any],
+    ) -> float | None:
+        if not outgoing:
+            return None
+        outgoing_key = _row_key(outgoing)
+        incoming_key = _row_key(incoming)
+        cache_key = (outgoing_key, incoming_key)
+        quality_column = f"{TRANSITION_EDGE_PREFIX}quality"
+        cacheable = (
+            outgoing_key is not None
+            and incoming_key is not None
+            and quality_column in outgoing
+            and quality_column in incoming
+        )
+        if cacheable and cache_key in self._fits:
+            return self._fits[cache_key]
+        outgoing_edges = self._row_edges(outgoing, outgoing_key)
+        incoming_edges = self._row_edges(incoming, incoming_key)
+        result = None
+        if outgoing_edges is not None and incoming_edges is None:
+            result = self._policy.neutral_dimension_score
+        elif outgoing_edges is not None and incoming_edges is not None:
+            affinity = beatmatch_affinity(
+                outgoing_edges,
+                incoming_edges,
+                genre_prior=pair_genre_prior(
+                    self._artist_prior(outgoing), self._artist_prior(incoming)
+                ),
+                policy=self._policy,
+            )
+            result = score_transition_fit(
+                outgoing_edges,
+                incoming_edges,
+                beatmatch_affinity=affinity,
+                policy=self._policy,
+            ).overall
+        if cacheable:
+            self._fits[cache_key] = result
+        return result
+
+    def _row_edges(self, row: Mapping[str, Any], key: Any) -> TransitionEdges | None:
+        if key is None or f"{TRANSITION_EDGE_PREFIX}quality" not in row:
+            return TransitionEdges.from_row(row)
+        if key not in self._edges:
+            self._edges[key] = TransitionEdges.from_row(row)
+        return self._edges[key]
+
+    def _artist_prior(self, row: Mapping[str, Any]) -> float | None:
+        artist = str(row.get("artist") or "").strip().lower()
+        if not artist:
+            return None
+        if artist not in self._priors:
+            self._priors[artist] = genre_beatmatch_prior(self._genre_map.get(artist))
+        return self._priors[artist]
+
+
 def beatmatch_affinity(
     outgoing: TransitionEdges,
     incoming: TransitionEdges,
@@ -322,6 +394,11 @@ def tempo_ratio(outgoing_bpm: float | None, incoming_bpm: float | None) -> float
         return 1.0
     normalized_incoming = normalized_tempo(float(outgoing_bpm), float(incoming_bpm))
     return float(outgoing_bpm) / normalized_incoming
+
+
+def _row_key(row: Mapping[str, Any]) -> Any:
+    value = row.get("id")
+    return value if value is not None else row.get("track_id")
 
 
 def _genre_prior(genre: str) -> float | None:
@@ -534,6 +611,7 @@ def _round(value: float) -> float:
 
 
 __all__ = [
+    "RowTransitionScorer",
     "TRANSITION_EDGE_COLUMNS",
     "TRANSITION_EDGE_PREFIX",
     "TransitionEdges",

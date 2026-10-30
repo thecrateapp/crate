@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from crate.config import radio_rotation_enabled
+from crate.config import radio_rotation_enabled, transition_fit_enabled
 from crate.recommendation_policy import RECENT_PLAY_WINDOW, canonical_key
 from crate.db.queries.recommendation_history import history_for_candidates
 
@@ -32,21 +32,17 @@ from crate.db.paths_candidates import (
     _MAX_CONSECUTIVE_SAME_ARTIST,
     _W_ARTIST_AFFINITY,
     _W_BLISS,
-    _W_BPM,
-    _W_ENERGY,
     _W_ERA,
     _W_GENRE_OVERLAP,
-    _W_KEY,
-    _bpm_penalty,
+    _audio_transition_penalty,
     _curation_penalty,
-    _energy_penalty,
     _era_penalty,
-    _key_penalty,
     _latest_track_context,
     _vector_distance,
 )
 from crate.db.paths_similarity import _artist_affinity, make_radio_genre_overlap_scorer
 from crate.db.queries.paths import find_candidate_rows, find_seeded_radio_candidate_rows
+from crate.db.queries.smart_mix_transition_edges import attach_transition_edges
 from crate.db.queries.global_catalog import get_global_radio_seed_tracks
 from crate.db.queries.radio import (
     count_user_radio_signals,
@@ -64,6 +60,10 @@ from crate.db.queries.radio import (
 from crate.db.queries.paths import load_artist_radio_graphs
 from crate.db.repositories.radio import (
     persist_radio_feedback,
+)
+from crate.smart_mix.transition_fit import (
+    TRANSITION_EDGE_PREFIX,
+    RowTransitionScorer,
 )
 from crate.track_versions import (
     canonical_track_title_key,
@@ -1145,6 +1145,12 @@ def _recent_track_context(candidate: dict) -> dict:
         "audio_scale": candidate.get("audio_scale"),
         "energy": candidate.get("energy"),
         "year": candidate.get("year"),
+        **{
+            key: value
+            for key, value in candidate.items()
+            if key in ("danceability", "valence")
+            or key.startswith(TRANSITION_EDGE_PREFIX)
+        },
     }
 
 
@@ -1576,6 +1582,7 @@ def _select_radio_candidate_from_rows(
     candidate_signals: dict | None = None,
     candidate_scores: list | None = None,
     max_consecutive: int | None = _MAX_CONSECUTIVE_SAME_ARTIST,
+    transition_scorer: RowTransitionScorer | None = None,
 ) -> dict | None:
     track_context = _latest_track_context(recent_tracks)
     target_norm = sum(v * v for v in target) ** 0.5
@@ -1673,9 +1680,7 @@ def _select_radio_candidate_from_rows(
             bliss_weight * (distance / max_dist)
             + affinity_weight * (1.0 - affinity)
             + genre_weight * (1.0 - overlap)
-            + _W_BPM * _bpm_penalty(candidate, track_context)
-            + _W_KEY * _key_penalty(candidate, track_context)
-            + _W_ENERGY * _energy_penalty(candidate, track_context)
+            + _audio_transition_penalty(candidate, track_context, transition_scorer)
             + _W_ERA * _era_penalty(candidate, track_context)
             + (signals["curation"] if signals else _curation_penalty(candidate))
             + source_penalty
@@ -1871,6 +1876,13 @@ def _generate_batch(
                 native_candidates.setdefault(entity_uid, row)
         candidate_rows = list(native_candidates.values())
     candidate_rows = _dedupe_radio_candidate_variants(candidate_rows)
+    transition_scorer = (
+        RowTransitionScorer(genre_map) if transition_fit_enabled() else None
+    )
+    if transition_scorer is not None and any(
+        f"{TRANSITION_EDGE_PREFIX}quality" in row for row in candidate_rows
+    ):
+        attach_transition_edges(recent_tracks[-1:], session=db_session)
     if is_seeded_context_radio and radio_rotation_enabled():
         candidate_rows = [
             row
@@ -1903,6 +1915,7 @@ def _generate_batch(
             genre_overlap=genre_overlap,
             recent_tracks=recent_tracks,
             radio_profile=radio_profile,
+            transition_scorer=transition_scorer,
             candidate_signals=rotation_options.get("candidate_signals"),
             candidate_scores=scores,
             max_consecutive=None,
@@ -1970,6 +1983,7 @@ def _generate_batch(
             genre_overlap=genre_overlap,
             recent_tracks=recent_tracks,
             radio_profile=radio_profile,
+            transition_scorer=transition_scorer,
             artist_batch_limit=artist_batch_limit,
             artist_session_limit=artist_session_limit,
             **rotation_options,
@@ -1993,6 +2007,7 @@ def _generate_batch(
                 genre_overlap=genre_overlap,
                 recent_tracks=recent_tracks,
                 radio_profile=radio_profile,
+                transition_scorer=transition_scorer,
                 artist_batch_limit=None,
                 artist_session_limit=artist_session_limit,
                 **rotation_options,
@@ -2016,6 +2031,7 @@ def _generate_batch(
                 genre_overlap=genre_overlap,
                 recent_tracks=recent_tracks,
                 radio_profile=radio_profile,
+                transition_scorer=transition_scorer,
                 artist_batch_limit=None,
                 artist_session_limit=None,
                 **rotation_options,
@@ -2040,6 +2056,7 @@ def _generate_batch(
                 genre_overlap=genre_overlap,
                 recent_tracks=recent_tracks,
                 radio_profile=radio_profile,
+                transition_scorer=transition_scorer,
                 max_consecutive=None,
                 **rotation_options,
             )

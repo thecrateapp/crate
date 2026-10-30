@@ -13,8 +13,10 @@ from crate.db.paths_similarity import (
     make_path_genre_overlap_scorer,
 )
 from crate.db.paths_vectors import _lerp
+from crate.config import transition_fit_enabled
 from crate.db.queries.recommendation_context import load_endpoint_contexts
 from crate.db.tx import read_scope
+from crate.smart_mix.transition_fit import RowTransitionScorer
 from crate.track_versions import track_song_identity
 
 
@@ -133,6 +135,9 @@ def compute_path(
             make_path_genre_overlap_scorer(genre_map, values)
             for values in segment_contexts
         ]
+        transition_scorer = (
+            RowTransitionScorer(genre_map) if transition_fit_enabled() else None
+        )
 
         def make_entry(track: dict, step: int, progress: float) -> dict:
             title_key = f"{track['artist']}::{track['title']}"
@@ -248,6 +253,7 @@ def compute_path(
                 selection_seed=f"{selection_seed}:{global_step}"
                 if selection_seed is not None
                 else None,
+                transition_scorer=transition_scorer,
                 session=current,
             )
             if track:
