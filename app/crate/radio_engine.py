@@ -1148,6 +1148,11 @@ def _recent_track_context(candidate: dict) -> dict:
     }
 
 
+def _latest_unique(history: list[str], current: set[str]) -> list[str]:
+    latest = {value: None for value in reversed(history) if value in current}
+    return list(reversed(latest))
+
+
 def _db_exclude_ids(used_track_ids: list[int]) -> set[int]:
     return set(used_track_ids[-_DB_EXCLUDE_ID_LIMIT:])
 
@@ -1761,20 +1766,22 @@ def _generate_batch(
         else used_track_ids
     )
     used_ids = set(hard_track_ids) | set(seed_track_ids)
-    used_titles = (
-        set(session["used_titles"])
+    title_memory = (
+        list(session["used_titles"])
         if not rotation or isinstance(session.get("buffer_refs"), list)
-        else set()
+        else []
     )
-    used_song_keys = {
+    used_titles = set(title_memory)
+    song_key_memory = [
         str(song_key)
         for song_key in (session.get("used_song_keys") or [])
         if str(song_key or "").strip()
-    }
+    ]
+    if rotation and not isinstance(session.get("buffer_refs"), list):
+        song_key_memory = []
     if rotation:
-        used_song_keys = set(session.get("seed_song_keys") or []) | (
-            used_song_keys if isinstance(session.get("buffer_refs"), list) else set()
-        )
+        song_key_memory = [*(session.get("seed_song_keys") or []), *song_key_memory]
+    used_song_keys = set(song_key_memory)
     session_artist_counts = _normalize_artist_counts(
         session.get("used_artist_counts") or {}
     )
@@ -2058,8 +2065,10 @@ def _generate_batch(
             used_ids.add(track_id)
             used_track_ids.append(track_id)
         used_titles.add(title_key)
+        title_memory.append(title_key)
         if song_key:
             used_song_keys.add(song_key)
+            song_key_memory.append(song_key)
         if artist_key:
             batch_artist_counts[artist_key] = batch_artist_counts.get(artist_key, 0) + 1
             session_artist_counts[artist_key] = (
@@ -2124,10 +2133,12 @@ def _generate_batch(
         session["used_track_ids"] = used_track_ids[-_DELIVERED_SONG_LIMIT:]
         _record_delivered_songs(session, tracks)
     session["used_titles"] = (
-        list(used_titles)[-_DELIVERED_SONG_LIMIT:] if rotation else list(used_titles)
+        _latest_unique(title_memory, used_titles)[-_DELIVERED_SONG_LIMIT:]
+        if rotation
+        else list(used_titles)
     )
     session["used_song_keys"] = (
-        sorted(used_song_keys)[-_DELIVERED_SONG_LIMIT:]
+        _latest_unique(song_key_memory, used_song_keys)[-_DELIVERED_SONG_LIMIT:]
         if rotation
         else sorted(used_song_keys)
     )

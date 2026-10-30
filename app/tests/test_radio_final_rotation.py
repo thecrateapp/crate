@@ -146,6 +146,33 @@ def test_a_known_buffer_followed_by_null_keeps_title_and_song_memory_bounded(
     assert all(size <= 500 for size in sizes.values()), sizes
 
 
+def test_bounded_title_and_song_memory_evicts_the_oldest_entries(monkeypatch):
+    buffer_track = _row(900, artist="Buffer")
+    fresh = _row(501, artist="Fresh")
+    _wire(monkeypatch, [buffer_track, fresh])
+    prior = [_row(index, artist=f"Prior {index}") for index in range(1, 500)]
+    state = _state(seed_song_keys=["seed::song"])
+    radio_engine._apply_buffer_context(state, ["900"])
+    state.update(
+        track_count=499,
+        used_titles=[radio_engine._title_key(row) for row in [*prior, buffer_track]],
+        used_song_keys=[radio_engine._song_key(row) for row in [*prior, buffer_track]],
+    )
+
+    result = radio_engine._advance_radio(state, 1)
+
+    assert [track["track_id"] for track in result["tracks"]] == [fresh["id"]]
+    for name, key in (
+        ("used_titles", radio_engine._title_key),
+        ("used_song_keys", radio_engine._song_key),
+    ):
+        memory = state[name]
+        assert len(memory) == 500
+        assert memory[-2:] == [key(buffer_track), key(fresh)]
+        assert key(prior[0]) not in memory
+        assert key(prior[-1]) in memory
+
+
 def test_legacy_native_delivery_records_only_rows_returned_after_known_and_limit_filtering(
     test_app,
     monkeypatch,
