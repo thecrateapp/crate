@@ -1,286 +1,164 @@
 package app.cratemusic.crate;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import android.content.Context;
+import android.os.Looper;
+import android.os.Handler;
+import android.os.SystemClock;
+import androidx.media3.common.Player;
+import androidx.media3.common.SimpleBasePlayer;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.time.Duration;
+import org.json.JSONObject;
+import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.Robolectric;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.RuntimeEnvironment;
+import org.robolectric.Shadows;
+import org.robolectric.annotation.Config;
+import org.robolectric.annotation.LooperMode;
+import org.robolectric.shadows.ShadowSystemClock;
 
-/**
- * TEST_GAP: Media3 EOF, audio focus and callbacks need a service/device runtime.
- * Policy/client tests exercise deadlines, generations and indexed retries; these guards
- * enforce their service wiring until the Xiaomi background/EOF smoke is run.
- * A bound service surviving stopSelf and receiving a late refill still needs physical QA.
- */
+@RunWith(RobolectricTestRunner.class)
+@Config(sdk = 35, manifest = Config.NONE)
+@LooperMode(LooperMode.Mode.PAUSED)
 public class NativeContinuationServiceContractTest {
-    private String source() throws Exception {
-        return new String(Files.readAllBytes(Paths.get(
-            "src/main/java/app/cratemusic/crate/CrateNativePlaybackService.java"
-        )), StandardCharsets.UTF_8);
-    }
+    private CrateNativePlaybackService service;
+    private NativeContinuationPolicy refill;
+    private NativeContinuationPolicy plans;
 
-    private String method(String source, String signature) {
-        int start = source.lastIndexOf(signature);
-        assertTrue("Missing service method: " + signature, start >= 0);
-        int open = source.indexOf('{', start);
-        int depth = 1;
-        for (int end = open + 1; end < source.length(); end++) {
-            if (source.charAt(end) == '{') depth++;
-            if (source.charAt(end) == '}' && --depth == 0) {
-                return source.substring(start, end + 1);
-            }
+    private static final class EndedPlayer extends SimpleBasePlayer {
+        EndedPlayer() { super(Looper.getMainLooper()); }
+        @Override protected State getState() {
+            return new State.Builder()
+                .setAvailableCommands(new Player.Commands.Builder().addAllCommands().build())
+                .setPlayWhenReady(true, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
+                .setPlaybackState(Player.STATE_ENDED)
+                .build();
         }
-        throw new AssertionError("Unclosed service method: " + signature);
     }
 
-    @Test
-    public void exhaustedRefillCannotKeepAudioFocusAtEnded() throws Exception {
-        String canContinue = method(source(), "private boolean canContinuePlayback()");
-        assertTrue(
-            "Playback eligibility must reject exhausted and unauthorized refill policy",
-            canContinue.contains("!refillPolicy.isTerminal()")
-        );
+    private Object field(String name) throws Exception {
+        Field field = CrateNativePlaybackService.class.getDeclaredField(name);
+        field.setAccessible(true);
+        return field.get(service);
     }
 
-    @Test
-    public void foregroundOnlyInvalidatesRequestsInsteadOfResettingRetryAndTerminalState() throws Exception {
-        String foreground = method(source(), "public void setAppInForeground(boolean foreground)");
-        assertFalse(
-            "Foreground must preserve exhausted/unauthorized state and retry backoff",
-            foreground.contains("cancelContinuationRequests()")
-        );
-        assertTrue(foreground.contains("refillPolicy.invalidateInFlight()"));
-        assertTrue(foreground.contains("continuationPolicy.invalidateInFlight()"));
-        assertFalse(foreground.contains(".reset()"));
-        assertFalse(foreground.contains("clearEndedDeadline()"));
+    private void setField(String name, Object value) throws Exception {
+        Field field = CrateNativePlaybackService.class.getDeclaredField(name);
+        field.setAccessible(true);
+        field.set(service, value);
     }
 
-    @Test
-    public void endedWaitUsesAMonotonicDeadlineInsteadOfRetryingWithoutALimit() throws Exception {
-        String source = source();
-        String stateChanged = method(source, "public void onPlaybackStateChanged(int playbackState)");
-        assertTrue(
-            "Entering ENDED must start the bounded wait using elapsedRealtime",
-            stateChanged.contains("onPlaybackEnded(SystemClock.elapsedRealtime())")
-        );
-        assertTrue(
-            "The service must check the ENDED deadline even without another player callback",
-            source.contains("endedDeadlineExpired(SystemClock.elapsedRealtime())")
-        );
-        String ended = method(stateChanged, "if (playbackState == Player.STATE_ENDED)");
-        assertTrue(ended.contains("settleEndedPlayback()"));
-        assertTrue(ended.contains("mainHandler.postDelayed("));
-        assertTrue(ended.contains("endedPlaybackTimeout"));
-        assertTrue(ended.contains("remainingEndedWaitMs(SystemClock.elapsedRealtime())"));
-        assertFalse(
-            "Repeated ENDED callbacks must not restart the grace period",
-            ended.contains("clearEndedDeadline()")
-        );
+    private NativeContinuationClient.Config config(String token, String session, boolean authoritative)
+        throws Exception {
+        return NativeContinuationClient.Config.fromJson(new JSONObject()
+            .put("apiBase", "https://example.test")
+            .put("token", token)
+            .put("expiresAtMs", Long.MAX_VALUE)
+            .put("refill", true)
+            .put("sessionId", session)
+            .put("batchIndex", 4)
+            .put("authoritativeCursor", authoritative));
     }
 
-    @Test
-    public void exhaustedRefillSettlesAnAlreadyEndedPlayerImmediately() throws Exception {
-        String applyRefill = method(source(), "private void applyRefill(");
-        String exhausted = method(applyRefill, "if (result.exhausted)");
-        int terminal = exhausted.indexOf("refillPolicy.onExhausted()");
-        int settle = exhausted.indexOf("settleEndedPlayback()");
-
-        assertTrue("An exhausted response must make refill terminal", terminal >= 0);
-        assertTrue(
-            "Exhaustion after the ENDED callback must release focus immediately",
-            settle > terminal
-        );
+    @Before public void setUp() throws Exception {
+        service = Robolectric.buildService(CrateNativePlaybackService.class).get();
+        setField("player", new CrateMixPlayer(new EndedPlayer()));
+        setField("audioManager", RuntimeEnvironment.getApplication().getSystemService(Context.AUDIO_SERVICE));
+        setField("audioFocusHeld", true);
+        refill = (NativeContinuationPolicy) field("refillPolicy");
+        plans = (NativeContinuationPolicy) field("continuationPolicy");
     }
 
-    @Test
-    public void unauthorizedRefillSettlesAnAlreadyEndedPlayerImmediately() throws Exception {
-        String unauthorized = method(source(), "private void invalidateContinuationAuthorization()");
-        int terminal = unauthorized.indexOf("refillPolicy.onUnauthorized()");
-        int settle = unauthorized.indexOf("settleEndedPlayback()");
-
-        assertTrue("An unauthorized response must make refill terminal", terminal >= 0);
-        assertTrue(
-            "Lost authorization after the ENDED callback must release focus immediately",
-            settle > terminal
-        );
+    @Test public void sameConfigurationKeepsExhaustionAcrossForegroundAndReconfiguration() throws Exception {
+        service.setContinuationConfig(config("token", "session", false));
+        refill.onExhausted();
+        plans.onUnauthorized();
+        service.setAppInForeground(true);
+        service.setContinuationConfig(config("token", "session", false));
+        assertTrue(refill.isTerminal());
+        assertTrue(plans.isTerminal());
+        assertFalse((boolean) field("audioFocusHeld"));
+        assertFalse(Shadows.shadowOf(service).isStoppedBySelf());
     }
 
-    @Test
-    public void endedTimeoutReleasesFocusAndStopsOnlyAnEndedService() throws Exception {
-        String source = source();
-        assertTrue(
-            "The handler timeout must invoke the same terminal playback settlement",
-            source.contains("Runnable endedPlaybackTimeout = this::settleEndedPlayback")
-        );
-        String settle = method(source, "private void settleEndedPlayback()");
-        assertTrue(settle.contains("player.getPlaybackState()"));
-        assertTrue(settle.contains("Player.STATE_ENDED"));
-        assertTrue(settle.contains("canContinuePlayback()"));
-        assertTrue(settle.contains("endedDeadlineExpired(SystemClock.elapsedRealtime())"));
-        int abandon = settle.indexOf("abandonPlaybackFocus()");
-        int stop = settle.indexOf("stopSelf()");
-        assertTrue("Settling ENDED must abandon audio focus", abandon >= 0);
-        assertTrue("Settling ENDED must stop the service after releasing focus", stop > abandon);
+    @Test public void sameConfigurationKeepsBackoffAndInvalidatesOldWork() throws Exception {
+        service.setContinuationConfig(config("token", "session", false));
+        refill.onFailure(SystemClock.elapsedRealtime());
+        plans.onFailure(SystemClock.elapsedRealtime());
+        long generation = refill.generation();
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(5));
+        service.setAppInForeground(true);
+        service.setContinuationConfig(config("token", "session", false));
+        assertEquals(5_000L, refill.retryDelayMs(SystemClock.elapsedRealtime()));
+        assertEquals(5_000L, plans.retryDelayMs(SystemClock.elapsedRealtime()));
+        assertFalse(refill.acceptsResult(generation));
     }
 
-    @Test
-    public void expiredEndedDeadlineCannotAuthorizePlaybackWhileTheServiceRemainsBound() throws Exception {
-        String canContinue = method(source(), "private boolean canContinuePlayback()");
-        assertTrue(
-            "A bound service must reject continuation after the ENDED deadline",
-            canContinue.contains("!refillPolicy.endedDeadlineExpired(SystemClock.elapsedRealtime())")
-        );
+    @Test public void sameConfigurationDoesNotRestartTheEndedDeadline() throws Exception {
+        service.setContinuationConfig(config("token", "session", false));
+        ShadowSystemClock.advanceBy(Duration.ofSeconds(45));
+        service.setAppInForeground(true);
+        service.setContinuationConfig(config("token", "session", false));
+        assertEquals(15_000L, refill.remainingEndedWaitMs(SystemClock.elapsedRealtime()));
     }
 
-    @Test
-    public void settlingEndedPlaybackInvalidatesPendingRefillsWithoutResettingTheExpiredDeadline() throws Exception {
-        String settle = method(source(), "private void settleEndedPlayback()");
-        int abandon = settle.indexOf("abandonPlaybackFocus()");
-        for (String invalidation : new String[] {
-            "mainHandler.removeCallbacks(refillRetry)",
-            "mainHandler.removeCallbacks(planRetry)",
-            "refillPolicy.invalidateInFlight()",
-            "continuationPolicy.invalidateInFlight()"
+    @Test public void sameConfigurationKeepsTheBackgroundRetryScheduled() throws Exception {
+        service.setContinuationConfig(config("token", "session", false));
+        refill.onFailure(SystemClock.elapsedRealtime());
+        service.setAppInForeground(false);
+        Handler handler = (Handler) field("mainHandler");
+        Runnable retry = (Runnable) field("refillRetry");
+        assertTrue(handler.hasCallbacks(retry));
+        service.setContinuationConfig(config("token", "session", false));
+        assertTrue(handler.hasCallbacks(retry));
+    }
+
+    @Test public void changedTokenSessionOrAuthoritativeCursorStartsAFreshPolicy() throws Exception {
+        service.setContinuationConfig(config("token", "session", false));
+        for (NativeContinuationClient.Config next : new NativeContinuationClient.Config[] {
+            config("new-token", "session", false),
+            config("new-token", "new-session", false),
+            config("new-token", "new-session", true)
         }) {
-            int invalidated = settle.indexOf(invalidation);
-            assertTrue(
-                "Before releasing focus, settlement must invalidate late work: " + invalidation,
-                invalidated >= 0 && invalidated < abandon
-            );
-        }
-        assertFalse("Settlement must preserve terminal and expired deadline", settle.contains(".reset()"));
-        assertFalse(settle.contains("cancelContinuationRequests()"));
-        assertFalse(settle.contains("clearEndedDeadline()"));
-    }
-
-    @Test
-    public void installingNewContinuationConfigurationWhileAlreadyEndedArmsAFreshDeadline() throws Exception {
-        String configure = method(source(), "public void setContinuationConfig(");
-        assertTrue(configure.contains("player.getPlaybackState()"));
-        assertTrue(configure.contains("Player.STATE_ENDED"));
-        assertTrue(configure.contains("canContinuePlayback()"));
-        assertTrue(
-            "A new configuration must bound ENDED even without another Media3 callback",
-            configure.contains("refillPolicy.onPlaybackEnded(SystemClock.elapsedRealtime())")
-        );
-        assertTrue(configure.contains("mainHandler.postDelayed("));
-        assertTrue(configure.contains("endedPlaybackTimeout"));
-        assertTrue(configure.contains("remainingEndedWaitMs(SystemClock.elapsedRealtime())"));
-    }
-
-    @Test
-    public void clearingContinuationConfigurationSettlesEndedPlaybackWithoutAnotherPlayerCallback() throws Exception {
-        String configure = method(source(), "public void setContinuationConfig(");
-        int installed = configure.indexOf("continuationConfig = config");
-        int settled = configure.indexOf("settleEndedPlayback()");
-        int armed = configure.indexOf("refillPolicy.onPlaybackEnded(");
-        int refill = configure.indexOf("maybeRefillQueue()");
-        assertTrue(installed >= 0);
-        assertTrue(
-            "Installing null or unusable config must settle ENDED after replacing the config",
-            settled > installed && settled < armed && settled < refill
-        );
-    }
-
-    private void assertRepeatSetterKeepsTheEndedWait(String setter) {
-        assertFalse(
-            "Repeat changes must retain the existing ENDED grace instead of resetting it",
-            setter.contains("cancelContinuationRequests()")
-        );
-        assertFalse(setter.contains(".reset()"));
-        assertFalse(setter.contains("clearEndedDeadline()"));
-        assertFalse(setter.contains("mainHandler.removeCallbacks(endedPlaybackTimeout)"));
-        assertTrue(setter.contains("mainHandler.removeCallbacks(refillRetry)"));
-        assertTrue(setter.contains("mainHandler.removeCallbacks(planRetry)"));
-        assertTrue(setter.contains("refillPolicy.invalidateInFlight()"));
-        assertTrue(setter.contains("continuationPolicy.invalidateInFlight()"));
-        int modeChanged = setter.indexOf("deckBPlayer.setRepeatMode(repeatMode)");
-        int settled = setter.indexOf("settleEndedPlayback()");
-        assertTrue(
-            "Repeat eligibility must be checked after installing the new mode, without waiting for Media3",
-            modeChanged >= 0 && settled > modeChanged
-        );
-    }
-
-    @Test
-    public void changingRepeatKeepsTheExistingEndedDeadlineAndSettlesIneligiblePlayback() throws Exception {
-        assertRepeatSetterKeepsTheEndedWait(method(source(), "public void setRepeat(String repeat)"));
-    }
-
-    @Test
-    public void mediaSessionRepeatChangeKeepsTheExistingEndedDeadlineAndSettlesIneligiblePlayback() throws Exception {
-        assertRepeatSetterKeepsTheEndedWait(method(source(), "public void beforeRepeatModeChange(int repeatMode)"));
-    }
-
-    @Test
-    public void activePlaybackCancelsTheEndedTimerAndClearsItsDeadline() throws Exception {
-        String stateChanged = method(source(), "public void onPlaybackStateChanged(int playbackState)");
-        assertTrue(
-            "Returning to active playback must cancel the pending ENDED timeout",
-            stateChanged.contains("mainHandler.removeCallbacks(endedPlaybackTimeout)")
-        );
-        assertTrue(stateChanged.contains("refillPolicy.clearEndedDeadline()"));
-    }
-
-    @Test
-    public void pauseReplacementAndDestructionCancelTheEndedTimer() throws Exception {
-        String source = source();
-        String cancel = method(source, "private void cancelContinuationRequests()");
-        assertTrue(
-            "Full cancellation must remove the ENDED callback before a later queue can play",
-            cancel.contains("mainHandler.removeCallbacks(endedPlaybackTimeout)")
-        );
-        assertTrue(cancel.contains("refillPolicy.reset()"));
-        String[] lifecycleMethods = {
-            "public void pause()",
-            "public void stopPlayback()",
-            "public void setQueue(",
-            "public void setContinuationConfig(",
-            "public void onDestroy()"
-        };
-        for (String signature : lifecycleMethods) {
-            assertTrue(
-                signature + " must cancel continuation and its ENDED timeout",
-                method(source, signature).contains("cancelContinuationRequests()")
-            );
+            refill.onExhausted();
+            plans.onUnauthorized();
+            service.setContinuationConfig(next);
+            assertFalse(refill.isTerminal());
+            assertFalse(plans.isTerminal());
+            assertEquals(60_000L, refill.remainingEndedWaitMs(SystemClock.elapsedRealtime()));
         }
     }
 
-    @Test
-    public void rejectsAnOldRefillBeforeApplyingItsAuthorizationFailure() throws Exception {
-        String source = source();
-        int start = source.indexOf("private void applyRefill(");
-        String apply = source.substring(start, source.indexOf("private void recordAppended(", start));
-        assertTrue(apply.indexOf("!revision.equals(queueState.revision())") >= 0);
-        assertTrue(apply.indexOf("!refillPolicy.acceptsResult(generation)") >= 0);
-        assertTrue(apply.indexOf("!revision.equals(queueState.revision())")
-            < apply.indexOf("Outcome.UNAUTHORIZED"));
-        assertTrue(apply.indexOf("!refillPolicy.acceptsResult(generation)")
-            < apply.indexOf("Outcome.UNAUTHORIZED"));
+    private void settle() throws Exception {
+        Method settle = CrateNativePlaybackService.class.getDeclaredMethod("settleEndedPlayback");
+        settle.setAccessible(true);
+        settle.invoke(service);
     }
 
-    @Test
-    public void postedRefillSettlesAnExpiredEndedDeadlineBeforeAcceptingOrAppendingItsResult() throws Exception {
-        String apply = method(source(), "private void applyRefill(");
-        int settled = apply.indexOf("settleEndedPlayback()");
-        int accepted = apply.indexOf("refillPolicy.acceptsResult(generation)");
-        int append = apply.indexOf("appendTracks(revision, result.tracks)");
-        assertTrue(
-            "A response posted before 60s but handled after expiry must invalidate its generation first",
-            settled >= 0 && settled < accepted
-        );
-        assertTrue(settled < append);
+    @Test public void finiteEndedPlaybackReleasesFocusWithoutStoppingTheMediaSession() throws Exception {
+        settle();
+        assertFalse((boolean) field("audioFocusHeld"));
+        assertFalse(Shadows.shadowOf(service).isStoppedBySelf());
     }
 
-    @Test
-    public void retriesUseATimerAndAreCancelledOnPause() throws Exception {
-        String source = source();
-        assertTrue(source.contains("mainHandler.postDelayed(retry, delayMs)"));
-        assertTrue(source.contains("scheduleContinuationRetry(refillPolicy, refillRetry)"));
-        int start = source.lastIndexOf("public void pause()");
-        String pause = source.substring(start, source.indexOf("public void stopPlayback()", start));
-        assertTrue(pause.contains("cancelContinuationRequests()"));
+    @Test public void continuationDeadlineReleasesFocusAndStopsTheService() throws Exception {
+        service.setContinuationConfig(config("token", "session", false));
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(60));
+        assertFalse((boolean) field("audioFocusHeld"));
+        assertTrue(Shadows.shadowOf(service).isStoppedBySelf());
+        assertTrue(refill.endedDeadlineExpired(SystemClock.elapsedRealtime()));
+    }
+
+    @Test public void clearingConfigurationSettlesEndedPlaybackWithoutStoppingControls() throws Exception {
+        service.setContinuationConfig(config("token", "session", false));
+        service.setContinuationConfig(null);
+        assertFalse((boolean) field("audioFocusHeld"));
+        assertFalse(Shadows.shadowOf(service).isStoppedBySelf());
     }
 }

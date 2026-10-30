@@ -308,7 +308,13 @@ export class AndroidNativeEngine implements PlaybackEngine {
     });
     if (typeof window !== "undefined") {
       window.addEventListener("crate:app-resumed", () => {
-        void this.configureContinuation();
+        if (
+          this.continuationContext &&
+          (this.queueMixRequested ||
+            this.continuationContext.descriptor !== null) &&
+          this.continuationExpiresAtMs <= Date.now()
+        )
+          void this.configureContinuation();
       });
       window.addEventListener(
         "crate:auth-runtime-reset",
@@ -590,6 +596,7 @@ export class AndroidNativeEngine implements PlaybackEngine {
         (typeof navigator !== "undefined" && navigator.onLine === false)
       ) {
         this.backgroundContinuationConfigured = false;
+        this.continuationExpiresAtMs = 0;
         await nativePlayback.setContinuation({ token: "" });
         return;
       }

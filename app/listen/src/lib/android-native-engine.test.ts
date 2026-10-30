@@ -1001,6 +1001,49 @@ describe("android native engine flags", () => {
       expect(continuationTokenMock).toHaveBeenCalledWith(descriptor);
     });
 
+    it("refreshes an expired authorization when the app resumes", async () => {
+      const engine = await loadQueue(12000);
+      await vi.waitFor(() =>
+        expect(nativePlaybackMock.setContinuation).toHaveBeenCalledWith(
+          expect.objectContaining({ token: "crv_continuation" }),
+        ),
+      );
+      const now = vi.spyOn(Date, "now").mockReturnValue(1_800_000_000_001);
+      try {
+        continuationTokenMock.mockResolvedValue({
+          token: "fresh-token",
+          expiresAtMs: 1_800_000_100_000,
+          apiBase: "https://api.example",
+        });
+        window.dispatchEvent(new CustomEvent("crate:app-resumed"));
+        await vi.waitFor(() =>
+          expect(nativePlaybackMock.setContinuation).toHaveBeenCalledWith(
+            expect.objectContaining({ token: "fresh-token" }),
+          ),
+        );
+      } finally {
+        now.mockRestore();
+        await engine.destroy();
+      }
+    });
+
+    it("does not reinstall an unchanged authorization when the app resumes", async () => {
+      const engine = await loadQueue(12000);
+      await vi.waitFor(() =>
+        expect(nativePlaybackMock.setContinuation).toHaveBeenCalledWith(
+          expect.objectContaining({ token: "crv_continuation" }),
+        ),
+      );
+      continuationTokenMock.mockClear();
+      nativePlaybackMock.setContinuation.mockClear();
+      window.dispatchEvent(new CustomEvent("crate:app-resumed"));
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(continuationTokenMock).not.toHaveBeenCalled();
+      expect(nativePlaybackMock.setContinuation).not.toHaveBeenCalled();
+      await engine.destroy();
+    });
+
     it("updates Infinite and repeat without reloading the current queue", async () => {
       const engine = await loadQueue(0);
       const descriptor = {

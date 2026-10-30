@@ -1407,7 +1407,19 @@ public class CrateNativePlaybackService extends MediaSessionService {
     public void setContinuationConfig(
         @Nullable NativeContinuationClient.Config config
     ) {
-        cancelContinuationRequests();
+        boolean changed = continuationConfig == null || config == null
+            ? continuationConfig != config
+            : !continuationConfig.token.equals(config.token)
+                || !continuationConfig.sessionId.equals(config.sessionId)
+                || config.authoritativeCursor;
+        if (changed) {
+            cancelContinuationRequests();
+        } else {
+            mainHandler.removeCallbacks(refillRetry);
+            mainHandler.removeCallbacks(planRetry);
+            refillPolicy.invalidateInFlight();
+            continuationPolicy.invalidateInFlight();
+        }
         if (config != null) {
             refillBatchIndex = config.nextBatchIndex(refillSessionId, refillBatchIndex);
             refillSessionId = config.sessionId;
@@ -1416,11 +1428,14 @@ public class CrateNativePlaybackService extends MediaSessionService {
         settleEndedPlayback();
         if (player != null && player.getPlaybackState() == Player.STATE_ENDED && canContinuePlayback()) {
             refillPolicy.onPlaybackEnded(SystemClock.elapsedRealtime());
+            mainHandler.removeCallbacks(endedPlaybackTimeout);
             mainHandler.postDelayed(
                 endedPlaybackTimeout,
                 refillPolicy.remainingEndedWaitMs(SystemClock.elapsedRealtime())
             );
         }
+        scheduleContinuationRetry(refillPolicy, refillRetry);
+        scheduleContinuationRetry(continuationPolicy, planRetry);
         maybeRequestContinuation();
         maybeRefillQueue();
     }
@@ -1466,7 +1481,7 @@ public class CrateNativePlaybackService extends MediaSessionService {
         refillPolicy.invalidateInFlight();
         continuationPolicy.invalidateInFlight();
         abandonPlaybackFocus();
-        stopSelf();
+        if (refillPolicy.endedDeadlineExpired(SystemClock.elapsedRealtime())) stopSelf();
     }
 
     private void scheduleContinuationRetry(NativeContinuationPolicy policy, Runnable retry) {
