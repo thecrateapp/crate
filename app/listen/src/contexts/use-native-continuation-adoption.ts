@@ -1,12 +1,15 @@
-import { useCallback } from "react";
+import { useCallback, type MutableRefObject } from "react";
 
-import type { Track } from "@/contexts/player-types";
+import type { PlaySource, Track } from "@/contexts/player-types";
 import {
   androidNativeEngine,
   shouldUseAndroidNativePlayer,
 } from "@/lib/android-native-engine";
+import { ensureContinuationSession } from "@/lib/radio-continuation";
 import type { EngineAppendedTrack } from "@/lib/playback-engine";
 import { toRadioTrack, toShapedRadioTrack } from "@/lib/radio-model";
+
+import type { PlaybackQueueReadiness } from "./playback-intelligence-model";
 
 type ValueRef<T> = { readonly current: T };
 
@@ -27,20 +30,54 @@ export function nativeAppendedTrackToTrack(entry: EngineAppendedTrack): Track {
 }
 
 export function useNativeContinuationAdoption({
+  queueReadinessRef,
   adoptTracks,
   queueRef,
+  playSourceRef,
 }: {
+  queueReadinessRef?: MutableRefObject<PlaybackQueueReadiness>;
   adoptTracks: (tracks: Track[]) => void;
   queueRef: ValueRef<Track[]>;
+  playSourceRef?: ValueRef<PlaySource | null>;
 }) {
   return useCallback(async () => {
-    if (!shouldUseAndroidNativePlayer()) return;
+    const isReady = () => queueReadinessRef?.current.ready !== false;
+    if (!shouldUseAndroidNativePlayer() || !isReady()) return;
+    const generation = queueReadinessRef?.current.generation;
+    const source = playSourceRef?.current;
+    const expectedSession = source?.radio
+      ? ensureContinuationSession(source)
+      : null;
     const appended = await androidNativeEngine.takeAppendedTracks();
+    if (
+      playSourceRef?.current !== source ||
+      !isReady() ||
+      generation !== queueReadinessRef?.current.generation
+    )
+      return;
+    const cursor = androidNativeEngine.getContinuationCursor();
+    if (
+      playSourceRef &&
+      (!expectedSession || !cursor || cursor.sessionId !== expectedSession)
+    )
+      return;
+    const radio = playSourceRef?.current?.radio;
+    if (
+      cursor &&
+      radio &&
+      (radio.continuationSessionId ?? radio.shapedSessionId) ===
+        cursor.sessionId
+    ) {
+      radio.continuationBatchIndex = Math.max(
+        radio.continuationBatchIndex ?? (radio.shapedSessionId ? 1 : 0),
+        cursor.batchIndex,
+      );
+    }
     if (appended.length === 0) return;
     const known = new Set(queueRef.current.map((track) => track.id));
     const tracks = appended
       .map(nativeAppendedTrackToTrack)
       .filter((track) => !known.has(track.id));
     if (tracks.length > 0) adoptTracks(tracks);
-  }, [adoptTracks, queueRef]);
+  }, [adoptTracks, queueRef, playSourceRef, queueReadinessRef]);
 }

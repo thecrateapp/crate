@@ -154,9 +154,9 @@ describe("Music paths pages", () => {
       }),
     );
     expect(playAll).toHaveBeenCalledWith(expect.any(Array), 1, {
-      type: "playlist",
+      type: "queue",
       name: pathDetail.name,
-      id: 77,
+      href: "/paths/77",
     });
   });
 
@@ -333,7 +333,7 @@ describe("Music paths pages", () => {
         expect.objectContaining({ title: "Track Two" }),
       ],
       1,
-      { type: "playlist", name: "Punk to Post-hardcore", id: 77 },
+      { type: "queue", name: "Punk to Post-hardcore", href: "/paths/77" },
     );
 
     fireEvent.contextMenu(row);

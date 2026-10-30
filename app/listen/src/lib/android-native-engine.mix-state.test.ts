@@ -11,11 +11,13 @@ const native = vi.hoisted(() => ({
   checkPermissions: vi.fn(),
   requestPermissions: vi.fn(),
   setContinuation: vi.fn(),
+  addListener: vi.fn().mockResolvedValue({ remove: vi.fn() }),
 }));
 vi.mock("@capacitor/core", () => ({ registerPlugin: () => native }));
 vi.mock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
 vi.mock("@/lib/playback-continuation", () => ({
   getPlaybackContinuationToken: vi.fn(),
+  invalidatePlaybackContinuationToken: vi.fn(),
 }));
 const mix: EngineMixState = {
   revision: "queue-a",

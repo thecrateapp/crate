@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useRef,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
@@ -37,6 +38,8 @@ import {
   setSingleMode as gpSetSingleMode,
 } from "@/lib/gapless-player";
 
+import type { PlaybackQueueReadiness } from "./playback-intelligence-model";
+
 type QueueCommitter = (queue: Track[]) => void;
 type IndexCommitter = (index: number) => void;
 type PlaybackCommitter = (value: boolean) => void;
@@ -61,6 +64,9 @@ function isJamPlaybackSource(source: PlaySource | undefined): boolean {
 }
 
 export interface UsePlayerStartActionsParams {
+  queueReadinessRef?: MutableRefObject<PlaybackQueueReadiness>;
+  isPlayingRef?: MutableRefObject<boolean>;
+  resumePlaybackIntelligence?: () => void;
   queueRef: MutableRefObject<Track[]>;
   currentIndexRef: MutableRefObject<number>;
   jamQueueLockedRef: MutableRefObject<boolean>;
@@ -97,6 +103,9 @@ export interface UsePlayerStartActionsParams {
 }
 
 export function usePlayerStartActions({
+  queueReadinessRef,
+  isPlayingRef,
+  resumePlaybackIntelligence,
   queueRef,
   currentIndexRef,
   jamQueueLockedRef,
@@ -126,7 +135,16 @@ export function usePlayerStartActions({
   silenceGaplessEngine,
   stopNativeEngineIfAvailable,
 }: UsePlayerStartActionsParams) {
-  const startQueuePlayback = useCallback(
+  const fallbackReadinessRef = useRef<PlaybackQueueReadiness>({
+    ready: true,
+    generation: 0,
+  });
+  const readinessRef = queueReadinessRef ?? fallbackReadinessRef;
+  const startQueuePlayback: (
+    tracks: Track[],
+    startIndex: number,
+    source?: PlaySource,
+  ) => void = useCallback(
     (tracks: Track[], startIndex: number, source?: PlaySource) => {
       if (jamQueueLockedRef.current && !isJamPlaybackSource(source)) return;
       if (!tracks.length) return;
@@ -144,6 +162,17 @@ export function usePlayerStartActions({
       resumeAfterReloadRef.current = false;
       cancelRestoreAutoplay();
       resetPlaybackIntelligence();
+      const generation = ++readinessRef.current.generation;
+      readinessRef.current.ready = false;
+      readinessRef.current.resumePending = () =>
+        startQueuePlayback(tracks, startIndex, source);
+      const isCurrent = () => generation === readinessRef.current.generation;
+      const ready = () => {
+        if (!isCurrent()) return;
+        readinessRef.current.ready = true;
+        readinessRef.current.resumePending = undefined;
+        if (isPlayingRef?.current !== false) resumePlaybackIntelligence?.();
+      };
       flushCurrentPlayEvent("interrupted");
 
       preparePlaybackDelivery(tracks, normalizedIndex, playbackDeliveryPolicy, {
@@ -163,6 +192,12 @@ export function usePlayerStartActions({
 
       if (shouldUseAndroidNativePlayer()) {
         const intentGeneration = beginNativePlaybackIntent();
+        void nativeEngine.setContinuationContext().catch((error) => {
+          console.warn(
+            "[native-player] previous continuation not cleared:",
+            error,
+          );
+        });
         silenceGaplessEngine();
         commitQueue(tracks);
         commitCurrentIndex(normalizedIndex);
@@ -192,10 +227,24 @@ export function usePlayerStartActions({
             shuffle: shuffleRef.current,
             target: "android-native",
           });
-          if (!isNativePlaybackRecoveryIntentCurrent(intentGeneration)) return;
-          return nativeEngine.loadQueue(snapshot);
+          if (
+            !isCurrent() ||
+            !isNativePlaybackRecoveryIntentCurrent(intentGeneration)
+          )
+            return;
+          await nativeEngine.loadQueue(snapshot);
+          if (
+            !isCurrent() ||
+            !isNativePlaybackRecoveryIntentCurrent(intentGeneration)
+          )
+            return;
+          ready();
         })().catch((error) => {
-          if (!isNativePlaybackRecoveryIntentCurrent(intentGeneration)) return;
+          if (
+            !isCurrent() ||
+            !isNativePlaybackRecoveryIntentCurrent(intentGeneration)
+          )
+            return;
           console.error("[native-player] failed to load queue:", error);
           commitIsPlaying(false);
           commitIsBuffering(false);
@@ -209,7 +258,10 @@ export function usePlayerStartActions({
           tracks,
           normalizedIndex,
         );
+        if (!isCurrent()) return;
         const engineUrls = engineTracks.map((track) => track.url);
+        commitQueue(tracks);
+        commitCurrentIndex(normalizedIndex);
 
         stopNativeEngineIfAvailable("before web queue load");
         gpLoadQueue(buildEngineUrls(tracks, engineUrls), normalizedIndex, {
@@ -225,8 +277,10 @@ export function usePlayerStartActions({
         }
 
         gpPlay();
+        ready();
         void publishConnectState?.({ claimActive: true }).catch(() => {});
       })().catch((error) => {
+        if (!isCurrent()) return;
         console.error("[gapless] failed to resolve queue playback:", error);
         bufferingIntentRef.current = false;
         commitIsBuffering(false);
@@ -234,6 +288,9 @@ export function usePlayerStartActions({
       });
     },
     [
+      readinessRef,
+      isPlayingRef,
+      resumePlaybackIntelligence,
       buildEngineUrls,
       cancelSoftInterruption,
       cancelRestoreAutoplay,

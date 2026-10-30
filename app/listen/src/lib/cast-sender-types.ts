@@ -95,6 +95,8 @@ export interface CastStartResult {
 }
 
 export interface CastPlaybackState {
+  playerState?: string;
+  mediaFinished?: boolean;
   active: boolean;
   currentIndex?: number;
   currentTime: number;
@@ -356,6 +358,11 @@ export interface ChromeCastMedia {
   playerState?: string;
   volume?: ChromeCastVolume;
   getEstimatedTime?(): number;
+  getStatus?(
+    request: Record<string, never> | null,
+    success: () => void,
+    error: (error: unknown) => void,
+  ): void;
   addUpdateListener?(listener: (isAlive: boolean) => void): void;
   removeUpdateListener?(listener: (isAlive: boolean) => void): void;
   pause(

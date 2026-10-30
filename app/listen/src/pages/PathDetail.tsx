@@ -59,9 +59,9 @@ export function PathDetail() {
     (startIndex: number) => {
       if (!path) return;
       playAll(path.tracks.map(mapToPlayerTrack), startIndex, {
-        type: "playlist",
+        type: "queue",
         name: path.name,
-        id: path.id,
+        href: `/paths/${path.id}`,
       });
     },
     [path, playAll],

@@ -20,6 +20,8 @@ import { isOnline as isRuntimeOnline } from "@/lib/capacitor";
 import { isCastSessionActive } from "@/lib/cast-sender";
 
 interface UsePlayerEngineCallbacksParams {
+  continueInfinitePlayback?: () => boolean;
+  resumePlaybackIntelligence?: () => void;
   callbacksRef: MutableRefObject<GaplessPlayerCallbacks>;
   crossfadeTimerRef: MutableRefObject<number | null>;
   currentIndexRef: MutableRefObject<number>;
@@ -77,6 +79,8 @@ interface UsePlayerEngineCallbacksParams {
 }
 
 export function usePlayerEngineCallbacks({
+  continueInfinitePlayback,
+  resumePlaybackIntelligence,
   callbacksRef,
   crossfadeTimerRef,
   currentIndexRef,
@@ -185,6 +189,7 @@ export function usePlayerEngineCallbacks({
       resumeAfterReloadRef.current = false;
       cancelRestoreAutoplay();
       cancelSoftInterruption();
+      resumePlaybackIntelligence?.();
       commitIsPlaying(true);
       commitIsBuffering(false);
       bufferingIntentRef.current = false;
@@ -272,10 +277,15 @@ export function usePlayerEngineCallbacks({
       );
     },
     onAllFinished: () => {
-      if (isCastSessionActive()) return;
+      if (isCastSessionActive() || isSoftInterrupted()) return;
       resumeAfterReloadRef.current = false;
       cancelRestoreAutoplay();
       cancelSoftInterruption();
+      if (continueInfinitePlayback?.()) {
+        commitIsPlaying(false);
+        bufferingIntentRef.current = true;
+        return;
+      }
       commitIsPlaying(false);
       commitIsBuffering(false);
       bufferingIntentRef.current = false;

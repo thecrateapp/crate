@@ -1393,6 +1393,7 @@
   "actions.playlist.toasts.removedFromLibrary": "Eliminada de tu biblioteca",
   "player.loading": "Cargando reproductor...",
   "player.toasts.updateLikedTracksFailed": "No se pudieron actualizar los temas favoritos",
+  "player.toasts.continuationUnavailable": "No se ha podido continuar la reproducción. Pulsa Reproducir para intentarlo de nuevo.",
   "player.queue.nothingQueued": "Nada en cola",
   "player.lyrics.loading": "Cargando letra...",
   "player.lyrics.unavailable": "No hay letra disponible",

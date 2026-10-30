@@ -16,6 +16,9 @@ type ValueRef<T> = { readonly current: T };
 type MutableValueRef<T> = { current: T };
 
 type NativePlaybackRuntimeOptions = {
+  recoverAtEnd?: () => boolean;
+  resumePlaybackIntelligence?: () => void;
+  resetPlaybackIntelligence?: () => void;
   beginSoftInterruption: (reason: "stream") => void;
   bufferingIntentRef: MutableValueRef<boolean>;
   commitCurrentIndex: (index: number) => void;
@@ -56,6 +59,9 @@ type NativePlaybackRuntimeOptions = {
 };
 
 export function useNativePlaybackRuntime({
+  recoverAtEnd,
+  resumePlaybackIntelligence,
+  resetPlaybackIntelligence,
   adoptNativeAppendedTracks,
   beginSoftInterruption,
   bufferingIntentRef,
@@ -133,6 +139,9 @@ export function useNativePlaybackRuntime({
   });
 
   useNativePlaybackEventBridge({
+    recoverAtEnd,
+    resumePlaybackIntelligence,
+    resetPlaybackIntelligence,
     adoptNativeAppendedTracks,
     applyNativePosition,
     applyNativeState,

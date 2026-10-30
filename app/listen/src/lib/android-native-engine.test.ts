@@ -24,7 +24,7 @@ const nativePlaybackMock = vi.hoisted(() => ({
   setVolume: vi.fn(),
   setPlaybackRate: vi.fn(),
   setEq: vi.fn(),
-  addListener: vi.fn(),
+  addListener: vi.fn().mockResolvedValue({ remove: vi.fn() }),
 }));
 
 vi.mock("@capacitor/core", () => ({
@@ -32,8 +32,10 @@ vi.mock("@capacitor/core", () => ({
 }));
 
 const continuationTokenMock = vi.hoisted(() => vi.fn());
+const invalidateContinuationTokenMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/playback-continuation", () => ({
   getPlaybackContinuationToken: continuationTokenMock,
+  invalidatePlaybackContinuationToken: invalidateContinuationTokenMock,
 }));
 
 describe("android native engine flags", () => {
@@ -47,8 +49,9 @@ describe("android native engine flags", () => {
 
   it("uses the native player by default on Android native runtime", async () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
-    const { shouldUseAndroidNativePlayer } =
-      await import("@/lib/android-native-engine");
+    const { shouldUseAndroidNativePlayer } = await import(
+      "@/lib/android-native-engine"
+    );
 
     expect(shouldUseAndroidNativePlayer()).toBe(true);
   });
@@ -69,8 +72,9 @@ describe("android native engine flags", () => {
 
   it("ignores the flag outside Android native runtime", async () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: false }));
-    const { shouldUseAndroidNativePlayer } =
-      await import("@/lib/android-native-engine");
+    const { shouldUseAndroidNativePlayer } = await import(
+      "@/lib/android-native-engine"
+    );
 
     expect(shouldUseAndroidNativePlayer()).toBe(false);
   });
@@ -79,8 +83,9 @@ describe("android native engine flags", () => {
     vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
     localStorage.setItem("listen-player-crossfade-seconds", "4");
     localStorage.setItem("crate-native-player-crossfade-enabled", "true");
-    const { shouldUseAndroidNativePlayer } =
-      await import("@/lib/android-native-engine");
+    const { shouldUseAndroidNativePlayer } = await import(
+      "@/lib/android-native-engine"
+    );
 
     expect(shouldUseAndroidNativePlayer()).toBe(true);
     expect(
@@ -694,7 +699,10 @@ describe("android native engine flags", () => {
     await vi.advanceTimersByTimeAsync(150);
     expect(nativePlaybackMock.getState).toHaveBeenCalledTimes(2);
     await expect(loadPromise).resolves.toEqual({ ...state, mixState: null });
-    expect(nativePlaybackMock.addListener).not.toHaveBeenCalled();
+    expect(nativePlaybackMock.addListener).not.toHaveBeenCalledWith(
+      "ready",
+      expect.any(Function),
+    );
     vi.useRealTimers();
   });
 
@@ -814,6 +822,7 @@ describe("android native engine flags", () => {
         volume: 1,
         continuation: context,
       });
+      return engine;
     }
 
     it("hands the continuation token and queue context to the native service", async () => {
@@ -840,8 +849,9 @@ describe("android native engine flags", () => {
 
     it("follows Smart Mix mode changes in the continuation context", async () => {
       vi.doMock("@/lib/capacitor-runtime", () => ({ isAndroidNative: true }));
-      const { continuationWithModes } =
-        await import("@/lib/android-native-engine");
+      const { continuationWithModes } = await import(
+        "@/lib/android-native-engine"
+      );
       const capabilities = {
         available: true,
         androidNativeCrossfade: true,
@@ -989,6 +999,386 @@ describe("android native engine flags", () => {
         ),
       );
       expect(continuationTokenMock).toHaveBeenCalledWith(descriptor);
+    });
+
+    it("refreshes an expired authorization when the app resumes", async () => {
+      const engine = await loadQueue(12000);
+      await vi.waitFor(() =>
+        expect(nativePlaybackMock.setContinuation).toHaveBeenCalledWith(
+          expect.objectContaining({ token: "crv_continuation" }),
+        ),
+      );
+      const now = vi.spyOn(Date, "now").mockReturnValue(1_800_000_000_001);
+      try {
+        continuationTokenMock.mockResolvedValue({
+          token: "fresh-token",
+          expiresAtMs: 1_800_000_100_000,
+          apiBase: "https://api.example",
+        });
+        window.dispatchEvent(new CustomEvent("crate:app-resumed"));
+        await vi.waitFor(() =>
+          expect(nativePlaybackMock.setContinuation).toHaveBeenCalledWith(
+            expect.objectContaining({ token: "fresh-token" }),
+          ),
+        );
+      } finally {
+        now.mockRestore();
+        await engine.destroy();
+      }
+    });
+
+    it("does not reinstall an unchanged authorization when the app resumes", async () => {
+      const engine = await loadQueue(12000);
+      await vi.waitFor(() =>
+        expect(nativePlaybackMock.setContinuation).toHaveBeenCalledWith(
+          expect.objectContaining({ token: "crv_continuation" }),
+        ),
+      );
+      continuationTokenMock.mockClear();
+      nativePlaybackMock.setContinuation.mockClear();
+      window.dispatchEvent(new CustomEvent("crate:app-resumed"));
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(continuationTokenMock).not.toHaveBeenCalled();
+      expect(nativePlaybackMock.setContinuation).not.toHaveBeenCalled();
+      await engine.destroy();
+    });
+
+    it("updates Infinite and repeat without reloading the current queue", async () => {
+      const engine = await loadQueue(0);
+      const descriptor = {
+        kind: "shaped_radio" as const,
+        sessionId: "session-1",
+        batchIndex: 4,
+      };
+      await engine.setContinuationContext({ ...context, descriptor });
+      expect(nativePlaybackMock.setContinuation).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          refill: true,
+          sessionId: "session-1",
+          batchIndex: 4,
+        }),
+      );
+      nativePlaybackMock.setRepeat.mockResolvedValue(state);
+      await engine.setRepeat("all");
+      expect(nativePlaybackMock.setContinuation).toHaveBeenLastCalledWith(
+        expect.objectContaining({ refill: false }),
+      );
+      await engine.setRepeat("off");
+      expect(nativePlaybackMock.setContinuation).toHaveBeenLastCalledWith(
+        expect.objectContaining({ refill: true }),
+      );
+      expect(nativePlaybackMock.setQueue).toHaveBeenCalledTimes(1);
+    });
+
+    it("revision removal: configures native refill without a numeric session revision", async () => {
+      const engine = await loadQueue(0);
+      await engine.setContinuationContext({
+        ...context,
+        descriptor: {
+          kind: "shaped_radio",
+          sessionId: "session-1",
+          batchIndex: 2,
+        },
+      });
+
+      expect(nativePlaybackMock.setContinuation).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          sessionId: "session-1",
+          batchIndex: 2,
+          refill: true,
+        }),
+      );
+      expect(
+        nativePlaybackMock.setContinuation.mock.calls[
+          nativePlaybackMock.setContinuation.mock.calls.length - 1
+        ]?.[0],
+      ).not.toHaveProperty("revision");
+      expect(nativePlaybackMock.setQueue.mock.calls[0]?.[0].revision).toBe(
+        "queue-rev-1",
+      );
+    });
+
+    it("revision removal: adopts a same-session native cursor while preserving the string queue guard", async () => {
+      const engine = await loadQueue(0);
+      await engine.setContinuationContext({
+        ...context,
+        descriptor: {
+          kind: "shaped_radio",
+          sessionId: "session-1",
+          batchIndex: 2,
+        },
+      });
+      const entry = {
+        sequence: 3,
+        id: "uid-9",
+        entityUid: "uid-9",
+        durationMs: 180000,
+        source: { entity_uid: "uid-9" },
+      };
+      nativePlaybackMock.getAppendedTracks.mockResolvedValueOnce({
+        revision: state.revision,
+        continuationSessionId: "session-1",
+        continuationBatchIndex: 6,
+        continuationRevision: 99,
+        tracks: [entry],
+      });
+
+      expect(await engine.takeAppendedTracks()).toEqual([entry]);
+      expect(engine.getContinuationCursor()).toEqual({
+        sessionId: "session-1",
+        batchIndex: 6,
+      });
+      nativePlaybackMock.getAppendedTracks.mockResolvedValueOnce({
+        revision: "old-queue",
+        continuationSessionId: "session-1",
+        continuationBatchIndex: 9,
+        tracks: [entry],
+      });
+      expect(await engine.takeAppendedTracks()).toEqual([]);
+      expect(engine.getContinuationCursor()).toEqual({
+        sessionId: "session-1",
+        batchIndex: 6,
+      });
+      expect(nativePlaybackMock.getAppendedTracks).toHaveBeenLastCalledWith({
+        revision: state.revision,
+        afterSequence: 3,
+      });
+    });
+
+    it("revision removal: only an authoritative cursor can rewind the same native session", async () => {
+      const engine = await loadQueue(0);
+      await engine.setContinuationContext({
+        ...context,
+        descriptor: {
+          kind: "shaped_radio",
+          sessionId: "session-1",
+          batchIndex: 2,
+        },
+      });
+      await engine.setContinuationCursor(
+        JSON.parse('{"sessionId":"session-1","batchIndex":10,"revision":1}'),
+      );
+      await engine.setContinuationCursor(
+        JSON.parse('{"sessionId":"session-1","batchIndex":6,"revision":99}'),
+      );
+      expect(engine.getContinuationCursor()).toEqual({
+        sessionId: "session-1",
+        batchIndex: 10,
+      });
+      await engine.setContinuationCursor(
+        JSON.parse('{"sessionId":"session-1","batchIndex":6,"revision":99}'),
+        true,
+      );
+      expect(engine.getContinuationCursor()).toEqual({
+        sessionId: "session-1",
+        batchIndex: 6,
+      });
+      expect(nativePlaybackMock.setContinuation).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          sessionId: "session-1",
+          batchIndex: 6,
+          authoritativeCursor: true,
+        }),
+      );
+      expect(
+        nativePlaybackMock.setContinuation.mock.calls[
+          nativePlaybackMock.setContinuation.mock.calls.length - 1
+        ]?.[0],
+      ).not.toHaveProperty("revision");
+    });
+
+    it("owns background refill only after a usable native configuration is installed", async () => {
+      const engine = await loadQueue(0);
+      expect(engine.hasBackgroundContinuation()).toBe(false);
+      const withDescriptor = {
+        ...context,
+        descriptor: { kind: "shaped_radio" as const, sessionId: "session-1" },
+      };
+      await engine.setContinuationContext(withDescriptor);
+      expect(engine.hasBackgroundContinuation()).toBe(true);
+      nativePlaybackMock.setContinuation.mockRejectedValueOnce(
+        new Error("service unavailable"),
+      );
+      await engine.setContinuationContext(withDescriptor);
+      expect(engine.hasBackgroundContinuation()).toBe(false);
+      await engine.setContinuationContext(withDescriptor);
+      expect(engine.hasBackgroundContinuation()).toBe(true);
+      await engine.setContinuationContext();
+      expect(engine.hasBackgroundContinuation()).toBe(false);
+      continuationTokenMock.mockResolvedValueOnce({
+        token: "expired",
+        expiresAtMs: 1,
+        apiBase: "https://api.example",
+      });
+      await engine.setContinuationContext(withDescriptor);
+      expect(engine.hasBackgroundContinuation()).toBe(false);
+      await engine.destroy();
+    });
+
+    it("adopts a native cursor even if a completed batch appended no tracks", async () => {
+      const engine = await loadQueue(0);
+      await engine.setContinuationContext({
+        ...context,
+        descriptor: {
+          kind: "shaped_radio",
+          sessionId: "session-1",
+          batchIndex: 2,
+        },
+      });
+      nativePlaybackMock.getAppendedTracks.mockResolvedValue({
+        revision: state.revision,
+        tracks: [],
+        continuationSessionId: "session-1",
+        continuationBatchIndex: 6,
+      });
+      expect(await engine.takeAppendedTracks()).toEqual([]);
+      expect(engine.getContinuationCursor()).toEqual({
+        sessionId: "session-1",
+        batchIndex: 6,
+      });
+      await engine.setContinuationContext({
+        ...context,
+        descriptor: {
+          kind: "shaped_radio",
+          sessionId: "session-1",
+          batchIndex: 2,
+        },
+      });
+      expect(nativePlaybackMock.setContinuation).toHaveBeenLastCalledWith(
+        expect.objectContaining({ batchIndex: 6 }),
+      );
+    });
+
+    it("publishes each foreground ACK before background refill and ignores an older native cursor", async () => {
+      const engine = await loadQueue(0);
+      await engine.setContinuationContext({
+        ...context,
+        descriptor: {
+          kind: "seeded_radio",
+          seedType: "album",
+          seedId: "42",
+          sessionId: "session-1",
+          batchIndex: 0,
+        },
+      });
+      for (const batchIndex of [1, 2]) {
+        await engine.setContinuationCursor({
+          sessionId: "session-1",
+          batchIndex,
+        });
+        nativePlaybackMock.getAppendedTracks.mockResolvedValue({
+          revision: state.revision,
+          tracks: [],
+          continuationSessionId: "session-1",
+          continuationBatchIndex: 0,
+        });
+        await engine.takeAppendedTracks();
+        expect(engine.getContinuationCursor()).toEqual({
+          sessionId: "session-1",
+          batchIndex,
+        });
+      }
+      expect(nativePlaybackMock.setContinuation).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          sessionId: "session-1",
+          batchIndex: 2,
+          refill: true,
+        }),
+      );
+      expect(nativePlaybackMock.setQueue).toHaveBeenCalledOnce();
+    });
+
+    it("realigns an authoritative server cursor without reloading the native queue", async () => {
+      const engine = await loadQueue(0);
+      await engine.setContinuationContext({
+        ...context,
+        descriptor: {
+          kind: "seeded_radio",
+          seedType: "album",
+          seedId: "42",
+          sessionId: "session-1",
+          batchIndex: 10,
+        },
+      });
+      await engine.setContinuationCursor({
+        sessionId: "session-1",
+        batchIndex: 10,
+      });
+      await engine.setContinuationCursor(
+        { sessionId: "session-1", batchIndex: 6 },
+        true,
+      );
+      nativePlaybackMock.getAppendedTracks.mockResolvedValue({
+        revision: state.revision,
+        tracks: [],
+        continuationSessionId: "session-1",
+        continuationBatchIndex: 6,
+      });
+      await engine.takeAppendedTracks();
+      expect(engine.getContinuationCursor()).toEqual({
+        sessionId: "session-1",
+        batchIndex: 6,
+      });
+      expect(nativePlaybackMock.setContinuation).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          sessionId: "session-1",
+          batchIndex: 6,
+          authoritativeCursor: true,
+        }),
+      );
+      expect(nativePlaybackMock.setQueue).toHaveBeenCalledOnce();
+    });
+
+    it("reissues rejected authorization once and ignores another queue's rejection", async () => {
+      const engine = await loadQueue(12000);
+      const call = nativePlaybackMock.addListener.mock.calls.find(
+        ([event]) => event === "continuationAuthorizationRequired",
+      );
+      const listener = call![1] as (event: { revision: string }) => void;
+      const before = continuationTokenMock.mock.calls.length;
+      listener({ revision: "old-queue" });
+      expect(continuationTokenMock).toHaveBeenCalledTimes(before);
+      listener({ revision: state.revision });
+      await vi.waitFor(() =>
+        expect(continuationTokenMock).toHaveBeenCalledTimes(before + 1),
+      );
+      listener({ revision: state.revision });
+      await Promise.resolve();
+      expect(invalidateContinuationTokenMock).toHaveBeenCalled();
+      expect(continuationTokenMock).toHaveBeenCalledTimes(before + 1);
+      await engine.destroy();
+    });
+
+    it("clears continuation authorization and rejects an in-flight token on logout", async () => {
+      const engine = await loadQueue(12000);
+      let resolveToken: (token: {
+        token: string;
+        expiresAtMs: number;
+        apiBase: string;
+      }) => void = () => {};
+      continuationTokenMock.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveToken = resolve;
+          }),
+      );
+      const pending = engine.setContinuationContext({ ...context });
+      window.dispatchEvent(new CustomEvent("crate:auth-runtime-reset"));
+      resolveToken({
+        token: "stale-token",
+        expiresAtMs: 1_800_000_000_000,
+        apiBase: "https://api.example",
+      });
+      await pending;
+      expect(invalidateContinuationTokenMock).toHaveBeenCalled();
+      expect(nativePlaybackMock.setContinuation).toHaveBeenLastCalledWith({
+        token: "",
+      });
+      expect(nativePlaybackMock.setContinuation).not.toHaveBeenCalledWith(
+        expect.objectContaining({ token: "stale-token" }),
+      );
+      await engine.destroy();
     });
 
     it("takes each natively appended track once per queue revision", async () => {

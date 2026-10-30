@@ -1371,6 +1371,7 @@
   "actions.playlist.toasts.removedFromLibrary": "Zure liburutegitik kendu da",
   "player.loading": "Erreproduzitzailea kargatzen...",
   "player.toasts.updateLikedTracksFailed": "Ezin izan dira gogoko pistak eguneratu",
+  "player.toasts.continuationUnavailable": "Ezin izan da erreprodukzioarekin jarraitu. Sakatu Erreproduzitu berriro saiatzeko.",
   "player.queue.nothingQueued": "Ez dago ezer ilaran",
   "player.lyrics.loading": "Letrak kargatzen...",
   "player.lyrics.unavailable": "Ez dago letrarik erabilgarri",

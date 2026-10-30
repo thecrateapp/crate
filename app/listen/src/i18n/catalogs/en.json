@@ -1393,6 +1393,7 @@
   "actions.playlist.toasts.removedFromLibrary": "Removed from your library",
   "player.loading": "Loading player...",
   "player.toasts.updateLikedTracksFailed": "Failed to update liked tracks",
+  "player.toasts.continuationUnavailable": "Could not continue playback. Press Play to try again.",
   "player.queue.nothingQueued": "Nothing queued",
   "player.lyrics.loading": "Loading lyrics...",
   "player.lyrics.unavailable": "No lyrics available",

@@ -1371,6 +1371,7 @@
   "actions.playlist.toasts.removedFromLibrary": "Aus der Bibliothek entfernt",
   "player.loading": "Player wird geladen...",
   "player.toasts.updateLikedTracksFailed": "Lieblingstitel konnten nicht aktualisiert werden",
+  "player.toasts.continuationUnavailable": "Die Wiedergabe konnte nicht fortgesetzt werden. Drücke Abspielen, um es erneut zu versuchen.",
   "player.queue.nothingQueued": "Keine Titel in der Queue",
   "player.lyrics.loading": "Songtext wird geladen...",
   "player.lyrics.unavailable": "Kein Songtext verfügbar",

@@ -1,8 +1,16 @@
 export type EngineRepeatMode = "off" | "one" | "all";
 export type EnginePlaybackState =
-  "idle" | "buffering" | "ready" | "playing" | "paused" | "ended";
+  | "idle"
+  | "buffering"
+  | "ready"
+  | "playing"
+  | "paused"
+  | "ended";
 export type EngineTransitionType =
-  "gapless" | "crossfade" | "manual-skip" | "seek";
+  | "gapless"
+  | "crossfade"
+  | "manual-skip"
+  | "seek";
 
 export interface NativeEventMetadata {
   nativeSequence?: number;
@@ -63,11 +71,17 @@ export interface EngineTransitionPlan {
 }
 
 export type EngineContinuationDescriptor =
-  | { kind: "shaped_radio"; sessionId: string }
+  | {
+      kind: "shaped_radio";
+      sessionId: string;
+      batchIndex?: number;
+    }
   | {
       kind: "seeded_radio";
       seedType: "artist" | "track" | "album" | "playlist" | "home_playlist";
       seedId: string;
+      sessionId?: string;
+      batchIndex?: number;
     };
 
 export interface EngineContinuationContext {

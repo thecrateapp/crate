@@ -10,6 +10,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 import androidx.annotation.Nullable;
 
@@ -36,6 +38,9 @@ final class NativeContinuationClient {
         final boolean allowLongBeatmatch;
         final String delivery;
         final boolean refill;
+        final boolean authoritativeCursor;
+        final String sessionId;
+        final int batchIndex;
 
         Config(
             String apiBase,
@@ -85,6 +90,19 @@ final class NativeContinuationClient {
             String delivery,
             boolean refill
         ) {
+            this(apiBase, token, expiresAtMs, source, preferredDurationMs, allowBeatmatch,
+                allowBassHandoff, allowLongBeatmatch, delivery, refill, "", 0, false);
+        }
+
+        private Config(
+            String apiBase, String token, long expiresAtMs, String source,
+            long preferredDurationMs, boolean allowBeatmatch, boolean allowBassHandoff,
+            boolean allowLongBeatmatch, String delivery, boolean refill,
+            String sessionId, int batchIndex, boolean authoritativeCursor
+        ) {
+            this.authoritativeCursor = authoritativeCursor;
+            this.sessionId = sessionId;
+            this.batchIndex = Math.max(0, batchIndex);
             this.apiBase = trimTrailingSlash(apiBase);
             this.token = token == null ? "" : token;
             this.expiresAtMs = expiresAtMs;
@@ -111,8 +129,16 @@ final class NativeContinuationClient {
                 payload.optBoolean("allowBassHandoff", false),
                 payload.optBoolean("allowLongBeatmatch", false),
                 payload.optString("delivery", ""),
-                payload.optBoolean("refill", false)
+                payload.optBoolean("refill", false),
+                payload.optString("sessionId", ""),
+                payload.optInt("batchIndex", 0),
+                payload.optBoolean("authoritativeCursor", false)
             );
+        }
+
+        int nextBatchIndex(String previousSessionId, int previousBatchIndex) {
+            return !authoritativeCursor && sessionId.equals(previousSessionId)
+                ? Math.max(previousBatchIndex, batchIndex) : batchIndex;
         }
 
         boolean isUsable(long nowWallMs) {
@@ -146,6 +172,9 @@ final class NativeContinuationClient {
         final List<String> sources;
         final List<JSONObject> plans;
         final boolean exhausted;
+        final String status;
+        final String sessionId;
+        final int batchIndex;
 
         Continuation(
             Outcome outcome,
@@ -154,6 +183,17 @@ final class NativeContinuationClient {
             List<JSONObject> plans,
             boolean exhausted
         ) {
+            this(outcome, tracks, sources, plans, exhausted, "", -1, "ok");
+        }
+
+        Continuation(
+            Outcome outcome, List<NativeTrack> tracks, List<String> sources,
+            List<JSONObject> plans, boolean exhausted, String sessionId,
+            int batchIndex, String status
+        ) {
+            this.status = status;
+            this.sessionId = sessionId;
+            this.batchIndex = batchIndex;
             this.outcome = outcome;
             this.tracks = tracks;
             this.sources = sources;
@@ -220,11 +260,17 @@ final class NativeContinuationClient {
     }
 
     Continuation fetchContinuation(Config config, List<NativeTrack> queue, int limit) {
+        return fetchContinuation(config, queue, limit, config.batchIndex);
+    }
+
+    Continuation fetchContinuation(
+        Config config, List<NativeTrack> queue, int limit, int batchIndex
+    ) {
         try {
             Response response = transport.post(
                 config.apiBase + CONTINUATION_PATH,
                 config.token,
-                continuationBody(config, queue, limit).toString()
+                continuationBody(config, queue, limit, batchIndex).toString()
             );
             if (response.status == 401 || response.status == 403) {
                 return Continuation.failed(Outcome.UNAUTHORIZED);
@@ -232,7 +278,14 @@ final class NativeContinuationClient {
             if (response.status != 200) {
                 return Continuation.failed(Outcome.FAILED);
             }
-            return parseContinuation(response.body, config, queue);
+            Continuation result = parseContinuation(response.body, config, queue);
+            if (
+                (result.batchIndex >= 0 && result.batchIndex != batchIndex
+                    && !("retryable_empty".equals(result.status) && result.tracks.isEmpty())) ||
+                (!result.sessionId.isEmpty() && !config.sessionId.isEmpty()
+                    && !result.sessionId.equals(config.sessionId))
+            ) return Continuation.failed(Outcome.FAILED);
+            return result;
         } catch (IOException | JSONException error) {
             return Continuation.failed(Outcome.FAILED);
         }
@@ -240,6 +293,12 @@ final class NativeContinuationClient {
 
     static JSONObject continuationBody(Config config, List<NativeTrack> queue, int limit)
         throws JSONException {
+        return continuationBody(config, queue, limit, config.batchIndex);
+    }
+
+    static JSONObject continuationBody(
+        Config config, List<NativeTrack> queue, int limit, int batchIndex
+    ) throws JSONException {
         JSONArray recent = new JSONArray();
         String after = "";
         for (int index = queue.size() - 1; index >= 0; index--) {
@@ -256,21 +315,34 @@ final class NativeContinuationClient {
             .put("delivery", config.delivery)
             .put("context", edgeContext(config));
         if (!after.isEmpty()) body.put("afterTrackEntityUid", after);
+        if (!config.sessionId.isEmpty()) {
+            body.put("batchIndex", batchIndex);
+        }
         return body;
     }
 
     static Continuation parseContinuation(String body, Config config, List<NativeTrack> queue)
         throws JSONException {
         JSONObject response = new JSONObject(body);
+        String status = response.optString("status", "ok");
+        if ("auth_required".equals(status)) return Continuation.failed(Outcome.UNAUTHORIZED);
+        if (!"ok".equals(status) && !"retryable_empty".equals(status) && !"exhausted".equals(status)) {
+            return Continuation.failed(Outcome.FAILED);
+        }
         JSONArray rawTracks = response.optJSONArray("tracks");
         List<NativeTrack> tracks = new ArrayList<>();
         List<String> sources = new ArrayList<>();
+        Set<String> known = new HashSet<>();
+        for (NativeTrack track : queue) {
+            if (!track.entityUid.isEmpty()) known.add(track.entityUid);
+        }
         if (rawTracks != null) {
             for (int index = 0; index < rawTracks.length(); index++) {
                 JSONObject raw = rawTracks.optJSONObject(index);
                 if (raw == null) continue;
                 String url = raw.optString("url", "");
-                if (url.isEmpty()) continue;
+                String entityUid = raw.optString("entityUid", "");
+                if (url.isEmpty() || entityUid.isEmpty() || !known.add(entityUid)) continue;
                 tracks.add(
                     new NativeTrack(
                         raw.optString("id", ""),
@@ -309,7 +381,10 @@ final class NativeContinuationClient {
             tracks,
             sources,
             plans,
-            response.optBoolean("exhausted", false)
+            response.optBoolean("exhausted", false) || "exhausted".equals(status),
+            response.optString("sessionId", config.sessionId),
+            response.optInt("batchIndex", -1),
+            status
         );
     }
 

@@ -189,21 +189,59 @@ def playback_continuation(
     user = _require_continuation_token(request)
     descriptor = get_continuation_descriptor(int(user["access_token_id"]))
     if not descriptor:
-        return PlaybackContinuationResponse(tracks=[], plans=[], exhausted=True)
+        return PlaybackContinuationResponse(
+            tracks=[], plans=[], exhausted=True, status="exhausted"
+        )
     known = {str(uid) for uid in payload.recent_entity_uids}
     if payload.after_track_entity_uid:
         known.add(str(payload.after_track_entity_uid))
-    rows, exhausted = continuation_radio_tracks(
-        descriptor,
-        user=user,
-        limit=payload.limit,
-        exclude_entity_uids=known,
-    )
-    tracks = [
-        track
-        for track in (_continuation_track(row, payload.delivery) for row in rows)
-        if track is not None
-    ]
+    batch = None
+    if payload.batch_index is not None and descriptor.get("sessionId"):
+        from crate.api.radio import indexed_continuation_batch
+
+        batch = indexed_continuation_batch(
+            descriptor,
+            user=user,
+            limit=payload.limit,
+            buffer_refs=[
+                *(
+                    str(uid)
+                    for uid in reversed(payload.recent_entity_uids)
+                    if uid != payload.after_track_entity_uid
+                ),
+                *(
+                    [str(payload.after_track_entity_uid)]
+                    if payload.after_track_entity_uid
+                    else []
+                ),
+            ],
+            batch_index=payload.batch_index,
+        )
+        rows, exhausted = batch["tracks"], batch["exhausted"]
+    else:
+        from crate.radio_continuation import RadioLeaseLost
+
+        try:
+            rows, exhausted = continuation_radio_tracks(
+                descriptor,
+                user=user,
+                limit=payload.limit,
+                exclude_entity_uids=known,
+            )
+        except RadioLeaseLost as exc:
+            raise HTTPException(
+                status_code=409,
+                detail="Radio session is busy; retry the request",
+                headers={"Retry-After": "1"},
+            ) from exc
+    tracks = []
+    seen = set(known)
+    for row in rows:
+        track = _continuation_track(row, payload.delivery)
+        if track is None or str(track.entity_uid) in seen:
+            continue
+        seen.add(str(track.entity_uid))
+        tracks.append(track)
     chain = (
         [str(payload.after_track_entity_uid)] if payload.after_track_entity_uid else []
     )
@@ -220,10 +258,23 @@ def playback_continuation(
         tracks=tracks,
         plans=_plan_transition_edges(edges) if edges else [],
         exhausted=exhausted,
+        status=(
+            "ok"
+            if tracks
+            else "auth_required"
+            if batch and batch["status"] == "auth_required"
+            else "exhausted"
+            if exhausted
+            else "retryable_empty"
+        ),
+        sessionId=batch["session_id"] if batch else None,
+        batchIndex=batch.get("batch_index") if batch else None,
     )
 
 
 def _continuation_track(row: dict, delivery: str) -> ContinuationTrackResponse | None:
+    if row.get("playable") is False:
+        return None
     entity_uid = row.get("track_entity_uid") or row.get("entity_uid")
     if not entity_uid:
         return None

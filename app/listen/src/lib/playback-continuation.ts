@@ -2,6 +2,8 @@ import type { PlaySource } from "@/contexts/player-types";
 import { api, getApiBase } from "@/lib/api";
 import type { EngineContinuationDescriptor } from "@/lib/playback-engine";
 
+import { ensureContinuationSession } from "./radio-continuation";
+
 const REFRESH_BEFORE_EXPIRY_MS = 2 * 60 * 60 * 1000;
 
 export interface PlaybackContinuationToken {
@@ -9,6 +11,8 @@ export interface PlaybackContinuationToken {
   expiresAtMs: number;
   apiBase: string;
 }
+
+let authorizationGeneration = 0;
 
 let cachedToken:
   | (PlaybackContinuationToken & { descriptorKey: string })
@@ -18,7 +22,9 @@ export async function getPlaybackContinuationToken(
   descriptor: EngineContinuationDescriptor | null = null,
 ): Promise<PlaybackContinuationToken> {
   const apiBase = getApiBase();
-  const descriptorKey = JSON.stringify(descriptor);
+  const descriptorKey = JSON.stringify(
+    descriptor ? { ...descriptor, batchIndex: undefined } : null,
+  );
   if (
     cachedToken &&
     cachedToken.apiBase === apiBase &&
@@ -28,11 +34,14 @@ export async function getPlaybackContinuationToken(
     const { token, expiresAtMs } = cachedToken;
     return { token, expiresAtMs, apiBase };
   }
+  const generation = authorizationGeneration;
   const response = await api<{ token: string; expiresAt: string }>(
     "/api/playback/continuation-token",
     "POST",
     descriptor ? { descriptor } : undefined,
   );
+  if (generation !== authorizationGeneration)
+    throw new Error("Continuation authorization changed");
   cachedToken = {
     token: response.token,
     expiresAtMs: Date.parse(response.expiresAt),
@@ -46,24 +55,36 @@ export async function getPlaybackContinuationToken(
   };
 }
 
+export function invalidatePlaybackContinuationToken(): void {
+  authorizationGeneration++;
+  cachedToken = null;
+}
+
 export function continuationDescriptor(
   source: PlaySource | null,
   options: { shuffle: boolean; infinite: boolean },
 ): EngineContinuationDescriptor | null {
   const radio = source?.radio;
   if (!source || !radio) return null;
+  const sessionId = ensureContinuationSession(source)!;
+  const cursor = {
+    sessionId,
+    batchIndex: radio.continuationBatchIndex,
+  };
   if (source.type === "radio") {
     if (radio.shapedSessionId) {
-      return { kind: "shaped_radio", sessionId: radio.shapedSessionId };
+      return { kind: "shaped_radio", ...cursor };
     }
-    return seededDescriptor(radio);
+    const seeded = seededDescriptor(radio);
+    return seeded ? { ...seeded, ...cursor } : null;
   }
-  if (!options.infinite || options.shuffle) return null;
+  if (!options.infinite) return null;
   if (
     (source.type === "album" && radio.seedType === "album") ||
     (source.type === "playlist" && radio.seedType === "playlist")
   ) {
-    return seededDescriptor(radio);
+    const seeded = seededDescriptor(radio);
+    return seeded ? { ...seeded, ...cursor } : null;
   }
   return null;
 }

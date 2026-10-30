@@ -7,6 +7,7 @@ import {
 
 import type { PlayerPauseOptions } from "@/contexts/player-context";
 import type { Track } from "@/contexts/player-types";
+import type { PlaybackResumeOptions } from "@/contexts/playback-intelligence-model";
 import {
   androidNativeEngine as nativeEngine,
   shouldUseAndroidNativePlayer,
@@ -43,6 +44,12 @@ function shouldUseImmediateTransportAction(): boolean {
 }
 
 export interface UsePlayerTransportControlsParams {
+  cancelQueuePreparation?: () => void;
+  resumePendingQueue?: () => boolean;
+  resetPlaybackIntelligence?: () => void;
+  resumePlaybackIntelligence?: (
+    options?: PlaybackResumeOptions,
+  ) => boolean | void;
   queueRef: MutableRefObject<Track[]>;
   isPlayingRef: MutableRefObject<boolean>;
   bufferingIntentRef: MutableRefObject<boolean>;
@@ -57,6 +64,10 @@ export interface UsePlayerTransportControlsParams {
 }
 
 export function usePlayerTransportControls({
+  cancelQueuePreparation,
+  resumePendingQueue,
+  resetPlaybackIntelligence,
+  resumePlaybackIntelligence,
   queueRef,
   isPlayingRef,
   bufferingIntentRef,
@@ -70,6 +81,8 @@ export function usePlayerTransportControls({
   silenceGaplessEngine,
 }: UsePlayerTransportControlsParams) {
   const pauseLocal = useCallback(() => {
+    cancelQueuePreparation?.();
+    resetPlaybackIntelligence?.();
     void cancelNativeMediaSessionResume();
     cancelSoftInterruption();
     bufferingIntentRef.current = false;
@@ -83,6 +96,8 @@ export function usePlayerTransportControls({
     }
     gpPause();
   }, [
+    cancelQueuePreparation,
+    resetPlaybackIntelligence,
     bufferingIntentRef,
     cancelSoftInterruption,
     commitIsBuffering,
@@ -90,9 +105,11 @@ export function usePlayerTransportControls({
   ]);
 
   const resumeLocal = useCallback(() => {
+    if (resumePendingQueue?.()) return;
+    cancelSoftInterruption();
+    if (resumePlaybackIntelligence?.({ userGesture: true })) return;
     if (!queueRef.current.length) return;
     markNativeMediaSessionPlayingIntent();
-    cancelSoftInterruption();
     bufferingIntentRef.current = true;
     commitIsBuffering(true);
     if (shouldUseAndroidNativePlayer()) {
@@ -116,6 +133,8 @@ export function usePlayerTransportControls({
       gpPlay();
     });
   }, [
+    resumePendingQueue,
+    resumePlaybackIntelligence,
     bufferingIntentRef,
     cancelSoftInterruption,
     commitIsBuffering,
@@ -125,6 +144,8 @@ export function usePlayerTransportControls({
 
   const pause = useCallback(
     (options?: PlayerPauseOptions) => {
+      cancelQueuePreparation?.();
+      resetPlaybackIntelligence?.();
       if (!options?.preserveNativeResume) {
         void cancelNativeMediaSessionResume();
       }
@@ -162,6 +183,8 @@ export function usePlayerTransportControls({
       });
     },
     [
+      cancelQueuePreparation,
+      resetPlaybackIntelligence,
       bufferingIntentRef,
       cancelSoftInterruption,
       commitIsBuffering,
@@ -171,6 +194,9 @@ export function usePlayerTransportControls({
   );
 
   const resume = useCallback(() => {
+    if (resumePendingQueue?.()) return;
+    cancelSoftInterruption();
+    if (resumePlaybackIntelligence?.({ userGesture: true })) return;
     if (!queueRef.current.length) return;
     markNativeMediaSessionPlayingIntent();
     if (isCastSessionActive()) {
@@ -187,7 +213,6 @@ export function usePlayerTransportControls({
         });
       return;
     }
-    cancelSoftInterruption();
     bufferingIntentRef.current = true;
     commitIsBuffering(true);
     if (shouldUseAndroidNativePlayer()) {
@@ -208,6 +233,8 @@ export function usePlayerTransportControls({
       gpPlay();
     });
   }, [
+    resumePendingQueue,
+    resumePlaybackIntelligence,
     bufferingIntentRef,
     cancelSoftInterruption,
     commitIsBuffering,

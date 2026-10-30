@@ -37,7 +37,8 @@ const adapter =
         handlers: {
           onLoad: (data) => void sessionRuntime?.load(data),
           onCurrentItem: (itemId) => sessionRuntime?.currentItem(itemId),
-          onPlayerState: (state) => sessionRuntime?.playerState(state),
+          onPlayerState: (state, mediaFinished) =>
+            sessionRuntime?.playerState(state, mediaFinished),
           onProgress: (progress) => sessionRuntime?.progress(progress),
           onQueueChange: () => void sessionRuntime?.refreshQueue(),
           onError: () => {

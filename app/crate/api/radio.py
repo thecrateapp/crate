@@ -12,6 +12,9 @@ from crate.api.openapi_responses import (
 from crate.api.schemas.radio import (
     PersonalizedRadioStationsResponse,
     RadioResponse,
+    RadioStartRequest,
+    RadioNextRequest,
+    RadioBatchResponse,
 )
 from crate.bliss import (
     generate_album_radio,
@@ -43,6 +46,14 @@ _RADIO_RESPONSES = merge_responses(
             "The seed resource was not found or no radio data is available yet."
         ),
         422: error_response("The route parameters failed validation."),
+    },
+)
+_RADIO_SESSION_RESPONSES = merge_responses(
+    AUTH_ERROR_RESPONSES,
+    {
+        409: error_response(
+            "The radio session is busy or its lease expired; retry the request."
+        )
     },
 )
 
@@ -132,6 +143,38 @@ def continuation_radio_tracks(
         if len(selected) >= limit:
             break
     return selected, exhausted and not selected
+
+
+def indexed_continuation_batch(
+    descriptor: dict,
+    *,
+    user: dict,
+    limit: int,
+    buffer_refs: list[str],
+    batch_index: int,
+) -> dict:
+    from crate.radio_continuation import start_batch, next_batch
+
+    user = {**user, "id": _continuation_user_id(user)}
+    session_id = descriptor["sessionId"]
+    if descriptor["kind"] == "seeded_radio" and batch_index == 0:
+        seed_type = descriptor["seedType"].replace("_", "-")
+        _validate_continuation_seed(seed_type, descriptor["seedId"], user)
+        return start_batch(
+            session_id=session_id,
+            user_id=_continuation_user_id(user),
+            seed_type=seed_type,
+            seed_value=descriptor["seedId"],
+            count=limit,
+            buffer_refs=buffer_refs,
+        )
+    return next_batch(
+        session_id,
+        user_id=_continuation_user_id(user),
+        batch_index=batch_index,
+        count=limit,
+        buffer_refs=buffer_refs,
+    )
 
 
 def _seeded_radio_rows(
@@ -439,18 +482,32 @@ def api_home_playlist_radio(
     return result
 
 
+def _continuation_user_id(user: dict) -> int:
+    user_id = _effective_user_id(user)
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return int(user_id)
+
+
+def _validate_continuation_seed(
+    seed_type: str | None, seed_value: str | None, user: dict
+) -> None:
+    if seed_type != "playlist":
+        return
+    if not seed_value or not seed_value.isdigit():
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    row = get_playlist_for_radio(int(seed_value))
+    if not row or (row.get("scope") == "system" and not row.get("is_active", False)):
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    if (
+        row.get("scope") != "system"
+        and row.get("user_id") != user["id"]
+        and user.get("role") != "admin"
+    ):
+        raise HTTPException(status_code=403, detail="Not your playlist")
+
+
 # ── Shaped Radio (v2) — sessions with like/dislike feedback ────────
-
-
-class RadioStartRequest(BaseModel):
-    mode: str = Field(default="seeded", description="seeded | discovery")
-    seed_type: str | None = None
-    seed_value: str | None = None
-
-
-class RadioNextRequest(BaseModel):
-    session_id: str
-    count: int = Field(default=20, ge=1, le=50)
 
 
 class RadioFeedbackRequest(BaseModel):
@@ -468,6 +525,7 @@ class RadioFeedbackRequest(BaseModel):
 
 @router.post(
     "/api/radio/start",
+    response_model=RadioBatchResponse,
     responses=AUTH_ERROR_RESPONSES,
     summary="Start a shaped radio session",
 )
@@ -475,6 +533,20 @@ def api_radio_start(request: Request, body: RadioStartRequest):
     user = _require_auth(request)
     from crate.radio_engine import start_radio
 
+    user = {**user, "id": _continuation_user_id(user)}
+    _validate_continuation_seed(body.seed_type, body.seed_value, user)
+    if body.session_id is not None:
+        from crate.radio_continuation import start_batch
+
+        return start_batch(
+            session_id=str(body.session_id),
+            user_id=user["id"],
+            mode=body.mode,
+            seed_type=body.seed_type,
+            seed_value=body.seed_value,
+            count=body.count,
+            buffer_refs=body.buffer_refs,
+        )
     result = start_radio(
         user_id=user["id"],
         mode=body.mode,
@@ -493,16 +565,36 @@ def api_radio_start(request: Request, body: RadioStartRequest):
 
 @router.post(
     "/api/radio/next",
-    responses=AUTH_ERROR_RESPONSES,
+    response_model=RadioBatchResponse,
+    responses=_RADIO_SESSION_RESPONSES,
     summary="Get next batch of radio tracks",
 )
 def api_radio_next(request: Request, body: RadioNextRequest):
     user = _require_auth(request)
     from crate.radio_engine import get_session_user_id, next_tracks
+    from crate.radio_continuation import RadioLeaseLost
 
-    if get_session_user_id(body.session_id) != _effective_user_id(user):
+    session_id = str(body.session_id)
+    if body.batch_index is not None:
+        from crate.radio_continuation import next_batch
+
+        return next_batch(
+            session_id,
+            user_id=_continuation_user_id(user),
+            batch_index=body.batch_index,
+            count=body.count,
+            buffer_refs=body.buffer_refs,
+        )
+    if get_session_user_id(session_id) != _continuation_user_id(user):
         return JSONResponse({"error": "Session not found or expired"}, status_code=404)
-    result = next_tracks(body.session_id, body.count)
+    try:
+        result = next_tracks(session_id, body.count)
+    except RadioLeaseLost as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Radio session is busy; retry the request",
+            headers={"Retry-After": "1"},
+        ) from exc
     if not result:
         return JSONResponse({"error": "Session not found or expired"}, status_code=404)
     return result
@@ -510,19 +602,30 @@ def api_radio_next(request: Request, body: RadioNextRequest):
 
 @router.post(
     "/api/radio/feedback",
-    responses=AUTH_ERROR_RESPONSES,
+    responses=_RADIO_SESSION_RESPONSES,
     summary="Like or dislike a radio track to shape the session",
 )
 def api_radio_feedback(request: Request, body: RadioFeedbackRequest):
-    _require_auth(request)
-    from crate.radio_engine import radio_feedback
+    user = _require_auth(request)
+    from crate.radio_engine import radio_feedback, get_session_user_id
+    from crate.radio_continuation import RadioLeaseLost
 
-    result = radio_feedback(
-        body.session_id,
-        body.track_id,
-        body.action,
-        global_track_uid=body.global_track_uid,
-    )
+    if get_session_user_id(body.session_id) != _continuation_user_id(user):
+        raise HTTPException(status_code=404, detail="Session not found or expired")
+
+    try:
+        result = radio_feedback(
+            body.session_id,
+            body.track_id,
+            body.action,
+            global_track_uid=body.global_track_uid,
+        )
+    except RadioLeaseLost as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Radio session is busy; retry the request",
+            headers={"Retry-After": "1"},
+        ) from exc
     if not result:
         return JSONResponse({"error": "Session not found or expired"}, status_code=404)
     return result
@@ -542,13 +645,25 @@ def api_radio_can_discover(request: Request):
 
 @router.delete(
     "/api/radio/session/{session_id}",
-    responses=AUTH_ERROR_RESPONSES,
+    responses=_RADIO_SESSION_RESPONSES,
     summary="End a radio session",
 )
 def api_radio_end_session(request: Request, session_id: str):
-    _require_auth(request)
-    from crate.radio_engine import _delete_session
+    user = _require_auth(request)
+    from crate.radio_engine import _delete_session, get_session_user_id
+    from crate.radio_continuation import RadioLeaseLost
 
-    if _delete_session(session_id):
+    if get_session_user_id(session_id) != _continuation_user_id(user):
+        raise HTTPException(status_code=404, detail="Session not found or expired")
+
+    try:
+        deleted = _delete_session(session_id)
+    except RadioLeaseLost as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Radio session is busy; retry the request",
+            headers={"Retry-After": "1"},
+        ) from exc
+    if deleted:
         return {"status": "ended"}
     return JSONResponse({"error": "Session not found"}, status_code=404)

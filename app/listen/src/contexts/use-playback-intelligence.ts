@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 
 import {
   type PlaybackIntelligenceOptions,
   type PlaybackIntelligenceRefs,
 } from "./playback-intelligence-model";
-import { usePlaybackContinuation } from "./use-playback-continuation";
-import { usePlaybackRadioRefill } from "./use-playback-radio-refill";
+import { usePlaybackRefillRuntime } from "./use-playback-refill-runtime";
 import { usePlaybackSuggestions } from "./use-playback-suggestions";
 
 export function usePlaybackIntelligence({
+  isSoftInterrupted,
+  queueReadinessRef,
+  stateRefs,
   queue,
   currentIndex,
   isPlaying,
@@ -21,49 +23,59 @@ export function usePlaybackIntelligence({
   recentlyPlayed,
   actions,
 }: PlaybackIntelligenceOptions) {
-  const currentIndexRef = useRef(currentIndex);
-  const playSourceRef = useRef(playSource);
-  const queueRef = useRef(queue);
+  const localCurrentIndexRef = useRef(currentIndex);
+  const localPlaySourceRef = useRef(playSource);
+  const localQueueRef = useRef(queue);
+  const currentIndexRef = stateRefs?.currentIndexRef ?? localCurrentIndexRef;
+  const playSourceRef = stateRefs?.playSourceRef ?? localPlaySourceRef;
+  const queueRef = stateRefs?.queueRef ?? localQueueRef;
   const recentlyPlayedRef = useRef(recentlyPlayed);
   // Keep a stable reference to actions so effects don't re-run when the
   // context re-memoizes them. We only ever call via `.current`.
   const actionsRef = useRef(actions);
   const refs = useMemo<PlaybackIntelligenceRefs>(
     () => ({
+      queueReadinessRef,
       currentIndexRef,
       playSourceRef,
       queueRef,
       recentlyPlayedRef,
       actionsRef,
     }),
-    [actionsRef, currentIndexRef, playSourceRef, queueRef, recentlyPlayedRef],
+    [
+      actionsRef,
+      currentIndexRef,
+      playSourceRef,
+      queueRef,
+      queueReadinessRef,
+      recentlyPlayedRef,
+    ],
   );
 
-  useEffect(() => {
-    currentIndexRef.current = currentIndex;
-    playSourceRef.current = playSource;
-    queueRef.current = queue;
+  useLayoutEffect(() => {
+    localCurrentIndexRef.current = currentIndex;
+    localPlaySourceRef.current = playSource;
+    localQueueRef.current = queue;
     recentlyPlayedRef.current = recentlyPlayed;
     actionsRef.current = actions;
-  }, [actions, currentIndex, playSource, queue, recentlyPlayed]);
+  }, [currentIndex, playSource, queue, recentlyPlayed, actions]);
 
-  const resetRadioRefill = usePlaybackRadioRefill({
+  const {
+    continueInfinitePlayback,
+    recoverAtEnd,
+    resume: resumePlaybackIntelligence,
+    reset: resetContinuation,
+  } = usePlaybackRefillRuntime({
+    isSoftInterrupted,
+    repeat,
     currentIndex,
-    isPlaying,
+    infinitePlaybackEnabled,
     playSource,
     queue,
     refs,
+    shuffle,
+    isPlaying,
   });
-  const { continueInfinitePlayback, reset: resetContinuation } =
-    usePlaybackContinuation({
-      repeat,
-      currentIndex,
-      infinitePlaybackEnabled,
-      playSource,
-      queue,
-      refs,
-      shuffle,
-    });
   const resetSuggestions = usePlaybackSuggestions({
     currentIndex,
     playSource,
@@ -75,13 +87,14 @@ export function usePlaybackIntelligence({
   });
 
   const resetPlaybackIntelligence = useCallback(() => {
-    resetRadioRefill();
     resetContinuation();
     resetSuggestions();
-  }, [resetContinuation, resetRadioRefill, resetSuggestions]);
+  }, [resetContinuation, resetSuggestions]);
 
   return {
     continueInfinitePlayback,
+    recoverAtEnd,
+    resumePlaybackIntelligence,
     resetPlaybackIntelligence,
   };
 }

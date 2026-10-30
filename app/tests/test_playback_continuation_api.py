@@ -126,7 +126,12 @@ def test_continuation_without_descriptor_is_exhausted(test_app, monkeypatch):
             json={"plannerVersion": "smart-mix-v2", "context": _CONTEXT},
         )
 
-    assert response.json() == {"tracks": [], "plans": [], "exhausted": True}
+    assert response.json() == {
+        "tracks": [],
+        "plans": [],
+        "exhausted": True,
+        "status": "exhausted",
+    }
 
 
 def test_continuation_requires_a_continuation_token(test_app):
@@ -295,7 +300,12 @@ def test_seeded_playlist_continuation_respects_playlist_ownership(monkeypatch):
 def test_radio_next_rejects_another_users_session(test_app, monkeypatch):
     import crate.radio_engine as radio_engine
 
-    monkeypatch.setattr(radio_engine, "get_session_user_id", lambda session_id: 999)
+    session_id = "11111111-1111-4111-8111-111111111111"
+    monkeypatch.setattr(
+        radio_engine,
+        "get_session_user_id",
+        lambda value: 999 if value == session_id else None,
+    )
     monkeypatch.setattr(
         radio_engine,
         "next_tracks",
@@ -303,7 +313,7 @@ def test_radio_next_rejects_another_users_session(test_app, monkeypatch):
     )
 
     response = test_app.post(
-        "/api/radio/next", json={"session_id": "radio-1", "count": 5}
+        "/api/radio/next", json={"session_id": session_id, "count": 5}
     )
 
     assert response.status_code == 404
@@ -347,3 +357,121 @@ def test_v116_schema_adds_the_descriptor_column():
         "ALTER TABLE user_access_tokens ADD COLUMN IF NOT EXISTS "
         "continuation_descriptor JSONB"
     ]
+
+
+def test_indexed_native_request_uses_buffer_tail_and_preserves_empty_status(
+    test_app, monkeypatch
+):
+    from crate.api import smart_mix, radio
+
+    tail, playing = uuid.uuid4(), uuid.uuid4()
+    calls = []
+    monkeypatch.setattr(
+        smart_mix,
+        "get_continuation_descriptor",
+        lambda _: {
+            "kind": "seeded_radio",
+            "seedType": "album",
+            "seedId": "12",
+            "sessionId": "s",
+        },
+    )
+
+    def indexed(descriptor, **kwargs):
+        calls.append(kwargs)
+        return {
+            "tracks": [],
+            "exhausted": False,
+            "status": "retryable_empty",
+            "session_id": "s",
+            "batch_index": 0,
+        }
+
+    monkeypatch.setattr(radio, "indexed_continuation_batch", indexed)
+    with patch("crate.api.auth.AuthMiddleware.resolve_user", _continuation_user()):
+        response = test_app.post(
+            "/api/playback/continuation",
+            json={
+                "plannerVersion": "smart-mix-v2",
+                "context": _CONTEXT,
+                "recentEntityUids": [str(tail), str(playing)],
+                "afterTrackEntityUid": str(tail),
+                "batchIndex": 0,
+            },
+        )
+    assert response.status_code == 200
+    assert response.json()["status"] == "retryable_empty"
+    assert response.json()["batchIndex"] == 0
+    assert calls[0]["buffer_refs"] == [str(playing), str(tail)]
+
+
+def test_legacy_native_lease_failure_returns_conflict_with_retry_after(
+    test_app, monkeypatch
+):
+    from crate.api import smart_mix
+
+    from tests.test_radio_contracts import _contended_radio_store
+
+    session_id = str(uuid.uuid4())
+    redis = _contended_radio_store(monkeypatch, session_id, user_id=42)
+    monkeypatch.setattr(
+        smart_mix,
+        "get_continuation_descriptor",
+        lambda _token_id: {"kind": "shaped_radio", "sessionId": session_id},
+    )
+
+    with (
+        patch("crate.api.auth.AuthMiddleware.resolve_user", _continuation_user()),
+        redis.lock(f"radio:session:{session_id}:lock", timeout=5),
+    ):
+        response = test_app.post(
+            "/api/playback/continuation",
+            json={"plannerVersion": "smart-mix-v2", "context": _CONTEXT},
+        )
+
+    assert response.status_code == 409
+    assert response.headers["retry-after"] == "1"
+
+
+@pytest.mark.parametrize("batch_index,cursor", [(0, -1), (4, 3)])
+def test_indexed_native_contention_preserves_the_committed_cursor(
+    test_app, monkeypatch, batch_index, cursor
+):
+    from crate.api import radio, smart_mix
+
+    from tests.test_radio_contracts import _contended_radio_store
+
+    session_id = str(uuid.uuid4())
+    redis = _contended_radio_store(
+        monkeypatch, session_id, existing=batch_index > 0, user_id=42
+    )
+    monkeypatch.setattr(
+        smart_mix,
+        "get_continuation_descriptor",
+        lambda _token_id: {
+            "kind": "seeded_radio",
+            "seedType": "album",
+            "seedId": "12",
+            "sessionId": session_id,
+        },
+    )
+    monkeypatch.setattr(radio, "get_album_for_radio", lambda _album_id: {"id": 12})
+    with (
+        patch("crate.api.auth.AuthMiddleware.resolve_user", _continuation_user()),
+        redis.lock(f"radio:session:{session_id}:lock", timeout=5),
+    ):
+        response = test_app.post(
+            "/api/playback/continuation",
+            json={
+                "plannerVersion": "smart-mix-v2",
+                "context": _CONTEXT,
+                "batchIndex": batch_index,
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["tracks"] == []
+    assert response.json()["plans"] == []
+    assert response.json()["status"] == "retryable_empty"
+    assert response.json()["exhausted"] is False
+    assert response.json()["batchIndex"] == cursor

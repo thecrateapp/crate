@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 
 import type { PlaySource, Track } from "@/contexts/player-types";
+import type { PlaybackQueueReadiness } from "@/contexts/playback-intelligence-model";
 import { clampIndex } from "@/contexts/player-queue-helpers";
 import { getTrackCacheKey } from "@/contexts/player-utils";
 import {
@@ -38,6 +39,7 @@ interface UsePlayerTrackRecoveryOptions {
   effectiveCrossfadeMsRef: Ref<number>;
   lastNonZeroVolumeRef: Ref<number>;
   playSourceRef: Ref<PlaySource | null>;
+  queueReadinessRef: Ref<PlaybackQueueReadiness>;
   queueRef: Ref<Track[]>;
   repeatRef: Ref<"off" | "one" | "all">;
   shuffleRef: Ref<boolean>;
@@ -71,6 +73,7 @@ export function usePlayerTrackRecovery({
   effectiveCrossfadeMsRef,
   lastNonZeroVolumeRef,
   playSourceRef,
+  queueReadinessRef,
   queueRef,
   repeatRef,
   shuffleRef,
@@ -109,24 +112,72 @@ export function usePlayerTrackRecovery({
       return true;
     }
 
-    const engineTracks = await toStartupEngineTracks(
-      recoveryQueue,
-      recoveryIndex,
-    );
+    const source = playSourceRef.current;
+    const activeTrackKey = getTrackCacheKey(recoveryQueue[recoveryIndex]!);
+    const generation = ++queueReadinessRef.current.generation;
+    queueReadinessRef.current.ready = false;
+    queueReadinessRef.current.resumePending = () =>
+      recoverActiveTrackRef.current();
+    const isCurrent = () => {
+      const queue = queueRef.current;
+      const track = queue[clampIndex(currentIndexRef.current, queue.length)];
+      return (
+        generation === queueReadinessRef.current.generation &&
+        source === playSourceRef.current &&
+        track != null &&
+        activeTrackKey === getTrackCacheKey(track)
+      );
+    };
+    let queueSnapshot = [...recoveryQueue];
+    let indexSnapshot = recoveryIndex;
+    try {
+      while (isCurrent()) {
+        const engineTracks = await toStartupEngineTracks(
+          queueSnapshot,
+          indexSnapshot,
+        );
+        if (!isCurrent()) return false;
 
-    gpLoadQueue(
-      buildEngineUrls(
-        recoveryQueue,
-        engineTracks.map((track) => track.url),
-      ),
-      recoveryIndex,
-      { restartIfSameIndex: true },
-    );
-    if (positionMs > 0) {
-      gpSeekTo(positionMs);
+        const latestQueue = queueRef.current;
+        const latestIndex = clampIndex(
+          currentIndexRef.current,
+          latestQueue.length,
+        );
+        if (
+          latestIndex !== indexSnapshot ||
+          latestQueue.length !== queueSnapshot.length ||
+          latestQueue.some(
+            (track, index) =>
+              getTrackCacheKey(track) !==
+              getTrackCacheKey(queueSnapshot[index]!),
+          )
+        ) {
+          queueSnapshot = [...latestQueue];
+          indexSnapshot = latestIndex;
+          continue;
+        }
+
+        gpLoadQueue(
+          buildEngineUrls(
+            latestQueue,
+            engineTracks.map((track) => track.url),
+          ),
+          latestIndex,
+          { restartIfSameIndex: true },
+        );
+        if (positionMs > 0) gpSeekTo(positionMs);
+        queueReadinessRef.current.ready = true;
+        queueReadinessRef.current.resumePending = undefined;
+        await gpPlay();
+        return true;
+      }
+      return false;
+    } finally {
+      if (generation === queueReadinessRef.current.generation) {
+        queueReadinessRef.current.ready = true;
+        queueReadinessRef.current.resumePending = undefined;
+      }
     }
-    await gpPlay();
-    return true;
   }, [
     buildEngineUrls,
     currentIndexRef,
@@ -134,6 +185,7 @@ export function usePlayerTrackRecovery({
     effectiveCrossfadeMsRef,
     lastNonZeroVolumeRef,
     playSourceRef,
+    queueReadinessRef,
     queueRef,
     repeatRef,
     shuffleRef,

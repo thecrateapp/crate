@@ -1,4 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
+import { createElement, Suspense, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CastPlaybackState } from "@/lib/cast-sender";
@@ -98,5 +99,312 @@ describe("useCastPlaybackRuntime", () => {
 
     expect(result.current).toBe(false);
     expect(commitCurrentTime).not.toHaveBeenCalled();
+  });
+
+  it("keeps the committed disconnect callback during a suspended render", async () => {
+    let listener!: (state: CastPlaybackState) => void;
+    subscribeMock.mockImplementation((nextListener) => {
+      listener = nextListener;
+      return vi.fn();
+    });
+    const committedDisconnect = vi.fn();
+    const pendingDisconnect = vi.fn();
+    const never = new Promise<void>(() => {});
+    const opts = {
+      onDisconnect: committedDisconnect,
+      commitCurrentTime: vi.fn(),
+      commitCurrentIndex: vi.fn(),
+      commitDuration: vi.fn(),
+      commitIsBuffering: vi.fn(),
+      commitIsPlaying: vi.fn(),
+      setVolumeState: vi.fn(),
+    };
+    const { rerender } = renderHook(
+      ({ onDisconnect, suspended }) => {
+        const runtime = useCastPlaybackRuntime({ ...opts, onDisconnect });
+        if (suspended) throw never;
+        return runtime;
+      },
+      {
+        initialProps: { onDisconnect: committedDisconnect, suspended: false },
+        wrapper: ({ children }: { children: ReactNode }) =>
+          createElement(Suspense, { fallback: null }, children),
+      },
+    );
+    const snapshot = {
+      active: true,
+      currentTime: 20,
+      duration: 100,
+      isBuffering: false,
+      isPlaying: true,
+    };
+    act(() => listener(snapshot));
+
+    await act(async () => {
+      rerender({ onDisconnect: pendingDisconnect, suspended: true });
+    });
+    act(() => listener({ ...snapshot, active: false }));
+
+    expect(committedDisconnect).toHaveBeenCalledOnce();
+    expect(pendingDisconnect).not.toHaveBeenCalled();
+  });
+});
+
+it("signals EOF only once and cancels ownership when Cast disconnects", () => {
+  let listener!: (state: CastPlaybackState) => void;
+  subscribeMock.mockImplementation((callback) => {
+    listener = callback;
+    return vi.fn();
+  });
+  const onQueueEnded = vi.fn(() => true);
+  const onResume = vi.fn();
+  const onDisconnect = vi.fn();
+  const commitIsBuffering = vi.fn();
+  renderHook(() =>
+    useCastPlaybackRuntime({
+      queueRef: { current: ["last"] },
+      onQueueEnded,
+      onResume,
+      onDisconnect,
+      commitCurrentIndex: vi.fn(),
+      commitCurrentTime: vi.fn(),
+      commitDuration: vi.fn(),
+      commitIsPlaying: vi.fn(),
+      commitIsBuffering,
+      setVolumeState: vi.fn(),
+    }),
+  );
+  const state = {
+    active: true,
+    currentIndex: 0,
+    currentTime: 50,
+    duration: 100,
+    isPlaying: true,
+    isBuffering: false,
+  };
+  act(() => listener(state));
+  expect(onResume).toHaveBeenCalledOnce();
+  act(() => listener({ ...state, isPlaying: false }));
+  expect(onQueueEnded).not.toHaveBeenCalled();
+  act(() => listener(state));
+  act(() => listener({ ...state, currentTime: 100, isPlaying: false }));
+  act(() => listener({ ...state, currentTime: 100, isPlaying: false }));
+  expect(onQueueEnded).toHaveBeenCalledOnce();
+  expect(commitIsBuffering).toHaveBeenLastCalledWith(false);
+  act(() => listener({ ...state, active: false }));
+  expect(onDisconnect).toHaveBeenCalledOnce();
+});
+
+it("treats an external PAUSED status at the end as cancellation, not EOF", () => {
+  let listener!: (state: CastPlaybackState) => void;
+  subscribeMock.mockImplementation((callback) => {
+    listener = callback;
+    return vi.fn();
+  });
+  const onPause = vi.fn();
+  const onQueueEnded = vi.fn(() => true);
+  renderHook(() =>
+    useCastPlaybackRuntime({
+      queueRef: { current: ["last"] },
+      onPause,
+      onQueueEnded,
+      commitCurrentIndex: vi.fn(),
+      commitCurrentTime: vi.fn(),
+      commitDuration: vi.fn(),
+      commitIsPlaying: vi.fn(),
+      commitIsBuffering: vi.fn(),
+      setVolumeState: vi.fn(),
+    }),
+  );
+  const state = {
+    active: true,
+    currentIndex: 0,
+    currentTime: 100,
+    duration: 100,
+    isPlaying: true,
+    isBuffering: false,
+  };
+  act(() => listener(state));
+  act(() =>
+    listener({
+      ...state,
+      isPlaying: false,
+      playerState: "PAUSED",
+      mediaFinished: true,
+    }),
+  );
+  expect(onPause).toHaveBeenCalledOnce();
+  expect(onQueueEnded).not.toHaveBeenCalled();
+});
+
+it("continues explicit EOF once even when the last sampled progress precedes the end", () => {
+  let listener!: (state: CastPlaybackState) => void;
+  subscribeMock.mockImplementation((callback) => {
+    listener = callback;
+    return vi.fn();
+  });
+  const onQueueEnded = vi.fn(() => true);
+  const onPause = vi.fn();
+  renderHook(() =>
+    useCastPlaybackRuntime({
+      queueRef: { current: ["last"] },
+      onQueueEnded,
+      onPause,
+      commitCurrentIndex: vi.fn(),
+      commitCurrentTime: vi.fn(),
+      commitDuration: vi.fn(),
+      commitIsPlaying: vi.fn(),
+      commitIsBuffering: vi.fn(),
+      setVolumeState: vi.fn(),
+    }),
+  );
+  const state = {
+    active: true,
+    currentIndex: 0,
+    currentTime: 98.9,
+    duration: 100,
+    isPlaying: true,
+    isBuffering: false,
+  };
+  act(() => listener(state));
+  const ended = {
+    ...state,
+    isPlaying: false,
+    playerState: "IDLE",
+    mediaFinished: true,
+  };
+  act(() => listener(ended));
+  act(() => listener(ended));
+  expect(onQueueEnded).toHaveBeenCalledOnce();
+  expect(onPause).not.toHaveBeenCalled();
+});
+
+describe("Cast queue transitions", () => {
+  function setup(queue = ["one", "two"]) {
+    let listener!: (state: CastPlaybackState) => void;
+    subscribeMock.mockImplementation((callback) => {
+      listener = callback;
+      return vi.fn();
+    });
+    const onPause = vi.fn();
+    const onQueueEnded = vi.fn(() => true);
+    renderHook(() =>
+      useCastPlaybackRuntime({
+        queueRef: { current: queue },
+        onPause,
+        onQueueEnded,
+        commitCurrentIndex: vi.fn(),
+        commitCurrentTime: vi.fn(),
+        commitDuration: vi.fn(),
+        commitIsPlaying: vi.fn(),
+        commitIsBuffering: vi.fn(),
+        setVolumeState: vi.fn(),
+      }),
+    );
+    const state: CastPlaybackState = {
+      active: true,
+      currentIndex: 0,
+      currentTime: 80,
+      duration: 100,
+      isPlaying: true,
+      isBuffering: false,
+      playerState: "PLAYING",
+    };
+    const publish = (next: CastPlaybackState) => act(() => listener(next));
+    return { state, publish, onPause, onQueueEnded };
+  }
+
+  it("keeps refill ownership through intermediate IDLE but cancels it on PAUSED", () => {
+    const { state, publish, onPause, onQueueEnded } = setup();
+    publish(state);
+    publish({ ...state, isPlaying: false, playerState: "IDLE" });
+    publish({
+      ...state,
+      currentIndex: 1,
+      currentTime: 0,
+      isPlaying: false,
+      isBuffering: true,
+      playerState: "BUFFERING",
+    });
+    publish({ ...state, currentIndex: 1, currentTime: 1 });
+
+    expect(onPause).not.toHaveBeenCalled();
+    expect(onQueueEnded).not.toHaveBeenCalled();
+
+    publish({
+      ...state,
+      currentIndex: 1,
+      isPlaying: false,
+      playerState: "PAUSED",
+    });
+    expect(onPause).toHaveBeenCalledOnce();
+    expect(onQueueEnded).not.toHaveBeenCalled();
+  });
+
+  it("accepts legacy EOF two seconds before duration without completing earlier samples", () => {
+    const { state, publish, onQueueEnded } = setup(["last"]);
+    publish(state);
+    publish({
+      ...state,
+      currentTime: 97.9,
+      isPlaying: false,
+      playerState: "IDLE",
+    });
+    expect(onQueueEnded).not.toHaveBeenCalled();
+
+    publish({ ...state, currentTime: 98 });
+    publish({
+      ...state,
+      currentTime: 98,
+      isPlaying: false,
+      playerState: "IDLE",
+    });
+    publish({
+      ...state,
+      currentTime: 98,
+      isPlaying: false,
+      playerState: "IDLE",
+    });
+
+    expect(onQueueEnded).toHaveBeenCalledOnce();
+  });
+
+  it("honors explicit mediaFinished false instead of applying the legacy EOF heuristic", () => {
+    const { state, publish, onQueueEnded } = setup(["last"]);
+    publish(state);
+    publish({
+      ...state,
+      currentTime: 100,
+      isPlaying: false,
+      playerState: "IDLE",
+      mediaFinished: false,
+    });
+
+    expect(onQueueEnded).not.toHaveBeenCalled();
+  });
+
+  it("retains EOF intent when the receiver publishes IDLE before mediaFinished", () => {
+    const { state, publish, onQueueEnded } = setup(["last"]);
+    publish(state);
+    publish({
+      ...state,
+      isPlaying: false,
+      playerState: "IDLE",
+      mediaFinished: false,
+    });
+    publish({
+      ...state,
+      isPlaying: false,
+      playerState: "IDLE",
+      mediaFinished: true,
+    });
+    publish({
+      ...state,
+      isPlaying: false,
+      playerState: "IDLE",
+      mediaFinished: true,
+    });
+
+    expect(onQueueEnded).toHaveBeenCalledOnce();
   });
 });

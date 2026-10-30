@@ -23,6 +23,7 @@ import {
   startCastSession,
 } from "@/lib/cast-sender";
 import type { PlaybackDeliveryPolicy } from "@/lib/player-playback-prefs";
+import type { PlaybackResumeOptions } from "./playback-intelligence-model";
 import { preparePlaybackDelivery } from "@/lib/playback-delivery";
 
 const PREV_DOUBLE_TAP_WINDOW_MS = 1500;
@@ -50,6 +51,9 @@ export interface UsePlayerNavigationActionsParams {
   advanceCursorTo: (index: number) => void;
   startTrackerSession: (track: Track, source: PlaySource | null) => void;
   continueInfinitePlayback: () => boolean;
+  resumePlaybackIntelligence?: (
+    options?: PlaybackResumeOptions,
+  ) => boolean | void;
   playbackDeliveryPolicy: PlaybackDeliveryPolicy;
 }
 
@@ -73,6 +77,7 @@ export function usePlayerNavigationActions({
   advanceCursorTo,
   startTrackerSession,
   continueInfinitePlayback,
+  resumePlaybackIntelligence,
   playbackDeliveryPolicy,
 }: UsePlayerNavigationActionsParams) {
   const advanceToTrack = useCallback(
@@ -86,6 +91,7 @@ export function usePlayerNavigationActions({
       const outgoing = queueRef.current[currentIndexRef.current];
       flushCurrentPlayEvent("skipped", outgoing);
       advanceCursorTo(targetIndex);
+      resumePlaybackIntelligence?.({ userGesture: true, selection: true });
       const incoming = queueRef.current[targetIndex];
       if (incoming) startTrackerSession(incoming, playSourceRef.current);
     },
@@ -96,6 +102,7 @@ export function usePlayerNavigationActions({
       playSourceRef,
       playbackDeliveryPolicy,
       queueRef,
+      resumePlaybackIntelligence,
       startTrackerSession,
     ],
   );

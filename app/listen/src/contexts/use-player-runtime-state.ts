@@ -1,4 +1,11 @@
-import { useCallback, useRef, useState } from "react";
+import {
+  useCallback,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
+import type { PlaybackQueueReadiness } from "./playback-intelligence-model";
 
 import type { PlaySource, RepeatMode, Track } from "@/contexts/player-types";
 import type { EngineMixState } from "@/lib/playback-engine";
@@ -61,7 +68,7 @@ export function usePlayerRuntimeState() {
     );
   }, []);
   const [shuffle, setShuffleState] = useState(() => stored.shuffle);
-  const [playSource, setPlaySource] = useState<PlaySource | null>(
+  const [playSource, setPlaySourceState] = useState<PlaySource | null>(
     () => stored.playSource,
   );
   const [repeat, setRepeatState] = useState<RepeatMode>("off");
@@ -86,6 +93,10 @@ export function usePlayerRuntimeState() {
 
   const crossfadeTimerRef = useRef<number | null>(null);
   const queueRef = useRef(queue);
+  const queueReadinessRef = useRef<PlaybackQueueReadiness>({
+    ready: true,
+    generation: 0,
+  });
   const jamQueueLockedRef = useRef(jamQueueLocked);
   const currentIndexRef = useRef(currentIndex);
   const currentTrackRef = useRef(currentTrack);
@@ -133,6 +144,15 @@ export function usePlayerRuntimeState() {
 
   const unshuffledQueueRef = useRef<Track[] | null>(stored.unshuffledQueue);
   const engineTrackMapRef = useRef<Map<string, Track[]>>(new Map());
+
+  const setPlaySource = useCallback<
+    Dispatch<SetStateAction<PlaySource | null>>
+  >((next) => {
+    const value =
+      typeof next === "function" ? next(playSourceRef.current) : next;
+    playSourceRef.current = value;
+    setPlaySourceState(value);
+  }, []);
 
   const resetEngineTrackMap = useCallback(() => {
     engineTrackMapRef.current = new Map();
@@ -265,6 +285,7 @@ export function usePlayerRuntimeState() {
     setPlaybackDeliveryPolicy,
     crossfadeTimerRef,
     queueRef,
+    queueReadinessRef,
     jamQueueLockedRef,
     currentIndexRef,
     currentTrackRef,
