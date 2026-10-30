@@ -45,7 +45,7 @@ remains in that pool. Fixed seeds support repeatable comparisons; normal
 creation and regeneration obtain new selection seeds.
 
 Endpoint exclusions, per-artist limits and validation share a primary-artist
-key. It trims and case-folds performer names and strips trailing `feat.`, `ft.`
+key. It trims and lowercases performer names and strips trailing `feat.`, `ft.`
 or `featuring` credits, including bracketed variants. `X feat. Y` therefore
 counts towards X. An unrelated compilation performer retains its own identity;
 `album_artist` is a fallback when the performer name is absent.
@@ -163,3 +163,21 @@ one transaction-local setting, which is five total SQL round trips. The sparse
 Production migration duration and index installation, physical listening/remote
 playback QA and final Linux CI remain separate checks. Local measurements do not
 establish production percentiles or replace those checks.
+
+## Principal artist identity
+
+Path adjacency limits and SQL candidate quotas use the same principal-artist rule:
+trim whitespace, remove an explicit trailing `feat`, `ft` or `featuring` credit
+(including parenthesized/bracketed credits), then lowercase the remaining name.
+The feature-credit pattern is shared between Python and PostgreSQL. Lowercase
+preserves distinct names such as `Straße` and `Strasse`.
+
+Keep `&`, `x`, `with` and commas as part of the name: these separators also occur
+in actual band and duo names, including `Florence + the Machine` and `Sunn O)))`.
+Splitting collaborations without authoritative artist credits would merge
+unrelated performers. Track display credits remain intact.
+
+Candidate statistics select one record per track ID or entity UID. An exact
+track-ID match takes precedence over a UID fallback; duplicate projections do
+not multiply candidates or add their listening counts together. Ties within
+one identity prefer the latest listen, then the stable entity key.

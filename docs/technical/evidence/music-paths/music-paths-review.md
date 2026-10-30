@@ -2,7 +2,7 @@
 
 > Historical capture: this report describes its recorded source snapshot before the reviewed fixes. Its measurements, warnings and approval notes do not validate the current implementation. See the [evidence index](README.md) and [current behavior](../../music-paths.md).
 
-Historical comparison: Diego rejected the punk-to-Japanoise bridge. See the
+Historical comparison: the punk-to-Japanoise bridge was revised. See the
 [revised bridge checkpoint](music-paths-bridge-review.md) for its replacement.
 
 **Recorded review status:** musical approval was pending at this capture, which covered endpoint context, anchor/coherence work and seven-day rotation. Later captures and the current behavior are linked from the evidence index.

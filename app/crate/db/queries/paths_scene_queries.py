@@ -7,6 +7,10 @@ from contextlib import nullcontext
 from sqlalchemy import text
 
 from crate.genre_taxonomy import resolve_genre_slug, slugify_genre
+from crate.recommendation_policy import (
+    PATH_ARTIST_TRIM_CHARS,
+    PATH_FEATURED_ARTIST_PATTERN,
+)
 from crate.db.queries.playable_media_filters import (
     playable_media_params,
     playable_track_clause,
@@ -33,6 +37,28 @@ _USER_GLOBAL_LIKES_CTE = """
           ON global_track.global_track_uid = liked.global_track_uid
         WHERE liked.user_id = :user_id
           AND global_track.local_track_id IS NOT NULL
+    )
+"""
+
+
+_USER_TRACK_STATS_CTE = """
+    user_stats AS MATERIALIZED (
+        SELECT entity_key, track_id, track_entity_uid, play_count,
+               complete_play_count, last_played_at
+        FROM user_track_stats
+        WHERE user_id = :user_id AND stat_window = 'all_time'
+    ),
+    user_stats_by_track AS (
+        SELECT DISTINCT ON (track_id) track_id, play_count, complete_play_count
+        FROM user_stats
+        WHERE track_id IS NOT NULL
+        ORDER BY track_id, last_played_at DESC NULLS LAST, entity_key
+    ),
+    user_stats_by_uid AS (
+        SELECT DISTINCT ON (track_entity_uid) track_entity_uid, play_count, complete_play_count
+        FROM user_stats
+        WHERE track_entity_uid IS NOT NULL
+        ORDER BY track_entity_uid, last_played_at DESC NULLS LAST, entity_key
     )
 """
 
@@ -161,7 +187,7 @@ def list_artist_scene_anchor_candidates(
             s.execute(
                 text(
                     f"""
-                    WITH {_USER_GLOBAL_LIKES_CTE}, target_artist AS (
+                    WITH {_USER_GLOBAL_LIKES_CTE}, {_USER_TRACK_STATS_CTE}, target_artist AS (
                         SELECT id, name, entity_uid, listeners, spotify_popularity,
                                popularity_score, album_count, track_count,
                                country, area, formed
@@ -252,8 +278,8 @@ def list_artist_scene_anchor_candidates(
                             t.popularity,
                             t.popularity_score AS track_popularity_score,
                             t.rating,
-                            COALESCE(uts.play_count, 0) AS user_play_count,
-                            COALESCE(uts.complete_play_count, 0) AS user_complete_play_count,
+                            COALESCE(uts_id.play_count, uts_uid.play_count, 0) AS user_play_count,
+                            COALESCE(uts_id.complete_play_count, uts_uid.complete_play_count, 0) AS user_complete_play_count,
                             (ult.track_id IS NOT NULL OR global_like.local_track_id IS NOT NULL) AS is_liked
                         FROM target_artist ta
                         JOIN library_albums a ON a.artist = ta.name
@@ -264,17 +290,8 @@ def list_artist_scene_anchor_candidates(
                           ON arc.artist_name = LOWER(
                               CASE WHEN performer.id IS NULL THEN ta.name ELSE performer.name END
                           )
-                        LEFT JOIN user_track_stats uts
-                          ON uts.user_id = :user_id
-                         AND uts.stat_window = 'all_time'
-                         AND (
-                             uts.track_id = t.id
-                             OR (
-                                 uts.track_entity_uid IS NOT NULL
-                                 AND t.entity_uid IS NOT NULL
-                                 AND uts.track_entity_uid = t.entity_uid
-                             )
-                         )
+                        LEFT JOIN user_stats_by_track uts_id ON uts_id.track_id = t.id
+                        LEFT JOIN user_stats_by_uid uts_uid ON uts_uid.track_entity_uid = t.entity_uid
                         LEFT JOIN user_liked_tracks ult
                           ON ult.user_id = :user_id
                          AND ult.track_id = t.id
@@ -283,7 +300,7 @@ def list_artist_scene_anchor_candidates(
                         WHERE t.bliss_vector IS NOT NULL
                           AND {playable_track_clause("t", "a")}
                         ORDER BY
-                            COALESCE(uts.play_count, 0) DESC,
+                            COALESCE(uts_id.play_count, uts_uid.play_count, 0) DESC,
                             (ult.track_id IS NOT NULL OR global_like.local_track_id IS NOT NULL) DESC,
                             t.popularity_score DESC NULLS LAST,
                             t.lastfm_top_rank ASC NULLS LAST,
@@ -354,7 +371,7 @@ def list_scene_path_candidates(
             s.execute(
                 text(
                     f"""
-                    WITH {_USER_GLOBAL_LIKES_CTE}, requested_genres AS (
+                    WITH {_USER_GLOBAL_LIKES_CTE}, {_USER_TRACK_STATS_CTE}, requested_genres AS (
                         SELECT UNNEST(CAST(:genre_slugs AS TEXT[])) AS genre_slug
                     ),
                     target_nodes AS (
@@ -394,6 +411,14 @@ def list_scene_path_candidates(
                             FROM artist_similarities
                         ) rel
                         GROUP BY LOWER(artist_name)
+                    ),
+                    artist_primary_keys AS MATERIALIZED (
+                        SELECT name,
+                               LOWER(BTRIM(REGEXP_REPLACE(
+                                   BTRIM(name, :path_artist_trim_chars),
+                                   :path_artist_pattern, '', 'i'
+                               ), :path_artist_trim_chars)) AS principal_artist_key
+                        FROM library_artists
                     ),
                     ranked_candidates AS (
                         SELECT
@@ -449,11 +474,14 @@ def list_scene_path_candidates(
                             t.popularity,
                             t.popularity_score AS track_popularity_score,
                             t.rating,
-                            COALESCE(uts.play_count, 0) AS user_play_count,
-                            COALESCE(uts.complete_play_count, 0) AS user_complete_play_count,
+                            COALESCE(uts_id.play_count, uts_uid.play_count, 0) AS user_play_count,
+                            COALESCE(uts_id.complete_play_count, uts_uid.complete_play_count, 0) AS user_complete_play_count,
                             (ult.track_id IS NOT NULL OR global_like.local_track_id IS NOT NULL) AS is_liked,
                             ROW_NUMBER() OVER (
-                                PARTITION BY am.genre_slug, LOWER(t.artist)
+                                PARTITION BY am.genre_slug, COALESCE(primary_key.principal_artist_key, LOWER(BTRIM(REGEXP_REPLACE(
+                                    BTRIM(COALESCE(NULLIF(t.artist, ''), a.artist, ''), :path_artist_trim_chars),
+                                    :path_artist_pattern, '', 'i'
+                                ), :path_artist_trim_chars)))
                                 ORDER BY
                                     t.popularity_score DESC NULLS LAST,
                                     t.lastfm_top_rank ASC NULLS LAST,
@@ -467,21 +495,13 @@ def list_scene_path_candidates(
                         JOIN library_albums a ON a.artist = am.artist_name
                         JOIN library_tracks t ON t.album_id = a.id
                         LEFT JOIN library_artists performer ON performer.name = t.artist
+                        LEFT JOIN artist_primary_keys primary_key ON primary_key.name = NULLIF(t.artist, '')
                         LEFT JOIN artist_relation_counts arc
                           ON arc.artist_name = LOWER(
                               CASE WHEN performer.id IS NULL THEN ar.name ELSE performer.name END
                           )
-                        LEFT JOIN user_track_stats uts
-                          ON uts.user_id = :user_id
-                         AND uts.stat_window = 'all_time'
-                         AND (
-                             uts.track_id = t.id
-                             OR (
-                                 uts.track_entity_uid IS NOT NULL
-                                 AND t.entity_uid IS NOT NULL
-                                 AND uts.track_entity_uid = t.entity_uid
-                             )
-                         )
+                        LEFT JOIN user_stats_by_track uts_id ON uts_id.track_id = t.id
+                        LEFT JOIN user_stats_by_uid uts_uid ON uts_uid.track_entity_uid = t.entity_uid
                         LEFT JOIN user_liked_tracks ult
                           ON ult.user_id = :user_id
                          AND ult.track_id = t.id
@@ -530,6 +550,8 @@ def list_scene_path_candidates(
                 ),
                 {
                     "genre_slugs": requested_genres,
+                    "path_artist_pattern": PATH_FEATURED_ARTIST_PATTERN,
+                    "path_artist_trim_chars": PATH_ARTIST_TRIM_CHARS,
                     "user_id": int(user_id or 0),
                     "alias_membership_multiplier": 0.70,
                     "min_membership_score": 0.45,

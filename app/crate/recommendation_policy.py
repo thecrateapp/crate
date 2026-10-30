@@ -11,15 +11,27 @@ SIGNIFICANT_PLAY_SECONDS = 30.0
 SIGNIFICANT_PLAY_RATIO = 0.5
 PATH_RECENCY_QUALITY_BAND = 0.05
 MAX_CONSECUTIVE_SAME_ARTIST = 2
-_FEATURED_ARTIST_RE = re.compile(
-    r"(?:\s+|\s*[(\[]\s*)(?:feat|ft|featuring)\.?\s+.+?[)\]]?\s*$",
-    re.IGNORECASE,
+PATH_ARTIST_TRIM_CHARS = (
+    " \t\n\r\v\f\x1c\x1d\x1e\x1f\x85\xa0\u1680"
+    "\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a"
+    "\u2028\u2029\u202f\u205f\u3000"
 )
+PATH_FEATURED_ARTIST_PATTERN = (
+    r"(?:\s+|\s*[(\[]\s*)(?:feat|ft|featuring)\.?\s+.+?[)\]]?\s*$"
+)
+_FEATURED_ARTIST_RE = re.compile(PATH_FEATURED_ARTIST_PATTERN, re.IGNORECASE)
 
 
 def path_artist_key(row: dict) -> str:
-    name = str(row.get("artist") or row.get("album_artist") or "").strip()
-    return _FEATURED_ARTIST_RE.sub("", name).strip().casefold()
+    """Lowercase the full name, stripping only explicit featured-artist credits.
+
+    Keep &, x, with and commas: they can be part of a band's actual name.
+    Lowercase matches the SQL quota key without folding distinct names together.
+    """
+    name = str(row.get("artist") or row.get("album_artist") or "").strip(
+        PATH_ARTIST_TRIM_CHARS
+    )
+    return _FEATURED_ARTIST_RE.sub("", name).strip(PATH_ARTIST_TRIM_CHARS).lower()
 
 
 def significant_play_threshold(duration: float | None) -> float:
@@ -81,6 +93,8 @@ def fresh_path_candidates(
 
 __all__ = [
     "MAX_CONSECUTIVE_SAME_ARTIST",
+    "PATH_ARTIST_TRIM_CHARS",
+    "PATH_FEATURED_ARTIST_PATTERN",
     "PATH_RECENCY_QUALITY_BAND",
     "RECENT_PLAY_WINDOW",
     "SIGNIFICANT_PLAY_RATIO",
