@@ -31,20 +31,21 @@ def test_compatible_tracks_returns_one_bounded_ranked_response(
 ) -> None:
     from crate.api import smart_mix
 
-    calls: list[tuple[str, int]] = []
+    calls: list[tuple[str, int, str]] = []
+    rank_modes: list[str] = []
     seed = _candidate("seed")
     candidate = _candidate("candidate")
 
-    def fake_inputs(entity_uid: str, *, max_candidates: int):
-        calls.append((entity_uid, max_candidates))
+    def fake_inputs(entity_uid: str, *, max_candidates: int, mode: str):
+        calls.append((entity_uid, max_candidates, mode))
         return seed, [candidate]
 
+    def fake_rank(*_args, mode: str, **_kwargs):
+        rank_modes.append(mode)
+        return [_result(candidate)]
+
     monkeypatch.setattr(smart_mix, "get_compatible_track_inputs", fake_inputs)
-    monkeypatch.setattr(
-        smart_mix,
-        "rank_compatible_tracks",
-        lambda *_args, **_kwargs: [_result(candidate)],
-    )
+    monkeypatch.setattr(smart_mix, "rank_compatible_tracks", fake_rank)
     monkeypatch.setattr(
         "crate.db.repositories.tasks.create_task",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
@@ -58,15 +59,18 @@ def test_compatible_tracks_returns_one_bounded_ranked_response(
             "scope": "local",
             "limit": 20,
             "planner_version": "smart-mix-v2",
+            "context": "smooth",
         },
     )
 
     assert response.status_code == 200
-    assert calls == [("00000000-0000-0000-0000-000000000001", 500)]
+    assert calls == [("00000000-0000-0000-0000-000000000001", 500, "smooth")]
+    assert rank_modes == ["smooth"]
     assert response.json() == {
         "seedTrackEntityUid": "seed",
         "scope": "local",
         "plannerVersion": "smart-mix-v2",
+        "context": "smooth",
         "items": [
             {
                 "trackId": candidate.track_id,
@@ -88,6 +92,13 @@ def test_compatible_tracks_returns_one_bounded_ranked_response(
                     "valence": 0.9,
                     "bliss": 0.8,
                     "genre": 1.0,
+                    "transition": 0.92,
+                    "beatmatchAffinity": 0.1,
+                    "beatmatchable": True,
+                    "tempoFlow": 1.0,
+                    "level": 0.95,
+                    "brightness": 0.9,
+                    "silence": 1.0,
                 },
                 "fallbackReasons": [],
             }
@@ -166,6 +177,13 @@ def _result(candidate: CompatibleTrackCandidate) -> CompatibleTrackResult:
         valence=0.9,
         bliss=0.8,
         genre=1.0,
+        transition=0.92,
+        beatmatch_affinity=0.1,
+        beatmatchable=True,
+        tempo_flow=1.0,
+        level=0.95,
+        brightness=0.9,
+        silence=1.0,
     )
     return CompatibleTrackResult(
         track_id=candidate.track_id,

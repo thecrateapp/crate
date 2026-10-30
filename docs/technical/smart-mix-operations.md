@@ -92,7 +92,7 @@ Los valores siguientes son los del código revisado, no valores descubiertos en 
 | `BEAT_GRID_FORMAT`              | `delta-ms-v1`        | Formato de beat grid                                     |
 | `PLANNER_IDENTIFIER`            | `smart-mix-v2`       | Identificador del lote de planes y de capabilities       |
 | `PLANNER_POLICY_VERSION`        | `2`                  | Versión numérica de cada plan individual                 |
-| `PLANNER_POLICY.rules_revision` | `5`                  | Revisión interna de reglas incluida en la clave de caché |
+| `PLANNER_POLICY.rules_revision` | `6`                  | Revisión interna de reglas incluida en la clave de caché |
 
 Cambiar reglas no implica necesariamente cambiar el identificador público del planner:
 la clave de caché incorpora ambas cosas.
@@ -194,11 +194,32 @@ resuelto. Un task coordinador `done` tampoco implica que todos sus hijos hayan t
 - Ganancias y headroom tienen en cuenta loudness/true peak acreditados; la política limita
   la suma prevista. Un valor planificado no sustituye la captura física de clipping/underrun.
 
-Compatibilidad combina tempo, armonía Camelot, energía, danceability, valence, Bliss y género.
+Compatibilidad combina el ajuste de transición (75 %) con Bliss (15 %) y género (10 %). El
+ajuste de transición (`smart_mix/transition_fit.py`) mezcla dos familias de pesos según la
+afinidad de beatmatch α:
+
+- **Beatmatch** (α = 1): tempo estricto (cero al 12 %), armonía Camelot, viabilidad de
+  beatmatch con las mismas reglas que el planner, nivel de borde, brillo, silencio y
+  continuidad de danceability/valence.
+- **Entrada suave** (α = 0): salto de nivel entre los 5 s finales y los 5 s iniciales (LUFS
+  acreditados o, si no, energía de borde), con subidas penalizadas antes que bajadas; brillo
+  espectral de borde; silencio entre pistas; pulso laxo (cero al 25 %, mitad/doble incluidos);
+  armonía con poco peso; continuidad de danceability/valence.
+
+`context=auto` calcula α como prior de género (familias electrónicas ≈ 0,9; rock, metal y
+folk ≈ 0,1–0,15; desconocido 0,35) multiplicado por la evidencia rítmica del par (confianza
+BPM y estabilidad de outro/intro). `context=beatmatch` y `context=smooth` fijan α a 1 y 0.
+Un set de rock con batería estable y prior bajo queda en entrada suave; un tema electrónico
+sin grid fiable no se ordena como si se pudiera beatmatchear.
+
 La consulta hace una preselección acotada por señales y luego filtra candidatos reproducibles
-localmente antes del límite final; el ranking deduplica grabaciones/variantes. El endpoint
-acepta `scope=local`, hasta 100 resultados y una ventana de candidatos acotada. Un score alto
-no acredita que el reproductor vaya a ejecutar beatmatch ni que exista cobertura federada.
+localmente antes del límite final; el ranking deduplica grabaciones/variantes. La ventana de
+BPM de la preselección es ±12 % (y mitad/doble) en beatmatch o con semilla electrónica, y
+±25 % en entrada suave o con semilla de prior bajo. El endpoint acepta `scope=local`, hasta
+100 resultados, `context` y una ventana de candidatos acotada. El desglose añade `transition`,
+`beatmatchAffinity`, `beatmatchable`, `tempoFlow`, `level`, `brightness` y `silence` sin
+cambiar los campos existentes. Un score alto no acredita que el reproductor vaya a ejecutar
+beatmatch ni que exista cobertura federada.
 
 Los lotes de planes cargan perfiles y caché en bloque. La clave incluye UID de ambos tracks,
 sus `profileRevision`, contexto, identificador del planner y revisión de reglas. Un cambio de
@@ -210,17 +231,17 @@ rutinaria. Un POST de planificación puede escribir caché aunque no modifique l
 Estas rutas describen la aplicación. No son herramientas disponibles automáticamente para
 Crate Agent; un Bearer MCP no es una sesión Admin ni un PAT de VirtualDJ.
 
-| Ruta                                                                     | Uso y efecto relevante                                                                                       |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| `GET /api/capabilities`                                                  | Flags efectivos y contrato de clientes; no acredita su implementación ni readiness física                    |
-| `GET /api/tracks/by-entity/{uid}/mix-profile?detail=summary\|full`       | Perfil por UID; `full` incluye beat grid; 404 puede indicar ausencia o perfil invalidado                     |
-| `GET /api/tracks/by-entity/{uid}/compatible`                             | Ranking local de candidatos; no desencadena análisis                                                         |
-| `POST /api/playback/transition-plans`                                    | Planificación por lote; usa caché                                                                            |
-| `POST /api/playback/continuation-token` y `/api/playback/continuation`   | Contrato para continuar planificación/cola en el runtime nativo                                              |
-| `GET /api/admin/smart-mix/status`                                        | Cobertura/campaña/tarea coordinadora; **puede encolar** `refresh_smart_mix_coverage` si falta o supera 600 s |
-| `GET /api/admin/smart-mix/tracks` y `/activity`                          | Paginación de perfiles/procesamiento y actividad de tareas                                                   |
-| `POST /api/admin/smart-mix/backfill` y `/backfill/resume\|pause\|cancel` | Cambian el control de campaña                                                                                |
-| `POST /api/admin/smart-mix/tracks/{id}/reanalyze`                        | Encola análisis por pista con deduplicación                                                                  |
+| Ruta                                                                         | Uso y efecto relevante                                                                                       |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `GET /api/capabilities`                                                      | Flags efectivos y contrato de clientes; no acredita su implementación ni readiness física                    |
+| `GET /api/tracks/by-entity/{uid}/mix-profile?detail=summary\|full`           | Perfil por UID; `full` incluye beat grid; 404 puede indicar ausencia o perfil invalidado                     |
+| `GET /api/tracks/by-entity/{uid}/compatible?context=auto\|beatmatch\|smooth` | Ranking local de candidatos; no desencadena análisis                                                         |
+| `POST /api/playback/transition-plans`                                        | Planificación por lote; usa caché                                                                            |
+| `POST /api/playback/continuation-token` y `/api/playback/continuation`       | Contrato para continuar planificación/cola en el runtime nativo                                              |
+| `GET /api/admin/smart-mix/status`                                            | Cobertura/campaña/tarea coordinadora; **puede encolar** `refresh_smart_mix_coverage` si falta o supera 600 s |
+| `GET /api/admin/smart-mix/tracks` y `/activity`                              | Paginación de perfiles/procesamiento y actividad de tareas                                                   |
+| `POST /api/admin/smart-mix/backfill` y `/backfill/resume\|pause\|cancel`     | Cambian el control de campaña                                                                                |
+| `POST /api/admin/smart-mix/tracks/{id}/reanalyze`                            | Encola análisis por pista con deduplicación                                                                  |
 
 Admin exige `library.analysis.manage`, incluso para sus lecturas. Los endpoints públicos de
 perfil/compatibles usan la autorización de sesión o el scope PAT `vdj.smart_mix.read` según

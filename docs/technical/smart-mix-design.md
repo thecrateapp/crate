@@ -371,7 +371,7 @@ Los covers usan la URL absoluta pública de Crate, sin ticket, porque VDJ la per
 
 ### 6.6 B — Asistente
 
-La carpeta Compatibles usa el ranking del backend con la pista cargada o una semilla explícita del menú contextual. BPM y key de Crate se pasan en los campos del SDK; Camelot, energía y confianza se muestran en `comment`, con un formato fijo y localizado. Cuando VDJ analiza la pista muestra sus propios valores: la presentación no compite con ellos. "Abrir en Crate" abre el navegador desde el menú contextual. El plugin no consume `TransitionPlan`: dentro de VDJ las transiciones las calcula el motor de VDJ con su propio grid.
+La carpeta Compatibles usa el ranking del backend con la pista cargada o una semilla explícita del menú contextual. El ranking es único y se adapta al contexto con un parámetro, no por cliente: `context=auto` deriva la afinidad de beatmatch del género y de la evidencia rítmica del par; `beatmatch` y `smooth` la fijan para sesiones electrónicas o de entrada suave. BPM y key de Crate se pasan en los campos del SDK; Camelot, energía y confianza se muestran en `comment`, con un formato fijo y localizado. Cuando VDJ analiza la pista muestra sus propios valores: la presentación no compite con ellos. "Abrir en Crate" abre el navegador desde el menú contextual. El plugin no consume `TransitionPlan`: dentro de VDJ las transiciones las calcula el motor de VDJ con su propio grid.
 
 ### 6.7 C — Crate Automix
 

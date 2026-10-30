@@ -295,6 +295,23 @@ class CompatibilityScoreResponse(SmartMixApiModel):
     valence: float = Field(ge=0.0, le=1.0)
     bliss: float = Field(ge=0.0, le=1.0)
     genre: float = Field(ge=0.0, le=1.0)
+    transition: float | None = Field(default=None, ge=0.0, le=1.0)
+    beatmatch_affinity: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        serialization_alias="beatmatchAffinity",
+    )
+    beatmatchable: bool | None = None
+    tempo_flow: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        serialization_alias="tempoFlow",
+    )
+    level: float | None = Field(default=None, ge=0.0, le=1.0)
+    brightness: float | None = Field(default=None, ge=0.0, le=1.0)
+    silence: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class CompatibleTrackResponse(SmartMixApiModel):
@@ -320,6 +337,7 @@ class CompatibleTracksResponse(SmartMixApiModel):
     planner_version: Literal["smart-mix-v2"] = Field(
         serialization_alias="plannerVersion"
     )
+    context: Literal["auto", "beatmatch", "smooth"] | None = None
     items: list[CompatibleTrackResponse]
 
 

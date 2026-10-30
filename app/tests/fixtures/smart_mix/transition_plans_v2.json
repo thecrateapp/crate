@@ -27,7 +27,7 @@
         "incomingGainDb": -4.0103,
         "curve": "equal-power",
         "bassHandoff": "balanced",
-        "confidence": 0.925,
+        "confidence": 0.94,
         "fallbackReason": null
       }
     },
@@ -58,7 +58,7 @@
         "incomingGainDb": -4.0103,
         "curve": "equal-power",
         "bassHandoff": "balanced",
-        "confidence": 0.925,
+        "confidence": 0.94,
         "fallbackReason": null
       }
     },
@@ -121,7 +121,7 @@
         "incomingGainDb": -4.0103,
         "curve": "equal-power",
         "bassHandoff": "balanced",
-        "confidence": 0.849731,
+        "confidence": 0.8694,
         "fallbackReason": null
       }
     },

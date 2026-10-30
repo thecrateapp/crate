@@ -400,6 +400,13 @@ def test_compatibility_score_uses_versioned_dimensions() -> None:
         "valence",
         "bliss",
         "genre",
+        "transition",
+        "beatmatchAffinity",
+        "beatmatchable",
+        "tempoFlow",
+        "level",
+        "brightness",
+        "silence",
     }
 
 
