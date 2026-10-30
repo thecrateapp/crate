@@ -759,10 +759,18 @@ function castAcknowledgement<T>(request: Promise<T>): Promise<T> {
 function castCommand(
   run: (resolve: () => void, reject: (error: unknown) => void) => void,
 ): Promise<void> {
-  uncertainCrateCastSessionId = activeCrateCastSessionId;
+  const sessionId = activeCrateCastSessionId;
+  const generation = castLifecycleGeneration;
   return castAcknowledgement(
     new Promise<void>((resolve, reject) => run(resolve, reject)),
-  );
+  ).catch((error) => {
+    if (
+      sessionId === activeCrateCastSessionId &&
+      isCurrentCastLifecycle(generation)
+    )
+      uncertainCrateCastSessionId = sessionId;
+    throw error;
+  });
 }
 
 function guardedCastQueueOperation(isCurrent: () => boolean): () => boolean {
@@ -797,8 +805,18 @@ async function applyCustomQueueDelta(
   if (
     media.items == null &&
     uncertainCrateCastSessionId === activeCrateCastSessionId
-  )
-    throw new Error("Cast queue needs a receiver snapshot before retrying.");
+  ) {
+    if (media.getStatus) {
+      await castAcknowledgement(
+        new Promise<void>((resolve, reject) =>
+          media.getStatus!(null, resolve, reject),
+        ),
+      );
+      assertCastQueueCurrent(isCurrent);
+    }
+    if (media.items == null)
+      throw new Error("Cast queue needs a receiver snapshot before retrying.");
+  }
 
   const numericByStableId = new Map(
     (media.items ?? [])

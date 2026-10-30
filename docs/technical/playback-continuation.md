@@ -38,6 +38,9 @@ cross-session rotation are outside this change.
   zero. A missing continuation session returns `exhausted`.
 - Ownership is checked before replaying a cached batch. Proxy identities must
   resolve to a real user ID. Private playlist access is checked at session start.
+- Session deletion removes its current and previous retained batch by cursor,
+  within the same fenced transaction, without scanning Redis. Legacy global
+  radio responses report `status: exhausted` consistently with `exhausted: true`.
 
 Continuation uses the session UUID and batch cursor, without a numeric session
 revision. Native continuation rejects the removed `revision` field with HTTP
@@ -72,7 +75,8 @@ the new seed context.
 
 EOF recovery stops waiting after five transport failures or 60 seconds under
 JavaScript ownership. It clears buffering, shows one translated notice and waits
-for an explicit Play gesture before retrying. Prefetch failures do not interrupt
+for an explicit Play or track-selection gesture before retrying. Selecting an
+earlier track resumes prefetch without skipping that track. Prefetch failures do not interrupt
 a track already playing. Online and visibility wakeups respect the retry backoff;
 authorization and exhausted results remain terminal. A confirmed append/advance
 ends the EOF wait before cursor publication, whose acknowledgement is bounded to
@@ -87,6 +91,10 @@ On return, adoption and a bounded native-state read confirm whether playback
 advanced before JavaScript can fetch or advance again. A confirmed new active
 track retires the old wait; otherwise foreground EOF recovery remains available.
 Toggling Infinite/repeat updates configuration without reloading the track.
+Reinstalling the same token/session without an authoritative cursor reset invalidates
+pending requests while retaining terminal results, backoff and the original ENDED deadline. An app-resume event
+only renews authorization when it has expired. Finite EOF releases audio focus
+while keeping the Media3 service and controls; only a continuation deadline stops it.
 Foreground native appends reserve queue positions until their ACK; a failure
 removes only those reservations. A confirmed append advances its cursor even
 if playback was paused in the meantime, without resuming playback.
@@ -104,7 +112,10 @@ is late. Intermediate `IDLE` events preserve playback intent; old receivers use
 a two-second EOF margin only when they omit `mediaFinished`. Cast mutation ACKs
 expire after 10 seconds and full append preparation after 30 seconds. An uncertain
 append requires a real receiver snapshot before retrying, preventing duplicates
-after a lost ACK. Late acknowledgements cannot commit a newer operation.
+after a lost ACK. When cached web items are missing after a failed command, the
+sender requests CAF media status before reconciling; absent receiver items still
+prevent a blind retry. Confirmed commands do not mark the queue uncertain.
+Late acknowledgements cannot commit a newer operation.
 
 ## Validation and remaining review
 
@@ -112,6 +123,8 @@ Automated coverage includes duplicate/concurrent requests, replay after lost
 responses, session ownership and expiry, Redis lease loss before/during commit,
 EOF during fetch/append, empty and deduplicated batches, reconnect, pause, source
 replacement, native handoff, preference changes, and queued Cast cancellation.
+Android service lifecycle tests run under Robolectric against the real service,
+including unchanged configuration, terminal state, retry scheduling and finite EOF.
 The lease recovery contracts run against Redis 7 through Testcontainers by
 default. CI supplies a dedicated Redis service. To use another **dedicated
 disposable** Redis:

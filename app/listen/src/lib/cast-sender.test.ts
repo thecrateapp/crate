@@ -1874,6 +1874,44 @@ describe("cast sender", () => {
     },
   );
 
+  it("refreshes CAF status when a rejected append leaves receiver items unavailable", async () => {
+    const { initial, media } = await prepareDeadlineWebQueue();
+    const { update } = appendFixture(initial);
+    const receiverItems = media.items;
+    const getStatus = vi.fn((_request: unknown, success: () => void) => {
+      Object.defineProperty(media, "items", {
+        value: receiverItems,
+        writable: true,
+      });
+      success();
+    });
+    Object.assign(media, { getStatus });
+    media.queueInsertItems.mockImplementation((request, _success, failure) => {
+      const inserted = request as {
+        items: Array<{ media: (typeof receiverItems)[number]["media"] }>;
+      };
+      receiverItems.push(
+        ...inserted.items.map((item) => ({ itemId: 42, media: item.media })),
+      );
+      Object.defineProperty(media, "items", {
+        value: undefined,
+        writable: true,
+      });
+      failure(new Error("Applied but ACK lost"));
+    });
+    await expect(syncCustomCastQueue(update)).resolves.toMatchObject({
+      ok: false,
+    });
+    await expect(syncCustomCastQueue(update)).resolves.toMatchObject({
+      ok: true,
+    });
+    expect(getStatus).toHaveBeenCalledOnce();
+    expect(media.queueInsertItems).toHaveBeenCalledOnce();
+    expect(
+      receiverItems.map((item) => item.media.customData.crateCast.itemId),
+    ).toEqual(["track-1-1", "track-2-1"]);
+  });
+
   it("waits for a real web snapshot after an applied insert loses its ACK instead of duplicating or falsely committing", async () => {
     vi.useFakeTimers();
     const { initial, media } = await prepareDeadlineWebQueue();
