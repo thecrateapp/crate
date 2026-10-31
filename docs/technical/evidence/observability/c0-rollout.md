@@ -118,8 +118,9 @@ Do not substitute an older release backup or describe a reconstruction as exact.
 This did not delete the database, library, Tidarr backups or current live
 configuration. A verified private **post-deployment configuration checkpoint** was
 created outside automatic retention at:
-`/home/crate/crate/data/deployment-config-backups/20261031T133257Z-post-c0`.
-It contains the current environment, Compose/operator overlay, release manifest,
+`/home/crate/.deployment-config-backups/20261031T133257Z-post-c0`.
+The canonical location is outside the project and application data mounts. It
+contains the current environment, Compose/operator overlay, release manifest,
 deployment helper, image inventory and checksums with 0700/0600 permissions.
 It is a checkpoint of the working `6681be8…` configuration, not recovery of the
 missing pre-deployment snapshot, a database backup or a completed restore drill.
@@ -129,8 +130,17 @@ retains the other four newest by directory mtime, skips symlinks and leaves all
 snapshots untouched if the current one is missing/invalid. Four real temporary
 filesystem cases failed before the fix and passed afterward; the related deploy,
 Sentry release and operator suites passed **112 cases, 25 macOS skips**.
-Independent review passed. Source publication/closing CI/helper installation are
-still pending; no application restart is needed for that helper-only correction.
+Independent review passed. PR [#312](https://github.com/thecrateapp/crate/pull/312)
+merged as `75b442401bfbca8646efe5f684fca36dd9aab31d` after all 12 applicable checks
+passed. The exact reviewed helper was installed atomically at **13:53:47 UTC**,
+with SHA256 `52b609963fef2e17067b16efc65a298d23bb115cf491296759cd27f3924a731a`.
+The previous helper remains in the private checkpoint. No cleanup was executed
+and all 33 container IDs/start times were unchanged; no application restart was
+needed. The application's immutable release remains `6681be8…`; helper provenance
+is recorded separately in [the update receipt](c0-retention-helper-update.json).
 
-C0 remains open until that correction is closed and Diego reviews the checkpoint.
-PR1A has not started.
+The [final runtime check](c0-final-runtime-check.json) confirms all 33 services
+ready/running, four Sentry receipts and retained pre-gap Prometheus history.
+
+C0 runtime remediation is complete and ready for Diego's review. Acceptance is
+still pending; PR1A has not started. The external probe host remains deferred.

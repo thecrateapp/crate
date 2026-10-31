@@ -1,0 +1,11 @@
+{
+  "helper_source_sha": "75b442401bfbca8646efe5f684fca36dd9aab31d",
+  "helper_sha256": "52b609963fef2e17067b16efc65a298d23bb115cf491296759cd27f3924a731a",
+  "previous_helper_sha256": "8e93d2116f95f270c53a026d7cf62a5ca3d24169181e91fedbba9af5a5eb742b",
+  "application_release_sha": "6681be8017b60865c00af61c3edc6f17696175b7",
+  "at": "2026-10-31T13:53:47.079487+00:00",
+  "server_containers_unchanged": 33,
+  "cleanup_executed": false,
+  "application_restarted": false,
+  "prior_helper_preserved": true
+}
