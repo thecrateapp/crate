@@ -122,6 +122,9 @@ def _fake_monitoring_cli(
         "import json, os, sys\n"
         "with open(os.environ['FAKE_DOCKER_LOG'], 'a') as output:\n"
         "    output.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+        "    if sys.argv[1] == 'compose':\n"
+        "        socket = os.environ.get('OBS_CONTAINERD_SOCKET', '/outside/from-dotenv.sock')\n"
+        "        output.write(json.dumps(['compose-socket', socket]) + '\\n')\n"
         "if sys.argv[1] == 'info':\n"
         "    print(os.environ['FAKE_DOCKER_DRIVER'])\n"
         "elif sys.argv[1] != 'compose':\n"
@@ -254,6 +257,35 @@ def test_containerd_start_rejects_socket_paths_outside_masked_run(
     else:
         assert not starts
         assert "no services started" in result.stdout
+
+
+@pytest.mark.parametrize("source", ["default", "command-line", "environment"])
+def test_compose_uses_the_same_socket_path_as_the_admission_guard(tmp_path, source):
+    expected = {
+        "default": "/run/containerd/containerd.sock",
+        "command-line": "/run/containerd/command-line.sock",
+        "environment": "/run/containerd/environment.sock",
+    }[source]
+    calls, environment = _fake_monitoring_cli(tmp_path, "overlayfs", expected)
+    command = [shutil.which("make") or "make", "observability-up", "OBS_CONTAINERD=1"]
+    if source == "environment":
+        environment["OBS_CONTAINERD_SOCKET"] = expected
+    elif source == "command-line":
+        environment["OBS_CONTAINERD_SOCKET"] = "/run/containerd/overridden.sock"
+        command.append(f"OBS_CONTAINERD_SOCKET={expected}")
+    result = subprocess.run(
+        command,
+        cwd=ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    assert result.returncode == 0, result.stderr
+    commands = [json.loads(line) for line in calls.read_text().splitlines()]
+    assert ["readlink", "-f", expected] in commands
+    sockets = [row[1] for row in commands if row[0] == "compose-socket"]
+    assert sockets and all(socket == expected for socket in sockets)
 
 
 def test_monitoring_has_bounded_cpu_memory_and_rotated_logs():

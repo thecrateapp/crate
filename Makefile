@@ -1227,6 +1227,8 @@ tauri-collect-artifacts: ## Collect Crate desktop release artifacts into desktop
 
 OBS_COMPOSE_FILES ?= docker-compose.yaml docker-compose.project.yaml
 OBS_CONTAINERD ?= 0
+OBS_CONTAINERD_SOCKET ?= /run/containerd/containerd.sock
+export OBS_CONTAINERD_SOCKET
 OBS_DC = $(DC) $(foreach f,$(OBS_COMPOSE_FILES),-f $(f)) -f deploy/observability/compose.observability.yaml $(if $(filter 1,$(OBS_CONTAINERD)),-f deploy/observability/compose.containerd.yaml) --profile observability
 OBS_SERVICES := crate-prometheus crate-grafana crate-node-exporter crate-postgres-exporter crate-redis-exporter crate-redis-durable-exporter crate-cadvisor crate-observability-docker-proxy
 

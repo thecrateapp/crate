@@ -192,6 +192,9 @@ The containerd socket's canonical host path must be under `/run`, where cAdvisor
 host rootfs is masked. Make resolves symlinks and refuses paths outside that tree;
 do not bypass this guard with a direct Compose invocation. Alternate socket
 locations require a collector/mount review before activation.
+Set this variable in the exported environment or as a Make argument. Make exports
+its default too, so the path checked by the guard is the same one Compose mounts;
+a divergent `.env` value cannot silently override it.
 
 The optional `compose.containerd.yaml` reuses the same proxy, image and resource
 limits. Only that proxy mounts the host containerd socket, with automatic path
