@@ -1196,17 +1196,28 @@ cmd_state_rollback() {
 }
 
 cmd_cleanup() {
-  local snapshots=()
-  local index
-
-  log "Keeping the latest 5 deploy snapshots"
+  log "Keeping the current and 4 latest deploy snapshots"
   if [[ -d "$BACKUP_ROOT" ]]; then
-    mapfile -t snapshots < <(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -print | sort -r)
-    for index in "${!snapshots[@]}"; do
-      if (( index >= 5 )); then
-        rm -rf "${snapshots[$index]}"
-      fi
-    done
+    python3 - "$BACKUP_ROOT" "$BACKUP_DIR" <<'PY'
+import shutil
+import sys
+from pathlib import Path
+
+root, current = map(Path, sys.argv[1:])
+if current.is_symlink() or not current.is_dir():
+    print("Skipping snapshot cleanup: current deployment backup is missing")
+    raise SystemExit(0)
+
+snapshots = [path for path in root.iterdir() if not path.is_symlink() and path.is_dir()]
+keep = {current}
+for path in sorted(snapshots, key=lambda path: path.stat().st_mtime_ns, reverse=True):
+    if path in keep:
+        continue
+    if len(keep) < 5:
+        keep.add(path)
+    else:
+        shutil.rmtree(path)
+PY
   fi
 
   cleanup_legacy_cache_layout

@@ -1,0 +1,42 @@
+{
+  "application_release_sha": "6681be8017b60865c00af61c3edc6f17696175b7",
+  "scope": "secondary diagnostic processes; server containers unchanged",
+  "receipts": {
+    "api": {
+      "id": "8e17cc2c93774b0ba1b6ff1fab79faf9",
+      "timestamp": "2026-10-31T13:27:05+00:00",
+      "release": "crate-6681be8017b60865c00af61c3edc6f17696175b7",
+      "environment": "production",
+      "service": "api",
+      "sdk.name": "sentry.python.fastapi",
+      "sdk.version": "2.73.0"
+    },
+    "worker": {
+      "id": "b865ec1d9af84f7db0ac6fd20ae223aa",
+      "timestamp": "2026-10-31T13:27:08+00:00",
+      "release": "crate-6681be8017b60865c00af61c3edc6f17696175b7",
+      "environment": "production",
+      "service": "worker-default",
+      "sdk.name": "sentry.python.fastapi",
+      "sdk.version": "2.73.0"
+    },
+    "go": {
+      "id": "bc47cd6d153e44999aecda9a88ca374c",
+      "timestamp": "2026-10-31T13:27:08+00:00",
+      "release": "crate-82ea84746f62f0c6052fdd5fdcf84dbb092c130b",
+      "environment": "production",
+      "service": "readplane",
+      "sdk.name": "sentry.go",
+      "sdk.version": "0.42.0"
+    },
+    "rust": {
+      "id": "a13528535e9742ee9aeb99d5c8b3038d",
+      "timestamp": "2026-10-31T13:27:08+00:00",
+      "release": "crate-6681be8017b60865c00af61c3edc6f17696175b7",
+      "environment": "production",
+      "service": "media-worker",
+      "sdk.name": "sentry.rust",
+      "sdk.version": "0.44.0"
+    }
+  }
+}

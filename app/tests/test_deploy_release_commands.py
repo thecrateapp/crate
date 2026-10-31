@@ -81,6 +81,110 @@ def _shell_function(name: str) -> str:
     return script[start : script.index("\n}\n", start) + 3]
 
 
+def _deployment_snapshot_fixture(tmp_path: Path) -> tuple[Path, list[str]]:
+    root = tmp_path / "snapshots"
+    root.mkdir()
+    names = [
+        "v9-ancient",
+        "v8-ancient",
+        "zzz-older",
+        "release-old",
+        "v3-backup",
+        "v2-backup",
+        "aaa-recent",
+        "bbb-most-recent",
+    ]
+    for index, name in enumerate(names, 1):
+        directory = root / name
+        directory.mkdir()
+        (directory / "payload").write_text(name)
+        timestamp = 1_700_000_000 + index * 100
+        os.utime(directory, (timestamp, timestamp))
+    return root, names
+
+
+def _run_snapshot_cleanup(root: Path, current: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [
+            "bash",
+            "-euo",
+            "pipefail",
+            "-c",
+            "log() { :; }\n"
+            "cleanup_legacy_cache_layout() { :; }\n"
+            "prune_unused_images() { :; }\n"
+            + _shell_function("cmd_cleanup")
+            + "\ncmd_cleanup\n",
+        ],
+        cwd=root.parent,
+        env={
+            "PATH": os.environ["PATH"],
+            "BACKUP_ROOT": str(root),
+            "BACKUP_DIR": str(root / current),
+            "DEPLOY_ID": current,
+        },
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+
+
+@pytest.mark.parametrize("current_timestamp", [1_700_000_050, 1_700_000_900])
+def test_cleanup_keeps_the_current_custom_snapshot_and_four_latest_by_age(
+    tmp_path: Path, current_timestamp: int
+) -> None:
+    root, _names = _deployment_snapshot_fixture(tmp_path)
+    current = root / "c0-custom-id"
+    current.mkdir()
+    (current / "payload").write_text("current snapshot")
+    os.utime(current, (current_timestamp, current_timestamp))
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "payload").write_text("external data")
+    link = root / "unrelated-symlink"
+    link.symlink_to(outside, target_is_directory=True)
+
+    result = _run_snapshot_cleanup(root, current.name)
+
+    assert result.returncode == 0, result.stderr
+    assert link.is_symlink()
+    assert (outside / "payload").read_text() == "external data"
+    expected = {
+        "c0-custom-id",
+        "v3-backup",
+        "v2-backup",
+        "aaa-recent",
+        "bbb-most-recent",
+    }
+    assert {
+        path.name for path in root.iterdir() if path.is_dir() and not path.is_symlink()
+    } == expected
+    assert (current / "payload").read_text() == "current snapshot"
+    for name in expected - {current.name}:
+        assert (root / name / "payload").read_text() == name
+
+
+@pytest.mark.parametrize("current_state", ["missing", "symlink"])
+def test_cleanup_never_prunes_without_a_real_current_snapshot(
+    tmp_path: Path, current_state: str
+) -> None:
+    root, names = _deployment_snapshot_fixture(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "payload").write_text("external data")
+    if current_state == "symlink":
+        (root / "c0-current").symlink_to(outside, target_is_directory=True)
+
+    _run_snapshot_cleanup(root, "c0-current")
+
+    assert {path.name for path in root.iterdir() if not path.is_symlink()} == set(names)
+    for name in names:
+        assert (root / name / "payload").read_text() == name
+    assert (outside / "payload").read_text() == "external data"
+    if current_state == "symlink":
+        assert (root / "c0-current").is_symlink()
+
+
 def _fake_docker(tmp_path: Path) -> tuple[dict, Path]:
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
