@@ -25,6 +25,7 @@ services:
     command:
       - --docker=tcp://crate-observability-docker-proxy:2375
       - --containerd=/run/crate-runtime-proxy/containerd.sock
+      - --containerd-namespace=moby
       - --housekeeping_interval=30s
       - --docker_only=true
       - --store_container_labels=false

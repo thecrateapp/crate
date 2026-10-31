@@ -63,6 +63,7 @@ def test_cadvisor_uses_a_read_only_proxy_socket_volume():
     cadvisor = services["crate-cadvisor"]
     command = " ".join(cadvisor["command"])
     assert "--containerd=/run/crate-runtime-proxy/containerd.sock" in command
+    assert "--containerd-namespace=moby" in command
     mounts = [
         mount
         for mount in cadvisor["volumes"]
