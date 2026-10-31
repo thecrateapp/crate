@@ -5,6 +5,7 @@ import json
 import os
 import platform
 import shutil
+import socket
 import subprocess
 import time
 import urllib.error
@@ -28,6 +29,7 @@ class MonitoringRuntime:
     command: list[str]
     environment: dict[str, str]
     grafana_url: str = ""
+    containerd_address: str = ""
 
     def compose(self, *arguments, timeout=120):
         result = subprocess.run(
@@ -110,6 +112,8 @@ def test_runtime_does_not_inherit_deployment_configuration(monkeypatch):
         "OBS_SECRETS_DIR",
         "OBS_DOCKER_ROOT",
         "OBS_GRAFANA_PORT",
+        "OBS_CONTAINERD",
+        "OBS_CONTAINERD_SOCKET",
         "COMPOSE_FILE",
         "COMPOSE_PROJECT_NAME",
         "COMPOSE_PROFILES",
@@ -150,7 +154,7 @@ def monitoring_runtime(tmp_path_factory):
     # Pin the validated local socket, even if another task changes the default context.
     docker_environment["DOCKER_HOST"] = endpoint
     info = subprocess.run(
-        ["docker", "info", "--format", "{{json .DockerRootDir}}"],
+        ["docker", "info", "--format", "{{json .}}"],
         capture_output=True,
         text=True,
         timeout=15,
@@ -158,7 +162,14 @@ def monitoring_runtime(tmp_path_factory):
     )
     if info.returncode:
         pytest.skip("Docker daemon is unavailable")
-    docker_root = json.loads(info.stdout)
+    metadata = json.loads(info.stdout)
+    driver = metadata["Driver"]
+    if expected_driver := os.environ.get("OBSERVABILITY_EXPECTED_DRIVER"):
+        assert driver == expected_driver, metadata["Driver"]
+    containerd = platform.system() == "Linux" and driver == "overlayfs"
+    if platform.system() == "Linux":
+        assert driver in {"overlay2", "overlayfs"}, driver
+    docker_root = metadata["DockerRootDir"]
     directory = tmp_path_factory.mktemp("observability-runtime")
     data = directory / "data"
     secrets = directory / "secrets"
@@ -243,6 +254,28 @@ def monitoring_runtime(tmp_path_factory):
         "OBS_GRAFANA_PORT": "0",
         "CRATE_POSTGRES_DB": "crate",
     }
+    extra_files = []
+    if containerd:
+        fixture_values["OBS_CONTAINERD_SOCKET"] = metadata["Containerd"]["Address"]
+        access = directory / "test-access.yaml"
+        access.write_text(
+            yaml.safe_dump(
+                {
+                    "services": {
+                        "crate-observability-docker-proxy": {
+                            "ports": ["127.0.0.1:0:2376"],
+                            "networks": ["observability", "observability-ui"],
+                        }
+                    }
+                }
+            )
+        )
+        extra_files = [
+            "-f",
+            str(OBSERVABILITY / "compose.containerd.yaml"),
+            "-f",
+            str(access),
+        ]
     environment.write_text(
         "".join(f"{key}={value}\n" for key, value in fixture_values.items())
     )
@@ -260,6 +293,7 @@ def monitoring_runtime(tmp_path_factory):
             str(base),
             "-f",
             str(OBSERVABILITY / "compose.observability.yaml"),
+            *extra_files,
             "--profile",
             "observability",
         ],
@@ -308,6 +342,20 @@ def monitoring_runtime(tmp_path_factory):
                     "crate-observability-docker-proxy",
                 }
             ]
+        if containerd:
+            runtime.compose(
+                "up",
+                "-d",
+                "--no-deps",
+                "--wait",
+                "--wait-timeout",
+                "45",
+                "crate-observability-docker-proxy",
+            )
+            runtime.containerd_address = runtime.compose(
+                "port", "crate-observability-docker-proxy", "2376"
+            )
+            assert runtime.containerd_address.startswith("127.0.0.1:")
         runtime.compose("up", "-d", "--no-deps", *services)
         address = runtime.compose("port", "crate-grafana", "3000")
         assert address.startswith("127.0.0.1:"), address
@@ -391,6 +439,7 @@ def test_monitoring_observes_real_dependencies_and_provisions_dashboards(
         "AND query NOT LIKE '%pg_stat_statements%' ORDER BY calls DESC LIMIT 1;",
     )
     assert query_id.lstrip("-").isdigit(), query_id
+    redis_id = runtime.compose("ps", "-q", "crate-redis")
 
     def dependencies_observed():
         rows = runtime.query("up")
@@ -405,7 +454,14 @@ def test_monitoring_observes_real_dependencies_and_provisions_dashboards(
         assert len(redis) == 2 and all(row["value"][1] == "1" for row in redis), redis
         if platform.system() == "Linux":
             assert runtime.query("node_memory_MemTotal_bytes")
-            assert runtime.query("container_memory_working_set_bytes")
+            containers = runtime.query(
+                "container_memory_working_set_bytes{"
+                'container_label_com_docker_compose_service="crate-redis"}'
+            )
+            assert any(
+                redis_id in row["metric"].get("id", "") and float(row["value"][1]) > 0
+                for row in containers
+            ), containers
         statements = runtime.query(
             'count({__name__=~"pg_stat_statements_.*",queryid="' + query_id + '"})'
         )
@@ -440,3 +496,104 @@ def test_monitoring_observes_real_dependencies_and_provisions_dashboards(
             )[-10000:]
         )
         raise
+
+
+def _containerd_rpc(address, method, path, namespaces, payload=b""):
+    # Raw HTTP/2 checks the deployed filter, including duplicate metadata headers.
+    import h2.connection
+    import h2.events
+
+    host, port = address.rsplit(":", 1)
+    connection = h2.connection.H2Connection()
+    headers = [
+        (":method", method),
+        (":scheme", "http"),
+        (":authority", "containerd"),
+        (":path", path),
+        ("content-type", "application/grpc"),
+        ("te", "trailers"),
+        *(("containerd-namespace", value) for value in namespaces),
+    ]
+    result = {}
+    body = bytearray()
+    with socket.create_connection((host, int(port)), timeout=10) as client:
+        connection.initiate_connection()
+        connection.send_headers(1, headers)
+        connection.send_data(
+            1, b"\x00" + len(payload).to_bytes(4, "big") + payload, end_stream=True
+        )
+        client.sendall(connection.data_to_send())
+        while True:
+            data = client.recv(65536)
+            assert data, "The proxy closed without completing the HTTP/2 response"
+            done = False
+            for event in connection.receive_data(data):
+                if isinstance(
+                    event, (h2.events.ResponseReceived, h2.events.TrailersReceived)
+                ):
+                    result.update(
+                        {key.decode(): value.decode() for key, value in event.headers}
+                    )
+                elif isinstance(event, h2.events.DataReceived):
+                    body.extend(event.data)
+                    connection.acknowledge_received_data(
+                        event.flow_controlled_length, event.stream_id
+                    )
+                elif isinstance(event, h2.events.StreamEnded):
+                    done = True
+                elif isinstance(
+                    event, (h2.events.StreamReset, h2.events.ConnectionTerminated)
+                ):
+                    raise AssertionError(f"Unexpected HTTP/2 termination: {event}")
+            if pending := connection.data_to_send():
+                client.sendall(pending)
+            if done:
+                return result, bytes(body)
+
+
+RPC = "/containerd.services.containers.v1.Containers/Get"
+
+
+def test_containerd_filter_reads_real_moby_metadata(monitoring_runtime):
+    runtime = monitoring_runtime
+    if not runtime.containerd_address:
+        pytest.skip(
+            "The filtered containerd endpoint is only used with overlayfs on Linux"
+        )
+    container_id = runtime.compose("ps", "-q", "crate-redis").encode()
+    payload = b"\x0a" + bytes([len(container_id)]) + container_id
+    headers, body = _containerd_rpc(
+        runtime.containerd_address, "POST", RPC, ["moby"], payload
+    )
+    assert headers[":status"] == "200", headers
+    assert headers["grpc-status"] == "0", headers
+    assert container_id in body
+
+
+@pytest.mark.parametrize(
+    "method,path,namespaces",
+    [
+        ("GET", RPC, ["moby"]),
+        ("POST", RPC, []),
+        ("POST", RPC, ["default"]),
+        ("POST", RPC, ["moby", "moby"]),
+        ("POST", RPC, ["moby", "default"]),
+        ("POST", RPC, ["moby,default"]),
+        ("POST", RPC.replace("/Get", "/List"), ["moby"]),
+        ("POST", RPC.replace("/Get", "/Create"), ["moby"]),
+        ("POST", RPC.replace("/Get", "/Update"), ["moby"]),
+        ("POST", RPC.replace("/Get", "/Delete"), ["moby"]),
+        ("POST", "/containerd.services.tasks.v1.Tasks/Get", ["moby"]),
+    ],
+)
+def test_containerd_filter_rejects_other_rpcs_and_namespaces(
+    monitoring_runtime, method, path, namespaces
+):
+    if not monitoring_runtime.containerd_address:
+        pytest.skip(
+            "The filtered containerd endpoint is only used with overlayfs on Linux"
+        )
+    headers, _ = _containerd_rpc(
+        monitoring_runtime.containerd_address, method, path, namespaces
+    )
+    assert headers[":status"] == "403", headers

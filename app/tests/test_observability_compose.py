@@ -110,10 +110,18 @@ def test_only_grafana_uses_the_non_internal_ui_network():
 
 
 @pytest.mark.parametrize(
-    "driver,admitted", [("overlay2", True), ("overlayfs", False), ("unknown", False)]
+    "driver,containerd,admitted",
+    [
+        ("overlay2", False, True),
+        ("overlayfs", False, False),
+        ("unknown", False, False),
+        ("overlayfs", True, True),
+        ("overlay2", True, False),
+        ("unknown", True, False),
+    ],
 )
 def test_monitoring_start_rejects_unreviewed_storage_drivers(
-    tmp_path, driver, admitted
+    tmp_path, driver, containerd, admitted
 ):
     executable = tmp_path / "docker"
     calls = tmp_path / "docker-calls.jsonl"
@@ -129,7 +137,11 @@ def test_monitoring_start_rejects_unreviewed_storage_drivers(
     )
     executable.chmod(0o755)
     result = subprocess.run(
-        [shutil.which("make") or "make", "observability-up"],
+        [
+            shutil.which("make") or "make",
+            "observability-up",
+            f"OBS_CONTAINERD={int(containerd)}",
+        ],
         cwd=ROOT,
         env={
             "PATH": str(tmp_path) + os.pathsep + os.defpath,
@@ -148,6 +160,27 @@ def test_monitoring_start_rejects_unreviewed_storage_drivers(
     assert bool(starts) is admitted
     if admitted:
         assert "--no-deps" in starts[0]
+        if containerd:
+            assert all(
+                "deploy/observability/compose.containerd.yaml" in command
+                for command in starts
+            )
+            proxy = next(
+                index
+                for index, command in enumerate(starts)
+                if "--wait" in command and "crate-observability-docker-proxy" in command
+            )
+            cadvisor = next(
+                index
+                for index, command in enumerate(starts)
+                if "crate-cadvisor" in command
+            )
+            assert proxy < cadvisor
+        else:
+            assert all(
+                "deploy/observability/compose.containerd.yaml" not in command
+                for command in starts
+            )
     else:
         assert "no services started" in result.stdout
 

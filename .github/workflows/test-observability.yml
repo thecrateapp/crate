@@ -6,6 +6,7 @@ on:
     paths:
       - "deploy/observability/**"
       - "app/tests/test_observability_compose.py"
+      - "app/tests/test_observability_containerd.py"
       - "app/tests/test_observability_runtime.py"
       - ".github/workflows/test-observability.yml"
       - "docker-compose*.yaml"
@@ -16,6 +17,7 @@ on:
     paths:
       - "deploy/observability/**"
       - "app/tests/test_observability_compose.py"
+      - "app/tests/test_observability_containerd.py"
       - "app/tests/test_observability_runtime.py"
       - ".github/workflows/test-observability.yml"
       - "docker-compose*.yaml"
@@ -31,6 +33,10 @@ concurrency:
 
 jobs:
   contracts:
+    strategy:
+      fail-fast: false
+      matrix:
+        storage: [overlay2, overlayfs]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -39,29 +45,34 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install configuration test dependencies
-        run: python -m pip install pytest==8.4.2 PyYAML==6.0.3
-      - name: Select the supported storage backend on the disposable runner
-        # cAdvisor's reviewed Docker-only integration supports classic overlay2.
+        run: python -m pip install pytest==8.4.2 PyYAML==6.0.3 h2==4.3.0
+      - name: Select the matrix storage backend on the disposable runner
         # This never runs on a Crate installation or changes production Docker.
+        env:
+          STORAGE_DRIVER: ${{ matrix.storage }}
         run: |
           test "$RUNNER_ENVIRONMENT" = "github-hosted"
-          if [ "$(docker info --format '{{.Driver}}')" = "overlayfs" ]; then
-            sudo python3 - <<'PY'
-          import json
+          if [ "$(docker info --format '{{.Driver}}')" != "$STORAGE_DRIVER" ]; then
+            sudo env STORAGE_DRIVER="$STORAGE_DRIVER" python3 - <<'PY'
+          import json, os
           from pathlib import Path
           path = Path("/etc/docker/daemon.json")
           settings = json.loads(path.read_text()) if path.exists() else {}
-          settings.setdefault("features", {})["containerd-snapshotter"] = False
-          settings["storage-driver"] = "overlay2"
+          driver = os.environ["STORAGE_DRIVER"]
+          settings.setdefault("features", {})["containerd-snapshotter"] = driver == "overlayfs"
+          if driver == "overlay2":
+              settings["storage-driver"] = driver
+          else:
+              settings.pop("storage-driver", None)
           path.parent.mkdir(parents=True, exist_ok=True)
           path.write_text(json.dumps(settings) + "\n")
           PY
             sudo systemctl restart docker
           fi
-          test "$(docker info --format '{{.Driver}}')" = "overlay2"
+          test "$(docker info --format '{{.Driver}}')" = "$STORAGE_DRIVER"
       - name: Validate overlay isolation, resources, dashboards and profile combinations
         # These tests use only the Compose parser, not Crate's DB/application fixtures.
-        run: python -m pytest --noconftest app/tests/test_observability_compose.py -q
+        run: python -m pytest --noconftest app/tests/test_observability_compose.py app/tests/test_observability_containerd.py -q
       - name: Check Prometheus configuration with its pinned release
         run: |
           image="$(python -c 'import yaml; print(yaml.safe_load(open("deploy/observability/compose.observability.yaml"))["services"]["crate-prometheus"]["image"])')"
@@ -72,11 +83,14 @@ jobs:
       - name: Validate Docker read proxy configuration
         run: |
           image="$(python -c 'import yaml; print(yaml.safe_load(open("deploy/observability/compose.observability.yaml"))["services"]["crate-observability-docker-proxy"]["image"])')"
-          docker run --rm --network none --read-only --cap-drop ALL \
-            --entrypoint haproxy \
-            --mount "type=bind,src=$PWD/deploy/observability/docker-proxy.haproxy.cfg,dst=/proxy.cfg,readonly" \
-            "$image" -c -f /proxy.cfg
+          for config in docker-proxy runtime-proxy; do
+            docker run --rm --network none --read-only --cap-drop ALL \
+              --entrypoint haproxy \
+              --mount "type=bind,src=$PWD/deploy/observability/$config.haproxy.cfg,dst=/proxy.cfg,readonly" \
+              "$image" -c -f /proxy.cfg
+          done
       - name: Exercise collectors and dashboards on a disposable Linux stack
         env:
           OBSERVABILITY_RUNTIME_TEST: "1"
+          OBSERVABILITY_EXPECTED_DRIVER: ${{ matrix.storage }}
         run: python -m pytest --noconftest app/tests/test_observability_runtime.py -q

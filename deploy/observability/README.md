@@ -32,13 +32,15 @@ not the root filesystem, and monitor actual filesystem space.
 
 Defaults (override with exported environment values before calling Make):
 
-| Variable            | Default                                           | Purpose                                                  |
-| ------------------- | ------------------------------------------------- | -------------------------------------------------------- |
-| `OBS_DATA_DIR`      | `/var/lib/crate-observability`                    | Persistent Prometheus and Grafana directories            |
-| `OBS_SECRETS_DIR`   | `/var/lib/crate-observability/secrets`            | File secrets, outside Git                                |
-| `OBS_DOCKER_ROOT`   | `/var/lib/docker`                                 | Actual Docker data-root, from `docker info`              |
-| `OBS_GRAFANA_PORT`  | `3001`                                            | Loopback-only Grafana port                               |
-| `OBS_COMPOSE_FILES` | `docker-compose.yaml docker-compose.project.yaml` | Base files; include the operator overlay if already used |
+| Variable                | Default                                           | Purpose                                                    |
+| ----------------------- | ------------------------------------------------- | ---------------------------------------------------------- |
+| `OBS_DATA_DIR`          | `/var/lib/crate-observability`                    | Persistent Prometheus and Grafana directories              |
+| `OBS_SECRETS_DIR`       | `/var/lib/crate-observability/secrets`            | File secrets, outside Git                                  |
+| `OBS_DOCKER_ROOT`       | `/var/lib/docker`                                 | Actual Docker data-root, from `docker info`                |
+| `OBS_CONTAINERD`        | `0`                                               | Set `1` only for Docker's `overlayfs` image store          |
+| `OBS_CONTAINERD_SOCKET` | `/run/containerd/containerd.sock`                 | Actual containerd address from `docker info`, adapter only |
+| `OBS_GRAFANA_PORT`      | `3001`                                            | Loopback-only Grafana port                                 |
+| `OBS_COMPOSE_FILES`     | `docker-compose.yaml docker-compose.project.yaml` | Base files; include the operator overlay if already used   |
 
 For home, pass `OBS_COMPOSE_FILES=docker-compose.home.yaml`. Keep the same Compose
 project name and network as the existing installation. The overlay reuses the
@@ -119,6 +121,20 @@ make observability-up
 make observability-status
 ```
 
+For Docker's containerd image store, first verify the driver and socket address:
+
+```bash
+docker info --format '{{.Driver}} {{.Containerd.Address}}'
+export OBS_CONTAINERD=1
+# Export OBS_CONTAINERD_SOCKET if its address differs from the default.
+make observability-config
+make observability-pull
+make observability-up
+```
+
+Keep `OBS_CONTAINERD=1` for subsequent status/stop/up commands on that installation.
+The adapter does not change Docker's configuration or migrate its image store.
+
 These targets act on the local Docker context; they never SSH. `up` selects only
 the monitoring services with `--no-deps`, so it does not start or recreate Crate.
 Check the Docker context and base Compose project before using them. On home:
@@ -168,19 +184,33 @@ inspect errors. Do not enable `privileged`, expose the Docker socket or remove
 the proxy allowlist to obtain a green dashboard. Rootless Docker and alternative
 container runtimes require a separate collector review.
 
-The current cAdvisor integration targets Docker's classic **overlay2** storage
-driver. Check `docker info --format '{{.Driver}}'` before activation and record it
-in C0; `observability-up` refuses other drivers before starting services. Docker's
-containerd image store (`overlayfs`) also needs a containerd client
-path that this restricted integration does not grant. Do not claim container
-coverage or activate this collector on that driver without a separate reviewed
-setup; do not grant the containerd socket or privileged mode as a workaround.
+Two Docker storage backends are supported explicitly: classic **overlay2** with
+`OBS_CONTAINERD=0`, and the containerd image store (**overlayfs**) with
+`OBS_CONTAINERD=1`. `observability-up` refuses a mismatch or any other driver
+before starting services. Record the actual driver/address in C0.
+
+The optional `compose.containerd.yaml` reuses the same proxy, image and resource
+limits. Only that proxy mounts the host containerd socket, with automatic path
+creation disabled. `runtime-proxy.haproxy.cfg` permits exactly the gRPC
+`containerd.services.containers.v1.Containers/Get` RPC through HTTP/2 POST and
+exactly one `containerd-namespace: moby` header. Other namespaces, duplicate
+namespace headers, task/list/version RPCs and mutations are denied. Docker's
+GET filter is unchanged. Neither socket being mounted `:ro` grants read-only API
+semantics; the protocol filter provides that restriction.
+
+cAdvisor receives only a read-only volume containing the proxy's Unix listener,
+never the raw containerd socket. The same filtered endpoint listens internally
+on port 2376 for validation; neither endpoint is published by the overlay. Make
+waits for the proxy to become healthy before starting cAdvisor, whose containerd
+client initializes once. After a failed startup, repair the proxy and recreate
+cAdvisor rather than accepting `up=1` without container metrics. No privileged
+mode or Docker daemon changes are required.
 
 ## Validation and C0 evidence
 
 ```bash
 cd app
-../.venv/bin/python -m pytest --noconftest tests/test_observability_compose.py -q
+../.venv/bin/python -m pytest --noconftest tests/test_observability_compose.py tests/test_observability_containerd.py -q
 ```
 
 CI also runs the pinned image's `promtool check config` without network access.
@@ -190,10 +220,13 @@ they do not start Crate or connect to production.
 The dedicated Linux CI job additionally runs an opt-in runtime test with a random
 Compose project, disposable PostgreSQL/Redis and dummy credentials. It verifies
 real dependency metrics and provisioned dashboards, then removes only its own
-resources. Before starting containers it selects the reviewed classic overlay2
-backend on its disposable GitHub-hosted runner; this does not configure Docker
-on any Crate installation. The normal backend suite skips this test. To run it against a local
-Unix-socket Docker context:
+resources. A Linux matrix exercises both `overlay2` and `overlayfs` on separate,
+disposable GitHub-hosted runners; it does not configure Docker on any Crate
+installation. With overlayfs it also verifies a real metadata Get through the
+proxy and HTTP 403 for other RPCs/namespaces, including duplicate headers. The
+container metric must identify the fixture's Redis container, not just any host
+container. The normal backend suite skips these tests. To run against a local
+Unix-socket Docker context (install `h2==4.3.0` for Linux overlayfs):
 
 ```bash
 OBSERVABILITY_RUNTIME_TEST=1 .venv/bin/python -m pytest --noconftest app/tests/test_observability_runtime.py -q
@@ -205,8 +238,9 @@ host/cgroup coverage is checked only on the Linux runner.
 C0 remains pending until the actual shadow deployment is reviewed. Record SHA,
 versions, Linux architecture, storage location, target health, series count,
 CPU/RSS/IO/throttling/OOMs, scrape time and growth; inventory active DSNs/rules
-without values. Exercise the agreed 20–30-minute user flow, distinguish unknown
-coverage, and decide the independent probe host. This overlay cannot establish
+without values. Exercise the agreed 20–30-minute user flow and distinguish unknown
+coverage. Diego deferred the independent probe host decision on 2026-10-31;
+record it as pending, not as an installed external probe. This overlay cannot establish
 an application SLO, repaired metric history or physical audio QA.
 
 ## Stop and rollback
