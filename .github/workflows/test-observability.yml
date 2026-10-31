@@ -40,6 +40,25 @@ jobs:
           python-version: "3.13"
       - name: Install configuration test dependencies
         run: python -m pip install pytest==8.4.2 PyYAML==6.0.3
+      - name: Select the supported storage backend on the disposable runner
+        # cAdvisor's reviewed Docker-only integration supports classic overlay2.
+        # This never runs on a Crate installation or changes production Docker.
+        run: |
+          test "$RUNNER_ENVIRONMENT" = "github-hosted"
+          if [ "$(docker info --format '{{.Driver}}')" = "overlayfs" ]; then
+            sudo python - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path("/etc/docker/daemon.json")
+          settings = json.loads(path.read_text()) if path.exists() else {}
+          settings.setdefault("features", {})["containerd-snapshotter"] = False
+          settings["storage-driver"] = "overlay2"
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(settings) + "\n")
+          PY
+            sudo systemctl restart docker
+          fi
+          test "$(docker info --format '{{.Driver}}')" = "overlay2"
       - name: Validate overlay isolation, resources, dashboards and profile combinations
         # These tests use only the Compose parser, not Crate's DB/application fixtures.
         run: python -m pytest --noconftest app/tests/test_observability_compose.py -q

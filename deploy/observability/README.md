@@ -190,7 +190,9 @@ they do not start Crate or connect to production.
 The dedicated Linux CI job additionally runs an opt-in runtime test with a random
 Compose project, disposable PostgreSQL/Redis and dummy credentials. It verifies
 real dependency metrics and provisioned dashboards, then removes only its own
-resources. The normal backend suite skips this test. To run it against a local
+resources. Before starting containers it selects the reviewed classic overlay2
+backend on its disposable GitHub-hosted runner; this does not configure Docker
+on any Crate installation. The normal backend suite skips this test. To run it against a local
 Unix-socket Docker context:
 
 ```bash
