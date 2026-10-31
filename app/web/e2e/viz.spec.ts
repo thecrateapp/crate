@@ -191,7 +191,7 @@ test("the home teasers are decorative and leave the card links with short names"
       "true",
     );
   await expect(page.locator(".leads a").first()).toHaveAccessibleName(
-    "Not a crossfade. A planned transition. Inside Smart Mix",
+    "A transition planned for each pair of tracks. Inside Smart Mix",
   );
   await expect(page.locator(".leads a").nth(1)).toHaveAccessibleName(
     "Let an agent look after the library. Agents in Admin",

@@ -186,7 +186,7 @@ export const admin: AdminPage = {
       id: "mcp",
       status: "opt-in",
       lede: [
-        "Your library can talk to your AI agent.",
+        "Let an AI agent look after your library.",
         "Over MCP, an agent such as Claude diagnoses the collection and prepares its maintenance. Nothing changes until a person approves it.",
       ],
     },

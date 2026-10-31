@@ -16,9 +16,9 @@ export const en = {
   "cta.copied": "Copied",
   "cta.copyLabel": "Copy the install command",
   "statement.1":
-    'Crate is free, open-source software for taking music back from streaming platforms and returning it to the people who give it meaning: fans and artists. <span class="hl">No subscriptions. No algorithms.</span>',
+    'Crate is free, open-source software that takes music back from the streaming platforms and returns it to the people who give it meaning: fans and artists. <span class="hl">There\'s no subscription, and your listening never leaves your server.</span>',
   "statement.2":
-    "Install it in your server. Bring your files. Tell your friends. Start a community and break with the system.",
+    "Install it on your server, bring your files and invite your friends. A Crate server is a small community, and federation connects it to others.",
   "statement.3":
     'Own your music. Support your artists. <span class="hl">Refuse the middleman.</span>',
   "screencast.label": "Crate walkthrough",
@@ -73,7 +73,7 @@ export const en = {
   "inside.health.confirm": "Confirm",
   "inside.health.auto": "Auto",
   "inside.mix.label": "Smart Mix · Android",
-  "inside.mix.title": "Not a crossfade. A planned transition.",
+  "inside.mix.title": "A transition planned for each pair of tracks.",
   "inside.mix.body":
     "Beatmatched, loudness-matched, bass swapped at the midpoint. Planned on your server, played on Android.",
   "inside.mix.link": "Inside Smart Mix",
@@ -134,7 +134,7 @@ export const en = {
   "working.link": "What we're working on",
   "working.jams.title": "Jams",
   "working.jams.body":
-    "Rooms with one shared queue, votes and DJ modes. The feature is built behind a flag while it is finished.",
+    "Rooms with one shared queue, votes and DJ modes. It stays behind a feature flag until it is finished.",
   "working.jams.facts":
     "rooms · shared queue · votes · DJ modes · behind a flag",
   "working.vdj.title": "VirtualDJ plugin",
