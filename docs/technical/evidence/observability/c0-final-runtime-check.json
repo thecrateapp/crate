@@ -1,0 +1,27 @@
+{
+  "at": "2026-10-31T13:58:01.741193+00:00",
+  "application_release_sha": "6681be8017b60865c00af61c3edc6f17696175b7",
+  "helper_source_sha": "75b442401bfbca8646efe5f684fca36dd9aab31d",
+  "healthy_or_running_services": 33,
+  "all_ready": true,
+  "scrape_targets": {
+    "redis-cache": "1",
+    "postgresql": "1",
+    "redis-durable": "1",
+    "prometheus": "1",
+    "cadvisor": "1",
+    "node": "1"
+  },
+  "container_memory_coverage": "33/33",
+  "sentry_receipts_verified": 4,
+  "pre_gap_prometheus_history_time": "2026-10-31T13:10:00Z",
+  "pre_gap_target_values": {
+    "redis-cache": "1",
+    "postgresql": "1",
+    "redis-durable": "1",
+    "prometheus": "1",
+    "cadvisor": "1",
+    "node": "1"
+  },
+  "prometheus_history_reused": true
+}

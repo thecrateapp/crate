@@ -1,29 +1,43 @@
 # Observability C0 evidence
 
-Infrastructure shadow is active from PR [#309](https://github.com/thecrateapp/crate/pull/309),
-source `248636d511d7356b732b908bc07ba0b50fdb9b97`. **C0 is pending acceptance.**
+**Runtime remediation is complete; C0 awaits Diego's review. PR1A has not started.**
+The application and shadow overlay use immutable source
+`6681be8017b60865c00af61c3edc6f17696175b7`; the deployment helper includes the
+retention fix from `75b442401bfbca8646efe5f684fca36dd9aab31d`.
 
-- [Authenticated web journey](functional-review.md): about 26 minutes of playback,
-  navigation, Infinite continuation and a client-only network fault. Includes
-  findings and links to normalized client records, 26 server samples and summaries.
-- [Initial baseline](baseline.md): activation/preflight, five-minute resource
-  observations and scoped stop/status procedure.
-- [Coverage matrix](coverage-matrix.md): producers, storage, consumers and gaps.
-- [Event dictionary](event-dictionary.md): proposed contracts for the following
-  instrumentation cuts, including user intent versus unsupported source metadata.
+- [Final rollout verification](c0-rollout.md): deployment, Tidarr preservation,
+  monitoring gap, resource observations, Sentry receipts and retention incident.
+- [Remediation source findings](c0-remediation.md): Grafana budget, companion
+  coverage, external artwork 404, SDK delivery and image release provenance.
+- [Post-rollout samples](c0-remediation-samples.jsonl),
+  [summary](c0-remediation-summary.json) and
+  [Sentry receipts](c0-sentry-receipts.json).
+- [Authenticated web journey](functional-review.md): the earlier 26-minute
+  playback/navigation/Infinite exercise and client-only network fault.
+- [Initial baseline](baseline.md), [coverage matrix](coverage-matrix.md) and
+  [event dictionary](event-dictionary.md): historical measurements, declared gaps
+  and proposed contracts for subsequent instrumentation.
 
-Published-album continuation appended 30 tracks and advanced naturally. A partial
-pre-release album ended empty with Infinite enabled because its source has no
-radio seed. Network/API transport recovered after the deliberate cut; a physical
-audio stall/recovery was not established. One resource 404 remains unclassified,
-and the browser capture overflowed twice; no full error ratio is inferred.
+The final checks cover six healthy scrape targets and working-set memory metrics
+for 33/33 current containers, including nginx/traefik/slskd. Tidarr was retired
+with private state backups and preserved bind directories. Grafana now has
+384 MiB and Prometheus 256 MiB within the unchanged 944 MiB / 1 CPU budget.
+The post-rollout window showed no monitoring restarts/OOMs; previous history was
+verified after reuse of the same Prometheus storage. The isolated Radar 404 was
+classified as unavailable Cover Art Archive artwork.
 
-During the longer window, monitoring used 349.6–384.2 MiB with no observed
-restarts/OOM kills. Grafana reached 98.6% of its individual 256 MiB limit. The
-existing five-minute dashboard CPU query covered 8/8 services throughout; the
-shorter exploratory rate can have holes. IO covers 3/8 services and four companion
-containers remain excluded from the Crate-prefix filter.
+API/worker/Go/Rust diagnostic receipts were independently verified in Sentry with
+correct per-image releases. This does not establish all instrumentation paths,
+installed Desktop delivery or current web-release symbolication. The earlier
+network fault did not establish a physical audio stall/recovery. Published-album
+Infinite continuation passed; a partial pre-release album with no radio seed
+still ended empty and remains a separate functional follow-up.
 
-Review per-service budgets and the declared gaps before acceptance. No SLO,
-complete platform coverage or retention forecast is claimed. The external-probe
-host is deferred by Diego. PR1A has not started.
+Deployment cleanup deleted the pre-C0 configuration snapshot by sorting names
+instead of dates. That exact environment was not recovered. A verified checkpoint
+of the working post-deployment configuration now lives outside cleanup and app
+mounts; retention protects the current snapshot and selects four others by mtime.
+Database, library and Tidarr data were not deleted. No restore drill is claimed.
+
+Short measurements establish neither long-term capacity nor complete metric-family
+coverage/SLOs. The external probe host is explicitly deferred.
