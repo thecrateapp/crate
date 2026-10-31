@@ -1,0 +1,117 @@
+name: VirtualDJ Plugin Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/vdj-plugin/**"
+      - ".github/workflows/vdj-plugin.yml"
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "tools/vdj-plugin/**"
+      - ".github/workflows/vdj-plugin.yml"
+
+jobs:
+  guard:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Keep the private SDK out of Git
+        run: |
+          if git ls-files tools/vdj-plugin | grep -E '(^|/)(vdjPlugin8|vdjOnlineSource|vdjDsp8|vdjVideo8)\.h$'; then
+            echo "VirtualDJ SDK headers must not be committed"
+            exit 1
+          fi
+
+      - name: Keep real access tokens out of Git
+        run: |
+          if git grep -nE 'crv_[A-Za-z0-9_-]{40,}' -- tools/vdj-plugin; then
+            echo "A Crate access token is committed under tools/vdj-plugin"
+            exit 1
+          fi
+
+  linux:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: release
+            build_type: Release
+            sanitizers: "OFF"
+          - name: sanitizers
+            build_type: Debug
+            sanitizers: "ON"
+    name: linux (${{ matrix.name }})
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake g++ libcurl4-openssl-dev libsqlite3-dev
+
+      - name: Build and test
+        run: make vdj-test VDJ_BUILD_TYPE=${{ matrix.build_type }} VDJ_SANITIZERS=${{ matrix.sanitizers }}
+
+  macos:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build and test
+        run: make vdj-test
+
+  windows:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.LOCALAPPDATA }}\vcpkg\archives
+          key: vcpkg-x64-windows-curl-sqlite3-${{ runner.os }}-v1
+
+      - name: Install dependencies
+        run: vcpkg install curl sqlite3 --triplet x64-windows
+
+      - name: Build and test
+        run: |
+          cmake -S tools/vdj-plugin -B build/vdj-headless `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows `
+            -DCRATE_VDJ_BUILD_REAL_PLUGIN=OFF -DCRATE_VDJ_BUILD_TESTS=ON
+          cmake --build build/vdj-headless --config Release --parallel
+          ctest --test-dir build/vdj-headless -C Release --output-on-failure
+
+  probe:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Probe server and summary tests
+        working-directory: tools/vdj-plugin/probe
+        run: |
+          pip install pytest
+          python -m pytest tests -q
