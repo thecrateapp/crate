@@ -28,12 +28,14 @@ ConnectionSession::ConnectionSession(
     ConnectionSettingsStore& settings,
     CredentialFactory credential_factory,
     HttpClient& http,
-    std::chrono::seconds refresh_interval
+    std::chrono::seconds refresh_interval,
+    std::chrono::seconds retry_interval
 )
     : settings_(settings)
     , credential_factory_(std::move(credential_factory))
     , http_(http)
     , refresh_interval_(refresh_interval)
+    , retry_interval_(retry_interval)
 {
 }
 
@@ -72,7 +74,19 @@ ConnectResult ConnectionSession::connect(
     if (!origin.has_value()) {
         return {ConnectError::InvalidOrigin, {}};
     }
-    const std::string token(trimmed(token_input));
+    std::string token(trimmed(token_input));
+    if (token.empty()) {
+        std::shared_ptr<CredentialStore> saved;
+        {
+            std::lock_guard lock(mutex_);
+            if (origin_ == *origin) {
+                saved = credentials_;
+            }
+        }
+        if (saved != nullptr) {
+            token = saved->load_token().value_or("");
+        }
+    }
     if (token.empty()) {
         return {ConnectError::MissingToken, {}};
     }
@@ -131,8 +145,29 @@ ConnectionStatus ConnectionSession::refresh_if_due(
     std::shared_ptr<CredentialStore> credentials;
     {
         std::lock_guard lock(mutex_);
-        if (credentials_ == nullptr || status_.state != ConnectionState::Connected ||
-            now - last_check_ < refresh_interval_) {
+        const bool refresh_due = status_.state == ConnectionState::Connected &&
+            now - last_check_ >= refresh_interval_;
+        const bool retry_due = status_.state == ConnectionState::Unreachable &&
+            now - last_check_ >= retry_interval_;
+        if (credentials_ == nullptr || (!refresh_due && !retry_due)) {
+            return status_;
+        }
+        origin = *origin_;
+        credentials = credentials_;
+    }
+    return check(origin, credentials, now, cancellation);
+}
+
+ConnectionStatus ConnectionSession::check_now(
+    Clock::time_point now,
+    const CancellationToken& cancellation
+)
+{
+    std::string origin;
+    std::shared_ptr<CredentialStore> credentials;
+    {
+        std::lock_guard lock(mutex_);
+        if (credentials_ == nullptr) {
             return status_;
         }
         origin = *origin_;

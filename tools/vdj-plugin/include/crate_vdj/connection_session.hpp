@@ -40,7 +40,8 @@ public:
         ConnectionSettingsStore& settings,
         CredentialFactory credential_factory,
         HttpClient& http,
-        std::chrono::seconds refresh_interval = std::chrono::minutes(10)
+        std::chrono::seconds refresh_interval = std::chrono::minutes(10),
+        std::chrono::seconds retry_interval = std::chrono::seconds(30)
     );
 
     ConnectionStatus restore(Clock::time_point now, const CancellationToken& cancellation);
@@ -52,6 +53,7 @@ public:
     );
     bool disconnect();
     ConnectionStatus refresh_if_due(Clock::time_point now, const CancellationToken& cancellation);
+    ConnectionStatus check_now(Clock::time_point now, const CancellationToken& cancellation);
 
     ConnectionStatus status() const;
     bool logged_in() const;
@@ -70,6 +72,7 @@ private:
     CredentialFactory credential_factory_;
     HttpClient& http_;
     std::chrono::seconds refresh_interval_;
+    std::chrono::seconds retry_interval_;
     mutable std::mutex mutex_;
     std::optional<std::string> origin_;
     std::shared_ptr<CredentialStore> credentials_;

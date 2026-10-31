@@ -335,6 +335,72 @@ void cancelled_connect_persists_nothing()
     CRATE_CHECK(!session.logged_in());
 }
 
+
+void unreachable_restore_retries_until_the_server_answers()
+{
+    Harness harness;
+    harness.settings.origin = kOrigin;
+    harness.vault->tokens[credential_account_for_origin(kOrigin)] = "crv_saved";
+    auto session = harness.session(600s);
+
+    CRATE_CHECK(session.restore(kStart, CancellationToken{}).state == ConnectionState::Unreachable);
+    CRATE_CHECK(!session.logged_in());
+
+    harness.http.serve_connected();
+    const auto requests_while_waiting = harness.http.requests.size();
+    session.refresh_if_due(kStart + 10s, CancellationToken{});
+    CRATE_CHECK(harness.http.requests.size() == requests_while_waiting);
+
+    const auto retried = session.refresh_if_due(kStart + 31s, CancellationToken{});
+
+    CRATE_CHECK(retried.state == ConnectionState::Connected);
+    CRATE_CHECK(session.logged_in());
+}
+
+void empty_token_reconnects_with_the_saved_one()
+{
+    Harness harness;
+    harness.settings.origin = kOrigin;
+    harness.vault->tokens[credential_account_for_origin(kOrigin)] = "crv_saved";
+    auto session = harness.session();
+    session.restore(kStart, CancellationToken{});
+    harness.http.serve_connected();
+
+    const auto result = session.connect(kOrigin, "", kStart + 1s, CancellationToken{});
+
+    CRATE_CHECK(result.error == ConnectError::None);
+    CRATE_CHECK(session.logged_in());
+    CRATE_CHECK(harness.vault->tokens.at(credential_account_for_origin(kOrigin)) == "crv_saved");
+}
+
+void empty_token_for_another_server_is_still_required()
+{
+    Harness harness;
+    harness.settings.origin = kOrigin;
+    harness.vault->tokens[credential_account_for_origin(kOrigin)] = "crv_saved";
+    auto session = harness.session();
+    session.restore(kStart, CancellationToken{});
+
+    const auto result =
+        session.connect("https://other.example.org", "", kStart + 1s, CancellationToken{});
+
+    CRATE_CHECK(result.error == ConnectError::MissingToken);
+}
+
+void check_now_logs_out_a_revoked_token_before_the_refresh_is_due()
+{
+    Harness harness;
+    harness.http.serve_connected();
+    auto session = harness.session(600s);
+    session.connect(kOrigin, "crv_valid", kStart, CancellationToken{});
+
+    harness.http.fail("/api/auth/me", 401);
+    const auto checked = session.check_now(kStart + 5s, CancellationToken{});
+
+    CRATE_CHECK(checked.state == ConnectionState::Unauthorized);
+    CRATE_CHECK(!session.logged_in());
+}
+
 } // namespace
 
 int main()
@@ -356,4 +422,8 @@ int main()
     disconnect_forgets_everything();
     session_reads_stay_responsive_during_a_check();
     cancelled_connect_persists_nothing();
+    unreachable_restore_retries_until_the_server_answers();
+    empty_token_reconnects_with_the_saved_one();
+    empty_token_for_another_server_is_still_required();
+    check_now_logs_out_a_revoked_token_before_the_refresh_is_due();
 }

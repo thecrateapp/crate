@@ -50,7 +50,9 @@ ConnectionDialogResult show_connection_dialog(const ConnectionDialogRequest& req
             origin.accessibilityLabel = @"Crate server address";
             NSSecureTextField* token =
                 [[NSSecureTextField alloc] initWithFrame:NSMakeRect(0, 0, 320, 24)];
-            token.placeholderString = @"Access token";
+            token.placeholderString = request.current_origin.empty()
+                ? @"Access token"
+                : to_ns(kSavedTokenHint);
             token.accessibilityLabel = @"Crate access token";
             [fields addView:origin inGravity:NSStackViewGravityTop];
             [fields addView:token inGravity:NSStackViewGravityTop];

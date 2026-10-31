@@ -27,4 +27,6 @@ inline constexpr const char* kConnectionDialogExplanation =
     "Connect VirtualDJ to your Crate server. Create an access token in Crate Listen, "
     "Settings, Access tokens. The Crate plugin requires a VirtualDJ Pro license.";
 
+inline constexpr const char* kSavedTokenHint = "Leave empty to keep the saved token";
+
 } // namespace crate::vdj
