@@ -313,6 +313,32 @@ def monitoring_runtime(tmp_path_factory):
         assert address.startswith("127.0.0.1:"), address
         runtime.grafana_url = "http://" + address
         yield runtime
+    except BaseException:
+        # Keep bounded collector evidence before the disposable project is removed.
+        metadata = subprocess.run(
+            [
+                "docker",
+                "info",
+                "--format",
+                "driver={{.Driver}} cgroup={{.CgroupVersion}}",
+            ],
+            env=docker_environment,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        print("Collector host:", metadata.stdout.strip())
+        print(
+            runtime.compose(
+                "logs",
+                "--no-color",
+                "--tail",
+                "12",
+                "crate-cadvisor",
+                "crate-observability-docker-proxy",
+            )[-8000:]
+        )
+        raise
     finally:
         # All names and resources belong to the random fixture project.
         runtime.compose("down", "--volumes", "--remove-orphans", timeout=90)
@@ -387,4 +413,30 @@ def test_monitoring_observes_real_dependencies_and_provisions_dashboards(
             "The exporter must observe the normalized probe query, without query text"
         )
 
-    _eventually(dependencies_observed)
+    try:
+        _eventually(dependencies_observed)
+    except AssertionError:
+        metadata = subprocess.run(
+            [
+                "docker",
+                "info",
+                "--format",
+                "driver={{.Driver}} cgroup={{.CgroupVersion}}",
+            ],
+            env=runtime.environment,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        print("Collector host:", metadata.stdout.strip())
+        print(
+            runtime.compose(
+                "logs",
+                "--no-color",
+                "--tail",
+                "20",
+                "crate-cadvisor",
+                "crate-observability-docker-proxy",
+            )[-10000:]
+        )
+        raise
