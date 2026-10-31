@@ -92,3 +92,20 @@ def test_render_produces_a_markdown_table():
 
     assert table.splitlines()[0] == "| Check | Evidence from logs | Observed in VDJ |"
     assert "x / y" in table
+
+
+def test_heartbeats_are_measured_per_plugin_instance():
+    probe = [
+        {"event": "heartbeat", "uptime_ms": 900_000},
+        {"event": "heartbeat", "uptime_ms": 930_000},
+        {"event": "heartbeat", "uptime_ms": 30_000},
+        {"event": "heartbeat", "uptime_ms": 60_000},
+        {"event": "heartbeat", "uptime_ms": 150_000},
+        {"event": "heartbeat", "uptime_ms": 390_000},
+    ]
+
+    rows = dict(summarize(probe, []))
+
+    assert rows["8. Source stays loaded"] == (
+        "6 heartbeats in 2 instance(s); longest instance 6.0 min, largest gap 4.0 min"
+    )

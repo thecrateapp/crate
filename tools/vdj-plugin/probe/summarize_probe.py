@@ -154,13 +154,29 @@ def summarize(probe: list[dict], server: list[dict]) -> list[tuple[str, str]]:
     )
 
     heartbeats = [e for e in probe if e.get("event") == "heartbeat"]
-    span_min = 0.0
-    if len(heartbeats) > 1:
-        span_min = (heartbeats[-1]["uptime_ms"] - heartbeats[0]["uptime_ms"]) / 60_000
+    instances: list[list[int]] = []
+    for heartbeat in heartbeats:
+        uptime = heartbeat["uptime_ms"]
+        if not instances or uptime < instances[-1][-1]:
+            instances.append([])
+        instances[-1].append(uptime)
+    longest_min = max(
+        ((uptimes[-1] - uptimes[0]) / 60_000 for uptimes in instances), default=0.0
+    )
+    largest_gap_min = max(
+        (
+            (later - earlier) / 60_000
+            for uptimes in instances
+            for earlier, later in zip(uptimes, uptimes[1:])
+        ),
+        default=0.0,
+    )
     rows.append(
         (
             "8. Source stays loaded",
-            f"{len(heartbeats)} heartbeats over {span_min:.1f} min",
+            f"{len(heartbeats)} heartbeats in {len(instances)} instance(s); "
+            f"longest instance {longest_min:.1f} min, "
+            f"largest gap {largest_gap_min:.1f} min",
         )
     )
 
