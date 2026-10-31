@@ -86,6 +86,49 @@ def test_sentry_scrubber_redacts_credentials_and_sensitive_query_values():
     assert event["request"]["headers"]["Authorization"] == "Bearer secret"
 
 
+def test_real_sentry_sdk_delivers_and_scrubs_events_through_before_send():
+    import sentry_sdk
+    from sentry_sdk.transport import Transport
+
+    from crate.observability.sentry import scrub_sentry_event
+
+    delivered = []
+
+    class InMemoryTransport(Transport):
+        def capture_envelope(self, envelope):
+            event = envelope.get_event()
+            if event is not None:
+                delivered.append(event)
+
+    client = sentry_sdk.Client(
+        dsn="https://public@example.invalid/1",
+        transport=InMemoryTransport,
+        default_integrations=False,
+        auto_enabling_integrations=False,
+        send_default_pii=False,
+        before_send=scrub_sentry_event,
+    )
+    try:
+        with sentry_sdk.isolation_scope() as scope:
+            scope.set_client(client)
+            scope.set_user({"id": "42", "email": "private@example.invalid"})
+            scope.set_extra("refresh_token", "private-refresh-token")
+            scope.set_extra("operation", "observability-regression")
+            event_id = sentry_sdk.capture_message(
+                "Crate SDK delivery regression", level="info"
+            )
+
+        assert event_id is not None, "before_send must accept the SDK's event and hint"
+        assert len(delivered) == 1
+        assert delivered[0]["event_id"] == event_id
+        assert delivered[0]["level"] == "info"
+        assert delivered[0]["user"] == {"id": "42"}
+        assert delivered[0]["extra"]["refresh_token"] == "[Filtered]"
+        assert delivered[0]["extra"]["operation"] == "observability-regression"
+    finally:
+        client.close()
+
+
 def test_sentry_scrubber_redacts_opensubsonic_query_and_form_credentials():
     from crate.observability.sentry import scrub_sentry_event
 

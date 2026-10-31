@@ -767,7 +767,7 @@ _setup-hosts:
 
 .PHONY: _create-dirs
 _create-dirs:
-	@mkdir -p data/{traefik/local/certs,tidarr,tidalrr,slskd,soulsync/{config,logs},nginx/{html,conf.d,logs}}
+	@mkdir -p data/{traefik/local/certs,tidalrr,slskd,soulsync/{config,logs},nginx/{html,conf.d,logs}}
 	@mkdir -p media/{music,downloads/{tidal/{incomplete,albums,tracks,playlists,videos},soulseek/incomplete}}
 	@echo "$(GREEN)Directories created$(NC)"
 

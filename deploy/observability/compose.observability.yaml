@@ -37,7 +37,7 @@ services:
     <<: *observability
     image: prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
     user: "65534:65534"
-    mem_limit: 384m
+    mem_limit: 256m
     cpus: 0.20
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -54,7 +54,7 @@ services:
     <<: *observability
     image: grafana/grafana:13.3.0@sha256:488984b716c0862639f91a698adbe2862677a5a07bad42da5f03f3030883b205
     user: "472:472"
-    mem_limit: 256m
+    mem_limit: 384m
     cpus: 0.30
     ports:
       - "127.0.0.1:${OBS_GRAFANA_PORT:-3001}:3000"

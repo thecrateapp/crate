@@ -301,6 +301,19 @@ def test_monitoring_has_bounded_cpu_memory_and_rotated_logs():
         assert logging["options"]["max-size"] and logging["options"]["max-file"], name
 
 
+def test_c0_reallocates_memory_without_increasing_the_monitoring_budget():
+    services = _overlay()["services"]
+    assert _memory_bytes(services["crate-prometheus"]["mem_limit"]) == 256 * 1024**2
+    assert _memory_bytes(services["crate-grafana"]["mem_limit"]) == 384 * 1024**2
+    assert (
+        sum(_memory_bytes(service["mem_limit"]) for service in services.values())
+        == 944 * 1024**2
+    )
+    assert sum(
+        float(service["cpus"]) for service in services.values()
+    ) == pytest.approx(1.0)
+
+
 @pytest.mark.parametrize("name", ["crate-prometheus", "crate-grafana"])
 def test_persistent_monitoring_data_uses_configurable_var_storage(name):
     service = _overlay()["services"][name]
@@ -425,6 +438,38 @@ def test_prometheus_scrapes_only_infrastructure_with_bounded_intervals():
             "60s",
         }
     assert not config.get("alerting"), "PR0 is shadow-only, without notification routes"
+
+
+@pytest.mark.parametrize(
+    "service,expected",
+    [
+        ("crate-api", True),
+        ("crate-cadvisor", True),
+        ("nginx", True),
+        ("traefik", True),
+        ("slskd", True),
+        ("tidarr", False),
+        ("unrelated-service", False),
+        ("other-nginx", False),
+        ("nginx-other", False),
+        ("crate-", False),
+        ("", False),
+    ],
+)
+def test_cadvisor_only_keeps_crate_and_explicit_companion_services(service, expected):
+    config = yaml.safe_load((OBSERVABILITY / "prometheus.yml").read_text())
+    cadvisor = next(
+        job for job in config["scrape_configs"] if job["job_name"] == "cadvisor"
+    )
+    rules = [
+        rule
+        for rule in cadvisor["metric_relabel_configs"]
+        if rule.get("action") == "keep"
+        and rule.get("source_labels") == ["container_label_com_docker_compose_service"]
+    ]
+    assert rules, "Container collection needs an explicit service allowlist"
+    kept = all(re.fullmatch(rule["regex"], service) is not None for rule in rules)
+    assert kept is expected
 
 
 def test_grafana_dashboards_share_the_provisioned_datasource_and_cover_infrastructure():

@@ -162,7 +162,6 @@ def stack_restart_container(request: Request, name: str):
     # Safety: only allow restarting crate containers
     allowed_prefixes = [
         "librarian-",
-        "tidarr",
         "tidalrr",
         "slskd",
         "soulsync",
@@ -183,7 +182,6 @@ def stack_restart_container(request: Request, name: str):
 
 ALLOWED_PREFIXES = [
     "librarian-",
-    "tidarr",
     "tidalrr",
     "slskd",
     "soulsync",

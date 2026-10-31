@@ -28,6 +28,10 @@ duration, series and disk growth during C0. Prometheus keeps **up to 90 days or
 compaction require additional disk headroom. Reserve at least 20 GiB on `/var`,
 not the root filesystem, and monitor actual filesystem space.
 
+Grafana receives 384 MiB and Prometheus 256 MiB within that same aggregate budget.
+The cAdvisor job admits Crate-prefixed services and the exact companion service
+names `nginx`, `traefik` and `slskd`; other service names are not retained.
+
 ## Provision storage and secrets
 
 Defaults (override with exported environment values before calling Make):

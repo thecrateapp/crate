@@ -180,8 +180,8 @@ describe("Stack typographic controls", () => {
     const logs = screen.getByRole("button", { name: "Show logs for worker" });
     const stop = screen.getByRole("button", { name: "Stop service worker" });
     const start = screen.getByRole("button", { name: "Start service scanner" });
-    const external = screen.getByRole("link", { name: "Open service tidarr" });
-    expect(external).toHaveAttribute("href", "https://search.lespedants.org");
+    const external = screen.getByRole("link", { name: "Open service traefik" });
+    expect(external).toHaveAttribute("href", "https://traefik.lespedants.org");
     expect(external).toHaveAttribute("target", "_blank");
     for (const action of [restart, logs, stop, start, external]) {
       expect(action).toHaveAttribute("data-variant", "ghost");
@@ -413,18 +413,19 @@ describe("Stack typographic controls", () => {
     await user.click(screen.getByRole("radio", { name: "All" }));
     await user.type(
       screen.getByRole("searchbox", { name: "Search stack services" }),
-      "8686",
+      "443",
     );
-    expect(screen.getByText("tidarr", { exact: true })).toBeVisible();
+    expect(screen.getByText("traefik", { exact: true })).toBeVisible();
     expect(created).toHaveBeenCalledOnce();
-    act(() =>
-      stream.onmessage?.({
-        data: JSON.stringify({
-          ...snapshot,
-          stack: { ...snapshot.stack, containers: [] },
-        }),
-        origin: window.location.origin,
-      } as MessageEvent),
+    act(
+      () =>
+        stream.onmessage?.({
+          data: JSON.stringify({
+            ...snapshot,
+            stack: { ...snapshot.stack, containers: [] },
+          }),
+          origin: window.location.origin,
+        } as MessageEvent),
     );
     expect(
       screen.getByText("No services match the current filters."),

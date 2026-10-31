@@ -76,7 +76,6 @@ interface ContainerLogs {
 type ServiceFilter = "all" | "running" | "stopped";
 
 const SERVICE_URLS: Record<string, string> = {
-  tidarr: "https://search.lespedants.org",
   traefik: "https://traefik.lespedants.org",
 };
 
