@@ -1,0 +1,179 @@
+# Append after the project/home compose files; all services require --profile observability.
+# Bind paths resolve from the repository root, where the first compose file lives.
+x-observability: &observability
+  profiles: [observability]
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 128
+  logging:
+    driver: local
+    options:
+      max-size: "10m"
+      max-file: "3"
+  labels:
+    traefik.enable: "false"
+  networks: [observability]
+
+networks:
+  observability:
+    internal: true
+  # Published loopback ports require a non-internal bridge on current Docker.
+  observability-ui: {}
+
+secrets:
+  observability_grafana_password:
+    file: ${OBS_SECRETS_DIR:-/var/lib/crate-observability/secrets}/grafana-admin-password
+  observability_postgres_password:
+    file: ${OBS_SECRETS_DIR:-/var/lib/crate-observability/secrets}/postgres-exporter-password
+  observability_redis_cache_passwords:
+    file: ${OBS_SECRETS_DIR:-/var/lib/crate-observability/secrets}/redis-cache-passwords.json
+  observability_redis_durable_passwords:
+    file: ${OBS_SECRETS_DIR:-/var/lib/crate-observability/secrets}/redis-durable-passwords.json
+
+services:
+  crate-prometheus:
+    <<: *observability
+    image: prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
+    user: "65534:65534"
+    mem_limit: 384m
+    cpus: 0.20
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=90d
+      - --storage.tsdb.retention.size=10GB
+      - --query.max-concurrency=4
+      - --query.timeout=10s
+    volumes:
+      - ./deploy/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ${OBS_DATA_DIR:-/var/lib/crate-observability}/prometheus:/prometheus
+
+  crate-grafana:
+    <<: *observability
+    image: grafana/grafana:13.3.0@sha256:488984b716c0862639f91a698adbe2862677a5a07bad42da5f03f3030883b205
+    user: "472:472"
+    mem_limit: 256m
+    cpus: 0.30
+    ports:
+      - "127.0.0.1:${OBS_GRAFANA_PORT:-3001}:3000"
+    networks: [observability, observability-ui]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/observability_grafana_password
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_UNIFIED_ALERTING_ENABLED: "false"
+      GF_LOG_MODE: console
+    secrets: [observability_grafana_password]
+    volumes:
+      - ./deploy/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/observability/grafana/dashboards:/etc/grafana/dashboards:ro
+      - ${OBS_DATA_DIR:-/var/lib/crate-observability}/grafana:/var/lib/grafana
+    tmpfs: ["/tmp:size=16m,uid=472,gid=472,mode=1777"]
+
+  crate-node-exporter:
+    <<: *observability
+    image: prom/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
+    user: "65534:65534"
+    mem_limit: 32m
+    cpus: 0.05
+    command:
+      - --path.rootfs=/host
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --collector.disable-defaults
+      - --collector.cpu
+      - --collector.meminfo
+      - --collector.loadavg
+      - --collector.filesystem
+      - --collector.diskstats
+      - --collector.stat
+      - --collector.uname
+      - --collector.time
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|var/lib/docker/.+)($|/)
+    volumes:
+      - /:/host:ro,rslave
+
+  crate-postgres-exporter:
+    <<: *observability
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1@sha256:ac5ec343104fae0e2d84a27bb8d69b38430a11910c5382cad85d478d2bab713e
+    user: "65534:65534"
+    mem_limit: 64m
+    cpus: 0.10
+    command:
+      - --collector.stat_statements
+      - --collector.stat_statements.limit=20
+      - --no-collector.stat_statements.include_query
+      - --no-collector.stat_user_tables
+      - --no-collector.statio_user_tables
+      - --no-collector.roles
+    environment:
+      DATA_SOURCE_URI: crate-postgres:5432/${CRATE_POSTGRES_DB:-crate}?sslmode=disable&connect_timeout=3
+      DATA_SOURCE_USER: crate_observer
+      DATA_SOURCE_PASS_FILE: /run/secrets/observability_postgres_password
+      PG_EXPORTER_COLLECTION_TIMEOUT: 5s
+    secrets: [observability_postgres_password]
+    networks: [observability, crate]
+
+  crate-redis-exporter:
+    <<: *observability
+    image: oliver006/redis_exporter:v1.96.0@sha256:3d57b9eb142a62ffc600063606a41cd471cd53d81bed10be5b56b3a8918f2c26
+    user: "65534:65534"
+    mem_limit: 32m
+    cpus: 0.05
+    command:
+      - --redis.addr=redis://crate-redis:6379
+      - --redis.password-file=/run/secrets/observability_redis_cache_passwords
+      - --connection-timeout=3s
+    secrets: [observability_redis_cache_passwords]
+    networks: [observability, crate]
+
+  crate-redis-durable-exporter:
+    <<: *observability
+    image: oliver006/redis_exporter:v1.96.0@sha256:3d57b9eb142a62ffc600063606a41cd471cd53d81bed10be5b56b3a8918f2c26
+    user: "65534:65534"
+    mem_limit: 32m
+    cpus: 0.05
+    command:
+      - --redis.addr=redis://crate-redis-durable:6379
+      - --redis.password-file=/run/secrets/observability_redis_durable_passwords
+      - --connection-timeout=3s
+    secrets: [observability_redis_durable_passwords]
+    networks: [observability, crate]
+
+  crate-cadvisor:
+    <<: *observability
+    image: ghcr.io/google/cadvisor:v0.60.6@sha256:b8e7d1093144fd088f425ff003d75a4aa405de075db78dae3bc563730b1bd07a
+    mem_limit: 128m
+    cpus: 0.20
+    command:
+      - --docker=tcp://crate-observability-docker-proxy:2375
+      - --housekeeping_interval=30s
+      - --docker_only=true
+      - --store_container_labels=false
+      - --whitelisted_container_labels=com.docker.compose.service
+      - --enable_metrics=cpu,memory,diskIO,network
+      - --disable_root_cgroup_stats=true
+    volumes:
+      - /:/rootfs:ro
+      - /sys:/sys:ro
+      - ${OBS_DOCKER_ROOT:-/var/lib/docker}:${OBS_DOCKER_ROOT:-/var/lib/docker}:ro
+    # Hide the host's live sockets even through the root filesystem mount.
+    tmpfs: ["/rootfs/run:size=1m,mode=000"]
+
+  crate-observability-docker-proxy:
+    <<: *observability
+    image: haproxy:3.2.26-alpine@sha256:5893840576071e6217cd52ebdcc14f454c6f7a631056fa6f4e0f40d3cac4215b
+    user: "0:0"
+    mem_limit: 16m
+    cpus: 0.05
+    command: [-f, /usr/local/etc/haproxy/haproxy.cfg]
+    volumes:
+      - ./deploy/observability/docker-proxy.haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    tmpfs: ["/tmp:size=1m,mode=1777"]

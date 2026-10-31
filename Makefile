@@ -1222,6 +1222,31 @@ tauri-collect-artifacts: ## Collect Crate desktop release artifacts into desktop
 	@$(TAURI_DIR)/scripts/collect-artifacts.sh local
 
 # ===========================================================================
+# OPTIONAL OBSERVABILITY (local commands; never SSH or activate implicitly)
+# ===========================================================================
+
+OBS_COMPOSE_FILES ?= docker-compose.yaml docker-compose.project.yaml
+OBS_DC = $(DC) $(foreach f,$(OBS_COMPOSE_FILES),-f $(f)) -f deploy/observability/compose.observability.yaml --profile observability
+OBS_SERVICES := crate-prometheus crate-grafana crate-node-exporter crate-postgres-exporter crate-redis-exporter crate-redis-durable-exporter crate-cadvisor crate-observability-docker-proxy
+
+.PHONY: observability-config observability-pull observability-up observability-stop observability-status
+observability-config: ## Validate optional monitoring compose without starting services
+	@$(OBS_DC) config --quiet
+
+observability-pull: observability-config ## Pull only pinned monitoring images
+	@$(OBS_DC) pull $(OBS_SERVICES)
+
+observability-up: observability-config ## Explicitly start only monitoring (provision secrets first)
+	@test "$$(docker info --format '{{.Driver}}')" = "overlay2" || { echo "Monitoring requires reviewed Docker overlay2 collector support; no services started."; exit 1; }
+	@$(OBS_DC) up -d --no-deps $(OBS_SERVICES)
+
+observability-stop: ## Stop only monitoring; preserve Crate and all data
+	@$(OBS_DC) stop $(OBS_SERVICES)
+
+observability-status: ## Show monitoring service status; verify scrape health separately
+	@$(OBS_DC) ps $(OBS_SERVICES)
+
+# ===========================================================================
 # HELP
 # ===========================================================================
 
