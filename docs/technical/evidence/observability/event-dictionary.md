@@ -30,3 +30,19 @@ IDs stay in bounded event/trace context used for deduplication, not series label
 Proposed SLOs remain review targets rather than achieved claims. Below20 eligible
 attempts in15 minutes, show insufficient coverage for rate-based notifications;
 availability failures and prolonged starvation still need their own rules.
+
+## Functional-flow finding: intent and source support
+
+The2026-10-31 web journey observed Infinite enabled while the last available
+track of a partial pre-release album ended with an empty queue and no radio
+request. The published-album contrast appended30 tracks and advanced naturally.
+Current code removes the radio seed for pre-release albums, then the refill
+runtime rejects sources without radio metadata.
+
+Refill observability must distinguish **user intent** from **runtime support**.
+Record a finite unsupported reason such as missing_seed/prerelease instead of
+silently dropping the episode from eligibility/coverage. A user-requested Infinite
+continuation must not disappear from the denominator merely because metadata or
+source construction failed. Any intentional product exclusion must be explicit
+and reviewed. This evidence proposes instrumentation semantics; it does not
+change the player or recommendation ranking.

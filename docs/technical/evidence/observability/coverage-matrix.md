@@ -46,5 +46,7 @@ The explicit overlayfs adapter passed Linux CI and production readiness. It expo
 1. Application release, effective Compose files, backend DSN presence and supervisor status were observed; see baseline.md. Actual Sentry ingestion/symbolication and an independent watchdog/probe remain unverified.
 2. Six Prometheus targets and PG/Redis dependency health pass. Thirty service groups are exported; four companion services are outside the current relabel allowlist. Decide their inclusion before claiming complete container coverage.
 3. Per-runtime diagnostic event ingestion/symbolication in Sentry and request/queue correlation, using bounded test identifiers.
-4. Short production infrastructure samples are recorded separately. The authenticated20–30minute application flow remains pending; no application performance threshold is claimed from infrastructure-only or Docker Desktop evidence.
+4. Short production infrastructure samples are recorded separately. The authenticated web journey is completed in [functional-review.md](functional-review.md). It establishes observed transitions and transport recovery with declared capture gaps; it does not establish an application SLO or physical audio quality.
 5. Playback/recommendations/Connect/offline/provider coverage gaps remain application work for later PRs. PR0 acceptance must not imply PR1A or QoE improvements are implemented.
+
+The authenticated web journey also exposed unsupported Infinite continuation for partial pre-release albums: source construction omits the seed before the refill support gate. The published-album contrast appended30 tracks. See functional-review.md and the dictionary for intent-versus-support semantics; no recommendation/player code was changed.

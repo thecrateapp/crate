@@ -1,6 +1,6 @@
 # Observability C0 — infrastructure shadow baseline
 
-Status: infrastructure shadow active; C0 acceptance remains pending review and functional verification.
+Status: infrastructure shadow active; C0 acceptance remains pending review and remaining coverage checks. The authenticated web journey is now recorded in [functional-review.md](functional-review.md).
 This record must not be read as a completed C0 acceptance or an application SLO.
 
 ## Approved decisions
@@ -127,11 +127,9 @@ Grafana is reachable only at server 127.0.0.1:3001 through an SSH tunnel.
 
 ## Acceptance still pending
 
-- Review the individual Grafana memory headroom, finite companion-container allowlist and partial CPU/IO rate coverage before treating infrastructure coverage as complete.
+- Review the individual Grafana memory headroom, finite companion-container allowlist and IO coverage before treating infrastructure coverage as complete. The later functional window has complete8/8 CPU/throttle coverage with the existing5-minute dashboard query; the exploratory2-minute calculation remains partial.
 
-- Authenticated20–30 minute user flow: navigation, playback/track change, Infinite
-  refill, client-side controlled network interruption and existing background work.
-  Available browser session is logged out; no synthetic success is claimed.
+- Authenticated web journey completed on2026-10-31,12:10–12:36 CET; see [functional-review.md](functional-review.md) for the published/pre-release contrast, network recovery, measured budget and remaining limitations.
 - Per-runtime Sentry ingestion/symbolication and supervisor delivery verification.
 - Diego's review of baseline, cost, dictionary and the remaining coverage gaps.
 
