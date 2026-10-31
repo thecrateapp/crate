@@ -1240,6 +1240,7 @@ observability-pull: observability-config ## Pull only pinned monitoring images
 observability-up: observability-config ## Explicitly start only monitoring (provision secrets first)
 	@case "$$(docker info --format '{{.Driver}}'):$(OBS_CONTAINERD)" in overlay2:0|overlayfs:1) ;; *) echo "Monitoring requires overlay2 (OBS_CONTAINERD=0) or overlayfs (OBS_CONTAINERD=1); no services started."; exit 1 ;; esac
 ifeq ($(OBS_CONTAINERD),1)
+	@socket_path=$$(readlink -f "$${OBS_CONTAINERD_SOCKET:-/run/containerd/containerd.sock}") && case "$$socket_path" in /run/*) ;; *) echo "Containerd socket must resolve under masked /run; no services started."; exit 1 ;; esac || { echo "Unable to validate containerd socket; no services started."; exit 1; }
 	@$(OBS_DC) up -d --no-deps --wait --wait-timeout 45 crate-observability-docker-proxy
 endif
 	@$(OBS_DC) up -d --no-deps $(OBS_SERVICES)

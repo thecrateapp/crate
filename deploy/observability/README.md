@@ -188,6 +188,10 @@ Two Docker storage backends are supported explicitly: classic **overlay2** with
 `OBS_CONTAINERD=0`, and the containerd image store (**overlayfs**) with
 `OBS_CONTAINERD=1`. `observability-up` refuses a mismatch or any other driver
 before starting services. Record the actual driver/address in C0.
+The containerd socket's canonical host path must be under `/run`, where cAdvisor's
+host rootfs is masked. Make resolves symlinks and refuses paths outside that tree;
+do not bypass this guard with a direct Compose invocation. Alternate socket
+locations require a collector/mount review before activation.
 
 The optional `compose.containerd.yaml` reuses the same proxy, image and resource
 limits. Only that proxy mounts the host containerd socket, with automatic path

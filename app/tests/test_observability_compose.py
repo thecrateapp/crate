@@ -109,6 +109,45 @@ def test_only_grafana_uses_the_non_internal_ui_network():
         assert ("observability-ui" in service["networks"]) is (name == "crate-grafana")
 
 
+def _fake_monitoring_cli(
+    tmp_path,
+    driver,
+    resolved_socket="/run/containerd/containerd.sock",
+    readlink_ok=True,
+):
+    calls = tmp_path / "docker-calls.jsonl"
+    docker = tmp_path / "docker"
+    docker.write_text(
+        f"#!{sys.executable}\n"
+        "import json, os, sys\n"
+        "with open(os.environ['FAKE_DOCKER_LOG'], 'a') as output:\n"
+        "    output.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+        "if sys.argv[1] == 'info':\n"
+        "    print(os.environ['FAKE_DOCKER_DRIVER'])\n"
+        "elif sys.argv[1] != 'compose':\n"
+        "    sys.exit(2)\n"
+    )
+    readlink = tmp_path / "readlink"
+    readlink.write_text(
+        f"#!{sys.executable}\n"
+        "import json, os, sys\n"
+        "with open(os.environ['FAKE_DOCKER_LOG'], 'a') as output:\n"
+        "    output.write(json.dumps(['readlink', *sys.argv[1:]]) + '\\n')\n"
+        "if os.environ['FAKE_READLINK_OK'] != '1':\n"
+        "    sys.exit(1)\n"
+        "print(os.environ['FAKE_RESOLVED_SOCKET'])\n"
+    )
+    docker.chmod(0o755)
+    readlink.chmod(0o755)
+    return calls, {
+        "PATH": str(tmp_path) + os.pathsep + os.defpath,
+        "FAKE_DOCKER_LOG": str(calls),
+        "FAKE_DOCKER_DRIVER": driver,
+        "FAKE_READLINK_OK": str(int(readlink_ok)),
+        "FAKE_RESOLVED_SOCKET": resolved_socket,
+    }
+
+
 @pytest.mark.parametrize(
     "driver,containerd,admitted",
     [
@@ -123,19 +162,7 @@ def test_only_grafana_uses_the_non_internal_ui_network():
 def test_monitoring_start_rejects_unreviewed_storage_drivers(
     tmp_path, driver, containerd, admitted
 ):
-    executable = tmp_path / "docker"
-    calls = tmp_path / "docker-calls.jsonl"
-    executable.write_text(
-        f"#!{sys.executable}\n"
-        "import json, os, sys\n"
-        "with open(os.environ['FAKE_DOCKER_LOG'], 'a') as output:\n"
-        "    output.write(json.dumps(sys.argv[1:]) + '\\n')\n"
-        "if sys.argv[1] == 'info':\n"
-        "    print(os.environ['FAKE_DOCKER_DRIVER'])\n"
-        "elif sys.argv[1] != 'compose':\n"
-        "    sys.exit(2)\n"
-    )
-    executable.chmod(0o755)
+    calls, environment = _fake_monitoring_cli(tmp_path, driver)
     result = subprocess.run(
         [
             shutil.which("make") or "make",
@@ -143,11 +170,7 @@ def test_monitoring_start_rejects_unreviewed_storage_drivers(
             f"OBS_CONTAINERD={int(containerd)}",
         ],
         cwd=ROOT,
-        env={
-            "PATH": str(tmp_path) + os.pathsep + os.defpath,
-            "FAKE_DOCKER_LOG": str(calls),
-            "FAKE_DOCKER_DRIVER": driver,
-        },
+        env=environment,
         capture_output=True,
         text=True,
         timeout=15,
@@ -182,6 +205,54 @@ def test_monitoring_start_rejects_unreviewed_storage_drivers(
                 for command in starts
             )
     else:
+        assert "no services started" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "socket,resolved,readlink_ok,admitted",
+    [
+        (
+            "/run/containerd/containerd.sock",
+            "/run/containerd/containerd.sock",
+            True,
+            True,
+        ),
+        (
+            "/var/lib/containerd/containerd.sock",
+            "/var/lib/containerd/containerd.sock",
+            True,
+            False,
+        ),
+        ("/run/escape.sock", "/opt/containerd.sock", True, False),
+        ("/run/missing.sock", "", False, False),
+    ],
+)
+def test_containerd_start_rejects_socket_paths_outside_masked_run(
+    tmp_path, socket, resolved, readlink_ok, admitted
+):
+    calls, environment = _fake_monitoring_cli(
+        tmp_path, "overlayfs", resolved, readlink_ok
+    )
+    result = subprocess.run(
+        [shutil.which("make") or "make", "observability-up", "OBS_CONTAINERD=1"],
+        cwd=ROOT,
+        env={**environment, "OBS_CONTAINERD_SOCKET": socket},
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    commands = [json.loads(line) for line in calls.read_text().splitlines()]
+    assert ["readlink", "-f", socket] in commands
+    starts = [
+        command for command in commands if command[0] == "compose" and "up" in command
+    ]
+    assert (result.returncode == 0) is admitted, result.stderr
+    if admitted:
+        assert len(starts) == 2
+        assert "--wait" in starts[0] and "crate-observability-docker-proxy" in starts[0]
+        assert "crate-cadvisor" in starts[1]
+    else:
+        assert not starts
         assert "no services started" in result.stdout
 
 
