@@ -506,8 +506,8 @@
     "sourcePath": "docs/technical/smart-mix-operations.md",
     "route": "/operations/smart-mix",
     "section": "operations",
-    "title": "Smart Mix - funcionamiento y operación",
-    "summary": "Perfiles, transiciones, backfill, estados y diagnóstico del Smart Mix implementado, con límites de observación para Crate Agent.",
+    "title": "Smart Mix - how it works and how to operate it",
+    "summary": "Profiles, transitions, backfill, states and diagnostics for the shipped Smart Mix, with the observation limits that apply to Crate Agent.",
     "keywords": [
       "smart mix",
       "backfill",

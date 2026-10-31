@@ -234,8 +234,8 @@ describe("docs app", () => {
   it.each([
     {
       route: "/operations/smart-mix",
-      heading: "Smart Mix: funcionamiento y operación",
-      linkName: "plan de continuación",
+      heading: "Smart Mix: how it works and how to operate it",
+      linkName: "continuation plan",
       linkedRoute: "/developer/smart-mix-continuation",
     },
     {
