@@ -527,6 +527,14 @@ ctest --test-dir build/vdj-headless --output-on-failure
 
 Baseline: 14 tests verdes en headless y 16 con el SDK local. Los nuevos targets deben registrarse en CTest. Los tests en Release usan checks que no desaparecen con `NDEBUG`. Los builds SDK usan `VIRTUALDJ_SDK_ROOT` privado; headers/samples SDK, credenciales y bundles generados no se incorporan a Git.
 
+**Desarrollo contra el stack local.** V02–V06 se desarrollan y prueban contra `make dev` con `test-music`; producción queda para el gate de cada release (X03, V10). El stack ya activa `CRATE_VDJ_ENABLED` y sirve `https://api.dev.lespedants.org` con el certificado de mkcert. Con VirtualDJ cerrado:
+
+```sh
+make vdj-dev VIRTUALDJ_SDK_ROOT=<sdk> VIRTUALDJ_APP=<ruta a VirtualDJ.app>
+```
+
+Compila `Crate.bundle` en Release, lo instala en `PluginsMacArm/OnlineSources` y abre VirtualDJ con `CRATE_VDJ_CA_BUNDLE` apuntando a la CA de mkcert; la verificación TLS sigue activa. El token se crea en Settings de Listen local con los scopes `vdj.*` necesarios y se pega en el diálogo de conexión junto al origen. Los perfiles de Smart Mix requieren `make crate-cli-linux-arm64` antes de construir el analysis worker y un backfill desde Admin. Smoke test: carpetas, búsqueda, carga en deck y carátulas, con todas las peticiones `/api/vdj/*` en 200 en los logs de `crate-dev-api`.
+
 ### VH01 — Gate de host: comprobar en VirtualDJ lo que el SDK no documenta
 
 **Dependencias:** ninguna; bloquea V03, V04 y V06. **Requiere:** VirtualDJ Pro en macOS arm64 abierto por una persona durante unos 15 minutos.
