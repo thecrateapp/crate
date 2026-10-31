@@ -17,7 +17,7 @@ from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
 MediaAudience = Literal["artwork", "stream", "sse", "ws"]
 
 MEDIA_ACCESS_TTL_SECONDS = 60
-ACCESS_TOKEN_MEDIA_TTL_SECONDS = 15 * 60
+ACCESS_TOKEN_MEDIA_TTL_SECONDS = 12 * 60 * 60
 _KEY_PREFIX = "media-access:v1:"
 _VALID_AUDIENCES = frozenset({"artwork", "stream", "sse", "ws"})
 _memory_lock = threading.Lock()
