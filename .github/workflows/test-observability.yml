@@ -46,7 +46,7 @@ jobs:
         run: |
           test "$RUNNER_ENVIRONMENT" = "github-hosted"
           if [ "$(docker info --format '{{.Driver}}')" = "overlayfs" ]; then
-            sudo python - <<'PY'
+            sudo python3 - <<'PY'
           import json
           from pathlib import Path
           path = Path("/etc/docker/daemon.json")
