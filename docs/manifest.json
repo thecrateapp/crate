@@ -476,8 +476,8 @@
     "sourcePath": "docs/technical/smart-mix-design.md",
     "route": "/architecture/smart-mix",
     "section": "architecture",
-    "title": "Smart Mix - diseño unificado",
-    "summary": "Contrato y arquitectura para terminar Smart Mix, crossfade Android nativo y VirtualDJ desde el WIP existente.",
+    "title": "Smart Mix, native Android crossfade and VirtualDJ: unified design",
+    "summary": "Contract and architecture for finishing Smart Mix, native Android crossfade and VirtualDJ from the existing WIP.",
     "keywords": [
       "smart mix",
       "crossfade",
@@ -491,8 +491,8 @@
     "sourcePath": "docs/technical/smart-mix-implementation-plan.md",
     "route": "/developer/smart-mix-continuation",
     "section": "developer",
-    "title": "Smart Mix - plan de continuación",
-    "summary": "Tareas, dependencias, pruebas y gates para completar la feature unificada desde su estado WIP.",
+    "title": "Smart Mix, native Android and VirtualDJ: continuation plan",
+    "summary": "Tasks, dependencies, tests and gates to complete the unified feature from its WIP state.",
     "keywords": [
       "smart mix",
       "crossfade",

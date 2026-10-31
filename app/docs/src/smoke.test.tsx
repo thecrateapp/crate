@@ -241,14 +241,14 @@ describe("docs app", () => {
     {
       route: "/architecture/smart-mix",
       heading:
-        "Smart Mix, crossfade Android nativo y VirtualDJ: diseño unificado",
-      linkName: "plan de implementación",
+        "Smart Mix, native Android crossfade and VirtualDJ: unified design",
+      linkName: "implementation plan",
       linkedRoute: "/developer/smart-mix-continuation",
     },
     {
       route: "/developer/smart-mix-continuation",
-      heading: "Smart Mix, Android nativo y VirtualDJ: plan de continuación",
-      linkName: "diseño unificado",
+      heading: "Smart Mix, native Android and VirtualDJ: continuation plan",
+      linkName: "unified design",
       linkedRoute: "/architecture/smart-mix",
     },
   ])(
