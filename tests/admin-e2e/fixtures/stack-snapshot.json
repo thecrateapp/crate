@@ -30,12 +30,12 @@
         "ports": []
       },
       {
-        "id": "sample-tidarr",
-        "name": "tidarr",
-        "image": "tidarr:sample",
+        "id": "sample-traefik",
+        "name": "traefik",
+        "image": "traefik:sample",
         "state": "running",
         "status": "Up 3 hours",
-        "ports": ["8686/tcp"]
+        "ports": ["443/tcp"]
       }
     ]
   }

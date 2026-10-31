@@ -359,11 +359,23 @@ def assemble_manifest(
     return manifest
 
 
+SENTRY_RELEASE_ENVIRONMENTS = {
+    "api": "CRATE_API_SENTRY_RELEASE",
+    "readplane": "CRATE_READPLANE_SENTRY_RELEASE",
+    "worker": "CRATE_WORKER_SENTRY_RELEASE",
+    "analysis-worker": "CRATE_ANALYSIS_WORKER_SENTRY_RELEASE",
+    "playback-worker": "CRATE_PLAYBACK_WORKER_SENTRY_RELEASE",
+    "media-worker": "CRATE_MEDIA_WORKER_SENTRY_RELEASE",
+}
+
+
 def render_release_env(manifest: dict) -> str:
     validate_manifest(manifest)
     lines = [f"CRATE_RELEASE_SHA={manifest['release_sha']}"]
     for name, entry in _image_entries(manifest):
         lines.append(f"{entry['environment']}={entry['repository']}@{entry['digest']}")
+    for name, environment in SENTRY_RELEASE_ENVIRONMENTS.items():
+        lines.append(f"{environment}=crate-{manifest['images'][name]['source_sha']}")
     return "\n".join(lines) + "\n"
 
 

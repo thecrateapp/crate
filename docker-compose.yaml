@@ -86,42 +86,6 @@ services:
       traefik.http.routers.traefik-secure.entryPoints: websecure
       traefik.http.routers.traefik-secure.service: api@internal
 
-  tidarr:
-    logging: *default-logging
-    image: cstaelen/tidarr:latest
-    container_name: tidarr
-    restart: unless-stopped
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-      # Auth disabled — Crate handles access via Traefik middleware
-      - ENABLE_BEETS=true
-      - REACT_APP_TIDAL_COUNTRY_CODE=${TIDAL_COUNTRY_CODE:-ES}
-    volumes:
-      - ${DATA_DIR}/tidarr:/home/app/standalone/shared
-      - ${MEDIA_DIR}/downloads/tidal/incomplete:/home/app/standalone/download/incomplete
-      - ${MEDIA_DIR}/downloads/tidal/albums:/home/app/standalone/download/albums
-      - ${MEDIA_DIR}/downloads/tidal/tracks:/home/app/standalone/download/tracks
-      - ${MEDIA_DIR}/downloads/tidal/playlists:/home/app/standalone/download/playlists
-      - ${MEDIA_DIR}/music:/home/app/standalone/library
-      - ${MEDIA_DIR}/music:/music
-      - ${MEDIA_DIR}/downloads/tidal/videos:/home/app/standalone/download/videos
-    ports:
-      - "${TIDARR_PORT}:8484"
-    networks:
-      - crate
-    labels:
-      traefik.enable: true
-      traefik.docker.network: crate
-      traefik.http.routers.tidarr.rule: Host(`search.${DOMAIN}`)
-      traefik.http.routers.tidarr.entryPoints: websecure
-      traefik.http.routers.tidarr.tls: true
-      traefik.http.routers.tidarr.tls.certresolver: letsencrypt
-      traefik.http.routers.tidarr.middlewares: crate-auth-soft@docker
-      traefik.http.services.tidarr.loadbalancer.server.port: 8484
-      traefik.http.services.tidarr.loadbalancer.server.scheme: http
-
   nginx:
     logging: *default-logging
     image: nginx:alpine
@@ -330,7 +294,7 @@ services:
       - CRATE_MCP_HEALTH_STALE_SECONDS=${CRATE_MCP_HEALTH_STALE_SECONDS:-604800}
       - SENTRY_DSN=${SENTRY_API_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
-      - SENTRY_RELEASE=${SENTRY_RELEASE:-}
+      - SENTRY_RELEASE=${CRATE_API_SENTRY_RELEASE:-${SENTRY_RELEASE:-}}
       - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
       - SENTRY_PROFILES_SAMPLE_RATE=${SENTRY_PROFILES_SAMPLE_RATE:-0}
       - CRATE_CONFIG=/app/config.yaml
@@ -479,7 +443,7 @@ services:
       - READPLANE_ADDR=:8686
       - SENTRY_DSN=${SENTRY_READPLANE_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
-      - SENTRY_RELEASE=${SENTRY_RELEASE:-}
+      - SENTRY_RELEASE=${CRATE_READPLANE_SENTRY_RELEASE:-${SENTRY_RELEASE:-}}
       - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
       - SENTRY_PROFILES_SAMPLE_RATE=${SENTRY_PROFILES_SAMPLE_RATE:-0}
       - CRATE_POSTGRES_USER=${CRATE_POSTGRES_USER}
@@ -584,7 +548,7 @@ services:
       - SENTRY_SERVICE=worker-default
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
-      - SENTRY_RELEASE=${SENTRY_RELEASE:-}
+      - SENTRY_RELEASE=${CRATE_WORKER_SENTRY_RELEASE:-${SENTRY_RELEASE:-}}
       - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
       - SENTRY_PROFILES_SAMPLE_RATE=${SENTRY_PROFILES_SAMPLE_RATE:-0}
       - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_WORKER_POSTGRES_STATEMENT_TIMEOUT_MS:-900000}
@@ -734,7 +698,7 @@ services:
       - SENTRY_SERVICE=projector
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
-      - SENTRY_RELEASE=${SENTRY_RELEASE:-}
+      - SENTRY_RELEASE=${CRATE_WORKER_SENTRY_RELEASE:-${SENTRY_RELEASE:-}}
       - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
       - SENTRY_PROFILES_SAMPLE_RATE=${SENTRY_PROFILES_SAMPLE_RATE:-0}
       - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_PROJECTOR_POSTGRES_STATEMENT_TIMEOUT_MS:-30000}
@@ -794,7 +758,7 @@ services:
       - SENTRY_SERVICE=worker-maintenance
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
-      - SENTRY_RELEASE=${SENTRY_RELEASE:-}
+      - SENTRY_RELEASE=${CRATE_WORKER_SENTRY_RELEASE:-${SENTRY_RELEASE:-}}
       - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
       - SENTRY_PROFILES_SAMPLE_RATE=${SENTRY_PROFILES_SAMPLE_RATE:-0}
       - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_WORKER_POSTGRES_STATEMENT_TIMEOUT_MS:-900000}
@@ -922,7 +886,7 @@ services:
       - SENTRY_SERVICE=worker-analysis
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
-      - SENTRY_RELEASE=${SENTRY_RELEASE:-}
+      - SENTRY_RELEASE=${CRATE_ANALYSIS_WORKER_SENTRY_RELEASE:-${SENTRY_RELEASE:-}}
       - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
       - SENTRY_PROFILES_SAMPLE_RATE=${SENTRY_PROFILES_SAMPLE_RATE:-0}
       - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_WORKER_POSTGRES_STATEMENT_TIMEOUT_MS:-900000}
@@ -1008,7 +972,7 @@ services:
       - SENTRY_SERVICE=worker-playback
       - SENTRY_DSN=${SENTRY_WORKERS_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
-      - SENTRY_RELEASE=${SENTRY_RELEASE:-}
+      - SENTRY_RELEASE=${CRATE_PLAYBACK_WORKER_SENTRY_RELEASE:-${SENTRY_RELEASE:-}}
       - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
       - SENTRY_PROFILES_SAMPLE_RATE=${SENTRY_PROFILES_SAMPLE_RATE:-0}
       - CRATE_POSTGRES_STATEMENT_TIMEOUT_MS=${CRATE_WORKER_POSTGRES_STATEMENT_TIMEOUT_MS:-900000}
@@ -1086,7 +1050,7 @@ services:
       - CRATE_MEDIA_WORKER_ADDR=0.0.0.0:8687
       - SENTRY_DSN=${SENTRY_MEDIA_WORKER_DSN:-}
       - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-production}
-      - SENTRY_RELEASE=${SENTRY_RELEASE:-}
+      - SENTRY_RELEASE=${CRATE_MEDIA_WORKER_SENTRY_RELEASE:-${SENTRY_RELEASE:-}}
       - SENTRY_TRACES_SAMPLE_RATE=${SENTRY_TRACES_SAMPLE_RATE:-0.1}
       - SENTRY_PROFILES_SAMPLE_RATE=${SENTRY_PROFILES_SAMPLE_RATE:-0}
       - REDIS_URL=${REDIS_DURABLE_URL:-redis://:${REDIS_PASSWORD}@crate-redis-durable:6379/0}

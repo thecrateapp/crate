@@ -7,6 +7,7 @@ on:
       - "deploy/observability/**"
       - "app/tests/test_observability_compose.py"
       - "app/tests/test_observability_containerd.py"
+      - "app/tests/test_observability_c0_retirement.py"
       - "app/tests/test_observability_runtime.py"
       - ".github/workflows/test-observability.yml"
       - "docker-compose*.yaml"
@@ -18,6 +19,7 @@ on:
       - "deploy/observability/**"
       - "app/tests/test_observability_compose.py"
       - "app/tests/test_observability_containerd.py"
+      - "app/tests/test_observability_c0_retirement.py"
       - "app/tests/test_observability_runtime.py"
       - ".github/workflows/test-observability.yml"
       - "docker-compose*.yaml"
@@ -72,7 +74,7 @@ jobs:
           test "$(docker info --format '{{.Driver}}')" = "$STORAGE_DRIVER"
       - name: Validate overlay isolation, resources, dashboards and profile combinations
         # These tests use only the Compose parser, not Crate's DB/application fixtures.
-        run: python -m pytest --noconftest app/tests/test_observability_compose.py app/tests/test_observability_containerd.py -q
+        run: python -m pytest --noconftest app/tests/test_observability_compose.py app/tests/test_observability_containerd.py app/tests/test_observability_c0_retirement.py -q
       - name: Check Prometheus configuration with its pinned release
         run: |
           image="$(python -c 'import yaml; print(yaml.safe_load(open("deploy/observability/compose.observability.yaml"))["services"]["crate-prometheus"]["image"])')"

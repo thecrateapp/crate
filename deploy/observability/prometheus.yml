@@ -23,7 +23,7 @@ scrape_configs:
     sample_limit: 10000
     metric_relabel_configs:
       - source_labels: [container_label_com_docker_compose_service]
-        regex: crate-.+
+        regex: (crate-.+|nginx|traefik|slskd)
         action: keep
 
   - job_name: postgresql

@@ -78,6 +78,14 @@ RELEASE_ENV_KEYS=(
   CRATE_SITE_IMAGE
   CRATE_DOCS_IMAGE
 )
+SENTRY_RELEASE_ENV_KEYS=(
+  CRATE_API_SENTRY_RELEASE
+  CRATE_READPLANE_SENTRY_RELEASE
+  CRATE_WORKER_SENTRY_RELEASE
+  CRATE_ANALYSIS_WORKER_SENTRY_RELEASE
+  CRATE_PLAYBACK_WORKER_SENTRY_RELEASE
+  CRATE_MEDIA_WORKER_SENTRY_RELEASE
+)
 # Agent images are optional: older manifests do not carry them. A deployment
 # only recreates a Crate Agent that is already running.
 OPTIONAL_RELEASE_ENV_KEYS=(
@@ -202,7 +210,7 @@ set_env_value() {
 is_release_env_key() {
   local candidate="$1"
   local key
-  for key in "${RELEASE_ENV_KEYS[@]}" "${OPTIONAL_RELEASE_ENV_KEYS[@]}"; do
+  for key in "${RELEASE_ENV_KEYS[@]}" "${OPTIONAL_RELEASE_ENV_KEYS[@]}" "${SENTRY_RELEASE_ENV_KEYS[@]}"; do
     [[ "$candidate" == "$key" ]] && return 0
   done
   return 1
@@ -227,6 +235,8 @@ validate_release_env_file() {
     fi
     if [[ "$key" == "CRATE_RELEASE_SHA" ]]; then
       [[ "$value" =~ ^[0-9a-f]{40}$ ]] || return 1
+    elif [[ "$key" == CRATE_*_SENTRY_RELEASE ]]; then
+      [[ "$value" =~ ^crate-[0-9a-f]{40}$ ]] || return 1
     elif [[ ! "$value" =~ ^[^[:space:]]+@sha256:[0-9a-f]{64}$ ]]; then
       log "Release image reference is not immutable: ${key}"
       return 1
@@ -247,6 +257,11 @@ apply_release_env() {
   local value
 
   validate_release_env_file "$file"
+  for key in "${SENTRY_RELEASE_ENV_KEYS[@]}"; do
+    if ! grep -q "^${key}=" "$file"; then
+      set_env_value "$key" ""
+    fi
+  done
   while IFS='=' read -r key value; do
     [[ -n "$key" ]] && set_env_value "$key" "$value"
   done < "$file"
@@ -404,6 +419,12 @@ cmd_release_preflight() {
 
   log "Validating candidate compose with the production environment"
   CRATE_RELEASE_SHA="$release_sha" \
+  CRATE_API_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_API_SENTRY_RELEASE)" \
+  CRATE_READPLANE_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_READPLANE_SENTRY_RELEASE)" \
+  CRATE_WORKER_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_WORKER_SENTRY_RELEASE)" \
+  CRATE_ANALYSIS_WORKER_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_ANALYSIS_WORKER_SENTRY_RELEASE)" \
+  CRATE_PLAYBACK_WORKER_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_PLAYBACK_WORKER_SENTRY_RELEASE)" \
+  CRATE_MEDIA_WORKER_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_MEDIA_WORKER_SENTRY_RELEASE)" \
   CRATE_API_IMAGE="$(env_file_value "$release_env" CRATE_API_IMAGE)" \
   CRATE_READPLANE_IMAGE="$(env_file_value "$release_env" CRATE_READPLANE_IMAGE)" \
   CRATE_WORKER_IMAGE="$(env_file_value "$release_env" CRATE_WORKER_IMAGE)" \
@@ -801,6 +822,15 @@ record_changed_release_services() {
     fi
     printf '%s\n' "$new_ref" >> "$BACKUP_DIR/changed_image_refs"
     read -r -a services <<< "${RELEASE_ENV_SERVICES[$key]}"
+    for service in "${services[@]}"; do
+      printf '%s\n' "$service" >> "$BACKUP_DIR/changed_services"
+    done
+  done
+  for key in "${SENTRY_RELEASE_ENV_KEYS[@]}"; do
+    new_ref="$(env_file_value "$candidate_env" "$key")"
+    old_ref="$(env_file_value "$old_env" "$key")"
+    [[ "$new_ref" != "$old_ref" ]] || continue
+    read -r -a services <<< "${RELEASE_ENV_SERVICES[${key%_SENTRY_RELEASE}_IMAGE]}"
     for service in "${services[@]}"; do
       printf '%s\n' "$service" >> "$BACKUP_DIR/changed_services"
     done
