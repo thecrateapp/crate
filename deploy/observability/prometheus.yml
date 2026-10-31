@@ -1,0 +1,48 @@
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+  evaluation_interval: 30s
+  external_labels:
+    app: crate
+
+# PR0 is infrastructure-only and shadow-only: no alert receivers or application targets.
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: [crate-prometheus:9090]
+    sample_limit: 5000
+
+  - job_name: node
+    static_configs:
+      - targets: [crate-node-exporter:9100]
+    sample_limit: 5000
+
+  - job_name: cadvisor
+    static_configs:
+      - targets: [crate-cadvisor:8080]
+    sample_limit: 10000
+    metric_relabel_configs:
+      - source_labels: [container_label_com_docker_compose_service]
+        regex: crate-.+
+        action: keep
+
+  - job_name: postgresql
+    # Query statistics are more expensive than host/Redis counters.
+    scrape_interval: 60s
+    static_configs:
+      - targets: [crate-postgres-exporter:9187]
+    sample_limit: 5000
+
+  - job_name: redis-cache
+    static_configs:
+      - targets: [crate-redis-exporter:9121]
+        labels:
+          redis_role: cache
+    sample_limit: 3000
+
+  - job_name: redis-durable
+    static_configs:
+      - targets: [crate-redis-durable-exporter:9121]
+        labels:
+          redis_role: durable
+    sample_limit: 3000

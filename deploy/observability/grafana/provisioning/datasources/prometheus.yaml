@@ -1,0 +1,11 @@
+apiVersion: 1
+datasources:
+  - name: Crate Prometheus
+    uid: crate-prometheus
+    type: prometheus
+    access: proxy
+    url: http://crate-prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 30s
