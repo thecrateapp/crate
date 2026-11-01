@@ -218,7 +218,7 @@ def _percentile(values: list[float], percentile: float) -> float:
 
 def _route_id(target: str, method: str, path: str) -> str:
     payload = f"{target}\0{method}\0{path}".encode("utf-8", errors="replace")
-    return hashlib.sha1(payload).hexdigest()[:16]
+    return hashlib.sha1(payload, usedforsecurity=False).hexdigest()[:16]
 
 
 # ── Recording ────────────────────────────────────────────────────

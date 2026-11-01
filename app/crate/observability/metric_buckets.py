@@ -251,7 +251,7 @@ return 0
 
 
 def _eval(redis, script: str, keys: list[str], args: list):
-    digest = hashlib.sha1(script.encode()).hexdigest()
+    digest = hashlib.sha1(script.encode(), usedforsecurity=False).hexdigest()
     try:
         return redis.evalsha(digest, len(keys), *keys, *args)
     except NoScriptError:
