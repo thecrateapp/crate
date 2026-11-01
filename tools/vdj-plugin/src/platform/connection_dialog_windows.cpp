@@ -132,7 +132,10 @@ ConnectionDialogResult show_connection_dialog(const ConnectionDialogRequest& req
     add_control(window, L"STATIC", to_wide(kConnectionDialogExplanation).c_str(), 0, 0, 16, 12, 420, 48);
     add_control(window, L"STATIC", L"Server address", 0, 0, 16, 66, 420, 18);
     add_control(window, L"EDIT", to_wide(request.current_origin).c_str(), ES_AUTOHSCROLL, kOriginId, 16, 86, 420, 24);
-    add_control(window, L"STATIC", L"Access token", 0, 0, 16, 116, 420, 18);
+    const std::wstring token_label = request.current_origin.empty()
+        ? L"Access token"
+        : L"Access token (" + to_wide(kSavedTokenHint) + L")";
+    add_control(window, L"STATIC", token_label.c_str(), 0, 0, 16, 116, 420, 18);
     add_control(window, L"EDIT", L"", ES_AUTOHSCROLL | ES_PASSWORD, kTokenId, 16, 136, 420, 24);
     add_control(window, L"BUTTON", L"Connect", BS_DEFPUSHBUTTON, kConnectId, 236, 176, 96, 28);
     add_control(window, L"BUTTON", L"Cancel", BS_PUSHBUTTON, kCancelId, 340, 176, 96, 28);

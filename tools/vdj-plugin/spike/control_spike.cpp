@@ -890,7 +890,7 @@ private:
                 clients_->credentials == credentials) {
                 return;
             }
-            next = std::make_shared<ServerClients>(http_, credentials, *origin, &metadata_cache_);
+            next = std::make_shared<ServerClients>(server_http_, credentials, *origin, &metadata_cache_);
             clients_ = std::move(next);
             return;
         }
@@ -960,6 +960,13 @@ private:
     }
 
     CurlHttpClient http_;
+    UnauthorizedObserverHttpClient server_http_{
+        http_,
+        [this] {
+            trace("server rejected the access token; checking the session");
+            connection_.request_check();
+        },
+    };
     MetadataCacheStore metadata_cache_;
     FileConnectionSettingsStore settings_;
     ConnectionSession session_;

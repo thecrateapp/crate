@@ -3,6 +3,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -100,6 +101,17 @@ public:
 class CurlHttpClient final : public HttpClient {
 public:
     HttpResult request(const HttpRequest& request) override;
+};
+
+class UnauthorizedObserverHttpClient final : public HttpClient {
+public:
+    UnauthorizedObserverHttpClient(HttpClient& inner, std::function<void()> on_unauthorized);
+
+    HttpResult request(const HttpRequest& request) override;
+
+private:
+    HttpClient& inner_;
+    std::function<void()> on_unauthorized_;
 };
 
 bool is_allowed_origin(std::string_view url, std::string_view allowed_origin);
