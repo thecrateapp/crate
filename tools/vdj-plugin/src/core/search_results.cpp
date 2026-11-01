@@ -54,7 +54,9 @@ bool parse_track_json(const json::Value& item, SearchTrack& track)
         json::optional_string(item, "audio_key", track.audio_key) &&
         json::optional_string(item, "audio_scale", track.audio_scale) &&
         json::optional_boolean(item, "has_cover", track.has_cover) &&
-        json::optional_string(item, "cover_url", track.cover_url);
+        json::optional_string(item, "cover_url", track.cover_url) &&
+        json::optional_string(item, "camelot", track.camelot) &&
+        json::optional_number(item, "energy", track.energy);
 }
 
 } // namespace detail

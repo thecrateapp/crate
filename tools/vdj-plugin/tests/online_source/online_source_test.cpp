@@ -1,4 +1,5 @@
 #include "crate_vdj/online_source.hpp"
+#include "crate_vdj/translations.hpp"
 
 #include "../support/check.hpp"
 #include "../support/connection_fakes.hpp"
@@ -33,6 +34,52 @@ constexpr const char* kSearchJson = R"json({
         "album": "Gris Klein",
         "duration": 193.5,
         "cover_url": "/api/vdj/albums/3/cover?size=512"
+    }]
+})json";
+
+constexpr const char* kProfiledSearchJson = R"json({
+    "artists": [],
+    "albums": [],
+    "tracks": [{
+        "entity_uid": "track-1",
+        "title": "Noah",
+        "artist": "Birds In Row",
+        "album": "Gris Klein",
+        "duration": 193.5,
+        "bpm": 121.0,
+        "audio_key": "C",
+        "audio_scale": "major",
+        "camelot": "8A",
+        "energy": 0.72
+    }]
+})json";
+
+constexpr const char* kCompatibleJson = R"json({
+    "seedTrackEntityUid": "seed-1",
+    "scope": "local",
+    "plannerVersion": "smart-mix-v2",
+    "context": "auto",
+    "items": [{
+        "trackId": 8,
+        "trackEntityUid": "track-2",
+        "title": "Torches",
+        "artist": "Birds In Row",
+        "album": "Gris Klein",
+        "score": 0.91,
+        "confidence": 0.9,
+        "scoreBreakdown": {
+            "plannerVersion": 2, "overall": 0.91, "signalConfidence": 0.9, "tempo": 1.0,
+            "harmonic": 1.0, "harmonicRelationship": "same", "energy": 0.9,
+            "danceability": 0.9, "valence": 0.9, "bliss": 0.8, "genre": 1.0
+        },
+        "fallbackReasons": [],
+        "duration": 201.5,
+        "bpm": 122.0,
+        "camelot": "9B",
+        "energy": 0.64,
+        "year": "2022",
+        "genre": "Post-hardcore",
+        "coverUrl": "/api/vdj/albums/3/cover?size=512"
     }]
 })json";
 
@@ -418,6 +465,68 @@ void a_ready_track_resolves_to_a_ticketed_stream()
     CRATE_CHECK(resolved.error.empty());
 }
 
+void search_tracks_show_camelot_and_energy()
+{
+    Harness harness;
+    harness.http.route("/api/search?q=noah", kProfiledSearchJson);
+    RecordingSink sink;
+
+    CRATE_CHECK(harness.source->search("noah", sink) == CallbackStatus::Done);
+
+    CRATE_CHECK(sink.tracks.size() == 1);
+    CRATE_CHECK(sink.tracks[0].bpm == 121.0f);
+    CRATE_CHECK(sink.tracks[0].key == vdj_key_from_camelot("8A"));
+    CRATE_CHECK(sink.tracks[0].comment == "Gris Klein \u00b7 8A \u00b7 Energy 72%");
+}
+
+void compatible_tracks_show_crate_fields()
+{
+    Harness harness;
+    harness.http.route("/api/tracks/by-entity/seed-1/compatible", kCompatibleJson);
+    RecordingSink sink;
+
+    CRATE_CHECK(harness.source->folder("crate:compatible:seed-1", sink) == CallbackStatus::Done);
+
+    CRATE_CHECK(sink.tracks.size() == 1);
+    const auto& track = sink.tracks[0];
+    CRATE_CHECK(track.unique_id == "track-2");
+    CRATE_CHECK(track.duration_seconds == 201.5f);
+    CRATE_CHECK(track.bpm == 122.0f);
+    CRATE_CHECK(track.key == vdj_key_from_camelot("9B"));
+    CRATE_CHECK(track.year == 2022);
+    CRATE_CHECK(track.genre == "Post-hardcore");
+    CRATE_CHECK(track.cover_url == std::string(kOrigin) + "/api/vdj/albums/3/cover?size=512");
+    CRATE_CHECK(track.comment == "Gris Klein \u00b7 9B \u00b7 Energy 64% \u00b7 Match 91%");
+}
+
+void a_seed_without_profile_shows_a_notice()
+{
+    Harness harness;
+    harness.http.fail("/api/tracks/by-entity/seed-1/compatible", 404);
+    RecordingSink sink;
+
+    CRATE_CHECK(harness.source->folder("crate:compatible:seed-1", sink) == CallbackStatus::Done);
+
+    CRATE_CHECK(sink.finishes == 1);
+    CRATE_CHECK(sink.tracks.size() == 1);
+    CRATE_CHECK(sink.tracks[0].unique_id == kNoProfileNoticeId);
+    CRATE_CHECK(sink.tracks[0].title == no_profile_notice_label("English"));
+
+    const auto notice = harness.source->stream_url(std::string(kNoProfileNoticeId));
+    CRATE_CHECK(!notice.url.has_value());
+    CRATE_CHECK(notice.error == no_profile_notice_label("English"));
+}
+
+void camelot_keys_map_to_virtualdj_keys()
+{
+    CRATE_CHECK(vdj_key_from_camelot("8A") == vdj_key_number("A", "minor"));
+    CRATE_CHECK(vdj_key_from_camelot("8B") == vdj_key_number("C", "major"));
+    CRATE_CHECK(vdj_key_from_camelot("1A") == vdj_key_number("G#", "minor"));
+    CRATE_CHECK(vdj_key_from_camelot("12B") == vdj_key_number("E", "major"));
+    CRATE_CHECK(vdj_key_from_camelot("13A") == 0);
+    CRATE_CHECK(vdj_key_from_camelot("") == 0);
+}
+
 void keys_and_cover_urls_map_to_virtualdj()
 {
     CRATE_CHECK(vdj_key_number("C", "major") == 16);
@@ -446,5 +555,9 @@ int main()
     names_with_quotes_fall_back_to_a_text_search();
     a_track_that_cannot_load_says_why();
     a_ready_track_resolves_to_a_ticketed_stream();
+    search_tracks_show_camelot_and_energy();
+    compatible_tracks_show_crate_fields();
+    a_seed_without_profile_shows_a_notice();
+    camelot_keys_map_to_virtualdj_keys();
     keys_and_cover_urls_map_to_virtualdj();
 }
