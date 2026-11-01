@@ -69,11 +69,15 @@ class ActivitySampler:
         }
         return counts, bool(rows.incomplete)
 
-    def _deltas(self, current: dict[tuple[str, str, int], int]):
+    def _deltas(
+        self,
+        previous: dict[tuple[str, str, int], int],
+        current: dict[tuple[str, str, int], int],
+    ):
         requests: dict[str, dict[str, int]] = {}
         queues: dict[str, dict[str, int]] = {}
         for identity, count in current.items():
-            delta = count - self._previous.get(identity, 0)
+            delta = count - previous.get(identity, 0)
             if delta <= 0:
                 continue
             key, raw_tags, _minute = identity
@@ -105,16 +109,17 @@ class ActivitySampler:
         try:
             current, incomplete = self._read_counts()
             sources["metrics"] = "partial" if incomplete else "available"
-            stalled = (
-                self._previous_at is not None
-                and now - self._previous_at > MAX_FRAME_GAP_SECONDS
-            )
-            if self._previous is None or stalled:
+            previous, previous_at = self._previous, self._previous_at
+            if (
+                previous is None
+                or previous_at is None
+                or now - previous_at > MAX_FRAME_GAP_SECONDS
+            ):
                 warming = True
                 sources["metrics"] = "warming"
             else:
-                requests, queues = self._deltas(current)
-                window = now - self._previous_at
+                requests, queues = self._deltas(previous, current)
+                window = now - previous_at
             self._previous, self._previous_at = current, now
         except Exception:
             log.debug("Live activity metrics read failed", exc_info=True)
