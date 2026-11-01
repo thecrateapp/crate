@@ -82,48 +82,11 @@ native Online Source integration is completed.
 
 ## Local Crate pilot
 
-The first pilot targets the development API, never production:
-
-```text
-https://api.dev.lespedants.org
-```
-
-The local compose stack enables `CRATE_VDJ_ENABLED` and
-`CRATE_SMART_MIX_ENABLED`, while keeping automation disabled. Discover the
-server contract with `GET /api/capabilities`, then send the opaque VDJ token
-as a Bearer token to the scoped endpoints. The token is created from an
-interactive Listen session through `POST /api/auth/access-tokens`; the raw
-secret is returned only on creation/rotation and must be stored in the system
-credential store.
-
-For the development readplane overlay, Bearer tokens with the `crv_` prefix
-are routed to FastAPI so the pilot exercises the real access-token resolver.
-This routing is intentionally local to `data/caddy/Caddyfile.readplane.dev`.
-
-On macOS, seed the token into Keychain without putting it in a file:
-
-```sh
-security add-generic-password -U \
-  -s org.cratemusic.virtualdj \
-  -a access-token \
-  -w
-```
-
-The command prompts for the opaque token. For the local pilot, trust the
-current Caddy development CA and launch VirtualDJ with the development origin
-configured:
-
-```sh
-docker cp crate-dev-caddy:/data/caddy/pki/authorities/local/root.crt /tmp/caddy-root.crt
-launchctl setenv CRATE_VDJ_CA_BUNDLE /tmp/caddy-root.crt
-launchctl setenv CRATE_VDJ_API_ORIGIN https://api.dev.lespedants.org
-open -a /Applications/VirtualDJ-dev/VirtualDJ.app
-```
-
-`CRATE_VDJ_CA_BUNDLE` is only needed for the local Caddy certificate. It keeps
-TLS verification enabled by explicitly adding the current development CA to
-the native libcurl client. Do not disable certificate verification or set this
-variable for production origins.
+Develop against the local stack (`make dev`), never production. With VirtualDJ
+closed, `make vdj-dev VIRTUALDJ_SDK_ROOT=<sdk> VIRTUALDJ_APP=<VirtualDJ.app>`
+builds and installs `Crate.bundle` and opens VirtualDJ trusting the mkcert
+development CA through `CRATE_VDJ_CA_BUNDLE`. The current steps live in §6 of
+the [implementation plan](../../docs/technical/smart-mix-implementation-plan.md).
 
 ## Metadata cache
 
