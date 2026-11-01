@@ -320,7 +320,7 @@ export function StackMap({
       <header className="stack-map__host">
         <div className="stack-map__identity">
           <MonoLabel tone="accent">Host topology</MonoLabel>
-          <h2>{snapshot.host.name}</h2>
+          <h2 className="stack-map__host-name">{snapshot.host.name}</h2>
           <p>
             {snapshot.host.address} <span>·</span> {snapshot.stacks.length}{" "}
             independent deployments <span>·</span> {snapshot.services.length}{" "}
@@ -429,7 +429,7 @@ export function StackMap({
                   className="stack-map__field-caption"
                   data-kind={field.kind}
                 >
-                  <h3>{field.name}</h3>
+                  <h3 className="stack-map__field-name">{field.name}</h3>
                   <p className="stack-map__field-count">
                     <strong>{summary?.total ?? 0}</strong>
                     <span>services · {field.revision}</span>
@@ -686,7 +686,7 @@ export function StackMap({
           {selected ? (
             <>
               <MonoLabel tone="accent">Selected service</MonoLabel>
-              <h3>{selected.label}</h3>
+              <h3 className="stack-map__service-name">{selected.label}</h3>
               <p className="stack-map__description">{selected.description}</p>
               <div className="stack-map__service-state">
                 <InfoBadge tone={health === "unhealthy" ? "danger" : "neutral"}>
