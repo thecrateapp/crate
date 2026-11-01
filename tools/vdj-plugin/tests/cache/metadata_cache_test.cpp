@@ -26,6 +26,9 @@ crate::vdj::SearchResults sample_search_results(
         .audio_scale = "m",
         .has_cover = true,
         .cover_url = std::move(cover_url),
+        .camelot = "11A",
+        .energy = 0.72,
+        .album_id = 31,
     });
     return results;
 }
@@ -73,6 +76,9 @@ int main()
         CRATE_CHECK(lookup.value->tracks.size() == 1);
         CRATE_CHECK(lookup.value->tracks[0].path.empty());
         CRATE_CHECK(lookup.value->tracks[0].cover_url == results.tracks[0].cover_url);
+        CRATE_CHECK(lookup.value->tracks[0].camelot == "11A");
+        CRATE_CHECK(lookup.value->tracks[0].energy == 0.72);
+        CRATE_CHECK(lookup.value->tracks[0].album_id == 31);
 
         lookup = cache.get_search(scope, "high vis", 101);
         CRATE_CHECK(lookup.ok());
