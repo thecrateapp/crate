@@ -5,13 +5,14 @@ section: operations
 audience: [developer, operator]
 status: canonical
 order: 100
-verified: 2026-07-21
+verified: 2026-11-01
 sources:
   [
     Makefile,
     docker-compose.dev.yaml,
     docker-compose.readplane.dev.yaml,
     docker-compose.yaml,
+    deploy/observability/compose.standalone.yaml,
   ]
 ---
 
@@ -38,6 +39,12 @@ durable Redis and Traefik. The home profile is a separate installer-owned
 compose installation and must be operated with its own variables and backup
 strategy.
 
+Optional monitoring (Prometheus, Grafana and exporters) runs as a separate
+Compose project, `crate-observability`, with its own releases, state and
+rollback under `/home/crate/crate-observability`. Application deploys never
+start, stop or remove it, and all deploys take the same host mutation lease. See
+[Monitoring](monitoring.md).
+
 ## Startup and data safety
 
 API/worker startup serializes Alembic migration work with advisory locking.
@@ -50,4 +57,5 @@ Use these detailed pages for instructions rather than duplicating them here:
 - [Development setup](00b-development-setup.md)
 - [Deployment profiles](deployment-profiles.md)
 - [Operations](operations.md)
+- [Monitoring](monitoring.md)
 - [Backup and recovery](ops-runbook.md)
