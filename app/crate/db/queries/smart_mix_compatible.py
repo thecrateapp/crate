@@ -68,7 +68,10 @@ _PROFILE_COLUMNS = """
     track.duration,
     track.musicbrainz_trackid AS recording_mbid,
     track.bliss_vector,
-    COALESCE(NULLIF(track.genre, ''), NULLIF(album.genre, '')) AS genre
+    COALESCE(NULLIF(track.genre, ''), NULLIF(album.genre, '')) AS genre,
+    album.id AS album_id,
+    album.has_cover AS album_has_cover,
+    COALESCE(NULLIF(track.year, ''), NULLIF(album.year, '')) AS year
 """
 
 _SEED_SQL = text(
@@ -302,6 +305,11 @@ def _candidate_from_row(row: Any) -> CompatibleTrackCandidate:
         bliss_vector=tuple(float(value) for value in (row["bliss_vector"] or ())),
         genres=_parse_genres(row["genre"]),
         playable=True,
+        album_id=int(row["album_id"]) if row["album_id"] is not None else None,
+        album_has_cover=bool(row["album_has_cover"]),
+        year=str(row["year"]) if row["year"] else None,
+        genre=str(row["genre"]) if row["genre"] else None,
+        duration_seconds=float(row["duration"]) if row["duration"] else None,
     )
 
 

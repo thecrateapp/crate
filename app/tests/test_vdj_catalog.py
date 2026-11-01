@@ -69,6 +69,8 @@ def test_vdj_catalog_folder_returns_bounded_page(test_app):
                 "bpm": 95.0,
                 "audio_key": "F#",
                 "audio_scale": "minor",
+                "camelot": "8A",
+                "energy": 0.72,
                 "has_cover": True,
                 "cover_url": "/api/vdj/albums/3/cover?size=512",
             }
@@ -130,18 +132,15 @@ def test_access_token_search_rejects_non_local_scopes(test_app, scope):
     local_search.assert_not_called()
 
 
-def test_access_token_search_runs_local_library_search(test_app):
-    results = {"artists": [], "albums": [], "tracks": []}
+def test_access_token_search_runs_the_local_dj_search(test_app):
     with (
         patch("crate.api.auth.AuthMiddleware.resolve_user", _catalog_user),
-        patch(
-            "crate.api.browse_media.search_local_library", return_value=results
-        ) as local_search,
+        patch("crate.api.browse_media.search_dj_tracks", return_value=[]) as dj_search,
     ):
         response = test_app.get("/api/search?q=noah&scope=local")
 
     assert response.status_code == 200
-    local_search.assert_called_once_with("noah", 20)
+    dj_search.assert_called_once_with("noah", 20)
 
 
 def test_vdj_catalog_response_never_exposes_server_paths(test_app):

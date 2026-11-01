@@ -146,6 +146,17 @@ def compatible_tracks(
                     silence=item.score_breakdown.silence,
                 ),
                 fallback_reasons=list(item.fallback_reasons),
+                duration=item.duration_seconds,
+                bpm=item.bpm,
+                camelot=item.camelot,
+                energy=item.energy,
+                year=item.year,
+                genre=item.genre,
+                cover_url=(
+                    f"/api/vdj/albums/{item.album_id}/cover?size=512"
+                    if item.album_id is not None and item.album_has_cover
+                    else None
+                ),
             )
             for item in ranked
         ],

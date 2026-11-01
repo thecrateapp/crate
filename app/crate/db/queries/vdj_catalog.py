@@ -41,11 +41,20 @@ _TRACK_COLUMNS = """
             LIMIT 1
         )
     ) AS genre,
-    t.bpm,
+    COALESCE(mix.bpm, t.bpm) AS bpm,
     t.audio_key,
     t.audio_scale,
+    mix.key_camelot AS camelot,
+    mix.global_energy AS energy,
     a.id AS album_id,
     COALESCE(a.has_cover, 0) AS has_cover
+"""
+
+_PROFILE_JOIN = """
+    LEFT JOIN track_mix_profiles mix
+      ON mix.track_id = t.id
+     AND mix.quality <> 'unavailable'
+     AND mix.source_stale_at IS NULL
 """
 
 _VISIBLE_PLAYLIST = """
@@ -131,6 +140,7 @@ _PLAYLIST_TRACKS_SQL = text(
     FROM resolved
     JOIN library_tracks t ON t.id = resolved.track_id
     LEFT JOIN library_albums a ON a.id = t.album_id
+    {_PROFILE_JOIN}
     WHERE t.entity_uid IS NOT NULL
     ORDER BY resolved.position, resolved.id
     """
@@ -142,6 +152,7 @@ _GENRE_TRACKS_SQL = text(
     FROM album_genres ag
     JOIN library_tracks t ON t.album_id = ag.album_id
     LEFT JOIN library_albums a ON a.id = t.album_id
+    {_PROFILE_JOIN}
     WHERE ag.genre_id = :genre_id
       AND t.entity_uid IS NOT NULL
     ORDER BY LOWER(t.artist), LOWER(t.album), t.disc_number, t.track_number, t.id
@@ -174,6 +185,7 @@ _RECENT_TRACKS_SQL = text(
     FROM recent
     JOIN library_tracks t ON t.id = recent.track_id
     LEFT JOIN library_albums a ON a.id = t.album_id
+    {_PROFILE_JOIN}
     WHERE t.entity_uid IS NOT NULL
     ORDER BY recent.last_played_at DESC, t.id
     LIMIT :row_limit
@@ -197,6 +209,7 @@ def _mood_tracks_sql(mood: str) -> TextClause:
         SELECT {_TRACK_COLUMNS}
         FROM library_tracks t
         LEFT JOIN library_albums a ON a.id = t.album_id
+    {_PROFILE_JOIN}
         WHERE t.mood_json IS NOT NULL
           AND {score} >= :threshold
           AND t.entity_uid IS NOT NULL

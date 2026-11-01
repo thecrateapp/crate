@@ -31,6 +31,27 @@ def test_ranking_is_deterministic_and_uses_shared_policy() -> None:
     assert first[0].score_breakdown.planner_version == PLANNER_POLICY.version
 
 
+def test_results_carry_what_a_dj_browser_shows() -> None:
+    seed = _candidate("seed", bpm=120.0, camelot="8A")
+    candidate = replace(
+        _candidate("candidate", bpm=121.0, camelot="8A"),
+        album_id=42,
+        album_has_cover=True,
+        year="2001",
+        genre="Post-hardcore",
+        duration_seconds=201.5,
+    )
+
+    [result] = rank_compatible_tracks(seed, [candidate], limit=10)
+
+    assert result.bpm == 121.0
+    assert result.camelot == "8A"
+    assert result.energy == 0.7
+    assert result.duration_seconds == 201.5
+    assert (result.year, result.genre) == ("2001", "Post-hardcore")
+    assert (result.album_id, result.album_has_cover) == (42, True)
+
+
 def test_half_and_double_bpm_candidates_remain_compatible() -> None:
     seed = _candidate("seed", bpm=120.0)
 

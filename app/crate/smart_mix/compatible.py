@@ -44,6 +44,11 @@ class CompatibleTrackCandidate:
     bliss_vector: tuple[float, ...] = ()
     genres: frozenset[str] = frozenset()
     playable: bool = True
+    album_id: int | None = None
+    album_has_cover: bool = False
+    year: str | None = None
+    genre: str | None = None
+    duration_seconds: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +62,14 @@ class CompatibleTrackResult:
     confidence: float
     score_breakdown: CompatibilityScore
     fallback_reasons: tuple[str, ...]
+    duration_seconds: float | None = None
+    bpm: float | None = None
+    camelot: str | None = None
+    energy: float | None = None
+    year: str | None = None
+    genre: str | None = None
+    album_id: int | None = None
+    album_has_cover: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -117,6 +130,14 @@ def rank_compatible_tracks(
             confidence=breakdown.signal_confidence,
             score_breakdown=breakdown,
             fallback_reasons=fallback_reasons,
+            duration_seconds=candidate.duration_seconds,
+            bpm=candidate.profile.bpm,
+            camelot=candidate.profile.camelot,
+            energy=candidate.profile.global_energy,
+            year=candidate.year,
+            genre=candidate.genre,
+            album_id=candidate.album_id,
+            album_has_cover=candidate.album_has_cover,
         )
         scored.append((candidate, result))
 
