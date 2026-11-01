@@ -10,6 +10,8 @@ bool is_spanish_language(std::string_view language);
 std::string_view compatible_folder_label(std::string_view language);
 std::string_view compatible_menu_label(std::string_view language);
 std::string_view open_in_crate_menu_label(std::string_view language);
+std::string_view artist_menu_label(std::string_view language);
+std::string_view album_menu_label(std::string_view language);
 
 std::string catalog_folder_label(
     std::string_view folder_id,

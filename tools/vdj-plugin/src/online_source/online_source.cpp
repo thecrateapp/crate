@@ -18,6 +18,7 @@ namespace {
 
 constexpr std::string_view kOnlineSourceFolderId = "Crate";
 constexpr int kMaxFolderPages = 5;
+constexpr std::size_t kMaxRememberedTracks = 5000;
 
 TrackEntry track_entry(
     const std::string& origin,
@@ -148,6 +149,16 @@ std::string compatible_folder_navigation_command(std::string_view language)
         std::string(compatible_folder_label(language)) + "\"";
 }
 
+std::string vdj_search_command(std::string_view field, std::string_view value)
+{
+    if (value.find('\'') == std::string_view::npos && value.find('"') == std::string_view::npos) {
+        return "search '" + std::string(field) + ":\"" + std::string(value) + "\"'";
+    }
+    std::string text(value);
+    std::erase(text, '"');
+    return "search \"" + text + "\"";
+}
+
 OnlineSource::OnlineSource(OnlineSourceDependencies dependencies)
     : host_(dependencies.host)
     , ui_(dependencies.ui)
@@ -241,6 +252,7 @@ CallbackStatus OnlineSource::search(const std::string& query, TrackSink& sink)
         return CallbackStatus::Failed;
     }
 
+    remember(result.value->tracks);
     const bool published = searches_.publish(*request, [&] {
         for (const auto& track : result.value->tracks) {
             sink.add(track_entry(server->origin, track, {}));
@@ -352,6 +364,7 @@ CallbackStatus OnlineSource::folder(const std::string& folder_id, TrackSink& sin
         cursor = *result.value->next_cursor;
     }
 
+    remember(tracks);
     const bool published = folders_.publish(*request, [&] {
         for (const auto& track : tracks) {
             sink.add(track_entry(server->origin, track, {}));
@@ -361,26 +374,95 @@ CallbackStatus OnlineSource::folder(const std::string& folder_id, TrackSink& sin
     return published ? CallbackStatus::Done : CallbackStatus::Cancelled;
 }
 
-std::vector<std::string_view> OnlineSource::context_menu()
+std::vector<std::string_view> OnlineSource::context_menu(const std::string& unique_id)
 {
-    return {compatible_menu_label(host_.language())};
+    const std::string language = host_.language();
+    std::vector<std::string_view> labels;
+    for (const auto action : menu_actions(unique_id)) {
+        switch (action) {
+        case MenuAction::Compatible:
+            labels.push_back(compatible_menu_label(language));
+            break;
+        case MenuAction::Artist:
+            labels.push_back(artist_menu_label(language));
+            break;
+        case MenuAction::Album:
+            labels.push_back(album_menu_label(language));
+            break;
+        }
+    }
+    return labels;
 }
 
 CallbackStatus OnlineSource::select_context_menu(const std::string& unique_id, std::size_t index)
 {
     log("track context menu id=" + unique_id + " index=" + std::to_string(index));
-    if (index != 0) {
+    const auto actions = menu_actions(unique_id);
+    if (index >= actions.size()) {
         return CallbackStatus::NotImplemented;
     }
-    {
-        std::lock_guard lock(compatible_mutex_);
-        compatible_seed_ = unique_id;
+    std::string command;
+    switch (actions[index]) {
+    case MenuAction::Compatible: {
+        {
+            std::lock_guard lock(compatible_mutex_);
+            compatible_seed_ = unique_id;
+        }
+        folders_.cancel_all();
+        log("compatible tracks folder selected seed=" + unique_id);
+        command = compatible_folder_navigation_command(host_.language());
+        break;
     }
-    folders_.cancel_all();
-    log("compatible tracks folder selected seed=" + unique_id);
-    const bool sent = host_.send_command(compatible_folder_navigation_command(host_.language()));
-    log(std::string("compatible tracks navigation command ") + (sent ? "sent" : "failed"));
+    case MenuAction::Artist:
+    case MenuAction::Album: {
+        const auto facts = facts_for(unique_id);
+        if (!facts.has_value()) {
+            return CallbackStatus::NotImplemented;
+        }
+        command = actions[index] == MenuAction::Artist
+            ? vdj_search_command("artist", facts->artist)
+            : vdj_search_command("album", facts->album);
+        break;
+    }
+    }
+    const bool sent = host_.send_command(command);
+    log(std::string("track context menu command ") + (sent ? "sent" : "failed"));
     return sent ? CallbackStatus::Done : CallbackStatus::Failed;
+}
+
+void OnlineSource::remember(const std::vector<SearchTrack>& tracks)
+{
+    std::lock_guard lock(facts_mutex_);
+    if (track_facts_.size() + tracks.size() > kMaxRememberedTracks) {
+        track_facts_.clear();
+    }
+    for (const auto& track : tracks) {
+        track_facts_[track.entity_uid] = TrackFacts{track.artist, track.album};
+    }
+}
+
+std::optional<OnlineSource::TrackFacts> OnlineSource::facts_for(const std::string& unique_id)
+{
+    std::lock_guard lock(facts_mutex_);
+    const auto found = track_facts_.find(unique_id);
+    if (found == track_facts_.end()) {
+        return std::nullopt;
+    }
+    return found->second;
+}
+
+std::vector<OnlineSource::MenuAction> OnlineSource::menu_actions(const std::string& unique_id)
+{
+    std::vector<MenuAction> actions{MenuAction::Compatible};
+    if (const auto facts = facts_for(unique_id)) {
+        if (!facts->artist.empty()) {
+            actions.push_back(MenuAction::Artist);
+        }
+        if (!facts->album.empty()) {
+            actions.push_back(MenuAction::Album);
+        }
+    }
+    return actions;
 }
 
 void OnlineSource::sync_clients()
@@ -434,6 +516,11 @@ CallbackStatus OnlineSource::compatible_folder(const std::string& seed_uid, Trac
             *result.value->fallback_reason);
     }
 
+    std::vector<SearchTrack> compatible_tracks;
+    for (const auto& compatible : result.value->items) {
+        compatible_tracks.push_back(compatible_track_as_search_track(compatible));
+    }
+    remember(compatible_tracks);
     const bool published = folders_.publish(*request, [&] {
         for (const auto& compatible : result.value->items) {
             const auto track = compatible_track_as_search_track(compatible);

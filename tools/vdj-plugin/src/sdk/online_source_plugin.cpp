@@ -337,7 +337,7 @@ public:
         if (unique_id == nullptr || context_menu == nullptr) {
             return E_FAIL;
         }
-        for (const auto label : source_.context_menu()) {
+        for (const auto label : source_.context_menu(unique_id)) {
             context_menu->add(label.data());
         }
         return S_OK;
