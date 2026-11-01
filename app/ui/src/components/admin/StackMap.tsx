@@ -806,18 +806,56 @@ export function StackMap({
           <summary>
             Service index <span>{snapshot.services.length}</span>
           </summary>
-          <div>
-            {inventory.services.map((service) => (
-              <button
-                key={service.id}
-                type="button"
-                onClick={() => select(service.id, true)}
-                aria-label={`Select ${service.label} from index`}
-              >
-                {service.label}
-                <span>{observed ? service.runtimeState : "unknown"}</span>
-              </button>
-            ))}
+          <div className="stack-map__list-groups">
+            {inventory.stacks.map((stack) => {
+              const members = inventory.services.filter(
+                (service) => service.stackId === stack.id,
+              );
+              if (!members.length) return null;
+              return (
+                <section
+                  key={stack.id}
+                  role="group"
+                  aria-label={`${stack.name} services`}
+                  className="stack-map__list-group"
+                  data-kind={stack.kind}
+                >
+                  <h4 className="stack-map__list-heading">
+                    <MonoLabel as="span">
+                      <i
+                        className="stack-map__stack-mark"
+                        data-kind={stack.kind}
+                        aria-hidden="true"
+                      />
+                      {stack.name}
+                      <span>{members.length}</span>
+                    </MonoLabel>
+                  </h4>
+                  <div className="stack-map__list-items">
+                    {members.map((service) => (
+                      <button
+                        key={service.id}
+                        type="button"
+                        onClick={() => select(service.id, true)}
+                        aria-label={`Select ${service.label} from index`}
+                      >
+                        <span className="stack-map__list-name">
+                          <i
+                            className="stack-map__stack-mark"
+                            data-kind={stack.kind}
+                            aria-hidden="true"
+                          />
+                          {service.label}
+                        </span>
+                        <span>
+                          {observed ? service.runtimeState : "unknown"}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
           </div>
         </details>
       </div>

@@ -428,10 +428,49 @@
   margin-left: 12px;
   color: var(--text-subtle);
 }
-.stack-map__list > div {
+.stack-map__list-groups {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 16px 32px;
+  padding-top: 8px;
+}
+.stack-map__list-heading {
+  margin: 0 0 4px;
+}
+.stack-map__list-heading > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.stack-map__list-heading > span > span {
+  color: var(--text-subtle);
+}
+.stack-map__list-items {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0 20px;
+}
+.stack-map__list-group[data-kind="application"] .stack-map__list-items {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.stack-map__list-name {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+.stack-map__stack-mark {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 12px;
+  height: 4px;
+  border-radius: 999px;
+}
+.stack-map__stack-mark[data-kind="application"] {
+  background: color-mix(in srgb, var(--accent-action-hi) 55%, transparent);
+}
+.stack-map__stack-mark[data-kind="observability"] {
+  box-shadow: inset 0 0 0 1px var(--text-muted);
 }
 .stack-map__list button,
 .stack-map__relations button {
@@ -457,7 +496,7 @@
 .stack-map__relations button:focus-visible {
   color: var(--accent-action-hi);
 }
-.stack-map__list button span,
+.stack-map__list button > span:last-child,
 .stack-map__relation-kind {
   font-family: var(--font-mono);
   color: var(--text-muted);
@@ -660,7 +699,8 @@
     display: block;
     margin-top: 8px;
   }
-  .stack-map__list > div {
+  .stack-map__list-groups,
+  .stack-map__list-group[data-kind="application"] .stack-map__list-items {
     grid-template-columns: minmax(0, 1fr);
   }
 }

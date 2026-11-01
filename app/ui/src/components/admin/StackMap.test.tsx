@@ -472,3 +472,37 @@ describe("StackMap live activity", () => {
     expect(inspector()).toHaveTextContent("Live data unavailable");
   });
 });
+
+describe("StackMap service index", () => {
+  it("groups services by deployment and marks each row with its deployment kind", () => {
+    render(<StackMap snapshot={snapshot()} />);
+
+    const application = screen.getByRole("group", { name: "Crate services" });
+    const observability = screen.getByRole("group", {
+      name: "Observability services",
+    });
+
+    expect(application).toHaveTextContent("Crate4");
+    expect(observability).toHaveTextContent("Observability2");
+    expect(
+      within(application).getByRole("button", {
+        name: "Select API from index",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(observability).getByRole("button", {
+        name: "Select Grafana from index",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      application.querySelectorAll(
+        '.stack-map__stack-mark[data-kind="application"]',
+      ),
+    ).toHaveLength(5);
+    expect(
+      observability.querySelectorAll(
+        '.stack-map__stack-mark[data-kind="observability"]',
+      ),
+    ).toHaveLength(3);
+  });
+});
