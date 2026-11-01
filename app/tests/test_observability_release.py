@@ -121,6 +121,10 @@ def test_bundle_builds_and_verifies_exact_committed_configuration(
     assert release.verify_bundle(destination) == manifest
 
 
+def _gzip(payload):
+    return _release()._canonical_gzip(payload)
+
+
 def _archive(path, entries):
     raw = io.BytesIO()
     with tarfile.open(fileobj=raw, mode="w", format=tarfile.USTAR_FORMAT) as archive:
@@ -131,7 +135,7 @@ def _archive(path, entries):
             member.linkname = linkname
             member.size = len(content) if kind == tarfile.REGTYPE else 0
             archive.addfile(member, io.BytesIO(content) if member.isfile() else None)
-    path.write_bytes(gzip.compress(raw.getvalue(), mtime=0))
+    path.write_bytes(_gzip(raw.getvalue()))
 
 
 def _entries(payloads, manifest):
@@ -494,7 +498,7 @@ def test_verifier_enforces_size_caps_before_parsing_or_extracting_payloads(
     if cap == "compressed":
         oversized.write_bytes(b"x" * (8 * 1024 * 1024 + 1))
     elif cap == "raw_gzip":
-        oversized.write_bytes(gzip.compress(b"\0" * (8 * 1024 * 1024 + 1), mtime=0))
+        oversized.write_bytes(_gzip(b"\0" * (8 * 1024 * 1024 + 1)))
     elif cap in {"pax", "gnu"}:
         raw = io.BytesIO()
         with tarfile.open(
@@ -504,7 +508,7 @@ def test_verifier_enforces_size_caps_before_parsing_or_extracting_payloads(
             header.type = tarfile.XHDTYPE if cap == "pax" else tarfile.GNUTYPE_LONGNAME
             header.size = 8 * 1024 * 1024 + 1
             archive.addfile(header, io.BytesIO(b"\0" * header.size))
-        oversized.write_bytes(gzip.compress(raw.getvalue(), mtime=0))
+        oversized.write_bytes(_gzip(raw.getvalue()))
     else:
         if cap == "member":
             payloads[FILES[3]] = b"#" * (2 * 1024 * 1024 + 1)
@@ -671,7 +675,7 @@ def test_verifier_rejects_noncanonical_member_metadata(
             if index == 0:
                 setattr(member, attribute, value)
             target.addfile(member, source.extractfile(member))
-    destination.write_bytes(gzip.compress(raw.getvalue(), mtime=0))
+    destination.write_bytes(_gzip(raw.getvalue()))
     with pytest.raises(ValueError, match="metadata"):
         release.verify_bundle(destination)
 
@@ -688,7 +692,7 @@ def test_verifier_rejects_noncanonical_member_order(tmp_path, committed_source):
     ):
         for member in reversed(source.getmembers()):
             target.addfile(member, source.extractfile(member))
-    destination.write_bytes(gzip.compress(raw.getvalue(), mtime=0))
+    destination.write_bytes(_gzip(raw.getvalue()))
     with pytest.raises(ValueError, match="order"):
         release.verify_bundle(destination)
 
@@ -718,7 +722,7 @@ def test_hidden_gnu_headers_cannot_evade_exact_regular_member_contract(
             if index < len(members):
                 member = members[index]
                 target.addfile(member, source.extractfile(member))
-    destination.write_bytes(gzip.compress(raw.getvalue(), mtime=0))
+    destination.write_bytes(_gzip(raw.getvalue()))
     with pytest.raises(ValueError):
         release.verify_bundle(destination)
 
@@ -751,7 +755,7 @@ def test_verifier_requires_one_canonical_gzip_member(
     elif defect == "fcomment":
         compressed = header[:3] + b"\x10" + header[4:] + b"note\0" + body
     elif defect == "second_member":
-        compressed += gzip.compress(b"", mtime=0)
+        compressed += _gzip(b"")
     elif defect == "trailing_zeros":
         compressed += b"\0" * 8
     else:
@@ -759,3 +763,168 @@ def test_verifier_requires_one_canonical_gzip_member(
     destination.write_bytes(compressed)
     with pytest.raises(ValueError, match="gzip"):
         release.verify_bundle(destination)
+
+
+def _commit_change(repository, changes):
+    for name, transform in changes.items():
+        path = repository / name
+        path.write_bytes(transform(path.read_bytes()))
+    _git(repository, "commit", "--quiet", "-am", "test: change monitoring release")
+    return _git(repository, "rev-parse", "HEAD").stdout.strip()
+
+
+def _grafana_digest_change(content):
+    document = content.decode()
+    image = yaml.safe_load(document)["services"]["crate-grafana"]["image"]
+    name, _ = image.split("@sha256:")
+    return document.replace(image, f"{name}@sha256:{'e' * 64}").encode()
+
+
+def test_extract_writes_a_verified_release_and_never_overwrites_one(
+    tmp_path, committed_source
+):
+    repository, sha, payloads = committed_source
+    release = _release()
+    bundle = tmp_path / "bundle.tar.gz"
+    manifest = release.build_bundle(repository, sha, bundle)
+    target = tmp_path / "releases" / sha
+
+    assert release.extract_bundle(bundle, target, expected_sha=sha) == manifest
+
+    for name, payload in payloads.items():
+        assert (target / name).read_bytes() == payload
+        assert (target / name).stat().st_mode & 0o777 == 0o644
+    assert (target / "deploy/observability/grafana").stat().st_mode & 0o777 == 0o755
+    assert release.verify_release(target, expected_sha=sha) == manifest
+    with pytest.raises(ValueError, match="already exists"):
+        release.extract_bundle(bundle, target, expected_sha=sha)
+    with pytest.raises(ValueError, match="expected revision"):
+        release.extract_bundle(bundle, tmp_path / "other", expected_sha="f" * 40)
+    assert not (tmp_path / "other").exists()
+    assert not list((tmp_path / "releases").glob(".extract-*"))
+
+
+def test_verify_release_rejects_edited_extra_or_linked_files(
+    tmp_path, committed_source
+):
+    repository, sha, _ = committed_source
+    release = _release()
+    bundle = tmp_path / "bundle.tar.gz"
+    release.build_bundle(repository, sha, bundle)
+
+    edited = tmp_path / "edited"
+    release.extract_bundle(bundle, edited, expected_sha=sha)
+    (edited / "deploy/observability/prometheus.yml").write_text("scrape_configs: []\n")
+    extra = tmp_path / "extra"
+    release.extract_bundle(bundle, extra, expected_sha=sha)
+    (extra / "deploy/observability/notes.txt").write_text("drift\n")
+    linked = tmp_path / "linked"
+    release.extract_bundle(bundle, linked, expected_sha=sha)
+    prometheus = linked / "deploy/observability/prometheus.yml"
+    copy = tmp_path / "prometheus.yml"
+    copy.write_bytes(prometheus.read_bytes())
+    prometheus.unlink()
+    prometheus.symlink_to(copy)
+
+    with pytest.raises(ValueError, match="mismatch"):
+        release.verify_release(edited)
+    with pytest.raises(ValueError, match="unexpected files"):
+        release.verify_release(extra)
+    with pytest.raises(ValueError, match="regular files"):
+        release.verify_release(linked)
+
+
+def test_install_replaces_live_files_and_plans_only_affected_services(
+    tmp_path, committed_source
+):
+    repository, first, _ = committed_source
+    release = _release()
+    prometheus = "deploy/observability/prometheus.yml"
+    second = _commit_change(
+        repository,
+        {
+            prometheus: lambda content: content + b"# reviewed change\n",
+            "deploy/observability/grafana/dashboards/infra-data.json": lambda content: (
+                content
+            ),
+        },
+    )
+    third = _commit_change(
+        repository,
+        {"deploy/observability/compose.observability.yaml": _grafana_digest_change},
+    )
+    releases = {}
+    for sha in (first, second, third):
+        bundle = tmp_path / f"{sha}.tar.gz"
+        release.build_bundle(repository, sha, bundle)
+        releases[sha] = tmp_path / "releases" / sha
+        release.extract_bundle(bundle, releases[sha], expected_sha=sha)
+    live = tmp_path / "live"
+
+    assert release.install_release(releases[first], live)["release_sha"] == first
+    assert release.verify_release(live, expected_sha=first)["release_sha"] == first
+    release.install_release(releases[second], live)
+    assert release.verify_release(live, expected_sha=second)["release_sha"] == second
+
+    initial = release.plan_transition(None, releases[first])
+    config = release.plan_transition(releases[first], releases[second])
+    image = release.plan_transition(releases[second], releases[third])
+    assert (initial["restart"], initial["stateful"]) == ([], [])
+    assert len(initial["images"]) == 8
+    assert (config["restart"], config["stateful"]) == (["crate-prometheus"], [])
+    assert (image["restart"], image["stateful"]) == ([], ["crate-grafana"])
+    assert image["previous"]["crate-grafana"] != image["images"]["crate-grafana"]
+
+
+def test_plan_cli_prints_shell_friendly_lines(tmp_path, committed_source):
+    repository, first, _ = committed_source
+    release = _release()
+    second = _commit_change(
+        repository,
+        {"deploy/observability/prometheus.yml": lambda content: content + b"#\n"},
+    )
+    paths = []
+    for sha in (first, second):
+        bundle = tmp_path / f"{sha}.tar.gz"
+        release.build_bundle(repository, sha, bundle)
+        paths.append(tmp_path / sha)
+        release.extract_bundle(bundle, paths[-1], expected_sha=sha)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "plan",
+            "--current",
+            str(paths[0]),
+            "--candidate",
+            str(paths[1]),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    lines = result.stdout.splitlines()
+    assert "restart crate-prometheus" in lines
+    assert not any(line.startswith("stateful ") for line in lines)
+    assert sum(line.startswith("image ") for line in lines) == 8
+    assert sum(line.startswith("previous-image ") for line in lines) == 8
+
+
+def test_bundle_header_does_not_depend_on_the_python_gzip_os_byte(
+    tmp_path, committed_source, monkeypatch
+):
+    repository, sha, _ = committed_source
+    release = _release()
+
+    def unix_header(data, compresslevel=9, *, mtime=None):
+        raise AssertionError("gzip.compress writes a platform-dependent OS byte")
+
+    monkeypatch.setattr(gzip, "compress", unix_header)
+    destination = tmp_path / "bundle.tar.gz"
+
+    manifest = release.build_bundle(repository, sha, destination)
+
+    assert destination.read_bytes()[:10] == bytes.fromhex("1f8b08000000000002ff")
+    assert release.verify_bundle(destination, expected_sha=sha) == manifest

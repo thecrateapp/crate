@@ -4,12 +4,12 @@
 from __future__ import annotations
 
 import argparse
-import gzip
 import hashlib
 import io
 import json
 import os
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -37,6 +37,14 @@ BUNDLE_FILES = tuple(
 MAX_BYTES = 8 * 1024 * 1024
 MAX_FILE_BYTES = 2 * 1024 * 1024
 MAX_MANIFEST_BYTES = 64 * 1024
+STATEFUL_SERVICES = ("crate-prometheus", "crate-grafana")
+MOUNTED_FILES = {
+    PREFIX + "prometheus.yml": "crate-prometheus",
+    PREFIX + "docker-proxy.haproxy.cfg": "crate-observability-docker-proxy",
+    PREFIX + "runtime-proxy.haproxy.cfg": "crate-observability-docker-proxy",
+    PREFIX + "grafana/provisioning/dashboards/infrastructure.yaml": "crate-grafana",
+    PREFIX + "grafana/provisioning/datasources/prometheus.yaml": "crate-grafana",
+}
 GZIP_HEADER = bytes.fromhex("1f8b08000000000002ff")
 _SHA = re.compile(r"[0-9a-f]{40}")
 _HASH = re.compile(r"[0-9a-f]{64}")
@@ -227,6 +235,10 @@ def _single_gzip_member(compressed: bytes) -> bytes:
 
 def verify_bundle(bundle_path: str | Path, *, expected_sha: str | None = None) -> dict:
     """Verify bounded archive contents without extracting into the filesystem."""
+    return _verified_bundle(bundle_path, expected_sha=expected_sha)[0]
+
+
+def _verified_bundle(bundle_path, *, expected_sha):
     if expected_sha is not None:
         _revision(expected_sha)
     with Path(bundle_path).open("rb") as source:
@@ -285,7 +297,125 @@ def verify_bundle(bundle_path: str | Path, *, expected_sha: str | None = None) -
     manifest = _verified_manifest(payloads.pop("manifest.json"), payloads)
     if expected_sha is not None and manifest["release_sha"] != expected_sha:
         raise ValueError("Bundle revision does not match the expected revision")
+    return manifest, payloads
+
+
+def _write_tree(directory: Path, payloads: dict, manifest: dict) -> None:
+    for name, content in payloads.items():
+        path = directory / name
+        path.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+        temporary = path.with_name(f".{path.name}.tmp")
+        temporary.write_bytes(content)
+        temporary.chmod(0o644)
+        os.replace(temporary, path)
+    for parent in {(directory / name).parent for name in payloads}:
+        while parent != directory:
+            parent.chmod(0o755)
+            parent = parent.parent
+    target = directory / "manifest.json"
+    temporary = directory / ".manifest.json.tmp"
+    temporary.write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n")
+    temporary.chmod(0o644)
+    os.replace(temporary, target)
+
+
+def extract_bundle(
+    bundle_path: str | Path, destination: str | Path, *, expected_sha: str
+) -> dict:
+    """Write a verified bundle into a new release directory, never over one."""
+    manifest, payloads = _verified_bundle(bundle_path, expected_sha=expected_sha)
+    target = Path(destination)
+    if target.exists() or target.is_symlink():
+        raise ValueError("Release directory already exists")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(dir=target.parent, prefix=".extract-"))
+    try:
+        staging.chmod(0o755)
+        _write_tree(staging, payloads, manifest)
+        os.rename(staging, target)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
     return manifest
+
+
+def _directory_payloads(directory: Path) -> tuple[bytes, dict]:
+    present = {
+        path.relative_to(directory).as_posix()
+        for path in directory.rglob("*")
+        if not path.is_dir()
+    }
+    if present != {*BUNDLE_FILES, "manifest.json"}:
+        raise ValueError("Release directory has missing or unexpected files")
+    payloads = {}
+    for name in sorted(present):
+        path = directory / name
+        if path.is_symlink() or not path.is_file():
+            raise ValueError("Release files must be regular files")
+        limit = MAX_MANIFEST_BYTES if name == "manifest.json" else MAX_FILE_BYTES
+        with path.open("rb") as source:
+            payloads[name] = source.read(limit + 1)
+        if len(payloads[name]) > limit:
+            raise ValueError("Release file size limit exceeded")
+    return payloads.pop("manifest.json"), payloads
+
+
+def verify_release(directory: str | Path, *, expected_sha: str | None = None) -> dict:
+    """Check an installed tree still matches the manifest it was written with."""
+    content, payloads = _directory_payloads(Path(directory))
+    manifest = _verified_manifest(content, payloads)
+    if expected_sha is not None and manifest["release_sha"] != _revision(expected_sha):
+        raise ValueError("Release revision does not match the expected revision")
+    return manifest
+
+
+def install_release(release: str | Path, live: str | Path) -> dict:
+    """Replace each live file atomically; the manifest is written last."""
+    content, payloads = _directory_payloads(Path(release))
+    manifest = _verified_manifest(content, payloads)
+    target = Path(live)
+    target.mkdir(mode=0o755, parents=True, exist_ok=True)
+    _write_tree(target, payloads, manifest)
+    return manifest
+
+
+def _service_images(directory: Path) -> dict:
+    import yaml
+
+    document = yaml.safe_load(
+        (directory / PREFIX / "compose.observability.yaml").read_text()
+    )
+    return {name: service["image"] for name, service in document["services"].items()}
+
+
+def plan_transition(current: str | Path | None, candidate: str | Path) -> dict:
+    """Which monitoring services a release change restarts or must back up."""
+    target = verify_release(candidate)
+    images = _service_images(Path(candidate))
+    if current is None:
+        return {"restart": [], "stateful": [], "images": images, "previous": {}}
+    source = verify_release(current)
+    previous = _service_images(Path(current))
+    changed_images = {
+        name for name, image in images.items() if previous.get(name) != image
+    }
+    restart = {
+        service
+        for name, service in MOUNTED_FILES.items()
+        if source["files"][name] != target["files"][name]
+    }
+    return {
+        "restart": sorted(restart - changed_images),
+        "stateful": sorted(changed_images & set(STATEFUL_SERVICES)),
+        "images": images,
+        "previous": previous,
+    }
+
+
+def _canonical_gzip(raw: bytes) -> bytes:
+    compressor = zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS)
+    body = compressor.compress(raw) + compressor.flush()
+    return GZIP_HEADER + body + struct.pack("<II", zlib.crc32(raw), len(raw))
 
 
 def build_bundle(
@@ -305,7 +435,7 @@ def build_bundle(
             archive.addfile(member, io.BytesIO(content))
     if len(raw.getvalue()) > MAX_BYTES:
         raise ValueError("Decompressed bundle size limit exceeded")
-    compressed = gzip.compress(raw.getvalue(), mtime=0)
+    compressed = _canonical_gzip(raw.getvalue())
     if len(compressed) > MAX_BYTES:
         raise ValueError("Compressed bundle size limit exceeded")
     target = Path(destination)
@@ -333,13 +463,43 @@ def main(argv=None) -> int:
     verify = commands.add_parser("verify")
     verify.add_argument("archive", type=Path)
     verify.add_argument("--expected-sha")
+    extract = commands.add_parser("extract")
+    extract.add_argument("archive", type=Path)
+    extract.add_argument("--expected-sha", required=True)
+    extract.add_argument("--destination", type=Path, required=True)
+    verify_tree = commands.add_parser("verify-release")
+    verify_tree.add_argument("directory", type=Path)
+    verify_tree.add_argument("--expected-sha")
+    install = commands.add_parser("install")
+    install.add_argument("--release", type=Path, required=True)
+    install.add_argument("--live", type=Path, required=True)
+    plan = commands.add_parser("plan")
+    plan.add_argument("--current", type=Path)
+    plan.add_argument("--candidate", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
-        manifest = (
-            build_bundle(args.source_root, args.sha, args.output)
-            if args.command == "bundle"
-            else verify_bundle(args.archive, expected_sha=args.expected_sha)
-        )
+        if args.command == "plan":
+            result = plan_transition(args.current, args.candidate)
+            for kind in ("restart", "stateful"):
+                for service in result[kind]:
+                    print(kind, service)
+            for service, image in sorted(result["images"].items()):
+                print("image", service, image)
+            for service, image in sorted(result["previous"].items()):
+                print("previous-image", service, image)
+            return 0
+        if args.command == "bundle":
+            manifest = build_bundle(args.source_root, args.sha, args.output)
+        elif args.command == "verify":
+            manifest = verify_bundle(args.archive, expected_sha=args.expected_sha)
+        elif args.command == "extract":
+            manifest = extract_bundle(
+                args.archive, args.destination, expected_sha=args.expected_sha
+            )
+        elif args.command == "verify-release":
+            manifest = verify_release(args.directory, expected_sha=args.expected_sha)
+        else:
+            manifest = install_release(args.release, args.live)
     except (ValueError, OSError) as error:
         print(f"Observability bundle rejected: {error}", file=sys.stderr)
         return 1
