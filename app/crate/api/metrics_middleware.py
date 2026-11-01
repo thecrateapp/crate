@@ -20,6 +20,14 @@ _SKIP_METRICS_PREFIXES = (
 _SLOW_REQUEST_MS = 1000
 _HTTP_LATENCY_METRIC = "api.request.latency"
 _HTTP_REQUESTS_METRIC = "api.request.count"
+_HTTP_CLIENT_METRIC = "api.request.client"
+_APP_CLIENTS = {
+    "listen-web": "listen-web",
+    "listen-android": "listen-android",
+    "listen-ios": "listen-ios",
+    "listen-tauri": "listen-desktop",
+    "admin-web": "admin-web",
+}
 _HTTP_ERRORS_METRIC = "api.request.errors"
 _HTTP_SLOW_METRIC = "api.request.slow"
 _STREAM_REQUESTS_METRIC = "stream.requests"
@@ -103,6 +111,16 @@ def _decrement_active_streams() -> int:
     with _active_streams_lock:
         _active_streams = max(0, _active_streams - 1)
         return _active_streams
+
+
+def _request_client(scope: Scope, path: str) -> str:
+    headers = dict(scope.get("headers") or [])
+    if headers.get(b"x-crate-readplane-fallback") == b"1":
+        return "readplane"
+    if path == "/rest" or path.startswith("/rest/"):
+        return "subsonic"
+    app = headers.get(b"x-crate-app") or headers.get(b"x-crate-client") or b""
+    return _APP_CLIENTS.get(app.decode("latin-1").strip().lower(), "other")
 
 
 class MetricsMiddleware:
@@ -203,6 +221,10 @@ class MetricsMiddleware:
 
         template = _normalize_path(path, _route_path(scope))
         is_opensubsonic = path == "/rest" or path.startswith("/rest/")
+        record_counter_later(
+            _HTTP_CLIENT_METRIC,
+            {"client": _request_client(scope, path), "status": str(status_code)},
+        )
         method = _normalize_method(path, scope.get("method", "GET"))
         tags = {
             "method": method,

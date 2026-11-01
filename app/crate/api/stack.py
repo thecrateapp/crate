@@ -16,7 +16,7 @@ from crate.api.openapi_responses import (
     merge_responses,
 )
 from crate.api.permissions import require_permission
-from crate.api.redis_sse import close_pubsub, open_pubsub
+from crate.api.redis_sse import close_pubsub, get_async_redis, open_pubsub
 from crate.api.schemas.utility import (
     AdminStackSnapshotResponse,
     StackActionResponse,
@@ -30,6 +30,7 @@ from crate.db.admin_stack_surface import (
     publish_stack_surface_signal,
 )
 from crate.db.snapshot_events import snapshot_channel
+from crate.observability import live_activity
 from crate.docker_ctl import (
     get_container,
     get_container_logs,
@@ -55,18 +56,53 @@ def _require_stack_operator(request: Request) -> dict:
     return require_permission(request, "ops.runtime.manage")
 
 
+def _decoded(value) -> str:
+    return value.decode() if isinstance(value, bytes) else str(value)
+
+
+async def _mark_live_watched() -> None:
+    try:
+        await get_async_redis().set(
+            live_activity.WATCH_KEY, "1", ex=live_activity.WATCH_TTL_SECONDS
+        )
+    except Exception:
+        log.debug("Could not mark live stack activity as watched", exc_info=True)
+
+
+async def _last_live_frame() -> str | None:
+    try:
+        frame = await get_async_redis().get(live_activity.FRAME_KEY)
+    except Exception:
+        log.debug("Could not read the last live stack frame", exc_info=True)
+        return None
+    return _decoded(frame) if frame else None
+
+
 async def _stack_stream() -> AsyncIterator[str]:
     yield f"data: {json_dumps(get_cached_stack_surface())}\n\n"
+    await _mark_live_watched()
+    frame = await _last_live_frame()
+    if frame:
+        yield f"event: activity\ndata: {frame}\n\n"
     pubsub = None
     channel = snapshot_channel(STACK_SNAPSHOT_SCOPE, "global")
     try:
         pubsub = await open_pubsub(channel)
+        await pubsub.subscribe(live_activity.CHANNEL)
         heartbeat_counter = 0
+        watch_counter = 0
         while True:
             message = await pubsub.get_message(
                 ignore_subscribe_messages=True, timeout=1.0
             )
+            watch_counter += 1
+            if watch_counter >= 10:
+                watch_counter = 0
+                await _mark_live_watched()
             if message and message.get("type") == "message":
+                if _decoded(message.get("channel")) == live_activity.CHANNEL:
+                    yield f"event: activity\ndata: {_decoded(message['data'])}\n\n"
+                    continue
                 yield f"data: {json_dumps(get_cached_stack_surface())}\n\n"
                 heartbeat_counter = 0
                 continue
@@ -80,6 +116,10 @@ async def _stack_stream() -> AsyncIterator[str]:
             await asyncio.sleep(30)
     finally:
         if pubsub is not None:
+            try:
+                await pubsub.unsubscribe(live_activity.CHANNEL)
+            except Exception:
+                log.debug("Could not unsubscribe live stack activity", exc_info=True)
             await close_pubsub(pubsub, channel)
 
 

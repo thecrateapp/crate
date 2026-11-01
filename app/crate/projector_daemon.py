@@ -13,6 +13,22 @@ from crate.db.init_db import init_db
 log = logging.getLogger(__name__)
 
 
+def _live_activity_sampler():
+    import time as wall_clock
+
+    from crate.db.cache_runtime import get_redis
+    from crate.db.queries.live_activity import count_listening_now
+    from crate.metrics import _minute_bucket
+    from crate.observability.live_activity import ActivitySampler
+
+    return ActivitySampler(
+        redis=get_redis,
+        minute=_minute_bucket,
+        now=wall_clock.time,
+        count_listening=count_listening_now,
+    )
+
+
 def run_projector_loop(
     stop_event: threading.Event,
     *,
@@ -32,8 +48,10 @@ def run_projector_loop(
     last_home_warm = 0.0
     last_agent_health_warm: float | None = None
     last_outbox_cleanup: float | None = None
+    live_sampler = _live_activity_sampler()
     while not stop_event.is_set():
         now = time.monotonic()
+        processed: int | None = None
         if os.environ.get("CRATE_MCP_ENABLED", "false").lower() == "true" and (
             last_agent_health_warm is None or now - last_agent_health_warm >= 60
         ):
@@ -62,6 +80,7 @@ def run_projector_loop(
                 if cleaned:
                     log.info("Pruned %d delivered domain outbox event(s)", cleaned)
             result = process_domain_events(limit=batch_limit)
+            processed = int(result.get("processed", 0))
             if not relay_result.get("failed") and not result.get("failed"):
                 from crate.role_readiness import progress
 
@@ -88,6 +107,12 @@ def run_projector_loop(
 
             capture_background_exception(error, "projector.iteration")
             log.debug("Snapshot projector failed", exc_info=True)
+        try:
+            from crate.observability import live_activity
+
+            live_activity.publish_if_watched(live_sampler, events=processed)
+        except Exception:
+            log.debug("Live stack activity publish failed", exc_info=True)
         stop_event.wait(interval)
     log.info("Projector loop stopped")
 

@@ -221,3 +221,20 @@ describe("api onUnauthorized", () => {
     }
   });
 });
+
+describe("Admin api client", () => {
+  it("identifies Admin traffic for request metrics without an app session id", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: async () => "{}",
+      headers: new Headers(),
+    });
+
+    await api("/api/admin/ops-snapshot");
+
+    const [, init] = vi.mocked(fetch).mock.calls[0]!;
+    expect(init?.headers).toMatchObject({ "X-Crate-Client": "admin-web" });
+    expect(init?.headers).not.toHaveProperty("X-Crate-App");
+  });
+});
