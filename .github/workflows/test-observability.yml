@@ -13,6 +13,8 @@ on:
       - "app/tests/test_observability_release.py"
       - "scripts/observability_release.py"
       - "scripts/observability_preflight.py"
+      - "scripts/observability-deploy-remote.sh"
+      - "app/tests/test_observability_remote_deploy_runtime.py"
       - ".github/workflows/test-observability.yml"
       - "docker-compose*.yaml"
       - "deploy/operator/compose.operator.yaml"
@@ -29,6 +31,8 @@ on:
       - "app/tests/test_observability_release.py"
       - "scripts/observability_release.py"
       - "scripts/observability_preflight.py"
+      - "scripts/observability-deploy-remote.sh"
+      - "app/tests/test_observability_remote_deploy_runtime.py"
       - ".github/workflows/test-observability.yml"
       - "docker-compose*.yaml"
       - "deploy/operator/compose.operator.yaml"
@@ -110,3 +114,8 @@ jobs:
           OBSERVABILITY_RUNTIME_TEST: "1"
           OBSERVABILITY_EXPECTED_DRIVER: ${{ matrix.storage }}
         run: python -m pytest --noconftest app/tests/test_observability_runtime.py -q
+      - name: Rehearse monitoring deploy, failed deploy and rollback on the same daemon
+        env:
+          OBSERVABILITY_RUNTIME_TEST: "1"
+          OBSERVABILITY_EXPECTED_DRIVER: ${{ matrix.storage }}
+        run: python -m pytest --noconftest app/tests/test_observability_remote_deploy_runtime.py -q

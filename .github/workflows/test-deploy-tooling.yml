@@ -5,7 +5,13 @@ on:
   pull_request:
     paths:
       - "scripts/deploy-remote.sh"
+      - "scripts/deploy.sh"
       - "app/tests/test_deploy_release_commands.py"
+      - "scripts/observability-deploy.sh"
+      - "scripts/observability-deploy-remote.sh"
+      - "scripts/observability_release.py"
+      - "scripts/observability_preflight.py"
+      - "app/tests/test_observability_remote_deploy.py"
       - "scripts/application_orphans.py"
       - "app/tests/test_application_orphans.py"
       - "deploy/operator/compose.operator.yaml"
@@ -16,7 +22,13 @@ on:
     branches: [main]
     paths:
       - "scripts/deploy-remote.sh"
+      - "scripts/deploy.sh"
       - "app/tests/test_deploy_release_commands.py"
+      - "scripts/observability-deploy.sh"
+      - "scripts/observability-deploy-remote.sh"
+      - "scripts/observability_release.py"
+      - "scripts/observability_preflight.py"
+      - "app/tests/test_observability_remote_deploy.py"
       - "scripts/application_orphans.py"
       - "app/tests/test_application_orphans.py"
       - "deploy/operator/compose.operator.yaml"
@@ -42,8 +54,9 @@ jobs:
           python-version: "3.13"
       - name: Install test dependencies
         run: python -m pip install pytest==8.4.2 PyYAML==6.0.3
-      - name: Validate deploy script and orphan retirement contracts
+      - name: Validate deploy scripts, host lease and orphan retirement contracts
         run: >-
           python -m pytest --noconftest
           app/tests/test_deploy_release_commands.py
+          app/tests/test_observability_remote_deploy.py
           app/tests/test_application_orphans.py -q

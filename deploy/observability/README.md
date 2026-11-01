@@ -198,11 +198,11 @@ and verify those paths against the old container mounts. A missing explicit
 database or a new empty data directory now blocks startup rather than silently
 using the default database or starting a fresh monitoring history.
 
-The controlled remote migration/rollback command is a subsequent checkpoint;
-this change does not migrate an existing installation automatically. Until the
-Stack inventory update is deployed, Admin's existing view still lists only its
-application project. Monitoring remains inspectable with its scoped commands and
-Grafana.
+Remote deployment (below) never migrates an existing installation by itself:
+the first deployment requires an explicit confirmation and refuses to start while
+Prometheus or Grafana from another project is running. Until the Stack inventory
+update is deployed, Admin's existing view still lists only its application
+project. Monitoring remains inspectable with its scoped commands and Grafana.
 
 The checkout's application deploy/rollback and the updated home installer no
 longer use generic `--remove-orphans`.
@@ -211,14 +211,14 @@ Retiring an obsolete application service now requires an explicit reviewed actio
 it is not an automatic side effect of updating unrelated services. This does not
 patch a previously provisioned Operator helper or an already released installer.
 Reprovision the approved `scripts/deploy-remote.sh` on the Operator host and
-upgrade the installer before relying on that protection. Host-wide cooperative
-locking and coordinated rollout still belong to D2.
+upgrade the installer before relying on that protection. The same applies to
+the host mutation lease described under remote deployment.
 
 ### Review and retire obsolete application containers
 
 The checkout provides a separate local tool; deployments never call it
 automatically. Run it against the exact Compose files used by the installation,
-with no concurrent deployment while D2's shared lock is pending:
+while no deployment holds the host mutation lease:
 
 ```bash
 python3 scripts/application_orphans.py --project-directory /home/crate/crate \
@@ -267,8 +267,8 @@ records file hashes, pinned image references and the revision in `manifest.json`
 The Make verifier requires `VERSION` and compares it to the manifest revision;
 the Python CLI exposes the same check as `verify <archive> --expected-sha <sha>`.
 This compares a declaration to the caller's expected revision. It does not prove
-that the contents came from Git or authenticate a re-created bundle; trusted
-artifact identity and main-branch authorization remain D2 requirements.
+that the contents came from Git or authenticate a re-created bundle; remote
+deployment adds the main-branch requirement.
 The archive excludes app Compose, `.env`, secrets and data. Verification bounds
 both compressed and complete decompressed size, checks physical headers (including
 GNU/PAX metadata), exact regular-file members, normalized owner/mode/time/order
@@ -277,9 +277,77 @@ through the same normal CLI error contract.
 
 These local artifact commands do not deploy. Verification establishes integrity
 and the declared format; it is not a deployment authorization or a signature.
-The remote deployment caller will separately require the approved main revision
-and expected artifact identity. Remote activation and rollback remain in the next
-implementation checkpoint.
+
+### Remote deployment and rollback
+
+```bash
+make observability-deploy VERSION=<full-main-sha>
+make observability-deploy-status
+make observability-deploy-rollback CONFIRM=rollback-observability
+```
+
+The workstation refuses a revision that is not on `origin/main` (fetch first),
+builds and verifies the bundle from that commit and uploads it with the release
+tooling from the same commit. On the server everything lives under
+`/home/crate/crate-observability`, separate from the application checkout:
+
+| Path              | Contents                                                             |
+| ----------------- | -------------------------------------------------------------------- |
+| `releases/<sha>/` | Verified, extracted releases; never overwritten                      |
+| `live/`           | Compose project directory; files replaced in place, manifest last    |
+| `state/`          | `current`, `previous`, `current.backup` and an append-only `history` |
+| `tooling/<sha>/`  | Release, preflight and remote scripts from that commit               |
+| `tooling/venv/`   | Prepared Python with `requirements-tooling.txt`, provisioned once    |
+| `backups/<id>/`   | State copies taken before a Prometheus or Grafana image change       |
+
+The server needs `/etc/crate-observability/monitoring.env` and the tooling
+virtualenv before the first deployment:
+
+```bash
+python3 -m venv /home/crate/crate-observability/tooling/venv
+/home/crate/crate-observability/tooling/venv/bin/pip install -r requirements-tooling.txt
+```
+
+A deployment takes the host mutation lock, verifies the bundle against the
+requested revision, refuses if `live/` no longer matches the recorded release,
+runs the storage preflight and pulls only missing pinned images. Only then does
+it change anything: `up -d --no-deps` recreates services whose image or Compose
+definition changed, and services whose mounted file changed are restarted
+(`prometheus.yml` restarts Prometheus, a proxy configuration restarts the proxy,
+Grafana provisioning restarts Grafana; dashboards reload within 30 seconds
+without a restart). Nothing runs `down` or removes data.
+
+The release is recorded only after every monitoring container runs (and is
+healthy where it has a healthcheck), every active Prometheus target is up and
+Grafana answers `/api/health`, within `OBS_VERIFY_SECONDS` (180 by default).
+Otherwise the previous release is reinstalled, restarted and verified, and the
+command still fails. A failed first deployment stops the monitoring services.
+
+When a release changes the Prometheus or Grafana image, the deployment checks
+free space, stops only that service, copies its data directory with the current
+image to `backups/<id>/` and then starts the new image. If verification fails,
+that copy is restored before the previous release starts. The copy is kept and
+recorded in `state/current.backup`; remove old copies by hand once the new
+version has proven itself. A manual rollback refuses to run an older Prometheus
+or Grafana image on migrated state: restore the recorded copy explicitly instead.
+
+The first deployment on a host requires `CONFIRM=first-deploy` (and
+`OBS_INITIALIZE_EMPTY=1` only for a new, deliberately empty installation); the
+controlled migration from the old monitoring project is the next checkpoint.
+
+#### Host mutation lease
+
+Application deploys, Operator deploys and monitoring deploys share one lock in
+`/home/crate/crate/.deploy`: `host-mutation.lock` (an `flock` held while a step
+changes the host) and `host-mutation.lease` (the owner of a multi-step deploy).
+`make deploy` takes the lease before its first change and releases it on exit,
+including after a failure; every changing step of `deploy-remote.sh` refuses
+while another owner holds it. A monitoring deploy runs as one step under the lock
+and refuses while an application deploy owns the lease. If a process died and
+left a lease behind, release it with `make deploy-unlock DEPLOY_ID=<owner>`;
+another owner's lease needs `CONFIRM=break-host-lock`. Operator hosts must be
+reprovisioned with the updated `deploy-remote.sh` and engine before Operator
+deploys take part.
 
 For a remote installation, tunnel Grafana instead of exposing it publicly:
 
