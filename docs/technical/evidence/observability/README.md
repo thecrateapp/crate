@@ -41,3 +41,7 @@ Database, library and Tidarr data were not deleted. No restore drill is claimed.
 
 Short measurements establish neither long-term capacity nor complete metric-family
 coverage/SLOs. The external probe host is explicitly deferred.
+
+Independent deployment work: [checkpoint D1](deployment-checkpoint-d1.md) covers
+autonomous Compose identity, application orphan protection and the local
+configuration artifact. Remote rollout and the Admin topology map remain pending.

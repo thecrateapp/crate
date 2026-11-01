@@ -55,7 +55,7 @@ func (s Stack) Pull(ctx context.Context, w io.Writer) error {
 }
 
 func (s Stack) Up(ctx context.Context, w io.Writer) error {
-	up := []string{"up", "-d", "--remove-orphans"}
+	up := []string{"up", "-d"}
 	if _, err := os.Stat(InfraBridge); s.operator() && err != nil {
 		up = append(up, "--scale", "crate-infra-relay=0")
 	}

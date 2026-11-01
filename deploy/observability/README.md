@@ -5,7 +5,11 @@ PostgreSQL exporter, separate cache/durable Redis exporters and cAdvisor. It add
 no application instrumentation, notification routes or dependencies to Crate.
 It does not repair the existing internal metrics; that is PR1A.
 
-This is a manually configured overlay. Home's installer integration belongs to
+Monitoring has its own Compose project, `crate-observability`, and can be updated
+independently from application containers. `compose.standalone.yaml` reuses the
+reviewed service definitions without loading application Compose or its `.env`.
+The old `compose.observability.yaml` remains available as migration input and for
+the existing collector integration harness. Home's installer integration belongs to
 the later adoption program. Sentry, Admin and the existing operator retain their
 current responsibilities. Do not enable Grafana notifications for this stage.
 
@@ -36,19 +40,43 @@ names `nginx`, `traefik` and `slskd`; other service names are not retained.
 
 Defaults (override with exported environment values before calling Make):
 
-| Variable                | Default                                           | Purpose                                                    |
-| ----------------------- | ------------------------------------------------- | ---------------------------------------------------------- |
-| `OBS_DATA_DIR`          | `/var/lib/crate-observability`                    | Persistent Prometheus and Grafana directories              |
-| `OBS_SECRETS_DIR`       | `/var/lib/crate-observability/secrets`            | File secrets, outside Git                                  |
-| `OBS_DOCKER_ROOT`       | `/var/lib/docker`                                 | Actual Docker data-root, from `docker info`                |
-| `OBS_CONTAINERD`        | `0`                                               | Set `1` only for Docker's `overlayfs` image store          |
-| `OBS_CONTAINERD_SOCKET` | `/run/containerd/containerd.sock`                 | Actual containerd address from `docker info`, adapter only |
-| `OBS_GRAFANA_PORT`      | `3001`                                            | Loopback-only Grafana port                                 |
-| `OBS_COMPOSE_FILES`     | `docker-compose.yaml docker-compose.project.yaml` | Base files; include the operator overlay if already used   |
+| Variable                | Default                                | Purpose                                                      |
+| ----------------------- | -------------------------------------- | ------------------------------------------------------------ |
+| `OBS_DATA_DIR`          | `/var/lib/crate-observability`         | Persistent Prometheus and Grafana directories                |
+| `OBS_SECRETS_DIR`       | `/var/lib/crate-observability/secrets` | File secrets, outside Git                                    |
+| `OBS_DOCKER_ROOT`       | `/var/lib/docker`                      | Actual Docker data-root, from `docker info`                  |
+| `OBS_CONTAINERD`        | `0`                                    | Set `1` only for Docker's `overlayfs` image store            |
+| `OBS_CONTAINERD_SOCKET` | `/run/containerd/containerd.sock`      | Actual containerd address from `docker info`, adapter only   |
+| `OBS_GRAFANA_PORT`      | `3001`                                 | Loopback-only Grafana port                                   |
+| `OBS_APP_NETWORK`       | `crate`                                | Existing external application network for PG/Redis exporters |
+| `OBS_ENV_FILE`          | `/dev/null`                            | Explicit monitoring settings; never the application `.env`   |
+| `CRATE_POSTGRES_DB`     | `crate` for config parsing only        | Actual observed database; must be explicitly set for startup |
 
-For home, pass `OBS_COMPOSE_FILES=docker-compose.home.yaml`. Keep the same Compose
-project name and network as the existing installation. The overlay reuses the
-`crate` network only for PG/Redis exporters and adds an internal monitoring
+Defaults are available for configuration inspection. **Startup requires explicit
+`OBS_DATA_DIR`, `OBS_SECRETS_DIR`, `OBS_APP_NETWORK` and `CRATE_POSTGRES_DB`**,
+exported or supplied through a dedicated non-secret monitoring file. For example:
+
+```dotenv
+# /etc/crate-observability/monitoring.env — use the installation's actual values
+OBS_DATA_DIR=/var/lib/crate-observability
+OBS_SECRETS_DIR=/var/lib/crate-observability/secrets
+OBS_APP_NETWORK=crate
+CRATE_POSTGRES_DB=crate
+```
+
+Do not point `OBS_ENV_FILE` at the application `.env`; startup rejects that path.
+The preflight asks Compose to resolve only the dedicated environment, keeps its
+output private and checks prepared storage. Existing Prometheus and Grafana
+directories must be non-empty. A newly provisioned, deliberately empty
+installation requires `OBS_INITIALIZE_EMPTY=1`; do not use it to bypass migration
+checks. The deployment account needs directory inspection access; an unreadable
+directory fails closed. File secrets remain private.
+
+`OBS_COMPOSE_FILES` is retired; commands reject it instead of silently selecting
+an application project. Both project and home installations use standalone Compose.
+Set `OBS_APP_NETWORK` to the installation's existing network when it differs from
+`crate`. This network is external: monitoring never creates or removes it.
+Only PG/Redis exporters join it. Monitoring has its own internal
 network. Only Grafana also joins a separate bridge so Docker can publish its
 loopback port; Prometheus/exporters do not join that access network. No Crate
 service waits for a monitoring service.
@@ -121,7 +149,9 @@ From the repository root:
 make observability-config
 make observability-pull
 # Only after provisioning and approval to activate this installation:
-make observability-up
+make observability-up OBS_ENV_FILE=/etc/crate-observability/monitoring.env
+# For a genuinely new installation with prepared empty directories only:
+# make observability-up OBS_ENV_FILE=/etc/crate-observability/monitoring.env OBS_INITIALIZE_EMPTY=1
 make observability-status
 ```
 
@@ -141,11 +171,115 @@ The adapter does not change Docker's configuration or migrate its image store.
 
 These targets act on the local Docker context; they never SSH. `up` selects only
 the monitoring services with `--no-deps`, so it does not start or recreate Crate.
-Check the Docker context and base Compose project before using them. On home:
+Check the Docker context before using them. Commands explicitly select the
+monitoring project and ignore the application's `.env`; export monitoring settings
+or supply a dedicated `OBS_ENV_FILE`. On home with a custom existing network:
 
 ```bash
-make observability-config OBS_COMPOSE_FILES=docker-compose.home.yaml
+make observability-config OBS_APP_NETWORK=my-existing-crate-network
 ```
+
+### Existing installations: migrate before standalone startup
+
+Changing a Compose project creates different containers. Do not start standalone
+monitoring while the previous Prometheus or Grafana is writing to the same data.
+`observability-up` checks running service/project labels and refuses startup if
+Prometheus or Grafana belongs to another project, or if that check fails. This is
+a singleton installation guard, not support for multiple monitoring installations
+on one host. Stop only the reviewed legacy monitoring instances during the planned
+migration; application, PostgreSQL and Redis remain running. Preserve data,
+secrets, permissions and Grafana datasource UID. A monitoring gap is expected.
+
+Before stopping the old instances, manually copy the four required non-secret
+settings into the dedicated file, using the real database and the old data and
+secret paths. The application `.env` is never imported implicitly. Run
+`make observability-start-preflight OBS_ENV_FILE=/etc/crate-observability/monitoring.env`
+and verify those paths against the old container mounts. A missing explicit
+database or a new empty data directory now blocks startup rather than silently
+using the default database or starting a fresh monitoring history.
+
+The controlled remote migration/rollback command is a subsequent checkpoint;
+this change does not migrate an existing installation automatically. Until the
+Stack inventory update is deployed, Admin's existing view still lists only its
+application project. Monitoring remains inspectable with its scoped commands and
+Grafana.
+
+The checkout's application deploy/rollback and the updated home installer no
+longer use generic `--remove-orphans`.
+This protects legacy monitoring and other project members during transition.
+Retiring an obsolete application service now requires an explicit reviewed action;
+it is not an automatic side effect of updating unrelated services. This does not
+patch a previously provisioned Operator helper or an already released installer.
+Reprovision the approved `scripts/deploy-remote.sh` on the Operator host and
+upgrade the installer before relying on that protection. Host-wide cooperative
+locking and coordinated rollout still belong to D2.
+
+### Review and retire obsolete application containers
+
+The checkout provides a separate local tool; deployments never call it
+automatically. Run it against the exact Compose files used by the installation,
+with no concurrent deployment while D2's shared lock is pending:
+
+```bash
+python3 scripts/application_orphans.py --project-directory /home/crate/crate \
+  --compose-file docker-compose.yaml --compose-file docker-compose.project.yaml audit
+```
+
+Include the active Operator overlay with another `--compose-file` when present.
+Review the service/image/full container IDs and `configuration_sha256` in the JSON report. To retire only
+specific reviewed obsolete containers, repeat the same configuration arguments:
+
+```bash
+python3 scripts/application_orphans.py --project-directory /home/crate/crate \
+  --compose-file docker-compose.yaml --compose-file docker-compose.project.yaml \
+  retire <full-64-character-container-id> --confirm-retirement \
+  --expected-config-sha256 <configuration_sha256-from-the-reviewed-audit>
+```
+
+The tool requires the reviewed configuration digest and rechecks current
+configuration and labels before removal. It resolves all Compose profiles, so
+an inactive declared service is not mistaken for an orphan. Foreign or
+unmanaged containers, one-off containers, declared services, the eight legacy
+monitoring services, Agent, Operator and its relay cannot be retired through
+this tool. Inventory failures abort. Removal targets immutable full IDs and does
+not delete volumes or bind-mounted data. This is explicit service retirement,
+not a replacement for deployment locking or a data-retention policy.
+
+### Immutable configuration artifact
+
+Build from a real committed revision after the standalone files are committed:
+
+```bash
+make observability-bundle VERSION=<full-commit-sha>
+make observability-bundle-verify VERSION=<full-commit-sha>
+```
+
+`OBS_BUNDLE` overrides the output/archive path; `OBS_PYTHON` selects Python 3.13
+(default `python3`) with `requirements-tooling.txt` installed. Use a dedicated
+tooling environment when the host interpreter is not prepared; no application
+container is needed. PyYAML is already a Crate dependency and is used here to
+validate actual YAML image fields, including quoted keys, aliases and overrides.
+The archive, hash and Git operations use the standard library/Git.
+The builder reads only the ten allowlisted monitoring files
+from the requested Git commit with replacement refs disabled, so dirty working-tree
+changes and local `git replace` substitutions are excluded. It
+records file hashes, pinned image references and the revision in `manifest.json`.
+The Make verifier requires `VERSION` and compares it to the manifest revision;
+the Python CLI exposes the same check as `verify <archive> --expected-sha <sha>`.
+This compares a declaration to the caller's expected revision. It does not prove
+that the contents came from Git or authenticate a re-created bundle; trusted
+artifact identity and main-branch authorization remain D2 requirements.
+The archive excludes app Compose, `.env`, secrets and data. Verification bounds
+both compressed and complete decompressed size, checks physical headers (including
+GNU/PAX metadata), exact regular-file members, normalized owner/mode/time/order
+and hashes, and never extracts into the filesystem. Corrupt deflate is rejected
+through the same normal CLI error contract.
+
+These local artifact commands do not deploy. Verification establishes integrity
+and the declared format; it is not a deployment authorization or a signature.
+The remote deployment caller will separately require the approved main revision
+and expected artifact identity. Remote activation and rollback remain in the next
+implementation checkpoint.
 
 For a remote installation, tunnel Grafana instead of exposing it publicly:
 

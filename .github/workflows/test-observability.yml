@@ -9,6 +9,14 @@ on:
       - "app/tests/test_observability_containerd.py"
       - "app/tests/test_observability_c0_retirement.py"
       - "app/tests/test_observability_runtime.py"
+      - "app/tests/test_observability_deployment.py"
+      - "app/tests/test_observability_release.py"
+      - "app/tests/test_deploy_release_commands.py"
+      - "scripts/observability_release.py"
+      - "scripts/observability_preflight.py"
+      - "scripts/application_orphans.py"
+      - "app/tests/test_application_orphans.py"
+      - "scripts/deploy-remote.sh"
       - ".github/workflows/test-observability.yml"
       - "docker-compose*.yaml"
       - "deploy/operator/compose.operator.yaml"
@@ -21,6 +29,14 @@ on:
       - "app/tests/test_observability_containerd.py"
       - "app/tests/test_observability_c0_retirement.py"
       - "app/tests/test_observability_runtime.py"
+      - "app/tests/test_observability_deployment.py"
+      - "app/tests/test_observability_release.py"
+      - "app/tests/test_deploy_release_commands.py"
+      - "scripts/observability_release.py"
+      - "scripts/observability_preflight.py"
+      - "scripts/application_orphans.py"
+      - "app/tests/test_application_orphans.py"
+      - "scripts/deploy-remote.sh"
       - ".github/workflows/test-observability.yml"
       - "docker-compose*.yaml"
       - "deploy/operator/compose.operator.yaml"
@@ -74,7 +90,15 @@ jobs:
           test "$(docker info --format '{{.Driver}}')" = "$STORAGE_DRIVER"
       - name: Validate overlay isolation, resources, dashboards and profile combinations
         # These tests use only the Compose parser, not Crate's DB/application fixtures.
-        run: python -m pytest --noconftest app/tests/test_observability_compose.py app/tests/test_observability_containerd.py app/tests/test_observability_c0_retirement.py -q
+        run: >-
+          python -m pytest --noconftest
+          app/tests/test_observability_compose.py
+          app/tests/test_observability_containerd.py
+          app/tests/test_observability_c0_retirement.py
+          app/tests/test_observability_deployment.py
+          app/tests/test_observability_release.py
+          app/tests/test_application_orphans.py
+          app/tests/test_deploy_release_commands.py -q
       - name: Check Prometheus configuration with its pinned release
         run: |
           image="$(python -c 'import yaml; print(yaml.safe_load(open("deploy/observability/compose.observability.yaml"))["services"]["crate-prometheus"]["image"])')"

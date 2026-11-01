@@ -39,7 +39,7 @@ func TestStackRunsComposeInTheInstallDirectory(t *testing.T) {
 
 	want := []string{
 		"/srv/crate $ sudo docker compose --project-directory /srv/crate -f /srv/crate/docker-compose.yaml --env-file /srv/crate/.env pull",
-		"/srv/crate $ sudo docker compose --project-directory /srv/crate -f /srv/crate/docker-compose.yaml --env-file /srv/crate/.env up -d --remove-orphans",
+		"/srv/crate $ sudo docker compose --project-directory /srv/crate -f /srv/crate/docker-compose.yaml --env-file /srv/crate/.env up -d",
 	}
 	if strings.Join(runner.calls, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("got\n%s", strings.Join(runner.calls, "\n"))
@@ -56,11 +56,11 @@ func TestTheOperatorOverlayJoinsEveryComposeCall(t *testing.T) {
 		bridge bool
 		want   string
 	}{
-		{"stack alone", nil, false, "-f /srv/crate/docker-compose.yaml --env-file /srv/crate/.env up -d --remove-orphans"},
+		{"stack alone", nil, false, "-f /srv/crate/docker-compose.yaml --env-file /srv/crate/.env up -d"},
 		{"operator without the bridge", []string{"docker-compose.yaml", "deploy/operator/compose.operator.yaml"}, false,
-			"-f /srv/crate/docker-compose.yaml -f /srv/crate/deploy/operator/compose.operator.yaml --env-file /srv/crate/.env up -d --remove-orphans --scale crate-infra-relay=0"},
+			"-f /srv/crate/docker-compose.yaml -f /srv/crate/deploy/operator/compose.operator.yaml --env-file /srv/crate/.env up -d --scale crate-infra-relay=0"},
 		{"operator with the bridge", []string{"docker-compose.yaml", "deploy/operator/compose.operator.yaml"}, true,
-			"-f /srv/crate/docker-compose.yaml -f /srv/crate/deploy/operator/compose.operator.yaml --env-file /srv/crate/.env up -d --remove-orphans"},
+			"-f /srv/crate/docker-compose.yaml -f /srv/crate/deploy/operator/compose.operator.yaml --env-file /srv/crate/.env up -d"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

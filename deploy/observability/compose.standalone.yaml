@@ -1,0 +1,60 @@
+name: crate-observability
+
+networks:
+  crate:
+    external: true
+    name: ${OBS_APP_NETWORK:-crate}
+  observability:
+    internal: true
+  observability-ui: {}
+
+secrets:
+  observability_grafana_password:
+    file: ${OBS_SECRETS_DIR:-/var/lib/crate-observability/secrets}/grafana-admin-password
+  observability_postgres_password:
+    file: ${OBS_SECRETS_DIR:-/var/lib/crate-observability/secrets}/postgres-exporter-password
+  observability_redis_cache_passwords:
+    file: ${OBS_SECRETS_DIR:-/var/lib/crate-observability/secrets}/redis-cache-passwords.json
+  observability_redis_durable_passwords:
+    file: ${OBS_SECRETS_DIR:-/var/lib/crate-observability/secrets}/redis-durable-passwords.json
+
+services:
+  crate-prometheus:
+    extends:
+      file: deploy/observability/compose.observability.yaml
+      service: crate-prometheus
+    volumes:
+      - ./deploy/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  crate-grafana:
+    extends:
+      file: deploy/observability/compose.observability.yaml
+      service: crate-grafana
+    volumes:
+      - ./deploy/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/observability/grafana/dashboards:/etc/grafana/dashboards:ro
+  crate-node-exporter:
+    extends:
+      file: deploy/observability/compose.observability.yaml
+      service: crate-node-exporter
+  crate-postgres-exporter:
+    extends:
+      file: deploy/observability/compose.observability.yaml
+      service: crate-postgres-exporter
+  crate-redis-exporter:
+    extends:
+      file: deploy/observability/compose.observability.yaml
+      service: crate-redis-exporter
+  crate-redis-durable-exporter:
+    extends:
+      file: deploy/observability/compose.observability.yaml
+      service: crate-redis-durable-exporter
+  crate-cadvisor:
+    extends:
+      file: deploy/observability/compose.observability.yaml
+      service: crate-cadvisor
+  crate-observability-docker-proxy:
+    extends:
+      file: deploy/observability/compose.observability.yaml
+      service: crate-observability-docker-proxy
+    volumes:
+      - ./deploy/observability/docker-proxy.haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro

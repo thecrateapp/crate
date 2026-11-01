@@ -127,7 +127,7 @@ def _fake_monitoring_cli(
         "        output.write(json.dumps(['compose-socket', socket]) + '\\n')\n"
         "if sys.argv[1] == 'info':\n"
         "    print(os.environ['FAKE_DOCKER_DRIVER'])\n"
-        "elif sys.argv[1] != 'compose':\n"
+        "elif sys.argv[1] not in {'compose', 'ps'}:\n"
         "    sys.exit(2)\n"
     )
     readlink = tmp_path / "readlink"

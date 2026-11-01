@@ -39,8 +39,8 @@ select_operator_overlay() {
 }
 select_operator_overlay
 # A running Crate Operator keeps its overlay through every stage: without it
-# crate-api and the workers lose the operator identity and --remove-orphans
-# removes the operator containers.
+# crate-api and the workers lose the operator identity. Service retirement is
+# explicit: application deployment must not remove other project members.
 OPERATOR_OVERLAY=""
 select_running_operator_overlay() {
   [[ -n "$(docker ps -q -f name='^crate-operator$')" ]] || return 0
@@ -905,7 +905,7 @@ cmd_up() {
     return 0
   fi
   log "Restarting only ${#services[@]} changed application service(s)"
-  dc up -d --no-build --no-deps --remove-orphans "${services[@]}"
+  dc up -d --no-build --no-deps "${services[@]}"
 }
 
 cmd_verify() {
@@ -1076,7 +1076,7 @@ cmd_rollback() {
   log "Restoring ${#rollback_services[@]} service(s) changed by the failed release"
   dc pull --ignore-buildable "${rollback_services[@]}" >/dev/null 2>&1 || \
     log "Registry pull failed during rollback; using preserved local images"
-  "${COMPOSE[@]}" up -d --no-build --no-deps --remove-orphans "${rollback_services[@]}"
+  "${COMPOSE[@]}" up -d --no-build --no-deps "${rollback_services[@]}"
   DEPLOY_PUBLIC_CHECKS=0 cmd_verify
 }
 
@@ -1190,7 +1190,7 @@ cmd_state_rollback() {
   log "Restarting recovered release ${target_tag}"
   dc pull --ignore-buildable "${PROJECT_SERVICES[@]}" >/dev/null 2>&1 || \
     log "Registry pull failed during state rollback; using preserved local images"
-  dc up -d --no-build --remove-orphans
+  dc up -d --no-build
   DEPLOY_PUBLIC_CHECKS=0 cmd_verify
   log "State rollback ${DEPLOY_ID} completed at schema ${expected_schema}"
 }
