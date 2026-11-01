@@ -37,6 +37,17 @@ def _request(server, path, *, method="GET", headers=None):
         return error.code, dict(error.headers), b""
 
 
+def _logged_events(server, count: int) -> list[dict]:
+    deadline = time.monotonic() + 2
+    while True:
+        lines = (
+            server.log_path.read_text().splitlines() if server.log_path.exists() else []
+        )
+        if len(lines) >= count or time.monotonic() > deadline:
+            return [json.loads(line) for line in lines]
+        time.sleep(0.01)
+
+
 def _ticket(age_seconds: float = 0.0) -> str:
     return f"{time.time() - age_seconds:.0f}"
 
@@ -98,7 +109,7 @@ def test_every_request_is_logged(server):
     )
     _request(server, f"/media/probe-short.wav?ticket={_ticket(60)}")
 
-    events = [json.loads(line) for line in server.log_path.read_text().splitlines()]
+    events = _logged_events(server, 2)
     assert [event["status"] for event in events] == [206, 401]
     assert events[0]["range"] == "bytes=0-9"
     assert events[0]["bytes_sent"] == 10
