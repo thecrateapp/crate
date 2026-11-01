@@ -887,6 +887,11 @@ deploy-image-rollback: ## Roll back only application images/config (requires CON
 	@test "$(CONFIRM)" = "rollback-images" || { echo "$(RED)CONFIRM=rollback-images is required$(NC)"; exit 1; }
 	@SERVER_USER="$(SERVER_USER)" SERVER_HOST="$(SERVER_HOST)" SERVER_PATH="$(SERVER_PATH)" DEPLOY_ID="$(strip $(DEPLOY_ID))" DEPLOY_CONFIRM="$(CONFIRM)" DEPLOY_IMAGE_OWNER="$(DEPLOY_IMAGE_OWNER)" DEPLOY_IMAGE_REGISTRY="$(DEPLOY_IMAGE_REGISTRY)" scripts/deploy.sh image-rollback
 
+.PHONY: deploy-unlock
+deploy-unlock: ## Release a stale host mutation lease (another owner requires CONFIRM=break-host-lock)
+	@test -n "$(strip $(DEPLOY_ID))" || { echo "$(RED)DEPLOY_ID=<lease owner> is required$(NC)"; exit 1; }
+	@SERVER_USER="$(SERVER_USER)" SERVER_HOST="$(SERVER_HOST)" SERVER_PATH="$(SERVER_PATH)" DEPLOY_ID="$(strip $(DEPLOY_ID))" DEPLOY_CONFIRM="$(CONFIRM)" DEPLOY_IMAGE_OWNER="$(DEPLOY_IMAGE_OWNER)" DEPLOY_IMAGE_REGISTRY="$(DEPLOY_IMAGE_REGISTRY)" scripts/deploy.sh unlock
+
 .PHONY: deploy-build
 deploy-build: ## Deploy by building on the server (GHCR fallback)
 	@echo "$(YELLOW)Syncing files...$(NC)"
@@ -1280,6 +1285,19 @@ observability-bundle: ## Package monitoring configuration from an exact Git comm
 
 observability-bundle-verify: ## Verify an independent monitoring archive without extracting it
 	@$(OBS_PYTHON) scripts/observability_release.py verify "$$OBS_BUNDLE" --expected-sha "$$OBS_RELEASE_SHA"
+
+OBS_DEPLOY_ENV = SERVER_USER="$(SERVER_USER)" SERVER_HOST="$(SERVER_HOST)" SERVER_PATH="$(SERVER_PATH)" OBS_DEPLOY_SHA='$(strip $(VERSION))' OBS_CONFIRM="$(CONFIRM)" OBS_CONTAINERD="$(OBS_CONTAINERD)" OBS_PYTHON="$(OBS_PYTHON)"
+.PHONY: observability-deploy observability-deploy-rollback observability-deploy-status
+observability-deploy: ## Deploy monitoring configuration from a main commit (usage: make observability-deploy VERSION=<full-main-sha>)
+	@test -n "$(strip $(VERSION))" || { echo "VERSION=<full-main-sha> is required"; exit 1; }
+	@$(OBS_DEPLOY_ENV) scripts/observability-deploy.sh deploy
+
+observability-deploy-rollback: ## Return monitoring to the previous release (requires CONFIRM=rollback-observability)
+	@test "$(CONFIRM)" = "rollback-observability" || { echo "CONFIRM=rollback-observability is required"; exit 1; }
+	@$(OBS_DEPLOY_ENV) scripts/observability-deploy.sh rollback
+
+observability-deploy-status: ## Show the deployed monitoring release, live drift and services
+	@$(OBS_DEPLOY_ENV) scripts/observability-deploy.sh status
 
 # ===========================================================================
 # HELP

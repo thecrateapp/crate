@@ -20,6 +20,10 @@ BACKUP_ROOT="${SERVER_PATH}/.deploy-backups"
 BACKUP_DIR="${BACKUP_ROOT}/${DEPLOY_ID}"
 ROLLBACK_TAG="rollback-${DEPLOY_ID}"
 IMAGE_PREFIX="${DEPLOY_IMAGE_REGISTRY}/${DEPLOY_IMAGE_OWNER}"
+HOST_LOCK_DIR="${SERVER_PATH}/.deploy"
+HOST_LOCK_OWNER="$DEPLOY_ID"
+HOST_LOCK_CONFIRM="$DEPLOY_CONFIRM"
+HOST_LOCK_WAIT_SECONDS="${HOST_LOCK_WAIT_SECONDS:-600}"
 
 cd "$SERVER_PATH"
 
@@ -1297,23 +1301,75 @@ cmd_diagnose() {
   dc logs --tail=120 crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-site crate-docs || true
 }
 
+host_lock_acquire() {
+  mkdir -p "$HOST_LOCK_DIR"
+  exec 9>>"$HOST_LOCK_DIR/host-mutation.lock"
+  if ! flock -w "$HOST_LOCK_WAIT_SECONDS" 9; then
+    echo "Another host mutation kept the lock for ${HOST_LOCK_WAIT_SECONDS}s; nothing changed" >&2
+    exit 1
+  fi
+}
+
+host_lease_field() {
+  local lease="$HOST_LOCK_DIR/host-mutation.lease"
+  [[ -f "$lease" ]] || return 0
+  sed -n "s/^$1=//p" "$lease"
+}
+
+host_lease_refuse_other() {
+  local owner
+  owner="$(host_lease_field owner)"
+  if [[ -n "$owner" && "$owner" != "$HOST_LOCK_OWNER" ]]; then
+    echo "Host mutation lease is held by ${owner} since $(host_lease_field since); nothing changed" >&2
+    exit 1
+  fi
+}
+
+host_guard() {
+  host_lock_acquire
+  host_lease_refuse_other
+  "$@"
+}
+
+cmd_host_lock() {
+  host_lock_acquire
+  host_lease_refuse_other
+  local lease="$HOST_LOCK_DIR/host-mutation.lease"
+  printf 'owner=%s\nsince=%s\n' "$HOST_LOCK_OWNER" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$lease.tmp"
+  mv -f "$lease.tmp" "$lease"
+}
+
+cmd_host_unlock() {
+  host_lock_acquire
+  local owner
+  owner="$(host_lease_field owner)"
+  [[ -n "$owner" ]] || return 0
+  if [[ "$owner" != "$HOST_LOCK_OWNER" && "$HOST_LOCK_CONFIRM" != "break-host-lock" ]]; then
+    echo "Host mutation lease is held by ${owner}; release it only with confirmation break-host-lock" >&2
+    exit 1
+  fi
+  rm -f "$HOST_LOCK_DIR/host-mutation.lease"
+}
+
 case "${1:-}" in
+  host-lock) cmd_host_lock ;;
+  host-unlock) cmd_host_unlock ;;
   release-preflight) cmd_release_preflight ;;
   preflight) cmd_preflight ;;
-  backup) cmd_backup ;;
-  recovery-snapshot) cmd_recovery_snapshot ;;
-  config) cmd_config ;;
-  pull) cmd_pull ;;
-  up) cmd_up ;;
+  backup) host_guard cmd_backup ;;
+  recovery-snapshot) host_guard cmd_recovery_snapshot ;;
+  config) host_guard cmd_config ;;
+  pull) host_guard cmd_pull ;;
+  up) host_guard cmd_up ;;
   verify) cmd_verify ;;
-  agent-context) cmd_agent_context ;;
-  rollback) cmd_rollback ;;
-  state-rollback) cmd_state_rollback ;;
-  cleanup) cmd_cleanup ;;
+  agent-context) host_guard cmd_agent_context ;;
+  rollback) host_guard cmd_rollback ;;
+  state-rollback) host_guard cmd_state_rollback ;;
+  cleanup) host_guard cmd_cleanup ;;
   ps) cmd_ps ;;
   diagnose) cmd_diagnose ;;
   *)
-    printf 'Usage: %s {release-preflight|preflight|backup|recovery-snapshot|config|pull|up|verify|agent-context|rollback|state-rollback|cleanup|ps|diagnose}\n' "$0" >&2
+    printf 'Usage: %s {host-lock|host-unlock|release-preflight|preflight|backup|recovery-snapshot|config|pull|up|verify|agent-context|rollback|state-rollback|cleanup|ps|diagnose}\n' "$0" >&2
     exit 2
     ;;
 esac
