@@ -6,6 +6,7 @@
 #include "crate_vdj/connection_worker.hpp"
 #include "crate_vdj/http_client.hpp"
 #include "crate_vdj/metadata_cache.hpp"
+#include "crate_vdj/models.hpp"
 #include "crate_vdj/request_coordinator.hpp"
 
 #include <cstddef>
@@ -15,6 +16,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace crate::vdj {
@@ -88,6 +90,7 @@ inline constexpr std::string_view kCompatibleFolderPrefix = "crate:compatible:";
 int vdj_key_number(std::string_view audio_key, std::string_view audio_scale);
 std::string api_asset_url(const std::string& origin, std::string_view path);
 std::string compatible_folder_navigation_command(std::string_view language);
+std::string vdj_search_command(std::string_view field, std::string_view value);
 
 class OnlineSource {
 public:
@@ -107,11 +110,24 @@ public:
     StreamUrl stream_url(const std::string& unique_id);
     CallbackStatus folder_list(FolderSink& sink);
     CallbackStatus folder(const std::string& folder_id, TrackSink& sink);
-    std::vector<std::string_view> context_menu();
+    std::vector<std::string_view> context_menu(const std::string& unique_id);
     CallbackStatus select_context_menu(const std::string& unique_id, std::size_t index);
 
 private:
     struct ServerClients;
+    struct TrackFacts {
+        std::string artist;
+        std::string album;
+    };
+    enum class MenuAction {
+        Compatible,
+        Artist,
+        Album,
+    };
+
+    void remember(const std::vector<SearchTrack>& tracks);
+    std::optional<TrackFacts> facts_for(const std::string& unique_id);
+    std::vector<MenuAction> menu_actions(const std::string& unique_id);
 
     void sync_clients();
     std::shared_ptr<ServerClients> clients();
@@ -131,6 +147,8 @@ private:
     RequestCoordinator folders_;
     std::mutex compatible_mutex_;
     std::optional<std::string> compatible_seed_;
+    std::mutex facts_mutex_;
+    std::unordered_map<std::string, TrackFacts> track_facts_;
     ConnectionWorker connection_;
 };
 

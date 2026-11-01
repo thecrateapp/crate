@@ -343,16 +343,40 @@ void current_compatible_folder_without_a_crate_track_is_empty()
     CRATE_CHECK(sink.tracks.empty());
 }
 
-void the_menu_offers_compatible_tracks_only()
+void an_unknown_track_only_offers_compatible_tracks()
 {
     Harness harness;
 
-    const auto entries = harness.source->context_menu();
-    CRATE_CHECK(entries.size() == 1);
-    CRATE_CHECK(harness.source->select_context_menu("track-1", 1) == CallbackStatus::NotImplemented);
-    CRATE_CHECK(harness.source->select_context_menu("track-1", 0) == CallbackStatus::Done);
+    CRATE_CHECK(harness.source->context_menu("unknown").size() == 1);
+    CRATE_CHECK(harness.source->select_context_menu("unknown", 1) == CallbackStatus::NotImplemented);
+    CRATE_CHECK(harness.source->select_context_menu("unknown", 0) == CallbackStatus::Done);
     CRATE_CHECK(harness.host.commands.size() == 1);
     CRATE_CHECK(harness.host.commands[0] == compatible_folder_navigation_command("English"));
+}
+
+void a_listed_track_offers_its_artist_and_album()
+{
+    Harness harness;
+    harness.http.route("/api/search?q=noah", kSearchJson);
+    RecordingSink sink;
+    CRATE_CHECK(harness.source->search("noah", sink) == CallbackStatus::Done);
+
+    const auto entries = harness.source->context_menu("track-1");
+
+    CRATE_CHECK(entries.size() == 3);
+    CRATE_CHECK(entries[1] == "More from this artist");
+    CRATE_CHECK(entries[2] == "This album");
+    CRATE_CHECK(harness.source->select_context_menu("track-1", 1) == CallbackStatus::Done);
+    CRATE_CHECK(harness.source->select_context_menu("track-1", 2) == CallbackStatus::Done);
+    CRATE_CHECK(harness.host.commands.size() == 2);
+    CRATE_CHECK(harness.host.commands[0] == "search 'artist:\"Birds In Row\"'");
+    CRATE_CHECK(harness.host.commands[1] == "search 'album:\"Gris Klein\"'");
+}
+
+void names_with_quotes_fall_back_to_a_text_search()
+{
+    CRATE_CHECK(vdj_search_command("artist", "Guns N' Roses") == "search \"Guns N' Roses\"");
+    CRATE_CHECK(vdj_search_command("album", "12\" Mixes") == "search \"12 Mixes\"");
 }
 
 void keys_and_cover_urls_map_to_virtualdj()
@@ -378,6 +402,8 @@ int main()
     a_new_folder_cancels_one_still_paging();
     folder_list_adds_the_compatible_folder();
     current_compatible_folder_without_a_crate_track_is_empty();
-    the_menu_offers_compatible_tracks_only();
+    an_unknown_track_only_offers_compatible_tracks();
+    a_listed_track_offers_its_artist_and_album();
+    names_with_quotes_fall_back_to_a_text_search();
     keys_and_cover_urls_map_to_virtualdj();
 }
