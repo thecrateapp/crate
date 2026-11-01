@@ -43,4 +43,30 @@ describe("metric stream model", () => {
       ).toEqual([null, null, 0]);
     },
   );
+  it("breaks a source-reset bucket instead of plotting partial history as an exact value", () => {
+    const start = Date.parse("2026-10-31T10:00:00Z");
+    const data = [
+      { timestamp: new Date(start).toISOString(), count: 10, avg: 20 },
+      {
+        timestamp: new Date(start + 60_000).toISOString(),
+        count: 5,
+        avg: 8,
+        source_gap: true,
+      },
+      {
+        timestamp: new Date(start + 120_000).toISOString(),
+        count: 12,
+        avg: 22,
+      },
+    ];
+
+    const series = buildMetricSeries(data, ["count", "avg"], 60);
+
+    expect(series[0]!.data).toEqual([
+      { x: start, y: 10 },
+      { x: start + 60_000, y: null },
+      { x: start + 120_000, y: 12 },
+    ]);
+    expect(series[1]!.data.map((point) => point.y)).toEqual([20, null, 22]);
+  });
 });

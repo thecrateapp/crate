@@ -1,6 +1,12 @@
 # ruff: noqa: F401
 """Response-oriented Pydantic models for the HTTP API contract."""
 
+from crate.api.schemas.metrics import (
+    MetricsSummaryResponse,
+    MetricsDashboardResponse,
+    MetricsRoutesResponse,
+)
+
 from crate.api.schemas import ai_agents as ai_agents
 from crate.api.schemas.sonic_insights import SonicNeighborsResponse, SonicReport
 from crate.api.schemas.agent_telegram import (

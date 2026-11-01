@@ -2404,23 +2404,43 @@ class TestAdminMetricsAPI:
         assert result["resource_pressure"] == sample
 
     def test_metrics_dashboard_uses_clean_http_metric_series(self, test_app):
-        summary_specs: dict[str, tuple[str, int]] = {}
+        summary_specs: dict[str, tuple] = {}
         recent_calls: list[str] = []
+        snapshot_calls = []
 
-        def fake_query_summaries(specs: dict[str, tuple[str, int]]):
+        def fake_query_summaries(specs: dict[str, tuple]):
             summary_specs.update(specs)
             return {
                 key: {"count": 1, "avg": 42, "min": 42, "max": 42, "sum": 42}
                 for key in specs
             }
 
-        def fake_query_recent(name: str, minutes: int = 60):
-            recent_calls.append(name)
-            return []
+        def fake_timeseries_snapshot(
+            names, period="minute", minutes=60, *, persisted=False
+        ):
+            recent_calls.extend(names)
+            snapshot_calls.append((list(names), period, minutes, persisted))
+            return {
+                "data": {name: [] for name in names},
+                "status": {
+                    name: {
+                        "availability": "empty",
+                        "source": "postgresql_v2" if persisted else "redis_v2",
+                        "reason": "empty",
+                        "observed_at": None,
+                        "age_seconds": None,
+                        "window_minutes": minutes,
+                    }
+                    for name in names
+                },
+            }
 
         with (
             patch("crate.metrics.query_summaries", side_effect=fake_query_summaries),
-            patch("crate.metrics.query_recent", side_effect=fake_query_recent),
+            patch(
+                "crate.metrics.query_timeseries_snapshot",
+                side_effect=fake_timeseries_snapshot,
+            ),
             patch("crate.db.cache_store.get_cache", return_value=None),
             patch("crate.db.cache_store.set_cache"),
             patch("crate.api.admin_metrics._build_metrics_system", return_value={}),
@@ -2429,9 +2449,16 @@ class TestAdminMetricsAPI:
             resp = test_app.get("/api/admin/metrics/dashboard?period=minute&minutes=5")
 
         assert resp.status_code == 200
+        assert len(snapshot_calls) == 1
+        assert snapshot_calls[0][1:] == ("minute", 5, True)
         assert summary_specs["api_latency"] == ("api.request.latency", 5)
         assert summary_specs["api_requests"] == ("api.request.count", 5)
-        assert summary_specs["api_errors"] == ("api.request.errors", 5)
+        assert summary_specs["api_errors"] == (
+            "api.request.count",
+            5,
+            {"status_class": "5xx"},
+        )
+        assert summary_specs["worker_queue_depth"] == ("worker.queue.depth", 5)
         assert summary_specs["api_slow"] == ("api.request.slow", 5)
         assert ("api.latency", 5) not in summary_specs.values()
         assert "api.request.latency" in recent_calls

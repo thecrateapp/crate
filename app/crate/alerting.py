@@ -7,6 +7,7 @@ The worker service loop persists the result; the operator supervisor alerts on i
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, field
 
 from crate.db.cache_settings import get_setting
@@ -24,13 +25,24 @@ class ThresholdBreach:
 
 @dataclass
 class HealthStatus:
-    score: int = 100
+    score: int | None = None
+    availability: str = "unavailable"
+    observed_at: str | None = None
+    inputs: dict = field(default_factory=dict)
+    collector_local: dict = field(default_factory=dict)
     breaches: list[ThresholdBreach] = field(default_factory=list)
     metrics: dict = field(default_factory=dict)
 
     def snapshot(self) -> dict:
         return {
-            "score": int(self.score),
+            "schema_version": 2,
+            "availability": self.availability,
+            "source": "redis_v2",
+            "coverage": "observed_only",
+            "observed_at": self.observed_at,
+            "inputs": self.inputs,
+            "collector_local": self.collector_local,
+            "score": int(self.score) if self.score is not None else None,
             "breaches": [
                 {
                     "name": breach.name[:80],
@@ -44,17 +56,25 @@ class HealthStatus:
 
 
 def _get_threshold(key: str, default: float) -> float:
-    raw = get_setting(f"alert_threshold_{key}")
-    if raw is not None:
-        try:
-            return float(raw)
-        except (ValueError, TypeError):
-            pass
+    keys = [key]
+    if key == "api_max_latency_ms":
+        keys.append(
+            "api_p95_latency_ms"
+        )  # Deprecated read-only alias; same maximum semantics.
+    for setting in keys:
+        raw = get_setting(f"alert_threshold_{setting}")
+        if raw is not None:
+            try:
+                value = float(raw)
+                if math.isfinite(value) and value >= 0:
+                    return value
+            except (ValueError, TypeError):
+                pass
     return default
 
 
 DEFAULT_THRESHOLDS = {
-    "api_p95_latency_ms": 3000,
+    "api_max_latency_ms": 3000,
     "api_error_rate_pct": 5,
     "worker_queue_depth": 50,
     "disk_warning_pct": 75,
@@ -67,46 +87,95 @@ DEFAULT_THRESHOLDS = {
 
 def evaluate_health() -> HealthStatus:
     """Evaluate current system health and return a scored status."""
-    from crate.metrics import query_summary
+    from crate.metrics import query_summaries, get_collection_health
 
     status = HealthStatus()
     breaches: list[ThresholdBreach] = []
-
-    # API latency
-    api_latency = query_summary("api.request.latency", minutes=5)
-    api_p95 = api_latency.get("max", 0)  # approximation — max of 5min as p95 proxy
-    status.metrics["api_p95"] = api_p95
-    threshold = _get_threshold(
-        "api_p95_latency_ms", DEFAULT_THRESHOLDS["api_p95_latency_ms"]
+    summaries = query_summaries(
+        {
+            "api_latency": ("api.request.latency", 5),
+            "api_requests": ("api.request.count", 5),
+            "api_errors": ("api.request.count", 5, {"status_class": "5xx"}),
+            "queue_depth": ("worker.queue.depth", 5),
+        }
     )
-    if api_p95 > threshold:
+    for key in ("api_latency", "api_requests", "api_errors", "queue_depth"):
+        sample = summaries.get(key, {})
+        status.inputs[key] = {
+            "availability": sample.get("availability", "unavailable"),
+            "observed_at": sample.get("observed_at"),
+            "sample_count": int(sample.get("sample_count", 0)),
+            "eligible_count": int(sample.get("eligible_count", 0)),
+        }
+    states = [value["availability"] for value in status.inputs.values()]
+    status.availability = (
+        "unavailable"
+        if "unavailable" in states
+        else "stale"
+        if "stale" in states
+        else "available"
+        if all(state == "available" for state in states)
+        else "partial"
+    )
+    local = get_collection_health()
+    status.collector_local = {
+        key: local[key] for key in ("scope", "coverage", "availability", "counters")
+    }
+    if (
+        local["availability"] in {"partial", "unavailable"}
+        and status.availability == "available"
+    ):
+        status.availability = local["availability"]
+    timestamps = [
+        value["observed_at"] for value in status.inputs.values() if value["observed_at"]
+    ]
+    status.observed_at = min(timestamps) if timestamps else None
+
+    api_latency = summaries.get("api_latency", {})
+    api_max = (
+        api_latency.get("max")
+        if api_latency.get("availability") == "available"
+        else None
+    )
+    status.metrics["api_max"] = api_max
+    threshold = _get_threshold(
+        "api_max_latency_ms", DEFAULT_THRESHOLDS["api_max_latency_ms"]
+    )
+    if api_max is not None and api_max > threshold:
         breaches.append(
-            ThresholdBreach("API p95 latency", api_p95, threshold, "warning")
+            ThresholdBreach("API max latency", api_max, threshold, "warning")
         )
 
-    # API error rate
-    api_requests = query_summary("api.request.count", minutes=5)
-    api_errors = query_summary("api.request.errors", minutes=5)
-    total_requests = api_requests.get("count", 0)
+    api_requests, api_errors = (
+        summaries.get("api_requests", {}),
+        summaries.get("api_errors", {}),
+    )
+    total_requests = api_errors.get("eligible_count", 0)
     error_count = api_errors.get("count", 0)
-    error_rate = (error_count / total_requests * 100) if total_requests > 0 else 0
+    error_rate = (
+        (error_count / total_requests * 100)
+        if total_requests > 0
+        and api_requests.get("availability")
+        == api_errors.get("availability")
+        == "available"
+        else None
+    )
     status.metrics["api_error_rate"] = error_rate
     threshold = _get_threshold(
         "api_error_rate_pct", DEFAULT_THRESHOLDS["api_error_rate_pct"]
     )
-    if error_rate > threshold:
+    if error_rate is not None and error_rate > threshold:
         breaches.append(
             ThresholdBreach("API error rate", error_rate, threshold, "critical")
         )
 
-    # Queue depth
-    queue = query_summary("worker.queue.depth", minutes=5)
-    queue_depth = queue.get("max", 0)
+    queue = summaries.get("queue_depth", {})
+    queue_depth = queue.get("max") if queue.get("availability") == "available" else None
     status.metrics["queue_depth"] = queue_depth
     threshold = _get_threshold(
         "worker_queue_depth", DEFAULT_THRESHOLDS["worker_queue_depth"]
     )
-    if queue_depth > threshold:
+    if queue_depth is not None and queue_depth > threshold:
         breaches.append(
             ThresholdBreach("Worker queue depth", queue_depth, threshold, "warning")
         )
@@ -186,7 +255,9 @@ def evaluate_health() -> HealthStatus:
             score -= 20
         else:
             score -= 10
-    status.score = max(0, min(100, score))
+    status.score = (
+        max(0, min(100, score)) if status.availability == "available" else None
+    )
     status.breaches = breaches
 
     return status

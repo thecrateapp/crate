@@ -1,0 +1,1000 @@
+--- a/app/crate/agent_observability.py
++++ b/app/crate/agent_observability.py
+@@ -243,12 +243,13 @@
+         raw = raw_inputs.get(key, {})
+         raw = raw if isinstance(raw, dict) else {}
+         state = raw.get("availability")
+-        input_date = _date(raw.get("observed_at"))
+         inputs[key] = {
+             "availability": state
+             if isinstance(state, str) and state in states
+             else "unavailable",
+-            "observed_at": input_date.isoformat() if input_date is not None else None,
++            "observed_at": _date(raw.get("observed_at")).isoformat()
++            if _date(raw.get("observed_at"))
++            else None,
+             **{
+                 field: raw[field]
+                 for field in ("sample_count", "eligible_count")
+@@ -287,7 +288,7 @@
+                     if type(item.get(key)) in {int, float} and math.isfinite(item[key])
+                 },
+             }
+-            for item in (raw_breaches if isinstance(raw_breaches, list) else [])
++            for item in raw_breaches
+         ],
+     }
+     local = payload.get("collector_local")
+@@ -324,14 +325,14 @@
+         if local_state in {"partial", "unavailable"} and producer_state == "available":
+             producer_state = local_state
+             selected.update(availability=producer_state, score=None)
+-    observed = _date(payload.get("observed_at"))
+-    dates = []
+-    for value in inputs.values():
+-        input_date = _date(value["observed_at"])
+-        if input_date is not None:
+-            dates.append(input_date)
+-    if observed is not None:
+-        dates.append(observed)
++    observed = payload.get("observed_at")
++    dates = [
++        _date(value["observed_at"])
++        for value in inputs.values()
++        if _date(value["observed_at"])
++    ]
++    if _date(observed):
++        dates.append(_date(observed))
+     selected["observed_at"] = min(dates).isoformat() if dates else None
+     result = _source(
+         "health",
+--- a/app/crate/api/admin_metrics.py
++++ b/app/crate/api/admin_metrics.py
+@@ -310,39 +310,36 @@
+ 
+ def _build_metrics_dashboard(period: str, minutes: int) -> dict:
+     from crate.db.cache_store import get_cache, set_cache
+-    from crate.metrics import query_timeseries_snapshot, query_route_latency_snapshot
++    from crate.metrics import (
++        query_historical,
++        query_recent,
++        query_recent_rolled,
++        query_route_latency,
++    )
+ 
+     cache_key = f"admin:metrics:dashboard:v2:{period}:{minutes}"
+     cached = get_cache(cache_key, max_age_seconds=10)
+     if cached is not None:
+         return {**cached, "summary": _attach_local_collector(cached["summary"])}
+ 
+-    sampled = query_timeseries_snapshot(
+-        list(_DASHBOARD_TIMESERIES.values()),
+-        period=period,
+-        minutes=minutes,
+-        persisted=True,
+-    )
+-    timeseries = {
+-        response_name: sampled["data"][metric_name]
+-        for response_name, metric_name in _DASHBOARD_TIMESERIES.items()
+-    }
+-    timeseries_status = {
+-        response_name: sampled["status"][metric_name]
+-        for response_name, metric_name in _DASHBOARD_TIMESERIES.items()
+-    }
+-    routes = query_route_latency_snapshot(minutes=min(minutes, 60), limit=20)
++    timeseries: dict[str, list[dict]] = {}
++    for response_name, metric_name in _DASHBOARD_TIMESERIES.items():
++        if period == "minute":
++            timeseries[response_name] = query_recent(metric_name, minutes)
++        elif period == "hour":
++            timeseries[response_name] = query_recent_rolled(
++                metric_name, minutes=minutes, bucket_minutes=60
++            )
++        else:
++            timeseries[response_name] = query_historical(metric_name, period)
++
+     payload = {
+         "summary": _build_metrics_summary(include_local=False),
+         "system": _build_metrics_system(),
+         "tasks": _list_running_tasks(limit=10),
+         "playback_delivery": _build_playback_delivery(),
+-        "route_latency": routes["routes"],
+-        "route_latency_status": {
+-            key: value for key, value in routes.items() if key != "routes"
+-        },
++        "route_latency": query_route_latency(minutes=min(minutes, 60), limit=20),
+         "timeseries": timeseries,
+-        "timeseries_status": timeseries_status,
+     }
+     set_cache(cache_key, payload, ttl=10)
+     return {**payload, "summary": _attach_local_collector(payload["summary"])}
+@@ -416,13 +413,13 @@
+     target: str | None = Query(None, description="Optional target filter, e.g. api"),
+ ):
+     _require_ops_health(request)
+-    from crate.metrics import query_route_latency_snapshot
++    from crate.metrics import query_route_latency
+ 
+     return {
+         "minutes": minutes,
+         "limit": limit,
+         "target": target,
+-        **query_route_latency_snapshot(minutes=minutes, limit=limit, target=target),
++        "routes": query_route_latency(minutes=minutes, limit=limit, target=target),
+     }
+ 
+ 
+--- a/app/crate/api/schemas/metrics.py
++++ b/app/crate/api/schemas/metrics.py
+@@ -30,7 +30,6 @@
+     cutover_at: str | None
+     legacy_status: Literal["unverified"]
+     legacy_combined: Literal[False]
+-    retention_days: Literal[8] = 8
+ 
+ 
+ class CollectorLocalHealth(BaseModel):
+@@ -68,19 +67,9 @@
+     playback_delivery: dict[str, Any]
+     route_latency: list[dict[str, Any]]
+     timeseries: dict[str, list[dict[str, Any]]]
+-    timeseries_status: dict[str, dict[str, Any]] = Field(default_factory=dict)
+-    route_latency_status: dict[str, Any] = Field(default_factory=dict)
+ 
+ 
+ class MetricsRoutesResponse(BaseModel):
+-    availability: Availability = "unavailable"
+-    reason: str | None = None
+-    source: Literal["redis_v2"] = "redis_v2"
+-    sample_kind: Literal["bounded_samples"] = "bounded_samples"
+-    sample_count: int = Field(default=0, ge=0)
+-    observed_count: int = Field(default=0, ge=0)
+-    truncated: bool = False
+-    window_minutes: int = Field(default=15, ge=1, le=240)
+     minutes: int
+     limit: int
+     target: str | None
+--- a/app/crate/db/queries/metric_minutes.py
++++ b/app/crate/db/queries/metric_minutes.py
+@@ -3,7 +3,7 @@
+ from __future__ import annotations
+ 
+ import json
+-from datetime import datetime, timedelta, timezone
++from datetime import datetime, timezone
+ 
+ from sqlalchemy import text
+ 
+@@ -18,123 +18,6 @@
+     return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed
+ 
+ 
+-def _now() -> datetime:
+-    return datetime.now(timezone.utc)
+-
+-
+-def _bounds(period: str, start, end, limit: int):
+-    now = _now().astimezone(timezone.utc).replace(second=0, microsecond=0)
+-    requested_start = (
+-        _utc(start).astimezone(timezone.utc) if start is not None else None
+-    )
+-    requested_end = _utc(end).astimezone(timezone.utc) if end is not None else now
+-    if requested_start is not None and requested_start > requested_end:
+-        raise ValueError("Metric window start exceeds end")
+-    end = min(now, requested_end.replace(second=0, microsecond=0))
+-    if period == "day":
+-        bin_start = end.replace(hour=0, minute=0)
+-        step = timedelta(days=1)
+-    elif period == "hour":
+-        bin_start = end.replace(minute=0)
+-        step = timedelta(hours=1)
+-    else:
+-        bin_start, step = end, timedelta(minutes=1)
+-    start = (
+-        requested_start.replace(second=0, microsecond=0)
+-        if requested_start is not None
+-        else bin_start - (limit - 1) * step
+-    )
+-    return max(start, now - timedelta(days=8)), end
+-
+-
+-def _read_series(names, period, start, end, limit, *, tags=None, session=None):
+-    if period not in {"minute", "hour", "day"}:
+-        raise ValueError("Invalid metric period")
+-    if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 12000:
+-        raise ValueError("Invalid metric row limit")
+-    if not isinstance(names, list) or any(not isinstance(name, str) for name in names):
+-        raise ValueError("Metric names must be a list of configured names")
+-    canonical = list(
+-        dict.fromkeys(canonical_metric(name).definition.name for name in names)
+-    )
+-    if len(canonical) > 32 or len(canonical) * limit > 12000:
+-        raise ValueError("Metric series read exceeds row budget")
+-    result = {name: [] for name in canonical}
+-    if not canonical:
+-        return result
+-    start, end = _bounds(period, start, end, limit)
+-    if start > end:
+-        return result
+-    conditions = [
+-        "name = ANY(:names)",
+-        "bucket_start >= :start",
+-        "bucket_start <= :end",
+-    ]
+-    params = {
+-        "names": canonical,
+-        "period": period,
+-        "limit": limit,
+-        "start": start,
+-        "end": end,
+-    }
+-    if tags is not None:
+-        conditions.append("tags_json @> CAST(:tags AS jsonb)")
+-        params["tags"] = json.dumps(
+-            dict(canonical_metric(canonical[0], tags).tags), sort_keys=True
+-        )
+-    statement = text(
+-        """
+-        WITH aggregated AS (
+-            SELECT name, date_trunc(:period, bucket_start, 'UTC') AS bucket_start,
+-                   SUM(count)::bigint AS count, SUM(sum_value) AS sum_value,
+-                   MIN(min_value) AS min_value, MAX(max_value) AS max_value,
+-                   SUM(sum_value) / NULLIF(SUM(count), 0) AS avg_value,
+-                   BOOL_OR(source_gap) AS source_gap,
+-                   MAX(last_observed_at) AS last_observed_at
+-            FROM metric_minute_snapshots
+-            WHERE """
+-        + " AND ".join(conditions)
+-        + """
+-            GROUP BY name, date_trunc(:period, bucket_start, 'UTC')
+-        ), ranked AS (
+-            SELECT *, ROW_NUMBER() OVER (PARTITION BY name ORDER BY bucket_start DESC) AS position
+-            FROM aggregated
+-        )
+-        SELECT name, bucket_start, count, sum_value, min_value, max_value, avg_value,
+-               source_gap, last_observed_at
+-        FROM ranked WHERE position <= :limit
+-        ORDER BY name, bucket_start DESC
+-    """
+-    )
+-
+-    def _impl(current):
+-        for row in current.execute(statement, params).mappings():
+-            item = dict(row)
+-            name = item.pop("name")
+-            item["bucket_start"] = item["bucket_start"].astimezone(timezone.utc)
+-            item["last_observed_at"] = item["last_observed_at"].astimezone(timezone.utc)
+-            result[name].append(item)
+-        return result
+-
+-    if session is not None:
+-        return _impl(session)
+-    with read_scope() as current:
+-        return _impl(current)
+-
+-
+-def query_metric_minute_series(
+-    names: list[str],
+-    period: str = "hour",
+-    start=None,
+-    end=None,
+-    limit: int = 168,
+-    *,
+-    session=None,
+-) -> dict[str, list[dict]]:
+-    """Read bounded windows for at most 32 families in one aggregation query."""
+-    return _read_series(names, period, start, end, limit, session=session)
+-
+-
+ def query_metric_minute_snapshots(
+     name: str,
+     period: str = "hour",
+@@ -145,11 +28,52 @@
+     tags: dict | None = None,
+     session=None,
+ ) -> list[dict]:
+-    """Aggregate dimensions before pagination over a bounded UTC window."""
+-    canonical = canonical_metric(name).definition.name
+-    return _read_series([name], period, start, end, limit, tags=tags, session=session)[
+-        canonical
+-    ]
++    """Aggregate dimensions by name, or filter a canonical subset of labels."""
++    if period not in {"minute", "hour", "day"}:
++        raise ValueError("Invalid metric period")
++    if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 12000:
++        raise ValueError("Invalid metric row limit")
++    series = canonical_metric(name, tags)
++    conditions = ["name = :name"]
++    params = {"name": series.definition.name, "period": period, "limit": limit}
++    if tags is not None:
++        conditions.append("tags_json @> CAST(:tags AS jsonb)")
++        params["tags"] = json.dumps(dict(series.tags), sort_keys=True)
++    if start is not None:
++        conditions.append("bucket_start >= :start")
++        params["start"] = _utc(start)
++    if end is not None:
++        conditions.append("bucket_start <= :end")
++        params["end"] = _utc(end)
++    statement = text(
++        """
++        SELECT date_trunc(:period, bucket_start) AS bucket_start,
++               SUM(count)::bigint AS count,
++               SUM(sum_value) AS sum_value,
++               MIN(min_value) AS min_value,
++               MAX(max_value) AS max_value,
++               SUM(sum_value) / NULLIF(SUM(count), 0) AS avg_value,
++               BOOL_OR(source_gap) AS source_gap,
++               MAX(last_observed_at) AS last_observed_at
++        FROM metric_minute_snapshots
++        WHERE """
++        + " AND ".join(conditions)
++        + """
++        GROUP BY date_trunc(:period, bucket_start)
++        ORDER BY bucket_start DESC
++        LIMIT :limit
++    """
++    )
++
++    def _impl(current):
++        return [
++            dict(row) for row in current.execute(statement, params).mappings().all()
++        ]
++
++    if session is not None:
++        return _impl(session)
++    with read_scope() as current:
++        return _impl(current)
+ 
+ 
+ def get_metric_history_status(*, session=None) -> dict:
+@@ -166,7 +90,6 @@
+             "cutover_at": cutover,
+             "legacy_status": "unverified",
+             "legacy_combined": False,
+-            "retention_days": 8,
+         }
+ 
+     if session is not None:
+@@ -175,8 +98,4 @@
+         return _impl(current)
+ 
+ 
+-__all__ = [
+-    "query_metric_minute_snapshots",
+-    "query_metric_minute_series",
+-    "get_metric_history_status",
+-]
++__all__ = ["query_metric_minute_snapshots", "get_metric_history_status"]
+--- a/app/crate/db/repositories/metric_minutes.py
++++ b/app/crate/db/repositories/metric_minutes.py
+@@ -139,11 +139,7 @@
+         raise ValueError("Metric retention batch must contain 1 to 5000 rows")
+     with optional_scope(session) as current:
+         with current.begin_nested():
+-            original = current.execute(
+-                text(
+-                    "SELECT current_setting('statement_timeout'), current_setting('lock_timeout')"
+-                )
+-            ).one()
++            original = current.execute(text("SELECT current_setting('statement_timeout'), current_setting('lock_timeout')")).one()
+             current.execute(text("SET LOCAL statement_timeout = '500ms'"))
+             current.execute(text("SET LOCAL lock_timeout = '50ms'"))
+             rows = current.execute(
+@@ -164,12 +160,8 @@
+             """),
+                 {"before": cutoff, "limit": limit},
+             ).all()
+-            current.execute(
+-                text(
+-                    "SELECT set_config('statement_timeout', :statement, true), set_config('lock_timeout', :lock, true)"
+-                ),
+-                {"statement": original[0], "lock": original[1]},
+-            )
++            current.execute(text("SELECT set_config('statement_timeout', :statement, true), set_config('lock_timeout', :lock, true)"),
++                            {"statement": original[0], "lock": original[1]})
+     return len(rows)
+ 
+ 
+--- a/app/crate/db/schema_sections/metric_minutes_v141.py
++++ b/app/crate/db/schema_sections/metric_minutes_v141.py
+@@ -25,7 +25,6 @@
+     cur.execute("""
+         CREATE INDEX IF NOT EXISTS idx_metric_minutes_name_bucket
+         ON metric_minute_snapshots (name, bucket_start DESC)
+-        INCLUDE (count, sum_value, min_value, max_value, last_observed_at, source_gap)
+     """)
+     cur.execute("""
+         CREATE INDEX IF NOT EXISTS idx_metric_minutes_retention
+--- a/app/crate/metrics.py
++++ b/app/crate/metrics.py
+@@ -31,8 +31,6 @@
+ _MAX_BUCKET_TTL_SECONDS = 7 * 86400
+ _ASYNC_QUEUE_MAX = 10_000
+ _ROUTE_LATENCY_METRIC = "api.route.latency"
+-_MAX_ROUTE_BUCKETS = 5000
+-_MAX_ROUTE_SAMPLES = 50_000
+ FEDERATION_METRICS = frozenset(
+     {
+         "federation.pairing.attempt",
+@@ -132,12 +130,12 @@
+         and reason in {"redis_unavailable", "redis_error"}
+     ):
+         state = "unavailable"
+-    elif last_error is not None and now - last_error <= 300:
+-        state = "partial"
+     elif last_write is None:
+         state = "empty"
+     elif now - last_write > 300:
+         state = "stale"
++    elif last_error is not None and now - last_error <= 300:
++        state = "partial"
+     else:
+         state = "available"
+ 
+@@ -238,7 +236,7 @@
+             raise ValueError("Metric values must be finite")
+     except (ValueError, TypeError, AttributeError):
+         _collection_event("invalid_observation")
+-        return False
++        return
+     if series.normalized_labels:
+         _collection_event("labels_normalized", series.normalized_labels)
+     try:
+@@ -247,7 +245,7 @@
+         redis = get_redis()
+         if redis is None:
+             _collection_event("redis_unavailable")
+-            return False
++            return
+         observed = time.time() if observed_at is None else observed_at
+         if metric_buckets.record_sample(
+             redis,
+@@ -259,12 +257,10 @@
+         ):
+             with _collection_lock:
+                 _last_write_at = time.time()
+-            return True
+         else:
+             _collection_event("cardinality_rejected")
+     except Exception:
+         _collection_event("redis_error")
+-    return False
+ 
+ 
+ def _record_route_latency_sync(
+@@ -284,8 +280,7 @@
+     target = safe_tags.get("target", "api")
+     status = safe_tags.get("status_class", "other")
+     observed = time.time() if observed_at is None else observed_at
+-    if not _record_sync(_ROUTE_LATENCY_METRIC, value, safe_tags, observed_at=observed):
+-        return
++    _record_sync(_ROUTE_LATENCY_METRIC, value, safe_tags, observed_at=observed)
+ 
+     try:
+         from crate.db.cache_runtime import get_redis
+@@ -704,38 +699,52 @@
+         }
+ 
+ 
+-def query_route_latency_snapshot(
++def query_route_latency(
+     minutes: int = 15, limit: int = 20, target: str | None = None
+-) -> dict:
++) -> list[dict]:
+     """Aggregate recent per-route latency with p95/p99 from sampled Redis data."""
+     minutes = max(1, min(240, int(minutes)))
+     limit = max(1, min(100, int(limit)))
+-    status = {
+-        "availability": "available",
+-        "reason": None,
+-        "source": "redis_v2",
+-        "sample_kind": "bounded_samples",
+-        "window_minutes": minutes,
+-    }
+     try:
+         from crate.db.cache_runtime import get_redis
+ 
+         r = get_redis()
+         if r is None:
+-            raise ConnectionError("Metric Redis is unavailable")
++            return []
+ 
+         now_bucket = _minute_bucket()
+-        minutes_to_read = [now_bucket - offset * 60 for offset in range(minutes)]
+-        raw = metric_buckets.read_route_buckets(
+-            r,
+-            minutes_to_read,
+-            max_buckets=_MAX_ROUTE_BUCKETS,
+-            max_samples=_MAX_ROUTE_SAMPLES,
+-            target=target,
+-        )
++        route_ids: set[str] = set()
++        minute_buckets = [now_bucket - offset * 60 for offset in range(minutes)]
++
++        pipe = r.pipeline(transaction=False)
++        for bucket_ts in minute_buckets:
++            pipe.smembers(_route_bucket_key(bucket_ts))
++        for route_set in pipe.execute():
++            for raw_id in route_set or []:
++                route_ids.add(
++                    raw_id.decode() if isinstance(raw_id, bytes) else str(raw_id)
++                )
++
++        if not route_ids:
++            return []
++
++        pipe = r.pipeline(transaction=False)
++        lookup: list[tuple[str, int]] = []
++        for route_id in sorted(route_ids):
++            for bucket_ts in minute_buckets:
++                key = _route_metric_key(route_id, bucket_ts)
++                pipe.hgetall(key)
++                pipe.lrange(f"{key}:samples", 0, -1)
++                lookup.append((route_id, bucket_ts))
++
++        raw = pipe.execute()
+         aggregates: dict[str, dict] = {}
+-        for row, samples_raw in raw:
+-            route_id = row["route_id"]
++        for index, (route_id, _bucket_ts) in enumerate(lookup):
++            data = raw[index * 2] if index * 2 < len(raw) else {}
++            samples_raw = raw[index * 2 + 1] if index * 2 + 1 < len(raw) else []
++            if not data:
++                continue
++            row = _decode_mapping(data)
+             if target and row.get("target") != target:
+                 continue
+ 
+@@ -788,20 +797,22 @@
+ 
+             for raw_sample in samples_raw or []:
+                 try:
+-                    current["samples"].append(float(raw_sample))
++                    current["samples"].append(
++                        float(
++                            raw_sample.decode()
++                            if isinstance(raw_sample, bytes)
++                            else raw_sample
++                        )
++                    )
+                 except (TypeError, ValueError):
+                     continue
+ 
+         results = []
+-        missing_samples = False
+         for row in aggregates.values():
+             count = int(row["count"])
+             if count <= 0:
+                 continue
+             samples = row.pop("samples")
+-            if not samples:
+-                missing_samples = True
+-                continue
+             errors = int(row["status_5xx"])
+             results.append(
+                 {
+@@ -821,47 +832,10 @@
+             key=lambda row: (float(row.get("p95") or 0), int(row.get("count") or 0)),
+             reverse=True,
+         )
+-        return {
+-            **status,
+-            "routes": results[:limit],
+-            "availability": "partial"
+-            if missing_samples
+-            else "available"
+-            if results
+-            else "empty",
+-            "reason": "missing_percentile_samples" if missing_samples else None,
+-            "observed_count": sum(int(row["count"]) for row in aggregates.values()),
+-            "sample_count": sum(int(row["sample_count"]) for row in results),
+-            "truncated": len(results) > limit,
+-        }
+-    except metric_buckets.MetricReadBudgetError:
+-        return {
+-            **status,
+-            "routes": [],
+-            "availability": "unavailable",
+-            "reason": "read_budget",
+-            "observed_count": 0,
+-            "sample_count": 0,
+-            "truncated": False,
+-        }
++        return results[:limit]
+     except Exception:
+         log.debug("Failed to query route latency metrics", exc_info=True)
+-        return {
+-            **status,
+-            "routes": [],
+-            "availability": "unavailable",
+-            "reason": "metric_source_unavailable",
+-            "observed_count": 0,
+-            "sample_count": 0,
+-            "truncated": False,
+-        }
+-
+-
+-def query_route_latency(
+-    minutes: int = 15, limit: int = 20, target: str | None = None
+-) -> list[dict]:
+-    """Compatibility list reader; status is exposed by the snapshot API."""
+-    return query_route_latency_snapshot(minutes, limit, target)["routes"]
++        return []
+ 
+ 
+ # ── Flush to PostgreSQL ──────────────────────────────────────────
+@@ -869,13 +843,9 @@
+ 
+ def prune_history(limit: int = 1000) -> int:
+     """Delete one bounded batch of fully expired v2 minutes, independent of Redis."""
+-    from crate.db.repositories.metric_minutes import (
+-        delete_metric_minute_snapshots_before,
+-    )
+-
+-    cutoff = datetime.fromtimestamp(_minute_bucket(), tz=timezone.utc) - timedelta(
+-        days=8
+-    )
++    from crate.db.repositories.metric_minutes import delete_metric_minute_snapshots_before
++
++    cutoff = datetime.fromtimestamp(_minute_bucket(), tz=timezone.utc) - timedelta(days=8)
+     return delete_metric_minute_snapshots_before(cutoff, limit=limit)
+ 
+ 
+@@ -933,131 +903,6 @@
+         log.warning("Metrics flush to PostgreSQL failed", exc_info=True)
+ 
+ 
+-def _historical_points(rows: list[dict], scale: float) -> list[dict]:
+-    return [
+-        {
+-            "timestamp": row["bucket_start"].isoformat(),
+-            "count": int(row["count"]),
+-            "avg": round(float(row["avg_value"] or 0) / scale, 2),
+-            "min": round(float(row["min_value"] or 0) / scale, 2),
+-            "max": round(float(row["max_value"] or 0) / scale, 2),
+-            "sum": round(float(row["sum_value"] or 0) / scale, 2),
+-            "source_gap": bool(row["source_gap"]),
+-            "observed_at": row["last_observed_at"].isoformat(),
+-        }
+-        for row in reversed(rows)
+-    ]
+-
+-
+-def query_timeseries_snapshot(
+-    names: list[str],
+-    period: str = "minute",
+-    minutes: int = 60,
+-    *,
+-    persisted: bool = False,
+-) -> dict:
+-    """Batch dashboard windows, declaring each series' source and watermark."""
+-    canonical = list(dict.fromkeys(get_metric_definition(name).name for name in names))
+-    source = "redis_v2" if period == "minute" and not persisted else "postgresql_v2"
+-    now = time.time()
+-    data = {name: [] for name in canonical}
+-    status = {
+-        name: {
+-            "availability": "empty",
+-            "reason": "no_observations",
+-            "source": source,
+-            "observed_at": None,
+-            "age_seconds": None,
+-            "window_minutes": minutes,
+-        }
+-        for name in canonical
+-    }
+-    if not canonical:
+-        return {"data": data, "status": status}
+-    try:
+-        if (
+-            period not in {"minute", "hour", "day"}
+-            or not 1 <= minutes <= 11520
+-            or len(canonical) > 32
+-        ):
+-            raise ValueError("Invalid metric window")
+-        if source == "redis_v2":
+-            if len(canonical) * minutes > 12000:
+-                raise metric_buckets.MetricReadBudgetError(
+-                    "Metric point budget exceeded"
+-                )
+-            rows = _recent_buckets({name: (name, minutes) for name in canonical})
+-            for name in canonical:
+-                scale = get_metric_definition(name).scale
+-                by_minute = {}
+-                for row in rows[name]:
+-                    by_minute.setdefault(int(row["minute"]), []).append(row)
+-                data[name] = [
+-                    {
+-                        "timestamp": datetime.fromtimestamp(
+-                            minute, tz=timezone.utc
+-                        ).isoformat(),
+-                        **_aggregate_rows(group, scale),
+-                        "source_gap": False,
+-                        "observed_at": datetime.fromtimestamp(
+-                            max(float(row["last_at"]) for row in group), tz=timezone.utc
+-                        ).isoformat(),
+-                    }
+-                    for minute, group in sorted(by_minute.items())
+-                ]
+-                summary = _summary_provenance(rows[name], scale, minutes, now)
+-                status[name].update(
+-                    {
+-                        key: summary[key]
+-                        for key in (
+-                            "availability",
+-                            "reason",
+-                            "observed_at",
+-                            "age_seconds",
+-                        )
+-                    }
+-                )
+-        else:
+-            from crate.db.queries.metric_minutes import query_metric_minute_series
+-
+-            end = datetime.fromtimestamp(_minute_bucket(), tz=timezone.utc)
+-            start = end - timedelta(minutes=minutes - 1)
+-            limit = (
+-                minutes
+-                if period == "minute"
+-                else math.ceil(minutes / (60 if period == "hour" else 1440)) + 1
+-            )
+-            rows = query_metric_minute_series(
+-                canonical, period=period, start=start, end=end, limit=limit
+-            )
+-            for name in canonical:
+-                data[name] = _historical_points(
+-                    rows[name], get_metric_definition(name).scale
+-                )
+-                if data[name]:
+-                    observed = max(point["observed_at"] for point in data[name])
+-                    gap = any(point["source_gap"] for point in data[name])
+-                    status[name].update(
+-                        availability="partial" if gap else "available",
+-                        reason="source_gap" if gap else None,
+-                        observed_at=observed,
+-                        age_seconds=max(
+-                            0, now - datetime.fromisoformat(observed).timestamp()
+-                        ),
+-                    )
+-    except Exception as error:
+-        reason = (
+-            "read_budget"
+-            if isinstance(error, metric_buckets.MetricReadBudgetError)
+-            else "metric_source_unavailable"
+-        )
+-        log.debug("Failed to read metric timeseries snapshot", exc_info=True)
+-        data = {name: [] for name in canonical}
+-        for value in status.values():
+-            value.update(availability="unavailable", reason=reason)
+-    return {"data": data, "status": status}
+-
+-
+ def query_historical(
+     name: str,
+     period: str = "hour",
+@@ -1075,7 +920,18 @@
+         rows = query_metric_minute_snapshots(
+             name=name, period=period, start=start, end=end, limit=limit, tags=tags
+         )
+-        return _historical_points(rows, scale)
++        return [
++            {
++                "timestamp": row["bucket_start"].isoformat(),
++                "count": int(row["count"]),
++                "avg": round(float(row["avg_value"] or 0) / scale, 2),
++                "min": round(float(row["min_value"] or 0) / scale, 2),
++                "max": round(float(row["max_value"] or 0) / scale, 2),
++                "sum": round(float(row["sum_value"] or 0) / scale, 2),
++                "source_gap": bool(row["source_gap"]),
++            }
++            for row in reversed(rows)
++        ]
+     except Exception:
+         log.debug("Failed to query historical metrics", exc_info=True)
+         return []
+--- a/app/crate/observability/metric_buckets.py
++++ b/app/crate/observability/metric_buckets.py
+@@ -5,7 +5,6 @@
+ import hashlib
+ import json
+ import uuid
+-from typing import Any
+ 
+ from redis.exceptions import NoScriptError
+ 
+@@ -15,47 +14,6 @@
+ NAMES_KEY = f"{PREFIX}:names"
+ DIRTY_KEY = f"{PREFIX}:dirty"
+ MAX_READ_BUCKETS = 50_000
+-
+-
+-class MetricReadBudgetError(ValueError):
+-    pass
+-
+-
+-_ROUTE_INDEXES = """
+-local total = 0
+-for _, key in ipairs(KEYS) do
+-    total = total + redis.call('scard', key)
+-    if total > tonumber(ARGV[1]) then return {0} end
+-end
+-local result = {1}
+-for _, key in ipairs(KEYS) do
+-    table.insert(result, redis.call('smembers', key))
+-end
+-return result
+-"""
+-
+-_ROUTE_HEADERS = """
+-local result = {}
+-for _, key in ipairs(KEYS) do
+-    local row = redis.call('hmget', key, unpack(ARGV))
+-    table.insert(row, redis.call('llen', key .. ':samples'))
+-    table.insert(result, row)
+-end
+-return result
+-"""
+-
+-_ROUTE_SAMPLES = """
+-local result = {}
+-for i, key in ipairs(KEYS) do
+-    local count = tonumber(ARGV[i])
+-    if count > 0 then
+-        table.insert(result, redis.call('lrange', key .. ':samples', 0, count - 1))
+-    else
+-        table.insert(result, {})
+-    end
+-end
+-return result
+-"""
+ 
+ _RECORD = """
+ local bucket, series, buckets, dirty, names = unpack(KEYS)
+@@ -186,24 +144,18 @@
+     if any(len(keys) > count for keys, count in zip(indexed, counts)):
+         raise ValueError("Metric index changed during bounded read")
+     lookup = [(key, raw_key) for key, keys in zip(specs, indexed) for raw_key in keys]
+-    unique_keys = list(dict.fromkeys(raw_key for _key, raw_key in lookup))
+-    fields = ("count", "sum", "min", "max", "last_at", "minute", "tags")
+-    rows = {}
+-    for offset in range(0, len(unique_keys), 500):
+-        chunk = unique_keys[offset : offset + 500]
++    result: dict[str, list[dict]] = {key: [] for key in specs}
++    for offset in range(0, len(lookup), 500):
++        chunk = lookup[offset : offset + 500]
+         pipe = redis.pipeline(transaction=False)
+-        for raw_key in chunk:
+-            pipe.hmget(raw_key, fields)
+-        for raw_key, values in zip(chunk, pipe.execute()):
+-            if values[0] is not None:
+-                rows[raw_key] = dict(zip(fields, values))
+-    result: dict[str, list[dict]] = {key: [] for key in specs}
+-    for key, raw_key in lookup:
+-        row = rows.get(raw_key)
+-        if row is not None and (
+-            tags is None or tags.items() <= json.loads(row["tags"]).items()
+-        ):
+-            result[key].append(row)
++        for _key, raw_key in chunk:
++            pipe.hgetall(raw_key)
++        for (key, _raw_key), data in zip(chunk, pipe.execute()):
++            if not data:
++                continue
++            row = decode_bucket(data)
++            if tags is None or tags.items() <= json.loads(row["tags"]).items():
++                result[key].append(row)
+     return result
+ 
+ 
+@@ -240,77 +192,6 @@
+         for (name, _key), row in zip(lookup, pipe.execute())
+         if row
+     }
+-
+-
+-def read_route_buckets(
+-    redis,
+-    minutes: list[int],
+-    *,
+-    max_buckets: int,
+-    max_samples: int,
+-    target: str | None = None,
+-) -> list[tuple[dict, list]]:
+-    """Bound indexes and sample transfer before reading actual route buckets."""
+-    indexed = _eval(
+-        redis,
+-        _ROUTE_INDEXES,
+-        [f"{PREFIX}:routes:{minute}" for minute in minutes],
+-        [max_buckets],
+-    )
+-    if not indexed[0]:
+-        raise MetricReadBudgetError("Route bucket read budget exceeded")
+-    keys = [
+-        f"{PREFIX}:route:{_decode(route)}:{minute}"
+-        for minute, routes in zip(minutes, indexed[1:])
+-        for route in routes
+-    ]
+-    fields = (
+-        "target",
+-        "method",
+-        "path",
+-        "count",
+-        "sum",
+-        "min",
+-        "max",
+-        "status_2xx",
+-        "status_3xx",
+-        "status_4xx",
+-        "status_5xx",
+-        "status_other",
+-        "last_at",
+-    )
+-    headers = []
+-    total_samples = 0
+-    for offset in range(0, len(keys), 250):
+-        chunk = keys[offset : offset + 250]
+-        raw = _eval(redis, _ROUTE_HEADERS, chunk, list(fields))
+-        for key, values in zip(chunk, raw):
+-            if values[3] is None:
+-                continue
+-            row: dict[str, Any] = dict(zip(fields, values[:-1]))
+-            for field in ("target", "method", "path"):
+-                row[field] = _decode(row[field]) if row[field] is not None else "other"
+-            row["route_id"] = key.rsplit(":", 2)[1]
+-            count = int(values[-1])
+-            if target and row["target"] != target:
+-                continue
+-            total_samples += count
+-            if total_samples > max_samples:
+-                raise MetricReadBudgetError("Route sample read budget exceeded")
+-            headers.append((key, row, count))
+-    result = []
+-    for offset in range(0, len(headers), 250):
+-        chunk = headers[offset : offset + 250]
+-        samples = _eval(
+-            redis,
+-            _ROUTE_SAMPLES,
+-            [key for key, _row, _count in chunk],
+-            [count for _key, _row, count in chunk],
+-        )
+-        result.extend(
+-            (row, values) for (_key, row, _count), values in zip(chunk, samples)
+-        )
+-    return result
+ 
+ 
+ def acknowledge_snapshots(
+@@ -335,8 +216,6 @@
+ 
+ 
+ __all__ = [
+-    "MetricReadBudgetError",
+-    "read_route_buckets",
+     "PREFIX",
+     "NAMES_KEY",
+     "record_sample",
+--- a/app/crate/worker.py
++++ b/app/crate/worker.py
+@@ -519,18 +519,10 @@
+         if now - last_metrics_prune > 60:
+             last_metrics_prune = now
+             if metrics_prune_thread is None or not metrics_prune_thread.is_alive():
+-                try:
+-                    metrics_prune_thread = threading.Thread(
+-                        target=_prune_metric_history,
+-                        name="crate-metric-retention",
+-                        daemon=True,
+-                    )
+-                    metrics_prune_thread.start()
+-                except RuntimeError:
+-                    metrics_prune_thread = None
+-                    log.warning(
+-                        "Metric retention thread could not start", exc_info=True
+-                    )
++                metrics_prune_thread = threading.Thread(
++                    target=_prune_metric_history, name="crate-metric-retention", daemon=True
++                )
++                metrics_prune_thread.start()
+ 
+         # Media-worker Redis events → task progress/events every 2s.
+         if now - last_media_worker_bridge > 2:

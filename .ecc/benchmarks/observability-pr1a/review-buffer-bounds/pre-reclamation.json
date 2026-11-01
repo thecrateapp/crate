@@ -1,0 +1,200 @@
+{
+  "appendonly": "no",
+  "bgsave": {
+    "accepted": true,
+    "elapsed_seconds": 0.217,
+    "lastsave_after": "2026-11-01T08:58:44",
+    "lastsave_before": "2026-11-01T08:58:41",
+    "status": "ok"
+  },
+  "cleanup": true,
+  "container_observed": {
+    "cpu_usage_total_ns": 1125823000,
+    "memory_limit_bytes": 805306368,
+    "memory_usage_bytes": 99069952
+  },
+  "generic_load": {
+    "accepted": 24000,
+    "attempts": 60000,
+    "canonical_series": 500,
+    "capacity_rejected": 36000,
+    "cardinality_rejected": 0,
+    "duration_seconds": 1.299,
+    "minute_slots": 120,
+    "ordering": "Chronological from now-119min through now, all500series perminute; no flusher/ACK removes dirty entries."
+  },
+  "generic_memory_samples": {
+    "all_index_bytes": 4628256,
+    "count": 50,
+    "dirty_index_bytes": 4628632,
+    "family_bucket_index_bytes": 4629848,
+    "family_series_index_bytes": 79808,
+    "max": 1048,
+    "mean": 1025.92,
+    "min": 1016
+  },
+  "image_id": "sha256:4ab05801a605362b921756ce9dff4893add29c678076fe49a72d8cc3278806c6",
+  "limits": {
+    "container_cpus": 2,
+    "container_memory_bytes": 805306368,
+    "generic_buckets": 24000,
+    "live_ttl_seconds": 7200,
+    "maxmemory_bytes": 536870912,
+    "policy": "volatile-lru",
+    "route_buckets": 2000,
+    "samples_per_route": 1000
+  },
+  "lua_sha256": {
+    "_RECORD": "10d931c1316ee3f31939e0ad3532bb710d4ef9c6da35d04ccae1f81cd8336036",
+    "_RECORD_ROUTE": "4a671b6117d040301a4bd69bec6693a985f33ac96ef2f1a9db6af206a9aea848"
+  },
+  "measured_at_utc": "2026-11-01T07:58:41.834880+00:00",
+  "rdb_save_schedule": "3600 1 300 100 60 10000",
+  "redis_version": "7.4.10",
+  "route_headers": {
+    "actual_lua_created": 2000,
+    "duration_seconds": 0.043,
+    "extra_bucket_rejected": true
+  },
+  "route_samples_memory_upperbound": {
+    "bucket_count": 2000,
+    "duration_seconds": 1.081,
+    "population": "Actual _RECORD_ROUTE creates headers plus first sample; direct batched RPUSH fills999 long finite-float strings. Synthetic memory upperbound only; header counts/sums do not model2million production observations.",
+    "preexisting_first_sample": "123.456",
+    "sample_list_memory_bytes": {
+      "max": 25392,
+      "mean": 25392,
+      "min": 25392
+    },
+    "samples_per_bucket": 1000,
+    "synthetic_sample": "1.7976931348623157e+308",
+    "synthetic_sample_bytes": 23,
+    "total_sample_slots": 2000000
+  },
+  "scope": "Local disposable Redis memory/limit smoke. Not HTTP latency, steady-state throughput, shared-cache capacity or production SLO evidence.",
+  "script_transport": "SCRIPT LOAD then pipelined EVALSHA, batches of500",
+  "snapshots": {
+    "after_bgsave": {
+      "dirty_index": 24000,
+      "evicted_keys": 0,
+      "expired_keys": 0,
+      "generic_index": 24000,
+      "key_count": 28017,
+      "latest_fork_usec": 2974,
+      "loss_counters": {
+        "capacity": "36000",
+        "last_at": "1793519910",
+        "route_capacity": "1"
+      },
+      "maxmemory": 536870912,
+      "maxmemory_policy": "volatile-lru",
+      "quarantine_index": 0,
+      "rdb_bgsave_in_progress": 0,
+      "rdb_last_bgsave_status": "ok",
+      "rdb_last_bgsave_time_sec": 0,
+      "rdb_last_cow_size": 1318912,
+      "route_index": 2000,
+      "used_memory": 93225824,
+      "used_memory_dataset": 89896640,
+      "used_memory_peak": 93228832,
+      "used_memory_rss": 103809024
+    },
+    "baseline": {
+      "dirty_index": 0,
+      "evicted_keys": 0,
+      "expired_keys": 0,
+      "generic_index": 0,
+      "key_count": 0,
+      "latest_fork_usec": 0,
+      "loss_counters": {},
+      "maxmemory": 536870912,
+      "maxmemory_policy": "volatile-lru",
+      "quarantine_index": 0,
+      "rdb_bgsave_in_progress": 0,
+      "rdb_last_bgsave_status": "ok",
+      "rdb_last_bgsave_time_sec": -1,
+      "rdb_last_cow_size": 0,
+      "route_index": 0,
+      "used_memory": 1187256,
+      "used_memory_dataset": 201456,
+      "used_memory_peak": 1187256,
+      "used_memory_rss": 10076160
+    },
+    "combined_synthetic_upperbound": {
+      "dirty_index": 24000,
+      "evicted_keys": 0,
+      "expired_keys": 0,
+      "generic_index": 24000,
+      "key_count": 28017,
+      "latest_fork_usec": 0,
+      "loss_counters": {
+        "capacity": "36000",
+        "last_at": "1793519910",
+        "route_capacity": "1"
+      },
+      "maxmemory": 536870912,
+      "maxmemory_policy": "volatile-lru",
+      "quarantine_index": 0,
+      "rdb_bgsave_in_progress": 0,
+      "rdb_last_bgsave_status": "ok",
+      "rdb_last_bgsave_time_sec": -1,
+      "rdb_last_cow_size": 0,
+      "route_index": 2000,
+      "used_memory": 93174400,
+      "used_memory_dataset": 89832956,
+      "used_memory_peak": 93228832,
+      "used_memory_rss": 98656256
+    },
+    "generic_24000_limit": {
+      "dirty_index": 24000,
+      "evicted_keys": 0,
+      "expired_keys": 0,
+      "generic_index": 24000,
+      "key_count": 24006,
+      "latest_fork_usec": 0,
+      "loss_counters": {
+        "capacity": "36000",
+        "last_at": "1793519910"
+      },
+      "maxmemory": 536870912,
+      "maxmemory_policy": "volatile-lru",
+      "quarantine_index": 0,
+      "rdb_bgsave_in_progress": 0,
+      "rdb_last_bgsave_status": "ok",
+      "rdb_last_bgsave_time_sec": -1,
+      "rdb_last_cow_size": 0,
+      "route_index": 0,
+      "used_memory": 41305792,
+      "used_memory_dataset": 38236384,
+      "used_memory_peak": 41305792,
+      "used_memory_rss": 50589696
+    },
+    "generic_plus_route_headers": {
+      "dirty_index": 24000,
+      "evicted_keys": 0,
+      "expired_keys": 0,
+      "generic_index": 24000,
+      "key_count": 28017,
+      "latest_fork_usec": 0,
+      "loss_counters": {
+        "capacity": "36000",
+        "last_at": "1793519910",
+        "route_capacity": "1"
+      },
+      "maxmemory": 536870912,
+      "maxmemory_policy": "volatile-lru",
+      "quarantine_index": 0,
+      "rdb_bgsave_in_progress": 0,
+      "rdb_last_bgsave_status": "ok",
+      "rdb_last_bgsave_time_sec": -1,
+      "rdb_last_cow_size": 0,
+      "route_index": 2000,
+      "used_memory": 42629376,
+      "used_memory_dataset": 39303264,
+      "used_memory_peak": 42668944,
+      "used_memory_rss": 50589696
+    }
+  },
+  "source_file_sha256": "12a610dadf505da163fd125f7aec4c04f3b1f68036c7ffac194a2e82ce1b9ce8",
+  "total_elapsed_seconds": 3.853
+}

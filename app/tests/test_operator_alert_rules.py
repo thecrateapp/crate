@@ -310,8 +310,13 @@ def test_digest_delivery_payload_is_signed_for_the_fixed_hermes_route(
 
 def test_alert_rules_consume_the_real_observability_summary(state, monkeypatch):
     from crate import agent_observability as observations
+    from tests.test_metric_health_evaluation import _observed_inputs
 
     now = datetime(2027, 1, 15, 8, tzinfo=UTC)
+    health_inputs = _observed_inputs()
+    for sample in health_inputs.values():
+        sample["observed_at"] = now.isoformat()
+        sample["age_seconds"] = 0.0
     monkeypatch.setattr("crate.agent_diagnostics._now", lambda: now)
     monkeypatch.setattr(observations, "_now", lambda: now)
     evidence = {
@@ -320,6 +325,12 @@ def test_alert_rules_consume_the_real_observability_summary(state, monkeypatch):
                 "source": "health",
                 "observed_at": now.isoformat(),
                 "payload": {
+                    "schema_version": 2,
+                    "availability": "available",
+                    "source": "redis_v2",
+                    "observed_at": now.isoformat(),
+                    "coverage": "observed_only",
+                    "inputs": health_inputs,
                     "score": 40,
                     "breaches": [
                         {"name": "API error rate", "severity": "critical", "value": 9}
@@ -352,6 +363,9 @@ def test_alert_rules_consume_the_real_observability_summary(state, monkeypatch):
     later = now + timedelta(seconds=120)
     evidence["queried_at"] = later
     evidence["runtime"][0]["observed_at"] = later.isoformat()
+    evidence["runtime"][0]["payload"]["observed_at"] = later.isoformat()
+    for sample in health_inputs.values():
+        sample["observed_at"] = later.isoformat()
     monkeypatch.setattr(observations, "_now", lambda: later)
     monkeypatch.setattr("crate.agent_diagnostics._now", lambda: later)
     supervisor.observe(

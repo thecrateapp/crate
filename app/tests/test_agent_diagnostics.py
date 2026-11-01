@@ -14,6 +14,87 @@ NOW = datetime(2026, 10, 16, 12, tzinfo=UTC)
 ARTIST_UID = "10000000-0000-0000-0000-000000000001"
 
 
+def test_metric_series_older_than_five_minutes_is_stale_within_requested_window(
+    monkeypatch,
+):
+    observed_at = (NOW - timedelta(minutes=60)).isoformat()
+    monkeypatch.setattr(
+        "crate.metrics.query_recent",
+        lambda *args, **kwargs: [
+            {
+                "timestamp": observed_at,
+                "count": 1,
+                "sum": 2.0,
+                "avg": 2.0,
+                "min": 2.0,
+                "max": 2.0,
+            }
+        ],
+    )
+
+    result = diagnostics.read_diagnostics(
+        source="metric_series", series="worker.queue.wait", minutes=100
+    )
+
+    assert result["availability"] == "stale"
+    assert result["observed_at"] == observed_at
+
+
+def test_metric_series_distinguishes_observation_count_from_returned_minutes(
+    monkeypatch,
+):
+    rows = [
+        {
+            "timestamp": (NOW - timedelta(minutes=1 - offset)).isoformat(),
+            "count": count,
+            "sum": count * 2.0,
+            "avg": 2.0,
+            "min": 2.0,
+            "max": 2.0,
+        }
+        for offset, count in enumerate((3, 4))
+    ]
+    monkeypatch.setattr("crate.metrics.query_recent", lambda *args, **kwargs: rows)
+
+    result = diagnostics.read_diagnostics(
+        source="metric_series", series="worker.queue.wait", minutes=5
+    )
+
+    assert result["availability"] == "available"
+    assert result["sample_count"] == 7
+    assert result["returned_count"] == 2
+    assert result["namespace"] == "crate:metrics:v2"
+    assert result["sample_kind"] == "minute_aggregates"
+
+
+def test_dense_metric_window_returns_latest_twenty_minutes_without_false_staleness(
+    monkeypatch,
+):
+    samples = [
+        {
+            "timestamp": (NOW - timedelta(minutes=59 - offset)).isoformat(),
+            "count": 1,
+            "sum": 2.0,
+            "avg": 2.0,
+            "min": 2.0,
+            "max": 2.0,
+        }
+        for offset in range(60)
+    ]
+    monkeypatch.setattr("crate.metrics.query_recent", lambda *args, **kwargs: samples)
+
+    result = diagnostics.read_diagnostics(
+        source="metric_series", series="worker.queue.wait", minutes=60, limit=20
+    )
+
+    assert result["data"]["samples"] == samples[-20:]
+    assert result["observed_at"] == NOW.isoformat()
+    assert result["availability"] == "available"
+    assert result["returned_count"] == 20
+    assert result["sample_count"] == 20
+    assert result["truncated"] is True
+
+
 @pytest.fixture(autouse=True)
 def frozen_clock(monkeypatch):
     monkeypatch.setattr(diagnostics, "_now", lambda: NOW)
@@ -722,7 +803,12 @@ def test_metric_truncation_reflects_omitted_samples(
     assert result["truncated"] is truncated
     assert result["returned_count"] == len(result["data"]["samples"])
     assert (result["returned_count"] < len(samples)) is truncated
-    assert result["availability"] == ("available" if count else "unavailable")
+    if payload_size == 0:
+        assert result["data"]["samples"] == samples[-limit:]
+    if count:
+        assert result["observed_at"] == result["data"]["samples"][-1]["timestamp"]
+    else:
+        assert result["availability"] == "unavailable"
 
 
 @pytest.mark.parametrize(

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { ResponsiveLine } from "@nivo/line";
 import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
@@ -20,17 +20,20 @@ import {
   buildMetricSeries,
   metricFieldLabel,
   type MetricSample,
+  type MetricReadStatus,
   type MetricStream,
 } from "./metric-stream-model";
 
-export function MetricChart({
+export const MetricChart = memo(function MetricChart({
   stream,
   data,
   intervalSeconds,
+  status,
 }: {
   stream: MetricStream;
   data: MetricSample[];
   intervalSeconds: number;
+  status?: MetricReadStatus;
 }) {
   const { colors, theme } = useInstrumentChartTheme();
   const motionAllowed = useMotionAllowed();
@@ -69,6 +72,18 @@ export function MetricChart({
         : colors.accent;
   const timestamp = (value: number) =>
     new Date(value).toISOString().replace("T", " ").replace("Z", " UTC");
+  const source =
+    status?.source === "redis_v2"
+      ? "Redis v2"
+      : status?.source === "postgresql_v2"
+        ? "PostgreSQL v2"
+        : null;
+  const emptyLabel =
+    status?.availability === "unavailable"
+      ? "Measurements unavailable"
+      : status?.availability === "empty"
+        ? "No observed samples"
+        : "No samples";
   return (
     <section
       aria-label={stream.title}
@@ -82,8 +97,16 @@ export function MetricChart({
         <p className="font-mono text-label text-text-muted break-words">
           {stream.unit} · {intervalSeconds === 60 ? "60 s" : "3,600 s"} buckets
         </p>
+        <p className="font-mono text-label text-text-subtle break-words">
+          {source
+            ? `Source: ${source} · ${status?.availability ?? "unverified"}`
+            : "Source unverified"}
+          {status?.observed_at ? ` · observed ${status.observed_at}` : ""}
+        </p>
         <p className="font-mono text-label text-text-subtle">
-          Current bucket may be incomplete.
+          {status?.source === "postgresql_v2"
+            ? "Stored minute snapshots; recent observations may await the next flush."
+            : "Current bucket may be incomplete."}
         </p>
       </header>
       <InstrumentChartLegend
@@ -96,7 +119,7 @@ export function MetricChart({
       />
       <div className="h-48" aria-label={`${stream.title} chronological plot`}>
         {!samples.length ? (
-          <EmptyState title="No samples" className="h-48" />
+          <EmptyState title={emptyLabel} className="h-48" />
         ) : (
           <ResponsiveLine
             data={series}
@@ -277,12 +300,12 @@ export function MetricChart({
         items={stream.fields.map((field, index) => ({
           label: metricFieldLabel(field),
           value: inspected
-            ? (series[index]?.data.find((point) => point.x === inspected.x)
-                ?.y ?? "No samples")
+            ? series[index]?.data.find((point) => point.x === inspected.x)?.y ??
+              "No samples"
             : "—",
           unit: stream.unit,
         }))}
       />
     </section>
   );
-}
+});

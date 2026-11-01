@@ -1,0 +1,47 @@
+{
+  "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "python": "3.13.11",
+  "packages": {
+    "redis": "8.1.0",
+    "SQLAlchemy": "2.1.6",
+    "psycopg2-binary": "2.9.13",
+    "docker": "7.2.0"
+  },
+  "hiredis_experiment": "3.5.0",
+  "limits": {
+    "pg_memory_mib": 768,
+    "pg_cpus": 4,
+    "redis_memory_mib": 256,
+    "redis_cpus": 1
+  },
+  "postgres_config": {
+    "shared_buffers": "128MB",
+    "work_mem": "8MB",
+    "max_parallel_workers_per_gather": 0,
+    "max_connections": 30
+  },
+  "redis_config": {
+    "maxmemory": "220mb",
+    "maxmemory_policy": "noeviction",
+    "save": "",
+    "appendonly": "no"
+  },
+  "images": [
+    {
+      "reference": ["pgvector/pgvector:pg15"],
+      "id": "sha256:a625400c9c19c92c0438d511240541004eb6e87874f36a46cf55636aabe645c6",
+      "digests": [
+        "pgvector/pgvector@sha256:a947c45cdc5906a1bc951f20a8709e321256343ee0f251e4ae00b5e7def4e6da"
+      ]
+    },
+    {
+      "reference": ["redis:7-alpine"],
+      "id": "sha256:4ab05801a605362b921756ce9dff4893add29c678076fe49a72d8cc3278806c6",
+      "digests": [
+        "redis@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2"
+      ]
+    }
+  ],
+  "external_host_load": "Unrelated esbuild process from another worktree consumed approximately145% CPU; not modified. Measurements are local and not production SLOs."
+}

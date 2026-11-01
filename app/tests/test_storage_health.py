@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
+from tests.test_metric_health_evaluation import _observed_inputs
+
 
 def test_days_until_full_projects_positive_growth_only():
     from crate.storage_health import estimate_days_until_full
@@ -75,8 +77,8 @@ def test_alerting_uses_worst_storage_pressure_instead_of_only_music(monkeypatch)
     from crate import alerting
 
     monkeypatch.setattr(
-        "crate.metrics.query_summary",
-        lambda *_args, **_kwargs: {"count": 0, "max": 0},
+        "crate.metrics.query_summaries",
+        lambda *_args, **_kwargs: _observed_inputs(),
     )
     monkeypatch.setattr(
         "crate.storage_health.collect_storage_health",
@@ -118,8 +120,8 @@ def test_alerting_reports_shared_filesystem_only_once(monkeypatch):
     from crate import alerting
 
     monkeypatch.setattr(
-        "crate.metrics.query_summary",
-        lambda *_args, **_kwargs: {"count": 0, "max": 0},
+        "crate.metrics.query_summaries",
+        lambda *_args, **_kwargs: _observed_inputs(),
     )
     monkeypatch.setattr(
         "crate.storage_health.collect_storage_health",
@@ -163,7 +165,19 @@ def test_health_snapshot_is_bounded_for_the_operator_supervisor():
 
     snapshot = status.snapshot()
 
-    assert set(snapshot) == {"score", "breaches"}
+    assert set(snapshot) == {
+        "schema_version",
+        "score",
+        "breaches",
+        "availability",
+        "source",
+        "observed_at",
+        "coverage",
+        "inputs",
+        "collector_local",
+    }
+    assert snapshot["schema_version"] == 2
+    assert snapshot["coverage"] == "observed_only"
     assert snapshot["score"] == 30 and len(snapshot["breaches"]) == 10
     assert snapshot["breaches"][0] == {
         "name": "x" * 80,

@@ -22,6 +22,7 @@ from sqlalchemy.engine.reflection import Inspector
 from sqlalchemy.exc import SAWarning
 
 from crate.db.orm.library import LibraryAlbum, LibraryArtist, LibraryTrack
+from crate.db.orm.metrics import MetricMinuteSnapshot
 from crate.db.orm.playlist import (
     Playlist,
     PlaylistMember,
@@ -37,6 +38,7 @@ ACTIVE_ORM_MODELS = (
     LibraryAlbum,
     LibraryArtist,
     LibraryTrack,
+    MetricMinuteSnapshot,
     NewRelease,
     Playlist,
     PlaylistMember,

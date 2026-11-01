@@ -1,8 +1,28 @@
 import asyncio
 from types import SimpleNamespace
 
+import pytest
+
 from crate.api import metrics_middleware
 from crate.api.metrics_middleware import _classify_metric_target
+
+
+def test_normalize_path_preserves_the_complete_registered_route_template():
+    assert (
+        metrics_middleware._normalize_path(
+            "/api/artists/123/radio", route_path="/api/artists/{artist_id}/radio"
+        )
+        == "/api/artists/{artist_id}/radio"
+    )
+
+
+def test_normalize_path_collapses_unregistered_api_paths_without_leaking_slugs():
+    normalized = metrics_middleware._normalize_path(
+        "/api/unregistered/SENSITIVE_SLUG", route_path=None
+    )
+
+    assert normalized == "/api/{unmatched}"
+    assert "SENSITIVE_SLUG" not in normalized
 
 
 def test_metrics_middleware_classifies_event_stream_as_stream():
@@ -40,6 +60,7 @@ def _run_metrics_middleware(
     method: str = "GET",
     status: int = 200,
     content_type: str = "application/xml",
+    fail_after_start: bool = False,
 ):
     records = []
     monkeypatch.setattr(
@@ -75,6 +96,8 @@ def _run_metrics_middleware(
                 "headers": [(b"content-type", content_type.encode())],
             }
         )
+        if fail_after_start:
+            raise RuntimeError("Injected stream failure")
         await send({"type": "http.response.body", "body": b""})
 
     async def receive():
@@ -83,8 +106,36 @@ def _run_metrics_middleware(
     async def send(_message):
         return None
 
-    asyncio.run(metrics_middleware.MetricsMiddleware(app)(scope, receive, send))
+    if fail_after_start:
+        with pytest.raises(RuntimeError, match="Injected stream failure"):
+            asyncio.run(metrics_middleware.MetricsMiddleware(app)(scope, receive, send))
+    else:
+        asyncio.run(metrics_middleware.MetricsMiddleware(app)(scope, receive, send))
     return records
+
+
+@pytest.mark.parametrize("fail_after_start", [False, True])
+def test_stream_concurrent_start_and_end_share_the_registered_route_identity(
+    monkeypatch, fail_after_start
+):
+    monkeypatch.setattr(metrics_middleware, "_active_streams", 0)
+    records = _run_metrics_middleware(
+        monkeypatch,
+        path="/api/events",
+        route_path="/api/events",
+        status=200,
+        content_type="text/event-stream",
+        fail_after_start=fail_after_start,
+    )
+
+    concurrent = [
+        record for record in records if record[:2] == ("sample", "stream.concurrent")
+    ]
+    tags = {"method": "GET", "path": "/api/events", "status": "200"}
+    assert concurrent == [
+        ("sample", "stream.concurrent", 1.0, tags),
+        ("sample", "stream.concurrent", 0.0, tags),
+    ]
 
 
 def test_metrics_middleware_records_low_cardinality_opensubsonic_route(monkeypatch):

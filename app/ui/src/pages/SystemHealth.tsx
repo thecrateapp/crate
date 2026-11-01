@@ -6,10 +6,13 @@ import {
   PageHeaderActions,
 } from "@/components/layout/PageHeader";
 import { Loader2, RefreshCw as HeaderRefreshCw } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { MetricChart } from "@/components/system-health/MetricChart";
-import { metricStreams } from "@/components/system-health/metric-stream-model";
+import {
+  metricStreams,
+  type MetricReadStatus,
+} from "@/components/system-health/metric-stream-model";
 
 import {
   OpsPageHero,
@@ -30,6 +33,13 @@ import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { Link } from "react-router";
 
 interface MetricSummary {
+  availability?: "available" | "empty" | "stale" | "partial" | "unavailable";
+  source?: string;
+  observed_at?: string | null;
+  age_seconds?: number | null;
+  window_minutes?: number;
+  sample_count?: number;
+  eligible_count?: number;
   count: number;
   avg: number;
   min: number;
@@ -38,10 +48,28 @@ interface MetricSummary {
 }
 
 interface MetricsSummaryResponse {
+  _meta?: {
+    schema_version: number;
+    generated_at: string;
+    history: {
+      cutover_at: string | null;
+      legacy_status: string;
+      legacy_combined: boolean;
+      retention_days?: number;
+    };
+    collector_local: {
+      scope: string;
+      coverage: string;
+      availability: string;
+      counters: Record<string, number>;
+      queue_depth: number;
+    };
+  };
   api_latency: MetricSummary;
   api_requests: MetricSummary;
   api_errors: MetricSummary;
   api_slow: MetricSummary;
+  worker_queue_depth: MetricSummary;
   stream_requests: MetricSummary;
   stream_latency: MetricSummary;
   stream_concurrent: MetricSummary;
@@ -87,6 +115,8 @@ interface SystemHealthDashboardResponse {
   playback_delivery?: PlaybackDeliverySnapshot;
   route_latency?: RouteLatencyRow[];
   timeseries: Record<string, TimeseriesPoint[]>;
+  timeseries_status?: Record<string, MetricReadStatus>;
+  route_latency_status?: MetricReadStatus;
 }
 
 interface ActiveTask {
@@ -246,6 +276,8 @@ interface RouteLatencyRow {
   min: number;
   max: number;
   avg: number;
+  sample_count?: number;
+  sampled?: boolean;
   p95: number;
   p99: number;
   status_2xx: number;
@@ -371,7 +403,13 @@ function ResourceMeter({
   );
 }
 
-function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
+function RouteLatencyOverview({
+  routes,
+  status,
+}: {
+  routes: RouteLatencyRow[];
+  status?: MetricReadStatus;
+}) {
   const visibleRoutes = routes.slice(0, 8);
   const maxP95 = Math.max(1, ...visibleRoutes.map((route) => route.p95 || 0));
   const totalRequests = routes.reduce(
@@ -398,7 +436,7 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
           <OpsStatTile
             label="Measured Routes"
             value={routes.length.toLocaleString()}
-            caption={`${totalRequests.toLocaleString()} sampled requests`}
+            caption={`${totalRequests.toLocaleString()} observed requests`}
             tone={routes.length > 0 ? "primary" : "default"}
           />
           <OpsStatTile
@@ -461,7 +499,11 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
                           max={maxP95}
                           color={barColor}
                           label={`${route.method} ${route.path} p95`}
-                          valueText={`${route.p95.toFixed(0)} ms; highest sampled route p95 ${maxP95.toFixed(0)} ms`}
+                          valueText={`${route.p95.toFixed(
+                            0,
+                          )} ms; highest sampled route p95 ${maxP95.toFixed(
+                            0,
+                          )} ms`}
                         />
                       </div>
                     </div>
@@ -516,7 +558,15 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
               })}
             </div>
           ) : (
-            <EmptyState title="No route latency samples yet" />
+            <EmptyState
+              title={
+                status?.availability === "unavailable"
+                  ? "Route measurements unavailable"
+                  : status?.availability === "partial"
+                    ? "Route measurements incomplete"
+                    : "No route latency samples yet"
+              }
+            />
           )}
         </OpsSurface>
       </div>
@@ -524,8 +574,23 @@ function RouteLatencyOverview({ routes }: { routes: RouteLatencyRow[] }) {
   );
 }
 
+function currentMetric(metric: MetricSummary | undefined, now: number) {
+  if (metric?.availability !== "available" || !metric.observed_at) return false;
+  const age = now - Date.parse(metric.observed_at);
+  return (
+    Number.isFinite(age) &&
+    age >= -30_000 &&
+    age <= Math.min(metric.window_minutes ?? 5, 5) * 60_000
+  );
+}
+
 export function SystemHealth() {
   useTaskCatalog();
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const clock = window.setInterval(() => setNow(Date.now()), 15_000);
+    return () => window.clearInterval(clock);
+  }, []);
   const [period, setPeriod] = useState<Period>("minute");
   const minutes = period === "minute" ? 60 : 1440;
 
@@ -550,19 +615,61 @@ export function SystemHealth() {
   const samplePeriod =
     dashboard === metricSnapshot.data ? metricSnapshot.period : period;
 
-  const summary = dashboard?.summary ?? null;
+  const rawSummary = dashboard?.summary ?? null;
+  const metadata = rawSummary?._meta;
+  const generatedAge = metadata ? now - Date.parse(metadata.generated_at) : NaN;
+  const verified =
+    metadata?.schema_version === 2 &&
+    Number.isFinite(generatedAge) &&
+    generatedAge >= -30_000 &&
+    generatedAge <= 300_000;
+  const apiUsable =
+    verified &&
+    !error &&
+    currentMetric(rawSummary?.api_latency, now) &&
+    currentMetric(rawSummary?.api_requests, now) &&
+    (rawSummary?.api_requests.sample_count ?? 0) > 0 &&
+    currentMetric(rawSummary?.api_errors, now) &&
+    (rawSummary?.api_errors.eligible_count ?? 0) > 0;
+  const local = metadata?.collector_local;
+  const localLoss =
+    local?.availability === "partial" || local?.availability === "unavailable";
+  const usable =
+    apiUsable &&
+    !localLoss &&
+    currentMetric(rawSummary?.worker_queue_depth, now) &&
+    (rawSummary?.worker_queue_depth.sample_count ?? 0) > 0;
+  const summary = apiUsable ? rawSummary : null;
+  const dropped = Object.entries(local?.counters ?? {}).reduce(
+    (total, [reason, count]) =>
+      [
+        "buffer_full",
+        "buffer_limit",
+        "buffer_expired",
+        "async_error",
+        "invalid_observation",
+        "redis_unavailable",
+        "redis_error",
+        "cardinality_rejected",
+      ].includes(reason)
+        ? total + count
+        : total,
+    0,
+  );
   const system = dashboard?.system ?? null;
   const tasks = dashboard?.tasks ?? [];
 
   const playbackDelivery = dashboard?.playback_delivery;
   const routeLatency = dashboard?.route_latency ?? [];
+  const routeStatus = dashboard?.route_latency_status;
 
   const score = useMemo(() => {
-    if (!summary) return null;
+    if (!summary || !usable) return null;
     let next = 100;
     if (summary.api_latency.max > 3000) next -= 15;
     if (summary.api_errors.count > 0 && summary.api_requests.count > 0) {
-      const errRate = summary.api_errors.count / summary.api_requests.count;
+      const errRate =
+        summary.api_errors.count / (summary.api_errors.eligible_count || 1);
       if (errRate > 0.05) next -= 20;
       else if (errRate > 0.01) next -= 5;
     }
@@ -575,13 +682,15 @@ export function SystemHealth() {
     if (system?.resource_pressure && !system.resource_pressure.allowed)
       next -= 10;
     return Math.max(0, next);
-  }, [summary, system]);
+  }, [summary, system, usable]);
 
   const errorRate =
     summary && summary.api_requests.count > 0
-      ? ((summary.api_errors.count / summary.api_requests.count) * 100).toFixed(
-          2,
-        )
+      ? (
+          (summary.api_errors.count /
+            (summary.api_errors.eligible_count || 1)) *
+          100
+        ).toFixed(2)
       : "—";
   const homeCacheTotal =
     (summary?.home_cache_hit.count ?? 0) +
@@ -602,18 +711,18 @@ export function SystemHealth() {
 
   const scoreSummary =
     score == null
-      ? "Health score unavailable: no metrics summary was returned."
+      ? "Health score unavailable: current, verified observations are required."
       : score >= 80
-        ? "Core services look stable and current pressure is within healthy bounds."
+        ? "Score for the observed API window and measured runtime pressure. Inspect individual signals for warnings."
         : score >= 50
           ? "The system is usable, but latency or load deserve attention before they become user-facing."
           : "Health is degraded enough to warrant immediate triage on latency, queue pressure or database usage.";
 
-  const queueTs = dashboard?.timeseries?.["worker.queue.depth"] ?? [];
   const runningTasks = tasks.length;
-  const queueDepth = queueTs.length
-    ? (queueTs[queueTs.length - 1]?.max ?? 0)
-    : null;
+  const queueDepth =
+    verified && !error && currentMetric(rawSummary?.worker_queue_depth, now)
+      ? rawSummary!.worker_queue_depth.max
+      : null;
 
   if (loading && !dashboard) {
     return (
@@ -682,6 +791,15 @@ export function SystemHealth() {
             ? `${summary.api_requests.count} requests`
             : "Metrics loading"}
         </InfoBadge>
+        <InfoBadge tone={usable ? "accent" : "warning"}>
+          {usable
+            ? "Observed window"
+            : !metadata
+              ? "Legacy metrics unverified"
+              : error || generatedAge > 300_000
+                ? "Metrics stale"
+                : "Metrics incomplete"}
+        </InfoBadge>
         <InfoBadge>{runningTasks} running tasks</InfoBadge>
         <InfoBadge>{queueDepth ?? "—"} queued depth</InfoBadge>
         {summary && errorRate !== "—" ? (
@@ -711,6 +829,25 @@ export function SystemHealth() {
         ) : null}
       </OpsPageHero>
 
+      {metadata ? (
+        <p
+          role="status"
+          aria-label="Metrics provenance"
+          className="text-sm text-text-muted"
+        >
+          Source: Redis v2 · {rawSummary?.api_requests.sample_count ?? 0}{" "}
+          observed requests.
+          {metadata.history.cutover_at
+            ? ` Corrected collection since ${metadata.history.cutover_at}.`
+            : " Corrected collection cutover pending."}
+          {
+            " Minute history retains 8 days. Legacy history is unverified and excluded. Collector diagnostics cover this process only."
+          }
+          {local
+            ? ` Local collector: ${local.availability}; ${local.queue_depth} buffered; ${dropped} dropped observations since process start.`
+            : ""}
+        </p>
+      ) : null}
       <div
         data-slot="system-health-summary"
         className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-4"
@@ -737,16 +874,20 @@ export function SystemHealth() {
           value={errorRate === "—" ? "—" : `${errorRate}%`}
           caption={
             summary
-              ? `${summary.api_errors.count} / ${summary.api_requests.count} requests`
+              ? `${summary.api_errors.count} / ${summary.api_errors.eligible_count} observed requests`
               : "Waiting for metrics"
           }
           tone={Number(errorRate) > 1 ? "danger" : "default"}
         />
         <OpsStatTile
           label="Slow Requests"
-          value={summary ? `${summary.api_slow.count}` : "—"}
+          value={
+            summary && currentMetric(summary.api_slow, now)
+              ? `${summary.api_slow.count}`
+              : "—"
+          }
           caption={
-            summary
+            summary && currentMetric(summary.api_slow, now)
               ? `${summary.api_slow.count} requests over 1s in the current window`
               : "Waiting for metrics"
           }
@@ -792,7 +933,7 @@ export function SystemHealth() {
         />
       </div>
 
-      <RouteLatencyOverview routes={routeLatency} />
+      <RouteLatencyOverview routes={routeLatency} status={routeStatus} />
 
       <OpsPanel
         title="Playback delivery"
@@ -1069,6 +1210,7 @@ export function SystemHealth() {
               stream={stream}
               data={dashboard?.timeseries?.[stream.id] ?? []}
               intervalSeconds={samplePeriod === "minute" ? 60 : 3600}
+              status={dashboard?.timeseries_status?.[stream.id]}
             />
           ))}
         </div>
@@ -1134,7 +1276,9 @@ export function SystemHealth() {
                     <div className="flex min-w-0 items-center gap-2 sm:w-32 sm:shrink-0">
                       <div className="min-w-0 flex-1">
                         <ProgressHairline
-                          label={`${task.label || taskLabel(task.type)} progress`}
+                          label={`${
+                            task.label || taskLabel(task.type)
+                          } progress`}
                           value={pct / 100}
                         />
                       </div>
