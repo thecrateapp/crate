@@ -1,7 +1,7 @@
 """Schema models for utility, infrastructure, metadata, and SSE endpoints."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator
 
@@ -119,9 +119,44 @@ class StackStatusResponse(BaseModel):
     containers: list[StackContainerResponse] = Field(default_factory=list)
 
 
+class StackInventoryHostResponse(BaseModel):
+    id: str
+    name: str
+
+
+class StackInventoryStackResponse(BaseModel):
+    id: str
+    kind: Literal["application", "observability"]
+    project: str
+
+
+class StackInventoryServiceResponse(BaseModel):
+    id: str
+    stack_id: Literal["application", "observability"]
+    service: str
+    project: str
+    container_id: str
+    container_name: str
+    image: str
+    runtime_state: str
+    health: Literal["healthy", "unhealthy", "starting", "none"]
+    status: str
+    actions: list[Literal["restart", "stop", "start"]] = Field(default_factory=list)
+
+
+class StackInventoryResponse(BaseModel):
+    schema_version: int
+    availability: Literal["available", "unavailable"]
+    reason: str | None = None
+    host: StackInventoryHostResponse
+    stacks: list[StackInventoryStackResponse] = Field(default_factory=list)
+    services: list[StackInventoryServiceResponse] = Field(default_factory=list)
+
+
 class AdminStackSnapshotResponse(BaseModel):
     snapshot: SnapshotMetadataResponse
     stack: StackStatusResponse
+    inventory: StackInventoryResponse | None = None
 
 
 class StackContainerDetailResponse(StackContainerResponse):
