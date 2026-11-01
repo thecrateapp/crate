@@ -18,6 +18,19 @@ api:
   dashboard: true
 `
 
+const traefikMetricsEntryPoint = `
+  metrics:
+    address: ":8082"
+`
+
+const traefikMetrics = `
+metrics:
+  prometheus:
+    entryPoint: metrics
+    addRoutersLabels: true
+    addServicesLabels: true
+`
+
 const traefikProviders = `
 providers:
   docker:
@@ -44,7 +57,9 @@ entryPoints:
   websecure:
     address: ":443"
 `)
+		b.WriteString(traefikMetricsEntryPoint)
 		b.WriteString(traefikProviders)
+		b.WriteString(traefikMetrics)
 		return b.String()
 	}
 	b.WriteString(`
@@ -61,7 +76,9 @@ entryPoints:
   websecure:
     address: ":443"
 `)
+	b.WriteString(traefikMetricsEntryPoint)
 	b.WriteString(traefikProviders)
+	b.WriteString(traefikMetrics)
 	b.WriteString(`
 certificatesResolvers:
   letsencrypt:

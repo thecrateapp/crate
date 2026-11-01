@@ -253,16 +253,17 @@ export function createStackMapSample(
 }
 
 export type StackActivitySample =
-  | "off"
-  | "replay"
-  | "warming"
-  | "paused"
-  | "unavailable";
+  "off" | "replay" | "warming" | "paused" | "unavailable";
 
-const RECORDED_ACTIVITY: Omit<
+const RECORDED_ACTIVITY: (Omit<
   StackActivityFrame,
-  "schema" | "sequence" | "observed_at" | "availability" | "sources"
->[] = [
+  | "schema"
+  | "sequence"
+  | "observed_at"
+  | "availability"
+  | "sources"
+  | "resources"
+> & { ingress: Record<string, number> })[] = [
   {
     window_seconds: 5,
     requests: {
@@ -277,6 +278,13 @@ const RECORDED_ACTIVITY: Omit<
     },
     projector: { events: 3 },
     listening: 3,
+    ingress: {
+      "crate-api": 84,
+      "crate-readplane-interactive": 42,
+      "crate-readplane-stream": 18,
+      listen: 30,
+      admin: 12,
+    },
   },
   {
     window_seconds: 5,
@@ -290,6 +298,13 @@ const RECORDED_ACTIVITY: Omit<
     },
     projector: { events: 0 },
     listening: 3,
+    ingress: {
+      "crate-api": 120,
+      "crate-readplane-interactive": 24,
+      "crate-readplane-stream": 6,
+      listen: 18,
+      admin: 30,
+    },
   },
   {
     window_seconds: 5,
@@ -304,6 +319,13 @@ const RECORDED_ACTIVITY: Omit<
     },
     projector: { events: 6 },
     listening: 4,
+    ingress: {
+      "crate-api": 60,
+      "crate-readplane-interactive": 54,
+      "crate-readplane-stream": 36,
+      listen: 42,
+      admin: 0,
+    },
   },
 ];
 
@@ -314,11 +336,20 @@ export function createStackActivitySample(
 ): StackActivityFrame | null | undefined {
   if (sample === "off") return undefined;
   if (sample === "unavailable") return null;
-  const recorded = RECORDED_ACTIVITY[index % RECORDED_ACTIVITY.length]!;
+  const { ingress, ...recorded } =
+    RECORDED_ACTIVITY[index % RECORDED_ACTIVITY.length]!;
   const sources = {
     metrics: "available",
     playback: "available",
     projector: "available",
+    resources: "available",
+  };
+  const observed = sample === "paused" ? now - 120_000 : now;
+  const resources = {
+    observed_at: new Date(observed).toISOString(),
+    ingress,
+    host: { cpu_percent: null, memory_used_gib: null, memory_total_gib: null },
+    services: {},
   };
   if (sample === "warming")
     return {
@@ -330,16 +361,16 @@ export function createStackActivitySample(
       window_seconds: null,
       requests: null,
       queues: null,
+      resources,
       sources: { ...sources, metrics: "warming" },
     };
   return {
     ...recorded,
     schema: 1,
     sequence: index + 1,
-    observed_at: new Date(
-      sample === "paused" ? now - 120_000 : now,
-    ).toISOString(),
+    observed_at: new Date(observed).toISOString(),
     availability: "available",
+    resources,
     sources,
   };
 }

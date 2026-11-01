@@ -65,7 +65,10 @@ describe("inventoryToStackMap", () => {
       stackId: "application",
       tier: "service",
     });
-    expect(api.activity).toEqual({ measures: ["requests"] });
+    expect(api.activity).toMatchObject({
+      measures: ["requests"],
+      routers: expect.arrayContaining(["crate-api"]),
+    });
     expect(
       map.services.find((item) => item.id === "crate/crate-postgres")!.tier,
     ).toBe("data");

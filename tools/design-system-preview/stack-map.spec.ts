@@ -261,6 +261,11 @@ test("Recorded live activity moves along declared links only when motion is allo
   await expect(map.locator(".stack-map__pulse")).toHaveCount(0, {
     timeout: 7000,
   });
+  await map.getByRole("button", { name: "Inspect Edge" }).click();
+  await expect(page.locator(".stack-map__live dt")).toContainText(["Ingress"]);
+  await expect(page.locator(".stack-map__live dd").first()).toContainText(
+    "/min",
+  );
 });
 
 test("Reduced motion keeps live readings but never animates pulses", async ({

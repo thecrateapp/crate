@@ -104,6 +104,27 @@ func TestPortsModeTraefikHasNoCertificates(t *testing.T) {
 	}
 }
 
+func TestTraefikExposesRouterMetricsOnAnInternalEntrypoint(t *testing.T) {
+	cloudflare := Defaults("/srv/crate")
+	cloudflare.Access = AccessCloudflare
+	cloudflare.Domain = "example.com"
+	for name, cfg := range map[string]Config{
+		"ports":      Defaults("/srv/crate"),
+		"cloudflare": cloudflare,
+	} {
+		static := TraefikStatic(cfg)
+		for _, want := range []string{
+			"  metrics:\n    address: \":8082\"",
+			"metrics:\n  prometheus:\n    entryPoint: metrics",
+			"    addRoutersLabels: true",
+		} {
+			if !strings.Contains(static, want) {
+				t.Errorf("%s: traefik.yml lacks %q", name, want)
+			}
+		}
+	}
+}
+
 func TestApplyWritesTheAgentSetupWithItsRepositoryLayout(t *testing.T) {
 	dir := t.TempDir()
 	if err := Apply(loadManifest(t), Defaults(dir), nil); err != nil {

@@ -246,6 +246,47 @@ Set `CRATE_GRAFANA_URL` on the API to show "Open in Grafana" links from the map
 inspector. Grafana only listens on `127.0.0.1:${OBS_GRAFANA_PORT}`, so the URL
 must be one the operator's browser can reach, typically through an SSH tunnel.
 
+### Ingress readings from Traefik
+
+With router metrics enabled, the map shows requests per minute through Edge for
+each application service and animates Edge links from that rate. Routers map to
+services in `app/ui/src/components/admin/stack-map-topology.ts`; a router with
+no series shows nothing, never zero.
+
+Traefik exposes metrics on an internal `metrics` entrypoint (`:8082`) that is
+never published on the host. New installations get it from the installer.
+Existing installations add it to `${DATA_DIR}/traefik/traefik.yml`:
+
+```yaml
+entryPoints:
+  # keep the existing web and websecure entries
+  metrics:
+    address: ":8082"
+
+metrics:
+  prometheus:
+    entryPoint: metrics
+    addRoutersLabels: true
+    addServicesLabels: true
+```
+
+Prometheus finds Traefik by DNS on the `traefik-metrics` network, which only
+Prometheus and Traefik join, and keeps only `traefik_router_requests_total` and
+`traefik_entrypoint_requests_total`. Traefik joins that network through an
+overlay that, like the projector overlay, is only appended while monitoring runs:
+
+```bash
+docker compose -f docker-compose.yaml -f docker-compose.project.yaml \
+  -f deploy/observability/compose.observability.yaml \
+  -f deploy/observability/compose.traefik-metrics.yaml \
+  --profile observability up -d traefik
+```
+
+Recreating Traefik drops in-flight connections for a few seconds, so schedule it.
+`OBS_TRAEFIK_METRICS_NETWORK` follows the same naming as
+`OBS_PROMETHEUS_QUERY_NETWORK`. Without the entrypoint or the overlay the scrape
+job has no targets and the map shows no ingress readings.
+
 ## Validation and C0 evidence
 
 ```bash

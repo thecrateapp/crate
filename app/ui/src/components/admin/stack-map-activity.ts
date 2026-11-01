@@ -20,6 +20,7 @@ export interface StackActivityFrame {
 
 export interface StackActivityResources {
   observed_at: string;
+  ingress?: Record<string, number> | null;
   host: {
     cpu_percent: number | null;
     memory_used_gib: number | null;
@@ -58,6 +59,7 @@ export interface StackActivityView {
   };
 }
 
+export const RESOURCES_MAX_AGE_MS = 90_000;
 const MAX_DOTS_PER_EDGE = 3;
 const MAX_DOTS = 40;
 
@@ -75,10 +77,10 @@ const taskValue = (completed: number, failed: number) =>
 
 function measuring(
   services: StackMapService[],
-  measure: "requests" | "events" | "listening",
+  measure: "requests" | "events" | "listening" | "ingress",
 ) {
-  return services.filter(
-    (service) => service.activity?.measures?.includes(measure),
+  return services.filter((service) =>
+    service.activity?.measures?.includes(measure),
   );
 }
 
@@ -139,8 +141,8 @@ export function deriveStackActivity(
     for (const [client, entry] of Object.entries(frame.requests)) {
       total += entry.count;
       errors += entry.errors;
-      const origins = services.filter(
-        (service) => service.activity?.clients?.includes(client),
+      const origins = services.filter((service) =>
+        service.activity?.clients?.includes(client),
       );
       if (origins.length !== 1) continue;
       const origin = origins[0]!;
@@ -178,8 +180,8 @@ export function deriveStackActivity(
       const count = entry.completed + entry.failed;
       tasks += count;
       if (!count) continue;
-      const consumers = services.filter(
-        (service) => service.activity?.queues?.includes(queue),
+      const consumers = services.filter((service) =>
+        service.activity?.queues?.includes(queue),
       );
       const links = consumers
         .map((consumer) =>
@@ -238,6 +240,46 @@ export function deriveStackActivity(
         });
       }
     }
+  }
+
+  const ingress = frame.resources?.ingress;
+  const ingressAge = frame.resources
+    ? now - Date.parse(frame.resources.observed_at)
+    : Infinity;
+  if (ingress && ingressAge <= RESOURCES_MAX_AGE_MS) {
+    const edges = measuring(services, "ingress");
+    let total: number | null = null;
+    for (const service of services) {
+      const routed = (service.activity?.routers ?? []).filter(
+        (router) => router in ingress,
+      );
+      if (!routed.length) continue;
+      const rate = Math.round(
+        routed.reduce((sum, router) => sum + ingress[router]!, 0),
+      );
+      total = (total ?? 0) + rate;
+      add(service.id, { label: "Ingress", value: `${rate}/min` });
+      const count = window ? Math.round((rate / 60) * window) : 0;
+      if (!count) continue;
+      for (const edge of edges) {
+        const link = connection(
+          (item) => item.source === edge.id && item.target === service.id,
+        );
+        if (link)
+          pulses.push({
+            connection: link,
+            count,
+            errors: 0,
+            dots: dotsFor(count),
+            reverse: false,
+          });
+      }
+    }
+    if (total !== null)
+      for (const edge of edges) {
+        add(edge.id, { label: "Ingress", value: `${total}/min` });
+        raise(edge.id, level(total, 3));
+      }
   }
 
   if (paused || view.status === "warming") {

@@ -41,9 +41,16 @@ function snapshot(): StackMapSnapshot {
       },
     ],
     services: [
-      service("api", { measures: ["requests"] }),
-      service("admin", { clients: ["admin-web"] }),
-      service("readplane", { clients: ["readplane"] }),
+      service("edge", { measures: ["ingress"] }),
+      service("api", {
+        measures: ["requests"],
+        routers: ["crate-api", "crate-api-vdj-media"],
+      }),
+      service("admin", { clients: ["admin-web"], routers: ["admin"] }),
+      service("readplane", {
+        clients: ["readplane"],
+        routers: ["crate-readplane-stream"],
+      }),
       service("listen", {
         clients: ["listen-web"],
         measures: ["listening"],
@@ -55,6 +62,8 @@ function snapshot(): StackMapSnapshot {
       service("projector", { measures: ["events"] }),
     ],
     connections: [
+      { source: "edge", target: "api", kind: "request" },
+      { source: "edge", target: "admin", kind: "request" },
       { source: "admin", target: "api", kind: "request" },
       { source: "readplane", target: "api", kind: "request" },
       { source: "worker", target: "durable", kind: "queue" },
@@ -201,6 +210,88 @@ describe("deriveStackActivity", () => {
     expect(view.pulses).toEqual([]);
     expect(view.readings.get("api")).toBeDefined();
     expect(view.ageSeconds).toBe(27);
+  });
+
+  it("derives Edge pulses and ingress readings from fresh router rates", () => {
+    const resources = {
+      observed_at: "2026-11-01T12:00:00Z",
+      host: {
+        cpu_percent: null,
+        memory_used_gib: null,
+        memory_total_gib: null,
+      },
+      services: {},
+      ingress: {
+        "crate-api": 96,
+        "crate-api-vdj-media": 24,
+        admin: 0,
+        "crate-readplane-stream": 36,
+      },
+    };
+
+    const view = deriveStackActivity(snapshot(), frame({ resources }), {
+      now: NOW,
+    });
+
+    expect(view.readings.get("api")).toContainEqual({
+      label: "Ingress",
+      value: "120/min",
+    });
+    expect(view.readings.get("admin")).toContainEqual({
+      label: "Ingress",
+      value: "0/min",
+    });
+    expect(view.readings.get("edge")).toEqual([
+      { label: "Ingress", value: "156/min" },
+    ]);
+    expect(pulse(view, "edge", "api")).toMatchObject({
+      count: 10,
+      errors: 0,
+      reverse: false,
+    });
+    expect(pulse(view, "edge", "admin")).toBeUndefined();
+    expect(pulse(view, "edge", "readplane")).toBeUndefined();
+  });
+
+  it("treats missing or old router rates as unknown, never as zero", () => {
+    const base = {
+      host: {
+        cpu_percent: null,
+        memory_used_gib: null,
+        memory_total_gib: null,
+      },
+      services: {},
+    };
+    const unconfigured = deriveStackActivity(
+      snapshot(),
+      frame({
+        resources: {
+          ...base,
+          observed_at: "2026-11-01T12:00:00Z",
+          ingress: {},
+        },
+      }),
+      { now: NOW },
+    );
+    const old = deriveStackActivity(
+      snapshot(),
+      frame({
+        resources: {
+          ...base,
+          observed_at: "2026-11-01T11:58:00Z",
+          ingress: { "crate-api": 600 },
+        },
+      }),
+      { now: NOW },
+    );
+
+    for (const view of [unconfigured, old]) {
+      expect(view.readings.get("edge")).toBeUndefined();
+      expect(
+        view.readings.get("api")?.some((item) => item.label === "Ingress"),
+      ).toBe(false);
+      expect(pulse(view, "edge", "api")).toBeUndefined();
+    }
   });
 
   it("caps the total number of moving dots", () => {

@@ -628,3 +628,59 @@ def test_resolved_projector_keeps_its_network_and_reaches_only_prometheus(tmp_pa
     )
     assert sharing == ["crate-projector", "crate-prometheus"]
 
+
+TRAEFIK_OVERLAY = "deploy/observability/compose.traefik-metrics.yaml"
+
+
+def test_traefik_router_metrics_are_discovered_without_a_permanent_target():
+    config = yaml.safe_load((OBSERVABILITY / "prometheus.yml").read_text())
+    job = next(job for job in config["scrape_configs"] if job["job_name"] == "traefik")
+    assert "static_configs" not in job
+    assert job["dns_sd_configs"] == [
+        {"names": ["traefik"], "type": "A", "port": 8082, "refresh_interval": "30s"}
+    ]
+    assert job["metric_relabel_configs"] == [
+        {
+            "source_labels": ["__name__"],
+            "regex": "traefik_(router|entrypoint)_requests_total",
+            "action": "keep",
+        }
+    ]
+    assert job["sample_limit"] == 1000
+
+
+def test_only_prometheus_joins_the_internal_traefik_metrics_network():
+    overlay = _overlay()
+    assert overlay["networks"]["traefik-metrics"]["internal"] is True
+    members = sorted(
+        name
+        for name, service in overlay["services"].items()
+        if "traefik-metrics" in service.get("networks", [])
+    )
+    assert members == ["crate-prometheus"]
+
+
+def test_traefik_overlay_only_adds_the_metrics_network():
+    overlay = yaml.safe_load((ROOT / TRAEFIK_OVERLAY).read_text())
+    assert set(overlay["services"]) == {"traefik"}
+    assert overlay["services"]["traefik"] == {"networks": ["crate", "traefik-metrics"]}
+    network = overlay["networks"]["traefik-metrics"]
+    assert network["external"] is True
+    assert network["name"] == "${OBS_TRAEFIK_METRICS_NETWORK:-crate_traefik-metrics}"
+
+
+def test_resolved_traefik_shares_its_metrics_network_with_prometheus_only(tmp_path):
+    services = _resolved_compose(
+        tmp_path,
+        "docker-compose.yaml",
+        True,
+        False,
+        extra_files=(TRAEFIK_OVERLAY,),
+    )["services"]
+    assert set(services["traefik"]["networks"]) == {"crate", "traefik-metrics"}
+    sharing = sorted(
+        name
+        for name, service in services.items()
+        if "traefik-metrics" in (service.get("networks") or {})
+    )
+    assert sharing == ["crate-prometheus", "traefik"]

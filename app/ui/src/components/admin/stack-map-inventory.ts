@@ -1,4 +1,7 @@
-import type { StackActivityResources } from "./stack-map-activity";
+import {
+  RESOURCES_MAX_AGE_MS,
+  type StackActivityResources,
+} from "./stack-map-activity";
 import type { StackMapService, StackMapSnapshot } from "./stack-map-model";
 import {
   STACK_ACTIVITY_ROLES,
@@ -32,8 +35,6 @@ export interface StackInventory {
   }[];
   links?: { grafana: string | null } | null;
 }
-
-const RESOURCES_MAX_AGE_MS = 90_000;
 
 const STACK_NAMES = {
   application: "Application",

@@ -22,6 +22,7 @@ QUERIES = {
     "host_cpu": '100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[1m])))',
     "host_used": "sum(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)",
     "host_total": "sum(node_memory_MemTotal_bytes)",
+    "ingress": "sum by (router) (rate(traefik_router_requests_total[1m])) * 60",
 }
 TIMEOUT_SECONDS = 2.0
 MIB = 1024 * 1024
@@ -71,8 +72,14 @@ def fetch_stack_resources(
             entry[field] = round(float(row["value"][1]) / scale, 1)
     used, total = _scalar(rows["host_used"]), _scalar(rows["host_total"])
     host_cpu = _scalar(rows["host_cpu"])
+    ingress = {}
+    for row in rows["ingress"]:
+        router = row.get("metric", {}).get("router", "").split("@", 1)[0]
+        if router:
+            ingress[router] = round(float(row["value"][1]), 1)
     return {
         "observed_at": datetime.fromtimestamp(now(), tz=timezone.utc).isoformat(),
+        "ingress": ingress,
         "host": {
             "cpu_percent": round(host_cpu, 1) if host_cpu is not None else None,
             "memory_used_gib": round(used / GIB, 1) if used is not None else None,

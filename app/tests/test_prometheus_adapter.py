@@ -41,6 +41,11 @@ def test_resources_combine_container_and_host_readings():
         "host_cpu": _vector(({}, 31.2)),
         "host_used": _vector(({}, 23622320128)),
         "host_total": _vector(({}, 66571993088)),
+        "ingress": _vector(
+            ({"router": "crate-api@docker"}, 182.4),
+            ({"router": "listen@file"}, 12),
+            ({}, 3),
+        ),
     }
     seen = []
 
@@ -68,6 +73,7 @@ def test_resources_combine_container_and_host_readings():
         "memory_used_gib": 22.0,
         "memory_total_gib": 62.0,
     }
+    assert resources["ingress"] == {"crate-api": 182.4, "listen": 12.0}
     assert (
         resources["observed_at"]
         == datetime.fromtimestamp(1730462405.0, tz=timezone.utc).isoformat()

@@ -197,13 +197,30 @@ export const STACK_HUBS: Record<"application" | "observability", string> = {
 export const STACK_ACTIVITY_ROLES: Partial<
   Record<string, StackMapActivityRole>
 > = {
-  "crate-api": { measures: ["requests"] },
-  "crate-ui": { clients: ["admin-web"] },
+  traefik: { measures: ["ingress"] },
+  "crate-api": {
+    measures: ["requests"],
+    routers: [
+      "crate-api",
+      "crate-api-access-token",
+      "crate-api-vdj-artwork",
+      "crate-api-vdj-media",
+    ],
+  },
+  "crate-ui": { clients: ["admin-web"], routers: ["admin"] },
   "crate-listen": {
     clients: ["listen-web", "listen-android", "listen-ios", "listen-desktop"],
+    routers: ["listen"],
     measures: ["listening"],
   },
-  "crate-readplane": { clients: ["readplane"] },
+  "crate-readplane": {
+    clients: ["readplane"],
+    routers: [
+      "crate-readplane-interactive",
+      "crate-readplane-sse",
+      "crate-readplane-stream",
+    ],
+  },
   "crate-worker": { queues: ["default", "fast"] },
   "crate-fast-worker": { queues: ["fast"] },
   "crate-maintenance-worker": { queues: ["maintenance"] },
@@ -216,6 +233,8 @@ export const STACK_CONNECTIONS: [string, string, StackMapConnection["kind"]][] =
   [
     ["traefik", "crate-listen", "request"],
     ["traefik", "crate-ui", "request"],
+    ["traefik", "crate-api", "request"],
+    ["traefik", "crate-readplane", "request"],
     ["crate-listen", "crate-readplane", "request"],
     ["crate-listen", "crate-api", "request"],
     ["crate-ui", "crate-api", "request"],

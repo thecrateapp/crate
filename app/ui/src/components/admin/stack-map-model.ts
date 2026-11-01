@@ -3,7 +3,8 @@ export type StackMapTier = "entry" | "service" | "data";
 export interface StackMapActivityRole {
   clients?: string[];
   queues?: string[];
-  measures?: ("requests" | "events" | "listening")[];
+  routers?: string[];
+  measures?: ("requests" | "events" | "listening" | "ingress")[];
 }
 
 export interface StackMapService {
