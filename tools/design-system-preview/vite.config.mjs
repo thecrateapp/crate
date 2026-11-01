@@ -285,6 +285,9 @@ export default defineConfig({
     emptyOutDir: true,
     rolldownOptions: {
       input: {
+        stackMap: fileURLToPath(
+          new URL("review-stack-map.html", import.meta.url),
+        ),
         review1BEContextMenus: fileURLToPath(
           new URL("review-1be-context-menus.html", import.meta.url),
         ),
