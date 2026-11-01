@@ -106,6 +106,47 @@ def test_compatible_tracks_returns_one_bounded_ranked_response(
     }
 
 
+def test_compatible_tracks_include_browser_fields_for_virtualdj(
+    test_app,
+    monkeypatch,
+) -> None:
+    from dataclasses import replace
+
+    from crate.api import smart_mix
+
+    seed = _candidate("seed")
+    candidate = _candidate("candidate")
+    result = replace(
+        _result(candidate),
+        duration_seconds=201.5,
+        bpm=121.0,
+        camelot="8A",
+        energy=0.72,
+        year="2001",
+        genre="Post-hardcore",
+        album_id=42,
+        album_has_cover=True,
+    )
+    monkeypatch.setattr(
+        smart_mix, "get_compatible_track_inputs", lambda *_a, **_k: (seed, [candidate])
+    )
+    monkeypatch.setattr(smart_mix, "rank_compatible_tracks", lambda *_a, **_k: [result])
+
+    response = test_app.get(
+        "/api/tracks/by-entity/00000000-0000-0000-0000-000000000001/compatible"
+    )
+
+    item = response.json()["items"][0]
+    assert response.status_code == 200
+    assert item["duration"] == 201.5
+    assert item["bpm"] == 121.0
+    assert item["camelot"] == "8A"
+    assert item["energy"] == 0.72
+    assert item["year"] == "2001"
+    assert item["genre"] == "Post-hardcore"
+    assert item["coverUrl"] == "/api/vdj/albums/42/cover?size=512"
+
+
 def test_compatible_tracks_reports_missing_seed_or_profile(
     test_app, monkeypatch
 ) -> None:

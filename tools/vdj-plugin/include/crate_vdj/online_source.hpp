@@ -87,8 +87,11 @@ struct OnlineSourceDependencies {
 
 inline constexpr std::string_view kCurrentCompatibleFolderId = "crate:compatible:current";
 inline constexpr std::string_view kCompatibleFolderPrefix = "crate:compatible:";
+inline constexpr std::string_view kNoticePrefix = "crate:notice:";
+inline constexpr std::string_view kNoProfileNoticeId = "crate:notice:no-profile";
 
 int vdj_key_number(std::string_view audio_key, std::string_view audio_scale);
+int vdj_key_from_camelot(std::string_view camelot);
 std::string api_asset_url(const std::string& origin, std::string_view path);
 std::string compatible_folder_navigation_command(std::string_view language);
 std::string vdj_search_command(std::string_view field, std::string_view value);

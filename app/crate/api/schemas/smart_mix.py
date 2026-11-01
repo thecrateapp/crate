@@ -329,6 +329,13 @@ class CompatibleTrackResponse(SmartMixApiModel):
         default_factory=list,
         serialization_alias="fallbackReasons",
     )
+    duration: float | None = None
+    bpm: float | None = None
+    camelot: str | None = None
+    energy: float | None = Field(default=None, ge=0.0, le=1.0)
+    year: str | None = None
+    genre: str | None = None
+    cover_url: str | None = Field(default=None, serialization_alias="coverUrl")
 
 
 class CompatibleTracksResponse(SmartMixApiModel):

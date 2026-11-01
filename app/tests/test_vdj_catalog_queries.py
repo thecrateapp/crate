@@ -90,6 +90,47 @@ def test_genre_folder_uses_normalized_album_genres(pg_db, tmp_path: Path) -> Non
     assert not uids & set(untagged.track_uids)
 
 
+def test_folder_tracks_prefer_the_current_smart_mix_profile(
+    pg_db, tmp_path: Path
+) -> None:
+    del pg_db
+    owner = _user("profiles")
+    library = _library(tmp_path, count=2)
+    genre_id = _genre(library.album_id, "screamo")
+    with transaction_scope() as session:
+        for track_id, bpm, stale in (
+            (library.track_ids[0], 121.5, False),
+            (library.track_ids[1], 99.0, True),
+        ):
+            session.execute(
+                text(
+                    """
+                    INSERT INTO track_mix_profiles
+                        (track_id, profile_version, profile_revision, analyzer,
+                         analyzer_version, source_revision, quality, analyzed_at,
+                         bpm, key_camelot, global_energy, source_stale_at)
+                    VALUES (:track_id, 1, 'profile', 'crate-rust', 'smart-mix-audio-v5',
+                            'source', 'full', NOW(), :bpm, '8A', 0.72,
+                            CASE WHEN :stale THEN NOW() ELSE NULL END)
+                    """
+                ),
+                {"track_id": track_id, "bpm": bpm, "stale": stale},
+            )
+
+    page = get_vdj_folder_page(f"crate:genre:{genre_id}", user_id=owner)
+
+    by_uid = {track["entity_uid"]: track for track in page["tracks"]}
+    profiled = by_uid[library.track_uids[0]]
+    stale = by_uid[library.track_uids[1]]
+    assert (profiled["bpm"], profiled["camelot"], profiled["energy"]) == (
+        121.5,
+        "8A",
+        0.72,
+    )
+    assert stale["bpm"] != 99.0
+    assert stale["camelot"] is None
+
+
 def test_mood_folder_returns_the_strongest_matches_first(pg_db, tmp_path: Path) -> None:
     del pg_db
     owner = _user("mood")

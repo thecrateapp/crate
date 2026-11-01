@@ -223,22 +223,22 @@ def test_session_search_ignores_filter_syntax(test_app) -> None:
     ordinary_search.assert_called_once()
 
 
-def test_access_token_search_never_returns_server_paths(test_app) -> None:
-    payload = {
-        "artists": [],
-        "albums": [],
-        "tracks": [
-            {"id": 1, "title": "Noah", "artist": "A", "album": "B", "path": "/music/x"}
-        ],
-    }
+def test_access_token_plain_text_search_uses_the_dj_search(test_app) -> None:
+    tracks = [{"id": 1, "title": "Noah", "artist": "A", "album": "B", "camelot": "8A"}]
     with (
         patch("crate.api.auth.AuthMiddleware.resolve_user", _token_user),
-        patch("crate.api.browse_media.search_local_library", return_value=payload),
+        patch(
+            "crate.api.browse_media.search_dj_tracks", return_value=tracks
+        ) as dj_search,
+        patch("crate.api.browse_media.search_local_library") as ordinary_search,
     ):
-        response = test_app.get("/api/search?q=noah")
+        response = test_app.get("/api/search", params={"q": "noah", "limit": 50})
 
     assert response.status_code == 200
+    assert response.json()["tracks"][0]["camelot"] == "8A"
     assert "path" not in response.json()["tracks"][0]
+    dj_search.assert_called_once_with("noah", 50)
+    ordinary_search.assert_not_called()
 
 
 def test_session_search_keeps_paths_for_listen(test_app) -> None:

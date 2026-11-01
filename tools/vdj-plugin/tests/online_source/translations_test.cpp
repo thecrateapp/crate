@@ -10,6 +10,9 @@ using crate::vdj::is_spanish_language;
 using crate::vdj::open_in_crate_menu_label;
 using crate::vdj::artist_menu_label;
 using crate::vdj::album_menu_label;
+using crate::vdj::energy_label;
+using crate::vdj::match_label;
+using crate::vdj::no_profile_notice_label;
 
 int main()
 {
@@ -26,6 +29,10 @@ int main()
     CRATE_CHECK(album_menu_label("Spanish") == "Este álbum");
     CRATE_CHECK(artist_menu_label("English") == "More from this artist");
     CRATE_CHECK(album_menu_label("English") == "This album");
+    CRATE_CHECK(energy_label("Spanish") == "Energía");
+    CRATE_CHECK(match_label("Spanish") == "Encaje");
+    CRATE_CHECK(no_profile_notice_label("Spanish") == "Esta pista aún no tiene perfil de Smart Mix");
+    CRATE_CHECK(no_profile_notice_label("English") == "This track has no Smart Mix profile yet");
 
     CRATE_CHECK(catalog_folder_label(
                "crate:recently-played", "Recently Played", "Spanish"

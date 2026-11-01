@@ -10,9 +10,13 @@
 
 #include <algorithm>
 #include <array>
-#include <chrono>
 #include <cctype>
+#include <charconv>
+#include <chrono>
+#include <cmath>
+#include <optional>
 #include <utility>
+#include <vector>
 
 namespace crate::vdj {
 namespace {
@@ -21,22 +25,58 @@ constexpr std::string_view kOnlineSourceFolderId = "Crate";
 constexpr int kMaxFolderPages = 5;
 constexpr std::size_t kMaxRememberedTracks = 5000;
 
+std::string percent(double value)
+{
+    return std::to_string(static_cast<int>(std::lround(std::clamp(value, 0.0, 1.0) * 100))) + "%";
+}
+
+std::string track_comment(
+    const SearchTrack& track,
+    std::string_view language,
+    std::optional<double> match
+)
+{
+    std::vector<std::string> parts;
+    if (!track.album.empty()) {
+        parts.push_back(track.album);
+    }
+    if (!track.camelot.empty()) {
+        parts.push_back(track.camelot);
+    }
+    if (track.energy.has_value()) {
+        parts.push_back(std::string(energy_label(language)) + " " + percent(*track.energy));
+    }
+    if (match.has_value()) {
+        parts.push_back(std::string(match_label(language)) + " " + percent(*match));
+    }
+    std::string comment;
+    for (const auto& part : parts) {
+        if (!comment.empty()) {
+            comment += " \u00b7 ";
+        }
+        comment += part;
+    }
+    return comment;
+}
+
 TrackEntry track_entry(
     const std::string& origin,
     const SearchTrack& track,
-    std::string comment
+    std::string_view language,
+    std::optional<double> match = std::nullopt
 )
 {
+    const int camelot_key = vdj_key_from_camelot(track.camelot);
     return TrackEntry{
         .unique_id = track.entity_uid,
         .title = track.title,
         .artist = track.artist,
         .genre = track.genre,
-        .comment = comment.empty() ? track.album : std::move(comment),
+        .comment = track_comment(track, language, match),
         .cover_url = track.cover_url.empty() ? "" : api_asset_url(origin, track.cover_url),
         .duration_seconds = static_cast<float>(track.duration_seconds),
         .bpm = static_cast<float>(track.bpm),
-        .key = vdj_key_number(track.audio_key, track.audio_scale),
+        .key = camelot_key != 0 ? camelot_key : vdj_key_number(track.audio_key, track.audio_scale),
         .year = track.year,
     };
 }
@@ -152,6 +192,30 @@ int vdj_key_number(std::string_view audio_key, std::string_view audio_scale)
         }
     }
     return 0;
+}
+
+int vdj_key_from_camelot(std::string_view camelot)
+{
+    if (camelot.size() < 2) {
+        return 0;
+    }
+    const char mode = static_cast<char>(std::toupper(static_cast<unsigned char>(camelot.back())));
+    const auto digits = camelot.substr(0, camelot.size() - 1);
+    int number = 0;
+    const auto parsed = std::from_chars(digits.data(), digits.data() + digits.size(), number);
+    if (parsed.ec != std::errc{} || parsed.ptr != digits.data() + digits.size() || number < 1 ||
+        number > 12 || (mode != 'A' && mode != 'B')) {
+        return 0;
+    }
+    static constexpr std::array<std::string_view, 12> minor_keys = {
+        "G#", "D#", "A#", "F", "C", "G", "D", "A", "E", "B", "F#", "C#",
+    };
+    static constexpr std::array<std::string_view, 12> major_keys = {
+        "B", "F#", "C#", "G#", "D#", "A#", "F", "C", "G", "D", "A", "E",
+    };
+    const auto index = static_cast<std::size_t>(number - 1);
+    return mode == 'A' ? vdj_key_number(minor_keys[index], "minor")
+                       : vdj_key_number(major_keys[index], "major");
 }
 
 std::string api_asset_url(const std::string& origin, std::string_view path)
@@ -275,9 +339,10 @@ CallbackStatus OnlineSource::search(const std::string& query, TrackSink& sink)
     }
 
     remember(result.value->tracks);
+    const std::string language = host_.language();
     const bool published = searches_.publish(*request, [&] {
         for (const auto& track : result.value->tracks) {
-            sink.add(track_entry(server->origin, track, {}));
+            sink.add(track_entry(server->origin, track, language));
         }
         sink.finish();
     });
@@ -298,6 +363,9 @@ void OnlineSource::cancel_search()
 
 StreamUrl OnlineSource::stream_url(const std::string& unique_id)
 {
+    if (unique_id.starts_with(kNoticePrefix)) {
+        return {std::nullopt, std::string(no_profile_notice_label(host_.language()))};
+    }
     const auto server = clients();
     if (server == nullptr) {
         return {std::nullopt, "Connect Crate before loading tracks."};
@@ -391,9 +459,10 @@ CallbackStatus OnlineSource::folder(const std::string& folder_id, TrackSink& sin
     }
 
     remember(tracks);
+    const std::string language = host_.language();
     const bool published = folders_.publish(*request, [&] {
         for (const auto& track : tracks) {
-            sink.add(track_entry(server->origin, track, {}));
+            sink.add(track_entry(server->origin, track, language));
         }
         sink.finish();
     });
@@ -479,6 +548,9 @@ std::optional<OnlineSource::TrackFacts> OnlineSource::facts_for(const std::strin
 
 std::vector<OnlineSource::MenuAction> OnlineSource::menu_actions(const std::string& unique_id)
 {
+    if (unique_id.starts_with(kNoticePrefix)) {
+        return {};
+    }
     std::vector<MenuAction> actions{MenuAction::Compatible};
     if (const auto facts = facts_for(unique_id)) {
         if (!facts->artist.empty()) {
@@ -542,18 +614,27 @@ CallbackStatus OnlineSource::compatible_folder(const std::string& seed_uid, Trac
             *result.value->fallback_reason);
     }
 
+    const std::string language = host_.language();
+    const bool missing_profile = result.value->items.empty() &&
+        result.value->fallback_reason == std::optional<std::string>("missing_profile");
     std::vector<SearchTrack> compatible_tracks;
     for (const auto& compatible : result.value->items) {
         compatible_tracks.push_back(compatible_track_as_search_track(compatible));
     }
     remember(compatible_tracks);
     const bool published = folders_.publish(*request, [&] {
-        for (const auto& compatible : result.value->items) {
-            const auto track = compatible_track_as_search_track(compatible);
+        if (missing_profile) {
+            TrackEntry notice;
+            notice.unique_id = kNoProfileNoticeId;
+            notice.title = no_profile_notice_label(language);
+            sink.add(notice);
+        }
+        for (std::size_t index = 0; index < compatible_tracks.size(); ++index) {
             sink.add(track_entry(
                 server->origin,
-                track,
-                "Album: " + track.album + " | " + compatible_track_comment(compatible)
+                compatible_tracks[index],
+                language,
+                result.value->items[index].score
             ));
         }
         sink.finish();
