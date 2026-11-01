@@ -202,9 +202,8 @@ int main()
 
     ContextMenuProbe context_menu;
     if (online_source->GetContextMenu("seed-track", &context_menu) != S_OK ||
-        context_menu.entries.size() != 2 ||
-        context_menu.entries[0] != "Mostrar pistas compatibles" ||
-        context_menu.entries[1] != "Abrir en Crate") {
+        context_menu.entries.size() != 1 ||
+        context_menu.entries[0] != "Mostrar pistas compatibles") {
         std::cerr << "Online Source context menu was not localized\n";
         online_source->Release();
         return 1;
@@ -213,9 +212,8 @@ int main()
     callbacks.language = "English";
     context_menu.entries.clear();
     if (online_source->GetContextMenu("seed-track", &context_menu) != S_OK ||
-        context_menu.entries.size() != 2 ||
-        context_menu.entries[0] != "Show compatible tracks" ||
-        context_menu.entries[1] != "Open in Crate") {
+        context_menu.entries.size() != 1 ||
+        context_menu.entries[0] != "Show compatible tracks") {
         std::cerr << "Online Source English labels were not localized\n";
         online_source->Release();
         return 1;
@@ -224,9 +222,8 @@ int main()
     callbacks.language = "Español";
     context_menu.entries.clear();
     if (online_source->GetContextMenu("seed-track", &context_menu) != S_OK ||
-        context_menu.entries.size() != 2 ||
-        context_menu.entries[0] != "Mostrar pistas compatibles" ||
-        context_menu.entries[1] != "Abrir en Crate") {
+        context_menu.entries.size() != 1 ||
+        context_menu.entries[0] != "Mostrar pistas compatibles") {
         std::cerr << "Online Source Spanish locale alias was not localized\n";
         online_source->Release();
         return 1;

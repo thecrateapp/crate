@@ -62,6 +62,8 @@ add_library(crate_vdj_core STATIC
     src/online_source/compatible_tracks.cpp
     src/online_source/translations.cpp
     src/online_source/vdj_track_path.cpp
+    src/online_source/online_source.cpp
+    src/core/request_coordinator.cpp
     src/mapping/compatible_tracks.cpp
     src/client/stream_resolver.cpp
     src/mapping/mix_profile.cpp
@@ -143,7 +145,7 @@ if(CRATE_VDJ_BUILD_REAL_PLUGIN)
     endif()
 
     function(configure_vdj_plugin_target target output_name)
-        add_library(${target} MODULE spike/control_spike.cpp)
+        add_library(${target} MODULE src/sdk/online_source_plugin.cpp)
         if(APPLE)
             target_sources(${target} PRIVATE src/platform/connection_dialog_macos.mm)
             target_link_libraries(${target} PRIVATE "-framework AppKit")
@@ -195,7 +197,7 @@ if(CRATE_VDJ_BUILD_REAL_PLUGIN)
             )
             set(CRATE_VDJ_BUNDLE_NAME "Crate")
             configure_file(
-                "${CMAKE_CURRENT_SOURCE_DIR}/spike/Info.plist.in"
+                "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Info.plist.in"
                 "${CMAKE_CURRENT_BINARY_DIR}/${target}-Info.plist"
                 @ONLY
             )
@@ -211,22 +213,15 @@ if(CRATE_VDJ_BUILD_REAL_PLUGIN)
         endif()
     endfunction()
 
-    configure_vdj_plugin_target(crate_vdj_control_plugin crate_vdj_control)
-
     configure_vdj_plugin_target(
         crate_vdj_online_source_plugin
         Crate
-    )
-    target_compile_definitions(
-        crate_vdj_online_source_plugin
-        PRIVATE CRATE_VDJ_ONLINE_SOURCE_PLUGIN=1
     )
 
     if(APPLE AND CRATE_VDJ_BUILD_TESTS)
         add_test(
             NAME crate_vdj_bundle_metadata
             COMMAND ${CMAKE_COMMAND}
-                -DCRATE_VDJ_CONTROL_BUNDLE=$<TARGET_BUNDLE_DIR:crate_vdj_control_plugin>
                 -DCRATE_VDJ_ONLINE_SOURCE_BUNDLE=$<TARGET_BUNDLE_DIR:crate_vdj_online_source_plugin>
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/sdk/verify_bundle_metadata.cmake"
         )
@@ -379,6 +374,24 @@ if(CRATE_VDJ_BUILD_TESTS)
         COMMAND crate_vdj_metadata_cache_test
     )
 
+    add_executable(crate_vdj_request_coordinator_test
+        tests/online_source/request_coordinator_test.cpp
+    )
+    target_link_libraries(crate_vdj_request_coordinator_test PRIVATE crate_vdj_core)
+    add_test(
+        NAME crate_vdj_request_coordinator_test
+        COMMAND crate_vdj_request_coordinator_test
+    )
+
+    add_executable(crate_vdj_online_source_test
+        tests/online_source/online_source_test.cpp
+    )
+    target_link_libraries(crate_vdj_online_source_test PRIVATE crate_vdj_core)
+    add_test(
+        NAME crate_vdj_online_source_test
+        COMMAND crate_vdj_online_source_test
+    )
+
     add_executable(crate_vdj_cache_migration_test
         tests/cache/cache_migration_test.cpp
     )
@@ -392,13 +405,9 @@ if(CRATE_VDJ_BUILD_TESTS)
         add_executable(crate_vdj_factory_contract
             tests/sdk/factory_contract.cpp
             tests/sdk/fake_connection_dialog.cpp
-            spike/control_spike.cpp
+            src/sdk/online_source_plugin.cpp
         )
         target_compile_features(crate_vdj_factory_contract PRIVATE cxx_std_20)
-        target_compile_definitions(
-            crate_vdj_factory_contract
-            PRIVATE CRATE_VDJ_ONLINE_SOURCE_PLUGIN=1
-        )
         target_include_directories(
             crate_vdj_factory_contract
             PRIVATE "${VirtualDJSDK_INCLUDE_DIR}"

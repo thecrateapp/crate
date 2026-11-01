@@ -1,4 +1,4 @@
-#include "connection_dialog.hpp"
+#include "crate_vdj/connection_dialog.hpp"
 
 #include <windows.h>
 

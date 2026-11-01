@@ -58,17 +58,14 @@ cmake -S tools/vdj-plugin -B build/vdj-macos -G Ninja \
 cmake --build build/vdj-macos
 ```
 
-The integration produces two macOS `.bundle` or Windows `.dll` artifacts: one
-General control plugin and one Online Source plugin. They must be installed in
-their respective VirtualDJ plugin directories for the manual gate:
+The integration produces one macOS `.bundle` or Windows `.dll`, the Online
+Source, installed in the VirtualDJ Online Sources directory:
 
 ```text
-crate_vdj_control.bundle       -> PluginsMacArm/AutoStart/
-Crate.bundle                    -> PluginsMacArm/OnlineSources/
+Crate.bundle -> PluginsMacArm/OnlineSources/
 ```
 
-Do not install the same binary in both directories. The output must not be
-committed.
+The output must not be committed.
 
 The Online Source identifies itself to VirtualDJ as `Crate` and packages the
 Crate provider icon in its bundle resources.

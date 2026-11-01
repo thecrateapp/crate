@@ -6,6 +6,7 @@
 #include <cctype>
 #include <cstdlib>
 #include <fstream>
+#include <optional>
 #include <sstream>
 #include <system_error>
 
@@ -141,19 +142,48 @@ bool FileConnectionSettingsStore::clear()
     return !error;
 }
 
-std::filesystem::path default_connection_settings_path()
+namespace {
+
+std::optional<std::filesystem::path> user_data_directory()
 {
 #if defined(_WIN32)
-    if (const char* app_data = std::getenv("APPDATA"); app_data != nullptr && app_data[0] != '\0') {
-        return std::filesystem::path(app_data) / "Crate" / "VirtualDJ" / "connection.json";
+    if (const wchar_t* app_data = _wgetenv(L"APPDATA"); app_data != nullptr && app_data[0] != L'\0') {
+        return std::filesystem::path(app_data);
     }
 #else
     if (const char* home = std::getenv("HOME"); home != nullptr && home[0] != '\0') {
-        return std::filesystem::path(home) / "Library" / "Application Support" / "Crate" /
-            "VirtualDJ" / "connection.json";
+        return std::filesystem::path(home) / "Library" / "Application Support";
     }
 #endif
+    return std::nullopt;
+}
+
+} // namespace
+
+std::filesystem::path default_connection_settings_path()
+{
+    if (const auto directory = user_data_directory()) {
+        return *directory / "Crate" / "VirtualDJ" / "connection.json";
+    }
     return std::filesystem::temp_directory_path() / "crate-vdj-connection.json";
+}
+
+std::filesystem::path default_metadata_cache_path()
+{
+    if (const char* configured = std::getenv("CRATE_VDJ_METADATA_CACHE");
+        configured != nullptr && configured[0] != '\0') {
+        return configured;
+    }
+    if (const auto directory = user_data_directory()) {
+        return *directory / "VirtualDJ" / "Cache" / "crate-metadata.sqlite";
+    }
+    return std::filesystem::temp_directory_path() / "crate-vdj-metadata.sqlite";
+}
+
+std::string utf8_path(const std::filesystem::path& path)
+{
+    const auto value = path.u8string();
+    return std::string(value.begin(), value.end());
 }
 
 } // namespace crate::vdj

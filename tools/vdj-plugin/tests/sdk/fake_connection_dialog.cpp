@@ -1,4 +1,4 @@
-#include "../../src/platform/connection_dialog.hpp"
+#include "crate_vdj/connection_dialog.hpp"
 
 namespace crate::vdj {
 
