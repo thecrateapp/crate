@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cctype>
 #include <utility>
 
@@ -77,6 +78,27 @@ std::string connect_message(const ConnectResult& result)
 }
 
 } // namespace
+
+std::string_view stream_failure_message(StreamFailure failure)
+{
+    switch (failure) {
+    case StreamFailure::TimedOut:
+        return "Crate took too long to answer. Load the track again.";
+    case StreamFailure::Unreachable:
+        return "Crate could not be reached. Check your connection and the Crate server.";
+    case StreamFailure::Unauthorized:
+        return "Crate rejected the access token. Log in to Crate again.";
+    case StreamFailure::NotFound:
+        return "This track is no longer in your Crate library.";
+    case StreamFailure::NotReady:
+        return "Crate is still preparing this track. Try again in a moment.";
+    case StreamFailure::None:
+    case StreamFailure::Cancelled:
+    case StreamFailure::Invalid:
+        break;
+    }
+    return "Crate could not load this track.";
+}
 
 struct OnlineSource::ServerClients {
     ServerClients(
@@ -280,15 +302,19 @@ StreamUrl OnlineSource::stream_url(const std::string& unique_id)
     if (server == nullptr) {
         return {std::nullopt, "Connect Crate before loading tracks."};
     }
+    const auto started = std::chrono::steady_clock::now();
     CancellationSource cancellation;
     const auto result = server->stream.resolve(unique_id, cancellation.token());
+    const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - started
+    ).count();
     if (!result.ok()) {
-        const std::string error = redact_sensitive(result.error);
-        log("stream URL resolution failed id=" + unique_id + " error=" + error);
-        return {std::nullopt, error};
+        log("stream URL resolution failed id=" + unique_id + " ms=" + std::to_string(elapsed_ms) +
+            " error=" + redact_sensitive(result.detail));
+        return {std::nullopt, std::string(stream_failure_message(result.failure))};
     }
-    log("stream URL resolved id=" + unique_id);
-    return {*result.value, {}};
+    log("stream URL resolved id=" + unique_id + " ms=" + std::to_string(elapsed_ms));
+    return {*result.url, {}};
 }
 
 CallbackStatus OnlineSource::folder_list(FolderSink& sink)
