@@ -131,6 +131,31 @@ paused/unavailable states; Admin typecheck, scoped ESLint, the story's scoped
 TypeScript check and the showcase catalogue pass. Screenshots:
 `.artifacts/stack-map-checkpoint-3-live/`.
 
+## Checkpoint 5: real inventory on the Stack page (tasks 6–8)
+
+- Inventory (`14b233529`): `stack-snapshot` and `stack-stream` carry an additive
+  `inventory` with host identity (`CRATE_HOST_ID`, `CRATE_HOST_NAME`), both
+  Compose projects (`CRATE_OBSERVABILITY_PROJECT`, legacy overlay services
+  classified by name), scoped ids (`project/service`), health separate from
+  runtime and per-service allowed actions. The legacy `stack` payload read by MCP
+  is unchanged. Docker failures keep the last good snapshot as stale or report
+  the inventory unavailable instead of a healthy empty host. Container actions
+  keep the existing allowlist, also require this deployment's project and return
+  404, 503 or `unchanged`; a broken socket no longer reports success.
+- Stack page (`467ebfdee`): the map renders from the inventory and receives the
+  activity frames already on `stack-stream`; service cards keep logs and
+  actions. One topology catalogue now feeds both the page and the review scene.
+- Prometheus and Grafana (`3cec1c4b9`): bounded cAdvisor/node-exporter queries
+  every 30 s from the projector while watched, carried as `resources` in frames
+  and applied only under 90 s old; Grafana links to the provisioned dashboards.
+  Both stay off until `CRATE_PROMETHEUS_URL` / `CRATE_GRAFANA_URL` are set.
+  Prometheus currently lives on the internal `observability` network, which the
+  application cannot reach; enabling readings needs a network decision.
+
+Checks: 22 inventory/action cases, 2 adapter cases, 9 sampler cases, 171 Admin
+cases across the map, activity, inventory adapter and Stack page, ten browser
+scenarios; Ruff, ESLint and Admin typecheck pass.
+
 ## Next adoption
 
 The production Stack route is unchanged pending visual review. The approved
