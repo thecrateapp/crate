@@ -381,3 +381,94 @@ describe("StackMap", () => {
     ).toBeNull();
   });
 });
+
+describe("StackMap live activity", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function liveSnapshot() {
+    const data = snapshot();
+    for (const service of data.services) {
+      if (service.id === "crate-api")
+        service.activity = { measures: ["requests"] };
+      if (service.id === "readplane")
+        service.activity = { clients: ["readplane"] };
+    }
+    return data;
+  }
+
+  function frame(observedAt: string) {
+    return {
+      schema: 1 as const,
+      sequence: 3,
+      observed_at: observedAt,
+      window_seconds: 5,
+      availability: "available" as const,
+      requests: { readplane: { count: 10, errors: 0 } },
+      queues: { default: { completed: 2, failed: 0 } },
+      projector: { events: 1 },
+      listening: 4,
+      sources: { metrics: "available" },
+    };
+  }
+
+  it("adds nothing when live activity is not wired", () => {
+    render(<StackMap snapshot={liveSnapshot()} />);
+
+    expect(screen.queryByText("Live activity")).toBeNull();
+    expect(document.querySelector("[data-live-status]")).toBeNull();
+  });
+
+  it("shows live readings, caption totals and a load arc for a fresh frame", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-01T12:00:05Z"));
+    render(
+      <StackMap
+        snapshot={liveSnapshot()}
+        activity={frame("2026-11-01T12:00:03Z")}
+      />,
+    );
+    const map = screen.getByRole("region", { name: "Stack topology" });
+
+    expect(document.querySelector("[data-live-status]")).toHaveTextContent(
+      "Live",
+    );
+    expect(map).toHaveTextContent("120 req/min · 4 listening · 2 tasks");
+    expect(within(inspector()).getByText("Live activity")).toBeVisible();
+    expect(inspector()).toHaveTextContent("120/min");
+    expect(
+      document.querySelector('.stack-map__level[data-service="crate-api"]'),
+    ).not.toBeNull();
+  });
+
+  it("pauses an old frame instead of presenting it as live", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-01T12:01:00Z"));
+    render(
+      <StackMap
+        snapshot={liveSnapshot()}
+        activity={frame("2026-11-01T12:00:03Z")}
+      />,
+    );
+
+    expect(document.querySelector("[data-live-status]")).toHaveAttribute(
+      "data-live-status",
+      "paused",
+    );
+    expect(document.querySelector("[data-live-status]")).toHaveTextContent(
+      /Paused · last/,
+    );
+  });
+
+  it("reports missing live data without inventing zero activity", () => {
+    render(<StackMap snapshot={liveSnapshot()} activity={null} />);
+    const map = screen.getByRole("region", { name: "Stack topology" });
+
+    expect(document.querySelector("[data-live-status]")).toHaveTextContent(
+      "Live data unavailable",
+    );
+    expect(map).toHaveTextContent("— req/min · — listening · — tasks");
+    expect(inspector()).toHaveTextContent("Live data unavailable");
+  });
+});

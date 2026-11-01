@@ -1,5 +1,11 @@
 export type StackMapTier = "entry" | "service" | "data";
 
+export interface StackMapActivityRole {
+  clients?: string[];
+  queues?: string[];
+  measures?: ("requests" | "events" | "listening")[];
+}
+
 export interface StackMapService {
   id: string;
   stackId: string;
@@ -11,6 +17,7 @@ export interface StackMapService {
   memoryMiB: number | null;
   tier?: StackMapTier;
   order?: number;
+  activity?: StackMapActivityRole;
 }
 
 export interface StackMapConnection {

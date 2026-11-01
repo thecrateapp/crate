@@ -103,6 +103,34 @@ Screenshots and browser inventory: `.artifacts/stack-map-checkpoint-2-followups/
 without page errors. Earlier checkpoints and canonical baselines are unchanged.
 No application-wide suite, dependency changes, API adoption or deployment occurred.
 
+## Checkpoint 4: live activity
+
+Branch `codex/stack-live` (stacked on PR1A). Preview: http://127.0.0.1:5188/review-stack-map.html
+(the 5186/5187/6006 servers still serve checkpoint 3 from `crate-stack-topology`).
+
+- The map accepts an optional `activity` frame from the projector sampler
+  (`event: activity` on `stack-stream`). Without the prop nothing changes.
+- Services declare what they originate or consume (`activity.clients`,
+  `activity.queues`, `activity.measures`). A pulse is drawn only when exactly one
+  service owns the signal and a declared connection backs it; queues served by
+  two services (such as `fast`) stay as a reading on the queue store.
+- Discrete pulses per frame (at most three per link and forty in total, log
+  scale) travel the link once and stop; they are animated through refs with a
+  single animation-frame loop per frame, never React state, and are skipped by
+  the motion gate and reduced motion. Error shares render in the danger tone.
+- Load arcs on nodes, a live caption line for the application stack
+  (`req/min · listening · tasks`) and an inspector Live section. Status is Live,
+  Live · partial, Warming up, Paused (frame older than 15 s, with its time) or
+  Live data unavailable; missing values render as an em dash, never zero.
+- The review scene replays three recorded frames every five seconds, labelled as
+  a recorded sample, with Off, Warming, Paused and Unavailable cases.
+
+Checks: 52 unit cases across the map, activity model and component files; ten
+browser scenarios including recorded pulses, reduced motion without pulses and
+paused/unavailable states; Admin typecheck, scoped ESLint, the story's scoped
+TypeScript check and the showcase catalogue pass. Screenshots:
+`.artifacts/stack-map-checkpoint-3-live/`.
+
 ## Next adoption
 
 The production Stack route is unchanged pending visual review. The approved

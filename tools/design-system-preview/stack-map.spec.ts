@@ -243,3 +243,61 @@ test("Reduced motion disables graph transitions while keeping selection usable",
   await postgres.click();
   await expect(postgres).toHaveAttribute("aria-pressed", "true");
 });
+
+test("Recorded live activity moves along declared links only when motion is allowed", async ({
+  page,
+}) => {
+  await page.goto(REVIEW);
+  const map = page.getByRole("region", { name: "Stack topology" });
+  await assertFieldGap(page, "Activity sample");
+  await expect(map.locator("[data-live-status]")).toHaveAttribute(
+    "data-live-status",
+    "live",
+  );
+  await expect(map.locator(".stack-map__field-live")).toContainText("req/min");
+  await expect
+    .poll(() => map.locator(".stack-map__pulse").count(), { timeout: 7000 })
+    .toBeGreaterThan(0);
+  await expect(map.locator(".stack-map__pulse")).toHaveCount(0, {
+    timeout: 7000,
+  });
+});
+
+test("Reduced motion keeps live readings but never animates pulses", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(REVIEW);
+  const map = page.getByRole("region", { name: "Stack topology" });
+  await expect(map.locator(".stack-map__field-live")).toContainText("req/min");
+  await page.waitForTimeout(6000);
+  await expect(map.locator(".stack-map__pulse")).toHaveCount(0);
+  await expect(map.locator(".stack-map__level").first()).toBeVisible();
+});
+
+test("Paused and unavailable activity samples never present stale data as live", async ({
+  page,
+}) => {
+  await page.goto(REVIEW);
+  const map = page.getByRole("region", { name: "Stack topology" });
+  const samples = page.getByRole("radiogroup", {
+    name: "Activity sample",
+    exact: true,
+  });
+  await samples.getByRole("radio", { name: "Paused", exact: true }).click();
+  await expect(map.locator("[data-live-status]")).toHaveAttribute(
+    "data-live-status",
+    "paused",
+  );
+  await page.waitForTimeout(1500);
+  await expect(map.locator(".stack-map__pulse")).toHaveCount(0);
+  await samples
+    .getByRole("radio", { name: "Unavailable", exact: true })
+    .click();
+  await expect(map.locator("[data-live-status]")).toHaveText(
+    "Live data unavailable",
+  );
+  await expect(map.locator(".stack-map__field-live")).toContainText(
+    "— req/min",
+  );
+});

@@ -1,8 +1,10 @@
 import type {
+  StackMapActivityRole,
   StackMapSnapshot,
   StackMapService,
   StackMapTier,
 } from "../../../app/ui/src/components/admin/stack-map-model";
+import type { StackActivityFrame } from "../../../app/ui/src/components/admin/stack-map-activity";
 
 export type StackMapSample = "observed" | "degraded" | "stale" | "unavailable";
 
@@ -183,6 +185,22 @@ const TIERS: Partial<Record<string, StackMapTier>> = {
   "crate-grafana": "entry",
 };
 
+const ACTIVITY: Partial<Record<string, StackMapActivityRole>> = {
+  "crate-api": { measures: ["requests"] },
+  "crate-ui": { clients: ["admin-web"] },
+  "crate-listen": {
+    clients: ["listen-web", "listen-android", "listen-ios", "listen-desktop"],
+    measures: ["listening"],
+  },
+  "crate-readplane": { clients: ["readplane"] },
+  "crate-worker": { queues: ["default", "fast"] },
+  "crate-fast-worker": { queues: ["fast"] },
+  "crate-maintenance-worker": { queues: ["maintenance"] },
+  "crate-analysis-worker": { queues: ["heavy"] },
+  "crate-playback-worker": { queues: ["playback"] },
+  "crate-projector": { measures: ["events"] },
+};
+
 export function createStackMapSample(
   sample: StackMapSample = "observed",
 ): StackMapSnapshot {
@@ -204,6 +222,7 @@ export function createStackMapSample(
       runtimeState: "running",
       health: "healthy",
       tier: TIERS[id] ?? "service",
+      activity: ACTIVITY[id],
     }),
   );
   if (sample === "degraded") {
@@ -248,6 +267,7 @@ export function createStackMapSample(
       connection("traefik", "crate-listen", "request"),
       connection("traefik", "crate-ui", "request"),
       connection("crate-listen", "crate-readplane", "request"),
+      connection("crate-listen", "crate-api", "request"),
       connection("crate-ui", "crate-api", "request"),
       connection("crate-readplane", "crate-api", "request"),
       connection("crate-readplane", "crate-postgres", "data"),
@@ -257,7 +277,9 @@ export function createStackMapSample(
       connection("crate-worker", "crate-redis-durable", "queue"),
       connection("crate-fast-worker", "crate-redis-durable", "queue"),
       connection("crate-maintenance-worker", "crate-postgres", "data"),
+      connection("crate-maintenance-worker", "crate-redis-durable", "queue"),
       connection("crate-analysis-worker", "crate-postgres", "data"),
+      connection("crate-analysis-worker", "crate-redis-durable", "queue"),
       connection("crate-playback-worker", "crate-redis-durable", "queue"),
       connection("crate-media-worker", "crate-redis", "data"),
       connection("crate-projector", "crate-postgres", "data"),
@@ -289,5 +311,97 @@ export function createStackMapSample(
       Date.now() - (sample === "stale" ? 12 * 60_000 : 30_000),
     ).toISOString(),
     metricsSource: sample === "unavailable" ? null : "prometheus",
+  };
+}
+
+export type StackActivitySample =
+  | "off"
+  | "replay"
+  | "warming"
+  | "paused"
+  | "unavailable";
+
+const RECORDED_ACTIVITY: Omit<
+  StackActivityFrame,
+  "schema" | "sequence" | "observed_at" | "availability" | "sources"
+>[] = [
+  {
+    window_seconds: 5,
+    requests: {
+      "listen-web": { count: 14, errors: 0 },
+      "listen-android": { count: 5, errors: 0 },
+      readplane: { count: 3, errors: 0 },
+      "admin-web": { count: 6, errors: 0 },
+    },
+    queues: {
+      default: { completed: 2, failed: 0 },
+      heavy: { completed: 1, failed: 0 },
+    },
+    projector: { events: 3 },
+    listening: 3,
+  },
+  {
+    window_seconds: 5,
+    requests: {
+      "listen-web": { count: 9, errors: 0 },
+      "admin-web": { count: 11, errors: 1 },
+    },
+    queues: {
+      maintenance: { completed: 1, failed: 0 },
+      fast: { completed: 4, failed: 0 },
+    },
+    projector: { events: 0 },
+    listening: 3,
+  },
+  {
+    window_seconds: 5,
+    requests: {
+      "listen-web": { count: 22, errors: 0 },
+      "listen-ios": { count: 2, errors: 0 },
+      readplane: { count: 1, errors: 0 },
+    },
+    queues: {
+      playback: { completed: 2, failed: 0 },
+      heavy: { completed: 2, failed: 1 },
+    },
+    projector: { events: 6 },
+    listening: 4,
+  },
+];
+
+export function createStackActivitySample(
+  sample: StackActivitySample,
+  index: number,
+  now = Date.now(),
+): StackActivityFrame | null | undefined {
+  if (sample === "off") return undefined;
+  if (sample === "unavailable") return null;
+  const recorded = RECORDED_ACTIVITY[index % RECORDED_ACTIVITY.length]!;
+  const sources = {
+    metrics: "available",
+    playback: "available",
+    projector: "available",
+  };
+  if (sample === "warming")
+    return {
+      ...recorded,
+      schema: 1,
+      sequence: index + 1,
+      observed_at: new Date(now).toISOString(),
+      availability: "warming",
+      window_seconds: null,
+      requests: null,
+      queues: null,
+      sources: { ...sources, metrics: "warming" },
+    };
+  return {
+    ...recorded,
+    schema: 1,
+    sequence: index + 1,
+    observed_at: new Date(
+      sample === "paused" ? now - 120_000 : now,
+    ).toISOString(),
+    availability: "available",
+    sources,
   };
 }

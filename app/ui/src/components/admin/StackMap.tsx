@@ -17,7 +17,21 @@ import {
   type StackMapPoint,
   type StackMapSnapshot,
 } from "./stack-map-model";
+import {
+  deriveStackActivity,
+  type StackActivityFrame,
+  type StackActivityView,
+} from "./stack-map-activity";
+import { useActivityPulses } from "./stack-map-pulses";
 import "./stack-map.css";
+
+const LIVE_LABELS: Record<StackActivityView["status"], string> = {
+  live: "Live",
+  partial: "Live · partial",
+  warming: "Warming up",
+  paused: "Paused",
+  unavailable: "Live data unavailable",
+};
 
 type ConnectionKind = StackMapConnection["kind"];
 
@@ -125,8 +139,25 @@ function DashSample({
   );
 }
 
-export function StackMap({ snapshot }: { snapshot: StackMapSnapshot }) {
+export function StackMap({
+  snapshot,
+  activity,
+}: {
+  snapshot: StackMapSnapshot;
+  activity?: StackActivityFrame | null;
+}) {
   const motionAllowed = useMotionAllowed();
+  const pulseLayerRef = useRef<SVGGElement>(null);
+  const pathRefs = useRef(new Map<StackMapConnection, SVGPathElement>());
+  const liveEnabled = activity !== undefined;
+  const activitySequence = activity?.sequence ?? null;
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    if (!liveEnabled) return;
+    setClock(Date.now());
+    const timer = window.setTimeout(() => setClock(Date.now()), 15_500);
+    return () => window.clearTimeout(timer);
+  }, [liveEnabled, activitySequence]);
   const visualRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef(new Map<string, HTMLButtonElement>());
   const prefix = useId().replace(/:/g, "");
@@ -256,6 +287,24 @@ export function StackMap({ snapshot }: { snapshot: StackMapSnapshot }) {
     );
   }
 
+  const activityView = useMemo(
+    () => deriveStackActivity(snapshot, activity ?? null, { now: clock }),
+    [snapshot, activity, clock],
+  );
+  const liveConnections = useMemo(
+    () => new Set(activityView.pulses.map((pulse) => pulse.connection)),
+    [activityView.pulses],
+  );
+  useActivityPulses({
+    layerRef: pulseLayerRef,
+    pathRefs,
+    pulses: activityView.pulses,
+    sequence: activityView.sequence,
+    enabled: liveEnabled && motionAllowed,
+  });
+  const liveReadings = selected
+    ? activityView.readings.get(selected.id) ?? []
+    : [];
   const health = selected ? serviceHealth(snapshot, selected) : "unknown";
   const selectedStack = snapshot.stacks.find(
     (stack) => stack.id === selected?.stackId,
@@ -338,6 +387,30 @@ export function StackMap({ snapshot }: { snapshot: StackMapSnapshot }) {
                 {failing === 1 ? "healthcheck" : "healthchecks"}
               </InfoBadge>
             ) : null}
+            {liveEnabled ? (
+              <InfoBadge
+                tone={
+                  activityView.status === "live"
+                    ? "accent"
+                    : activityView.status === "paused" ||
+                        activityView.status === "unavailable"
+                      ? "warning"
+                      : "neutral"
+                }
+                data-live-status={activityView.status}
+              >
+                {LIVE_LABELS[activityView.status]}
+                {activityView.status === "paused" && activity
+                  ? ` · last ${new Date(
+                      activity.observed_at,
+                    ).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                    })}`
+                  : ""}
+              </InfoBadge>
+            ) : null}
           </div>
           <div
             className="stack-map__fields"
@@ -386,6 +459,17 @@ export function StackMap({ snapshot }: { snapshot: StackMapSnapshot }) {
                       "Health unknown"
                     )}
                   </p>
+                  {liveEnabled && field.kind === "application" ? (
+                    <p
+                      className="stack-map__field-live"
+                      data-status={activityView.status}
+                    >
+                      {activityView.summary.requestsPerMinute ?? "—"} req/min{" "}
+                      <span>·</span> {activityView.summary.listening ?? "—"}{" "}
+                      listening <span>·</span>{" "}
+                      {activityView.summary.tasks ?? "—"} tasks
+                    </p>
+                  ) : null}
                 </div>
               );
             })}
@@ -480,7 +564,12 @@ export function StackMap({ snapshot }: { snapshot: StackMapSnapshot }) {
                   <path
                     key={`${connection.source}-${connection.target}-${connection.kind}-${index}`}
                     d={connectionPath(from, to, fieldsById.get(from.stackId))}
+                    ref={(node) => {
+                      if (node) pathRefs.current.set(connection, node);
+                      else pathRefs.current.delete(connection);
+                    }}
                     className="stack-map__connection"
+                    data-live={liveConnections.has(connection)}
                     data-active={active}
                     data-muted={Boolean(previewId) && !active}
                     data-kind={connection.kind}
@@ -492,6 +581,27 @@ export function StackMap({ snapshot }: { snapshot: StackMapSnapshot }) {
                   />
                 );
               })}
+              {[...activityView.levels].map(([serviceId, value]) => {
+                const point = layout.nodes.get(serviceId);
+                if (!point || value <= 0) return null;
+                return (
+                  <circle
+                    key={`level-${serviceId}`}
+                    className="stack-map__level"
+                    data-service={serviceId}
+                    data-paused={activityView.status === "paused"}
+                    cx={point.x}
+                    cy={point.y}
+                    r={point.ring === "hub" ? 24 : 16}
+                    pathLength={100}
+                    strokeDasharray={`${Math.max(4, value * 100).toFixed(
+                      1,
+                    )} 100`}
+                    transform={`rotate(-90 ${point.x} ${point.y})`}
+                  />
+                );
+              })}
+              <g ref={pulseLayerRef} className="stack-map__pulses" />
             </svg>
             {inventory.services.map((service) => {
               const point = layout.nodes.get(service.id);
@@ -622,6 +732,32 @@ export function StackMap({ snapshot }: { snapshot: StackMapSnapshot }) {
                   <dd>{selectedStack?.revision ?? "Unknown"}</dd>
                 </div>
               </dl>
+              {liveEnabled ? (
+                <div
+                  className="stack-map__live"
+                  data-status={activityView.status}
+                >
+                  <MonoLabel as="p">Live activity</MonoLabel>
+                  {liveReadings.length ? (
+                    <dl>
+                      {liveReadings.map((reading) => (
+                        <div key={reading.label}>
+                          <dt>{reading.label}</dt>
+                          <dd>{reading.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : (
+                    <p className="stack-map__quiet">
+                      {activityView.status === "unavailable"
+                        ? "Live data unavailable"
+                        : activityView.status === "warming"
+                          ? "Collecting the first window"
+                          : "No attributed activity in the last window"}
+                    </p>
+                  )}
+                </div>
+              ) : null}
               {relationList("Depends on", selection.outgoingLinks)}
               {relationList("Used by", selection.incomingLinks)}
               <p className="stack-map__source">

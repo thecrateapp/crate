@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FormField } from "@crate/ui/primitives/FormField";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 import { StackMap } from "../../../app/ui/src/components/admin/StackMap";
 import {
+  createStackActivitySample,
   createStackMapSample,
+  type StackActivitySample,
   type StackMapSample,
 } from "./stack-map-fixtures";
 import "./stack-map-review.css";
@@ -12,6 +14,18 @@ import "./stack-map-review.css";
 export function StackMapReview() {
   const [sample, setSample] = useState<StackMapSample>("observed");
   const [snapshot, setSnapshot] = useState(() => createStackMapSample());
+  const [activitySample, setActivitySample] =
+    useState<StackActivitySample>("replay");
+  const [frameIndex, setFrameIndex] = useState(0);
+  useEffect(() => {
+    if (activitySample !== "replay") return;
+    const timer = window.setInterval(
+      () => setFrameIndex((index) => index + 1),
+      5000,
+    );
+    return () => window.clearInterval(timer);
+  }, [activitySample]);
+  const activity = createStackActivitySample(activitySample, frameIndex);
   return (
     <main className="stack-map-review">
       <header className="stack-map-review__header">
@@ -39,16 +53,37 @@ export function StackMapReview() {
             ]}
           />
         </FormField>
+        <FormField kind="group" label="Activity sample">
+          <SegmentedControl
+            as="radio"
+            label="Activity sample"
+            value={activitySample}
+            onValueChange={(value: StackActivitySample) => {
+              setActivitySample(value);
+              setFrameIndex(0);
+            }}
+            items={[
+              { value: "off", label: "Off" },
+              { value: "replay", label: "Replay" },
+              { value: "warming", label: "Warming" },
+              { value: "paused", label: "Paused" },
+              { value: "unavailable", label: "Unavailable" },
+            ]}
+          />
+        </FormField>
       </header>
       <p className="stack-map-review__notice">
         Interactive visual checkpoint · sample data · no server connection
+        {activitySample === "replay"
+          ? " · recorded activity sample replayed every 5 s"
+          : ""}
       </p>
       <InstrumentPanel
         label={{ children: "Runtime map", tone: "accent" }}
         meta="One host · two stacks"
         summary="Host and stack topology"
       >
-        <StackMap snapshot={snapshot} />
+        <StackMap snapshot={snapshot} activity={activity} />
       </InstrumentPanel>
     </main>
   );
