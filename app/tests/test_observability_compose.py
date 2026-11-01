@@ -505,7 +505,7 @@ def test_grafana_dashboards_share_the_provisioned_datasource_and_cover_infrastru
     assert all("or vector(0)" not in expression for expression in expressions)
 
 
-def _resolved_compose(tmp_path, base, enabled, operator):
+def _resolved_compose(tmp_path, base, enabled, operator, extra_files=()):
     if not shutil.which("docker"):
         pytest.skip("Docker Compose parser required; no daemon or containers used")
     files = [base]
@@ -514,6 +514,7 @@ def _resolved_compose(tmp_path, base, enabled, operator):
     if operator:
         files.append("deploy/operator/compose.operator.yaml")
     files.append(str(OVERLAY.relative_to(ROOT)))
+    files.extend(extra_files)
     values = {
         "PUID": "1000",
         "PGID": "1000",
@@ -577,3 +578,53 @@ def test_overlay_resolves_opt_in_without_changing_crate_startup(
     for name, service in services.items():
         if name not in overlay_services:
             assert overlay_services.isdisjoint(service.get("depends_on", {})), name
+
+
+PROJECTOR_OVERLAY = "deploy/observability/compose.projector-prometheus.yaml"
+
+
+def test_only_prometheus_joins_the_internal_query_network():
+    overlay = _overlay()
+    assert overlay["networks"]["prometheus-query"]["internal"] is True
+    members = sorted(
+        name
+        for name, service in overlay["services"].items()
+        if "prometheus-query" in service.get("networks", [])
+    )
+    assert members == ["crate-prometheus"]
+
+
+def test_projector_overlay_only_adds_the_query_network_and_prometheus_url():
+    overlay = yaml.safe_load((ROOT / PROJECTOR_OVERLAY).read_text())
+    assert set(overlay["services"]) == {"crate-projector"}
+    projector = overlay["services"]["crate-projector"]
+    assert projector["networks"] == ["crate", "prometheus-query"]
+    assert projector["environment"] == {
+        "CRATE_PROMETHEUS_URL": "http://crate-prometheus:9090"
+    }
+    assert "ports" not in projector
+    network = overlay["networks"]["prometheus-query"]
+    assert network["external"] is True
+    assert network["name"] == "${OBS_PROMETHEUS_QUERY_NETWORK:-crate_prometheus-query}"
+
+
+def test_resolved_projector_keeps_its_network_and_reaches_only_prometheus(tmp_path):
+    services = _resolved_compose(
+        tmp_path,
+        "docker-compose.yaml",
+        True,
+        False,
+        extra_files=(PROJECTOR_OVERLAY,),
+    )["services"]
+    projector = services["crate-projector"]
+    assert set(projector["networks"]) == {"crate", "prometheus-query"}
+    assert projector["environment"]["CRATE_PROMETHEUS_URL"] == (
+        "http://crate-prometheus:9090"
+    )
+    sharing = sorted(
+        name
+        for name, service in services.items()
+        if "prometheus-query" in (service.get("networks") or {})
+    )
+    assert sharing == ["crate-projector", "crate-prometheus"]
+

@@ -1,0 +1,12 @@
+# Optional, appended only when monitoring runs: lets crate-projector read Stack
+# resources from Prometheus over a network shared with Prometheus alone.
+services:
+  crate-projector:
+    networks: [crate, prometheus-query]
+    environment:
+      CRATE_PROMETHEUS_URL: http://crate-prometheus:9090
+
+networks:
+  prometheus-query:
+    name: ${OBS_PROMETHEUS_QUERY_NETWORK:-crate_prometheus-query}
+    external: true

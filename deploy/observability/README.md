@@ -217,6 +217,35 @@ client initializes once. After a failed startup, repair the proxy and recreate
 cAdvisor rather than accepting `up=1` without container metrics. No privileged
 mode or Docker daemon changes are required.
 
+## Stack map resource readings
+
+The Admin Stack map reads per-service CPU and memory and host readings from
+Prometheus. Prometheus stays on internal networks: it shares `prometheus-query`
+with `crate-projector` and nothing else, so no application container other than
+the projector can reach its API, and the projector cannot reach the exporters,
+cAdvisor, Grafana or the Docker socket proxy.
+
+Readings are off until the projector overlay is appended, and it must only be
+appended while monitoring runs, because it joins an external network created by
+the monitoring project:
+
+```bash
+docker compose -f docker-compose.yaml -f docker-compose.project.yaml \
+  -f deploy/observability/compose.observability.yaml \
+  -f deploy/observability/compose.projector-prometheus.yaml \
+  --profile observability up -d crate-projector
+```
+
+`OBS_PROMETHEUS_QUERY_NETWORK` names that network: `crate_prometheus-query` when
+monitoring shares the application project (the default), or
+`crate-observability_prometheus-query` for the independent monitoring project.
+The projector queries Prometheus every 30 seconds only while someone has the
+Stack page open; without the overlay the map shows n/a, never zero.
+
+Set `CRATE_GRAFANA_URL` on the API to show "Open in Grafana" links from the map
+inspector. Grafana only listens on `127.0.0.1:${OBS_GRAFANA_PORT}`, so the URL
+must be one the operator's browser can reach, typically through an SSH tunnel.
+
 ## Validation and C0 evidence
 
 ```bash
