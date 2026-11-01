@@ -37,6 +37,13 @@ import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { LoadingState } from "@crate/ui/domain/states/LoadingState";
 import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
 import { api } from "@/lib/api";
+import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
+import { StackMap } from "@/components/admin/StackMap";
+import type { StackActivityFrame } from "@/components/admin/stack-map-activity";
+import {
+  inventoryToStackMap,
+  type StackInventory,
+} from "@/components/admin/stack-map-inventory";
 import { SearchInput } from "@crate/ui/primitives/SearchInput";
 
 interface Container {
@@ -66,6 +73,7 @@ interface StackSnapshotData {
     generation_ms: number;
   };
   stack: StackStatus;
+  inventory?: StackInventory | null;
 }
 
 interface ContainerLogs {
@@ -262,6 +270,7 @@ function ServiceCard({
 
 export function Stack() {
   const [snapshot, setSnapshot] = useState<StackSnapshotData | null>(null);
+  const [activity, setActivity] = useState<StackActivityFrame | undefined>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [streamStatus, setStreamStatus] =
@@ -283,6 +292,16 @@ export function Stack() {
   );
   const reconnectTimerRef = useRef<number | null>(null);
   const data = snapshot?.stack ?? null;
+  const mapSnapshot = useMemo(
+    () =>
+      snapshot?.inventory
+        ? inventoryToStackMap(snapshot.inventory, {
+            stale: snapshot.snapshot.stale,
+            observedAt: snapshot.snapshot.built_at ?? null,
+          })
+        : null,
+    [snapshot],
+  );
 
   const fetchSnapshot = useCallback(async (fresh = false, silent = false) => {
     if (!silent) setLoading(true);
@@ -324,6 +343,15 @@ export function Stack() {
           // Ignore malformed stream payloads and wait for the next event.
         }
       };
+      stream.addEventListener("activity", (event) => {
+        const message = event as MessageEvent<string>;
+        if (message.origin && message.origin !== window.location.origin) return;
+        try {
+          setActivity(JSON.parse(message.data) as StackActivityFrame);
+        } catch {
+          // Ignore malformed activity frames and wait for the next one.
+        }
+      });
       stream.onerror = () => {
         stream?.close();
         if (closed) return;
@@ -502,6 +530,15 @@ export function Stack() {
         </OpsPanel>
       ) : (
         <>
+          {mapSnapshot ? (
+            <InstrumentPanel
+              label={{ children: "Runtime map", tone: "accent" }}
+              meta="Host and deployments"
+              summary="Host and stack topology"
+            >
+              <StackMap snapshot={mapSnapshot} activity={activity} />
+            </InstrumentPanel>
+          ) : null}
           <section
             aria-label="Stack summary"
             className="grid min-w-0 grid-cols-2 gap-x-6 gap-y-7 py-3 lg:grid-cols-3"

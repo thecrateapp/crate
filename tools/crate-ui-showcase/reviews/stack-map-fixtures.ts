@@ -1,10 +1,13 @@
 import type {
-  StackMapActivityRole,
   StackMapSnapshot,
   StackMapService,
-  StackMapTier,
 } from "../../../app/ui/src/components/admin/stack-map-model";
 import type { StackActivityFrame } from "../../../app/ui/src/components/admin/stack-map-activity";
+import {
+  STACK_ACTIVITY_ROLES,
+  STACK_CONNECTIONS,
+  STACK_SERVICE_CATALOG,
+} from "../../../app/ui/src/components/admin/stack-map-topology";
 
 export type StackMapSample = "observed" | "degraded" | "stale" | "unavailable";
 
@@ -175,32 +178,6 @@ const observability = [
   ],
 ] as const;
 
-const TIERS: Partial<Record<string, StackMapTier>> = {
-  traefik: "entry",
-  "crate-listen": "entry",
-  "crate-ui": "entry",
-  "crate-postgres": "data",
-  "crate-redis": "data",
-  "crate-redis-durable": "data",
-  "crate-grafana": "entry",
-};
-
-const ACTIVITY: Partial<Record<string, StackMapActivityRole>> = {
-  "crate-api": { measures: ["requests"] },
-  "crate-ui": { clients: ["admin-web"] },
-  "crate-listen": {
-    clients: ["listen-web", "listen-android", "listen-ios", "listen-desktop"],
-    measures: ["listening"],
-  },
-  "crate-readplane": { clients: ["readplane"] },
-  "crate-worker": { queues: ["default", "fast"] },
-  "crate-fast-worker": { queues: ["fast"] },
-  "crate-maintenance-worker": { queues: ["maintenance"] },
-  "crate-analysis-worker": { queues: ["heavy"] },
-  "crate-playback-worker": { queues: ["playback"] },
-  "crate-projector": { measures: ["events"] },
-};
-
 export function createStackMapSample(
   sample: StackMapSample = "observed",
 ): StackMapSnapshot {
@@ -221,8 +198,8 @@ export function createStackMapSample(
       stackId,
       runtimeState: "running",
       health: "healthy",
-      tier: TIERS[id] ?? "service",
-      activity: ACTIVITY[id],
+      tier: STACK_SERVICE_CATALOG[id]?.tier ?? "service",
+      activity: STACK_ACTIVITY_ROLES[id],
     }),
   );
   if (sample === "degraded") {
@@ -263,48 +240,9 @@ export function createStackMapSample(
       },
     ],
     services,
-    connections: [
-      connection("traefik", "crate-listen", "request"),
-      connection("traefik", "crate-ui", "request"),
-      connection("crate-listen", "crate-readplane", "request"),
-      connection("crate-listen", "crate-api", "request"),
-      connection("crate-ui", "crate-api", "request"),
-      connection("crate-readplane", "crate-api", "request"),
-      connection("crate-readplane", "crate-postgres", "data"),
-      connection("crate-api", "crate-postgres", "data"),
-      connection("crate-api", "crate-redis", "data"),
-      connection("crate-api", "crate-redis-durable", "queue"),
-      connection("crate-worker", "crate-redis-durable", "queue"),
-      connection("crate-fast-worker", "crate-redis-durable", "queue"),
-      connection("crate-maintenance-worker", "crate-postgres", "data"),
-      connection("crate-maintenance-worker", "crate-redis-durable", "queue"),
-      connection("crate-analysis-worker", "crate-postgres", "data"),
-      connection("crate-analysis-worker", "crate-redis-durable", "queue"),
-      connection("crate-playback-worker", "crate-redis-durable", "queue"),
-      connection("crate-media-worker", "crate-redis", "data"),
-      connection("crate-projector", "crate-postgres", "data"),
-      connection("crate-projector", "crate-redis-durable", "queue"),
-      connection("crate-grafana", "crate-prometheus", "request"),
-      ...[
-        "crate-node-exporter",
-        "crate-cadvisor",
-        "crate-postgres-exporter",
-        "crate-redis-exporter",
-        "crate-redis-durable-exporter",
-      ].map((id) => connection("crate-prometheus", id, "telemetry")),
-      connection(
-        "crate-cadvisor",
-        "crate-observability-docker-proxy",
-        "telemetry",
-      ),
-      connection("crate-postgres-exporter", "crate-postgres", "telemetry"),
-      connection("crate-redis-exporter", "crate-redis", "telemetry"),
-      connection(
-        "crate-redis-durable-exporter",
-        "crate-redis-durable",
-        "telemetry",
-      ),
-    ],
+    connections: STACK_CONNECTIONS.map(([source, target, kind]) =>
+      connection(source, target, kind),
+    ),
     availability:
       sample === "stale" || sample === "unavailable" ? sample : "available",
     observedAt: new Date(
