@@ -22,6 +22,7 @@ REMOTE_SCRIPT_PATH="${SERVER_PATH}/.deploy/deploy-remote.sh"
 DEPLOY_CANDIDATE_DIR=""
 TMP_DIR=""
 ROLLBACK_ENABLED=1
+HOST_LEASE_HELD=0
 
 log() {
   printf '\n==> %s\n' "$*"
@@ -33,6 +34,7 @@ fail() {
 }
 
 cleanup() {
+  release_host_lease
   if [[ -n "$TMP_DIR" && -d "$TMP_DIR" ]]; then
     rm -rf "$TMP_DIR"
   fi
@@ -149,6 +151,18 @@ require_deploy_id() {
   if [[ ! "$DEPLOY_ID" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$ ]]; then
     fail "DEPLOY_ID must use only letters, digits, dot, underscore or dash"
   fi
+}
+
+acquire_host_lease() {
+  remote_deploy host-lock
+  HOST_LEASE_HELD=1
+}
+
+release_host_lease() {
+  [[ "$HOST_LEASE_HELD" == "1" ]] || return 0
+  HOST_LEASE_HELD=0
+  remote_deploy host-unlock ||
+    printf 'Could not release the host mutation lease; run make deploy-unlock DEPLOY_ID=%s\n' "$DEPLOY_ID" >&2
 }
 
 prepare_remote_script() {
@@ -402,6 +416,7 @@ run_deploy() {
   local_preflight
 
   prepare_remote_script
+  acquire_host_lease
   stage_remote_preflight_payload
   remote_deploy release-preflight
   ssh_remote "rm -rf '$DEPLOY_CANDIDATE_DIR'"
@@ -429,6 +444,7 @@ run_recovery_snapshot() {
   require_deploy_id
   prepare_remote_script
   resolve_remote_release_settings
+  acquire_host_lease
   remote_deploy recovery-snapshot
   log "Recovery snapshot ${DEPLOY_ID} completed; production remains quiesced for deploy"
 }
@@ -440,6 +456,7 @@ run_rollback() {
   fi
   prepare_remote_script
   resolve_remote_release_settings
+  acquire_host_lease
   remote_deploy state-rollback
   log "Production rollback ${DEPLOY_ID} completed"
 }
@@ -451,17 +468,27 @@ run_image_rollback() {
   fi
   prepare_remote_script
   resolve_remote_release_settings
+  acquire_host_lease
   remote_deploy rollback
   log "Application image rollback ${DEPLOY_ID} completed"
 }
 
+run_unlock() {
+  require_deploy_id
+  prepare_remote_script
+  resolve_remote_release_settings
+  remote_deploy host-unlock
+  log "Host mutation lease ${DEPLOY_ID} released"
+}
+
 case "$ACTION" in
   deploy) run_deploy ;;
+  unlock) run_unlock ;;
   preflight) run_preflight ;;
   recovery-snapshot) run_recovery_snapshot ;;
   rollback) run_rollback ;;
   image-rollback) run_image_rollback ;;
   *)
-    fail "unknown action '${ACTION}' (expected deploy, preflight, recovery-snapshot, rollback or image-rollback)"
+    fail "unknown action '${ACTION}' (expected deploy, preflight, recovery-snapshot, rollback, image-rollback or unlock)"
     ;;
 esac

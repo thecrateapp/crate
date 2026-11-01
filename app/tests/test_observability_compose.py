@@ -125,9 +125,12 @@ def _fake_monitoring_cli(
         "    if sys.argv[1] == 'compose':\n"
         "        socket = os.environ.get('OBS_CONTAINERD_SOCKET', '/outside/from-dotenv.sock')\n"
         "        output.write(json.dumps(['compose-socket', socket]) + '\\n')\n"
+        "if '--environment' in sys.argv:\n"
+        "    for key in ('OBS_DATA_DIR', 'OBS_SECRETS_DIR', 'OBS_APP_NETWORK', 'CRATE_POSTGRES_DB'):\n"
+        "        print(key + '=' + os.environ[key])\n"
         "if sys.argv[1] == 'info':\n"
         "    print(os.environ['FAKE_DOCKER_DRIVER'])\n"
-        "elif sys.argv[1] != 'compose':\n"
+        "elif sys.argv[1] not in {'compose', 'ps'}:\n"
         "    sys.exit(2)\n"
     )
     readlink = tmp_path / "readlink"
@@ -142,8 +145,17 @@ def _fake_monitoring_cli(
     )
     docker.chmod(0o755)
     readlink.chmod(0o755)
+    state = tmp_path / "monitoring-state"
+    for name in ("prometheus", "grafana"):
+        (state / name).mkdir(parents=True)
+        (state / name / "existing-data").write_text("preserved")
     return calls, {
         "PATH": str(tmp_path) + os.pathsep + os.defpath,
+        "OBS_DATA_DIR": str(state),
+        "OBS_SECRETS_DIR": str(tmp_path / "secrets"),
+        "OBS_APP_NETWORK": "crate",
+        "CRATE_POSTGRES_DB": "fixture-db",
+        "OBS_PYTHON": sys.executable,
         "FAKE_DOCKER_LOG": str(calls),
         "FAKE_DOCKER_DRIVER": driver,
         "FAKE_READLINK_OK": str(int(readlink_ok)),

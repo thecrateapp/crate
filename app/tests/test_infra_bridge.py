@@ -600,6 +600,7 @@ def test_incremental_release_approval_and_local_deploy_rollback_contract(lab):
     lab.bridge.tick()
     steps = [a[-1] for a, _ in lab.runner.calls if a[0] == "/bin/bash"]
     assert steps == [
+        "host-lock",
         "release-preflight",
         "backup",
         "preflight",
@@ -607,6 +608,7 @@ def test_incremental_release_approval_and_local_deploy_rollback_contract(lab):
         "pull",
         "up",
         "rollback",
+        "host-unlock",
     ]
     assert all("make" not in a and "ssh" not in a for a, _ in lab.runner.calls)
     (root / "release.env").write_text("CRATE_API_IMAGE=forged")

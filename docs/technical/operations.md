@@ -5,12 +5,13 @@ section: operations
 audience: [operator]
 status: canonical
 order: 120
-verified: 2026-10-26
+verified: 2026-11-01
 sources:
   [
     docker-compose.yaml,
     docker-compose.home.yaml,
     scripts/deploy-remote.sh,
+    scripts/observability-deploy-remote.sh,
     app/crate/projector.py,
     deploy/hermes/context_server.py,
     deploy/hermes/activate_context.py,
@@ -27,6 +28,11 @@ The optional [independent deterministic operator](./crate-operator.md) documents
 standalone incident persistence, job watches, delivery retries and the external
 watchdog. Its opt-in deployment and native callback integration remain separate
 from the read-only Crate Agent.
+
+[Monitoring](monitoring.md) explains what Admin and Grafana show, how to reach
+Grafana and how the independent monitoring project is deployed. Application,
+Operator and monitoring deploys share a host mutation lease; a deploy that finds
+another owner changes nothing.
 
 ## Runtime responsibilities
 

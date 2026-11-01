@@ -124,13 +124,13 @@ func TestTransitionMovesBetweenModes(t *testing.T) {
 		wantFiles       string
 	}{
 		{"agent on", "", "", Off, Agent, map[string]string{"AGENT_TELEGRAM_TOKEN": "t"},
-			[]string{"agent_setup.py init", "up -d --remove-orphans"}, "agent", ""},
+			[]string{"agent_setup.py init", "up -d"}, "agent", ""},
 		{"agent to operator", "agent", "", Agent, Operator, nil,
-			[]string{"agent_setup.py init --non-interactive --no-network --reuse --in-container --profile operator", "--profile agent rm -s -f crate-agent", "agent_setup.py revoke --in-container --profile agent", "compose.operator.yaml --env-file /ENV up -d --remove-orphans"}, "crate-operator", overlay},
+			[]string{"agent_setup.py init --non-interactive --no-network --reuse --in-container --profile operator", "--profile agent rm -s -f crate-agent", "agent_setup.py revoke --in-container --profile agent", "compose.operator.yaml --env-file /ENV up -d"}, "crate-operator", overlay},
 		{"operator off", "crate-operator", overlay, Operator, Off, nil,
-			[]string{"compose.operator.yaml --env-file /ENV --profile crate-operator rm -s -f crate-operator crate-infra-relay", "compose.operator.yaml --env-file /ENV run && revoke --in-container --profile operator", "docker-compose.yaml --env-file /ENV up -d --remove-orphans"}, "", ""},
+			[]string{"compose.operator.yaml --env-file /ENV --profile crate-operator rm -s -f crate-operator crate-infra-relay", "compose.operator.yaml --env-file /ENV run && revoke --in-container --profile operator", "docker-compose.yaml --env-file /ENV up -d"}, "", ""},
 		{"new bot", "agent", "", Agent, Agent, map[string]string{"AGENT_TELEGRAM_TOKEN": "t"},
-			[]string{"agent_setup.py init", "up -d --remove-orphans", "--profile agent restart crate-agent"}, "agent", ""},
+			[]string{"agent_setup.py init", "up -d", "--profile agent restart crate-agent"}, "agent", ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
