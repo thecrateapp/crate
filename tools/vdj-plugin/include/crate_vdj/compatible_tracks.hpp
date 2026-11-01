@@ -43,6 +43,7 @@ struct CompatibleTrack {
     int year = 0;
     std::string genre;
     std::string cover_url;
+    int album_id = 0;
 };
 
 struct CompatibleTracks {

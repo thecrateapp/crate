@@ -22,6 +22,7 @@ struct ConnectionDialogResult {
 
 ConnectionDialogResult show_connection_dialog(const ConnectionDialogRequest& request);
 void show_connection_message(const std::string& title, const std::string& message);
+bool open_in_browser(const std::string& url);
 
 inline constexpr const char* kConnectionDialogExplanation =
     "Connect VirtualDJ to your Crate server. Create an access token in Crate Listen, "

@@ -3,6 +3,7 @@
 #include "crate_vdj/json_mapping.hpp"
 
 #include <charconv>
+#include <cstdint>
 #include <limits>
 
 namespace crate::vdj {
@@ -70,7 +71,9 @@ bool parse_item(const json::Value& value, CompatibleTrack& item)
         return false;
     }
     std::string year;
+    std::optional<std::int64_t> album_id;
     if (!json::optional_number(value, "duration", item.duration_seconds) ||
+        !json::optional_integer(value, "albumId", album_id, 1, std::numeric_limits<int>::max()) ||
         !json::optional_number(value, "bpm", item.bpm) ||
         !json::optional_string(value, "camelot", item.camelot) ||
         !json::optional_number(value, "energy", item.energy) ||
@@ -79,6 +82,7 @@ bool parse_item(const json::Value& value, CompatibleTrack& item)
         !json::optional_string(value, "coverUrl", item.cover_url)) {
         return false;
     }
+    item.album_id = static_cast<int>(album_id.value_or(0));
     const auto parsed_year = std::from_chars(year.data(), year.data() + year.size(), item.year);
     if (parsed_year.ec != std::errc{}) {
         item.year = 0;
@@ -144,6 +148,7 @@ SearchTrack compatible_track_as_search_track(const CompatibleTrack& track)
     mapped.year = track.year;
     mapped.genre = track.genre;
     mapped.cover_url = track.cover_url;
+    mapped.album_id = track.album_id;
     return mapped;
 }
 

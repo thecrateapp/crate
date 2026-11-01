@@ -484,6 +484,9 @@ std::vector<std::string_view> OnlineSource::context_menu(const std::string& uniq
         case MenuAction::Album:
             labels.push_back(album_menu_label(language));
             break;
+        case MenuAction::OpenInCrate:
+            labels.push_back(open_in_crate_menu_label(language));
+            break;
         }
     }
     return labels;
@@ -507,6 +510,18 @@ CallbackStatus OnlineSource::select_context_menu(const std::string& unique_id, s
         log("compatible tracks folder selected seed=" + unique_id);
         command = compatible_folder_navigation_command(host_.language());
         break;
+    }
+    case MenuAction::OpenInCrate: {
+        const auto facts = facts_for(unique_id);
+        const auto listen_url = session_.status().listen_url;
+        if (!facts.has_value() || facts->album_id <= 0 || listen_url.empty()) {
+            return CallbackStatus::NotImplemented;
+        }
+        const bool opened = host_.open_url(
+            listen_url + "/albums/" + std::to_string(facts->album_id) + "/album?track=" + unique_id
+        );
+        log(std::string("open in crate ") + (opened ? "opened" : "failed"));
+        return opened ? CallbackStatus::Done : CallbackStatus::Failed;
     }
     case MenuAction::Artist:
     case MenuAction::Album: {
@@ -532,7 +547,7 @@ void OnlineSource::remember(const std::vector<SearchTrack>& tracks)
         track_facts_.clear();
     }
     for (const auto& track : tracks) {
-        track_facts_[track.entity_uid] = TrackFacts{track.artist, track.album};
+        track_facts_[track.entity_uid] = TrackFacts{track.artist, track.album, track.album_id};
     }
 }
 
@@ -558,6 +573,9 @@ std::vector<OnlineSource::MenuAction> OnlineSource::menu_actions(const std::stri
         }
         if (!facts->album.empty()) {
             actions.push_back(MenuAction::Album);
+        }
+        if (facts->album_id > 0 && !session_.status().listen_url.empty()) {
+            actions.push_back(MenuAction::OpenInCrate);
         }
     }
     return actions;

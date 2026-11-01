@@ -55,3 +55,21 @@ def test_vdj_automation_requires_smart_mix(test_app, monkeypatch):
     assert payload["online_source"] is True
     assert payload["smart_mix_assistant"] is False
     assert payload["automation"] is False
+
+
+def test_vdj_capabilities_expose_the_listen_url_when_configured(test_app, monkeypatch):
+    monkeypatch.setenv("CRATE_VDJ_ENABLED", "true")
+    monkeypatch.setenv("CRATE_LISTEN_PUBLIC_BASE_URL", "https://listen.example.org/")
+
+    response = test_app.get("/api/capabilities")
+
+    assert response.json()["vdj"]["listen_url"] == "https://listen.example.org"
+
+
+def test_vdj_capabilities_omit_the_listen_url_when_unset(test_app, monkeypatch):
+    monkeypatch.setenv("CRATE_VDJ_ENABLED", "true")
+    monkeypatch.delenv("CRATE_LISTEN_PUBLIC_BASE_URL", raising=False)
+
+    response = test_app.get("/api/capabilities")
+
+    assert "listen_url" not in response.json()["vdj"]

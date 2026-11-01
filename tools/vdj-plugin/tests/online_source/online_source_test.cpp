@@ -50,7 +50,8 @@ constexpr const char* kProfiledSearchJson = R"json({
         "audio_key": "C",
         "audio_scale": "major",
         "camelot": "8A",
-        "energy": 0.72
+        "energy": 0.72,
+        "album_id": 31
     }]
 })json";
 
@@ -160,6 +161,7 @@ class FakeHost final : public HostPort {
 public:
     std::optional<std::string> track_path;
     std::vector<std::string> commands;
+    std::vector<std::string> opened;
 
     std::string language() override
     {
@@ -174,6 +176,12 @@ public:
     bool send_command(const std::string& command) override
     {
         commands.push_back(command);
+        return true;
+    }
+
+    bool open_url(const std::string& url) override
+    {
+        opened.push_back(url);
         return true;
     }
 };
@@ -229,11 +237,11 @@ struct Harness {
         std::filesystem::temp_directory_path() / "crate-vdj-online-source-test.sqlite";
     std::unique_ptr<OnlineSource> source;
 
-    explicit Harness(bool connected = true)
+    explicit Harness(bool connected = true, std::string capabilities = capabilities_json())
     {
         std::filesystem::remove(cache_path);
         http.route("/api/auth/me", me_json());
-        http.route("/api/capabilities", capabilities_json());
+        http.route("/api/capabilities", std::move(capabilities));
         if (connected) {
             settings.origin = kOrigin;
             vault->tokens[credential_account_for_origin(kOrigin)] = "crv_saved";
@@ -517,6 +525,39 @@ void a_seed_without_profile_shows_a_notice()
     CRATE_CHECK(notice.error == no_profile_notice_label("English"));
 }
 
+std::string capabilities_with_listen()
+{
+    auto capabilities = capabilities_json();
+    capabilities.insert(capabilities.find("\"vdj\":{") + 7, R"("listen_url":"https://listen.example.org",)");
+    return capabilities;
+}
+
+void a_track_opens_its_album_in_listen()
+{
+    Harness harness(true, capabilities_with_listen());
+    harness.http.route("/api/search?q=noah", kProfiledSearchJson);
+    RecordingSink sink;
+    CRATE_CHECK(harness.source->search("noah", sink) == CallbackStatus::Done);
+
+    const auto entries = harness.source->context_menu("track-1");
+
+    CRATE_CHECK(entries.size() == 4);
+    CRATE_CHECK(entries[3] == "Open in Crate");
+    CRATE_CHECK(harness.source->select_context_menu("track-1", 3) == CallbackStatus::Done);
+    CRATE_CHECK(harness.host.opened.size() == 1);
+    CRATE_CHECK(harness.host.opened[0] == "https://listen.example.org/albums/31/album?track=track-1");
+}
+
+void open_in_crate_needs_a_listen_url()
+{
+    Harness harness;
+    harness.http.route("/api/search?q=noah", kProfiledSearchJson);
+    RecordingSink sink;
+    CRATE_CHECK(harness.source->search("noah", sink) == CallbackStatus::Done);
+
+    CRATE_CHECK(harness.source->context_menu("track-1").size() == 3);
+}
+
 void camelot_keys_map_to_virtualdj_keys()
 {
     CRATE_CHECK(vdj_key_from_camelot("8A") == vdj_key_number("A", "minor"));
@@ -559,5 +600,7 @@ int main()
     compatible_tracks_show_crate_fields();
     a_seed_without_profile_shows_a_notice();
     camelot_keys_map_to_virtualdj_keys();
+    a_track_opens_its_album_in_listen();
+    open_in_crate_needs_a_listen_url();
     keys_and_cover_urls_map_to_virtualdj();
 }

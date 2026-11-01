@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter, Request
 
 from crate.api.schemas.capabilities import (
@@ -57,9 +59,15 @@ def get_capabilities(request: Request) -> CapabilitiesResponse:
             online_source=vdj_available,
             smart_mix_assistant=vdj_smart_mix_assistant,
             automation=vdj_automation,
+            listen_url=_listen_url(),
         ),
         access_token=_access_token_capabilities(request, vdj_automation),
     )
+
+
+def _listen_url() -> str | None:
+    configured = os.environ.get("CRATE_LISTEN_PUBLIC_BASE_URL", "").strip()
+    return configured.rstrip("/") or None
 
 
 def _access_token_capabilities(

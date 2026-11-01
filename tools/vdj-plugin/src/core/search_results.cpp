@@ -3,7 +3,9 @@
 #include "track_json.hpp"
 
 #include <charconv>
+#include <cstdint>
 #include <limits>
+#include <optional>
 
 namespace crate::vdj {
 namespace detail {
@@ -41,7 +43,8 @@ bool year_field(const json::Value& item, int& output)
 
 bool parse_track_json(const json::Value& item, SearchTrack& track)
 {
-    return item.is_object() &&
+    std::optional<std::int64_t> album_id;
+    const bool parsed = item.is_object() &&
         json::required_string(item, "entity_uid", track.entity_uid) &&
         json::required_string(item, "title", track.title) &&
         json::optional_string(item, "artist", track.artist) &&
@@ -56,7 +59,10 @@ bool parse_track_json(const json::Value& item, SearchTrack& track)
         json::optional_boolean(item, "has_cover", track.has_cover) &&
         json::optional_string(item, "cover_url", track.cover_url) &&
         json::optional_string(item, "camelot", track.camelot) &&
-        json::optional_number(item, "energy", track.energy);
+        json::optional_number(item, "energy", track.energy) &&
+        json::optional_integer(item, "album_id", album_id, 1, std::numeric_limits<int>::max());
+    track.album_id = static_cast<int>(album_id.value_or(0));
+    return parsed;
 }
 
 } // namespace detail

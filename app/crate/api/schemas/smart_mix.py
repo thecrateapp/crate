@@ -336,6 +336,7 @@ class CompatibleTrackResponse(SmartMixApiModel):
     year: str | None = None
     genre: str | None = None
     cover_url: str | None = Field(default=None, serialization_alias="coverUrl")
+    album_id: int | None = Field(default=None, serialization_alias="albumId")
 
 
 class CompatibleTracksResponse(SmartMixApiModel):

@@ -326,7 +326,7 @@ def get_vdj_folder_page(
 
 def _serialize_track(row: Mapping[Any, Any]) -> dict[str, Any]:
     item = dict(row)
-    album_id = item.pop("album_id", None)
+    album_id = item.get("album_id")
     item["entity_uid"] = str(item["entity_uid"])
     item["has_cover"] = bool(item.pop("has_cover", False))
     item["cover_url"] = (

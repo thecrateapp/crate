@@ -157,6 +157,7 @@ def compatible_tracks(
                     if item.album_id is not None and item.album_has_cover
                     else None
                 ),
+                album_id=item.album_id,
             )
             for item in ranked
         ],
