@@ -71,6 +71,7 @@ def test_vdj_catalog_folder_returns_bounded_page(test_app):
                 "audio_scale": "minor",
                 "camelot": "8A",
                 "energy": 0.72,
+                "album_id": 3,
                 "has_cover": True,
                 "cover_url": "/api/vdj/albums/3/cover?size=512",
             }

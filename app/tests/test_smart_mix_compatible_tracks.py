@@ -145,6 +145,7 @@ def test_compatible_tracks_include_browser_fields_for_virtualdj(
     assert item["year"] == "2001"
     assert item["genre"] == "Post-hardcore"
     assert item["coverUrl"] == "/api/vdj/albums/42/cover?size=512"
+    assert item["albumId"] == 42
 
 
 def test_compatible_tracks_reports_missing_seed_or_profile(

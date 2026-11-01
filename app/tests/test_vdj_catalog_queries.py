@@ -127,6 +127,7 @@ def test_folder_tracks_prefer_the_current_smart_mix_profile(
         "8A",
         0.72,
     )
+    assert profiled["album_id"] == library.album_id
     assert stale["bpm"] != 99.0
     assert stale["camelot"] is None
 
