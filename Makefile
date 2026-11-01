@@ -97,6 +97,18 @@ dev-admin: ## Start only the Admin UI dev server (:5173)
 dev-listen: ## Start only the Listen dev server (:5174)
 	@npm run --workspace=app/listen dev -- --port 5174 --host
 
+VDJ_TEST_DIR ?= build/vdj-headless
+VDJ_BUILD_TYPE ?= Release
+VDJ_SANITIZERS ?= OFF
+
+.PHONY: vdj-test
+vdj-test: ## Build and run the VirtualDJ plugin tests without the SDK (VDJ_BUILD_TYPE=, VDJ_SANITIZERS=ON)
+	@cmake -S tools/vdj-plugin -B $(VDJ_TEST_DIR) -DCMAKE_BUILD_TYPE=$(VDJ_BUILD_TYPE) \
+		-DCRATE_VDJ_BUILD_REAL_PLUGIN=OFF -DCRATE_VDJ_BUILD_TESTS=ON \
+		-DCRATE_VDJ_ENABLE_SANITIZERS=$(VDJ_SANITIZERS)
+	@cmake --build $(VDJ_TEST_DIR) --parallel
+	@ctest --test-dir $(VDJ_TEST_DIR) --output-on-failure
+
 VIRTUALDJ_APP ?= /Applications/VirtualDJ.app
 VDJ_BUILD_DIR ?= build/vdj-macos
 VDJ_ONLINE_SOURCES := $(HOME)/Library/Application Support/VirtualDJ/PluginsMacArm/OnlineSources
