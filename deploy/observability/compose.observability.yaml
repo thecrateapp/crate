@@ -24,6 +24,9 @@ networks:
   # Shared only with crate-projector, which reads Stack resources from Prometheus.
   prometheus-query:
     internal: true
+  # Shared only with Traefik, whose router metrics feed Stack ingress readings.
+  traefik-metrics:
+    internal: true
 
 secrets:
   observability_grafana_password:
@@ -38,7 +41,7 @@ secrets:
 services:
   crate-prometheus:
     <<: *observability
-    networks: [observability, prometheus-query]
+    networks: [observability, prometheus-query, traefik-metrics]
     image: prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
     user: "65534:65534"
     mem_limit: 256m

@@ -9,6 +9,8 @@ networks:
   observability-ui: {}
   prometheus-query:
     internal: true
+  traefik-metrics:
+    internal: true
 
 secrets:
   observability_grafana_password:
