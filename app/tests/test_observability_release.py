@@ -721,3 +721,41 @@ def test_hidden_gnu_headers_cannot_evade_exact_regular_member_contract(
     destination.write_bytes(gzip.compress(raw.getvalue(), mtime=0))
     with pytest.raises(ValueError):
         release.verify_bundle(destination)
+
+
+@pytest.mark.parametrize(
+    "defect",
+    [
+        "mtime",
+        "fname",
+        "fcomment",
+        "second_member",
+        "trailing_zeros",
+        "trailing_garbage",
+    ],
+)
+def test_verifier_requires_one_canonical_gzip_member(
+    tmp_path, committed_source, defect
+):
+    repository, sha, _ = committed_source
+    release = _release()
+    destination = tmp_path / "bundle.tar.gz"
+    release.build_bundle(repository, sha, destination)
+    compressed = destination.read_bytes()
+    assert compressed[:10] == bytes.fromhex("1f8b08000000000002ff")
+    header, body = compressed[:10], compressed[10:]
+    if defect == "mtime":
+        compressed = header[:4] + (1).to_bytes(4, "little") + header[8:] + body
+    elif defect == "fname":
+        compressed = header[:3] + b"\x08" + header[4:] + b"bundle.tar\0" + body
+    elif defect == "fcomment":
+        compressed = header[:3] + b"\x10" + header[4:] + b"note\0" + body
+    elif defect == "second_member":
+        compressed += gzip.compress(b"", mtime=0)
+    elif defect == "trailing_zeros":
+        compressed += b"\0" * 8
+    else:
+        compressed += b"garbage"
+    destination.write_bytes(compressed)
+    with pytest.raises(ValueError, match="gzip"):
+        release.verify_bundle(destination)

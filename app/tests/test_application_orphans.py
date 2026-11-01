@@ -7,8 +7,13 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+OPERATOR_OVERLAYS = (
+    "deploy/operator/compose.operator.yaml",
+    "app/installer/internal/assets/files/compose.operator.yaml",
+)
 
 
 def _module():
@@ -201,3 +206,69 @@ def test_retirement_rejects_changed_authority_and_failed_inventory(
         == 1
     )
     assert not any("rm" in command for command in calls)
+
+
+@pytest.mark.parametrize("overlay", OPERATOR_OVERLAYS)
+def test_every_operator_overlay_service_is_protected_or_an_application_override(
+    overlay,
+):
+    protected = _module().PROTECTED
+    services = yaml.safe_load((ROOT / overlay).read_text())["services"]
+    base = yaml.safe_load((ROOT / "docker-compose.yaml").read_text())["services"]
+    assert services
+    for name, definition in services.items():
+        if "image" in definition or "container_name" in definition:
+            assert name in protected, name
+            if "container_name" in definition:
+                assert definition["container_name"] in protected, name
+        else:
+            assert name in base, name
+
+
+@pytest.mark.parametrize(
+    "service",
+    ["crate-operator-supervisor", "crate-provenance", "crate-provenance-docker"],
+)
+def test_retire_refuses_operator_services_absent_from_the_audited_configuration(
+    tmp_path, monkeypatch, service
+):
+    module = _module()
+    calls = []
+    (tmp_path / "docker-compose.yaml").write_text("fixture")
+    configuration = {"name": "crate", "services": {"crate-api": {}}}
+
+    def run(command, **kwargs):
+        calls.append(command)
+        if "config" in command:
+            value = configuration
+        elif "ps" in command:
+            return subprocess.CompletedProcess(command, 0, "a" * 64 + "\n", "")
+        else:
+            value = [_container(service)]
+        return subprocess.CompletedProcess(command, 0, json.dumps(value), "")
+
+    monkeypatch.setattr(module.subprocess, "run", run)
+    digest = hashlib.sha256(
+        json.dumps(configuration, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    arguments = [
+        "--project-directory",
+        str(tmp_path),
+        "--compose-file",
+        "docker-compose.yaml",
+    ]
+    assert (
+        module.main(
+            [
+                *arguments,
+                "retire",
+                "a" * 64,
+                "--confirm-retirement",
+                "--expected-config-sha256",
+                digest,
+            ]
+        )
+        == 1
+    )
+    assert not any("rm" in command for command in calls)
+    assert module.classify_orphans(configuration, [_container(service)]) == []

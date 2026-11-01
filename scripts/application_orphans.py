@@ -22,7 +22,10 @@ PROTECTED = {
     "crate-observability-docker-proxy",
     "crate-agent",
     "crate-operator",
+    "crate-operator-supervisor",
     "crate-infra-relay",
+    "crate-provenance",
+    "crate-provenance-docker",
 }
 CONTAINER_ID = re.compile(r"[0-9a-f]{64}")
 MAX_CONTAINERS = 500

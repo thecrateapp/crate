@@ -101,8 +101,8 @@ protection until legacy monitoring is retired.
 
 ## Review corrections — 2026-11-01
 
-Diego authorized closing Claude's D1 findings before publication. All changes
-remain local, uncommitted and undeployed.
+Diego authorized closing Claude's D1 findings before publication. These
+corrections were committed in `44471b5da` and remain undeployed.
 
 - Startup now requires explicit non-secret data/secrets/network/database settings
   from exported values or a dedicated monitoring environment. The application
@@ -138,3 +138,37 @@ Bash syntax and whitespace checks pass. Sequential independent SPEC then QUALITY
 reviews approve the corrections. No full suite, Linux runtime migration or
 production action occurred. Existing D2/runtime/controlled-migration gaps above
 remain explicit; the final program step still updates GitHub and website docs.
+
+## Review follow-ups 2 — 2026-11-01
+
+Local, uncommitted changes on top of `44471b5da`; nothing deployed.
+
+- Orphan protection now also covers `crate-operator-supervisor`,
+  `crate-provenance` and `crate-provenance-docker`. An audit rendered without the
+  Operator overlay previously reported them as eligible and `retire` removed
+  them. A test loads both reviewed Operator overlays (`deploy/operator/` and the
+  installer copy) with `yaml.safe_load`: every service or `container_name` they
+  define must be protected, and the remaining entries must be overrides of base
+  application services. Another test confirms `retire` refuses each of the three.
+- The bundle verifier no longer uses `GzipFile`, which accepted any header mtime,
+  FNAME/FCOMMENT fields, concatenated members and zero padding. It now requires
+  the builder's exact 10-byte header (`1f8b 08 00 00000000 02 ff`), exactly one
+  deflate member, a matching CRC32/ISIZE trailer and no trailing bytes. The
+  decompressed 8 MiB bound is unchanged. Recompress-and-compare was rejected
+  because deflate output can differ between zlib builds on the builder and target.
+- The heavy matrix in `test-observability.yml` (dockerd restart, image pulls) no
+  longer triggers on `scripts/deploy-remote.sh`, `scripts/application_orphans.py`
+  or their tests. The new `test-deploy-tooling.yml` runs only those two pytest
+  files with pytest/PyYAML, without Docker. A contract test checks the split.
+
+Scoped validation: release artifact file **65 passed** (6 new gzip cases);
+orphan tool **18 passed** (5 new); deploy release commands **71 passed** (1 new)
+with Bash 5. Under macOS's Bash 3.2 that last file shows 2 pre-existing failures
+(`mapfile`), which is unrelated to these changes; CI runs on Ubuntu with Bash 5.
+
+```bash
+.venv/bin/python -m pytest --noconftest app/tests/test_observability_release.py -q
+.venv/bin/python -m pytest --noconftest app/tests/test_application_orphans.py -q
+PATH=/opt/homebrew/bin:$PATH .venv/bin/python -m pytest --noconftest \
+  app/tests/test_deploy_release_commands.py -q
+```

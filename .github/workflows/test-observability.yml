@@ -11,12 +11,8 @@ on:
       - "app/tests/test_observability_runtime.py"
       - "app/tests/test_observability_deployment.py"
       - "app/tests/test_observability_release.py"
-      - "app/tests/test_deploy_release_commands.py"
       - "scripts/observability_release.py"
       - "scripts/observability_preflight.py"
-      - "scripts/application_orphans.py"
-      - "app/tests/test_application_orphans.py"
-      - "scripts/deploy-remote.sh"
       - ".github/workflows/test-observability.yml"
       - "docker-compose*.yaml"
       - "deploy/operator/compose.operator.yaml"
@@ -31,12 +27,8 @@ on:
       - "app/tests/test_observability_runtime.py"
       - "app/tests/test_observability_deployment.py"
       - "app/tests/test_observability_release.py"
-      - "app/tests/test_deploy_release_commands.py"
       - "scripts/observability_release.py"
       - "scripts/observability_preflight.py"
-      - "scripts/application_orphans.py"
-      - "app/tests/test_application_orphans.py"
-      - "scripts/deploy-remote.sh"
       - ".github/workflows/test-observability.yml"
       - "docker-compose*.yaml"
       - "deploy/operator/compose.operator.yaml"
@@ -96,9 +88,7 @@ jobs:
           app/tests/test_observability_containerd.py
           app/tests/test_observability_c0_retirement.py
           app/tests/test_observability_deployment.py
-          app/tests/test_observability_release.py
-          app/tests/test_application_orphans.py
-          app/tests/test_deploy_release_commands.py -q
+          app/tests/test_observability_release.py -q
       - name: Check Prometheus configuration with its pinned release
         run: |
           image="$(python -c 'import yaml; print(yaml.safe_load(open("deploy/observability/compose.observability.yaml"))["services"]["crate-prometheus"]["image"])')"

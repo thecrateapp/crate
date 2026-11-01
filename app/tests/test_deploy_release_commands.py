@@ -489,6 +489,30 @@ def test_build_workflow_promotes_a_complete_manifest_after_selective_builds() ->
     )
 
 
+def test_deploy_tooling_changes_skip_the_heavy_monitoring_matrix() -> None:
+    workflows = ROOT / ".github/workflows"
+    heavy = yaml.safe_load((workflows / "test-observability.yml").read_text())
+    light = yaml.safe_load((workflows / "test-deploy-tooling.yml").read_text())
+    tooling = {
+        "scripts/deploy-remote.sh": "app/tests/test_deploy_release_commands.py",
+        "scripts/application_orphans.py": "app/tests/test_application_orphans.py",
+    }
+    paths = {*tooling, *tooling.values()}
+
+    for event in ("pull_request", "push"):
+        assert not paths & set(heavy[True][event]["paths"])
+        assert paths <= set(light[True][event]["paths"])
+    heavy_runs = " ".join(
+        step.get("run", "") for job in heavy["jobs"].values() for step in job["steps"]
+    )
+    light_runs = " ".join(
+        step.get("run", "") for job in light["jobs"].values() for step in job["steps"]
+    )
+    assert not any(test in heavy_runs for test in tooling.values())
+    assert all(test in light_runs for test in tooling.values())
+    assert "docker" not in light_runs and "systemctl" not in light_runs
+
+
 def test_deploy_extracts_release_manifest_for_production_platform() -> None:
     deploy_script = (ROOT / "scripts/deploy.sh").read_text()
 

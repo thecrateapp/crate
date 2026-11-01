@@ -10,6 +10,7 @@ import io
 import json
 import os
 import re
+import struct
 import subprocess
 import sys
 import tarfile
@@ -36,6 +37,7 @@ BUNDLE_FILES = tuple(
 MAX_BYTES = 8 * 1024 * 1024
 MAX_FILE_BYTES = 2 * 1024 * 1024
 MAX_MANIFEST_BYTES = 64 * 1024
+GZIP_HEADER = bytes.fromhex("1f8b08000000000002ff")
 _SHA = re.compile(r"[0-9a-f]{40}")
 _HASH = re.compile(r"[0-9a-f]{64}")
 _IMAGE = re.compile(r"[^\s\"'@]+:[^\s\"'@:/]+@sha256:[0-9a-f]{64}")
@@ -206,6 +208,23 @@ def _regular_archive_headers(raw: bytes) -> None:
     raise ValueError("Missing archive terminator")
 
 
+def _single_gzip_member(compressed: bytes) -> bytes:
+    if compressed[: len(GZIP_HEADER)] != GZIP_HEADER:
+        raise ValueError("Noncanonical gzip header")
+    inflater = zlib.decompressobj(-zlib.MAX_WBITS)
+    raw = inflater.decompress(compressed[len(GZIP_HEADER) :], MAX_BYTES + 1)
+    if len(raw) > MAX_BYTES:
+        raise ValueError("Decompressed bundle size limit exceeded")
+    if not inflater.eof:
+        raise ValueError("Truncated gzip member")
+    if len(inflater.unused_data) != 8:
+        raise ValueError("Exactly one gzip member without trailing data is required")
+    checksum, size = struct.unpack("<II", inflater.unused_data)
+    if checksum != zlib.crc32(raw) or size != len(raw):
+        raise ValueError("gzip member checksum or size mismatch")
+    return raw
+
+
 def verify_bundle(bundle_path: str | Path, *, expected_sha: str | None = None) -> dict:
     """Verify bounded archive contents without extracting into the filesystem."""
     if expected_sha is not None:
@@ -215,10 +234,7 @@ def verify_bundle(bundle_path: str | Path, *, expected_sha: str | None = None) -
     if len(compressed) > MAX_BYTES:
         raise ValueError("Compressed bundle size limit exceeded")
     try:
-        with gzip.GzipFile(fileobj=io.BytesIO(compressed)) as source:
-            raw = source.read(MAX_BYTES + 1)
-        if len(raw) > MAX_BYTES:
-            raise ValueError("Decompressed bundle size limit exceeded")
+        raw = _single_gzip_member(compressed)
         _regular_archive_headers(raw)
         payloads = {}
         expected_names = sorted((*BUNDLE_FILES, "manifest.json"))
