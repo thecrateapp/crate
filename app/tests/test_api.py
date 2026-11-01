@@ -2459,7 +2459,11 @@ class TestAdminMetricsAPI:
             {"status_class": "5xx"},
         )
         assert summary_specs["worker_queue_depth"] == ("worker.queue.depth", 5)
-        assert summary_specs["api_slow"] == ("api.request.slow", 5)
+        assert summary_specs["api_slow"] == (
+            "api.request.count",
+            5,
+            {"latency_class": "slow"},
+        )
         assert ("api.latency", 5) not in summary_specs.values()
         assert "api.request.latency" in recent_calls
         assert "api.request.count" in recent_calls
@@ -2471,11 +2475,27 @@ class TestAdminMetricsAPI:
     def test_metrics_timeseries_maps_legacy_http_name(self, test_app):
         calls: list[str] = []
 
-        def fake_query_recent(name: str, minutes: int = 60):
-            calls.append(name)
-            return []
+        def fake_timeseries_snapshot(names, period="minute", minutes=60, **_kwargs):
+            calls.extend(names)
+            return {
+                "data": {name: [] for name in names},
+                "status": {
+                    name: {
+                        "availability": "empty",
+                        "reason": "no_observations",
+                        "source": "redis_v2",
+                        "observed_at": None,
+                        "age_seconds": None,
+                        "window_minutes": minutes,
+                    }
+                    for name in names
+                },
+            }
 
-        with patch("crate.metrics.query_recent", side_effect=fake_query_recent):
+        with patch(
+            "crate.metrics.query_timeseries_snapshot",
+            side_effect=fake_timeseries_snapshot,
+        ):
             resp = test_app.get(
                 "/api/admin/metrics/timeseries?name=api.latency&period=minute&minutes=5"
             )
