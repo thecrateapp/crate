@@ -131,7 +131,12 @@ def test_standalone_extends_only_the_eight_reviewed_monitoring_services():
     for name, service in standalone["services"].items():
         assert service["extends"]["service"] == name
         assert Path(service["extends"]["file"]).name == "compose.observability.yaml"
-    assert set(standalone["networks"]) == {"crate", "observability", "observability-ui"}
+    assert set(standalone["networks"]) == {
+        "crate",
+        "observability",
+        "observability-ui",
+        "prometheus-query",
+    }
     assert standalone["networks"]["crate"]["external"] is True
 
 
@@ -195,10 +200,21 @@ def test_standalone_resolves_without_application_compose_and_preserves_reviewed_
 
     assert standalone["name"] == "crate-observability"
     assert set(standalone["services"]) == SERVICES
-    assert set(standalone["networks"]) == {"crate", "observability", "observability-ui"}
+    assert set(standalone["networks"]) == {
+        "crate",
+        "observability",
+        "observability-ui",
+        "prometheus-query",
+    }
     assert standalone["networks"]["crate"]["name"] == "fixture-application-network"
     assert standalone["networks"]["crate"]["external"] is True
     assert standalone["networks"]["observability"]["internal"] is True
+    assert standalone["networks"]["prometheus-query"]["internal"] is True
+    assert sorted(
+        name
+        for name, service in standalone["services"].items()
+        if "prometheus-query" in (service.get("networks") or {})
+    ) == ["crate-prometheus"]
     assert len(standalone["secrets"]) == 4
     for name in SERVICES:
         actual, previous = standalone["services"][name], legacy["services"][name]
