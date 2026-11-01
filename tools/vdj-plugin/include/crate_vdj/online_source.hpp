@@ -5,6 +5,7 @@
 #include "crate_vdj/connection_settings.hpp"
 #include "crate_vdj/connection_worker.hpp"
 #include "crate_vdj/http_client.hpp"
+#include "crate_vdj/media_access_client.hpp"
 #include "crate_vdj/metadata_cache.hpp"
 #include "crate_vdj/models.hpp"
 #include "crate_vdj/request_coordinator.hpp"
@@ -91,6 +92,7 @@ int vdj_key_number(std::string_view audio_key, std::string_view audio_scale);
 std::string api_asset_url(const std::string& origin, std::string_view path);
 std::string compatible_folder_navigation_command(std::string_view language);
 std::string vdj_search_command(std::string_view field, std::string_view value);
+std::string_view stream_failure_message(StreamFailure failure);
 
 class OnlineSource {
 public:

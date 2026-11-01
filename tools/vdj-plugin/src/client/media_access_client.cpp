@@ -9,15 +9,6 @@
 namespace crate::vdj {
 namespace {
 
-ParseResult<std::string> failure(ModelErrorCode code, std::string message)
-{
-    return ParseResult<std::string>{
-        .value = std::nullopt,
-        .error_code = code,
-        .error = std::move(message),
-    };
-}
-
 bool is_stream_path(std::string_view path)
 {
     return path.starts_with("/api/vdj/tracks/by-entity/") &&
@@ -55,20 +46,49 @@ MediaAccessClient::MediaAccessClient(
 {
 }
 
-ParseResult<std::string> MediaAccessClient::issue_stream_url(
+StreamResolution stream_failure(StreamFailure failure, std::string detail)
+{
+    return StreamResolution{.url = std::nullopt, .failure = failure, .detail = std::move(detail)};
+}
+
+StreamResolution stream_failure(const HttpError& error)
+{
+    switch (error.code) {
+    case HttpErrorCode::Cancelled:
+        return stream_failure(StreamFailure::Cancelled, error.message);
+    case HttpErrorCode::Timeout:
+        return stream_failure(StreamFailure::TimedOut, error.message);
+    case HttpErrorCode::HttpStatus:
+        if (error.status_code == 401 || error.status_code == 403) {
+            return stream_failure(StreamFailure::Unauthorized, error.message);
+        }
+        if (error.status_code == 404) {
+            return stream_failure(StreamFailure::NotFound, error.message);
+        }
+        return stream_failure(StreamFailure::Unreachable, error.message);
+    case HttpErrorCode::Network:
+        return stream_failure(StreamFailure::Unreachable, error.message);
+    case HttpErrorCode::InvalidResponse:
+        break;
+    }
+    return stream_failure(StreamFailure::Invalid, error.message);
+}
+
+StreamResolution MediaAccessClient::issue_stream_url(
     std::string_view path,
     std::string_view bearer_token,
-    const CancellationToken& cancellation
+    const CancellationToken& cancellation,
+    std::chrono::milliseconds timeout
 )
 {
     if (cancellation.cancelled()) {
-        return failure(ModelErrorCode::TransportError, "request cancelled");
+        return stream_failure(StreamFailure::Cancelled, "request cancelled");
     }
     if (!is_stream_path(path)) {
-        return failure(ModelErrorCode::InvalidField, "invalid VDJ stream path");
+        return stream_failure(StreamFailure::Invalid, "invalid VDJ stream path");
     }
     if (bearer_token.empty()) {
-        return failure(ModelErrorCode::InvalidField, "VDJ access token is empty");
+        return stream_failure(StreamFailure::Unauthorized, "VDJ access token is empty");
     }
 
     HttpRequest request{
@@ -86,12 +106,13 @@ ParseResult<std::string> MediaAccessClient::issue_stream_url(
                 {"path", std::string(path)},
             }})},
         }.dump(),
+        .timeout = timeout,
         .cancellation = cancellation,
     };
 
     const auto response = http_.request(request);
     if (const auto* error = std::get_if<HttpError>(&response)) {
-        return failure(ModelErrorCode::TransportError, error->message);
+        return stream_failure(*error);
     }
 
     const auto parsed = json::parse_object(std::get<HttpResponse>(response).body);
@@ -112,17 +133,15 @@ ParseResult<std::string> MediaAccessClient::issue_stream_url(
         }
     }
     if (!ticket.has_value()) {
-        return failure(
-            ModelErrorCode::InvalidResponse,
+        return stream_failure(
+            StreamFailure::Invalid,
             "media access response did not contain the requested stream ticket"
         );
     }
 
-    return ParseResult<std::string>{
-        .value = allowed_origin_ + std::string(path) + "?media_ticket=" +
+    return StreamResolution{
+        .url = allowed_origin_ + std::string(path) + "?media_ticket=" +
             encode_query_value(*ticket),
-        .error_code = ModelErrorCode::InvalidJson,
-        .error = {},
     };
 }
 

@@ -55,6 +55,15 @@ public:
         routes_.emplace_back(prefix, HttpResponse{.status_code = 200, .body = std::move(body)});
     }
 
+    void fail(const std::string& prefix, int status)
+    {
+        std::lock_guard lock(mutex_);
+        routes_.emplace_back(
+            prefix,
+            HttpError{.code = HttpErrorCode::HttpStatus, .status_code = status, .message = "HTTP " + std::to_string(status)}
+        );
+    }
+
     HttpResult request(const HttpRequest& request) override
     {
         const std::string path = request.url.substr(std::string(kOrigin).size());
@@ -68,10 +77,11 @@ public:
         std::optional<HttpResult> result;
         {
             std::lock_guard lock(mutex_);
+            std::size_t longest = 0;
             for (const auto& [prefix, response] : routes_) {
-                if (path.starts_with(prefix)) {
+                if (path.starts_with(prefix) && prefix.size() > longest) {
                     result = response;
-                    break;
+                    longest = prefix.size();
                 }
             }
         }
@@ -379,6 +389,35 @@ void names_with_quotes_fall_back_to_a_text_search()
     CRATE_CHECK(vdj_search_command("album", "12\" Mixes") == "search \"12 Mixes\"");
 }
 
+void a_track_that_cannot_load_says_why()
+{
+    Harness harness;
+    harness.http.fail("/api/vdj/tracks/by-entity/gone/playback", 404);
+
+    const auto missing = harness.source->stream_url("gone");
+
+    CRATE_CHECK(!missing.url.has_value());
+    CRATE_CHECK(missing.error == stream_failure_message(StreamFailure::NotFound));
+}
+
+void a_ready_track_resolves_to_a_ticketed_stream()
+{
+    Harness harness;
+    harness.http.route(
+        "/api/vdj/tracks/by-entity/track-1/playback",
+        R"json({"entity_uid":"track-1","content_origin":"local","preparing":false,"delivery":{"format":"flac"}})json"
+    );
+    harness.http.route(
+        "/api/auth/media-access",
+        R"json({"tickets":[{"audience":"stream","path":"/api/vdj/tracks/by-entity/track-1/stream","ticket":"t1"}]})json"
+    );
+
+    const auto resolved = harness.source->stream_url("track-1");
+
+    CRATE_CHECK(resolved.url == std::string(kOrigin) + "/api/vdj/tracks/by-entity/track-1/stream?media_ticket=t1");
+    CRATE_CHECK(resolved.error.empty());
+}
+
 void keys_and_cover_urls_map_to_virtualdj()
 {
     CRATE_CHECK(vdj_key_number("C", "major") == 16);
@@ -405,5 +444,7 @@ int main()
     an_unknown_track_only_offers_compatible_tracks();
     a_listed_track_offers_its_artist_and_album();
     names_with_quotes_fall_back_to_a_text_search();
+    a_track_that_cannot_load_says_why();
+    a_ready_track_resolves_to_a_ticketed_stream();
     keys_and_cover_urls_map_to_virtualdj();
 }
