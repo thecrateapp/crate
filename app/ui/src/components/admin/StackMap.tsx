@@ -252,8 +252,8 @@ export function StackMap({
       const node = nodeRefs.current.get(serviceId);
       if (node) node.focus();
       else
-        window.requestAnimationFrame(
-          () => nodeRefs.current.get(serviceId)?.focus(),
+        window.requestAnimationFrame(() =>
+          nodeRefs.current.get(serviceId)?.focus(),
         );
     }
   }
@@ -303,7 +303,7 @@ export function StackMap({
     enabled: liveEnabled && motionAllowed,
   });
   const liveReadings = selected
-    ? activityView.readings.get(selected.id) ?? []
+    ? (activityView.readings.get(selected.id) ?? [])
     : [];
   const health = selected ? serviceHealth(snapshot, selected) : "unknown";
   const selectedStack = snapshot.stacks.find(
