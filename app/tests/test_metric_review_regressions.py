@@ -165,13 +165,94 @@ def test_persisted_points_become_stale_when_no_fresh_flush_arrives(
     assert status["reason"]
 
 
-def test_a_new_bucket_during_index_selection_keeps_a_bounded_live_summary(
+def test_sparse_persisted_series_stay_available_while_the_collector_flushes(
+    pg_db,
+    review_runtime,
+):
+    metrics, _redis, clock = review_runtime
+    metrics.record_counter("api.requests")
+    metrics.flush_to_postgres()
+    _advance(clock, 900)
+    metrics.flush_to_postgres()
+
+    result = metrics.query_timeseries_snapshot(
+        ["api.requests"], minutes=60, persisted=True
+    )
+
+    status = result["status"]["api.request.count"]
+    assert status["availability"] in {"available", "partial"}
+    assert status["reason"] != "collection_stale"
+    assert status["age_seconds"] == pytest.approx(900, abs=60)
+
+
+def test_a_stopped_collector_marks_even_empty_persisted_series_stale(
+    pg_db,
+    review_runtime,
+):
+    metrics, _redis, clock = review_runtime
+    metrics.record_counter("api.requests")
+    metrics.flush_to_postgres()
+    _advance(clock, 900)
+
+    result = metrics.query_timeseries_snapshot(
+        ["api.requests", "api.request.errors"], minutes=60, persisted=True
+    )
+
+    for name in ("api.request.count", "api.request.errors"):
+        assert result["status"][name]["availability"] == "stale", name
+        assert result["status"][name]["reason"] == "collection_stale", name
+
+
+def test_past_persisted_windows_do_not_become_stale(pg_db, review_runtime):
+    metrics, _redis, clock = review_runtime
+    start = datetime.fromtimestamp(clock["minute"] - 60, timezone.utc)
+    end = datetime.fromtimestamp(clock["minute"] + 120, timezone.utc)
+    metrics.record_counter("api.requests")
+    metrics.flush_to_postgres()
+    _advance(clock, 3600)
+    metrics.flush_to_postgres()
+
+    result = metrics.query_timeseries_snapshot(
+        ["api.requests"],
+        minutes=5,
+        persisted=True,
+        start=start.isoformat(),
+        end=end.isoformat(),
+    )
+
+    status = result["status"]["api.request.count"]
+    assert status["availability"] in {"available", "partial"}
+    assert status["reason"] not in {"collection_stale", "observation_expired"}
+
+
+def test_gauge_summaries_report_the_latest_value_of_each_series(review_runtime):
+    metrics, _redis, clock = review_runtime
+    metrics.record("worker.queue.depth", 40.0, {"queue": "default"})
+    metrics.record("worker.queue.depth", 5.0, {"queue": "heavy"})
+    _advance(clock, 60)
+    metrics.record("worker.queue.depth", 3.0, {"queue": "default"})
+
+    summary = metrics.query_summary("worker.queue.depth", minutes=5)
+
+    assert summary["max"] == 40
+    assert summary["latest"] == 8
+
+
+def _family_bucket_keys(metrics, redis, name):
+    definition = metrics.get_metric_definition(name)
+    return redis.zrange(
+        f"{metrics.metric_buckets.PREFIX}:buckets:{definition.name}", 0, -1
+    )
+
+
+def test_a_bucket_lost_between_index_selection_and_reads_degrades_only_its_series(
     review_runtime,
     monkeypatch,
 ):
     metrics, redis, clock = review_runtime
     metrics.record_counter("api.requests")
-    _advance(clock, 60)
+    metrics.record("api.request.latency", 40.0)
+    lost = _family_bucket_keys(metrics, redis, "api.requests")[0]
     original_pipeline = redis.pipeline
     injected = False
 
@@ -181,25 +262,115 @@ def test_a_new_bucket_during_index_selection_keeps_a_bounded_live_summary(
 
         def execute(*execute_args, **execute_kwargs):
             nonlocal injected
-            counted_index = any(
-                command[0][0] == "ZCOUNT" for command in pipe.command_stack
+            reads_hashes = any(
+                command[0][0] == "HMGET" for command in pipe.command_stack
             )
-            result = original_execute(*execute_args, **execute_kwargs)
-            if counted_index and not injected:
+            if reads_hashes and not injected:
                 injected = True
-                metrics.record_counter("api.requests")
-            return result
+                redis.delete(lost)
+            return original_execute(*execute_args, **execute_kwargs)
 
         pipe.execute = execute
         return pipe
 
     monkeypatch.setattr(redis, "pipeline", racing_pipeline)
 
-    summary = metrics.query_summary("api.requests", minutes=5)
+    result = metrics.query_summaries(
+        {
+            "requests": ("api.requests", 5),
+            "latency": ("api.request.latency", 5),
+        }
+    )
 
-    assert summary["availability"] == "available"
-    assert summary["count"] in {1, 2}
-    assert summary["sum"] == summary["count"]
+    assert injected
+    assert result["requests"]["availability"] == "partial"
+    assert result["requests"]["reason"] == "live_bucket_missing"
+    assert result["latency"]["availability"] == "available"
+    assert result["latency"]["count"] == 1
+
+
+def test_naturally_expired_index_entries_do_not_fail_long_live_reads(
+    review_runtime,
+):
+    metrics, redis, clock = review_runtime
+    metrics.record_counter("api.requests")
+    redis.delete(*_family_bucket_keys(metrics, redis, "api.requests"))
+    _advance(clock, metrics._bucket_ttl_seconds() + 120)
+
+    summary = metrics.query_summary("api.requests", minutes=1440)
+
+    assert summary["availability"] != "unavailable"
+    assert summary["reason"] != "metric_source_unavailable"
+
+
+def test_metric_indexes_are_not_eviction_candidates_but_buckets_expire(
+    review_runtime,
+):
+    metrics, redis, _clock = review_runtime
+    buckets = metrics.metric_buckets
+    metrics.record_counter("api.requests")
+    family = metrics.get_metric_definition("api.requests").name
+
+    for key in (
+        buckets.DIRTY_KEY,
+        buckets.ALL_BUCKETS_KEY,
+        buckets.NAMES_KEY,
+        f"{buckets.PREFIX}:series:{family}",
+        f"{buckets.PREFIX}:buckets:{family}",
+    ):
+        assert redis.ttl(key) == -1, key
+    bucket = _family_bucket_keys(metrics, redis, "api.requests")[0]
+    assert redis.ttl(bucket) > 0
+
+
+def test_foreign_cache_evictions_do_not_mark_metric_history_as_gaps(
+    pg_db,
+    review_runtime,
+    monkeypatch,
+):
+    metrics, redis, clock = review_runtime
+    metrics.record_counter("api.requests")
+    metrics.flush_to_postgres()
+    baseline = metrics._collection_counters["source_changed"]
+    original_info = redis.info
+    evictions = {"count": 0}
+
+    def info(section=None, *args, **kwargs):
+        data = original_info(section, *args, **kwargs)
+        if section == "stats":
+            evictions["count"] += 500
+            data = {**data, "evicted_keys": evictions["count"]}
+        return data
+
+    monkeypatch.setattr(redis, "info", info)
+    _advance(clock, 60)
+    metrics.record_counter("api.requests")
+    metrics.flush_to_postgres()
+    _advance(clock, 60)
+    metrics.record_counter("api.requests")
+    metrics.flush_to_postgres()
+
+    assert metrics._collection_counters["source_changed"] == baseline
+
+
+def test_losing_an_unpersisted_metric_bucket_records_loss_and_a_gap(
+    pg_db,
+    review_runtime,
+):
+    metrics, redis, clock = review_runtime
+    metrics.record_counter("api.requests")
+    metrics.flush_to_postgres()
+    baseline = metrics._collection_counters["source_changed"]
+    _advance(clock, 60)
+    metrics.record_counter("api.requests")
+    pending = redis.zrange(metrics.metric_buckets.DIRTY_KEY, 0, -1)
+    redis.delete(*pending)
+
+    metrics.flush_to_postgres()
+
+    assert redis.hget(metrics.metric_buckets.LOSS_KEY, "evicted") == str(len(pending))
+    assert metrics._collection_counters["source_changed"] > baseline
+    assert redis.zcard(metrics.metric_buckets.DIRTY_KEY) == 0
 
 
 @pytest.mark.parametrize(

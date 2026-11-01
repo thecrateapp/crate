@@ -3,8 +3,9 @@
 2026-11-01. Worktree `/Users/diego/Code/crate-observability-integrity`, branch
 `codex/observability-integrity`, base `6b1803c4506312b6550fb548cce8ffb333443e20`.
 This checkpoint supersedes the completeness claims in checkpoints 1–3 where
-Claude's subsequent review found uncovered failure modes. Work remains local;
-there is no commit, publication, production rollout or PR1B/QoE implementation.
+Claude's subsequent review found uncovered failure modes. These corrections are
+committed locally as `55fc5eddc` and published on the branch; there is no PR,
+production rollout or PR1B/QoE implementation.
 
 ## Durable coverage and poison isolation
 
@@ -102,3 +103,43 @@ No full platform suite ran. The Stack Map and D1 repairs remain in their separat
 worktrees with their own evidence. D2 remote deployment/locking/Linux migration,
 PR1B continuous QoE, C1 and final GitHub/documentation-website updates retain their
 planned checkpoints. Production C0 is unchanged.
+
+## Review follow-ups 2 — 2026-11-01
+
+Claude took over the remaining plan. These follow-ups are uncommitted on top of
+`55fc5eddc`.
+
+- False gaps from a shared cache: the global `INFO evicted_keys` counter no
+  longer participates in source-change detection. Any eviction of an unrelated
+  cache key used to mark every flushed minute as a gap and every live summary as
+  partial. Only our own losses count now: a pending bucket whose hash vanished is
+  recorded as `evicted` (or `expired` past its lifetime) in the loss counters,
+  which opens a gap through `dropped_samples`. Previously that case only emitted
+  a local `expired_before_flush` event and lost the data silently.
+- Index durability: series, bucket, names, buffer, dirty and quarantine indexes
+  and the trim watermarks no longer carry a TTL, so `volatile-lru` cannot evict
+  them. They stay bounded by age trimming in the record script and by a new
+  `trim_indexes` step after each flush, which counts trimmed unpersisted entries
+  as expired. Bucket hashes keep their TTL.
+- Live read race: a bucket that vanishes between index selection and hash reads
+  marks only its own key `partial` (`live_bucket_missing`); other keys in the
+  batch stay available. Naturally expired index entries are skipped, so long
+  windows no longer fail. The previous race test never injected the race and is
+  replaced by one that deletes a hash between the two phases.
+- Persisted freshness follows the collector heartbeat (`checked_at` of the last
+  successful flush, ten-minute limit) instead of the age of the last observation.
+  Sparse series stay available while the collector runs; a stopped collector
+  marks every series in a current window, including empty ones,
+  `stale`/`collection_stale`; windows already covered by the collector never go
+  stale.
+- Catalogue guard: producers imported inside functions are scanned, with a
+  self-test proving it.
+- Gauge summaries expose `latest` (sum of each series' latest value). Admin's
+  queued depth shows it instead of the five-minute maximum; the alert threshold
+  keeps the window maximum on purpose.
+
+Tests: 392 cases across every metric, observability, storage-health and alerting
+test module, plus 34 SystemHealth cases, with real disposable Redis and
+PostgreSQL. Each new regression was observed failing first. Ruff, Prettier,
+ESLint and Admin typecheck pass on the changed files.
+

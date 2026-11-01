@@ -19,7 +19,6 @@ def persist_metric_collection(
     *,
     source_id: str,
     checked_at: datetime,
-    evicted_keys: int = 0,
     dropped_samples: int = 0,
     pending_buckets: int = 0,
     oldest_pending_at: float | None = None,
@@ -51,7 +50,6 @@ def persist_metric_collection(
         if previous_at is None or checked_at >= previous_at:
             changed = previous_at is not None and (
                 previous["source_id"] != source_id
-                or evicted_keys != previous.get("evicted_keys", 0)
                 or dropped_samples != previous.get("dropped_samples", 0)
                 or checked_at - previous_at > timedelta(seconds=buffer_ttl_seconds)
             )
@@ -91,7 +89,6 @@ def persist_metric_collection(
             state = {
                 "source_id": source_id,
                 "checked_at": checked_at.isoformat(),
-                "evicted_keys": evicted_keys,
                 "dropped_samples": dropped_samples,
                 "gaps": merged,
                 "pending_buckets": pending_buckets,

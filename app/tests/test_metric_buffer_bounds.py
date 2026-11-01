@@ -114,7 +114,7 @@ def test_buffer_indexes_prune_old_members_and_expire_with_live_data(
     assert redis.zcard(metric_buckets.DIRTY_KEY) == 1
     assert redis.zcard(quarantine) == 0
     for key in (all_buckets, metric_buckets.DIRTY_KEY, quarantine):
-        assert not redis.exists(key) or 0 < redis.ttl(key) <= 7200
+        assert not redis.exists(key) or redis.ttl(key) == -1
 
 
 def _record_route(metrics, path, value=10.0):

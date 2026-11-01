@@ -156,7 +156,7 @@ def test_metrics_redis_bucket_ttl_is_configurable(monkeypatch):
     assert metrics._bucket_ttl_seconds() == 2 * 3600
 
 
-def test_record_sync_applies_configured_ttl_to_bucket_and_indexes(
+def test_record_sync_expires_buckets_and_keeps_indexes_non_volatile(
     monkeypatch, metric_runtime
 ):
     metrics, redis, clock = metric_runtime
@@ -164,13 +164,13 @@ def test_record_sync_applies_configured_ttl_to_bucket_and_indexes(
 
     metrics._record_sync("api.requests", 1.0)
 
-    keys = [
-        _request_bucket(clock),
+    indexes = [
         metric_buckets.NAMES_KEY,
         f"{metric_buckets.PREFIX}:series:api.request.count",
         f"{metric_buckets.PREFIX}:buckets:api.request.count",
     ]
-    assert all(7198 <= redis.ttl(key) <= 7200 for key in keys)
+    assert 7198 <= redis.ttl(_request_bucket(clock)) <= 7200
+    assert all(redis.ttl(key) == -1 for key in indexes)
 
 
 @pytest.mark.parametrize("failure_phase", ["before_commit", "after_commit"])

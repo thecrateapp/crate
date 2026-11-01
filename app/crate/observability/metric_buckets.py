@@ -40,6 +40,14 @@ class MetricReadIncompleteError(ValueError):
     pass
 
 
+class BucketRows(dict):
+    """Rows per requested key, plus keys whose live buckets vanished mid-read."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.incomplete: set[str] = set()
+
+
 _READ_INDEXES = """
 local total = 0
 for i, key in ipairs(KEYS) do
@@ -119,7 +127,7 @@ if redis.call('exists', bucket) == 0 then
                 redis.call('del', candidate)
                 redis.call('zrem', all, candidate)
                 local previous = tonumber(redis.call('get', trimmed)) or 0
-                redis.call('set', trimmed, math.max(previous, old_minute + 60), 'EX', ttl)
+                redis.call('set', trimmed, math.max(previous, old_minute + 60))
                 break
             end
         end
@@ -155,12 +163,6 @@ redis.call('zadd', dirty, minute, bucket)
 redis.call('zadd', all, minute, bucket)
 redis.call('sadd', names, ARGV[7])
 redis.call('expire', bucket, ttl)
-redis.call('expire', series, ttl)
-redis.call('expire', buckets, ttl)
-redis.call('expire', names, ttl)
-redis.call('expire', all, ttl)
-redis.call('expire', dirty, ttl)
-redis.call('expire', quarantine, ttl)
 return 1
 """
 
@@ -176,7 +178,7 @@ if redis.call('exists', bucket) == 0 and redis.call('zcard', all) >= tonumber(AR
         redis.call('del', oldest[1], oldest[1] .. ':samples')
         redis.call('zrem', all, oldest[1])
         local previous = tonumber(redis.call('get', trimmed)) or 0
-        redis.call('set', trimmed, math.max(previous, tonumber(oldest[2]) + 60), 'EX', ttl)
+        redis.call('set', trimmed, math.max(previous, tonumber(oldest[2]) + 60))
     else
         redis.call('hincrby', loss, 'route_capacity', 1)
         redis.call('hset', loss, 'last_at', observed)
@@ -184,7 +186,6 @@ if redis.call('exists', bucket) == 0 and redis.call('zcard', all) >= tonumber(AR
     end
 end
 redis.call('zadd', all, minute, bucket)
-redis.call('expire', all, ttl)
 redis.call('sadd', index, ARGV[6])
 redis.call('expire', index, ttl)
 redis.call('hset', bucket, 'route_id', ARGV[6], 'target', ARGV[7], 'method', ARGV[8], 'path', ARGV[9])
@@ -212,8 +213,24 @@ redis.call('zrem', KEYS[2], KEYS[1])
 redis.call('zadd', KEYS[3], ARGV[4], KEYS[1])
 redis.call('hset', KEYS[1], 'quarantine_recoverable', ARGV[6])
 redis.call('expire', KEYS[1], ARGV[5])
-redis.call('expire', KEYS[3], ARGV[5])
 return 1
+"""
+
+_TRIM = """
+local dirty, quarantine, all, names, loss = KEYS[1], KEYS[2], KEYS[3], KEYS[4], KEYS[5]
+local cutoff, observed, prefix = tonumber(ARGV[1]), ARGV[2], ARGV[3]
+local expired = redis.call('zremrangebyscore', dirty, '-inf', cutoff)
+expired = expired + redis.call('zremrangebyscore', quarantine, '-inf', cutoff)
+if expired > 0 then
+    redis.call('hincrby', loss, 'expired', expired)
+    redis.call('hset', loss, 'last_at', observed)
+end
+redis.call('zremrangebyscore', all, '-inf', cutoff)
+for _, name in ipairs(redis.call('smembers', names)) do
+    redis.call('zremrangebyscore', prefix .. ':series:' .. name, '-inf', cutoff)
+    redis.call('zremrangebyscore', prefix .. ':buckets:' .. name, '-inf', cutoff)
+end
+return expired
 """
 
 _ACK = """
@@ -295,10 +312,26 @@ def record_sample(
     return bool(result)
 
 
+def bucket_minute(key: str) -> int | None:
+    try:
+        return int(key.rsplit(":", 1)[1])
+    except (IndexError, ValueError):
+        return None
+
+
 def read_buckets(
-    redis, specs: dict[str, tuple[str, int]], now: int, *, tags: dict | None = None
-) -> dict[str, list[dict]]:
-    """Read actual indexed buckets, sharing index and data round trips."""
+    redis,
+    specs: dict[str, tuple[str, int]],
+    now: int,
+    *,
+    tags: dict | None = None,
+    ttl: int | None = None,
+) -> BucketRows:
+    """Read actual indexed buckets, sharing index and data round trips.
+
+    A bucket that expired normally is skipped. One that vanished while its minute
+    is still inside the live buffer marks only its own key as incomplete.
+    """
     keys, bounds = [], [MAX_READ_BUCKETS]
     for name, minutes in specs.values():
         definition = get_metric_definition(name)
@@ -310,25 +343,63 @@ def read_buckets(
     indexed = indexed[1:]
     lookup = [(key, raw_key) for key, keys in zip(specs, indexed) for raw_key in keys]
     unique_keys = list(dict.fromkeys(raw_key for _key, raw_key in lookup))
-    fields = ("count", "sum", "min", "max", "last_at", "minute", "tags")
+    fields = ("count", "sum", "min", "max", "last", "last_at", "minute", "tags")
     rows = {}
+    vanished = set()
     for offset in range(0, len(unique_keys), 500):
         chunk = unique_keys[offset : offset + 500]
         pipe = redis.pipeline(transaction=False)
         for raw_key in chunk:
             pipe.hmget(raw_key, fields)
         for raw_key, values in zip(chunk, pipe.execute()):
-            if values[0] is None:
-                raise MetricReadIncompleteError("An indexed metric bucket is missing")
-            rows[raw_key] = dict(zip(fields, values))
-    result: dict[str, list[dict]] = {key: [] for key in specs}
+            if values[0] is not None:
+                rows[raw_key] = dict(zip(fields, values))
+                continue
+            minute = bucket_minute(_decode(raw_key))
+            if ttl is None or minute is None or minute + 60 + ttl > now:
+                vanished.add(raw_key)
+    result = BucketRows({key: [] for key in specs})
     for key, raw_key in lookup:
+        if raw_key in vanished:
+            result.incomplete.add(key)
         row = rows.get(raw_key)
         if row is not None and (
             tags is None or tags.items() <= json.loads(row["tags"]).items()
         ):
             result[key].append(row)
     return result
+
+
+def trim_indexes(redis, *, cutoff: int, observed: float) -> int:
+    """Age-bound the non-volatile indexes; unpersisted entries count as expired."""
+    return int(
+        _eval(
+            redis,
+            _TRIM,
+            [DIRTY_KEY, QUARANTINE_KEY, ALL_BUCKETS_KEY, NAMES_KEY, LOSS_KEY],
+            [cutoff, observed, PREFIX],
+        )
+    )
+
+
+def record_lost_buckets(redis, keys: list[str], *, now: float, ttl: int) -> None:
+    """Count pending buckets whose data vanished before reaching PostgreSQL."""
+    evicted = expired = 0
+    for key in keys:
+        minute = bucket_minute(key)
+        if minute is not None and minute + 60 + ttl <= now:
+            expired += 1
+        else:
+            evicted += 1
+    if not evicted and not expired:
+        return
+    pipe = redis.pipeline(transaction=False)
+    if evicted:
+        pipe.hincrby(LOSS_KEY, "evicted", evicted)
+    if expired:
+        pipe.hincrby(LOSS_KEY, "expired", expired)
+    pipe.hset(LOSS_KEY, "last_at", now)
+    pipe.execute()
 
 
 def pending_snapshots(redis, limit: int = 500) -> list[tuple[str, dict[str, str]]]:
@@ -451,7 +522,6 @@ def collection_state(redis, run_id: str) -> dict:
     losses = decode_bucket(losses)
     return {
         "source_id": f"{run_id}:{_decode(source)}",
-        "evicted_keys": int(redis.info("stats").get("evicted_keys", 0)),
         "dropped_samples": sum(
             int(value) for key, value in losses.items() if key != "last_at"
         ),
@@ -592,6 +662,9 @@ __all__ = [
     "NAMES_KEY",
     "record_sample",
     "read_buckets",
+    "BucketRows",
+    "trim_indexes",
+    "record_lost_buckets",
     "pending_snapshots",
     "acknowledge_snapshots",
 ]

@@ -13,6 +13,7 @@ class MetricSummary(BaseModel):
     min: float
     max: float
     sum: float
+    latest: float | None = None
     availability: Availability = "unavailable"
     reason: str | None = None
     source: Literal["redis_v2"] = "redis_v2"

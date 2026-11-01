@@ -186,6 +186,16 @@ describe("SystemHealth collection provenance", () => {
     expect(screen.queryByText("0 queued depth")).not.toBeInTheDocument();
   });
 
+  it("shows the latest queued depth instead of the window maximum", () => {
+    const snapshot = freshDashboard();
+    Object.assign(snapshot.summary.worker_queue_depth, { max: 40, latest: 3 });
+
+    show(snapshot);
+
+    expect(screen.getByText("3 queued depth")).toBeVisible();
+    expect(screen.queryByText("40 queued depth")).not.toBeInTheDocument();
+  });
+
   it("exposes known losses in the local collector instead of certifying fresh samples", () => {
     const snapshot = freshDashboard();
     Object.assign(snapshot.summary._meta.collector_local, {

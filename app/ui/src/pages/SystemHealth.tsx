@@ -45,6 +45,7 @@ interface MetricSummary {
   min: number;
   max: number;
   sum: number;
+  latest?: number | null;
 }
 
 interface MetricsSummaryResponse {
@@ -721,7 +722,7 @@ export function SystemHealth() {
   const runningTasks = tasks.length;
   const queueDepth =
     verified && !error && currentMetric(rawSummary?.worker_queue_depth, now)
-      ? rawSummary!.worker_queue_depth.max
+      ? rawSummary!.worker_queue_depth.latest ?? null
       : null;
 
   if (loading && !dashboard) {

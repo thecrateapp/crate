@@ -462,7 +462,23 @@ def _recent_buckets(specs: dict[str, tuple[str, int]], *, tags: dict | None = No
     redis = get_redis()
     if redis is None:
         raise ConnectionError("Metric Redis is unavailable")
-    return metric_buckets.read_buckets(redis, specs, _minute_bucket(), tags=tags)
+    return metric_buckets.read_buckets(
+        redis, specs, _minute_bucket(), tags=tags, ttl=_bucket_ttl_seconds()
+    )
+
+
+def _latest_total(rows: list[dict], scale: float) -> float | None:
+    latest: dict[str, tuple[float, float, float]] = {}
+    for row in rows:
+        if row.get("last") is None:
+            continue
+        position = (float(row["minute"]), float(row["last_at"]))
+        current = latest.get(row["tags"])
+        if current is None or position > current[:2]:
+            latest[row["tags"]] = (*position, float(row["last"]))
+    if not latest:
+        return None
+    return round(sum(value for _minute, _at, value in latest.values()) / scale, 2)
 
 
 def _aggregate_rows(rows: list[dict], scale: float) -> dict:
@@ -628,6 +644,7 @@ def _summary_provenance(rows, scale, minutes, now, *, filters=None, latest=None)
     result = _aggregate_rows(selected, scale)
     return {
         **result,
+        "latest": _latest_total(selected, scale),
         "availability": state,
         "reason": reason,
         "source": "redis_v2",
@@ -660,7 +677,9 @@ def query_summaries(specs: dict[str, tuple]) -> dict[str, dict]:
         redis = get_redis()
         if redis is None:
             raise ConnectionError("Metric Redis is unavailable")
-        rows = metric_buckets.read_buckets(redis, normalized, _minute_bucket())
+        rows = metric_buckets.read_buckets(
+            redis, normalized, _minute_bucket(), ttl=_bucket_ttl_seconds()
+        )
         missing = [
             name for key, (name, _minutes) in normalized.items() if not rows[key]
         ]
@@ -684,6 +703,8 @@ def query_summaries(specs: dict[str, tuple]) -> dict[str, dict]:
             reason = _live_coverage_reason(coverage, minutes)
             if reason:
                 result[key].update(availability="partial", reason=reason)
+            elif key in rows.incomplete:
+                result[key].update(availability="partial", reason="live_bucket_missing")
         return result
     except Exception:
         log.debug("Failed to query batched metric summaries", exc_info=True)
@@ -889,6 +910,7 @@ def flush_to_postgres(period: str = "hour"):
         if redis is None:
             _collection_event("redis_unavailable")
             return
+        ttl = _bucket_ttl_seconds()
         # A Redis restart can restore an earlier revision. Treat it as a source
         # change, preserving known DB counts and marking the overlapping minute.
         for _batch in range(10):
@@ -900,6 +922,11 @@ def flush_to_postgres(period: str = "hour"):
             state = metric_buckets.collection_state(redis, run_id)
             snapshots = []
             accepted = []
+            lost = [key for key, row in pending if not row]
+            if lost:
+                metric_buckets.record_lost_buckets(
+                    redis, lost, now=time.time(), ttl=ttl
+                )
             for key, row in pending:
                 if not row:
                     _collection_event("expired_before_flush")
@@ -973,6 +1000,8 @@ def flush_to_postgres(period: str = "hour"):
                 metric_buckets.acknowledge_snapshots(
                     redis, accepted, expected_run_id=run_id
                 )
+        now = time.time()
+        metric_buckets.trim_indexes(redis, cutoff=int(now) - ttl - 60, observed=now)
         run_id = redis.info("server")["run_id"]
         state = metric_buckets.collection_state(redis, run_id)
         result = persist_metric_collection(
@@ -1003,6 +1032,9 @@ def _historical_points(rows: list[dict], scale: float) -> list[dict]:
         }
         for row in reversed(rows)
     ]
+
+
+_PERSISTED_COLLECTION_MAX_AGE = 600
 
 
 def query_timeseries_snapshot(
@@ -1137,6 +1169,16 @@ def query_timeseries_snapshot(
                 and datetime.fromisoformat(finish) >= window_start
                 for begin, finish in collection.get("gaps", [])
             )
+            checked_at = (
+                datetime.fromisoformat(collection["checked_at"])
+                if collection.get("checked_at")
+                else None
+            )
+            collection_stale = (
+                checked_at is not None
+                and checked_at < window_end + timedelta(minutes=1)
+                and now - checked_at.timestamp() > _PERSISTED_COLLECTION_MAX_AGE
+            )
             for name in canonical:
                 data[name] = _historical_points(
                     rows[name], get_metric_definition(name).scale
@@ -1144,24 +1186,18 @@ def query_timeseries_snapshot(
                 if data[name]:
                     observed = max(point["observed_at"] for point in data[name])
                     gap = window_gap or any(point["source_gap"] for point in data[name])
-                    age = max(0, now - datetime.fromisoformat(observed).timestamp())
-                    stale = age > 600
                     status[name].update(
-                        availability="stale"
-                        if stale
-                        else "partial"
-                        if gap
-                        else "available",
-                        reason="observation_expired"
-                        if stale
-                        else "source_gap"
-                        if gap
-                        else None,
+                        availability="partial" if gap else "available",
+                        reason="source_gap" if gap else None,
                         observed_at=observed,
-                        age_seconds=age,
+                        age_seconds=max(
+                            0, now - datetime.fromisoformat(observed).timestamp()
+                        ),
                     )
                 elif window_gap:
                     status[name].update(availability="partial", reason="source_gap")
+                if collection_stale:
+                    status[name].update(availability="stale", reason="collection_stale")
     except Exception as error:
         reason = (
             "read_budget"
