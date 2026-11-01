@@ -153,6 +153,7 @@ struct OnlineSource::ServerClients {
         , stream(http, *credentials, origin)
         , catalog(http, *credentials, origin, cache)
         , compatible(http, *credentials, origin)
+        , play_events(http, *credentials, origin)
     {
     }
 
@@ -162,6 +163,7 @@ struct OnlineSource::ServerClients {
     StreamResolver stream;
     CatalogClient catalog;
     CompatibleTracksClient compatible;
+    PlayEventClient play_events;
 };
 
 int vdj_key_number(std::string_view audio_key, std::string_view audio_scale)
@@ -267,11 +269,21 @@ OnlineSource::OnlineSource(OnlineSourceDependencies dependencies)
               ui_.notify("Crate", connect_message(result));
           }
       )
+    , spool_(std::move(dependencies.play_events_path))
+    , run_worker_(dependencies.run_automix_worker)
 {
 }
 
 OnlineSource::~OnlineSource()
 {
+    {
+        std::lock_guard lock(worker_mutex_);
+        worker_stopping_ = true;
+    }
+    worker_wakeup_.notify_all();
+    if (worker_.joinable()) {
+        worker_.join();
+    }
     searches_.shutdown();
     folders_.shutdown();
 }
@@ -280,6 +292,79 @@ void OnlineSource::start()
 {
     log("online source plugin loaded");
     connection_.start();
+    if (run_worker_) {
+        worker_ = std::thread([this] { run_worker(); });
+    }
+}
+
+void OnlineSource::run_worker()
+{
+    std::unique_lock lock(worker_mutex_);
+    while (!worker_stopping_) {
+        worker_wakeup_.wait_for(lock, std::chrono::seconds(1), [this] { return worker_stopping_; });
+        if (worker_stopping_) {
+            break;
+        }
+        lock.unlock();
+        tick(std::chrono::system_clock::now());
+        lock.lock();
+    }
+}
+
+void OnlineSource::tick(std::chrono::system_clock::time_point now)
+{
+    if (!session_.logged_in() || !session_.status().features.play_events) {
+        return;
+    }
+    const int reported_decks = host_.deck_count();
+    const int decks = reported_decks > 0 ? std::min(reported_decks, 4) : 2;
+    bool recorded = false;
+    for (int deck = 1; deck <= decks; ++deck) {
+        for (auto& event : tracker_.observe(deck, host_.read_deck(deck), now)) {
+            if (const auto facts = facts_for(event.track_entity_uid)) {
+                event.title = facts->title;
+                event.artist = facts->artist;
+                event.album = facts->album;
+            }
+            log("play recorded id=" + event.track_entity_uid + " seconds=" +
+                std::to_string(static_cast<int>(event.played_seconds)));
+            spool_.append(event);
+            recorded = true;
+        }
+    }
+    if (recorded || now - last_flush_attempt_ >= std::chrono::seconds(30)) {
+        flush_plays(now);
+    }
+}
+
+void OnlineSource::flush_plays(std::chrono::system_clock::time_point now)
+{
+    last_flush_attempt_ = now;
+    const auto pending = spool_.pending();
+    const auto server = clients();
+    if (pending.empty() || server == nullptr) {
+        return;
+    }
+    CancellationSource cancellation;
+    std::vector<PlayEvent> remaining;
+    for (const auto& event : pending) {
+        if (!remaining.empty()) {
+            remaining.push_back(event);
+            continue;
+        }
+        switch (server->play_events.send(event, cancellation.token())) {
+        case PlayEventDelivery::Sent:
+            log("play sent id=" + event.track_entity_uid);
+            break;
+        case PlayEventDelivery::Rejected:
+            log("play rejected id=" + event.track_entity_uid);
+            break;
+        case PlayEventDelivery::Retry:
+            remaining.push_back(event);
+            break;
+        }
+    }
+    spool_.replace(remaining);
 }
 
 bool OnlineSource::logged_in() const
@@ -547,7 +632,7 @@ void OnlineSource::remember(const std::vector<SearchTrack>& tracks)
         track_facts_.clear();
     }
     for (const auto& track : tracks) {
-        track_facts_[track.entity_uid] = TrackFacts{track.artist, track.album, track.album_id};
+        track_facts_[track.entity_uid] = TrackFacts{track.title, track.artist, track.album, track.album_id};
     }
 }
 

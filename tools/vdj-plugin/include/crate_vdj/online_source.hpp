@@ -8,15 +8,20 @@
 #include "crate_vdj/media_access_client.hpp"
 #include "crate_vdj/metadata_cache.hpp"
 #include "crate_vdj/models.hpp"
+#include "crate_vdj/play_events.hpp"
 #include "crate_vdj/request_coordinator.hpp"
 
+#include <chrono>
+#include <condition_variable>
 #include <cstddef>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -55,6 +60,8 @@ public:
     virtual std::optional<std::string> loaded_track_path() = 0;
     virtual bool send_command(const std::string& command) = 0;
     virtual bool open_url(const std::string& url) = 0;
+    virtual int deck_count() = 0;
+    virtual std::optional<DeckReading> read_deck(int deck) = 0;
 };
 
 class ConnectionUi {
@@ -81,9 +88,11 @@ struct OnlineSourceDependencies {
     ConnectionSettingsStore& settings;
     ConnectionSession::CredentialFactory credentials;
     std::string metadata_cache_path;
+    std::filesystem::path play_events_path;
     HostPort& host;
     ConnectionUi& ui;
     std::function<void(const std::string&)> log;
+    bool run_automix_worker = true;
 };
 
 inline constexpr std::string_view kCurrentCompatibleFolderId = "crate:compatible:current";
@@ -118,10 +127,12 @@ public:
     CallbackStatus folder(const std::string& folder_id, TrackSink& sink);
     std::vector<std::string_view> context_menu(const std::string& unique_id);
     CallbackStatus select_context_menu(const std::string& unique_id, std::size_t index);
+    void tick(std::chrono::system_clock::time_point now);
 
 private:
     struct ServerClients;
     struct TrackFacts {
+        std::string title;
         std::string artist;
         std::string album;
         int album_id = 0;
@@ -142,6 +153,8 @@ private:
     CallbackStatus compatible_folder(const std::string& seed_uid, TrackSink& sink);
     std::optional<std::string> current_crate_track_uid();
     void log(const std::string& message) const;
+    void flush_plays(std::chrono::system_clock::time_point now);
+    void run_worker();
 
     HostPort& host_;
     ConnectionUi& ui_;
@@ -158,6 +171,14 @@ private:
     std::mutex facts_mutex_;
     std::unordered_map<std::string, TrackFacts> track_facts_;
     ConnectionWorker connection_;
+    PlayTracker tracker_;
+    PlayEventSpool spool_;
+    std::chrono::system_clock::time_point last_flush_attempt_{};
+    bool run_worker_;
+    std::mutex worker_mutex_;
+    std::condition_variable worker_wakeup_;
+    bool worker_stopping_ = false;
+    std::thread worker_;
 };
 
 } // namespace crate::vdj

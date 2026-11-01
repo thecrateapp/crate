@@ -29,6 +29,7 @@ struct ConnectionFeatures {
     bool online_source = false;
     bool smart_mix_assistant = false;
     bool automation = false;
+    bool play_events = false;
 };
 
 struct ConnectionStatus {
