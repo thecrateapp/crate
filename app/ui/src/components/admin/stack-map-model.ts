@@ -47,6 +47,7 @@ export interface StackMapSnapshot {
   availability: "available" | "stale" | "unavailable";
   observedAt: string | null;
   metricsSource: "prometheus" | null;
+  links?: { grafana?: string | null };
 }
 
 export interface StackMapLink {

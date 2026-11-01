@@ -41,6 +41,7 @@ import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 import { StackMap } from "@/components/admin/StackMap";
 import type { StackActivityFrame } from "@/components/admin/stack-map-activity";
 import {
+  applyStackResources,
   inventoryToStackMap,
   type StackInventory,
 } from "@/components/admin/stack-map-inventory";
@@ -302,6 +303,14 @@ export function Stack() {
         : null,
     [snapshot],
   );
+  const resources = activity?.resources;
+  const liveMapSnapshot = useMemo(
+    () =>
+      mapSnapshot
+        ? applyStackResources(mapSnapshot, resources, Date.now())
+        : null,
+    [mapSnapshot, resources],
+  );
 
   const fetchSnapshot = useCallback(async (fresh = false, silent = false) => {
     if (!silent) setLoading(true);
@@ -536,7 +545,7 @@ export function Stack() {
               meta="Host and deployments"
               summary="Host and stack topology"
             >
-              <StackMap snapshot={mapSnapshot} activity={activity} />
+              <StackMap snapshot={liveMapSnapshot!} activity={activity} />
             </InstrumentPanel>
           ) : null}
           <section

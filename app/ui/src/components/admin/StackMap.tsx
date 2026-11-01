@@ -732,6 +732,21 @@ export function StackMap({
                   <dd>{selectedStack?.revision ?? "Unknown"}</dd>
                 </div>
               </dl>
+              {snapshot.links?.grafana ? (
+                <a
+                  className="stack-map__grafana"
+                  href={`${snapshot.links.grafana}/d/${
+                    selected.tier === "data"
+                      ? "crate-infra-data"
+                      : "crate-infra-runtime"
+                  }?from=now-1h&to=now`}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`Open ${selected.label} in Grafana`}
+                >
+                  Open in Grafana
+                </a>
+              ) : null}
               {liveEnabled ? (
                 <div
                   className="stack-map__live"

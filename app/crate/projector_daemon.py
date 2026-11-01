@@ -21,11 +21,20 @@ def _live_activity_sampler():
     from crate.metrics import _minute_bucket
     from crate.observability.live_activity import ActivitySampler
 
+    prometheus = os.environ.get("CRATE_PROMETHEUS_URL", "").strip()
+    fetch_resources = None
+    if prometheus:
+        from functools import partial
+
+        from crate.observability.prometheus_adapter import fetch_stack_resources
+
+        fetch_resources = partial(fetch_stack_resources, prometheus)
     return ActivitySampler(
         redis=get_redis,
         minute=_minute_bucket,
         now=wall_clock.time,
         count_listening=count_listening_now,
+        fetch_resources=fetch_resources,
     )
 
 

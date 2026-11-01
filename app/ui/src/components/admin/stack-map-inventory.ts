@@ -1,3 +1,4 @@
+import type { StackActivityResources } from "./stack-map-activity";
 import type { StackMapService, StackMapSnapshot } from "./stack-map-model";
 import {
   STACK_ACTIVITY_ROLES,
@@ -29,7 +30,10 @@ export interface StackInventory {
     status: string;
     actions: ("restart" | "stop" | "start")[];
   }[];
+  links?: { grafana: string | null } | null;
 }
+
+const RESOURCES_MAX_AGE_MS = 90_000;
 
 const STACK_NAMES = {
   application: "Application",
@@ -112,5 +116,38 @@ export function inventoryToStackMap(
     availability: !available ? "unavailable" : stale ? "stale" : "available",
     observedAt,
     metricsSource: null,
+    links: { grafana: inventory?.links?.grafana ?? null },
+  };
+}
+
+export function applyStackResources(
+  map: StackMapSnapshot,
+  resources: StackActivityResources | null | undefined,
+  now: number,
+): StackMapSnapshot {
+  if (!resources) return map;
+  const observed = Date.parse(resources.observed_at);
+  if (!Number.isFinite(observed) || now - observed > RESOURCES_MAX_AGE_MS)
+    return map;
+  return {
+    ...map,
+    host: {
+      ...map.host,
+      cpuPercent: resources.host.cpu_percent,
+      memoryUsedGiB: resources.host.memory_used_gib,
+      memoryTotalGiB: resources.host.memory_total_gib,
+    },
+    services: map.services.map((service) => {
+      const reading =
+        resources.services[service.id.slice(service.id.indexOf("/") + 1)];
+      return reading
+        ? {
+            ...service,
+            cpuPercent: reading.cpu_percent,
+            memoryMiB: reading.memory_mib,
+          }
+        : service;
+    }),
+    metricsSource: "prometheus",
   };
 }

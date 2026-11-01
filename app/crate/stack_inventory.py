@@ -38,6 +38,11 @@ def host_identity() -> dict[str, str]:
     }
 
 
+def links() -> dict[str, str | None]:
+    grafana = os.environ.get("CRATE_GRAFANA_URL", "").strip().rstrip("/")
+    return {"grafana": grafana or None}
+
+
 def actions_for(name: str, project: str, application: str) -> list[str]:
     """The unchanged prefix allowlist, limited to containers of this deployment."""
     if project != application or not name.startswith(ACTION_PREFIXES):
@@ -87,6 +92,7 @@ def build_inventory() -> dict:
             },
         ],
         "services": services,
+        "links": links(),
     }
 
 
@@ -98,6 +104,7 @@ def unavailable_inventory(reason: str) -> dict:
         "host": host_identity(),
         "stacks": [],
         "services": [],
+        "links": links(),
     }
 
 

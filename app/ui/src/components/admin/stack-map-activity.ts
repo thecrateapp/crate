@@ -14,7 +14,21 @@ export interface StackActivityFrame {
   queues: Record<string, { completed: number; failed: number }> | null;
   projector: { events: number } | null;
   listening: number | null;
+  resources?: StackActivityResources | null;
   sources: Record<string, string>;
+}
+
+export interface StackActivityResources {
+  observed_at: string;
+  host: {
+    cpu_percent: number | null;
+    memory_used_gib: number | null;
+    memory_total_gib: number | null;
+  };
+  services: Record<
+    string,
+    { cpu_percent: number | null; memory_mib: number | null }
+  >;
 }
 
 export interface StackActivityReading {

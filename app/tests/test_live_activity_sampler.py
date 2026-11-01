@@ -162,5 +162,52 @@ def test_frames_carry_counts_only(sampler_runtime):
         "queues",
         "projector",
         "listening",
+        "resources",
         "sources",
     }
+
+
+def test_resources_refresh_at_most_every_thirty_seconds_and_survive_failures(
+    available_runtime,
+):
+    from crate.observability import live_activity
+
+    _metrics, redis, clock = available_runtime
+    calls = []
+    outcome = {"fail": False}
+
+    def fetch():
+        calls.append(clock["now"])
+        if outcome["fail"]:
+            raise RuntimeError("prometheus unreachable")
+        return {"observed_at": "t", "host": {}, "services": {"crate-api": {}}}
+
+    sampler = live_activity.ActivitySampler(
+        redis=lambda: redis,
+        minute=lambda: clock["minute"],
+        now=lambda: clock["now"],
+        count_listening=lambda: 0,
+        fetch_resources=fetch,
+    )
+
+    first = sampler.sample(events=0)
+    clock["now"] += 5
+    second = sampler.sample(events=0)
+    clock["now"] += 30
+    outcome["fail"] = True
+    third = sampler.sample(events=0)
+
+    assert len(calls) == 2
+    assert first["resources"]["services"] == {"crate-api": {}}
+    assert second["sources"]["resources"] == "available"
+    assert third["resources"] == first["resources"]
+    assert third["sources"]["resources"] == "unavailable"
+
+
+def test_resources_are_unconfigured_without_a_prometheus_source(sampler_runtime):
+    sampler, _metrics, _redis, _clock, _listening = sampler_runtime
+
+    frame = sampler.sample(events=0)
+
+    assert frame["resources"] is None
+    assert frame["sources"]["resources"] == "unconfigured"

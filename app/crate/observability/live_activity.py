@@ -19,6 +19,7 @@ SEQUENCE_KEY = f"{PREFIX}:sequence"
 FRAME_TTL_SECONDS = 30
 WATCH_TTL_SECONDS = 30
 MAX_FRAME_GAP_SECONDS = 120
+RESOURCES_INTERVAL_SECONDS = 30
 SCHEMA_VERSION = 1
 
 _SPECS = {
@@ -37,8 +38,12 @@ class ActivitySampler:
         minute: Callable[[], int],
         now: Callable[[], float],
         count_listening: Callable[[], int],
+        fetch_resources: Callable[[], dict] | None = None,
     ):
         self._redis = redis
+        self._fetch_resources = fetch_resources
+        self._resources: dict | None = None
+        self._resources_at: float | None = None
         self._minute = minute
         self._now = now
         self._count_listening = count_listening
@@ -123,9 +128,14 @@ class ActivitySampler:
             listening = None
             sources["playback"] = "unavailable"
         sources["projector"] = "available" if events is not None else "unavailable"
+        sources["resources"] = self._refresh_resources(now)
         if warming:
             availability = "warming"
-        elif any(state in {"unavailable", "partial"} for state in sources.values()):
+        elif any(
+            state in {"unavailable", "partial"}
+            for key, state in sources.items()
+            if key != "resources"
+        ):
             availability = "partial"
         else:
             availability = "available"
@@ -139,8 +149,25 @@ class ActivitySampler:
             "queues": queues,
             "projector": {"events": int(events)} if events is not None else None,
             "listening": listening,
+            "resources": self._resources,
             "sources": sources,
         }
+
+    def _refresh_resources(self, now: float) -> str:
+        if self._fetch_resources is None:
+            return "unconfigured"
+        if (
+            self._resources_at is not None
+            and now - self._resources_at < RESOURCES_INTERVAL_SECONDS
+        ):
+            return "available" if self._resources is not None else "unavailable"
+        self._resources_at = now
+        try:
+            self._resources = self._fetch_resources()
+            return "available"
+        except Exception:
+            log.debug("Live activity resource read failed", exc_info=True)
+            return "unavailable"
 
 
 def mark_watched(redis) -> None:

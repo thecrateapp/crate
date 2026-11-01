@@ -316,3 +316,13 @@ def test_snapshot_response_keeps_the_inventory(test_app, monkeypatch):
 
     assert response.status_code == 200
     assert response.json()["inventory"]["services"][0]["id"] == "crate/traefik"
+
+
+def test_inventory_links_grafana_only_when_configured(inventory_docker, monkeypatch):
+    monkeypatch.delenv("CRATE_GRAFANA_URL", raising=False)
+    assert inventory_docker.build_inventory()["links"] == {"grafana": None}
+
+    monkeypatch.setenv("CRATE_GRAFANA_URL", "https://grafana.example/")
+    assert inventory_docker.build_inventory()["links"] == {
+        "grafana": "https://grafana.example"
+    }

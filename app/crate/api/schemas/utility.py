@@ -144,6 +144,10 @@ class StackInventoryServiceResponse(BaseModel):
     actions: list[Literal["restart", "stop", "start"]] = Field(default_factory=list)
 
 
+class StackInventoryLinksResponse(BaseModel):
+    grafana: str | None = None
+
+
 class StackInventoryResponse(BaseModel):
     schema_version: int
     availability: Literal["available", "unavailable"]
@@ -151,6 +155,7 @@ class StackInventoryResponse(BaseModel):
     host: StackInventoryHostResponse
     stacks: list[StackInventoryStackResponse] = Field(default_factory=list)
     services: list[StackInventoryServiceResponse] = Field(default_factory=list)
+    links: StackInventoryLinksResponse | None = None
 
 
 class AdminStackSnapshotResponse(BaseModel):

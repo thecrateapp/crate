@@ -591,6 +591,20 @@
 .stack-map__field-live:not([data-status="live"]) {
   color: var(--text-muted);
 }
+.stack-map__grafana {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--accent-action-hi);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.stack-map__grafana:hover,
+.stack-map__grafana:focus-visible {
+  color: var(--text-primary);
+}
 .stack-map__live {
   padding: 16px 0;
   border-top: 1px solid var(--border-quiet);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyStackResources,
   inventoryToStackMap,
   type StackInventory,
 } from "./stack-map-inventory";
@@ -153,5 +154,69 @@ describe("inventoryToStackMap", () => {
     });
 
     expect(map.connections).toEqual([]);
+  });
+});
+
+describe("applyStackResources", () => {
+  const resources = {
+    observed_at: "2026-11-01T12:00:00Z",
+    host: { cpu_percent: 31.2, memory_used_gib: 22, memory_total_gib: 62 },
+    services: { "crate-api": { cpu_percent: 12.5, memory_mib: 500 } },
+  };
+
+  it("applies fresh Prometheus readings by service name", () => {
+    const map = inventoryToStackMap(
+      inventory([service("crate", "crate-api"), service("crate", "crate-ui")]),
+      { stale: false, observedAt: null },
+    );
+
+    const live = applyStackResources(
+      map,
+      resources,
+      Date.parse("2026-11-01T12:00:30Z"),
+    );
+
+    expect(live.metricsSource).toBe("prometheus");
+    expect(live.host).toMatchObject({
+      cpuPercent: 31.2,
+      memoryUsedGiB: 22,
+      memoryTotalGiB: 62,
+    });
+    expect(
+      live.services.find((item) => item.id === "crate/crate-api"),
+    ).toMatchObject({
+      cpuPercent: 12.5,
+      memoryMiB: 500,
+    });
+    expect(
+      live.services.find((item) => item.id === "crate/crate-ui")!.cpuPercent,
+    ).toBeNull();
+  });
+
+  it("ignores old or missing readings instead of presenting them as current", () => {
+    const map = inventoryToStackMap(
+      inventory([service("crate", "crate-api")]),
+      {
+        stale: false,
+        observedAt: null,
+      },
+    );
+
+    expect(
+      applyStackResources(map, resources, Date.parse("2026-11-01T12:05:00Z")),
+    ).toBe(map);
+    expect(applyStackResources(map, null, Date.now())).toBe(map);
+  });
+
+  it("keeps the Grafana link from the inventory", () => {
+    const map = inventoryToStackMap(
+      {
+        ...inventory([service("crate", "crate-api")]),
+        links: { grafana: "https://g.example" },
+      },
+      { stale: false, observedAt: null },
+    );
+
+    expect(map.links).toEqual({ grafana: "https://g.example" });
   });
 });

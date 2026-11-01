@@ -506,3 +506,29 @@ describe("StackMap service index", () => {
     ).toHaveLength(3);
   });
 });
+
+describe("StackMap Grafana link", () => {
+  it("links the selected service to Grafana only when it is configured", () => {
+    const { unmount } = render(<StackMap snapshot={snapshot()} />);
+    expect(
+      within(inspector()).queryByRole("link", { name: /grafana/i }),
+    ).toBeNull();
+    unmount();
+
+    render(
+      <StackMap
+        snapshot={{
+          ...snapshot(),
+          links: { grafana: "https://grafana.example" },
+        }}
+      />,
+    );
+
+    expect(
+      within(inspector()).getByRole("link", { name: "Open API in Grafana" }),
+    ).toHaveAttribute(
+      "href",
+      "https://grafana.example/d/crate-infra-runtime?from=now-1h&to=now",
+    );
+  });
+});
