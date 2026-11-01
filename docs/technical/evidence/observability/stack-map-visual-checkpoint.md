@@ -125,7 +125,7 @@ Branch `codex/stack-live` (stacked on PR1A). Preview: http://127.0.0.1:5188/revi
 - The review scene replays three recorded frames every five seconds, labelled as
   a recorded sample, with Off, Warming, Paused and Unavailable cases.
 
-Checks: 52 unit cases across the map, activity model and component files; ten
+Checks: 48 unit cases across the map, activity model and component files; ten
 browser scenarios including recorded pulses, reduced motion without pulses and
 paused/unavailable states; Admin typecheck, scoped ESLint, the story's scoped
 TypeScript check and the showcase catalogue pass. Screenshots:
