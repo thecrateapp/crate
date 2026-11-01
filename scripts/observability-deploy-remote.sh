@@ -12,6 +12,7 @@ OBS_VERIFY_SECONDS="${OBS_VERIFY_SECONDS:-180}"
 OBS_VERIFY_INTERVAL="${OBS_VERIFY_INTERVAL:-5}"
 OBS_PYTHON="${OBS_PYTHON:-$OBS_ROOT/tooling/venv/bin/python}"
 CRATE_SERVER_PATH="${CRATE_SERVER_PATH:-/home/crate/crate}"
+CRATE_APP_PROJECT="${CRATE_APP_PROJECT:-crate}"
 HOST_LOCK_DIR="${CRATE_SERVER_PATH}/.deploy"
 HOST_LOCK_OWNER="obs-${OBS_DEPLOY_ID}"
 HOST_LOCK_CONFIRM="$OBS_CONFIRM"
@@ -32,13 +33,16 @@ LIVE="$OBS_ROOT/live"
 STATE="$OBS_ROOT/state"
 RELEASES="$OBS_ROOT/releases"
 TOOLS="$OBS_ROOT/tooling/$OBS_DEPLOY_SHA"
+ADOPTION="$OBS_ROOT/adoption"
 
 RESTART=()
 STATEFUL=()
 IMAGES=()
 PREVIOUS_IMAGES=()
 BACKED_UP=()
+LEGACY=()
 APPLIED=0
+ADOPTING=0
 OBS_DATA_DIR=""
 
 log() {
@@ -167,13 +171,17 @@ assert_inputs() {
     fail "release tooling for $OBS_DEPLOY_SHA is not staged"
 }
 
-assert_runtime() {
+assert_driver() {
   local driver
   driver="$(docker info --format '{{.Driver}}')"
   case "$driver:$OBS_CONTAINERD" in
     overlay2:0 | overlayfs:1) ;;
     *) fail "monitoring requires overlay2 (OBS_CONTAINERD=0) or overlayfs (OBS_CONTAINERD=1), found $driver" ;;
   esac
+}
+
+assert_runtime() {
+  assert_driver
   local service projects
   for service in crate-prometheus crate-grafana; do
     projects="$(docker ps --filter "label=com.docker.compose.service=$service" \
@@ -261,11 +269,9 @@ in_service_image() {
     -v "$source:/src:ro" -v "$target:/dst" "$image" -c "$script"
 }
 
-backup_state() {
-  local service="$1"
-  local image data backup needed free
-  image="$(image_for "$service" ${PREVIOUS_IMAGES[@]+"${PREVIOUS_IMAGES[@]}"})" ||
-    fail "no running image recorded for $service"
+assert_backup_space() {
+  local service="$1" image="$2"
+  local data backup needed free
   data="$(data_directory "$service")"
   backup="$OBS_ROOT/backups/$OBS_DEPLOY_ID/$service"
   mkdir -p "$backup"
@@ -274,25 +280,40 @@ backup_state() {
   if ((free < needed + needed / 10 + 1048576)); then
     fail "not enough space to back up $service: need ${needed} KiB plus margin, ${free} KiB free"
   fi
-  log "Backing up $service state (${needed} KiB); monitoring gap starts"
-  dc_in "$LIVE" stop "$service"
-  BACKED_UP+=("$service")
-  in_service_image "$image" "$data" "$backup" \
+  log "Backing up $service state (${needed} KiB)"
+}
+
+copy_state() {
+  local service="$1" image="$2"
+  in_service_image "$image" "$(data_directory "$service")" "$OBS_ROOT/backups/$OBS_DEPLOY_ID/$service" \
     'cp -a /src/. /dst/ && [ "$(find /src | wc -l)" = "$(find /dst | wc -l)" ]' ||
     fail "backup of $service did not complete"
+  BACKED_UP+=("$service")
+}
+
+backup_state() {
+  local service="$1" image
+  image="$(image_for "$service" ${PREVIOUS_IMAGES[@]+"${PREVIOUS_IMAGES[@]}"})" ||
+    fail "no running image recorded for $service"
+  assert_backup_space "$service" "$image"
+  log "Stopping $service; monitoring gap starts"
+  dc_in "$LIVE" stop "$service"
+  copy_state "$service" "$image"
+}
+
+restore_copy() {
+  local service="$1" image="$2"
+  local backup="$OBS_ROOT/backups/$OBS_DEPLOY_ID/$service"
+  log "Restoring $service state from $backup"
+  docker run --rm --network none --user 0:0 --entrypoint sh \
+    -v "$backup:/src:ro" -v "$(data_directory "$service"):/dst" "$image" \
+    -c 'rm -rf /dst/* /dst/.[!.]* /dst/..?* && cp -a /src/. /dst/'
 }
 
 restore_state() {
   local service="$1"
-  local image data backup
-  image="$(image_for "$service" ${PREVIOUS_IMAGES[@]+"${PREVIOUS_IMAGES[@]}"})"
-  data="$(data_directory "$service")"
-  backup="$OBS_ROOT/backups/$OBS_DEPLOY_ID/$service"
-  log "Restoring $service state from $backup"
   dc_in "$LIVE" stop "$service"
-  docker run --rm --network none --user 0:0 --entrypoint sh \
-    -v "$backup:/src:ro" -v "$data:/dst" "$image" \
-    -c 'rm -rf /dst/* /dst/.[!.]* /dst/..?* && cp -a /src/. /dst/'
+  restore_copy "$service" "$(image_for "$service" ${PREVIOUS_IMAGES[@]+"${PREVIOUS_IMAGES[@]}"})"
 }
 
 start_services() {
@@ -488,14 +509,196 @@ cmd_status() {
   dc_in "$LIVE" ps "${SERVICES[@]}"
 }
 
+legacy_containers() {
+  LEGACY=()
+  local service id project image
+  for service in "${SERVICES[@]}"; do
+    while read -r id project image; do
+      [[ -n "$id" && "$project" != "$PROJECT" ]] || continue
+      LEGACY+=("$service $id $image")
+    done < <(docker ps --filter "label=com.docker.compose.service=$service" \
+      --format '{{.ID}} {{with .Label "com.docker.compose.project"}}{{.}}{{else}}unmanaged{{end}} {{.Image}}')
+  done
+}
+
+legacy_entry() {
+  local entry
+  for entry in ${LEGACY[@]+"${LEGACY[@]}"}; do
+    if [[ "${entry%% *}" == "$1" ]]; then
+      printf '%s\n' "${entry#* }"
+      return 0
+    fi
+  done
+  return 1
+}
+
+mount_source() {
+  docker inspect --format "{{range .Mounts}}{{if eq .Destination \"$2\"}}{{.Source}}{{end}}{{end}}" "$1"
+}
+
+assert_legacy_mount() {
+  local id="$1" destination="$2" expected="$3" actual
+  actual="$(mount_source "$id" "$destination")"
+  [[ "$actual" == "$expected" ]] ||
+    fail "legacy $destination is mounted from ${actual:-nothing}, not $expected; adopting would start a different history"
+}
+
+application_identities() {
+  local id
+  docker ps --filter "label=com.docker.compose.project=$CRATE_APP_PROJECT" --format '{{.ID}}' |
+    while read -r id; do
+      docker inspect --format \
+        '{{index .Config.Labels "com.docker.compose.service"}} {{.Id}} {{.State.StartedAt}} {{.RestartCount}}' "$id"
+    done | grep -Ev "^($(IFS='|'; echo "${SERVICES[*]}")) " | sort || true
+}
+
+cmd_inventory() {
+  local report
+  mkdir -p "$ADOPTION"
+  report="$ADOPTION/inventory-$(date -u +%Y%m%dT%H%M%SZ).txt"
+  legacy_containers
+  {
+    echo "# legacy monitoring: service container project state image mounts"
+    local entry id
+    for entry in ${LEGACY[@]+"${LEGACY[@]}"}; do
+      id="$(cut -d' ' -f2 <<< "$entry")"
+      docker inspect --format \
+        "${entry%% *} {{.Id}} {{index .Config.Labels \"com.docker.compose.project\"}} {{.State.Status}} {{.Config.Image}} {{range .Mounts}}{{.Source}}:{{.Destination}} {{end}}" "$id"
+    done
+    echo "# application ($CRATE_APP_PROJECT): service container started_at restarts"
+    application_identities
+    echo "# docker networks: $(docker network ls -q | wc -l | tr -d ' ') (adoption adds 4; default address pools allow about 31)"
+  } | tee "$report"
+  log "Inventory saved to $report"
+}
+
+on_adopt_exit() {
+  local status=$?
+  trap - EXIT
+  if [[ "$ADOPTING" == "1" && "$status" -ne 0 ]]; then
+    set +e
+    printf 'Adoption failed; returning to the legacy monitoring.\n' >&2
+    [[ ! -e "$LIVE" ]] || dc_in "$LIVE" stop "${SERVICES[@]}"
+    local service entry ids=()
+    for service in ${BACKED_UP[@]+"${BACKED_UP[@]}"}; do
+      entry="$(legacy_entry "$service")"
+      restore_copy "$service" "${entry#* }"
+    done
+    for entry in "${LEGACY[@]}"; do
+      ids+=("$(cut -d' ' -f2 <<< "$entry")")
+    done
+    docker start "${ids[@]}" >/dev/null
+    [[ ! -e "$LIVE" ]] || mv "$LIVE" "$OBS_ROOT/failed-live-$OBS_DEPLOY_ID"
+    printf 'Legacy monitoring restarted on its pre-adoption data; keeping the failure exit code.\n' >&2
+  fi
+  exit "$status"
+}
+
+cmd_adopt() {
+  assert_inputs
+  [[ -z "$(state_value current)" ]] || fail "monitoring already runs as $PROJECT; nothing to adopt"
+  [[ "$OBS_CONFIRM" == "adopt-legacy-monitoring" ]] || fail "adoption requires OBS_CONFIRM=adopt-legacy-monitoring"
+  [[ ! -e "$LIVE" ]] || fail "live configuration exists without deployment state; nothing changed"
+  assert_driver
+  stage_release
+  local release="$RELEASES/$OBS_DEPLOY_SHA"
+  OBS_DATA_DIR="$(env_value "$release" OBS_DATA_DIR)"
+  [[ -n "$OBS_DATA_DIR" ]] || fail "OBS_DATA_DIR is not set in $OBS_ENV_FILE"
+  legacy_containers
+  local prometheus grafana
+  prometheus="$(legacy_entry crate-prometheus)" ||
+    fail "no legacy Prometheus is running; a new installation uses OBS_CONFIRM=first-deploy"
+  grafana="$(legacy_entry crate-grafana)" ||
+    fail "no legacy Grafana is running; a new installation uses OBS_CONFIRM=first-deploy"
+  assert_legacy_mount "${prometheus%% *}" /prometheus "$OBS_DATA_DIR/prometheus"
+  assert_legacy_mount "${grafana%% *}" /var/lib/grafana "$OBS_DATA_DIR/grafana"
+  load_plan "" "$release"
+  preflight "$release"
+  assert_containerd_socket "$release"
+  pull_missing_images
+  assert_backup_space crate-prometheus "${prometheus#* }"
+  assert_backup_space crate-grafana "${grafana#* }"
+  release_tool install --release "$release" --live "$LIVE" >/dev/null
+  if ! dc_in "$LIVE" create "${SERVICES[@]}"; then
+    dc_in "$LIVE" rm -f "${SERVICES[@]}" || true
+    mv "$LIVE" "$OBS_ROOT/failed-live-$OBS_DEPLOY_ID"
+    fail "could not create the $PROJECT networks and containers; legacy monitoring was not stopped"
+  fi
+  mkdir -p "$ADOPTION"
+  application_identities > "$ADOPTION/application-before-$OBS_DEPLOY_ID"
+
+  trap on_adopt_exit EXIT
+  ADOPTING=1
+  local entry ids=()
+  for entry in "${LEGACY[@]}"; do
+    ids+=("$(cut -d' ' -f2 <<< "$entry")")
+  done
+  log "Stopping ${#ids[@]} legacy monitoring containers; monitoring gap starts"
+  docker stop "${ids[@]}" >/dev/null
+  copy_state crate-prometheus "${prometheus#* }"
+  copy_state crate-grafana "${grafana#* }"
+  activate "$release"
+  verify_stack "$LIVE" || fail "adopted monitoring did not verify within ${OBS_VERIFY_SECONDS}s"
+  ADOPTING=0
+  trap - EXIT
+  mkdir -p "$STATE"
+  printf '%s\n' "${LEGACY[@]}" > "$STATE/legacy.tmp"
+  mv -f "$STATE/legacy.tmp" "$STATE/legacy"
+  record "$OBS_DEPLOY_SHA" "" adopt
+  application_identities > "$ADOPTION/application-after-$OBS_DEPLOY_ID"
+  if cmp -s "$ADOPTION/application-before-$OBS_DEPLOY_ID" "$ADOPTION/application-after-$OBS_DEPLOY_ID"; then
+    log "Application containers unchanged (same IDs, start times and restart counts)"
+  else
+    printf 'Application containers changed during adoption; compare %s\n' "$ADOPTION" >&2
+  fi
+  log "Monitoring adopted as $PROJECT at $OBS_DEPLOY_SHA; legacy containers are stopped, not removed"
+}
+
+cmd_revert_adoption() {
+  [[ "$OBS_CONFIRM" == "revert-adoption" ]] || fail "reverting requires OBS_CONFIRM=revert-adoption"
+  [[ -s "$STATE/legacy" ]] || fail "no adopted legacy monitoring is recorded"
+  local entry ids=()
+  while read -r entry; do
+    ids+=("$(cut -d' ' -f2 <<< "$entry")")
+  done < "$STATE/legacy"
+  dc_in "$LIVE" stop "${SERVICES[@]}"
+  docker start "${ids[@]}" >/dev/null
+  local stamp
+  stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  mv "$LIVE" "$OBS_ROOT/reverted-live-$stamp"
+  mv "$STATE" "$OBS_ROOT/reverted-state-$stamp"
+  log "Legacy monitoring restarted; $PROJECT stopped and its state kept in reverted-state-$stamp"
+}
+
+cmd_retire_legacy() {
+  [[ "$OBS_CONFIRM" == "retire-legacy-monitoring" ]] || fail "retiring requires OBS_CONFIRM=retire-legacy-monitoring"
+  [[ -n "$(state_value current)" && -s "$STATE/legacy" ]] || fail "no adopted legacy monitoring is recorded"
+  local service id image project status
+  while read -r service id image; do
+    read -r project status < <(docker inspect --format \
+      '{{index .Config.Labels "com.docker.compose.project"}} {{.State.Status}}' "$id")
+    [[ "$project" != "$PROJECT" && "$status" != "running" ]] ||
+      fail "$service ($id) is running or belongs to $PROJECT; nothing removed"
+  done < "$STATE/legacy"
+  while read -r service id image; do
+    docker rm "$id" >/dev/null
+    log "Removed legacy $service container $id; its data and volumes are kept"
+  done < "$STATE/legacy"
+  mv -f "$STATE/legacy" "$STATE/legacy.retired"
+}
+
 main() {
   case "${1:-}" in
     deploy) host_guard cmd_deploy ;;
     rollback) host_guard cmd_rollback ;;
     status) cmd_status ;;
+    inventory) cmd_inventory ;;
+    adopt) host_guard cmd_adopt ;;
+    revert-adoption) host_guard cmd_revert_adoption ;;
+    retire-legacy) host_guard cmd_retire_legacy ;;
     host-unlock) cmd_host_unlock ;;
     *)
-      printf 'Usage: %s {deploy|rollback|status|host-unlock}\n' "$0" >&2
+      printf 'Usage: %s {deploy|rollback|status|inventory|adopt|revert-adoption|retire-legacy|host-unlock}\n' "$0" >&2
       exit 2
       ;;
   esac

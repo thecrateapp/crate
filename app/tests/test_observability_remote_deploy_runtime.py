@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import importlib.util
 import json
 import os
@@ -10,6 +11,8 @@ import shutil
 import socket
 import subprocess
 import sys
+import time
+import urllib.request
 import uuid
 from pathlib import Path
 
@@ -211,13 +214,14 @@ def rehearsal(tmp_path_factory):
         (secrets / name).write_text(content)
         (secrets / name).chmod(0o444)
     containerd = platform.system() == "Linux" and driver == "overlayfs"
+    grafana_port = _free_port()
     env_file = server / "monitoring.env"
     lines = [
         f"OBS_DATA_DIR={data}",
         f"OBS_SECRETS_DIR={secrets}",
         f"OBS_APP_NETWORK={network}",
         "CRATE_POSTGRES_DB=crate",
-        f"OBS_GRAFANA_PORT={_free_port()}",
+        f"OBS_GRAFANA_PORT={grafana_port}",
         f"OBS_DOCKER_ROOT={metadata['DockerRootDir']}",
     ]
     if containerd:
@@ -232,11 +236,41 @@ def rehearsal(tmp_path_factory):
         (fake_bin / "flock").write_text(f"#!{sys.executable}\n{FLOCK_SHIM}")
         (fake_bin / "flock").chmod(0o755)
     root = server / "crate-observability"
+    legacy_project = f"crate-rehearsal-{suffix}"
+    legacy_compose = repository / "docker-compose.legacy.yaml"
+    legacy_compose.write_text(
+        f"name: {legacy_project}\n"
+        "networks:\n"
+        "  crate:\n"
+        "    external: true\n"
+        f"    name: {network}\n"
+        "services:\n"
+        "  crate-api:\n"
+        "    image: busybox:1.37\n"
+        "    command: [sleep, '3600']\n"
+        "    networks: [crate]\n"
+    )
+    legacy_command = [
+        "docker",
+        "compose",
+        "--project-name",
+        legacy_project,
+        "--project-directory",
+        str(repository),
+        "--env-file",
+        str(env_file),
+        "-f",
+        str(legacy_compose),
+        "-f",
+        str(repository / PREFIX / "compose.observability.yaml"),
+        "--profile",
+        "observability",
+    ]
 
     def run(name, action="deploy", **extra):
         sha = commits[name]
         deploy_id = f"obs-{action}-{name}-{uuid.uuid4().hex[:6]}"
-        if action == "deploy":
+        if action in ("deploy", "adopt"):
             staging = root / "staging" / deploy_id
             staging.mkdir(parents=True)
             release.build_bundle(repository, sha, staging / "bundle.tar.gz")
@@ -245,7 +279,9 @@ def rehearsal(tmp_path_factory):
             for item in TOOLING:
                 shutil.copy(repository / item, tools / Path(item).name)
         active = (
-            (root / "state/current").read_text().strip() if action != "deploy" else sha
+            sha
+            if action in ("deploy", "adopt")
+            else (root / "state/current").read_text().strip()
         )
         script = root / "tooling" / active / "observability-deploy-remote.sh"
         return _run(
@@ -261,6 +297,7 @@ def rehearsal(tmp_path_factory):
                 "OBS_PYTHON": sys.executable,
                 "OBS_VERIFY_SECONDS": "240",
                 "CRATE_SERVER_PATH": str(app),
+                "CRATE_APP_PROJECT": legacy_project,
                 **extra,
             },
             check=False,
@@ -293,6 +330,9 @@ def rehearsal(tmp_path_factory):
             "docker_env": docker_env,
             "sentinel": sentinel,
             "original": original,
+            "legacy": legacy_command,
+            "legacy_project": legacy_project,
+            "grafana_port": grafana_port,
         }
     finally:
         live = root / "live"
@@ -317,6 +357,12 @@ def rehearsal(tmp_path_factory):
                 check=False,
                 timeout=300,
             )
+        _run(
+            [*legacy_command, "down", "--volumes"],
+            env=docker_env,
+            check=False,
+            timeout=300,
+        )
         _run(["docker", "rm", "-f", sentinel], env=docker_env, check=False)
         _run(["docker", "network", "rm", network], env=docker_env, check=False)
         _run(
@@ -381,3 +427,111 @@ def test_deploy_failed_deploy_and_rollback_leave_the_application_untouched(rehea
     assert _container(docker_env, rehearsal["sentinel"]) == sentinel_before
     assert (rehearsal["app"] / ".env").read_text() == "APP_SECRET=application-only\n"
     assert not (rehearsal["app"] / ".deploy/host-mutation.lease").exists()
+
+
+def _prometheus_query(docker_env, container, query, at=None):
+    url = "http://127.0.0.1:9090/api/v1/query?query=" + query
+    if at is not None:
+        url += f"&time={at}"
+    result = _run(
+        ["docker", "exec", container, "wget", "-qO-", url], env=docker_env, check=False
+    )
+    return json.loads(result.stdout)["data"]["result"] if result.returncode == 0 else []
+
+
+def _eventually(check, *, seconds=180):
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        value = check()
+        if value:
+            return value
+        time.sleep(3)
+    raise AssertionError("condition not reached")
+
+
+def _grafana(port, method, path, body=None):
+    request = urllib.request.Request(
+        f"http://127.0.0.1:{port}{path}",
+        method=method,
+        data=json.dumps(body).encode() if body is not None else None,
+        headers={
+            "Authorization": "Basic "
+            + base64.b64encode(f"admin:{PASSWORD}".encode()).decode(),
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            return json.loads(response.read() or b"{}")
+    except (OSError, ValueError):
+        return None
+
+
+def _legacy_service(rehearsal, service):
+    return _run(
+        [
+            "docker",
+            "ps",
+            "-aq",
+            "--filter",
+            f"label=com.docker.compose.project={rehearsal['legacy_project']}",
+            "--filter",
+            f"label=com.docker.compose.service={service}",
+        ],
+        env=rehearsal["docker_env"],
+    ).stdout.strip()
+
+
+def _status(docker_env, container):
+    return _run(
+        ["docker", "inspect", "--format", "{{.State.Status}}", container],
+        env=docker_env,
+        check=False,
+    ).stdout.strip()
+
+
+def test_adoption_keeps_history_and_grafana_state_then_reverts_and_retires(rehearsal):
+    docker_env = rehearsal["docker_env"]
+    port = rehearsal["grafana_port"]
+    _run([*rehearsal["legacy"], "up", "-d"], env=docker_env, timeout=600)
+    legacy_prometheus = _legacy_service(rehearsal, "crate-prometheus")
+    _eventually(lambda: _prometheus_query(docker_env, legacy_prometheus, "up"))
+    before = int(time.time())
+    _eventually(lambda: _grafana(port, "GET", "/api/health"))
+    marker = _grafana(port, "POST", "/api/folders", {"title": "adoption-marker"})
+    assert marker and marker.get("uid")
+    app = _legacy_service(rehearsal, "crate-api")
+    app_before = _container(docker_env, app)
+
+    adopted = rehearsal["run"](
+        "base", action="adopt", OBS_CONFIRM="adopt-legacy-monitoring"
+    )
+
+    assert adopted.returncode == 0, adopted.stderr + adopted.stdout
+    assert "Application containers unchanged" in adopted.stdout
+    prometheus = _service_container(docker_env, "crate-prometheus")
+    assert _prometheus_query(docker_env, prometheus, "up", at=before)
+    assert _grafana(port, "GET", f"/api/folders/{marker['uid']}")
+    assert _grafana(port, "GET", "/api/datasources/uid/crate-prometheus")
+    assert _status(docker_env, legacy_prometheus) == "exited"
+    assert _container(docker_env, app) == app_before
+
+    reverted = rehearsal["run"](
+        "base", action="revert-adoption", OBS_CONFIRM="revert-adoption"
+    )
+    assert reverted.returncode == 0, reverted.stderr + reverted.stdout
+    assert _status(docker_env, legacy_prometheus) == "running"
+    _eventually(lambda: _grafana(port, "GET", f"/api/folders/{marker['uid']}"))
+
+    readopted = rehearsal["run"](
+        "base", action="adopt", OBS_CONFIRM="adopt-legacy-monitoring"
+    )
+    assert readopted.returncode == 0, readopted.stderr + readopted.stdout
+    retired = rehearsal["run"](
+        "base", action="retire-legacy", OBS_CONFIRM="retire-legacy-monitoring"
+    )
+    assert retired.returncode == 0, retired.stderr + retired.stdout
+    assert _status(docker_env, legacy_prometheus) == ""
+    assert _grafana(port, "GET", f"/api/folders/{marker['uid']}")
+    assert _container(docker_env, app) == app_before
+    assert (rehearsal["root"] / "state/legacy.retired").exists()

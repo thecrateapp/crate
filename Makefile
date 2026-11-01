@@ -1299,6 +1299,24 @@ observability-deploy-rollback: ## Return monitoring to the previous release (req
 observability-deploy-status: ## Show the deployed monitoring release, live drift and services
 	@$(OBS_DEPLOY_ENV) scripts/observability-deploy.sh status
 
+.PHONY: observability-adoption-inventory observability-adopt observability-revert-adoption observability-retire-legacy
+observability-adoption-inventory: ## Read-only report of legacy monitoring and application containers (VERSION=<full-main-sha>)
+	@test -n "$(strip $(VERSION))" || { echo "VERSION=<full-main-sha> is required"; exit 1; }
+	@$(OBS_DEPLOY_ENV) scripts/observability-deploy.sh inventory
+
+observability-adopt: ## Move the legacy monitoring to its own project (requires CONFIRM=adopt-legacy-monitoring)
+	@test -n "$(strip $(VERSION))" || { echo "VERSION=<full-main-sha> is required"; exit 1; }
+	@test "$(CONFIRM)" = "adopt-legacy-monitoring" || { echo "CONFIRM=adopt-legacy-monitoring is required"; exit 1; }
+	@$(OBS_DEPLOY_ENV) scripts/observability-deploy.sh adopt
+
+observability-revert-adoption: ## Restart the legacy monitoring and stop the adopted project (requires CONFIRM=revert-adoption)
+	@test "$(CONFIRM)" = "revert-adoption" || { echo "CONFIRM=revert-adoption is required"; exit 1; }
+	@$(OBS_DEPLOY_ENV) scripts/observability-deploy.sh revert-adoption
+
+observability-retire-legacy: ## Remove the stopped legacy monitoring containers; data is kept (requires CONFIRM=retire-legacy-monitoring)
+	@test "$(CONFIRM)" = "retire-legacy-monitoring" || { echo "CONFIRM=retire-legacy-monitoring is required"; exit 1; }
+	@$(OBS_DEPLOY_ENV) scripts/observability-deploy.sh retire-legacy
+
 # ===========================================================================
 # HELP
 # ===========================================================================

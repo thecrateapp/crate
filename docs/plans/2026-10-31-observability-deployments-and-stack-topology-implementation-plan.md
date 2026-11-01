@@ -128,3 +128,19 @@ Operator helpers need an explicit approved reprovisioning step; no live state
 was changed. Evidence: `deployment-checkpoint-d1.md`, Review corrections.
 D2, controlled migration and final GitHub + documentation-website adoption remain
 unchanged subsequent checkpoints.
+
+## D2 and adoption — 2026-11-01
+
+Diego chose a host lock shared by application, Operator and monitoring deploys
+and an automatic state copy before Prometheus or Grafana image changes. Task 4
+is implemented: `make observability-deploy|-rollback|-status`, a server layout
+separate from the application checkout, drift refusal, per-service restarts,
+verification with automatic rollback, and the host mutation lease in
+`deploy-remote.sh`, `deploy.sh` and the Operator engine. Task 5 is implemented
+up to the production step: read-only inventory, adoption that creates the new
+project before the gap, recovery copy, verification, revert and explicit
+retirement. Rehearsed with real images on a clean Docker-in-Docker daemon and on
+OrbStack; the rehearsal also found and fixed a gzip header that broke bundles on
+Python 3.12. Evidence: `deployment-checkpoint-d2.md`. Production adoption,
+Operator reprovisioning and the documentation website remain, each on Diego's
+go-ahead.

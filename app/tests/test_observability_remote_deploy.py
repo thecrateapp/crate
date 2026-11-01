@@ -41,14 +41,19 @@ HOST_LOCK_FUNCTIONS = (
 UNHEALTHY = "\n# fake: unhealthy\n"
 
 FAKE_DOCKER = r"""
-import json, os, subprocess, sys
+import json, os, re, subprocess, sys
 from pathlib import Path
 
 import yaml
 
 argv = sys.argv[1:]
 state_path = Path(os.environ["FAKE_STATE"])
-state = json.loads(state_path.read_text()) if state_path.exists() else {"containers": {}, "present": []}
+state = (
+    json.loads(state_path.read_text())
+    if state_path.exists()
+    else {"containers": {}, "present": [], "objects": {}}
+)
+state.setdefault("objects", {})
 with open(os.environ["FAKE_LOG"], "a") as log:
     log.write(json.dumps(argv) + "\n")
 
@@ -63,21 +68,73 @@ def env_file(path):
             values[key] = value
     return values
 
+def objects():
+    found = dict(state["objects"])
+    for name, container in state["containers"].items():
+        found["id-" + name] = {
+            "service": name,
+            "project": "crate-observability",
+            "image": container["image"],
+            "running": container["running"],
+            "started": "2026-11-01T12:00:00Z",
+            "restarts": 0,
+            "mounts": {},
+        }
+    return found
+
+def filters():
+    return dict(
+        argv[index + 1].removeprefix("label=").split("=", 1)
+        for index, item in enumerate(argv)
+        if item == "--filter"
+    )
+
 if argv[0] == "info":
     print(os.environ.get("FAKE_DRIVER", "overlay2"))
 elif argv[0] == "ps":
-    service = argv[argv.index("--filter") + 1].split("=")[-1]
-    legacy = os.environ.get("FAKE_LEGACY_PROJECT")
-    if legacy and service in ("crate-prometheus", "crate-grafana"):
-        print(legacy)
+    wanted = filters()
+    template = argv[argv.index("--format") + 1]
+    for identifier, item in objects().items():
+        if not item["running"]:
+            continue
+        if wanted.get("com.docker.compose.service", item["service"]) != item["service"]:
+            continue
+        if wanted.get("com.docker.compose.project", item["project"]) != item["project"]:
+            continue
+        if template == "{{.ID}}":
+            print(identifier)
+        elif template.startswith("{{.ID}}"):
+            print(identifier, item["project"], item["image"])
+        else:
+            print(item["project"])
 elif argv[:2] == ["image", "inspect"]:
     sys.exit(0 if argv[2] in state["present"] else 1)
 elif argv[0] == "pull":
     state["present"].append(argv[-1])
     save()
+elif argv[0] in ("stop", "start", "rm"):
+    for identifier in argv[1:]:
+        if argv[0] == "rm":
+            state["objects"].pop(identifier)
+        else:
+            state["objects"][identifier]["running"] = argv[0] == "start"
+    save()
 elif argv[0] == "inspect":
-    container = state["containers"].get(argv[-1].removeprefix("id-"), {})
-    print("running " if container.get("running") else "exited ")
+    template, identifier = argv[argv.index("--format") + 1], argv[-1]
+    item = objects().get(identifier, {})
+    if "eq .Destination" in template:
+        destination = re.search(r'eq .Destination "([^"]+)"', template).group(1)
+        print(item.get("mounts", {}).get(destination, ""))
+    elif "range .Mounts" in template:
+        mounts = " ".join(f"{source}:{target}" for target, source in item["mounts"].items())
+        status = "running" if item["running"] else "exited"
+        print(item["service"], identifier, item["project"], status, item["image"], mounts)
+    elif ".RestartCount" in template:
+        print(item["service"], identifier, item["started"], item["restarts"])
+    elif template.startswith("{{index .Config.Labels"):
+        print(item["project"], "running" if item["running"] else "exited")
+    else:
+        print("running " if item.get("running") else "exited ")
 elif argv[0] == "run":
     mounts = {}
     for index, item in enumerate(argv):
@@ -100,12 +157,13 @@ elif argv[0] == "compose":
         for key, value in environment.items():
             print(f"{key}={value}")
     elif command[0] == "up":
+        data = Path(environment["OBS_DATA_DIR"])
+        (data / "prometheus" / "written-by-new-project").write_text("tsdb")
         for name in [item for item in command[1:] if item.startswith("crate-")]:
             container = state["containers"].get(name)
             if container is None or container["image"] != images[name]:
                 if container and name == "crate-grafana" and images[name].endswith("e" * 64):
-                    data = Path(environment["OBS_DATA_DIR"]) / "grafana"
-                    (data / "migrated-by-new-image").write_text(images[name])
+                    (data / "grafana" / "migrated-by-new-image").write_text(images[name])
                 state["containers"][name] = {"image": images[name], "running": True}
             state["containers"][name]["running"] = True
         save()
@@ -127,6 +185,9 @@ elif argv[0] == "compose":
             print(json.dumps({"data": {"activeTargets": [{"health": health}]}}))
     elif command[0] == "port":
         print("127.0.0.1:3001")
+    elif command[0] == "create" and os.environ.get("FAKE_CREATE_FAIL") == "1":
+        print("all predefined address pools have been fully subnetted", file=sys.stderr)
+        sys.exit(1)
 """
 
 FAKE_SSH = r"""
@@ -306,6 +367,48 @@ class Lab:
     def live_prometheus(self):
         return (self.root / "live" / PREFIX / "prometheus.yml").read_text()
 
+    def seed_legacy(self, *, prometheus_data=None):
+        images = {
+            name: service["image"]
+            for name, service in yaml.safe_load(self.compose)["services"].items()
+        }
+        objects = {}
+        for name, image in images.items():
+            mounts = {}
+            if name == "crate-prometheus":
+                mounts = {
+                    "/prometheus": str(prometheus_data or self.data / "prometheus")
+                }
+            if name == "crate-grafana":
+                mounts = {"/var/lib/grafana": str(self.data / "grafana")}
+            objects[f"legacy-{name}"] = {
+                "service": name,
+                "project": "crate",
+                "image": image,
+                "running": True,
+                "started": "2026-10-01T00:00:00Z",
+                "restarts": 0,
+                "mounts": mounts,
+            }
+        for name in ("crate-api", "crate-worker"):
+            objects[f"app-{name}"] = {
+                "service": name,
+                "project": "crate",
+                "image": f"ghcr.io/thecrateapp/{name}:release",
+                "running": True,
+                "started": "2026-10-30T09:00:00Z",
+                "restarts": 1,
+                "mounts": {},
+            }
+        state = {"containers": {}, "present": [], "objects": objects}
+        (self.tmp / "docker-state.json").write_text(json.dumps(state))
+
+    def services(self):
+        return list(yaml.safe_load(self.compose)["services"])
+
+    def docker_state(self):
+        return json.loads((self.tmp / "docker-state.json").read_text())
+
     def deploy(self, version, **overrides):
         result = self.run("deploy", version, **overrides)
         assert result.returncode == 0, result.stderr
@@ -447,9 +550,8 @@ def test_only_main_revisions_leave_the_workstation(lab):
 
 
 def test_legacy_monitoring_writers_block_the_first_deploy(lab):
-    result = lab.run(
-        "deploy", "base", OBS_CONFIRM="first-deploy", FAKE_LEGACY_PROJECT="crate"
-    )
+    lab.seed_legacy()
+    result = lab.run("deploy", "base", OBS_CONFIRM="first-deploy")
 
     assert result.returncode == 1
     assert "another project" in result.stderr
@@ -490,3 +592,134 @@ def test_both_remote_scripts_share_one_host_lock_implementation():
         assert _function(application, name) == _function(observability, name), name
     assert 'HOST_LOCK_DIR="${SERVER_PATH}/.deploy"' in application.read_text()
     assert 'HOST_LOCK_DIR="${CRATE_SERVER_PATH}/.deploy"' in observability.read_text()
+
+
+def test_inventory_reports_legacy_monitoring_and_application_without_changes(lab):
+    lab.seed_legacy()
+
+    result = lab.run("inventory", "base")
+
+    assert result.returncode == 0, result.stderr
+    assert "crate-prometheus legacy-crate-prometheus crate running" in result.stdout
+    assert f"{lab.data / 'prometheus'}:/prometheus" in result.stdout
+    assert "crate-api app-crate-api 2026-10-30T09:00:00Z 1" in result.stdout
+    assert "legacy-crate-grafana 2026" not in result.stdout.split("# application")[1]
+    assert list((lab.root / "adoption").glob("inventory-*.txt"))
+    assert not any(call[0] in {"stop", "start", "rm"} for call in lab.calls())
+
+
+def test_adoption_refuses_a_different_data_directory_before_stopping_anything(lab):
+    lab.seed_legacy(prometheus_data=lab.server / "elsewhere")
+
+    unconfirmed = lab.run("adopt", "base")
+    mismatch = lab.run("adopt", "base", OBS_CONFIRM="adopt-legacy-monitoring")
+
+    assert unconfirmed.returncode == 1
+    assert "OBS_CONFIRM=adopt-legacy-monitoring" in unconfirmed.stderr
+    assert mismatch.returncode == 1
+    assert "different history" in mismatch.stderr
+    assert not any(call[0] in {"stop", "start", "rm"} for call in lab.calls())
+    assert all(item["running"] for item in lab.docker_state()["objects"].values())
+
+
+def test_adoption_moves_monitoring_and_keeps_application_and_legacy_containers(lab):
+    lab.seed_legacy()
+
+    result = lab.run(
+        "adopt",
+        "base",
+        OBS_CONFIRM="adopt-legacy-monitoring",
+        OBS_DEPLOY_ID="obs-adopt",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "Application containers unchanged" in result.stdout
+    objects = lab.docker_state()["objects"]
+    assert all(not objects[f"legacy-{name}"]["running"] for name in lab.services())
+    assert (
+        objects["app-crate-api"]["running"] and objects["app-crate-worker"]["running"]
+    )
+    assert lab.state("current") == lab.commits["base"]
+    assert lab.state("previous") == ""
+    assert lab.state("current.backup") == str(lab.root / "backups/obs-adopt")
+    backup = lab.root / "backups/obs-adopt"
+    assert (backup / "crate-prometheus/chunks").read_text() == "tsdb"
+    assert (backup / "crate-grafana/grafana.db").read_text() == "dashboards"
+    assert len((lab.root / "state/legacy").read_text().splitlines()) == 8
+    assert not any(call[0] == "rm" for call in lab.calls())
+    calls = lab.calls()
+    created = next(
+        i for i, call in enumerate(calls) if "create" in call and call[0] == "compose"
+    )
+    stopped = next(i for i, call in enumerate(calls) if call[0] == "stop")
+    assert created < stopped
+
+    lab.deploy("config")
+    assert lab.state("current") == lab.commits["config"]
+
+
+def test_failed_adoption_restores_data_and_restarts_the_legacy_monitoring(lab):
+    lab.seed_legacy()
+
+    result = lab.run(
+        "adopt",
+        "broken",
+        OBS_CONFIRM="adopt-legacy-monitoring",
+        OBS_DEPLOY_ID="obs-bad",
+    )
+
+    assert result.returncode == 1
+    assert "Legacy monitoring restarted" in result.stderr
+    objects = lab.docker_state()["objects"]
+    assert all(item["running"] for item in objects.values())
+    assert not any(
+        item["running"] for item in lab.docker_state()["containers"].values()
+    )
+    assert sorted(path.name for path in (lab.data / "prometheus").iterdir()) == [
+        "chunks"
+    ]
+    assert lab.state("current") is None
+    assert not (lab.root / "live").exists()
+    assert (lab.root / "failed-live-obs-bad").is_dir()
+
+
+def test_adoption_can_be_reverted_and_legacy_retired_only_when_stopped(lab):
+    lab.seed_legacy()
+    lab.run("adopt", "base", OBS_CONFIRM="adopt-legacy-monitoring")
+
+    reverted = lab.run("revert-adoption", OBS_CONFIRM="revert-adoption")
+
+    assert reverted.returncode == 0, reverted.stderr
+    assert all(item["running"] for item in lab.docker_state()["objects"].values())
+    assert lab.state("current") is None
+    assert list(lab.root.glob("reverted-state-*"))
+
+    lab.run("adopt", "base", OBS_CONFIRM="adopt-legacy-monitoring")
+    refused = lab.run("retire-legacy")
+    retired = lab.run("retire-legacy", OBS_CONFIRM="retire-legacy-monitoring")
+
+    assert refused.returncode == 1
+    assert retired.returncode == 0, retired.stderr
+    remaining = lab.docker_state()["objects"]
+    assert sorted(remaining) == ["app-crate-api", "app-crate-worker"]
+    assert (lab.data / "grafana/grafana.db").read_text() == "dashboards"
+    assert (lab.root / "state/legacy.retired").exists()
+
+
+def test_adoption_creates_the_new_project_before_the_monitoring_gap(lab):
+    lab.seed_legacy()
+
+    result = lab.run(
+        "adopt",
+        "base",
+        OBS_CONFIRM="adopt-legacy-monitoring",
+        OBS_DEPLOY_ID="obs-pools",
+        FAKE_CREATE_FAIL="1",
+    )
+
+    assert result.returncode == 1
+    assert "legacy monitoring was not stopped" in result.stderr
+    assert not any(call[0] in {"stop", "start", "rm"} for call in lab.calls())
+    assert all(item["running"] for item in lab.docker_state()["objects"].values())
+    assert lab.state("current") is None
+    assert not (lab.root / "live").exists()

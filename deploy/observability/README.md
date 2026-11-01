@@ -331,9 +331,69 @@ recorded in `state/current.backup`; remove old copies by hand once the new
 version has proven itself. A manual rollback refuses to run an older Prometheus
 or Grafana image on migrated state: restore the recorded copy explicitly instead.
 
-The first deployment on a host requires `CONFIRM=first-deploy` (and
-`OBS_INITIALIZE_EMPTY=1` only for a new, deliberately empty installation); the
-controlled migration from the old monitoring project is the next checkpoint.
+The first deployment on a host without monitoring requires
+`CONFIRM=first-deploy` (and `OBS_INITIALIZE_EMPTY=1` only for a new,
+deliberately empty installation). A host that already runs the old overlay is
+adopted instead.
+
+#### Adopting the old monitoring overlay
+
+The old overlay runs the eight monitoring services inside the application
+project. Adoption moves them to `crate-observability` on the same data, with a
+monitoring gap of a few minutes and no change to application containers.
+
+1. Prepare `/etc/crate-observability/monitoring.env` and the tooling virtualenv
+   (above), then take a read-only inventory:
+
+   ```bash
+   make observability-adoption-inventory VERSION=<full-main-sha>
+   ```
+
+   The report (also saved under `adoption/`) lists each legacy container with
+   its project, image and mounts, and every application container with its ID,
+   start time and restart count. Check that `OBS_DATA_DIR` and
+   `OBS_SECRETS_DIR` match the legacy mounts.
+
+2. In a planned window, adopt:
+
+   ```bash
+   make observability-adopt VERSION=<full-main-sha> CONFIRM=adopt-legacy-monitoring
+   ```
+
+   Before changing anything the command refuses if the legacy Prometheus or
+   Grafana data is mounted from somewhere other than `OBS_DATA_DIR` (that would
+   start a new history), runs the storage preflight, pulls missing images and
+   checks space for a recovery copy. It then stops only the eight legacy
+   containers, copies both data directories to `backups/<id>/`, starts
+   `crate-observability` on the same directories and verifies it like a deploy.
+   If verification fails, the copy is restored and the legacy containers start
+   again. It finally compares the application containers with the inventory
+   taken before the stop.
+
+3. Confirm history before the gap in Prometheus, the **Crate infrastructure**
+   dashboards and the `crate-prometheus` datasource in Grafana. Record the gap
+   (start and end are in the command output).
+
+4. The legacy containers stay stopped, not removed. Until they are retired,
+   return to them with:
+
+   ```bash
+   make observability-revert-adoption CONFIRM=revert-adoption
+   ```
+
+   which stops `crate-observability`, starts the legacy containers on the same
+   data and keeps the adopted state aside for inspection.
+
+5. Once the adopted monitoring has run cleanly (a few days), remove the stopped
+   legacy containers. Data, secrets and volumes are kept:
+
+   ```bash
+   make observability-retire-legacy CONFIRM=retire-legacy-monitoring
+   ```
+
+   Then point the projector and Traefik overlays at the standalone networks
+   (`OBS_PROMETHEUS_QUERY_NETWORK=crate-observability_prometheus-query`,
+   `OBS_TRAEFIK_METRICS_NETWORK=crate-observability_traefik-metrics`).
 
 #### Host mutation lease
 

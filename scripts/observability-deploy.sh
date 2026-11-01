@@ -82,11 +82,11 @@ stage_release() {
     "$TMP_DIR/observability-deploy-remote.sh" "$REMOTE:$tools/"
 }
 
-run_deploy() {
+run_staged() {
   require_main_release
   package_release
   stage_release
-  remote_run "$(quoted "$OBS_REMOTE_ROOT/tooling/$OBS_DEPLOY_SHA/observability-deploy-remote.sh")" deploy
+  remote_run "$(quoted "$OBS_REMOTE_ROOT/tooling/$OBS_DEPLOY_SHA/observability-deploy-remote.sh")" "$1"
 }
 
 run_rollback() {
@@ -99,8 +99,10 @@ run_status() {
 }
 
 case "$ACTION" in
-  deploy) run_deploy ;;
+  deploy) run_staged deploy ;;
   rollback) run_rollback ;;
   status) run_status ;;
-  *) fail "unknown action '${ACTION}' (expected deploy, rollback or status)" ;;
+  inventory | adopt) run_staged "$ACTION" ;;
+  revert-adoption | retire-legacy) remote_run "$(active_remote_script)" "$ACTION" ;;
+  *) fail "unknown action '${ACTION}' (expected deploy, rollback, status, inventory, adopt, revert-adoption or retire-legacy)" ;;
 esac
