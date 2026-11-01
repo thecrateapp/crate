@@ -95,6 +95,21 @@ std::optional<ConnectionIdentity> parse_identity(std::string_view body)
     return identity;
 }
 
+std::string https_listen_url(std::string_view body)
+{
+    const auto parsed = json::parse_object(body);
+    if (!parsed.ok()) {
+        return {};
+    }
+    const auto* section = json::member(*parsed.value, "vdj");
+    std::string url;
+    if (section == nullptr || !section->is_object() ||
+        !json::optional_string(*section, "listen_url", url) || !url.starts_with("https://")) {
+        return {};
+    }
+    return url;
+}
+
 bool token_automation_granted(std::string_view body)
 {
     const auto parsed = json::parse_object(body);
@@ -160,6 +175,7 @@ ConnectionStatus CapabilityClient::check(
         effective.smart_mix_assistant && has_scope(scopes, kSmartMixScope);
     status.features.automation =
         effective.automation && token_automation_granted(*capabilities_body.body);
+    status.listen_url = https_listen_url(*capabilities_body.body);
     if (!effective.online_source) {
         status.state = ConnectionState::ServerDisabled;
         status.message = "the server does not offer the Online Source";

@@ -1,6 +1,7 @@
 #include "crate_vdj/connection_dialog.hpp"
 
 #include <windows.h>
+#include <shellapi.h>
 
 #include <string>
 
@@ -157,6 +158,14 @@ ConnectionDialogResult show_connection_dialog(const ConnectionDialogRequest& req
 void show_connection_message(const std::string& title, const std::string& message)
 {
     MessageBoxW(nullptr, to_wide(message).c_str(), to_wide(title).c_str(), MB_OK | MB_ICONINFORMATION | MB_TOPMOST);
+}
+
+bool open_in_browser(const std::string& url)
+{
+    const auto result = reinterpret_cast<INT_PTR>(
+        ShellExecuteW(nullptr, L"open", to_wide(url).c_str(), nullptr, nullptr, SW_SHOWNORMAL)
+    );
+    return result > 32;
 }
 
 } // namespace crate::vdj

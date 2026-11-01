@@ -70,6 +70,7 @@ struct SearchTrack {
     std::string cover_url;
     std::string camelot;
     std::optional<double> energy;
+    int album_id = 0;
 };
 
 struct SearchResults {

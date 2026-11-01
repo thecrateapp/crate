@@ -34,6 +34,25 @@ void connected_token_exposes_identity_and_features()
     }
 }
 
+void the_listen_url_is_kept_only_over_https()
+{
+    ScriptedHttpClient http;
+    http.serve("/api/auth/me", me_json());
+    auto capabilities = capabilities_json();
+    const auto vdj = capabilities.find("\"vdj\":{");
+    capabilities.insert(vdj + 7, R"("listen_url":"https://listen.example.org",)");
+    http.serve("/api/capabilities", capabilities);
+    CapabilityClient client(http, kOrigin);
+
+    CRATE_CHECK(client.check("crv_valid", CancellationToken{}).listen_url == "https://listen.example.org");
+
+    auto insecure = capabilities_json();
+    insecure.insert(insecure.find("\"vdj\":{") + 7, R"("listen_url":"http://listen.example.org",)");
+    http.serve("/api/capabilities", insecure);
+
+    CRATE_CHECK(client.check("crv_valid", CancellationToken{}).listen_url.empty());
+}
+
 void rejected_token_asks_for_reconnection()
 {
     ScriptedHttpClient http;
@@ -147,6 +166,7 @@ void malformed_capabilities_are_incompatible()
 
 int main()
 {
+    the_listen_url_is_kept_only_over_https();
     connected_token_exposes_identity_and_features();
     rejected_token_asks_for_reconnection();
     session_tokens_are_not_plugin_tokens();

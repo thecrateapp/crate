@@ -151,7 +151,7 @@ if(CRATE_VDJ_BUILD_REAL_PLUGIN)
             target_link_libraries(${target} PRIVATE "-framework AppKit")
         elseif(WIN32)
             target_sources(${target} PRIVATE src/platform/connection_dialog_windows.cpp)
-            target_link_libraries(${target} PRIVATE User32)
+            target_link_libraries(${target} PRIVATE User32 Shell32)
         endif()
         target_compile_features(${target} PRIVATE cxx_std_20)
         target_link_libraries(

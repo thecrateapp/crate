@@ -204,6 +204,11 @@ public:
         return plugin_.cb != nullptr && plugin_.SendCommand(command.c_str()) == S_OK;
     }
 
+    bool open_url(const std::string& url) override
+    {
+        return open_in_browser(url);
+    }
+
 private:
     IVdjPlugin8& plugin_;
 };

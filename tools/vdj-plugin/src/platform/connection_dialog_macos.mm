@@ -88,4 +88,16 @@ void show_connection_message(const std::string& title, const std::string& messag
     });
 }
 
+bool open_in_browser(const std::string& url)
+{
+    __block bool opened = false;
+    run_on_main(^{
+        @autoreleasepool {
+            NSURL* target = [NSURL URLWithString:to_ns(url)];
+            opened = target != nil && [[NSWorkspace sharedWorkspace] openURL:target];
+        }
+    });
+    return opened;
+}
+
 } // namespace crate::vdj

@@ -54,6 +54,7 @@ public:
     virtual std::string language() = 0;
     virtual std::optional<std::string> loaded_track_path() = 0;
     virtual bool send_command(const std::string& command) = 0;
+    virtual bool open_url(const std::string& url) = 0;
 };
 
 class ConnectionUi {
@@ -123,11 +124,13 @@ private:
     struct TrackFacts {
         std::string artist;
         std::string album;
+        int album_id = 0;
     };
     enum class MenuAction {
         Compatible,
         Artist,
         Album,
+        OpenInCrate,
     };
 
     void remember(const std::vector<SearchTrack>& tracks);
