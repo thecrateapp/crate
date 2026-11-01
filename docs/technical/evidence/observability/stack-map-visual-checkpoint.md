@@ -156,10 +156,32 @@ Checks: 22 inventory/action cases, 2 adapter cases, 9 sampler cases, 171 Admin
 cases across the map, activity, inventory adapter and Stack page, ten browser
 scenarios; Ruff, ESLint and Admin typecheck pass.
 
+## Checkpoint 6: Prometheus access and Traefik ingress
+
+- Network (`f7edc48fc`): Prometheus joins an internal `prometheus-query` network
+  shared only with `crate-projector`, through the optional overlay
+  `compose.projector-prometheus.yaml`. No other application container can reach
+  the Prometheus API, and the projector cannot reach the exporters, cAdvisor,
+  Grafana or the Docker socket proxy.
+- Ingress (`a02bb6f81`): Traefik exposes router metrics on an unpublished `:8082`
+  entrypoint; Prometheus scrapes it over an internal `traefik-metrics` network
+  shared with Traefik alone and keeps only the two request counters. Each
+  application service declares its routers; the map shows Ingress per service
+  and on Edge, and pulses Edge links from the router rate. Routers without series
+  show nothing, readings older than 90 s are ignored and a frame without Traefik
+  metrics leaves Edge silent. Edge now also links to API and Readplane, which
+  Traefik routes directly.
+- The production `traefik.yml` change is documented in the observability README
+  and not applied.
+
+Checks: 2 adapter cases, 68 Compose cases (projector and Traefik overlays,
+network isolation), installer Traefik test, 173 Admin cases, ten browser
+scenarios including Edge ingress in the inspector; Admin typecheck passes.
+
 ## Next adoption
 
 The production Stack route is unchanged pending visual review. The approved
 broader plan still includes additive host/stack/service inventory, snapshot/SSE
 integration, scoped controls, remote deploy/rollback and migration rehearsal,
 followed by GitHub and documentation-website updates. PR1A and D1 remain in their
-separate worktrees; this cut performs no commit/push/deployment.
+separate worktrees; this cut performs no push or deployment.
