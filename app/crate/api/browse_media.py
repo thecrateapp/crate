@@ -180,6 +180,13 @@ def _without_server_paths(results: dict) -> dict:
     }
 
 
+def _has_dj_filters(query: str) -> bool:
+    try:
+        return parse_dj_query(query).has_filters
+    except ValueError:
+        return False
+
+
 @router.get(
     "/api/search",
     response_model=SearchResponse,
@@ -205,6 +212,7 @@ def api_search(
             parse_dj_query(q_stripped)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if fields == "dj" or (is_access_token and _has_dj_filters(q_stripped)):
         return {
             "artists": [],
             "albums": [],

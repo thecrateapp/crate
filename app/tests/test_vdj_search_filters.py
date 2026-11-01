@@ -177,6 +177,52 @@ def test_invalid_dj_syntax_is_a_client_error(test_app) -> None:
     assert response.status_code == 400
 
 
+def test_access_token_search_applies_filters_written_in_the_text(test_app) -> None:
+    with (
+        patch("crate.api.auth.AuthMiddleware.resolve_user", _token_user),
+        patch("crate.api.browse_media.search_dj_tracks", return_value=[]) as dj_search,
+        patch("crate.api.browse_media.search_local_library") as ordinary_search,
+    ):
+        response = test_app.get(
+            "/api/search", params={"q": 'artist:"Rival Schools"', "limit": 50}
+        )
+
+    assert response.status_code == 200
+    dj_search.assert_called_once_with('artist:"Rival Schools"', 50)
+    ordinary_search.assert_not_called()
+
+
+def test_access_token_search_with_invalid_syntax_falls_back_to_text(test_app) -> None:
+    payload = {"artists": [], "albums": [], "tracks": []}
+    with (
+        patch("crate.api.auth.AuthMiddleware.resolve_user", _token_user),
+        patch("crate.api.browse_media.search_dj_tracks") as dj_search,
+        patch(
+            "crate.api.browse_media.search_local_library", return_value=payload
+        ) as ordinary_search,
+    ):
+        response = test_app.get("/api/search", params={"q": "bpm:fast noah"})
+
+    assert response.status_code == 200
+    dj_search.assert_not_called()
+    ordinary_search.assert_called_once()
+
+
+def test_session_search_ignores_filter_syntax(test_app) -> None:
+    payload = {"artists": [], "albums": [], "tracks": []}
+    with (
+        patch("crate.api.browse_media.search_dj_tracks") as dj_search,
+        patch(
+            "crate.api.browse_media.search_local_library", return_value=payload
+        ) as ordinary_search,
+    ):
+        response = test_app.get("/api/search", params={"q": 'artist:"Rival Schools"'})
+
+    assert response.status_code == 200
+    dj_search.assert_not_called()
+    ordinary_search.assert_called_once()
+
+
 def test_access_token_search_never_returns_server_paths(test_app) -> None:
     payload = {
         "artists": [],
