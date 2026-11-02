@@ -326,3 +326,67 @@ def test_inventory_links_grafana_only_when_configured(inventory_docker, monkeypa
     assert inventory_docker.build_inventory()["links"] == {
         "grafana": "https://grafana.example"
     }
+
+
+def test_daemon_name_reads_the_docker_host_and_tolerates_failures(monkeypatch):
+    monkeypatch.setattr(
+        docker_ctl, "_call", lambda method, path: (200, {"Name": " crate-prod "})
+    )
+    assert docker_ctl.daemon_name() == "crate-prod"
+
+    monkeypatch.setattr(docker_ctl, "_call", lambda method, path: (500, {}))
+    assert docker_ctl.daemon_name() is None
+
+    def unreachable(method, path):
+        raise docker_ctl.DockerUnavailableError("down")
+
+    monkeypatch.setattr(docker_ctl, "_call", unreachable)
+    assert docker_ctl.daemon_name() is None
+
+
+def test_host_identity_prefers_configuration_then_the_docker_host(monkeypatch):
+    from crate import stack_inventory
+
+    monkeypatch.delenv("CRATE_HOST_ID", raising=False)
+    monkeypatch.delenv("CRATE_HOST_NAME", raising=False)
+    monkeypatch.setattr(docker_ctl, "daemon_name", lambda: "crate-prod")
+    monkeypatch.setattr(stack_inventory.socket, "gethostname", lambda: "6012e7fdcdb6")
+    assert stack_inventory.host_identity() == {"id": "crate-prod", "name": "crate-prod"}
+
+    monkeypatch.setattr(docker_ctl, "daemon_name", lambda: None)
+    assert stack_inventory.host_identity()["id"] == "6012e7fdcdb6"
+
+    monkeypatch.setenv("CRATE_HOST_ID", "hetzner-1")
+    monkeypatch.setenv("CRATE_HOST_NAME", "Crate production")
+    assert stack_inventory.host_identity() == {
+        "id": "hetzner-1",
+        "name": "Crate production",
+    }
+
+
+@pytest.mark.parametrize(
+    "compose",
+    [
+        "docker-compose.yaml",
+        "docker-compose.home.yaml",
+        "app/installer/internal/assets/files/docker-compose.home.yaml",
+    ],
+)
+def test_the_api_receives_the_stack_map_settings(compose):
+    import yaml
+
+    root = Path(__file__).resolve().parents[2]
+    environment = yaml.safe_load((root / compose).read_text())["services"]["crate-api"][
+        "environment"
+    ]
+    names = (
+        set(environment)
+        if isinstance(environment, dict)
+        else {item.split("=", 1)[0] for item in environment}
+    )
+    assert {
+        "CRATE_HOST_ID",
+        "CRATE_HOST_NAME",
+        "CRATE_GRAFANA_URL",
+        "CRATE_OBSERVABILITY_PROJECT",
+    } <= names

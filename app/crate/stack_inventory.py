@@ -31,7 +31,11 @@ def observability_project() -> str:
 
 
 def host_identity() -> dict[str, str]:
-    host_id = os.environ.get("CRATE_HOST_ID", "").strip() or socket.gethostname()
+    host_id = (
+        os.environ.get("CRATE_HOST_ID", "").strip()
+        or docker_ctl.daemon_name()
+        or socket.gethostname()
+    )
     return {
         "id": host_id,
         "name": os.environ.get("CRATE_HOST_NAME", "").strip() or host_id,
