@@ -96,6 +96,23 @@ LABEL_VALUES = {
     ),
     "origin_remote": ("remote",),
     "playback_engine": ("gapless", "media3"),
+    "playback_failure_cause": (
+        "network",
+        "decode",
+        "auth",
+        "unavailable",
+        "timeout",
+        "other",
+    ),
+    "playback_outcome": ("started", "failed", "cancelled"),
+    "playback_telemetry_loss": ("dropped", "expired", "send_failed"),
+    "playback_telemetry_outcome": (
+        "accepted",
+        "duplicate",
+        "rate_limited",
+        "unverified",
+    ),
+    "playback_telemetry_version": ("v1", "v2"),
     "playback_origin": ("local", "remote", "imported"),
     "playback_policy": ("original", "balanced", "data_saver"),
     "playback_runtime": (
@@ -481,6 +498,49 @@ METRIC_SPECS = {
             "requested_policy": "playback_policy",
             "runtime": "playback_runtime",
         },
+    ),
+    "playback.intent.count": (
+        "counter_delta",
+        "1",
+        {
+            "engine": "playback_engine",
+            "origin": "playback_origin",
+            "runtime": "playback_runtime",
+        },
+    ),
+    "playback.result.count": (
+        "counter_delta",
+        "1",
+        {
+            "cause": "playback_failure_cause",
+            "origin": "playback_origin",
+            "outcome": "playback_outcome",
+            "runtime": "playback_runtime",
+        },
+    ),
+    "playback.active.ms": (
+        "distribution",
+        "ms",
+        {
+            "engine": "playback_engine",
+            "origin": "playback_origin",
+            "runtime": "playback_runtime",
+        },
+    ),
+    "playback.telemetry.events": (
+        "counter_delta",
+        "1",
+        {"outcome": "playback_telemetry_outcome"},
+    ),
+    "playback.telemetry.client_loss": (
+        "counter_delta",
+        "1",
+        {"reason": "playback_telemetry_loss"},
+    ),
+    "playback.telemetry.payload": (
+        "counter_delta",
+        "1",
+        {"version": "playback_telemetry_version"},
     ),
     "playback.stall.count": (
         "counter_delta",

@@ -26,6 +26,10 @@ from crate.api.schemas.operations import (
     AdminGovernorSnapshotResponse,
     AdminLogsSnapshotResponse,
 )
+from crate.observability.playback_qoe import (
+    SUMMARY_SPECS as PLAYBACK_QOE_SUMMARY_SPECS,
+    derive_playback_qoe,
+)
 from crate.db.admin_logs_surface import (
     LOGS_SURFACE_STREAM_CHANNEL,
     get_cached_logs_surface,
@@ -101,6 +105,7 @@ _SUMMARY_METRICS = {
     "media_worker_admission_denied": ("media_worker.admission.denied", 60),
     "media_worker_cache_pruned": ("media_worker.cache.pruned", 60),
     "media_worker_cache_bytes_removed": ("media_worker.cache.bytes_removed", 60),
+    **PLAYBACK_QOE_SUMMARY_SPECS,
 }
 
 
@@ -315,7 +320,7 @@ def _build_metrics_dashboard(period: str, minutes: int) -> dict:
     from crate.db.cache_store import get_cache, set_cache
     from crate.metrics import query_timeseries_snapshot, query_route_latency_snapshot
 
-    cache_key = f"admin:metrics:dashboard:v2:{period}:{minutes}"
+    cache_key = f"admin:metrics:dashboard:v3:{period}:{minutes}"
     cached = get_cache(cache_key, max_age_seconds=10)
     if cached is not None:
         return {**cached, "summary": _attach_local_collector(cached["summary"])}
@@ -335,11 +340,13 @@ def _build_metrics_dashboard(period: str, minutes: int) -> dict:
         for response_name, metric_name in _DASHBOARD_TIMESERIES.items()
     }
     routes = query_route_latency_snapshot(minutes=min(minutes, 60), limit=20)
+    summary = _build_metrics_summary(include_local=False)
     payload = {
-        "summary": _build_metrics_summary(include_local=False),
+        "summary": summary,
         "system": _build_metrics_system(),
         "tasks": _list_running_tasks(limit=10),
         "playback_delivery": _build_playback_delivery(),
+        "playback_qoe": derive_playback_qoe(summary),
         "route_latency": routes["routes"],
         "route_latency_status": {
             key: value for key, value in routes.items() if key != "routes"

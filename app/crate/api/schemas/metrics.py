@@ -69,6 +69,7 @@ class MetricsDashboardResponse(BaseModel):
     system: dict[str, Any]
     tasks: list[dict[str, Any]]
     playback_delivery: dict[str, Any]
+    playback_qoe: dict[str, Any] = Field(default_factory=dict)
     route_latency: list[dict[str, Any]]
     timeseries: dict[str, list[dict[str, Any]]]
     timeseries_status: dict[str, dict[str, Any]] = Field(default_factory=dict)
