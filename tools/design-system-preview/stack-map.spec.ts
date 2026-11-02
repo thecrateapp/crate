@@ -2,6 +2,12 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const REVIEW = "/review-stack-map.html";
 
+test.use({
+  launchOptions: {
+    args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
+  },
+});
+
 async function assertTargets(map: Locator) {
   const nodes = map.getByRole("button", { name: /^Inspect / });
   const boxes = await nodes.evaluateAll((elements) =>
@@ -305,4 +311,182 @@ test("Paused and unavailable activity samples never present stale data as live",
   await expect(map.locator(".stack-map__field-live")).toContainText(
     "— req/min",
   );
+});
+
+test.describe("3D view", () => {
+  async function open3D(page: Page) {
+    await page.goto(REVIEW);
+    await page.evaluate(() => window.localStorage.clear());
+    await page.reload();
+    const map = page.getByRole("region", { name: "Stack topology" });
+    await map.getByRole("radio", { name: "3D", exact: true }).click();
+    const stage = map.locator(".stack-map-3d__stage");
+    await expect(map.locator(".stack-map-3d")).toHaveAttribute(
+      "data-renderer-state",
+      "ready",
+    );
+    await expect(stage).toHaveAttribute("data-animating", "false");
+    return { map, stage };
+  }
+
+  async function visibleLabels(map: Locator) {
+    return map
+      .locator(
+        '.stack-map-3d__node:not([data-label-hidden="true"]) .stack-map__node-label',
+      )
+      .evaluateAll((elements) =>
+        elements.map((element) => {
+          const { x, y, width, height } = element.getBoundingClientRect();
+          return { name: element.textContent, x, y, width, height };
+        }),
+      );
+  }
+
+  test("keeps 44px targets and separate labels from a deterministic camera", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const { map, stage } = await open3D(page);
+    await expect(stage).toHaveAttribute("data-camera", /^0\.00,0\.73,/);
+    const boxes = await map
+      .locator(".stack-map-3d__node:not([hidden])")
+      .evaluateAll((elements) =>
+        elements.map((element) => {
+          const { width, height } = element.getBoundingClientRect();
+          return { name: element.getAttribute("aria-label"), width, height };
+        }),
+      );
+    expect(boxes).toHaveLength(23);
+    for (const box of boxes) {
+      expect(box.width, `${box.name} target width`).toBeGreaterThanOrEqual(44);
+      expect(box.height, `${box.name} target height`).toBeGreaterThanOrEqual(
+        44,
+      );
+    }
+    const labels = await visibleLabels(map);
+    const overlaps: string[] = [];
+    for (let index = 0; index < labels.length; index++)
+      for (const other of labels.slice(index + 1)) {
+        const label = labels[index]!;
+        const width =
+          Math.min(label.x + label.width, other.x + other.width) -
+          Math.max(label.x, other.x);
+        const height =
+          Math.min(label.y + label.height, other.y + other.height) -
+          Math.max(label.y, other.y);
+        if (width > 1 && height > 1)
+          overlaps.push(`${label.name} / ${other.name}`);
+      }
+    expect(overlaps, "Visible 3D labels must not overlap").toEqual([]);
+    await assertNoHorizontalOverflow(page);
+  });
+
+  test("supports keyboard selection and camera controls", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const { map, stage } = await open3D(page);
+    const start = await stage.getAttribute("data-camera");
+    await stage.focus();
+    await page.keyboard.press("Tab");
+    await expect(
+      map.getByRole("button", { name: "Inspect API", exact: true }),
+    ).toBeFocused();
+    await page.keyboard.press("ArrowRight");
+    const focused = page.locator(".stack-map-3d__node:focus");
+    const name = (await focused.getAttribute("aria-label"))!.replace(
+      "Inspect ",
+      "",
+    );
+    await page.keyboard.press("Enter");
+    await expect(focused).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(".stack-map__service-name")).toHaveText(name);
+
+    await stage.focus();
+    await page.keyboard.press("Shift+ArrowLeft");
+    await expect(stage).not.toHaveAttribute("data-camera", start!);
+    await page.keyboard.press("0");
+    await expect(stage).toHaveAttribute("data-camera", start!);
+  });
+
+  test("animates traffic only when motion is allowed", async ({ page }) => {
+    const { stage } = await open3D(page);
+    await expect
+      .poll(async () => Number(await stage.getAttribute("data-pulses")), {
+        timeout: 8000,
+      })
+      .toBeGreaterThan(0);
+
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.reload();
+    await expect(page.locator(".stack-map-3d")).toHaveAttribute(
+      "data-motion",
+      "off",
+    );
+    for (let sample = 0; sample < 6; sample++) {
+      await page.waitForTimeout(1000);
+      expect(
+        Number(
+          (await page
+            .locator(".stack-map-3d__stage")
+            .getAttribute("data-pulses")) ?? "0",
+        ),
+      ).toBe(0);
+    }
+  });
+
+  test("remembers the 3D view and returns to 2D when the context is lost", async ({
+    page,
+  }) => {
+    const { map } = await open3D(page);
+    await page.reload();
+    await expect(map.locator(".stack-map-3d")).toHaveAttribute(
+      "data-renderer-state",
+      "ready",
+    );
+    await page.evaluate(() => {
+      const canvas = document.querySelector<HTMLCanvasElement>(
+        ".stack-map-3d__canvas",
+      );
+      canvas
+        ?.getContext("webgl2")
+        ?.getExtension("WEBGL_lose_context")
+        ?.loseContext();
+    });
+    await expect(map.locator(".stack-map-3d")).toHaveCount(0);
+    await expect(
+      map.getByRole("button", { name: "Inspect API", exact: true }),
+    ).toBeVisible();
+    await expect(map.getByRole("status")).toContainText(
+      "graphics context was lost",
+    );
+  });
+
+  test("stays in 2D without WebGL2 or on narrow maps", async ({ page }) => {
+    await page.addInitScript(() => {
+      const original = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (
+        this: HTMLCanvasElement,
+        type: string,
+        ...rest: unknown[]
+      ) {
+        if (type === "webgl2") return null;
+        return original.call(this, type as "2d", ...(rest as []));
+      } as typeof original;
+    });
+    await page.goto(REVIEW);
+    const map = page.getByRole("region", { name: "Stack topology" });
+    await expect(
+      map.getByRole("radio", { name: "3D", exact: true }),
+    ).toBeDisabled();
+    await expect(map.getByRole("status")).toContainText("no WebGL2");
+
+    const narrow = await page.context().newPage();
+    await narrow.setViewportSize({ width: 390, height: 1000 });
+    await narrow.goto(REVIEW);
+    const narrowMap = narrow.getByRole("region", { name: "Stack topology" });
+    await expect(
+      narrowMap.getByRole("radio", { name: "3D", exact: true }),
+    ).toBeDisabled();
+    await expect(narrowMap.getByRole("status")).toContainText("880 px");
+    await assertNoHorizontalOverflow(narrow);
+  });
 });
