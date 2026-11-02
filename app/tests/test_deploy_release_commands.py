@@ -1280,3 +1280,11 @@ def test_local_lease_release_runs_once_and_reports_a_failed_release(tmp_path):
     assert result.returncode == 0
     assert calls.read_text().splitlines() == ["host-unlock"]
     assert "make deploy-unlock DEPLOY_ID=deploy-a" in result.stderr
+
+
+def test_grafana_target_tunnels_loopback_grafana_and_opens_it() -> None:
+    output = _make_dry_run("observability-grafana", "GRAFANA_LOCAL_PORT=3999")
+
+    assert "-L 3999:127.0.0.1:3001 crate@95.216.3.27" in output
+    assert "ExitOnForwardFailure=yes" in output
+    assert 'open "http://localhost:3999"' in output

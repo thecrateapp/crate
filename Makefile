@@ -1331,6 +1331,15 @@ observability-deploy-rollback: ## Return monitoring to the previous release (req
 observability-deploy-status: ## Show the deployed monitoring release, live drift and services
 	@$(OBS_DEPLOY_ENV) scripts/observability-deploy.sh status
 
+GRAFANA_LOCAL_PORT  ?= 3001
+GRAFANA_REMOTE_PORT ?= 3001
+.PHONY: observability-grafana
+observability-grafana: ## Open production Grafana through an SSH tunnel; Ctrl-C closes it
+	@echo "Grafana: http://localhost:$(GRAFANA_LOCAL_PORT) (Ctrl-C closes the tunnel)"
+	@( sleep 2; open "http://localhost:$(GRAFANA_LOCAL_PORT)" 2>/dev/null || xdg-open "http://localhost:$(GRAFANA_LOCAL_PORT)" >/dev/null 2>&1 || true ) &
+	@ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 \
+		-L $(GRAFANA_LOCAL_PORT):127.0.0.1:$(GRAFANA_REMOTE_PORT) $(SERVER_USER)@$(SERVER_HOST)
+
 .PHONY: observability-adoption-inventory observability-adopt observability-revert-adoption observability-retire-legacy
 observability-adoption-inventory: ## Read-only report of legacy monitoring and application containers (VERSION=<full-main-sha>)
 	@test -n "$(strip $(VERSION))" || { echo "VERSION=<full-main-sha> is required"; exit 1; }
