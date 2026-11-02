@@ -358,3 +358,19 @@ def test_example_ships_prometheus_rules_disabled_until_after_shadow():
     assert {"observability", "queues", "availability", "playback"} <= groups
     for item in rules:
         Rule(**item)
+
+
+def test_summary_rules_ship_disabled_and_read_the_mcp_summary_tools():
+    rules = json.loads(
+        (ROOT / "deploy/operator/config.operator.example.json").read_text()
+    )["rules"]
+    summary = [
+        rule
+        for rule in rules
+        if rule["tool"] in {"get_stack_status", "get_playback_quality"}
+    ]
+
+    assert {rule["id"] for rule in summary} == {"monitoring-status", "summary-stalls"}
+    assert all(rule["enabled"] is False for rule in summary)
+    monitoring = Rule(**next(r for r in summary if r["id"] == "monitoring-status"))
+    assert (monitoring.kind, monitoring.expected) == ("drift", "running")

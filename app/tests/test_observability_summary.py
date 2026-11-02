@@ -176,12 +176,12 @@ def test_kpi_segments_below_three_listeners_are_suppressed():
     assert breakdown["day"] == "2026-11-02"
     assert breakdown["segments"] == [
         {
-            "dims": {"platform": "android"},
+            "segment": "platform=android",
             "value": 300.0,
             "sample": 9,
             "suppressed": False,
         },
-        {"dims": {"platform": "ios"}, "value": None, "sample": 1, "suppressed": True},
+        {"segment": "platform=ios", "value": None, "sample": 1, "suppressed": True},
     ]
 
 

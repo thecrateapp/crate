@@ -16,7 +16,9 @@ TOOLS = {
     "get_instance_inventory",
     "get_observability_summary",
     "get_pipeline_status",
+    "get_playback_quality",
     "get_smart_mix_status",
+    "get_stack_status",
 }
 RULE_TOOLS = TOOLS | {PROMETHEUS_TOOL}
 MCP_REQUESTS = 8

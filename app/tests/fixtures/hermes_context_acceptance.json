@@ -190,6 +190,24 @@
         "No expone probes funcionales del host en vivo",
         "aceptación física por plataforma"
       ]
+    },
+    {
+      "id": "observability-summary",
+      "question_es": "¿Puede Crate Agent decir cómo va la reproducción, los KPIs de producto y la monitorización?",
+      "source_path": "docs/technical/monitoring.md",
+      "search_queries": [
+        "get_playback_quality"
+      ],
+      "required_evidence": [
+        "get_playback_quality",
+        "get_product_kpis",
+        "get_stack_status"
+      ],
+      "unavailability_expectation_es": "El resumen es opt-in: si no se ha ejecutado se informa como no disponible y, con más de 15 minutos, como antiguo; nunca como cero.",
+      "required_limit_evidence": [
+        "opt-in",
+        "never zero"
+      ]
     }
   ]
 }

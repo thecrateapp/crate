@@ -7,12 +7,11 @@ from datetime import UTC, date, datetime, timedelta
 
 from crate.db.jobs.product_kpis import KPI_QUERIES
 from crate.db.ops_runtime import set_ops_runtime_state
-from crate.db.queries.observability_summary import read_summary_inputs
+from crate.db.queries.observability_summary import SUMMARY_KEY, read_summary_inputs
 from crate.db.queries.product_kpis import MINIMUM_SEGMENT_SAMPLE
 from crate.metrics import query_summaries
 from crate.stack_inventory import OBSERVABILITY_SERVICES
 
-SUMMARY_KEY = "observability_summary"
 SUMMARY_SCHEMA = 1
 KPI_WINDOWS = (7, 30)
 PLAYBACK_WINDOW_MINUTES = 15
@@ -128,7 +127,9 @@ def _breakdowns(rows: list[dict]) -> dict:
             )
             segments.append(
                 {
-                    "dims": {str(k): str(v) for k, v in row["dims"].items()},
+                    "segment": ",".join(
+                        f"{key}={value}" for key, value in sorted(row["dims"].items())
+                    ),
                     "value": None if suppressed else row["value"],
                     "sample": row["sample"],
                     "suppressed": suppressed,

@@ -9,6 +9,9 @@ from sqlalchemy import text
 from crate.db.queries.product_kpis import get_product_kpi_rows
 from crate.db.tx import read_scope
 
+SUMMARY_KEY = "observability_summary"
+SUMMARY_BYTES = 49152
+
 
 def read_summary_inputs(start: date, end: date, *, session=None) -> dict:
     def _impl(current) -> dict:
@@ -39,4 +42,37 @@ def read_summary_inputs(start: date, end: date, *, session=None) -> dict:
         return _impl(current)
 
 
-__all__ = ["read_summary_inputs"]
+def read_observability_summary(*, session=None) -> dict:
+    """The persisted presentation summary, bounded; never computes it."""
+
+    def _impl(current) -> dict:
+        current.execute(text("SET LOCAL statement_timeout = '5s'"))
+        row = (
+            current.execute(
+                text(
+                    """
+                    SELECT updated_at AS observed_at,
+                        octet_length(payload_json::text) > :limit AS oversized,
+                        CASE WHEN octet_length(payload_json::text) <= :limit
+                            THEN payload_json END AS payload
+                    FROM ops_runtime_state WHERE key = :key
+                    """
+                ),
+                {"key": SUMMARY_KEY, "limit": SUMMARY_BYTES},
+            )
+            .mappings()
+            .first()
+        )
+        return dict(row) if row else {}
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
+__all__ = [
+    "SUMMARY_KEY",
+    "read_observability_summary",
+    "read_summary_inputs",
+]

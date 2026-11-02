@@ -277,7 +277,7 @@ assuming publication from these source contracts.
 
 ## Bounded observation coverage (contract 1.2 candidate)
 
-Contract 1.2.0 adds four read tools with the existing envelope schema `1`.
+Contract 1.2.0 adds seven read tools with the existing envelope schema `1`.
 `get_instance_inventory`, `get_observability_summary` and `get_pipeline_status` require
 `ops.status.read`; `get_smart_mix_status` requires `library.health.read`. Actions remain
 explicit opt-in. Listing or discovering a tool grants no authority.
@@ -302,6 +302,14 @@ The usual bounded MCP admission and diagnostic audit still apply.
 | Smart Mix exact profiles                         | One UUID-batched lookup of `track_mix_profiles` and `track_processing_state` for at most 50 unique exact track UUIDs                                                                                                                                        | Implemented bounded read, partial library coverage    | No library scan, new acoustic validation, candidate ranking, transition plan or physical/platform acceptance                                                                                                                                                                                                                                                                                                                                            |
 | Provider / storage / streaming / Redis health    | No functional probe is called by these tools                                                                                                                                                                                                                | Unavailable                                           | Current functional health; HTTP 200 or a running process cannot establish it                                                                                                                                                                                                                                                                                                                                                                            |
 | Operational event cursor                         | No global UI-event journal is synthesized                                                                                                                                                                                                                   | Unavailable in these tools                            | A supervisor supplies its own durable operational event cursor                                                                                                                                                                                                                                                                                                                                                                                          |
+
+`get_playback_quality`, `get_product_kpis` and `get_stack_status` (also `ops.status.read`)
+read the opt-in `observability_summary` row in `ops_runtime_state`, written by the
+`compute_observability_summary` maintenance task when an administrator gives it a schedule
+interval. They never compute it. `get_product_kpis.window_days` is 7 or 30 and returns one
+source per KPI group; breakdown segments under three listeners carry a null value. A
+missing summary or section is unavailable, one older than 15 minutes is stale, and the
+monitoring release SHA is not reported. See [Monitoring](monitoring.md).
 
 `get_pipeline_status.pipeline` is the closed enum `import`, `enrichment`, `analysis`,
 `bliss`, `playback`, `projector`, `federation`, `acquisition`. The returned exact task type
