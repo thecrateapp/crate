@@ -16,9 +16,12 @@ func TestLoad(t *testing.T) {
 		t.Setenv("REDIS_DURABLE_URL", "")
 		t.Setenv("JWT_SECRET", "")
 
+		t.Setenv("READPLANE_METRICS_ADDR", "")
+
 		cfg := Load("test")
 
 		assert.Equal(t, defaultAddr, cfg.Addr)
+		assert.Empty(t, cfg.MetricsAddr, "metrics listener stays closed by default")
 		assert.Equal(t, defaultRedisURL, cfg.RedisURL)
 		assert.Equal(t, defaultQueryTimeoutMS*time.Millisecond, cfg.QueryTimeout)
 		assert.True(t, cfg.Enabled, "Enabled should default to true")
@@ -57,10 +60,12 @@ func TestLoad(t *testing.T) {
 		t.Setenv("READPLANE_LOCAL_MEDIA_ENABLED", "true")
 		t.Setenv("READPLANE_MUSIC_ROOT", "/srv/music")
 		t.Setenv("READPLANE_CACHE_ROOT", "/srv/cache")
+		t.Setenv("READPLANE_METRICS_ADDR", ":9200")
 
 		cfg := Load("test")
 
 		assert.Equal(t, ":9999", cfg.Addr)
+		assert.Equal(t, ":9200", cfg.MetricsAddr)
 		assert.False(t, cfg.Enabled, "Enabled should parse false")
 		assert.Equal(t, int32(3), cfg.MaxDBConns)
 		assert.Equal(t, 1500*time.Millisecond, cfg.QueryTimeout)

@@ -39,6 +39,7 @@ type Server struct {
 	smartMixCatalog smartMixCatalog
 	artworkResolver *media.ArtworkResolver
 	mediaMetrics    *observability.MediaMetrics
+	requestMetrics  *observability.RequestMetrics
 	snapshots       *snapshots.Store
 	fallback        *httpx.FallbackProxy
 	federationProxy *readplanefederation.Proxy
@@ -103,7 +104,20 @@ func NewServer(
 	}
 	server.artworkResolver = media.NewArtworkResolver(cfg.CacheRoot)
 	server.mediaMetrics = observability.NewMediaMetrics()
+	server.requestMetrics = observability.NewRequestMetrics()
 	return server
+}
+
+// MetricsHandler serves request and media metrics for the internal scrape port.
+func (s *Server) MetricsHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/metrics" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+		_ = observability.WritePrometheus(w, s.requestMetrics, s.mediaMetrics)
+	})
 }
 
 // Handler returns the complete HTTP handler with routing and middleware.
@@ -259,6 +273,9 @@ func (s *Server) withAccessLog(next http.Handler) http.Handler {
 		start := time.Now()
 		recorder := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(recorder, r)
+		if s.requestMetrics != nil {
+			s.requestMetrics.Observe(recorder.Header().Get("X-Crate-Readplane"), recorder.status, time.Since(start))
+		}
 		traceID, _ := r.Context().Value(traceIDKey).(string)
 		s.logger.Info(
 			"readplane request",
