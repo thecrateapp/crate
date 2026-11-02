@@ -185,9 +185,15 @@ elif argv[0] == "compose":
         if url.endswith("/-/ready"):
             print("Prometheus is Ready.")
         else:
-            unhealthy = "fake: unhealthy" in (project / "deploy/observability/prometheus.yml").read_text()
-            health = "down" if unhealthy else "up"
-            print(json.dumps({"data": {"activeTargets": [{"health": health}]}}))
+            config = (project / "deploy/observability/prometheus.yml").read_text()
+            health = "down" if "fake: unhealthy" in config else "up"
+            targets = [{"health": health}]
+            if "fake: app-down" in config:
+                targets += [
+                    {"health": "down", "labels": {"job": job}}
+                    for job in ("crate-app", "traefik")
+                ]
+            print(json.dumps({"data": {"activeTargets": targets}}))
     elif command[0] == "port":
         print("127.0.0.1:3001")
     elif command[0] == "create" and os.environ.get("FAKE_CREATE_FAIL") == "1":
@@ -287,6 +293,7 @@ class Lab:
         self.commit("broken", prometheus_suffix=UNHEALTHY)
         self.commit("upgrade", upgrade_grafana=True)
         self.commit("broken-upgrade", prometheus_suffix=UNHEALTHY, upgrade_grafana=True)
+        self.commit("app-down", prometheus_suffix="\n# fake: app-down\n")
         _git(self.repo, "update-ref", "refs/remotes/origin/main", "HEAD")
         self.commit("unreviewed", prometheus_suffix="\n# not on main\n")
 
@@ -465,6 +472,14 @@ def test_config_change_restarts_only_the_service_that_mounts_it(lab):
         lab.commits["base"],
         lab.commits["config"],
     ]
+
+
+def test_application_targets_down_do_not_fail_monitoring_verification(lab):
+    lab.deploy("base", OBS_CONFIRM="first-deploy")
+
+    lab.deploy("app-down")
+
+    assert lab.state("current") == lab.commits["app-down"]
 
 
 def test_failed_verification_restores_the_previous_configuration(lab):
