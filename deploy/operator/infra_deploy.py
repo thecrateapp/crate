@@ -22,6 +22,8 @@ OPTIONAL = (
     ".deploy/release-manifest.json.candidate",
     ".deploy/agent-context.candidate.tar.gz",
     "deploy/traefik/federation-readplane.yml",
+    "deploy/observability/compose.projector-prometheus.yaml",
+    "deploy/observability/compose.traefik-metrics.yaml",
     "app/config.yaml",
 )
 DIRECTORIES = (".deploy", ".deploy-backups")

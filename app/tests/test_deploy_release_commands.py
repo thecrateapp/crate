@@ -439,14 +439,98 @@ def test_deploy_ships_the_operator_overlay_and_agent_tooling() -> None:
     }
     for file in tooling:
         assert (ROOT / file).is_file(), file
+    loop = 'for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}"; do'
     payload = deploy[
         deploy.index("prepare_payload() {") : deploy.index("sync_config() {")
     ]
-    assert payload.count('for file in "${AGENT_TOOLING[@]}"; do') == 2
+    assert payload.count(loop) == 2
     sync = deploy[deploy.index("sync_config() {") :]
-    assert sync.index('for file in "${AGENT_TOOLING[@]}"; do') < sync.index(
-        "deploy-remote.sh"
+    assert sync.index(loop) < sync.index("deploy-remote.sh")
+
+
+PROJECTOR_OVERLAY = "deploy/observability/compose.projector-prometheus.yaml"
+TRAEFIK_OVERLAY = "deploy/observability/compose.traefik-metrics.yaml"
+
+
+def test_deploy_ships_the_monitoring_overlays() -> None:
+    deploy = (ROOT / "scripts/deploy.sh").read_text()
+    block = deploy[deploy.index("MONITORING_OVERLAYS=(") :]
+    overlays = block[len("MONITORING_OVERLAYS=(") : block.index(")")].split()
+
+    assert overlays == [PROJECTOR_OVERLAY, TRAEFIK_OVERLAY]
+    for file in overlays:
+        assert (ROOT / file).is_file(), file
+
+
+@pytest.mark.parametrize(
+    ("env", "networks", "expected"),
+    [
+        ("", "", []),
+        (
+            "",
+            "crate_prometheus-query crate_traefik-metrics",
+            [PROJECTOR_OVERLAY, TRAEFIK_OVERLAY],
+        ),
+        (
+            "OBS_PROMETHEUS_QUERY_NETWORK=crate-observability_prometheus-query\n",
+            "crate_prometheus-query crate-observability_traefik-metrics",
+            [],
+        ),
+        (
+            (
+                "OBS_PROMETHEUS_QUERY_NETWORK=crate-observability_prometheus-query\n"
+                "OBS_TRAEFIK_METRICS_NETWORK=crate-observability_traefik-metrics\n"
+            ),
+            "crate-observability_prometheus-query",
+            [PROJECTOR_OVERLAY],
+        ),
+    ],
+)
+def test_remote_deploy_keeps_monitoring_overlays_while_their_networks_exist(
+    tmp_path: Path, env: str, networks: str, expected: list[str]
+) -> None:
+    for overlay in (PROJECTOR_OVERLAY, TRAEFIK_OVERLAY):
+        (tmp_path / overlay).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / overlay).write_text("services: {}\n")
+    (tmp_path / ".env").write_text(env)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    docker = fake_bin / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        '[[ "$1 $2" == "network inspect" ]] || exit 2\n'
+        'for name in $FAKE_NETWORKS; do [[ "$3" == "$name" ]] && exit 0; done\n'
+        "exit 1\n"
     )
+    docker.chmod(0o755)
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+    selection = script[
+        script.index("env_file_value() {") : script.index("compose_has_service() {")
+    ]
+
+    result = subprocess.run(
+        [
+            "bash",
+            "-euo",
+            "pipefail",
+            "-c",
+            "COMPOSE=(docker compose)\n"
+            + selection
+            + "printf '%s\\n' \"${COMPOSE[@]}\"\n",
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+            "FAKE_NETWORKS": networks,
+        },
+    )
+
+    appended = result.stdout.splitlines()[2:]
+    assert appended == [part for file in expected for part in ("-f", file)]
 
 
 def _make_dry_run(target: str, *variables: str) -> str:

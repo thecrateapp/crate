@@ -164,6 +164,20 @@ env_value() {
   env_file_value .env "$key"
 }
 
+select_monitoring_overlays() {
+  local overlay variable default network
+  while read -r overlay variable default; do
+    [[ -f "$overlay" ]] || continue
+    network="$(env_value "$variable")"
+    docker network inspect "${network:-$default}" >/dev/null 2>&1 || continue
+    COMPOSE+=(-f "$overlay")
+  done <<'OVERLAYS'
+deploy/observability/compose.projector-prometheus.yaml OBS_PROMETHEUS_QUERY_NETWORK crate_prometheus-query
+deploy/observability/compose.traefik-metrics.yaml OBS_TRAEFIK_METRICS_NETWORK crate_traefik-metrics
+OVERLAYS
+}
+select_monitoring_overlays
+
 compose_has_service() {
   local service="$1"
   if [[ -z "$(env_value REDIS_PASSWORD)" ]]; then
