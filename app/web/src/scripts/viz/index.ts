@@ -35,6 +35,8 @@ const views: Record<string, () => Promise<View>> = {
   approval: () =>
     import("./approval-view").then((module) => module.initApproval),
   agent: () => import("./agent-view").then((module) => module.initAgent),
+  "stack-map": () =>
+    import("./stack-map-view").then((module) => module.initStackMap),
 };
 
 export function initViz(root: ParentNode = document): Cleanup {

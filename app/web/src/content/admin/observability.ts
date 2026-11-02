@@ -1,141 +1,35 @@
 import type { ScaleFigure } from "../architecture/en";
 import type { Feature } from "../../lib/chapters";
 
-export type StackId = "application" | "observability";
-export type Link = "request" | "data" | "queue" | "telemetry";
+export type MapView = "3d" | "2d";
 
-export interface MapNode {
-  id: string;
-  label: string;
-  x: number;
-  y: number;
-  hub?: boolean;
-  reading?: string;
-}
-
-export interface MapStack {
-  id: StackId;
-  name: string;
-  nodes: MapNode[];
-  links: [string, string, Link][];
-}
-
-export const MAP_HEADINGS = {
+export const STACK_MAP = {
   label: "Stack",
   host: "host crate · two deployments",
-  sample: "Sample readings",
-  live: "While the page is open",
-};
-
-export const STACKS: MapStack[] = [
-  {
-    id: "application",
-    name: "Application",
-    nodes: [
-      { id: "crate-listen", label: "Listen", x: 18, y: 10 },
-      { id: "traefik", label: "Edge", x: 50, y: 10, reading: "64 req/min" },
-      { id: "crate-ui", label: "Admin", x: 82, y: 10 },
-      { id: "crate-readplane", label: "Readplane", x: 16, y: 32 },
-      {
-        id: "crate-api",
-        label: "API",
-        x: 50,
-        y: 40,
-        hub: true,
-        reading: "6% · 1.1 GiB",
-      },
-      { id: "crate-projector", label: "Projector", x: 84, y: 32 },
-      { id: "crate-worker", label: "Worker", x: 16, y: 54 },
-      { id: "crate-fast-worker", label: "Fast worker", x: 84, y: 54 },
-      { id: "crate-maintenance-worker", label: "Maintenance", x: 12, y: 72 },
-      {
-        id: "crate-analysis-worker",
-        label: "Analysis",
-        x: 37,
-        y: 70,
-        reading: "41% · 640 MiB",
-      },
-      { id: "crate-playback-worker", label: "Playback", x: 63, y: 70 },
-      { id: "crate-media-worker", label: "Media", x: 88, y: 72 },
-      { id: "crate-postgres", label: "PostgreSQL", x: 20, y: 90 },
-      { id: "crate-redis", label: "Redis cache", x: 50, y: 90 },
-      { id: "crate-redis-durable", label: "Redis durable", x: 80, y: 90 },
-    ],
-    links: [
-      ["traefik", "crate-listen", "request"],
-      ["traefik", "crate-ui", "request"],
-      ["traefik", "crate-api", "request"],
-      ["traefik", "crate-readplane", "request"],
-      ["crate-listen", "crate-readplane", "request"],
-      ["crate-ui", "crate-api", "request"],
-      ["crate-readplane", "crate-api", "request"],
-      ["crate-api", "crate-postgres", "data"],
-      ["crate-api", "crate-redis", "data"],
-      ["crate-api", "crate-redis-durable", "queue"],
-      ["crate-worker", "crate-redis-durable", "queue"],
-      ["crate-fast-worker", "crate-redis-durable", "queue"],
-      ["crate-maintenance-worker", "crate-postgres", "data"],
-      ["crate-analysis-worker", "crate-postgres", "data"],
-      ["crate-playback-worker", "crate-redis-durable", "queue"],
-      ["crate-media-worker", "crate-redis", "data"],
-      ["crate-projector", "crate-postgres", "data"],
-      ["crate-projector", "crate-redis-durable", "queue"],
-    ],
-  },
-  {
-    id: "observability",
-    name: "Observability",
-    nodes: [
-      { id: "crate-grafana", label: "Grafana", x: 50, y: 10 },
-      { id: "crate-node-exporter", label: "Host exporter", x: 24, y: 32 },
-      {
-        id: "crate-prometheus",
-        label: "Prometheus",
-        x: 50,
-        y: 46,
-        hub: true,
-        reading: "2% · 310 MiB",
-      },
-      { id: "crate-cadvisor", label: "cAdvisor", x: 78, y: 28 },
-      {
-        id: "crate-observability-docker-proxy",
-        label: "Read proxy",
-        x: 80,
-        y: 58,
-      },
-      { id: "crate-postgres-exporter", label: "PG exporter", x: 24, y: 72 },
-      { id: "crate-redis-exporter", label: "Cache exporter", x: 50, y: 88 },
-      {
-        id: "crate-redis-durable-exporter",
-        label: "Broker exporter",
-        x: 74,
-        y: 76,
-      },
-    ],
-    links: [
-      ["crate-grafana", "crate-prometheus", "request"],
-      ["crate-cadvisor", "crate-observability-docker-proxy", "telemetry"],
-      ["crate-prometheus", "crate-node-exporter", "telemetry"],
-      ["crate-prometheus", "crate-cadvisor", "telemetry"],
-      ["crate-prometheus", "crate-postgres-exporter", "telemetry"],
-      ["crate-prometheus", "crate-redis-exporter", "telemetry"],
-      ["crate-prometheus", "crate-redis-durable-exporter", "telemetry"],
-    ],
-  },
-];
-
-export const LIVE_READINGS = {
-  host: { cpu: "23%", memory: "8.0 of 62.6 GiB" },
-  clients: [
-    { client: "listen-web", label: "Listen web", perMinute: 31 },
-    { client: "listen-android", label: "Android", perMinute: 17 },
-    { client: "listen-ios", label: "iOS", perMinute: 6 },
-    { client: "listen-desktop", label: "Desktop", perMinute: 3 },
-    { client: "admin-web", label: "Admin", perMinute: 5 },
-    { client: "subsonic", label: "Subsonic", perMinute: 2 },
-  ],
-  listening: 3,
-  tasksPerMinute: 4,
+  sample: "Sample data",
+  views: "Map view",
+  caption:
+    "Admin's Stack page, captured with sample data. Each deployment on the host is a dome in 3D and a ring in 2D. Node size is memory, the spike is CPU, and the moving dots are requests, tasks and events from the last few seconds.",
+  widths: [390, 768, 1440],
+  sizes: "(min-width: 1480px) 1440px, 100vw",
+  video: "/stack-map/stack-map-3d",
+  images: {
+    "3d": {
+      image: "/stack-map/stack-map-3d",
+      width: 1440,
+      height: 645,
+      alt: "Stack map in 3D: two domes on one host. The application dome is lit in cyan with the API at its top, request lines from Edge, Admin, Listen and Readplane, and dashed queue and data lines to PostgreSQL, Redis and the workers. The monitoring dome beside it is grey, with Prometheus at the centre and Grafana, cAdvisor and the exporters around it.",
+    },
+    "2d": {
+      image: "/stack-map/stack-map-2d",
+      width: 1440,
+      height: 692,
+      alt: "Stack map in 2D: two rings of services. The application ring has the API at the centre, with request lines from Edge, Admin, Listen and Readplane carrying moving dots, and dashed lines to PostgreSQL, Redis cache, Redis durable and the workers. The monitoring ring has Prometheus at the centre with Grafana and the exporters around it.",
+    },
+  } satisfies Record<
+    MapView,
+    { image: string; width: number; height: number; alt: string }
+  >,
 };
 
 export const FEATURES: Feature[] = [

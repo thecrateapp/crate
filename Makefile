@@ -157,6 +157,10 @@ dev-docs: ## Start only the docs dev server (:5175)
 dev-site: ## Start only the site dev server (:5176)
 	@cd app/web && npx astro dev --port 5176 --host
 
+.PHONY: site-stack-map-assets
+site-stack-map-assets: ## Capture the Admin Stack map with sample data for the site (needs ffmpeg and cwebp)
+	@scripts/site/stack-map-assets.sh
+
 .PHONY: dev-down
 dev-down: ## Stop everything (backend + frontends)
 	@$(DC_DEV) down

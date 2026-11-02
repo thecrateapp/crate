@@ -1,95 +1,63 @@
 ---
-import { LIVE_READINGS, MAP_HEADINGS, STACKS } from "../../content/admin/observability";
+import { STACK_MAP, type MapView } from "../../content/admin/observability";
 
-const total = LIVE_READINGS.clients.reduce((sum, client) => sum + client.perMinute, 0);
-const busiest = Math.max(...LIVE_READINGS.clients.map((client) => client.perMinute));
-const stacks = STACKS.map((stack) => {
-  const at = new Map(stack.nodes.map((node) => [node.id, node]));
-  return {
-    ...stack,
-    lines: stack.links.map(([from, to, kind], index) => ({ a: at.get(from)!, b: at.get(to)!, kind, index })),
-  };
-});
+const views: MapView[] = ["3d", "2d"];
+const srcset = (image: string) => STACK_MAP.widths.map((width) => `${image}-${width}.webp ${width}w`).join(", ");
+const poster = `${STACK_MAP.images["3d"].image}-1440.webp`;
 ---
 
-<figure class="stackmap" data-reveal data-playing aria-label={`Stack map with sample readings: the host runs an application deployment of ${STACKS[0]!.nodes.length} services around the API and a monitoring deployment of ${STACKS[1]!.nodes.length} services around Prometheus, with ${total} requests per minute and ${LIVE_READINGS.listening} devices listening`}>
+<figure class="stackmap" data-viz="stack-map" data-view="3d" data-reveal>
   <header class="viz-bar" data-enter>
-    <p class="viz-label"><b>{MAP_HEADINGS.label}</b> {MAP_HEADINGS.host}</p>
-    <p class="viz-label sample">{MAP_HEADINGS.sample}</p>
+    <p class="viz-label"><b>{STACK_MAP.label}</b> {STACK_MAP.host}</p>
+    <p class="viz-label sample">{STACK_MAP.sample}</p>
   </header>
 
-  <div class="stacks" aria-hidden="true">
+  <div class="switch" role="group" aria-label={STACK_MAP.views}>
     {
-      stacks.map((stack) => (
-        <section class:list={["stack", stack.id]}>
-          <p class="stack-name">
-            <b>{stack.name}</b>
-            <span>{stack.nodes.length} services</span>
-          </p>
-          <div class="plane">
-            <svg class="links" viewBox="0 0 100 100" preserveAspectRatio="none">
-              {stack.lines.map((line) => (
-                <line
-                  class:list={["link", line.kind]}
-                  x1={line.a.x}
-                  y1={line.a.y}
-                  x2={line.b.x}
-                  y2={line.b.y}
-                  pathLength="1"
-                  style={`--i:${line.index}`}
-                  vector-effect="non-scaling-stroke"
-                />
-              ))}
-            </svg>
-            {stack.nodes.map((node) => (
-              <span class:list={["node", { hub: node.hub }]} style={`left:${node.x}%;top:${node.y}%`}>
-                <i class="dot" />
-                <b>{node.label}</b>
-                {node.reading && <em>{node.reading}</em>}
-              </span>
-            ))}
-          </div>
-        </section>
+      views.map((view) => (
+        <button type="button" data-view-button={view} aria-pressed={view === "3d" ? "true" : "false"}>
+          {view.toUpperCase()}
+        </button>
       ))
     }
   </div>
 
-  <div class="live">
-    <p class="viz-label">{MAP_HEADINGS.live}</p>
-    <dl class="figures">
-      <div>
-        <dt>Requests</dt>
-        <dd>{total}<small>/min</small></dd>
-      </div>
-      <div>
-        <dt>Listening now</dt>
-        <dd>{LIVE_READINGS.listening}</dd>
-      </div>
-      <div>
-        <dt>Tasks</dt>
-        <dd>{LIVE_READINGS.tasksPerMinute}<small>/min</small></dd>
-      </div>
-      <div>
-        <dt>Host</dt>
-        <dd class="host">{LIVE_READINGS.host.cpu} CPU<small>{LIVE_READINGS.host.memory}</small></dd>
-      </div>
-    </dl>
-    <ul class="clients" aria-label="Requests per minute by client, sample">
-      {
-        LIVE_READINGS.clients.map((client) => (
-          <li style={`--v:${(client.perMinute / busiest).toFixed(3)}`}>
-            <span>{client.label}</span>
-            <i aria-hidden="true" />
-            <b>{client.perMinute}</b>
-          </li>
-        ))
-      }
-    </ul>
-  </div>
+  {
+    views.map((view) => {
+      const image = STACK_MAP.images[view];
+      return (
+        <div class="frame" data-view-panel={view} style={`aspect-ratio:${image.width} / ${image.height}`}>
+          <img
+            srcset={srcset(image.image)}
+            sizes={STACK_MAP.sizes}
+            src={`${image.image}-1440.webp`}
+            width={image.width}
+            height={image.height}
+            alt={image.alt}
+            loading="lazy"
+            decoding="async"
+          />
+          {view === "3d" && (
+            <video muted loop playsinline preload="none" disablepictureinpicture poster={poster} aria-hidden="true" tabindex="-1">
+              <source src={`${STACK_MAP.video}.webm`} type="video/webm" />
+              <source src={`${STACK_MAP.video}.mp4`} type="video/mp4" />
+            </video>
+          )}
+          <span class="badge" aria-hidden="true">
+            {STACK_MAP.sample}
+          </span>
+        </div>
+      );
+    })
+  }
+
+  <figcaption>{STACK_MAP.caption}</figcaption>
 </figure>
 
 <style>
   .stackmap {
+    display: grid;
+    gap: 18px;
     margin: 0;
     padding-top: 22px;
     border-top: 1px solid var(--line);
@@ -99,246 +67,107 @@ const stacks = STACKS.map((stack) => {
     color: var(--amber);
   }
 
-  .stacks {
-    display: grid;
-    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
-    gap: clamp(16px, 3vw, 40px);
-    margin: 4vh 0;
+  .switch {
+    display: none;
+    gap: 6px;
+    justify-self: start;
   }
 
-  .stack {
-    min-width: 0;
-    padding: 18px clamp(12px, 2vw, 24px) 24px;
+  :global(html.js) .switch {
+    display: flex;
+  }
+
+  .switch button {
+    min-width: 56px;
+    min-height: 44px;
+    padding: 0 16px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--fg-2);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    transition:
+      background-color 0.2s var(--ease-snap),
+      color 0.2s var(--ease-snap),
+      border-color 0.2s var(--ease-snap);
+  }
+
+  .switch button:hover {
+    border-color: rgba(103, 232, 249, 0.5);
+    color: var(--fg);
+  }
+
+  .switch button[aria-pressed="true"] {
+    border-color: var(--cyan-hi);
+    background: var(--cyan-hi);
+    color: var(--bg);
+  }
+
+  .switch button:focus-visible {
+    outline: 2px solid var(--cyan-hi);
+    outline-offset: 3px;
+  }
+
+  .frame {
+    position: relative;
+    overflow: hidden;
     border: 1px solid var(--line);
     border-radius: 18px;
-    background: radial-gradient(120% 90% at 50% 45%, rgba(6, 182, 212, 0.08), transparent 70%);
+    background: #0a0a0f;
   }
 
-  .stack.observability {
-    background: radial-gradient(120% 90% at 50% 45%, rgba(241, 245, 249, 0.05), transparent 70%);
-  }
-
-  .stack-name {
-    display: flex;
-    justify-content: space-between;
-    margin: 0 0 8px;
-    font-family: var(--mono);
-    font-size: 10.5px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--fg-3);
-  }
-
-  .stack-name b {
-    font-weight: 500;
-    color: var(--cyan-hi);
-  }
-
-  .observability .stack-name b {
-    color: var(--fg-2);
-  }
-
-  .plane {
-    position: relative;
-    aspect-ratio: 1 / 0.92;
-  }
-
-  .links {
+  .frame img,
+  .frame video {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
-    overflow: visible;
+    object-fit: cover;
   }
 
-  .link {
-    fill: none;
-    stroke: rgba(241, 245, 249, 0.14);
-    stroke-width: 1;
+  .frame video {
+    opacity: 0;
+    transition: opacity 0.4s var(--ease-snap);
   }
 
-  .link.request {
-    stroke: rgba(103, 232, 249, 0.38);
-    stroke-dasharray: 0.06 0.12;
+  .frame:global(.is-video) video {
+    opacity: 1;
   }
 
-  .link.queue {
-    stroke-dasharray: 0.02 0.04;
+  :global(html.js) .stackmap[data-view="3d"] [data-view-panel="2d"],
+  :global(html.js) .stackmap[data-view="2d"] [data-view-panel="3d"] {
+    display: none;
   }
 
-  .link.telemetry {
-    stroke: rgba(241, 245, 249, 0.22);
-    stroke-dasharray: 0.03 0.05;
-  }
-
-  .is-playing .link.request {
-    animation: flow 2.4s linear infinite;
-    animation-delay: calc(var(--i, 0) * -0.3s);
-  }
-
-  .is-playing .link.telemetry {
-    animation: flow 3.6s linear infinite reverse;
-    animation-delay: calc(var(--i, 0) * -0.4s);
-  }
-
-  @keyframes flow {
-    to {
-      stroke-dashoffset: -1;
-    }
-  }
-
-  .node {
+  .badge {
     position: absolute;
-    display: grid;
-    justify-items: center;
-    gap: 4px;
-    transform: translate(-50%, -6px);
-    white-space: nowrap;
-  }
-
-  .dot {
-    width: 11px;
-    height: 11px;
-    border: 1px solid rgba(241, 245, 249, 0.5);
-    border-radius: 50%;
-    background: var(--bg);
-  }
-
-  .hub .dot {
-    width: 18px;
-    height: 18px;
-    border-color: var(--cyan-hi);
-    background: radial-gradient(circle, var(--cyan-hi) 0 30%, rgba(6, 182, 212, 0.25) 31%);
-    box-shadow: 0 0 22px rgba(6, 182, 212, 0.45);
-  }
-
-  .observability .hub .dot {
-    border-color: var(--fg);
-    background: radial-gradient(circle, var(--fg) 0 30%, rgba(241, 245, 249, 0.18) 31%);
-    box-shadow: 0 0 18px rgba(241, 245, 249, 0.25);
-  }
-
-  .node b {
-    padding: 1px 5px;
-    border-radius: 4px;
-    background: rgba(10, 10, 15, 0.82);
+    top: 14px;
+    right: 14px;
+    padding: 4px 10px;
+    border: 1px solid rgba(251, 191, 36, 0.45);
+    border-radius: 999px;
+    background: rgba(10, 10, 15, 0.78);
+    color: var(--amber);
     font-family: var(--mono);
     font-size: 10.5px;
-    font-weight: 400;
-    color: var(--fg-2);
-  }
-
-  .hub b {
-    color: var(--fg);
-  }
-
-  .node em {
-    font-family: var(--mono);
-    font-size: 9.5px;
-    font-style: normal;
-    color: var(--amber);
-  }
-
-  .live {
-    display: grid;
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    gap: 12px clamp(24px, 5vw, 80px);
-    align-items: start;
-    padding-top: 22px;
-    border-top: 1px solid var(--line);
-  }
-
-  .live > .viz-label {
-    grid-column: 1 / -1;
-  }
-
-  .figures {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 18px 24px;
-    margin: 0;
-  }
-
-  .figures dt {
-    font-family: var(--mono);
-    font-size: 10px;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
+  }
+
+  figcaption {
+    max-width: 72ch;
     color: var(--fg-3);
-  }
-
-  .figures dd {
-    margin: 4px 0 0;
-    font-family: var(--display);
-    font-weight: 800;
-    font-size: clamp(1.6rem, 2.6vw, 2.4rem);
-    line-height: 1;
-    letter-spacing: -0.04em;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .figures small {
-    margin-left: 4px;
     font-family: var(--mono);
-    font-size: 11px;
-    font-weight: 400;
-    letter-spacing: 0;
-    color: var(--fg-3);
-  }
-
-  .figures .host small {
-    display: block;
-    margin: 6px 0 0;
-  }
-
-  .clients {
-    display: grid;
-    gap: 10px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .clients li {
-    display: grid;
-    grid-template-columns: 11ch minmax(0, 1fr) 3ch;
-    gap: 12px;
-    align-items: center;
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--fg-2);
-  }
-
-  .clients i {
-    height: 6px;
-    border-radius: 999px;
-    background: linear-gradient(90deg, var(--cyan-hi) calc(var(--v) * 100%), rgba(241, 245, 249, 0.06) calc(var(--v) * 100%));
-  }
-
-  .clients b {
-    font-weight: 500;
-    color: var(--fg);
-    text-align: right;
-    font-variant-numeric: tabular-nums;
+    font-size: 11.5px;
+    line-height: 1.6;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .is-playing .link.request,
-    .is-playing .link.telemetry {
-      animation: none;
-    }
-  }
-
-  @media (max-width: 760px) {
-    .stacks,
-    .live {
-      grid-template-columns: 1fr;
-    }
-    .node b {
-      font-size: 9.5px;
-    }
-    .node em {
-      font-size: 8.5px;
+    .frame video {
+      display: none;
     }
   }
 </style>

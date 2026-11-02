@@ -2,21 +2,11 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { repoFile } from "../../lib/source-drift";
 import { admin } from "./en";
-import {
-  FEATURES,
-  FIGURES,
-  LIVE_READINGS,
-  MAP_HEADINGS,
-  NEVER,
-  STACKS,
-} from "./observability";
+import { FEATURES, FIGURES, NEVER, STACK_MAP } from "./observability";
 
 const branchSource = (path: string) =>
   existsSync(repoFile(path)) ? readFileSync(repoFile(path), "utf8") : null;
 
-const topology = branchSource(
-  "app/ui/src/components/admin/stack-map-topology.ts",
-);
 const featureText = FEATURES.map((f) => `${f.title} ${f.body}`).join(" ");
 
 describe("the observability chapter", () => {
@@ -29,79 +19,87 @@ describe("the observability chapter", () => {
     expect(system?.link?.href).toBe("#observability");
   });
 
-  it("labels the map readings as a sample", () => {
-    expect(MAP_HEADINGS.sample).toBe("Sample readings");
-  });
-
   it("uses no emoji", () => {
-    const text = JSON.stringify({ admin, FEATURES, NEVER, STACKS });
+    const text = JSON.stringify({ admin, FEATURES, NEVER, STACK_MAP });
     expect(text).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 });
 
-describe("the stack map copied from Admin's topology", () => {
-  const catalog = topology
-    ? new Map(
-        [
-          ...topology.matchAll(
-            /^\s+"?([a-z0-9-]+)"?: \{\n\s+label: "([^"]+)",[\s\S]*?stack: "(\w+)"/gm,
-          ),
-        ].map(([, id, label, stack]) => [
-          id!,
-          { label: label!, stack: stack! },
-        ]),
-      )
-    : new Map();
-  const connections = topology
-    ? new Set(
-        [
-          ...topology.matchAll(/\["([a-z0-9-]+)", "([a-z0-9-]+)", "(\w+)"\]/g),
-        ].map(([, a, b, kind]) => `${a} ${b} ${kind}`),
-      )
-    : new Set<string>();
+const webpSize = (file: string) => {
+  const bytes = readFileSync(file);
+  expect(bytes.toString("ascii", 12, 16)).toBe("VP8 ");
+  return {
+    width: bytes.readUInt16LE(26) & 0x3fff,
+    height: bytes.readUInt16LE(28) & 0x3fff,
+  };
+};
 
-  it.skipIf(!topology)(
-    "names every service as Admin does, in its stack",
-    () => {
-      for (const stack of STACKS)
-        for (const node of stack.nodes)
-          expect(catalog.get(node.id), node.id).toEqual({
-            label: node.label,
-            stack: stack.id,
-          });
-    },
+describe("the Stack map captures", () => {
+  const component = readFileSync(
+    repoFile("app/web/src/components/viz/StackMap.astro"),
+    "utf8",
+  );
+  const view = readFileSync(
+    repoFile("app/web/src/scripts/viz/stack-map-view.ts"),
+    "utf8",
   );
 
-  it.skipIf(!topology)("shows every declared service once", () => {
-    const shown = STACKS.flatMap((stack) => stack.nodes.map((node) => node.id));
-    expect([...shown].sort()).toEqual([...catalog.keys()].sort());
-  });
-
-  it.skipIf(!topology)("draws only connections Admin declares", () => {
-    for (const stack of STACKS)
-      for (const [from, to, kind] of stack.links)
-        expect(connections).toContain(`${from} ${to} ${kind}`);
-  });
-
-  it.skipIf(!topology)("puts the hubs Admin uses at the centre", () => {
-    const hubs = STACKS.map(
-      (stack) => stack.nodes.find((node) => node.hub)?.id,
+  it("labels every capture as sample data, visibly and in the caption", () => {
+    expect(STACK_MAP.sample).toBe("Sample data");
+    expect(STACK_MAP.caption).toMatch(/captured with sample data/);
+    expect(component).toMatch(
+      /<p class="viz-label sample">\{STACK_MAP\.sample\}<\/p>/,
     );
-    expect(hubs).toEqual(["crate-api", "crate-prometheus"]);
-    expect(topology).toMatch(
-      /application: "crate-api",\n\s+observability: "crate-prometheus"/,
-    );
+    expect(component).toMatch(/class="badge"[\s\S]*\{STACK_MAP\.sample\}/);
   });
 
-  it("only lists clients the API classifies", () => {
-    const data = branchSource("app/crate/observability/metric_catalog_data.py");
-    if (!data) return;
-    const block = data.slice(data.indexOf('"http_client": ('));
-    const clients = [
-      ...block.slice(0, block.indexOf(")")).matchAll(/"([a-z-]+)"/g),
-    ].map(([, value]) => value);
-    for (const client of LIVE_READINGS.clients)
-      expect(clients).toContain(client.client);
+  it("ships every image width with the declared size", () => {
+    for (const [key, image] of Object.entries(STACK_MAP.images)) {
+      expect(image.alt.length, key).toBeGreaterThan(80);
+      for (const width of STACK_MAP.widths) {
+        const file = repoFile(`app/web/public${image.image}-${width}.webp`);
+        expect(existsSync(file), file).toBe(true);
+        const size = webpSize(file);
+        expect(size.width).toBe(width);
+        expect(size.height / size.width).toBeCloseTo(
+          image.height / image.width,
+          2,
+        );
+      }
+    }
+  });
+
+  it("ships the 3D loop as WebM and MP4 and loads it only on demand", () => {
+    for (const format of ["webm", "mp4"])
+      expect(
+        existsSync(repoFile(`app/web/public${STACK_MAP.video}.${format}`)),
+      ).toBe(true);
+    expect(component).toMatch(
+      /<video muted loop playsinline preload="none"[^>]*poster=/,
+    );
+    expect(component).toMatch(/loading="lazy"/);
+    expect(component).toMatch(/decoding="async"/);
+  });
+
+  it("keeps the still image under reduced motion", () => {
+    expect(component).toMatch(
+      /@media \(prefers-reduced-motion: reduce\) \{\s*\.frame video \{\s*display: none;/,
+    );
+    expect(view).toMatch(/if \(!video \|\| reducedMotion\(\)\) return;/);
+  });
+
+  it("captures every service Admin declares", () => {
+    const topology = branchSource(
+      "app/ui/src/components/admin/stack-map-topology.ts",
+    );
+    const capture = branchSource("tests/site-capture/stack-map.spec.ts");
+    if (!topology || !capture) return;
+    const declared = [
+      ...topology.matchAll(/^\s+"?([a-z0-9-]+)"?: \{\n\s+label: "/gm),
+    ].map(([, id]) => id!);
+    expect(declared.length).toBeGreaterThan(20);
+    for (const service of declared)
+      expect(capture, service).toContain(`["${service}", `);
   });
 });
 

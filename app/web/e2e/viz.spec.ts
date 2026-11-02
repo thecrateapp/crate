@@ -27,7 +27,7 @@ test("every live visual on /admin mounts when it comes into view", async ({
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
 
-  expect(await mountAll(page, "/admin")).toBe(9);
+  expect(await mountAll(page, "/admin")).toBe(10);
   expect(errors).toEqual([]);
 });
 
@@ -357,5 +357,53 @@ test.describe("reduced motion", () => {
     await expect(chat.locator("[data-chat-status]")).toHaveText(
       "Approved in Telegram · queued · reported",
     );
+  });
+});
+
+test("the Stack map switches between 3D and 2D and plays the loop only when shown", async ({
+  page,
+}) => {
+  await page.goto("/admin#observability");
+  const map = page.locator('[data-viz="stack-map"]');
+  await map.scrollIntoViewIfNeeded();
+  await expect(map).toHaveAttribute("data-viz-ready", "");
+  await expect(map.locator(".sample")).toHaveText("Sample data");
+  const three = map.getByRole("button", { name: "3D" });
+  const two = map.getByRole("button", { name: "2D" });
+  await expect(three).toHaveAttribute("aria-pressed", "true");
+  const box = await two.boundingBox();
+  expect(box!.height).toBeGreaterThanOrEqual(44);
+  expect(box!.width).toBeGreaterThanOrEqual(44);
+  const video = map.locator("video");
+  await expect
+    .poll(() => video.evaluate((el: HTMLVideoElement) => el.paused))
+    .toBe(false);
+  await two.focus();
+  await page.keyboard.press("Enter");
+  await expect(two).toHaveAttribute("aria-pressed", "true");
+  await expect(map.locator('[data-view-panel="2d"] img')).toBeVisible();
+  await expect(map.locator('[data-view-panel="3d"]')).toBeHidden();
+  expect(await video.evaluate((el: HTMLVideoElement) => el.paused)).toBe(true);
+});
+
+test.describe("reduced motion", () => {
+  test.use({ reducedMotion: "reduce" });
+
+  test("the Stack map keeps its still image and never loads the loop", async ({
+    page,
+  }) => {
+    const requested: string[] = [];
+    page.on("request", (request) => {
+      if (/stack-map-3d\.(webm|mp4)$/.test(request.url()))
+        requested.push(request.url());
+    });
+    await page.goto("/admin#observability");
+    const map = page.locator('[data-viz="stack-map"]');
+    await map.scrollIntoViewIfNeeded();
+    await expect(map).toHaveAttribute("data-viz-ready", "");
+    await expect(map.locator('[data-view-panel="3d"] img')).toBeVisible();
+    await expect(map.locator("video")).toBeHidden();
+    await page.waitForTimeout(500);
+    expect(requested).toEqual([]);
   });
 });
