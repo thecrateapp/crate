@@ -219,6 +219,17 @@ public:
         return static_cast<int>(decks);
     }
 
+    std::string browsed_folder_path() override
+    {
+        std::array<char, 2048> path = {};
+        if (plugin_.cb == nullptr ||
+            plugin_.GetStringInfo("get_browsed_folder_path", path.data(), static_cast<int>(path.size())) !=
+                S_OK) {
+            return {};
+        }
+        return path.data();
+    }
+
     bool automix_active() override
     {
         double active = 0;

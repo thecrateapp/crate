@@ -192,6 +192,7 @@ public:
     int layout_decks = 2;
     bool automix = true;
     std::vector<QueuedSong> queue;
+    std::string browsed_folder = "onlinemusic:/Crate/Genres";
 
     std::string language() override
     {
@@ -223,6 +224,11 @@ public:
     bool automix_active() override
     {
         return automix;
+    }
+
+    std::string browsed_folder_path() override
+    {
+        return browsed_folder;
     }
 
     std::vector<QueuedSong> automix_queue(int count) override
@@ -733,26 +739,47 @@ struct AutomixHarness {
     }
 };
 
-void automix_appends_the_best_compatible_track_for_the_playing_one()
+const std::string kGoToAutomix = "browser_gotofolder \"onlinemusic:/Crate/Crate Automix\"";
+const std::string kBackToGenres = "browser_gotofolder \"onlinemusic:/Crate/Genres\"";
+
+std::vector<std::string> list_automix_folder(AutomixHarness& automix)
+{
+    RecordingSink sink;
+    automix.harness.source->folder(std::string(kAutomixFolderId), sink);
+    std::vector<std::string> uids;
+    for (const auto& track : sink.tracks) {
+        uids.push_back(track.unique_id);
+    }
+    return uids;
+}
+
+void automix_lists_a_track_in_vdj_before_queueing_it()
 {
     AutomixHarness automix;
 
-    const auto commands = automix.commands_after(kPlayStart);
+    CRATE_CHECK(automix.commands_after(kPlayStart) == std::vector<std::string>{kGoToAutomix});
+    CRATE_CHECK(list_automix_folder(automix) == std::vector<std::string>{"a"});
 
-    CRATE_CHECK(commands.size() == 1);
-    CRATE_CHECK(commands[0] == "playlist_add \"netsearch://plugin-Crate/a\"");
+    const auto commands = automix.commands_after(kPlayStart + 1s);
+
+    CRATE_CHECK(commands.size() == 3);
+    CRATE_CHECK(commands[1] == kBackToGenres);
+    CRATE_CHECK(commands[2] == "playlist_add \"netsearch://plugin-Crate/a\"");
 }
 
 void automix_chains_the_second_track_from_the_first_and_never_repeats_an_album()
 {
     AutomixHarness automix;
     automix.commands_after(kPlayStart);
+    list_automix_folder(automix);
+    automix.commands_after(kPlayStart + 1s);
     automix.harness.host.queue = {{"Crate", ""}};
 
-    const auto commands = automix.commands_after(kPlayStart + 10s);
+    automix.commands_after(kPlayStart + 10s);
+    list_automix_folder(automix);
+    const auto commands = automix.commands_after(kPlayStart + 11s);
 
-    CRATE_CHECK(commands.size() == 2);
-    CRATE_CHECK(commands[1] == "playlist_add \"netsearch://plugin-Crate/c\"");
+    CRATE_CHECK(commands.back() == "playlist_add \"netsearch://plugin-Crate/c\"");
 }
 
 void automix_waits_while_two_tracks_are_queued()
@@ -766,15 +793,15 @@ void automix_waits_while_two_tracks_are_queued()
 void a_manual_change_puts_a_fitting_track_right_next()
 {
     AutomixHarness automix;
-    automix.commands_after(kPlayStart);
     automix.harness.host.queue = {{"Crate", ""}, {"Crate", ""}};
-    automix.harness.source->tick(kPlayStart + 6s);
+    automix.commands_after(kPlayStart);
     automix.harness.host.decks[1] = DeckReading{crate_path("manual"), true, 1'000, 200'000};
 
-    const auto commands = automix.commands_after(kPlayStart + 10s);
+    CRATE_CHECK(automix.commands_after(kPlayStart + 10s) == std::vector<std::string>{kGoToAutomix});
+    list_automix_folder(automix);
+    const auto commands = automix.commands_after(kPlayStart + 11s);
 
-    CRATE_CHECK(commands.size() == 2);
-    CRATE_CHECK(commands[1] == "automix_add_next \"netsearch://plugin-Crate/m\"");
+    CRATE_CHECK(commands.back() == "automix_add_next \"netsearch://plugin-Crate/m\"");
 }
 
 void a_track_coming_from_the_queue_is_not_a_manual_change()
@@ -795,10 +822,42 @@ void a_track_coming_from_the_queue_is_not_a_manual_change()
 
     automix.harness.host.decks[1] = DeckReading{crate_path("queued"), true, 1'000, 200'000};
     automix.harness.host.queue = {{"Crate", "Other Song"}};
-    const auto commands = automix.commands_after(kPlayStart + 10s);
+    automix.commands_after(kPlayStart + 10s);
+    list_automix_folder(automix);
+    const auto commands = automix.commands_after(kPlayStart + 11s);
 
-    CRATE_CHECK(commands.size() == 1);
-    CRATE_CHECK(commands[0] == "playlist_add \"netsearch://plugin-Crate/q\"");
+    CRATE_CHECK(commands.back() == "playlist_add \"netsearch://plugin-Crate/q\"");
+}
+
+void a_track_is_queued_anyway_if_vdj_never_lists_the_folder()
+{
+    AutomixHarness automix;
+    automix.commands_after(kPlayStart);
+
+    CRATE_CHECK(automix.commands_after(kPlayStart + 1s).size() == 1);
+    const auto commands = automix.commands_after(kPlayStart + 3s);
+
+    CRATE_CHECK(commands.size() == 3);
+    CRATE_CHECK(commands[1] == kBackToGenres);
+    CRATE_CHECK(commands[2] == "playlist_add \"netsearch://plugin-Crate/a\"");
+}
+
+void a_busy_browser_is_never_moved()
+{
+    AutomixHarness automix;
+    automix.harness.source->cancel_search();
+
+    CRATE_CHECK(automix.commands_after(std::chrono::system_clock::now()).empty());
+}
+
+void an_unknown_browser_folder_is_never_left()
+{
+    AutomixHarness automix;
+    automix.harness.host.browsed_folder.clear();
+
+    const auto commands = automix.commands_after(kPlayStart);
+
+    CRATE_CHECK(commands == std::vector<std::string>{"playlist_add \"netsearch://plugin-Crate/a\""});
 }
 
 void automix_does_nothing_without_permission_or_with_automix_off()
@@ -859,11 +918,14 @@ int main()
     plays_are_reported_with_the_track_names();
     plays_wait_in_the_spool_until_crate_answers();
     decks_beyond_the_layout_are_not_read();
-    automix_appends_the_best_compatible_track_for_the_playing_one();
+    automix_lists_a_track_in_vdj_before_queueing_it();
     automix_chains_the_second_track_from_the_first_and_never_repeats_an_album();
     automix_waits_while_two_tracks_are_queued();
     a_manual_change_puts_a_fitting_track_right_next();
     a_track_coming_from_the_queue_is_not_a_manual_change();
+    a_track_is_queued_anyway_if_vdj_never_lists_the_folder();
+    a_busy_browser_is_never_moved();
+    an_unknown_browser_folder_is_never_left();
     automix_does_nothing_without_permission_or_with_automix_off();
     a_track_opens_its_album_in_listen();
     open_in_crate_needs_a_listen_url();

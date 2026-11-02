@@ -11,9 +11,11 @@
 #include "crate_vdj/play_events.hpp"
 #include "crate_vdj/request_coordinator.hpp"
 
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
+#include <cstdint>
 #include <deque>
 #include <filesystem>
 #include <functional>
@@ -70,6 +72,7 @@ public:
     virtual int deck_count() = 0;
     virtual std::optional<DeckReading> read_deck(int deck) = 0;
     virtual bool automix_active() = 0;
+    virtual std::string browsed_folder_path() = 0;
     virtual std::vector<QueuedSong> automix_queue(int count) = 0;
 };
 
@@ -106,6 +109,9 @@ struct OnlineSourceDependencies {
 
 inline constexpr std::string_view kCurrentCompatibleFolderId = "crate:compatible:current";
 inline constexpr std::string_view kCompatibleFolderPrefix = "crate:compatible:";
+inline constexpr std::string_view kAutomixFolderId = "crate:automix:queue";
+inline constexpr std::string_view kAutomixFolderName = "Crate Automix";
+inline constexpr std::string_view kAutomixFolderPath = "onlinemusic:/Crate/Crate Automix";
 inline constexpr std::string_view kNoticePrefix = "crate:notice:";
 inline constexpr std::string_view kNoProfileNoticeId = "crate:notice:no-profile";
 
@@ -168,7 +174,12 @@ private:
         const std::vector<std::optional<DeckReading>>& decks,
         std::chrono::system_clock::time_point now
     );
-    std::optional<std::string> choose_automix_track(const std::string& anchor);
+    std::optional<SearchTrack> choose_automix_track(const std::string& anchor);
+    void continue_automix_addition(std::chrono::system_clock::time_point now);
+    void enqueue_automix_addition();
+    bool browser_busy(std::chrono::system_clock::time_point now) const;
+    void mark_browser_activity();
+    CallbackStatus automix_folder(TrackSink& sink);
     std::optional<std::string> uid_for_title(const std::string& title);
 
     HostPort& host_;
@@ -197,7 +208,21 @@ private:
         std::string expected_next_title;
         std::chrono::system_clock::time_point next_action_at{};
     };
+    struct AutomixAddition {
+        std::string uid;
+        bool next = false;
+        std::string previous_folder;
+        std::chrono::system_clock::time_point chosen_at{};
+        std::chrono::system_clock::time_point navigated_at{};
+        bool navigated = false;
+    };
     AutomixState automix_;
+    std::optional<AutomixAddition> automix_addition_;
+    std::mutex automix_listing_mutex_;
+    std::vector<SearchTrack> automix_listing_;
+    std::atomic<bool> automix_listed_ = false;
+    std::atomic<std::int64_t> last_browser_activity_ms_ = 0;
+    std::atomic<std::int64_t> ignore_browser_activity_until_ms_ = 0;
     std::chrono::system_clock::time_point last_flush_attempt_{};
     bool run_worker_;
     std::mutex worker_mutex_;
