@@ -6,6 +6,7 @@ use std::io::{self, Read};
 use std::process;
 
 use crate_media_worker::http;
+use crate_media_worker::metrics;
 use crate_media_worker::observability;
 use crate_media_worker::package::{
     build_album_package, build_track_artifact, PackageJob, TrackArtifactJob,
@@ -54,6 +55,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             let addr = arg_value(&args, "--addr")
                 .or_else(|| env::var("CRATE_MEDIA_WORKER_ADDR").ok())
                 .unwrap_or_else(|| "0.0.0.0:8687".to_string());
+            if let Some(metrics_addr) = env::var("CRATE_METRICS_ADDR")
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+            {
+                let bound = metrics::serve(&metrics_addr)?;
+                eprintln!("crate-media-worker metrics on {bound}");
+            }
             http::serve(&addr)?;
             Ok(())
         }
