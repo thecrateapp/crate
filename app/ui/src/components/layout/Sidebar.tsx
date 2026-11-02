@@ -105,6 +105,11 @@ const navItems = [
     label: "Genres",
     capabilities: ["library.view"],
   },
+  {
+    to: "/product",
+    label: "Product",
+    capabilities: ["ops.health.view"],
+  },
   { section: "System" },
   {
     to: "/system",
