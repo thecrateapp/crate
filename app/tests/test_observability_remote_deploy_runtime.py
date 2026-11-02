@@ -495,8 +495,8 @@ def test_adoption_keeps_history_and_grafana_state_then_reverts_and_retires(rehea
     port = rehearsal["grafana_port"]
     _run([*rehearsal["legacy"], "up", "-d"], env=docker_env, timeout=600)
     legacy_prometheus = _legacy_service(rehearsal, "crate-prometheus")
-    _eventually(lambda: _prometheus_query(docker_env, legacy_prometheus, "up"))
-    before = int(time.time())
+    up = _eventually(lambda: _prometheus_query(docker_env, legacy_prometheus, "up"))
+    before = up[0]["value"][0]
     _eventually(lambda: _grafana(port, "GET", "/api/health"))
     marker = _grafana(port, "POST", "/api/folders", {"title": "adoption-marker"})
     assert marker and marker.get("uid")

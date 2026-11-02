@@ -504,6 +504,12 @@ monitoring shares the application project (the default), or
 The projector queries Prometheus every 30 seconds only while someone has the
 Stack page open; without the overlay the map shows n/a, never zero.
 
+`make deploy` ships this overlay and the Traefik one below, and keeps each in
+the application's Compose files while its network exists, so an application
+deploy that recreates the projector or Traefik does not drop them. Set
+`OBS_PROMETHEUS_QUERY_NETWORK` and `OBS_TRAEFIK_METRICS_NETWORK` in the
+application `.env` when monitoring runs as its own project.
+
 Set `CRATE_GRAFANA_URL` on the API to show "Open in Grafana" links from the map
 inspector. Grafana only listens on `127.0.0.1:${OBS_GRAFANA_PORT}`, so the URL
 must be one the operator's browser can reach, typically through an SSH tunnel.
