@@ -309,3 +309,66 @@ def test_unavailable_redis_accepts_but_marks_events_unverified(recorded, monkeyp
     assert response.status_code == 204
     assert ("playback.telemetry.events", 1.0, {"outcome": "unverified"}) in recorded
     assert [call[0] for call in _qoe(recorded)] == ["playback.stall.ms"]
+
+
+def _continuation(outcome: str = "recovered", **extra) -> dict:
+    return {
+        "event": "continuation",
+        "continuation": outcome,
+        "surface": "radio",
+        "duration_ms": 4_000,
+        **extra,
+    }
+
+
+@pytest.mark.parametrize(
+    "event",
+    [
+        {**_continuation(), "surface": None},
+        {**_continuation(), "continuation": None},
+        _event("startup", continuation="recovered", surface="radio"),
+        {"event": "startup", "duration_ms": 10},
+        _continuation(outcome="skipped"),
+    ],
+)
+def test_continuation_fields_belong_only_to_continuation_events(event):
+    with pytest.raises(ValidationError):
+        PlaybackQoeBatchRequest.model_validate({"events": [event]})
+
+
+def test_continuation_events_record_queue_waits_without_track_context(recorded, redis):
+    from crate.api.playback_telemetry import post_playback_qoe
+
+    payload = PlaybackQoeBatchRequest.model_validate(
+        {
+            "schema_version": 2,
+            "events": [
+                _continuation(event_id="event-0001", runtime="desktop_web"),
+                {
+                    **_continuation("cancelled", event_id="event-0002"),
+                    "surface": "infinite",
+                    "duration_ms": None,
+                },
+            ],
+        }
+    )
+
+    post_playback_qoe(_request_for(), payload)
+
+    assert _qoe(recorded) == [
+        (
+            "playback.continuation.count",
+            1.0,
+            {"surface": "radio", "outcome": "recovered", "runtime": "desktop_web"},
+        ),
+        (
+            "playback.continuation.wait_ms",
+            4_000.0,
+            {"surface": "radio", "outcome": "recovered"},
+        ),
+        (
+            "playback.continuation.count",
+            1.0,
+            {"surface": "infinite", "outcome": "cancelled"},
+        ),
+    ]

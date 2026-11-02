@@ -37,11 +37,12 @@ const base = {
 
 function sentBodies(fetchMock: ReturnType<typeof vi.fn>) {
   return fetchMock.mock.calls.map(
-    ([, init]) => JSON.parse((init as RequestInit).body as string) as {
-      schema_version: number;
-      batch_id: string;
-      events: Array<Record<string, unknown>>;
-    },
+    ([, init]) =>
+      JSON.parse((init as RequestInit).body as string) as {
+        schema_version: number;
+        batch_id: string;
+        events: Array<Record<string, unknown>>;
+      },
   );
 }
 
@@ -124,6 +125,39 @@ describe("playback QoE", () => {
     ).not.toHaveProperty("outcome");
   });
 
+  it("shapes continuation waits without any track or delivery context", () => {
+    expect(
+      shapePlaybackQoeEvent({
+        ...base,
+        event: "continuation",
+        continuation: "recovered",
+        surface: "infinite",
+        durationMs: 2_500.4,
+        runtime: "tauri",
+        outcome: "failed",
+      }),
+    ).toEqual({
+      event: "continuation",
+      continuation: "recovered",
+      surface: "infinite",
+      duration_ms: 2_500,
+      runtime: "tauri",
+    });
+    expect(
+      shapePlaybackQoeEvent({
+        event: "continuation",
+        continuation: "skipped",
+        surface: "radio",
+      }),
+    ).toBeNull();
+    expect(
+      shapePlaybackQoeEvent({
+        event: "continuation",
+        continuation: "cancelled",
+      }),
+    ).toBeNull();
+  });
+
   it("sends version 2 batches with fetch and keeps the session on a 401", async () => {
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 401 }));
     const location = window.location.href;
@@ -147,8 +181,9 @@ describe("playback QoE", () => {
       "intent",
       "result",
     ]);
-    expect(batch.events.every((event) => typeof event.event_id === "string"))
-      .toBe(true);
+    expect(
+      batch.events.every((event) => typeof event.event_id === "string"),
+    ).toBe(true);
     expect(window.location.href).toBe(location);
     expect(ensureFreshAuthToken).not.toHaveBeenCalled();
   });

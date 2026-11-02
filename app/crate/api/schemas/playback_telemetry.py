@@ -13,6 +13,7 @@ PlaybackQoeEventName = Literal[
     "intent",
     "result",
     "active",
+    "continuation",
 ]
 PlaybackQoeOutcome = Literal["started", "failed", "cancelled"]
 PlaybackQoeFailureCause = Literal[
@@ -25,6 +26,10 @@ PlaybackQoeRuntime = Literal[
     "desktop_web", "mobile_web", "android_native", "ios_native", "tauri"
 ]
 PlaybackQoeEngine = Literal["gapless", "media3"]
+PlaybackContinuationOutcome = Literal[
+    "recovered", "unavailable", "exhausted", "cancelled", "native", "auth"
+]
+PlaybackContinuationSurface = Literal["radio", "infinite"]
 
 
 class PlaybackQoeEventRequest(BaseModel):
@@ -33,9 +38,9 @@ class PlaybackQoeEventRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     event: PlaybackQoeEventName
-    origin: PlaybackQoeOrigin
-    requested_policy: PlaybackQoePolicy
-    effective_policy: PlaybackQoePolicy
+    origin: PlaybackQoeOrigin | None = None
+    requested_policy: PlaybackQoePolicy | None = None
+    effective_policy: PlaybackQoePolicy | None = None
     duration_ms: int | None = Field(default=None, ge=0, le=600_000)
     buffered_ahead_seconds: float | None = Field(default=None, ge=0, le=7_200)
     attempt: int | None = Field(default=None, ge=1, le=3)
@@ -45,9 +50,23 @@ class PlaybackQoeEventRequest(BaseModel):
     occurred_at: int | None = Field(default=None, ge=0)
     outcome: PlaybackQoeOutcome | None = None
     cause: PlaybackQoeFailureCause | None = None
+    continuation: PlaybackContinuationOutcome | None = None
+    surface: PlaybackContinuationSurface | None = None
 
     @model_validator(mode="after")
     def _result_shape(self):
+        is_continuation = self.event == "continuation"
+        continuation_fields = (self.continuation, self.surface)
+        if (is_continuation and None in continuation_fields) or (
+            not is_continuation and any(continuation_fields)
+        ):
+            raise ValueError("continuation and surface belong to continuation events")
+        if not is_continuation and None in (
+            self.origin,
+            self.requested_policy,
+            self.effective_policy,
+        ):
+            raise ValueError("playback events carry origin and delivery policies")
         if (self.event == "result") != (self.outcome is not None):
             raise ValueError("outcome is required for result events only")
         if self.cause is not None and self.outcome != "failed":

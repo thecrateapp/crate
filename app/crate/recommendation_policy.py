@@ -6,6 +6,8 @@ import re
 
 from crate.track_versions import track_song_identity
 
+RECOMMENDATION_RULES_REVISION = 1
+EARLY_SKIP_SECONDS = 30.0
 RECENT_PLAY_WINDOW = timedelta(days=7)
 SIGNIFICANT_PLAY_SECONDS = 30.0
 SIGNIFICANT_PLAY_RATIO = 0.5

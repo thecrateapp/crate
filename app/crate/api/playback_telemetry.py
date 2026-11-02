@@ -96,7 +96,21 @@ def _runtime_tags(event, *names: str) -> dict[str, str]:
     return tags
 
 
+def _record_continuation(event) -> None:
+    tags = {"surface": event.surface, "outcome": event.continuation}
+    record_later(
+        "playback.continuation.count",
+        1.0,
+        {**tags, **({"runtime": event.runtime} if event.runtime else {})},
+    )
+    if event.duration_ms is not None:
+        record_later("playback.continuation.wait_ms", float(event.duration_ms), tags)
+
+
 def _record_qoe_event(event) -> None:
+    if event.event == "continuation":
+        _record_continuation(event)
+        return
     tags = _metric_tags(event)
     if event.event == "startup" and event.duration_ms is not None:
         record_later("playback.startup.ms", float(event.duration_ms), tags)
