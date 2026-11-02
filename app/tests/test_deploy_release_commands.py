@@ -450,6 +450,7 @@ def test_deploy_ships_the_operator_overlay_and_agent_tooling() -> None:
 
 PROJECTOR_OVERLAY = "deploy/observability/compose.projector-prometheus.yaml"
 TRAEFIK_OVERLAY = "deploy/observability/compose.traefik-metrics.yaml"
+APP_METRICS_OVERLAY = "deploy/observability/compose.app-metrics.yaml"
 
 
 def test_deploy_ships_the_monitoring_overlays() -> None:
@@ -457,7 +458,7 @@ def test_deploy_ships_the_monitoring_overlays() -> None:
     block = deploy[deploy.index("MONITORING_OVERLAYS=(") :]
     overlays = block[len("MONITORING_OVERLAYS=(") : block.index(")")].split()
 
-    assert overlays == [PROJECTOR_OVERLAY, TRAEFIK_OVERLAY]
+    assert overlays == [PROJECTOR_OVERLAY, TRAEFIK_OVERLAY, APP_METRICS_OVERLAY]
     for file in overlays:
         assert (ROOT / file).is_file(), file
 
@@ -468,8 +469,8 @@ def test_deploy_ships_the_monitoring_overlays() -> None:
         ("", "", []),
         (
             "",
-            "crate_prometheus-query crate_traefik-metrics",
-            [PROJECTOR_OVERLAY, TRAEFIK_OVERLAY],
+            "crate_prometheus-query crate_traefik-metrics crate_app-metrics",
+            [PROJECTOR_OVERLAY, TRAEFIK_OVERLAY, APP_METRICS_OVERLAY],
         ),
         (
             "OBS_PROMETHEUS_QUERY_NETWORK=crate-observability_prometheus-query\n",
@@ -484,12 +485,17 @@ def test_deploy_ships_the_monitoring_overlays() -> None:
             "crate-observability_prometheus-query",
             [PROJECTOR_OVERLAY],
         ),
+        (
+            "OBS_APP_METRICS_NETWORK=crate-observability_app-metrics\n",
+            "crate_app-metrics crate-observability_app-metrics",
+            [APP_METRICS_OVERLAY],
+        ),
     ],
 )
 def test_remote_deploy_keeps_monitoring_overlays_while_their_networks_exist(
     tmp_path: Path, env: str, networks: str, expected: list[str]
 ) -> None:
-    for overlay in (PROJECTOR_OVERLAY, TRAEFIK_OVERLAY):
+    for overlay in (PROJECTOR_OVERLAY, TRAEFIK_OVERLAY, APP_METRICS_OVERLAY):
         (tmp_path / overlay).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / overlay).write_text("services: {}\n")
     (tmp_path / ".env").write_text(env)

@@ -24,6 +24,7 @@ OPTIONAL = (
     "deploy/traefik/federation-readplane.yml",
     "deploy/observability/compose.projector-prometheus.yaml",
     "deploy/observability/compose.traefik-metrics.yaml",
+    "deploy/observability/compose.app-metrics.yaml",
     "app/config.yaml",
 )
 DIRECTORIES = (".deploy", ".deploy-backups")
