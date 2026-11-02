@@ -141,6 +141,7 @@ def test_expected_staging_and_env_transition_is_not_rebased(lab):
         root / "release-manifest.json"
     ).read_bytes()
     assert [args[-1] for args, _ in lab.runner.calls if args[0] == "/bin/bash"] == [
+        "host-lock",
         "release-preflight",
         "backup",
         "preflight",
@@ -148,6 +149,7 @@ def test_expected_staging_and_env_transition_is_not_rebased(lab):
         "pull",
         "up",
         "verify",
+        "host-unlock",
     ]
 
 
@@ -176,7 +178,14 @@ def test_external_change_between_stages_stops_without_unreviewed_rollback(lab):
         == "indeterminate"
     )
     steps = [args[-1] for args, _ in lab.runner.calls if args[0] == "/bin/bash"]
-    assert steps == ["release-preflight", "backup", "preflight", "config"]
+    assert steps == [
+        "host-lock",
+        "release-preflight",
+        "backup",
+        "preflight",
+        "config",
+        "host-unlock",
+    ]
 
 
 @pytest.mark.parametrize(
@@ -598,7 +607,7 @@ def test_operator_deploy_seals_staged_bundle_and_activates_context_after_verify(
         == approval["agent-context.tar.gz"]
     )
     stages = [args[-1] for args, _ in lab.runner.calls if args[0] == "/bin/bash"]
-    assert stages[-2:] == ["verify", "agent-context"]
+    assert stages[-3:] == ["verify", "agent-context", "host-unlock"]
 
 
 def test_operator_deploy_rejects_missing_context_before_effects(lab):

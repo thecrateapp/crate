@@ -107,7 +107,7 @@ func TestTurningTheAgentOffRetiresIt(t *testing.T) {
 	w.setUpAgent(context.Background(), stack.Stack{Run: runner, Compose: w.docker.Compose, Dir: dir}, "http://127.0.0.1:1")
 
 	calls := strings.Join(runner.streamed, "\n")
-	for _, want := range []string{"--profile agent rm -s -f crate-agent", "agent_setup.py revoke", "up -d --remove-orphans"} {
+	for _, want := range []string{"--profile agent rm -s -f crate-agent", "agent_setup.py revoke", "up -d"} {
 		if !strings.Contains(calls, want) {
 			t.Errorf("missing %q in\n%s", want, calls)
 		}

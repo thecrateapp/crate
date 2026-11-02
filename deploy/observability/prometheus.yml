@@ -46,3 +46,15 @@ scrape_configs:
         labels:
           redis_role: durable
     sample_limit: 3000
+
+  - job_name: traefik
+    dns_sd_configs:
+      - names: [traefik]
+        type: A
+        port: 8082
+        refresh_interval: 30s
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: traefik_(router|entrypoint)_requests_total
+        action: keep
+    sample_limit: 1000

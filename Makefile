@@ -919,6 +919,11 @@ deploy-image-rollback: ## Roll back only application images/config (requires CON
 	@test "$(CONFIRM)" = "rollback-images" || { echo "$(RED)CONFIRM=rollback-images is required$(NC)"; exit 1; }
 	@SERVER_USER="$(SERVER_USER)" SERVER_HOST="$(SERVER_HOST)" SERVER_PATH="$(SERVER_PATH)" DEPLOY_ID="$(strip $(DEPLOY_ID))" DEPLOY_CONFIRM="$(CONFIRM)" DEPLOY_IMAGE_OWNER="$(DEPLOY_IMAGE_OWNER)" DEPLOY_IMAGE_REGISTRY="$(DEPLOY_IMAGE_REGISTRY)" scripts/deploy.sh image-rollback
 
+.PHONY: deploy-unlock
+deploy-unlock: ## Release a stale host mutation lease (another owner requires CONFIRM=break-host-lock)
+	@test -n "$(strip $(DEPLOY_ID))" || { echo "$(RED)DEPLOY_ID=<lease owner> is required$(NC)"; exit 1; }
+	@SERVER_USER="$(SERVER_USER)" SERVER_HOST="$(SERVER_HOST)" SERVER_PATH="$(SERVER_PATH)" DEPLOY_ID="$(strip $(DEPLOY_ID))" DEPLOY_CONFIRM="$(CONFIRM)" DEPLOY_IMAGE_OWNER="$(DEPLOY_IMAGE_OWNER)" DEPLOY_IMAGE_REGISTRY="$(DEPLOY_IMAGE_REGISTRY)" scripts/deploy.sh unlock
+
 .PHONY: deploy-build
 deploy-build: ## Deploy by building on the server (GHCR fallback)
 	@echo "$(YELLOW)Syncing files...$(NC)"
@@ -1257,33 +1262,92 @@ tauri-collect-artifacts: ## Collect Crate desktop release artifacts into desktop
 # OPTIONAL OBSERVABILITY (local commands; never SSH or activate implicitly)
 # ===========================================================================
 
-OBS_COMPOSE_FILES ?= docker-compose.yaml docker-compose.project.yaml
+OBS_ENV_FILE ?= /dev/null
+OBS_PROJECT_DIR := $(CURDIR)
+export OBS_ENV_FILE OBS_PROJECT_DIR
 OBS_CONTAINERD ?= 0
 OBS_CONTAINERD_SOCKET ?= /run/containerd/containerd.sock
 export OBS_CONTAINERD_SOCKET
-OBS_DC = $(DC) $(foreach f,$(OBS_COMPOSE_FILES),-f $(f)) -f deploy/observability/compose.observability.yaml $(if $(filter 1,$(OBS_CONTAINERD)),-f deploy/observability/compose.containerd.yaml) --profile observability
+OBS_DC = $(DC) --project-name crate-observability --project-directory "$$OBS_PROJECT_DIR" --env-file "$$OBS_ENV_FILE" -f deploy/observability/compose.standalone.yaml $(if $(filter 1,$(OBS_CONTAINERD)),-f deploy/observability/compose.containerd.yaml) --profile observability
 OBS_SERVICES := crate-prometheus crate-grafana crate-node-exporter crate-postgres-exporter crate-redis-exporter crate-redis-durable-exporter crate-cadvisor crate-observability-docker-proxy
 
-.PHONY: observability-config observability-pull observability-up observability-stop observability-status
-observability-config: ## Validate optional monitoring compose without starting services
+.PHONY: observability-scope observability-config observability-pull observability-start-preflight observability-up observability-stop observability-status
+observability-scope:
+ifneq ($(strip $(OBS_COMPOSE_FILES)),)
+	@echo "OBS_COMPOSE_FILES is retired. Use standalone observability with OBS_APP_NETWORK and OBS_ENV_FILE; migrate the old monitoring project first." >&2
+	@exit 1
+endif
+
+observability-config: observability-scope ## Validate standalone monitoring without starting services
 	@$(OBS_DC) config --quiet
 
 observability-pull: observability-config ## Pull only pinned monitoring images
 	@$(OBS_DC) pull $(OBS_SERVICES)
 
-observability-up: observability-config ## Explicitly start only monitoring (provision secrets first)
+observability-start-preflight: observability-config ## Check explicit monitoring settings and prepared storage
+	@$(OBS_PYTHON) scripts/observability_preflight.py --env-file "$$OBS_ENV_FILE" --project-dir "$$OBS_PROJECT_DIR" $(if $(filter 1,$(OBS_INITIALIZE_EMPTY)),--initialize-empty) -- $(OBS_DC)
+
+observability-up: observability-start-preflight ## Explicitly start only monitoring (provision secrets first)
 	@case "$$(docker info --format '{{.Driver}}'):$(OBS_CONTAINERD)" in overlay2:0|overlayfs:1) ;; *) echo "Monitoring requires overlay2 (OBS_CONTAINERD=0) or overlayfs (OBS_CONTAINERD=1); no services started."; exit 1 ;; esac
+	@for service in crate-prometheus crate-grafana; do \
+		projects="$$(docker ps --filter "label=com.docker.compose.service=$$service" --format '{{with .Label "com.docker.compose.project"}}{{.}}{{else}}unmanaged{{end}}')" || { echo "Cannot check existing monitoring writers; no services started." >&2; exit 1; }; \
+		if [ -n "$$(printf '%s\n' "$$projects" | sed '/^crate-observability$$/d; /^$$/d')" ]; then \
+			echo "Monitoring writers from another project are running. Migrate the old monitoring project before standalone startup." >&2; exit 1; \
+		fi; \
+	done
 ifeq ($(OBS_CONTAINERD),1)
 	@socket_path=$$(readlink -f "$${OBS_CONTAINERD_SOCKET:-/run/containerd/containerd.sock}") && case "$$socket_path" in /run/*) ;; *) echo "Containerd socket must resolve under masked /run; no services started."; exit 1 ;; esac || { echo "Unable to validate containerd socket; no services started."; exit 1; }
 	@$(OBS_DC) up -d --no-deps --wait --wait-timeout 45 crate-observability-docker-proxy
 endif
 	@$(OBS_DC) up -d --no-deps $(OBS_SERVICES)
 
-observability-stop: ## Stop only monitoring; preserve Crate and all data
+observability-stop: observability-scope ## Stop only standalone monitoring; preserve all data
 	@$(OBS_DC) stop $(OBS_SERVICES)
 
-observability-status: ## Show monitoring service status; verify scrape health separately
+observability-status: observability-scope ## Show monitoring service status; verify scrape health separately
 	@$(OBS_DC) ps $(OBS_SERVICES)
+
+OBS_PYTHON ?= python3
+OBS_BUNDLE ?= .artifacts/crate-observability-$(strip $(VERSION)).tar.gz
+OBS_RELEASE_SHA := $(strip $(VERSION))
+export OBS_BUNDLE OBS_RELEASE_SHA
+.PHONY: observability-bundle observability-bundle-verify
+observability-bundle: ## Package monitoring configuration from an exact Git commit; never deploy
+	@$(OBS_PYTHON) scripts/observability_release.py bundle --source-root "$$OBS_PROJECT_DIR" --sha "$$OBS_RELEASE_SHA" --output "$$OBS_BUNDLE"
+
+observability-bundle-verify: ## Verify an independent monitoring archive without extracting it
+	@$(OBS_PYTHON) scripts/observability_release.py verify "$$OBS_BUNDLE" --expected-sha "$$OBS_RELEASE_SHA"
+
+OBS_DEPLOY_ENV = SERVER_USER="$(SERVER_USER)" SERVER_HOST="$(SERVER_HOST)" SERVER_PATH="$(SERVER_PATH)" OBS_DEPLOY_SHA='$(strip $(VERSION))' OBS_CONFIRM="$(CONFIRM)" OBS_CONTAINERD="$(OBS_CONTAINERD)" OBS_PYTHON="$(OBS_PYTHON)"
+.PHONY: observability-deploy observability-deploy-rollback observability-deploy-status
+observability-deploy: ## Deploy monitoring configuration from a main commit (usage: make observability-deploy VERSION=<full-main-sha>)
+	@test -n "$(strip $(VERSION))" || { echo "VERSION=<full-main-sha> is required"; exit 1; }
+	@$(OBS_DEPLOY_ENV) scripts/observability-deploy.sh deploy
+
+observability-deploy-rollback: ## Return monitoring to the previous release (requires CONFIRM=rollback-observability)
+	@test "$(CONFIRM)" = "rollback-observability" || { echo "CONFIRM=rollback-observability is required"; exit 1; }
+	@$(OBS_DEPLOY_ENV) scripts/observability-deploy.sh rollback
+
+observability-deploy-status: ## Show the deployed monitoring release, live drift and services
+	@$(OBS_DEPLOY_ENV) scripts/observability-deploy.sh status
+
+.PHONY: observability-adoption-inventory observability-adopt observability-revert-adoption observability-retire-legacy
+observability-adoption-inventory: ## Read-only report of legacy monitoring and application containers (VERSION=<full-main-sha>)
+	@test -n "$(strip $(VERSION))" || { echo "VERSION=<full-main-sha> is required"; exit 1; }
+	@$(OBS_DEPLOY_ENV) scripts/observability-deploy.sh inventory
+
+observability-adopt: ## Move the legacy monitoring to its own project (requires CONFIRM=adopt-legacy-monitoring)
+	@test -n "$(strip $(VERSION))" || { echo "VERSION=<full-main-sha> is required"; exit 1; }
+	@test "$(CONFIRM)" = "adopt-legacy-monitoring" || { echo "CONFIRM=adopt-legacy-monitoring is required"; exit 1; }
+	@$(OBS_DEPLOY_ENV) scripts/observability-deploy.sh adopt
+
+observability-revert-adoption: ## Restart the legacy monitoring and stop the adopted project (requires CONFIRM=revert-adoption)
+	@test "$(CONFIRM)" = "revert-adoption" || { echo "CONFIRM=revert-adoption is required"; exit 1; }
+	@$(OBS_DEPLOY_ENV) scripts/observability-deploy.sh revert-adoption
+
+observability-retire-legacy: ## Remove the stopped legacy monitoring containers; data is kept (requires CONFIRM=retire-legacy-monitoring)
+	@test "$(CONFIRM)" = "retire-legacy-monitoring" || { echo "CONFIRM=retire-legacy-monitoring is required"; exit 1; }
+	@$(OBS_DEPLOY_ENV) scripts/observability-deploy.sh retire-legacy
 
 # ===========================================================================
 # HELP

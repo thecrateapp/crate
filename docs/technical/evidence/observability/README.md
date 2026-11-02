@@ -52,3 +52,9 @@ Observability checkpoint: [Collection integrity](http://127.0.0.1:5186/review-ob
 The actual System Health page has six fixture states: observed, Redis unavailable,
 empty, partial, stale and legacy. The scene is shared with Storybook and issues no
 backend requests. See `docs/technical/evidence/observability/pr1a-checkpoint-2.md`.
+
+Independent deployment work: [checkpoint D1](deployment-checkpoint-d1.md) covers
+autonomous Compose identity, application orphan protection and the local
+configuration artifact. [Checkpoint D2](deployment-checkpoint-d2.md) covers remote
+deploy and rollback, the shared host mutation lease and adoption of the old
+overlay, rehearsed with real images.
