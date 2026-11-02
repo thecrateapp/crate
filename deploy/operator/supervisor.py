@@ -8,6 +8,8 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from .prometheus import QUERIES as PROMETHEUS_QUERIES
+from .prometheus import TOOL as PROMETHEUS_TOOL
 from .state import LIMITS, CapacityError, enqueue, event, prune
 
 TOOLS = {
@@ -16,6 +18,9 @@ TOOLS = {
     "get_pipeline_status",
     "get_smart_mix_status",
 }
+RULE_TOOLS = TOOLS | {PROMETHEUS_TOOL}
+MCP_REQUESTS = 8
+PROMETHEUS_REQUESTS = 16
 KINDS = {"availability", "high", "low", "drift", "progress", "stuck", "digest"}
 DIGEST_SEEN = 200
 DIGEST_GROUPS = 20
@@ -80,14 +85,17 @@ class Rule:
     detail_field: tuple = ()
     group_field: tuple = ()
     row_fields: tuple = ()
+    enabled: bool = True
 
     def __post_init__(self):
         if not IDENTIFIER.fullmatch(self.id) or not IDENTIFIER.fullmatch(
             self.subsystem
         ):
             raise ValueError("Invalid rule identity")
-        if self.tool not in TOOLS or self.kind not in KINDS:
+        if self.tool not in RULE_TOOLS or self.kind not in KINDS:
             raise ValueError("Unknown observation or rule kind")
+        if type(self.enabled) is not bool:
+            raise ValueError("Rule enablement must be explicit")
         if (
             not 1 <= self.fresh_seconds <= 86400
             or not 1 <= self.trigger_samples <= 20
@@ -161,6 +169,9 @@ class Rule:
                 "acquisition",
             }:
                 raise ValueError("Exact pipeline argument required")
+        elif self.tool == PROMETHEUS_TOOL:
+            if set(args) != {"query"} or args["query"] not in PROMETHEUS_QUERIES:
+                raise ValueError("Exact allowlisted Prometheus query required")
         elif args:
             raise ValueError(
                 "Only bounded no-argument inventory/summary/Smart Mix polling supported"
@@ -175,6 +186,15 @@ class Rule:
     @property
     def request_key(self):
         return self.tool + ":" + json.dumps(self.arguments or {}, sort_keys=True)
+
+
+def check_request_bounds(rules):
+    keys = {rule.request_key: rule.tool for rule in rules}
+    prometheus = sum(tool == PROMETHEUS_TOOL for tool in keys.values())
+    if len(keys) - prometheus > MCP_REQUESTS or prometheus > PROMETHEUS_REQUESTS:
+        raise ValueError(
+            "At most eight MCP and sixteen Prometheus observations per cycle"
+        )
 
 
 def _valid(source, rule, now):
@@ -489,8 +509,7 @@ class Supervisor:
             or len({(rule.subsystem, rule.id) for rule in rules}) != len(rules)
         ):
             raise ValueError("Invalid instance or rule count/identity")
-        if len({rule.request_key for rule in rules}) > 8:
-            raise ValueError("At most eight distinct observation requests per cycle")
+        check_request_bounds(rules)
         self.state, self.instance, self.rules = state, instance, rules
         self._rules_by_key = {
             f"{instance}/{rule.subsystem}/{rule.id}": rule for rule in rules

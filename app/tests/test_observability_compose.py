@@ -641,6 +641,43 @@ def test_resolved_projector_keeps_its_network_and_reaches_only_prometheus(tmp_pa
     assert sharing == ["crate-projector", "crate-prometheus"]
 
 
+SUPERVISOR_OVERLAY = "deploy/observability/compose.supervisor-prometheus.yaml"
+
+
+def test_supervisor_overlay_only_adds_the_query_network():
+    overlay = yaml.safe_load((ROOT / SUPERVISOR_OVERLAY).read_text())
+    assert overlay["services"] == {
+        "crate-operator-supervisor": {"networks": ["crate", "prometheus-query"]}
+    }
+    assert overlay["networks"] == {
+        "prometheus-query": {
+            "name": "${OBS_PROMETHEUS_QUERY_NETWORK:-crate_prometheus-query}",
+            "external": True,
+        }
+    }
+
+
+def test_resolved_supervisor_shares_prometheus_only_with_the_projector(tmp_path):
+    services = _resolved_compose(
+        tmp_path,
+        "docker-compose.yaml",
+        True,
+        True,
+        extra_files=(PROJECTOR_OVERLAY, SUPERVISOR_OVERLAY),
+    )["services"]
+    sharing = sorted(
+        name
+        for name, service in services.items()
+        if "prometheus-query" in (service.get("networks") or {})
+    )
+    assert sharing == [
+        "crate-operator-supervisor",
+        "crate-projector",
+        "crate-prometheus",
+    ]
+    assert "ports" not in services["crate-operator-supervisor"]
+
+
 TRAEFIK_OVERLAY = "deploy/observability/compose.traefik-metrics.yaml"
 
 

@@ -6,6 +6,7 @@
   "poll_seconds": 45,
   "mcp_url": "http://crate-api:8585/mcp",
   "mcp_host": "api.example.com",
+  "prometheus_url": "http://crate-prometheus:9090",
   "mcp_token_file": "/run/secrets/operator_mcp_read",
   "api_token_file": "/run/secrets/operator_api",
   "webhook_url": "http://crate-operator:8644/webhooks/crate-operator",
@@ -119,6 +120,192 @@
         "status"
       ],
       "cooldown_seconds": 3600
+    },
+    {
+      "id": "prometheus",
+      "subsystem": "observability",
+      "tool": "prometheus_query",
+      "arguments": {
+        "query": "prometheus-up"
+      },
+      "source_path": [],
+      "enabled": false,
+      "kind": "availability"
+    },
+    {
+      "id": "app-scrape-down",
+      "subsystem": "observability",
+      "tool": "prometheus_query",
+      "arguments": {
+        "query": "app-scrape-up-min"
+      },
+      "source_path": [],
+      "enabled": false,
+      "kind": "low",
+      "field": ["value"],
+      "threshold": 0,
+      "clear_threshold": 1
+    },
+    {
+      "id": "app-scrape-age",
+      "subsystem": "observability",
+      "tool": "prometheus_query",
+      "arguments": {
+        "query": "app-scrape-age-max"
+      },
+      "source_path": [],
+      "enabled": false,
+      "kind": "high",
+      "field": ["value"],
+      "threshold": 120,
+      "clear_threshold": 60
+    },
+    {
+      "id": "app-sample-limit",
+      "subsystem": "observability",
+      "tool": "prometheus_query",
+      "arguments": {
+        "query": "app-sample-limit-hit"
+      },
+      "source_path": [],
+      "enabled": false,
+      "kind": "high",
+      "field": ["value"],
+      "threshold": 1,
+      "clear_threshold": 0,
+      "cooldown_seconds": 3600
+    },
+    {
+      "id": "queue-depth",
+      "subsystem": "queues",
+      "tool": "prometheus_query",
+      "arguments": {
+        "query": "queue-depth-max"
+      },
+      "source_path": [],
+      "enabled": false,
+      "kind": "high",
+      "field": ["value"],
+      "threshold": 500,
+      "clear_threshold": 200,
+      "critical": 2000
+    },
+    {
+      "id": "queue-wait-p95",
+      "subsystem": "queues",
+      "tool": "prometheus_query",
+      "arguments": {
+        "query": "queue-wait-p95-max"
+      },
+      "source_path": [],
+      "enabled": false,
+      "kind": "high",
+      "field": ["value"],
+      "threshold": 600,
+      "clear_threshold": 300
+    },
+    {
+      "id": "task-failure-ratio",
+      "subsystem": "queues",
+      "tool": "prometheus_query",
+      "arguments": {
+        "query": "task-failure-ratio-max"
+      },
+      "source_path": [],
+      "enabled": false,
+      "kind": "high",
+      "field": ["value"],
+      "threshold": 0.2,
+      "clear_threshold": 0.1,
+      "critical": 0.5,
+      "cooldown_seconds": 1800
+    },
+    {
+      "id": "api-error-ratio",
+      "subsystem": "availability",
+      "tool": "prometheus_query",
+      "arguments": {
+        "query": "api-error-ratio"
+      },
+      "source_path": [],
+      "enabled": false,
+      "kind": "high",
+      "field": ["value"],
+      "threshold": 0.05,
+      "clear_threshold": 0.02,
+      "critical": 0.2
+    },
+    {
+      "id": "api-latency-p95",
+      "subsystem": "availability",
+      "tool": "prometheus_query",
+      "arguments": {
+        "query": "api-latency-p95-max"
+      },
+      "source_path": [],
+      "enabled": false,
+      "kind": "high",
+      "field": ["value"],
+      "threshold": 2,
+      "clear_threshold": 1
+    },
+    {
+      "id": "stream-latency-p95",
+      "subsystem": "availability",
+      "tool": "prometheus_query",
+      "arguments": {
+        "query": "stream-p95-max"
+      },
+      "source_path": [],
+      "enabled": false,
+      "kind": "high",
+      "field": ["value"],
+      "threshold": 3,
+      "clear_threshold": 1.5
+    },
+    {
+      "id": "stalls-per-startup",
+      "subsystem": "playback",
+      "tool": "prometheus_query",
+      "arguments": {
+        "query": "playback-stalls-per-startup"
+      },
+      "source_path": [],
+      "enabled": false,
+      "kind": "high",
+      "field": ["value"],
+      "threshold": 0.3,
+      "clear_threshold": 0.15,
+      "cooldown_seconds": 1800
+    },
+    {
+      "id": "startup-p95",
+      "subsystem": "playback",
+      "tool": "prometheus_query",
+      "arguments": {
+        "query": "playback-startup-p95-max"
+      },
+      "source_path": [],
+      "enabled": false,
+      "kind": "high",
+      "field": ["value"],
+      "threshold": 5,
+      "clear_threshold": 3
+    },
+    {
+      "id": "transcode-failure-ratio",
+      "subsystem": "playback",
+      "tool": "prometheus_query",
+      "arguments": {
+        "query": "transcode-failure-ratio-max"
+      },
+      "source_path": [],
+      "enabled": false,
+      "kind": "high",
+      "field": ["value"],
+      "threshold": 0.2,
+      "clear_threshold": 0.1,
+      "cooldown_seconds": 1800
     }
   ],
   "human_callback_secret_file": "/run/secrets/operator_human",

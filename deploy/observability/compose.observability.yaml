@@ -21,7 +21,7 @@ networks:
     internal: true
   # Published loopback ports require a non-internal bridge on current Docker.
   observability-ui: {}
-  # Shared only with crate-projector, which reads Stack resources from Prometheus.
+  # Shared only with crate-projector (Stack resources) and the Operator supervisor (alert rules).
   prometheus-query:
     internal: true
   # Shared only with Traefik, whose router metrics feed Stack ingress readings.

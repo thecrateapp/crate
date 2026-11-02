@@ -99,7 +99,7 @@ def test_example_configs_ship_the_three_alert_rules(name):
     assert failed.cooldown_seconds == 1800 and "error" not in failed.row_fields
     releases = rules["new-releases"]
     assert releases.kind == "digest" and releases.cooldown_seconds == 3600
-    assert {rule.request_key for rule in rules.values()} == {
+    assert {rule.request_key for rule in rules.values() if rule.enabled} == {
         "get_observability_summary:{}",
         "get_instance_inventory:{}",
     }
