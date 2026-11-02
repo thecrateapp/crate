@@ -5,217 +5,540 @@
       "avg": 32,
       "min": 12,
       "max": 48,
-      "sum": 3840
+      "sum": 3840,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 120,
+      "eligible_count": 120,
+      "sample_kind": "observations"
     },
     "api_requests": {
       "count": 120,
       "avg": 2,
       "min": 0,
       "max": 5,
-      "sum": 120
+      "sum": 120,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 120,
+      "eligible_count": 120,
+      "sample_kind": "observations"
     },
     "api_errors": {
       "count": 0,
       "avg": 0,
       "min": 0,
       "max": 0,
-      "sum": 0
+      "sum": 0,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 0,
+      "eligible_count": 120,
+      "sample_kind": "observations"
     },
     "api_slow": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "stream_requests": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "stream_latency": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "stream_concurrent": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "stream_transcode_duration": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "stream_transcode_completed": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "stream_transcode_failed": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "home_cache_hit": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "home_cache_miss": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "home_cache_waited": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "home_cache_coalesced": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "home_cache_stale_fallback": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "home_compute_ms": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "home_endpoint_cache_hit": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "home_endpoint_cache_miss": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "home_endpoint_compute_ms": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "worker_resource_deferred": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "worker_resource_defer_seconds": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "worker_resource_load_ratio": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "worker_resource_iowait_percent": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "worker_resource_swap_used_percent": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "media_worker_completed": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "media_worker_failed": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "media_worker_duration": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "media_worker_bytes": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "media_worker_admission_denied": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "media_worker_cache_pruned": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
     },
     "media_worker_cache_bytes_removed": {
       "count": 10,
       "avg": 1,
       "min": 0,
       "max": 2,
-      "sum": 10
+      "sum": 10,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 10,
+      "eligible_count": 10,
+      "sample_kind": "observations"
+    },
+    "_meta": {
+      "schema_version": 2,
+      "generated_at": "2026-10-10T21:00:00.000Z",
+      "history": {
+        "availability": "available",
+        "source": "postgresql_v2",
+        "cutover_at": "2026-10-10T20:00:00.000Z",
+        "legacy_status": "unverified",
+        "legacy_combined": false,
+        "retention_days": 8
+      },
+      "collector_local": {
+        "scope": "process",
+        "coverage": "local_only",
+        "availability": "available",
+        "observed_at": "2026-10-10T21:00:00.000Z",
+        "started_at": "2026-10-10T20:00:00.000Z",
+        "last_write_at": "2026-10-10T21:00:00.000Z",
+        "last_error_at": null,
+        "queue_depth": 0,
+        "queue_capacity": 10000,
+        "counters": {
+          "buffer_full": 0,
+          "redis_error": 0,
+          "invalid_observation": 0
+        }
+      }
+    },
+    "worker_queue_depth": {
+      "count": 1,
+      "avg": 2,
+      "min": 2,
+      "max": 2,
+      "sum": 2,
+      "availability": "available",
+      "reason": null,
+      "source": "redis_v2",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "window_minutes": 5,
+      "sample_count": 1,
+      "eligible_count": 1,
+      "sample_kind": "observations"
     }
   },
   "system": {
@@ -506,5 +829,98 @@
         "sum": 120
       }
     ]
+  },
+  "timeseries_status": {
+    "api.latency": {
+      "source": "postgresql_v2",
+      "availability": "available",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "reason": null
+    },
+    "api.requests": {
+      "source": "postgresql_v2",
+      "availability": "available",
+      "observed_at": "2026-10-10T21:00:00.000Z",
+      "age_seconds": 0,
+      "reason": null
+    },
+    "api.errors": {
+      "source": "postgresql_v2",
+      "availability": "empty",
+      "observed_at": null,
+      "age_seconds": null,
+      "reason": "no_observations"
+    },
+    "api.slow": {
+      "source": "postgresql_v2",
+      "availability": "empty",
+      "observed_at": null,
+      "age_seconds": null,
+      "reason": "no_observations"
+    },
+    "stream.requests": {
+      "source": "postgresql_v2",
+      "availability": "empty",
+      "observed_at": null,
+      "age_seconds": null,
+      "reason": "no_observations"
+    },
+    "stream.transcode.duration": {
+      "source": "postgresql_v2",
+      "availability": "empty",
+      "observed_at": null,
+      "age_seconds": null,
+      "reason": "no_observations"
+    },
+    "home.compute.ms": {
+      "source": "postgresql_v2",
+      "availability": "empty",
+      "observed_at": null,
+      "age_seconds": null,
+      "reason": "no_observations"
+    },
+    "home.endpoint_compute.ms": {
+      "source": "postgresql_v2",
+      "availability": "empty",
+      "observed_at": null,
+      "age_seconds": null,
+      "reason": "no_observations"
+    },
+    "worker.task.duration": {
+      "source": "postgresql_v2",
+      "availability": "empty",
+      "observed_at": null,
+      "age_seconds": null,
+      "reason": "no_observations"
+    },
+    "worker.queue.wait": {
+      "source": "postgresql_v2",
+      "availability": "empty",
+      "observed_at": null,
+      "age_seconds": null,
+      "reason": "no_observations"
+    },
+    "worker.queue.depth": {
+      "source": "postgresql_v2",
+      "availability": "empty",
+      "observed_at": null,
+      "age_seconds": null,
+      "reason": "no_observations"
+    },
+    "worker.resource.deferred": {
+      "source": "postgresql_v2",
+      "availability": "empty",
+      "observed_at": null,
+      "age_seconds": null,
+      "reason": "no_observations"
+    },
+    "worker.resource.load_ratio": {
+      "source": "postgresql_v2",
+      "availability": "empty",
+      "observed_at": null,
+      "age_seconds": null,
+      "reason": "no_observations"
+    }
   }
 }

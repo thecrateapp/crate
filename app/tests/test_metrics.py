@@ -1,227 +1,150 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from math import ceil
 
-def test_record_sync_adds_metric_name_to_tracked_set(monkeypatch):
-    from crate import metrics
+import pytest
 
-    class FakePipeline:
-        def __init__(self):
-            self.sadd_calls: list[tuple[str, str]] = []
-            self.expire_calls: list[tuple[str, int]] = []
+from crate.observability import metric_buckets
+from crate.observability.metric_catalog import canonical_metric
+from tests.test_metric_minute_integrity import (
+    _historical_totals,
+    isolated_metric_redis_server as isolated_metric_redis_server,
+    metric_runtime as metric_runtime,
+)
 
-        def sadd(self, key: str, member: str):
-            self.sadd_calls.append((key, member))
-            return self
 
-        def expire(self, key: str, ttl: int):
-            self.expire_calls.append((key, ttl))
-            return self
+def _request_bucket(clock):
+    return metric_buckets.bucket_key(canonical_metric("api.requests"), clock["minute"])
 
-        def hincrby(self, *_args):
-            return self
 
-        def hincrbyfloat(self, *_args):
-            return self
+def _numeric_summary(summary):
+    return {key: summary[key] for key in ("count", "avg", "min", "max", "sum")}
 
-        def eval(self, *_args):
-            return self
 
-        def set(self, *_args, **kwargs):
-            return self
+def _observe_pipelines(monkeypatch, redis):
+    batches = []
+    original_pipeline = redis.pipeline
 
-        def execute(self):
-            return []
+    def pipeline(*args, **kwargs):
+        current = original_pipeline(*args, **kwargs)
+        original_execute = current.execute
 
-    class FakeRedis:
-        def __init__(self):
-            self.pipeline_instance = FakePipeline()
+        def execute(*execute_args, **execute_kwargs):
+            batches.append([command for command, _options in current.command_stack])
+            return original_execute(*execute_args, **execute_kwargs)
 
-        def pipeline(self, transaction: bool = False):
-            return self.pipeline_instance
+        monkeypatch.setattr(current, "execute", execute)
+        return current
 
-    fake_redis = FakeRedis()
-    monkeypatch.setattr("crate.db.cache_runtime.get_redis", lambda: fake_redis)
-    monkeypatch.setattr(metrics, "_minute_bucket", lambda ts=None: 600)
+    monkeypatch.setattr(redis, "pipeline", pipeline)
+    return batches
+
+
+def test_record_sync_indexes_canonical_series_and_marks_minute_dirty(metric_runtime):
+    metrics, redis, clock = metric_runtime
 
     metrics._record_sync("api.requests", 1.0)
 
-    assert (
-        "crate:metric_keys",
-        "api.requests",
-    ) in fake_redis.pipeline_instance.sadd_calls
-    assert any(
-        key == "crate:metric_keys" and ttl == metrics._MAX_BUCKET_TTL_SECONDS
-        for key, ttl in fake_redis.pipeline_instance.expire_calls
+    key = _request_bucket(clock)
+    assert redis.smembers(metric_buckets.NAMES_KEY) == {"api.request.count"}
+    assert redis.hget(key, "count") == "1"
+    assert redis.hget(key, "sum") == "1"
+    assert redis.zscore(metric_buckets.DIRTY_KEY, key) == clock["minute"]
+    assert redis.zrange(
+        f"{metric_buckets.PREFIX}:buckets:api.request.count", 0, -1
+    ) == [key]
+    assert redis.exists("crate:metric_keys") == 0
+
+
+def test_record_route_latency_indexes_real_sample_and_canonical_metric(metric_runtime):
+    metrics, redis, clock = metric_runtime
+    path = "/api/me/home/discovery"
+    tags = {"method": "GET", "path": path, "status": "200"}
+
+    metrics._record_route_latency_sync(42.0, tags)
+
+    route_id = metrics._route_id("api", "GET", path)
+    assert metrics._ROUTE_LATENCY_METRIC in redis.smembers(metric_buckets.NAMES_KEY)
+    assert redis.smembers(metrics._route_bucket_key(clock["minute"])) == {route_id}
+    route_key = metrics._route_metric_key(route_id, clock["minute"])
+    assert redis.lrange(f"{route_key}:samples", 0, -1) == ["42.0"]
+    assert redis.hget(route_key, "status_2xx") == "1"
+    canonical_key = metric_buckets.bucket_key(
+        canonical_metric(metrics._ROUTE_LATENCY_METRIC, tags), clock["minute"]
     )
+    assert redis.zscore(metric_buckets.DIRTY_KEY, canonical_key) == clock["minute"]
 
 
-def test_record_route_latency_adds_metric_name_to_tracked_set(monkeypatch):
-    from crate import metrics
+def test_flush_reads_dirty_index_without_scanning_other_redis_keys(
+    pg_db, metric_runtime, monkeypatch
+):
+    metrics, redis, clock = metric_runtime
+    metrics.record_counter("api.requests")
+    redis.sadd(metrics._route_bucket_key(clock["minute"]), "unrelated-route-index")
+    redis.set("crate:metrics:unrelated:string", "not-a-metric-hash")
 
-    class FakePipeline:
-        def __init__(self):
-            self.sadd_calls: list[tuple[str, str]] = []
-            self.expire_calls: list[tuple[str, int]] = []
+    def no_scan(*_args, **_kwargs):
+        pytest.fail("Metric flush must use its dirty index instead of scanning Redis")
 
-        def sadd(self, key: str, member: str):
-            self.sadd_calls.append((key, member))
-            return self
+    monkeypatch.setattr(redis, "scan", no_scan)
+    monkeypatch.setattr(redis, "scan_iter", no_scan)
 
-        def expire(self, key: str, ttl: int):
-            self.expire_calls.append((key, ttl))
-            return self
+    metrics.flush_to_postgres()
 
-        def hset(self, *_args, **kwargs):
-            return self
+    assert _historical_totals(metrics, "api.requests") == {"count": 1, "sum": 1.0}
+    assert redis.zcard(metric_buckets.DIRTY_KEY) == 0
+    assert redis.get("crate:metrics:unrelated:string") == "not-a-metric-hash"
 
-        def hincrby(self, *_args):
-            return self
 
-        def hincrbyfloat(self, *_args):
-            return self
+def test_legacy_hundred_observations_are_not_combined_with_two_v2_observations(
+    pg_db, metric_runtime
+):
+    from crate.db.queries.management import query_metric_rollups
+    from crate.db.repositories.management import upsert_metric_rollup
 
-        def eval(self, *_args):
-            return self
-
-        def rpush(self, *_args):
-            return self
-
-        def ltrim(self, *_args):
-            return self
-
-        def execute(self):
-            return []
-
-    class FakeRedis:
-        def __init__(self):
-            self.pipeline_instance = FakePipeline()
-
-        def pipeline(self, transaction: bool = False):
-            return self.pipeline_instance
-
-    fake_redis = FakeRedis()
-    monkeypatch.setattr("crate.db.cache_runtime.get_redis", lambda: fake_redis)
-    monkeypatch.setattr(metrics, "_minute_bucket", lambda ts=None: 600)
-
-    metrics._record_route_latency_sync(
-        42.0, {"method": "GET", "path": "/api/test", "status": "200"}
+    metrics, redis, clock = metric_runtime
+    minute = clock["minute"]
+    redis.hset(
+        f"crate:metrics:api.requests:{minute}",
+        mapping={"count": 100, "sum": 100, "min": 1, "max": 1},
     )
-
-    assert (
-        "crate:metric_keys",
-        metrics._ROUTE_LATENCY_METRIC,
-    ) in fake_redis.pipeline_instance.sadd_calls
-    assert any(
-        key == "crate:metric_keys" and ttl == metrics._MAX_BUCKET_TTL_SECONDS
-        for key, ttl in fake_redis.pipeline_instance.expire_calls
+    redis.sadd("crate:metric_keys", "api.requests")
+    bucket_start = datetime.fromtimestamp(minute, timezone.utc).replace(minute=0)
+    upsert_metric_rollup(
+        name="api.requests",
+        tags_json="{}",
+        period="hour",
+        bucket_start=bucket_start.isoformat(),
+        count=100,
+        sum_value=100.0,
+        min_value=1.0,
+        max_value=1.0,
+        avg_value=1.0,
     )
+    for _observation in range(2):
+        metrics.record_counter("api.requests")
 
+    assert _numeric_summary(metrics.query_summary("api.requests")) == {
+        "count": 2,
+        "avg": 1.0,
+        "min": 1.0,
+        "max": 1.0,
+        "sum": 2.0,
+    }
+    metrics.flush_to_postgres()
+    metrics.flush_to_postgres()
 
-def test_flush_to_postgres_uses_smembers_then_targeted_scan(monkeypatch):
-    from crate import metrics
-
-    class FakeRedis:
-        def __init__(self):
-            self.smembers_calls: list[str] = []
-            self.scan_patterns: list[str] = []
-            self._scan_calls = 0
-
-        def smembers(self, key: str):
-            self.smembers_calls.append(key)
-            return {b"api.requests"}
-
-        def scan(self, cursor: int, match: str | None = None, count: int | None = None):
-            self._scan_calls += 1
-            self.scan_patterns.append(match or "")
-            # Return one old bucket on the first call per pattern, then stop
-            if cursor == 0 and "api.requests" in (match or ""):
-                return 0, [b"crate:metrics:api.requests:0"]
-            return 0, []
-
-        def hgetall(self, key: str):
-            return {"count": b"1", "sum": b"10", "min": b"5", "max": b"15"}
-
-        def get(self, key: str):
-            return None
-
-    fake_redis = FakeRedis()
-    monkeypatch.setattr("crate.db.cache_runtime.get_redis", lambda: fake_redis)
-    monkeypatch.setattr(metrics, "_minute_bucket", lambda ts=None: 600)
-
-    call_log = []
-
-    def fake_upsert(**kwargs):
-        call_log.append(kwargs)
-
-    monkeypatch.setattr(
-        "crate.db.repositories.management.upsert_metric_rollup", fake_upsert
-    )
-
-    metrics.flush_to_postgres(period="hour")
-
-    assert "crate:metric_keys" in fake_redis.smembers_calls
-    assert any("api.requests" in p for p in fake_redis.scan_patterns)
-    assert len(call_log) == 1
-    assert call_log[0]["name"] == "api.requests"
-
-
-def test_flush_to_postgres_skips_non_hash_metric_keys(monkeypatch):
-    from crate import metrics
-
-    class FakeRedis:
-        def __init__(self):
-            self.hgetall_calls: list[str] = []
-
-        def smembers(self, key: str):
-            return {b"api.requests"}
-
-        def scan(self, cursor: int, match: str | None = None, count: int | None = None):
-            if cursor != 0:
-                return 0, []
-            if match == "crate:metrics:api.requests:*":
-                return 0, [b"crate:metrics:api.requests:0"]
-            if match == "crate:metrics:routes:*":
-                return 0, [b"crate:metrics:routes:0"]
-            return 0, []
-
-        def type(self, key: str):
-            if key == "crate:metrics:routes:0":
-                return b"set"
-            return b"hash"
-
-        def hgetall(self, key: str):
-            self.hgetall_calls.append(key)
-            if key == "crate:metrics:routes:0":
-                raise AssertionError("non-hash route index should be skipped")
-            return {"count": b"1", "sum": b"10", "min": b"5", "max": b"15"}
-
-        def get(self, key: str):
-            return None
-
-    fake_redis = FakeRedis()
-    monkeypatch.setattr("crate.db.cache_runtime.get_redis", lambda: fake_redis)
-    monkeypatch.setattr(metrics, "_minute_bucket", lambda ts=None: 600)
-
-    call_log = []
-
-    def fake_upsert(**kwargs):
-        call_log.append(kwargs)
-
-    monkeypatch.setattr(
-        "crate.db.repositories.management.upsert_metric_rollup", fake_upsert
-    )
-
-    metrics.flush_to_postgres(period="hour")
-
-    assert fake_redis.hgetall_calls == ["crate:metrics:api.requests:0"]
-    assert len(call_log) == 1
+    assert _historical_totals(metrics, "api.requests") == {"count": 2, "sum": 2.0}
+    assert query_metric_rollups(name="api.requests")[0]["count"] == 100
+    assert redis.hget(f"crate:metrics:api.requests:{minute}", "count") == "100"
 
 
 def test_metrics_redis_bucket_ttl_is_configurable(monkeypatch):
     from crate import metrics
 
     monkeypatch.delenv("CRATE_METRICS_REDIS_TTL_SECONDS", raising=False)
-    assert metrics._bucket_ttl_seconds() == 24 * 3600
+    assert metrics._bucket_ttl_seconds() == 2 * 3600
 
     monkeypatch.setenv("CRATE_METRICS_REDIS_TTL_SECONDS", "7200")
     assert metrics._bucket_ttl_seconds() == 7200
@@ -230,202 +153,210 @@ def test_metrics_redis_bucket_ttl_is_configurable(monkeypatch):
     assert metrics._bucket_ttl_seconds() == 3600
 
     monkeypatch.setenv("CRATE_METRICS_REDIS_TTL_SECONDS", "invalid")
-    assert metrics._bucket_ttl_seconds() == 24 * 3600
+    assert metrics._bucket_ttl_seconds() == 2 * 3600
 
 
-def test_record_sync_uses_configured_redis_ttl(monkeypatch):
-    from crate import metrics
-
-    class FakePipeline:
-        def __init__(self):
-            self.expires: list[tuple[str, int]] = []
-            self.sets: list[tuple[str, int | None]] = []
-
-        def sadd(self, *_args):
-            return self
-
-        def hincrby(self, *_args):
-            return self
-
-        def hincrbyfloat(self, *_args):
-            return self
-
-        def eval(self, *_args):
-            return self
-
-        def expire(self, key: str, ttl: int):
-            self.expires.append((key, ttl))
-            return self
-
-        def set(
-            self, key: str, _value: str, *, ex: int | None = None, nx: bool = False
-        ):
-            assert nx is True
-            self.sets.append((key, ex))
-            return self
-
-        def execute(self):
-            return []
-
-    class FakeRedis:
-        def __init__(self):
-            self.pipeline_instance = FakePipeline()
-
-        def pipeline(self, transaction: bool = False):
-            assert transaction is False
-            return self.pipeline_instance
-
-    fake_redis = FakeRedis()
-
+def test_record_sync_expires_buckets_and_keeps_indexes_non_volatile(
+    monkeypatch, metric_runtime
+):
+    metrics, redis, clock = metric_runtime
     monkeypatch.setenv("CRATE_METRICS_REDIS_TTL_SECONDS", "7200")
-    monkeypatch.setattr(metrics, "_minute_bucket", lambda ts=None: 600)
-    monkeypatch.setattr("crate.db.cache_runtime.get_redis", lambda: fake_redis)
 
-    metrics._record_sync("api.requests", 1.0, {"target": "api"})
+    metrics._record_sync("api.requests", 1.0)
 
-    assert (
-        "crate:metrics:api.requests:600",
-        7200,
-    ) in fake_redis.pipeline_instance.expires
-    assert (
-        "crate:metrics:api.requests:600:tags",
-        7200,
-    ) in fake_redis.pipeline_instance.sets
+    indexes = [
+        metric_buckets.NAMES_KEY,
+        f"{metric_buckets.PREFIX}:series:api.request.count",
+        f"{metric_buckets.PREFIX}:buckets:api.request.count",
+    ]
+    assert 7198 <= redis.ttl(_request_bucket(clock)) <= 7200
+    assert all(redis.ttl(key) == -1 for key in indexes)
+
+
+@pytest.mark.parametrize("failure_phase", ["before_commit", "after_commit"])
+def test_failed_flush_keeps_dirty_and_retry_does_not_lose_or_duplicate(
+    pg_db, metric_runtime, monkeypatch, failure_phase
+):
+    from crate.db.repositories import metric_minutes
+
+    metrics, redis, clock = metric_runtime
+    for _observation in range(10):
+        metrics.record_counter("api.requests")
+    key = _request_bucket(clock)
+    original_persist = metric_minutes.persist_metric_collection
+    calls = 0
+
+    def fail_first_flush(snapshots, **kwargs):
+        nonlocal calls
+        if not snapshots:
+            return original_persist(snapshots, **kwargs)
+        calls += 1
+        if calls == 1:
+            if failure_phase == "after_commit":
+                original_persist(snapshots, **kwargs)
+            raise RuntimeError("Injected database transport failure")
+        return original_persist(snapshots, **kwargs)
+
+    monkeypatch.setattr(metric_minutes, "persist_metric_collection", fail_first_flush)
+
+    metrics.flush_to_postgres()
+
+    assert redis.zscore(metric_buckets.DIRTY_KEY, key) == clock["minute"]
+    persisted = 10 if failure_phase == "after_commit" else 0
+    assert _historical_totals(metrics, "api.requests") == {
+        "count": persisted,
+        "sum": float(persisted),
+    }
+
+    metrics.flush_to_postgres()
+    metrics.flush_to_postgres()
+
+    assert _historical_totals(metrics, "api.requests") == {"count": 10, "sum": 10.0}
+    assert redis.zscore(metric_buckets.DIRTY_KEY, key) is None
+    assert calls == 2
+
+
+def test_observation_between_persist_and_ack_remains_dirty_until_next_snapshot(
+    pg_db, metric_runtime, monkeypatch
+):
+    metrics, redis, clock = metric_runtime
+    for _observation in range(10):
+        metrics.record_counter("api.requests")
+    key = _request_bucket(clock)
+    original_ack = metric_buckets.acknowledge_snapshots
+    dirty_after_ack = []
+
+    def write_before_first_ack(connection, snapshots, **kwargs):
+        if not dirty_after_ack:
+            assert _historical_totals(metrics, "api.requests") == {
+                "count": 10,
+                "sum": 10.0,
+            }
+            metrics.record_counter("api.requests")
+        original_ack(connection, snapshots, **kwargs)
+        dirty_after_ack.append(redis.zscore(metric_buckets.DIRTY_KEY, key))
+
+    monkeypatch.setattr(metric_buckets, "acknowledge_snapshots", write_before_first_ack)
+
+    metrics.flush_to_postgres()
+
+    assert dirty_after_ack == [clock["minute"], None]
+    assert _historical_totals(metrics, "api.requests") == {"count": 11, "sum": 11.0}
 
 
 class TestMetricsBatchQueries:
-    def test_query_summaries_batches_multiple_metrics_in_one_pipeline(
-        self, monkeypatch
+    def test_two_specs_sharing_a_family_download_each_real_bucket_once(
+        self, metric_runtime
     ):
-        from crate import metrics
-
-        fixed_bucket = 600
-
-        class FakePipeline:
-            def __init__(self):
-                self.keys: list[str] = []
-                self.executed = False
-
-            def hgetall(self, key: str):
-                self.keys.append(key)
-                return self
-
-            def execute(self):
-                self.executed = True
-                results = []
-                for key in self.keys:
-                    if "api.request.latency" in key:
-                        results.append(
-                            {"count": "2", "sum": "84", "min": "40", "max": "44"}
-                        )
-                    elif "api.request.errors" in key:
-                        results.append(
-                            {"count": "1", "sum": "1", "min": "1", "max": "1"}
-                        )
-                    else:
-                        results.append({})
-                return results
-
-        class FakeRedis:
-            def __init__(self):
-                self.pipeline_calls = 0
-                self.pipeline_instance = FakePipeline()
-
-            def pipeline(self, transaction: bool = False):
-                assert transaction is False
-                self.pipeline_calls += 1
-                return self.pipeline_instance
-
-        fake_redis = FakeRedis()
-
-        monkeypatch.setattr(metrics, "_minute_bucket", lambda ts=None: fixed_bucket)
-        monkeypatch.setattr("crate.db.cache_runtime.get_redis", lambda: fake_redis)
+        metrics, redis, _clock = metric_runtime
+        metrics.record_counter("api.request.count", {"status": "200"})
+        metrics.record_counter("api.request.count", {"status": "200"})
+        before = redis.info("commandstats")
 
         summaries = metrics.query_summaries(
             {
-                "api_latency": ("api.request.latency", 2),
+                "requests": ("api.request.count", 5),
+                "errors": ("api.request.count", 5, {"status_class": "5xx"}),
+            }
+        )
+
+        after = redis.info("commandstats")
+        hmget_before = before.get("cmdstat_hmget", {}).get("calls", 0)
+        hmget_after = after.get("cmdstat_hmget", {}).get("calls", 0)
+        assert hmget_after - hmget_before == 1
+        hgetall_before = before.get("cmdstat_hgetall", {}).get("calls", 0)
+        hgetall_after = after.get("cmdstat_hgetall", {}).get("calls", 0)
+        assert hgetall_after == hgetall_before
+        assert summaries["requests"]["count"] == 2
+        assert summaries["errors"]["count"] == 0
+        assert summaries["errors"]["eligible_count"] == 2
+        assert summaries["errors"]["availability"] == "available"
+
+    def test_bucket_budget_bounds_index_download_before_rejecting(
+        self, monkeypatch, metric_runtime
+    ):
+        metrics, redis, clock = metric_runtime
+        now = clock["minute"]
+        for offset in range(3):
+            clock["minute"] = now - offset * 60
+            metrics.record_counter("api.requests")
+        clock["minute"] = now
+        monkeypatch.setattr(metric_buckets, "MAX_READ_BUCKETS", 2)
+        original_pipeline = redis.pipeline
+
+        def bounded_pipeline(*args, **kwargs):
+            current = original_pipeline(*args, **kwargs)
+            original_range = current.zrangebyscore
+
+            def bounded_range(name, minimum, maximum, start=None, num=None, **options):
+                assert start is not None, (
+                    "Index download must have a server-side offset"
+                )
+                assert num is not None and 0 < num <= 3, (
+                    "Index download must be limited to the remaining budget plus one"
+                )
+                return original_range(
+                    name, minimum, maximum, start=start, num=num, **options
+                )
+
+            monkeypatch.setattr(current, "zrangebyscore", bounded_range)
+            return current
+
+        monkeypatch.setattr(redis, "pipeline", bounded_pipeline)
+
+        with pytest.raises(ValueError, match="budget"):
+            metric_buckets.read_buckets(redis, {"requests": ("api.requests", 3)}, now)
+
+    @pytest.mark.parametrize("minute_count", [2, 501])
+    def test_query_summaries_batches_indexed_buckets_in_bounded_pipelines(
+        self, monkeypatch, metric_runtime, minute_count
+    ):
+        metrics, redis, clock = metric_runtime
+        now = clock["minute"]
+        for offset in range(minute_count):
+            clock["minute"] = now - offset * 60
+            metrics.record("api.request.latency", 40.0)
+            metrics.record("api.request.latency", 44.0)
+        clock["minute"] = now
+        metrics.record_counter("api.request.errors")
+        batches = _observe_pipelines(monkeypatch, redis)
+
+        summaries = metrics.query_summaries(
+            {
+                "api_latency": ("api.request.latency", minute_count),
                 "api_errors": ("api.request.errors", 1),
             }
         )
 
-        assert fake_redis.pipeline_calls == 1
-        assert fake_redis.pipeline_instance.executed is True
-        assert fake_redis.pipeline_instance.keys == [
-            "crate:metrics:api.request.latency:600",
-            "crate:metrics:api.request.latency:540",
-            "crate:metrics:api.request.errors:600",
-        ]
-        assert summaries["api_latency"] == {
-            "count": 4,
+        assert _numeric_summary(summaries["api_latency"]) == {
+            "count": minute_count * 2,
             "avg": 42.0,
             "min": 40.0,
             "max": 44.0,
-            "sum": 168.0,
+            "sum": minute_count * 84.0,
         }
-        assert summaries["api_errors"] == {
+        assert _numeric_summary(summaries["api_errors"]) == {
             "count": 1,
             "avg": 1.0,
             "min": 1.0,
             "max": 1.0,
             "sum": 1.0,
         }
+        hash_batches = [batch for batch in batches if batch and batch[0][0] == "HMGET"]
+        assert len(hash_batches) == ceil((minute_count + 1) / 500)
+        assert len(batches) <= 1 + len(hash_batches)
+        assert sum(len(batch) for batch in hash_batches) == minute_count + 1
+        assert all(len(batch) <= 500 for batch in hash_batches)
+        assert all(command[0] == "HMGET" for batch in hash_batches for command in batch)
 
-    def test_query_route_latency_aggregates_recent_p95_p99(self, monkeypatch):
-        from crate import metrics
-
-        fixed_bucket = 600
-        route_id = metrics._route_id("api", "GET", "/api/me/home/discovery")
-
-        class FakePipeline:
-            def __init__(self):
-                self.ops: list[tuple[str, str]] = []
-
-            def smembers(self, key: str):
-                self.ops.append(("smembers", key))
-                return self
-
-            def hgetall(self, key: str):
-                self.ops.append(("hgetall", key))
-                return self
-
-            def lrange(self, key: str, start: int, end: int):
-                assert start == 0
-                assert end == -1
-                self.ops.append(("lrange", key))
-                return self
-
-            def execute(self):
-                results = []
-                for op, key in self.ops:
-                    if op == "smembers":
-                        results.append({route_id} if key.endswith(":600") else set())
-                    elif op == "hgetall" and key.endswith(":600"):
-                        results.append(
-                            {
-                                "route_id": route_id,
-                                "target": "api",
-                                "method": "GET",
-                                "path": "/api/me/home/discovery",
-                                "count": "3",
-                                "sum": "300",
-                                "min": "80",
-                                "max": "120",
-                                "status_2xx": "3",
-                            }
-                        )
-                    elif op == "lrange" and key.endswith(":600:samples"):
-                        results.append(["100", "120", "80"])
-                    else:
-                        results.append({} if op == "hgetall" else [])
-                return results
-
-        class FakeRedis:
-            def pipeline(self, transaction: bool = False):
-                assert transaction is False
-                return FakePipeline()
-
-        monkeypatch.setattr(metrics, "_minute_bucket", lambda ts=None: fixed_bucket)
-        monkeypatch.setattr("crate.db.cache_runtime.get_redis", lambda: FakeRedis())
+    def test_query_route_latency_aggregates_recent_p95_p99(self, metric_runtime):
+        metrics, _redis, _clock = metric_runtime
+        path = "/api/me/home/discovery"
+        route_id = metrics._route_id("api", "GET", path)
+        for value in (100.0, 120.0, 80.0):
+            metrics._record_route_latency_sync(
+                value, {"method": "GET", "path": path, "status": "200"}
+            )
 
         routes = metrics.query_route_latency(minutes=2, limit=10)
 
@@ -434,7 +365,7 @@ class TestMetricsBatchQueries:
                 "route_id": route_id,
                 "target": "api",
                 "method": "GET",
-                "path": "/api/me/home/discovery",
+                "path": path,
                 "count": 3,
                 "sum": 300.0,
                 "min": 80.0,
@@ -448,5 +379,27 @@ class TestMetricsBatchQueries:
                 "p95": 120.0,
                 "p99": 120.0,
                 "error_rate": 0.0,
+                "sample_count": 3,
+                "sampled": False,
             }
         ]
+
+    def test_query_route_latency_declares_the_bounded_sample_population(
+        self, metric_runtime, monkeypatch
+    ):
+        metrics, _redis, _clock = metric_runtime
+        monkeypatch.setenv("CRATE_ROUTE_METRIC_SAMPLE_LIMIT", "50")
+        for value in range(1, 61):
+            metrics._record_route_latency_sync(
+                float(value),
+                {"method": "GET", "path": "/api/me/home/discovery", "status": "200"},
+            )
+
+        routes = metrics.query_route_latency(minutes=2, limit=10)
+
+        assert len(routes) == 1
+        assert routes[0]["count"] == 60
+        assert routes[0]["sample_count"] == 50
+        assert routes[0]["sampled"] is True
+        assert routes[0]["p95"] == 58.0
+        assert routes[0]["p99"] == 60.0

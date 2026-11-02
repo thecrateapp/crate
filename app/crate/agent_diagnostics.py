@@ -700,17 +700,23 @@ def read_diagnostics(
                 "An enumerated series and bounded minute window are required",
             )
         samples = query_recent(series, minutes=minutes)
-        rows = _rows(samples, limit)
+        rows = _rows(samples[-limit:], limit)
+        observed_at = rows[-1]["timestamp"] if rows else None
+        availability, reason = _fresh(observed_at, min(minutes * 60, 300), 86400)
         return _envelope(
             "metric_series",
             {"series": series, "minutes": minutes, "samples": _safe(rows)},
-            observed_at=rows[-1]["timestamp"] if rows else None,
-            availability="available" if rows else "unavailable",
-            reason=None if rows else "No persisted metric samples available",
+            observed_at=observed_at,
+            availability=availability if rows else "unavailable",
+            reason=reason if rows else "No metric observations available",
             returned_count=len(rows),
+            sample_count=sum(int(row.get("count", 0)) for row in rows),
+            namespace="crate:metrics:v2",
+            sample_kind="minute_aggregates",
             truncated=len(samples) > len(rows),
-            interpretation="Minute aggregates from persisted worker metrics. Missing samples do not imply zero activity or healthy dependencies.",
+            interpretation="Redis v2 minute aggregates of observed events. Returned rows and observed events are distinct; missing samples do not imply zero activity or healthy dependencies.",
         )
+
     if source not in {"worker_logs", "worker_status", "analysis_status"}:
         raise DiagnosticError("INVALID_ARGUMENT", "Unknown diagnostic source")
     if source != "worker_logs":

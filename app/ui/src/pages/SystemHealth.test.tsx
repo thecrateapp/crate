@@ -1,10 +1,10 @@
 import { MemoryRouter } from "react-router";
 import { AuthContext } from "@/contexts/AuthContext";
-import { screen, within } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import dashboardFixture from "../../../../tests/admin-e2e/fixtures/metrics-dashboard.json";
+import storedDashboardFixture from "../../../../tests/admin-e2e/fixtures/metrics-dashboard.json";
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 
 const { useApiMock, refetchMock, charts, motionMock } = vi.hoisted(() => ({
@@ -29,11 +29,40 @@ vi.mock("@/lib/task-catalog", async (importOriginal) => {
 
 import { SystemHealth } from "./SystemHealth";
 
+const dashboardFixture = structuredClone(storedDashboardFixture);
+const observedAt = new Date().toISOString();
+dashboardFixture.summary._meta.generated_at = observedAt;
+dashboardFixture.summary._meta.collector_local.observed_at = observedAt;
+dashboardFixture.summary._meta.collector_local.last_write_at = observedAt;
+for (const metric of Object.values(dashboardFixture.summary)) {
+  if ("count" in metric) {
+    metric.observed_at = observedAt;
+    metric.age_seconds = 0;
+  }
+}
 const dashboard = { ...dashboardFixture, timeseries: {} };
 const resourcesDescription =
   "Storage pressure, database pool use and analysis backlog surfaced as operational cards.";
 
 describe("SystemHealth Resources instrument", () => {
+  it("keeps plots stable while the parent clock updates freshness", () => {
+    vi.useFakeTimers();
+    try {
+      useApiMock.mockReturnValue({
+        data: dashboardFixture,
+        loading: false,
+        error: null,
+        refetch: refetchMock,
+      });
+      renderWithAdminProviders(<SystemHealth />);
+      const renders = charts.length;
+      expect(renders).toBeGreaterThan(0);
+      act(() => vi.advanceTimersByTime(15_000));
+      expect(charts).toHaveLength(renders);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it.each([false, true])(
     "honours motion permission %s at the statistical chart boundary",
     (allowed) => {
@@ -122,6 +151,76 @@ describe("SystemHealth Resources instrument", () => {
     expect(screen.getByText("— queued depth")).toBeVisible();
     expect(screen.queryByText("100% error rate")).not.toBeInTheDocument();
   });
+
+  it.each([
+    ["available", "0"],
+    ["empty", "—"],
+    ["partial", "—"],
+  ])("shows slow requests with %s evidence as %s", (availability, value) => {
+    useApiMock.mockReturnValue({
+      data: {
+        ...dashboard,
+        summary: {
+          ...dashboard.summary,
+          api_slow: {
+            ...dashboard.summary.api_slow,
+            availability,
+            count: 0,
+            sample_count: 0,
+            eligible_count: 2,
+          },
+        },
+      },
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+    renderWithAdminProviders(<SystemHealth />);
+    const tile = screen
+      .getByText("Slow Requests", { selector: "div" })
+      .closest<HTMLElement>(".crate-form-field")!;
+    expect(within(tile).getByText(value, { exact: true })).toBeVisible();
+  });
+
+  it.each([0, 3])(
+    "counts %s capacity drops without treating quarantine or source gaps as dropped samples",
+    (capacityDrops) => {
+      useApiMock.mockReturnValue({
+        data: {
+          ...dashboard,
+          summary: {
+            ...dashboard.summary,
+            _meta: {
+              ...dashboard.summary._meta,
+              collector_local: {
+                ...dashboard.summary._meta.collector_local,
+                availability: "partial",
+                counters: {
+                  buffer_limit: capacityDrops,
+                  unsupported_snapshot: 7,
+                  source_changed: 5,
+                },
+              },
+            },
+          },
+        },
+        loading: false,
+        error: null,
+        refetch: refetchMock,
+      });
+      renderWithAdminProviders(<SystemHealth />);
+      expect(
+        screen.getByText(
+          new RegExp(
+            `${capacityDrops} dropped observations since process start\\.`,
+          ),
+        ),
+      ).toBeVisible();
+      expect(screen.getByText("Health Score").parentElement).toHaveTextContent(
+        "—",
+      );
+    },
+  );
 
   it("offers recovery for a cold dashboard error and retains stale data on refresh errors", async () => {
     const user = userEvent.setup();

@@ -178,6 +178,13 @@ def read_observation_evidence(
                         "sequence",
                         "score",
                         "breaches",
+                        "schema_version",
+                        "availability",
+                        "source",
+                        "coverage",
+                        "observed_at",
+                        "inputs",
+                        "collector_local",
                     ],
                 },
             )

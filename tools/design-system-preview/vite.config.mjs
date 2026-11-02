@@ -452,6 +452,9 @@ export default defineConfig({
         adminDashboard: fileURLToPath(
           new URL("admin-dashboard-demo.html", import.meta.url),
         ),
+        observabilityIntegrity: fileURLToPath(
+          new URL("review-observability-integrity.html", import.meta.url),
+        ),
         adminSystemHealth: fileURLToPath(
           new URL("admin-system-health-demo.html", import.meta.url),
         ),

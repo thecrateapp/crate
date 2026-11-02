@@ -1,0 +1,2 @@
+# Unified patches require context whitespace, including blank context lines.
+.ecc/benchmarks/observability-pr1a/before-from-final.patch -whitespace

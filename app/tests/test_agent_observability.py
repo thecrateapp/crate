@@ -452,15 +452,35 @@ def test_summary_invalid_runtime_counters_remain_unknown_preserving_other_source
     assert len(json.dumps(result, ensure_ascii=False).encode()) < 60000
 
 
+def _versioned_health(*, score=60, availability="available", breaches=None):
+    from tests.test_metric_health_evaluation import _observed_inputs
+
+    inputs = _observed_inputs()
+    for sample in inputs.values():
+        sample["observed_at"] = NOW.isoformat()
+        sample["age_seconds"] = 0.0
+    return {
+        "schema_version": 2,
+        "score": score,
+        "breaches": breaches or [],
+        "availability": availability,
+        "source": "redis_v2",
+        "observed_at": NOW.isoformat(),
+        "coverage": "observed_only",
+        "inputs": inputs,
+    }
+
+
 def test_summary_exposes_health_and_alert_samples(stored):
+    expected_breaches = [
+        {"name": "RAM usage", "severity": "warning", "value": 97.5},
+    ]
+    health_payload = _versioned_health(breaches=expected_breaches)
     stored["runtime"].append(
         record(
             "health",
             {
-                "score": 60,
-                "breaches": [
-                    {"name": "RAM usage", "severity": "warning", "value": 97.5},
-                ],
+                **health_payload,
                 "metrics": {"secret": "omit"},
             },
         )
@@ -472,14 +492,118 @@ def test_summary_exposes_health_and_alert_samples(stored):
     stored["new_releases"] = [{"id": "1", "artist": "A", "album": "B"}]
     sources = observations.get_observability_summary()["data"]["sources"]
     assert sources["health"]["availability"] == "available"
-    assert sources["health"]["data"] == {
-        "score": 60,
-        "breaches": [{"name": "RAM usage", "severity": "warning", "value": 97.5}],
-    }
+    assert sources["health"]["data"]["score"] == 60
+    assert sources["health"]["data"]["breaches"] == expected_breaches
+    assert sources["health"]["data"]["schema_version"] == 2
+    assert sources["health"]["data"]["availability"] == "available"
+    assert "secret" not in json.dumps(sources["health"])
     failed = sources["failed_tasks"]
     assert failed["returned_count"] == 20 and failed["truncated"]
     assert len(failed["data"]["rows"]) == 20
     assert sources["new_releases"]["data"]["rows"][0]["album"] == "B"
+
+
+def test_summary_marks_legacy_health_as_unverified_instead_of_available(stored):
+    stored["runtime"].append(record("health", {"score": 100, "breaches": []}))
+
+    health = observations.get_observability_summary()["data"]["sources"]["health"]
+
+    assert health["availability"] != "available"
+    assert "unverified" in health["reason"].lower()
+
+
+@pytest.mark.parametrize("availability", ["empty", "stale", "partial", "unavailable"])
+def test_summary_preserves_v2_health_uncertainty_and_required_input_metadata(
+    stored, availability
+):
+    payload = _versioned_health(score=None, availability=availability)
+    payload["inputs"]["api_latency"]["availability"] = availability
+    payload["secret"] = "do-not-expose"
+    stored["runtime"].append(record("health", payload))
+
+    health = observations.get_observability_summary()["data"]["sources"]["health"]
+
+    assert (
+        health["availability"]
+        == {
+            "empty": "unavailable",
+            "partial": "stale",
+            "stale": "stale",
+            "unavailable": "unavailable",
+        }[availability]
+    )
+    assert health["data"]["score"] is None
+    assert health["data"]["schema_version"] == 2
+    assert health["data"]["availability"] == availability
+    assert health["data"]["coverage"] == "observed_only"
+    assert set(health["data"]["inputs"]) == {
+        "api_latency",
+        "api_requests",
+        "api_errors",
+        "queue_depth",
+    }
+    assert health["data"]["inputs"]["api_latency"]["availability"] == availability
+    assert "do-not-expose" not in json.dumps(health)
+
+
+@pytest.mark.parametrize(
+    "invalid_fields",
+    [
+        {"inputs": []},
+        {"availability": []},
+        {"inputs": {"api_latency": {"availability": {}}}},
+    ],
+)
+def test_malformed_v2_health_structure_is_unavailable_without_crashing(
+    stored, invalid_fields
+):
+    payload = {**_versioned_health(score=100), **invalid_fields}
+    stored["runtime"].append(record("health", payload))
+
+    health = observations.get_observability_summary()["data"]["sources"]["health"]
+
+    assert health["availability"] != "available"
+
+
+def test_available_health_without_all_required_inputs_is_not_available(stored):
+    payload = _versioned_health(score=100)
+    del payload["inputs"]["api_errors"]
+    stored["runtime"].append(record("health", payload))
+
+    health = observations.get_observability_summary()["data"]["sources"]["health"]
+
+    assert health["availability"] != "available"
+    assert health["data"]["score"] is None
+
+
+@pytest.mark.parametrize(
+    ("input_name", "invalid_fields"),
+    [
+        ("api_latency", {"observed_at": None}),
+        (
+            "api_latency",
+            {"observed_at": (NOW - timedelta(seconds=600)).isoformat()},
+        ),
+        (
+            "api_latency",
+            {"observed_at": (NOW + timedelta(days=1)).isoformat()},
+        ),
+        ("api_latency", {"sample_count": 0}),
+        ("api_errors", {"sample_count": 0, "eligible_count": 0}),
+    ],
+)
+def test_fresh_health_envelope_cannot_hide_invalid_required_input_evidence(
+    stored, input_name, invalid_fields
+):
+    payload = _versioned_health(score=100)
+    payload["inputs"][input_name].update(invalid_fields)
+    stored["runtime"].append(record("health", payload))
+
+    health = observations.get_observability_summary()["data"]["sources"]["health"]
+
+    assert health["availability"] != "available"
+    assert health["data"]["score"] is None
+    assert health["data"]["inputs"][input_name]["availability"] != "available"
 
 
 @pytest.mark.parametrize(

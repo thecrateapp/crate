@@ -124,7 +124,48 @@ def test_crate_migration_follows_the_current_main_head() -> None:
     assert scripts.get_revision("138").down_revision == "137"
     assert scripts.get_revision("139").down_revision == "138"
     assert scripts.get_revision("140").down_revision == "139"
-    assert scripts.get_heads() == ["140"]
+    assert scripts.get_heads() == ["141"]
+    assert scripts.get_revision("141").down_revision == "140"
+
+
+def test_metric_minute_migration_uses_immutable_schema_definition(monkeypatch):
+    root = Path(__file__).resolve().parents[1] / "crate" / "db"
+    assert (root / "migrations/versions/141_metric_minute_snapshots.py").is_file()
+    assert (root / "schema_sections/metric_minutes_v141.py").is_file()
+    migration = import_module(
+        "crate.db.migrations.versions.141_metric_minute_snapshots"
+    )
+    schema = import_module("crate.db.schema_sections.metric_minutes_v141")
+    migration_executor = RecordingExecutor()
+    schema_executor = RecordingExecutor()
+    monkeypatch.setattr(migration, "op", migration_executor)
+
+    migration.upgrade()
+    schema.create_metric_minute_snapshots_v141_schema(schema_executor)
+
+    assert migration_executor.statements == schema_executor.statements
+    statements = "\n".join(migration_executor.statements)
+    assert "CREATE TABLE IF NOT EXISTS metric_minute_snapshots" in statements
+    assert "metric_rollups" not in statements
+
+
+def test_metric_minute_migration_downgrade_keeps_legacy_rollups(monkeypatch):
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "crate/db/migrations/versions/141_metric_minute_snapshots.py"
+    )
+    assert path.is_file()
+    migration = import_module(
+        "crate.db.migrations.versions.141_metric_minute_snapshots"
+    )
+    executor = RecordingExecutor()
+    monkeypatch.setattr(migration, "op", executor)
+
+    migration.downgrade()
+
+    statements = "\n".join(executor.statements)
+    assert "DROP TABLE IF EXISTS metric_minute_snapshots" in statements
+    assert "metric_rollups" not in statements
 
 
 def test_deployed_revisions_keep_their_numbers_ahead_of_branch_revisions() -> None:
