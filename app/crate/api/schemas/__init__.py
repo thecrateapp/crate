@@ -5,6 +5,7 @@ from crate.api.schemas.metrics import (
     MetricsSummaryResponse,
     MetricsDashboardResponse,
     MetricsRoutesResponse,
+    ProductKpiResponse,
 )
 
 from crate.api.schemas import ai_agents as ai_agents

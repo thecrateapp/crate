@@ -118,6 +118,9 @@ const Analysis = lazy(() =>
 const SystemHealth = lazy(() =>
   import("@/pages/SystemHealth").then((m) => ({ default: m.SystemHealth })),
 );
+const Product = lazy(() =>
+  import("@/pages/Product").then((m) => ({ default: m.Product })),
+);
 const PlaybackDelivery = lazy(() =>
   import("@/pages/PlaybackDelivery").then((m) => ({
     default: m.PlaybackDelivery,
@@ -372,6 +375,14 @@ export default function App() {
                   element={
                     <RequireCapabilities anyOf={OPS_HEALTH_VIEW}>
                       <SystemHealth />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="product"
+                  element={
+                    <RequireCapabilities anyOf={OPS_HEALTH_VIEW}>
+                      <Product />
                     </RequireCapabilities>
                   }
                 />

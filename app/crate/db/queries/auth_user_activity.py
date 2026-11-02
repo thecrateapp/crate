@@ -18,6 +18,10 @@ def _configured_inactive_after_days() -> int:
     return max(1, min(value, 3650))
 
 
+def configured_inactive_after_days() -> int:
+    return _configured_inactive_after_days()
+
+
 def _safe_coerce_datetime(value: str | datetime | None) -> datetime | None:
     try:
         parsed = coerce_datetime(value)
@@ -71,4 +75,5 @@ def derive_user_activity(
 __all__ = [
     "DEFAULT_INACTIVE_AFTER_DAYS",
     "derive_user_activity",
+    "configured_inactive_after_days",
 ]

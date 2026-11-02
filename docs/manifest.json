@@ -196,6 +196,15 @@
     "order": 115
   },
   {
+    "sourcePath": "docs/technical/product-kpis.md",
+    "route": "/operations/product-kpis",
+    "section": "operations",
+    "title": "Product KPIs",
+    "summary": "How Crate computes instance-wide product figures, what each one means and how they are kept private.",
+    "keywords": ["kpi", "product", "listeners", "retention", "analytics"],
+    "order": 124
+  },
+  {
     "sourcePath": "docs/technical/operations.md",
     "route": "/operations/operations",
     "section": "operations",

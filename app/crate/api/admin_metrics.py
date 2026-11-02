@@ -20,6 +20,7 @@ from crate.api.schemas.metrics import (
     MetricsDashboardResponse,
     MetricsRoutesResponse,
     MetricsTimeseriesResponse,
+    ProductKpiResponse,
 )
 from crate.api.schemas.operations import (
     AdminGovernorSnapshotResponse,
@@ -29,6 +30,7 @@ from crate.db.admin_logs_surface import (
     LOGS_SURFACE_STREAM_CHANNEL,
     get_cached_logs_surface,
 )
+from crate.db.queries.product_kpis import get_product_kpi_rows
 
 router = APIRouter(prefix="/api/admin", tags=["admin-metrics"])
 
@@ -347,6 +349,56 @@ def _build_metrics_dashboard(period: str, minutes: int) -> dict:
     }
     set_cache(cache_key, payload, ttl=10)
     return {**payload, "summary": _attach_local_collector(payload["summary"])}
+
+
+KPI_WINDOWS = (7, 30, 90, 365)
+KPI_MINIMUM_SAMPLE = 3
+
+
+@router.get(
+    "/kpis",
+    response_model=ProductKpiResponse,
+    responses=AUTH_ERROR_RESPONSES,
+    summary="Daily product KPIs for a window and the one before it",
+)
+def product_kpis(request: Request, days: int = Query(30)):
+    _require_ops_health(request)
+    if days not in KPI_WINDOWS:
+        raise HTTPException(status_code=422, detail="days must be 7, 30, 90 or 365")
+    end = datetime.now(timezone.utc).date()
+    current_start = end - timedelta(days=days - 1)
+    previous_start = current_start - timedelta(days=days)
+    data = get_product_kpi_rows(previous_start, end)
+    series: dict[tuple[str, str], dict] = {}
+    for row in data["rows"]:
+        dims = {str(key): str(value) for key, value in (row["dims"] or {}).items()}
+        entry = series.setdefault(
+            (row["kpi"], json_dumps(dict(sorted(dims.items())))),
+            {"kpi": row["kpi"], "dims": dims, "points": []},
+        )
+        suppressed = (
+            bool(dims)
+            and row["sample"] is not None
+            and row["sample"] < KPI_MINIMUM_SAMPLE
+        )
+        entry["points"].append(
+            {
+                "day": row["day"].isoformat(),
+                "value": None if suppressed else row["value"],
+                "sample": row["sample"],
+                "suppressed": suppressed,
+            }
+        )
+    computed = data["computed_at"]
+    return {
+        "window_days": days,
+        "current_start": current_start.isoformat(),
+        "previous_start": previous_start.isoformat(),
+        "end": end.isoformat(),
+        "computed_at": computed.isoformat() if computed else None,
+        "minimum_sample": KPI_MINIMUM_SAMPLE,
+        "series": list(series.values()),
+    }
 
 
 @router.get(

@@ -154,6 +154,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "prepare_library_repairs": TaskPoolConfig("maintenance", 0, 1800, 0),
     "repair_duplicate_tracks": TaskPoolConfig("maintenance", 2, 3600, 0),
     "compute_analytics": TaskPoolConfig("maintenance", 2, 600, 0),
+    "compute_product_kpis": TaskPoolConfig("maintenance", 2, 900, 0),
     "check_new_releases": TaskPoolConfig("maintenance", 2, 7200, 1),
     "promote_due_releases": TaskPoolConfig("maintenance", 2, 900, 0),
     "scan": TaskPoolConfig("maintenance", 2, 1800, 0),

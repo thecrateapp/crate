@@ -165,6 +165,7 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     ),
     "cleanup_invalid_genre_taxonomy": TaskTypeInfo("Taxonomy Cleanup", "enrichment"),
     "compute_analytics": TaskTypeInfo("Library Analytics", "analysis"),
+    "compute_product_kpis": TaskTypeInfo("Product KPIs", "analysis"),
     "refresh_user_listening_stats": TaskTypeInfo("Listening Stats Refresh", "analysis"),
     "refresh_dirty_listening_stats": TaskTypeInfo(
         "Pending Listening Stats Sweep", "analysis"

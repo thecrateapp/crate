@@ -95,3 +95,26 @@ class MetricsTimeseriesResponse(BaseModel):
     period: Literal["minute", "hour", "day"]
     data: list[dict[str, Any]]
     status: dict[str, Any]
+
+
+class ProductKpiPoint(BaseModel):
+    day: str
+    value: float | None
+    sample: int | None = None
+    suppressed: bool = False
+
+
+class ProductKpiSeries(BaseModel):
+    kpi: str
+    dims: dict[str, str] = Field(default_factory=dict)
+    points: list[ProductKpiPoint]
+
+
+class ProductKpiResponse(BaseModel):
+    window_days: int
+    current_start: str
+    previous_start: str
+    end: str
+    computed_at: str | None
+    minimum_sample: int
+    series: list[ProductKpiSeries]

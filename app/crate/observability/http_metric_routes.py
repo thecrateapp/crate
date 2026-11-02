@@ -126,6 +126,7 @@ HTTP_ROUTES = frozenset(
         "/api/admin/i18n/listen/locales/:param/draft-missing",
         "/api/admin/i18n/listen/quality",
         "/api/admin/i18n/listen/requests",
+        "/api/admin/kpis",
         "/api/admin/llm/status",
         "/api/admin/logs",
         "/api/admin/logs-snapshot",
