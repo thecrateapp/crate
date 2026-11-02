@@ -121,6 +121,17 @@ def _detect_project_name() -> str:
     return ""
 
 
+def daemon_name() -> str | None:
+    """The Docker host's name: the server's hostname, not this container's."""
+    try:
+        status, body = _call("GET", "/info")
+    except DockerUnavailableError:
+        return None
+    if status != 200 or not isinstance(body, dict):
+        return None
+    return str(body.get("Name") or "").strip() or None
+
+
 def application_project() -> str:
     """The Compose project of this deployment, detected first, then configured."""
     import os

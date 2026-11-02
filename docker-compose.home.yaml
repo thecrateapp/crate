@@ -274,6 +274,10 @@ services:
     environment:
       <<: [*crate-env, *crate-enrichment-env, *ai-credential-env]
       CRATE_RUNTIME: api
+      CRATE_HOST_ID: ${CRATE_HOST_ID:-}
+      CRATE_HOST_NAME: ${CRATE_HOST_NAME:-}
+      CRATE_GRAFANA_URL: ${CRATE_GRAFANA_URL:-}
+      CRATE_OBSERVABILITY_PROJECT: ${CRATE_OBSERVABILITY_PROJECT:-}
       CRATE_MCP_ENABLED: ${CRATE_MCP_ENABLED:-false}
       CRATE_MCP_ACTIONS_ENABLED: ${CRATE_MCP_ACTIONS_ENABLED:-false}
       CRATE_MCP_OAUTH_ENABLED: ${CRATE_MCP_OAUTH_ENABLED:-false}
