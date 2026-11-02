@@ -55,6 +55,11 @@ public:
     virtual void add(const std::string& id, const std::string& name) = 0;
 };
 
+struct QueuedSong {
+    std::string source;
+    std::string title;
+};
+
 class HostPort {
 public:
     virtual ~HostPort() = default;
@@ -65,7 +70,7 @@ public:
     virtual int deck_count() = 0;
     virtual std::optional<DeckReading> read_deck(int deck) = 0;
     virtual bool automix_active() = 0;
-    virtual std::vector<std::string> automix_upcoming(int count) = 0;
+    virtual std::vector<QueuedSong> automix_queue(int count) = 0;
 };
 
 class ConnectionUi {
@@ -163,10 +168,8 @@ private:
         const std::vector<std::optional<DeckReading>>& decks,
         std::chrono::system_clock::time_point now
     );
-    std::optional<std::string> choose_automix_track(
-        const std::string& anchor,
-        const std::vector<std::string>& upcoming
-    );
+    std::optional<std::string> choose_automix_track(const std::string& anchor);
+    std::optional<std::string> uid_for_title(const std::string& title);
 
     HostPort& host_;
     ConnectionUi& ui_;
@@ -191,6 +194,7 @@ private:
         std::unordered_set<std::string> played;
         std::deque<std::string> recent;
         bool replan = false;
+        std::string expected_next_title;
         std::chrono::system_clock::time_point next_action_at{};
     };
     AutomixState automix_;

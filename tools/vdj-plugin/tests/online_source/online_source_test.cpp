@@ -191,7 +191,7 @@ public:
     std::map<int, DeckReading> decks;
     int layout_decks = 2;
     bool automix = true;
-    std::vector<std::string> upcoming;
+    std::vector<QueuedSong> queue;
 
     std::string language() override
     {
@@ -225,13 +225,13 @@ public:
         return automix;
     }
 
-    std::vector<std::string> automix_upcoming(int count) override
+    std::vector<QueuedSong> automix_queue(int count) override
     {
-        std::vector<std::string> paths;
-        for (int index = 0; index < count && index < static_cast<int>(upcoming.size()); ++index) {
-            paths.push_back(upcoming[static_cast<std::size_t>(index)]);
+        std::vector<QueuedSong> songs;
+        for (int index = 0; index < count && index < static_cast<int>(queue.size()); ++index) {
+            songs.push_back(queue[static_cast<std::size_t>(index)]);
         }
-        return paths;
+        return songs;
     }
 
     std::optional<DeckReading> read_deck(int deck) override
@@ -747,7 +747,7 @@ void automix_chains_the_second_track_from_the_first_and_never_repeats_an_album()
 {
     AutomixHarness automix;
     automix.commands_after(kPlayStart);
-    automix.harness.host.upcoming = {crate_path("a")};
+    automix.harness.host.queue = {{"Crate", ""}};
 
     const auto commands = automix.commands_after(kPlayStart + 10s);
 
@@ -758,7 +758,7 @@ void automix_chains_the_second_track_from_the_first_and_never_repeats_an_album()
 void automix_waits_while_two_tracks_are_queued()
 {
     AutomixHarness automix;
-    automix.harness.host.upcoming = {crate_path("a"), crate_path("c")};
+    automix.harness.host.queue = {{"Crate", ""}, {"/Users/dj/Music/own.mp3", "Own Track"}};
 
     CRATE_CHECK(automix.commands_after(kPlayStart).empty());
 }
@@ -767,13 +767,38 @@ void a_manual_change_puts_a_fitting_track_right_next()
 {
     AutomixHarness automix;
     automix.commands_after(kPlayStart);
-    automix.harness.host.upcoming = {crate_path("a")};
+    automix.harness.host.queue = {{"Crate", ""}, {"Crate", ""}};
+    automix.harness.source->tick(kPlayStart + 6s);
     automix.harness.host.decks[1] = DeckReading{crate_path("manual"), true, 1'000, 200'000};
 
     const auto commands = automix.commands_after(kPlayStart + 10s);
 
     CRATE_CHECK(commands.size() == 2);
     CRATE_CHECK(commands[1] == "automix_add_next \"netsearch://plugin-Crate/m\"");
+}
+
+void a_track_coming_from_the_queue_is_not_a_manual_change()
+{
+    AutomixHarness automix;
+    automix.harness.http.route(
+        "/api/search?q=queued",
+        R"json({"artists":[],"albums":[],"tracks":[{"entity_uid":"queued","title":"Queued Song","artist":"Queue Band","album":"Queue Album"}]})json"
+    );
+    automix.harness.http.route(
+        "/api/tracks/by-entity/queued/compatible",
+        compatible_json("queued", {{"q", "Band Q", "Album Q"}})
+    );
+    RecordingSink listed;
+    automix.harness.source->search("queued", listed);
+    automix.harness.host.queue = {{"Crate", "Queued Song"}, {"Crate", "Other Song"}};
+    automix.commands_after(kPlayStart);
+
+    automix.harness.host.decks[1] = DeckReading{crate_path("queued"), true, 1'000, 200'000};
+    automix.harness.host.queue = {{"Crate", "Other Song"}};
+    const auto commands = automix.commands_after(kPlayStart + 10s);
+
+    CRATE_CHECK(commands.size() == 1);
+    CRATE_CHECK(commands[0] == "playlist_add \"netsearch://plugin-Crate/q\"");
 }
 
 void automix_does_nothing_without_permission_or_with_automix_off()
@@ -838,6 +863,7 @@ int main()
     automix_chains_the_second_track_from_the_first_and_never_repeats_an_album();
     automix_waits_while_two_tracks_are_queued();
     a_manual_change_puts_a_fitting_track_right_next();
+    a_track_coming_from_the_queue_is_not_a_manual_change();
     automix_does_nothing_without_permission_or_with_automix_off();
     a_track_opens_its_album_in_listen();
     open_in_crate_needs_a_listen_url();

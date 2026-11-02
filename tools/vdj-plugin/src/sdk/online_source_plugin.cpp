@@ -225,23 +225,32 @@ public:
         return plugin_.cb != nullptr && plugin_.GetInfo("automix", &active) == S_OK && active != 0;
     }
 
-    std::vector<std::string> automix_upcoming(int count) override
+    std::vector<QueuedSong> automix_queue(int count) override
     {
-        std::vector<std::string> paths;
+        std::vector<QueuedSong> queue;
         if (plugin_.cb == nullptr) {
-            return paths;
+            return queue;
         }
         for (int index = 1; index <= count; ++index) {
-            std::array<char, 4096> filepath = {};
-            const std::string query = "get_automix_song filepath " + std::to_string(index);
-            if (plugin_.GetStringInfo(query.c_str(), filepath.data(), static_cast<int>(filepath.size())) !=
-                    S_OK ||
-                filepath[0] == '\0') {
+            const std::string position = " " + std::to_string(index);
+            std::array<char, 4096> source = {};
+            if (plugin_.GetStringInfo(
+                    ("get_automix_song filepath" + position).c_str(),
+                    source.data(),
+                    static_cast<int>(source.size())
+                ) != S_OK ||
+                source[0] == '\0') {
                 break;
             }
-            paths.emplace_back(filepath.data());
+            std::array<char, 1024> title = {};
+            plugin_.GetStringInfo(
+                ("get_automix_song title" + position).c_str(),
+                title.data(),
+                static_cast<int>(title.size())
+            );
+            queue.push_back(QueuedSong{source.data(), title.data()});
         }
-        return paths;
+        return queue;
     }
 
     std::optional<DeckReading> read_deck(int deck) override

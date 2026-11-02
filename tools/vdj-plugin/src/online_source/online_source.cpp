@@ -390,9 +390,15 @@ void OnlineSource::feed_automix(
     }
     if (*seed != automix_.seed) {
         const auto planned = std::find(automix_.planned.begin(), automix_.planned.end(), *seed);
-        automix_.replan = !automix_.seed.empty() && planned == automix_.planned.end();
+        const auto facts = facts_for(*seed);
+        const bool from_queue = planned != automix_.planned.end() ||
+            (facts.has_value() && !facts->title.empty() &&
+             casefolded(facts->title) == casefolded(automix_.expected_next_title));
+        automix_.replan = !automix_.seed.empty() && !from_queue;
         if (planned == automix_.planned.end()) {
-            automix_.planned.clear();
+            if (automix_.replan) {
+                automix_.planned.clear();
+            }
         } else {
             automix_.planned.erase(automix_.planned.begin(), planned + 1);
         }
@@ -402,35 +408,37 @@ void OnlineSource::feed_automix(
         if (automix_.recent.size() > kAutomixRecentTracks) {
             automix_.recent.pop_front();
         }
-        log("automix seed id=" + *seed);
+        log("automix seed id=" + *seed + (automix_.replan ? " manual" : ""));
     }
+
+    const auto queue = host_.automix_queue(static_cast<int>(kAutomixLookahead) + 1);
+    automix_.expected_next_title = queue.empty() ? "" : queue.front().title;
     if (now < automix_.next_action_at) {
         return;
     }
-
-    std::vector<std::string> upcoming;
-    std::string upcoming_log;
-    for (const auto& path : host_.automix_upcoming(static_cast<int>(kAutomixLookahead) + 1)) {
-        upcoming.push_back(crate_uid_from_vdj_filepath(path).value_or(""));
-        upcoming_log += (upcoming_log.empty() ? "" : ",") + (upcoming.back().empty() ? std::string("other") : upcoming.back());
-    }
-    if (!automix_.replan && upcoming.size() >= kAutomixLookahead) {
+    if (!automix_.replan && queue.size() >= kAutomixLookahead) {
         return;
     }
-    const std::string anchor = automix_.replan || upcoming.empty() || upcoming.back().empty()
-        ? *seed
-        : upcoming.back();
-    const auto pick = choose_automix_track(anchor, upcoming);
+
+    std::string anchor = *seed;
+    if (!automix_.replan && !queue.empty() && queue.back().source == "Crate") {
+        if (!automix_.planned.empty()) {
+            anchor = automix_.planned.back();
+        } else if (const auto by_title = uid_for_title(queue.back().title)) {
+            anchor = *by_title;
+        }
+    }
+    const auto pick = choose_automix_track(anchor);
     automix_.next_action_at = now + kAutomixActionSpacing;
     if (!pick.has_value()) {
-        log("automix found no track anchor=" + anchor + " upcoming=" + upcoming_log);
+        log("automix found no track anchor=" + anchor);
         automix_.replan = false;
         return;
     }
     const std::string verb = automix_.replan ? "automix_add_next" : "playlist_add";
     const bool sent = host_.send_command(verb + " " + netsearch_path(*pick));
-    log("automix " + verb + " id=" + *pick + " anchor=" + anchor + " upcoming=" + upcoming_log +
-        (sent ? "" : " failed"));
+    log("automix " + verb + " id=" + *pick + " anchor=" + anchor + " queued=" +
+        std::to_string(queue.size()) + (sent ? "" : " failed"));
     if (sent) {
         if (automix_.replan) {
             automix_.planned.insert(automix_.planned.begin(), *pick);
@@ -441,10 +449,22 @@ void OnlineSource::feed_automix(
     automix_.replan = false;
 }
 
-std::optional<std::string> OnlineSource::choose_automix_track(
-    const std::string& anchor,
-    const std::vector<std::string>& upcoming
-)
+std::optional<std::string> OnlineSource::uid_for_title(const std::string& title)
+{
+    if (title.empty()) {
+        return std::nullopt;
+    }
+    const auto wanted = casefolded(title);
+    std::lock_guard lock(facts_mutex_);
+    for (const auto& [uid, facts] : track_facts_) {
+        if (casefolded(facts.title) == wanted) {
+            return uid;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<std::string> OnlineSource::choose_automix_track(const std::string& anchor)
 {
     const auto server = clients();
     if (server == nullptr) {
@@ -462,7 +482,6 @@ std::optional<std::string> OnlineSource::choose_automix_track(
     remember(candidates);
 
     std::unordered_set<std::string> excluded(automix_.played.begin(), automix_.played.end());
-    excluded.insert(upcoming.begin(), upcoming.end());
     excluded.insert(automix_.planned.begin(), automix_.planned.end());
     excluded.insert(anchor);
     std::unordered_set<std::string> recent_artists;
