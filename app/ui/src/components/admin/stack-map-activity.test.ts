@@ -162,6 +162,32 @@ describe("deriveStackActivity", () => {
     });
   });
 
+  it("merges every client of one service into a single reading and pulse", () => {
+    const data = snapshot();
+    data.services = data.services.map((service) =>
+      service.id === "admin"
+        ? { ...service, activity: { clients: ["admin-web", "admin-cli"] } }
+        : service,
+    );
+    const view = deriveStackActivity(
+      data,
+      frame({
+        requests: {
+          "admin-web": { count: 12, errors: 1 },
+          "admin-cli": { count: 3, errors: 0 },
+        },
+      }),
+      { now: NOW },
+    );
+
+    expect(
+      view.readings.get("admin")?.filter((item) => item.label === "Requests"),
+    ).toEqual([{ label: "Requests", value: "180/min" }]);
+    expect(
+      view.pulses.filter((item) => item.connection.source === "admin"),
+    ).toEqual([expect.objectContaining({ count: 15, errors: 1 })]);
+  });
+
   it("does not draw a pulse for a client without a declared connection", () => {
     const view = deriveStackActivity(snapshot(), frame(), { now: NOW });
 

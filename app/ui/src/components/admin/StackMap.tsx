@@ -755,8 +755,8 @@ export function StackMap({
                   <MonoLabel as="p">Live activity</MonoLabel>
                   {liveReadings.length ? (
                     <dl>
-                      {liveReadings.map((reading) => (
-                        <div key={reading.label}>
+                      {liveReadings.map((reading, index) => (
+                        <div key={`${reading.label}-${index}`}>
                           <dt>{reading.label}</dt>
                           <dd>{reading.value}</dd>
                         </div>

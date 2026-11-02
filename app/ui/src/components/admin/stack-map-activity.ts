@@ -138,6 +138,7 @@ export function deriveStackActivity(
     const measurers = measuring(services, "requests");
     let total = 0;
     let errors = 0;
+    const byOrigin = new Map<string, { count: number; errors: number }>();
     for (const [client, entry] of Object.entries(frame.requests)) {
       total += entry.count;
       errors += entry.errors;
@@ -145,15 +146,20 @@ export function deriveStackActivity(
         service.activity?.clients?.includes(client),
       );
       if (origins.length !== 1) continue;
-      const origin = origins[0]!;
-      add(origin.id, {
+      const merged = byOrigin.get(origins[0]!.id) ?? { count: 0, errors: 0 };
+      merged.count += entry.count;
+      merged.errors += entry.errors;
+      byOrigin.set(origins[0]!.id, merged);
+    }
+    for (const [originId, entry] of byOrigin) {
+      add(originId, {
         label: "Requests",
         value: `${perMinute(entry.count, window)}/min`,
       });
-      raise(origin.id, level(perMinute(entry.count, window), 3));
+      raise(originId, level(perMinute(entry.count, window), 3));
       for (const measurer of measurers) {
         const link = connection(
-          (item) => item.source === origin.id && item.target === measurer.id,
+          (item) => item.source === originId && item.target === measurer.id,
         );
         if (link && entry.count > 0)
           pulses.push({
