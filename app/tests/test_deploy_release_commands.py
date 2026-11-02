@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -10,6 +11,65 @@ import yaml
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.mark.parametrize("operation", ["cmd_up", "cmd_rollback"])
+def test_application_update_keeps_legacy_monitoring_sentinel(tmp_path, operation):
+    sentinel = tmp_path / "monitoring-running"
+    sentinel.write_text("existing monitoring container\n")
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake = fake_bin / "docker"
+    fake.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, os, pathlib, sys\n"
+        "with open(os.environ['DOCKER_TEST_LOG'], 'a') as output:\n"
+        "    output.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+        "if '--remove-orphans' in sys.argv:\n"
+        "    pathlib.Path(os.environ['MONITORING_SENTINEL']).unlink(missing_ok=True)\n"
+    )
+    fake.chmod(0o755)
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    (backup / "changed_services").write_text("crate-api\n")
+    (tmp_path / ".deploy").mkdir()
+    log = tmp_path / "docker.jsonl"
+    shell = (
+        "log() { :; }\nrecord_agent_deployment() { :; }\n"
+        "cmd_verify() { :; }\ncompose_has_service() { return 0; }\n"
+        "COMPOSE=(docker compose --project-name crate)\n"
+        'dc() { "${COMPOSE[@]}" "$@"; }\n'
+        + _shell_function(operation)
+        + f"\n{operation}\n"
+    )
+
+    result = subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", shell],
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+            "BACKUP_DIR": str(backup),
+            "DEPLOY_ID": "fixture",
+            "DOCKER_TEST_LOG": str(log),
+            "MONITORING_SENTINEL": str(sentinel),
+        },
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert sentinel.is_file(), "An application update retired the monitoring sentinel"
+    commands = [json.loads(line) for line in log.read_text().splitlines()]
+    starts = [command for command in commands if "up" in command]
+    assert len(starts) == 1
+    assert starts[0][-1] == "crate-api"
+    assert "--remove-orphans" not in starts[0]
+
+
+def test_state_rollback_never_implicitly_retires_other_project_services():
+    assert "--remove-orphans" not in _shell_function("cmd_state_rollback")
 
 
 @pytest.mark.parametrize(
@@ -430,6 +490,30 @@ def test_build_workflow_promotes_a_complete_manifest_after_selective_builds() ->
     )
 
 
+def test_deploy_tooling_changes_skip_the_heavy_monitoring_matrix() -> None:
+    workflows = ROOT / ".github/workflows"
+    heavy = yaml.safe_load((workflows / "test-observability.yml").read_text())
+    light = yaml.safe_load((workflows / "test-deploy-tooling.yml").read_text())
+    tooling = {
+        "scripts/deploy-remote.sh": "app/tests/test_deploy_release_commands.py",
+        "scripts/application_orphans.py": "app/tests/test_application_orphans.py",
+    }
+    paths = {*tooling, *tooling.values()}
+
+    for event in ("pull_request", "push"):
+        assert not paths & set(heavy[True][event]["paths"])
+        assert paths <= set(light[True][event]["paths"])
+    heavy_runs = " ".join(
+        step.get("run", "") for job in heavy["jobs"].values() for step in job["steps"]
+    )
+    light_runs = " ".join(
+        step.get("run", "") for job in light["jobs"].values() for step in job["steps"]
+    )
+    assert not any(test in heavy_runs for test in tooling.values())
+    assert all(test in light_runs for test in tooling.values())
+    assert "docker" not in light_runs and "systemctl" not in light_runs
+
+
 def test_deploy_extracts_release_manifest_for_production_platform() -> None:
     deploy_script = (ROOT / "scripts/deploy.sh").read_text()
 
@@ -847,3 +931,197 @@ def test_remote_state_rollback_restores_database_before_old_images() -> None:
     assert rollback_body.index("pg_restore") < rollback_body.index(
         'log "Restarting recovered release'
     )
+
+
+HOST_LOCK_FUNCTIONS = (
+    "host_lock_acquire",
+    "host_lease_field",
+    "host_lease_refuse_other",
+    "host_guard",
+    "cmd_host_lock",
+    "cmd_host_unlock",
+)
+MUTATING_STEPS = {
+    "backup",
+    "recovery-snapshot",
+    "config",
+    "pull",
+    "up",
+    "agent-context",
+    "rollback",
+    "state-rollback",
+    "cleanup",
+}
+
+
+def _flock_bin(tmp_path: Path) -> str:
+    """Real flock on Linux; an fcntl shim with the same fd semantics elsewhere."""
+    if shutil.which("flock"):
+        return os.environ["PATH"]
+    shim_dir = tmp_path / "flock-bin"
+    shim_dir.mkdir(exist_ok=True)
+    shim = shim_dir / "flock"
+    shim.write_text(
+        f"#!{__import__('sys').executable}\n"
+        "import fcntl, sys, time\n"
+        "args = sys.argv[1:]\n"
+        "wait = float(args[args.index('-w') + 1]) if '-w' in args else None\n"
+        "fd = int(args[-1])\n"
+        "deadline = time.monotonic() + (wait or 0)\n"
+        "while True:\n"
+        "    try:\n"
+        "        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)\n"
+        "        sys.exit(0)\n"
+        "    except BlockingIOError:\n"
+        "        if wait is not None and time.monotonic() >= deadline:\n"
+        "            sys.exit(1)\n"
+        "        time.sleep(0.05)\n"
+    )
+    shim.chmod(0o755)
+    return f"{shim_dir}{os.pathsep}{os.environ['PATH']}"
+
+
+def _host_lock_shell(tmp_path: Path, owner: str, body: str, *, confirm: str = ""):
+    functions = "\n".join(_shell_function(name) for name in HOST_LOCK_FUNCTIONS)
+    script = (
+        f"HOST_LOCK_DIR='{tmp_path / 'server/.deploy'}'\n"
+        f"HOST_LOCK_OWNER='{owner}'\n"
+        f"HOST_LOCK_CONFIRM='{confirm}'\n"
+        "HOST_LOCK_WAIT_SECONDS=1\n"
+        f"{functions}\n{body}\n"
+    )
+    return subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", script],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        env={**os.environ, "PATH": _flock_bin(tmp_path)},
+        check=False,
+    )
+
+
+def test_host_lease_serializes_owners_and_requires_confirmation_to_break(tmp_path):
+    lease = tmp_path / "server/.deploy/host-mutation.lease"
+
+    assert _host_lock_shell(tmp_path, "deploy-a", "cmd_host_lock").returncode == 0
+    assert "owner=deploy-a" in lease.read_text()
+
+    other = _host_lock_shell(tmp_path, "obs-b", "host_guard touch '$PWD/never'")
+    same = _host_lock_shell(
+        tmp_path, "deploy-a", f"host_guard touch '{tmp_path / 'ran'}'"
+    )
+    second = _host_lock_shell(tmp_path, "obs-b", "cmd_host_lock")
+    refused = _host_lock_shell(tmp_path, "obs-b", "cmd_host_unlock")
+
+    assert other.returncode == 1 and "held by deploy-a" in other.stderr
+    assert not (tmp_path / "never").exists()
+    assert same.returncode == 0 and (tmp_path / "ran").exists()
+    assert second.returncode == 1
+    assert refused.returncode == 1 and "break-host-lock" in refused.stderr
+    assert "owner=deploy-a" in lease.read_text()
+
+    broken = _host_lock_shell(
+        tmp_path, "obs-b", "cmd_host_unlock", confirm="break-host-lock"
+    )
+    assert broken.returncode == 0 and not lease.exists()
+    assert _host_lock_shell(tmp_path, "obs-b", "cmd_host_unlock").returncode == 0
+
+
+def test_host_guard_waits_for_a_running_mutation_then_fails_without_effect(tmp_path):
+    lock = tmp_path / "server/.deploy/host-mutation.lock"
+    lock.parent.mkdir(parents=True)
+    holder = subprocess.Popen(
+        [
+            __import__("sys").executable,
+            "-c",
+            (
+                "import fcntl, sys, time\n"
+                f"f = open({str(lock)!r}, 'a')\n"
+                "fcntl.flock(f, fcntl.LOCK_EX)\n"
+                "print('held', flush=True)\n"
+                "time.sleep(30)\n"
+            ),
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert holder.stdout.readline().strip() == "held"
+        result = _host_lock_shell(
+            tmp_path, "deploy-a", f"host_guard touch '{tmp_path / 'ran'}'"
+        )
+    finally:
+        holder.kill()
+        holder.wait()
+
+    assert result.returncode == 1
+    assert "kept the lock" in result.stderr
+    assert not (tmp_path / "ran").exists()
+    assert (
+        _host_lock_shell(
+            tmp_path, "deploy-a", f"host_guard touch '{tmp_path / 'ran'}'"
+        ).returncode
+        == 0
+    )
+
+
+def test_remote_dispatch_guards_every_mutating_step_and_leaves_reads_free():
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+    dispatch = script[script.index('case "${1:-}" in') :]
+    routes = {}
+    for line in dispatch.splitlines()[1:]:
+        step, separator, action = line.strip().partition(") ")
+        if separator and not step.startswith("*"):
+            routes[step] = action.rstrip(" ;")
+
+    assert {
+        step for step, action in routes.items() if action.startswith("host_guard ")
+    } == (MUTATING_STEPS)
+    assert routes["host-lock"] == "cmd_host_lock"
+    assert routes["host-unlock"] == "cmd_host_unlock"
+    for step in ("release-preflight", "preflight", "verify", "ps", "diagnose"):
+        assert not routes[step].startswith("host_guard")
+
+
+def test_local_deploy_holds_the_lease_around_every_mutating_sequence():
+    script = (ROOT / "scripts/deploy.sh").read_text()
+
+    def body(name):
+        start = script.index(f"{name}() {{")
+        return script[start : script.index("\n}\n", start)]
+
+    for name, first_mutation in (
+        ("run_deploy", "remote_deploy backup"),
+        ("run_recovery_snapshot", "remote_deploy recovery-snapshot"),
+        ("run_rollback", "remote_deploy state-rollback"),
+        ("run_image_rollback", "remote_deploy rollback"),
+    ):
+        text = body(name)
+        assert text.index("acquire_host_lease") < text.index(first_mutation), name
+    assert "release_host_lease" in body("cleanup")
+    assert "remote_deploy host-lock" in body("acquire_host_lease")
+    assert "remote_deploy host-unlock" in body("release_host_lease")
+    assert "acquire_host_lease" not in body("run_preflight")
+
+
+def test_local_lease_release_runs_once_and_reports_a_failed_release(tmp_path):
+    script = (ROOT / "scripts/deploy.sh").read_text()
+    start = script.index("release_host_lease() {")
+    release = script[start : script.index("\n}\n", start) + 3]
+    calls = tmp_path / "calls"
+    shell = (
+        f"remote_deploy() {{ echo \"$1\" >> '{calls}'; return 1; }}\n"
+        "DEPLOY_ID=deploy-a\nHOST_LEASE_HELD=1\n"
+        f"{release}\nrelease_host_lease\nrelease_host_lease\n"
+    )
+
+    result = subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", shell],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert calls.read_text().splitlines() == ["host-unlock"]
+    assert "make deploy-unlock DEPLOY_ID=deploy-a" in result.stderr

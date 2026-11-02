@@ -1,4 +1,4 @@
-#include "connection_dialog.hpp"
+#include "crate_vdj/connection_dialog.hpp"
 
 #import <AppKit/AppKit.h>
 #include <dispatch/dispatch.h>
@@ -50,7 +50,9 @@ ConnectionDialogResult show_connection_dialog(const ConnectionDialogRequest& req
             origin.accessibilityLabel = @"Crate server address";
             NSSecureTextField* token =
                 [[NSSecureTextField alloc] initWithFrame:NSMakeRect(0, 0, 320, 24)];
-            token.placeholderString = @"Access token";
+            token.placeholderString = request.current_origin.empty()
+                ? @"Access token"
+                : to_ns(kSavedTokenHint);
             token.accessibilityLabel = @"Crate access token";
             [fields addView:origin inGravity:NSStackViewGravityTop];
             [fields addView:token inGravity:NSStackViewGravityTop];
@@ -84,6 +86,18 @@ void show_connection_message(const std::string& title, const std::string& messag
             [alert runModal];
         }
     });
+}
+
+bool open_in_browser(const std::string& url)
+{
+    __block bool opened = false;
+    run_on_main(^{
+        @autoreleasepool {
+            NSURL* target = [NSURL URLWithString:to_ns(url)];
+            opened = target != nil && [[NSWorkspace sharedWorkspace] openURL:target];
+        }
+    });
+    return opened;
 }
 
 } // namespace crate::vdj

@@ -36,6 +36,14 @@ struct CompatibleTrack {
     double confidence = 0;
     CompatibilityScoreBreakdown score_breakdown;
     std::vector<std::string> fallback_reasons;
+    double duration_seconds = 0;
+    double bpm = 0;
+    std::string camelot;
+    std::optional<double> energy;
+    int year = 0;
+    std::string genre;
+    std::string cover_url;
+    int album_id = 0;
 };
 
 struct CompatibleTracks {
@@ -51,8 +59,6 @@ ParseResult<CompatibleTracks> parse_compatible_tracks_json(
 );
 
 SearchTrack compatible_track_as_search_track(const CompatibleTrack& track);
-
-std::string compatible_track_comment(const CompatibleTrack& track);
 
 class CompatibleTracksClient final {
 public:

@@ -68,6 +68,9 @@ struct SearchTrack {
     std::string audio_scale;
     bool has_cover = false;
     std::string cover_url;
+    std::string camelot;
+    std::optional<double> energy;
+    int album_id = 0;
 };
 
 struct SearchResults {

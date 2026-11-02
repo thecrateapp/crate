@@ -5,6 +5,7 @@
 #include "crate_vdj/media_access_client.hpp"
 #include "crate_vdj/models.hpp"
 
+#include <chrono>
 #include <string>
 #include <string_view>
 
@@ -15,10 +16,11 @@ public:
     StreamResolver(
         HttpClient& http,
         CredentialStore& credentials,
-        std::string allowed_origin
+        std::string allowed_origin,
+        std::chrono::milliseconds budget = std::chrono::seconds(8)
     );
 
-    ParseResult<std::string> resolve(
+    StreamResolution resolve(
         std::string_view entity_uid,
         const CancellationToken& cancellation
     );
@@ -27,6 +29,7 @@ private:
     HttpClient& http_;
     CredentialStore& credentials_;
     std::string allowed_origin_;
+    std::chrono::milliseconds budget_;
     MediaAccessClient media_access_client_;
 };
 

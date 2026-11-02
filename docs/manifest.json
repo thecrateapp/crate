@@ -205,6 +205,21 @@
     "order": 120
   },
   {
+    "sourcePath": "docs/technical/monitoring.md",
+    "route": "/operations/monitoring",
+    "section": "operations",
+    "title": "Monitoring",
+    "summary": "What Admin and Grafana show, how to reach Grafana, and how the independent monitoring project is deployed, adopted and rolled back.",
+    "keywords": [
+      "monitoring",
+      "grafana",
+      "prometheus",
+      "observability",
+      "adoption"
+    ],
+    "order": 122
+  },
+  {
     "sourcePath": "docs/technical/crate-agent.md",
     "route": "/operations/crate-agent",
     "section": "operations",

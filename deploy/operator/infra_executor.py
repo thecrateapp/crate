@@ -1,5 +1,6 @@
 """Bounded fixed host jobs. No shell, SSH, user argv, or model filesystem interface."""
 
+import contextlib
 import hashlib
 import json
 import os
@@ -638,106 +639,115 @@ class Executor:
                 "target": self.c["restore_target"],
             }
         if op == "deploy":
-            server = Path(self.c["server_path"])
-            original = plan["preconditions"]["host_inputs"]
-            expected = dict(original)
-            self._assert_deploy_inputs(plan, expected)
-            self._remote("release-preflight", plan)
-            checkpoint()
-            if (
-                self.preconditions(op, plan["target"], plan["version"])
-                != plan["preconditions"]
-            ):
-                raise ValueError("Host changed during release preflight")
-            root, assets, manifest = self._release(plan["version"])
-            environment = environment_versions((server / ".env").read_bytes(), manifest)
-            backup = server / ".deploy-backups" / ("infra-" + plan["id"])
-            if backup.exists() or backup.is_symlink():
-                raise ValueError("Deployment backup target already exists")
-            backup_initial, backup_configured = generated_backup_inputs(
-                original, assets, environment[0], manifest, plan["id"]
-            )
-            backup_expected = backup_initial
-            self._remote("backup", plan)
-            assert_backup_inputs(server, plan["id"], backup_expected)
-            self._assert_deploy_inputs(plan, expected)
-            (server / ".deploy").mkdir(exist_ok=True)
-            staged = staged_inputs(original, assets)
-            configured = configured_inputs(staged, assets, environment[-1])
-            if configured != plan["preconditions"]["configured_host_inputs"]:
-                raise ValueError("Predicted configuration transition changed")
+            self._remote("host-lock", plan)
             try:
-                for name in ("release.env", "release-manifest.json"):
-                    shutil.copyfile(
-                        root / name, server / ".deploy" / (name + ".candidate")
-                    )
-                for name in ("docker-compose.yaml", "docker-compose.project.yaml"):
-                    shutil.copyfile(root / name, server / name)
-                if "agent-context.tar.gz" in assets:
-                    shutil.copyfile(
-                        root / "agent-context.tar.gz",
-                        server / ".deploy/agent-context.candidate.tar.gz",
-                    )
-                expected = staged
-                steps = ("preflight", "config", "pull", "up", "verify")
-                if "agent-context.tar.gz" in assets:
-                    steps += ("agent-context",)
-                for step in steps:
-                    checkpoint()
-                    self._assert_deploy_inputs(plan, expected)
-                    assert_backup_inputs(server, plan["id"], backup_expected)
-                    self._remote(step, plan)
-                    if step == "config":
-                        expected = configured
-                        backup_expected = backup_configured
-                    self._assert_deploy_inputs(plan, expected)
-                    assert_backup_inputs(server, plan["id"], backup_expected)
-            except Exception:  # noqa: BLE001 — only known own transitions permit rollback.
-                current = host_inputs(server, provisioned=self.policy.provisioned)
-                stable = set(original) - {
-                    ".env",
-                    ".deploy/release-manifest.json",
-                    "docker-compose.yaml",
-                    "docker-compose.project.yaml",
-                    ".deploy/release.env.candidate",
-                    ".deploy/release-manifest.json.candidate",
-                    ".deploy/agent-context.candidate.tar.gz",
-                }
-                safe = all(current[key] == original[key] for key in stable)
-                safe = safe and current[".env"] in {
-                    hashlib.sha256(raw).hexdigest() for raw in environment
-                }
-                for key in set(original) - stable - {".env"}:
-                    safe = safe and current[key] in {
-                        original[key],
-                        staged[key],
-                        configured[key],
-                    }
-                if safe:
-                    # A partial config failure may have written either exact predicted
-                    # selection; rollback never consumes arbitrary retained inputs.
-                    backup_actual = dict(backup_initial)
-                    for name in ("changed_image_refs", "changed_services"):
-                        path = backup / name
-                        value = self._file_hash(path) if path.exists() else None
-                        if value not in {backup_initial[name], backup_configured[name]}:
-                            raise CommandError(
-                                "Deployment backup selection drifted"
-                            ) from None
-                        backup_actual[name] = value
-                    assert_backup_inputs(server, plan["id"], backup_actual)
-                    self._remote("rollback", plan)
-                raise CommandError(
-                    "Deployment failed; rollback only attempted for known trusted inputs"
-                ) from None
-            return {
-                "release_sha": plan["version"],
-                "host_inputs": expected,
-                "effective_compose_sha256": plan["preconditions"][
-                    "effective_compose_sha256"
-                ],
-            }
+                result = self._deploy(plan, checkpoint)
+            except BaseException:
+                with contextlib.suppress(Exception):
+                    self._remote("host-unlock", plan)
+                raise
+            self._remote("host-unlock", plan)
+            return result
         raise ValueError("Unknown operation")
+
+    def _deploy(self, plan, checkpoint):
+        server = Path(self.c["server_path"])
+        original = plan["preconditions"]["host_inputs"]
+        expected = dict(original)
+        self._assert_deploy_inputs(plan, expected)
+        self._remote("release-preflight", plan)
+        checkpoint()
+        if (
+            self.preconditions("deploy", plan["target"], plan["version"])
+            != plan["preconditions"]
+        ):
+            raise ValueError("Host changed during release preflight")
+        root, assets, manifest = self._release(plan["version"])
+        environment = environment_versions((server / ".env").read_bytes(), manifest)
+        backup = server / ".deploy-backups" / ("infra-" + plan["id"])
+        if backup.exists() or backup.is_symlink():
+            raise ValueError("Deployment backup target already exists")
+        backup_initial, backup_configured = generated_backup_inputs(
+            original, assets, environment[0], manifest, plan["id"]
+        )
+        backup_expected = backup_initial
+        self._remote("backup", plan)
+        assert_backup_inputs(server, plan["id"], backup_expected)
+        self._assert_deploy_inputs(plan, expected)
+        (server / ".deploy").mkdir(exist_ok=True)
+        staged = staged_inputs(original, assets)
+        configured = configured_inputs(staged, assets, environment[-1])
+        if configured != plan["preconditions"]["configured_host_inputs"]:
+            raise ValueError("Predicted configuration transition changed")
+        try:
+            for name in ("release.env", "release-manifest.json"):
+                shutil.copyfile(root / name, server / ".deploy" / (name + ".candidate"))
+            for name in ("docker-compose.yaml", "docker-compose.project.yaml"):
+                shutil.copyfile(root / name, server / name)
+            if "agent-context.tar.gz" in assets:
+                shutil.copyfile(
+                    root / "agent-context.tar.gz",
+                    server / ".deploy/agent-context.candidate.tar.gz",
+                )
+            expected = staged
+            steps = ("preflight", "config", "pull", "up", "verify")
+            if "agent-context.tar.gz" in assets:
+                steps += ("agent-context",)
+            for step in steps:
+                checkpoint()
+                self._assert_deploy_inputs(plan, expected)
+                assert_backup_inputs(server, plan["id"], backup_expected)
+                self._remote(step, plan)
+                if step == "config":
+                    expected = configured
+                    backup_expected = backup_configured
+                self._assert_deploy_inputs(plan, expected)
+                assert_backup_inputs(server, plan["id"], backup_expected)
+        except Exception:  # noqa: BLE001 — only known own transitions permit rollback.
+            current = host_inputs(server, provisioned=self.policy.provisioned)
+            stable = set(original) - {
+                ".env",
+                ".deploy/release-manifest.json",
+                "docker-compose.yaml",
+                "docker-compose.project.yaml",
+                ".deploy/release.env.candidate",
+                ".deploy/release-manifest.json.candidate",
+                ".deploy/agent-context.candidate.tar.gz",
+            }
+            safe = all(current[key] == original[key] for key in stable)
+            safe = safe and current[".env"] in {
+                hashlib.sha256(raw).hexdigest() for raw in environment
+            }
+            for key in set(original) - stable - {".env"}:
+                safe = safe and current[key] in {
+                    original[key],
+                    staged[key],
+                    configured[key],
+                }
+            if safe:
+                # A partial config failure may have written either exact predicted
+                # selection; rollback never consumes arbitrary retained inputs.
+                backup_actual = dict(backup_initial)
+                for name in ("changed_image_refs", "changed_services"):
+                    path = backup / name
+                    value = self._file_hash(path) if path.exists() else None
+                    if value not in {backup_initial[name], backup_configured[name]}:
+                        raise CommandError(
+                            "Deployment backup selection drifted"
+                        ) from None
+                    backup_actual[name] = value
+                assert_backup_inputs(server, plan["id"], backup_actual)
+                self._remote("rollback", plan)
+            raise CommandError(
+                "Deployment failed; rollback only attempted for known trusted inputs"
+            ) from None
+        return {
+            "release_sha": plan["version"],
+            "host_inputs": expected,
+            "effective_compose_sha256": plan["preconditions"][
+                "effective_compose_sha256"
+            ],
+        }
 
     def verify(self, plan, result):
         if plan["operation"] == "restart":

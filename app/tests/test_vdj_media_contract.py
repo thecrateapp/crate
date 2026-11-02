@@ -106,15 +106,15 @@ def _get(test_app, ticket: str, *, path: str = STREAM_PATH, **headers):
         return test_app.get(f"{path}?media_ticket={ticket}", headers=headers)
 
 
-def test_access_token_tickets_cover_the_initial_download(fake_redis) -> None:
+def test_access_token_tickets_last_a_virtualdj_session(fake_redis) -> None:
     issued = media_access.issue_media_access_ticket(
         user_id=7, access_token_id=42, audience="stream", path=STREAM_PATH
     )
 
     [ttl] = fake_redis.ttls.values()
-    assert ttl == media_access.ACCESS_TOKEN_MEDIA_TTL_SECONDS == 15 * 60
+    assert ttl == media_access.ACCESS_TOKEN_MEDIA_TTL_SECONDS == 12 * 60 * 60
     remaining = issued.expires_at - datetime.now(timezone.utc)
-    assert timedelta(minutes=14) < remaining <= timedelta(minutes=15)
+    assert timedelta(hours=11, minutes=59) < remaining <= timedelta(hours=12)
 
 
 def test_session_tickets_keep_their_short_lifetime(fake_redis) -> None:
@@ -166,6 +166,18 @@ def test_head_reports_the_full_length(
 
     assert response.status_code == 200
     assert response.headers["content-length"] == str(len(AUDIO))
+
+
+def test_virtualdj_can_download_again_with_the_url_it_cached(
+    test_app, fake_redis, token_state, audio_file
+) -> None:
+    ticket = _token_ticket()
+
+    first = _get(test_app, ticket)
+    again = _get(test_app, ticket)
+
+    assert first.status_code == again.status_code == 200
+    assert again.content == AUDIO
 
 
 def test_revoking_the_token_stops_the_next_range(

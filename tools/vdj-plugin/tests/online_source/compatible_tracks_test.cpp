@@ -121,10 +121,6 @@ int main()
     CRATE_CHECK(mapped.title == "First Track");
     CRATE_CHECK(mapped.artist == "Artist One");
     CRATE_CHECK(mapped.album == "Album One");
-    const auto comment = compatible_track_comment(parsed.value->items[0]);
-    CRATE_CHECK(comment.find("score=0.91") != std::string::npos);
-    CRATE_CHECK(comment.find("harmonic=adjacent") != std::string::npos);
-    CRATE_CHECK(comment.find("tempo=1.00") != std::string::npos);
 
     FakeHttpClient http;
     MemoryCredentialStore credentials;
