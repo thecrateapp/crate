@@ -143,14 +143,13 @@ def _images(payloads: dict[str, bytes]) -> list[str]:
     return sorted(set(images))
 
 
-def _manifest(payloads, revision):
+def _manifest(payloads, revision, names=None):
+    names = BUNDLE_FILES if names is None else names
     return {
         "schema_version": 1,
         "stack_id": "crate-observability",
         "release_sha": _revision(revision),
-        "files": {
-            name: hashlib.sha256(payloads[name]).hexdigest() for name in BUNDLE_FILES
-        },
+        "files": {name: hashlib.sha256(payloads[name]).hexdigest() for name in names},
         "images": _images(payloads),
     }
 
@@ -164,7 +163,8 @@ def _unique_object(pairs):
     return result
 
 
-def _verified_manifest(content, payloads):
+def _verified_manifest(content, payloads, names=None):
+    names = BUNDLE_FILES if names is None else names
     try:
         manifest = json.loads(content, object_pairs_hook=_unique_object)
     except (UnicodeError, json.JSONDecodeError) as error:
@@ -184,14 +184,14 @@ def _verified_manifest(content, payloads):
     files = manifest["files"]
     if (
         not isinstance(files, dict)
-        or set(files) != set(BUNDLE_FILES)
+        or set(files) != set(names)
         or any(
             not isinstance(value, str) or not _HASH.fullmatch(value)
             for value in files.values()
         )
     ):
         raise ValueError("Invalid manifest file checksums")
-    if manifest != _manifest(payloads, manifest["release_sha"]):
+    if manifest != _manifest(payloads, manifest["release_sha"], tuple(names)):
         raise ValueError("Bundle checksum or image metadata mismatch")
     return manifest
 
@@ -345,13 +345,35 @@ def extract_bundle(
     return manifest
 
 
-def _directory_payloads(directory: Path) -> tuple[bytes, dict]:
+def _installed_names(directory: Path) -> tuple[str, ...]:
+    path = directory / "manifest.json"
+    if path.is_symlink() or not path.is_file():
+        raise ValueError("Release directory has missing or unexpected files")
+    with path.open("rb") as source:
+        content = source.read(MAX_MANIFEST_BYTES + 1)
+    if len(content) > MAX_MANIFEST_BYTES:
+        raise ValueError("Release file size limit exceeded")
+    try:
+        files = json.loads(content).get("files")
+    except (UnicodeError, json.JSONDecodeError, AttributeError) as error:
+        raise ValueError("Invalid observability manifest JSON") from error
+    if not isinstance(files, dict) or not files:
+        raise ValueError("Invalid manifest file checksums")
+    for name in files:
+        parts = name.split("/") if isinstance(name, str) else [""]
+        if not name.startswith(PREFIX) or any(part in ("", ".", "..") for part in parts):
+            raise ValueError("Invalid manifest file path")
+    return tuple(sorted(files))
+
+
+def _directory_payloads(directory: Path) -> tuple[bytes, dict, tuple[str, ...]]:
+    names = _installed_names(directory)
     present = {
         path.relative_to(directory).as_posix()
         for path in directory.rglob("*")
         if not path.is_dir()
     }
-    if present != {*BUNDLE_FILES, "manifest.json"}:
+    if present != {*names, "manifest.json"}:
         raise ValueError("Release directory has missing or unexpected files")
     payloads = {}
     for name in sorted(present):
@@ -363,13 +385,13 @@ def _directory_payloads(directory: Path) -> tuple[bytes, dict]:
             payloads[name] = source.read(limit + 1)
         if len(payloads[name]) > limit:
             raise ValueError("Release file size limit exceeded")
-    return payloads.pop("manifest.json"), payloads
+    return payloads.pop("manifest.json"), payloads, names
 
 
 def verify_release(directory: str | Path, *, expected_sha: str | None = None) -> dict:
     """Check an installed tree still matches the manifest it was written with."""
-    content, payloads = _directory_payloads(Path(directory))
-    manifest = _verified_manifest(content, payloads)
+    content, payloads, names = _directory_payloads(Path(directory))
+    manifest = _verified_manifest(content, payloads, names)
     if expected_sha is not None and manifest["release_sha"] != _revision(expected_sha):
         raise ValueError("Release revision does not match the expected revision")
     return manifest
@@ -377,11 +399,14 @@ def verify_release(directory: str | Path, *, expected_sha: str | None = None) ->
 
 def install_release(release: str | Path, live: str | Path) -> dict:
     """Replace each live file atomically; the manifest is written last."""
-    content, payloads = _directory_payloads(Path(release))
-    manifest = _verified_manifest(content, payloads)
+    content, payloads, names = _directory_payloads(Path(release))
+    manifest = _verified_manifest(content, payloads, names)
     target = Path(live)
     target.mkdir(mode=0o755, parents=True, exist_ok=True)
     _write_tree(target, payloads, manifest)
+    for path in (target / PREFIX).rglob("*"):
+        if not path.is_dir() and path.relative_to(target).as_posix() not in names:
+            path.unlink()
     return manifest
 
 
@@ -408,7 +433,7 @@ def plan_transition(current: str | Path | None, candidate: str | Path) -> dict:
     restart = {
         service
         for name, service in MOUNTED_FILES.items()
-        if source["files"][name] != target["files"][name]
+        if source["files"].get(name) != target["files"].get(name)
     }
     return {
         "restart": sorted(restart - changed_images),
