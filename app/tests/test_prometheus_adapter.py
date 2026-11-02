@@ -93,3 +93,40 @@ def test_resources_raise_instead_of_returning_partial_zeros():
 
     with pytest.raises(prometheus_adapter.PrometheusUnavailableError):
         prometheus_adapter.fetch_stack_resources("http://p:9090", opener=opener)
+
+
+def test_rate_windows_hold_four_scrapes_of_their_job():
+    import re
+    from pathlib import Path
+
+    import yaml
+
+    from crate.observability.prometheus_adapter import QUERIES
+
+    config = yaml.safe_load(
+        (
+            Path(__file__).resolve().parents[2] / "deploy/observability/prometheus.yml"
+        ).read_text()
+    )
+    default = config["global"]["scrape_interval"]
+    interval = {
+        job["job_name"]: job.get("scrape_interval", default)
+        for job in config["scrape_configs"]
+    }
+    source = {
+        "container_cpu_usage_seconds_total": "cadvisor",
+        "node_cpu_seconds_total": "node",
+        "traefik_router_requests_total": "traefik",
+    }
+
+    def seconds(value):
+        return int(value[:-1]) * {"s": 1, "m": 60}[value[-1]]
+
+    windows = [
+        (metric, window)
+        for query in QUERIES.values()
+        for metric, window in re.findall(r"rate\((\w+)[^\[]*\[(\w+)\]", query)
+    ]
+    assert {metric for metric, _ in windows} == set(source)
+    for metric, window in windows:
+        assert seconds(window) >= 4 * seconds(interval[source[metric]]), metric
