@@ -511,4 +511,49 @@ describe("SystemHealth Resources instrument", () => {
       screen.queryByRole("meter", { name: "Transcode slots" }),
     ).not.toBeInTheDocument();
   });
+
+  it("shows playback health from the dashboard and marks it unavailable when absent", () => {
+    useApiMock.mockReturnValue({
+      data: {
+        ...dashboard,
+        playback_qoe: {
+          availability: "available",
+          caveats: [],
+          window_minutes: 15,
+          attempts: 40,
+          started: 39,
+          failed: 1,
+          start_success_ratio: 0.975,
+          stall_ratio: 0.002,
+          startup_avg_ms: 310,
+          telemetry: {},
+        },
+      },
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+    const view = renderWithAdminProviders(<SystemHealth />, {
+      route: "/system",
+    });
+
+    const panel = screen
+      .getByText("Playback health")
+      .closest<HTMLElement>("section")!;
+    expect(within(panel).getByText("98%")).toBeVisible();
+    expect(within(panel).getByText("39 of 40 attempts started")).toBeVisible();
+    view.unmount();
+
+    useApiMock.mockReturnValue({
+      data: dashboard,
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+    renderWithAdminProviders(<SystemHealth />, { route: "/system" });
+
+    expect(
+      screen.getByText(/Playback quality readings are unavailable/),
+    ).toBeVisible();
+  });
 });
