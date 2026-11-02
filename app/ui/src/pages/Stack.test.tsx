@@ -5,7 +5,15 @@ import snapshot from "../../../../tests/admin-e2e/fixtures/stack-snapshot.json";
 import { api } from "@/lib/api";
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 import { Stack } from "./Stack";
+import { supportsWebGL2 } from "@/components/admin/stack-map-3d/webgl-support";
+import { STACK_MAP_VIEW_STORAGE_KEY } from "@/components/admin/stack-map-3d/stack-map-view-preference";
 vi.mock("@/lib/api", () => ({ api: vi.fn() }));
+vi.mock("@/components/admin/stack-map-3d/webgl-support", () => ({
+  supportsWebGL2: vi.fn(() => true),
+}));
+vi.mock("@/components/admin/stack-map-3d/StackMap3DStage", () => ({
+  default: () => <div data-testid="stack-map-3d" />,
+}));
 let stream: {
   onopen: ((event: Event) => void) | null;
   onmessage: ((event: MessageEvent) => void) | null;
@@ -430,15 +438,14 @@ describe("Stack typographic controls", () => {
     );
     expect(screen.getByText("traefik", { exact: true })).toBeVisible();
     expect(created).toHaveBeenCalledOnce();
-    act(
-      () =>
-        stream.onmessage?.({
-          data: JSON.stringify({
-            ...snapshot,
-            stack: { ...snapshot.stack, containers: [] },
-          }),
-          origin: window.location.origin,
-        } as MessageEvent),
+    act(() =>
+      stream.onmessage?.({
+        data: JSON.stringify({
+          ...snapshot,
+          stack: { ...snapshot.stack, containers: [] },
+        }),
+        origin: window.location.origin,
+      } as MessageEvent),
     );
     expect(
       screen.getByText("No services match the current filters."),
@@ -496,6 +503,50 @@ describe("Stack runtime map", () => {
       await screen.findByRole("region", { name: "Stack topology" }),
     ).toBeVisible();
     expect(screen.getByRole("button", { name: "Inspect API" })).toBeVisible();
+  });
+
+  it("offers a persisted 3D view of the runtime map", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api).mockImplementation(async () => ({ ...snapshot, inventory }));
+    const { unmount } = renderWithAdminProviders(<Stack />);
+    const map = await screen.findByRole("region", { name: "Stack topology" });
+    await user.click(within(map).getByRole("radio", { name: "3D" }));
+
+    expect(await within(map).findByTestId("stack-map-3d")).toBeInTheDocument();
+    expect(window.localStorage.getItem(STACK_MAP_VIEW_STORAGE_KEY)).toBe("3d");
+    unmount();
+
+    renderWithAdminProviders(<Stack />);
+    const restored = await screen.findByRole("region", {
+      name: "Stack topology",
+    });
+    expect(await within(restored).findByTestId("stack-map-3d")).toBeVisible();
+    window.localStorage.clear();
+  });
+
+  it("keeps the 2D map when WebGL2 is missing or the map is narrow", async () => {
+    vi.mocked(supportsWebGL2).mockReturnValue(false);
+    window.localStorage.setItem(STACK_MAP_VIEW_STORAGE_KEY, "3d");
+    vi.mocked(api).mockImplementation(async () => ({ ...snapshot, inventory }));
+    const { unmount } = renderWithAdminProviders(<Stack />);
+    const map = await screen.findByRole("region", { name: "Stack topology" });
+
+    expect(within(map).getByRole("radio", { name: "3D" })).toBeDisabled();
+    expect(
+      within(map).getByRole("button", { name: "Inspect API" }),
+    ).toBeVisible();
+    expect(within(map).getByText(/no WebGL2/)).toBeVisible();
+    unmount();
+
+    vi.mocked(supportsWebGL2).mockReturnValue(true);
+    vi.stubGlobal("innerWidth", 640);
+    renderWithAdminProviders(<Stack />);
+    const narrow = await screen.findByRole("region", {
+      name: "Stack topology",
+    });
+    expect(within(narrow).getByRole("radio", { name: "3D" })).toBeDisabled();
+    expect(within(narrow).getByText(/880 px/)).toBeVisible();
+    window.localStorage.clear();
   });
 
   it("feeds activity frames from the existing stack stream into the map", async () => {
