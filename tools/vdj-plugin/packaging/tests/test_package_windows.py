@@ -183,3 +183,21 @@ def test_an_invalid_dll_is_never_packaged(tmp_path: Path) -> None:
             inspect=_inspect(dependencies=["libcurl.dll"]),
         )
     assert not (tmp_path / "dist").exists()
+
+
+def test_checksum_and_manifest_use_unix_line_endings(tmp_path: Path) -> None:
+    contract_header = tmp_path / "contract_negotiator.hpp"
+    contract_header.write_text('supported_contract_versions = {"2026-08"};\n')
+
+    result = package(
+        _dll(tmp_path / "build"),
+        tmp_path / "dist",
+        version_header=_version_header(tmp_path),
+        contract_header=contract_header,
+        tested_virtualdj=[],
+        inspect=_inspect(),
+    )
+
+    checksum = (tmp_path / "dist" / (result.name + ".sha256")).read_bytes()
+    manifest = (tmp_path / "dist" / "manifest-windows-x64.json").read_bytes()
+    assert b"\r" not in checksum and b"\r" not in manifest
