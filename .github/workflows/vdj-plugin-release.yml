@@ -82,6 +82,12 @@ jobs:
           if (-not $dumpbin) { throw "dumpbin.exe not found" }
           Split-Path $dumpbin | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
+      - name: Packaging tests on Windows
+        working-directory: tools/vdj-plugin/packaging
+        run: |
+          python -m pip install pytest
+          python -m pytest tests -q
+
       - name: Package
         run: >-
           python tools/vdj-plugin/packaging/package_windows.py
