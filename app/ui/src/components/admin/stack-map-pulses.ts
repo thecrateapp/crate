@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 import type { StackActivityPulse } from "./stack-map-activity";
 import type { StackMapConnection } from "./stack-map-model";
 
@@ -31,7 +31,9 @@ export function useActivityPulses({
   enabled: boolean;
 }) {
   const pulsesRef = useRef(pulses);
-  pulsesRef.current = pulses;
+  useLayoutEffect(() => {
+    pulsesRef.current = pulses;
+  }, [pulses]);
 
   useEffect(() => {
     const layer = layerRef.current;
