@@ -1,4 +1,12 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { Meter } from "@crate/ui/primitives/Meter";
@@ -23,7 +31,20 @@ import {
   type StackActivityView,
 } from "./stack-map-activity";
 import { useActivityPulses } from "./stack-map-pulses";
+import { useStackMapView } from "./stack-map-3d/stack-map-view-preference";
+import { supportsWebGL2 } from "./stack-map-3d/webgl-support";
+import type { StackMap3DUnavailableReason } from "./stack-map-3d/StackMap3DStage";
 import "./stack-map.css";
+
+const StackMap3DStage = lazy(() => import("./stack-map-3d/StackMap3DStage"));
+
+const VIEW_NOTES = {
+  compact: "3D needs at least 880 px of map width.",
+  webgl: "3D is unavailable because this browser has no WebGL2.",
+  "context-lost":
+    "3D stopped because the graphics context was lost. Showing 2D.",
+  failed: "3D could not start in this browser. Showing 2D.",
+} as const;
 
 const LIVE_LABELS: Record<StackActivityView["status"], string> = {
   live: "Live",
@@ -142,9 +163,13 @@ function DashSample({
 export function StackMap({
   snapshot,
   activity,
+  selectedId: controlledSelectedId,
+  onSelectedIdChange,
 }: {
   snapshot: StackMapSnapshot;
   activity?: StackActivityFrame | null;
+  selectedId?: string | null;
+  onSelectedIdChange?: (serviceId: string) => void;
 }) {
   const motionAllowed = useMotionAllowed();
   const pulseLayerRef = useRef<SVGGElement>(null);
@@ -164,7 +189,26 @@ export function StackMap({
   const [compact, setCompact] = useState(
     () => typeof window !== "undefined" && window.innerWidth < 880,
   );
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [internalSelectedId, setInternalSelectedId] = useState<string | null>(
+    null,
+  );
+  const selectedId =
+    controlledSelectedId !== undefined
+      ? controlledSelectedId
+      : internalSelectedId;
+  const [preferredView, setPreferredView] = useStackMapView();
+  const [webgl] = useState(supportsWebGL2);
+  const [unavailable, setUnavailable] =
+    useState<StackMap3DUnavailableReason | null>(null);
+  const viewNoteId = useId();
+  const show3D = preferredView === "3d" && webgl && !compact && !unavailable;
+  const viewNote = compact
+    ? VIEW_NOTES.compact
+    : !webgl
+      ? VIEW_NOTES.webgl
+      : unavailable
+        ? VIEW_NOTES[unavailable]
+        : null;
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [focusedServiceId, setFocusedServiceId] = useState<string | null>(null);
   const inventory = useMemo(() => orderStackMapInventory(snapshot), [snapshot]);
@@ -246,7 +290,8 @@ export function StackMap({
   }, []);
 
   function select(serviceId: string, focus = false) {
-    setSelectedId(serviceId);
+    setInternalSelectedId(serviceId);
+    onSelectedIdChange?.(serviceId);
     setHoveredId(null);
     if (focus) {
       const node = nodeRefs.current.get(serviceId);
@@ -411,6 +456,35 @@ export function StackMap({
                   : ""}
               </InfoBadge>
             ) : null}
+            <div className="stack-map__view">
+              <SegmentedControl
+                as="radio"
+                size="sm"
+                label="Map view"
+                aria-describedby={viewNote ? viewNoteId : undefined}
+                value={show3D ? "3d" : "2d"}
+                onValueChange={(value: "2d" | "3d") => {
+                  if (value === "3d") setUnavailable(null);
+                  setPreferredView(value);
+                }}
+                items={[
+                  { value: "2d", label: "2D" },
+                  { value: "3d", label: "3D", disabled: compact || !webgl },
+                ]}
+              />
+              {viewNote ? (
+                <p
+                  id={viewNoteId}
+                  className="stack-map__view-note"
+                  role="status"
+                  data-reason={
+                    compact ? "compact" : !webgl ? "webgl" : unavailable
+                  }
+                >
+                  {viewNote}
+                </p>
+              ) : null}
+            </div>
           </div>
           <div
             className="stack-map__fields"
@@ -474,210 +548,227 @@ export function StackMap({
               );
             })}
           </div>
-          <div
-            className="stack-map__stage"
-            data-compact={compact}
-            style={{ aspectRatio: `${layout.width} / ${layout.height}` }}
-          >
-            <svg
-              viewBox={`0 0 ${layout.width} ${layout.height}`}
-              aria-hidden="true"
-              className="stack-map__wires"
+          {show3D ? (
+            <Suspense
+              fallback={
+                <p className="stack-map__view-loading">Loading 3D view</p>
+              }
             >
-              <defs>
-                {(["rest", "active"] as const).map((state) => (
-                  <marker
-                    key={state}
-                    id={`${prefix}-arrow-${state}`}
-                    className={`stack-map__arrow stack-map__arrow--${state}`}
-                    viewBox="0 0 8 8"
-                    refX="7"
-                    refY="4"
-                    markerWidth={state === "active" ? 8 : 6}
-                    markerHeight={state === "active" ? 8 : 6}
-                    markerUnits="userSpaceOnUse"
-                    orient="auto"
-                  >
-                    <path d="M1 1 L7 4 L1 7" fill="none" strokeWidth="1.2" />
-                  </marker>
-                ))}
-              </defs>
-              {layout.fields.map((field) => {
-                const ticks = field.outerRadius + (compact ? 16 : 26);
-                const scale = field.yScale;
-                return (
-                  <g
-                    key={field.id}
-                    className="stack-map__field"
-                    transform={`translate(${field.cx} ${field.cy})`}
-                  >
-                    <ellipse rx={34} ry={34} />
-                    {field.innerRadius !== null ? (
-                      <ellipse
-                        rx={field.innerRadius}
-                        ry={field.innerRadius * scale}
-                        data-ring="inner"
-                      />
-                    ) : null}
-                    <ellipse
-                      rx={field.outerRadius}
-                      ry={field.outerRadius * scale}
-                      data-ring="outer"
-                    />
-                    <ellipse rx={ticks} ry={ticks * scale} />
-                    <path
-                      d={`M-${ticks + 12},0 H${ticks + 12} M0,-${format(
-                        ticks * scale + 12,
-                      )} V${format(ticks * scale + 12)}`}
-                      strokeDasharray="1 7"
-                    />
-                    {Array.from({ length: 48 }, (_, tick) => {
-                      const angle = (tick / 48) * Math.PI * 2;
-                      const length = tick % 4 === 0 ? 7 : 3;
-                      return (
-                        <line
-                          key={tick}
-                          x1={format(Math.cos(angle) * ticks)}
-                          y1={format(Math.sin(angle) * ticks * scale)}
-                          x2={format(Math.cos(angle) * (ticks + length))}
-                          y2={format(
-                            Math.sin(angle) * (ticks + length) * scale,
-                          )}
+              <StackMap3DStage
+                snapshot={snapshot}
+                activityView={activityView}
+                selectedId={selected?.id ?? null}
+                onSelect={(serviceId) => select(serviceId)}
+                nodeRefs={nodeRefs}
+                onUnavailable={setUnavailable}
+              />
+            </Suspense>
+          ) : (
+            <div
+              className="stack-map__stage"
+              data-compact={compact}
+              style={{ aspectRatio: `${layout.width} / ${layout.height}` }}
+            >
+              <svg
+                viewBox={`0 0 ${layout.width} ${layout.height}`}
+                aria-hidden="true"
+                className="stack-map__wires"
+              >
+                <defs>
+                  {(["rest", "active"] as const).map((state) => (
+                    <marker
+                      key={state}
+                      id={`${prefix}-arrow-${state}`}
+                      className={`stack-map__arrow stack-map__arrow--${state}`}
+                      viewBox="0 0 8 8"
+                      refX="7"
+                      refY="4"
+                      markerWidth={state === "active" ? 8 : 6}
+                      markerHeight={state === "active" ? 8 : 6}
+                      markerUnits="userSpaceOnUse"
+                      orient="auto"
+                    >
+                      <path d="M1 1 L7 4 L1 7" fill="none" strokeWidth="1.2" />
+                    </marker>
+                  ))}
+                </defs>
+                {layout.fields.map((field) => {
+                  const ticks = field.outerRadius + (compact ? 16 : 26);
+                  const scale = field.yScale;
+                  return (
+                    <g
+                      key={field.id}
+                      className="stack-map__field"
+                      transform={`translate(${field.cx} ${field.cy})`}
+                    >
+                      <ellipse rx={34} ry={34} />
+                      {field.innerRadius !== null ? (
+                        <ellipse
+                          rx={field.innerRadius}
+                          ry={field.innerRadius * scale}
+                          data-ring="inner"
                         />
-                      );
-                    })}
-                  </g>
-                );
-              })}
-              {snapshot.connections.map((connection, index) => {
-                const from = layout.nodes.get(connection.source);
-                const to = layout.nodes.get(connection.target);
-                if (
-                  !from ||
-                  !to ||
-                  !servicesById.has(connection.source) ||
-                  !servicesById.has(connection.target)
-                )
-                  return null;
-                const active = activeConnections.has(connection);
+                      ) : null}
+                      <ellipse
+                        rx={field.outerRadius}
+                        ry={field.outerRadius * scale}
+                        data-ring="outer"
+                      />
+                      <ellipse rx={ticks} ry={ticks * scale} />
+                      <path
+                        d={`M-${ticks + 12},0 H${ticks + 12} M0,-${format(
+                          ticks * scale + 12,
+                        )} V${format(ticks * scale + 12)}`}
+                        strokeDasharray="1 7"
+                      />
+                      {Array.from({ length: 48 }, (_, tick) => {
+                        const angle = (tick / 48) * Math.PI * 2;
+                        const length = tick % 4 === 0 ? 7 : 3;
+                        return (
+                          <line
+                            key={tick}
+                            x1={format(Math.cos(angle) * ticks)}
+                            y1={format(Math.sin(angle) * ticks * scale)}
+                            x2={format(Math.cos(angle) * (ticks + length))}
+                            y2={format(
+                              Math.sin(angle) * (ticks + length) * scale,
+                            )}
+                          />
+                        );
+                      })}
+                    </g>
+                  );
+                })}
+                {snapshot.connections.map((connection, index) => {
+                  const from = layout.nodes.get(connection.source);
+                  const to = layout.nodes.get(connection.target);
+                  if (
+                    !from ||
+                    !to ||
+                    !servicesById.has(connection.source) ||
+                    !servicesById.has(connection.target)
+                  )
+                    return null;
+                  const active = activeConnections.has(connection);
+                  return (
+                    <path
+                      key={`${connection.source}-${connection.target}-${connection.kind}-${index}`}
+                      d={connectionPath(from, to, fieldsById.get(from.stackId))}
+                      ref={(node) => {
+                        if (node) pathRefs.current.set(connection, node);
+                        else pathRefs.current.delete(connection);
+                      }}
+                      className="stack-map__connection"
+                      data-live={liveConnections.has(connection)}
+                      data-active={active}
+                      data-muted={Boolean(previewId) && !active}
+                      data-kind={connection.kind}
+                      data-cross-stack={from.stackId !== to.stackId}
+                      strokeDasharray={DASHES[connection.kind]}
+                      markerEnd={`url(#${prefix}-arrow-${
+                        active ? "active" : "rest"
+                      })`}
+                    />
+                  );
+                })}
+                {[...activityView.levels].map(([serviceId, value]) => {
+                  const point = layout.nodes.get(serviceId);
+                  if (!point || value <= 0) return null;
+                  return (
+                    <circle
+                      key={`level-${serviceId}`}
+                      className="stack-map__level"
+                      data-service={serviceId}
+                      data-paused={activityView.status === "paused"}
+                      cx={point.x}
+                      cy={point.y}
+                      r={point.ring === "hub" ? 24 : 16}
+                      pathLength={100}
+                      strokeDasharray={`${Math.max(4, value * 100).toFixed(
+                        1,
+                      )} 100`}
+                      transform={`rotate(-90 ${point.x} ${point.y})`}
+                    />
+                  );
+                })}
+                <g ref={pulseLayerRef} className="stack-map__pulses" />
+              </svg>
+              {inventory.services.map((service) => {
+                const point = layout.nodes.get(service.id);
+                if (!point) return null;
+                const active = related.activeIds.has(service.id);
+                const state = serviceHealth(snapshot, service);
+                const runtime = observed ? service.runtimeState : "unknown";
+                const word = !observed
+                  ? null
+                  : state === "unhealthy"
+                    ? "failing"
+                    : runtime !== "running"
+                      ? runtime
+                      : null;
                 return (
-                  <path
-                    key={`${connection.source}-${connection.target}-${connection.kind}-${index}`}
-                    d={connectionPath(from, to, fieldsById.get(from.stackId))}
+                  <button
+                    key={service.id}
                     ref={(node) => {
-                      if (node) pathRefs.current.set(connection, node);
-                      else pathRefs.current.delete(connection);
+                      if (node) nodeRefs.current.set(service.id, node);
+                      else nodeRefs.current.delete(service.id);
                     }}
-                    className="stack-map__connection"
-                    data-live={liveConnections.has(connection)}
+                    type="button"
+                    aria-label={`Inspect ${service.label}`}
+                    aria-pressed={selected?.id === service.id}
                     data-active={active}
-                    data-muted={Boolean(previewId) && !active}
-                    data-kind={connection.kind}
-                    data-cross-stack={from.stackId !== to.stackId}
-                    strokeDasharray={DASHES[connection.kind]}
-                    markerEnd={`url(#${prefix}-arrow-${
-                      active ? "active" : "rest"
-                    })`}
-                  />
+                    data-dimmed={Boolean(previewId) && !active}
+                    data-selected={selected?.id === service.id}
+                    data-health={state}
+                    data-runtime={runtime}
+                    data-hub={point.ring === "hub"}
+                    data-ring={point.ring}
+                    data-label={point.label}
+                    className="stack-map__node"
+                    style={{
+                      left: `${(point.x / layout.width) * 100}%`,
+                      top: `${(point.y / layout.height) * 100}%`,
+                    }}
+                    onPointerEnter={() => setHoveredId(service.id)}
+                    onPointerLeave={() => setHoveredId(null)}
+                    onFocus={() => setFocusedServiceId(service.id)}
+                    onBlur={() => setFocusedServiceId(null)}
+                    onClick={() => select(service.id)}
+                    onKeyDown={(event) => {
+                      if (
+                        ![
+                          "ArrowLeft",
+                          "ArrowRight",
+                          "ArrowUp",
+                          "ArrowDown",
+                        ].includes(event.key)
+                      )
+                        return;
+                      event.preventDefault();
+                      const order = fieldsById.get(point.stackId)?.order ?? [];
+                      const index = order.indexOf(service.id);
+                      const offset =
+                        event.key === "ArrowLeft" || event.key === "ArrowUp"
+                          ? -1
+                          : 1;
+                      const next =
+                        order[(index + offset + order.length) % order.length];
+                      if (next) nodeRefs.current.get(next)?.focus();
+                    }}
+                  >
+                    <span className="stack-map__node-ring" aria-hidden="true" />
+                    <span className="stack-map__node-core" aria-hidden="true" />
+                    <span className="stack-map__node-label">
+                      {service.label}
+                      {word ? (
+                        <span className="stack-map__node-state">{word}</span>
+                      ) : null}
+                    </span>
+                  </button>
                 );
               })}
-              {[...activityView.levels].map(([serviceId, value]) => {
-                const point = layout.nodes.get(serviceId);
-                if (!point || value <= 0) return null;
-                return (
-                  <circle
-                    key={`level-${serviceId}`}
-                    className="stack-map__level"
-                    data-service={serviceId}
-                    data-paused={activityView.status === "paused"}
-                    cx={point.x}
-                    cy={point.y}
-                    r={point.ring === "hub" ? 24 : 16}
-                    pathLength={100}
-                    strokeDasharray={`${Math.max(4, value * 100).toFixed(
-                      1,
-                    )} 100`}
-                    transform={`rotate(-90 ${point.x} ${point.y})`}
-                  />
-                );
-              })}
-              <g ref={pulseLayerRef} className="stack-map__pulses" />
-            </svg>
-            {inventory.services.map((service) => {
-              const point = layout.nodes.get(service.id);
-              if (!point) return null;
-              const active = related.activeIds.has(service.id);
-              const state = serviceHealth(snapshot, service);
-              const runtime = observed ? service.runtimeState : "unknown";
-              const word = !observed
-                ? null
-                : state === "unhealthy"
-                  ? "failing"
-                  : runtime !== "running"
-                    ? runtime
-                    : null;
-              return (
-                <button
-                  key={service.id}
-                  ref={(node) => {
-                    if (node) nodeRefs.current.set(service.id, node);
-                    else nodeRefs.current.delete(service.id);
-                  }}
-                  type="button"
-                  aria-label={`Inspect ${service.label}`}
-                  aria-pressed={selected?.id === service.id}
-                  data-active={active}
-                  data-dimmed={Boolean(previewId) && !active}
-                  data-selected={selected?.id === service.id}
-                  data-health={state}
-                  data-runtime={runtime}
-                  data-hub={point.ring === "hub"}
-                  data-ring={point.ring}
-                  data-label={point.label}
-                  className="stack-map__node"
-                  style={{
-                    left: `${(point.x / layout.width) * 100}%`,
-                    top: `${(point.y / layout.height) * 100}%`,
-                  }}
-                  onPointerEnter={() => setHoveredId(service.id)}
-                  onPointerLeave={() => setHoveredId(null)}
-                  onFocus={() => setFocusedServiceId(service.id)}
-                  onBlur={() => setFocusedServiceId(null)}
-                  onClick={() => select(service.id)}
-                  onKeyDown={(event) => {
-                    if (
-                      ![
-                        "ArrowLeft",
-                        "ArrowRight",
-                        "ArrowUp",
-                        "ArrowDown",
-                      ].includes(event.key)
-                    )
-                      return;
-                    event.preventDefault();
-                    const order = fieldsById.get(point.stackId)?.order ?? [];
-                    const index = order.indexOf(service.id);
-                    const offset =
-                      event.key === "ArrowLeft" || event.key === "ArrowUp"
-                        ? -1
-                        : 1;
-                    const next =
-                      order[(index + offset + order.length) % order.length];
-                    if (next) nodeRefs.current.get(next)?.focus();
-                  }}
-                >
-                  <span className="stack-map__node-ring" aria-hidden="true" />
-                  <span className="stack-map__node-core" aria-hidden="true" />
-                  <span className="stack-map__node-label">
-                    {service.label}
-                    {word ? (
-                      <span className="stack-map__node-state">{word}</span>
-                    ) : null}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+            </div>
+          )}
         </div>
         <section
           className="stack-map__inspector"

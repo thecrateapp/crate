@@ -2,6 +2,26 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StackMap } from "./StackMap";
+import { supportsWebGL2 } from "./stack-map-3d/webgl-support";
+import { STACK_MAP_VIEW_STORAGE_KEY } from "./stack-map-3d/stack-map-view-preference";
+import type { StackMap3DStageProps } from "./stack-map-3d/StackMap3DStage";
+
+vi.mock("./stack-map-3d/webgl-support", () => ({
+  supportsWebGL2: vi.fn(() => true),
+}));
+
+vi.mock("./stack-map-3d/StackMap3DStage", () => ({
+  default: ({ selectedId, onSelect, onUnavailable }: StackMap3DStageProps) => (
+    <div data-testid="stack-map-3d" data-selected={selectedId ?? ""}>
+      <button type="button" onClick={() => onSelect("postgres")}>
+        Pick PostgreSQL in 3D
+      </button>
+      <button type="button" onClick={() => onUnavailable("context-lost")}>
+        Lose context
+      </button>
+    </div>
+  ),
+}));
 import type { StackMapSnapshot } from "./stack-map-model";
 
 function snapshot(): StackMapSnapshot {
@@ -160,6 +180,32 @@ describe("StackMap", () => {
 
     expect(redis).toHaveAttribute("aria-pressed", "true");
     expect(postgres).toHaveAttribute("aria-pressed", "false");
+    expect(inspector()).toHaveTextContent("Redis service");
+  });
+
+  it("follows a controlled selection and reports new picks", async () => {
+    const user = userEvent.setup();
+    const onSelectedIdChange = vi.fn();
+    const { rerender } = render(
+      <StackMap
+        snapshot={snapshot()}
+        selectedId="postgres"
+        onSelectedIdChange={onSelectedIdChange}
+      />,
+    );
+    expect(inspector()).toHaveTextContent("PostgreSQL service");
+
+    await user.click(screen.getByRole("button", { name: "Inspect Redis" }));
+
+    expect(onSelectedIdChange).toHaveBeenCalledWith("redis");
+    expect(inspector()).toHaveTextContent("PostgreSQL service");
+    rerender(
+      <StackMap
+        snapshot={snapshot()}
+        selectedId="redis"
+        onSelectedIdChange={onSelectedIdChange}
+      />,
+    );
     expect(inspector()).toHaveTextContent("Redis service");
   });
 
@@ -530,5 +576,87 @@ describe("StackMap Grafana link", () => {
       "href",
       "https://grafana.example/d/crate-infra-runtime?from=now-1h&to=now",
     );
+  });
+});
+
+describe("StackMap 3D view", () => {
+  afterEach(() => {
+    window.localStorage.clear();
+    vi.mocked(supportsWebGL2).mockReturnValue(true);
+    vi.unstubAllGlobals();
+  });
+
+  it("starts in 2D and persists the switch to 3D", async () => {
+    const user = userEvent.setup();
+    render(<StackMap snapshot={snapshot()} />);
+    expect(screen.getByRole("radio", { name: "2D" })).toBeChecked();
+
+    await user.click(screen.getByRole("radio", { name: "3D" }));
+
+    expect(await screen.findByTestId("stack-map-3d")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Inspect API" })).toBeNull();
+    expect(window.localStorage.getItem(STACK_MAP_VIEW_STORAGE_KEY)).toBe("3d");
+    await user.click(screen.getByRole("radio", { name: "2D" }));
+    expect(screen.getByRole("button", { name: "Inspect API" })).toBeVisible();
+    expect(window.localStorage.getItem(STACK_MAP_VIEW_STORAGE_KEY)).toBe("2d");
+  });
+
+  it("restores a stored 3D preference and shares the selection with the inspector", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(STACK_MAP_VIEW_STORAGE_KEY, "3d");
+    render(<StackMap snapshot={snapshot()} />);
+    const stage = await screen.findByTestId("stack-map-3d");
+    expect(stage).toHaveAttribute("data-selected", "crate-api");
+
+    await user.click(
+      screen.getByRole("button", { name: "Pick PostgreSQL in 3D" }),
+    );
+
+    expect(inspector()).toHaveTextContent("PostgreSQL service");
+    expect(screen.getByTestId("stack-map-3d")).toHaveAttribute(
+      "data-selected",
+      "postgres",
+    );
+  });
+
+  it("keeps 2D with an explanation when the browser has no WebGL2", () => {
+    vi.mocked(supportsWebGL2).mockReturnValue(false);
+    window.localStorage.setItem(STACK_MAP_VIEW_STORAGE_KEY, "3d");
+    render(<StackMap snapshot={snapshot()} />);
+
+    expect(screen.getByRole("radio", { name: "3D" })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: "2D" })).toBeChecked();
+    expect(screen.getByRole("status")).toHaveTextContent("no WebGL2");
+    expect(screen.queryByTestId("stack-map-3d")).toBeNull();
+  });
+
+  it("disables 3D below the width threshold", () => {
+    vi.stubGlobal("innerWidth", 600);
+    window.localStorage.setItem(STACK_MAP_VIEW_STORAGE_KEY, "3d");
+    render(<StackMap snapshot={snapshot()} />);
+
+    expect(screen.getByRole("radio", { name: "3D" })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("880 px");
+    expect(screen.queryByTestId("stack-map-3d")).toBeNull();
+  });
+
+  it("falls back to 2D with a notice when the graphics context is lost", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(STACK_MAP_VIEW_STORAGE_KEY, "3d");
+    render(<StackMap snapshot={snapshot()} />);
+    await user.click(
+      await screen.findByRole("button", { name: "Lose context" }),
+    );
+
+    expect(screen.queryByTestId("stack-map-3d")).toBeNull();
+    expect(screen.getByRole("button", { name: "Inspect API" })).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "graphics context was lost",
+    );
+    expect(window.localStorage.getItem(STACK_MAP_VIEW_STORAGE_KEY)).toBe("3d");
+
+    await user.click(screen.getByRole("radio", { name: "3D" }));
+    expect(await screen.findByTestId("stack-map-3d")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).toBeNull();
   });
 });

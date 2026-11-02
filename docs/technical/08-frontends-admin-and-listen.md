@@ -23,6 +23,7 @@ sources:
   - app/listen/src/components/crates/crate-download.test.ts
   - app/ui/src/pages/Stack.tsx
   - app/ui/src/components/admin/StackMap.tsx
+  - app/ui/src/components/admin/stack-map-3d/StackMap3DStage.tsx
   - app/crate/stack_inventory.py
   - app/crate/observability/live_activity.py
   - app/crate/observability/prometheus_adapter.py
@@ -151,6 +152,27 @@ seconds are ignored; a missing reading shows nothing rather than zero.
 `CRATE_GRAFANA_URL` adds links from the inspector to the infrastructure
 dashboards. The overlays and the Traefik change are described in the monitoring
 README (`deploy/observability/README.md`).
+
+The map has an optional 3D view, chosen with the 2D | 3D toggle in its toolbar.
+Each deployment becomes a dome: the 2D layout is lifted onto the dome surface, so
+looking straight down reproduces the 2D map, hubs sit at the apex and links inside
+a deployment run along the surface. Node size encodes memory, a spike encodes CPU
+(a missing reading draws no spike, zero draws a stub), halos encode health and the
+live layer becomes particles along the links plus a short ingress beam on Edge.
+The inspector, service index and selection are the same as in 2D.
+
+The view lives in `app/ui/src/components/admin/stack-map-3d/` and uses three.js,
+including `three/examples/jsm` lines, bloom post-processing and geometry utils.
+The stage and `three-vendor` load as lazy chunks, so the 2D page does not grow.
+Rendering is on demand: no frames are drawn at rest, only while the camera moves
+or a replayed activity frame is animating. The choice is stored in local storage
+under `crate.admin.stack-map.view.v1` and defaults to 2D. The toggle is disabled
+below about 880 px of map width and without WebGL2, and the map returns to 2D with
+a notice if the graphics context is lost. Reduced motion removes the intro, fly-to
+transitions and particles; `data-crate-effects="off"` removes bloom; a software
+renderer drops bloom, thins resting links and renders at a lower internal
+resolution to keep 60 fps. Intensities and line widths are `--stack-map-3d-*`
+custom properties and camera timings derive from `--motion-duration-normal`.
 
 ## Listen app architecture
 
