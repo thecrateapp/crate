@@ -513,6 +513,9 @@ void OnlineSource::enqueue_automix_addition()
 
 bool OnlineSource::browser_busy(std::chrono::system_clock::time_point now) const
 {
+    if (browser_searching_) {
+        return true;
+    }
     const auto last = last_browser_activity_ms_.load();
     const auto current = epoch_milliseconds(now);
     return last > 0 && current >= last &&
@@ -521,10 +524,14 @@ bool OnlineSource::browser_busy(std::chrono::system_clock::time_point now) const
 
 void OnlineSource::mark_browser_activity()
 {
-    const auto current = epoch_milliseconds(std::chrono::system_clock::now());
-    if (current > ignore_browser_activity_until_ms_.load()) {
-        last_browser_activity_ms_ = current;
+    if (!ignoring_browser_activity()) {
+        last_browser_activity_ms_ = epoch_milliseconds(std::chrono::system_clock::now());
     }
+}
+
+bool OnlineSource::ignoring_browser_activity() const
+{
+    return epoch_milliseconds(std::chrono::system_clock::now()) <= ignore_browser_activity_until_ms_.load();
 }
 
 CallbackStatus OnlineSource::automix_folder(TrackSink& sink)
@@ -665,6 +672,9 @@ void OnlineSource::logout()
 CallbackStatus OnlineSource::search(const std::string& query, TrackSink& sink)
 {
     log("online search callback query=" + query);
+    if (!ignoring_browser_activity()) {
+        browser_searching_ = !query.empty();
+    }
     mark_browser_activity();
     const auto request = searches_.begin();
     if (!request.has_value()) {
@@ -782,6 +792,10 @@ CallbackStatus OnlineSource::folder(const std::string& folder_id, TrackSink& sin
     }
     if (folder_id == kAutomixFolderId) {
         return automix_folder(sink);
+    }
+    if (!ignoring_browser_activity()) {
+        browser_searching_ = false;
+        mark_browser_activity();
     }
 
     const auto request = folders_.begin();

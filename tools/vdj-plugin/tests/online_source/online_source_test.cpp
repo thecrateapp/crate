@@ -724,11 +724,11 @@ struct AutomixHarness {
             compatible_json("manual", {{"m", "Band M", "Album M"}})
         );
         harness.http.route(
-            "/api/search?q=seed",
-            R"json({"artists":[],"albums":[],"tracks":[{"entity_uid":"seed","title":"Seed","artist":"Seed Band","album":"Seed Album"}]})json"
+            "/api/vdj/catalog/folders/crate%3Agenre%3A7",
+            R"json({"folders":[],"tracks":[{"entity_uid":"seed","title":"Seed","artist":"Seed Band","album":"Seed Album"}],"next_cursor":null})json"
         );
         RecordingSink listed;
-        harness.source->search("seed", listed);
+        harness.source->folder("crate:genre:7", listed);
         harness.host.decks[1] = DeckReading{crate_path("seed"), true, 10'000, 200'000};
     }
 
@@ -808,15 +808,15 @@ void a_track_coming_from_the_queue_is_not_a_manual_change()
 {
     AutomixHarness automix;
     automix.harness.http.route(
-        "/api/search?q=queued",
-        R"json({"artists":[],"albums":[],"tracks":[{"entity_uid":"queued","title":"Queued Song","artist":"Queue Band","album":"Queue Album"}]})json"
+        "/api/vdj/catalog/folders/crate%3Agenre%3A8",
+        R"json({"folders":[],"tracks":[{"entity_uid":"queued","title":"Queued Song","artist":"Queue Band","album":"Queue Album"}],"next_cursor":null})json"
     );
     automix.harness.http.route(
         "/api/tracks/by-entity/queued/compatible",
         compatible_json("queued", {{"q", "Band Q", "Album Q"}})
     );
     RecordingSink listed;
-    automix.harness.source->search("queued", listed);
+    automix.harness.source->folder("crate:genre:8", listed);
     automix.harness.host.queue = {{"Crate", "Queued Song"}, {"Crate", "Other Song"}};
     automix.commands_after(kPlayStart);
 
@@ -848,6 +848,33 @@ void a_busy_browser_is_never_moved()
     automix.harness.source->cancel_search();
 
     CRATE_CHECK(automix.commands_after(std::chrono::system_clock::now()).empty());
+}
+
+void an_open_search_is_never_left()
+{
+    AutomixHarness automix;
+    automix.harness.http.route("/api/search?q=kneecap", kSearchJson);
+    RecordingSink results;
+    automix.harness.source->search("kneecap", results);
+    const auto later = std::chrono::system_clock::now() + 10s;
+
+    CRATE_CHECK(automix.commands_after(later).empty());
+    const auto queued = automix.commands_after(later + 31s);
+
+    CRATE_CHECK(queued == std::vector<std::string>{"playlist_add \"netsearch://plugin-Crate/a\""});
+}
+
+void opening_a_folder_ends_the_search()
+{
+    AutomixHarness automix;
+    automix.harness.http.route("/api/search?q=kneecap", kSearchJson);
+    automix.harness.http.route("/api/vdj/catalog/folders/crate%3Agenre%3A1", folder_page_json("track-9", ""));
+    RecordingSink results;
+    automix.harness.source->search("kneecap", results);
+    RecordingSink folder;
+    automix.harness.source->folder("crate:genre:1", folder);
+
+    CRATE_CHECK(automix.commands_after(std::chrono::system_clock::now() + 10s) == std::vector<std::string>{kGoToAutomix});
 }
 
 void an_unknown_browser_folder_is_never_left()
@@ -926,6 +953,8 @@ int main()
     a_track_is_queued_anyway_if_vdj_never_lists_the_folder();
     a_busy_browser_is_never_moved();
     an_unknown_browser_folder_is_never_left();
+    an_open_search_is_never_left();
+    opening_a_folder_ends_the_search();
     automix_does_nothing_without_permission_or_with_automix_off();
     a_track_opens_its_album_in_listen();
     open_in_crate_needs_a_listen_url();

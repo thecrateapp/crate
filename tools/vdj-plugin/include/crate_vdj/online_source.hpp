@@ -179,6 +179,7 @@ private:
     void enqueue_automix_addition();
     bool browser_busy(std::chrono::system_clock::time_point now) const;
     void mark_browser_activity();
+    bool ignoring_browser_activity() const;
     CallbackStatus automix_folder(TrackSink& sink);
     std::optional<std::string> uid_for_title(const std::string& title);
 
@@ -221,6 +222,7 @@ private:
     std::mutex automix_listing_mutex_;
     std::vector<SearchTrack> automix_listing_;
     std::atomic<bool> automix_listed_ = false;
+    std::atomic<bool> browser_searching_ = false;
     std::atomic<std::int64_t> last_browser_activity_ms_ = 0;
     std::atomic<std::int64_t> ignore_browser_activity_until_ms_ = 0;
     std::chrono::system_clock::time_point last_flush_attempt_{};
