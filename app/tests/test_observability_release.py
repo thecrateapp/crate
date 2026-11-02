@@ -933,3 +933,54 @@ def test_bundle_header_does_not_depend_on_the_python_gzip_os_byte(
 
     assert destination.read_bytes()[:10] == bytes.fromhex("1f8b08000000000002ff")
     assert release.verify_bundle(destination, expected_sha=sha) == manifest
+
+
+def test_installed_releases_verify_against_their_own_file_list(
+    tmp_path, committed_source, monkeypatch
+):
+    repository, sha, _ = committed_source
+    release = _release()
+    rules = "deploy/observability/recording-rules.yml"
+    newer = tmp_path / "releases/newer"
+    bundle = tmp_path / "newer.tar.gz"
+    release.build_bundle(repository, sha, bundle)
+    release.extract_bundle(bundle, newer, expected_sha=sha)
+
+    monkeypatch.setattr(
+        release, "BUNDLE_FILES", tuple(n for n in release.BUNDLE_FILES if n != rules)
+    )
+    older = tmp_path / "releases/older"
+    older_bundle = tmp_path / "older.tar.gz"
+    release.build_bundle(repository, sha, older_bundle)
+    release.extract_bundle(older_bundle, older, expected_sha=sha)
+    monkeypatch.undo()
+
+    live = tmp_path / "live"
+    release.install_release(older, live)
+    assert rules not in release.verify_release(live)["files"]
+
+    release.install_release(newer, live)
+    assert rules in release.verify_release(live)["files"]
+    upgrade = release.plan_transition(older, newer)
+    assert upgrade["restart"] == ["crate-prometheus"]
+
+    release.install_release(older, live)
+    assert not (live / rules).exists()
+    assert rules not in release.verify_release(live)["files"]
+
+
+def test_installed_manifest_cannot_name_files_outside_the_stack(
+    tmp_path, committed_source
+):
+    repository, sha, _ = committed_source
+    release = _release()
+    bundle = tmp_path / "bundle.tar.gz"
+    release.build_bundle(repository, sha, bundle)
+    tree = tmp_path / "tree"
+    release.extract_bundle(bundle, tree, expected_sha=sha)
+    manifest = json.loads((tree / "manifest.json").read_text())
+    manifest["files"]["deploy/observability/../../.env"] = "0" * 64
+    (tree / "manifest.json").write_text(json.dumps(manifest))
+
+    with pytest.raises(ValueError, match="file path"):
+        release.verify_release(tree)
