@@ -555,6 +555,28 @@ Recreating Traefik drops in-flight connections for a few seconds, so schedule it
 `OBS_PROMETHEUS_QUERY_NETWORK`. Without the entrypoint or the overlay the scrape
 job has no targets and the map shows no ingress readings.
 
+## Application metrics endpoints
+
+`compose.app-metrics.yaml` opens an internal metrics port (9200) in each
+application container. Nothing is published on the host, and the scrape targets
+come with the application dashboards.
+
+- **Python services** (API, workers, projector): every process writes the
+  exported catalogue families (`crate.observability.prometheus`) to a tmpfs at
+  `/tmp/crate-metrics`. The supervising process clears it once per container
+  start and serves it with `crate_build_info`. Counters and histograms keep their
+  totals when a child process restarts. Global gauges keep their latest value,
+  and per-process gauges such as `crate_stream_concurrent` add up only live
+  processes. Routes and services are never labels; per-route detail stays in
+  System Health.
+- **Readplane** (`READPLANE_METRICS_ADDR`): request counts and durations by
+  source, local media counters and cumulative open-latency buckets.
+- **Media worker** (`CRATE_METRICS_ADDR`): requests, packages in progress,
+  outcomes and build durations, served from their own thread so a scrape does
+  not wait behind a long package.
+
+Without the overlay, nothing imports the Prometheus client or opens a port.
+
 ## Validation and C0 evidence
 
 ```bash

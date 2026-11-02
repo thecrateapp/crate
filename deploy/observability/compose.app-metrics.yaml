@@ -1,0 +1,22 @@
+# Optional: opens each application container's internal metrics port (9200).
+# Nothing is published on the host; scrape targets are added with the dashboards.
+x-python-metrics: &python-metrics
+  environment:
+    CRATE_PROMETHEUS_METRICS: "1"
+  tmpfs:
+    - /tmp/crate-metrics:uid=${PUID:-1000},gid=${PGID:-1000},mode=0700
+
+services:
+  crate-api: *python-metrics
+  crate-worker: *python-metrics
+  crate-fast-worker: *python-metrics
+  crate-maintenance-worker: *python-metrics
+  crate-analysis-worker: *python-metrics
+  crate-playback-worker: *python-metrics
+  crate-projector: *python-metrics
+  crate-readplane:
+    environment:
+      READPLANE_METRICS_ADDR: ":9200"
+  crate-media-worker:
+    environment:
+      CRATE_METRICS_ADDR: 0.0.0.0:9200

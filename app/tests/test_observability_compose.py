@@ -696,3 +696,58 @@ def test_resolved_traefik_shares_its_metrics_network_with_prometheus_only(tmp_pa
         if "traefik-metrics" in (service.get("networks") or {})
     )
     assert sharing == ["crate-prometheus", "traefik"]
+
+
+APP_METRICS_OVERLAY = "deploy/observability/compose.app-metrics.yaml"
+PYTHON_METRIC_SERVICES = {
+    "crate-api",
+    "crate-worker",
+    "crate-fast-worker",
+    "crate-maintenance-worker",
+    "crate-analysis-worker",
+    "crate-playback-worker",
+    "crate-projector",
+}
+
+
+def test_app_metrics_overlay_only_opens_internal_endpoints():
+    from crate.observability.metrics_server import DEFAULT_DIRECTORY
+
+    services = yaml.safe_load((ROOT / APP_METRICS_OVERLAY).read_text())["services"]
+
+    assert set(services) == PYTHON_METRIC_SERVICES | {
+        "crate-readplane",
+        "crate-media-worker",
+    }
+    for name in PYTHON_METRIC_SERVICES:
+        assert set(services[name]) == {"environment", "tmpfs"}, name
+        assert services[name]["environment"] == {"CRATE_PROMETHEUS_METRICS": "1"}
+        assert [mount.split(":")[0] for mount in services[name]["tmpfs"]] == [
+            DEFAULT_DIRECTORY
+        ]
+    assert services["crate-readplane"] == {
+        "environment": {"READPLANE_METRICS_ADDR": ":9200"}
+    }
+    assert services["crate-media-worker"] == {
+        "environment": {"CRATE_METRICS_ADDR": "0.0.0.0:9200"}
+    }
+
+
+def test_resolved_app_metrics_keep_networks_and_publish_nothing(tmp_path):
+    base = _resolved_compose(tmp_path, "docker-compose.yaml", True, False)["services"]
+    services = _resolved_compose(
+        tmp_path,
+        "docker-compose.yaml",
+        True,
+        False,
+        extra_files=(APP_METRICS_OVERLAY,),
+    )["services"]
+
+    for name in PYTHON_METRIC_SERVICES | {"crate-readplane", "crate-media-worker"}:
+        assert services[name].get("networks") == base[name].get("networks"), name
+        assert services[name].get("ports") == base[name].get("ports"), name
+    for name in PYTHON_METRIC_SERVICES:
+        assert services[name]["environment"]["CRATE_PROMETHEUS_METRICS"] == "1"
+        assert any(
+            mount.startswith("/tmp/crate-metrics:") for mount in services[name]["tmpfs"]
+        ), name

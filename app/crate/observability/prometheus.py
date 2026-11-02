@@ -9,6 +9,7 @@ import os
 import re
 from dataclasses import dataclass
 from types import MappingProxyType
+from typing import Any, Literal
 
 from crate.observability.metric_catalog import (
     METRIC_CATALOG,
@@ -73,7 +74,7 @@ class ExportedFamily:
     kind: str
     unit: str
     labels: tuple[str, ...]
-    multiprocess_mode: str | None
+    multiprocess_mode: Literal["livesum", "mostrecent"] | None
     buckets: tuple[float, ...] | None
 
 
@@ -106,7 +107,7 @@ def _labels(definition: MetricDefinition) -> tuple[str, ...]:
 
 
 def _family(definition: MetricDefinition) -> ExportedFamily:
-    mode = None
+    mode: Literal["livesum", "mostrecent"] | None = None
     if definition.kind == "gauge":
         mode = "livesum" if definition.name in PER_PROCESS_GAUGES else "mostrecent"
     return ExportedFamily(
@@ -128,7 +129,7 @@ EXPORTED_FAMILIES = MappingProxyType(
     }
 )
 
-_metrics: dict[str, object] = {}
+_metrics: dict[str, Any] = {}
 _enabled: bool | None = None
 _exit_pid: int | None = None
 
@@ -158,14 +159,14 @@ def _register_exit() -> None:
         atexit.register(_mark_dead, pid)
 
 
-def _metric(family: ExportedFamily):
-    metric = _metrics.get(family.name)
-    if metric is not None:
-        return metric
+def _metric(family: ExportedFamily) -> Any:
+    if family.name in _metrics:
+        return _metrics[family.name]
     import prometheus_client
 
     _register_exit()
     description = f"{family.source} ({family.unit})"
+    metric: Any
     if family.kind == "counter":
         metric = prometheus_client.Counter(
             family.name, description, family.labels, registry=None
@@ -176,7 +177,7 @@ def _metric(family: ExportedFamily):
             description,
             family.labels,
             registry=None,
-            multiprocess_mode=family.multiprocess_mode,
+            multiprocess_mode=family.multiprocess_mode or "mostrecent",
         )
     else:
         metric = prometheus_client.Histogram(
@@ -184,7 +185,7 @@ def _metric(family: ExportedFamily):
             description,
             family.labels,
             registry=None,
-            buckets=family.buckets,
+            buckets=family.buckets or BUCKETS[family.unit],
         )
     _metrics[family.name] = metric
     return metric
