@@ -590,6 +590,11 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ("compute_product_kpis",),
     ),
     (
+        "crate.worker_handlers.observability_summary",
+        "OBSERVABILITY_SUMMARY_TASK_HANDLERS",
+        ("compute_observability_summary",),
+    ),
+    (
         "crate.worker_handlers.ai_configuration",
         "AI_CONFIGURATION_TASK_HANDLERS",
         ("ai_catalog_refresh", "ai_profile_test"),

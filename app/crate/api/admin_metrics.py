@@ -30,7 +30,10 @@ from crate.db.admin_logs_surface import (
     LOGS_SURFACE_STREAM_CHANNEL,
     get_cached_logs_surface,
 )
-from crate.db.queries.product_kpis import get_product_kpi_rows
+from crate.db.queries.product_kpis import (
+    MINIMUM_SEGMENT_SAMPLE,
+    get_product_kpi_rows,
+)
 
 router = APIRouter(prefix="/api/admin", tags=["admin-metrics"])
 
@@ -352,7 +355,7 @@ def _build_metrics_dashboard(period: str, minutes: int) -> dict:
 
 
 KPI_WINDOWS = (7, 30, 90, 365)
-KPI_MINIMUM_SAMPLE = 3
+KPI_MINIMUM_SAMPLE = MINIMUM_SEGMENT_SAMPLE
 
 
 @router.get(
