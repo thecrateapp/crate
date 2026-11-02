@@ -13,16 +13,16 @@ SERVICE_LABEL = "container_label_com_docker_compose_service"
 QUERIES = {
     "cpu": (
         f"sum by ({SERVICE_LABEL}) "
-        f'(rate(container_cpu_usage_seconds_total{{{SERVICE_LABEL}!=""}}[1m])) * 100'
+        f'(rate(container_cpu_usage_seconds_total{{{SERVICE_LABEL}!=""}}[2m])) * 100'
     ),
     "memory": (
         f"sum by ({SERVICE_LABEL}) "
         f'(container_memory_working_set_bytes{{{SERVICE_LABEL}!=""}})'
     ),
-    "host_cpu": '100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[1m])))',
+    "host_cpu": '100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[2m])))',
     "host_used": "sum(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)",
     "host_total": "sum(node_memory_MemTotal_bytes)",
-    "ingress": "sum by (router) (rate(traefik_router_requests_total[1m])) * 60",
+    "ingress": "sum by (router) (rate(traefik_router_requests_total[2m])) * 60",
 }
 TIMEOUT_SECONDS = 2.0
 MIB = 1024 * 1024
