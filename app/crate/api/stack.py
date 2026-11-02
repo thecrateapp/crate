@@ -16,7 +16,7 @@ from crate.api.openapi_responses import (
     merge_responses,
 )
 from crate.api.permissions import require_permission
-from crate.api.redis_sse import close_pubsub, open_pubsub
+from crate.api.redis_sse import close_pubsub, get_async_redis, open_pubsub
 from crate.api.schemas.utility import (
     AdminStackSnapshotResponse,
     StackActionResponse,
@@ -30,12 +30,14 @@ from crate.db.admin_stack_surface import (
     publish_stack_surface_signal,
 )
 from crate.db.snapshot_events import snapshot_channel
+from crate.observability import live_activity
 from crate.docker_ctl import (
+    DockerUnavailableError,
+    application_project,
+    container_action,
+    container_project,
     get_container,
     get_container_logs,
-    restart_container,
-    start_container,
-    stop_container,
 )
 
 log = logging.getLogger(__name__)
@@ -55,18 +57,53 @@ def _require_stack_operator(request: Request) -> dict:
     return require_permission(request, "ops.runtime.manage")
 
 
+def _decoded(value) -> str:
+    return value.decode() if isinstance(value, bytes) else str(value)
+
+
+async def _mark_live_watched() -> None:
+    try:
+        await get_async_redis().set(
+            live_activity.WATCH_KEY, "1", ex=live_activity.WATCH_TTL_SECONDS
+        )
+    except Exception:
+        log.debug("Could not mark live stack activity as watched", exc_info=True)
+
+
+async def _last_live_frame() -> str | None:
+    try:
+        frame = await get_async_redis().get(live_activity.FRAME_KEY)
+    except Exception:
+        log.debug("Could not read the last live stack frame", exc_info=True)
+        return None
+    return _decoded(frame) if frame else None
+
+
 async def _stack_stream() -> AsyncIterator[str]:
     yield f"data: {json_dumps(get_cached_stack_surface())}\n\n"
+    await _mark_live_watched()
+    frame = await _last_live_frame()
+    if frame:
+        yield f"event: activity\ndata: {frame}\n\n"
     pubsub = None
     channel = snapshot_channel(STACK_SNAPSHOT_SCOPE, "global")
     try:
         pubsub = await open_pubsub(channel)
+        await pubsub.subscribe(live_activity.CHANNEL)
         heartbeat_counter = 0
+        watch_counter = 0
         while True:
             message = await pubsub.get_message(
                 ignore_subscribe_messages=True, timeout=1.0
             )
+            watch_counter += 1
+            if watch_counter >= 10:
+                watch_counter = 0
+                await _mark_live_watched()
             if message and message.get("type") == "message":
+                if _decoded(message.get("channel")) == live_activity.CHANNEL:
+                    yield f"event: activity\ndata: {_decoded(message['data'])}\n\n"
+                    continue
                 yield f"data: {json_dumps(get_cached_stack_surface())}\n\n"
                 heartbeat_counter = 0
                 continue
@@ -80,6 +117,10 @@ async def _stack_stream() -> AsyncIterator[str]:
             await asyncio.sleep(30)
     finally:
         if pubsub is not None:
+            try:
+                await pubsub.unsubscribe(live_activity.CHANNEL)
+            except Exception:
+                log.debug("Could not unsubscribe live stack activity", exc_info=True)
             await close_pubsub(pubsub, channel)
 
 
@@ -151,35 +192,6 @@ def stack_container_logs(request: Request, name: str, tail: int = 50):
     return {"name": name, "logs": logs}
 
 
-@router.post(
-    "/api/stack/container/{name}/restart",
-    response_model=StackActionResponse,
-    responses=_STACK_RESPONSES,
-    summary="Restart a managed container",
-)
-def stack_restart_container(request: Request, name: str):
-    _require_stack_operator(request)
-    # Safety: only allow restarting crate containers
-    allowed_prefixes = [
-        "librarian-",
-        "tidalrr",
-        "slskd",
-        "soulsync",
-        "traefik",
-        "nginx",
-    ]
-    if not any(name.startswith(p) for p in allowed_prefixes):
-        raise HTTPException(
-            status_code=403, detail=f"Cannot restart '{name}': not a managed container"
-        )
-
-    ok = restart_container(name)
-    if ok:
-        publish_stack_surface_signal()
-        return {"status": "restarting", "name": name}
-    raise HTTPException(status_code=500, detail="Restart failed")
-
-
 ALLOWED_PREFIXES = [
     "librarian-",
     "tidalrr",
@@ -189,9 +201,49 @@ ALLOWED_PREFIXES = [
     "nginx",
 ]
 
+_ACTION_STATUS = {"restart": "restarting", "stop": "stopped", "start": "started"}
+
 
 def _is_allowed(name: str) -> bool:
     return any(name.startswith(p) for p in ALLOWED_PREFIXES)
+
+
+def _run_container_action(request: Request, name: str, action: str) -> dict:
+    _require_stack_operator(request)
+    if not _is_allowed(name):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Cannot {action} '{name}': not a managed container",
+        )
+    try:
+        project = container_project(name)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Container not found")
+        if project != application_project():
+            raise HTTPException(
+                status_code=403,
+                detail=f"Cannot {action} '{name}': not part of this deployment",
+            )
+        outcome = container_action(name, action)
+    except DockerUnavailableError:
+        raise HTTPException(status_code=503, detail="Docker is unavailable")
+    if outcome == "not_found":
+        raise HTTPException(status_code=404, detail="Container not found")
+    if outcome == "failed":
+        raise HTTPException(status_code=500, detail=f"{action.capitalize()} failed")
+    publish_stack_surface_signal()
+    status = "unchanged" if outcome == "unchanged" else _ACTION_STATUS[action]
+    return {"status": status, "name": name}
+
+
+@router.post(
+    "/api/stack/container/{name}/restart",
+    response_model=StackActionResponse,
+    responses=_STACK_RESPONSES,
+    summary="Restart a managed container",
+)
+def stack_restart_container(request: Request, name: str):
+    return _run_container_action(request, name, "restart")
 
 
 @router.post(
@@ -201,16 +253,7 @@ def _is_allowed(name: str) -> bool:
     summary="Stop a managed container",
 )
 def stack_stop_container(request: Request, name: str):
-    _require_stack_operator(request)
-    if not _is_allowed(name):
-        raise HTTPException(
-            status_code=403, detail=f"Cannot stop '{name}': not a managed container"
-        )
-    ok = stop_container(name)
-    if ok:
-        publish_stack_surface_signal()
-        return {"status": "stopped", "name": name}
-    raise HTTPException(status_code=500, detail="Stop failed")
+    return _run_container_action(request, name, "stop")
 
 
 @router.post(
@@ -220,13 +263,4 @@ def stack_stop_container(request: Request, name: str):
     summary="Start a managed container",
 )
 def stack_start_container(request: Request, name: str):
-    _require_stack_operator(request)
-    if not _is_allowed(name):
-        raise HTTPException(
-            status_code=403, detail=f"Cannot start '{name}': not a managed container"
-        )
-    ok = start_container(name)
-    if ok:
-        publish_stack_surface_signal()
-        return {"status": "started", "name": name}
-    raise HTTPException(status_code=500, detail="Start failed")
+    return _run_container_action(request, name, "start")

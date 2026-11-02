@@ -70,6 +70,15 @@ LABEL_VALUES = {
     ),
     "http_status": ("1xx", "2xx", "3xx", "4xx", "5xx"),
     "http_latency_class": ("fast", "slow"),
+    "http_client": (
+        "listen-web",
+        "listen-android",
+        "listen-ios",
+        "listen-desktop",
+        "admin-web",
+        "subsonic",
+        "readplane",
+    ),
     "media_package_kind": ("album", "track"),
     "opensubsonic_error_code": (
         "generic",
@@ -261,6 +270,11 @@ LABEL_VALUES = {
 }
 
 METRIC_SPECS = {
+    "api.request.client": (
+        "counter_delta",
+        "1",
+        {"client": "http_client", "status": "http_status"},
+    ),
     "api.request.count": (
         "counter_delta",
         "1",

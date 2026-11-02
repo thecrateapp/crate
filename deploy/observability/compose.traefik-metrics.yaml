@@ -1,0 +1,10 @@
+# Optional, appended only when monitoring runs: lets Prometheus scrape Traefik's
+# internal metrics entrypoint over a network shared with Prometheus alone.
+services:
+  traefik:
+    networks: [crate, traefik-metrics]
+
+networks:
+  traefik-metrics:
+    name: ${OBS_TRAEFIK_METRICS_NETWORK:-crate_traefik-metrics}
+    external: true

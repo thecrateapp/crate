@@ -11,6 +11,11 @@ let stream: {
   onmessage: ((event: MessageEvent) => void) | null;
   onerror: ((event: Event) => void) | null;
   close: ReturnType<typeof vi.fn>;
+  listeners: Map<string, (event: MessageEvent) => void>;
+  addEventListener: (
+    type: string,
+    listener: (event: MessageEvent) => void,
+  ) => void;
 };
 const created = vi.fn();
 beforeEach(() => {
@@ -24,7 +29,15 @@ beforeEach(() => {
   created.mockClear();
   vi.stubGlobal("EventSource", function (url: string) {
     created(url);
-    stream = { onopen: null, onmessage: null, onerror: null, close: vi.fn() };
+    const listeners = new Map<string, (event: MessageEvent) => void>();
+    stream = {
+      onopen: null,
+      onmessage: null,
+      onerror: null,
+      close: vi.fn(),
+      listeners,
+      addEventListener: (type, listener) => listeners.set(type, listener),
+    };
     return stream;
   });
   vi.spyOn(window, "setTimeout");
@@ -434,5 +447,85 @@ describe("Stack typographic controls", () => {
     expect(api).toHaveBeenCalledWith("/api/admin/stack-snapshot?fresh=1");
     unmount();
     expect(stream.close).toHaveBeenCalledOnce();
+  });
+});
+
+describe("Stack runtime map", () => {
+  const inventory = {
+    schema_version: 1,
+    availability: "available",
+    reason: null,
+    host: { id: "crate-production", name: "Crate production" },
+    stacks: [
+      { id: "application", kind: "application", project: "crate" },
+      {
+        id: "observability",
+        kind: "observability",
+        project: "crate-observability",
+      },
+    ],
+    services: [
+      {
+        id: "crate/crate-api",
+        stack_id: "application",
+        service: "crate-api",
+        project: "crate",
+        container_id: "a".repeat(64),
+        container_name: "crate-api",
+        image: "ghcr.io/crate/api:1",
+        runtime_state: "running",
+        health: "healthy",
+        status: "Up 1 hour (healthy)",
+        actions: [],
+      },
+    ],
+  };
+
+  it("renders the topology map only when the snapshot carries an inventory", async () => {
+    const { unmount } = renderWithAdminProviders(<Stack />);
+    expect(
+      await screen.findByRole("region", { name: "Stack summary" }),
+    ).toBeVisible();
+    expect(screen.queryByRole("region", { name: "Stack topology" })).toBeNull();
+    unmount();
+
+    vi.mocked(api).mockImplementation(async () => ({ ...snapshot, inventory }));
+    renderWithAdminProviders(<Stack />);
+
+    expect(
+      await screen.findByRole("region", { name: "Stack topology" }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Inspect API" })).toBeVisible();
+  });
+
+  it("feeds activity frames from the existing stack stream into the map", async () => {
+    vi.mocked(api).mockImplementation(async () => ({ ...snapshot, inventory }));
+    renderWithAdminProviders(<Stack />);
+    await screen.findByRole("region", { name: "Stack topology" });
+
+    act(() => {
+      stream.listeners.get("activity")?.(
+        new MessageEvent("activity", {
+          data: JSON.stringify({
+            schema: 1,
+            sequence: 1,
+            observed_at: new Date().toISOString(),
+            window_seconds: 5,
+            availability: "available",
+            requests: {},
+            queues: {},
+            projector: { events: 0 },
+            listening: 0,
+            sources: {},
+          }),
+        }),
+      );
+    });
+
+    expect(document.querySelector("[data-live-status]")).toHaveAttribute(
+      "data-live-status",
+      "live",
+    );
+    expect(created).toHaveBeenCalledTimes(1);
   });
 });
