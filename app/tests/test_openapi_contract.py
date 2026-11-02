@@ -1815,6 +1815,18 @@ def test_openapi_exposes_typed_authenticated_resource_governor_snapshot(test_app
     )
 
 
+def test_openapi_exposes_typed_authenticated_product_kpis(test_app):
+    schema = test_app.get("/openapi.json").json()
+    operation = schema["paths"]["/api/admin/kpis"]["get"]
+
+    assert operation["tags"] == ["admin-metrics"]
+    assert operation["security"]
+    assert (
+        operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
+        == "#/components/schemas/ProductKpiResponse"
+    )
+
+
 def test_openapi_native_confirmation_uses_independent_hmac_security(test_app):
     data = test_app.get("/openapi.json").json()
     native = data["paths"]["/api/internal/agent-telegram/events"]["post"]
