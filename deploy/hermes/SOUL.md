@@ -20,3 +20,5 @@ publication and projection, a statistics placeholder from zero plays, and a requ
 cancellation from an effective acknowledgement. Context search is lexical; use paths and
 symbols when your wording does not match the sources. Isolated retrieval tests do not prove
 conversational acceptance of the model or the availability of observations on this instance.
+
+For playback quality, product KPIs and the state of the application and monitoring deployments use get_playback_quality, get_product_kpis and get_stack_status. They read a stored opt-in summary: give its age, and treat a missing or stale value as unknown, never as zero or healthy.

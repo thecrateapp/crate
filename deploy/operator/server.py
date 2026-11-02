@@ -23,8 +23,10 @@ from .delivery import (
     request_json,
     validate_url,
 )
+from .prometheus import TOOL as PROMETHEUS_TOOL
+from .prometheus import PrometheusReader
 from .state import CapacityError, State, StateUnavailable
-from .supervisor import IDENTIFIER, TOOLS, Rule, Supervisor
+from .supervisor import IDENTIFIER, TOOLS, Rule, Supervisor, check_request_bounds
 
 
 class MCPReader:
@@ -105,7 +107,8 @@ def load_config(path):
     if (
         not required
         <= set(config)
-        <= required | {"human_callback_secret_file", "allowed_operators"}
+        <= required
+        | {"human_callback_secret_file", "allowed_operators", "prometheus_url"}
         or type(config["poll_seconds"]) is not int
         or not 30 <= config["poll_seconds"] <= 60
     ):
@@ -117,8 +120,9 @@ def load_config(path):
     ):
         raise ValueError("Invalid listener")
     validate_mcp_host(config["mcp_host"])
-    for field in ("mcp_url", "webhook_url"):
-        validate_url(config[field])
+    for field in ("mcp_url", "webhook_url", "prometheus_url"):
+        if field in config:
+            validate_url(config[field])
     for field in (
         "state_directory",
         "mcp_token_file",
@@ -127,16 +131,22 @@ def load_config(path):
     ):
         if not Path(config[field]).is_absolute():
             raise ValueError("Absolute dedicated paths required")
-    config["parsed_rules"] = [Rule(**rule) for rule in config["rules"]]
-    rules = config["parsed_rules"]
+    declared = [Rule(**rule) for rule in config["rules"]]
+    rules = [rule for rule in declared if rule.enabled]
     if (
         not isinstance(config["instance"], str)
         or not IDENTIFIER.fullmatch(config["instance"])
-        or not 1 <= len(rules) <= 50
-        or len({(rule.subsystem, rule.id) for rule in rules}) != len(rules)
-        or len({rule.request_key for rule in rules}) > 8
+        or not 1 <= len(rules)
+        or len(declared) > 50
+        or len({(rule.subsystem, rule.id) for rule in declared}) != len(declared)
     ):
         raise ValueError("Invalid instance, rule identities or bounded request count")
+    check_request_bounds(rules)
+    if "prometheus_url" not in config and any(
+        rule.tool == PROMETHEUS_TOOL for rule in rules
+    ):
+        raise ValueError("Enabled Prometheus rules require prometheus_url")
+    config["parsed_rules"] = rules
     return config
 
 
@@ -152,8 +162,9 @@ def read_secret(path):
 
 
 class Poller:
-    def __init__(self, supervisor, reader, delivery):
+    def __init__(self, supervisor, reader, delivery, *, prometheus=None):
         self.supervisor, self.reader, self.delivery = supervisor, reader, delivery
+        self.prometheus = prometheus
         self.watch_offset = 0
 
     def tick(self, now=None):
@@ -161,8 +172,13 @@ class Poller:
         responses = {}
         for rule in self.supervisor.rules:
             if rule.request_key not in responses:
+                reader = (
+                    self.prometheus if rule.tool == PROMETHEUS_TOOL else self.reader
+                )
                 try:
-                    responses[rule.request_key] = self.reader.call(
+                    if reader is None:
+                        raise ValueError("observation_unconfigured")
+                    responses[rule.request_key] = reader.call(
                         rule.tool, rule.arguments or {}
                     )
                 except Exception:  # noqa: BLE001 — isolate failures without leaking private transport details.
@@ -371,6 +387,9 @@ def main(argv=None):
             supervisor,
             MCPReader(config["mcp_url"], mcp_token, config["mcp_host"]),
             delivery,
+            prometheus=PrometheusReader(config["prometheus_url"])
+            if "prometheus_url" in config
+            else None,
         )
 
         def current_human_policy(receipt):

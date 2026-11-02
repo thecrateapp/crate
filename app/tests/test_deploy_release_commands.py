@@ -451,6 +451,7 @@ def test_deploy_ships_the_operator_overlay_and_agent_tooling() -> None:
 PROJECTOR_OVERLAY = "deploy/observability/compose.projector-prometheus.yaml"
 TRAEFIK_OVERLAY = "deploy/observability/compose.traefik-metrics.yaml"
 APP_METRICS_OVERLAY = "deploy/observability/compose.app-metrics.yaml"
+SUPERVISOR_OVERLAY = "deploy/observability/compose.supervisor-prometheus.yaml"
 
 
 def test_deploy_ships_the_monitoring_overlays() -> None:
@@ -458,7 +459,12 @@ def test_deploy_ships_the_monitoring_overlays() -> None:
     block = deploy[deploy.index("MONITORING_OVERLAYS=(") :]
     overlays = block[len("MONITORING_OVERLAYS=(") : block.index(")")].split()
 
-    assert overlays == [PROJECTOR_OVERLAY, TRAEFIK_OVERLAY, APP_METRICS_OVERLAY]
+    assert overlays == [
+        PROJECTOR_OVERLAY,
+        TRAEFIK_OVERLAY,
+        APP_METRICS_OVERLAY,
+        SUPERVISOR_OVERLAY,
+    ]
     for file in overlays:
         assert (ROOT / file).is_file(), file
 
@@ -521,6 +527,65 @@ def test_remote_deploy_keeps_monitoring_overlays_while_their_networks_exist(
             "pipefail",
             "-c",
             "COMPOSE=(docker compose)\n"
+            + selection
+            + "printf '%s\\n' \"${COMPOSE[@]}\"\n",
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+            "FAKE_NETWORKS": networks,
+        },
+    )
+
+    appended = result.stdout.splitlines()[2:]
+    assert appended == [part for file in expected for part in ("-f", file)]
+
+
+@pytest.mark.parametrize(
+    ("operator", "networks", "expected"),
+    [
+        ("", "crate_prometheus-query", [PROJECTOR_OVERLAY]),
+        ("deploy/operator/compose.operator.yaml", "", []),
+        (
+            "deploy/operator/compose.operator.yaml",
+            "crate_prometheus-query",
+            [PROJECTOR_OVERLAY, SUPERVISOR_OVERLAY],
+        ),
+    ],
+)
+def test_supervisor_joins_prometheus_only_with_a_running_operator(
+    tmp_path: Path, operator: str, networks: str, expected: list[str]
+) -> None:
+    for overlay in (PROJECTOR_OVERLAY, SUPERVISOR_OVERLAY):
+        (tmp_path / overlay).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / overlay).write_text("services: {}\n")
+    (tmp_path / ".env").write_text("")
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    docker = fake_bin / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        '[[ "$1 $2" == "network inspect" ]] || exit 2\n'
+        'for name in $FAKE_NETWORKS; do [[ "$3" == "$name" ]] && exit 0; done\n'
+        "exit 1\n"
+    )
+    docker.chmod(0o755)
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+    selection = script[
+        script.index("env_file_value() {") : script.index("compose_has_service() {")
+    ]
+
+    result = subprocess.run(
+        [
+            "bash",
+            "-euo",
+            "pipefail",
+            "-c",
+            f"COMPOSE=(docker compose)\nOPERATOR_OVERLAY={operator}\n"
             + selection
             + "printf '%s\\n' \"${COMPOSE[@]}\"\n",
         ],

@@ -14,6 +14,7 @@ from crate.agent_diagnostics import (
     _safe,
 )
 from crate.db.queries import agent_observability as evidence_store
+from crate.db.queries import observability_summary as summary_store
 from crate.smart_mix import versions
 
 SERVICES = (
@@ -801,3 +802,136 @@ def get_smart_mix_status(track_uids=None):
             "Request omitted exact track UUIDs in smaller batches"
         )
     return result
+
+
+SUMMARY_FRESH_SECONDS = 900
+KPI_GROUPS = (
+    "users",
+    "devices",
+    "listening",
+    "library",
+    "acquisition",
+    "engagement",
+    "federation",
+    "streams",
+)
+
+
+def _summary():
+    try:
+        return summary_store.read_observability_summary(), None
+    except Exception:  # noqa: BLE001 — failures must not leak DB DSNs or credentials.
+        return {}, "Persisted evidence source failed"
+
+
+def _summary_section(record, name):
+    payload = record.get("payload")
+    section = payload.get(name) if isinstance(payload, dict) else None
+    return section if isinstance(section, dict) else {}
+
+
+def _summary_source(name, record, failure, section, selected):
+    if not failure and not record:
+        failure = "Observability summary is opt-in and has not run"
+    elif not failure and record.get("oversized"):
+        failure = "Stored summary exceeds 49152 byte bound"
+    source = _source(
+        name,
+        {"observed_at": record.get("observed_at")} if record else None,
+        selected,
+        failure,
+        SUMMARY_FRESH_SECONDS,
+    )
+    state = section.get("availability")
+    if source["availability"] != "unavailable" and state in {"unavailable", "empty"}:
+        source.update(
+            availability="unavailable",
+            reason=section.get("reason") or state,
+            coverage="unavailable",
+        )
+    elif source["availability"] == "available" and state == "stale":
+        source.update(availability="stale", reason=section.get("reason"))
+    source["interpretation"] = (
+        "Persisted opt-in summary; missing values are unknown, never zero"
+    )
+    return source
+
+
+def get_playback_quality():
+    """Stored playback startup, stall and recovery figures with their sample."""
+    record, failure = _summary()
+    playback = _summary_section(record, "playback")
+    return _result(
+        "playback_quality",
+        {
+            "playback": _summary_source(
+                "observability_summary:playback", record, failure, playback, playback
+            )
+        },
+        data={
+            "window_minutes": playback.get("window_minutes"),
+            "minimum_startups": playback.get("minimum_startups"),
+        },
+    )
+
+
+def get_product_kpis(window_days=30):
+    """Stored daily product KPIs for 7 or 30 days, segments under 3 suppressed."""
+    if window_days not in (7, 30):
+        raise DiagnosticError("INVALID_ARGUMENT", "window_days must be 7 or 30")
+    record, failure = _summary()
+    kpis = _summary_section(record, "product_kpis")
+    windows = kpis.get("windows") or {}
+    breakdowns = kpis.get("breakdowns") or {}
+    sources = {}
+    for group in KPI_GROUPS:
+        selected = {
+            key: value
+            for key, value in {
+                "kpis": (windows.get(str(window_days)) or {}).get(group),
+                "breakdowns": breakdowns.get(group),
+            }.items()
+            if value
+        }
+        sources[group] = _summary_source(
+            f"observability_summary:product_kpis:{group}",
+            record,
+            failure,
+            kpis,
+            selected,
+        )
+    return _result(
+        "product_kpis",
+        sources,
+        data={
+            "window_days": window_days,
+            "end": kpis.get("end"),
+            "computed_at": kpis.get("computed_at"),
+            "minimum_sample": kpis.get("minimum_sample"),
+            "aggregation": "Each KPI has days, latest, sum and mean. Read latest for snapshot KPIs and sum or mean for daily ones.",
+        },
+    )
+
+
+def get_stack_status():
+    """Stored application and monitoring deployment state from the Stack inventory."""
+    record, failure = _summary()
+    stack = _summary_section(record, "stack")
+    return _result(
+        "stack_status",
+        {
+            name: _summary_source(
+                f"observability_summary:stack:{name}",
+                record,
+                failure,
+                stack,
+                stack.get(name),
+            )
+            for name in ("application", "monitoring")
+        },
+        data={
+            "host": stack.get("host"),
+            "inventory_observed_at": stack.get("observed_at"),
+            "resources": stack.get("resources") or "live_only",
+        },
+    )
