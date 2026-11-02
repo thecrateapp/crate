@@ -24,6 +24,40 @@ namespace {
 constexpr std::string_view kOnlineSourceFolderId = "Crate";
 constexpr int kMaxFolderPages = 5;
 constexpr std::size_t kMaxRememberedTracks = 5000;
+constexpr std::size_t kAutomixLookahead = 2;
+constexpr std::size_t kAutomixRecentTracks = 4;
+constexpr auto kAutomixActionSpacing = std::chrono::seconds(5);
+
+std::string casefolded(std::string_view value)
+{
+    std::string folded(value);
+    std::transform(folded.begin(), folded.end(), folded.begin(), [](unsigned char character) {
+        return static_cast<char>(std::tolower(character));
+    });
+    return folded;
+}
+
+std::string netsearch_path(const std::string& uid)
+{
+    return "\"netsearch://plugin-Crate/" + uid + "\"";
+}
+
+std::optional<std::string> incoming_crate_track(const std::vector<std::optional<DeckReading>>& decks)
+{
+    std::optional<std::string> incoming;
+    double shortest_elapsed = 0;
+    for (const auto& reading : decks) {
+        if (!reading.has_value() || !reading->audible) {
+            continue;
+        }
+        const auto uid = crate_uid_from_vdj_filepath(reading->filepath);
+        if (uid.has_value() && (!incoming.has_value() || reading->elapsed_ms < shortest_elapsed)) {
+            incoming = uid;
+            shortest_elapsed = reading->elapsed_ms;
+        }
+    }
+    return incoming;
+}
 
 std::string percent(double value)
 {
@@ -317,10 +351,12 @@ void OnlineSource::tick(std::chrono::system_clock::time_point now)
         return;
     }
     const int reported_decks = host_.deck_count();
-    const int decks = reported_decks > 0 ? std::min(reported_decks, 4) : 2;
+    const int deck_total = reported_decks > 0 ? std::min(reported_decks, 4) : 2;
+    std::vector<std::optional<DeckReading>> decks;
     bool recorded = false;
-    for (int deck = 1; deck <= decks; ++deck) {
-        for (auto& event : tracker_.observe(deck, host_.read_deck(deck), now)) {
+    for (int deck = 1; deck <= deck_total; ++deck) {
+        decks.push_back(host_.read_deck(deck));
+        for (auto& event : tracker_.observe(deck, decks.back(), now)) {
             if (const auto facts = facts_for(event.track_entity_uid)) {
                 event.title = facts->title;
                 event.artist = facts->artist;
@@ -335,6 +371,119 @@ void OnlineSource::tick(std::chrono::system_clock::time_point now)
     if (recorded || now - last_flush_attempt_ >= std::chrono::seconds(30)) {
         flush_plays(now);
     }
+    feed_automix(decks, now);
+}
+
+void OnlineSource::feed_automix(
+    const std::vector<std::optional<DeckReading>>& decks,
+    std::chrono::system_clock::time_point now
+)
+{
+    const auto status = session_.status();
+    if (!status.features.automation || !status.features.smart_mix_assistant ||
+        !host_.automix_active()) {
+        return;
+    }
+    const auto seed = incoming_crate_track(decks);
+    if (!seed.has_value()) {
+        return;
+    }
+    if (*seed != automix_.seed) {
+        const auto planned = std::find(automix_.planned.begin(), automix_.planned.end(), *seed);
+        automix_.replan = !automix_.seed.empty() && planned == automix_.planned.end();
+        if (planned == automix_.planned.end()) {
+            automix_.planned.clear();
+        } else {
+            automix_.planned.erase(automix_.planned.begin(), planned + 1);
+        }
+        automix_.seed = *seed;
+        automix_.played.insert(*seed);
+        automix_.recent.push_back(*seed);
+        if (automix_.recent.size() > kAutomixRecentTracks) {
+            automix_.recent.pop_front();
+        }
+        log("automix seed id=" + *seed);
+    }
+    if (now < automix_.next_action_at) {
+        return;
+    }
+
+    std::vector<std::string> upcoming;
+    std::string upcoming_log;
+    for (const auto& path : host_.automix_upcoming(static_cast<int>(kAutomixLookahead) + 1)) {
+        upcoming.push_back(crate_uid_from_vdj_filepath(path).value_or(""));
+        upcoming_log += (upcoming_log.empty() ? "" : ",") + (upcoming.back().empty() ? std::string("other") : upcoming.back());
+    }
+    if (!automix_.replan && upcoming.size() >= kAutomixLookahead) {
+        return;
+    }
+    const std::string anchor = automix_.replan || upcoming.empty() || upcoming.back().empty()
+        ? *seed
+        : upcoming.back();
+    const auto pick = choose_automix_track(anchor, upcoming);
+    automix_.next_action_at = now + kAutomixActionSpacing;
+    if (!pick.has_value()) {
+        log("automix found no track anchor=" + anchor + " upcoming=" + upcoming_log);
+        automix_.replan = false;
+        return;
+    }
+    const std::string verb = automix_.replan ? "automix_add_next" : "playlist_add";
+    const bool sent = host_.send_command(verb + " " + netsearch_path(*pick));
+    log("automix " + verb + " id=" + *pick + " anchor=" + anchor + " upcoming=" + upcoming_log +
+        (sent ? "" : " failed"));
+    if (sent) {
+        if (automix_.replan) {
+            automix_.planned.insert(automix_.planned.begin(), *pick);
+        } else {
+            automix_.planned.push_back(*pick);
+        }
+    }
+    automix_.replan = false;
+}
+
+std::optional<std::string> OnlineSource::choose_automix_track(
+    const std::string& anchor,
+    const std::vector<std::string>& upcoming
+)
+{
+    const auto server = clients();
+    if (server == nullptr) {
+        return std::nullopt;
+    }
+    CancellationSource cancellation;
+    const auto result = server->compatible.fetch(anchor, cancellation.token());
+    if (!result.ok()) {
+        return std::nullopt;
+    }
+    std::vector<SearchTrack> candidates;
+    for (const auto& item : result.value->items) {
+        candidates.push_back(compatible_track_as_search_track(item));
+    }
+    remember(candidates);
+
+    std::unordered_set<std::string> excluded(automix_.played.begin(), automix_.played.end());
+    excluded.insert(upcoming.begin(), upcoming.end());
+    excluded.insert(automix_.planned.begin(), automix_.planned.end());
+    excluded.insert(anchor);
+    std::unordered_set<std::string> recent_artists;
+    std::unordered_set<std::string> recent_albums;
+    std::vector<std::string> window(automix_.recent.begin(), automix_.recent.end());
+    window.push_back(anchor);
+    for (const auto& uid : window) {
+        if (const auto facts = facts_for(uid)) {
+            recent_artists.insert(casefolded(facts->artist));
+            recent_albums.insert(casefolded(facts->album));
+        }
+    }
+    for (const auto& candidate : candidates) {
+        if (excluded.contains(candidate.entity_uid) ||
+            recent_artists.contains(casefolded(candidate.artist)) ||
+            (!candidate.album.empty() && recent_albums.contains(casefolded(candidate.album)))) {
+            continue;
+        }
+        return candidate.entity_uid;
+    }
+    return std::nullopt;
 }
 
 void OnlineSource::flush_plays(std::chrono::system_clock::time_point now)

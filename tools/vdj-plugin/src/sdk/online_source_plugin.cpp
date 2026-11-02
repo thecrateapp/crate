@@ -18,6 +18,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <vector>
 
 #ifndef E_FAIL
 #define E_FAIL ((HRESULT)0x80004005L)
@@ -216,6 +217,31 @@ public:
             return 0;
         }
         return static_cast<int>(decks);
+    }
+
+    bool automix_active() override
+    {
+        double active = 0;
+        return plugin_.cb != nullptr && plugin_.GetInfo("automix", &active) == S_OK && active != 0;
+    }
+
+    std::vector<std::string> automix_upcoming(int count) override
+    {
+        std::vector<std::string> paths;
+        if (plugin_.cb == nullptr) {
+            return paths;
+        }
+        for (int index = 1; index <= count; ++index) {
+            std::array<char, 4096> filepath = {};
+            const std::string query = "get_automix_song filepath " + std::to_string(index);
+            if (plugin_.GetStringInfo(query.c_str(), filepath.data(), static_cast<int>(filepath.size())) !=
+                    S_OK ||
+                filepath[0] == '\0') {
+                break;
+            }
+            paths.emplace_back(filepath.data());
+        }
+        return paths;
     }
 
     std::optional<DeckReading> read_deck(int deck) override

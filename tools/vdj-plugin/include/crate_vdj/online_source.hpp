@@ -14,6 +14,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
+#include <deque>
 #include <filesystem>
 #include <functional>
 #include <memory>
@@ -23,6 +24,7 @@
 #include <string_view>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace crate::vdj {
@@ -62,6 +64,8 @@ public:
     virtual bool open_url(const std::string& url) = 0;
     virtual int deck_count() = 0;
     virtual std::optional<DeckReading> read_deck(int deck) = 0;
+    virtual bool automix_active() = 0;
+    virtual std::vector<std::string> automix_upcoming(int count) = 0;
 };
 
 class ConnectionUi {
@@ -155,6 +159,14 @@ private:
     void log(const std::string& message) const;
     void flush_plays(std::chrono::system_clock::time_point now);
     void run_worker();
+    void feed_automix(
+        const std::vector<std::optional<DeckReading>>& decks,
+        std::chrono::system_clock::time_point now
+    );
+    std::optional<std::string> choose_automix_track(
+        const std::string& anchor,
+        const std::vector<std::string>& upcoming
+    );
 
     HostPort& host_;
     ConnectionUi& ui_;
@@ -173,6 +185,15 @@ private:
     ConnectionWorker connection_;
     PlayTracker tracker_;
     PlayEventSpool spool_;
+    struct AutomixState {
+        std::string seed;
+        std::vector<std::string> planned;
+        std::unordered_set<std::string> played;
+        std::deque<std::string> recent;
+        bool replan = false;
+        std::chrono::system_clock::time_point next_action_at{};
+    };
+    AutomixState automix_;
     std::chrono::system_clock::time_point last_flush_attempt_{};
     bool run_worker_;
     std::mutex worker_mutex_;
