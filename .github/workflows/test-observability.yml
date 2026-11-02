@@ -14,6 +14,7 @@ on:
       - "scripts/observability_release.py"
       - "scripts/observability_preflight.py"
       - "scripts/observability-deploy-remote.sh"
+      - "scripts/observability-check.sh"
       - "app/tests/test_observability_remote_deploy_runtime.py"
       - ".github/workflows/test-observability.yml"
       - "docker-compose*.yaml"
@@ -32,6 +33,7 @@ on:
       - "scripts/observability_release.py"
       - "scripts/observability_preflight.py"
       - "scripts/observability-deploy-remote.sh"
+      - "scripts/observability-check.sh"
       - "app/tests/test_observability_remote_deploy_runtime.py"
       - ".github/workflows/test-observability.yml"
       - "docker-compose*.yaml"
@@ -93,13 +95,8 @@ jobs:
           app/tests/test_observability_c0_retirement.py
           app/tests/test_observability_deployment.py
           app/tests/test_observability_release.py -q
-      - name: Check Prometheus configuration with its pinned release
-        run: |
-          image="$(python -c 'import yaml; print(yaml.safe_load(open("deploy/observability/compose.observability.yaml"))["services"]["crate-prometheus"]["image"])')"
-          docker run --rm --network none --read-only --cap-drop ALL \
-            --memory 128m --cpus 0.5 --entrypoint /bin/promtool \
-            --mount "type=bind,src=$PWD/deploy/observability,dst=/etc/prometheus,readonly" \
-            "$image" check config /etc/prometheus/prometheus.yml
+      - name: Check Prometheus configuration and recording rules with its pinned release
+        run: scripts/observability-check.sh
       - name: Validate Docker read proxy configuration
         run: |
           image="$(python -c 'import yaml; print(yaml.safe_load(open("deploy/observability/compose.observability.yaml"))["services"]["crate-observability-docker-proxy"]["image"])')"
