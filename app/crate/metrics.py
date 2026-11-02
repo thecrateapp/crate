@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 from queue import Empty, Full, Queue
 from threading import Lock, Thread
 
-from crate.observability import metric_buckets
+from crate.observability import metric_buckets, prometheus
 from crate.observability.metric_catalog import canonical_metric, get_metric_definition
 
 log = logging.getLogger(__name__)
@@ -230,6 +230,7 @@ def _record_sync(
     tags: dict | None = None,
     *,
     observed_at: float | None = None,
+    export: bool = True,
 ):
     """Record one observation atomically, storing catalogue units and dimensions."""
     global _last_write_at
@@ -241,6 +242,8 @@ def _record_sync(
     except (ValueError, TypeError, AttributeError):
         _collection_event("invalid_observation")
         return False
+    if export:
+        prometheus.observe(series, canonical_value)
     if series.normalized_labels:
         _collection_event("labels_normalized", series.normalized_labels)
     try:
@@ -288,7 +291,9 @@ def _record_route_latency_sync(
     target = safe_tags.get("target", "api")
     status = safe_tags.get("status_class", "other")
     observed = time.time() if observed_at is None else observed_at
-    if not _record_sync(_ROUTE_LATENCY_METRIC, value, safe_tags, observed_at=observed):
+    if not _record_sync(
+        _ROUTE_LATENCY_METRIC, value, safe_tags, observed_at=observed, export=False
+    ):
         return
 
     try:
@@ -338,7 +343,7 @@ def _async_record_loop():
             elif name == _ROUTE_LATENCY_METRIC:
                 _record_route_latency_sync(value, tags, observed_at=observed)
             else:
-                _record_sync(name, value, tags, observed_at=observed)
+                _record_sync(name, value, tags, observed_at=observed, export=False)
         except Exception:
             _collection_event("async_error")
         finally:
@@ -384,6 +389,7 @@ def record_later(name: str, value: float, tags: dict | None = None):
     except (ValueError, TypeError, AttributeError):
         _collection_event("invalid_observation")
         return
+    prometheus.observe(series, value * series.definition.scale)
     if series.normalized_labels:
         _collection_event("labels_normalized", series.normalized_labels)
     observed = time.time()

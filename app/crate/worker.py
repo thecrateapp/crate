@@ -68,7 +68,9 @@ def run_worker(config: dict):
     )
 
     from crate.observability import init_sentry, resolve_service_name
+    from crate.observability.metrics_server import start as start_metrics
 
+    start_metrics(resolve_service_name("worker"))
     init_sentry(resolve_service_name("workers"))
 
     from crate.utils import init_musicbrainz
