@@ -61,7 +61,7 @@ export function createPlaybackQoeStore<TEvent extends object>(
   let timer: unknown = null;
   let timerDueAt = Number.POSITIVE_INFINITY;
   let generation = 0;
-  let scope = deps.getScope();
+  let scope: string | null = null;
 
   function clearScheduled(): void {
     if (timer === null) return;
@@ -92,11 +92,13 @@ export function createPlaybackQoeStore<TEvent extends object>(
     tokens = limits.burst;
     refilledAt = deps.now();
     pausedUntil = 0;
-    scope = deps.getScope();
+    scope = null;
   }
 
   function ensureScope(): void {
-    if (deps.getScope() !== scope) clear();
+    const current = deps.getScope();
+    if (scope !== null && current !== scope) clear();
+    scope = current;
   }
 
   function takeToken(): boolean {

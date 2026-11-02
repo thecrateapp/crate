@@ -115,7 +115,7 @@ def _record_qoe_event(event) -> None:
         if event.cause is not None:
             result_tags["cause"] = event.cause
         record_later("playback.result.count", 1.0, result_tags)
-    elif event.event == "active":
+    elif event.event == "active" and event.duration_ms is not None:
         record_later(
             "playback.active.ms",
             float(event.duration_ms),

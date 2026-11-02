@@ -93,7 +93,7 @@ def derive_playback_qoe(summary: dict) -> dict:
         (summary.get(key) or {}).get("availability")
         for key in (*SUMMARY_SPECS, "playback_stall_ms")
     }
-    if any(totals[key] is None for key in _REQUIRED):
+    if attempts is None or any(totals[key] is None for key in _REQUIRED):
         availability, reason = "unavailable", "metric_source_unavailable"
     elif not totals["playback_payload_v2"] and not attempts:
         availability, reason = "empty", "no_current_clients"
