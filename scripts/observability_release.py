@@ -143,7 +143,8 @@ def _images(payloads: dict[str, bytes]) -> list[str]:
     return sorted(set(images))
 
 
-def _manifest(payloads, revision, names=BUNDLE_FILES):
+def _manifest(payloads, revision, names=None):
+    names = BUNDLE_FILES if names is None else names
     return {
         "schema_version": 1,
         "stack_id": "crate-observability",
@@ -162,7 +163,8 @@ def _unique_object(pairs):
     return result
 
 
-def _verified_manifest(content, payloads, names=BUNDLE_FILES):
+def _verified_manifest(content, payloads, names=None):
+    names = BUNDLE_FILES if names is None else names
     try:
         manifest = json.loads(content, object_pairs_hook=_unique_object)
     except (UnicodeError, json.JSONDecodeError) as error:
