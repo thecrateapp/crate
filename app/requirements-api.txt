@@ -24,3 +24,4 @@ casbin>=1.37
 sentry-sdk[fastapi]>=2.60,<3
 mcp==2.3.0
 Authlib==1.9.1
+prometheus-client==0.26.0

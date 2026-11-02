@@ -73,6 +73,7 @@ from crate.mcp.schemas import (
     MetadataRehydratePlanInput,
     PipelineInput,
     PlanInput,
+    ProductKpisInput,
     QualityInput,
     QualityRunInput,
     RepairApplyInput,
@@ -101,6 +102,21 @@ OBSERVATION_TOOLS = {
         SmartMixStatusInput,
         "library.health.read",
         "Read stored Smart Mix coverage, campaign and version evidence for up to 50 exact track UUIDs. No scan, profile calculation or coverage refresh.",
+    ),
+    "get_playback_quality": (
+        InstanceInput,
+        "ops.status.read",
+        "Read the stored playback summary: startups, startup time, stalls and recoveries over 15 minutes. Ratios need 20 startups; missing values are unknown, not zero.",
+    ),
+    "get_product_kpis": (
+        ProductKpisInput,
+        "ops.status.read",
+        "Read stored daily product KPIs for the last 7 or 30 days by group, with segments under three listeners suppressed. No recomputation.",
+    ),
+    "get_stack_status": (
+        InstanceInput,
+        "ops.status.read",
+        "Read the stored state of the application and monitoring deployments from the Stack inventory. No live Docker probe; resource readings are live-only.",
     ),
 }
 

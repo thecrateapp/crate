@@ -10,6 +10,10 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { MetricChart } from "@/components/system-health/MetricChart";
 import {
+  PlaybackHealth,
+  type PlaybackQoeSummary,
+} from "@/components/system-health/PlaybackHealth";
+import {
   metricStreams,
   type MetricReadStatus,
 } from "@/components/system-health/metric-stream-model";
@@ -114,6 +118,7 @@ interface SystemHealthDashboardResponse {
   system: SystemMetrics;
   tasks: ActiveTask[];
   playback_delivery?: PlaybackDeliverySnapshot;
+  playback_qoe?: PlaybackQoeSummary;
   route_latency?: RouteLatencyRow[];
   timeseries: Record<string, TimeseriesPoint[]>;
   timeseries_status?: Record<string, MetricReadStatus>;
@@ -965,6 +970,8 @@ export function SystemHealth() {
           </p>
         )}
       </OpsPanel>
+
+      <PlaybackHealth qoe={error ? undefined : dashboard?.playback_qoe} />
 
       {system ? (
         <InstrumentPanel

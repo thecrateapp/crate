@@ -1,0 +1,263 @@
+{
+  "uid": "crate-app-telemetry",
+  "title": "Crate application \u00b7 Telemetry health",
+  "schemaVersion": 40,
+  "version": 1,
+  "editable": false,
+  "tags": ["crate", "application", "shadow", "telemetry"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [],
+  "panels": [
+    {
+      "title": "Collectors up",
+      "type": "timeseries",
+      "description": "1 when the last scrape succeeded, 0 when it failed. No data means the service is not discovered.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:scrape_up:by_service",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 1
+    },
+    {
+      "title": "Scrape age",
+      "type": "timeseries",
+      "description": "Seconds since the last scrape attempt per service. Grows when a target disappears, until it goes stale.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:scrape_age_seconds:by_service",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 2
+    },
+    {
+      "title": "Samples per scrape",
+      "type": "timeseries",
+      "description": "Samples exposed by each service. A sudden rise points at label cardinality.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:scrape_samples:by_service",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 3
+    },
+    {
+      "title": "Sample limit reached",
+      "type": "timeseries",
+      "description": "1 when a service exposed at least the 20,000-sample limit and the scrape was rejected.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:scrape_sample_limit_hit:by_service",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 4
+    },
+    {
+      "title": "Scrape duration",
+      "type": "timeseries",
+      "description": "Time Prometheus spent scraping each application target.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (service) (scrape_duration_seconds{job=\"crate-app\"})",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 5
+    },
+    {
+      "title": "Rule evaluation",
+      "type": "timeseries",
+      "description": "Recording rule groups' last evaluation time. Missing groups mean the rules did not load.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "prometheus_rule_group_last_duration_seconds{rule_group=~\".*crate-app-.*\"}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{rule_group}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 6
+    }
+  ],
+  "templating": {
+    "list": []
+  }
+}

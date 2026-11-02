@@ -1,0 +1,92 @@
+rule_files:
+  - recording-rules.yml
+
+evaluation_interval: 30s
+
+tests:
+  - name: a counter reset keeps the request rate
+    interval: 30s
+    input_series:
+      - series: 'crate_api_request_total{job="crate-app",service="crate-api",target="api",status_class="2xx",method="GET",latency_class="fast"}'
+        values: "0+10x14 10+10x20"
+    promql_expr_test:
+      - expr: crate:api_requests:rate5m
+        eval_time: 10m
+        exp_samples:
+          - labels: 'crate:api_requests:rate5m{target="api",status_class="2xx"}'
+            value: 0.33333333333333337
+
+  - name: no data leaves every application ratio and quantile empty
+    interval: 30s
+    input_series:
+      - series: 'up{job="node-exporter",instance="crate-node-exporter:9100"}'
+        values: "1x20"
+    promql_expr_test:
+      - expr: crate:api_request_errors:ratio5m
+        eval_time: 10m
+        exp_samples: []
+      - expr: crate:api_request_latency_seconds:p95_5m
+        eval_time: 10m
+        exp_samples: []
+      - expr: crate:playback_stalls_per_startup:ratio15m
+        eval_time: 10m
+        exp_samples: []
+      - expr: crate:worker_task_failures:ratio15m
+        eval_time: 10m
+        exp_samples: []
+      - expr: crate:scrape_up:by_service
+        eval_time: 10m
+        exp_samples: []
+
+  - name: idle traffic has no ratio and real traffic without errors reads zero
+    interval: 30s
+    input_series:
+      - series: 'crate_api_request_total{job="crate-app",service="crate-api",target="api",status_class="2xx",method="GET",latency_class="fast"}'
+        values: "0+6x20"
+      - series: 'crate_api_request_total{job="crate-app",service="crate-api",target="opensubsonic",status_class="2xx",method="GET",latency_class="fast"}'
+        values: "4x20"
+      - series: 'crate_api_request_latency_seconds_count{job="crate-app",service="crate-api",target="opensubsonic",status_class="2xx",method="GET"}'
+        values: "4x20"
+      - series: 'crate_api_request_latency_seconds_bucket{job="crate-app",service="crate-api",target="opensubsonic",status_class="2xx",method="GET",le="+Inf"}'
+        values: "4x20"
+    promql_expr_test:
+      - expr: crate:api_request_errors:ratio5m
+        eval_time: 10m
+        exp_samples:
+          - labels: 'crate:api_request_errors:ratio5m{target="api"}'
+            value: 0
+      - expr: crate:api_request_latency_seconds:p95_5m
+        eval_time: 10m
+        exp_samples: []
+      - expr: crate:api_requests:increase5m{target="opensubsonic"}
+        eval_time: 10m
+        exp_samples:
+          - labels: 'crate:api_requests:increase5m{target="opensubsonic"}'
+            value: 0
+
+  - name: a collector that goes down reads as down, then its gauges expire
+    interval: 30s
+    input_series:
+      - series: 'up{job="crate-app",service="crate-worker",instance="10.0.0.3:9200"}'
+        values: "1x5 0x15"
+      - series: 'crate_worker_queue_depth{job="crate-app",service="crate-worker",instance="10.0.0.3:9200",queue="default"}'
+        values: "7x5 _x15"
+    promql_expr_test:
+      - expr: crate:scrape_up:by_service
+        eval_time: 2m
+        exp_samples:
+          - labels: 'crate:scrape_up:by_service{service="crate-worker"}'
+            value: 1
+      - expr: crate:worker_queue_depth:last2m
+        eval_time: 2m
+        exp_samples:
+          - labels: 'crate:worker_queue_depth:last2m{queue="default"}'
+            value: 7
+      - expr: crate:scrape_up:by_service
+        eval_time: 8m
+        exp_samples:
+          - labels: 'crate:scrape_up:by_service{service="crate-worker"}'
+            value: 0
+      - expr: crate:worker_queue_depth:last2m
+        eval_time: 8m
+        exp_samples: []

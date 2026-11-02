@@ -135,7 +135,9 @@ def run_projector(
     """Run the projector as its own long-lived process."""
     del config
     from crate.observability import init_sentry
+    from crate.observability.metrics_server import start as start_metrics
 
+    start_metrics("projector")
     init_sentry("projector")
     init_db()
 

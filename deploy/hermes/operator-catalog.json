@@ -1250,6 +1250,46 @@
     }
   },
   {
+    "name": "get_playback_quality",
+    "description": "Read the stored playback summary: startups, startup time, stalls and recoveries over 15 minutes. Ratios need 20 startups; missing values are unknown, not zero.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "InstanceInput",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "get_product_kpis",
+    "description": "Read stored daily product KPIs for the last 7 or 30 days by group, with segments under three listeners suppressed. No recomputation.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "window_days": {
+          "default": 30,
+          "enum": [
+            7,
+            30
+          ],
+          "title": "Window Days",
+          "type": "integer"
+        }
+      },
+      "title": "ProductKpisInput",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
     "name": "get_runtime_policy",
     "description": "Read configured runtime policy and actual consumer adoption separately. Idle consumers can leave adoption pending.",
     "inputSchema": {
@@ -1289,6 +1329,21 @@
         }
       },
       "title": "SmartMixStatusInput",
+      "type": "object"
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "get_stack_status",
+    "description": "Read the stored state of the application and monitoring deployments from the Stack inventory. No live Docker probe; resource readings are live-only.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "InstanceInput",
       "type": "object"
     },
     "annotations": {

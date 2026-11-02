@@ -555,6 +555,66 @@ Recreating Traefik drops in-flight connections for a few seconds, so schedule it
 `OBS_PROMETHEUS_QUERY_NETWORK`. Without the entrypoint or the overlay the scrape
 job has no targets and the map shows no ingress readings.
 
+## Application metrics endpoints
+
+`compose.app-metrics.yaml` opens an internal metrics port (9200) in each
+application container and joins it to the `app-metrics` network, which only
+Prometheus shares. Nothing is published on the host. Like the projector and
+Traefik overlays, it is only appended while monitoring runs, and `make deploy`
+keeps it while that network exists. `OBS_APP_METRICS_NETWORK` names the network:
+`crate_app-metrics` by default, `crate-observability_app-metrics` for the
+independent monitoring project.
+
+- **Python services** (API, workers, projector): every process writes the
+  exported catalogue families (`crate.observability.prometheus`) to a tmpfs at
+  `/tmp/crate-metrics`. The supervising process clears it once per container
+  start and serves it with `crate_build_info`. Counters and histograms keep their
+  totals when a child process restarts. Global gauges keep their latest value,
+  and per-process gauges such as `crate_stream_concurrent` add up only live
+  processes. Routes and services are never labels; per-route detail stays in
+  System Health.
+- **Readplane** (`READPLANE_METRICS_ADDR`): request counts and durations by
+  source, local media counters and cumulative open-latency buckets.
+- **Media worker** (`CRATE_METRICS_ADDR`): requests, packages in progress,
+  outcomes and build durations, served from their own thread so a scrape does
+  not wait behind a long package.
+
+Without the overlay, nothing imports the Prometheus client or opens a port.
+
+### Recording rules and application dashboards
+
+Prometheus discovers the application services by DNS on `app-metrics` (job
+`crate-app`, every 15 seconds, at most 20,000 samples per scrape) and keeps only
+`crate_*` families. `recording-rules.yml` turns them into rates, 95th
+percentiles and ratios with a sample count next to each one. A ratio or
+quantile without traffic stays empty; a zero only appears when there was traffic
+and nothing failed. Grafana provisions four dashboards from them: Overview,
+Playback, Workers and projector, and Telemetry health. Radio and Music Paths
+panels arrive with their metrics.
+
+`scripts/observability-check.sh` runs `promtool check config`, `check rules` and
+the rule unit tests in `recording-rules.test.yml` (counter reset, no data, idle
+traffic, lost collector) with the pinned Prometheus image and no network; CI runs
+it on every change.
+
+### Shadow period
+
+The application dashboards and rules run in shadow for 7 to 14 days before any
+alert reads them. There are no alert receivers during shadow. Record, for the
+whole overlay (Prometheus, Grafana, exporters and the application metrics ports):
+
+- CPU, RSS and IO of Prometheus and of each application container, compared
+  with the same days before the overlay;
+- Prometheus disk growth per day and the retention it implies;
+- active series per job and the largest families
+  (`topk(10, count by (__name__) ({job="crate-app"}))`), and any scrape that hit
+  the sample limit;
+- scrape duration and failed scrapes per service, and rule evaluation time.
+
+Shadow ends when those figures fit the monitoring budget and the panels have been
+compared with System Health for the same windows. Only then do alert rules start
+reading the recorded series, one group at a time.
+
 ## Validation and C0 evidence
 
 ```bash
@@ -562,7 +622,8 @@ cd app
 ../.venv/bin/python -m pytest --noconftest tests/test_observability_compose.py tests/test_observability_containerd.py -q
 ```
 
-CI also runs the pinned image's `promtool check config` without network access.
+CI also runs `scripts/observability-check.sh`: the pinned image's `promtool`
+checks the config and rules and runs the rule unit tests without network access.
 The tests resolve project/home and operator combinations with synthetic values;
 they do not start Crate or connect to production.
 

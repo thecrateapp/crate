@@ -5,7 +5,7 @@ section: operations
 audience: [operator]
 status: canonical
 order: 122
-verified: 2026-11-01
+verified: 2026-11-02
 sources:
   [
     deploy/observability/README.md,
@@ -21,6 +21,12 @@ sources:
     scripts/deploy.sh,
     app/ui/src/pages/SystemHealth.tsx,
     app/crate/observability/metric_catalog_data.py,
+    app/crate/observability/summary.py,
+    app/crate/agent_observability.py,
+    deploy/operator/prometheus.py,
+    deploy/operator/supervisor.py,
+    deploy/operator/config.operator.example.json,
+    deploy/observability/compose.supervisor-prometheus.yaml,
     Makefile,
   ]
 ---
@@ -123,10 +129,43 @@ interrupted deploy can leave the lease behind; release it with
 `make deploy-unlock DEPLOY_ID=<owner>` (another owner's lease also needs
 `CONFIRM=break-host-lock`).
 
+## Alerts and the observability summary
+
+The Crate Operator supervisor sends alerts to Telegram. Besides the rules it reads
+from the Crate MCP, it can read a fixed allowlist of Prometheus recording rules
+directly, so an alert still fires when the API or PostgreSQL is down. Each read
+has a 2 second timeout and a 64 KB answer limit, takes its freshness from the
+recorded sample, and needs a minimum sample before a ratio counts. An empty,
+ambiguous, rejected or under-sampled answer is unavailable: it never opens or
+resolves an incident on its own.
+
+The rules are grouped as observability (Prometheus up, app scrapes, sample
+limit), queues (depth, wait, failure ratio), availability (API errors and
+latency, stream latency) and playback (stalls per startup, startup time,
+transcode failures). They ship with `"enabled": false` in
+`deploy/operator/config.operator.example.json` and are enabled one by one after
+the shadow period. The supervisor reaches Prometheus through
+`compose.supervisor-prometheus.yaml`, which application deploys keep while the
+Operator runs and the `prometheus-query` network exists; set `prometheus_url` in
+the supervisor config.
+
+An opt-in maintenance task, `compute_observability_summary`, stores one
+presentation summary in `ops_runtime`: playback quality over 15 minutes, product
+KPIs for 7 and 30 days, and the state of both deployments from the cached Stack
+inventory. Its schedule interval is 0 until an administrator sets one. The Crate
+MCP serves it read-only through `get_playback_quality`, `get_product_kpis`
+(`window_days` 7 or 30, segments under three listeners suppressed) and
+`get_stack_status`; Crate Agent and Crate Operator use the same tools. Nothing in
+the summary feeds alerts, a summary older than 15 minutes reads as stale, and a
+missing summary or section is unavailable, never zero.
+
 ## Limitations
 
-- No alerts are sent from Prometheus and there is no external probe yet; the
-  Crate Operator remains the alerting path.
+- Prometheus sends no alerts itself and there is no external probe yet; the
+  Crate Operator supervisor is the alerting path, and its Prometheus rules are
+  disabled until enabled after the shadow period.
+- The monitoring release SHA is not reported by containers, so
+  `get_stack_status` shows the deployment and its health but not the release.
 - Application metrics are not in Prometheus, so Grafana has no API, playback or
   worker dashboards.
 - Metrics from a Docker Desktop or OrbStack virtual machine describe the VM, not

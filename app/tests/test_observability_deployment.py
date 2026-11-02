@@ -137,6 +137,7 @@ def test_standalone_extends_only_the_eight_reviewed_monitoring_services():
         "observability-ui",
         "prometheus-query",
         "traefik-metrics",
+        "app-metrics",
     }
     assert standalone["networks"]["crate"]["external"] is True
 
@@ -207,6 +208,7 @@ def test_standalone_resolves_without_application_compose_and_preserves_reviewed_
         "observability-ui",
         "prometheus-query",
         "traefik-metrics",
+        "app-metrics",
     }
     assert standalone["networks"]["crate"]["name"] == "fixture-application-network"
     assert standalone["networks"]["crate"]["external"] is True
@@ -222,6 +224,12 @@ def test_standalone_resolves_without_application_compose_and_preserves_reviewed_
         name
         for name, service in standalone["services"].items()
         if "traefik-metrics" in (service.get("networks") or {})
+    ) == ["crate-prometheus"]
+    assert standalone["networks"]["app-metrics"]["internal"] is True
+    assert sorted(
+        name
+        for name, service in standalone["services"].items()
+        if "app-metrics" in (service.get("networks") or {})
     ) == ["crate-prometheus"]
     assert len(standalone["secrets"]) == 4
     for name in SERVICES:

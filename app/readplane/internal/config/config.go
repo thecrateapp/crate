@@ -23,6 +23,7 @@ const (
 // Config holds all runtime configuration for the readplane service.
 type Config struct {
 	Addr                           string
+	MetricsAddr                    string
 	DatabaseURL                    string
 	RedisURL                       string
 	DurableRedisURL                string
@@ -62,6 +63,7 @@ type Config struct {
 func Load(version string) Config {
 	return Config{
 		Addr:                           stringEnv("READPLANE_ADDR", defaultAddr),
+		MetricsAddr:                    stringEnv("READPLANE_METRICS_ADDR", ""),
 		DatabaseURL:                    databaseURL(),
 		RedisURL:                       stringEnv("REDIS_CACHE_URL", stringEnv("REDIS_URL", defaultRedisURL)),
 		DurableRedisURL:                stringEnv("REDIS_DURABLE_URL", stringEnv("REDIS_URL", defaultRedisURL)),

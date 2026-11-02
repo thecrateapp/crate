@@ -10,6 +10,7 @@ Entry paths:
 - Library: storage/import/sync, enrichment/acquisition and analysis in chapters `04`, `05` and `06`.
 - Users and playback: chapters `07`, `08`, `09`; OpenSubsonic documentation.
 - Smart Mix: `docs/technical/smart-mix-operations.md` for behavior, versions and diagnosis; the design and continuation plan for future work and pending gates. The MCP exposes `get_smart_mix_status` with dedicated coverage/campaign observations, age and evidence limits.
+- Observability: `docs/technical/monitoring.md`. The MCP exposes `get_playback_quality`, `get_product_kpis` (7 or 30 days) and `get_stack_status` from an opt-in stored summary; a missing or stale summary is unknown, never zero.
 - Agents: `docs/technical/11-crate-mcp.md`, `crate-mcp.md`, `crate-mcp-distribution.md` and the JSON contract.
 - Operations: `docs/technical/operations.md`, `crate-agent.md` (setup, model, approvals and troubleshooting for Crate Agent and Crate Operator), `ops-runbook.md`, `deployment-profiles.md`, `hermes-operator-release.md`, `crate-operator.md` and `hermes-plan-confirmation.md`.
 - Dedicated operator: `deploy/operator/` holds the supervisor, infrastructure bridge/relay, provenance, profiles and contracts; `deploy/hermes/` holds the runtime, adapters, context and native providers.

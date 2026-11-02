@@ -103,8 +103,11 @@
           "get_operation_catalog",
           "get_pipeline_status",
           "get_plan",
+          "get_playback_quality",
+          "get_product_kpis",
           "get_runtime_policy",
           "get_smart_mix_status",
+          "get_stack_status",
           "inspect_artist",
           "list_jobs",
           "list_library_issues",
@@ -137,9 +140,9 @@
           "run_quality_check",
           "run_schedule",
           "search_acquisition",
+          "search_shows",
           "search_tidal_missing_albums",
-          "search_tidal_missing_artist",
-          "search_shows"
+          "search_tidal_missing_artist"
         ],
         "prompts": false,
         "resources": false

@@ -131,6 +131,8 @@ export function usePlayerPlaybackRuntime({
     markSeekPosition,
     recordProgress,
     recordPlaybackQualityProgress,
+    recordPlaybackIntent,
+    recordPlaybackResult,
     recordCurrentPlaybackQoe,
   } = usePlayerPlaybackObservability({
     currentTrackRef,
@@ -436,6 +438,8 @@ export function usePlayerPlaybackRuntime({
     recordPlaybackStarted: (durationMs) => {
       recordCurrentPlaybackQoe("startup", { durationMs });
     },
+    recordPlaybackIntent,
+    recordPlaybackResult,
     onActivePlaybackStarted: preResolveNextTrack,
     pullFromEngine,
     setAnalyserVersion,

@@ -174,7 +174,13 @@ select_monitoring_overlays() {
   done <<'OVERLAYS'
 deploy/observability/compose.projector-prometheus.yaml OBS_PROMETHEUS_QUERY_NETWORK crate_prometheus-query
 deploy/observability/compose.traefik-metrics.yaml OBS_TRAEFIK_METRICS_NETWORK crate_traefik-metrics
+deploy/observability/compose.app-metrics.yaml OBS_APP_METRICS_NETWORK crate_app-metrics
 OVERLAYS
+  overlay=deploy/observability/compose.supervisor-prometheus.yaml
+  [[ -n "${OPERATOR_OVERLAY:-}" && -f "$overlay" ]] || return 0
+  network="$(env_value OBS_PROMETHEUS_QUERY_NETWORK)"
+  docker network inspect "${network:-crate_prometheus-query}" >/dev/null 2>&1 || return 0
+  COMPOSE+=(-f "$overlay")
 }
 select_monitoring_overlays
 

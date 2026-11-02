@@ -68,7 +68,9 @@ def run_worker(config: dict):
     )
 
     from crate.observability import init_sentry, resolve_service_name
+    from crate.observability.metrics_server import start as start_metrics
 
+    start_metrics(resolve_service_name("worker"))
     init_sentry(resolve_service_name("workers"))
 
     from crate.utils import init_musicbrainz
@@ -586,6 +588,16 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         "crate.worker_handlers.product_kpis",
         "PRODUCT_KPI_TASK_HANDLERS",
         ("compute_product_kpis",),
+    ),
+    (
+        "crate.worker_handlers.observability_summary",
+        "OBSERVABILITY_SUMMARY_TASK_HANDLERS",
+        ("compute_observability_summary",),
+    ),
+    (
+        "crate.worker_handlers.recommendation_skips",
+        "RECOMMENDATION_SKIP_TASK_HANDLERS",
+        ("compute_recommendation_skips",),
     ),
     (
         "crate.worker_handlers.ai_configuration",

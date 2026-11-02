@@ -169,6 +169,21 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
+	var metricsServer *http.Server
+	if cfg.MetricsAddr != "" {
+		metricsServer = &http.Server{
+			Addr:              cfg.MetricsAddr,
+			Handler:           server.MetricsHandler(),
+			ReadHeaderTimeout: 5 * time.Second,
+		}
+		go func() {
+			logger.Info("crate-readplane metrics listening", "addr", cfg.MetricsAddr)
+			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				logger.Warn("metrics server failed", "error", err)
+			}
+		}()
+	}
+
 	go func() {
 		logger.Info("crate-readplane listening", "addr", cfg.Addr, "version", cfg.Version)
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -181,6 +196,9 @@ func main() {
 	<-ctx.Done()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	if metricsServer != nil {
+		_ = metricsServer.Shutdown(shutdownCtx)
+	}
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		logger.Warn("http shutdown failed", "error", err)
 		observability.CaptureOperationError(err, "shutdown.http", nil)

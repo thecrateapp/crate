@@ -358,3 +358,190 @@ def test_sdk_smart_mix_worst_case_profile_budget_still_returns_exact_omissions(
             ]["omitted_track_uids"] == UIDS[:50]
 
     asyncio.run(run())
+
+
+def summary_record(age=0, **sections):
+    from datetime import timedelta
+
+    from tests.test_agent_observability import NOW
+
+    payload = {
+        "schema_version": 1,
+        "playback": {
+            "availability": "available",
+            "window_minutes": 15,
+            "minimum_startups": 20,
+            "startups": 40,
+            "stalls_per_startup": 0.1,
+        },
+        "product_kpis": {
+            "availability": "available",
+            "end": "2025-01-01",
+            "computed_at": "2025-01-01T00:00:00+00:00",
+            "minimum_sample": 3,
+            "windows": {
+                "7": {"listening": {"listening.plays": {"kind": "daily", "sum": 60.0}}},
+                "30": {
+                    "listening": {"listening.plays": {"kind": "daily", "sum": 900.0}}
+                },
+            },
+            "breakdowns": {
+                "listening": {
+                    "listening.plays_by_platform": {
+                        "day": "2025-01-01",
+                        "segments": [
+                            {
+                                "segment": "platform=ios",
+                                "value": None,
+                                "suppressed": True,
+                            }
+                        ],
+                    }
+                }
+            },
+        },
+        "stack": {
+            "availability": "available",
+            "host": {"id": "crate", "name": "crate"},
+            "observed_at": "2025-01-01T00:00:00+00:00",
+            "application": {"services": 2, "running": 2},
+            "monitoring": {"status": "degraded", "missing": ["crate-grafana"]},
+            "resources": "live_only",
+        },
+        **sections,
+    }
+    return {
+        "observed_at": (NOW - timedelta(seconds=age)).isoformat(),
+        "oversized": False,
+        "payload": payload,
+    }
+
+
+SUMMARY_CASES = [
+    ("get_playback_quality", {}),
+    ("get_product_kpis", {"window_days": 7}),
+    ("get_stack_status", {}),
+]
+
+
+@pytest.mark.parametrize("name,arguments", SUMMARY_CASES)
+def test_sdk_summary_tools_need_status_grant_and_never_compute(
+    monkeypatch, transport_app, diagnostic_boundary, name, arguments
+):
+    app, tokens, _ = transport_app
+    reads = Mock(return_value=summary_record())
+    monkeypatch.setattr(observations.summary_store, "read_observability_summary", reads)
+    forbidden = Mock(side_effect=AssertionError("Summary tool computed evidence"))
+    for path in (
+        "crate.observability.summary.compute_observability_summary",
+        "crate.observability.summary.build_observability_summary",
+        "crate.db.repositories.tasks.create_task",
+        "crate.db.admin_stack_surface.get_cached_stack_surface",
+    ):
+        monkeypatch.setattr(path, forbidden)
+
+    async def run():
+        async with app.router.lifespan_context(app):
+            for kind in ("ops", "library"):
+                async with _client(app, tokens[kind]) as client:
+                    result = await client.call_tool(name, arguments)
+                    assert bool(result.is_error) is (kind == "library")
+                    if kind == "ops":
+                        assert result.structured_content["data"]["sources"]
+
+    asyncio.run(run())
+    reads.assert_called_once()
+    forbidden.assert_not_called()
+
+
+def test_sdk_product_kpis_rejects_other_windows_before_read(
+    monkeypatch, transport_app, diagnostic_boundary
+):
+    app, tokens, _ = transport_app
+    reader = Mock()
+    monkeypatch.setattr(
+        observations.summary_store, "read_observability_summary", reader
+    )
+
+    async def run():
+        async with (
+            app.router.lifespan_context(app),
+            _client(app, tokens["all"]) as client,
+        ):
+            result = await client.call_tool("get_product_kpis", {"window_days": 90})
+            assert result.structured_content["error"]["code"] == "INVALID_ARGUMENT"
+
+    asyncio.run(run())
+    reader.assert_not_called()
+
+
+def test_summary_tools_report_the_window_and_suppressed_segments(monkeypatch):
+    monkeypatch.setattr(
+        observations.summary_store, "read_observability_summary", summary_record
+    )
+
+    week = observations.get_product_kpis(7)["data"]
+    month = observations.get_product_kpis(30)["data"]
+
+    listening = week["sources"]["listening"]
+    assert listening["availability"] == "available"
+    assert listening["data"]["kpis"]["listening.plays"]["sum"] == 60.0
+    assert (
+        month["sources"]["listening"]["data"]["kpis"]["listening.plays"]["sum"] == 900.0
+    )
+    segment = listening["data"]["breakdowns"]["listening.plays_by_platform"][
+        "segments"
+    ][0]
+    assert segment == {"segment": "platform=ios", "value": None, "suppressed": True}
+    assert week["sources"]["federation"]["availability"] == "unavailable"
+    assert week["minimum_sample"] == 3
+
+    stack = observations.get_stack_status()["data"]
+    assert stack["sources"]["monitoring"]["data"]["missing"] == ["crate-grafana"]
+    assert stack["resources"] == "live_only"
+
+
+@pytest.mark.parametrize(
+    "record,reason",
+    [
+        ({}, "Observability summary is opt-in and has not run"),
+        ({**summary_record(), "oversized": True, "payload": None}, "49152"),
+    ],
+)
+def test_missing_or_oversized_summary_is_unavailable(monkeypatch, record, reason):
+    monkeypatch.setattr(
+        observations.summary_store, "read_observability_summary", lambda: record
+    )
+
+    for result in (
+        observations.get_playback_quality(),
+        observations.get_product_kpis(30),
+        observations.get_stack_status(),
+    ):
+        assert result["availability"] == "unavailable"
+        for source in result["data"]["sources"].values():
+            assert source["data"] is None
+            assert reason in source["reason"]
+
+
+def test_summary_section_states_and_age_are_not_healthy(monkeypatch):
+    empty = summary_record(
+        product_kpis={"availability": "empty", "reason": "no_computed_kpis"},
+        playback={"availability": "unavailable", "reason": "metric_source_unavailable"},
+    )
+    monkeypatch.setattr(
+        observations.summary_store, "read_observability_summary", lambda: empty
+    )
+    playback = observations.get_playback_quality()["data"]["sources"]["playback"]
+    assert (playback["availability"], playback["reason"]) == (
+        "unavailable",
+        "metric_source_unavailable",
+    )
+    kpis = observations.get_product_kpis(30)["data"]["sources"]
+    assert {source["availability"] for source in kpis.values()} == {"unavailable"}
+
+    old = summary_record(age=3600)
+    monkeypatch.setattr(
+        observations.summary_store, "read_observability_summary", lambda: old
+    )
+    assert observations.get_playback_quality()["availability"] == "stale"

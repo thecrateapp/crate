@@ -158,6 +158,10 @@ def main():
     elif args.command in ("web", "api"):
         import uvicorn
 
+        from crate.observability import resolve_service_name
+        from crate.observability.metrics_server import start as start_metrics
+
+        start_metrics(resolve_service_name("api"))
         uvicorn.run(
             "crate.api:create_app",
             factory=True,

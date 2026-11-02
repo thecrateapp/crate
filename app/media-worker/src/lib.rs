@@ -4,6 +4,7 @@
 pub mod cache;
 pub mod http;
 pub mod metadata;
+pub mod metrics;
 pub mod observability;
 pub mod package;
 pub mod progress;

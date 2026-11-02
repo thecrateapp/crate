@@ -76,6 +76,8 @@ function createOptions() {
     recordProgress: vi.fn(),
     recordPlaybackQualityProgress: vi.fn(),
     recordPlaybackStarted: vi.fn(),
+    recordPlaybackIntent: vi.fn(),
+    recordPlaybackResult: vi.fn(),
     onActivePlaybackStarted: vi.fn(),
     pullFromEngine: vi.fn(() => ({ resolvedTrack: TRACK_A })),
     setAnalyserVersion: vi.fn(),
@@ -301,7 +303,51 @@ describe("usePlayerEngineCallbacks", () => {
     options.callbacksRef.current.onPlay?.("/stream/a");
 
     expect(options.recordPlaybackStarted).toHaveBeenCalledWith(250);
+    expect(options.recordPlaybackIntent).toHaveBeenCalledOnce();
+    expect(options.recordPlaybackResult).toHaveBeenCalledWith("started");
     now.mockRestore();
+  });
+
+  it("counts one intent per play request and closes it with a failure cause", async () => {
+    const options = createOptions();
+    options.engineTrackMapRef.current.set("/stream/a", [TRACK_A]);
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    renderHook(() => usePlayerEngineCallbacks(options));
+
+    options.callbacksRef.current.onPlayRequest?.("/stream/a");
+    options.callbacksRef.current.onPlayRequest?.("/stream/a");
+    options.callbacksRef.current.onError?.("/stream/a", "MEDIA_ERR_DECODE");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(options.recordPlaybackIntent).toHaveBeenCalledOnce();
+    expect(options.recordPlaybackResult).toHaveBeenCalledWith(
+      "failed",
+      "decode",
+    );
+    expect(options.recordPlaybackStarted).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  it("does not report a result for errors after playback started", async () => {
+    const options = createOptions();
+    options.engineTrackMapRef.current.set("/stream/a", [TRACK_A]);
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    renderHook(() => usePlayerEngineCallbacks(options));
+
+    options.callbacksRef.current.onPlayRequest?.("/stream/a");
+    options.callbacksRef.current.onPlay?.("/stream/a");
+    options.callbacksRef.current.onError?.("/stream/a", "MEDIA_ERR_NETWORK");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(options.recordPlaybackResult).toHaveBeenCalledTimes(1);
+    expect(options.recordPlaybackResult).toHaveBeenCalledWith("started");
+    consoleError.mockRestore();
   });
 
   it("applies a deferred seek when the active track finishes loading", () => {
