@@ -1,6 +1,12 @@
 # Observability C0 evidence
 
-**Runtime remediation is complete; C0 awaits Diego's review. PR1A has not started.**
+**C0 is accepted; PR1A is in development.**
+See the [acceptance and initial objectives](c0-acceptance.md).
+Development checkpoint: [PR1A identity and absolute minutes](pr1a-checkpoint-1.md).
+Subsequent checkpoints: [collection and consumers](pr1a-checkpoint-2.md),
+[retention and bounded reads](pr1a-checkpoint-3.md).
+The [review corrections](pr1a-review-corrections.md) supersede their uncovered
+restart, rolling-catalogue and shared-buffer completeness claims.
 The application and shadow overlay use immutable source
 `6681be8017b60865c00af61c3edc6f17696175b7`; the deployment helper includes the
 retention fix from `75b442401bfbca8646efe5f684fca36dd9aab31d`.
@@ -41,3 +47,8 @@ Database, library and Tidarr data were not deleted. No restore drill is claimed.
 
 Short measurements establish neither long-term capacity nor complete metric-family
 coverage/SLOs. The external probe host is explicitly deferred.
+
+Observability checkpoint: [Collection integrity](http://127.0.0.1:5186/review-observability-integrity.html).
+The actual System Health page has six fixture states: observed, Redis unavailable,
+empty, partial, stale and legacy. The scene is shared with Storybook and issues no
+backend requests. See `docs/technical/evidence/observability/pr1a-checkpoint-2.md`.

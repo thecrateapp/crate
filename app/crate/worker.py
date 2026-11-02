@@ -256,6 +256,17 @@ def _refresh_analysis_runtime_state() -> None:
     )
 
 
+def _prune_metric_history():
+    try:
+        from crate.metrics import prune_history
+
+        deleted = prune_history()
+        if deleted:
+            log.debug("Pruned %d expired metric minutes", deleted)
+    except Exception:
+        log.warning("Metric minute retention failed", exc_info=True)
+
+
 def _run_service_loop(config: dict, stop_event: threading.Event):
     """Background thread: scheduler checks, watcher, zombie cleanup, import queue."""
     import time as _time
@@ -282,6 +293,8 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
     last_analysis_status_update = 0
     last_health_update = 0
     last_metrics_flush = 0
+    last_metrics_prune = 0
+    metrics_prune_thread = None
     last_shadow_backfill = 0
     last_media_worker_bridge = 0
     last_jam_auto_dj = 0
@@ -501,6 +514,23 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
                 flush_to_postgres()
             except Exception:
                 log.debug("Metrics flush failed", exc_info=True)
+
+        # Retention has an independent cadence and never blocks scheduler/Auto DJ.
+        if now - last_metrics_prune > 60:
+            last_metrics_prune = now
+            if metrics_prune_thread is None or not metrics_prune_thread.is_alive():
+                try:
+                    metrics_prune_thread = threading.Thread(
+                        target=_prune_metric_history,
+                        name="crate-metric-retention",
+                        daemon=True,
+                    )
+                    metrics_prune_thread.start()
+                except RuntimeError:
+                    metrics_prune_thread = None
+                    log.warning(
+                        "Metric retention thread could not start", exc_info=True
+                    )
 
         # Media-worker Redis events → task progress/events every 2s.
         if now - last_media_worker_bridge > 2:

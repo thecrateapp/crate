@@ -1,6 +1,12 @@
 import type { StorybookConfig } from "@storybook/react-vite";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath } from "node:url";
+const systemHealthFixture = fileURLToPath(
+  new URL(
+    "../../design-system-preview/admin-system-health-fixtures.ts",
+    import.meta.url,
+  ),
+);
 const catalogFixture = fileURLToPath(
   new URL(
     "../../design-system-preview/admin-catalog-fixtures.ts",
@@ -295,14 +301,26 @@ const catalogReviewFixture = {
       );
     if (transformed === code) return null;
     if (isAcquisition)
-      transformed = `import { AcquisitionEventSource as EventSource } from ${JSON.stringify(acquisitionFixture)};\n${transformed}`;
+      transformed = `import { AcquisitionEventSource as EventSource } from ${JSON.stringify(
+        acquisitionFixture,
+      )};\n${transformed}`;
     if (isNewReleases)
-      transformed = `import { SampleEventSource as EventSource } from ${JSON.stringify(newReleasesFixture)};\n${transformed}`;
+      transformed = `import { SampleEventSource as EventSource } from ${JSON.stringify(
+        newReleasesFixture,
+      )};\n${transformed}`;
     return transformed;
   },
   resolveId(source: string, importer?: string) {
     const importerPath =
       importer?.split(/[?#]/)[0]?.replaceAll("\\", "/") ?? "";
+    if (
+      importerPath.endsWith("/app/ui/src/pages/SystemHealth.tsx") &&
+      (source.endsWith("/hooks/use-api") ||
+        source.endsWith("/hooks/use-api.ts") ||
+        source.endsWith("/lib/task-catalog") ||
+        source.endsWith("/lib/task-catalog.ts"))
+    )
+      return systemHealthFixture;
     if (
       importerPath.endsWith("/app/ui/src/components/genres/GenreWheel.tsx") &&
       (source.endsWith("/hooks/use-api") ||

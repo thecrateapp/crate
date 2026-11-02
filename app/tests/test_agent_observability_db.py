@@ -1,12 +1,45 @@
 """Real PostgreSQL enforces read-only observation and bounded persisted sources."""
 
 import json
+from datetime import datetime, timezone
 
 from crate.db.queries.agent_observability import read_observation_evidence
 from crate.db.tx import read_scope, transaction_scope
 from sqlalchemy import text
 
 from tests.test_smart_mix_admin import _create_tracks
+
+
+def test_health_sql_projection_preserves_v2_metadata_without_private_fields(pg_db):
+    from tests.test_metric_health_evaluation import _observed_inputs
+
+    payload = {
+        "schema_version": 2,
+        "score": None,
+        "breaches": [],
+        "availability": "partial",
+        "source": "redis_v2",
+        "observed_at": datetime.now(timezone.utc).isoformat(),
+        "coverage": "observed_only",
+        "inputs": _observed_inputs(),
+    }
+    with transaction_scope() as session:
+        session.execute(
+            text("""INSERT INTO ops_runtime_state (key,payload_json,updated_at)
+            VALUES ('health',CAST(:payload AS jsonb),NOW())
+            ON CONFLICT(key) DO UPDATE SET payload_json=EXCLUDED.payload_json,
+                updated_at=EXCLUDED.updated_at"""),
+            {
+                "payload": json.dumps(
+                    {**payload, "metrics": {"secret": "omit"}, "secret": "omit"}
+                )
+            },
+        )
+
+    evidence = read_observation_evidence()
+
+    health = next(row for row in evidence["runtime"] if row["source"] == "health")
+    assert health["payload"] == payload
 
 
 def test_persisted_observation_query_is_read_only_batched_and_bounded(pg_db):

@@ -1,0 +1,14 @@
+{
+  "status": "pending",
+  "reason": "Canceled in a controlled manner after 3 minutes during VACUUM, after SQL expansion. No 500-series latency measurements were run.",
+  "sql_insert_seconds": 166.15,
+  "additional_rows_inserted": 4608000,
+  "planned_active_series": 500,
+  "planned_pg_rows": 5760000,
+  "limits": {
+    "pg_memory_mib": 768,
+    "pg_cpus": 4,
+    "redis_memory_mib": 256,
+    "redis_cpus": 1
+  }
+}
