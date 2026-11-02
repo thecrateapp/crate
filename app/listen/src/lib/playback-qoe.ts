@@ -27,7 +27,8 @@ export type PlaybackQoeEventName =
   | "recovery"
   | "intent"
   | "result"
-  | "active";
+  | "active"
+  | "continuation";
 export type PlaybackQoeOutcome = "started" | "failed" | "cancelled";
 export type PlaybackQoeFailureCause =
   | "network"
@@ -44,12 +45,20 @@ export type PlaybackQoeRuntime =
   | "ios_native"
   | "tauri";
 export type PlaybackQoeEngine = "gapless" | "media3";
+export type PlaybackContinuationOutcome =
+  | "recovered"
+  | "unavailable"
+  | "exhausted"
+  | "cancelled"
+  | "native"
+  | "auth";
+export type PlaybackContinuationSurface = "radio" | "infinite";
 
 export interface PlaybackQoeInput {
   event: PlaybackQoeEventName;
-  origin: PlaybackQoeOrigin;
-  requestedPolicy: ConcretePlaybackDeliveryPolicy;
-  effectivePolicy: ConcretePlaybackDeliveryPolicy;
+  origin?: PlaybackQoeOrigin;
+  requestedPolicy?: ConcretePlaybackDeliveryPolicy;
+  effectivePolicy?: ConcretePlaybackDeliveryPolicy;
   durationMs?: number;
   bufferedAheadSeconds?: number;
   attempt?: number;
@@ -57,13 +66,15 @@ export interface PlaybackQoeInput {
   engine?: PlaybackQoeEngine;
   outcome?: PlaybackQoeOutcome;
   cause?: PlaybackQoeFailureCause;
+  continuation?: PlaybackContinuationOutcome;
+  surface?: PlaybackContinuationSurface;
 }
 
 export interface PlaybackQoeEvent {
   event: PlaybackQoeEventName;
-  origin: PlaybackQoeOrigin;
-  requested_policy: ConcretePlaybackDeliveryPolicy;
-  effective_policy: ConcretePlaybackDeliveryPolicy;
+  origin?: PlaybackQoeOrigin;
+  requested_policy?: ConcretePlaybackDeliveryPolicy;
+  effective_policy?: ConcretePlaybackDeliveryPolicy;
   duration_ms?: number;
   buffered_ahead_seconds?: number;
   attempt?: number;
@@ -71,6 +82,8 @@ export interface PlaybackQoeEvent {
   engine?: PlaybackQoeEngine;
   outcome?: PlaybackQoeOutcome;
   cause?: PlaybackQoeFailureCause;
+  continuation?: PlaybackContinuationOutcome;
+  surface?: PlaybackContinuationSurface;
 }
 
 const QOE_PATH = "/api/playback/qoe";
@@ -98,6 +111,7 @@ function isEventName(value: unknown): value is PlaybackQoeEventName {
     "intent",
     "result",
     "active",
+    "continuation",
   ].includes(String(value));
 }
 
@@ -114,6 +128,25 @@ function isFailureCause(value: unknown): value is PlaybackQoeFailureCause {
     "timeout",
     "other",
   ].includes(String(value));
+}
+
+function isContinuationOutcome(
+  value: unknown,
+): value is PlaybackContinuationOutcome {
+  return [
+    "recovered",
+    "unavailable",
+    "exhausted",
+    "cancelled",
+    "native",
+    "auth",
+  ].includes(String(value));
+}
+
+function isContinuationSurface(
+  value: unknown,
+): value is PlaybackContinuationSurface {
+  return ["radio", "infinite"].includes(String(value));
 }
 
 function isOrigin(value: unknown): value is PlaybackQoeOrigin {
@@ -152,6 +185,7 @@ export function getPlaybackQoeRuntime(): PlaybackQoeRuntime {
 export function shapePlaybackQoeEvent(
   input: PlaybackQoeInput | Record<string, unknown>,
 ): PlaybackQoeEvent | null {
+  if (input.event === "continuation") return shapeContinuationEvent(input);
   if (
     !isEventName(input.event) ||
     !isOrigin(input.origin) ||
@@ -192,11 +226,36 @@ export function shapePlaybackQoeEvent(
   return event;
 }
 
+function shapeContinuationEvent(
+  input: PlaybackQoeInput | Record<string, unknown>,
+): PlaybackQoeEvent | null {
+  if (
+    !isContinuationOutcome(input.continuation) ||
+    !isContinuationSurface(input.surface)
+  ) {
+    return null;
+  }
+  const event: PlaybackQoeEvent = {
+    event: "continuation",
+    continuation: input.continuation,
+    surface: input.surface,
+  };
+  const durationMs = boundedNumber(input.durationMs, 0, 600_000, true);
+  if (durationMs !== undefined) event.duration_ms = durationMs;
+  if (isRuntime(input.runtime)) event.runtime = input.runtime;
+  return event;
+}
+
 function createId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return crypto.randomUUID();
   }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  return `${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 12)}`;
 }
 
 function retryAfterSeconds(value: string | null): number | undefined {
