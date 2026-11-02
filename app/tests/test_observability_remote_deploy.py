@@ -17,12 +17,17 @@ BUNDLE_FILES = (
     "compose.observability.yaml",
     "compose.containerd.yaml",
     "prometheus.yml",
+    "recording-rules.yml",
     "docker-proxy.haproxy.cfg",
     "runtime-proxy.haproxy.cfg",
     "grafana/provisioning/dashboards/infrastructure.yaml",
     "grafana/provisioning/datasources/prometheus.yaml",
     "grafana/dashboards/infra-runtime.json",
     "grafana/dashboards/infra-data.json",
+    "grafana/dashboards/app-overview.json",
+    "grafana/dashboards/app-playback.json",
+    "grafana/dashboards/app-workers.json",
+    "grafana/dashboards/app-telemetry.json",
 )
 SCRIPTS = (
     "scripts/observability_release.py",

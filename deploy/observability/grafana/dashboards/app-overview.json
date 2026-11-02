@@ -1,0 +1,343 @@
+{
+  "uid": "crate-app-overview",
+  "title": "Crate application \u00b7 Overview",
+  "schemaVersion": 40,
+  "version": 1,
+  "editable": false,
+  "tags": ["crate", "application", "shadow", "overview"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [],
+  "panels": [
+    {
+      "title": "Collectors up",
+      "type": "timeseries",
+      "description": "1 when the last scrape of the service's internal metrics port succeeded, 0 when it failed. No data means the service is not discovered.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:scrape_up:by_service",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 1
+    },
+    {
+      "title": "API requests",
+      "type": "timeseries",
+      "description": "Requests per second by target and status class, from the API's own counters.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:api_requests:rate5m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{target}} {{status_class}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 2
+    },
+    {
+      "title": "API error ratio",
+      "type": "timeseries",
+      "description": "Error responses over all responses in 5 minutes. Empty without traffic.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:api_request_errors:ratio5m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{target}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 3
+    },
+    {
+      "title": "API p95 latency",
+      "type": "timeseries",
+      "description": "95th percentile over 5 minutes. Empty without traffic.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:api_request_latency_seconds:p95_5m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{target}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 4
+    },
+    {
+      "title": "API sample",
+      "type": "timeseries",
+      "description": "Requests per target in the same 5-minute window. Sample size for the same window. A ratio over a small sample is not a trend.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:api_requests:increase5m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{target}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 5
+    },
+    {
+      "title": "Requests by client",
+      "type": "timeseries",
+      "description": "Requests per second by client (Listen platforms, Admin, Subsonic).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:api_requests_by_client:rate5m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{client}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 6
+    },
+    {
+      "title": "Stream p95 latency",
+      "type": "timeseries",
+      "description": "95th percentile of stream responses over 5 minutes. Empty without streams.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:stream_latency_seconds:p95_5m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{target}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 7
+    },
+    {
+      "title": "Concurrent streams",
+      "type": "timeseries",
+      "description": "Streams open now, summed over the processes of each service. Expires two minutes after the last scrape.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:stream_concurrent:by_service",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 8
+    }
+  ],
+  "templating": {
+    "list": []
+  }
+}
