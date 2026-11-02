@@ -1,0 +1,61 @@
+---
+import { FEATURES, FIGURES, FIGURES_NOTE, NEVER, NEVER_LABEL } from "../../content/admin/observability";
+import ScaleFigures from "../architecture/ScaleFigures.astro";
+import FeatureList from "../FeatureList.astro";
+import StackMap from "../viz/StackMap.astro";
+---
+
+<div class="observability">
+  <div class="viz-band">
+    <StackMap />
+  </div>
+  <FeatureList items={FEATURES} />
+  <div class="figures">
+    <ScaleFigures figures={FIGURES} note={FIGURES_NOTE} />
+  </div>
+  <div class="never" data-reveal>
+    <p class="viz-label" data-enter>{NEVER_LABEL}</p>
+    <ul data-enter style="--d:80ms">
+      {NEVER.map((item) => <li>{item}</li>)}
+    </ul>
+  </div>
+</div>
+
+<style>
+  .figures {
+    margin-top: 10vh;
+  }
+
+  .never {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 12px clamp(24px, 5vw, 80px);
+    margin-top: 8vh;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .never ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .never li {
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--fg-2);
+  }
+
+  @media (max-width: 760px) {
+    .never {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
