@@ -711,7 +711,9 @@ PYTHON_METRIC_SERVICES = {
 
 
 def test_app_metrics_overlay_only_opens_internal_endpoints():
-    from crate.observability.metrics_server import DEFAULT_DIRECTORY
+    server = (ROOT / "app/crate/observability/metrics_server.py").read_text()
+    directory = re.search(r'^DEFAULT_DIRECTORY = "([^"]+)"$', server, re.M)
+    assert directory
 
     services = yaml.safe_load((ROOT / APP_METRICS_OVERLAY).read_text())["services"]
 
@@ -723,7 +725,7 @@ def test_app_metrics_overlay_only_opens_internal_endpoints():
         assert set(services[name]) == {"environment", "tmpfs"}, name
         assert services[name]["environment"] == {"CRATE_PROMETHEUS_METRICS": "1"}
         assert [mount.split(":")[0] for mount in services[name]["tmpfs"]] == [
-            DEFAULT_DIRECTORY
+            directory.group(1)
         ]
     assert services["crate-readplane"] == {
         "environment": {"READPLANE_METRICS_ADDR": ":9200"}
