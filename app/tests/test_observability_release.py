@@ -24,12 +24,17 @@ FILES = (
     "deploy/observability/compose.observability.yaml",
     "deploy/observability/compose.containerd.yaml",
     "deploy/observability/prometheus.yml",
+    "deploy/observability/recording-rules.yml",
     "deploy/observability/docker-proxy.haproxy.cfg",
     "deploy/observability/runtime-proxy.haproxy.cfg",
     "deploy/observability/grafana/provisioning/datasources/prometheus.yaml",
     "deploy/observability/grafana/provisioning/dashboards/infrastructure.yaml",
     "deploy/observability/grafana/dashboards/infra-runtime.json",
     "deploy/observability/grafana/dashboards/infra-data.json",
+    "deploy/observability/grafana/dashboards/app-overview.json",
+    "deploy/observability/grafana/dashboards/app-playback.json",
+    "deploy/observability/grafana/dashboards/app-workers.json",
+    "deploy/observability/grafana/dashboards/app-telemetry.json",
 )
 
 
@@ -113,7 +118,7 @@ def test_bundle_builds_and_verifies_exact_committed_configuration(
     with tarfile.open(destination, "r:gz") as archive:
         members = archive.getmembers()
         assert {member.name for member in members} == {*FILES, "manifest.json"}
-        assert len(members) == 11
+        assert len(members) == len(FILES) + 1
         assert all(member.isfile() for member in members)
         assert json.load(archive.extractfile("manifest.json")) == manifest
         for name, payload in payloads.items():

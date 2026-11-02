@@ -26,12 +26,17 @@ BUNDLE_FILES = tuple(
         "compose.observability.yaml",
         "compose.containerd.yaml",
         "prometheus.yml",
+        "recording-rules.yml",
         "docker-proxy.haproxy.cfg",
         "runtime-proxy.haproxy.cfg",
         "grafana/provisioning/dashboards/infrastructure.yaml",
         "grafana/provisioning/datasources/prometheus.yaml",
         "grafana/dashboards/infra-runtime.json",
         "grafana/dashboards/infra-data.json",
+        "grafana/dashboards/app-overview.json",
+        "grafana/dashboards/app-playback.json",
+        "grafana/dashboards/app-workers.json",
+        "grafana/dashboards/app-telemetry.json",
     )
 )
 MAX_BYTES = 8 * 1024 * 1024
@@ -40,6 +45,7 @@ MAX_MANIFEST_BYTES = 64 * 1024
 STATEFUL_SERVICES = ("crate-prometheus", "crate-grafana")
 MOUNTED_FILES = {
     PREFIX + "prometheus.yml": "crate-prometheus",
+    PREFIX + "recording-rules.yml": "crate-prometheus",
     PREFIX + "docker-proxy.haproxy.cfg": "crate-observability-docker-proxy",
     PREFIX + "runtime-proxy.haproxy.cfg": "crate-observability-docker-proxy",
     PREFIX + "grafana/provisioning/dashboards/infrastructure.yaml": "crate-grafana",

@@ -11,6 +11,8 @@ networks:
     internal: true
   traefik-metrics:
     internal: true
+  app-metrics:
+    internal: true
 
 secrets:
   observability_grafana_password:
@@ -29,6 +31,7 @@ services:
       service: crate-prometheus
     volumes:
       - ./deploy/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/observability/recording-rules.yml:/etc/prometheus/recording-rules.yml:ro
   crate-grafana:
     extends:
       file: deploy/observability/compose.observability.yaml

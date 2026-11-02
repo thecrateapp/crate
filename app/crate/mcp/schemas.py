@@ -104,6 +104,10 @@ class PipelineInput(ClosedInput):
     pipeline: PipelineName
 
 
+class ProductKpisInput(ClosedInput):
+    window_days: Literal[7, 30] = 30
+
+
 class SmartMixStatusInput(ClosedInput):
     track_uids: Annotated[list[EntityUID], Field(max_length=50)] | None = None
 

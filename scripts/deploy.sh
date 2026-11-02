@@ -211,6 +211,8 @@ AGENT_TOOLING=(
 MONITORING_OVERLAYS=(
   deploy/observability/compose.projector-prometheus.yaml
   deploy/observability/compose.traefik-metrics.yaml
+  deploy/observability/compose.app-metrics.yaml
+  deploy/observability/compose.supervisor-prometheus.yaml
 )
 
 prepare_payload() {

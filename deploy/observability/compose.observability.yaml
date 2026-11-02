@@ -21,11 +21,14 @@ networks:
     internal: true
   # Published loopback ports require a non-internal bridge on current Docker.
   observability-ui: {}
-  # Shared only with crate-projector, which reads Stack resources from Prometheus.
+  # Shared only with crate-projector (Stack resources) and the Operator supervisor (alert rules).
   prometheus-query:
     internal: true
   # Shared only with Traefik, whose router metrics feed Stack ingress readings.
   traefik-metrics:
+    internal: true
+  # Shared only with the application containers' internal metrics ports.
+  app-metrics:
     internal: true
 
 secrets:
@@ -41,7 +44,7 @@ secrets:
 services:
   crate-prometheus:
     <<: *observability
-    networks: [observability, prometheus-query, traefik-metrics]
+    networks: [observability, prometheus-query, traefik-metrics, app-metrics]
     image: prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
     user: "65534:65534"
     mem_limit: 256m
@@ -55,6 +58,7 @@ services:
       - --query.timeout=10s
     volumes:
       - ./deploy/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/observability/recording-rules.yml:/etc/prometheus/recording-rules.yml:ro
       - ${OBS_DATA_DIR:-/var/lib/crate-observability}/prometheus:/prometheus
 
   crate-grafana:

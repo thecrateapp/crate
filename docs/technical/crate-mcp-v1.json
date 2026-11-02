@@ -1477,6 +1477,44 @@
       "read_only": true
     },
     {
+      "base_grant": "ops.status.read",
+      "contract_version": "1.2.0",
+      "description": "Read the stored playback summary: startups, startup time, stalls and recoveries over 15 minutes. Ratios need 20 startups; missing values are unknown, not zero.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "InstanceInput",
+        "type": "object"
+      },
+      "input_schema_sha256": "a59a965335384b70e1556caa53e5201d45d43d5054fbacc8a504477bbd7b8e87",
+      "name": "get_playback_quality",
+      "read_only": true
+    },
+    {
+      "base_grant": "ops.status.read",
+      "contract_version": "1.2.0",
+      "description": "Read stored daily product KPIs for the last 7 or 30 days by group, with segments under three listeners suppressed. No recomputation.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "window_days": {
+            "default": 30,
+            "enum": [
+              7,
+              30
+            ],
+            "title": "Window Days",
+            "type": "integer"
+          }
+        },
+        "title": "ProductKpisInput",
+        "type": "object"
+      },
+      "input_schema_sha256": "7dbe7116e80ee53d493b751316e4be966afac068afd8098ead5192fb4282f310",
+      "name": "get_product_kpis",
+      "read_only": true
+    },
+    {
       "base_grant": "ops.runtime.read",
       "contract_version": "1.2.0",
       "description": "Read configured runtime policy and actual consumer adoption separately. Idle consumers can leave adoption pending.",
@@ -1520,6 +1558,20 @@
       },
       "input_schema_sha256": "360b75317bc54c4c03b07e89e80b0ea69dfce0e5a129d36d536266056c1c21ed",
       "name": "get_smart_mix_status",
+      "read_only": true
+    },
+    {
+      "base_grant": "ops.status.read",
+      "contract_version": "1.2.0",
+      "description": "Read the stored state of the application and monitoring deployments from the Stack inventory. No live Docker probe; resource readings are live-only.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "InstanceInput",
+        "type": "object"
+      },
+      "input_schema_sha256": "a59a965335384b70e1556caa53e5201d45d43d5054fbacc8a504477bbd7b8e87",
+      "name": "get_stack_status",
       "read_only": true
     },
     {

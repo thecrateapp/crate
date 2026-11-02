@@ -641,6 +641,43 @@ def test_resolved_projector_keeps_its_network_and_reaches_only_prometheus(tmp_pa
     assert sharing == ["crate-projector", "crate-prometheus"]
 
 
+SUPERVISOR_OVERLAY = "deploy/observability/compose.supervisor-prometheus.yaml"
+
+
+def test_supervisor_overlay_only_adds_the_query_network():
+    overlay = yaml.safe_load((ROOT / SUPERVISOR_OVERLAY).read_text())
+    assert overlay["services"] == {
+        "crate-operator-supervisor": {"networks": ["crate", "prometheus-query"]}
+    }
+    assert overlay["networks"] == {
+        "prometheus-query": {
+            "name": "${OBS_PROMETHEUS_QUERY_NETWORK:-crate_prometheus-query}",
+            "external": True,
+        }
+    }
+
+
+def test_resolved_supervisor_shares_prometheus_only_with_the_projector(tmp_path):
+    services = _resolved_compose(
+        tmp_path,
+        "docker-compose.yaml",
+        True,
+        True,
+        extra_files=(PROJECTOR_OVERLAY, SUPERVISOR_OVERLAY),
+    )["services"]
+    sharing = sorted(
+        name
+        for name, service in services.items()
+        if "prometheus-query" in (service.get("networks") or {})
+    )
+    assert sharing == [
+        "crate-operator-supervisor",
+        "crate-projector",
+        "crate-prometheus",
+    ]
+    assert "ports" not in services["crate-operator-supervisor"]
+
+
 TRAEFIK_OVERLAY = "deploy/observability/compose.traefik-metrics.yaml"
 
 
@@ -715,24 +752,32 @@ def test_app_metrics_overlay_only_opens_internal_endpoints():
     directory = re.search(r'^DEFAULT_DIRECTORY = "([^"]+)"$', server, re.M)
     assert directory
 
-    services = yaml.safe_load((ROOT / APP_METRICS_OVERLAY).read_text())["services"]
+    overlay = yaml.safe_load((ROOT / APP_METRICS_OVERLAY).read_text())
+    services = overlay["services"]
 
     assert set(services) == PYTHON_METRIC_SERVICES | {
         "crate-readplane",
         "crate-media-worker",
     }
     for name in PYTHON_METRIC_SERVICES:
-        assert set(services[name]) == {"environment", "tmpfs"}, name
+        assert set(services[name]) == {"networks", "environment", "tmpfs"}, name
+        assert services[name]["networks"] == ["crate", "app-metrics"], name
         assert services[name]["environment"] == {"CRATE_PROMETHEUS_METRICS": "1"}
         assert [mount.split(":")[0] for mount in services[name]["tmpfs"]] == [
             directory.group(1)
         ]
     assert services["crate-readplane"] == {
-        "environment": {"READPLANE_METRICS_ADDR": ":9200"}
+        "networks": ["crate", "app-metrics"],
+        "environment": {"READPLANE_METRICS_ADDR": ":9200"},
     }
     assert services["crate-media-worker"] == {
-        "environment": {"CRATE_METRICS_ADDR": "0.0.0.0:9200"}
+        "networks": ["crate", "app-metrics"],
+        "environment": {"CRATE_METRICS_ADDR": "0.0.0.0:9200"},
     }
+    assert all("ports" not in service for service in services.values())
+    network = overlay["networks"]["app-metrics"]
+    assert network["external"] is True
+    assert network["name"] == "${OBS_APP_METRICS_NETWORK:-crate_app-metrics}"
 
 
 def test_resolved_app_metrics_keep_networks_and_publish_nothing(tmp_path):
@@ -745,11 +790,70 @@ def test_resolved_app_metrics_keep_networks_and_publish_nothing(tmp_path):
         extra_files=(APP_METRICS_OVERLAY,),
     )["services"]
 
-    for name in PYTHON_METRIC_SERVICES | {"crate-readplane", "crate-media-worker"}:
-        assert services[name].get("networks") == base[name].get("networks"), name
+    app = PYTHON_METRIC_SERVICES | {"crate-readplane", "crate-media-worker"}
+    for name in app:
+        assert set(services[name]["networks"]) == {"crate", "app-metrics"}, name
         assert services[name].get("ports") == base[name].get("ports"), name
+    sharing = {
+        name
+        for name, service in services.items()
+        if "app-metrics" in (service.get("networks") or {})
+    }
+    assert sharing == app | {"crate-prometheus"}
     for name in PYTHON_METRIC_SERVICES:
         assert services[name]["environment"]["CRATE_PROMETHEUS_METRICS"] == "1"
         assert any(
             mount.startswith("/tmp/crate-metrics:") for mount in services[name]["tmpfs"]
         ), name
+
+
+def test_only_prometheus_joins_the_internal_app_metrics_network():
+    overlay = _overlay()
+    assert overlay["networks"]["app-metrics"]["internal"] is True
+    members = sorted(
+        name
+        for name, service in overlay["services"].items()
+        if "app-metrics" in service.get("networks", [])
+    )
+    assert members == ["crate-prometheus"]
+
+
+def test_prometheus_discovers_only_app_metrics_ports_and_loads_the_rules():
+    config = yaml.safe_load((OBSERVABILITY / "prometheus.yml").read_text())
+    job = next(
+        job for job in config["scrape_configs"] if job["job_name"] == "crate-app"
+    )
+    assert "static_configs" not in job
+    [discovery] = job["dns_sd_configs"]
+    assert {key: discovery[key] for key in ("type", "port", "refresh_interval")} == {
+        "type": "A",
+        "port": 9200,
+        "refresh_interval": "30s",
+    }
+    assert set(discovery["names"]) == PYTHON_METRIC_SERVICES | {
+        "crate-readplane",
+        "crate-media-worker",
+    }
+    assert job["relabel_configs"] == [
+        {"source_labels": ["__meta_dns_name"], "target_label": "service"}
+    ]
+    assert job["metric_relabel_configs"] == [
+        {"source_labels": ["__name__"], "regex": "crate_.+", "action": "keep"}
+    ]
+    assert job["sample_limit"] == 20000
+    assert config["rule_files"] == ["/etc/prometheus/recording-rules.yml"]
+    prometheus = _overlay()["services"]["crate-prometheus"]
+    assert (
+        "./deploy/observability/recording-rules.yml:/etc/prometheus/recording-rules.yml:ro"
+        in prometheus["volumes"]
+    )
+
+
+def test_recording_rules_never_turn_missing_traffic_into_zero():
+    rules = yaml.safe_load((OBSERVABILITY / "recording-rules.yml").read_text())
+    expressions = [rule["expr"] for group in rules["groups"] for rule in group["rules"]]
+    assert expressions
+    for expression in expressions:
+        assert "vector(0)" not in expression
+        if "histogram_quantile" in expression or "/" in expression:
+            assert "> 0" in expression, expression

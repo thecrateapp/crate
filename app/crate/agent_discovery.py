@@ -96,6 +96,13 @@ _LIMITS = {
         "refresh": False,
         "stored_evidence_only": True,
     },
+    "get_playback_quality": {"refresh": False, "stored_evidence_only": True},
+    "get_product_kpis": {
+        "windows": [7, 30],
+        "minimum_segment_sample": 3,
+        "refresh": False,
+    },
+    "get_stack_status": {"live_probe": False, "stored_evidence_only": True},
     "search_shows": {"rows": 50, "offset": 10000},
     "preview_shows_import": {
         "shows": 50,

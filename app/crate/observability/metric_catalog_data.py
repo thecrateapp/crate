@@ -159,6 +159,7 @@ LABEL_VALUES = {
         "compose_artist_hero",
         "compute_analytics",
         "compute_product_kpis",
+        "compute_observability_summary",
         "compute_bliss",
         "compute_completeness",
         "compute_popularity",

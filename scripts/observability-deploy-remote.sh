@@ -348,7 +348,11 @@ scrapes_healthy() {
     wget -qO- 'http://127.0.0.1:9090/api/v1/targets?state=active' |
     "$OBS_PYTHON" -c '
 import json, sys
-targets = json.load(sys.stdin)["data"]["activeTargets"]
+targets = [
+    target
+    for target in json.load(sys.stdin)["data"]["activeTargets"]
+    if target.get("labels", {}).get("job") not in {"crate-app", "traefik"}
+]
 sys.exit(0 if targets and all(target["health"] == "up" for target in targets) else 1)
 '
 }

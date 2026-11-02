@@ -5,7 +5,10 @@ global:
   external_labels:
     app: crate
 
-# PR0 is infrastructure-only and shadow-only: no alert receivers or application targets.
+rule_files:
+  - /etc/prometheus/recording-rules.yml
+
+# Shadow-only: recording rules and dashboards, no alert receivers.
 scrape_configs:
   - job_name: prometheus
     static_configs:
@@ -58,3 +61,28 @@ scrape_configs:
         regex: traefik_(router|entrypoint)_requests_total
         action: keep
     sample_limit: 1000
+
+  - job_name: crate-app
+    scrape_interval: 15s
+    dns_sd_configs:
+      - names:
+          - crate-api
+          - crate-worker
+          - crate-fast-worker
+          - crate-maintenance-worker
+          - crate-analysis-worker
+          - crate-playback-worker
+          - crate-projector
+          - crate-readplane
+          - crate-media-worker
+        type: A
+        port: 9200
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__meta_dns_name]
+        target_label: service
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: crate_.+
+        action: keep
+    sample_limit: 20000
