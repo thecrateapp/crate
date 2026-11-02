@@ -896,13 +896,13 @@ def _count_active_users() -> int:
         return 0
 
 
-def _count_active_streams() -> int:
+def _count_active_streams() -> int | None:
     try:
         from crate.db.queries.management import count_recent_streams
 
         return int(count_recent_streams(window_minutes=3))
     except Exception:
-        return 0
+        return None
 
 
 def _read_cpu_totals() -> tuple[int, int] | None:

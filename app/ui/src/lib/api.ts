@@ -30,6 +30,7 @@ function checkSessionBeforeRedirect(): void {
 }
 
 export const api = createApiClient({
+  defaultHeaders: { "X-Crate-Client": "admin-web" },
   onError: captureApiError,
   onUnauthorized: checkSessionBeforeRedirect,
 });

@@ -1,5 +1,10 @@
 # Crate UI — Design System
 
+Stack Map: `Reviews/Admin/Stack Map` shares its scene and actual Admin component
+with [the standalone review](http://127.0.0.1:5186/review-stack-map.html). It uses
+local sample topology and exposes keyboard/pointer selection, related-service
+navigation, resource readings and explicit stale/unavailable states.
+
 Local Storybook: http://127.0.0.1:6006/?path=/docs/system-introduction--docs
 
 Use Node 22 from the repository root:

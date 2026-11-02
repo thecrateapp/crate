@@ -10,8 +10,14 @@ log = logging.getLogger(__name__)
 DOCKER_SOCKET = "/var/run/docker.sock"
 
 
-def _request(method: str, path: str, body: bytes | None = None) -> dict | list | None:
-    """Make a raw HTTP request to the Docker Unix socket."""
+class DockerUnavailableError(RuntimeError):
+    """The Docker API could not be reached or returned an unreadable response."""
+
+
+def _call(
+    method: str, path: str, body: bytes | None = None
+) -> tuple[int, dict | list | None]:
+    """Send one request and return its HTTP status with the decoded JSON body."""
     try:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.settimeout(30)
@@ -35,24 +41,30 @@ def _request(method: str, path: str, body: bytes | None = None) -> dict | list |
                 break
             response += chunk
         sock.close()
+    except OSError as error:
+        raise DockerUnavailableError(f"{method} {path}: {error}") from error
 
-        # Parse HTTP response
-        parts = response.split(b"\r\n\r\n", 1)
-        if len(parts) < 2:
-            return None
+    head, separator, body_data = response.partition(b"\r\n\r\n")
+    try:
+        status = int(head.split(b"\r\n", 1)[0].split()[1])
+    except (IndexError, ValueError) as error:
+        raise DockerUnavailableError(f"{method} {path}: malformed response") from error
+    if "Transfer-Encoding: chunked" in head.decode(errors="replace"):
+        body_data = _decode_chunked(body_data)
+    if not separator or not body_data.strip():
+        return status, None
+    try:
+        return status, json.loads(body_data)
+    except ValueError as error:
+        raise DockerUnavailableError(f"{method} {path}: unreadable body") from error
 
-        body_data = parts[1]
-        # Handle chunked transfer encoding
-        header_str = parts[0].decode()
-        if "Transfer-Encoding: chunked" in header_str:
-            body_data = _decode_chunked(body_data)
 
-        if not body_data.strip():
-            return None
-
-        return json.loads(body_data)
-    except Exception as e:
-        log.warning("Docker API request failed: %s %s — %s", method, path, e)
+def _request(method: str, path: str, body: bytes | None = None) -> dict | list | None:
+    """Legacy helper: the decoded body, or None for empty bodies and failures."""
+    try:
+        return _call(method, path, body)[1]
+    except DockerUnavailableError as error:
+        log.warning("Docker API request failed: %s", error)
         return None
 
 
@@ -107,6 +119,57 @@ def _detect_project_name() -> str:
                 labels = c.get("Labels", {})
                 return labels.get("com.docker.compose.project", "")
     return ""
+
+
+def application_project() -> str:
+    """The Compose project of this deployment, detected first, then configured."""
+    import os
+
+    return (
+        _detect_project_name()
+        or os.environ.get("CRATE_COMPOSE_PROJECT", "").strip()
+        or "crate"
+    )
+
+
+def _health(status_text: str) -> str:
+    if "(healthy)" in status_text:
+        return "healthy"
+    if "(unhealthy)" in status_text:
+        return "unhealthy"
+    if "(health: starting)" in status_text:
+        return "starting"
+    return "none"
+
+
+def list_compose_containers(projects: list[str]) -> list[dict]:
+    """Every container of the given Compose projects. Failures raise, never empty."""
+    label_filter = quote(json.dumps({"label": ["com.docker.compose.project"]}), safe="")
+    status, data = _call("GET", f"/containers/json?all=true&filters={label_filter}")
+    if status != 200 or not isinstance(data, list):
+        raise DockerUnavailableError("Docker could not list containers")
+    wanted = set(projects)
+    containers = []
+    for item in data:
+        labels = item.get("Labels") or {}
+        project = labels.get("com.docker.compose.project", "")
+        if project not in wanted:
+            continue
+        status_text = item.get("Status", "")
+        containers.append(
+            {
+                "id": item.get("Id", ""),
+                "name": (item.get("Names") or ["/unknown"])[0].lstrip("/"),
+                "image": item.get("Image", ""),
+                "state": item.get("State", "unknown"),
+                "status": status_text,
+                "health": _health(status_text),
+                "project": project,
+                "service": labels.get("com.docker.compose.service", ""),
+            }
+        )
+    containers.sort(key=lambda container: (container["project"], container["name"]))
+    return containers
 
 
 def list_containers(all_containers: bool = False) -> list[dict]:
@@ -184,22 +247,60 @@ def get_container(name: str) -> dict | None:
     }
 
 
+_ACTION_PATHS = {
+    "restart": "restart?t=10",
+    "stop": "stop?t=10",
+    "start": "start",
+}
+
+
+def container_action(name: str, action: str) -> str:
+    """Run one action: done, unchanged, not_found or failed. Transport errors raise."""
+    status, _body = _call(
+        "POST", f"/containers/{quote(name, safe='')}/{_ACTION_PATHS[action]}"
+    )
+    if status == 204:
+        return "done"
+    if status == 304:
+        return "unchanged"
+    if status == 404:
+        return "not_found"
+    return "failed"
+
+
+def _legacy_action(name: str, action: str) -> bool:
+    try:
+        return container_action(name, action) in {"done", "unchanged"}
+    except DockerUnavailableError as error:
+        log.warning("Docker %s failed for %s: %s", action, name, error)
+        return False
+
+
 def restart_container(name: str) -> bool:
     """Restart a container by name."""
-    result = _request("POST", f"/containers/{quote(name, safe='')}/restart?t=10")
-    return result is None  # 204 No Content = success
+    return _legacy_action(name, "restart")
 
 
 def stop_container(name: str) -> bool:
     """Stop a container by name."""
-    result = _request("POST", f"/containers/{quote(name, safe='')}/stop?t=10")
-    return result is None
+    return _legacy_action(name, "stop")
 
 
 def start_container(name: str) -> bool:
     """Start a stopped container by name."""
-    result = _request("POST", f"/containers/{quote(name, safe='')}/start")
-    return result is None
+    return _legacy_action(name, "start")
+
+
+def container_project(name: str) -> str | None:
+    """Compose project label of one container, None when it does not exist."""
+    status, data = _call("GET", f"/containers/{quote(name, safe='')}/json")
+    if status == 404:
+        return None
+    if status != 200 or not isinstance(data, dict):
+        raise DockerUnavailableError(f"Cannot inspect {name}")
+    return ((data.get("Config") or {}).get("Labels") or {}).get(
+        "com.docker.compose.project"
+    )
 
 
 def get_container_logs(name: str, tail: int = 50) -> str:

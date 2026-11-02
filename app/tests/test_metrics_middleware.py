@@ -61,6 +61,7 @@ def _run_metrics_middleware(
     status: int = 200,
     content_type: str = "application/xml",
     fail_after_start: bool = False,
+    headers: list[tuple[bytes, bytes]] | None = None,
 ):
     records = []
     monkeypatch.setattr(
@@ -83,7 +84,7 @@ def _run_metrics_middleware(
         "method": method,
         "path": path,
         "query_string": b"p=do-not-record&apiKey=also-secret",
-        "headers": [],
+        "headers": headers or [],
     }
 
     async def app(inner_scope, receive, send):
@@ -196,3 +197,66 @@ def test_opensubsonic_requests_over_one_second_emit_the_slow_budget_counter(
     )
 
     assert any(record[:2] == ("counter", "api.request.slow") for record in records)
+
+
+@pytest.mark.parametrize(
+    ("path", "headers", "client"),
+    [
+        ("/api/me", [(b"x-crate-app", b"listen-web")], "listen-web"),
+        ("/api/me", [(b"x-crate-app", b" LISTEN-ANDROID ")], "listen-android"),
+        ("/api/me", [(b"x-crate-app", b"listen-ios")], "listen-ios"),
+        ("/api/me", [(b"x-crate-app", b"listen-tauri")], "listen-desktop"),
+        ("/api/admin/ops-snapshot", [(b"x-crate-client", b"admin-web")], "admin-web"),
+        ("/rest/getSong.view", [], "subsonic"),
+        (
+            "/api/me",
+            [(b"x-crate-app", b"listen-web"), (b"x-crate-readplane-fallback", b"1")],
+            "readplane",
+        ),
+        ("/api/me", [(b"x-crate-app", b"someone-else")], "other"),
+        ("/api/me", [], "other"),
+    ],
+)
+def test_requests_record_a_closed_client_dimension(monkeypatch, path, headers, client):
+    records = _run_metrics_middleware(
+        monkeypatch,
+        path=path,
+        route_path=path,
+        content_type="application/json",
+        headers=headers,
+    )
+
+    assert ("counter", "api.request.client", {"client": client, "status": "200"}) in (
+        records
+    )
+
+
+def test_event_streams_also_record_their_client(monkeypatch):
+    monkeypatch.setattr(metrics_middleware, "_active_streams", 0)
+    records = _run_metrics_middleware(
+        monkeypatch,
+        path="/api/admin/ops-stream",
+        route_path="/api/admin/ops-stream",
+        content_type="text/event-stream",
+        headers=[(b"x-crate-client", b"admin-web")],
+    )
+
+    assert (
+        "counter",
+        "api.request.client",
+        {"client": "admin-web", "status": "200"},
+    ) in records
+
+
+def test_client_family_is_closed_and_low_cardinality():
+    from crate.observability.metric_catalog import canonical_metric
+
+    known = canonical_metric(
+        "api.request.client", {"client": "admin-web", "status": "503"}
+    )
+    unknown = canonical_metric(
+        "api.request.client", {"client": "spoofed", "status": "200"}
+    )
+
+    assert dict(known.tags) == {"client": "admin-web", "status_class": "5xx"}
+    assert dict(unknown.tags)["client"] == "other"

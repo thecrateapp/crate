@@ -5,7 +5,7 @@ section: architecture
 audience: [developer]
 status: canonical
 order: 97
-verified: 2026-10-21
+verified: 2026-11-01
 sources:
   - app/ui
   - app/listen
@@ -21,6 +21,11 @@ sources:
   - app/tests/test_crates_api.py
   - app/tests/test_crate_downloads.py
   - app/listen/src/components/crates/crate-download.test.ts
+  - app/ui/src/pages/Stack.tsx
+  - app/ui/src/components/admin/StackMap.tsx
+  - app/crate/stack_inventory.py
+  - app/crate/observability/live_activity.py
+  - app/crate/observability/prometheus_adapter.py
 ---
 
 # Frontend Architecture: Admin and Listen
@@ -119,6 +124,33 @@ eventing:
 
 That data is exposed through the ops snapshot surface rather than being wired as
 one-off dashboard fetches.
+
+### Stack map
+
+The Stack page draws the host and both Compose projects (application and
+optional monitoring) as a topology map. Services, health and allowed actions
+come from a Docker inventory built off-request into the cached stack snapshot.
+If Docker cannot be read the map says so, or keeps the last snapshot marked
+stale, instead of showing an empty healthy host. Container actions keep the
+existing allowlist and are limited to the application project.
+
+A live layer animates the map while someone has the page open. The projector
+samples aggregate counters every five seconds and publishes a frame on the
+existing `stack-stream` SSE as `event: activity`: requests per minute by client
+(Listen web, Android, iOS and desktop, Admin, Subsonic, readplane fallback),
+completed and failed tasks per queue, projected events and devices listening
+now. Frames carry counts only, never user, track or route identifiers, and stop
+when nobody watches. Pulses follow declared connections only, are capped per
+frame and are disabled under reduced motion.
+
+With `CRATE_PROMETHEUS_URL` set and the projector joined to the internal
+`prometheus-query` network, the same frames add CPU and memory per service and
+for the host every 30 seconds, plus requests per minute through Traefik for each
+service when Traefik's metrics entrypoint is enabled. Readings older than 90
+seconds are ignored; a missing reading shows nothing rather than zero.
+`CRATE_GRAFANA_URL` adds links from the inspector to the infrastructure
+dashboards. The overlays and the Traefik change are described in the monitoring
+README (`deploy/observability/README.md`).
 
 ## Listen app architecture
 
@@ -271,7 +303,6 @@ adapter, server transition planning and native continuation are selected for
 native execution. See [Smart Mix operation](smart-mix-operations.md) for the consumer matrix,
 flag dependencies and outstanding platform/physical acceptance gates.
 
-
 ## Listen Crates: permissions, sharing and downloads
 
 Verified against implementation and tests on 2026-10-21. A Crate is an album collection,
@@ -283,8 +314,7 @@ tracks. Neither operation acquires missing remote music.
 `none`. Collaboration requires both membership and `is_collaborative=true`; disabling it
 removes collaborator access to private Crates until enabled again. Owners edit content,
 change visibility/collaboration, manage members and delete the Crate. Collaborators edit
-content and can leave; public viewers cannot edit. Private or inaccessible details return
-404. Listen derives controls from access through `app/listen/src/lib/collaboration-access.ts`;
+content and can leave; public viewers cannot edit. Private or inaccessible details return 404. Listen derives controls from access through `app/listen/src/lib/collaboration-access.ts`;
 the server rechecks authority, so a hidden button is not the permission boundary.
 
 Owners add collaborators by user ID or username. The create/list/accept invitation-link
