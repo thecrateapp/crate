@@ -28,6 +28,7 @@ DEFAULT_SCHEDULES = {
     "global_catalog_reconcile_incremental": 300,  # 5min — drain dirty sources
     "global_catalog_reconcile_full": 43200,  # 12h — verify canonical catalog
     "refresh_dirty_listening_stats": 300,  # 5min — trailing edge for debounced plays
+    "compute_product_kpis": 3600,  # 1h — recompute today's and yesterday's KPIs
 }
 
 SCHEDULED_TASKS = [

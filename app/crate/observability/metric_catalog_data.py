@@ -158,6 +158,7 @@ LABEL_VALUES = {
         "cleanup_stream_variants",
         "compose_artist_hero",
         "compute_analytics",
+        "compute_product_kpis",
         "compute_bliss",
         "compute_completeness",
         "compute_popularity",
