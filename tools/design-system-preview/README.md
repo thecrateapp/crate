@@ -907,3 +907,8 @@ Open <http://127.0.0.1:5186/review-admin-federation.html> or Storybook
 pending peers, a sample import, streaming activity, risk data and audit events. Use the controls to
 review loading, empty, unavailable and read-only states. Peer and policy actions are simulated in
 memory; no requests reach the API or another node.
+
+Observability checkpoint: [Collection integrity](http://127.0.0.1:5186/review-observability-integrity.html).
+The actual System Health page has six fixture states: observed, Redis unavailable,
+empty, partial, stale and legacy. The scene is shared with Storybook and issues no
+backend requests. See `docs/technical/evidence/observability/pr1a-checkpoint-2.md`.

@@ -32,6 +32,7 @@ public:
     void start();
     void connect(std::string origin, std::string token);
     bool disconnect();
+    void request_check();
 
 private:
     struct PendingConnect {
@@ -49,6 +50,7 @@ private:
     std::mutex mutex_;
     std::condition_variable wakeup_;
     std::optional<PendingConnect> pending_;
+    bool check_requested_ = false;
     std::optional<CancellationSource> active_;
     bool stopping_ = false;
     std::thread thread_;

@@ -11,6 +11,11 @@ struct PluginTranslations {
     std::string_view compatible_folder;
     std::string_view compatible_menu;
     std::string_view open_in_crate_menu;
+    std::string_view artist_menu;
+    std::string_view album_menu;
+    std::string_view energy;
+    std::string_view match;
+    std::string_view no_profile_notice;
     std::string_view playlists;
     std::string_view genres;
     std::string_view moods;
@@ -27,6 +32,11 @@ constexpr PluginTranslations kEnglishTranslations = {
     "Smart Mix compatible tracks",
     "Show compatible tracks",
     "Open in Crate",
+    "More from this artist",
+    "This album",
+    "Energy",
+    "Match",
+    "This track has no Smart Mix profile yet",
     "Playlists",
     "Genres",
     "Moods",
@@ -43,6 +53,11 @@ constexpr PluginTranslations kSpanishTranslations = {
     "Pistas compatibles de Smart Mix",
     "Mostrar pistas compatibles",
     "Abrir en Crate",
+    "Más de este artista",
+    "Este álbum",
+    "Energía",
+    "Encaje",
+    "Esta pista aún no tiene perfil de Smart Mix",
     "Listas de reproducción",
     "Géneros",
     "Estados de ánimo",
@@ -96,6 +111,31 @@ std::string_view compatible_menu_label(std::string_view language)
 std::string_view open_in_crate_menu_label(std::string_view language)
 {
     return translations_for_language(language).open_in_crate_menu;
+}
+
+std::string_view artist_menu_label(std::string_view language)
+{
+    return translations_for_language(language).artist_menu;
+}
+
+std::string_view album_menu_label(std::string_view language)
+{
+    return translations_for_language(language).album_menu;
+}
+
+std::string_view energy_label(std::string_view language)
+{
+    return translations_for_language(language).energy;
+}
+
+std::string_view match_label(std::string_view language)
+{
+    return translations_for_language(language).match;
+}
+
+std::string_view no_profile_notice_label(std::string_view language)
+{
+    return translations_for_language(language).no_profile_notice;
 }
 
 std::string catalog_folder_label(

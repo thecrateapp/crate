@@ -30,5 +30,7 @@ private:
 };
 
 std::filesystem::path default_connection_settings_path();
+std::filesystem::path default_metadata_cache_path();
+std::string utf8_path(const std::filesystem::path& path);
 
 } // namespace crate::vdj

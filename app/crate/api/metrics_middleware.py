@@ -11,66 +11,6 @@ from crate.metrics import record_counter_later, record_later, record_route_laten
 
 log = logging.getLogger(__name__)
 
-# Patterns that normalize dynamic path segments to templates.
-_PATH_NORMALIZERS = [
-    (
-        re.compile(r"/api/cast/sessions/[^/]+/items/[^/]+/artwork"),
-        "/api/cast/sessions/{lease}/items/{item_id}/artwork",
-    ),
-    (
-        re.compile(r"/api/cast/sessions/[^/]+/items/[^/]+/stream"),
-        "/api/cast/sessions/{lease}/items/{item_id}/stream",
-    ),
-    (
-        re.compile(r"/api/cast/sessions/[^/]+/items/[^/]+/spectrum"),
-        "/api/cast/sessions/{lease}/items/{item_id}/spectrum",
-    ),
-    (
-        re.compile(r"/api/cast/sessions/[^/]+/items/[^/]+"),
-        "/api/cast/sessions/{lease}/items/{item_id}",
-    ),
-    (
-        re.compile(r"/api/cast/sessions/[^/]+/state"),
-        "/api/cast/sessions/{lease}/state",
-    ),
-    (
-        re.compile(r"/api/cast/sessions/[^/]+/checkpoints"),
-        "/api/cast/sessions/{lease}/checkpoints",
-    ),
-    (
-        re.compile(r"/api/cast/sessions/[^/]+"),
-        "/api/cast/sessions/{lease}",
-    ),
-    (re.compile(r"/api/tracks/(\d+)"), "/api/tracks/{id}"),
-    (re.compile(r"/api/tracks/by-entity/[^/]+"), "/api/tracks/by-entity/{entity_uid}"),
-    (
-        re.compile(r"/api/tracks/by-storage/[^/]+"),
-        "/api/tracks/by-storage/{storage_id}",
-    ),
-    (re.compile(r"/api/albums/(\d+)"), "/api/albums/{id}"),
-    (re.compile(r"/api/albums/by-entity/[^/]+"), "/api/albums/by-entity/{entity_uid}"),
-    (re.compile(r"/api/artists/(\d+)"), "/api/artists/{id}"),
-    (
-        re.compile(r"/api/artists/by-entity/[^/]+"),
-        "/api/artists/by-entity/{entity_uid}",
-    ),
-    (re.compile(r"/api/playlists/(\d+)"), "/api/playlists/{id}"),
-    (re.compile(r"/api/genres/[^/]+"), "/api/genres/{slug}"),
-    (re.compile(r"/api/tasks/[a-f0-9]+"), "/api/tasks/{id}"),
-    (re.compile(r"/api/curation/playlists/(\d+)"), "/api/curation/playlists/{id}"),
-    (re.compile(r"/api/manage/artists/(\d+)"), "/api/manage/artists/{id}"),
-    (
-        re.compile(r"/api/manage/artists/by-entity/[^/]+"),
-        "/api/manage/artists/by-entity/{entity_uid}",
-    ),
-    (
-        re.compile(r"/api/manage/albums/by-entity/[^/]+"),
-        "/api/manage/albums/by-entity/{entity_uid}",
-    ),
-    (re.compile(r"/api/stream/.+"), "/api/stream/{path}"),
-    (re.compile(r"/api/me/home/section/.+"), "/api/me/home/section/{id}"),
-    (re.compile(r"/api/events/task/[a-f0-9]+"), "/api/events/task/{id}"),
-]
 _OPENSUBSONIC_ROUTE = re.compile(r"^/rest/([A-Za-z0-9]+)(?:\.view)?$")
 
 _SKIP_METRICS_PREFIXES = (
@@ -96,10 +36,7 @@ def _normalize_path(path: str, route_path: str | None = None) -> str:
         if match:
             return f"/rest/{match.group(1)}"
         return "/rest/{unmatched}"
-    for pattern, template in _PATH_NORMALIZERS:
-        if pattern.match(path):
-            return template
-    return path
+    return route_path or "/api/{unmatched}"
 
 
 def _should_skip_metrics(path: str) -> bool:
@@ -185,7 +122,7 @@ class MetricsMiddleware:
         normalized_path = _normalize_path(path, _route_path(scope))
 
         async def send_wrapper(message: Message) -> None:
-            nonlocal status_code, response_headers, stream_started
+            nonlocal status_code, response_headers, stream_started, normalized_path
             if message["type"] == "http.response.start":
                 status_code = int(message["status"])
                 response_headers = message.get("headers", [])
@@ -200,7 +137,9 @@ class MetricsMiddleware:
                         _STREAM_CONCURRENT_METRIC,
                         float(concurrent),
                         {
-                            "method": scope.get("method", "GET"),
+                            "method": _normalize_method(
+                                path, scope.get("method", "GET")
+                            ),
                             "path": normalized_path,
                             "status": str(status_code),
                         },
@@ -216,7 +155,7 @@ class MetricsMiddleware:
                     _STREAM_CONCURRENT_METRIC,
                     float(concurrent),
                     {
-                        "method": scope.get("method", "GET"),
+                        "method": _normalize_method(path, scope.get("method", "GET")),
                         "path": normalized_path,
                         "status": str(status_code),
                     },
@@ -287,7 +226,13 @@ class MetricsMiddleware:
             elapsed_ms=elapsed_ms,
             target=target,
         )
-        record_counter_later(_HTTP_REQUESTS_METRIC, tags)
+        record_counter_later(
+            _HTTP_REQUESTS_METRIC,
+            {
+                **tags,
+                "latency_class": "slow" if elapsed_ms >= _SLOW_REQUEST_MS else "fast",
+            },
+        )
 
         if status_code >= 500:
             record_counter_later(_HTTP_ERRORS_METRIC, tags)

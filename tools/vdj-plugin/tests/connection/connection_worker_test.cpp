@@ -12,6 +12,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <thread>
 #include <vector>
 
 using namespace crate::vdj;
@@ -161,6 +162,27 @@ void a_new_server_supersedes_an_in_flight_connect()
     CRATE_CHECK(!harness.vault->tokens.contains(credential_account_for_origin(kOrigin)));
 }
 
+
+void a_requested_check_runs_before_the_next_refresh()
+{
+    Harness harness;
+    harness.http.scripted.serve_connected();
+    auto worker = harness.worker();
+    worker->start();
+    worker->connect(kOrigin, "crv_valid");
+    CRATE_CHECK(harness.wait_for_connects(1));
+
+    harness.http.scripted.fail("/api/auth/me", 401);
+    worker->request_check();
+
+    const auto deadline = std::chrono::steady_clock::now() + 2s;
+    while (harness.session.logged_in() && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(10ms);
+    }
+    CRATE_CHECK(!harness.session.logged_in());
+    CRATE_CHECK(harness.session.status().state == ConnectionState::Unauthorized);
+}
+
 } // namespace
 
 int main()
@@ -170,4 +192,5 @@ int main()
     connect_reports_its_result();
     disconnect_cancels_an_in_flight_connect();
     a_new_server_supersedes_an_in_flight_connect();
+    a_requested_check_runs_before_the_next_refresh();
 }

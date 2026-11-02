@@ -35,7 +35,7 @@ void failed_migration_is_rolled_back(const std::filesystem::path& database_path)
 {
     std::filesystem::remove(database_path);
     sqlite3* database = nullptr;
-    CRATE_CHECK(sqlite3_open(database_path.c_str(), &database) == SQLITE_OK);
+    CRATE_CHECK(sqlite3_open(database_path.string().c_str(), &database) == SQLITE_OK);
     execute(
         database,
         "CREATE TABLE metadata_cache ("
@@ -60,7 +60,7 @@ void failed_migration_is_rolled_back(const std::filesystem::path& database_path)
         CRATE_CHECK(!cache.error().empty());
     }
 
-    CRATE_CHECK(sqlite3_open(database_path.c_str(), &database) == SQLITE_OK);
+    CRATE_CHECK(sqlite3_open(database_path.string().c_str(), &database) == SQLITE_OK);
     CRATE_CHECK(!has_column(database, "stale_until"));
     CRATE_CHECK(sqlite3_close(database) == SQLITE_OK);
     std::filesystem::remove(database_path);
@@ -79,7 +79,7 @@ int main()
     sqlite3* legacy_database = nullptr;
     CRATE_CHECK(
         sqlite3_open_v2(
-            database_path.c_str(),
+            database_path.string().c_str(),
             &legacy_database,
             SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
             nullptr
@@ -119,7 +119,7 @@ int main()
     sqlite3* migrated_database = nullptr;
     CRATE_CHECK(
         sqlite3_open_v2(
-            database_path.c_str(),
+            database_path.string().c_str(),
             &migrated_database,
             SQLITE_OPEN_READONLY,
             nullptr

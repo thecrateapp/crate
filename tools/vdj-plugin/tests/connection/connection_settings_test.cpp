@@ -15,6 +15,43 @@ using namespace crate::vdj;
 
 namespace {
 
+void set_environment(const char* name, const char* value)
+{
+#if defined(_WIN32)
+    _putenv_s(name, value);
+#else
+    setenv(name, value, 1);
+#endif
+}
+
+void paths_are_passed_to_sqlite_as_utf8()
+{
+    const std::filesystem::path path(u8"/tmp/Jos\u00e9/M\u00fasica/crate-metadata.sqlite");
+
+    CRATE_CHECK(utf8_path(path).find("Jos\xC3\xA9") != std::string::npos);
+    CRATE_CHECK(utf8_path(path).find("M\xC3\xBAsica") != std::string::npos);
+}
+
+void metadata_cache_path_honours_the_override()
+{
+    set_environment("CRATE_VDJ_METADATA_CACHE", "/tmp/crate-override.sqlite");
+
+    CRATE_CHECK(default_metadata_cache_path() == std::filesystem::path("/tmp/crate-override.sqlite"));
+
+    set_environment("CRATE_VDJ_METADATA_CACHE", "");
+    CRATE_CHECK(default_metadata_cache_path().filename() == "crate-metadata.sqlite");
+}
+
+#if defined(_WIN32)
+void windows_paths_keep_non_ascii_user_folders()
+{
+    _wputenv_s(L"APPDATA", L"C:\\Users\\Jos\u00e9\\AppData\\Roaming");
+
+    CRATE_CHECK(utf8_path(default_metadata_cache_path()).find("Jos\xC3\xA9") != std::string::npos);
+    CRATE_CHECK(utf8_path(default_connection_settings_path()).find("Jos\xC3\xA9") != std::string::npos);
+}
+#endif
+
 class CountingCredentialStore final : public CredentialStore {
 public:
     std::optional<std::string> token;
@@ -139,6 +176,11 @@ void credential_accounts_are_scoped_by_origin()
 
 int main()
 {
+    paths_are_passed_to_sqlite_as_utf8();
+    metadata_cache_path_honours_the_override();
+#if defined(_WIN32)
+    windows_paths_keep_non_ascii_user_folders();
+#endif
     normalizes_and_rejects_origins();
     persists_only_the_origin();
     ignores_invalid_persisted_origins();

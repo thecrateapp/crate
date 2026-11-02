@@ -644,3 +644,8 @@ System/Listen web closure provides the same Coverage evidence without a second s
 See [scope, evidence and follow-up](./LISTEN_WEB_CLOSURE.md). Active Listen contracts are
 documented; the remaining 15 global entries retain their explicit Admin/gated/unreferenced
 classification. Native-device certification remains separate.
+
+Observability checkpoint: [Collection integrity](http://127.0.0.1:5186/review-observability-integrity.html).
+The actual System Health page has six fixture states: observed, Redis unavailable,
+empty, partial, stale and legacy. The scene is shared with Storybook and issues no
+backend requests. See `docs/technical/evidence/observability/pr1a-checkpoint-2.md`.

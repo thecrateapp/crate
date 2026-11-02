@@ -97,6 +97,38 @@ dev-admin: ## Start only the Admin UI dev server (:5173)
 dev-listen: ## Start only the Listen dev server (:5174)
 	@npm run --workspace=app/listen dev -- --port 5174 --host
 
+VDJ_TEST_DIR ?= build/vdj-headless
+VDJ_BUILD_TYPE ?= Release
+VDJ_SANITIZERS ?= OFF
+
+.PHONY: vdj-test
+vdj-test: ## Build and run the VirtualDJ plugin tests without the SDK (VDJ_BUILD_TYPE=, VDJ_SANITIZERS=ON)
+	@cmake -S tools/vdj-plugin -B $(VDJ_TEST_DIR) -DCMAKE_BUILD_TYPE=$(VDJ_BUILD_TYPE) \
+		-DCRATE_VDJ_BUILD_REAL_PLUGIN=OFF -DCRATE_VDJ_BUILD_TESTS=ON \
+		-DCRATE_VDJ_ENABLE_SANITIZERS=$(VDJ_SANITIZERS)
+	@cmake --build $(VDJ_TEST_DIR) --parallel
+	@ctest --test-dir $(VDJ_TEST_DIR) --output-on-failure
+
+VIRTUALDJ_APP ?= /Applications/VirtualDJ.app
+VDJ_BUILD_DIR ?= build/vdj-macos
+VDJ_ONLINE_SOURCES := $(HOME)/Library/Application Support/VirtualDJ/PluginsMacArm/OnlineSources
+
+.PHONY: vdj-dev
+vdj-dev: ## Build the VirtualDJ plugin, install it and open VirtualDJ against the dev stack (VIRTUALDJ_SDK_ROOT=, VIRTUALDJ_APP=)
+	@test -n "$(VIRTUALDJ_SDK_ROOT)" || { echo "$(RED)Set VIRTUALDJ_SDK_ROOT to the folder with vdjPlugin8.h and vdjOnlineSource.h$(NC)"; exit 1; }
+	@test -d "$(VIRTUALDJ_APP)" || { echo "$(RED)VirtualDJ not found at $(VIRTUALDJ_APP); set VIRTUALDJ_APP$(NC)"; exit 1; }
+	@if pgrep -f "Contents/MacOS/VirtualDJ" >/dev/null; then echo "$(RED)Quit VirtualDJ before installing the plugin$(NC)"; exit 1; fi
+	@ca="$$(mkcert -CAROOT 2>/dev/null)/rootCA.pem"; \
+	test -s "$$ca" || { echo "$(RED)mkcert CA not found. Run 'make setup' first$(NC)"; exit 1; }; \
+	cmake -S tools/vdj-plugin -B $(VDJ_BUILD_DIR) -DCMAKE_BUILD_TYPE=Release \
+		-DCRATE_VDJ_BUILD_REAL_PLUGIN=ON -DVirtualDJSDK_ROOT="$(VIRTUALDJ_SDK_ROOT)" >/dev/null && \
+	cmake --build $(VDJ_BUILD_DIR) --target crate_vdj_online_source_plugin --parallel && \
+	mkdir -p "$(VDJ_ONLINE_SOURCES)" && \
+	rm -rf "$(VDJ_ONLINE_SOURCES)/Crate.bundle" && \
+	cp -R $(VDJ_BUILD_DIR)/Crate.bundle "$(VDJ_ONLINE_SOURCES)/" && \
+	open --env "CRATE_VDJ_CA_BUNDLE=$$ca" -a "$(VIRTUALDJ_APP)" && \
+	echo "$(GREEN)Crate.bundle installed; connect from VirtualDJ to https://api.dev.lespedants.org$(NC)"
+
 .PHONY: listen-story-card
 listen-story-card: ## Render an Instagram Story share-card preview (vars: kind title subtitle image out)
 	@node app/listen/scripts/render-instagram-story-card.mjs \

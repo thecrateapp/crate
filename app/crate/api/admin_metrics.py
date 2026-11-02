@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import os
-from typing import AsyncIterator
+from datetime import datetime, timedelta, timezone
+from typing import AsyncIterator, Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
@@ -14,6 +15,12 @@ from crate.api._deps import json_dumps
 from crate.api.openapi_responses import AUTH_ERROR_RESPONSES
 from crate.api.permissions import require_any_permission, require_permission
 from crate.api.redis_sse import close_pubsub, open_pubsub
+from crate.api.schemas.metrics import (
+    MetricsSummaryResponse,
+    MetricsDashboardResponse,
+    MetricsRoutesResponse,
+    MetricsTimeseriesResponse,
+)
 from crate.api.schemas.operations import (
     AdminGovernorSnapshotResponse,
     AdminLogsSnapshotResponse,
@@ -53,8 +60,9 @@ _DASHBOARD_TIMESERIES = {
 _SUMMARY_METRICS = {
     "api_latency": ("api.request.latency", 5),
     "api_requests": ("api.request.count", 5),
-    "api_errors": ("api.request.errors", 5),
-    "api_slow": ("api.request.slow", 5),
+    "api_errors": ("api.request.count", 5, {"status_class": "5xx"}),
+    "api_slow": ("api.request.count", 5, {"latency_class": "slow"}),
+    "worker_queue_depth": ("worker.queue.depth", 5),
     "stream_requests": ("stream.requests", 5),
     "stream_latency": ("stream.latency", 5),
     "stream_concurrent": ("stream.concurrent", 5),
@@ -123,10 +131,38 @@ def _require_llm_status_viewer(request: Request) -> dict:
     )
 
 
-def _build_metrics_summary() -> dict:
+def _build_metrics_summary(*, include_local: bool = True) -> dict:
     from crate.metrics import query_summaries
+    from crate.db.queries.metric_minutes import get_metric_history_status
 
-    return query_summaries(_SUMMARY_METRICS)
+    try:
+        history = get_metric_history_status()
+    except Exception:
+        history = {
+            "source": "postgresql_v2",
+            "availability": "unavailable",
+            "cutover_at": None,
+            "legacy_status": "unverified",
+            "legacy_combined": False,
+        }
+    result = {
+        **query_summaries(_SUMMARY_METRICS),
+        "_meta": {
+            "schema_version": 2,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "history": history,
+        },
+    }
+    return _attach_local_collector(result) if include_local else result
+
+
+def _attach_local_collector(summary: dict) -> dict:
+    from crate.metrics import get_collection_health
+
+    return {
+        **summary,
+        "_meta": {**summary["_meta"], "collector_local": get_collection_health()},
+    }
 
 
 def _build_metrics_system() -> dict:
@@ -275,43 +311,48 @@ def _build_playback_delivery() -> dict:
 
 def _build_metrics_dashboard(period: str, minutes: int) -> dict:
     from crate.db.cache_store import get_cache, set_cache
-    from crate.metrics import (
-        query_historical,
-        query_recent,
-        query_recent_rolled,
-        query_route_latency,
-    )
+    from crate.metrics import query_timeseries_snapshot, query_route_latency_snapshot
 
-    cache_key = f"admin:metrics:dashboard:{period}:{minutes}"
+    cache_key = f"admin:metrics:dashboard:v2:{period}:{minutes}"
     cached = get_cache(cache_key, max_age_seconds=10)
     if cached is not None:
-        return cached
+        return {**cached, "summary": _attach_local_collector(cached["summary"])}
 
-    timeseries: dict[str, list[dict]] = {}
-    for response_name, metric_name in _DASHBOARD_TIMESERIES.items():
-        if period == "minute":
-            timeseries[response_name] = query_recent(metric_name, minutes)
-        elif period == "hour":
-            timeseries[response_name] = query_recent_rolled(
-                metric_name, minutes=minutes, bucket_minutes=60
-            )
-        else:
-            timeseries[response_name] = query_historical(metric_name, period)
-
+    sampled = query_timeseries_snapshot(
+        list(_DASHBOARD_TIMESERIES.values()),
+        period=period,
+        minutes=minutes,
+        persisted=True,
+    )
+    timeseries = {
+        response_name: sampled["data"][metric_name]
+        for response_name, metric_name in _DASHBOARD_TIMESERIES.items()
+    }
+    timeseries_status = {
+        response_name: sampled["status"][metric_name]
+        for response_name, metric_name in _DASHBOARD_TIMESERIES.items()
+    }
+    routes = query_route_latency_snapshot(minutes=min(minutes, 60), limit=20)
     payload = {
-        "summary": _build_metrics_summary(),
+        "summary": _build_metrics_summary(include_local=False),
         "system": _build_metrics_system(),
         "tasks": _list_running_tasks(limit=10),
         "playback_delivery": _build_playback_delivery(),
-        "route_latency": query_route_latency(minutes=min(minutes, 60), limit=20),
+        "route_latency": routes["routes"],
+        "route_latency_status": {
+            key: value for key, value in routes.items() if key != "routes"
+        },
         "timeseries": timeseries,
+        "timeseries_status": timeseries_status,
     }
     set_cache(cache_key, payload, ttl=10)
-    return payload
+    return {**payload, "summary": _attach_local_collector(payload["summary"])}
 
 
 @router.get(
     "/metrics/summary",
+    response_model=MetricsSummaryResponse,
+    response_model_exclude_unset=True,
     responses=AUTH_ERROR_RESPONSES,
     summary="Current metrics snapshot",
 )
@@ -322,13 +363,16 @@ def metrics_summary(request: Request):
 
 @router.get(
     "/metrics/timeseries",
+    response_model=MetricsTimeseriesResponse,
     responses=AUTH_ERROR_RESPONSES,
     summary="Time-series metric data",
 )
 def metrics_timeseries(
     request: Request,
     name: str = Query(..., description="Metric name, e.g. api.latency"),
-    period: str = Query("hour", description="Granularity: minute, hour, day"),
+    period: Literal["minute", "hour", "day"] = Query(
+        "hour", description="Granularity: minute, hour, day"
+    ),
     start: str | None = Query(None, description="ISO start timestamp"),
     end: str | None = Query(None, description="ISO end timestamp"),
     minutes: int = Query(
@@ -336,34 +380,43 @@ def metrics_timeseries(
     ),
 ):
     _require_ops_health(request)
-    from crate.metrics import query_recent, query_historical, query_recent_rolled
+    from crate.metrics import query_timeseries_snapshot
 
     metric_name = _DASHBOARD_TIMESERIES.get(name, name)
 
-    if period == "minute":
-        return {
-            "name": name,
-            "period": period,
-            "data": query_recent(metric_name, minutes),
+    try:
+        for bound in (start, end):
+            if bound is not None:
+                datetime.fromisoformat(bound)
+        bounds = {
+            key: value
+            for key, value in (("start", start), ("end", end))
+            if value is not None
         }
-    if period == "hour" and not start and not end:
-        return {
-            "name": name,
-            "period": period,
-            "data": query_recent_rolled(
-                metric_name, minutes=minutes, bucket_minutes=60
-            ),
-        }
-
+        if period == "day" and "start" not in bounds:
+            bounds["start"] = (
+                (datetime.now(timezone.utc) - timedelta(days=8))
+                .replace(second=0, microsecond=0)
+                .isoformat()
+            )
+        snapshot = query_timeseries_snapshot(
+            [metric_name], period=period, minutes=minutes, persisted=True, **bounds
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    canonical = next(iter(snapshot["data"]))
     return {
         "name": name,
         "period": period,
-        "data": query_historical(metric_name, period, start, end),
+        "data": snapshot["data"][canonical],
+        "status": snapshot["status"][canonical],
     }
 
 
 @router.get(
     "/metrics/routes",
+    response_model=MetricsRoutesResponse,
+    response_model_exclude_unset=True,
     responses=AUTH_ERROR_RESPONSES,
     summary="Recent API route latency",
 )
@@ -374,18 +427,20 @@ def metrics_routes(
     target: str | None = Query(None, description="Optional target filter, e.g. api"),
 ):
     _require_ops_health(request)
-    from crate.metrics import query_route_latency
+    from crate.metrics import query_route_latency_snapshot
 
     return {
         "minutes": minutes,
         "limit": limit,
         "target": target,
-        "routes": query_route_latency(minutes=minutes, limit=limit, target=target),
+        **query_route_latency_snapshot(minutes=minutes, limit=limit, target=target),
     }
 
 
 @router.get(
     "/metrics/dashboard",
+    response_model=MetricsDashboardResponse,
+    response_model_exclude_unset=True,
     responses=AUTH_ERROR_RESPONSES,
     summary="Bundled system health payload",
 )

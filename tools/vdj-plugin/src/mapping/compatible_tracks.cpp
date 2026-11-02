@@ -2,9 +2,9 @@
 
 #include "crate_vdj/json_mapping.hpp"
 
-#include <iomanip>
+#include <charconv>
+#include <cstdint>
 #include <limits>
-#include <sstream>
 
 namespace crate::vdj {
 namespace {
@@ -70,6 +70,23 @@ bool parse_item(const json::Value& value, CompatibleTrack& item)
         !parse_breakdown(*breakdown, item.score_breakdown)) {
         return false;
     }
+    std::string year;
+    std::optional<std::int64_t> album_id;
+    if (!json::optional_number(value, "duration", item.duration_seconds) ||
+        !json::optional_integer(value, "albumId", album_id, 1, std::numeric_limits<int>::max()) ||
+        !json::optional_number(value, "bpm", item.bpm) ||
+        !json::optional_string(value, "camelot", item.camelot) ||
+        !json::optional_number(value, "energy", item.energy) ||
+        !json::optional_string(value, "year", year) ||
+        !json::optional_string(value, "genre", item.genre) ||
+        !json::optional_string(value, "coverUrl", item.cover_url)) {
+        return false;
+    }
+    item.album_id = static_cast<int>(album_id.value_or(0));
+    const auto parsed_year = std::from_chars(year.data(), year.data() + year.size(), item.year);
+    if (parsed_year.ec != std::errc{}) {
+        item.year = 0;
+    }
     if (reasons != nullptr && reasons->is_array()) {
         for (const auto& reason : *reasons) {
             if (!reason.is_string() || reason.get<std::string>().empty()) {
@@ -124,35 +141,15 @@ SearchTrack compatible_track_as_search_track(const CompatibleTrack& track)
     mapped.title = track.title;
     mapped.artist = track.artist;
     mapped.album = track.album;
+    mapped.duration_seconds = track.duration_seconds;
+    mapped.bpm = track.bpm;
+    mapped.camelot = track.camelot;
+    mapped.energy = track.energy;
+    mapped.year = track.year;
+    mapped.genre = track.genre;
+    mapped.cover_url = track.cover_url;
+    mapped.album_id = track.album_id;
     return mapped;
-}
-
-std::string compatible_track_comment(const CompatibleTrack& track)
-{
-    const auto& breakdown = track.score_breakdown;
-    std::ostringstream output;
-    output << std::fixed << std::setprecision(2)
-           << "Smart Mix score=" << track.score
-           << " confidence=" << track.confidence
-           << " tempo=" << breakdown.tempo
-           << " harmonic=" << breakdown.harmonic_relationship
-           << " energy=" << breakdown.energy
-           << " danceability=" << breakdown.danceability
-           << " valence=" << breakdown.valence
-           << " bliss=" << breakdown.bliss
-           << " genre=" << breakdown.genre;
-    if (!track.fallback_reasons.empty()) {
-        output << " fallback=";
-        for (std::size_t index = 0;
-             index < track.fallback_reasons.size();
-             ++index) {
-            if (index > 0) {
-                output << ',';
-            }
-            output << track.fallback_reasons[index];
-        }
-    }
-    return output.str();
 }
 
 } // namespace crate::vdj

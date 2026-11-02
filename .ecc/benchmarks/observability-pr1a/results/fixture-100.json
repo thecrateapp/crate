@@ -1,0 +1,634 @@
+{
+  "active_series": 100,
+  "families": 40,
+  "minutes": 11520,
+  "pg_rows": 1152000,
+  "seed_start": "2026-10-23T19:14:00+00:00",
+  "seed_end": "2026-10-31T19:13:00+00:00",
+  "redis_now_minute": 1793474040,
+  "redis_recent_minutes": 60,
+  "redis_dense_family": "api.request.latency",
+  "redis_dense_family_series": 40,
+  "redis_dense_minutes": 1440,
+  "redis_route_series": 40,
+  "redis_route_minutes": 60,
+  "redis_samples_per_route_minute": 20,
+  "series": [
+    {
+      "series_id": "f0448a46505d51e5b8a2ff31d591829f44b2fad930666623bf85b9e6cfd1374d",
+      "name": "api.request.latency",
+      "tags_json": "{\"method\":\"GET\",\"route\":\"/api/status\",\"service\":\"api\",\"status_class\":\"2xx\",\"target\":\"api\"}",
+      "value": 0.03
+    },
+    {
+      "series_id": "6237d8414134e011a775876971be7f4d5063ea0472028d2ed4ec9db5142a1ab3",
+      "name": "api.request.latency",
+      "tags_json": "{\"method\":\"GET\",\"route\":\"/api/status\",\"service\":\"worker\",\"status_class\":\"2xx\",\"target\":\"api\"}",
+      "value": 0.034999999999999996
+    },
+    {
+      "series_id": "afdc4b4a3412d454d81493bc9ad9bb8e35cb482e6c9dff552f1b307541da3354",
+      "name": "api.request.latency",
+      "tags_json": "{\"method\":\"GET\",\"route\":\"/api/status\",\"service\":\"readplane\",\"status_class\":\"2xx\",\"target\":\"api\"}",
+      "value": 0.04
+    },
+    {
+      "series_id": "342b608809c724c46a211ef5d7a81f611d4d22773fdb155dd6db6c40d42ad493",
+      "name": "api.request.count",
+      "tags_json": "{\"method\":\"GET\",\"route\":\"/api/status\",\"service\":\"api\",\"status_class\":\"2xx\",\"target\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "da86ca96d9269c522a725542f5d0fd0faa8faa319ca5cc72760d001c2d9f6199",
+      "name": "api.request.count",
+      "tags_json": "{\"method\":\"GET\",\"route\":\"/api/status\",\"service\":\"worker\",\"status_class\":\"2xx\",\"target\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "67ec0e18ff76198de61c3b95f05ed4b04aaed9e9fee75f164cb5fe717a9ce6d5",
+      "name": "api.request.count",
+      "tags_json": "{\"method\":\"GET\",\"route\":\"/api/status\",\"service\":\"readplane\",\"status_class\":\"2xx\",\"target\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "6e6c43d5fa2ac78362c6ccb652a7fb328a998ece18a87ab409795823c5cdb6bb",
+      "name": "api.request.errors",
+      "tags_json": "{\"method\":\"GET\",\"route\":\"/api/status\",\"service\":\"api\",\"status_class\":\"2xx\",\"target\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "f0e9851fb446887a43e8a840384372fa202d6633392be03fe7665b3836a51c9b",
+      "name": "api.request.errors",
+      "tags_json": "{\"method\":\"GET\",\"route\":\"/api/status\",\"service\":\"worker\",\"status_class\":\"2xx\",\"target\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "928ec2d068d3b75f3ebbaf9891e86f3d4e9713e7da47b4c9cdb8651921bc1dee",
+      "name": "api.request.errors",
+      "tags_json": "{\"method\":\"GET\",\"route\":\"/api/status\",\"service\":\"readplane\",\"status_class\":\"2xx\",\"target\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "9036e3a7708f8748ceb18f427932b347cb770e83a4e74db24097974b28b869b7",
+      "name": "api.request.slow",
+      "tags_json": "{\"method\":\"GET\",\"route\":\"/api/status\",\"service\":\"api\",\"status_class\":\"2xx\",\"target\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "a37ced682ba92c2122bdab51aed94cb50c752d591143b183606d903031bbb299",
+      "name": "api.request.slow",
+      "tags_json": "{\"method\":\"GET\",\"route\":\"/api/status\",\"service\":\"worker\",\"status_class\":\"2xx\",\"target\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "4e277e2ecc566ea885ee09bcc9674430c7f048f1927ab57d89a59698e50cf0c6",
+      "name": "api.request.slow",
+      "tags_json": "{\"method\":\"GET\",\"route\":\"/api/status\",\"service\":\"readplane\",\"status_class\":\"2xx\",\"target\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "f0b2b5c65530249b67699b3e39e2cef8df46674838bd08fa90493c172ea1324b",
+      "name": "stream.requests",
+      "tags_json": "{\"format\":\"aac\",\"method\":\"GET\",\"route\":\"/api/status\",\"service\":\"api\",\"status_class\":\"2xx\",\"target\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "83a9b7cea2f708680ad1f73d3398ba1b43567929b2634e2d6a5296899888e24b",
+      "name": "stream.requests",
+      "tags_json": "{\"format\":\"aac\",\"method\":\"GET\",\"route\":\"/api/status\",\"service\":\"worker\",\"status_class\":\"2xx\",\"target\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "f3a0936192c59d59c9e45992a01f6281ca5b37d47330ebb986e9b5011284be2b",
+      "name": "stream.requests",
+      "tags_json": "{\"format\":\"aac\",\"method\":\"GET\",\"route\":\"/api/status\",\"service\":\"readplane\",\"status_class\":\"2xx\",\"target\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "257801f48c3fb74452d2d16dda5a74a10c25fd3d781595c2bf372ffa28aa2017",
+      "name": "stream.transcode.duration",
+      "tags_json": "{\"outcome\":\"completed\",\"preset\":\"balanced\",\"service\":\"api\",\"target\":\"api\"}",
+      "value": 0.03
+    },
+    {
+      "series_id": "f110a3fdb9fd1a0b9cdfe4310322bd7674706f0d5a565e36d8960049df538d84",
+      "name": "stream.transcode.duration",
+      "tags_json": "{\"outcome\":\"completed\",\"preset\":\"balanced\",\"service\":\"worker\",\"target\":\"api\"}",
+      "value": 0.034999999999999996
+    },
+    {
+      "series_id": "da13aecf9e594c421536dbcde5fcff1c0a7765bced0e0d56ecb5cb4e3432ccfe",
+      "name": "stream.transcode.duration",
+      "tags_json": "{\"outcome\":\"completed\",\"preset\":\"balanced\",\"service\":\"readplane\",\"target\":\"api\"}",
+      "value": 0.04
+    },
+    {
+      "series_id": "93661e15dba41eef45438e5f02c3addc77051a96eed94063c36086b963ba7784",
+      "name": "stream.transcode.completed",
+      "tags_json": "{\"preset\":\"balanced\",\"service\":\"api\",\"target\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "39ec7c27e1971893418ce5c7f8984987299be38f1ddb5e76e297d8f060c757b6",
+      "name": "stream.transcode.completed",
+      "tags_json": "{\"preset\":\"balanced\",\"service\":\"worker\",\"target\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "f5095887a6f538f0ec33df45196c3d3b52a4a99846963e75b53cfab04b45194a",
+      "name": "stream.transcode.completed",
+      "tags_json": "{\"preset\":\"balanced\",\"service\":\"readplane\",\"target\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "6a96b64b0de3915eef55ce98db4086e14333cee9c74077f4057d4f64a27b3dba",
+      "name": "stream.transcode.failed",
+      "tags_json": "{\"preset\":\"balanced\",\"service\":\"api\",\"target\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "abe56000d69f00c3689cbecb03b07ae90e6698523aed63019bf30cf138e466d3",
+      "name": "stream.transcode.failed",
+      "tags_json": "{\"preset\":\"balanced\",\"service\":\"worker\",\"target\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "7ee2f574e5b969e59ddbf4313def11dd99bed3138ed44db07b55ecb49d5360b3",
+      "name": "stream.transcode.failed",
+      "tags_json": "{\"preset\":\"balanced\",\"service\":\"readplane\",\"target\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "1096d14a5acb5edd4374e3a4a2c1729c0b1384afd00734702978ca77d301e708",
+      "name": "stream.cache.bytes",
+      "tags_json": "{\"service\":\"api\",\"target\":\"api\"}",
+      "value": 100000
+    },
+    {
+      "series_id": "17dce2a44dd942dee130ad0d31871ab237938c6c0ff9dc67ce1a66c5f7bfb5ef",
+      "name": "stream.cache.bytes",
+      "tags_json": "{\"service\":\"worker\",\"target\":\"api\"}",
+      "value": 100001
+    },
+    {
+      "series_id": "9776ddda0a56b9b10f20a4771626a5aedd35594374af39b72a0493ad8a440a04",
+      "name": "stream.cache.bytes",
+      "tags_json": "{\"service\":\"readplane\",\"target\":\"api\"}",
+      "value": 100002
+    },
+    {
+      "series_id": "82ac8a25b2e647d15e44988391eb26cf7b124adec279c2368fca6b28c65ad3ee",
+      "name": "stream.cache.bytes_removed",
+      "tags_json": "{\"service\":\"api\",\"target\":\"api\"}",
+      "value": 100000
+    },
+    {
+      "series_id": "a52b5663d0a77ca4da2071107a963b7ec6bdff36eea3e84ac9f47a01542fd0e3",
+      "name": "stream.cache.bytes_removed",
+      "tags_json": "{\"service\":\"worker\",\"target\":\"api\"}",
+      "value": 100001
+    },
+    {
+      "series_id": "9a5032babb521828fde6c63819b6d85c1e722537322b0cd4e6bc1e69eceeba29",
+      "name": "stream.cache.bytes_removed",
+      "tags_json": "{\"service\":\"readplane\",\"target\":\"api\"}",
+      "value": 100002
+    },
+    {
+      "series_id": "8432030e02e90c83ed52dce00d0d6edaf86ddee7008b95120d84986d02fe5b75",
+      "name": "playback.startup.ms",
+      "tags_json": "{\"effective_policy\":\"original\",\"engine\":\"gapless\",\"origin\":\"local\",\"requested_policy\":\"original\",\"runtime\":\"desktop_web\",\"service\":\"api\"}",
+      "value": 0.03
+    },
+    {
+      "series_id": "bf1f182ad2ba45e87010f697b34fa3dcf00fdb50daf398b08544f5a03813e1f1",
+      "name": "playback.startup.ms",
+      "tags_json": "{\"effective_policy\":\"original\",\"engine\":\"gapless\",\"origin\":\"local\",\"requested_policy\":\"original\",\"runtime\":\"desktop_web\",\"service\":\"worker\"}",
+      "value": 0.034999999999999996
+    },
+    {
+      "series_id": "b9e055ba902f28d9a93bb84998308daf904ceced925028a5d70c3e5b4c9ad3ff",
+      "name": "playback.startup.ms",
+      "tags_json": "{\"effective_policy\":\"original\",\"engine\":\"gapless\",\"origin\":\"local\",\"requested_policy\":\"original\",\"runtime\":\"desktop_web\",\"service\":\"readplane\"}",
+      "value": 0.04
+    },
+    {
+      "series_id": "9f9c36d9ab81d615ae523c32454c637e6435a9ec19cd5d7bdcca95d8d5750f7b",
+      "name": "playback.stall.ms",
+      "tags_json": "{\"effective_policy\":\"original\",\"engine\":\"gapless\",\"origin\":\"local\",\"requested_policy\":\"original\",\"runtime\":\"desktop_web\",\"service\":\"api\"}",
+      "value": 0.03
+    },
+    {
+      "series_id": "9211e9ef12e5c8af52dbc6c1cd423dae5176b72f0c20b5b2f1913865065d1d04",
+      "name": "playback.stall.ms",
+      "tags_json": "{\"effective_policy\":\"original\",\"engine\":\"gapless\",\"origin\":\"local\",\"requested_policy\":\"original\",\"runtime\":\"desktop_web\",\"service\":\"worker\"}",
+      "value": 0.034999999999999996
+    },
+    {
+      "series_id": "eb1405b14ed4685d0414ede75840bc9ff64512984ae2d09bba682ff0523032bc",
+      "name": "playback.stall.ms",
+      "tags_json": "{\"effective_policy\":\"original\",\"engine\":\"gapless\",\"origin\":\"local\",\"requested_policy\":\"original\",\"runtime\":\"desktop_web\",\"service\":\"readplane\"}",
+      "value": 0.04
+    },
+    {
+      "series_id": "87aa3a1ec9f95a914be41e47924033c2b33cbaa44c322a465cc61a57dfd480cf",
+      "name": "home.compute.ms",
+      "tags_json": "{\"scope\":\"context\",\"service\":\"api\"}",
+      "value": 0.03
+    },
+    {
+      "series_id": "6cdec8f835f47700d2fc172c12503a26dd495790c8a4176a0e94f8ba1e41b37e",
+      "name": "home.compute.ms",
+      "tags_json": "{\"scope\":\"context\",\"service\":\"worker\"}",
+      "value": 0.034999999999999996
+    },
+    {
+      "series_id": "8829c438dbf5d756ec187acb5e7b04b6494211633e1343e41b54f61face16258",
+      "name": "home.compute.ms",
+      "tags_json": "{\"scope\":\"context\",\"service\":\"readplane\"}",
+      "value": 0.04
+    },
+    {
+      "series_id": "404e380e3b2b66268d1d73c58eef17e1f5fedd8f753b8ff0e8c851571fb360bb",
+      "name": "home.endpoint_compute.ms",
+      "tags_json": "{\"service\":\"api\"}",
+      "value": 0.03
+    },
+    {
+      "series_id": "ec35c4536f11e6feae26ac7a82a8cbc672cace5a6b8b434cdf5c02b1051362ac",
+      "name": "home.endpoint_compute.ms",
+      "tags_json": "{\"service\":\"worker\"}",
+      "value": 0.034999999999999996
+    },
+    {
+      "series_id": "cbe6da239dd459f7fe2b42b5e95d31239da46860a6a73b21b439e9962efd243e",
+      "name": "home.endpoint_compute.ms",
+      "tags_json": "{\"service\":\"readplane\"}",
+      "value": 0.04
+    },
+    {
+      "series_id": "5d6256ab87c16a5349f8f3a15a413fe175ed15027485e1b7e59ad7865115ac9b",
+      "name": "worker.queue.depth",
+      "tags_json": "{\"queue\":\"default\",\"service\":\"api\"}",
+      "value": 2
+    },
+    {
+      "series_id": "b4c76bf27cecf73319acdf775edefbea212689cbe5bd7ed25b242b2141935831",
+      "name": "worker.queue.depth",
+      "tags_json": "{\"queue\":\"default\",\"service\":\"worker\"}",
+      "value": 3
+    },
+    {
+      "series_id": "80080a884995f06e8bda6b4fa7a525ad8dc4efe962522054d5d79d394c1f7b50",
+      "name": "worker.queue.depth",
+      "tags_json": "{\"queue\":\"default\",\"service\":\"readplane\"}",
+      "value": 4
+    },
+    {
+      "series_id": "c15aa39084fb578aa2229effece62653248f0db20453bf7d122cb6613d6676fa",
+      "name": "worker.task.duration",
+      "tags_json": "{\"outcome\":\"completed\",\"queue\":\"default\",\"service\":\"api\",\"task_type\":\"scan\"}",
+      "value": 0.03
+    },
+    {
+      "series_id": "10eb03cda76cd7465c237119ce97d84c2f3ab044a594425657e1bafd74909af3",
+      "name": "worker.task.duration",
+      "tags_json": "{\"outcome\":\"completed\",\"queue\":\"default\",\"service\":\"worker\",\"task_type\":\"scan\"}",
+      "value": 0.034999999999999996
+    },
+    {
+      "series_id": "f46ce3e8dd094a8f92aabe393a9ae9ee0a0ffb50af14f822c2bdc45870201c18",
+      "name": "worker.task.duration",
+      "tags_json": "{\"outcome\":\"completed\",\"queue\":\"default\",\"service\":\"readplane\",\"task_type\":\"scan\"}",
+      "value": 0.04
+    },
+    {
+      "series_id": "ff6ec0310ee05b0cc52e60548e07c5fac049cfc1def720dba6e8a84c488ee61d",
+      "name": "worker.queue.wait",
+      "tags_json": "{\"queue\":\"default\",\"service\":\"api\",\"task_type\":\"scan\"}",
+      "value": 0.03
+    },
+    {
+      "series_id": "f0c51de71e7922c278f1ba2b04d5768f778ff89a93665ca8fe96317d49d404ca",
+      "name": "worker.queue.wait",
+      "tags_json": "{\"queue\":\"default\",\"service\":\"worker\",\"task_type\":\"scan\"}",
+      "value": 0.034999999999999996
+    },
+    {
+      "series_id": "6717cc91079cd63a0a7392370dd85442d2ee44a714eebde95bcdbfc24caa4c38",
+      "name": "worker.queue.wait",
+      "tags_json": "{\"queue\":\"default\",\"service\":\"readplane\",\"task_type\":\"scan\"}",
+      "value": 0.04
+    },
+    {
+      "series_id": "b8f233a53ebf93684b517ea53cd406c2788094e64f001c51797a982b3a883710",
+      "name": "worker.resource.deferred",
+      "tags_json": "{\"queue\":\"default\",\"reason\":\"iowait\",\"service\":\"api\",\"source\":\"daemon\",\"task_type\":\"scan\"}",
+      "value": 1
+    },
+    {
+      "series_id": "8fee32776d74c199acd7d33c56df3f72a5b2a3dcd3978f26488a045ab7ca7d5b",
+      "name": "worker.resource.deferred",
+      "tags_json": "{\"queue\":\"default\",\"reason\":\"iowait\",\"service\":\"worker\",\"source\":\"daemon\",\"task_type\":\"scan\"}",
+      "value": 1
+    },
+    {
+      "series_id": "9e1e084067c7ec70ace226bf6d0ebf01c6a75e65496841c4a40d1f147c2a8e01",
+      "name": "worker.resource.deferred",
+      "tags_json": "{\"queue\":\"default\",\"reason\":\"iowait\",\"service\":\"readplane\",\"source\":\"daemon\",\"task_type\":\"scan\"}",
+      "value": 1
+    },
+    {
+      "series_id": "030e547edd6850f98d47a32556e75f8121c3272cfb7418eda1c3e6c1fcb7b13d",
+      "name": "worker.resource.defer_seconds",
+      "tags_json": "{\"queue\":\"default\",\"reason\":\"iowait\",\"service\":\"api\",\"source\":\"daemon\",\"task_type\":\"scan\"}",
+      "value": 0.03
+    },
+    {
+      "series_id": "1297471a6afcc0da4a209a79c0ca1f8dcf65bf564ae3cb324b955999ecc44c9a",
+      "name": "worker.resource.defer_seconds",
+      "tags_json": "{\"queue\":\"default\",\"reason\":\"iowait\",\"service\":\"worker\",\"source\":\"daemon\",\"task_type\":\"scan\"}",
+      "value": 0.034999999999999996
+    },
+    {
+      "series_id": "6bc1938913f41cd945bc53459bfad77b25a12356ed2117bb86bfff21836e1edc",
+      "name": "worker.resource.defer_seconds",
+      "tags_json": "{\"queue\":\"default\",\"reason\":\"iowait\",\"service\":\"readplane\",\"source\":\"daemon\",\"task_type\":\"scan\"}",
+      "value": 0.04
+    },
+    {
+      "series_id": "4f7372ccbdda676232544b87879f0ba3dfbee0f48c9123382b618b8c87991290",
+      "name": "worker.resource.load_ratio",
+      "tags_json": "{\"queue\":\"default\",\"reason\":\"iowait\",\"service\":\"api\",\"source\":\"daemon\",\"task_type\":\"scan\"}",
+      "value": 0.5
+    },
+    {
+      "series_id": "2395531b6481094aeec54c1b65508800098419c278c62e110714db66c2ecf8bd",
+      "name": "worker.resource.load_ratio",
+      "tags_json": "{\"queue\":\"default\",\"reason\":\"iowait\",\"service\":\"worker\",\"source\":\"daemon\",\"task_type\":\"scan\"}",
+      "value": 0.5
+    },
+    {
+      "series_id": "a182b89bbd2f0835f255c77af04d816242570db52f4090544fcd47556f020991",
+      "name": "worker.resource.load_ratio",
+      "tags_json": "{\"queue\":\"default\",\"reason\":\"iowait\",\"service\":\"readplane\",\"source\":\"daemon\",\"task_type\":\"scan\"}",
+      "value": 0.5
+    },
+    {
+      "series_id": "3348e1a3ab631734c22e60898d8ea4ad37e2253f277fa7c871ce6a7f59023654",
+      "name": "worker.resource.iowait_percent",
+      "tags_json": "{\"queue\":\"default\",\"reason\":\"iowait\",\"service\":\"api\",\"source\":\"daemon\",\"task_type\":\"scan\"}",
+      "value": 0.5
+    },
+    {
+      "series_id": "bfd1eeab7fd6779dbf8050f7e54007b9117cd6f93f30b694ccda9ed78ff52f85",
+      "name": "worker.resource.iowait_percent",
+      "tags_json": "{\"queue\":\"default\",\"reason\":\"iowait\",\"service\":\"worker\",\"source\":\"daemon\",\"task_type\":\"scan\"}",
+      "value": 0.5
+    },
+    {
+      "series_id": "01e67e66144be94c1df8274bd6c4fd4f1e7023df9007aa40642d9aaed310c530",
+      "name": "worker.resource.swap_used_percent",
+      "tags_json": "{\"queue\":\"default\",\"reason\":\"iowait\",\"service\":\"api\",\"source\":\"daemon\",\"task_type\":\"scan\"}",
+      "value": 0.5
+    },
+    {
+      "series_id": "c1206f71ccc579b289852cf969ef2ab3ad9320143037e7bb1c9a2323f60f4ec5",
+      "name": "worker.resource.swap_used_percent",
+      "tags_json": "{\"queue\":\"default\",\"reason\":\"iowait\",\"service\":\"worker\",\"source\":\"daemon\",\"task_type\":\"scan\"}",
+      "value": 0.5
+    },
+    {
+      "series_id": "7a6ba97aa745edfc289183c00e0d3cd22da66f26e4c470f10c948ea11609345c",
+      "name": "mcp.tool.latency_ms",
+      "tags_json": "{\"service\":\"api\"}",
+      "value": 0.03
+    },
+    {
+      "series_id": "0c89246e68fe64f99ce547a3591b1a13e8c61aaeb5e0b9a2b3c44235d132e1c4",
+      "name": "mcp.tool.latency_ms",
+      "tags_json": "{\"service\":\"worker\"}",
+      "value": 0.034999999999999996
+    },
+    {
+      "series_id": "eeb06bfb0684a3a90dbe23d6b5b2876e66889c67cde3cfc478c45e4f6188eb88",
+      "name": "mcp.tool.response_bytes",
+      "tags_json": "{\"service\":\"api\"}",
+      "value": 100000
+    },
+    {
+      "series_id": "3ea7fbfb72409bbf717158524f8d6e34888d65679c18be92a598d8dc7c2cde46",
+      "name": "mcp.tool.response_bytes",
+      "tags_json": "{\"service\":\"worker\"}",
+      "value": 100001
+    },
+    {
+      "series_id": "508f0631aee2ef2d7d2b59046e27449bdfc713ba716692fab37820a8434ea1a6",
+      "name": "mcp.tool.success",
+      "tags_json": "{\"service\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "4c09f07b617601ffcbc8e853dc959c6052af9d0c75b85ca6d27ef4faba04444b",
+      "name": "mcp.tool.success",
+      "tags_json": "{\"service\":\"worker\"}",
+      "value": 1
+    },
+    {
+      "series_id": "6b744ef7822f7b410e25fca93ba64df0e4a81105acb08d3669827079348f9fb6",
+      "name": "mcp.tool.denied",
+      "tags_json": "{\"service\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "8034afe9e9ac9bece9ced560f96f497eeb7d14ff649d7ee0b9268b33cfca6cca",
+      "name": "mcp.tool.denied",
+      "tags_json": "{\"service\":\"worker\"}",
+      "value": 1
+    },
+    {
+      "series_id": "b00fdb5158cece16bc32cf307ec8ee8bb89f873fd51dfe0388a0e0b5fa3d648d",
+      "name": "mcp.tool.rate_limited",
+      "tags_json": "{\"service\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "6624c85ec1c075bf882740456e619f000a7cc3109e5eeef06b2664927c42f4b9",
+      "name": "mcp.tool.rate_limited",
+      "tags_json": "{\"service\":\"worker\"}",
+      "value": 1
+    },
+    {
+      "series_id": "d1767e64cc1e0365048944ab1e95a5523ba3e559a3c0975b3debd4deccd27c83",
+      "name": "mcp.job.completed",
+      "tags_json": "{\"service\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "c6140fc15ad204bd5e33aa67838f25e9227b2fbd1fe686c1418841cc727158a2",
+      "name": "mcp.job.completed",
+      "tags_json": "{\"service\":\"worker\"}",
+      "value": 1
+    },
+    {
+      "series_id": "308d13376ad84f9c08a5205b220232bc786eb73284b13f64399aab56ffeb72a8",
+      "name": "mcp.job.failed",
+      "tags_json": "{\"service\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "c483b3636e8dc59b172d19f69740fb3c4d4c95c4a5adfe19a902c3c91b49902e",
+      "name": "mcp.job.failed",
+      "tags_json": "{\"service\":\"worker\"}",
+      "value": 1
+    },
+    {
+      "series_id": "437a579cdd6be72c6321befb914b33a60328c67b43c604627f096b5faec626e6",
+      "name": "mcp.auth.denied",
+      "tags_json": "{\"service\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "1b0b2a166b3ad64a4f510a55200588084b5e48505cda95f83568bef4376313df",
+      "name": "mcp.auth.denied",
+      "tags_json": "{\"service\":\"worker\"}",
+      "value": 1
+    },
+    {
+      "series_id": "450168ba39202af7b52bf7a3c47705887396842977e7e5cd3b88e751d436227f",
+      "name": "stream.latency",
+      "tags_json": "{\"method\":\"GET\",\"route\":\"/api/status\",\"service\":\"api\",\"status_class\":\"2xx\",\"target\":\"api\"}",
+      "value": 0.03
+    },
+    {
+      "series_id": "811d979e5f5d586c2a4bd2ad4723e3365074132d202fb261020cb9904f42ce19",
+      "name": "stream.latency",
+      "tags_json": "{\"method\":\"GET\",\"route\":\"/api/status\",\"service\":\"worker\",\"status_class\":\"2xx\",\"target\":\"api\"}",
+      "value": 0.034999999999999996
+    },
+    {
+      "series_id": "d49916d0e645721dceebab31e7bf7afd423329cb2551b0343ee546cfe94383d4",
+      "name": "stream.concurrent",
+      "tags_json": "{\"method\":\"GET\",\"route\":\"/api/status\",\"service\":\"api\",\"status_class\":\"2xx\",\"target\":\"api\"}",
+      "value": 2
+    },
+    {
+      "series_id": "872a33f531f9d3b2c1063d637434c353b52210ebe0fe97ac92e8898ac1e50b3c",
+      "name": "stream.concurrent",
+      "tags_json": "{\"method\":\"GET\",\"route\":\"/api/status\",\"service\":\"worker\",\"status_class\":\"2xx\",\"target\":\"api\"}",
+      "value": 3
+    },
+    {
+      "series_id": "454bfe67903968eb0bbd5dc0300ec6d382288666c16e22c35a361b544c151ccf",
+      "name": "stream.cache.files",
+      "tags_json": "{\"service\":\"api\",\"target\":\"api\"}",
+      "value": 2
+    },
+    {
+      "series_id": "bcdfd6e28aac13989f4c1c5a479642299d4ae437b4ef97a34a1d3759e1e04553",
+      "name": "stream.cache.files",
+      "tags_json": "{\"service\":\"worker\",\"target\":\"api\"}",
+      "value": 3
+    },
+    {
+      "series_id": "b49471bc47878010ed9dc2ecdcf0cfdb1a9a147c3082cc9a3e77c51541324a82",
+      "name": "stream.cache.files_removed",
+      "tags_json": "{\"service\":\"api\",\"target\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "91cc5564c4a7c376cf939e2abb2e6bc5690490c41dc6486fecc7621e96bfb4cc",
+      "name": "stream.cache.files_removed",
+      "tags_json": "{\"service\":\"worker\",\"target\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "6979e7d3948ce444f5d0295561b9768088cf20c230271b7c0a5ab0347ea9b1c2",
+      "name": "stream.cache.orphan_files",
+      "tags_json": "{\"service\":\"api\",\"target\":\"api\"}",
+      "value": 2
+    },
+    {
+      "series_id": "0e50623fdb73b9cd954755683af8e10967974fb4b679df69590afe333fb86829",
+      "name": "stream.cache.orphan_files",
+      "tags_json": "{\"service\":\"worker\",\"target\":\"api\"}",
+      "value": 3
+    },
+    {
+      "series_id": "42c36b2e59eced6cd127dc7c65c8e737a07f7bc8cabd022196983f866f390106",
+      "name": "playback.stall.count",
+      "tags_json": "{\"effective_policy\":\"original\",\"engine\":\"gapless\",\"origin\":\"local\",\"requested_policy\":\"original\",\"runtime\":\"desktop_web\",\"service\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "34663c7f8eb7827308e45ea70167d81d207ee43a0269fbd4f7f5bcb9cc2058d2",
+      "name": "playback.stall.count",
+      "tags_json": "{\"effective_policy\":\"original\",\"engine\":\"gapless\",\"origin\":\"local\",\"requested_policy\":\"original\",\"runtime\":\"desktop_web\",\"service\":\"worker\"}",
+      "value": 1
+    },
+    {
+      "series_id": "70d5ccc264490294de05c2f8f10baf169771f7a34e53a439491db79abbbaf792",
+      "name": "playback.recovery.count",
+      "tags_json": "{\"effective_policy\":\"original\",\"engine\":\"gapless\",\"origin\":\"local\",\"requested_policy\":\"original\",\"runtime\":\"desktop_web\",\"service\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "d83bf17fc7dbfc1a9058f0bf7847bf1efea121d8023acf6f7ca92fd29d2d0ba6",
+      "name": "playback.recovery.count",
+      "tags_json": "{\"effective_policy\":\"original\",\"engine\":\"gapless\",\"origin\":\"local\",\"requested_policy\":\"original\",\"runtime\":\"desktop_web\",\"service\":\"worker\"}",
+      "value": 1
+    },
+    {
+      "series_id": "ee2fe7745c22407a1001c79c66f18225da1e36ce65533583158ee2bc3cab18e3",
+      "name": "home.cache.hit",
+      "tags_json": "{\"scope\":\"context\",\"service\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "be785abc67320b30a5f4a941a8386108b5b036d0d23d6be80d95b237a1ec56f0",
+      "name": "home.cache.hit",
+      "tags_json": "{\"scope\":\"context\",\"service\":\"worker\"}",
+      "value": 1
+    },
+    {
+      "series_id": "9fb1a089559332d2408de69f1f3273b985c3136eea3e2142a5d48b4b7b56e371",
+      "name": "home.cache.miss",
+      "tags_json": "{\"scope\":\"context\",\"service\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "daeb47280f174cf08f024732c7cde7f49d9b19bdeca9810441657e9fcb1e1a6e",
+      "name": "home.cache.miss",
+      "tags_json": "{\"scope\":\"context\",\"service\":\"worker\"}",
+      "value": 1
+    },
+    {
+      "series_id": "b5d2d112d435b2ce6375eb86d1a0c0f3b542366646599cfce72b4adf62d9665c",
+      "name": "home.cache.waited",
+      "tags_json": "{\"scope\":\"context\",\"service\":\"api\"}",
+      "value": 1
+    },
+    {
+      "series_id": "3988bf00f1c92ce4004faca7771d31b4a6010de3c2c2e76f7bb21d02a3b154ba",
+      "name": "home.cache.waited",
+      "tags_json": "{\"scope\":\"context\",\"service\":\"worker\"}",
+      "value": 1
+    }
+  ],
+  "pg": {
+    "table_bytes": 424681472,
+    "index_bytes": 469975040,
+    "total_bytes": 894787584,
+    "rows": 1152000
+  },
+  "redis": {
+    "used_memory": 85049368,
+    "used_memory_peak": 85049952,
+    "total_commands_processed": 261613,
+    "keys": 68540
+  },
+  "seed_seconds": 17.567666832823306,
+  "caveats": [
+    "Redis fixture uses60min for normal families plus40series/24h dense latency; normal24h completeness differs from PG eight-day fixture. No library/task/system workload is seeded. Cold dashboard measures metrics branch only with constant auxiliaries."
+  ]
+}

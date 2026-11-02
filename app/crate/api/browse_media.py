@@ -180,6 +180,14 @@ def _without_server_paths(results: dict) -> dict:
     }
 
 
+def _is_valid_dj_query(query: str) -> bool:
+    try:
+        parse_dj_query(query)
+    except ValueError:
+        return False
+    return True
+
+
 @router.get(
     "/api/search",
     response_model=SearchResponse,
@@ -200,11 +208,17 @@ def api_search(
     if len(q_stripped) < 2:
         return {"artists": [], "albums": [], "tracks": []}
     is_access_token = user.get("auth_type") == "access_token"
+    if is_access_token and scope in ("auto", "federated"):
+        raise HTTPException(
+            status_code=403,
+            detail="Access tokens can only search the local library",
+        )
     if fields == "dj":
         try:
             parse_dj_query(q_stripped)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if fields == "dj" or (is_access_token and _is_valid_dj_query(q_stripped)):
         return {
             "artists": [],
             "albums": [],
@@ -212,11 +226,6 @@ def api_search(
         }
 
     scope = scope if scope in ("local", "auto", "federated") else "local"
-    if scope != "local" and is_access_token:
-        raise HTTPException(
-            status_code=403,
-            detail="Access tokens can only search the local library",
-        )
     if scope == "local":
         results = search_local_library(q_stripped, capped_limit)
         return _without_server_paths(results) if is_access_token else results

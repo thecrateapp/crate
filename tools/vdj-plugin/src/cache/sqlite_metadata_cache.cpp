@@ -17,7 +17,7 @@ namespace crate::vdj {
 namespace {
 
 constexpr std::int64_t kSchemaVersion = 2;
-constexpr std::uint32_t kPayloadVersion = 1;
+constexpr std::uint32_t kPayloadVersion = 2;
 constexpr std::size_t kMaximumCollectionSize = 100'000;
 
 template <typename T>
@@ -246,11 +246,17 @@ void serialize_track(BinaryWriter& writer, const SearchTrack& track)
     writer.put_string(track.audio_scale);
     writer.put_bool(track.has_cover);
     writer.put_string(cacheable_cover_url(track.cover_url));
+    writer.put_string(track.camelot);
+    writer.put_bool(track.energy.has_value());
+    writer.put_double(track.energy.value_or(0));
+    writer.put_i32(track.album_id);
 }
 
 bool deserialize_track(BinaryReader& reader, SearchTrack& track)
 {
-    return reader.read_string(track.entity_uid) &&
+    bool has_energy = false;
+    double energy = 0;
+    const bool read = reader.read_string(track.entity_uid) &&
         reader.read_string(track.title) &&
         reader.read_string(track.artist) &&
         reader.read_string(track.album) &&
@@ -261,7 +267,15 @@ bool deserialize_track(BinaryReader& reader, SearchTrack& track)
         reader.read_string(track.audio_key) &&
         reader.read_string(track.audio_scale) &&
         reader.read_bool(track.has_cover) &&
-        reader.read_string(track.cover_url);
+        reader.read_string(track.cover_url) &&
+        reader.read_string(track.camelot) &&
+        reader.read_bool(has_energy) &&
+        reader.read_double(energy) &&
+        reader.read_i32(track.album_id);
+    if (read && has_energy) {
+        track.energy = energy;
+    }
+    return read;
 }
 
 void serialize_search_results(BinaryWriter& writer, const SearchResults& results)

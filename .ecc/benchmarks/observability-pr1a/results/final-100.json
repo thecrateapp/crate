@@ -1,0 +1,1895 @@
+{
+  "label": "final-100",
+  "source_path": "immutable-snapshot:final-source",
+  "fixture": {
+    "active_series": 100,
+    "families": 40,
+    "minutes": 11520,
+    "pg_rows": 1152000,
+    "seed_start": "2026-10-23T19:14:00+00:00",
+    "seed_end": "2026-10-31T19:13:00+00:00",
+    "redis_now_minute": 1793474040,
+    "redis_recent_minutes": 60,
+    "redis_dense_family": "api.request.latency",
+    "redis_dense_family_series": 40,
+    "redis_dense_minutes": 1440,
+    "redis_route_series": 40,
+    "redis_route_minutes": 60,
+    "redis_samples_per_route_minute": 20,
+    "pg": {
+      "table_bytes": 424681472,
+      "index_bytes": 469975040,
+      "total_bytes": 894787584,
+      "rows": 1152000
+    },
+    "redis": {
+      "used_memory": 85049368,
+      "used_memory_peak": 85049952,
+      "total_commands_processed": 261613,
+      "keys": 68540
+    },
+    "seed_seconds": 17.567666832823306,
+    "caveats": [
+      "Redis fixture uses60min for normal families plus40series/24h dense latency; normal24h completeness differs from PG eight-day fixture. No library/task/system workload is seeded. Cold dashboard measures metrics branch only with constant auxiliaries."
+    ]
+  },
+  "cases": [
+    {
+      "name": "pg_15m",
+      "operations": 100,
+      "warmups": 10,
+      "concurrency": 10,
+      "wall_seconds": 0.092,
+      "p50_ms": 6.827,
+      "p95_ms": 23.663,
+      "p99_ms": 28.744,
+      "max_ms": 29.511,
+      "response_bytes": {
+        "min": 3301,
+        "max": 3301,
+        "mean": 3301.0
+      },
+      "errors": [],
+      "error_count": 0,
+      "empty_timeseries_occurrences": {},
+      "first_timeseries_lengths": null,
+      "first_statuses": null,
+      "first_graphs": null
+    },
+    {
+      "name": "pg_1h",
+      "operations": 100,
+      "warmups": 10,
+      "concurrency": 10,
+      "wall_seconds": 0.083,
+      "p50_ms": 6.488,
+      "p95_ms": 13.484,
+      "p99_ms": 17.933,
+      "max_ms": 19.043,
+      "response_bytes": {
+        "min": 13201,
+        "max": 13201,
+        "mean": 13201.0
+      },
+      "errors": [],
+      "error_count": 0,
+      "empty_timeseries_occurrences": {},
+      "first_timeseries_lengths": null,
+      "first_statuses": null,
+      "first_graphs": null
+    },
+    {
+      "name": "pg_24h",
+      "operations": 100,
+      "warmups": 10,
+      "concurrency": 10,
+      "wall_seconds": 0.058,
+      "p50_ms": 5.244,
+      "p95_ms": 7.186,
+      "p99_ms": 7.94,
+      "max_ms": 8.302,
+      "response_bytes": {
+        "min": 5511,
+        "max": 5511,
+        "mean": 5511.0
+      },
+      "errors": [],
+      "error_count": 0,
+      "empty_timeseries_occurrences": {},
+      "first_timeseries_lengths": null,
+      "first_statuses": null,
+      "first_graphs": null
+    },
+    {
+      "name": "pg_7d",
+      "operations": 100,
+      "warmups": 10,
+      "concurrency": 10,
+      "wall_seconds": 0.372,
+      "p50_ms": 27.877,
+      "p95_ms": 64.957,
+      "p99_ms": 67.027,
+      "max_ms": 73.877,
+      "response_bytes": {
+        "min": 37335,
+        "max": 37335,
+        "mean": 37335.0
+      },
+      "errors": [],
+      "error_count": 0,
+      "empty_timeseries_occurrences": {},
+      "first_timeseries_lengths": null,
+      "first_statuses": null,
+      "first_graphs": null
+    },
+    {
+      "name": "dashboard_cold_60m",
+      "operations": 100,
+      "warmups": 10,
+      "concurrency": 10,
+      "wall_seconds": 3.991,
+      "p50_ms": 395.349,
+      "p95_ms": 456.701,
+      "p99_ms": 471.29,
+      "max_ms": 502.915,
+      "response_bytes": {
+        "min": 229736,
+        "max": 229736,
+        "mean": 229736.0
+      },
+      "errors": [],
+      "error_count": 0,
+      "empty_timeseries_occurrences": {},
+      "first_timeseries_lengths": {
+        "api.latency": 59,
+        "api.requests": 59,
+        "api.errors": 59,
+        "api.slow": 59,
+        "stream.requests": 59,
+        "stream.transcode.duration": 59,
+        "stream.transcode.completed": 59,
+        "stream.transcode.failed": 59,
+        "stream.cache.bytes": 59,
+        "stream.cache.bytes_removed": 59,
+        "playback.startup.ms": 59,
+        "playback.stall.ms": 59,
+        "home.compute.ms": 59,
+        "home.endpoint_compute.ms": 59,
+        "worker.queue.depth": 59,
+        "worker.task.duration": 59,
+        "worker.queue.wait": 59,
+        "worker.resource.deferred": 59,
+        "worker.resource.defer_seconds": 59,
+        "worker.resource.load_ratio": 59,
+        "worker.resource.iowait_percent": 59,
+        "worker.resource.swap_used_percent": 59
+      },
+      "first_statuses": {
+        "timeseries_status": {
+          "api.latency": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "api.requests": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "api.errors": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "api.slow": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "stream.requests": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "stream.transcode.duration": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "stream.transcode.completed": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "stream.transcode.failed": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "stream.cache.bytes": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "stream.cache.bytes_removed": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "playback.startup.ms": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "playback.stall.ms": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "home.compute.ms": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "home.endpoint_compute.ms": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "worker.queue.depth": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "worker.task.duration": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "worker.queue.wait": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "worker.resource.deferred": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "worker.resource.defer_seconds": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "worker.resource.load_ratio": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "worker.resource.iowait_percent": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "worker.resource.swap_used_percent": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          }
+        },
+        "route_latency_status": {
+          "availability": "available",
+          "reason": null,
+          "source": "redis_v2",
+          "sample_kind": "bounded_samples",
+          "window_minutes": 60,
+          "observed_count": 47200,
+          "sample_count": 47200,
+          "truncated": true
+        }
+      },
+      "first_graphs": {
+        "json_bytes": 206703,
+        "total_points": 1298,
+        "observations_by_family": {
+          "api.latency": 3540,
+          "api.requests": 3540,
+          "api.errors": 3540,
+          "api.slow": 3540,
+          "stream.requests": 3540,
+          "stream.transcode.duration": 3540,
+          "stream.transcode.completed": 3540,
+          "stream.transcode.failed": 3540,
+          "stream.cache.bytes": 3540,
+          "stream.cache.bytes_removed": 3540,
+          "playback.startup.ms": 3540,
+          "playback.stall.ms": 3540,
+          "home.compute.ms": 3540,
+          "home.endpoint_compute.ms": 3540,
+          "worker.queue.depth": 3540,
+          "worker.task.duration": 3540,
+          "worker.queue.wait": 3540,
+          "worker.resource.deferred": 3540,
+          "worker.resource.defer_seconds": 3540,
+          "worker.resource.load_ratio": 3540,
+          "worker.resource.iowait_percent": 2360,
+          "worker.resource.swap_used_percent": 2360
+        }
+      }
+    },
+    {
+      "name": "dashboard_cached_60m",
+      "operations": 100,
+      "warmups": 10,
+      "concurrency": 10,
+      "wall_seconds": 0.308,
+      "p50_ms": 0.02,
+      "p95_ms": 0.066,
+      "p99_ms": 0.323,
+      "max_ms": 0.801,
+      "response_bytes": {
+        "min": 229736,
+        "max": 229736,
+        "mean": 229736.0
+      },
+      "errors": [],
+      "error_count": 0,
+      "empty_timeseries_occurrences": {},
+      "first_timeseries_lengths": {
+        "api.latency": 59,
+        "api.requests": 59,
+        "api.errors": 59,
+        "api.slow": 59,
+        "stream.requests": 59,
+        "stream.transcode.duration": 59,
+        "stream.transcode.completed": 59,
+        "stream.transcode.failed": 59,
+        "stream.cache.bytes": 59,
+        "stream.cache.bytes_removed": 59,
+        "playback.startup.ms": 59,
+        "playback.stall.ms": 59,
+        "home.compute.ms": 59,
+        "home.endpoint_compute.ms": 59,
+        "worker.queue.depth": 59,
+        "worker.task.duration": 59,
+        "worker.queue.wait": 59,
+        "worker.resource.deferred": 59,
+        "worker.resource.defer_seconds": 59,
+        "worker.resource.load_ratio": 59,
+        "worker.resource.iowait_percent": 59,
+        "worker.resource.swap_used_percent": 59
+      },
+      "first_statuses": {
+        "timeseries_status": {
+          "api.latency": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "api.requests": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "api.errors": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "api.slow": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "stream.requests": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "stream.transcode.duration": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "stream.transcode.completed": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "stream.transcode.failed": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "stream.cache.bytes": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "stream.cache.bytes_removed": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "playback.startup.ms": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "playback.stall.ms": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "home.compute.ms": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "home.endpoint_compute.ms": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "worker.queue.depth": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "worker.task.duration": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "worker.queue.wait": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "worker.resource.deferred": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "worker.resource.defer_seconds": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "worker.resource.load_ratio": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "worker.resource.iowait_percent": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          },
+          "worker.resource.swap_used_percent": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 60
+          }
+        },
+        "route_latency_status": {
+          "availability": "available",
+          "reason": null,
+          "source": "redis_v2",
+          "sample_kind": "bounded_samples",
+          "window_minutes": 60,
+          "observed_count": 47200,
+          "sample_count": 47200,
+          "truncated": true
+        }
+      },
+      "first_graphs": {
+        "json_bytes": 206703,
+        "total_points": 1298,
+        "observations_by_family": {
+          "api.latency": 3540,
+          "api.requests": 3540,
+          "api.errors": 3540,
+          "api.slow": 3540,
+          "stream.requests": 3540,
+          "stream.transcode.duration": 3540,
+          "stream.transcode.completed": 3540,
+          "stream.transcode.failed": 3540,
+          "stream.cache.bytes": 3540,
+          "stream.cache.bytes_removed": 3540,
+          "playback.startup.ms": 3540,
+          "playback.stall.ms": 3540,
+          "home.compute.ms": 3540,
+          "home.endpoint_compute.ms": 3540,
+          "worker.queue.depth": 3540,
+          "worker.task.duration": 3540,
+          "worker.queue.wait": 3540,
+          "worker.resource.deferred": 3540,
+          "worker.resource.defer_seconds": 3540,
+          "worker.resource.load_ratio": 3540,
+          "worker.resource.iowait_percent": 2360,
+          "worker.resource.swap_used_percent": 2360
+        }
+      }
+    },
+    {
+      "name": "dashboard_cold_1440m",
+      "operations": 100,
+      "warmups": 10,
+      "concurrency": 10,
+      "wall_seconds": 4.385,
+      "p50_ms": 437.183,
+      "p95_ms": 487.234,
+      "p99_ms": 505.973,
+      "max_ms": 524.244,
+      "response_bytes": {
+        "min": 113128,
+        "max": 113128,
+        "mean": 113128.0
+      },
+      "errors": [],
+      "error_count": 0,
+      "empty_timeseries_occurrences": {},
+      "first_timeseries_lengths": {
+        "api.latency": 25,
+        "api.requests": 25,
+        "api.errors": 25,
+        "api.slow": 25,
+        "stream.requests": 25,
+        "stream.transcode.duration": 25,
+        "stream.transcode.completed": 25,
+        "stream.transcode.failed": 25,
+        "stream.cache.bytes": 25,
+        "stream.cache.bytes_removed": 25,
+        "playback.startup.ms": 25,
+        "playback.stall.ms": 25,
+        "home.compute.ms": 25,
+        "home.endpoint_compute.ms": 25,
+        "worker.queue.depth": 25,
+        "worker.task.duration": 25,
+        "worker.queue.wait": 25,
+        "worker.resource.deferred": 25,
+        "worker.resource.defer_seconds": 25,
+        "worker.resource.load_ratio": 25,
+        "worker.resource.iowait_percent": 25,
+        "worker.resource.swap_used_percent": 25
+      },
+      "first_statuses": {
+        "timeseries_status": {
+          "api.latency": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "api.requests": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "api.errors": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "api.slow": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "stream.requests": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "stream.transcode.duration": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "stream.transcode.completed": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "stream.transcode.failed": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "stream.cache.bytes": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "stream.cache.bytes_removed": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "playback.startup.ms": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "playback.stall.ms": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "home.compute.ms": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "home.endpoint_compute.ms": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "worker.queue.depth": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "worker.task.duration": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "worker.queue.wait": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "worker.resource.deferred": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "worker.resource.defer_seconds": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "worker.resource.load_ratio": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "worker.resource.iowait_percent": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "worker.resource.swap_used_percent": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          }
+        },
+        "route_latency_status": {
+          "availability": "available",
+          "reason": null,
+          "source": "redis_v2",
+          "sample_kind": "bounded_samples",
+          "window_minutes": 60,
+          "observed_count": 47200,
+          "sample_count": 47200,
+          "truncated": true
+        }
+      },
+      "first_graphs": {
+        "json_bytes": 90051,
+        "total_points": 550,
+        "observations_by_family": {
+          "api.latency": 86340,
+          "api.requests": 86340,
+          "api.errors": 86340,
+          "api.slow": 86340,
+          "stream.requests": 86340,
+          "stream.transcode.duration": 86340,
+          "stream.transcode.completed": 86340,
+          "stream.transcode.failed": 86340,
+          "stream.cache.bytes": 86340,
+          "stream.cache.bytes_removed": 86340,
+          "playback.startup.ms": 86340,
+          "playback.stall.ms": 86340,
+          "home.compute.ms": 86340,
+          "home.endpoint_compute.ms": 86340,
+          "worker.queue.depth": 86340,
+          "worker.task.duration": 86340,
+          "worker.queue.wait": 86340,
+          "worker.resource.deferred": 86340,
+          "worker.resource.defer_seconds": 86340,
+          "worker.resource.load_ratio": 86340,
+          "worker.resource.iowait_percent": 57560,
+          "worker.resource.swap_used_percent": 57560
+        }
+      }
+    },
+    {
+      "name": "dashboard_cached_1440m",
+      "operations": 100,
+      "warmups": 10,
+      "concurrency": 10,
+      "wall_seconds": 0.081,
+      "p50_ms": 0.004,
+      "p95_ms": 0.028,
+      "p99_ms": 0.036,
+      "max_ms": 0.041,
+      "response_bytes": {
+        "min": 113128,
+        "max": 113128,
+        "mean": 113128.0
+      },
+      "errors": [],
+      "error_count": 0,
+      "empty_timeseries_occurrences": {},
+      "first_timeseries_lengths": {
+        "api.latency": 25,
+        "api.requests": 25,
+        "api.errors": 25,
+        "api.slow": 25,
+        "stream.requests": 25,
+        "stream.transcode.duration": 25,
+        "stream.transcode.completed": 25,
+        "stream.transcode.failed": 25,
+        "stream.cache.bytes": 25,
+        "stream.cache.bytes_removed": 25,
+        "playback.startup.ms": 25,
+        "playback.stall.ms": 25,
+        "home.compute.ms": 25,
+        "home.endpoint_compute.ms": 25,
+        "worker.queue.depth": 25,
+        "worker.task.duration": 25,
+        "worker.queue.wait": 25,
+        "worker.resource.deferred": 25,
+        "worker.resource.defer_seconds": 25,
+        "worker.resource.load_ratio": 25,
+        "worker.resource.iowait_percent": 25,
+        "worker.resource.swap_used_percent": 25
+      },
+      "first_statuses": {
+        "timeseries_status": {
+          "api.latency": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "api.requests": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "api.errors": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "api.slow": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "stream.requests": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "stream.transcode.duration": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "stream.transcode.completed": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "stream.transcode.failed": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "stream.cache.bytes": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "stream.cache.bytes_removed": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "playback.startup.ms": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "playback.stall.ms": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "home.compute.ms": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "home.endpoint_compute.ms": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "worker.queue.depth": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "worker.task.duration": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "worker.queue.wait": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "worker.resource.deferred": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "worker.resource.defer_seconds": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "worker.resource.load_ratio": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "worker.resource.iowait_percent": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          },
+          "worker.resource.swap_used_percent": {
+            "availability": "available",
+            "reason": null,
+            "source": "postgresql_v2",
+            "observed_at": "2026-10-31T19:13:30+00:00",
+            "age_seconds": 60.0,
+            "window_minutes": 1440
+          }
+        },
+        "route_latency_status": {
+          "availability": "available",
+          "reason": null,
+          "source": "redis_v2",
+          "sample_kind": "bounded_samples",
+          "window_minutes": 60,
+          "observed_count": 47200,
+          "sample_count": 47200,
+          "truncated": true
+        }
+      },
+      "first_graphs": {
+        "json_bytes": 90051,
+        "total_points": 550,
+        "observations_by_family": {
+          "api.latency": 86340,
+          "api.requests": 86340,
+          "api.errors": 86340,
+          "api.slow": 86340,
+          "stream.requests": 86340,
+          "stream.transcode.duration": 86340,
+          "stream.transcode.completed": 86340,
+          "stream.transcode.failed": 86340,
+          "stream.cache.bytes": 86340,
+          "stream.cache.bytes_removed": 86340,
+          "playback.startup.ms": 86340,
+          "playback.stall.ms": 86340,
+          "home.compute.ms": 86340,
+          "home.endpoint_compute.ms": 86340,
+          "worker.queue.depth": 86340,
+          "worker.task.duration": 86340,
+          "worker.queue.wait": 86340,
+          "worker.resource.deferred": 86340,
+          "worker.resource.defer_seconds": 86340,
+          "worker.resource.load_ratio": 86340,
+          "worker.resource.iowait_percent": 57560,
+          "worker.resource.swap_used_percent": 57560
+        }
+      }
+    }
+  ],
+  "explain": {
+    "15m": [
+      {
+        "Plan": {
+          "Node Type": "Subquery Scan",
+          "Parallel Aware": false,
+          "Async Capable": false,
+          "Alias": "ranked",
+          "Startup Cost": 9.04,
+          "Total Cost": 10.3,
+          "Plan Rows": 42,
+          "Plan Width": 78,
+          "Actual Startup Time": 0.347,
+          "Actual Total Time": 0.353,
+          "Actual Rows": 15,
+          "Actual Loops": 1,
+          "Shared Hit Blocks": 12,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0,
+          "Plans": [
+            {
+              "Node Type": "WindowAgg",
+              "Parent Relationship": "Subquery",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Startup Cost": 9.04,
+              "Total Cost": 9.88,
+              "Plan Rows": 42,
+              "Plan Width": 86,
+              "Actual Startup Time": 0.346,
+              "Actual Total Time": 0.351,
+              "Actual Rows": 15,
+              "Actual Loops": 1,
+              "Run Condition": "(row_number() OVER (?) <= 12000)",
+              "Shared Hit Blocks": 12,
+              "Shared Read Blocks": 0,
+              "Shared Dirtied Blocks": 0,
+              "Shared Written Blocks": 0,
+              "Local Hit Blocks": 0,
+              "Local Read Blocks": 0,
+              "Local Dirtied Blocks": 0,
+              "Local Written Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0,
+              "Plans": [
+                {
+                  "Node Type": "Sort",
+                  "Parent Relationship": "Outer",
+                  "Parallel Aware": false,
+                  "Async Capable": false,
+                  "Startup Cost": 9.04,
+                  "Total Cost": 9.15,
+                  "Plan Rows": 42,
+                  "Plan Width": 78,
+                  "Actual Startup Time": 0.328,
+                  "Actual Total Time": 0.329,
+                  "Actual Rows": 15,
+                  "Actual Loops": 1,
+                  "Sort Key": [
+                    "metric_minute_snapshots.name",
+                    "(date_trunc('minute'::text, metric_minute_snapshots.bucket_start, 'UTC'::text)) DESC"
+                  ],
+                  "Sort Method": "quicksort",
+                  "Sort Space Used": 26,
+                  "Sort Space Type": "Memory",
+                  "Shared Hit Blocks": 12,
+                  "Shared Read Blocks": 0,
+                  "Shared Dirtied Blocks": 0,
+                  "Shared Written Blocks": 0,
+                  "Local Hit Blocks": 0,
+                  "Local Read Blocks": 0,
+                  "Local Dirtied Blocks": 0,
+                  "Local Written Blocks": 0,
+                  "Temp Read Blocks": 0,
+                  "Temp Written Blocks": 0,
+                  "Plans": [
+                    {
+                      "Node Type": "Aggregate",
+                      "Strategy": "Hashed",
+                      "Partial Mode": "Simple",
+                      "Parent Relationship": "Outer",
+                      "Parallel Aware": false,
+                      "Async Capable": false,
+                      "Startup Cost": 6.44,
+                      "Total Cost": 7.49,
+                      "Plan Rows": 42,
+                      "Plan Width": 78,
+                      "Actual Startup Time": 0.26,
+                      "Actual Total Time": 0.266,
+                      "Actual Rows": 15,
+                      "Actual Loops": 1,
+                      "Group Key": [
+                        "metric_minute_snapshots.name",
+                        "date_trunc('minute'::text, metric_minute_snapshots.bucket_start, 'UTC'::text)"
+                      ],
+                      "Planned Partitions": 0,
+                      "HashAgg Batches": 1,
+                      "Peak Memory Usage": 24,
+                      "Disk Usage": 0,
+                      "Shared Hit Blocks": 6,
+                      "Shared Read Blocks": 0,
+                      "Shared Dirtied Blocks": 0,
+                      "Shared Written Blocks": 0,
+                      "Local Hit Blocks": 0,
+                      "Local Read Blocks": 0,
+                      "Local Dirtied Blocks": 0,
+                      "Local Written Blocks": 0,
+                      "Temp Read Blocks": 0,
+                      "Temp Written Blocks": 0,
+                      "Plans": [
+                        {
+                          "Node Type": "Index Only Scan",
+                          "Parent Relationship": "Outer",
+                          "Parallel Aware": false,
+                          "Async Capable": false,
+                          "Scan Direction": "Forward",
+                          "Index Name": "idx_metric_minutes_name_bucket",
+                          "Relation Name": "metric_minute_snapshots",
+                          "Alias": "metric_minute_snapshots",
+                          "Startup Cost": 0.55,
+                          "Total Cost": 5.6,
+                          "Plan Rows": 42,
+                          "Plan Width": 70,
+                          "Actual Startup Time": 0.188,
+                          "Actual Total Time": 0.221,
+                          "Actual Rows": 45,
+                          "Actual Loops": 1,
+                          "Index Cond": "((name = ANY ('{api.request.latency}'::text[])) AND (bucket_start >= '2026-10-31 18:59:00+00'::timestamp with time zone) AND (bucket_start <= '2026-10-31 19:14:00+00'::timestamp with time zone))",
+                          "Rows Removed by Index Recheck": 0,
+                          "Heap Fetches": 0,
+                          "Shared Hit Blocks": 6,
+                          "Shared Read Blocks": 0,
+                          "Shared Dirtied Blocks": 0,
+                          "Shared Written Blocks": 0,
+                          "Local Hit Blocks": 0,
+                          "Local Read Blocks": 0,
+                          "Local Dirtied Blocks": 0,
+                          "Local Written Blocks": 0,
+                          "Temp Read Blocks": 0,
+                          "Temp Written Blocks": 0
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "Planning": {
+          "Shared Hit Blocks": 238,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        },
+        "Planning Time": 1.02,
+        "Triggers": [],
+        "Execution Time": 0.487
+      }
+    ],
+    "1h": [
+      {
+        "Plan": {
+          "Node Type": "Subquery Scan",
+          "Parallel Aware": false,
+          "Async Capable": false,
+          "Alias": "ranked",
+          "Startup Cost": 32.2,
+          "Total Cost": 37.24,
+          "Plan Rows": 168,
+          "Plan Width": 78,
+          "Actual Startup Time": 0.2,
+          "Actual Total Time": 0.213,
+          "Actual Rows": 60,
+          "Actual Loops": 1,
+          "Shared Hit Blocks": 14,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0,
+          "Plans": [
+            {
+              "Node Type": "WindowAgg",
+              "Parent Relationship": "Subquery",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Startup Cost": 32.2,
+              "Total Cost": 35.56,
+              "Plan Rows": 168,
+              "Plan Width": 86,
+              "Actual Startup Time": 0.2,
+              "Actual Total Time": 0.21,
+              "Actual Rows": 60,
+              "Actual Loops": 1,
+              "Run Condition": "(row_number() OVER (?) <= 12000)",
+              "Shared Hit Blocks": 14,
+              "Shared Read Blocks": 0,
+              "Shared Dirtied Blocks": 0,
+              "Shared Written Blocks": 0,
+              "Local Hit Blocks": 0,
+              "Local Read Blocks": 0,
+              "Local Dirtied Blocks": 0,
+              "Local Written Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0,
+              "Plans": [
+                {
+                  "Node Type": "Sort",
+                  "Parent Relationship": "Outer",
+                  "Parallel Aware": false,
+                  "Async Capable": false,
+                  "Startup Cost": 32.2,
+                  "Total Cost": 32.62,
+                  "Plan Rows": 168,
+                  "Plan Width": 78,
+                  "Actual Startup Time": 0.193,
+                  "Actual Total Time": 0.195,
+                  "Actual Rows": 60,
+                  "Actual Loops": 1,
+                  "Sort Key": [
+                    "metric_minute_snapshots.name",
+                    "(date_trunc('minute'::text, metric_minute_snapshots.bucket_start, 'UTC'::text)) DESC"
+                  ],
+                  "Sort Method": "quicksort",
+                  "Sort Space Used": 32,
+                  "Sort Space Type": "Memory",
+                  "Shared Hit Blocks": 14,
+                  "Shared Read Blocks": 0,
+                  "Shared Dirtied Blocks": 0,
+                  "Shared Written Blocks": 0,
+                  "Local Hit Blocks": 0,
+                  "Local Read Blocks": 0,
+                  "Local Dirtied Blocks": 0,
+                  "Local Written Blocks": 0,
+                  "Temp Read Blocks": 0,
+                  "Temp Written Blocks": 0,
+                  "Plans": [
+                    {
+                      "Node Type": "Aggregate",
+                      "Strategy": "Hashed",
+                      "Partial Mode": "Simple",
+                      "Parent Relationship": "Outer",
+                      "Parallel Aware": false,
+                      "Async Capable": false,
+                      "Startup Cost": 20.11,
+                      "Total Cost": 24.31,
+                      "Plan Rows": 168,
+                      "Plan Width": 78,
+                      "Actual Startup Time": 0.15,
+                      "Actual Total Time": 0.159,
+                      "Actual Rows": 60,
+                      "Actual Loops": 1,
+                      "Group Key": [
+                        "metric_minute_snapshots.name",
+                        "date_trunc('minute'::text, metric_minute_snapshots.bucket_start, 'UTC'::text)"
+                      ],
+                      "Planned Partitions": 0,
+                      "HashAgg Batches": 1,
+                      "Peak Memory Usage": 64,
+                      "Disk Usage": 0,
+                      "Shared Hit Blocks": 8,
+                      "Shared Read Blocks": 0,
+                      "Shared Dirtied Blocks": 0,
+                      "Shared Written Blocks": 0,
+                      "Local Hit Blocks": 0,
+                      "Local Read Blocks": 0,
+                      "Local Dirtied Blocks": 0,
+                      "Local Written Blocks": 0,
+                      "Temp Read Blocks": 0,
+                      "Temp Written Blocks": 0,
+                      "Plans": [
+                        {
+                          "Node Type": "Index Only Scan",
+                          "Parent Relationship": "Outer",
+                          "Parallel Aware": false,
+                          "Async Capable": false,
+                          "Scan Direction": "Forward",
+                          "Index Name": "idx_metric_minutes_name_bucket",
+                          "Relation Name": "metric_minute_snapshots",
+                          "Alias": "metric_minute_snapshots",
+                          "Startup Cost": 0.55,
+                          "Total Cost": 16.75,
+                          "Plan Rows": 168,
+                          "Plan Width": 70,
+                          "Actual Startup Time": 0.076,
+                          "Actual Total Time": 0.118,
+                          "Actual Rows": 180,
+                          "Actual Loops": 1,
+                          "Index Cond": "((name = ANY ('{api.request.latency}'::text[])) AND (bucket_start >= '2026-10-31 18:14:00+00'::timestamp with time zone) AND (bucket_start <= '2026-10-31 19:14:00+00'::timestamp with time zone))",
+                          "Rows Removed by Index Recheck": 0,
+                          "Heap Fetches": 0,
+                          "Shared Hit Blocks": 8,
+                          "Shared Read Blocks": 0,
+                          "Shared Dirtied Blocks": 0,
+                          "Shared Written Blocks": 0,
+                          "Local Hit Blocks": 0,
+                          "Local Read Blocks": 0,
+                          "Local Dirtied Blocks": 0,
+                          "Local Written Blocks": 0,
+                          "Temp Read Blocks": 0,
+                          "Temp Written Blocks": 0
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "Planning": {
+          "Shared Hit Blocks": 238,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        },
+        "Planning Time": 0.594,
+        "Triggers": [],
+        "Execution Time": 0.323
+      }
+    ],
+    "24h": [
+      {
+        "Plan": {
+          "Node Type": "Subquery Scan",
+          "Parallel Aware": false,
+          "Async Capable": false,
+          "Alias": "ranked",
+          "Startup Cost": 851.04,
+          "Total Cost": 982.38,
+          "Plan Rows": 4378,
+          "Plan Width": 78,
+          "Actual Startup Time": 1.414,
+          "Actual Total Time": 1.419,
+          "Actual Rows": 25,
+          "Actual Loops": 1,
+          "Shared Hit Blocks": 66,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0,
+          "Plans": [
+            {
+              "Node Type": "WindowAgg",
+              "Parent Relationship": "Subquery",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Startup Cost": 851.04,
+              "Total Cost": 938.6,
+              "Plan Rows": 4378,
+              "Plan Width": 86,
+              "Actual Startup Time": 1.413,
+              "Actual Total Time": 1.418,
+              "Actual Rows": 25,
+              "Actual Loops": 1,
+              "Run Condition": "(row_number() OVER (?) <= 12000)",
+              "Shared Hit Blocks": 66,
+              "Shared Read Blocks": 0,
+              "Shared Dirtied Blocks": 0,
+              "Shared Written Blocks": 0,
+              "Local Hit Blocks": 0,
+              "Local Read Blocks": 0,
+              "Local Dirtied Blocks": 0,
+              "Local Written Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0,
+              "Plans": [
+                {
+                  "Node Type": "Sort",
+                  "Parent Relationship": "Outer",
+                  "Parallel Aware": false,
+                  "Async Capable": false,
+                  "Startup Cost": 851.04,
+                  "Total Cost": 861.99,
+                  "Plan Rows": 4378,
+                  "Plan Width": 78,
+                  "Actual Startup Time": 1.41,
+                  "Actual Total Time": 1.411,
+                  "Actual Rows": 25,
+                  "Actual Loops": 1,
+                  "Sort Key": [
+                    "metric_minute_snapshots.name",
+                    "(date_trunc('hour'::text, metric_minute_snapshots.bucket_start, 'UTC'::text)) DESC"
+                  ],
+                  "Sort Method": "quicksort",
+                  "Sort Space Used": 28,
+                  "Sort Space Type": "Memory",
+                  "Shared Hit Blocks": 66,
+                  "Shared Read Blocks": 0,
+                  "Shared Dirtied Blocks": 0,
+                  "Shared Written Blocks": 0,
+                  "Local Hit Blocks": 0,
+                  "Local Read Blocks": 0,
+                  "Local Dirtied Blocks": 0,
+                  "Local Written Blocks": 0,
+                  "Temp Read Blocks": 0,
+                  "Temp Written Blocks": 0,
+                  "Plans": [
+                    {
+                      "Node Type": "Aggregate",
+                      "Strategy": "Hashed",
+                      "Partial Mode": "Simple",
+                      "Parent Relationship": "Outer",
+                      "Parallel Aware": false,
+                      "Async Capable": false,
+                      "Startup Cost": 433.03,
+                      "Total Cost": 542.48,
+                      "Plan Rows": 4378,
+                      "Plan Width": 78,
+                      "Actual Startup Time": 1.372,
+                      "Actual Total Time": 1.394,
+                      "Actual Rows": 25,
+                      "Actual Loops": 1,
+                      "Group Key": [
+                        "metric_minute_snapshots.name",
+                        "date_trunc('hour'::text, metric_minute_snapshots.bucket_start, 'UTC'::text)"
+                      ],
+                      "Planned Partitions": 0,
+                      "HashAgg Batches": 1,
+                      "Peak Memory Usage": 217,
+                      "Disk Usage": 0,
+                      "Shared Hit Blocks": 60,
+                      "Shared Read Blocks": 0,
+                      "Shared Dirtied Blocks": 0,
+                      "Shared Written Blocks": 0,
+                      "Local Hit Blocks": 0,
+                      "Local Read Blocks": 0,
+                      "Local Dirtied Blocks": 0,
+                      "Local Written Blocks": 0,
+                      "Temp Read Blocks": 0,
+                      "Temp Written Blocks": 0,
+                      "Plans": [
+                        {
+                          "Node Type": "Index Only Scan",
+                          "Parent Relationship": "Outer",
+                          "Parallel Aware": false,
+                          "Async Capable": false,
+                          "Scan Direction": "Forward",
+                          "Index Name": "idx_metric_minutes_name_bucket",
+                          "Relation Name": "metric_minute_snapshots",
+                          "Alias": "metric_minute_snapshots",
+                          "Startup Cost": 0.55,
+                          "Total Cost": 343.93,
+                          "Plan Rows": 4455,
+                          "Plan Width": 70,
+                          "Actual Startup Time": 0.07,
+                          "Actual Total Time": 0.979,
+                          "Actual Rows": 4320,
+                          "Actual Loops": 1,
+                          "Index Cond": "((name = ANY ('{api.request.latency}'::text[])) AND (bucket_start >= '2026-10-30 19:14:00+00'::timestamp with time zone) AND (bucket_start <= '2026-10-31 19:14:00+00'::timestamp with time zone))",
+                          "Rows Removed by Index Recheck": 0,
+                          "Heap Fetches": 0,
+                          "Shared Hit Blocks": 60,
+                          "Shared Read Blocks": 0,
+                          "Shared Dirtied Blocks": 0,
+                          "Shared Written Blocks": 0,
+                          "Local Hit Blocks": 0,
+                          "Local Read Blocks": 0,
+                          "Local Dirtied Blocks": 0,
+                          "Local Written Blocks": 0,
+                          "Temp Read Blocks": 0,
+                          "Temp Written Blocks": 0
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "Planning": {
+          "Shared Hit Blocks": 233,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        },
+        "Planning Time": 0.252,
+        "Triggers": [],
+        "Execution Time": 1.464
+      }
+    ],
+    "7d": [
+      {
+        "Plan": {
+          "Node Type": "Subquery Scan",
+          "Parallel Aware": false,
+          "Async Capable": false,
+          "Alias": "ranked",
+          "Startup Cost": 6061.38,
+          "Total Cost": 6896.01,
+          "Plan Rows": 27821,
+          "Plan Width": 78,
+          "Actual Startup Time": 9.46,
+          "Actual Total Time": 9.493,
+          "Actual Rows": 169,
+          "Actual Loops": 1,
+          "Shared Hit Blocks": 395,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0,
+          "Plans": [
+            {
+              "Node Type": "WindowAgg",
+              "Parent Relationship": "Subquery",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Startup Cost": 6061.38,
+              "Total Cost": 6617.8,
+              "Plan Rows": 27821,
+              "Plan Width": 86,
+              "Actual Startup Time": 9.459,
+              "Actual Total Time": 9.485,
+              "Actual Rows": 169,
+              "Actual Loops": 1,
+              "Run Condition": "(row_number() OVER (?) <= 12000)",
+              "Shared Hit Blocks": 395,
+              "Shared Read Blocks": 0,
+              "Shared Dirtied Blocks": 0,
+              "Shared Written Blocks": 0,
+              "Local Hit Blocks": 0,
+              "Local Read Blocks": 0,
+              "Local Dirtied Blocks": 0,
+              "Local Written Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0,
+              "Plans": [
+                {
+                  "Node Type": "Sort",
+                  "Parent Relationship": "Outer",
+                  "Parallel Aware": false,
+                  "Async Capable": false,
+                  "Startup Cost": 6061.38,
+                  "Total Cost": 6130.93,
+                  "Plan Rows": 27821,
+                  "Plan Width": 78,
+                  "Actual Startup Time": 9.457,
+                  "Actual Total Time": 9.46,
+                  "Actual Rows": 169,
+                  "Actual Loops": 1,
+                  "Sort Key": [
+                    "metric_minute_snapshots.name",
+                    "(date_trunc('hour'::text, metric_minute_snapshots.bucket_start, 'UTC'::text)) DESC"
+                  ],
+                  "Sort Method": "quicksort",
+                  "Sort Space Used": 46,
+                  "Sort Space Type": "Memory",
+                  "Shared Hit Blocks": 395,
+                  "Shared Read Blocks": 0,
+                  "Shared Dirtied Blocks": 0,
+                  "Shared Written Blocks": 0,
+                  "Local Hit Blocks": 0,
+                  "Local Read Blocks": 0,
+                  "Local Dirtied Blocks": 0,
+                  "Local Written Blocks": 0,
+                  "Temp Read Blocks": 0,
+                  "Temp Written Blocks": 0,
+                  "Plans": [
+                    {
+                      "Node Type": "Aggregate",
+                      "Strategy": "Hashed",
+                      "Partial Mode": "Simple",
+                      "Parent Relationship": "Outer",
+                      "Parallel Aware": false,
+                      "Async Capable": false,
+                      "Startup Cost": 3033.91,
+                      "Total Cost": 3729.44,
+                      "Plan Rows": 27821,
+                      "Plan Width": 78,
+                      "Actual Startup Time": 9.29,
+                      "Actual Total Time": 9.383,
+                      "Actual Rows": 169,
+                      "Actual Loops": 1,
+                      "Group Key": [
+                        "metric_minute_snapshots.name",
+                        "date_trunc('hour'::text, metric_minute_snapshots.bucket_start, 'UTC'::text)"
+                      ],
+                      "Planned Partitions": 0,
+                      "HashAgg Batches": 1,
+                      "Peak Memory Usage": 849,
+                      "Disk Usage": 0,
+                      "Shared Hit Blocks": 389,
+                      "Shared Read Blocks": 0,
+                      "Shared Dirtied Blocks": 0,
+                      "Shared Written Blocks": 0,
+                      "Local Hit Blocks": 0,
+                      "Local Read Blocks": 0,
+                      "Local Dirtied Blocks": 0,
+                      "Local Written Blocks": 0,
+                      "Temp Read Blocks": 0,
+                      "Temp Written Blocks": 0,
+                      "Plans": [
+                        {
+                          "Node Type": "Index Only Scan",
+                          "Parent Relationship": "Outer",
+                          "Parallel Aware": false,
+                          "Async Capable": false,
+                          "Scan Direction": "Forward",
+                          "Index Name": "idx_metric_minutes_name_bucket",
+                          "Relation Name": "metric_minute_snapshots",
+                          "Alias": "metric_minute_snapshots",
+                          "Startup Cost": 0.55,
+                          "Total Cost": 2405.75,
+                          "Plan Rows": 31408,
+                          "Plan Width": 70,
+                          "Actual Startup Time": 0.057,
+                          "Actual Total Time": 6.216,
+                          "Actual Rows": 30240,
+                          "Actual Loops": 1,
+                          "Index Cond": "((name = ANY ('{api.request.latency}'::text[])) AND (bucket_start >= '2026-10-24 19:14:00+00'::timestamp with time zone) AND (bucket_start <= '2026-10-31 19:14:00+00'::timestamp with time zone))",
+                          "Rows Removed by Index Recheck": 0,
+                          "Heap Fetches": 0,
+                          "Shared Hit Blocks": 389,
+                          "Shared Read Blocks": 0,
+                          "Shared Dirtied Blocks": 0,
+                          "Shared Written Blocks": 0,
+                          "Local Hit Blocks": 0,
+                          "Local Read Blocks": 0,
+                          "Local Dirtied Blocks": 0,
+                          "Local Written Blocks": 0,
+                          "Temp Read Blocks": 0,
+                          "Temp Written Blocks": 0
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "Planning": {
+          "Shared Hit Blocks": 233,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        },
+        "Planning Time": 0.27,
+        "Triggers": [],
+        "Execution Time": 9.772
+      }
+    ]
+  },
+  "redis_before": {
+    "used_memory": 84901088,
+    "used_memory_peak": 89897688,
+    "total_commands_processed": 21468629,
+    "keys": 68540
+  },
+  "redis_after": {
+    "used_memory": 85068752,
+    "used_memory_peak": 89897688,
+    "total_commands_processed": 23661134,
+    "keys": 68540
+  },
+  "redis_command_delta": 2192505,
+  "pg": {
+    "table_bytes": 424681472,
+    "index_bytes": 531095552,
+    "total_bytes": 955924480,
+    "rows": 1152000
+  },
+  "budgets_local_not_production_slo": {
+    "pg_individual_p95_ms": 250,
+    "dashboard_metrics_cold_p95_ms": 500
+  },
+  "host_load": [8.00732421875, 6.9111328125, 6.337890625],
+  "redis_parser_class": "redis._parsers.hiredis._HiredisParser",
+  "source_fingerprint_before": "4b2698047877a72a33a17c99534e668925bd0c149f9e703bed963792efcc230e",
+  "reference_clock_utc": "2026-10-31T19:14:30+00:00",
+  "clock_controls": [
+    "metrics.time.time",
+    "metrics._minute_bucket",
+    "metric_minutes._now",
+    "admin_metrics.datetime.now"
+  ],
+  "timing_scope": "Python function elapsed; response size serialized outside timer; no ASGI/network; constant system/tasks/playbackDelivery helpers",
+  "source_fingerprint": "4b2698047877a72a33a17c99534e668925bd0c149f9e703bed963792efcc230e"
+}
