@@ -588,6 +588,11 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ("compute_product_kpis",),
     ),
     (
+        "crate.worker_handlers.recommendation_skips",
+        "RECOMMENDATION_SKIP_TASK_HANDLERS",
+        ("compute_recommendation_skips",),
+    ),
+    (
         "crate.worker_handlers.ai_configuration",
         "AI_CONFIGURATION_TASK_HANDLERS",
         ("ai_catalog_refresh", "ai_profile_test"),

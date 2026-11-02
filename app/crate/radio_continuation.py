@@ -7,6 +7,11 @@ from uuid import UUID
 from redis.exceptions import LockError, WatchError
 
 from crate import radio_engine as engine
+from crate.observability.recommendations import (
+    note_radio_generated,
+    note_radio_recovered,
+    observe_radio_batch,
+)
 
 
 class RadioLeaseLost(RuntimeError):
@@ -75,6 +80,12 @@ def _recover_batch(session_id: str, user_id: int, index: int) -> dict:
     )
 
 
+def _profile(session: dict) -> str:
+    return str(
+        session.get("radio_profile") or engine._radio_profile(session.get("seed_type"))
+    )
+
+
 def _commit(session: dict, result: dict, index: int, lease) -> dict:
     result = {
         **result,
@@ -114,6 +125,29 @@ def start_batch(
     count: int = 20,
     buffer_refs: list[str] | None = None,
 ) -> dict:
+    with observe_radio_batch("start", count) as observation:
+        observation["result"] = _start_batch(
+            session_id=session_id,
+            user_id=user_id,
+            mode=mode,
+            seed_type=seed_type,
+            seed_value=seed_value,
+            count=count,
+            buffer_refs=buffer_refs,
+        )
+    return observation["result"]
+
+
+def _start_batch(
+    *,
+    session_id: str,
+    user_id: int,
+    mode: str,
+    seed_type: str | None,
+    seed_value: str | None,
+    count: int,
+    buffer_refs: list[str] | None,
+) -> dict:
     if user_id is None:
         return _empty(session_id, "auth_required")
     session_id = str(UUID(session_id))
@@ -135,6 +169,9 @@ def start_batch(
                 )
             if engine._redis().get(f"{engine._session_key(session_id)}:started"):
                 return _empty(session_id)
+            note_radio_generated(
+                engine._radio_profile(seed_type if mode == "seeded" else None)
+            )
             created = engine._create_radio(
                 user_id,
                 mode,
@@ -147,8 +184,10 @@ def start_batch(
             if not created:
                 return _empty(session_id)
             session, result = created
+            note_radio_generated(_profile(session))
             return _commit(session, result, 0, lease)
     except RadioLeaseLost:
+        note_radio_recovered()
         return _recover_batch(session_id, user_id, 0)
 
 
@@ -159,6 +198,25 @@ def next_batch(
     batch_index: int,
     count: int = 20,
     buffer_refs: list[str] | None = None,
+) -> dict:
+    with observe_radio_batch("next", count) as observation:
+        observation["result"] = _next_batch(
+            session_id,
+            user_id=user_id,
+            batch_index=batch_index,
+            count=count,
+            buffer_refs=buffer_refs,
+        )
+    return observation["result"]
+
+
+def _next_batch(
+    session_id: str,
+    *,
+    user_id: int,
+    batch_index: int,
+    count: int,
+    buffer_refs: list[str] | None,
 ) -> dict:
     if user_id is None:
         return _empty(session_id, "auth_required")
@@ -176,9 +234,11 @@ def next_batch(
             expected = int(session.get("batch_index", 0)) + 1
             if batch_index != expected:
                 return _empty(session_id, "retryable_empty", batch_index=expected - 1)
+            note_radio_generated(_profile(session))
             engine._apply_buffer_context(session, buffer_refs)
             return _commit(
                 session, engine._advance_radio(session, count), batch_index, lease
             )
     except RadioLeaseLost:
+        note_radio_recovered()
         return _recover_batch(session_id, user_id, batch_index)
