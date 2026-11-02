@@ -167,6 +167,7 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     "compute_analytics": TaskTypeInfo("Library Analytics", "analysis"),
     "compute_product_kpis": TaskTypeInfo("Product KPIs", "analysis"),
     "compute_observability_summary": TaskTypeInfo("Observability Summary", "analysis"),
+    "compute_recommendation_skips": TaskTypeInfo("Recommendation skips", "analysis"),
     "refresh_user_listening_stats": TaskTypeInfo("Listening Stats Refresh", "analysis"),
     "refresh_dirty_listening_stats": TaskTypeInfo(
         "Pending Listening Stats Sweep", "analysis"

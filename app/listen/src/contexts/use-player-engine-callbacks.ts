@@ -18,6 +18,20 @@ import {
 } from "@/lib/gapless-player";
 import { isOnline as isRuntimeOnline } from "@/lib/capacitor";
 import { isCastSessionActive } from "@/lib/cast-sender";
+import type { PlaybackQoeFailureCause } from "@/lib/playback-qoe";
+
+function playbackFailureCause(error: unknown): PlaybackQoeFailureCause {
+  const text = String(
+    error instanceof Error ? `${error.name} ${error.message}` : error,
+  ).toUpperCase();
+  if (text.includes("DECODE")) return "decode";
+  if (text.includes("NOT_SUPPORTED") || text.includes("NOTSUPPORTED")) {
+    return "unavailable";
+  }
+  if (text.includes("NETWORK")) return "network";
+  if (text.includes("TIMEOUT")) return "timeout";
+  return "other";
+}
 
 interface UsePlayerEngineCallbacksParams {
   continueInfinitePlayback?: () => boolean;
@@ -62,6 +76,11 @@ interface UsePlayerEngineCallbacksParams {
   recordProgress: (seconds: number) => void;
   recordPlaybackQualityProgress: (seconds: number) => void;
   recordPlaybackStarted: (durationMs: number) => void;
+  recordPlaybackIntent: () => void;
+  recordPlaybackResult: (
+    outcome: "started" | "failed" | "cancelled",
+    cause?: PlaybackQoeFailureCause,
+  ) => void;
   onActivePlaybackStarted: () => void;
   pullFromEngine: (sourceQueue?: Track[]) => {
     resolvedTrack: Track | undefined;
@@ -113,6 +132,8 @@ export function usePlayerEngineCallbacks({
   recordProgress,
   recordPlaybackQualityProgress,
   recordPlaybackStarted,
+  recordPlaybackIntent,
+  recordPlaybackResult,
   onActivePlaybackStarted,
   pullFromEngine,
   setAnalyserVersion,
@@ -172,7 +193,10 @@ export function usePlayerEngineCallbacks({
     },
     onPlayRequest: () => {
       if (isCastSessionActive()) return;
-      playbackRequestStartedAtRef.current ??= Date.now();
+      if (playbackRequestStartedAtRef.current === null) {
+        playbackRequestStartedAtRef.current = Date.now();
+        recordPlaybackIntent();
+      }
       bufferingIntentRef.current = true;
       if (!isPlayingRef.current) {
         commitIsPlaying(true);
@@ -184,6 +208,7 @@ export function usePlayerEngineCallbacks({
         recordPlaybackStarted(
           Math.max(0, Date.now() - playbackRequestStartedAtRef.current),
         );
+        recordPlaybackResult("started");
         playbackRequestStartedAtRef.current = null;
       }
       resumeAfterReloadRef.current = false;
@@ -300,8 +325,13 @@ export function usePlayerEngineCallbacks({
         );
         return;
       }
+      const requested = playbackRequestStartedAtRef.current !== null;
       if (isPlaybackGestureRequiredError(err)) {
         console.warn("[gapless] playback requires a user gesture:", err);
+        if (requested) {
+          playbackRequestStartedAtRef.current = null;
+          recordPlaybackResult("cancelled");
+        }
         cancelRestoreAutoplay();
         requireUserGestureToResume();
         return;
@@ -316,7 +346,14 @@ export function usePlayerEngineCallbacks({
       }
       console.error("[gapless] error:", err);
       cancelRestoreAutoplay();
+      if (requested) playbackRequestStartedAtRef.current = null;
       void isRuntimeOnline().then((online) => {
+        if (requested) {
+          recordPlaybackResult(
+            "failed",
+            online ? playbackFailureCause(err) : "network",
+          );
+        }
         beginSoftInterruption(online ? "stream" : "offline");
       });
     },

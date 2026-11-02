@@ -1,11 +1,11 @@
 {
   "tracks": "48,213",
   "albums": "4,400",
-  "pytest": 7475,
-  "vitest": 6769,
+  "pytest": 7506,
+  "vitest": 6799,
   "goTests": 382,
   "rustTests": 291,
-  "taskTypes": 143,
+  "taskTypes": 144,
   "migrations": 142,
   "taskQueues": {
     "maintenance": [
@@ -31,6 +31,7 @@
       "compute_analytics",
       "compute_product_kpis",
       "compute_observability_summary",
+      "compute_recommendation_skips",
       "check_new_releases",
       "promote_due_releases",
       "scan",

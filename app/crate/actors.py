@@ -156,6 +156,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "compute_analytics": TaskPoolConfig("maintenance", 2, 600, 0),
     "compute_product_kpis": TaskPoolConfig("maintenance", 2, 900, 0),
     "compute_observability_summary": TaskPoolConfig("maintenance", 2, 120, 0),
+    "compute_recommendation_skips": TaskPoolConfig("maintenance", 2, 300, 0),
     "check_new_releases": TaskPoolConfig("maintenance", 2, 7200, 1),
     "promote_due_releases": TaskPoolConfig("maintenance", 2, 900, 0),
     "scan": TaskPoolConfig("maintenance", 2, 1800, 0),

@@ -1,18 +1,42 @@
-import { apiFetch, getApiBase } from "@/lib/api";
+import { AUTH_RUNTIME_RESET_EVENT } from "@/contexts/auth-runtime";
+import {
+  AUTH_SESSION_REJECTED_EVENT,
+  apiUrl,
+  ensureFreshAuthToken,
+  getApiAuthHeaders,
+  getApiBase,
+} from "@/lib/api";
 import {
   isAndroidBrowser,
   isAndroidNative,
   isIosBrowser,
   isIosNative,
 } from "@/lib/capacitor-runtime";
-import { isTauriRuntime } from "@/lib/platform";
+import { isTauriRuntime, usesConfigurableServer } from "@/lib/platform";
 import type { ConcretePlaybackDeliveryPolicy } from "@/lib/playback-network-quality";
+import {
+  createPlaybackQoeStore,
+  type PlaybackQoeSendResult,
+} from "@/lib/playback-qoe-store";
+import { getCurrentServerId } from "@/lib/server-store";
 
 export type PlaybackQoeEventName =
   | "startup"
   | "stall_start"
   | "stall_end"
-  | "recovery";
+  | "recovery"
+  | "intent"
+  | "result"
+  | "active"
+  | "continuation";
+export type PlaybackQoeOutcome = "started" | "failed" | "cancelled";
+export type PlaybackQoeFailureCause =
+  | "network"
+  | "decode"
+  | "auth"
+  | "unavailable"
+  | "timeout"
+  | "other";
 export type PlaybackQoeOrigin = "local" | "remote" | "imported";
 export type PlaybackQoeRuntime =
   | "desktop_web"
@@ -21,39 +45,49 @@ export type PlaybackQoeRuntime =
   | "ios_native"
   | "tauri";
 export type PlaybackQoeEngine = "gapless" | "media3";
+export type PlaybackContinuationOutcome =
+  | "recovered"
+  | "unavailable"
+  | "exhausted"
+  | "cancelled"
+  | "native"
+  | "auth";
+export type PlaybackContinuationSurface = "radio" | "infinite";
 
 export interface PlaybackQoeInput {
   event: PlaybackQoeEventName;
-  origin: PlaybackQoeOrigin;
-  requestedPolicy: ConcretePlaybackDeliveryPolicy;
-  effectivePolicy: ConcretePlaybackDeliveryPolicy;
+  origin?: PlaybackQoeOrigin;
+  requestedPolicy?: ConcretePlaybackDeliveryPolicy;
+  effectivePolicy?: ConcretePlaybackDeliveryPolicy;
   durationMs?: number;
   bufferedAheadSeconds?: number;
   attempt?: number;
   runtime?: PlaybackQoeRuntime;
   engine?: PlaybackQoeEngine;
+  outcome?: PlaybackQoeOutcome;
+  cause?: PlaybackQoeFailureCause;
+  continuation?: PlaybackContinuationOutcome;
+  surface?: PlaybackContinuationSurface;
 }
 
 export interface PlaybackQoeEvent {
   event: PlaybackQoeEventName;
-  origin: PlaybackQoeOrigin;
-  requested_policy: ConcretePlaybackDeliveryPolicy;
-  effective_policy: ConcretePlaybackDeliveryPolicy;
+  origin?: PlaybackQoeOrigin;
+  requested_policy?: ConcretePlaybackDeliveryPolicy;
+  effective_policy?: ConcretePlaybackDeliveryPolicy;
   duration_ms?: number;
   buffered_ahead_seconds?: number;
   attempt?: number;
   runtime?: PlaybackQoeRuntime;
   engine?: PlaybackQoeEngine;
+  outcome?: PlaybackQoeOutcome;
+  cause?: PlaybackQoeFailureCause;
+  continuation?: PlaybackContinuationOutcome;
+  surface?: PlaybackContinuationSurface;
 }
 
-const MAX_EVENTS_PER_SESSION = 24;
-const MAX_BATCH_SIZE = 12;
-const FLUSH_DELAY_MS = 1_000;
-const REQUEST_TIMEOUT_MS = 2_000;
-
-let events: PlaybackQoeEvent[] = [];
-let flushTimer: number | null = null;
-let recordedEventCount = 0;
+const QOE_PATH = "/api/playback/qoe";
+const REQUEST_TIMEOUT_MS = 5_000;
 
 function boundedNumber(
   value: unknown,
@@ -69,9 +103,50 @@ function boundedNumber(
 }
 
 function isEventName(value: unknown): value is PlaybackQoeEventName {
-  return ["startup", "stall_start", "stall_end", "recovery"].includes(
-    String(value),
-  );
+  return [
+    "startup",
+    "stall_start",
+    "stall_end",
+    "recovery",
+    "intent",
+    "result",
+    "active",
+    "continuation",
+  ].includes(String(value));
+}
+
+function isOutcome(value: unknown): value is PlaybackQoeOutcome {
+  return ["started", "failed", "cancelled"].includes(String(value));
+}
+
+function isFailureCause(value: unknown): value is PlaybackQoeFailureCause {
+  return [
+    "network",
+    "decode",
+    "auth",
+    "unavailable",
+    "timeout",
+    "other",
+  ].includes(String(value));
+}
+
+function isContinuationOutcome(
+  value: unknown,
+): value is PlaybackContinuationOutcome {
+  return [
+    "recovered",
+    "unavailable",
+    "exhausted",
+    "cancelled",
+    "native",
+    "auth",
+  ].includes(String(value));
+}
+
+function isContinuationSurface(
+  value: unknown,
+): value is PlaybackContinuationSurface {
+  return ["radio", "infinite"].includes(String(value));
 }
 
 function isOrigin(value: unknown): value is PlaybackQoeOrigin {
@@ -110,6 +185,7 @@ export function getPlaybackQoeRuntime(): PlaybackQoeRuntime {
 export function shapePlaybackQoeEvent(
   input: PlaybackQoeInput | Record<string, unknown>,
 ): PlaybackQoeEvent | null {
+  if (input.event === "continuation") return shapeContinuationEvent(input);
   if (
     !isEventName(input.event) ||
     !isOrigin(input.origin) ||
@@ -139,78 +215,139 @@ export function shapePlaybackQoeEvent(
   if (attempt !== undefined) event.attempt = attempt;
   if (isRuntime(input.runtime)) event.runtime = input.runtime;
   if (isEngine(input.engine)) event.engine = input.engine;
+  if (event.event === "result") {
+    if (!isOutcome(input.outcome)) return null;
+    event.outcome = input.outcome;
+    if (input.outcome === "failed" && isFailureCause(input.cause)) {
+      event.cause = input.cause;
+    }
+  }
+  if (event.event === "active" && event.duration_ms === undefined) return null;
   return event;
 }
 
-function clearFlushTimer(): void {
-  if (flushTimer === null) return;
-  window.clearTimeout(flushTimer);
-  flushTimer = null;
-}
-
-function sendBatch(batch: PlaybackQoeEvent[]): void {
-  const body = JSON.stringify({ events: batch });
+function shapeContinuationEvent(
+  input: PlaybackQoeInput | Record<string, unknown>,
+): PlaybackQoeEvent | null {
   if (
-    typeof navigator !== "undefined" &&
-    typeof navigator.sendBeacon === "function" &&
-    getApiBase() === ""
+    !isContinuationOutcome(input.continuation) ||
+    !isContinuationSurface(input.surface)
   ) {
-    const payload = new Blob([body], { type: "application/json" });
-    if (navigator.sendBeacon("/api/playback/qoe", payload)) return;
+    return null;
   }
-
-  const controller = new AbortController();
-  const timeout = window.setTimeout(
-    () => controller.abort(),
-    REQUEST_TIMEOUT_MS,
-  );
-  void apiFetch("/api/playback/qoe", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body,
-    keepalive: true,
-    signal: controller.signal,
-  })
-    .catch(() => {})
-    .finally(() => window.clearTimeout(timeout));
+  const event: PlaybackQoeEvent = {
+    event: "continuation",
+    continuation: input.continuation,
+    surface: input.surface,
+  };
+  const durationMs = boundedNumber(input.durationMs, 0, 600_000, true);
+  if (durationMs !== undefined) event.duration_ms = durationMs;
+  if (isRuntime(input.runtime)) event.runtime = input.runtime;
+  return event;
 }
 
-/** Queue an intentionally tiny, non-blocking telemetry event. */
+function createId(): string {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 12)}`;
+}
+
+function retryAfterSeconds(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds, 3_600);
+  const at = Date.parse(value);
+  if (!Number.isFinite(at)) return undefined;
+  return Math.min(Math.max(0, (at - Date.now()) / 1_000), 3_600);
+}
+
+async function sendBatch(body: string): Promise<PlaybackQoeSendResult> {
+  if (usesConfigurableServer) {
+    await ensureFreshAuthToken().catch(() => false);
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(apiUrl(QOE_PATH), {
+      method: "POST",
+      headers: { ...getApiAuthHeaders(), "Content-Type": "application/json" },
+      body,
+      credentials: usesConfigurableServer ? "omit" : "include",
+      keepalive: true,
+      signal: controller.signal,
+    });
+    return {
+      status: response.status,
+      retryAfterSeconds: retryAfterSeconds(response.headers.get("Retry-After")),
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function sendOnUnload(body: string): boolean {
+  if (
+    getApiBase() !== "" ||
+    typeof navigator === "undefined" ||
+    typeof navigator.sendBeacon !== "function"
+  ) {
+    return false;
+  }
+  return navigator.sendBeacon(
+    QOE_PATH,
+    new Blob([body], { type: "application/json" }),
+  );
+}
+
+const store = createPlaybackQoeStore<PlaybackQoeEvent>({
+  now: () => Date.now(),
+  createId,
+  getScope: () => `${getApiBase()}|${getCurrentServerId() ?? "web"}`,
+  send: sendBatch,
+  sendOnUnload,
+  setTimer: (callback, delayMs) => setTimeout(callback, delayMs),
+  clearTimer: (timer) => clearTimeout(timer as ReturnType<typeof setTimeout>),
+});
+
 export function recordPlaybackQoe(
   input: PlaybackQoeInput | Record<string, unknown>,
 ): void {
   const event = shapePlaybackQoeEvent(input);
-  if (!event || recordedEventCount >= MAX_EVENTS_PER_SESSION) return;
-  events.push(event);
-  recordedEventCount += 1;
-  if (events.length >= MAX_BATCH_SIZE) {
-    flushPlaybackQoe();
-    return;
-  }
-  if (flushTimer === null && typeof window !== "undefined") {
-    flushTimer = window.setTimeout(flushPlaybackQoe, FLUSH_DELAY_MS);
-  }
+  if (event) store.record(event);
 }
 
 export function flushPlaybackQoe(): void {
-  if (events.length === 0) return;
-  clearFlushTimer();
-  const pending = events;
-  events = [];
-  for (let index = 0; index < pending.length; index += MAX_BATCH_SIZE) {
-    sendBatch(pending.slice(index, index + MAX_BATCH_SIZE));
-  }
+  void store.flush();
+}
+
+export function clearPlaybackQoe(): void {
+  store.clear();
+}
+
+export function getPlaybackQoeDeliverySnapshot() {
+  return store.snapshot();
 }
 
 export function installPlaybackQoeFlush(): () => void {
   if (typeof window === "undefined") return () => {};
-  const flush = () => flushPlaybackQoe();
+  const flush = () => store.flushOnUnload();
+  const clear = () => store.clear();
   window.addEventListener("pagehide", flush);
-  return () => window.removeEventListener("pagehide", flush);
+  window.addEventListener(AUTH_RUNTIME_RESET_EVENT, clear);
+  window.addEventListener(AUTH_SESSION_REJECTED_EVENT, clear);
+  return () => {
+    window.removeEventListener("pagehide", flush);
+    window.removeEventListener(AUTH_RUNTIME_RESET_EVENT, clear);
+    window.removeEventListener(AUTH_SESSION_REJECTED_EVENT, clear);
+  };
 }
 
 export function __resetPlaybackQoeForTests(): void {
-  events = [];
-  recordedEventCount = 0;
-  clearFlushTimer();
+  store.clear();
 }

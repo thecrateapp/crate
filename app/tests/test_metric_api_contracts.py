@@ -234,7 +234,7 @@ def test_dashboard_cache_preserves_sample_time_and_attaches_current_process_coll
     )
     cache_keys = list(redis.scan_iter(match="cache:admin:metrics:dashboard:*"))
     assert len(cache_keys) == 1
-    assert ":v2:" in cache_keys[0]
+    assert ":v3:" in cache_keys[0]
     cached = json.loads(redis.get(cache_keys[0]))
     assert "collector_local" not in json.dumps(cached)
     sample_time = "2026-10-31T08:00:00+00:00"

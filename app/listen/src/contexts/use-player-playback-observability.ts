@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import type { Track } from "@/contexts/player-types";
 import { usePlayEventTracker } from "@/contexts/use-play-event-tracker";
@@ -16,7 +16,13 @@ import {
   installPlaybackQoeFlush,
   recordPlaybackQoe,
   type PlaybackQoeEventName,
+  type PlaybackQoeFailureCause,
+  type PlaybackQoeOutcome,
 } from "@/lib/playback-qoe";
+
+const ACTIVE_REPORT_MS = 60_000;
+const ACTIVE_MIN_REMAINDER_MS = 1_000;
+const MAX_PROGRESS_STEP_SECONDS = 5;
 
 interface Ref<T> {
   current: T;
@@ -54,10 +60,6 @@ export function usePlayerPlaybackObservability({
     recordProgress,
   } = usePlayEventTracker(getPlaybackSnapshot);
 
-  const recordPlaybackQualityProgress = useCallback((seconds: number) => {
-    recordStablePlayback(seconds);
-  }, []);
-
   const recordCurrentPlaybackQoe = useCallback(
     (
       event: PlaybackQoeEventName,
@@ -65,6 +67,8 @@ export function usePlayerPlaybackObservability({
         durationMs?: number;
         bufferedAheadSeconds?: number;
         attempt?: number;
+        outcome?: PlaybackQoeOutcome;
+        cause?: PlaybackQoeFailureCause;
       } = {},
     ) => {
       const track = currentTrackRef.current;
@@ -86,13 +90,60 @@ export function usePlayerPlaybackObservability({
     [currentTrackRef, playbackDeliveryPolicy],
   );
 
+  const lastProgressSecondsRef = useRef<number | null>(null);
+  const activeMsRef = useRef(0);
+
+  const reportActivePlayback = useCallback(
+    (minimumMs: number) => {
+      const durationMs = Math.round(activeMsRef.current);
+      if (durationMs < minimumMs) return;
+      activeMsRef.current = 0;
+      recordCurrentPlaybackQoe("active", { durationMs });
+    },
+    [recordCurrentPlaybackQoe],
+  );
+
+  const recordPlaybackQualityProgress = useCallback(
+    (seconds: number) => {
+      recordStablePlayback(seconds);
+      const previous = lastProgressSecondsRef.current;
+      lastProgressSecondsRef.current = seconds;
+      if (previous === null) return;
+      const step = seconds - previous;
+      if (step <= 0 || step > MAX_PROGRESS_STEP_SECONDS) return;
+      activeMsRef.current += step * 1_000;
+      reportActivePlayback(ACTIVE_REPORT_MS);
+    },
+    [reportActivePlayback],
+  );
+
+  const recordPlaybackIntent = useCallback(() => {
+    lastProgressSecondsRef.current = null;
+    recordCurrentPlaybackQoe("intent");
+  }, [recordCurrentPlaybackQoe]);
+
+  const recordPlaybackResult = useCallback(
+    (outcome: PlaybackQoeOutcome, cause?: PlaybackQoeFailureCause) => {
+      recordCurrentPlaybackQoe("result", { outcome, cause });
+    },
+    [recordCurrentPlaybackQoe],
+  );
+
   useEffect(() => {
     return subscribeToPlaybackDeliveryNetworkChanges(() => {
       setPlaybackDeliveryPolicy(getPlaybackDeliveryPolicyPreference());
     });
   }, [setPlaybackDeliveryPolicy]);
 
-  useEffect(() => installPlaybackQoeFlush(), []);
+  useEffect(() => {
+    const reportRemainder = () => reportActivePlayback(ACTIVE_MIN_REMAINDER_MS);
+    window.addEventListener("pagehide", reportRemainder);
+    const uninstall = installPlaybackQoeFlush();
+    return () => {
+      window.removeEventListener("pagehide", reportRemainder);
+      uninstall();
+    };
+  }, [reportActivePlayback]);
 
   return {
     startTrackerSession,
@@ -102,6 +153,8 @@ export function usePlayerPlaybackObservability({
     markSeekPosition,
     recordProgress,
     recordPlaybackQualityProgress,
+    recordPlaybackIntent,
+    recordPlaybackResult,
     recordCurrentPlaybackQoe,
   };
 }
