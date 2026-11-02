@@ -1,31 +1,68 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { apiFetchMock } = vi.hoisted(() => ({
-  apiFetchMock: vi.fn(),
+const { apiBase, ensureFreshAuthToken } = vi.hoisted(() => ({
+  apiBase: { value: "" },
+  ensureFreshAuthToken: vi.fn(async () => true),
 }));
 
 vi.mock("@/lib/api", () => ({
-  apiFetch: apiFetchMock,
-  getApiBase: () => "https://listen.example",
+  AUTH_SESSION_REJECTED_EVENT: "crate:auth-session-rejected",
+  apiUrl: (path: string) => `${apiBase.value}${path}`,
+  ensureFreshAuthToken,
+  getApiAuthHeaders: () => ({ "X-Crate-App": "listen" }),
+  getApiBase: () => apiBase.value,
+}));
+
+vi.mock("@/contexts/auth-runtime", () => ({
+  AUTH_RUNTIME_RESET_EVENT: "crate:auth-runtime-reset",
+}));
+
+vi.mock("@/lib/server-store", () => ({
+  getCurrentServerId: () => null,
 }));
 
 import {
   __resetPlaybackQoeForTests,
   flushPlaybackQoe,
+  installPlaybackQoeFlush,
   recordPlaybackQoe,
   shapePlaybackQoeEvent,
 } from "@/lib/playback-qoe";
 
+const base = {
+  origin: "local",
+  requestedPolicy: "balanced",
+  effectivePolicy: "balanced",
+} as const;
+
+function sentBodies(fetchMock: ReturnType<typeof vi.fn>) {
+  return fetchMock.mock.calls.map(
+    ([, init]) => JSON.parse((init as RequestInit).body as string) as {
+      schema_version: number;
+      batch_id: string;
+      events: Array<Record<string, unknown>>;
+    },
+  );
+}
+
+async function settle() {
+  for (let tick = 0; tick < 10; tick += 1) await Promise.resolve();
+}
+
 describe("playback QoE", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     vi.useFakeTimers();
-    apiFetchMock
-      .mockReset()
-      .mockResolvedValue(new Response(null, { status: 204 }));
+    apiBase.value = "";
+    fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
     __resetPlaybackQoeForTests();
   });
 
   afterEach(() => {
+    __resetPlaybackQoeForTests();
+    vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
@@ -57,66 +94,109 @@ describe("playback QoE", () => {
     });
   });
 
-  it("batches best-effort events without blocking the caller", async () => {
-    recordPlaybackQoe({
-      event: "stall_start",
+  it("shapes results and active time the way the server validates them", () => {
+    expect(shapePlaybackQoeEvent({ ...base, event: "result" })).toBeNull();
+    expect(shapePlaybackQoeEvent({ ...base, event: "active" })).toBeNull();
+    expect(
+      shapePlaybackQoeEvent({
+        ...base,
+        event: "result",
+        outcome: "started",
+        cause: "network",
+      }),
+    ).toEqual({
+      event: "result",
       origin: "local",
-      requestedPolicy: "original",
-      effectivePolicy: "original",
+      requested_policy: "balanced",
+      effective_policy: "balanced",
+      outcome: "started",
     });
-    recordPlaybackQoe({
-      event: "recovery",
-      origin: "local",
-      requestedPolicy: "original",
-      effectivePolicy: "original",
-      attempt: 2,
-    });
+    expect(
+      shapePlaybackQoeEvent({
+        ...base,
+        event: "result",
+        outcome: "failed",
+        cause: "decode",
+      }),
+    ).toMatchObject({ outcome: "failed", cause: "decode" });
+    expect(
+      shapePlaybackQoeEvent({ ...base, event: "intent", outcome: "failed" }),
+    ).not.toHaveProperty("outcome");
+  });
 
+  it("sends version 2 batches with fetch and keeps the session on a 401", async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 401 }));
+    const location = window.location.href;
+
+    recordPlaybackQoe({ ...base, event: "intent" });
+    recordPlaybackQoe({ ...base, event: "result", outcome: "started" });
     flushPlaybackQoe();
-    await Promise.resolve();
+    await settle();
 
-    expect(apiFetchMock).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenCalledWith(
       "/api/playback/qoe",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({
-          events: [
-            {
-              event: "stall_start",
-              origin: "local",
-              requested_policy: "original",
-              effective_policy: "original",
-            },
-            {
-              event: "recovery",
-              origin: "local",
-              requested_policy: "original",
-              effective_policy: "original",
-              attempt: 2,
-            },
-          ],
-        }),
+        credentials: "include",
+        keepalive: true,
       }),
     );
+    const batch = sentBodies(fetchMock)[0]!;
+    expect(batch.schema_version).toBe(2);
+    expect(batch.events.map((event) => event.event)).toEqual([
+      "intent",
+      "result",
+    ]);
+    expect(batch.events.every((event) => typeof event.event_id === "string"))
+      .toBe(true);
+    expect(window.location.href).toBe(location);
+    expect(ensureFreshAuthToken).not.toHaveBeenCalled();
   });
 
-  it("caps repeated telemetry within one playback session", () => {
-    for (let index = 0; index < 30; index += 1) {
-      recordPlaybackQoe({
-        event: "stall_start",
-        origin: "local",
-        requestedPolicy: "balanced",
-        effectivePolicy: "balanced",
-      });
-    }
+  it("honours Retry-After before resending a rate-limited batch", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(null, { status: 429, headers: { "Retry-After": "20" } }),
+    );
 
+    recordPlaybackQoe({ ...base, event: "stall_start" });
     flushPlaybackQoe();
+    await settle();
+    await vi.advanceTimersByTimeAsync(19_000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    const allEvents = apiFetchMock.mock.calls.flatMap(([, init]) => {
-      const body = JSON.parse(init?.body as string) as { events: unknown[] };
-      return body.events;
-    });
-    expect(allEvents).toHaveLength(24);
-    expect(apiFetchMock.mock.calls).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(1_500);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [first, second] = sentBodies(fetchMock);
+    expect(second?.batch_id).toBe(first?.batch_id);
+  });
+
+  it("drops pending events when the account changes or signs out", async () => {
+    const uninstall = installPlaybackQoeFlush();
+
+    recordPlaybackQoe({ ...base, event: "stall_start" });
+    window.dispatchEvent(new CustomEvent("crate:auth-runtime-reset"));
+    await vi.advanceTimersByTimeAsync(5_000);
+    recordPlaybackQoe({ ...base, event: "recovery", attempt: 1 });
+    window.dispatchEvent(new CustomEvent("crate:auth-session-rejected"));
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    uninstall();
+  });
+
+  it("hands the buffer to sendBeacon when the page is hidden", () => {
+    const sendBeacon = vi.fn(() => true);
+    vi.stubGlobal("navigator", { ...navigator, sendBeacon });
+    const uninstall = installPlaybackQoeFlush();
+
+    recordPlaybackQoe({ ...base, event: "stall_start" });
+    window.dispatchEvent(new Event("pagehide"));
+
+    expect(sendBeacon).toHaveBeenCalledWith(
+      "/api/playback/qoe",
+      expect.any(Blob),
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    uninstall();
   });
 });

@@ -108,6 +108,56 @@ describe("usePlayerPlaybackObservability", () => {
     });
   });
 
+  it("reports active listening time once a minute and the remainder on pagehide", () => {
+    const { result } = renderHook(() =>
+      usePlayerPlaybackObservability(createOptions()),
+    );
+
+    act(() => {
+      for (let second = 0; second <= 70; second += 1) {
+        result.current.recordPlaybackQualityProgress(second);
+      }
+      result.current.recordPlaybackQualityProgress(200);
+      result.current.recordPlaybackQualityProgress(203);
+    });
+
+    const active = () =>
+      recordPlaybackQoe.mock.calls
+        .map(([input]) => input as { event: string; durationMs?: number })
+        .filter((input) => input.event === "active");
+    expect(active()).toEqual([
+      expect.objectContaining({ event: "active", durationMs: 60_000 }),
+    ]);
+
+    act(() => {
+      window.dispatchEvent(new Event("pagehide"));
+    });
+
+    expect(active().map((input) => input.durationMs)).toEqual([60_000, 13_000]);
+  });
+
+  it("reports intents and results with the current track context", () => {
+    const { result } = renderHook(() =>
+      usePlayerPlaybackObservability(createOptions()),
+    );
+
+    act(() => {
+      result.current.recordPlaybackIntent();
+      result.current.recordPlaybackResult("failed", "network");
+    });
+
+    expect(recordPlaybackQoe).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "intent", origin: "local" }),
+    );
+    expect(recordPlaybackQoe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: "result",
+        outcome: "failed",
+        cause: "network",
+      }),
+    );
+  });
+
   it("cleans up network and QoE listeners on unmount", () => {
     const networkCleanup = vi.fn();
     const qoeCleanup = vi.fn();
