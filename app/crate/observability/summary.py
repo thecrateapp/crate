@@ -115,7 +115,8 @@ def _window(rows: list[dict], start: date) -> dict:
 def _breakdowns(rows: list[dict]) -> dict:
     latest: dict[str, date] = {}
     for row in rows:
-        latest[row["kpi"]] = max(row["day"], latest.get(row["kpi"], row["day"]))
+        current = latest.get(row["kpi"])
+        latest[row["kpi"]] = row["day"] if current is None else max(row["day"], current)
     groups: dict[str, dict] = {}
     for kpi in sorted(latest):
         segments = []
