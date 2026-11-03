@@ -51,11 +51,20 @@ type Integration struct {
 	Validate    string           `yaml:"validate"`
 }
 
+// Monitoring declares the optional monitoring settings: Env goes to the
+// separate monitoring.env the crate-observability project reads, App to the
+// application .env the monitoring overlays read.
+type Monitoring struct {
+	Env []Setting `yaml:"env"`
+	App []Setting `yaml:"app"`
+}
+
 type Manifest struct {
 	Version      int           `yaml:"version"`
 	Core         []Setting     `yaml:"core"`
 	Generated    []Generated   `yaml:"generated"`
 	Tuning       []string      `yaml:"tuning"`
+	Monitoring   Monitoring    `yaml:"monitoring"`
 	Integrations []Integration `yaml:"integrations"`
 }
 
@@ -119,6 +128,18 @@ func (m *Manifest) validate() error {
 		if err := claim(name, "tuning"); err != nil {
 			return err
 		}
+	}
+	for _, s := range m.Monitoring.App {
+		if err := claim(s.Env, "monitoring app"); err != nil {
+			return err
+		}
+	}
+	monitoring := map[string]bool{}
+	for _, s := range m.Monitoring.Env {
+		if s.Env == "" || monitoring[s.Env] {
+			return fmt.Errorf("monitoring variable %q is empty or repeated", s.Env)
+		}
+		monitoring[s.Env] = true
 	}
 	ids := map[string]bool{}
 	for _, in := range m.Integrations {

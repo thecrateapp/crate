@@ -1,0 +1,8 @@
+services:
+  crate-operator-supervisor:
+    networks: [crate, prometheus-query]
+
+networks:
+  prometheus-query:
+    name: ${OBS_PROMETHEUS_QUERY_NETWORK:-crate_prometheus-query}
+    external: true

@@ -8,6 +8,9 @@
 #   generated     secrets created once and kept when the install is reconfigured
 #   tuning        knobs with safe compose defaults; never asked
 #   integrations  optional features the user can enable, with their variables
+#   monitoring    optional monitoring: env is the separate monitoring.env the
+#                 crate-observability project reads; app lists the .env
+#                 variables the application overlays in deploy/observability read
 #
 # installer_only variables stay in .env for the installer and the compose CLI;
 # no container reads them. transient variables are handed to a setup step and
@@ -212,6 +215,36 @@ tuning:
   - SETLISTFM_SHOWS_SYNC_ENABLED
   - SETLISTFM_SHOWS_SYNC_MAX_ARTISTS
   - STREAM_TRANSCODE_MAX_CONCURRENT
+
+monitoring:
+  env:
+    - env: OBS_DATA_DIR
+      label: Monitoring data
+    - env: OBS_SECRETS_DIR
+      label: Monitoring secrets
+    - env: OBS_APP_NETWORK
+      label: Crate network the database exporters join
+    - env: CRATE_POSTGRES_DB
+      label: Observed database
+    - env: OBS_GRAFANA_PORT
+      label: Grafana port on this machine
+    - env: OBS_DOCKER_ROOT
+      label: Docker data root
+    - env: OBS_CONTAINERD_SOCKET
+      label: containerd socket
+    - env: OBS_CONTAINERD
+      label: Docker containerd image store
+      installer_only: true
+    - env: OBS_RELEASE
+      label: Installer that wrote the monitoring files
+      installer_only: true
+  app:
+    - env: OBS_APP_METRICS_NETWORK
+      label: Network Prometheus scrapes Crate on
+    - env: OBS_PROMETHEUS_QUERY_NETWORK
+      label: Network the projector and supervisor query Prometheus on
+    - env: OBS_TRAEFIK_METRICS_NETWORK
+      label: Network Prometheus scrapes Traefik on
 
 integrations:
   - id: lastfm

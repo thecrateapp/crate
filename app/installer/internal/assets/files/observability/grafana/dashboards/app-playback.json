@@ -1,0 +1,352 @@
+{
+  "uid": "crate-app-playback",
+  "title": "Crate application \u00b7 Playback",
+  "schemaVersion": 40,
+  "version": 1,
+  "editable": false,
+  "tags": ["crate", "application", "shadow", "playback"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [],
+  "panels": [
+    {
+      "title": "Startup p95",
+      "type": "timeseries",
+      "description": "Time from play to first audio, 95th percentile over 15 minutes by origin and runtime. Empty without starts.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:playback_startup_seconds:p95_15m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{origin}} {{runtime}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 1
+    },
+    {
+      "title": "Starts observed",
+      "type": "timeseries",
+      "description": "Starts reported by clients in 15 minutes. Sample size for the same window. A ratio over a small sample is not a trend.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:playback_startup:increase15m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{origin}} {{runtime}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 2
+    },
+    {
+      "title": "Stalls per start",
+      "type": "timeseries",
+      "description": "Stalls over starts in 15 minutes. Zero only when there were starts and no stalls.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:playback_stalls_per_startup:ratio15m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{origin}} {{runtime}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 3
+    },
+    {
+      "title": "Stall p95",
+      "type": "timeseries",
+      "description": "95th percentile stall duration over 15 minutes. Empty without stalls.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:playback_stall_seconds:p95_15m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{origin}} {{runtime}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 4
+    },
+    {
+      "title": "Stalls and recoveries",
+      "type": "timeseries",
+      "description": "Stalls and recoveries reported in 15 minutes.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:playback_stalls:increase15m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "stalls {{origin}} {{runtime}}"
+        },
+        {
+          "refId": "B",
+          "expr": "crate:playback_recoveries:increase15m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "recoveries {{origin}} {{runtime}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 5
+    },
+    {
+      "title": "Transcode failure ratio",
+      "type": "timeseries",
+      "description": "Transcodes that did not complete over all transcodes in 15 minutes, by preset. Empty without transcodes.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:stream_transcode_failures:ratio15m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{preset}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 6
+    },
+    {
+      "title": "Transcodes",
+      "type": "timeseries",
+      "description": "Transcodes in 15 minutes by preset. Sample size for the same window. A ratio over a small sample is not a trend.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:stream_transcodes:increase15m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{preset}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 7
+    },
+    {
+      "title": "Stream requests",
+      "type": "timeseries",
+      "description": "Stream requests per second by target and status class.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:stream_requests:rate5m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{target}} {{status_class}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 8
+    }
+  ],
+  "templating": {
+    "list": []
+  }
+}
