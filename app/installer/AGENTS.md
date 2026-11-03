@@ -27,6 +27,9 @@ for linux/darwin × amd64/arm64.
   `docs/plans/2026-11-03-installer-observability-design.md`. Its settings live under
   `monitoring:` in the manifest: `env` for the separate `monitoring.env`, `app` for the
   application `.env` variables the overlays read.
+  Storage, secrets and the `crate_observer` role come from `scripts/observability_setup.py`
+  (`prepare`, `role`, `status`), run like the agent setup in a throwaway `crate-api` container
+  as root; it prints names and booleans only and never rotates a secret.
 - Reconfiguring must never rotate a generated secret or drop a line the user added to `.env`.
   `install.BuildEnv` keeps existing values; keep it that way.
 - `CRATE_IMAGE_TAG` follows `install.UpgradeImageTag`: a release installer (`vX.Y.Z`, the git

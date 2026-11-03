@@ -22,6 +22,9 @@ const (
 	OperatorOverlay  = "compose.operator.yaml"
 	OperatorExample  = "config.operator.example.json"
 	ProvenanceProxy  = "provenance-docker.haproxy.cfg"
+
+	ObservabilitySetup     = "observability_setup.py"
+	ObservabilityPreflight = "observability_preflight.py"
 )
 
 // ObservabilityDir holds the monitoring files, embedded under the same
@@ -63,6 +66,9 @@ var Sources = withObservability(map[string]string{
 	OperatorOverlay:  "deploy/operator/compose.operator.yaml",
 	OperatorExample:  "deploy/operator/config.operator.example.json",
 	ProvenanceProxy:  "deploy/operator/provenance-docker.haproxy.cfg",
+
+	ObservabilitySetup:     "scripts/observability_setup.py",
+	ObservabilityPreflight: "scripts/observability_preflight.py",
 })
 
 func withObservability(sources map[string]string) map[string]string {
