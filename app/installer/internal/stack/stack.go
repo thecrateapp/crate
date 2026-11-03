@@ -24,7 +24,8 @@ type Stack struct {
 	Files   []string // relative to Dir; empty means docker-compose.yaml
 	// Env is the installation's .env; it names the networks the monitoring
 	// overlays join. Nil means their default names.
-	Env *envfile.Values
+	Env               *envfile.Values
+	MonitoringFollows bool
 }
 
 // InfraBridge is the host socket the optional infrastructure relay of
@@ -77,7 +78,9 @@ func (s Stack) Up(ctx context.Context, w io.Writer) error {
 	if _, err := os.Stat(InfraBridge); s.operator() && err != nil {
 		up = append(up, "--scale", "crate-infra-relay=0")
 	}
-	if _, dropped := s.ActiveFiles(ctx); len(dropped) > 0 {
+	if _, dropped := s.ActiveFiles(ctx); len(dropped) > 0 && s.MonitoringFollows {
+		fmt.Fprintf(w, "Starting without %s for now: monitoring recreates its network next.\n", strings.Join(dropped, ", "))
+	} else if len(dropped) > 0 {
 		fmt.Fprintf(w, "Starting without %s: the monitoring network it joins is missing. Run `crate observability enable` to restore it.\n", strings.Join(dropped, ", "))
 	}
 	name, args := s.Command(ctx, up...)

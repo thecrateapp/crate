@@ -233,3 +233,28 @@ func TestStackNeverChecksNetworksWithoutMonitoringOverlays(t *testing.T) {
 		t.Fatalf("unexpected calls %q", runner.calls)
 	}
 }
+
+func TestStackTellsWhenMonitoringRestoresAMissingNetwork(t *testing.T) {
+	runner := &networkRunner{networks: []string{"crate-observability_prometheus-query"}}
+	s := Stack{
+		Run:     runner,
+		Compose: []string{"docker", "compose"},
+		Dir:     "/srv/crate",
+		Files: []string{
+			"docker-compose.yaml",
+			"deploy/observability/compose.projector-prometheus.yaml",
+			"deploy/observability/compose.app-metrics.yaml",
+		},
+		MonitoringFollows: true,
+	}
+	out := &bytes.Buffer{}
+
+	s.Up(context.Background(), out)
+
+	if !strings.Contains(out.String(), "monitoring recreates its network next") {
+		t.Fatalf("no note that monitoring restores the network: %q", out.String())
+	}
+	if strings.Contains(out.String(), "crate observability enable") {
+		t.Fatalf("asks for a command the wizard runs itself: %q", out.String())
+	}
+}
