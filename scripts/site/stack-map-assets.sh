@@ -13,10 +13,8 @@ export SITE_CAPTURE_OUT="$RAW"
 npx playwright test -c playwright.site-capture.config.ts
 
 mkdir -p "$OUT"
-for view in 2d 3d; do
-  for width in 390 768 1440; do
-    cwebp -quiet -q 80 -m 6 -resize "$width" 0 "$RAW/stack-map-$view.png" -o "$OUT/stack-map-$view-$width.webp"
-  done
+for width in 390 768 1440; do
+  cwebp -quiet -q 80 -m 6 -resize "$width" 0 "$RAW/stack-map-3d.png" -o "$OUT/stack-map-3d-$width.webp"
 done
 
 crop=$(cat "$RAW/loop-crop.txt")

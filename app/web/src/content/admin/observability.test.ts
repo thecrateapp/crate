@@ -50,22 +50,21 @@ describe("the Stack map captures", () => {
     expect(component).toMatch(
       /<p class="viz-label sample">\{STACK_MAP\.sample\}<\/p>/,
     );
-    expect(component).toMatch(/class="badge"[\s\S]*\{STACK_MAP\.sample\}/);
+    expect(component).not.toMatch(/class="badge"/);
   });
 
   it("ships every image width with the declared size", () => {
-    for (const [key, image] of Object.entries(STACK_MAP.images)) {
-      expect(image.alt.length, key).toBeGreaterThan(80);
-      for (const width of STACK_MAP.widths) {
-        const file = repoFile(`app/web/public${image.image}-${width}.webp`);
-        expect(existsSync(file), file).toBe(true);
-        const size = webpSize(file);
-        expect(size.width).toBe(width);
-        expect(size.height / size.width).toBeCloseTo(
-          image.height / image.width,
-          2,
-        );
-      }
+    const { image } = STACK_MAP;
+    expect(image.alt.length).toBeGreaterThan(80);
+    for (const width of STACK_MAP.widths) {
+      const file = repoFile(`app/web/public${image.image}-${width}.webp`);
+      expect(existsSync(file), file).toBe(true);
+      const size = webpSize(file);
+      expect(size.width).toBe(width);
+      expect(size.height / size.width).toBeCloseTo(
+        image.height / image.width,
+        2,
+      );
     }
   });
 
@@ -83,7 +82,7 @@ describe("the Stack map captures", () => {
 
   it("keeps the still image under reduced motion", () => {
     expect(component).toMatch(
-      /@media \(prefers-reduced-motion: reduce\) \{\s*\.frame video \{\s*display: none;/,
+      /@media \(prefers-reduced-motion: reduce\) \{\s*\.shot video \{\s*display: none;/,
     );
     expect(view).toMatch(/if \(!video \|\| reducedMotion\(\)\) return;/);
   });

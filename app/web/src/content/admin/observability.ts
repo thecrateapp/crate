@@ -1,35 +1,21 @@
 import type { ScaleFigure } from "../architecture/en";
 import type { Feature } from "../../lib/chapters";
 
-export type MapView = "3d" | "2d";
-
 export const STACK_MAP = {
   label: "Stack",
   host: "host crate · two deployments",
   sample: "Sample data",
-  views: "Map view",
   caption:
-    "Admin's Stack page, captured with sample data. Each deployment on the host is a dome in 3D and a ring in 2D. Node size is memory, the spike is CPU, and the moving dots are requests, tasks and events from the last few seconds.",
+    "Admin's Stack page, captured with sample data. Each deployment on the host is a dome. Node size is memory, the spike is CPU, and the moving dots are requests, tasks and events from the last few seconds.",
   widths: [390, 768, 1440],
   sizes: "(min-width: 1480px) 1440px, 100vw",
   video: "/stack-map/stack-map-3d",
-  images: {
-    "3d": {
-      image: "/stack-map/stack-map-3d",
-      width: 1440,
-      height: 645,
-      alt: "Stack map in 3D: two domes on one host. The application dome is lit in cyan with the API at its top, request lines from Edge, Admin, Listen and Readplane, and dashed queue and data lines to PostgreSQL, Redis and the workers. The monitoring dome beside it is grey, with Prometheus at the centre and Grafana, cAdvisor and the exporters around it.",
-    },
-    "2d": {
-      image: "/stack-map/stack-map-2d",
-      width: 1440,
-      height: 692,
-      alt: "Stack map in 2D: two rings of services. The application ring has the API at the centre, with request lines from Edge, Admin, Listen and Readplane carrying moving dots, and dashed lines to PostgreSQL, Redis cache, Redis durable and the workers. The monitoring ring has Prometheus at the centre with Grafana and the exporters around it.",
-    },
-  } satisfies Record<
-    MapView,
-    { image: string; width: number; height: number; alt: string }
-  >,
+  image: {
+    image: "/stack-map/stack-map-3d",
+    width: 1440,
+    height: 645,
+    alt: "Stack map in 3D: two domes on one host. The application dome is lit in cyan with the API at its top, request lines from Edge, Admin, Listen and Readplane, and dashed queue and data lines to PostgreSQL, Redis and the workers. The monitoring dome beside it is grey, with Prometheus at the centre and Grafana, cAdvisor and the exporters around it.",
+  },
 };
 
 export const FEATURES: Feature[] = [

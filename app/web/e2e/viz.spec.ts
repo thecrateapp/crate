@@ -360,7 +360,7 @@ test.describe("reduced motion", () => {
   });
 });
 
-test("the Stack map switches between 3D and 2D and plays the loop only when shown", async ({
+test("the Stack map shows the 3D loop only while it is on screen", async ({
   page,
 }) => {
   await page.goto("/admin#observability");
@@ -368,22 +368,16 @@ test("the Stack map switches between 3D and 2D and plays the loop only when show
   await map.scrollIntoViewIfNeeded();
   await expect(map).toHaveAttribute("data-viz-ready", "");
   await expect(map.locator(".sample")).toHaveText("Sample data");
-  const three = map.getByRole("button", { name: "3D" });
-  const two = map.getByRole("button", { name: "2D" });
-  await expect(three).toHaveAttribute("aria-pressed", "true");
-  const box = await two.boundingBox();
-  expect(box!.height).toBeGreaterThanOrEqual(44);
-  expect(box!.width).toBeGreaterThanOrEqual(44);
+  await expect(map.getByRole("button")).toHaveCount(0);
+  await expect(map.getByText("Sample data", { exact: true })).toHaveCount(1);
   const video = map.locator("video");
   await expect
     .poll(() => video.evaluate((el: HTMLVideoElement) => el.paused))
     .toBe(false);
-  await two.focus();
-  await page.keyboard.press("Enter");
-  await expect(two).toHaveAttribute("aria-pressed", "true");
-  await expect(map.locator('[data-view-panel="2d"] img')).toBeVisible();
-  await expect(map.locator('[data-view-panel="3d"]')).toBeHidden();
-  expect(await video.evaluate((el: HTMLVideoElement) => el.paused)).toBe(true);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect
+    .poll(() => video.evaluate((el: HTMLVideoElement) => el.paused))
+    .toBe(true);
 });
 
 test.describe("reduced motion", () => {
@@ -401,7 +395,7 @@ test.describe("reduced motion", () => {
     const map = page.locator('[data-viz="stack-map"]');
     await map.scrollIntoViewIfNeeded();
     await expect(map).toHaveAttribute("data-viz-ready", "");
-    await expect(map.locator('[data-view-panel="3d"] img')).toBeVisible();
+    await expect(map.locator(".shot img")).toBeVisible();
     await expect(map.locator("video")).toBeHidden();
     await page.waitForTimeout(500);
     expect(requested).toEqual([]);

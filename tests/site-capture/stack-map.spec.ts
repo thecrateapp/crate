@@ -227,16 +227,10 @@ test.beforeAll(() => {
   mkdirSync(join(OUT, "frames"), { recursive: true });
 });
 
-async function openStack(
-  page: Page,
-  view: "2d" | "3d",
-  adminApi,
-  openAdminPage,
-) {
+async function openStack(page: Page, adminApi, openAdminPage) {
   adminApi.respondTo("/api/admin/stack-snapshot", snapshot());
-  await page.addInitScript(
-    (value) => localStorage.setItem("crate.admin.stack-map.view.v1", value),
-    view,
+  await page.addInitScript(() =>
+    localStorage.setItem("crate.admin.stack-map.view.v1", "3d"),
   );
   await streamSampleActivity(page);
   await openAdminPage("/stack");
@@ -247,18 +241,8 @@ async function openStack(
   return map;
 }
 
-test("2D stack map", async ({ page, adminApi, openAdminPage }) => {
-  const map = await openStack(page, "2d", adminApi, openAdminPage);
-  await map.scrollIntoViewIfNeeded();
-  await expect(map).toContainText("Ingress");
-  await page.waitForTimeout(2500);
-  await map.locator(".stack-map__stage").screenshot({
-    path: join(OUT, "stack-map-2d.png"),
-  });
-});
-
 async function open3D(page: Page, adminApi, openAdminPage) {
-  const map = await openStack(page, "3d", adminApi, openAdminPage);
+  const map = await openStack(page, adminApi, openAdminPage);
   const stage = map.locator(".stack-map-3d__stage");
   await expect(map.locator(".stack-map-3d")).toHaveAttribute(
     "data-renderer-state",

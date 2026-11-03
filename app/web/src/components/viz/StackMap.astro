@@ -1,55 +1,32 @@
 ---
-import { STACK_MAP, type MapView } from "../../content/admin/observability";
+import { STACK_MAP } from "../../content/admin/observability";
 
-const views: MapView[] = ["3d", "2d"];
-const srcset = (image: string) => STACK_MAP.widths.map((width) => `${image}-${width}.webp ${width}w`).join(", ");
-const poster = `${STACK_MAP.images["3d"].image}-1440.webp`;
+const { image } = STACK_MAP;
+const srcset = STACK_MAP.widths.map((width) => `${image.image}-${width}.webp ${width}w`).join(", ");
 ---
 
-<figure class="stackmap" data-viz="stack-map" data-view="3d" data-reveal>
+<figure class="stackmap" data-viz="stack-map" data-reveal>
   <header class="viz-bar" data-enter>
     <p class="viz-label"><b>{STACK_MAP.label}</b> {STACK_MAP.host}</p>
     <p class="viz-label sample">{STACK_MAP.sample}</p>
   </header>
 
-  <div class="switch" role="group" aria-label={STACK_MAP.views}>
-    {
-      views.map((view) => (
-        <button type="button" data-view-button={view} aria-pressed={view === "3d" ? "true" : "false"}>
-          {view.toUpperCase()}
-        </button>
-      ))
-    }
+  <div class="shot" style={`aspect-ratio:${image.width} / ${image.height}`}>
+    <img
+      srcset={srcset}
+      sizes={STACK_MAP.sizes}
+      src={`${image.image}-1440.webp`}
+      width={image.width}
+      height={image.height}
+      alt={image.alt}
+      loading="lazy"
+      decoding="async"
+    />
+    <video muted loop playsinline preload="none" disablepictureinpicture poster={`${image.image}-1440.webp`} aria-hidden="true" tabindex="-1">
+      <source src={`${STACK_MAP.video}.webm`} type="video/webm" />
+      <source src={`${STACK_MAP.video}.mp4`} type="video/mp4" />
+    </video>
   </div>
-
-  {
-    views.map((view) => {
-      const image = STACK_MAP.images[view];
-      return (
-        <div class="frame" data-view-panel={view} style={`aspect-ratio:${image.width} / ${image.height}`}>
-          <img
-            srcset={srcset(image.image)}
-            sizes={STACK_MAP.sizes}
-            src={`${image.image}-1440.webp`}
-            width={image.width}
-            height={image.height}
-            alt={image.alt}
-            loading="lazy"
-            decoding="async"
-          />
-          {view === "3d" && (
-            <video muted loop playsinline preload="none" disablepictureinpicture poster={poster} aria-hidden="true" tabindex="-1">
-              <source src={`${STACK_MAP.video}.webm`} type="video/webm" />
-              <source src={`${STACK_MAP.video}.mp4`} type="video/mp4" />
-            </video>
-          )}
-          <span class="badge" aria-hidden="true">
-            {STACK_MAP.sample}
-          </span>
-        </div>
-      );
-    })
-  }
 
   <figcaption>{STACK_MAP.caption}</figcaption>
 </figure>
@@ -67,60 +44,12 @@ const poster = `${STACK_MAP.images["3d"].image}-1440.webp`;
     color: var(--amber);
   }
 
-  .switch {
-    display: none;
-    gap: 6px;
-    justify-self: start;
-  }
-
-  :global(html.js) .switch {
-    display: flex;
-  }
-
-  .switch button {
-    min-width: 56px;
-    min-height: 44px;
-    padding: 0 16px;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    background: transparent;
-    color: var(--fg-2);
-    font-family: var(--mono);
-    font-size: 12px;
-    letter-spacing: 0.12em;
-    cursor: pointer;
-    transition:
-      background-color 0.2s var(--ease-snap),
-      color 0.2s var(--ease-snap),
-      border-color 0.2s var(--ease-snap);
-  }
-
-  .switch button:hover {
-    border-color: rgba(103, 232, 249, 0.5);
-    color: var(--fg);
-  }
-
-  .switch button[aria-pressed="true"] {
-    border-color: var(--cyan-hi);
-    background: var(--cyan-hi);
-    color: var(--bg);
-  }
-
-  .switch button:focus-visible {
-    outline: 2px solid var(--cyan-hi);
-    outline-offset: 3px;
-  }
-
-  .frame {
+  .shot {
     position: relative;
-    overflow: hidden;
-    border: 1px solid var(--line);
-    border-radius: 18px;
-    background: #0a0a0f;
   }
 
-  .frame img,
-  .frame video {
+  .shot img,
+  .shot video {
     position: absolute;
     inset: 0;
     width: 100%;
@@ -128,33 +57,13 @@ const poster = `${STACK_MAP.images["3d"].image}-1440.webp`;
     object-fit: cover;
   }
 
-  .frame video {
+  .shot video {
     opacity: 0;
     transition: opacity 0.4s var(--ease-snap);
   }
 
-  .frame:global(.is-video) video {
+  .shot:global(.is-video) video {
     opacity: 1;
-  }
-
-  :global(html.js) .stackmap[data-view="3d"] [data-view-panel="2d"],
-  :global(html.js) .stackmap[data-view="2d"] [data-view-panel="3d"] {
-    display: none;
-  }
-
-  .badge {
-    position: absolute;
-    top: 14px;
-    right: 14px;
-    padding: 4px 10px;
-    border: 1px solid rgba(251, 191, 36, 0.45);
-    border-radius: 999px;
-    background: rgba(10, 10, 15, 0.78);
-    color: var(--amber);
-    font-family: var(--mono);
-    font-size: 10.5px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
   }
 
   figcaption {
@@ -166,7 +75,7 @@ const poster = `${STACK_MAP.images["3d"].image}-1440.webp`;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .frame video {
+    .shot video {
       display: none;
     }
   }
