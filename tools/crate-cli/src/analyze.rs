@@ -41,6 +41,10 @@ const FULL_PROFILE_MIN_STABILITY: f32 = 0.8;
 /// for a full profile; below it the grid may be half a beat out. Without a constant grid,
 /// a full profile needs tracked beats that never slide half a beat.
 const FULL_PROFILE_MIN_PHASE_SUPPORT: f64 = 0.7;
+/// A cue takes the constant grid's tempo and beat only when its own tracked tempo is this
+/// close: 1 % over the 24-beat cue window is a quarter beat of drift. A constant grid that a
+/// cue does not keep, or that part of the track does not keep, cannot back a full profile.
+const CUE_GRID_TEMPO_TOLERANCE: f64 = 0.01;
 
 #[derive(Serialize)]
 pub struct AnalysisResult {
@@ -703,15 +707,16 @@ fn cue_downbeat_ms(
     beat_grid_ms.get(index).copied()
 }
 
-/// On a constant grid the tempo and beat at a cue are the grid's. Stability still comes
-/// from the tracked beats around the cue, so a messy outro stays messy.
+/// On a constant grid the tempo and beat at a cue are the grid's, as long as the tracked
+/// beats around the cue keep the grid's tempo; otherwise they stay the tracked ones.
+/// Stability always comes from the tracked beats, so a messy outro stays messy.
 fn on_constant_grid(
     local: LocalBeat,
     grid: Option<&ConstantGrid>,
     cue_ms: Option<u64>,
 ) -> LocalBeat {
     match (grid, cue_ms) {
-        (Some(grid), Some(cue_ms)) => {
+        (Some(grid), Some(cue_ms)) if keeps_grid_tempo(&local, grid) => {
             let beat = grid.beat_near_ms(cue_ms as f64);
             LocalBeat {
                 bpm: grid.bpm as f32,
@@ -721,6 +726,10 @@ fn on_constant_grid(
         }
         _ => local,
     }
+}
+
+fn keeps_grid_tempo(local: &LocalBeat, grid: &ConstantGrid) -> bool {
+    (f64::from(local.bpm) / grid.bpm - 1.0).abs() <= CUE_GRID_TEMPO_TOLERANCE
 }
 
 /// The published beats and their onset frames: the constant grid over the tracked span
@@ -1036,14 +1045,23 @@ pub fn analyze_smart_mix_segments(
             sample_rate,
         ),
     };
-    let intro_local = local_beat(&tracked_ms, &beat_frames, sample_rate, intro_cue_ms)
-        .map(|local| on_constant_grid(local, constant_grid.as_ref(), intro_cue_ms));
-    let outro_local = if tail.is_none() {
+    let intro_tracked = local_beat(&tracked_ms, &beat_frames, sample_rate, intro_cue_ms);
+    let outro_tracked = if tail.is_none() {
         local_beat(&tracked_ms, &beat_frames, sample_rate, outro_cue_ms)
-            .map(|local| on_constant_grid(local, constant_grid.as_ref(), outro_cue_ms))
     } else {
         None
     };
+    let grid_holds = constant_grid.as_ref().is_none_or(|grid| {
+        !grid.tempo_deviates
+            && [intro_tracked, outro_tracked]
+                .iter()
+                .flatten()
+                .all(|local| keeps_grid_tempo(local, grid))
+    });
+    let intro_local =
+        intro_tracked.map(|local| on_constant_grid(local, constant_grid.as_ref(), intro_cue_ms));
+    let outro_local =
+        outro_tracked.map(|local| on_constant_grid(local, constant_grid.as_ref(), outro_cue_ms));
     let cue_stability = intro_local
         .zip(outro_local)
         .map(|(intro, outro)| 0.5 * (intro.stability + outro.stability));
@@ -1085,6 +1103,7 @@ pub fn analyze_smart_mix_segments(
         && bpm_confidence >= 0.75
         && steady_cues
         && clear_phase
+        && grid_holds
     {
         "full"
     } else {

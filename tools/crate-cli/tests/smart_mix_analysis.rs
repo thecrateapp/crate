@@ -663,3 +663,42 @@ fn v6_keeps_a_half_beat_slide_partial_when_the_tempo_moves() {
     assert!(profile.intro_tempo_stability.unwrap() >= 0.8);
     assert!(profile.outro_tempo_stability.unwrap() >= 0.8);
 }
+
+fn tempo_change_near_the_end(beats_at_125: usize) -> Vec<f32> {
+    let (mut times, mut end) = sections(&[(120.0, 125.0)]);
+    for _ in 0..beats_at_125 {
+        times.push(end);
+        end += 60.0 / 125.0;
+    }
+    accented_clicks(&times, end + 1.0)
+}
+
+fn on_a_constant_grid(grid: &[u64], bpm: f64) -> bool {
+    let beat_ms = 60_000.0 / bpm;
+    grid.windows(2)
+        .all(|pair| ((pair[1] - pair[0]) as f64 - beat_ms).abs() <= 1.0)
+}
+
+#[test]
+fn v6_follows_a_tempo_change_in_the_last_sixth() {
+    let profile = analyze_smart_mix_samples(&tempo_change_near_the_end(50), SAMPLE_RATE);
+
+    let outro = f64::from(profile.outro_bpm.unwrap());
+    assert!((outro - 125.0).abs() <= 0.5, "outro tempo {outro}");
+    assert!(
+        !(profile.quality == "full" && on_a_constant_grid(&profile.beat_grid_ms, 120.0)),
+        "a full profile on a 120 BPM constant grid over a 125 BPM ending"
+    );
+}
+
+#[test]
+fn v6_measures_the_outro_tempo_when_only_the_last_bars_change() {
+    let profile = analyze_smart_mix_samples(&tempo_change_near_the_end(26), SAMPLE_RATE);
+
+    let outro = f64::from(profile.outro_bpm.unwrap());
+    assert!((outro - 125.0).abs() <= 0.6, "outro tempo {outro}");
+    assert!(
+        !(profile.quality == "full" && on_a_constant_grid(&profile.beat_grid_ms, 120.0)),
+        "a full profile on a 120 BPM constant grid over a 125 BPM ending"
+    );
+}

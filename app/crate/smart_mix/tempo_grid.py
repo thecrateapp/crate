@@ -7,7 +7,8 @@ beats and took the tempo from a regression of beat index against time, so one sl
 the BPM by about 1/N and the grid sat half a beat off through the break. This fit
 maximises the coherence of the beat times at twice the beat rate, where a beat on the
 off-beat lines up with one on the beat. A constant grid is published only when the
-beats stay close to it along the whole track; its tempo snaps to a whole or half BPM if
+beats stay close to it along most of the track, and it is marked when some stretch of
+them keeps another tempo; its tempo snaps to a whole or half BPM if
 that keeps the grid within 25 ms over the track, and the majority of the tracked beats
 picks its phase unless both the bass and the broadband onsets are clearly stronger on
 the other half-beat phase.
@@ -28,6 +29,16 @@ BLOCK_BEATS = 16
 BEAT_TOLERANCE_MS = 35.0
 BLOCK_TOLERANCE_MS = 25.0
 MIN_STEADY_BLOCKS = 0.8
+# A constant grid cannot back a full profile when SECTION_MIN_RUNS consecutive runs of
+# SECTION_BEATS tracked beats keep their own tempo at least SECTION_TEMPO_CHANGE away
+# from the grid's and are clearly less coherent at the grid's tempo.
+SECTION_BEATS = 24
+SECTION_STEP_BEATS = 4
+SECTION_MIN_RUNS = 2
+SECTION_TEMPO_CHANGE = 0.02
+SECTION_MIN_COHERENCE = 0.6
+SECTION_MAX_GRID_SHARE = 0.6
+SECTION_SEARCH_SPAN = 0.08
 SNAP_DRIFT_MS = 25.0
 PHASE_FLIP_RATIO = 1.25
 ONSET_WINDOW_FRAMES = 2
@@ -44,6 +55,7 @@ class ConstantGrid:
     anchor_ms: float
     phase_support: float
     phase_flipped: bool
+    tempo_deviates: bool = False
 
     def beats_ms(self, from_ms: float, to_ms: float) -> tuple[int, ...]:
         first = int(_round_half_away((from_ms - self.anchor_ms) / self.period_ms))
@@ -94,7 +106,9 @@ def _median(values: np.ndarray) -> float:
     return float(ordered[ordered.size // 2])
 
 
-def _best_period(times: np.ndarray, initial: float, span: float) -> tuple[float, float]:
+def _best_period(
+    times: np.ndarray, initial: float, span: float, search_span: float = SEARCH_SPAN
+) -> tuple[float, float]:
     step = max(initial * initial / (16.0 * span), 1e-3)
 
     def search(start: float, stop: float, step: float) -> tuple[float, float]:
@@ -105,7 +119,7 @@ def _best_period(times: np.ndarray, initial: float, span: float) -> tuple[float,
         return float(periods[best]), float(coherence[best]) / times.size
 
     coarse, _ = search(
-        initial * (1.0 - SEARCH_SPAN), initial * (1.0 + SEARCH_SPAN), step
+        initial * (1.0 - search_span), initial * (1.0 + search_span), step
     )
     return search(coarse - step, coarse + step, step / 20.0)
 
@@ -124,6 +138,25 @@ def _is_steady(times: np.ndarray, period: float, lattice: float) -> bool:
         and abs(_median(block)) <= BLOCK_TOLERANCE_MS
     )
     return bool(blocks) and steady >= MIN_STEADY_BLOCKS * len(blocks)
+
+
+def _has_section_at_another_tempo(times: np.ndarray, period: float) -> bool:
+    consecutive = 0
+    for start in range(0, times.size - SECTION_BEATS + 1, SECTION_STEP_BEATS):
+        run = times[start : start + SECTION_BEATS]
+        local, coherence = _best_period(
+            run, period, float(run[-1] - run[0]), SECTION_SEARCH_SPAN
+        )
+        at_grid, _ = _resultant(run, period, 2.0)
+        elsewhere = (
+            coherence >= SECTION_MIN_COHERENCE
+            and abs(local / period - 1.0) >= SECTION_TEMPO_CHANGE
+            and at_grid <= SECTION_MAX_GRID_SHARE * coherence
+        )
+        consecutive = consecutive + 1 if elsewhere else 0
+        if consecutive >= SECTION_MIN_RUNS:
+            return True
+    return False
 
 
 def _snapped_period(period: float, span: float) -> float:
@@ -225,6 +258,7 @@ def fit_tempo(
             anchor_ms=anchor,
             phase_support=near(phase),
             phase_flipped=flipped,
+            tempo_deviates=_has_section_at_another_tempo(times, period),
         ),
     )
 

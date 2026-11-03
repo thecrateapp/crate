@@ -9,7 +9,8 @@
 //! The fit here does not count beats. It maximises the coherence of the beat times at
 //! twice the beat rate, where a beat on the off-beat lines up with one on the beat, so
 //! every tracked beat informs the period and a phase flip costs nothing. A constant grid
-//! is published only when the beats stay close to it along the whole track. Its tempo
+//! is published only when the beats stay close to it along most of the track, and it is
+//! marked when some stretch of them keeps another tempo. Its tempo
 //! then snaps to a whole (or half) BPM if that keeps the grid within 25 ms over the track,
 //! and its phase is checked against the onsets: the majority of the tracked beats picks
 //! one of the two half-beat phases, unless both the bass and the broadband onsets are
@@ -31,6 +32,19 @@ const BLOCK_BEATS: usize = 16;
 const BEAT_TOLERANCE_MS: f64 = 35.0;
 const BLOCK_TOLERANCE_MS: f64 = 25.0;
 const MIN_STEADY_BLOCKS: f64 = 0.8;
+/// A constant grid cannot back a full profile when part of the track keeps another tempo:
+/// at least `SECTION_MIN_RUNS` consecutive runs of `SECTION_BEATS` tracked beats (stepping
+/// by `SECTION_STEP_BEATS`) coherent at a tempo `SECTION_TEMPO_CHANGE` or more away from
+/// the grid's, which drifts more than a quarter beat over a run, and clearly less coherent
+/// at the grid's tempo (at most `SECTION_MAX_GRID_SHARE` of their own coherence). Each
+/// run's tempo is searched within `SECTION_SEARCH_SPAN` of the grid's.
+const SECTION_BEATS: usize = 24;
+const SECTION_STEP_BEATS: usize = 4;
+const SECTION_MIN_RUNS: usize = 2;
+const SECTION_TEMPO_CHANGE: f64 = 0.02;
+const SECTION_MIN_COHERENCE: f64 = 0.6;
+const SECTION_MAX_GRID_SHARE: f64 = 0.6;
+const SECTION_SEARCH_SPAN: f64 = 0.08;
 /// Largest drift over the tracked span that snapping the tempo may add, as Mixxx allows.
 const SNAP_DRIFT_MS: f64 = 25.0;
 /// Onsets must be this much stronger on the other phase, in both bands, to overrule the
@@ -67,6 +81,8 @@ pub struct ConstantGrid {
     pub phase_support: f64,
     /// The onsets overruled the majority of the tracked beats.
     pub phase_flipped: bool,
+    /// Part of the track keeps another tempo, so the grid is wrong there.
+    pub tempo_deviates: bool,
 }
 
 impl ConstantGrid {
@@ -111,8 +127,9 @@ fn median(values: &mut [f64]) -> f64 {
     values[values.len() / 2]
 }
 
-/// Period with the most coherent beats at twice the beat rate, around `initial`.
-fn best_period(times: &[f64], initial: f64, span: f64) -> (f64, f64) {
+/// Period with the most coherent beats at twice the beat rate, within `search_span` of
+/// `initial`.
+fn best_period(times: &[f64], initial: f64, span: f64, search_span: f64) -> (f64, f64) {
     let step = (initial * initial / (16.0 * span)).max(1e-3);
     let search = |from: f64, to: f64, step: f64| {
         let mut best = (initial, f64::MIN);
@@ -127,8 +144,8 @@ fn best_period(times: &[f64], initial: f64, span: f64) -> (f64, f64) {
         best
     };
     let (coarse, _) = search(
-        initial * (1.0 - SEARCH_SPAN),
-        initial * (1.0 + SEARCH_SPAN),
+        initial * (1.0 - search_span),
+        initial * (1.0 + search_span),
         step,
     );
     search(coarse - step, coarse + step, step / 20.0)
@@ -155,6 +172,27 @@ fn is_steady(times: &[f64], period: f64, lattice: f64) -> bool {
         })
         .count();
     !blocks.is_empty() && steady as f64 >= MIN_STEADY_BLOCKS * blocks.len() as f64
+}
+
+/// Some stretch of tracked beats keeps its own tempo, clearly away from `period`.
+fn has_section_at_another_tempo(times: &[f64], period: f64) -> bool {
+    let mut consecutive = 0;
+    let mut start = 0;
+    while start + SECTION_BEATS <= times.len() {
+        let run = &times[start..start + SECTION_BEATS];
+        let span = run[SECTION_BEATS - 1] - run[0];
+        let (local, coherence) = best_period(run, period, span, SECTION_SEARCH_SPAN);
+        let (at_grid, _) = resultant(run, period, 2.0);
+        let elsewhere = coherence >= SECTION_MIN_COHERENCE
+            && (local / period - 1.0).abs() >= SECTION_TEMPO_CHANGE
+            && at_grid <= SECTION_MAX_GRID_SHARE * coherence;
+        consecutive = if elsewhere { consecutive + 1 } else { 0 };
+        if consecutive >= SECTION_MIN_RUNS {
+            return true;
+        }
+        start += SECTION_STEP_BEATS;
+    }
+    false
 }
 
 fn snapped_period(period: f64, span: f64) -> f64 {
@@ -214,7 +252,7 @@ pub fn fit_tempo(beats_ms: &[u64], features: &FrameFeatures, sample_rate: u32) -
     if initial <= 0.0 || span <= 0.0 {
         return None;
     }
-    let (fitted, coherence) = best_period(&times, initial, span);
+    let (fitted, coherence) = best_period(&times, initial, span, SEARCH_SPAN);
     let lattice = |period: f64| {
         let (_, angle) = resultant(&times, period, 2.0);
         (angle / TAU * period / 2.0).rem_euclid(period / 2.0)
@@ -271,6 +309,7 @@ pub fn fit_tempo(beats_ms: &[u64], features: &FrameFeatures, sample_rate: u32) -
             anchor_ms,
             phase_support: near(phase),
             phase_flipped,
+            tempo_deviates: has_section_at_another_tempo(&times, period),
         }),
     })
 }
@@ -374,6 +413,7 @@ mod tests {
             "{grid:?}"
         );
         assert!(grid.phase_support > 0.95);
+        assert!(!grid.tempo_deviates);
     }
 
     #[test]
@@ -409,6 +449,7 @@ mod tests {
             "{grid:?}"
         );
         assert!((grid.phase_support - 0.8).abs() < 0.01);
+        assert!(!grid.tempo_deviates, "an off-beat section keeps the tempo");
     }
 
     #[test]
@@ -533,6 +574,23 @@ mod tests {
     }
 
     #[test]
+    fn a_sustained_section_at_another_tempo_marks_the_constant_grid() {
+        let mut beats = lattice(120.0, 250, 1_000.0);
+        let start = beats[beats.len() - 1] + 60_000.0 / 125.0;
+        beats.extend(lattice(125.0, 50, start));
+        let strong: Vec<(f64, f32)> = beats.iter().map(|time| (*time, 1.0)).collect();
+
+        let fit = fit_tempo(
+            &rounded(&beats),
+            &features(150_000.0, &strong, &strong),
+            SAMPLE_RATE,
+        )
+        .unwrap();
+
+        assert!(fit.grid.unwrap().tempo_deviates);
+    }
+
+    #[test]
     fn grid_beats_cover_the_requested_span_on_the_lattice() {
         let grid = ConstantGrid {
             bpm: 120.0,
@@ -540,6 +598,7 @@ mod tests {
             anchor_ms: 1_250.0,
             phase_support: 1.0,
             phase_flipped: false,
+            tempo_deviates: false,
         };
 
         assert_eq!(grid.beats_ms(-300.0, 1_900.0), vec![250, 750, 1_250, 1_750]);

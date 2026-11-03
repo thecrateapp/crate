@@ -85,7 +85,10 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
             [round(position / frame_ms) for position in beat_grid_ms], dtype=int
         )
         bpm = round(constant_grid.bpm, 3)
-        clear_phase = constant_grid.phase_support >= _FULL_PROFILE_MIN_PHASE_SUPPORT
+        clear_phase = (
+            constant_grid.phase_support >= _FULL_PROFILE_MIN_PHASE_SUPPORT
+            and not constant_grid.tempo_deviates
+        )
     else:
         beat_grid_ms, grid_frames = tracked_ms, beat_frames
         if tempo_fit is not None:

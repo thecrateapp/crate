@@ -52,6 +52,7 @@ def test_a_whole_tempo_snaps_and_keeps_the_beat_phase() -> None:
     assert grid.bpm == 128.0
     assert abs(_wrap(grid.anchor_ms - 230.0, grid.period_ms)) <= 3.0
     assert grid.phase_support > 0.95
+    assert not grid.tempo_deviates
 
 
 def test_a_section_on_the_off_beat_does_not_move_the_tempo_or_the_phase() -> None:
@@ -68,6 +69,7 @@ def test_a_section_on_the_off_beat_does_not_move_the_tempo_or_the_phase() -> Non
     assert grid.bpm == 128.0
     assert abs(_wrap(grid.anchor_ms - 100.0, period)) <= 1.0
     assert grid.phase_support == pytest.approx(0.8, abs=0.01)
+    assert not grid.tempo_deviates
 
 
 def test_onsets_overrule_beats_tracked_on_the_off_beat() -> None:
@@ -110,6 +112,14 @@ def test_two_tempos_get_no_constant_grid_even_where_they_alias() -> None:
     strong = [(time, 1.0) for time in beats]
 
     assert _fit(beats, strong, strong, 125_000.0).grid is None
+
+
+def test_a_sustained_section_at_another_tempo_marks_the_constant_grid() -> None:
+    beats = _lattice(120.0, 250, 1_000.0)
+    beats += _lattice(125.0, 50, beats[-1] + 60_000.0 / 125.0)
+    strong = [(time, 1.0) for time in beats]
+
+    assert _fit(beats, strong, strong, 150_000.0).grid.tempo_deviates
 
 
 def test_too_few_beats_fit_nothing() -> None:
@@ -174,6 +184,13 @@ def test_grid_constants_match_the_rust_analyzer() -> None:
         "BEAT_TOLERANCE_MS",
         "BLOCK_TOLERANCE_MS",
         "MIN_STEADY_BLOCKS",
+        "SECTION_BEATS",
+        "SECTION_STEP_BEATS",
+        "SECTION_MIN_RUNS",
+        "SECTION_MAX_GRID_SHARE",
+        "SECTION_TEMPO_CHANGE",
+        "SECTION_MIN_COHERENCE",
+        "SECTION_SEARCH_SPAN",
         "SNAP_DRIFT_MS",
         "PHASE_FLIP_RATIO",
         "SLIDE_WINDOW_BEATS",
