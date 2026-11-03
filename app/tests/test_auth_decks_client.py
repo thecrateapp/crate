@@ -666,3 +666,66 @@ def test_native_listen_start_keeps_its_custom_scheme_contract(app_id):
 
     assert captured["app_id"] == app_id
     assert captured["return_to"] == "cratemusic://oauth/callback"
+
+
+# Account linking stays Tauri-only: Decks can only log in.
+@pytest.mark.parametrize("mode", ["link", "native_link"])
+def test_native_oauth_link_rejects_crate_decks(mode):
+    from crate.api.auth import _oauth_start_response
+    from crate.api.schemas.auth import OAuthStartRequest
+
+    with (
+        patch("crate.api.auth._provider_available", return_value=True),
+        pytest.raises(HTTPException) as exc,
+    ):
+        _oauth_start_response(
+            _request(app="decks/0.1.0", path="/api/auth/oauth/google/link"),
+            "google",
+            OAuthStartRequest(
+                return_to=LOOPBACK_CALLBACK,
+                native_code_challenge=CHALLENGE,
+                native_state=STATE,
+            ),
+            mode=mode,
+            user_id=7,
+        )
+
+    assert exc.value.status_code == 400
+
+
+# Decks skips cookies on refresh; a Listen web session must still get them.
+def test_listen_cookie_session_keeps_its_cookies_on_refresh(test_app):
+    session = {
+        "id": "listen-session",
+        "user_id": 7,
+        "expires_at": datetime.now(timezone.utc) + timedelta(days=29),
+        "revoked_at": None,
+        "app_id": "listen-web",
+        "device_label": None,
+        "device_fingerprint": None,
+    }
+    with (
+        patch(
+            "crate.api.auth.verify_refresh_jwt",
+            return_value={"user_id": 7, "sid": "listen-session"},
+        ),
+        patch("crate.api.auth.get_session", return_value=session),
+        patch("crate.api.auth.get_user_by_id", return_value=dict(_USER)),
+        patch("crate.api.auth.touch_session", return_value=session),
+        patch("crate.api.auth.create_jwt", return_value="new-access"),
+        patch("crate.api.auth.create_refresh_jwt", return_value="new-refresh"),
+    ):
+        response = test_app.post(
+            "/api/auth/refresh",
+            json={"refresh_token": "old-refresh"},
+            headers={"X-Crate-App": "listen-web"},
+        )
+
+    assert response.status_code == 200
+    cookies = _set_cookie_headers(response)
+    assert any(
+        cookie.startswith("crate_session_listen=new-access") for cookie in cookies
+    )
+    assert any(
+        cookie.startswith("crate_refresh_listen=new-refresh") for cookie in cookies
+    )
