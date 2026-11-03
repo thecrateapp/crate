@@ -176,6 +176,10 @@ workers and projector, and telemetry health, which shows whether collection
 itself is working. Grafana only listens on the server's loopback;
 `make observability-grafana` opens an SSH tunnel and the browser.
 
+On a home installation the `crate` installer offers the stack as an optional,
+unchecked step on Linux, and `crate observability enable|disable|status` turns it
+on and off later; [Monitoring](monitoring.md#home-installations) lists the steps.
+
 ## Alerts
 
 Crate Operator's supervisor sends alerts to Telegram. Besides the checks it runs

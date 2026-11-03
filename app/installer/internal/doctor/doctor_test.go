@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -19,11 +21,16 @@ import (
 	"github.com/thecrateapp/crate/app/installer/internal/validate"
 )
 
-type composeRunner struct{ ps, check string }
+type composeRunner struct {
+	ps, check  string
+	noNetworks bool
+}
 
 func (r composeRunner) Output(_ context.Context, name string, args ...string) (string, error) {
 	line := strings.Join(args, " ")
 	switch {
+	case strings.Contains(line, "network inspect") && r.noNetworks:
+		return "", errors.New("no such network")
 	case strings.Contains(line, "ps --all --format json"):
 		return r.ps, nil
 	case strings.Contains(line, "runtime.py --check"):
@@ -207,5 +214,67 @@ func TestDoctorChecksCrateAgent(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestDoctorListsMonitoringAsOptional(t *testing.T) {
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer api.Close()
+	dir := installAt(t, api.URL, nil)
+
+	report, err := Run(context.Background(), dir, deps(`{"Service":"crate-api","State":"running","Health":"healthy"}`, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if item := find(report, "Monitoring", "Monitoring"); item.Status != Skip {
+		t.Fatalf("monitoring row %+v", item)
+	}
+	if report.Monitoring == nil || report.Monitoring.Configured || report.Monitoring.Connected {
+		t.Fatalf("monitoring %+v", report.Monitoring)
+	}
+}
+
+func TestDoctorWarnsWhenAMonitoringNetworkIsMissing(t *testing.T) {
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer api.Close()
+	dir := installAt(t, api.URL, map[string]string{
+		"COMPOSE_FILE": "docker-compose.yaml:deploy/observability/compose.projector-prometheus.yaml:" +
+			"deploy/observability/compose.traefik-metrics.yaml:deploy/observability/compose.app-metrics.yaml",
+	})
+	stored := envfile.New()
+	stored.Set("OBS_GRAFANA_PORT", "1")
+	envfile.Write(filepath.Join(dir, "monitoring.env"), envfile.Render(stored, "", nil))
+	d := deps(`{"Service":"crate-api","State":"running","Health":"healthy"}`, nil)
+	d.Run = composeRunner{ps: `{"Service":"crate-api","State":"running","Health":"healthy"}`, noNetworks: true}
+
+	report, err := Run(context.Background(), dir, d)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	crate := find(report, "Monitoring", "Crate")
+	if crate.Status != Warn || !strings.Contains(crate.Detail, "compose.app-metrics.yaml") {
+		t.Fatalf("crate row %+v", crate)
+	}
+	if find(report, "Monitoring", "Grafana").Status != Warn || find(report, "Monitoring", "Services").Status != Warn {
+		t.Fatalf("items %+v", report.Items)
+	}
+	var out bytes.Buffer
+	if err := PrintJSON(&out, report); err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(out.Bytes(), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"healthy", "items", "monitoring"} {
+		if _, ok := decoded[key]; !ok {
+			t.Fatalf("JSON lacks %s: %s", key, out.String())
+		}
+	}
+	monitoringJSON := decoded["monitoring"].(map[string]any)
+	if monitoringJSON["connected"] != false || len(monitoringJSON["missing_overlays"].([]any)) != 3 {
+		t.Fatalf("monitoring JSON %v", monitoringJSON)
 	}
 }

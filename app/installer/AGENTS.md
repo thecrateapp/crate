@@ -34,6 +34,12 @@ for linux/darwin × amd64/arm64.
   adds the application overlays to `COMPOSE_FILE`; `agent.Activate` keeps them after the operator
   overlay. `stack.Stack` leaves out an overlay whose network is missing, so a lost monitoring
   network never stops Crate.
+  The wizard's optional Monitoring step (unchecked by default; `--observability=on|off|keep` with
+  `--yes`) enables, disables or upgrades monitoring after Crate answers; upgrades back up
+  Grafana before an image change and restart services whose mounted file changed
+  (`observability.MountedFiles`, kept equal to `MOUNTED_FILES` in
+  `scripts/observability_release.py`). `crate doctor --json` reports it in a separate
+  `monitoring` object; its items are warnings at most.
 - Reconfiguring must never rotate a generated secret or drop a line the user added to `.env`.
   `install.BuildEnv` keeps existing values; keep it that way.
 - `CRATE_IMAGE_TAG` follows `install.UpgradeImageTag`: a release installer (`vX.Y.Z`, the git
