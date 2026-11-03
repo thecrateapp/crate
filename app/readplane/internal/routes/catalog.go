@@ -18,6 +18,10 @@ import (
 var routeUUIDRE = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 func (s *Server) searchRoute(w http.ResponseWriter, r *http.Request) {
+	if hasAccessTokenBearer(r) {
+		s.fallbackOrRouteMiss(w, r)
+		return
+	}
 	if !s.requireCatalogAuth(w, r) {
 		return
 	}
@@ -309,7 +313,7 @@ func (s *Server) trackRoute(w http.ResponseWriter, r *http.Request) {
 		s.fallbackOrRouteMiss(w, r)
 		return
 	}
-	if parts[len(parts)-1] == "stream" && hasAccessTokenBearer(r) {
+	if hasAccessTokenBearer(r) {
 		s.fallbackOrRouteMiss(w, r)
 		return
 	}
