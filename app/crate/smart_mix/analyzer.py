@@ -10,6 +10,7 @@ import numpy as np
 from crate.smart_mix.cue_detection import detect_mix_cues
 from crate.smart_mix.key_detection import detect_key
 from crate.smart_mix.models import MixProfileQuality, TrackMixProfileDraft
+from crate.smart_mix.tempo_grid import fit_tempo, half_beat_slides
 from crate.smart_mix.versions import ANALYZER_VERSION, PYTHON_ANALYZER
 
 
@@ -24,6 +25,9 @@ _DOWNBEAT_WINDOW_SECONDS = 0.046
 _DOWNBEAT_MIN_BEATS = 16
 _DOWNBEAT_MIN_CONFIDENCE = 0.65
 _DOWNBEAT_MARGIN = 0.3
+# Share of the tracked beats on the published phase of a constant grid for a full
+# profile; without a constant grid, the tracked beats must never slide half a beat.
+_FULL_PROFILE_MIN_PHASE_SUPPORT = 0.7
 WINDOW_SECONDS = 5.0
 FULL_SCAN_HEAD_SECONDS = 240
 FULL_SCAN_TAIL_SECONDS = 120
@@ -59,7 +63,7 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
         sparse=True,
     )
     beat_frames = np.asarray(beat_frames, dtype=int).reshape(-1)
-    beat_grid_ms = tuple(
+    tracked_ms = tuple(
         sorted(
             {
                 max(1, round(float(frame) * HOP_LENGTH * 1_000 / sample_rate))
@@ -68,13 +72,28 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
         )
     )
     bpm, bpm_confidence, tempo_stability = _tempo_features(
-        beat_grid_ms,
+        tracked_ms,
         onset_envelope,
         beat_frames,
     )
+    frame_ms = HOP_LENGTH * 1_000 / sample_rate
+    tempo_fit = fit_tempo(tracked_ms, onset_envelope, low_onsets, frame_ms=frame_ms)
+    constant_grid = tempo_fit.grid if tempo_fit is not None else None
+    if constant_grid is not None:
+        beat_grid_ms = constant_grid.beats_ms(tracked_ms[0], tracked_ms[-1])
+        grid_frames = np.array(
+            [round(position / frame_ms) for position in beat_grid_ms], dtype=int
+        )
+        bpm = round(constant_grid.bpm, 3)
+        clear_phase = constant_grid.phase_support >= _FULL_PROFILE_MIN_PHASE_SUPPORT
+    else:
+        beat_grid_ms, grid_frames = tracked_ms, beat_frames
+        if tempo_fit is not None:
+            bpm = round(tempo_fit.bpm, 3)
+        clear_phase = half_beat_slides(tracked_ms) == 0
     downbeat_anchor_ms, time_signature = _downbeat_features(
         beat_grid_ms,
-        beat_frames,
+        grid_frames,
         bpm_confidence,
         onsets=onset_envelope,
         low_onsets=low_onsets,
@@ -118,6 +137,7 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
             bpm_confidence=bpm_confidence,
             tempo_stability=tempo_stability,
             downbeat_anchor_ms=downbeat_anchor_ms,
+            clear_phase=clear_phase,
         )
     )
 
@@ -479,12 +499,14 @@ def _profile_quality(
     bpm_confidence: float,
     tempo_stability: float,
     downbeat_anchor_ms: int | None,
+    clear_phase: bool = True,
 ) -> MixProfileQuality:
     if (
         len(beat_grid_ms) >= 12
         and bpm_confidence >= 0.75
         and tempo_stability >= 0.8
         and downbeat_anchor_ms is not None
+        and clear_phase
     ):
         return MixProfileQuality.FULL
     return MixProfileQuality.PARTIAL

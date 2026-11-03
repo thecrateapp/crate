@@ -530,3 +530,98 @@ fn short_tracks_are_still_scanned_in_full() {
     assert_eq!(decoded.head.len(), 15 * SAMPLE_RATE as usize);
     assert_eq!(decoded.duration_ms, 15_000);
 }
+
+/// A drum loop: a kick with a click attack on every beat and a hi-hat on every off-beat.
+/// Inside `offbeat_section` (seconds) the kick stops and loud claps sit on the off-beats,
+/// the kind of break where a beat tracker locks onto the off-beat for a while.
+fn drum_loop(bpm: f64, seconds: f64, offbeat_section: Option<(f64, f64)>) -> Vec<f32> {
+    let rate = f64::from(SAMPLE_RATE);
+    let mut samples = vec![0.0_f32; (seconds * rate) as usize];
+    let mut seed = 0x9e37_79b9_u32;
+    let mut noise = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        seed as f32 / u32::MAX as f32 * 2.0 - 1.0
+    };
+    let beat = 60.0 / bpm;
+    let in_break =
+        |time: f64| offbeat_section.is_some_and(|(start, end)| (start..end).contains(&time));
+    let mut index = 0;
+    while index as f64 * beat < seconds {
+        let time = index as f64 * beat;
+        let start = (time * rate).round() as usize;
+        if !in_break(time) {
+            let length = (0.12 * rate) as usize;
+            let mut phase = 0.0_f64;
+            for offset in 0..length {
+                let progress = offset as f64 / length as f64;
+                phase += 2.0 * std::f64::consts::PI * (90.0 - 40.0 * progress) / rate;
+                let click = if offset < 40 { 0.4 * noise() } else { 0.0 };
+                if let Some(sample) = samples.get_mut(start + offset) {
+                    *sample += 0.8 * (-5.0 * progress).exp() as f32 * phase.sin() as f32 + click;
+                }
+            }
+        }
+        let offbeat = time + beat / 2.0;
+        let (amplitude, length) = if in_break(offbeat) {
+            (0.9, 0.08)
+        } else {
+            (0.12, 0.03)
+        };
+        let start = (offbeat * rate).round() as usize;
+        let length = (length * rate) as usize;
+        for offset in 0..length {
+            let envelope = (-6.0 * offset as f32 / length as f32).exp();
+            if let Some(sample) = samples.get_mut(start + offset) {
+                *sample += amplitude * envelope * noise();
+            }
+        }
+        index += 1;
+    }
+    samples
+}
+
+fn worst_beat_error_ms(grid: &[u64], bpm: f64) -> f64 {
+    let beat_ms = 60_000.0 / bpm;
+    grid.iter()
+        .map(|position| {
+            let position = *position as f64;
+            (position - (position / beat_ms).round() * beat_ms).abs()
+        })
+        .fold(0.0, f64::max)
+}
+
+#[test]
+fn v6_reports_an_integer_bpm_for_an_integer_tempo() {
+    let profile = analyze_smart_mix_samples(&drum_loop(128.0, 90.0, None), SAMPLE_RATE);
+
+    assert_eq!(profile.bpm, Some(128.0));
+    let worst = worst_beat_error_ms(&profile.beat_grid_ms, 128.0);
+    assert!(worst <= 5.0, "a beat is {worst} ms off the kicks");
+    assert_eq!(profile.intro_bpm, Some(128.0));
+    assert_eq!(profile.outro_bpm, Some(128.0));
+}
+
+#[test]
+fn v6_grid_holds_the_beat_through_an_offbeat_section() {
+    let profile =
+        analyze_smart_mix_samples(&drum_loop(128.0, 90.0, Some((30.0, 60.0))), SAMPLE_RATE);
+
+    assert_eq!(profile.bpm, Some(128.0));
+    let worst = worst_beat_error_ms(&profile.beat_grid_ms, 128.0);
+    assert!(worst <= 5.0, "a beat is {worst} ms off the beat");
+    let expected = (profile.beat_grid_ms.last().unwrap() - profile.beat_grid_ms[0]) as f64
+        / (60_000.0 / 128.0);
+    assert_eq!(profile.beat_grid_ms.len(), expected.round() as usize + 1);
+}
+
+#[test]
+fn v6_keeps_a_fractional_tempo() {
+    let profile = analyze_smart_mix_samples(&drum_loop(127.6, 120.0, None), SAMPLE_RATE);
+
+    let bpm = f64::from(profile.bpm.unwrap());
+    assert!((bpm - 127.6).abs() <= 0.01, "detected BPM was {bpm}");
+    let worst = worst_beat_error_ms(&profile.beat_grid_ms, 127.6);
+    assert!(worst <= 5.0, "a beat is {worst} ms off the kicks");
+}

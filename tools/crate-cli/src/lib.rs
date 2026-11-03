@@ -18,6 +18,8 @@ pub mod ml;
 pub mod quality;
 pub mod scan;
 pub mod tags;
+#[cfg(feature = "analysis")]
+pub mod tempo_grid;
 
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};

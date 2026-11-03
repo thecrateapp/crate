@@ -18,6 +18,7 @@ use crate::beat_tracking;
 use crate::key_detection::detect_key;
 use crate::loudness::{LoudnessMeter, LoudnessSummary, MEASUREMENT_VERSION};
 use crate::mix_profile::{to_camelot, SmartMixProfileResult, ANALYZER_VERSION};
+use crate::tempo_grid::{self, ConstantGrid};
 use crate::{collect_audio_files, parse_extensions};
 
 const TARGET_SAMPLE_RATE: u32 = 22050;
@@ -36,6 +37,10 @@ const LOCAL_JITTER_LIMIT: f32 = 0.20;
 const CUE_DOWNBEAT_BEATS: usize = 32;
 const LOCAL_MIX_WINDOW_MS: f64 = 12_000.0;
 const FULL_PROFILE_MIN_STABILITY: f32 = 0.8;
+/// Share of the tracked beats that must sit on the published phase of a constant grid
+/// for a full profile; below it the grid may be half a beat out. Without a constant grid,
+/// a full profile needs tracked beats that never slide half a beat.
+const FULL_PROFILE_MIN_PHASE_SUPPORT: f64 = 0.7;
 
 #[derive(Serialize)]
 pub struct AnalysisResult {
@@ -698,6 +703,47 @@ fn cue_downbeat_ms(
     beat_grid_ms.get(index).copied()
 }
 
+/// On a constant grid the tempo and beat at a cue are the grid's. Stability still comes
+/// from the tracked beats around the cue, so a messy outro stays messy.
+fn on_constant_grid(
+    local: LocalBeat,
+    grid: Option<&ConstantGrid>,
+    cue_ms: Option<u64>,
+) -> LocalBeat {
+    match (grid, cue_ms) {
+        (Some(grid), Some(cue_ms)) => {
+            let beat = grid.beat_near_ms(cue_ms as f64);
+            LocalBeat {
+                bpm: grid.bpm as f32,
+                beat_ms: (beat >= 0.0).then(|| beat.round() as u64),
+                stability: local.stability,
+            }
+        }
+        _ => local,
+    }
+}
+
+/// The published beats and their onset frames: the constant grid over the tracked span
+/// when the track keeps one tempo, otherwise the tracked beats.
+fn published_grid(
+    grid: Option<&ConstantGrid>,
+    tracked_ms: &[u64],
+    tracked_frames: &[usize],
+    sample_rate: u32,
+) -> (Vec<u64>, Vec<usize>) {
+    let (Some(grid), Some(first), Some(last)) = (grid, tracked_ms.first(), tracked_ms.last())
+    else {
+        return (tracked_ms.to_vec(), tracked_frames.to_vec());
+    };
+    let beats = grid.beats_ms(*first as f64, *last as f64);
+    let frame_ms = HOP_SIZE as f64 * 1_000.0 / f64::from(sample_rate);
+    let frames = beats
+        .iter()
+        .map(|beat| (*beat as f64 / frame_ms).round() as usize)
+        .collect();
+    (beats, frames)
+}
+
 struct TempoFeatures {
     frame_bpm: Option<f32>,
     stability: f32,
@@ -941,10 +987,23 @@ pub fn analyze_smart_mix_segments(
     let features = beat_tracking::frame_features(samples, sample_rate);
     let onsets = &features.onsets;
     let beat_frames = beat_tracking::track_beats(onsets, sample_rate);
-    let beat_grid_ms = beat_tracking::refine_beat_times_ms(samples, sample_rate, &beat_frames);
+    let tracked_ms = beat_tracking::refine_beat_times_ms(samples, sample_rate, &beat_frames);
     let tempo = tempo_features(&beat_frames, onsets, sample_rate);
     let tempo_stability = tempo.stability;
-    let bpm = grid_bpm(&beat_grid_ms).or(tempo.frame_bpm);
+    let tempo_fit = tempo_grid::fit_tempo(&tracked_ms, &features, sample_rate);
+    let constant_grid = tempo_fit.as_ref().and_then(|fit| fit.grid.clone());
+    let (beat_grid_ms, grid_frames) = published_grid(
+        constant_grid.as_ref(),
+        &tracked_ms,
+        &beat_frames,
+        sample_rate,
+    );
+    let bpm = match (&constant_grid, &tempo_fit) {
+        (Some(grid), _) => Some(grid.bpm as f32),
+        (None, Some(fit)) => Some(((fit.bpm * 1_000.0).round() / 1_000.0) as f32),
+        (None, None) => grid_bpm(&tracked_ms),
+    }
+    .or(tempo.frame_bpm);
     let (key, scale, key_confidence) = detect_key(samples, sample_rate);
     let camelot = to_camelot(&key, &scale).map(str::to_owned);
     let (active_start_ms, intro_cue_ms, mut outro_cue_ms, mut active_end_ms) =
@@ -969,9 +1028,11 @@ pub fn analyze_smart_mix_segments(
             sample_rate,
         ),
     };
-    let intro_local = local_beat(&beat_grid_ms, &beat_frames, sample_rate, intro_cue_ms);
+    let intro_local = local_beat(&tracked_ms, &beat_frames, sample_rate, intro_cue_ms)
+        .map(|local| on_constant_grid(local, constant_grid.as_ref(), intro_cue_ms));
     let outro_local = if tail.is_none() {
-        local_beat(&beat_grid_ms, &beat_frames, sample_rate, outro_cue_ms)
+        local_beat(&tracked_ms, &beat_frames, sample_rate, outro_cue_ms)
+            .map(|local| on_constant_grid(local, constant_grid.as_ref(), outro_cue_ms))
     } else {
         None
     };
@@ -981,14 +1042,14 @@ pub fn analyze_smart_mix_segments(
     let bpm_confidence = tempo.confidence(cue_stability.unwrap_or(tempo_stability));
     let downbeat_detectable = tempo.confidence(tempo_stability) >= DOWNBEAT_MIN_CONFIDENCE;
     let intro_downbeat_ms = downbeat_detectable
-        .then(|| cue_downbeat_ms(&features, &beat_frames, &beat_grid_ms, intro_cue_ms))
+        .then(|| cue_downbeat_ms(&features, &grid_frames, &beat_grid_ms, intro_cue_ms))
         .flatten();
     let outro_downbeat_ms = (downbeat_detectable && tail.is_none())
-        .then(|| cue_downbeat_ms(&features, &beat_frames, &beat_grid_ms, outro_cue_ms))
+        .then(|| cue_downbeat_ms(&features, &grid_frames, &beat_grid_ms, outro_cue_ms))
         .flatten();
     let downbeat_anchor_ms = downbeat_detectable
         .then(|| {
-            beat_tracking::downbeat_phase(&features, &beat_frames)
+            beat_tracking::downbeat_phase(&features, &grid_frames)
                 .and_then(|phase| beat_grid_ms.get(phase).copied())
         })
         .flatten()
@@ -1007,12 +1068,20 @@ pub fn analyze_smart_mix_segments(
             && intro.stability >= FULL_PROFILE_MIN_STABILITY
             && outro.stability >= FULL_PROFILE_MIN_STABILITY
     });
-    let quality =
-        if tail.is_none() && beat_grid_ms.len() >= 12 && bpm_confidence >= 0.75 && steady_cues {
-            "full"
-        } else {
-            "partial"
-        };
+    let clear_phase = match &constant_grid {
+        Some(grid) => grid.phase_support >= FULL_PROFILE_MIN_PHASE_SUPPORT,
+        None => tempo_grid::half_beat_slides(&tracked_ms) == 0,
+    };
+    let quality = if tail.is_none()
+        && beat_grid_ms.len() >= 12
+        && bpm_confidence >= 0.75
+        && steady_cues
+        && clear_phase
+    {
+        "full"
+    } else {
+        "partial"
+    };
 
     SmartMixProfileResult {
         schema_version: 1,
