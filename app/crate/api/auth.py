@@ -509,12 +509,31 @@ def _is_listen_request(
     return "listen." in origin
 
 
+def _is_decks_client(request: Request, *, app_id: str | None = None) -> bool:
+    return native_oauth_auth.is_decks_app_id(
+        app_id
+    ) or native_oauth_auth.is_decks_app_id(request.headers.get("x-crate-app"))
+
+
+def _is_refresh_capable_client(
+    request: Request, *, app_id: str | None = None, return_to: str | None = None
+) -> bool:
+    """Listen and Crate Decks get refresh tokens and the Listen session policy.
+
+    Cookie naming stays on `_is_listen_request`: Decks is bearer-only and never
+    receives auth cookies.
+    """
+    return _is_listen_request(
+        request, app_id=app_id, return_to=return_to
+    ) or _is_decks_client(request, app_id=app_id)
+
+
 def _access_expiry_hours(
     request: Request, *, app_id: str | None = None, return_to: str | None = None
 ) -> int:
     return (
         LISTEN_ACCESS_TOKEN_EXPIRY_HOURS
-        if _is_listen_request(request, app_id=app_id, return_to=return_to)
+        if _is_refresh_capable_client(request, app_id=app_id, return_to=return_to)
         else JWT_EXPIRY_HOURS
     )
 
@@ -524,7 +543,7 @@ def _session_expiry_hours(
 ) -> int:
     return (
         24 * LISTEN_REFRESH_TOKEN_EXPIRY_DAYS
-        if _is_listen_request(request, app_id=app_id, return_to=return_to)
+        if _is_refresh_capable_client(request, app_id=app_id, return_to=return_to)
         else JWT_EXPIRY_HOURS
     )
 
@@ -766,7 +785,7 @@ def _request_device_fingerprint(
     )
     if explicit:
         return explicit
-    if not _is_listen_request(request, app_id=app_id):
+    if not _is_refresh_capable_client(request, app_id=app_id):
         return None
     source = "|".join(
         part
@@ -1014,7 +1033,7 @@ def _callback_origin(return_to: str | None = None, *, app_id: str | None = None)
     allowed = _allowed_redirect_origins()
     if return_to and (
         native_oauth_auth.is_native_callback_url(return_to)
-        or _is_native_listen_app_id(app_id)
+        or native_oauth_auth.is_native_app_id(app_id)
     ):
         # Native/Tauri OAuth still needs an HTTPS callback registered with
         # Google/Apple. Keep it on Listen, not Admin, so desktop/mobile auth
@@ -1102,6 +1121,12 @@ def _native_oauth_completion_redirect_url(
         )
         fragment = urlencode({"desktop": "tauri", "code": code, "state": state})
         return f"{redirect_url}#{fragment}"
+
+    if native_oauth_auth.is_decks_app_id(app_id):
+        if not native_oauth_auth.is_decks_loopback_callback_url(return_to):
+            raise HTTPException(status_code=400, detail="Invalid native OAuth callback")
+        redirect_url = _append_query_param(str(return_to), "code", code)
+        return _append_query_param(redirect_url, "state", state)
 
     redirect_url = (
         return_to
@@ -1360,7 +1385,7 @@ def _create_login_session(
     )
     refresh_token = (
         create_refresh_jwt(user["id"], session_id, expires_at_dt)
-        if _is_listen_request(request, app_id=app)
+        if _is_refresh_capable_client(request, app_id=app)
         else None
     )
     return token, session, refresh_token
@@ -1451,6 +1476,8 @@ def _set_login_cookies(
     app_id: str | None = None,
     return_to: str | None = None,
 ) -> None:
+    if _is_decks_client(request, app_id=app_id):
+        return
     _clear_cookies_for_context(
         response,
         request,
@@ -2033,6 +2060,8 @@ def refresh_auth(request: Request, body: RefreshTokenRequest | None = None):
             },
         }
     )
+    if _is_decks_client(request, app_id=session_app_id):
+        return response
     _clear_cookies_for_context(response, request, app_id=session_app_id)
     _set_auth_cookie(
         response,
@@ -2428,7 +2457,9 @@ def _oauth_start_response(
             status_code=403, detail=f"{provider.title()} login is unavailable"
         )
 
-    app_id = _infer_oauth_app_id(request, body.return_to)
+    app_id = native_oauth_auth.native_binding_app_id(
+        _infer_oauth_app_id(request, body.return_to)
+    )
     if mode == "native_link":
         _validate_native_oauth_link_start(
             app_id=app_id,
@@ -2899,8 +2930,11 @@ def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
             detail="Native OAuth exchange is not enabled",
         )
     app_id = (request.headers.get("x-crate-app") or "").strip().lower()
-    if not _is_native_listen_app_id(app_id):
+    if not native_oauth_auth.is_native_app_id(app_id):
         raise HTTPException(status_code=400, detail="Invalid native OAuth client")
+    # The handoff is bound to the canonical app ID (`crate-decks` for every
+    # `decks/<version>`); the session keeps the client's own header value.
+    binding_app_id = native_oauth_auth.native_binding_app_id(app_id) or app_id
     if not _NATIVE_VERIFIER_RE.fullmatch(body.code_verifier):
         raise HTTPException(
             status_code=400,
@@ -2913,7 +2947,7 @@ def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
             code=body.code,
             state=body.state,
             verifier=body.code_verifier,
-            app_id=app_id,
+            app_id=binding_app_id,
         )
         if completed is not None:
             return completed
@@ -2932,7 +2966,7 @@ def native_oauth_exchange(request: Request, body: NativeOAuthExchangeRequest):
             status_code=503,
             detail="Native OAuth exchange is temporarily unavailable",
         ) from exc
-    if not secrets.compare_digest(handoff.app_id, app_id):
+    if not secrets.compare_digest(handoff.app_id, binding_app_id):
         raise HTTPException(status_code=401, detail="Native OAuth client mismatch")
     try:
         user = get_user_by_id(handoff.user_id)
