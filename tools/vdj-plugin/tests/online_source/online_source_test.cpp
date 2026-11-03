@@ -8,6 +8,8 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstdio>
+#include <exception>
 #include <filesystem>
 #include <functional>
 #include <future>
@@ -337,8 +339,12 @@ struct Harness {
     ~Harness()
     {
         source.reset();
-        std::filesystem::remove(cache_path);
-        std::filesystem::remove(spool_path);
+        std::error_code cache_error;
+        std::filesystem::remove(cache_path, cache_error);
+        CRATE_CHECK(!cache_error);
+        std::error_code spool_error;
+        std::filesystem::remove(spool_path, spool_error);
+        CRATE_CHECK(!spool_error);
     }
 };
 
@@ -922,41 +928,53 @@ void keys_and_cover_urls_map_to_virtualdj()
 
 } // namespace
 
+void run(const char* name, void (*test)())
+{
+    std::printf("%s\n", name);
+    std::fflush(stdout);
+    try {
+        test();
+    } catch (const std::exception& error) {
+        std::fprintf(stderr, "%s threw: %s\n", name, error.what());
+        std::exit(EXIT_FAILURE);
+    }
+}
+
 int main()
 {
-    search_publishes_tracks_once_with_absolute_covers();
-    a_new_search_supersedes_one_in_flight();
-    cancel_search_leaves_the_list_untouched();
-    a_cancel_after_the_response_does_not_publish();
-    a_disconnected_source_finishes_empty_lists();
-    folder_pages_are_published_together();
-    a_new_folder_cancels_one_still_paging();
-    folder_list_adds_the_compatible_folder();
-    current_compatible_folder_without_a_crate_track_is_empty();
-    an_unknown_track_only_offers_compatible_tracks();
-    a_listed_track_offers_its_artist_and_album();
-    names_with_quotes_fall_back_to_a_text_search();
-    a_track_that_cannot_load_says_why();
-    a_ready_track_resolves_to_a_ticketed_stream();
-    search_tracks_show_camelot_and_energy();
-    compatible_tracks_show_crate_fields();
-    a_seed_without_profile_shows_a_notice();
-    camelot_keys_map_to_virtualdj_keys();
-    plays_are_reported_with_the_track_names();
-    plays_wait_in_the_spool_until_crate_answers();
-    decks_beyond_the_layout_are_not_read();
-    automix_lists_a_track_in_vdj_before_queueing_it();
-    automix_chains_the_second_track_from_the_first_and_never_repeats_an_album();
-    automix_waits_while_two_tracks_are_queued();
-    a_manual_change_puts_a_fitting_track_right_next();
-    a_track_coming_from_the_queue_is_not_a_manual_change();
-    a_track_is_queued_anyway_if_vdj_never_lists_the_folder();
-    a_busy_browser_is_never_moved();
-    an_unknown_browser_folder_is_never_left();
-    an_open_search_is_never_left();
-    opening_a_folder_ends_the_search();
-    automix_does_nothing_without_permission_or_with_automix_off();
-    a_track_opens_its_album_in_listen();
-    open_in_crate_needs_a_listen_url();
-    keys_and_cover_urls_map_to_virtualdj();
+    run("search_publishes_tracks_once_with_absolute_covers", search_publishes_tracks_once_with_absolute_covers);
+    run("a_new_search_supersedes_one_in_flight", a_new_search_supersedes_one_in_flight);
+    run("cancel_search_leaves_the_list_untouched", cancel_search_leaves_the_list_untouched);
+    run("a_cancel_after_the_response_does_not_publish", a_cancel_after_the_response_does_not_publish);
+    run("a_disconnected_source_finishes_empty_lists", a_disconnected_source_finishes_empty_lists);
+    run("folder_pages_are_published_together", folder_pages_are_published_together);
+    run("a_new_folder_cancels_one_still_paging", a_new_folder_cancels_one_still_paging);
+    run("folder_list_adds_the_compatible_folder", folder_list_adds_the_compatible_folder);
+    run("current_compatible_folder_without_a_crate_track_is_empty", current_compatible_folder_without_a_crate_track_is_empty);
+    run("an_unknown_track_only_offers_compatible_tracks", an_unknown_track_only_offers_compatible_tracks);
+    run("a_listed_track_offers_its_artist_and_album", a_listed_track_offers_its_artist_and_album);
+    run("names_with_quotes_fall_back_to_a_text_search", names_with_quotes_fall_back_to_a_text_search);
+    run("a_track_that_cannot_load_says_why", a_track_that_cannot_load_says_why);
+    run("a_ready_track_resolves_to_a_ticketed_stream", a_ready_track_resolves_to_a_ticketed_stream);
+    run("search_tracks_show_camelot_and_energy", search_tracks_show_camelot_and_energy);
+    run("compatible_tracks_show_crate_fields", compatible_tracks_show_crate_fields);
+    run("a_seed_without_profile_shows_a_notice", a_seed_without_profile_shows_a_notice);
+    run("camelot_keys_map_to_virtualdj_keys", camelot_keys_map_to_virtualdj_keys);
+    run("plays_are_reported_with_the_track_names", plays_are_reported_with_the_track_names);
+    run("plays_wait_in_the_spool_until_crate_answers", plays_wait_in_the_spool_until_crate_answers);
+    run("decks_beyond_the_layout_are_not_read", decks_beyond_the_layout_are_not_read);
+    run("automix_lists_a_track_in_vdj_before_queueing_it", automix_lists_a_track_in_vdj_before_queueing_it);
+    run("automix_chains_the_second_track_from_the_first_and_never_repeats_an_album", automix_chains_the_second_track_from_the_first_and_never_repeats_an_album);
+    run("automix_waits_while_two_tracks_are_queued", automix_waits_while_two_tracks_are_queued);
+    run("a_manual_change_puts_a_fitting_track_right_next", a_manual_change_puts_a_fitting_track_right_next);
+    run("a_track_coming_from_the_queue_is_not_a_manual_change", a_track_coming_from_the_queue_is_not_a_manual_change);
+    run("a_track_is_queued_anyway_if_vdj_never_lists_the_folder", a_track_is_queued_anyway_if_vdj_never_lists_the_folder);
+    run("a_busy_browser_is_never_moved", a_busy_browser_is_never_moved);
+    run("an_unknown_browser_folder_is_never_left", an_unknown_browser_folder_is_never_left);
+    run("an_open_search_is_never_left", an_open_search_is_never_left);
+    run("opening_a_folder_ends_the_search", opening_a_folder_ends_the_search);
+    run("automix_does_nothing_without_permission_or_with_automix_off", automix_does_nothing_without_permission_or_with_automix_off);
+    run("a_track_opens_its_album_in_listen", a_track_opens_its_album_in_listen);
+    run("open_in_crate_needs_a_listen_url", open_in_crate_needs_a_listen_url);
+    run("keys_and_cover_urls_map_to_virtualdj", keys_and_cover_urls_map_to_virtualdj);
 }
