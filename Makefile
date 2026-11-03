@@ -1292,18 +1292,7 @@ observability-start-preflight: observability-config ## Check explicit monitoring
 	@$(OBS_PYTHON) scripts/observability_preflight.py --env-file "$$OBS_ENV_FILE" --project-dir "$$OBS_PROJECT_DIR" $(if $(filter 1,$(OBS_INITIALIZE_EMPTY)),--initialize-empty) -- $(OBS_DC)
 
 observability-up: observability-start-preflight ## Explicitly start only monitoring (provision secrets first)
-	@case "$$(docker info --format '{{.Driver}}'):$(OBS_CONTAINERD)" in overlay2:0|overlayfs:1) ;; *) echo "Monitoring requires overlay2 (OBS_CONTAINERD=0) or overlayfs (OBS_CONTAINERD=1); no services started."; exit 1 ;; esac
-	@for service in crate-prometheus crate-grafana; do \
-		projects="$$(docker ps --filter "label=com.docker.compose.service=$$service" --format '{{with .Label "com.docker.compose.project"}}{{.}}{{else}}unmanaged{{end}}')" || { echo "Cannot check existing monitoring writers; no services started." >&2; exit 1; }; \
-		if [ -n "$$(printf '%s\n' "$$projects" | sed '/^crate-observability$$/d; /^$$/d')" ]; then \
-			echo "Monitoring writers from another project are running. Migrate the old monitoring project before standalone startup." >&2; exit 1; \
-		fi; \
-	done
-ifeq ($(OBS_CONTAINERD),1)
-	@socket_path=$$(readlink -f "$${OBS_CONTAINERD_SOCKET:-/run/containerd/containerd.sock}") && case "$$socket_path" in /run/*) ;; *) echo "Containerd socket must resolve under masked /run; no services started."; exit 1 ;; esac || { echo "Unable to validate containerd socket; no services started."; exit 1; }
-	@$(OBS_DC) up -d --no-deps --wait --wait-timeout 45 crate-observability-docker-proxy
-endif
-	@$(OBS_DC) up -d --no-deps $(OBS_SERVICES)
+	@OBS_CONTAINERD=$(OBS_CONTAINERD) scripts/observability-up.sh
 
 observability-stop: observability-scope ## Stop only standalone monitoring; preserve all data
 	@$(OBS_DC) stop $(OBS_SERVICES)
