@@ -1,4 +1,5 @@
-"""Library paths stay inside the library root."""
+"""Library paths stay inside the library root, and stored paths resolve the
+same way in FastAPI as in the read plane (`app/readplane/internal/media/path.go`)."""
 
 from __future__ import annotations
 
@@ -43,3 +44,33 @@ def test_safe_path_rejects_a_symlink_into_a_sibling_directory(library):
     link.symlink_to(library.parent / "music-private" / "secret.flac")
 
     assert safe_path(library, "Artist/leak.flac") is None
+
+
+@pytest.mark.parametrize(
+    "stored",
+    ["/data/Artist/track.flac", "/music/Artist/track.flac", "Artist/track.flac"],
+)
+def test_resolve_source_path_maps_stored_paths_like_the_read_plane(
+    library, monkeypatch, stored
+):
+    from crate.streaming import service
+
+    monkeypatch.setattr(service, "library_path", lambda: library)
+
+    assert (
+        service.resolve_source_path({"path": stored})
+        == (library / "Artist" / "track.flac").resolve()
+    )
+
+
+@pytest.mark.parametrize(
+    "stored", ["/data/../music-private/secret.flac", "/elsewhere/track.flac"]
+)
+def test_resolve_source_path_rejects_stored_paths_outside_the_library(
+    library, monkeypatch, stored
+):
+    from crate.streaming import service
+
+    monkeypatch.setattr(service, "library_path", lambda: library)
+
+    assert service.resolve_source_path({"path": stored}) is None
