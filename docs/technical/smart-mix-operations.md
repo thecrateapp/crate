@@ -135,16 +135,19 @@ profile into a deck (Android, Crate Decks) must follow these definitions.
   section half a beat out. v6 fits the strongest constant pulse at twice the beat rate,
   where an off-beat lines up with a beat. When the beats stay on it along most of the
   track it publishes a constant grid, snaps the tempo to a whole or half BPM if that keeps
-  the grid within 25 ms over the track, and checks its phase: the majority of the tracked
-  beats chooses between the two half-beat phases, unless the bass and broadband onsets are
-  both clearly stronger on the other. A track whose tempo moves keeps its tracked beats.
+  the grid within 25 ms over the track, and checks its phase against the bass: the
+  majority of the tracked beats chooses between the two half-beat phases, real bass twice
+  as strong on the other phase contests that choice, and four times as strong moves the
+  grid onto the kick (the tracker follows broadband onsets, so quiet hats on the off-beat
+  can outvote a kick without a click). A track whose tempo moves keeps its tracked beats.
   Local `intro*`/`outro*` tempo and beats follow the constant grid only where the tracked
   beats around the cue keep its tempo within 1 %; their stability always comes from the
   tracked beats.
 - **Quality.** A profile is `full` only if its grid holds. On a constant grid: at least
-  70 % of the tracked beats on the published phase, both cues keeping its tempo, and no
-  stretch of at least 28 tracked beats coherent at a tempo 2 % or more away from it (more
-  than a quarter beat of drift). Without one: tracked beats that never slide half a beat.
+  70 % of the tracked beats on the published phase, a phase the bass does not contest,
+  both cues keeping its tempo, and no stretch of at least 28 tracked beats coherent at a
+  tempo 2 % or more away from it (more than a quarter beat of drift). Without one: tracked
+  beats that never slide half a beat and whose phase the bass does not contest.
   Other profiles stay `partial`; the planner can still beatmatch from their cue beats, but
   clients must not trust their whole grid.
 

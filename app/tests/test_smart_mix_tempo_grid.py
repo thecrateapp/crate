@@ -85,6 +85,58 @@ def test_onsets_overrule_beats_tracked_on_the_off_beat() -> None:
     assert grid.phase_support == 0.0
 
 
+def test_a_track_without_bass_never_flips_its_phase() -> None:
+    period = 60_000.0 / 120.0
+    beats = _lattice(120.0, 200, 250.0)
+    broad = [(time, 0.4) for time in beats] + [
+        (time, 1.0) for time in _lattice(120.0, 200, 250.0 + period / 2)
+    ]
+    from crate.smart_mix.tempo_grid import fit_tempo
+
+    onsets, low_onsets = _envelopes(110_000.0, broad, [])
+    low_onsets[:] = 0.0
+
+    grid = fit_tempo(
+        [round(beat) for beat in beats], onsets, low_onsets, frame_ms=FRAME_MS
+    ).grid
+
+    assert not grid.phase_flipped
+    assert abs(_wrap(grid.anchor_ms - 250.0, period)) <= 1.0
+
+
+def test_a_kick_on_the_other_phase_flips_a_grid_tracked_on_the_hats() -> None:
+    period = 60_000.0 / 124.0
+    hats = _lattice(124.0, 240, 1_000.0 + period / 2)
+    kicks = _lattice(124.0, 240, 1_000.0)
+    broad = [(time, 1.0) for time in hats] + [(time, 0.4) for time in kicks]
+
+    grid = _fit(hats, broad, [(time, 1.0) for time in kicks], 120_000.0).grid
+
+    assert grid.phase_flipped and grid.phase_contested
+    assert abs(_wrap(grid.anchor_ms - 1_000.0, period)) <= 1.0
+
+
+def test_a_kick_between_the_tracked_beats_contests_them() -> None:
+    from crate.smart_mix.tempo_grid import bass_contests_tracked_beats
+
+    period = 60_000.0 / 87.0
+    kicks, time = [], 1_000.0
+    for index in range(150):
+        kicks.append(time)
+        time += period * (1.0 + 0.01 * math.sin(index / 9.0))
+    hats = [(left + right) / 2 for left, right in zip(kicks, kicks[1:])]
+    low = [(time, 1.0) for time in kicks]
+    on_hats = _envelopes(110_000.0, [(time, 1.0) for time in hats], low)
+    on_kicks = _envelopes(110_000.0, low, low)
+
+    assert bass_contests_tracked_beats(
+        [round(beat) for beat in hats], *on_hats, frame_ms=FRAME_MS
+    )
+    assert not bass_contests_tracked_beats(
+        [round(beat) for beat in kicks], *on_kicks, frame_ms=FRAME_MS
+    )
+
+
 def test_a_fractional_tempo_is_not_snapped() -> None:
     beats = _lattice(127.6, 400, 50.0)
     strong = [(time, 1.0) for time in beats]
@@ -192,7 +244,9 @@ def test_grid_constants_match_the_rust_analyzer() -> None:
         "SECTION_MIN_COHERENCE",
         "SECTION_SEARCH_SPAN",
         "SNAP_DRIFT_MS",
-        "PHASE_FLIP_RATIO",
+        "KICK_CONTEST_RATIO",
+        "KICK_FLIP_RATIO",
+        "KICK_MIN_SHARE",
         "SLIDE_WINDOW_BEATS",
         "SLIDE_MIN_FRACTION",
         "SLIDE_CONTEXT_BEATS",
@@ -288,3 +342,49 @@ def test_analyze_mix_profile_holds_the_beat_through_an_offbeat_section(
 
     assert profile.bpm == 128.0
     _assert_on_the_beat(profile.beat_grid_ms, 128.0)
+
+
+def _sine_kick_under_hats(path: Path, *, kick_gain: float, high_pass: bool) -> None:
+    """Drum-machine kick without a click on every beat from 1 s and a noise hat on
+    every off-beat at 124 BPM; ``high_pass`` removes the hats' bass."""
+    from scipy.signal import butter, sosfilt
+
+    rng = np.random.default_rng(5)
+    beat = 60.0 / 124.0
+    audio = np.zeros(round((1.0 + 300 * beat + 2.0) * SAMPLE_RATE))
+    kick_time = np.arange(round(0.12 * SAMPLE_RATE)) / SAMPLE_RATE
+    kick = np.sin(
+        np.cumsum(2 * np.pi * (50 + 100 * np.exp(-30 * kick_time)) / SAMPLE_RATE)
+    )
+    kick *= kick_gain * np.exp(-25 * kick_time)
+    sos = butter(4, 2_000, btype="highpass", fs=SAMPLE_RATE, output="sos")
+    for index in range(300):
+        start = round((1.0 + index * beat) * SAMPLE_RATE)
+        audio[start : start + kick.size] += kick
+        hat = rng.standard_normal(round(0.09 * SAMPLE_RATE))
+        if high_pass:
+            hat = sosfilt(sos, hat)
+        hat *= np.exp(-4.0 * np.arange(hat.size) / hat.size)
+        start = round((1.0 + (index + 0.5) * beat) * SAMPLE_RATE)
+        audio[start : start + hat.size] += hat
+    audio = 0.9 * audio / np.max(np.abs(audio))
+    wavfile.write(path, SAMPLE_RATE, (audio * 32767).astype(np.int16))
+
+
+@pytest.mark.parametrize("high_pass", [True, False], ids=["high-passed", "broadband"])
+def test_analyze_mix_profile_follows_the_kick_or_stays_partial(
+    tmp_path: Path, high_pass: bool
+) -> None:
+    from crate.smart_mix.analyzer import analyze_mix_profile
+
+    track = tmp_path / "kick-under-hats.wav"
+    _sine_kick_under_hats(track, kick_gain=0.3, high_pass=high_pass)
+
+    profile = analyze_mix_profile(track)
+
+    beat_ms = 60_000.0 / 124.0
+    on_kicks = all(
+        abs(_wrap(position - 1_000.0, beat_ms)) <= 25.0
+        for position in profile.beat_grid_ms
+    )
+    assert on_kicks or profile.quality == "partial"

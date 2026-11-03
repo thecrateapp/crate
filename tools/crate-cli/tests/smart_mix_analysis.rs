@@ -702,3 +702,159 @@ fn v6_measures_the_outro_tempo_when_only_the_last_bars_change() {
         "a full profile on a 120 BPM constant grid over a 125 BPM ending"
     );
 }
+
+/// The kick of a drum machine without a click: a 150 to 50 Hz sweep.
+fn sine_kick(samples: &mut [f32], start: usize, amplitude: f32) {
+    let length = (0.12 * SAMPLE_RATE as f32) as usize;
+    let mut phase = 0.0_f32;
+    for offset in 0..length {
+        let time = offset as f32 / SAMPLE_RATE as f32;
+        phase +=
+            2.0 * std::f32::consts::PI * (50.0 + 100.0 * (-30.0 * time).exp()) / SAMPLE_RATE as f32;
+        if let Some(sample) = samples.get_mut(start + offset) {
+            *sample += amplitude * (-25.0 * time).exp() * phase.sin();
+        }
+    }
+}
+
+/// Fourth-order high-pass (two RBJ biquads), so the hats carry nothing in the bass.
+fn high_passed(input: &[f32], cutoff_hz: f32) -> Vec<f32> {
+    let w0 = 2.0 * std::f32::consts::PI * cutoff_hz / SAMPLE_RATE as f32;
+    let alpha = w0.sin() / (2.0 * std::f32::consts::FRAC_1_SQRT_2);
+    let (cos, a0) = (w0.cos(), 1.0 + alpha);
+    let b = [
+        (1.0 + cos) / 2.0 / a0,
+        -(1.0 + cos) / a0,
+        (1.0 + cos) / 2.0 / a0,
+    ];
+    let a = [-2.0 * cos / a0, (1.0 - alpha) / a0];
+    let mut signal = input.to_vec();
+    for _ in 0..2 {
+        let (mut x1, mut x2, mut y1, mut y2) = (0.0_f32, 0.0_f32, 0.0_f32, 0.0_f32);
+        for sample in signal.iter_mut() {
+            let x = *sample;
+            let y = b[0] * x + b[1] * x1 + b[2] * x2 - a[0] * y1 - a[1] * y2;
+            (x2, x1, y2, y1) = (x1, x, y1, y);
+            *sample = y;
+        }
+    }
+    signal
+}
+
+/// A sine kick on every beat from 1 s and a noise hat on every off-beat, over a quiet
+/// chord, with the tempo moving linearly from `start_bpm` to `end_bpm`. Returns the audio
+/// and the kick times (ms). `hat_cutoff_hz` high-passes the hats; zero leaves them
+/// broadband.
+fn kick_and_offbeat_hats(
+    (start_bpm, end_bpm): (f32, f32),
+    beats: usize,
+    kick_gain: f32,
+    hat_gain: f32,
+    hat_seconds: f32,
+    hat_cutoff_hz: f32,
+) -> (Vec<f32>, Vec<f64>) {
+    let mut kicks = Vec::with_capacity(beats);
+    let mut time = 1.0_f32;
+    for index in 0..beats {
+        kicks.push(time);
+        time += 60.0 / (start_bpm + (end_bpm - start_bpm) * index as f32 / beats as f32);
+    }
+    let mut samples = vec![0.0_f32; ((time + 2.0) * SAMPLE_RATE as f32) as usize];
+    let mut seed = 0x1357_9bdf_u32;
+    let mut noise = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        seed as f32 / u32::MAX as f32 * 2.0 - 1.0
+    };
+    let hat_length = (hat_seconds * SAMPLE_RATE as f32) as usize;
+    for (index, kick) in kicks.iter().enumerate() {
+        sine_kick(
+            &mut samples,
+            (kick * SAMPLE_RATE as f32) as usize,
+            kick_gain,
+        );
+        let next = kicks.get(index + 1).copied().unwrap_or(time);
+        let raw: Vec<f32> = (0..hat_length).map(|_| noise()).collect();
+        let hat = if hat_cutoff_hz > 0.0 {
+            high_passed(&raw, hat_cutoff_hz)
+        } else {
+            raw
+        };
+        let start = ((kick + next) / 2.0 * SAMPLE_RATE as f32) as usize;
+        for (offset, value) in hat.iter().enumerate() {
+            let envelope = (-4.0 * offset as f32 / hat_length as f32).exp();
+            samples[start + offset] += hat_gain * envelope * value;
+        }
+    }
+    let body_end = (time * SAMPLE_RATE as f32) as usize;
+    for (index, sample) in samples
+        .iter_mut()
+        .enumerate()
+        .take(body_end)
+        .skip(SAMPLE_RATE as usize)
+    {
+        let seconds = index as f32 / SAMPLE_RATE as f32;
+        for hz in [220.0_f32, 261.63, 329.63] {
+            *sample += 0.03 * (2.0 * std::f32::consts::PI * hz * seconds).sin();
+        }
+    }
+    let kicks_ms = kicks
+        .iter()
+        .map(|kick| f64::from(*kick) * 1_000.0)
+        .collect();
+    (samples, kicks_ms)
+}
+
+fn on_the_kicks(grid: &[u64], bpm: f64) -> bool {
+    let beat_ms = 60_000.0 / bpm;
+    grid.iter().all(|position| {
+        let offset = *position as f64 - 1_000.0;
+        (offset - (offset / beat_ms).round() * beat_ms).abs() <= 10.0
+    })
+}
+
+#[test]
+fn v6_follows_a_sine_kick_under_high_passed_hats() {
+    let (samples, _) = kick_and_offbeat_hats((124.0, 124.0), 300, 0.3, 1.0, 0.09, 2_000.0);
+
+    let profile = analyze_smart_mix_samples(&samples, SAMPLE_RATE);
+
+    assert!(
+        on_the_kicks(&profile.beat_grid_ms, 124.0),
+        "grid {:?}",
+        &profile.beat_grid_ms[..4]
+    );
+    assert_eq!(profile.quality, "partial");
+}
+
+#[test]
+fn v6_keeps_the_phase_partial_when_the_kick_contests_it() {
+    let (samples, _) = kick_and_offbeat_hats((128.0, 128.0), 320, 0.8, 0.15, 0.03, 0.0);
+
+    let profile = analyze_smart_mix_samples(&samples, SAMPLE_RATE);
+
+    assert!(
+        on_the_kicks(&profile.beat_grid_ms, 128.0) || profile.quality == "partial",
+        "full profile with the grid {:?} off the kicks",
+        &profile.beat_grid_ms[..4]
+    );
+}
+
+#[test]
+fn v6_keeps_tracked_beats_partial_when_the_kick_contests_them() {
+    // A slow drift, so no constant grid: the tracked beats are published as they are.
+    let (samples, kicks) = kick_and_offbeat_hats((120.0, 123.0), 300, 0.8, 0.15, 0.03, 0.0);
+
+    let profile = analyze_smart_mix_samples(&samples, SAMPLE_RATE);
+
+    let on_kicks = profile
+        .beat_grid_ms
+        .iter()
+        .all(|beat| kicks.iter().any(|kick| (*beat as f64 - kick).abs() <= 10.0));
+    assert!(
+        on_kicks || profile.quality == "partial",
+        "full profile with the beats {:?} off the kicks",
+        &profile.beat_grid_ms[..4]
+    );
+}

@@ -38,8 +38,10 @@ const CUE_DOWNBEAT_BEATS: usize = 32;
 const LOCAL_MIX_WINDOW_MS: f64 = 12_000.0;
 const FULL_PROFILE_MIN_STABILITY: f32 = 0.8;
 /// Share of the tracked beats that must sit on the published phase of a constant grid
-/// for a full profile; below it the grid may be half a beat out. Without a constant grid,
-/// a full profile needs tracked beats that never slide half a beat.
+/// for a full profile, which the bass must not contest; below it the grid may be half a
+/// beat out. Without a constant grid,
+/// a full profile needs tracked beats that never slide half a beat and whose phase the
+/// bass does not contest.
 const FULL_PROFILE_MIN_PHASE_SUPPORT: f64 = 0.7;
 /// A cue takes the constant grid's tempo and beat only when its own tracked tempo is this
 /// close: 1 % over the 24-beat cue window is a quarter beat of drift. A constant grid that a
@@ -1095,8 +1097,11 @@ pub fn analyze_smart_mix_segments(
             && outro.stability >= FULL_PROFILE_MIN_STABILITY
     });
     let clear_phase = match &constant_grid {
-        Some(grid) => grid.phase_support >= FULL_PROFILE_MIN_PHASE_SUPPORT,
-        None => tempo_grid::half_beat_slides(&tracked_ms) == 0,
+        Some(grid) => grid.phase_support >= FULL_PROFILE_MIN_PHASE_SUPPORT && !grid.phase_contested,
+        None => {
+            tempo_grid::half_beat_slides(&tracked_ms) == 0
+                && !tempo_grid::bass_contests_tracked_beats(&tracked_ms, &features, sample_rate)
+        }
     };
     let quality = if tail.is_none()
         && beat_grid_ms.len() >= 12

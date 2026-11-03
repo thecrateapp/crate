@@ -12,9 +12,9 @@
 //! is published only when the beats stay close to it along most of the track, and it is
 //! marked when some stretch of them keeps another tempo. Its tempo
 //! then snaps to a whole (or half) BPM if that keeps the grid within 25 ms over the track,
-//! and its phase is checked against the onsets: the majority of the tracked beats picks
-//! one of the two half-beat phases, unless both the bass and the broadband onsets are
-//! clearly stronger on the other one.
+//! and its phase is checked against the bass: the majority of the tracked beats picks one
+//! of the two half-beat phases, a kick clearly stronger on the other one contests it, and
+//! an overwhelming one moves the grid onto the kick.
 
 use std::f64::consts::TAU;
 
@@ -47,9 +47,16 @@ const SECTION_MAX_GRID_SHARE: f64 = 0.6;
 const SECTION_SEARCH_SPAN: f64 = 0.08;
 /// Largest drift over the tracked span that snapping the tempo may add, as Mixxx allows.
 const SNAP_DRIFT_MS: f64 = 25.0;
-/// Onsets must be this much stronger on the other phase, in both bands, to overrule the
-/// majority of the tracked beats.
-const PHASE_FLIP_RATIO: f32 = 1.25;
+/// The tracker follows broadband onsets, so quiet hats on the off-beat can outvote a kick
+/// without a click and the tracked beats then agree with themselves. The bass decides:
+/// bass onsets this many times stronger on the other half-beat phase contest the
+/// published phase (no full profile)...
+const KICK_CONTEST_RATIO: f32 = 2.0;
+/// ...and this many times move the grid onto them.
+const KICK_FLIP_RATIO: f32 = 4.0;
+/// Bass counts only when the other phase carries real bass: at least this share of the
+/// 95th percentile of the bass onsets over the tracked span.
+const KICK_MIN_SHARE: f32 = 0.5;
 const ONSET_WINDOW_FRAMES: usize = 2;
 /// A half-beat slide is a run of this many intervals...
 const SLIDE_WINDOW_BEATS: usize = 6;
@@ -79,10 +86,13 @@ pub struct ConstantGrid {
     /// Share (0..1) of the tracked beats that sit on the published phase rather than on
     /// the off-beat. Low values mean the phase is ambiguous.
     pub phase_support: f64,
-    /// The onsets overruled the majority of the tracked beats.
+    /// The bass moved the grid off the phase most tracked beats sit on.
     pub phase_flipped: bool,
     /// Part of the track keeps another tempo, so the grid is wrong there.
     pub tempo_deviates: bool,
+    /// The bass is clearly stronger on the other phase than on the one the tracked beats
+    /// chose (always true when flipped): the phase is not confirmed.
+    pub phase_contested: bool,
 }
 
 impl ConstantGrid {
@@ -204,39 +214,59 @@ fn snapped_period(period: f64, span: f64) -> f64 {
         .unwrap_or(period)
 }
 
-/// Median onset peak around the grid positions between `from` and `to` (ms), for the
-/// broadband and the bass onsets: the typical beat position, so one loud section (a
-/// break full of claps on the off-beat) cannot decide the phase of the whole track.
-fn onset_evidence(
+/// Median bass onset peak around the given positions (ms): the typical beat position, so
+/// one loud section cannot decide the phase of the whole track.
+fn median_bass_at(
     features: &FrameFeatures,
-    sample_rate: u32,
-    phase: f64,
-    period: f64,
-    (from, to): (f64, f64),
-) -> (f32, f32) {
-    let frame_ms = HOP_SIZE as f64 * 1_000.0 / f64::from(sample_rate);
-    let peak = |values: &[f32], frame: usize| {
-        let start = frame.saturating_sub(ONSET_WINDOW_FRAMES);
-        let end = (frame + ONSET_WINDOW_FRAMES + 1).min(values.len());
-        values[start.min(end)..end]
-            .iter()
-            .copied()
-            .fold(0.0_f32, f32::max)
-    };
-    let (mut broad, mut low) = (Vec::new(), Vec::new());
-    let mut position = phase + ((from - phase) / period).ceil() * period;
-    while position <= to {
-        let frame = (position / frame_ms).round() as usize;
-        if frame < features.onsets.len() {
-            broad.push(f64::from(peak(&features.onsets, frame)));
-            low.push(f64::from(peak(&features.low_onsets, frame)));
-        }
-        position += period;
+    frame_ms: f64,
+    positions: impl Iterator<Item = f64>,
+) -> f32 {
+    let values = &features.low_onsets;
+    let mut peaks: Vec<f64> = positions
+        .map(|position| (position / frame_ms).round() as usize)
+        .filter(|frame| *frame < values.len())
+        .map(|frame| {
+            let start = frame.saturating_sub(ONSET_WINDOW_FRAMES);
+            let end = (frame + ONSET_WINDOW_FRAMES + 1).min(values.len());
+            f64::from(values[start..end].iter().copied().fold(0.0_f32, f32::max))
+        })
+        .collect();
+    if peaks.is_empty() {
+        return 0.0;
     }
-    if broad.is_empty() {
-        return (0.0, 0.0);
+    median(&mut peaks) as f32
+}
+
+/// Grid positions of one phase between `from` and `to` (ms).
+fn lattice_positions(phase: f64, period: f64, (from, to): (f64, f64)) -> impl Iterator<Item = f64> {
+    let first = ((from - phase) / period).ceil() as i64;
+    let last = ((to - phase) / period).floor() as i64;
+    (first..=last).map(move |index| phase + index as f64 * period)
+}
+
+/// `(contested, overwhelming)`: real bass on the other phase, at least
+/// `KICK_CONTEST_RATIO` (or `KICK_FLIP_RATIO`) times the bass on the chosen one.
+fn bass_against(chosen: f32, other: f32, peak: f32) -> (bool, bool) {
+    let real_bass = other > 0.0 && other >= KICK_MIN_SHARE * peak;
+    (
+        real_bass && other >= KICK_CONTEST_RATIO * chosen,
+        real_bass && other >= KICK_FLIP_RATIO * chosen,
+    )
+}
+
+/// 95th percentile of the bass onsets between `from` and `to` (ms).
+fn bass_peak(features: &FrameFeatures, frame_ms: f64, (from, to): (f64, f64)) -> f32 {
+    let end = ((to / frame_ms) as usize + 1).min(features.low_onsets.len());
+    let start = ((from / frame_ms) as usize).min(end);
+    let mut values: Vec<f64> = features.low_onsets[start..end]
+        .iter()
+        .map(|value| f64::from(*value))
+        .collect();
+    if values.is_empty() {
+        return 0.0;
     }
-    (median(&mut broad) as f32, median(&mut low) as f32)
+    values.sort_by(f64::total_cmp);
+    values[((values.len() as f64 * 0.95) as usize).min(values.len() - 1)] as f32
 }
 
 /// Fits the strongest constant pulse to refined beat positions (ms) and, when the track
@@ -283,12 +313,22 @@ pub fn fit_tempo(beats_ms: &[u64], features: &FrameFeatures, sample_rate: u32) -
         (off_beat, on_beat)
     };
     let tracked = (times[0], times[times.len() - 1]);
-    let (majority_broad, majority_low) =
-        onset_evidence(features, sample_rate, majority, period, tracked);
-    let (minority_broad, minority_low) =
-        onset_evidence(features, sample_rate, minority, period, tracked);
-    let phase_flipped = minority_broad >= PHASE_FLIP_RATIO * majority_broad
-        && minority_low >= PHASE_FLIP_RATIO * majority_low;
+    let frame_ms = HOP_SIZE as f64 * 1_000.0 / f64::from(sample_rate);
+    let majority_bass = median_bass_at(
+        features,
+        frame_ms,
+        lattice_positions(majority, period, tracked),
+    );
+    let minority_bass = median_bass_at(
+        features,
+        frame_ms,
+        lattice_positions(minority, period, tracked),
+    );
+    let (phase_contested, phase_flipped) = bass_against(
+        majority_bass,
+        minority_bass,
+        bass_peak(features, frame_ms, tracked),
+    );
     let phase = if phase_flipped { minority } else { majority };
     let mut offsets: Vec<f64> = times
         .iter()
@@ -310,8 +350,31 @@ pub fn fit_tempo(beats_ms: &[u64], features: &FrameFeatures, sample_rate: u32) -
             phase_support: near(phase),
             phase_flipped,
             tempo_deviates: has_section_at_another_tempo(&times, period),
+            phase_contested,
         }),
     })
+}
+
+/// Tracked beats published without a constant grid whose phase the bass contests: real
+/// bass between consecutive beats, at least `KICK_CONTEST_RATIO` times the bass on them.
+pub fn bass_contests_tracked_beats(
+    beats_ms: &[u64],
+    features: &FrameFeatures,
+    sample_rate: u32,
+) -> bool {
+    if beats_ms.len() < 2 || sample_rate == 0 {
+        return false;
+    }
+    let frame_ms = HOP_SIZE as f64 * 1_000.0 / f64::from(sample_rate);
+    let times: Vec<f64> = beats_ms.iter().map(|beat| *beat as f64).collect();
+    let on = median_bass_at(features, frame_ms, times.iter().copied());
+    let between = median_bass_at(
+        features,
+        frame_ms,
+        times.windows(2).map(|pair| 0.5 * (pair[0] + pair[1])),
+    );
+    let tracked = (times[0], times[times.len() - 1]);
+    bass_against(on, between, bass_peak(features, frame_ms, tracked)).0
 }
 
 /// Places where the tracked beats slide half a beat, which leaves part of the grid on the
@@ -480,6 +543,88 @@ mod tests {
     }
 
     #[test]
+    fn a_track_without_bass_never_flips_its_phase() {
+        let period = 60_000.0 / 120.0;
+        let beats = lattice(120.0, 200, 250.0);
+        let tracked: Vec<(f64, f32)> = beats.iter().map(|time| (*time, 0.4)).collect();
+        let other: Vec<(f64, f32)> = lattice(120.0, 200, 250.0 + period / 2.0)
+            .into_iter()
+            .map(|time| (time, 1.0))
+            .collect();
+        let mut silent_bass = features(110_000.0, &[tracked, other].concat(), &[]);
+        silent_bass
+            .low_onsets
+            .iter_mut()
+            .for_each(|value| *value = 0.0);
+
+        let fit = fit_tempo(&rounded(&beats), &silent_bass, SAMPLE_RATE).unwrap();
+
+        let grid = fit.grid.unwrap();
+        assert!(!grid.phase_flipped, "{grid:?}");
+        assert!(
+            wrap(grid.anchor_ms - 250.0, period).abs() <= 1.0,
+            "{grid:?}"
+        );
+    }
+
+    #[test]
+    fn a_kick_on_the_other_phase_flips_a_grid_tracked_on_the_hats() {
+        let period = 60_000.0 / 124.0;
+        let hats = lattice(124.0, 240, 1_000.0 + period / 2.0);
+        let kicks = lattice(124.0, 240, 1_000.0);
+        let broad: Vec<(f64, f32)> = hats
+            .iter()
+            .map(|time| (*time, 1.0))
+            .chain(kicks.iter().map(|time| (*time, 0.4)))
+            .collect();
+        let low: Vec<(f64, f32)> = kicks.iter().map(|time| (*time, 1.0)).collect();
+
+        let fit = fit_tempo(
+            &rounded(&hats),
+            &features(120_000.0, &broad, &low),
+            SAMPLE_RATE,
+        )
+        .unwrap();
+
+        let grid = fit.grid.unwrap();
+        assert!(grid.phase_flipped, "{grid:?}");
+        assert!(
+            wrap(grid.anchor_ms - 1_000.0, period).abs() <= 1.0,
+            "{grid:?}"
+        );
+    }
+
+    #[test]
+    fn a_kick_between_the_tracked_beats_contests_them() {
+        let period = 60_000.0 / 87.0;
+        let mut kicks = Vec::new();
+        let mut time = 1_000.0;
+        for index in 0..150 {
+            kicks.push(time);
+            time += period * (1.0 + 0.01 * (index as f64 / 9.0).sin());
+        }
+        let hats: Vec<f64> = kicks
+            .windows(2)
+            .map(|pair| 0.5 * (pair[0] + pair[1]))
+            .collect();
+        let broad: Vec<(f64, f32)> = hats.iter().map(|time| (*time, 1.0)).collect();
+        let low: Vec<(f64, f32)> = kicks.iter().map(|time| (*time, 1.0)).collect();
+        let on_hats = features(110_000.0, &broad, &low);
+        let on_kicks = features(110_000.0, &low, &low);
+
+        assert!(bass_contests_tracked_beats(
+            &rounded(&hats),
+            &on_hats,
+            SAMPLE_RATE
+        ));
+        assert!(!bass_contests_tracked_beats(
+            &rounded(&kicks),
+            &on_kicks,
+            SAMPLE_RATE
+        ));
+    }
+
+    #[test]
     fn a_fractional_tempo_is_not_snapped() {
         let beats = lattice(127.6, 400, 50.0);
         let strong: Vec<(f64, f32)> = beats.iter().map(|time| (*time, 1.0)).collect();
@@ -599,6 +744,7 @@ mod tests {
             phase_support: 1.0,
             phase_flipped: false,
             tempo_deviates: false,
+            phase_contested: false,
         };
 
         assert_eq!(grid.beats_ms(-300.0, 1_900.0), vec![250, 750, 1_250, 1_750]);

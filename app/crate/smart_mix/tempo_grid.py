@@ -10,8 +10,8 @@ off-beat lines up with one on the beat. A constant grid is published only when t
 beats stay close to it along most of the track, and it is marked when some stretch of
 them keeps another tempo; its tempo snaps to a whole or half BPM if
 that keeps the grid within 25 ms over the track, and the majority of the tracked beats
-picks its phase unless both the bass and the broadband onsets are clearly stronger on
-the other half-beat phase.
+picks its phase; a kick clearly stronger on the other half-beat phase contests it, and an
+overwhelming one moves the grid onto the kick.
 """
 
 from __future__ import annotations
@@ -40,7 +40,13 @@ SECTION_MIN_COHERENCE = 0.6
 SECTION_MAX_GRID_SHARE = 0.6
 SECTION_SEARCH_SPAN = 0.08
 SNAP_DRIFT_MS = 25.0
-PHASE_FLIP_RATIO = 1.25
+# The bass decides the phase against the tracked beats (which follow broadband onsets):
+# real bass KICK_CONTEST_RATIO times stronger on the other phase contests it, and
+# KICK_FLIP_RATIO times moves the grid onto it. Real bass is at least KICK_MIN_SHARE of
+# the 95th percentile of the bass onsets over the tracked span.
+KICK_CONTEST_RATIO = 2.0
+KICK_FLIP_RATIO = 4.0
+KICK_MIN_SHARE = 0.5
 ONSET_WINDOW_FRAMES = 2
 SLIDE_WINDOW_BEATS = 6
 SLIDE_MIN_FRACTION = 0.4
@@ -56,6 +62,7 @@ class ConstantGrid:
     phase_support: float
     phase_flipped: bool
     tempo_deviates: bool = False
+    phase_contested: bool = False
 
     def beats_ms(self, from_ms: float, to_ms: float) -> tuple[int, ...]:
         first = int(_round_half_away((from_ms - self.anchor_ms) / self.period_ms))
@@ -168,33 +175,40 @@ def _snapped_period(period: float, span: float) -> float:
     return period
 
 
-def _onset_evidence(
-    onsets: np.ndarray,
-    low_onsets: np.ndarray,
-    frame_ms: float,
-    phase: float,
-    period: float,
-    tracked: tuple[float, float],
-) -> tuple[float, float]:
-    """Median onset peak around the grid positions: the typical beat position, so one
-    loud section cannot decide the phase of the whole track."""
-
-    def peak(values: np.ndarray, frame: int) -> float:
-        start = max(0, frame - ONSET_WINDOW_FRAMES)
-        end = min(values.size, frame + ONSET_WINDOW_FRAMES + 1)
-        return float(np.max(values[start:end])) if start < end else 0.0
-
-    broad, low = [], []
-    position = phase + math.ceil((tracked[0] - phase) / period) * period
-    while position <= tracked[1]:
+def _median_bass_at(low_onsets: np.ndarray, frame_ms: float, positions) -> float:
+    """Median bass onset peak around the given positions (ms): the typical beat
+    position, so one loud section cannot decide the phase of the whole track."""
+    peaks = []
+    for position in positions:
         frame = int(_round_half_away(position / frame_ms))
-        if frame < onsets.size:
-            broad.append(peak(onsets, frame))
-            low.append(peak(low_onsets, frame))
-        position += period
-    if not broad:
-        return 0.0, 0.0
-    return _median(np.asarray(broad)), _median(np.asarray(low))
+        if frame < low_onsets.size:
+            start = max(0, frame - ONSET_WINDOW_FRAMES)
+            end = min(low_onsets.size, frame + ONSET_WINDOW_FRAMES + 1)
+            peaks.append(float(np.max(low_onsets[start:end])))
+    return _median(np.asarray(peaks)) if peaks else 0.0
+
+
+def _lattice_positions(phase: float, period: float, tracked: tuple[float, float]):
+    first = math.ceil((tracked[0] - phase) / period)
+    last = math.floor((tracked[1] - phase) / period)
+    return [phase + index * period for index in range(first, last + 1)]
+
+
+def _bass_peak(low_onsets: np.ndarray, frame_ms: float, tracked) -> float:
+    end = min(int(tracked[1] / frame_ms) + 1, low_onsets.size)
+    start = min(int(tracked[0] / frame_ms), end)
+    values = np.sort(low_onsets[start:end])
+    if not values.size:
+        return 0.0
+    return float(values[min(int(values.size * 0.95), values.size - 1)])
+
+
+def _bass_against(chosen: float, other: float, peak: float) -> tuple[bool, bool]:
+    real_bass = other > 0.0 and other >= KICK_MIN_SHARE * peak
+    return (
+        real_bass and other >= KICK_CONTEST_RATIO * chosen,
+        real_bass and other >= KICK_FLIP_RATIO * chosen,
+    )
 
 
 def fit_tempo(
@@ -235,15 +249,14 @@ def fit_tempo(
     tracked = (float(times[0]), float(times[-1]))
     onsets = np.asarray(onsets, dtype=np.float64)
     low_onsets = np.asarray(low_onsets, dtype=np.float64)
-    majority_broad, majority_low = _onset_evidence(
-        onsets, low_onsets, frame_ms, majority, period, tracked
-    )
-    minority_broad, minority_low = _onset_evidence(
-        onsets, low_onsets, frame_ms, minority, period, tracked
-    )
-    flipped = (
-        minority_broad >= PHASE_FLIP_RATIO * majority_broad
-        and minority_low >= PHASE_FLIP_RATIO * majority_low
+    contested, flipped = _bass_against(
+        _median_bass_at(
+            low_onsets, frame_ms, _lattice_positions(majority, period, tracked)
+        ),
+        _median_bass_at(
+            low_onsets, frame_ms, _lattice_positions(minority, period, tracked)
+        ),
+        _bass_peak(low_onsets, frame_ms, tracked),
     )
     phase = minority if flipped else majority
     offsets = _wrap(times - phase, period)
@@ -259,8 +272,25 @@ def fit_tempo(
             phase_support=near(phase),
             phase_flipped=flipped,
             tempo_deviates=_has_section_at_another_tempo(times, period),
+            phase_contested=contested,
         ),
     )
+
+
+def bass_contests_tracked_beats(
+    beats_ms, onsets: np.ndarray, low_onsets: np.ndarray, *, frame_ms: float
+) -> bool:
+    """Tracked beats published without a constant grid whose phase the bass contests:
+    real bass between consecutive beats, KICK_CONTEST_RATIO times the bass on them."""
+    del onsets  # same signature as fit_tempo; only the bass decides
+    times = np.asarray(beats_ms, dtype=np.float64)
+    if times.size < 2 or frame_ms <= 0:
+        return False
+    low_onsets = np.asarray(low_onsets, dtype=np.float64)
+    on = _median_bass_at(low_onsets, frame_ms, times)
+    between = _median_bass_at(low_onsets, frame_ms, (times[:-1] + times[1:]) / 2.0)
+    tracked = (float(times[0]), float(times[-1]))
+    return _bass_against(on, between, _bass_peak(low_onsets, frame_ms, tracked))[0]
 
 
 def half_beat_slides(beats_ms) -> int:
@@ -290,4 +320,10 @@ def half_beat_slides(beats_ms) -> int:
     return slides
 
 
-__all__ = ["ConstantGrid", "TempoFit", "fit_tempo", "half_beat_slides"]
+__all__ = [
+    "ConstantGrid",
+    "TempoFit",
+    "bass_contests_tracked_beats",
+    "fit_tempo",
+    "half_beat_slides",
+]

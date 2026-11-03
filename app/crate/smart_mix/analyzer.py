@@ -10,7 +10,11 @@ import numpy as np
 from crate.smart_mix.cue_detection import detect_mix_cues
 from crate.smart_mix.key_detection import detect_key
 from crate.smart_mix.models import MixProfileQuality, TrackMixProfileDraft
-from crate.smart_mix.tempo_grid import fit_tempo, half_beat_slides
+from crate.smart_mix.tempo_grid import (
+    bass_contests_tracked_beats,
+    fit_tempo,
+    half_beat_slides,
+)
 from crate.smart_mix.versions import ANALYZER_VERSION, PYTHON_ANALYZER
 
 
@@ -26,7 +30,8 @@ _DOWNBEAT_MIN_BEATS = 16
 _DOWNBEAT_MIN_CONFIDENCE = 0.65
 _DOWNBEAT_MARGIN = 0.3
 # Share of the tracked beats on the published phase of a constant grid for a full
-# profile; without a constant grid, the tracked beats must never slide half a beat.
+# profile, which the bass must not contest; without a constant grid, the tracked beats
+# must never slide half a beat and the bass must not contest their phase.
 _FULL_PROFILE_MIN_PHASE_SUPPORT = 0.7
 WINDOW_SECONDS = 5.0
 FULL_SCAN_HEAD_SECONDS = 240
@@ -88,12 +93,17 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
         clear_phase = (
             constant_grid.phase_support >= _FULL_PROFILE_MIN_PHASE_SUPPORT
             and not constant_grid.tempo_deviates
+            and not constant_grid.phase_contested
         )
     else:
         beat_grid_ms, grid_frames = tracked_ms, beat_frames
         if tempo_fit is not None:
             bpm = round(tempo_fit.bpm, 3)
-        clear_phase = half_beat_slides(tracked_ms) == 0
+        clear_phase = half_beat_slides(
+            tracked_ms
+        ) == 0 and not bass_contests_tracked_beats(
+            tracked_ms, onset_envelope, low_onsets, frame_ms=frame_ms
+        )
     downbeat_anchor_ms, time_signature = _downbeat_features(
         beat_grid_ms,
         grid_frames,
