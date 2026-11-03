@@ -76,6 +76,9 @@ type Config struct {
 	// Profiles are the optional compose services to run; nil keeps the
 	// existing COMPOSE_PROFILES.
 	Profiles []string
+	// KeepMonitoringFiles leaves the monitoring files a newer installer
+	// wrote untouched.
+	KeepMonitoringFiles bool
 }
 
 const LocalDomainDefault = "crate.local"

@@ -106,7 +106,50 @@ ssh -N -L 3001:127.0.0.1:3001 crate@<server>
 
 Then open `http://localhost:3001`, sign in as `admin` with the password from the
 `grafana-admin-password` secret file and open the **Crate infrastructure**
-folder.
+folder. On a home installation, the installer showed that password when it
+generated it; it is also in `<monitoring data>/secrets/grafana-admin-password`,
+readable only by root.
+
+## Home installations
+
+The `crate` installer offers monitoring as an optional step on Linux. It starts
+unchecked; the step lists the cost (8 containers capped at 944 MiB of memory and
+1 CPU, up to 10 GB of history, keep 20 GB free) and asks for the data folder
+(`<data folder>/observability` by default), the Grafana port (3001) and the
+Grafana password (left empty, one is generated and shown once at the end). On
+macOS, with rootless Docker, an unsupported storage driver or Compose v1 the step
+says why it is not available. Grafana listens only on that machine.
+
+From the command line, on an installation that already runs:
+
+```bash
+crate observability enable --dir ~/crate    # asks first; Crate restarts once
+crate observability status --dir ~/crate
+crate observability disable --dir ~/crate   # stops monitoring; data stays
+```
+
+Unattended installs use `crate install --yes --observability=on|off|keep`
+(default `keep`, or `CRATE_OBSERVABILITY`), with `CRATE_OBSERVABILITY_DIR`,
+`CRATE_GRAFANA_PORT` and `CRATE_GRAFANA_PASSWORD`; the password is read only
+from the environment.
+
+Enabling runs these steps in order: it writes `monitoring.env` in the install
+folder (no secrets), makes sure the database runs, prepares the data folders,
+the secret files and a read-only `crate_observer` database account in a
+throwaway `crate-api` container, starts the `crate-observability` project, then
+adds the network variables and the application overlays to `.env` and restarts
+Crate on them. The database account's password is stored as a SCRAM verifier,
+never in clear text. Disabling removes the overlays, restarts Crate and stops
+the eight monitoring services; it keeps the data, secrets, networks and the
+database account.
+
+Running `crate install` again with monitoring on updates it: Grafana's data is
+copied to `<monitoring data>/backups/` before a new Grafana image migrates it,
+and Prometheus, Grafana or the socket proxy restart when their configuration
+changed. An older installer leaves monitoring files written by a newer one
+untouched. `crate doctor` lists monitoring as optional: a stopped service, a
+silent Grafana or a missing monitoring network are warnings, and Crate starts
+without an overlay whose network is gone.
 
 ## Deploying monitoring
 

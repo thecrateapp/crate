@@ -389,3 +389,51 @@ func TestStatusReportsAMissingNetworkAndGrafana(t *testing.T) {
 		t.Fatal("status checks the database account")
 	}
 }
+
+func TestUpgradeBacksUpGrafanaAndRestartsWhatReadsChangedFiles(t *testing.T) {
+	dir, port := enabled(t, "")
+	m := monitor(dir, &fakeRunner{grafanaSet: true, networks: true}, map[string]string{"CRATE_GRAFANA_PORT": port})
+	before := m.Snapshot()
+	if before.Grafana == "" || len(before.Files) == 0 {
+		t.Fatalf("snapshot %+v", before)
+	}
+	compose := filepath.Join(dir, "deploy", "observability", "compose.observability.yaml")
+	data, _ := os.ReadFile(compose)
+	os.WriteFile(compose, bytes.Replace(data, []byte(before.Grafana), []byte("grafana/grafana:99.0.0"), 1), 0o644)
+	for _, name := range []string{"prometheus.yml", "grafana/provisioning/datasources/prometheus.yaml"} {
+		path := filepath.Join(dir, "deploy", "observability", filepath.FromSlash(name))
+		data, _ := os.ReadFile(path)
+		os.WriteFile(path, append(data, []byte("\n# changed\n")...), 0o644)
+	}
+	run := &fakeRunner{grafanaSet: true, networks: true}
+	m.Run = run
+
+	if _, err := m.Upgrade(context.Background(), before); err != nil {
+		t.Fatal(err)
+	}
+
+	stop := run.index("stream", "stop crate-grafana")
+	backup := run.index("run", "observability_setup.py backup-grafana")
+	up := run.index("run", "observability-up.sh")
+	restart := run.index("stream", " restart ")
+	if stop < 0 || backup < stop || up < backup || restart < up {
+		t.Fatalf("order stop %d backup %d up %d restart %d\n%v", stop, backup, up, restart, run.events)
+	}
+	if line := run.events[restart].line; !strings.HasSuffix(line, "restart crate-prometheus") {
+		t.Fatalf("restart %s", line)
+	}
+}
+
+func TestUpgradeWithoutChangesRestartsNothing(t *testing.T) {
+	dir, port := enabled(t, "")
+	run := &fakeRunner{grafanaSet: true, networks: true}
+	m := monitor(dir, run, map[string]string{"CRATE_GRAFANA_PORT": port})
+
+	if _, err := m.Upgrade(context.Background(), m.Snapshot()); err != nil {
+		t.Fatal(err)
+	}
+
+	if run.index("stream", " restart ") >= 0 || run.index("run", "backup-grafana") >= 0 {
+		t.Fatalf("unexpected restart or backup: %v", run.events)
+	}
+}
