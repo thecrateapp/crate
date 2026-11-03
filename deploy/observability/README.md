@@ -171,6 +171,8 @@ The adapter does not change Docker's configuration or migrate its image store.
 
 These targets act on the local Docker context; they never SSH. `up` selects only
 the monitoring services with `--no-deps`, so it does not start or recreate Crate.
+Its checks live in `scripts/observability-up.sh`, which the `crate` installer runs
+too; set `DOCKER="sudo docker"` when the account is not in the docker group.
 Check the Docker context before using them. Commands explicitly select the
 monitoring project and ignore the application's `.env`; export monitoring settings
 or supply a dedicated `OBS_ENV_FILE`. On home with a custom existing network:
