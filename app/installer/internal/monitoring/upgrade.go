@@ -12,6 +12,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/thecrateapp/crate/app/installer/internal/envfile"
 	"github.com/thecrateapp/crate/app/installer/internal/observability"
 )
 
@@ -90,4 +91,14 @@ func (m Monitor) Upgrade(ctx context.Context, before Snapshot) (Enabled, error) 
 		return Enabled{}, fmt.Errorf("restart monitoring: %w", err)
 	}
 	return result, m.waitGrafana(ctx, value(stored, "OBS_GRAFANA_PORT"))
+}
+
+// KeepFiles reports whether the monitoring files in installDir came from a
+// newer installer than version, which must not rewrite them.
+func KeepFiles(installDir, version string) bool {
+	stored, err := envfile.Read(filepath.Join(installDir, EnvName))
+	if err != nil {
+		return false
+	}
+	return !observability.MayWrite(value(stored, "OBS_RELEASE"), version)
 }

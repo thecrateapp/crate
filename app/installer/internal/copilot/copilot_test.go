@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -349,5 +350,28 @@ func TestTheCopilotInstallsTheImagesOfItsRelease(t *testing.T) {
 				t.Fatalf("image tag %q, want %q", session.cfg.ImageTag, tc.want)
 			}
 		})
+	}
+}
+
+func TestTheCopilotLeavesMonitoringFilesFromANewerInstaller(t *testing.T) {
+	h := newHarness(t)
+	rules := filepath.Join(h.dir, "deploy", "observability", "prometheus.yml")
+	if err := os.MkdirAll(filepath.Dir(rules), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(rules, []byte("newer"), 0o644)
+	stored := envfile.New()
+	stored.Set("OBS_RELEASE", "v9.0.0")
+	envfile.Write(filepath.Join(h.dir, "monitoring.env"), envfile.Render(stored, "", nil))
+
+	if r := h.call("crate_apply", nil, nil); r.IsError {
+		t.Fatalf("apply: %s", r.Content[0].(*mcp.TextContent).Text)
+	}
+
+	if data, _ := os.ReadFile(rules); string(data) != "newer" {
+		t.Fatalf("prometheus.yml rewritten: %q", data)
+	}
+	if _, err := os.Stat(filepath.Join(h.dir, "docker-compose.yaml")); err != nil {
+		t.Fatal("the installation must still be written")
 	}
 }
