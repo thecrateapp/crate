@@ -60,6 +60,8 @@ type wizard struct {
 	configuring bool // `crate configure`, where Crate Operator is offered
 	agent       agentState
 	mon         monitoringPlan
+	// answer replaces the confirmation prompt in tests.
+	answer func(title string, value bool) (bool, error)
 }
 
 func Run(ctx context.Context, opts Options) error {
@@ -125,6 +127,9 @@ func (w *wizard) form(groups ...*huh.Group) error {
 func (w *wizard) confirm(title, description string, value bool) (bool, error) {
 	if !w.interactive() {
 		return value, nil
+	}
+	if w.answer != nil {
+		return w.answer(title, value)
 	}
 	err := w.form(huh.NewGroup(huh.NewConfirm().
 		Title(title).

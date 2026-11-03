@@ -185,3 +185,62 @@ func TestUnattendedInstallWithoutStartingPointsAtTheMonitoringCommand(t *testing
 		t.Fatal("the monitoring files are written with the installation")
 	}
 }
+
+func TestTurningMonitoringOffAsksForConfirmation(t *testing.T) {
+	cases := []struct {
+		name    string
+		answers []bool
+		want    bool
+		asked   []string
+	}{
+		{"keeps it when not confirmed", []bool{false, false}, true, []string{"Set up monitoring?", "Turn monitoring off?"}},
+		{"turns it off when confirmed", []bool{false, true}, false, []string{"Set up monitoring?", "Turn monitoring off?"}},
+		{"asks once to keep it on", []bool{true}, true, []string{"Set up monitoring?"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			stored := envfile.New()
+			stored.Set("OBS_DATA_DIR", filepath.Join(dir, "data", "observability"))
+			stored.Set("OBS_RELEASE", "v3.2.0")
+			envfile.Write(filepath.Join(dir, monitoring.EnvName), envfile.Render(stored, "", nil))
+			active := envfile.New()
+			active.Set("COMPOSE_FILE", activeOverlays)
+			w, _ := linuxWizard(t, Options{Version: "v3.2.0", InstallDir: dir})
+			prepared(t, w, active)
+			var asked []string
+			w.answer = func(title string, _ bool) (bool, error) {
+				asked = append(asked, title)
+				answer := tc.answers[0]
+				tc.answers = tc.answers[1:]
+				return answer, nil
+			}
+
+			if err := w.monitoringStep(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+
+			if w.mon.want != tc.want || strings.Join(asked, "|") != strings.Join(tc.asked, "|") {
+				t.Fatalf("want %v, asked %q", w.mon.want, asked)
+			}
+		})
+	}
+}
+
+func TestUnattendedOffTurnsMonitoringOffWithoutAsking(t *testing.T) {
+	active := envfile.New()
+	active.Set("COMPOSE_FILE", activeOverlays)
+	w, _ := linuxWizard(t, Options{Version: "v3.2.0", InstallDir: t.TempDir(), Yes: true, Observability: ObservabilityOff})
+	prepared(t, w, active)
+	w.answer = func(title string, _ bool) (bool, error) {
+		t.Fatalf("asked %q", title)
+		return false, nil
+	}
+
+	if err := w.monitoringStep(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if w.mon.want {
+		t.Fatal("--observability=off must turn monitoring off")
+	}
+}
