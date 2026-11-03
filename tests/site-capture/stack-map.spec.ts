@@ -9,6 +9,7 @@ import stackSnapshot from "../admin-e2e/fixtures/stack-snapshot.json";
 const OUT = process.env.SITE_CAPTURE_OUT ?? "test-results/site-capture";
 const LOOP_MS = Number(process.env.SITE_CAPTURE_LOOP_MS ?? 8000);
 const SWING = 0.32;
+const WARMUP_MS = 600;
 
 const APPLICATION: [string, string, string, number, number][] = [
   ["crate-api", "crate-api", "healthy", 6.1, 1126],
@@ -277,7 +278,14 @@ test.describe("3D loop", () => {
     );
     const cdp = await page.context().newCDPSession(page);
     const frames: { file: string; at: number }[] = [];
+    let recording = false;
     cdp.on("Page.screencastFrame", async ({ data, metadata, sessionId }) => {
+      if (!recording) {
+        await cdp
+          .send("Page.screencastFrameAck", { sessionId })
+          .catch(() => {});
+        return;
+      }
       const file = `${String(frames.length).padStart(4, "0")}.jpg`;
       frames.push({ file, at: metadata.timestamp ?? Date.now() / 1000 });
       writeFileSync(join(OUT, "frames", file), Buffer.from(data, "base64"));
@@ -288,6 +296,8 @@ test.describe("3D loop", () => {
     await page.mouse.move(x, y);
     await page.mouse.down();
     await cdp.send("Page.startScreencast", { format: "jpeg", quality: 92 });
+    await page.waitForTimeout(WARMUP_MS);
+    recording = true;
     const started = Date.now();
     while (Date.now() - started < LOOP_MS) {
       const phase = (Date.now() - started) / LOOP_MS;
