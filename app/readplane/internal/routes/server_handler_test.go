@@ -585,6 +585,58 @@ func TestTrackRoute_PlaybackTranscodedFallsBack(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, rec.Code)
 }
 
+// ── access tokens (crv_) ──────────────────────────────────────────────────
+
+func TestAccessTokenRoutesFallBackToFastAPI(t *testing.T) {
+	// FastAPI owns crv_ validation and its per-route allowlist; the readplane
+	// only knows JWTs, so it must hand these requests over instead of 401.
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Backend-Authorization", r.Header.Get("Authorization"))
+		w.Header().Set("X-Backend-URI", r.URL.RequestURI())
+		_ = httpx.WriteJSON(w, http.StatusOK, map[string]any{"source": "fastapi"})
+	}))
+	defer backend.Close()
+	fallback, err := httpx.NewFallbackProxy(true, backend.URL, "test")
+	assert.NoError(t, err)
+	server := &Server{
+		cfg:             config.Config{Version: "test"},
+		logger:          slog.New(slog.NewTextHandler(io.Discard, nil)),
+		auth:            auth.NewAuthenticator(nil, "test-jwt-secret", 5*time.Second),
+		catalog:         catalog.NewStore(nil, 5*time.Second),
+		smartMixCatalog: stubSmartMixCatalog{},
+		fallback:        fallback,
+	}
+
+	for _, test := range []struct {
+		name          string
+		path          string
+		authorization string
+		wantStatus    int
+		wantSource    string
+	}{
+		{name: "search", path: "/api/search?q=test&limit=5", authorization: "Bearer crv_vdj", wantStatus: http.StatusOK, wantSource: "fallback"},
+		{name: "playback by entity", path: "/api/tracks/by-entity/" + smartMixTestUID + "/playback", authorization: "Bearer crv_vdj", wantStatus: http.StatusOK, wantSource: "fallback"},
+		{name: "mix profile by entity", path: "/api/tracks/by-entity/" + smartMixTestUID + "/mix-profile", authorization: "Bearer crv_vdj", wantStatus: http.StatusOK, wantSource: "fallback"},
+		{name: "invalid JWT search stays native", path: "/api/search?q=test", authorization: "Bearer not-a-jwt", wantStatus: http.StatusUnauthorized, wantSource: "miss"},
+		{name: "invalid JWT playback stays native", path: "/api/tracks/by-entity/" + smartMixTestUID + "/playback", authorization: "Bearer not-a-jwt", wantStatus: http.StatusUnauthorized, wantSource: "miss"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, test.path, nil)
+			req.Header.Set("Authorization", test.authorization)
+			rec := httptest.NewRecorder()
+
+			server.Handler().ServeHTTP(rec, req)
+
+			assert.Equal(t, test.wantStatus, rec.Code)
+			assert.Equal(t, test.wantSource, rec.Header().Get("X-Crate-Readplane"))
+			if test.wantSource == "fallback" {
+				assert.Equal(t, test.authorization, rec.Header().Get("X-Backend-Authorization"))
+				assert.Equal(t, test.path, rec.Header().Get("X-Backend-URI"))
+			}
+		})
+	}
+}
+
 // ── cacheEvents ───────────────────────────────────────────────────────────
 
 func TestCacheEvents_NoRedis(t *testing.T) {
