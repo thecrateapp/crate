@@ -437,8 +437,24 @@ type Report struct {
 	Availability    observability.Availability
 }
 
-// Status reads the monitoring state without changing anything.
+// Status reads the monitoring state without changing anything, including
+// the setup state, which takes a throwaway crate-api container.
 func (m Monitor) Status(ctx context.Context) (Report, error) {
+	report, err := m.Inspect(ctx)
+	if err != nil || !report.Configured {
+		return report, err
+	}
+	values, err := m.installation()
+	if err != nil {
+		return report, err
+	}
+	report.Setup, _ = m.setupStatus(ctx, m.app(values), value(m.stored(), "OBS_DATA_DIR"), true)
+	return report, nil
+}
+
+// Inspect reads the monitoring state from compose, the networks and Grafana
+// only.
+func (m Monitor) Inspect(ctx context.Context) (Report, error) {
 	values, err := m.installation()
 	if err != nil {
 		return Report{}, err
@@ -457,7 +473,6 @@ func (m Monitor) Status(ctx context.Context) (Report, error) {
 	if out, err := m.Run.Output(ctx, name, args...); err == nil {
 		report.Services, _ = stack.ParseServices(out)
 	}
-	report.Setup, _ = m.setupStatus(ctx, app, value(stored, "OBS_DATA_DIR"), true)
 	report.GrafanaHealthy = m.GrafanaHealthy(ctx, port)
 	return report, nil
 }
