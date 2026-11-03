@@ -186,8 +186,8 @@ export const admin: AdminPage = {
       title: "Observability",
       id: "observability",
       lede: [
-        "Know what the server is doing, and how listening goes.",
-        "Crate records how it behaves and shows it in Admin. Readings stay on your server, carry counts rather than identities, and a missing reading is never shown as zero.",
+        "The whole server on one screen, and every play measured.",
+        "Admin draws the host and every container as a live map and records how playback goes. Readings stay on your server and carry counts rather than identities.",
       ],
     },
     {

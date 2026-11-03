@@ -4,45 +4,19 @@ import { join } from "node:path";
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "../admin-e2e/fixtures";
+import sample from "../../app/web/src/content/admin/stack-map-sample.json";
 import stackSnapshot from "../admin-e2e/fixtures/stack-snapshot.json";
 
 const OUT = process.env.SITE_CAPTURE_OUT ?? "test-results/site-capture";
 const LOOP_MS = Number(process.env.SITE_CAPTURE_LOOP_MS ?? 8000);
 const SWING = 0.32;
+
+type Row = [string, string, string, number, number];
+
+const APPLICATION = sample.application as Row[];
+const OBSERVABILITY = sample.observability as Row[];
+const PROJECTS = sample.projects;
 const WARMUP_MS = 600;
-
-const APPLICATION: [string, string, string, number, number][] = [
-  ["crate-api", "crate-api", "healthy", 6.1, 1126],
-  ["crate-ui", "crate-ui", "healthy", 0.2, 9],
-  ["traefik", "traefik:v3.6", "none", 1.8, 140],
-  ["crate-listen", "crate-listen", "healthy", 0.1, 8],
-  ["crate-readplane", "crate-readplane", "healthy", 1.2, 10],
-  ["crate-projector", "crate-api", "healthy", 3.4, 276],
-  ["crate-analysis-worker", "crate-worker", "healthy", 41.3, 643],
-  ["crate-maintenance-worker", "crate-worker", "healthy", 2.6, 512],
-  ["crate-worker", "crate-worker", "healthy", 4.8, 588],
-  ["crate-fast-worker", "crate-worker", "healthy", 1.1, 401],
-  ["crate-playback-worker", "crate-worker", "healthy", 0.7, 362],
-  ["crate-media-worker", "crate-media-worker", "healthy", 0.1, 4],
-  ["crate-postgres", "postgres:15", "healthy", 5.2, 606],
-  ["crate-redis", "redis:7", "healthy", 0.9, 22],
-  ["crate-redis-durable", "redis:7", "healthy", 0.6, 32],
-  ["crate-site", "crate-site", "none", 0.1, 6],
-  ["crate-docs", "crate-docs", "none", 0.1, 9],
-];
-
-const OBSERVABILITY: [string, string, string, number, number][] = [
-  ["crate-prometheus", "prom/prometheus:v3.15", "healthy", 2.1, 312],
-  ["crate-grafana", "grafana/grafana:13.3", "healthy", 0.4, 118],
-  ["crate-node-exporter", "prom/node-exporter:v1.12", "none", 0.3, 14],
-  ["crate-cadvisor", "ghcr.io/google/cadvisor:v0.60", "healthy", 0.6, 23],
-  ["crate-postgres-exporter", "postgres-exporter:v0.20", "none", 0.2, 12],
-  ["crate-redis-exporter", "redis_exporter:v1.96", "none", 0.5, 8],
-  ["crate-redis-durable-exporter", "redis_exporter:v1.96", "none", 0.4, 8],
-  ["crate-observability-docker-proxy", "haproxy:3.2", "healthy", 1.7, 12],
-];
-
-const PROJECTS = { application: "crate", observability: "crate-observability" };
 
 function services() {
   return (
@@ -103,7 +77,7 @@ function snapshot() {
       schema_version: 1,
       availability: "available",
       reason: null,
-      host: { id: "crate", name: "crate" },
+      host: { id: sample.host.name, name: sample.host.name },
       stacks: [
         {
           id: "application",
@@ -124,7 +98,7 @@ function snapshot() {
 
 async function streamSampleActivity(page: Page) {
   await page.addInitScript(
-    ({ resources }) => {
+    ({ resources, sample }) => {
       class SampleEventSource extends EventTarget {
         readonly readyState = 1;
         readonly url: string;
@@ -140,45 +114,39 @@ async function streamSampleActivity(page: Page) {
           const send = () => {
             const observed = new Date().toISOString();
             const jitter = (value: number) =>
-              Math.max(0, value + ((sequence * 7) % 3) - 1);
+              value > 1 ? Math.max(0, value + ((sequence * 7) % 3) - 1) : value;
+            const { activity, host } = sample;
             this.dispatchEvent(
               new MessageEvent("activity", {
                 data: JSON.stringify({
                   schema: 1,
                   sequence: ++sequence,
                   observed_at: observed,
-                  window_seconds: 10,
+                  window_seconds: activity.window_seconds,
                   availability: "available",
-                  requests: {
-                    "listen-web": { count: jitter(6), errors: 0 },
-                    "listen-android": { count: jitter(3), errors: 0 },
-                    "listen-ios": { count: 1, errors: 0 },
-                    "listen-desktop": { count: 1, errors: 0 },
-                    "admin-web": { count: 1, errors: 0 },
-                    subsonic: { count: 1, errors: 0 },
-                    readplane: { count: jitter(2), errors: 0 },
-                  },
-                  queues: {
-                    default: { completed: 1, failed: 0 },
-                    fast: { completed: jitter(2), failed: 0 },
-                    maintenance: { completed: 1, failed: 0 },
-                    heavy: { completed: 1, failed: 0 },
-                    playback: { completed: 1, failed: 0 },
-                  },
-                  projector: { events: jitter(3) },
-                  listening: 3,
+                  requests: Object.fromEntries(
+                    Object.entries(activity.requests).map(([client, count]) => [
+                      client,
+                      { count: jitter(count), errors: 0 },
+                    ]),
+                  ),
+                  queues: Object.fromEntries(
+                    Object.entries(activity.queues).map(
+                      ([queue, completed]) => [
+                        queue,
+                        { completed: jitter(completed), failed: 0 },
+                      ],
+                    ),
+                  ),
+                  projector: { events: jitter(activity.projector_events) },
+                  listening: activity.listening,
                   resources: {
                     observed_at: observed,
-                    ingress: {
-                      listen: 31,
-                      admin: 5,
-                      "crate-api": 18,
-                      "crate-readplane-interactive": 12,
-                    },
+                    ingress: activity.ingress,
                     host: {
-                      cpu_percent: 23,
-                      memory_used_gib: 8,
-                      memory_total_gib: 62.6,
+                      cpu_percent: host.cpu_percent,
+                      memory_used_gib: host.memory_used_gib,
+                      memory_total_gib: host.memory_total_gib,
                     },
                     services: resources,
                   },
@@ -209,7 +177,7 @@ async function streamSampleActivity(page: Page) {
         value: SampleEventSource,
       });
     },
-    { resources: resources() },
+    { resources: resources(), sample },
   );
 }
 

@@ -325,6 +325,34 @@ test("visuals load lazily instead of with the page", async ({ page }) => {
   );
 });
 
+test.describe("the Stack map on a phone", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("the Stack map shows the portrait still and never loads the loop", async ({
+    page,
+  }) => {
+    const requested: string[] = [];
+    page.on("request", (request) => {
+      if (/stack-map-3d\.(webm|mp4)$/.test(request.url()))
+        requested.push(request.url());
+    });
+    await page.goto("/admin#observability");
+    const map = page.locator('[data-viz="stack-map"]');
+    await map.scrollIntoViewIfNeeded();
+    await expect(map).toHaveAttribute("data-viz-ready", "");
+    await expect
+      .poll(() =>
+        map
+          .locator(".shot img")
+          .evaluate((img: HTMLImageElement) => img.currentSrc),
+      )
+      .toMatch(/stack-map-3d-portrait-780\.webp$/);
+    await expect(map.locator("video")).toBeHidden();
+    await page.waitForTimeout(500);
+    expect(requested).toEqual([]);
+  });
+});
+
 test.describe("reduced motion", () => {
   test.use({ reducedMotion: "reduce" });
 

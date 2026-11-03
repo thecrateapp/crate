@@ -11,6 +11,7 @@ export function initStackMap(root: HTMLElement): Cleanup {
   const observer = new IntersectionObserver(
     ([entry]) => {
       if (!video || reducedMotion()) return;
+      if (getComputedStyle(video).display === "none") return;
       if (entry?.isIntersecting) video.play().catch(() => {});
       else video.pause();
     },
