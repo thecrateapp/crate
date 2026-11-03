@@ -24,8 +24,36 @@ const (
 	ProvenanceProxy  = "provenance-docker.haproxy.cfg"
 )
 
+// ObservabilityDir holds the monitoring files, embedded under the same
+// relative paths they have in deploy/observability.
+const ObservabilityDir = "observability"
+
+// ObservabilityFiles are the monitoring release bundle followed by the
+// application overlays, relative to deploy/observability.
+var ObservabilityFiles = []string{
+	"compose.standalone.yaml",
+	"compose.observability.yaml",
+	"compose.containerd.yaml",
+	"prometheus.yml",
+	"recording-rules.yml",
+	"docker-proxy.haproxy.cfg",
+	"runtime-proxy.haproxy.cfg",
+	"grafana/provisioning/dashboards/infrastructure.yaml",
+	"grafana/provisioning/datasources/prometheus.yaml",
+	"grafana/dashboards/infra-runtime.json",
+	"grafana/dashboards/infra-data.json",
+	"grafana/dashboards/app-overview.json",
+	"grafana/dashboards/app-playback.json",
+	"grafana/dashboards/app-workers.json",
+	"grafana/dashboards/app-telemetry.json",
+	"compose.projector-prometheus.yaml",
+	"compose.traefik-metrics.yaml",
+	"compose.app-metrics.yaml",
+	"compose.supervisor-prometheus.yaml",
+}
+
 // Sources maps each embedded file to its path from the repository root.
-var Sources = map[string]string{
+var Sources = withObservability(map[string]string{
 	Compose:          "docker-compose.home.yaml",
 	CrateConfig:      "app/config.yaml",
 	FederationRoutes: "deploy/traefik/federation-readplane.yml",
@@ -35,6 +63,13 @@ var Sources = map[string]string{
 	OperatorOverlay:  "deploy/operator/compose.operator.yaml",
 	OperatorExample:  "deploy/operator/config.operator.example.json",
 	ProvenanceProxy:  "deploy/operator/provenance-docker.haproxy.cfg",
+})
+
+func withObservability(sources map[string]string) map[string]string {
+	for _, name := range ObservabilityFiles {
+		sources[ObservabilityDir+"/"+name] = "deploy/observability/" + name
+	}
+	return sources
 }
 
 // Deployed maps the embedded files written into the install folder to

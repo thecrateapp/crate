@@ -19,9 +19,14 @@ for linux/darwin × amd64/arm64.
   (the Crate Agent bot token, allowlist, model key and approver) are handed to a setup step
   and never written to `.env`; `install.BuildEnv` skips them.
 - The binary embeds the compose file, `app/config.yaml`, the Traefik read-plane routes, the
-  manifest, `scripts/agent_setup.py`, the agent runtime it imports and the operator overlay
+  manifest, `scripts/agent_setup.py`, the agent runtime it imports, the operator overlay and the
+  monitoring bundle with its application overlays from `deploy/observability`
   (`internal/assets`). After changing any of them run `go generate ./...` here; CI fails when
   the embedded copies are stale.
+- Monitoring is opt-in and Linux only in v1; see
+  `docs/plans/2026-11-03-installer-observability-design.md`. Its settings live under
+  `monitoring:` in the manifest: `env` for the separate `monitoring.env`, `app` for the
+  application `.env` variables the overlays read.
 - Reconfiguring must never rotate a generated secret or drop a line the user added to `.env`.
   `install.BuildEnv` keeps existing values; keep it that way.
 - `CRATE_IMAGE_TAG` follows `install.UpgradeImageTag`: a release installer (`vX.Y.Z`, the git

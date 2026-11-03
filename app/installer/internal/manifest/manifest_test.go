@@ -113,3 +113,65 @@ integrations:
 		t.Error("a transient secret is still a secret")
 	}
 }
+
+func composeVariables(t *testing.T, names ...string) map[string]bool {
+	t.Helper()
+	used := map[string]bool{}
+	for _, name := range names {
+		compose, err := assets.Read(assets.ObservabilityDir + "/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, match := range composeVariable.FindAllStringSubmatch(string(compose), -1) {
+			used[match[1]] = true
+		}
+	}
+	return used
+}
+
+func TestMonitoringManifestMatchesTheMonitoringCompose(t *testing.T) {
+	m, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	used := composeVariables(t,
+		"compose.standalone.yaml", "compose.observability.yaml", "compose.containerd.yaml")
+	declared := map[string]bool{}
+	for _, s := range m.Monitoring.Env {
+		declared[s.Env] = true
+		if !used[s.Env] && !s.InstallerOnly {
+			t.Errorf("monitoring declares %s but no monitoring compose file reads it", s.Env)
+		}
+	}
+	for name := range used {
+		if !declared[name] {
+			t.Errorf("the monitoring compose reads %s; declare it under monitoring.env", name)
+		}
+	}
+}
+
+func TestMonitoringManifestMatchesTheApplicationOverlays(t *testing.T) {
+	m, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	used := composeVariables(t,
+		"compose.projector-prometheus.yaml", "compose.traefik-metrics.yaml",
+		"compose.app-metrics.yaml", "compose.supervisor-prometheus.yaml")
+	application := map[string]bool{}
+	for _, name := range m.Variables() {
+		application[name] = true
+	}
+	overlay := map[string]bool{}
+	for _, s := range m.Monitoring.App {
+		overlay[s.Env] = true
+		if !used[s.Env] {
+			t.Errorf("monitoring.app declares %s but no application overlay reads it", s.Env)
+		}
+	}
+	for name := range used {
+		if !overlay[name] && !application[name] {
+			t.Errorf("an application overlay reads %s; declare it under monitoring.app", name)
+		}
+	}
+}

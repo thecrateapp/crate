@@ -1,0 +1,112 @@
+# Shadow-only recording rules for the application dashboards.
+# A ratio or quantile without traffic stays empty: missing is never a healthy zero.
+groups:
+  - name: crate-app-collection
+    interval: 30s
+    rules:
+      - record: crate:scrape_up:by_service
+        expr: max by (service) (up{job="crate-app"})
+      - record: crate:scrape_samples:by_service
+        expr: sum by (service) (scrape_samples_scraped{job="crate-app"})
+      - record: crate:scrape_age_seconds:by_service
+        expr: time() - max by (service) (timestamp(up{job="crate-app"}))
+      - record: crate:scrape_sample_limit_hit:by_service
+        expr: max by (service) (scrape_samples_post_metric_relabeling{job="crate-app"} >= bool 20000)
+
+  - name: crate-app-api
+    interval: 30s
+    rules:
+      - record: crate:api_requests:rate5m
+        expr: sum by (target, status_class) (rate(crate_api_request_total[5m]))
+      - record: crate:api_requests:increase5m
+        expr: sum by (target) (increase(crate_api_request_total[5m]))
+      - record: crate:api_request_errors:ratio5m
+        expr: |
+          (
+            sum by (target) (rate(crate_api_request_errors_total[5m]))
+              or 0 * sum by (target) (rate(crate_api_request_total[5m]))
+          )
+            / (sum by (target) (rate(crate_api_request_total[5m])) > 0)
+      - record: crate:api_request_latency_seconds:p95_5m
+        expr: |
+          histogram_quantile(0.95, sum by (target, le) (rate(crate_api_request_latency_seconds_bucket[5m])))
+            and on (target) (sum by (target) (rate(crate_api_request_latency_seconds_count[5m])) > 0)
+      - record: crate:api_requests_by_client:rate5m
+        expr: sum by (client) (rate(crate_api_request_client_total[5m]))
+
+  - name: crate-app-playback
+    interval: 30s
+    rules:
+      - record: crate:playback_startup:increase15m
+        expr: sum by (origin, runtime) (increase(crate_playback_startup_seconds_count[15m]))
+      - record: crate:playback_startup_seconds:p95_15m
+        expr: |
+          histogram_quantile(0.95, sum by (origin, runtime, le) (rate(crate_playback_startup_seconds_bucket[15m])))
+            and on (origin, runtime) (sum by (origin, runtime) (rate(crate_playback_startup_seconds_count[15m])) > 0)
+      - record: crate:playback_stalls:increase15m
+        expr: sum by (origin, runtime) (increase(crate_playback_stall_total[15m]))
+      - record: crate:playback_stalls_per_startup:ratio15m
+        expr: |
+          (
+            sum by (origin, runtime) (increase(crate_playback_stall_total[15m]))
+              or 0 * sum by (origin, runtime) (increase(crate_playback_startup_seconds_count[15m]))
+          )
+            / (sum by (origin, runtime) (increase(crate_playback_startup_seconds_count[15m])) > 0)
+      - record: crate:playback_stall_seconds:p95_15m
+        expr: |
+          histogram_quantile(0.95, sum by (origin, runtime, le) (rate(crate_playback_stall_seconds_bucket[15m])))
+            and on (origin, runtime) (sum by (origin, runtime) (rate(crate_playback_stall_seconds_count[15m])) > 0)
+      - record: crate:playback_recoveries:increase15m
+        expr: sum by (origin, runtime) (increase(crate_playback_recovery_total[15m]))
+
+  - name: crate-app-streams
+    interval: 30s
+    rules:
+      - record: crate:stream_requests:rate5m
+        expr: sum by (target, status_class) (rate(crate_stream_requests_total[5m]))
+      - record: crate:stream_latency_seconds:p95_5m
+        expr: |
+          histogram_quantile(0.95, sum by (target, le) (rate(crate_stream_latency_seconds_bucket[5m])))
+            and on (target) (sum by (target) (rate(crate_stream_latency_seconds_count[5m])) > 0)
+      - record: crate:stream_concurrent:by_service
+        expr: sum by (service) (last_over_time(crate_stream_concurrent[2m]))
+      - record: crate:stream_transcodes:increase15m
+        expr: sum by (preset) (increase(crate_stream_transcode_duration_seconds_count[15m]))
+      - record: crate:stream_transcode_failures:ratio15m
+        expr: |
+          (
+            sum by (preset) (increase(crate_stream_transcode_duration_seconds_count{outcome!="completed"}[15m]))
+              or 0 * sum by (preset) (increase(crate_stream_transcode_duration_seconds_count[15m]))
+          )
+            / (sum by (preset) (increase(crate_stream_transcode_duration_seconds_count[15m])) > 0)
+
+  - name: crate-app-workers
+    interval: 30s
+    rules:
+      - record: crate:worker_queue_depth:last2m
+        expr: max by (queue) (last_over_time(crate_worker_queue_depth[2m]))
+      - record: crate:worker_queue_running:last2m
+        expr: max by (queue) (last_over_time(crate_worker_queue_running[2m]))
+      - record: crate:worker_tasks:increase15m
+        expr: sum by (queue, outcome) (increase(crate_worker_task_duration_seconds_count[15m]))
+      - record: crate:worker_task_failures:ratio15m
+        expr: |
+          (
+            sum by (queue) (increase(crate_worker_task_duration_seconds_count{outcome!="completed"}[15m]))
+              or 0 * sum by (queue) (increase(crate_worker_task_duration_seconds_count[15m]))
+          )
+            / (sum by (queue) (increase(crate_worker_task_duration_seconds_count[15m])) > 0)
+      - record: crate:worker_task_duration_seconds:p95_15m
+        expr: |
+          histogram_quantile(0.95, sum by (queue, le) (rate(crate_worker_task_duration_seconds_bucket[15m])))
+            and on (queue) (sum by (queue) (rate(crate_worker_task_duration_seconds_count[15m])) > 0)
+      - record: crate:worker_queue_wait_seconds:p95_15m
+        expr: |
+          histogram_quantile(0.95, sum by (queue, le) (rate(crate_worker_queue_wait_seconds_bucket[15m])))
+            and on (queue) (sum by (queue) (rate(crate_worker_queue_wait_seconds_count[15m])) > 0)
+      - record: crate:worker_resource_deferred:increase15m
+        expr: sum by (queue, reason) (increase(crate_worker_resource_deferred_total[15m]))
+      - record: crate:media_worker_packages:increase15m
+        expr: sum by (kind) (increase(crate_media_worker_package_completed_total[15m]))
+      - record: crate:media_worker_package_failures:increase15m
+        expr: sum by (kind) (increase(crate_media_worker_package_failed_total[15m]))
