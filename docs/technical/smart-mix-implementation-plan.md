@@ -134,7 +134,7 @@ node scripts/check-docs.mjs
 
 From `app/listen/android`: `./gradlew :app:testDebugUnitTest` for unit tests and `./gradlew :app:connectedDebugAndroidTest` for instrumentation on an explicitly selected device. From `app/readplane`: `go test ./internal/routes ./internal/catalog ./internal/snapshots` when its contract is touched. Add Ruff/Pyright and the existing frontend checks according to the affected files; do not replace the repository gates with this minimal list.
 
-The existing targets `make cap-android-smart-mix-artifacts` and its local test variant produce an APK explicitly pointed at dev. The `prod-artifacts` variant requires an explicit choice of environment and is not part of the default CI. `make vdj-test` (V09) and `make vdj-package` (V10, macOS arm64) exist; `vdj-build` and the Windows and macOS Intel packages are still pending.
+The existing targets `make cap-android-smart-mix-artifacts` and its local test variant produce an APK explicitly pointed at dev. The `prod-artifacts` variant requires an explicit choice of environment and is not part of the default CI. `make vdj-test` (V09), `make vdj-package` (V10, macOS) and the `vdj-plugin-release.yml` workflow (V10, macOS and Windows) exist.
 
 ## 3. Shared platform: P01 to P06
 
@@ -687,7 +687,9 @@ VH01 ruled out local paths and `file://` in `GetStreamUrl` (R31). It is only via
 
 **DoD:** installable packages per platform with documented requirements (Pro, architecture, signing); A, B and Crate Automix verified on a real host.
 
-**Status 2026-11-02 (R2, macOS arm64):** `make vdj-package` builds `Crate.bundle` in Release, checks that `Info.plist` declares `Crate`, that it exports `DllGetClassObject` and that it ships no SDK headers, probe or tokens; it signs it ad-hoc and writes the zip, its `.sha256` and `manifest-macos-arm64.json` to `dist/vdj/` (version, contracts from `contract_negotiator.hpp`, tested VDJ 8.5.9307, Pro, install path, signing). Installation and the quarantine `xattr` are in the plugin README. The packaging script `packaging/package_macos.py` has tests in CI. Pending: the R2 gate in production on the package after the deploy, Windows x64, macOS Intel, Developer ID and notarization, SBOM and license inventory, release workflow.
+**Status 2026-11-02 (R2, macOS arm64):** `make vdj-package` builds `Crate.bundle` in Release, checks that `Info.plist` declares `Crate`, that it exports `DllGetClassObject` and that it ships no SDK headers, probe or tokens; it signs it ad-hoc and writes the zip, its `.sha256` and `manifest-macos-arm64.json` to `dist/vdj/` (version, contracts from `contract_negotiator.hpp`, tested VDJ 8.5.9307, Pro, install path, signing). Installation and the quarantine `xattr` are in the plugin README.
+
+**Status 2026-11-02 (packages in CI):** the `vdj-plugin-release.yml` workflow builds macOS arm64, macOS x86_64 (cross-compiled, minimum macOS 12) and Windows x64. The SDK 20211003 headers come from the `VIRTUALDJ_SDK_ZIP_B64` secret, are unpacked outside the checkout and are verified by SHA-256. Packaging rejects wrong architectures and dependencies users do not have: on macOS only system libraries; on Windows curl, SQLite and the CRT are static, because VDJ does not look for DLLs next to the plugin. A `crate-vdj-v<version>` tag equal to `kPluginVersion` publishes all three as a prerelease that is not marked latest, because the website downloads from `releases/latest`. Pending: the R2 gate in production, host gates for macOS Intel and Windows, Developer ID and notarization, Authenticode, SBOM and license inventory.
 
 ## 7. Integration, acceptance and operation: X01 to X04
 
