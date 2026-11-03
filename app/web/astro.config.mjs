@@ -1,12 +1,46 @@
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { pluginLineNumbers } from "@expressive-code/plugin-line-numbers";
+import expressiveCode, { ExpressiveCodeTheme } from "astro-expressive-code";
 import { defineConfig } from "astro/config";
+import { crateSourceLinks } from "./src/lib/code-blocks.ts";
+
+const crateTheme = ExpressiveCodeTheme.fromJSONString(
+  readFileSync(new URL("./src/lib/code-theme.json", import.meta.url), "utf8"),
+);
 
 export default defineConfig({
   site: "https://cratemusic.app",
   trailingSlash: "never",
   server: { allowedHosts: [".dev.cratemusic.app"] },
   build: { format: "file" },
-  markdown: { shikiConfig: { theme: "css-variables" } },
+  integrations: [
+    expressiveCode({
+      themes: [crateTheme],
+      plugins: [crateSourceLinks(), pluginLineNumbers()],
+      defaultProps: { showLineNumbers: false },
+      styleOverrides: {
+        borderRadius: "6px",
+        borderColor: "rgba(241, 245, 249, 0.1)",
+        codeFontFamily: "var(--mono)",
+        codeFontSize: "0.85rem",
+        codeLineHeight: "1.65",
+        codePaddingBlock: "1.1rem",
+        codePaddingInline: "1.25rem",
+        uiFontFamily: "var(--mono)",
+        uiFontSize: "0.72rem",
+        frames: {
+          shadowColor: "transparent",
+          editorTabBarBorderBottomColor: "rgba(241, 245, 249, 0.1)",
+          tooltipSuccessBackground: "#06b6d4",
+        },
+        textMarkers: {
+          markBackground: "rgba(103, 232, 249, 0.08)",
+          markBorderColor: "#67e8f9",
+        },
+      },
+    }),
+  ],
   i18n: {
     defaultLocale: "en",
     locales: ["en"],

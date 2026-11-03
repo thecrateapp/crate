@@ -50,11 +50,15 @@ The projector reads that stream every five seconds, up to 200 events at a time, 
 event affects. A play event touches one user's "recently played". A like touches that user's home. New listening
 aggregates touch both the user's stats and the instance's:
 
-```python
+```python source="app/crate/projector.py#L262-L276" commit="cacf4b3471371b6cc68c7a3baf2a4a752f74626f" "actions.add"
 if event_type == "user.play_event.recorded":
     user_id = _coerce_int(payload.get("user_id") or event.get("subject_key"))
     if user_id is not None:
         actions.add(("recent-user", user_id))
+elif scope == "home:discovery":
+    user_id = _coerce_int(event.get("subject_key"))
+    if user_id is not None:
+        actions.add(("home-user", user_id))
 elif event_type in _HOME_EVENT_TYPES:
     user_id = _coerce_int(payload.get("user_id") or event.get("subject_key"))
     if user_id is not None:
@@ -77,21 +81,37 @@ The read plane is a Go service with a deliberately tiny budget: 128 MB of memory
 hot route it authenticates the request, reads one snapshot row, and answers. A two-second in-process cache of
 1,000 entries absorbs bursts, like several devices in the same household opening the app at once.
 
-If the snapshot is missing, the read plane hands the request to FastAPI:
+If the snapshot is missing, the read plane hands the request to FastAPI. Only when that isn't possible does it
+answer with a 404 or a 503 itself:
 
-```go
+```go source="app/readplane/internal/routes/server.go#L424-L439" commit="cacf4b3471371b6cc68c7a3baf2a4a752f74626f" "s.tryFallback(w, r)"
 row, err := s.snapshots.Get(r.Context(), "home:discovery", strconv.FormatInt(user.ID, 10))
 if err != nil {
 	if s.tryFallback(w, r) {
 		return
 	}
-	// no fallback available: 404 if missing, 503 if the store is down
+	status := http.StatusServiceUnavailable
+	detail := "Home discovery snapshot unavailable"
+	if errors.Is(err, snapshots.ErrNotFound) {
+		status = http.StatusNotFound
+		detail = "Home discovery snapshot not found"
+	}
+	httpx.MarkReadplane(w, "miss")
+	httpx.WriteError(w, status, detail)
+	return
 }
 httpx.MarkReadplane(w, "hit")
 ```
 
 Every response says what happened in an `X-Crate-Readplane` header: `hit`, `miss` or `fallback`. That header is
-the first thing to check when a screen looks wrong. The fallback itself sits behind a circuit breaker: after five
+the first thing to check when a screen looks wrong.
+
+```sh title="Check which path served the home screen"
+curl -s -o /dev/null -D - "https://your-crate-server/api/me/home/discovery" \
+  -H "Authorization: Bearer $TOKEN" | grep -i x-crate-readplane
+```
+
+The fallback itself sits behind a circuit breaker: after five
 consecutive failures it stops forwarding for ten seconds and answers `503` with `Retry-After: 1`, so a struggling
 API isn't buried under retries.
 
@@ -100,7 +120,7 @@ API isn't buried under retries.
 A snapshot that is a few minutes old is usually fine. One that is hours old usually isn't. The read plane makes
 that call in one small function:
 
-```go
+```go source="app/readplane/internal/snapshots/store.go#L327-L334" commit="cacf4b3471371b6cc68c7a3baf2a4a752f74626f" "maxAge" "staleMaxAge"
 stale = now.Sub(builtAt) > maxAge
 if staleAfter != nil && !staleAfter.IsZero() && !staleAfter.After(now) {
 	stale = true

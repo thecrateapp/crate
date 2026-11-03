@@ -39,6 +39,21 @@ test("a post links its sources on GitHub and loads its diagram", async ({
     .toBe(true);
 });
 
+test("code blocks link their source pinned to a commit", async ({ page }) => {
+  await page.goto(POST);
+  const link = page.locator(".expressive-code .source-link").first();
+  await expect(link).toHaveAttribute(
+    "href",
+    /^https:\/\/github\.com\/thecrateapp\/crate\/blob\/[0-9a-f]{40}\/.+#L\d+(-L\d+)?$/,
+  );
+  await expect(
+    page
+      .locator(".expressive-code")
+      .first()
+      .locator("button.copy, .copy button"),
+  ).toHaveCount(1);
+});
+
 test("the RSS feed lists published posts", async ({ request }) => {
   const response = await request.get("/blog/rss.xml");
   expect(response.status()).toBe(200);

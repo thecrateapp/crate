@@ -151,10 +151,13 @@ const minutes = readingMinutes(post.body ?? "");
   .prose :global(ul),
   .prose :global(ol),
   .prose :global(blockquote),
-  .prose :global(table),
-  .prose :global(pre),
-  .prose :global(figure) {
+  .prose :global(table) {
     margin: 0 0 1.4em;
+  }
+
+  .prose :global(.expressive-code) {
+    margin: 2em 0 2em calc(-1 * clamp(0px, 10vw, 180px));
+    width: calc(100% + clamp(0px, 10vw, 180px));
   }
 
   .prose :global(h2) {
@@ -202,16 +205,6 @@ const minutes = readingMinutes(post.body ?? "");
     font-family: var(--mono);
     font-size: 0.86em;
     color: var(--fg);
-  }
-
-  .prose :global(pre) {
-    overflow-x: auto;
-    padding: 18px 20px;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    font-family: var(--mono);
-    font-size: 0.85rem;
-    line-height: 1.6;
   }
 
   .prose :global(img) {
@@ -276,26 +269,17 @@ const minutes = readingMinutes(post.body ?? "");
     font-size: 0.9rem;
   }
 
-  :global(:root) {
-    --astro-code-foreground: #f1f5f9;
-    --astro-code-background: rgba(13, 14, 20, 0.88);
-    --astro-code-token-keyword: #67e8f9;
-    --astro-code-token-constant: #a5f3fc;
-    --astro-code-token-string: #fbbf24;
-    --astro-code-token-string-expression: #fbbf24;
-    --astro-code-token-comment: #7e8084;
-    --astro-code-token-function: #f1f5f9;
-    --astro-code-token-parameter: #cbd5e1;
-    --astro-code-token-punctuation: #999ca0;
-    --astro-code-token-link: #67e8f9;
-  }
-
   @media (max-width: 760px) {
     .post {
       padding-top: 16vh;
     }
     .prose,
     .sources {
+      margin-left: 0;
+    }
+    .prose :global(img),
+    .prose :global(.expressive-code) {
+      width: 100%;
       margin-left: 0;
     }
   }

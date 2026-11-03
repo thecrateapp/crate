@@ -65,6 +65,28 @@ the blog pages. It removes the patterns that make text read as machine-written (
 closers, forced groups of three, dashes everywhere, bold labels, inflated claims). It changes prose only, never
 code, paths, frontmatter or link targets, and it must not add or drop facts.
 
+## Code blocks
+
+Code blocks use [Expressive Code](https://expressive-code.com) with Crate's theme
+(`app/web/src/lib/code-theme.json`). Excerpts from the repository say where they come from:
+
+````md
+```go source="app/readplane/internal/routes/server.go#L424-L439" commit="<40-character commit>" "s.tryFallback(w, r)"
+...the exact lines 424 to 439 of that file at that commit...
+```
+````
+
+- `source` is the repository path with an optional `#L<start>` or `#L<start>-L<end>` range. The block shows the
+  path as its title, the file's real line numbers and a "GitHub · L424–439" link in its header.
+- `commit` is required with `source`: the full 40-character SHA the excerpt was copied from, so the link keeps
+  pointing at the same lines after `main` moves on (`git rev-parse origin/main`). The build fails without it.
+- Copy the lines exactly and contiguously. If a fragment needs trimming, use a shorter range rather than editing
+  lines out, so the numbers stay true.
+- Highlight what matters with text markers (`"tryFallback"`) or line markers (`{3-5}`, counted from the first
+  line of the block).
+- Shell commands use `sh` with a `title` and render as a terminal. Show commands, not invented output.
+- `blog-calendar.test.ts` checks that every `source` path exists.
+
 ## Diagrams
 
 - SVG files in `app/web/public/blog/<slug>/`, referenced from Markdown with alt text that explains the diagram:

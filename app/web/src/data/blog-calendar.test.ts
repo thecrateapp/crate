@@ -77,6 +77,17 @@ describe("blog calendar", () => {
       expect(slugs).toContain(file.replace(/\.md$/, ""));
   });
 
+  it("points code blocks at files that exist", () => {
+    for (const file of posts) {
+      const text = readFileSync(`${postsDir}${file}`, "utf8");
+      for (const [, source] of text.matchAll(/^```\S*.*\bsource="([^"#]+)/gm)) {
+        expect(existsSync(`${repoRoot}${source}`), `${file}: ${source}`).toBe(
+          true,
+        );
+      }
+    }
+  });
+
   it("keeps posts short", () => {
     for (const file of posts) {
       expect(readingWords(frontmatter(file).body), file).toBeLessThanOrEqual(
