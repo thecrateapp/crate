@@ -5,7 +5,11 @@ from uuid import uuid4
 
 import pytest
 from crate.db.tx import read_scope
-from crate.smart_mix.versions import ANALYZER_VERSION, PROFILE_SCHEMA_VERSION
+from crate.smart_mix.versions import (
+    ANALYZER_VERSION,
+    PROFILE_SCHEMA_VERSION,
+    READABLE_ANALYZER_VERSIONS,
+)
 from sqlalchemy import text
 
 from tests.conftest import PG_AVAILABLE
@@ -268,6 +272,8 @@ def test_improvements_include_only_listened_tracks_without_current_full_or_bliss
     states = [
         ("full", ANALYZER_VERSION, PROFILE_SCHEMA_VERSION, False, [1.0]),
         ("full", "old", PROFILE_SCHEMA_VERSION, False, []),
+        # The previous analyzer stays current until the backfill recomputes it.
+        ("full", "smart-mix-audio-v5", PROFILE_SCHEMA_VERSION, False, [3.0]),
         ("full", ANALYZER_VERSION, PROFILE_SCHEMA_VERSION + 1, False, None),
         ("full", ANALYZER_VERSION, PROFILE_SCHEMA_VERSION, True, [2.0]),
         ("partial", ANALYZER_VERSION, PROFILE_SCHEMA_VERSION, False, None),
@@ -287,15 +293,15 @@ def test_improvements_include_only_listened_tracks_without_current_full_or_bliss
             },
         )
         _play(library, "2026-10-24", track=t["id"], minutes=n)
-    _track(library, album, 6)  # Unheard missing analyses have no registered impact.
+    _track(library, album, 7)  # Unheard missing analyses have no registered impact.
     r = _report(library)
     improvements = {i["key"]: i for i in r["improvements"]}
     assert improvements["full"]["tracks"] == 4
-    assert improvements["full"]["minutes"] == 14
+    assert improvements["full"]["minutes"] == 2 + 4 + 5 + 6
     assert improvements["bliss"]["tracks"] == 3
-    assert improvements["bliss"]["minutes"] == 10
+    assert improvements["bliss"]["minutes"] == 2 + 4 + 6
     assert improvements["full"]["albums"][0]["played_tracks"] == 4
-    assert improvements["full"]["albums"][0]["minutes"] == 14
+    assert improvements["full"]["albums"][0]["minutes"] == 17
 
 
 def test_album_then_artist_fallback_uses_mapped_canonical_and_track_tier_wins(library):
@@ -474,7 +480,7 @@ def test_report_streams_one_small_row_per_track_without_internal_columns(library
                 "previous_start": date(2026, 8, 26),
                 "previous_end": date(2026, 9, 24),
                 "profile_version": PROFILE_SCHEMA_VERSION,
-                "analyzer_version": ANALYZER_VERSION,
+                "analyzer_versions": list(READABLE_ANALYZER_VERSIONS),
             },
         ).all()
 

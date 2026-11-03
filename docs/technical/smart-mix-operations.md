@@ -151,9 +151,26 @@ profile into a deck (Android, Crate Decks) must follow these definitions.
   Other profiles stay `partial`; the planner can still beatmatch from their cue beats, but
   clients must not trust their whole grid.
 
-Moving to v6 marks v5 profiles `outdated`. Recomputing them is a backfill campaign, which
-nothing starts on its own. Until it runs, reads that ask for the current analyzer version
-(rule-based playlists that require a full profile, sonic neighbours) see fewer profiles.
+#### What happens when v6 is deployed
+
+- **Readers keep the v5 profiles.** `READABLE_ANALYZER_VERSIONS` (v6 and v5) decides what
+  counts as current for rule-based playlists that require a full profile (preview,
+  generation and scheduled `auto_refresh_enabled` regeneration), the
+  `is_current_full_profile` flag, sonic neighbours and collection insights. A v5 profile
+  keeps serving its v5 measurements, key bias and tracked grid included, until it is
+  recomputed. The planner, compatible tracks and the profile endpoints never filtered on
+  the version.
+- **Writers, the backfill and Admin target v6.** Every new analysis writes v6 and replaces
+  the v5 profile of its track. Admin coverage counts only v6 profiles as current, and the
+  track table shows v5 ones as `outdated`: they measure backfill progress, not what
+  readers can use.
+- **Recomputing is a backfill campaign.** Deploying does not start one. Started from Admin,
+  it claims every v5 profile (and missing ones) with target generation v6. A campaign
+  left `running` at deploy keeps going: the coordinator checks only its status and every
+  claim uses the deployed target, so it starts recomputing the whole library with v6
+  while its stored `target` still reads v5 (agent observability reports that mismatch).
+  Pause it before deploying if the recompute should wait.
+- When the backfill has finished, remove v5 from `READABLE_ANALYZER_VERSIONS`.
 
 ## Producing and publishing profiles
 

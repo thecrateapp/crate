@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from crate.db.queries.sonic_insights import sonic_track_reading
 from crate.db.queries.user_library_stats_range import instance_stats_today
 from crate.db.tx import read_scope
-from crate.smart_mix.versions import ANALYZER_VERSION, PROFILE_SCHEMA_VERSION
+from crate.smart_mix.versions import PROFILE_SCHEMA_VERSION, READABLE_ANALYZER_VERSIONS
 
 _WINDOWS = {"30d": 30, "90d": 90, "365d": 365}
 
@@ -45,7 +45,7 @@ WITH seed AS MATERIALIZED (
            t.acousticness,t.instrumentalness,t.valence,n.distance,
            COALESCE(p.quality IN ('full','partial')
              AND p.profile_version=:profile_version
-             AND p.analyzer_version=:analyzer_version
+             AND p.analyzer_version=ANY(:analyzer_versions)
              AND p.source_stale_at IS NULL,false) AS profile_current,
            p.bpm AS mix_bpm,p.bpm_confidence AS mix_bpm_confidence,
            p.global_energy AS mix_energy,p.integrated_lufs AS mix_integrated_lufs,
@@ -100,7 +100,7 @@ def get_sonic_neighbors(
         "end": end,
         "start": end - timedelta(days=_WINDOWS[window] - 1),
         "profile_version": PROFILE_SCHEMA_VERSION,
-        "analyzer_version": ANALYZER_VERSION,
+        "analyzer_versions": list(READABLE_ANALYZER_VERSIONS),
     }
 
     def _impl(current: Session) -> dict | None:

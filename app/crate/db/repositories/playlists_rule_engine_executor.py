@@ -17,7 +17,7 @@ from crate.db.tracklist_engine import (
 )
 from crate.db.tx import read_scope
 from crate.genre_taxonomy import get_related_genre_terms
-from crate.smart_mix.versions import ANALYZER_VERSION, PROFILE_SCHEMA_VERSION
+from crate.smart_mix.versions import PROFILE_SCHEMA_VERSION, READABLE_ANALYZER_VERSIONS
 from crate.track_versions import dedupe_track_variants
 
 
@@ -219,7 +219,7 @@ def _with_full_mix_profile(where: str, params: dict, *, required: bool) -> str:
     if not required:
         return where
     params["mix_profile_version"] = PROFILE_SCHEMA_VERSION
-    params["mix_analyzer_version"] = ANALYZER_VERSION
+    params["mix_analyzer_versions"] = list(READABLE_ANALYZER_VERSIONS)
     # Same current-profile contract as Analysis/backfill. EXISTS cannot duplicate
     # tracks and stays outside the rule group's all/any boolean expression.
     return f"""({where}) AND EXISTS (
@@ -227,7 +227,7 @@ def _with_full_mix_profile(where: str, params: dict, *, required: bool) -> str:
         WHERE mix_profile.track_id = t.id
           AND mix_profile.quality = 'full'
           AND mix_profile.profile_version = :mix_profile_version
-          AND mix_profile.analyzer_version = :mix_analyzer_version
+          AND mix_profile.analyzer_version = ANY(:mix_analyzer_versions)
           AND mix_profile.source_stale_at IS NULL
     )"""
 

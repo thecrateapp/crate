@@ -6,6 +6,11 @@ from crate.smart_mix.policy import PLANNER_POLICY
 API_CONTRACT_VERSION = "2026-08"
 PROFILE_SCHEMA_VERSION = 1
 ANALYZER_VERSION = "smart-mix-audio-v6"
+# Readers count profiles of these analyzer versions as current, so moving to a new
+# analyzer does not empty playlists, flags or reports before the backfill campaign
+# recomputes the library. Profiles are written, and backfill claims target, only
+# ANALYZER_VERSION; Admin coverage and track status measure progress against it.
+READABLE_ANALYZER_VERSIONS = (ANALYZER_VERSION, "smart-mix-audio-v5")
 PYTHON_ANALYZER = "crate-python"
 MEASUREMENT_VERSION = "bs1770-v1"
 PLANNER_IDENTIFIER = PLANNER_POLICY.identifier
@@ -21,4 +26,5 @@ __all__ = [
     "PLANNER_POLICY_VERSION",
     "PROFILE_SCHEMA_VERSION",
     "PYTHON_ANALYZER",
+    "READABLE_ANALYZER_VERSIONS",
 ]

@@ -96,3 +96,13 @@ def test_operator_reference_versions_match_implemented_contract(identifier):
         else getattr(versions, identifier)
     )
     assert rows[identifier] == str(expected)
+
+
+def test_readers_accept_the_previous_analyzer_while_writers_target_the_new_one() -> (
+    None
+):
+    assert versions.READABLE_ANALYZER_VERSIONS[0] == versions.ANALYZER_VERSION
+    assert "smart-mix-audio-v5" in versions.READABLE_ANALYZER_VERSIONS
+    assert len(set(versions.READABLE_ANALYZER_VERSIONS)) == len(
+        versions.READABLE_ANALYZER_VERSIONS
+    )
