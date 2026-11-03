@@ -5,6 +5,7 @@ package assets
 import (
 	"embed"
 	"io/fs"
+	"strings"
 )
 
 //go:generate go run ../../cmd/sync-assets
@@ -82,7 +83,7 @@ func withObservability(sources map[string]string) map[string]string {
 
 // Deployed maps the embedded files written into the install folder to
 // their path there.
-var Deployed = map[string]string{
+var Deployed = withObservability(map[string]string{
 	Compose:          "docker-compose.yaml",
 	CrateConfig:      "config.yaml",
 	FederationRoutes: "deploy/traefik/federation-readplane.yml",
@@ -91,6 +92,20 @@ var Deployed = map[string]string{
 	OperatorOverlay:  "deploy/operator/compose.operator.yaml",
 	OperatorExample:  "deploy/operator/config.operator.example.json",
 	ProvenanceProxy:  "deploy/operator/provenance-docker.haproxy.cfg",
+
+	ObservabilitySetup:     "scripts/observability_setup.py",
+	ObservabilityPreflight: "scripts/observability_preflight.py",
+	ObservabilityUp:        "scripts/observability-up.sh",
+})
+
+// Monitoring reports whether an embedded file belongs to the optional
+// monitoring: its bundle, its application overlays or its scripts.
+func Monitoring(name string) bool {
+	switch name {
+	case ObservabilitySetup, ObservabilityPreflight, ObservabilityUp:
+		return true
+	}
+	return strings.HasPrefix(name, ObservabilityDir+"/")
 }
 
 func Read(name string) ([]byte, error) {

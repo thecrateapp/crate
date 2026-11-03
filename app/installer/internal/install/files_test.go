@@ -135,6 +135,12 @@ func TestApplyWritesTheAgentSetupWithItsRepositoryLayout(t *testing.T) {
 		"deploy/hermes/runtime.py",
 		"deploy/operator/compose.operator.yaml",
 		"deploy/operator/config.operator.example.json",
+		"scripts/observability_setup.py",
+		"scripts/observability_preflight.py",
+		"scripts/observability-up.sh",
+		"deploy/observability/compose.standalone.yaml",
+		"deploy/observability/grafana/dashboards/app-overview.json",
+		"deploy/observability/compose.app-metrics.yaml",
 	} {
 		if info, err := os.Stat(filepath.Join(dir, path)); err != nil || info.Size() == 0 {
 			t.Errorf("%s: %v", path, err)
@@ -160,5 +166,39 @@ func TestComposeFilesFollowComposeFile(t *testing.T) {
 	}
 	if got := ComposeFiles(nil); len(got) != 1 {
 		t.Errorf("no settings: %v", got)
+	}
+}
+
+func TestApplyLeavesMonitoringFilesFromANewerInstaller(t *testing.T) {
+	dir := t.TempDir()
+	rules := filepath.Join(dir, "deploy", "observability", "prometheus.yml")
+	if err := os.MkdirAll(filepath.Dir(rules), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(rules, []byte("newer"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Defaults(dir)
+	cfg.KeepMonitoringFiles = true
+
+	if err := Apply(loadManifest(t), cfg, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	if data, _ := os.ReadFile(rules); string(data) != "newer" {
+		t.Fatalf("prometheus.yml rewritten: %q", data)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "docker-compose.yaml")); err != nil {
+		t.Fatal("the rest of the installation must still be written")
+	}
+}
+
+func TestEnvKeepsMonitoringNetworksInTheirOwnSection(t *testing.T) {
+	m := loadManifest(t)
+	values := envfile.New()
+	values.Set("OBS_APP_METRICS_NETWORK", "crate-observability_app-metrics")
+	rendered := envfile.Render(values, EnvHeader, Sections(m))
+	if !strings.Contains(rendered, "# Monitoring\nOBS_APP_METRICS_NETWORK=") {
+		t.Fatalf("rendered:\n%s", rendered)
 	}
 }

@@ -149,6 +149,18 @@ func Env(s Settings) *envfile.Values {
 	return values
 }
 
+// MountedFiles maps each monitoring file a running service reads at start,
+// relative to deploy/observability, to that service. A change to one needs a
+// restart; scripts/observability_release.py keeps the same map.
+var MountedFiles = map[string]string{
+	"prometheus.yml":                                      "crate-prometheus",
+	"recording-rules.yml":                                 "crate-prometheus",
+	"docker-proxy.haproxy.cfg":                            "crate-observability-docker-proxy",
+	"runtime-proxy.haproxy.cfg":                           "crate-observability-docker-proxy",
+	"grafana/provisioning/dashboards/infrastructure.yaml": "crate-grafana",
+	"grafana/provisioning/datasources/prometheus.yaml":    "crate-grafana",
+}
+
 // Overlay is an application compose overlay that joins a network the
 // monitoring project creates.
 type Overlay struct {
@@ -232,6 +244,10 @@ func Active(values *envfile.Values) bool {
 // monitoring network never stops the application from starting. It returns
 // the files to use and the overlays it left out.
 func Select(files []string, values *envfile.Values, exists func(network string) bool) (kept, dropped []string) {
+	if values == nil {
+		values = envfile.New()
+	}
+	checked := map[string]bool{}
 	for _, file := range files {
 		index := slices.IndexFunc(Overlays, func(o Overlay) bool { return o.File == file })
 		if index < 0 {
@@ -242,7 +258,12 @@ func Select(files []string, values *envfile.Values, exists func(network string) 
 		if strings.TrimSpace(network) == "" {
 			network = Networks[Overlays[index].Network]
 		}
-		if exists(network) {
+		found, ok := checked[network]
+		if !ok {
+			found = exists(network)
+			checked[network] = found
+		}
+		if found {
 			kept = append(kept, file)
 		} else {
 			dropped = append(dropped, file)

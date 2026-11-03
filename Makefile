@@ -1324,6 +1324,10 @@ observability-deploy-rollback: ## Return monitoring to the previous release (req
 observability-deploy-status: ## Show the deployed monitoring release, live drift and services
 	@$(OBS_DEPLOY_ENV) scripts/observability-deploy.sh status
 
+.PHONY: installer-observability-e2e
+installer-observability-e2e: ## End-to-end installer monitoring test in a disposable Docker-in-Docker container (KEEP=1 keeps it)
+	@scripts/installer-observability-e2e.sh
+
 GRAFANA_LOCAL_PORT  ?= 3001
 GRAFANA_REMOTE_PORT ?= 3001
 .PHONY: observability-grafana

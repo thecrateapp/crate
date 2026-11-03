@@ -155,6 +155,11 @@ func Sections(m *manifest.Manifest) []envfile.Section {
 		}
 		sections = append(sections, envfile.Section{Title: in.Title, Keys: keys})
 	}
+	monitoring := make([]string, 0, len(m.Monitoring.App))
+	for _, s := range m.Monitoring.App {
+		monitoring = append(monitoring, s.Env)
+	}
+	sections = append(sections, envfile.Section{Title: "Monitoring", Keys: monitoring})
 	sections = append(sections, envfile.Section{Title: "Tuning", Keys: m.Tuning})
 	return sections
 }

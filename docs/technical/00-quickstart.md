@@ -97,6 +97,7 @@ crate configure            # choose integrations to set up, change or turn off
 crate configure telegram   # go straight to one of them
 crate doctor               # machine, Docker, services, API and every configured key
 crate doctor --json        # the same report for scripts and agents
+crate observability enable # optional Prometheus and Grafana for this server (Linux)
 ```
 
 `crate configure` saves the keys in `.env` and restarts only the services that
@@ -106,6 +107,11 @@ run. Tidal connects after Crate starts, from Admin > Settings > Downloads, with
 a code you enter at tidal.com/activate. For unattended installs, export the
 integration variables (for example `FANART_API_KEY`) before `crate install
 --yes`; `deploy/install/integrations.yaml` lists them.
+
+Monitoring is optional and off unless you choose it in the installer or run
+`crate observability enable`. It costs about 944 MiB of memory, 1 CPU and up to
+10 GB of disk, and Grafana listens only on the server; see
+[Monitoring](monitoring.md#home-installations).
 
 ## Access modes and endpoints
 

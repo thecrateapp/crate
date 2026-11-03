@@ -245,3 +245,32 @@ def test_role_lets_the_exporter_log_in_and_stays_idempotent(
             cursor.execute(f'DROP OWNED BY "{name}"')
             cursor.execute(f'DROP ROLE IF EXISTS "{name}"')
         admin.close()
+
+
+def test_backup_grafana_copies_its_data_and_keeps_owners(
+    setup, owners, tmp_path, monkeypatch
+):
+    settings = _settings(tmp_path)
+    setup.prepare(settings, {"GRAFANA_ADMIN_PASSWORD": GRAFANA_PASSWORD}, chown=owners)
+    grafana = tmp_path / "observability/grafana"
+    (grafana / "plugins").mkdir()
+    (grafana / "grafana.db").write_text("dashboards")
+    chowned = {}
+    monkeypatch.setattr(
+        os,
+        "lchown",
+        lambda path, uid, gid: chowned.__setitem__(Path(path).name, (uid, gid)),
+    )
+
+    result = setup.backup_grafana(settings, stamp="20261103T000000Z")
+
+    target = tmp_path / "observability/backups/grafana-20261103T000000Z"
+    assert result == {"backup": target.name}
+    assert (target / "grafana.db").read_text() == "dashboards"
+    assert {"grafana-20261103T000000Z", "grafana.db", "plugins"} <= set(chowned)
+    assert _mode(tmp_path / "observability/backups") == 0o700
+
+
+def test_backup_grafana_needs_its_data(setup, tmp_path):
+    with pytest.raises(setup.SetupError, match="no Grafana data"):
+        setup.backup_grafana(_settings(tmp_path))

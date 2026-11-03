@@ -92,3 +92,36 @@ func TestLayoutsAndStoredSecrets(t *testing.T) {
 		t.Fatal("each mode has its own secrets")
 	}
 }
+
+func TestActivateKeepsMonitoringOverlaysAfterTheOperator(t *testing.T) {
+	const (
+		projector  = "deploy/observability/compose.projector-prometheus.yaml"
+		traefik    = "deploy/observability/compose.traefik-metrics.yaml"
+		metrics    = "deploy/observability/compose.app-metrics.yaml"
+		supervisor = "deploy/observability/compose.supervisor-prometheus.yaml"
+	)
+	monitoring := "docker-compose.yaml:" + projector + ":" + traefik + ":" + metrics
+	withOperator := "docker-compose.yaml:" + OperatorOverlay + ":" + projector + ":" + traefik + ":" + metrics + ":" + supervisor
+	cases := []struct {
+		name, files string
+		to          Mode
+		want        string
+	}{
+		{"operator on", monitoring, Operator, withOperator},
+		{"operator off", withOperator, Off, monitoring},
+		{"agent", withOperator, Agent, monitoring},
+		{"no monitoring", "", Operator, "docker-compose.yaml:" + OperatorOverlay},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			values := settings()
+			if tc.files != "" {
+				values.Set("COMPOSE_FILE", tc.files)
+			}
+			Activate(values, tc.to)
+			if got, _ := values.Get("COMPOSE_FILE"); got != tc.want {
+				t.Fatalf("COMPOSE_FILE %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

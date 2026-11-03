@@ -4,6 +4,10 @@ import (
 	"context"
 	"errors"
 	"io"
+	"maps"
+	"os"
+	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -323,5 +327,23 @@ func TestMayWrite(t *testing.T) {
 		if got := MayWrite(tc.current, tc.version); got != tc.want {
 			t.Errorf("MayWrite(%q, %q) = %v", tc.current, tc.version, got)
 		}
+	}
+}
+
+func TestMountedFilesMatchTheReleaseTool(t *testing.T) {
+	script, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "scripts", "observability_release.py"))
+	if err != nil {
+		t.Skipf("release tool not available: %v", err)
+	}
+	block := regexp.MustCompile(`(?s)MOUNTED_FILES = \{(.*?)\n\}`).FindSubmatch(script)
+	if block == nil {
+		t.Fatal("MOUNTED_FILES not found")
+	}
+	want := map[string]string{}
+	for _, match := range regexp.MustCompile(`PREFIX \+ "([^"]+)": "([^"]+)"`).FindAllSubmatch(block[1], -1) {
+		want[string(match[1])] = string(match[2])
+	}
+	if len(want) == 0 || !maps.Equal(MountedFiles, want) {
+		t.Fatalf("MountedFiles %v, release tool %v", MountedFiles, want)
 	}
 }
