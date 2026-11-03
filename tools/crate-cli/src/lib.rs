@@ -9,6 +9,8 @@ pub mod bliss;
 pub mod diff;
 pub mod fingerprint;
 #[cfg(feature = "analysis")]
+pub mod key_detection;
+#[cfg(feature = "analysis")]
 pub mod loudness;
 pub mod mix_profile;
 #[cfg(feature = "ml")]
