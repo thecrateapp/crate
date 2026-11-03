@@ -7,8 +7,8 @@ from pathlib import Path
 
 import numpy as np
 
-from crate.smart_mix.camelot import to_camelot
 from crate.smart_mix.cue_detection import detect_mix_cues
+from crate.smart_mix.key_detection import detect_key
 from crate.smart_mix.models import MixProfileQuality, TrackMixProfileDraft
 from crate.smart_mix.versions import ANALYZER_VERSION, PYTHON_ANALYZER
 
@@ -28,27 +28,6 @@ WINDOW_SECONDS = 5.0
 FULL_SCAN_HEAD_SECONDS = 240
 FULL_SCAN_TAIL_SECONDS = 120
 _READ_BLOCK_FRAMES = 65_536
-
-_KEY_NAMES = (
-    "C",
-    "C#",
-    "D",
-    "D#",
-    "E",
-    "F",
-    "F#",
-    "G",
-    "G#",
-    "A",
-    "A#",
-    "B",
-)
-_MAJOR_PROFILE = np.array(
-    [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88]
-)
-_MINOR_PROFILE = np.array(
-    [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17]
-)
 
 
 def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
@@ -427,65 +406,7 @@ def _key_features(
     audio: np.ndarray,
     sample_rate: int,
 ) -> tuple[str | None, str | None, str | None, float]:
-    import librosa
-
-    max_samples = min(audio.size, sample_rate * 90)
-    with warnings.catch_warnings():
-        warnings.filterwarnings(
-            "ignore",
-            message="Trying to estimate tuning from empty frequency set.",
-            category=UserWarning,
-        )
-        chroma = librosa.feature.chroma_stft(
-            y=audio[:max_samples],
-            sr=sample_rate,
-            hop_length=HOP_LENGTH,
-        )
-    if chroma.size == 0:
-        return None, None, None, 0.0
-    chroma_mean = np.mean(chroma, axis=1)
-    if float(np.sum(chroma_mean)) <= 1e-8:
-        return None, None, None, 0.0
-
-    candidates: list[tuple[float, str, str]] = []
-    for index, key_name in enumerate(_KEY_NAMES):
-        observed = np.roll(chroma_mean, -index)
-        candidates.append(
-            (
-                _safe_correlation(observed, _MAJOR_PROFILE),
-                key_name,
-                "major",
-            )
-        )
-        candidates.append(
-            (
-                _safe_correlation(observed, _MINOR_PROFILE),
-                key_name,
-                "minor",
-            )
-        )
-    candidates.sort(reverse=True, key=lambda candidate: candidate[0])
-    best_score, key, scale = candidates[0]
-    second_score = candidates[1][0]
-    confidence = max(
-        0.0,
-        min(
-            1.0,
-            (best_score + 1.0) * 0.35 + max(0.0, best_score - second_score),
-        ),
-    )
-    try:
-        camelot = to_camelot(key, scale)
-    except ValueError:
-        camelot = None
-    return key, scale, camelot, round(confidence, 4)
-
-
-def _safe_correlation(left: np.ndarray, right: np.ndarray) -> float:
-    if float(np.std(left)) <= 1e-8:
-        return -1.0
-    value = float(np.corrcoef(left, right)[0, 1])
-    return value if math.isfinite(value) else -1.0
+    return detect_key(audio, sample_rate)
 
 
 def _window_features(

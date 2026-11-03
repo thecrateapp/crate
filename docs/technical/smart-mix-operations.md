@@ -87,7 +87,7 @@ These values come from the reviewed code; they were not discovered from a live i
 | ------------------------------- | -------------------- | ----------------------------------------------------- |
 | `API_CONTRACT_VERSION`          | `2026-08`            | Advertised integration and capabilities contract      |
 | `PROFILE_SCHEMA_VERSION`        | `1`                  | Schema of the persisted and serialized profile        |
-| `ANALYZER_VERSION`              | `smart-mix-audio-v5` | Target generation of profile analysis                 |
+| `ANALYZER_VERSION`              | `smart-mix-audio-v6` | Target generation of profile analysis                 |
 | `MEASUREMENT_VERSION`           | `bs1770-v1`          | Loudness and true peak provenance used by the planner |
 | `BEAT_GRID_FORMAT`              | `delta-ms-v1`        | Beat grid format                                      |
 | `PLANNER_IDENTIFIER`            | `smart-mix-v2`       | Identifier for plan batches and capabilities          |

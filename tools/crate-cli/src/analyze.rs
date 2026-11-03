@@ -1161,8 +1161,7 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
     let energy = compute_energy(rms);
     let dynamic_range = compute_dynamic_range(&samples);
     let bpm = estimate_bpm(&samples, sample_rate);
-    let (key, scale, _) = detect_key(&samples, sample_rate);
-    let mix_profile = Some(analyze_smart_mix_segments(
+    let mix_profile = analyze_smart_mix_segments(
         &samples,
         tail.as_ref().map(|(samples, start_ms)| AudioTail {
             samples,
@@ -1171,7 +1170,8 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
         sample_rate,
         Some(duration_ms),
         measured_loudness.as_ref(),
-    ));
+    );
+    let (key, scale) = (mix_profile.key.clone(), mix_profile.scale.clone());
 
     // Average spectral centroid
     let mut planner = RealFftPlanner::<f32>::new();
@@ -1194,8 +1194,8 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
     AnalysisResult {
         path: path.to_string_lossy().to_string(),
         bpm,
-        key: Some(key),
-        scale: Some(scale),
+        key,
+        scale,
         loudness: Some((loudness * 10.0).round() / 10.0),
         energy: Some((energy * 1000.0).round() / 1000.0),
         dynamic_range: Some((dynamic_range * 10.0).round() / 10.0),
@@ -1205,7 +1205,7 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
         valence: None,
         acousticness: None,
         instrumentalness: None,
-        mix_profile,
+        mix_profile: Some(mix_profile),
         error: None,
     }
 }

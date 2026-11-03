@@ -1,11 +1,33 @@
-//! Musical key from a pitch-class profile matched against Krumhansl-Kessler key profiles.
+//! Musical key from a semitone pitch-class profile matched against the Krumhansl-Kessler
+//! key profiles.
+//!
+//! Analyzer v5 summed the power of each 2048-point FFT bin (10.8 Hz wide at 22.05 kHz)
+//! into the pitch class of the bin centre, from 20 Hz up. Below about 180 Hz a bin is
+//! wider than a semitone, so the low bins fell on the pitch classes of the multiples of
+//! 10.8 Hz: the harmonic series of a slightly flat F (F, C, F, A, C, D...). Kick and
+//! bass carry most of the power down there, so whatever the key, most tracks came out as
+//! F major, D minor or A minor (7B, 7A and 8A: 81 % of the library).
+//!
+//! The profile below maps a long FFT onto semitone bands from A1 upward. Each band is a
+//! triangular kernel in log frequency that sums to one, so no pitch class collects more
+//! bins than another. Bands are log-compressed and measured against the median of the
+//! neighbouring bands, so broadband energy (kicks, noise, cymbals) cancels out and a
+//! strong tonic does not mask the third next to it. The difference is kept signed: noise
+//! then averages to zero in every band instead of favouring the narrowest (lowest) ones.
 
 use realfft::RealFftPlanner;
 
-use crate::analyze::compute_magnitude_spectrum;
-
-const FFT_SIZE: usize = 2048;
-const HOP_SIZE: usize = 512;
+const FFT_SIZE: usize = 8_192;
+const HOP_SIZE: usize = 4_096;
+/// A1 (55 Hz) to G#6 (1.66 kHz), five whole octaves.
+const LOWEST_NOTE: usize = 33;
+const NOTE_COUNT: usize = 60;
+/// Half-width of each band, in semitones: neighbouring bands overlap by half.
+const BAND_WIDTH_SEMITONES: f32 = 1.0;
+/// Log compression, relative to the loudest band of the track.
+const COMPRESSION: f32 = 100.0;
+/// Whitening subtracts the median of this many bands on each side.
+const WHITENING_RADIUS: usize = 6;
 
 const KRUMHANSL_MAJOR: [f32; 12] = [
     6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88,
@@ -17,41 +39,92 @@ const NOTE_NAMES: [&str; 12] = [
     "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
 ];
 
-fn compute_chromagram(samples: &[f32], sample_rate: u32) -> [f32; 12] {
-    let mut chroma = [0.0f32; 12];
-    let sr = sample_rate as f32;
-    let mut planner = RealFftPlanner::<f32>::new();
+fn note_hz(note: usize) -> f32 {
+    440.0 * 2.0_f32.powf((note as f32 - 69.0) / 12.0)
+}
 
-    let mut pos = 0;
-    let mut frame_count = 0;
-
-    while pos + FFT_SIZE <= samples.len() {
-        let frame = &samples[pos..pos + FFT_SIZE];
-        let magnitudes = compute_magnitude_spectrum(frame, FFT_SIZE, &mut planner);
-
-        // Map each frequency bin to a pitch class
-        for (bin, &mag) in magnitudes.iter().enumerate() {
-            let freq = bin as f32 * sr / FFT_SIZE as f32;
-            if !(20.0..=5000.0).contains(&freq) {
-                continue;
+/// Sparse (bin, weight) kernels for the analysed notes plus the whitening margin on
+/// both sides, so the outermost analysed bands are whitened like the inner ones.
+fn band_kernels(sample_rate: u32) -> Vec<Vec<(usize, f32)>> {
+    let bin_hz = sample_rate as f32 / FFT_SIZE as f32;
+    (LOWEST_NOTE - WHITENING_RADIUS..LOWEST_NOTE + NOTE_COUNT + WHITENING_RADIUS)
+        .map(|note| {
+            let centre = note_hz(note);
+            let mut weights: Vec<(usize, f32)> = (1..=FFT_SIZE / 2)
+                .filter_map(|bin| {
+                    let distance = (12.0 * (bin as f32 * bin_hz / centre).log2()).abs();
+                    let weight = 1.0 - distance / BAND_WIDTH_SEMITONES;
+                    (weight > 0.0).then_some((bin, weight))
+                })
+                .collect();
+            let total: f32 = weights.iter().map(|(_, weight)| weight).sum();
+            if total > 0.0 {
+                weights.iter_mut().for_each(|(_, weight)| *weight /= total);
             }
-            // Convert frequency to MIDI note, then to pitch class
-            let midi = 69.0 + 12.0 * (freq / 440.0).log2();
-            let pitch_class = ((midi.round() as i32 % 12) + 12) % 12;
-            chroma[pitch_class as usize] += mag * mag; // Energy
-        }
+            weights
+        })
+        .collect()
+}
 
-        pos += HOP_SIZE;
-        frame_count += 1;
+/// Mean magnitude per semitone band, one row per frame.
+fn band_spectrogram(samples: &[f32], sample_rate: u32) -> Vec<Vec<f32>> {
+    if samples.is_empty() || sample_rate == 0 {
+        return Vec::new();
     }
+    let kernels = band_kernels(sample_rate);
+    let mut planner = RealFftPlanner::<f32>::new();
+    let fft = planner.plan_fft_forward(FFT_SIZE);
+    let window: Vec<f32> = (0..FFT_SIZE)
+        .map(|index| {
+            0.5 - 0.5 * (2.0 * std::f32::consts::PI * index as f32 / FFT_SIZE as f32).cos()
+        })
+        .collect();
+    let mut input = vec![0.0_f32; FFT_SIZE];
+    let mut spectrum = fft.make_output_vec();
+    let frames = 1 + samples.len().saturating_sub(FFT_SIZE) / HOP_SIZE;
+    (0..frames)
+        .map(|frame| {
+            let start = frame * HOP_SIZE;
+            for (offset, value) in input.iter_mut().enumerate() {
+                *value = samples.get(start + offset).copied().unwrap_or(0.0) * window[offset];
+            }
+            fft.process(&mut input, &mut spectrum).ok();
+            kernels
+                .iter()
+                .map(|weights| {
+                    weights
+                        .iter()
+                        .map(|(bin, weight)| spectrum[*bin].norm() * weight)
+                        .sum()
+                })
+                .collect()
+        })
+        .collect()
+}
 
-    if frame_count > 0 {
-        for c in &mut chroma {
-            *c /= frame_count as f32;
+/// Harmonic weight of each pitch class (0 = C) over the whole signal. Only the shape
+/// matters: values are relative and may be negative for classes below the noise floor.
+pub fn pitch_class_profile(samples: &[f32], sample_rate: u32) -> [f32; 12] {
+    let mut profile = [0.0_f32; 12];
+    let bands = band_spectrogram(samples, sample_rate);
+    let peak = bands.iter().flatten().copied().fold(0.0_f32, f32::max);
+    if peak <= f32::EPSILON {
+        return profile;
+    }
+    let mut compressed = vec![0.0_f32; NOTE_COUNT + 2 * WHITENING_RADIUS];
+    let mut neighbours = [0.0_f32; 2 * WHITENING_RADIUS + 1];
+    for frame in &bands {
+        for (value, band) in compressed.iter_mut().zip(frame) {
+            *value = (COMPRESSION * band / peak).ln_1p();
+        }
+        for index in 0..NOTE_COUNT {
+            neighbours.copy_from_slice(&compressed[index..=index + 2 * WHITENING_RADIUS]);
+            neighbours.sort_unstable_by(f32::total_cmp);
+            let floor = neighbours[WHITENING_RADIUS];
+            profile[(LOWEST_NOTE + index) % 12] += compressed[index + WHITENING_RADIUS] - floor;
         }
     }
-
-    chroma
+    profile
 }
 
 fn pearson_correlation(a: &[f32; 12], b: &[f32; 12]) -> f32 {
@@ -82,7 +155,7 @@ fn pearson_correlation(a: &[f32; 12], b: &[f32; 12]) -> f32 {
 }
 
 pub fn detect_key(samples: &[f32], sample_rate: u32) -> (String, String, f32) {
-    let chroma = compute_chromagram(samples, sample_rate);
+    let chroma = pitch_class_profile(samples, sample_rate);
 
     let mut best_key = 0usize;
     let mut best_scale = "major";
