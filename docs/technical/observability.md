@@ -5,7 +5,7 @@ section: operations
 audience: [operator, developer]
 status: canonical
 order: 121
-verified: 2026-11-02
+verified: 2026-11-03
 sources:
   [
     app/crate/metrics.py,
@@ -63,9 +63,11 @@ minute in Redis and written to PostgreSQL, where they are kept for eight days.
 When Redis restarts, evicts data or loses a buffer, the gap is recorded next to
 the data.
 
-Admin reads that history. Each figure says whether it is available, partial,
-stale, empty (the source reported and nothing happened) or unavailable (the source
-did not report). A missing value is shown as missing, never as zero.
+Admin reads that history. Each figure says whether it is available, partial
+(collection recorded a gap inside the window), stale (the collector has not
+checked in for more than ten minutes), empty (the source reported and nothing
+happened) or unavailable (the source did not report). A missing value is shown as
+missing, never as zero: System Health leaves a gap in the chart.
 
 With monitoring enabled, every application container also exposes its readings on
 an internal port, `9200`, that is never published on the host. Prometheus scrapes
