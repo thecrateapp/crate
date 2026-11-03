@@ -67,3 +67,18 @@ func TestObservabilityRejectsUnknownActionsBeforeTouchingDocker(t *testing.T) {
 		}
 	}
 }
+
+func TestObservabilityFlagFollowsTheEnvironmentAndRejectsOtherValues(t *testing.T) {
+	t.Setenv("CRATE_OBSERVABILITY", "on")
+	opts, err := parseInstallFlags(nil, &bytes.Buffer{})
+	if err != nil || opts.Observability != "on" {
+		t.Fatalf("got %+v, %v", opts, err)
+	}
+	if opts, err = parseInstallFlags([]string{"--observability", "off"}, &bytes.Buffer{}); err != nil || opts.Observability != "off" {
+		t.Fatalf("got %+v, %v", opts, err)
+	}
+	var stderr bytes.Buffer
+	if _, err := parseInstallFlags([]string{"--observability", "maybe"}, &stderr); err == nil || !strings.Contains(stderr.String(), "on, off or keep") {
+		t.Fatalf("got %v, %q", err, stderr.String())
+	}
+}

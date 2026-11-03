@@ -12,6 +12,9 @@ booleans only; no secret value is ever printed.
   role     the crate_observer database role, with its password stored as a
            SCRAM-SHA-256 verifier, and the pg_stat_statements extension
   status   what is in place, as booleans
+  backup-grafana
+           copy Grafana's data, with its owners, before a new Grafana image
+           migrates it
 """
 
 from __future__ import annotations
@@ -23,7 +26,9 @@ import hmac
 import json
 import os
 import secrets as tokens
+import shutil
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -254,11 +259,29 @@ def status(settings: dict, connect=None, name: str = ROLE) -> dict:
     return report
 
 
+def backup_grafana(settings: dict, stamp: str | None = None) -> dict:
+    root = data_dir(settings)
+    source = root / "grafana"
+    if not source.is_dir():
+        raise SetupError("there is no Grafana data to back up")
+    stamp = stamp or time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    backups = root / "backups"
+    backups.mkdir(mode=0o700, exist_ok=True)
+    target = backups / f"grafana-{stamp}"
+    shutil.copytree(source, target, symlinks=True)
+    for path in [source, *source.rglob("*")]:
+        info = path.lstat()
+        os.lchown(target / path.relative_to(source), info.st_uid, info.st_gid)
+    return {"backup": target.name}
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         description="Prepare monitoring storage, secrets and the database role."
     )
-    parser.add_argument("command", choices=("prepare", "role", "status"))
+    parser.add_argument(
+        "command", choices=("prepare", "role", "status", "backup-grafana")
+    )
     parser.add_argument(
         "--env-file", type=Path, required=True, help="the application .env"
     )
@@ -278,6 +301,8 @@ def main(argv=None) -> int:
             result = prepare(settings, dict(os.environ))
         elif args.command == "role":
             result = role(settings)
+        elif args.command == "backup-grafana":
+            result = backup_grafana(settings)
         else:
             result = status(settings, connect=False if args.no_database else None)
     except SetupError as error:

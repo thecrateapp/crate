@@ -69,7 +69,9 @@ func runObservability(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return reportError(stderr, err)
 		}
-		printEnabled(stdout, result)
+		ui.Success(stdout, "Monitoring is running")
+		monitoring.PrintEnabled(stdout, result)
+		fmt.Fprintln(stdout)
 	case "disable":
 		if err := confirm(*yes, "Turn monitoring off?",
 			"Crate restarts once without it and the monitoring containers stop. Its history, settings and passwords stay for the next `crate observability enable`."); err != nil {
@@ -103,24 +105,6 @@ func confirm(yes bool, title, description string) error {
 		return wizard.ErrCancelled
 	}
 	return err
-}
-
-func printEnabled(w io.Writer, result monitoring.Enabled) {
-	ui.Success(w, "Monitoring is running")
-	ui.Heading(w, "Open Grafana")
-	password := "unchanged"
-	switch {
-	case result.Generated:
-		password = result.Password
-	case result.Password != "":
-		password = "the one you chose"
-	}
-	ui.Rows(w, [][2]string{{"Address", result.URL}, {"User", monitoring.GrafanaUser}, {"Password", password}})
-	if result.Generated {
-		fmt.Fprintf(w, "  %s\n", ui.Muted.Render("Save it now; it is not shown again."))
-	}
-	port := strings.TrimPrefix(result.URL, "http://localhost:")
-	fmt.Fprintf(w, "  %s\n\n", ui.Muted.Render("From another computer: ssh -N -L "+port+":127.0.0.1:"+port+" <user>@<this server>"))
 }
 
 func printStatus(w io.Writer, report monitoring.Report) {

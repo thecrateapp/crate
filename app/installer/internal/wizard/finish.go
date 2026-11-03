@@ -11,6 +11,7 @@ import (
 	"github.com/thecrateapp/crate/app/installer/internal/agent"
 	"github.com/thecrateapp/crate/app/installer/internal/envfile"
 	"github.com/thecrateapp/crate/app/installer/internal/install"
+	"github.com/thecrateapp/crate/app/installer/internal/monitoring"
 	"github.com/thecrateapp/crate/app/installer/internal/stack"
 	"github.com/thecrateapp/crate/app/installer/internal/system"
 	"github.com/thecrateapp/crate/app/installer/internal/ui"
@@ -28,7 +29,7 @@ func (w *wizard) dnsHost(ctx context.Context) install.DNSHost {
 }
 
 func (w *wizard) review(ctx context.Context) error {
-	ui.Step(w.out, 6, totalSteps, "Review", "Nothing has been written yet.")
+	ui.Step(w.out, 7, totalSteps, "Review", "Nothing has been written yet.")
 	admin := "the password you chose"
 	switch {
 	case w.existing != nil:
@@ -61,6 +62,7 @@ func (w *wizard) review(ctx context.Context) error {
 		enabled = []string{"none yet"}
 	}
 	rows = append(rows, [2]string{"Integrations", strings.Join(enabled, ", ")})
+	rows = append(rows, [2]string{"Monitoring", w.monitoringSummary()})
 	ui.Rows(w.out, rows)
 
 	ui.Heading(w.out, "Files")
@@ -95,13 +97,14 @@ func (w *wizard) review(ctx context.Context) error {
 }
 
 func (w *wizard) install(ctx context.Context) error {
-	ui.Step(w.out, 7, totalSteps, "Installing", "")
+	ui.Step(w.out, 8, totalSteps, "Installing", "")
 	if w.opts.DryRun {
 		ui.Success(w.out, "Dry run: nothing was written and no container was started.")
 		return nil
 	}
 	if err := ui.Spin(w.out, w.interactive(), "Writing the installation", func() error {
 		w.cfg.DockerGID = system.SocketGroup(ctx, w.run, w.host)
+		w.beforeApply()
 		return install.Apply(w.manifest, w.cfg, w.existing)
 	}); err != nil {
 		return err
@@ -119,6 +122,9 @@ func (w *wizard) install(ctx context.Context) error {
 		ui.Success(w.out, "Files are ready. Start Crate with `docker compose up -d` in "+w.cfg.InstallDir)
 		if agent.Wanted(w.existingAfterApply()) != agent.Off {
 			ui.Success(w.out, "Then set up Crate Agent with `"+agent.SetupCommand+"`")
+		}
+		for _, step := range w.monitoringNextSteps() {
+			ui.Success(w.out, step)
 		}
 		return nil
 	}
@@ -147,8 +153,9 @@ func (w *wizard) install(ctx context.Context) error {
 	}
 	ui.Success(w.out, "Crate is running")
 	w.setUpAgent(ctx, s, api)
+	err = w.applyMonitoring(ctx)
 	w.done()
-	return nil
+	return err
 }
 
 // stack is the installation's compose project with the files it runs.
@@ -188,6 +195,9 @@ func (w *wizard) done() {
 	if w.cfg.AdminPasswordGenerated {
 		fmt.Fprintf(w.out, "  %s\n", ui.Muted.Render("Save it in your password manager; it is also DEFAULT_ADMIN_PASSWORD in .env."))
 	}
+	if w.mon.done {
+		monitoring.PrintEnabled(w.out, w.mon.result)
+	}
 
 	ui.Heading(w.out, "Next")
 	steps := []string{
@@ -210,6 +220,7 @@ func (w *wizard) done() {
 		{"Logs", "cd " + w.cfg.InstallDir + " && docker compose logs -f"},
 		{"Integrations", "crate configure --dir " + w.cfg.InstallDir},
 		{"Health", "crate doctor --dir " + w.cfg.InstallDir},
+		{"Monitoring", "crate observability status --dir " + w.cfg.InstallDir},
 		{"Everything else", "crate install --dir " + w.cfg.InstallDir},
 	})
 	fmt.Fprintln(w.out)

@@ -149,6 +149,18 @@ func Env(s Settings) *envfile.Values {
 	return values
 }
 
+// MountedFiles maps each monitoring file a running service reads at start,
+// relative to deploy/observability, to that service. A change to one needs a
+// restart; scripts/observability_release.py keeps the same map.
+var MountedFiles = map[string]string{
+	"prometheus.yml":                                      "crate-prometheus",
+	"recording-rules.yml":                                 "crate-prometheus",
+	"docker-proxy.haproxy.cfg":                            "crate-observability-docker-proxy",
+	"runtime-proxy.haproxy.cfg":                           "crate-observability-docker-proxy",
+	"grafana/provisioning/dashboards/infrastructure.yaml": "crate-grafana",
+	"grafana/provisioning/datasources/prometheus.yaml":    "crate-grafana",
+}
+
 // Overlay is an application compose overlay that joins a network the
 // monitoring project creates.
 type Overlay struct {

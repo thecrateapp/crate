@@ -29,12 +29,15 @@ type Options struct {
 	SkipStart  bool // write the files, do not start containers
 	Accessible bool // plain prompts for screen readers
 	SignIn     bool // only sign the running agent in to its model provider
+	// Observability is on, off or keep (the default): what to do with the
+	// optional monitoring when the wizard does not ask.
+	Observability string
 }
 
 // ErrCancelled is returned when the user leaves the wizard.
 var ErrCancelled = errors.New("installation cancelled")
 
-const totalSteps = 7
+const totalSteps = 8
 
 type wizard struct {
 	opts     Options
@@ -44,6 +47,7 @@ type wizard struct {
 	manifest *manifest.Manifest
 
 	detectDocker   func(context.Context, system.Runner, system.Host) (system.Docker, system.DockerState)
+	detectHost     func(context.Context, system.Runner) system.Host
 	startupTimeout time.Duration
 	agentTimeout   time.Duration
 	telegramWait   time.Duration
@@ -55,6 +59,7 @@ type wizard struct {
 	tidal       bool // the user chose Tidal, which connects after start
 	configuring bool // `crate configure`, where Crate Operator is offered
 	agent       agentState
+	mon         monitoringPlan
 }
 
 func Run(ctx context.Context, opts Options) error {
@@ -72,6 +77,7 @@ func Run(ctx context.Context, opts Options) error {
 		validate:       validate.NewClient(),
 		manifest:       m,
 		detectDocker:   system.DetectDocker,
+		detectHost:     system.DetectHost,
 		startupTimeout: 10 * time.Minute,
 		agentTimeout:   2 * time.Minute,
 		telegramWait:   time.Minute,
@@ -86,6 +92,7 @@ func (w *wizard) execute(ctx context.Context) error {
 		w.basics,
 		w.access,
 		w.integrations,
+		w.monitoringStep,
 		w.admin,
 		w.review,
 		w.install,

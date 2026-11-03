@@ -80,7 +80,7 @@ func Apply(m *manifest.Manifest, cfg Config, existing *envfile.Values) error {
 			return fmt.Errorf("create %s: %w", dir, err)
 		}
 	}
-	if err := WriteAssets(cfg.InstallDir, func(string) bool { return true }); err != nil {
+	if err := WriteAssets(cfg.InstallDir, func(name string) bool { return !cfg.KeepMonitoringFiles || !assets.Monitoring(name) }); err != nil {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(traefik, "traefik.yml"), []byte(TraefikStatic(cfg)), 0o644); err != nil {
