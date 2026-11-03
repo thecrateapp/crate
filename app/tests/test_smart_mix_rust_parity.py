@@ -80,10 +80,10 @@ def test_python_and_rust_mix_profiles_stay_within_tolerance(tmp_path: Path) -> N
     )
     rust_profile = json.loads(result.stdout)["mixProfile"]
 
-    assert abs(rust_profile["bpm"] - python_profile.bpm) <= 1.0
+    assert rust_profile["bpm"] == python_profile.bpm == 120.0
     assert abs(rust_profile["introCueMs"] - python_profile.intro_cue_ms) <= 550
     assert abs(rust_profile["outroCueMs"] - python_profile.outro_cue_ms) <= 550
-    assert rust_profile["camelot"] == python_profile.camelot
+    assert rust_profile["camelot"] == python_profile.camelot == "8A"
     assert rust_profile["quality"] == python_profile.quality
     assert 0.0 <= rust_profile["bpmConfidence"] <= 1.0
     assert 0.0 <= rust_profile["keyConfidence"] <= 1.0
