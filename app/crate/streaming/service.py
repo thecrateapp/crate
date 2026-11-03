@@ -80,6 +80,10 @@ def resolve_source_path(track: dict) -> Path | None:
         filepath = filepath[len(lib_str) :].lstrip("/")
     elif filepath.startswith("/music/"):
         filepath = filepath[len("/music/") :].lstrip("/")
+    elif filepath.startswith("/data/"):
+        # Rows written when the library was mounted at /data; the read plane
+        # (media.ResolveUnder) maps them onto the library root the same way.
+        filepath = filepath[len("/data/") :].lstrip("/")
     return safe_path(lib, filepath)
 
 

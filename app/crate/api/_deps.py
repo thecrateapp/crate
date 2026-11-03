@@ -81,7 +81,9 @@ def exclude_dirs() -> set[str]:
 
 def safe_path(base: Path, user_path: str) -> Path | None:
     resolved = (base / user_path).resolve()
-    if not str(resolved).startswith(str(base.resolve())):
+    # Compare path components: a string prefix check let a sibling such as
+    # `<library>-private/` (or a symlink into it) pass as inside the library.
+    if not resolved.is_relative_to(base.resolve()):
         return None
     return resolved
 
