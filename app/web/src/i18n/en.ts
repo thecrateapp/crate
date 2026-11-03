@@ -91,6 +91,12 @@ export const en = {
   "inside.mcp.body":
     "Crate exposes an MCP server, so AI agents such as Claude can diagnose and maintain your library. Agents propose changes; a person approves them in Admin. Read-only by default, and off until you opt in.",
   "inside.mcp.link": "Agents in Admin",
+  "inside.stack.label": "Stack map · Admin",
+  "inside.stack.title": "Your server, drawn live.",
+  "inside.stack.body":
+    "Every container on the host, the requests reaching it and the devices playing right now, from Docker and your own metrics.",
+  "inside.stack.link": "Observability in Admin",
+  "inside.stack.sample": "Sample data",
   "inside.mcp.you": "You",
   "inside.mcp.plan": "Plan",
   "inside.mcp.expires": "Expires in {minutes} min",

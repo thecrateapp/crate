@@ -112,7 +112,7 @@ test("the home page shows four live pieces that link to their pages", async ({
   }
 });
 
-test("the home page leads with Smart Mix and AI agents and links to their chapters", async ({
+test("the home page leads with Smart Mix, AI agents and the Stack map and links to their chapters", async ({
   page,
 }) => {
   await page.goto("/");
@@ -120,7 +120,12 @@ test("the home page leads with Smart Mix and AI agents and links to their chapte
   const hrefs = await leads.evaluateAll((links) =>
     links.map((link) => link.getAttribute("href")),
   );
-  expect(hrefs).toEqual(["/listen#smart-mix", "/admin#mcp"]);
+  expect(hrefs).toEqual([
+    "/listen#smart-mix",
+    "/admin#mcp",
+    "/admin#observability",
+  ]);
+  await expect(leads.nth(2)).toContainText("Sample data");
   await expect(leads.nth(1)).toContainText(/MCP/);
   await expect(leads.nth(1)).toContainText(/approves them in Admin/);
   for (const href of hrefs) {
@@ -195,6 +200,9 @@ test("the home teasers are decorative and leave the card links with short names"
   );
   await expect(page.locator(".leads a").nth(1)).toHaveAccessibleName(
     "Let an agent look after the library. Agents in Admin",
+  );
+  await expect(page.locator(".leads a").nth(2)).toHaveAccessibleName(
+    "Your server, drawn live. Observability in Admin",
   );
 });
 
