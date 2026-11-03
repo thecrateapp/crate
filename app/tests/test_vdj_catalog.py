@@ -141,7 +141,7 @@ def test_access_token_search_runs_the_local_dj_search(test_app):
         response = test_app.get("/api/search?q=noah&scope=local")
 
     assert response.status_code == 200
-    dj_search.assert_called_once_with("noah", 20)
+    dj_search.assert_called_once_with("noah", 20, include_path=True)
 
 
 def test_vdj_catalog_response_never_exposes_server_paths(test_app):

@@ -385,6 +385,45 @@ func TestSearchRoute_MethodNotAllowed(t *testing.T) {
 	assertMethodNotAllowed(t, newTestServerNoAuth(), http.MethodPost, "/api/search?q=test")
 }
 
+func TestSearchRoute_FieldsSearchIsFastAPIOnly(t *testing.T) {
+	// DJ search (fields=dj) has its own filters and the S9 `playable` field;
+	// the native local search must not answer it with different data.
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/api/search", r.URL.Path)
+		assert.Equal(t, "1", r.Header.Get("X-Crate-Readplane-Fallback"))
+		_ = httpx.WriteJSON(w, http.StatusOK, map[string]any{"source": "fastapi"})
+	}))
+	defer backend.Close()
+	fallback, err := httpx.NewFallbackProxy(true, backend.URL, "test")
+	assert.NoError(t, err)
+
+	for _, test := range []struct {
+		name       string
+		path       string
+		fallback   *httpx.FallbackProxy
+		wantStatus int
+		wantSource string
+	}{
+		{name: "dj search falls back", path: "/api/search?q=bpm:120-128&fields=dj", fallback: fallback, wantStatus: http.StatusOK, wantSource: "fallback"},
+		{name: "unknown fields fall back", path: "/api/search?q=noah&fields=other", fallback: fallback, wantStatus: http.StatusOK, wantSource: "fallback"},
+		{name: "dj search without fallback is unavailable", path: "/api/search?q=noah&fields=dj", fallback: nil, wantStatus: http.StatusServiceUnavailable, wantSource: "miss"},
+		{name: "plain search stays native", path: "/api/search?q=noah", fallback: fallback, wantStatus: http.StatusUnauthorized, wantSource: "miss"},
+		{name: "empty fields stays native", path: "/api/search?q=noah&fields=", fallback: fallback, wantStatus: http.StatusUnauthorized, wantSource: "miss"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := newTestServerWithCatalog()
+			server.fallback = test.fallback
+			req := httptest.NewRequest(http.MethodGet, test.path, nil)
+			rec := httptest.NewRecorder()
+
+			server.Handler().ServeHTTP(rec, req)
+
+			assert.Equal(t, test.wantStatus, rec.Code)
+			assert.Equal(t, test.wantSource, rec.Header().Get("X-Crate-Readplane"))
+		})
+	}
+}
+
 // ── albumRoute ────────────────────────────────────────────────────────────
 
 func TestAlbumRoute_NonNumericID(t *testing.T) {

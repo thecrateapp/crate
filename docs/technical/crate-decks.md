@@ -11,8 +11,18 @@ sources:
   - app/crate/api/native_oauth_auth.py
   - app/crate/api/capabilities.py
   - app/crate/api/schemas/capabilities.py
+  - app/crate/api/browse_media.py
+  - app/crate/api/schemas/media.py
+  - app/crate/api/schemas/smart_mix.py
+  - app/crate/db/queries/browse_media_search.py
+  - app/crate/smart_mix/planner.py
+  - app/crate/smart_mix/cue_detection.py
+  - app/crate/smart_mix/analyzer.py
+  - app/readplane/internal/routes/catalog.go
+  - app/listen/android/app/src/main/java/app/cratemusic/crate/NativeTransitionPlan.java
   - app/tests/test_auth_decks_client.py
   - app/tests/test_capabilities_decks.py
+  - app/tests/test_search_playable_audio.py
 ---
 
 # Crate Decks server contract
@@ -82,3 +92,52 @@ The constants live in `app/crate/api/capabilities.py`
 (`DECKS_CONTRACT_VERSION`, `DECKS_MIN_CLIENT_VERSION`, `_decks_features`), and
 the allowed feature names in `DecksFeature`
 (`app/crate/api/schemas/capabilities.py`).
+
+## Audio availability and plan fields (S9)
+
+### `playable` in DJ search
+
+Decks searches with `GET /api/search?fields=dj&q=…&limit=50`. Each track in that
+response carries `playable`:
+
+- `true`: the audio file exists in the library as a regular file, so
+  `/api/tracks/by-entity/{uid}/stream` (and the VDJ stream) can serve it.
+- `false`: the library row exists but the file is missing, is not a regular
+  file, resolves outside the library or cannot be read. Decks should not offer
+  it for loading.
+
+The check is the one the stream endpoints use (`resolve_source_path` and
+`is_file()`), done on every request for at most 50 results. The server path is
+used for the check and never returned. Access-token DJ queries (a valid DJ query
+without `fields=dj`) also carry `playable`.
+
+Plain local, `auto` and federated search do not include `playable`: the Go read
+plane serves plain local search natively and must keep the same JSON. Any
+`/api/search` request with a `fields` parameter falls back from the read plane
+to FastAPI (`searchRoute` in `app/readplane/internal/routes/catalog.go`), so
+`fields=dj` gets the DJ filters and `playable` behind the edge too. The paged
+navigation responses (S3) will carry the same field when they exist.
+
+### Plan and profile fields
+
+- **`beatPhaseOffsetMs`** (`POST /api/playback/transition-plans`): beat-phase
+  correction for `mode=beatmatch`, 0 in the other modes. It is measured on the
+  outgoing (mix) timeline and is smaller than one outgoing beat. It moves the
+  incoming start point ahead, never back: when the outgoing reaches
+  `outgoingCueMs`, the incoming starts from
+  `incomingCueMs + round(beatPhaseOffsetMs × incomingTempoRatio)` ms of its own
+  audio, at `incomingTempoRatio` speed. In the other modes it starts at
+  `incomingCueMs`.
+- **`activeEndMs`** (`GET /api/tracks/by-entity/{uid}/mix-profile`): the musical
+  end of the track, the end of the last 50 ms frame whose RMS stays within 35 dB
+  of the loudest analysed frame and above −55 dBFS (long files measure it on
+  their analysed tail). Fade-out tails fall after it, so it is not a silence
+  threshold: a client that needs the point where the audio drops to silence
+  (Mixxx's −60 dB N60dBSound) measures it itself. `outroCueMs` is placed
+  before it.
+
+The Android client applies the offset the same way
+(`NativeTransitionPlan.startIncomingCueMs()`); the planner computes it in
+`_beat_phase_offset` (`app/crate/smart_mix/planner.py`), and the analyser
+computes `activeEndMs` in `detect_mix_cues`
+(`app/crate/smart_mix/cue_detection.py`).
