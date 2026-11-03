@@ -126,6 +126,26 @@ def test_neighbor_readings_never_fall_back_to_legacy_energy_or_loudness(pg_db):
         assert reading["integrated_lufs"] is None
 
 
+@pytest.mark.skipif(not PG_AVAILABLE, reason="PostgreSQL not available")
+def test_previous_analyzer_profiles_stay_current_for_neighbor_readings(pg_db):
+    from crate.db.queries.sonic_neighbors import get_sonic_neighbors
+
+    with read_scope() as s:
+        album = _album(s)
+        seed = _neighbor(s, album, 1, [1.0] + [0.0] * 19)
+        neighbor = _neighbor(s, album, 2, [1.0, 0.1] + [0.0] * 18)
+        s.execute(
+            text("""INSERT INTO track_mix_profiles(track_id,profile_version,profile_revision,analyzer,analyzer_version,source_revision,quality,bpm,global_energy,integrated_lufs,measurement_version,analyzed_at)
+            VALUES(:id,:version,'test','crate-rust','smart-mix-audio-v5','source','full',123,0.4,-16,'bs1770-v1',now())"""),
+            {"id": neighbor["id"], "version": PROFILE_SCHEMA_VERSION},
+        )
+
+        reading = get_sonic_neighbors(seed["id"], session=s)["items"][0]["track"]
+
+        assert reading["bpm"] == 123
+        assert reading["quality"] == "full"
+
+
 def test_sonic_neighbor_endpoint_is_typed_bounded_and_authenticated(
     test_app, monkeypatch
 ):

@@ -217,3 +217,53 @@ def test_artist_analysis_marks_only_current_full_profiles(pg_db, monkeypatch):
     for name, profile in profiles.items():
         if profile is not None:
             assert profile["is_current_full_profile"] is (name == "current"), name
+
+
+@pytest.mark.parametrize(
+    ("analyzer_version", "expected"),
+    [(ANALYZER_VERSION, True), ("smart-mix-audio-v5", True), ("audio-v4", False)],
+)
+def test_previous_analyzer_full_profiles_stay_current_during_the_backfill(
+    pg_db, analyzer_version, expected
+):
+    from crate.db.repositories.library_reference_reads import get_artist_analysis_tracks
+
+    with transaction_scope() as session:
+        session.execute(
+            text("INSERT INTO library_artists (name) VALUES ('Current Artist')")
+        )
+        album_id = session.execute(
+            text("""
+            INSERT INTO library_albums (artist, name, path)
+            VALUES ('Current Artist', 'Current Album', '/music/current-audit')
+            RETURNING id
+        """)
+        ).scalar_one()
+        track_id = session.execute(
+            text("""
+            INSERT INTO library_tracks
+                (album_id, artist, album, filename, title, path, entity_uid)
+            VALUES (:album_id, 'Current Artist', 'Current Album', 'one.flac', 'One',
+                    '/music/current-audit/one.flac', gen_random_uuid())
+            RETURNING id
+        """),
+            {"album_id": album_id},
+        ).scalar_one()
+        session.execute(
+            text("""
+            INSERT INTO track_mix_profiles
+                (track_id, profile_version, profile_revision, analyzer, analyzer_version,
+                 source_revision, quality, analyzed_at)
+            VALUES (:track_id, :profile_version, 'profile-current', 'crate-rust',
+                    :analyzer_version, 'source-current', 'full', NOW())
+        """),
+            {
+                "track_id": track_id,
+                "profile_version": PROFILE_SCHEMA_VERSION,
+                "analyzer_version": analyzer_version,
+            },
+        )
+
+    [row] = get_artist_analysis_tracks("Current Artist")
+
+    assert row["smart_mix"]["is_current_full_profile"] is expected

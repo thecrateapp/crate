@@ -23,6 +23,15 @@ def detect_mix_cues(
     sample_rate: int,
     beat_grid_ms: tuple[int, ...] = (),
 ) -> MixCuePoints:
+    """Musical bounds and default cues.
+
+    ``active_start_ms`` and ``active_end_ms`` bound the 50 ms RMS frames (25 ms hop)
+    within ``ACTIVE_RANGE_DB`` of the loudest frame and above ``MIN_ACTIVE_DBFS``. They
+    mark where the music is, not where sound stops: a fade or a reverb tail continues
+    past ``active_end_ms``, which therefore falls 1-6 s before a -60 dB end of sound
+    such as Mixxx's. The intro cue is the first beat at or after the start and the outro
+    cue the last beat ``DEFAULT_MIX_WINDOW_MS`` before the end.
+    """
     if sample_rate <= 0 or audio.size == 0:
         return MixCuePoints(None, None, None, None)
 

@@ -94,6 +94,53 @@ def test_full_mix_selection_and_count_require_current_full_profiles(
     assert execute_smart_rules(rules, count_only=True) == 8
 
 
+# Profiles of the previous analyzer stay current for readers until the backfill campaign
+# recomputes them; only the version they were written by changes.
+PREVIOUS_ANALYZER_VERSION = "smart-mix-audio-v5"
+
+
+def test_full_mix_selection_keeps_previous_analyzer_profiles_during_the_backfill(
+    pg_db, monkeypatch
+):
+    from crate.db.repositories.playlists_create import create_playlist
+    from crate.db.repositories.playlists_detail_reads import get_playlist_tracks
+    from crate.worker_handlers import management
+
+    previous = _track(pg_db, 1, analyzer_version=PREVIOUS_ANALYZER_VERSION)
+    current = _track(pg_db, 2)
+    _track(pg_db, 3, analyzer_version="old-analysis")
+    rules = {
+        "rules": [],
+        "limit": 10,
+        "sort": "title",
+        "require_full_mix_profile": True,
+    }
+
+    assert execute_smart_rules(rules, count_only=True) == 2
+    assert [row["id"] for row in execute_smart_rules(rules)] == [
+        previous["id"],
+        current["id"],
+    ]
+    playlist_id = create_playlist(
+        "Mix ready",
+        scope="system",
+        generation_mode="smart",
+        is_smart=True,
+        smart_rules=rules,
+        auto_refresh_enabled=True,
+    )
+    monkeypatch.setattr(management, "emit_progress", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(management, "emit_task_event", lambda *_args, **_kwargs: None)
+    result = management._handle_generate_system_playlist(
+        "test-previous-analyzer", {"playlist_id": playlist_id}, {}
+    )
+    assert result["track_count"] == 2
+    assert [track["track_id"] for track in get_playlist_tracks(playlist_id)] == [
+        previous["id"],
+        current["id"],
+    ]
+
+
 def test_full_mix_requirement_cannot_be_bypassed_by_match_any(pg_db):
     current = _track(pg_db, 1)
     _track(pg_db, 2, quality="partial")

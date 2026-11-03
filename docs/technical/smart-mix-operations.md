@@ -11,6 +11,9 @@ sources:
   - app/crate/smart_mix/versions.py
   - app/crate/smart_mix/models.py
   - app/crate/smart_mix/analyzer.py
+  - app/crate/smart_mix/key_detection.py
+  - app/crate/smart_mix/tempo_grid.py
+  - app/crate/smart_mix/cue_detection.py
   - app/crate/smart_mix/planner.py
   - app/crate/smart_mix/policy.py
   - app/crate/smart_mix/source.py
@@ -87,7 +90,7 @@ These values come from the reviewed code; they were not discovered from a live i
 | ------------------------------- | -------------------- | ----------------------------------------------------- |
 | `API_CONTRACT_VERSION`          | `2026-08`            | Advertised integration and capabilities contract      |
 | `PROFILE_SCHEMA_VERSION`        | `1`                  | Schema of the persisted and serialized profile        |
-| `ANALYZER_VERSION`              | `smart-mix-audio-v5` | Target generation of profile analysis                 |
+| `ANALYZER_VERSION`              | `smart-mix-audio-v6` | Target generation of profile analysis                 |
 | `MEASUREMENT_VERSION`           | `bs1770-v1`          | Loudness and true peak provenance used by the planner |
 | `BEAT_GRID_FORMAT`              | `delta-ms-v1`        | Beat grid format                                      |
 | `PLANNER_IDENTIFIER`            | `smart-mix-v2`       | Identifier for plan batches and capabilities          |
@@ -101,6 +104,73 @@ Each profile keeps `profileRevision`, `sourceRevision`, `analyzer`, `analyzerVer
 `profileVersion` and `analyzedAt`. `sourceRevision` is a hash of size, mtime in nanoseconds
 and inode; it is not a hash of the audio content or a Git SHA. The release SHA identifies the
 code; the source revision identifies the analyzed file.
+
+## Reading profile and plan fields
+
+Some fields are easy to misread from their names. Clients that execute plans or inject a
+profile into a deck (Android, Crate Decks) must follow these definitions.
+
+| Field                      | Meaning                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bpm`                      | Global tempo. A whole or half BPM when the track keeps a constant tempo that rounds to it within 25 ms over the track; otherwise the fitted tempo                                                                                                                                                                                       |
+| `beatGridMs`               | Absolute beat positions in ms (`delta-ms-v1` is only the storage encoding). A constant grid at `bpm` when the track keeps one tempo, otherwise the tracked beats. Only `detail=full` returns it                                                                                                                                         |
+| `activeStartMs`            | Musical start: the first 50 ms RMS frame within 35 dB of the loudest frame and above -55 dBFS                                                                                                                                                                                                                                           |
+| `activeEndMs`              | Musical end, by the same rule (for long tracks, over the last 120 s). A fade or reverb tail continues after it, so it falls 1-6 s before a -60 dB end of sound such as Mixxx's. It is not a silence threshold                                                                                                                           |
+| `introCueMs`, `outroCueMs` | Suggested mix points: the first beat at or after `activeStartMs` and the last beat 4 s before `activeEndMs`                                                                                                                                                                                                                             |
+| `beatPhaseOffsetMs`        | Plan field, beatmatch only. In output time and below one outgoing beat: the incoming track starts this much after `incomingCueMs` when the outgoing reaches `outgoingCueMs`. In incoming track time, start at `incomingCueMs + beatPhaseOffsetMs * incomingTempoRatio` (`NativeTransitionPlan.startIncomingCueMs()`); never subtract it |
+
+### Analyzer v6
+
+`smart-mix-audio-v6` (Rust and Python fallback alike) changes three measurements.
+
+- **Key.** v5 summed raw 2048-point FFT bins into pitch classes from 20 Hz. Below about
+  180 Hz a bin is wider than a semitone and the low bins fell on the harmonic series of a
+  flat F, so kick and bass read as F major, D minor or A minor: 81 % of the development
+  profiles were 7B, 8A or 7A. v6 maps an 8192-point FFT onto semitone bands from A1 to G#6,
+  each summing to one, and whitens them against their neighbours before matching the same
+  Krumhansl-Kessler profiles.
+- **Tempo and grid.** v5 published the tracked beats and took the tempo from a regression
+  of beat index against time, so a beat the tracker inserted or dropped while following the
+  off-beat through a break moved the BPM by about 1/N (128.346 for 128) and left that
+  section half a beat out. v6 fits the strongest constant pulse at twice the beat rate,
+  where an off-beat lines up with a beat. When the beats stay on it along most of the
+  track it publishes a constant grid, snaps the tempo to a whole or half BPM if that keeps
+  the grid within 25 ms over the track, and checks its phase against the bass: the
+  majority of the tracked beats chooses between the two half-beat phases, real bass twice
+  as strong on the other phase contests that choice, and four times as strong moves the
+  grid onto the kick (the tracker follows broadband onsets, so quiet hats on the off-beat
+  can outvote a kick without a click). A track whose tempo moves keeps its tracked beats.
+  Local `intro*`/`outro*` tempo and beats follow the constant grid only where the tracked
+  beats around the cue keep its tempo within 1 %; their stability always comes from the
+  tracked beats.
+- **Quality.** A profile is `full` only if its grid holds. On a constant grid: at least
+  70 % of the tracked beats on the published phase, a phase the bass does not contest,
+  both cues keeping its tempo, and no stretch of at least 28 tracked beats coherent at a
+  tempo 2 % or more away from it (more than a quarter beat of drift). Without one: tracked
+  beats that never slide half a beat and whose phase the bass does not contest.
+  Other profiles stay `partial`; the planner can still beatmatch from their cue beats, but
+  clients must not trust their whole grid.
+
+#### What happens when v6 is deployed
+
+- **Readers keep the v5 profiles.** `READABLE_ANALYZER_VERSIONS` (v6 and v5) decides what
+  counts as current for rule-based playlists that require a full profile (preview,
+  generation and scheduled `auto_refresh_enabled` regeneration), the
+  `is_current_full_profile` flag, sonic neighbours and collection insights. A v5 profile
+  keeps serving its v5 measurements, key bias and tracked grid included, until it is
+  recomputed. The planner, compatible tracks and the profile endpoints never filtered on
+  the version.
+- **Writers, the backfill and Admin target v6.** Every new analysis writes v6 and replaces
+  the v5 profile of its track. Admin coverage counts only v6 profiles as current, and the
+  track table shows v5 ones as `outdated`: they measure backfill progress, not what
+  readers can use.
+- **Recomputing is a backfill campaign.** Deploying does not start one. Started from Admin,
+  it claims every v5 profile (and missing ones) with target generation v6. A campaign
+  left `running` at deploy keeps going: the coordinator checks only its status and every
+  claim uses the deployed target, so it starts recomputing the whole library with v6
+  while its stored `target` still reads v5 (agent observability reports that mismatch).
+  Pause it before deploying if the recompute should wait.
+- When the backfill has finished, remove v5 from `READABLE_ANALYZER_VERSIONS`.
 
 ## Producing and publishing profiles
 

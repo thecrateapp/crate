@@ -85,6 +85,24 @@ def test_done_rows_of_an_older_generation_are_claimed_again(
     }
 
 
+def test_previous_analyzer_profiles_are_claimed_for_the_new_generation(
+    pg_db, tmp_path: Path
+) -> None:
+    del pg_db
+    [track_id] = _create_tracks(tmp_path, count=1)
+    _insert_profile(track_id, analyzer_version="smart-mix-audio-v5")
+    _insert_processing(
+        track_id, state="done", attempts=1, target_generation="smart-mix-audio-v5"
+    )
+
+    claimed = claim_smart_mix_backfill_batch(
+        limit=10, max_attempts=3, claimed_by="test-worker"
+    )
+
+    assert [row["id"] for row in claimed] == [track_id]
+    assert _processing_row(track_id)["target_generation"] == ANALYZER_VERSION
+
+
 def test_exhausted_rows_of_an_older_generation_get_a_fresh_retry_budget(
     pg_db, tmp_path: Path
 ) -> None:

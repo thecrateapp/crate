@@ -15,8 +15,10 @@ use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 
 use crate::beat_tracking;
+use crate::key_detection::detect_key;
 use crate::loudness::{LoudnessMeter, LoudnessSummary, MEASUREMENT_VERSION};
 use crate::mix_profile::{to_camelot, SmartMixProfileResult, ANALYZER_VERSION};
+use crate::tempo_grid::{self, ConstantGrid};
 use crate::{collect_audio_files, parse_extensions};
 
 const TARGET_SAMPLE_RATE: u32 = 22050;
@@ -35,6 +37,16 @@ const LOCAL_JITTER_LIMIT: f32 = 0.20;
 const CUE_DOWNBEAT_BEATS: usize = 32;
 const LOCAL_MIX_WINDOW_MS: f64 = 12_000.0;
 const FULL_PROFILE_MIN_STABILITY: f32 = 0.8;
+/// Share of the tracked beats that must sit on the published phase of a constant grid
+/// for a full profile, which the bass must not contest; below it the grid may be half a
+/// beat out. Without a constant grid,
+/// a full profile needs tracked beats that never slide half a beat and whose phase the
+/// bass does not contest.
+const FULL_PROFILE_MIN_PHASE_SUPPORT: f64 = 0.7;
+/// A cue takes the constant grid's tempo and beat only when its own tracked tempo is this
+/// close: 1 % over the 24-beat cue window is a quarter beat of drift. A constant grid that a
+/// cue does not keep, or that part of the track does not keep, cannot back a full profile.
+const CUE_GRID_TEMPO_TOLERANCE: f64 = 0.01;
 
 #[derive(Serialize)]
 pub struct AnalysisResult {
@@ -390,7 +402,7 @@ fn compute_dynamic_range(samples: &[f32]) -> f32 {
     frame_rms[p95_idx] - frame_rms[p5_idx]
 }
 
-fn compute_magnitude_spectrum(
+pub(crate) fn compute_magnitude_spectrum(
     samples: &[f32],
     fft_size: usize,
     planner: &mut RealFftPlanner<f32>,
@@ -496,124 +508,6 @@ fn estimate_bpm_from_onsets(onsets: &[f32], sample_rate: u32) -> Option<f32> {
 
     let bpm = 60.0 * sr / (best_lag as f32 * HOP_SIZE as f32);
     Some((bpm * 10.0).round() / 10.0)
-}
-
-const KRUMHANSL_MAJOR: [f32; 12] = [
-    6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88,
-];
-const KRUMHANSL_MINOR: [f32; 12] = [
-    6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17,
-];
-const NOTE_NAMES: [&str; 12] = [
-    "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
-];
-
-fn compute_chromagram(samples: &[f32], sample_rate: u32) -> [f32; 12] {
-    let mut chroma = [0.0f32; 12];
-    let sr = sample_rate as f32;
-    let mut planner = RealFftPlanner::<f32>::new();
-
-    let mut pos = 0;
-    let mut frame_count = 0;
-
-    while pos + FFT_SIZE <= samples.len() {
-        let frame = &samples[pos..pos + FFT_SIZE];
-        let magnitudes = compute_magnitude_spectrum(frame, FFT_SIZE, &mut planner);
-
-        // Map each frequency bin to a pitch class
-        for (bin, &mag) in magnitudes.iter().enumerate() {
-            let freq = bin as f32 * sr / FFT_SIZE as f32;
-            if !(20.0..=5000.0).contains(&freq) {
-                continue;
-            }
-            // Convert frequency to MIDI note, then to pitch class
-            let midi = 69.0 + 12.0 * (freq / 440.0).log2();
-            let pitch_class = ((midi.round() as i32 % 12) + 12) % 12;
-            chroma[pitch_class as usize] += mag * mag; // Energy
-        }
-
-        pos += HOP_SIZE;
-        frame_count += 1;
-    }
-
-    if frame_count > 0 {
-        for c in &mut chroma {
-            *c /= frame_count as f32;
-        }
-    }
-
-    chroma
-}
-
-fn pearson_correlation(a: &[f32; 12], b: &[f32; 12]) -> f32 {
-    let n = 12.0f32;
-    let sum_a: f32 = a.iter().sum();
-    let sum_b: f32 = b.iter().sum();
-    let mean_a = sum_a / n;
-    let mean_b = sum_b / n;
-
-    let mut num = 0.0f32;
-    let mut den_a = 0.0f32;
-    let mut den_b = 0.0f32;
-
-    for i in 0..12 {
-        let da = a[i] - mean_a;
-        let db = b[i] - mean_b;
-        num += da * db;
-        den_a += da * da;
-        den_b += db * db;
-    }
-
-    let den = (den_a * den_b).sqrt();
-    if den > 0.0 {
-        num / den
-    } else {
-        0.0
-    }
-}
-
-fn detect_key(samples: &[f32], sample_rate: u32) -> (String, String, f32) {
-    let chroma = compute_chromagram(samples, sample_rate);
-
-    let mut best_key = 0usize;
-    let mut best_scale = "major";
-    let mut best_corr = f32::MIN;
-    let mut second_corr = f32::MIN;
-
-    for shift in 0..12 {
-        let mut rotated = [0.0f32; 12];
-        for i in 0..12 {
-            rotated[i] = chroma[(i + shift) % 12];
-        }
-
-        let major_corr = pearson_correlation(&rotated, &KRUMHANSL_MAJOR);
-        let minor_corr = pearson_correlation(&rotated, &KRUMHANSL_MINOR);
-
-        if major_corr > best_corr {
-            second_corr = best_corr;
-            best_corr = major_corr;
-            best_key = shift;
-            best_scale = "major";
-        } else if major_corr > second_corr {
-            second_corr = major_corr;
-        }
-        if minor_corr > best_corr {
-            second_corr = best_corr;
-            best_corr = minor_corr;
-            best_key = shift;
-            best_scale = "minor";
-        } else if minor_corr > second_corr {
-            second_corr = minor_corr;
-        }
-    }
-
-    let confidence =
-        (((best_corr + 1.0) * 0.35) + (best_corr - second_corr).max(0.0)).clamp(0.0, 1.0);
-    (
-        NOTE_NAMES[best_key].to_string(),
-        best_scale.to_string(),
-        confidence,
-    )
 }
 
 fn percentile(values: &[f32], quantile: f32) -> f32 {
@@ -815,6 +709,52 @@ fn cue_downbeat_ms(
     beat_grid_ms.get(index).copied()
 }
 
+/// On a constant grid the tempo and beat at a cue are the grid's, as long as the tracked
+/// beats around the cue keep the grid's tempo; otherwise they stay the tracked ones.
+/// Stability always comes from the tracked beats, so a messy outro stays messy.
+fn on_constant_grid(
+    local: LocalBeat,
+    grid: Option<&ConstantGrid>,
+    cue_ms: Option<u64>,
+) -> LocalBeat {
+    match (grid, cue_ms) {
+        (Some(grid), Some(cue_ms)) if keeps_grid_tempo(&local, grid) => {
+            let beat = grid.beat_near_ms(cue_ms as f64);
+            LocalBeat {
+                bpm: grid.bpm as f32,
+                beat_ms: (beat >= 0.0).then(|| beat.round() as u64),
+                stability: local.stability,
+            }
+        }
+        _ => local,
+    }
+}
+
+fn keeps_grid_tempo(local: &LocalBeat, grid: &ConstantGrid) -> bool {
+    (f64::from(local.bpm) / grid.bpm - 1.0).abs() <= CUE_GRID_TEMPO_TOLERANCE
+}
+
+/// The published beats and their onset frames: the constant grid over the tracked span
+/// when the track keeps one tempo, otherwise the tracked beats.
+fn published_grid(
+    grid: Option<&ConstantGrid>,
+    tracked_ms: &[u64],
+    tracked_frames: &[usize],
+    sample_rate: u32,
+) -> (Vec<u64>, Vec<usize>) {
+    let (Some(grid), Some(first), Some(last)) = (grid, tracked_ms.first(), tracked_ms.last())
+    else {
+        return (tracked_ms.to_vec(), tracked_frames.to_vec());
+    };
+    let beats = grid.beats_ms(*first as f64, *last as f64);
+    let frame_ms = HOP_SIZE as f64 * 1_000.0 / f64::from(sample_rate);
+    let frames = beats
+        .iter()
+        .map(|beat| (*beat as f64 / frame_ms).round() as usize)
+        .collect();
+    (beats, frames)
+}
+
 struct TempoFeatures {
     frame_bpm: Option<f32>,
     stability: f32,
@@ -918,6 +858,14 @@ fn frame_rms(samples: &[f32], sample_rate: u32) -> (Vec<f32>, usize, usize) {
     (values, frame_length, hop_length)
 }
 
+/// Musical bounds and default cues: `(active_start, intro_cue, outro_cue, active_end)`.
+///
+/// The active bounds enclose the 50 ms RMS frames (25 ms hop) within 35 dB of the loudest
+/// frame and above -55 dBFS. They mark where the music is, not where sound stops: a fade
+/// or a reverb tail continues past the active end, which therefore falls 1-6 s before a
+/// -60 dB end of sound such as Mixxx's. The intro cue is the first beat at or after the
+/// start and the outro cue the last beat 4 s before the end. Same rule as the Python
+/// `cue_detection.detect_mix_cues`.
 fn detect_mix_cues(
     samples: &[f32],
     sample_rate: u32,
@@ -1058,10 +1006,23 @@ pub fn analyze_smart_mix_segments(
     let features = beat_tracking::frame_features(samples, sample_rate);
     let onsets = &features.onsets;
     let beat_frames = beat_tracking::track_beats(onsets, sample_rate);
-    let beat_grid_ms = beat_tracking::refine_beat_times_ms(samples, sample_rate, &beat_frames);
+    let tracked_ms = beat_tracking::refine_beat_times_ms(samples, sample_rate, &beat_frames);
     let tempo = tempo_features(&beat_frames, onsets, sample_rate);
     let tempo_stability = tempo.stability;
-    let bpm = grid_bpm(&beat_grid_ms).or(tempo.frame_bpm);
+    let tempo_fit = tempo_grid::fit_tempo(&tracked_ms, &features, sample_rate);
+    let constant_grid = tempo_fit.as_ref().and_then(|fit| fit.grid.clone());
+    let (beat_grid_ms, grid_frames) = published_grid(
+        constant_grid.as_ref(),
+        &tracked_ms,
+        &beat_frames,
+        sample_rate,
+    );
+    let bpm = match (&constant_grid, &tempo_fit) {
+        (Some(grid), _) => Some(grid.bpm as f32),
+        (None, Some(fit)) => Some(((fit.bpm * 1_000.0).round() / 1_000.0) as f32),
+        (None, None) => grid_bpm(&tracked_ms),
+    }
+    .or(tempo.frame_bpm);
     let (key, scale, key_confidence) = detect_key(samples, sample_rate);
     let camelot = to_camelot(&key, &scale).map(str::to_owned);
     let (active_start_ms, intro_cue_ms, mut outro_cue_ms, mut active_end_ms) =
@@ -1086,26 +1047,37 @@ pub fn analyze_smart_mix_segments(
             sample_rate,
         ),
     };
-    let intro_local = local_beat(&beat_grid_ms, &beat_frames, sample_rate, intro_cue_ms);
-    let outro_local = if tail.is_none() {
-        local_beat(&beat_grid_ms, &beat_frames, sample_rate, outro_cue_ms)
+    let intro_tracked = local_beat(&tracked_ms, &beat_frames, sample_rate, intro_cue_ms);
+    let outro_tracked = if tail.is_none() {
+        local_beat(&tracked_ms, &beat_frames, sample_rate, outro_cue_ms)
     } else {
         None
     };
+    let grid_holds = constant_grid.as_ref().is_none_or(|grid| {
+        !grid.tempo_deviates
+            && [intro_tracked, outro_tracked]
+                .iter()
+                .flatten()
+                .all(|local| keeps_grid_tempo(local, grid))
+    });
+    let intro_local =
+        intro_tracked.map(|local| on_constant_grid(local, constant_grid.as_ref(), intro_cue_ms));
+    let outro_local =
+        outro_tracked.map(|local| on_constant_grid(local, constant_grid.as_ref(), outro_cue_ms));
     let cue_stability = intro_local
         .zip(outro_local)
         .map(|(intro, outro)| 0.5 * (intro.stability + outro.stability));
     let bpm_confidence = tempo.confidence(cue_stability.unwrap_or(tempo_stability));
     let downbeat_detectable = tempo.confidence(tempo_stability) >= DOWNBEAT_MIN_CONFIDENCE;
     let intro_downbeat_ms = downbeat_detectable
-        .then(|| cue_downbeat_ms(&features, &beat_frames, &beat_grid_ms, intro_cue_ms))
+        .then(|| cue_downbeat_ms(&features, &grid_frames, &beat_grid_ms, intro_cue_ms))
         .flatten();
     let outro_downbeat_ms = (downbeat_detectable && tail.is_none())
-        .then(|| cue_downbeat_ms(&features, &beat_frames, &beat_grid_ms, outro_cue_ms))
+        .then(|| cue_downbeat_ms(&features, &grid_frames, &beat_grid_ms, outro_cue_ms))
         .flatten();
     let downbeat_anchor_ms = downbeat_detectable
         .then(|| {
-            beat_tracking::downbeat_phase(&features, &beat_frames)
+            beat_tracking::downbeat_phase(&features, &grid_frames)
                 .and_then(|phase| beat_grid_ms.get(phase).copied())
         })
         .flatten()
@@ -1124,12 +1096,24 @@ pub fn analyze_smart_mix_segments(
             && intro.stability >= FULL_PROFILE_MIN_STABILITY
             && outro.stability >= FULL_PROFILE_MIN_STABILITY
     });
-    let quality =
-        if tail.is_none() && beat_grid_ms.len() >= 12 && bpm_confidence >= 0.75 && steady_cues {
-            "full"
-        } else {
-            "partial"
-        };
+    let clear_phase = match &constant_grid {
+        Some(grid) => grid.phase_support >= FULL_PROFILE_MIN_PHASE_SUPPORT && !grid.phase_contested,
+        None => {
+            tempo_grid::half_beat_slides(&tracked_ms) == 0
+                && !tempo_grid::bass_contests_tracked_beats(&tracked_ms, &features, sample_rate)
+        }
+    };
+    let quality = if tail.is_none()
+        && beat_grid_ms.len() >= 12
+        && bpm_confidence >= 0.75
+        && steady_cues
+        && clear_phase
+        && grid_holds
+    {
+        "full"
+    } else {
+        "partial"
+    };
 
     SmartMixProfileResult {
         schema_version: 1,
@@ -1278,8 +1262,7 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
     let energy = compute_energy(rms);
     let dynamic_range = compute_dynamic_range(&samples);
     let bpm = estimate_bpm(&samples, sample_rate);
-    let (key, scale, _) = detect_key(&samples, sample_rate);
-    let mix_profile = Some(analyze_smart_mix_segments(
+    let mix_profile = analyze_smart_mix_segments(
         &samples,
         tail.as_ref().map(|(samples, start_ms)| AudioTail {
             samples,
@@ -1288,7 +1271,8 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
         sample_rate,
         Some(duration_ms),
         measured_loudness.as_ref(),
-    ));
+    );
+    let (key, scale) = (mix_profile.key.clone(), mix_profile.scale.clone());
 
     // Average spectral centroid
     let mut planner = RealFftPlanner::<f32>::new();
@@ -1311,8 +1295,8 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
     AnalysisResult {
         path: path.to_string_lossy().to_string(),
         bpm,
-        key: Some(key),
-        scale: Some(scale),
+        key,
+        scale,
         loudness: Some((loudness * 10.0).round() / 10.0),
         energy: Some((energy * 1000.0).round() / 1000.0),
         dynamic_range: Some((dynamic_range * 10.0).round() / 10.0),
@@ -1322,7 +1306,7 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
         valence: None,
         acousticness: None,
         instrumentalness: None,
-        mix_profile,
+        mix_profile: Some(mix_profile),
         error: None,
     }
 }

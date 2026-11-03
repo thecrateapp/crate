@@ -7,9 +7,14 @@ from pathlib import Path
 
 import numpy as np
 
-from crate.smart_mix.camelot import to_camelot
 from crate.smart_mix.cue_detection import detect_mix_cues
+from crate.smart_mix.key_detection import detect_key
 from crate.smart_mix.models import MixProfileQuality, TrackMixProfileDraft
+from crate.smart_mix.tempo_grid import (
+    bass_contests_tracked_beats,
+    fit_tempo,
+    half_beat_slides,
+)
 from crate.smart_mix.versions import ANALYZER_VERSION, PYTHON_ANALYZER
 
 
@@ -24,31 +29,14 @@ _DOWNBEAT_WINDOW_SECONDS = 0.046
 _DOWNBEAT_MIN_BEATS = 16
 _DOWNBEAT_MIN_CONFIDENCE = 0.65
 _DOWNBEAT_MARGIN = 0.3
+# Share of the tracked beats on the published phase of a constant grid for a full
+# profile, which the bass must not contest; without a constant grid, the tracked beats
+# must never slide half a beat and the bass must not contest their phase.
+_FULL_PROFILE_MIN_PHASE_SUPPORT = 0.7
 WINDOW_SECONDS = 5.0
 FULL_SCAN_HEAD_SECONDS = 240
 FULL_SCAN_TAIL_SECONDS = 120
 _READ_BLOCK_FRAMES = 65_536
-
-_KEY_NAMES = (
-    "C",
-    "C#",
-    "D",
-    "D#",
-    "E",
-    "F",
-    "F#",
-    "G",
-    "G#",
-    "A",
-    "A#",
-    "B",
-)
-_MAJOR_PROFILE = np.array(
-    [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88]
-)
-_MINOR_PROFILE = np.array(
-    [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17]
-)
 
 
 def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
@@ -80,7 +68,7 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
         sparse=True,
     )
     beat_frames = np.asarray(beat_frames, dtype=int).reshape(-1)
-    beat_grid_ms = tuple(
+    tracked_ms = tuple(
         sorted(
             {
                 max(1, round(float(frame) * HOP_LENGTH * 1_000 / sample_rate))
@@ -89,13 +77,36 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
         )
     )
     bpm, bpm_confidence, tempo_stability = _tempo_features(
-        beat_grid_ms,
+        tracked_ms,
         onset_envelope,
         beat_frames,
     )
+    frame_ms = HOP_LENGTH * 1_000 / sample_rate
+    tempo_fit = fit_tempo(tracked_ms, onset_envelope, low_onsets, frame_ms=frame_ms)
+    constant_grid = tempo_fit.grid if tempo_fit is not None else None
+    if constant_grid is not None:
+        beat_grid_ms = constant_grid.beats_ms(tracked_ms[0], tracked_ms[-1])
+        grid_frames = np.array(
+            [round(position / frame_ms) for position in beat_grid_ms], dtype=int
+        )
+        bpm = round(constant_grid.bpm, 3)
+        clear_phase = (
+            constant_grid.phase_support >= _FULL_PROFILE_MIN_PHASE_SUPPORT
+            and not constant_grid.tempo_deviates
+            and not constant_grid.phase_contested
+        )
+    else:
+        beat_grid_ms, grid_frames = tracked_ms, beat_frames
+        if tempo_fit is not None:
+            bpm = round(tempo_fit.bpm, 3)
+        clear_phase = half_beat_slides(
+            tracked_ms
+        ) == 0 and not bass_contests_tracked_beats(
+            tracked_ms, onset_envelope, low_onsets, frame_ms=frame_ms
+        )
     downbeat_anchor_ms, time_signature = _downbeat_features(
         beat_grid_ms,
-        beat_frames,
+        grid_frames,
         bpm_confidence,
         onsets=onset_envelope,
         low_onsets=low_onsets,
@@ -139,6 +150,7 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
             bpm_confidence=bpm_confidence,
             tempo_stability=tempo_stability,
             downbeat_anchor_ms=downbeat_anchor_ms,
+            clear_phase=clear_phase,
         )
     )
 
@@ -427,65 +439,7 @@ def _key_features(
     audio: np.ndarray,
     sample_rate: int,
 ) -> tuple[str | None, str | None, str | None, float]:
-    import librosa
-
-    max_samples = min(audio.size, sample_rate * 90)
-    with warnings.catch_warnings():
-        warnings.filterwarnings(
-            "ignore",
-            message="Trying to estimate tuning from empty frequency set.",
-            category=UserWarning,
-        )
-        chroma = librosa.feature.chroma_stft(
-            y=audio[:max_samples],
-            sr=sample_rate,
-            hop_length=HOP_LENGTH,
-        )
-    if chroma.size == 0:
-        return None, None, None, 0.0
-    chroma_mean = np.mean(chroma, axis=1)
-    if float(np.sum(chroma_mean)) <= 1e-8:
-        return None, None, None, 0.0
-
-    candidates: list[tuple[float, str, str]] = []
-    for index, key_name in enumerate(_KEY_NAMES):
-        observed = np.roll(chroma_mean, -index)
-        candidates.append(
-            (
-                _safe_correlation(observed, _MAJOR_PROFILE),
-                key_name,
-                "major",
-            )
-        )
-        candidates.append(
-            (
-                _safe_correlation(observed, _MINOR_PROFILE),
-                key_name,
-                "minor",
-            )
-        )
-    candidates.sort(reverse=True, key=lambda candidate: candidate[0])
-    best_score, key, scale = candidates[0]
-    second_score = candidates[1][0]
-    confidence = max(
-        0.0,
-        min(
-            1.0,
-            (best_score + 1.0) * 0.35 + max(0.0, best_score - second_score),
-        ),
-    )
-    try:
-        camelot = to_camelot(key, scale)
-    except ValueError:
-        camelot = None
-    return key, scale, camelot, round(confidence, 4)
-
-
-def _safe_correlation(left: np.ndarray, right: np.ndarray) -> float:
-    if float(np.std(left)) <= 1e-8:
-        return -1.0
-    value = float(np.corrcoef(left, right)[0, 1])
-    return value if math.isfinite(value) else -1.0
+    return detect_key(audio, sample_rate)
 
 
 def _window_features(
@@ -558,12 +512,14 @@ def _profile_quality(
     bpm_confidence: float,
     tempo_stability: float,
     downbeat_anchor_ms: int | None,
+    clear_phase: bool = True,
 ) -> MixProfileQuality:
     if (
         len(beat_grid_ms) >= 12
         and bpm_confidence >= 0.75
         and tempo_stability >= 0.8
         and downbeat_anchor_ms is not None
+        and clear_phase
     ):
         return MixProfileQuality.FULL
     return MixProfileQuality.PARTIAL
