@@ -71,7 +71,9 @@ export const listen: ListenPage = {
   chapters: [
     {
       title: "Play",
-      lede: ["Gapless albums. Transitions that know the music."],
+      lede: [
+        "Albums play gapless. Everything else blends by how the tracks sound.",
+      ],
       features: [
         {
           title: "Gapless and smart transitions",
@@ -96,7 +98,7 @@ export const listen: ListenPage = {
       title: "Smart Mix",
       id: "smart-mix",
       lede: [
-        "Not a crossfade. A planned transition.",
+        "A transition planned for each pair of tracks.",
         "Your server measures every track and plans every handoff. Android plays it locked to the beat.",
       ],
       smartMix: {

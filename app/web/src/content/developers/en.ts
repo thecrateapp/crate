@@ -59,7 +59,7 @@ export const developers: DevelopersPage = {
         },
         {
           title: "MCP",
-          body: "Opt-in, off until an operator enables it: /mcp on the Crate API serves MCP clients such as Claude Code, over OAuth 2 with PKCE or service tokens. Agents prepare plans and a person approves each change, in Admin or, with Crate Operator, in Telegram. Approval starts on when you connect an agent from Admin.",
+          body: "Opt-in, off until an operator enables it: /mcp on the Crate API serves MCP clients such as Claude Code, over OAuth 2 with PKCE or service tokens. Agents prepare plans and a person approves each change, in Admin or, with Crate Operator, in Telegram. Approval is required by default when you connect an agent from Admin.",
           link: { href: "/admin#mcp", label: "AI agents, via MCP" },
         },
       ],

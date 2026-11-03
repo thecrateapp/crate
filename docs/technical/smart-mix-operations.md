@@ -1,6 +1,6 @@
 ---
-title: Smart Mix - funcionamiento y operación
-summary: Perfiles, transiciones, backfill, estados y diagnóstico del Smart Mix implementado, con límites de observación para Crate Agent.
+title: Smart Mix - how it works and how to operate it
+summary: Profiles, transitions, backfill, states and diagnostics for the shipped Smart Mix, with the observation limits that apply to Crate Agent.
 section: operations
 audience: [operator, developer]
 status: canonical
@@ -46,279 +46,283 @@ sources:
   - app/tests/test_smart_mix_admin.py
 ---
 
-# Smart Mix: funcionamiento y operación
+# Smart Mix: how it works and how to operate it
 
-Referencia del comportamiento contrastado con el código de la release
-`d3e6ef6b94ab233680f3d1a8d0c2c43b5a7d917c`, revisado el 21 de octubre de 2026.
-Las observaciones MCP descritas corresponden al candidato aditivo 1.2.0; comprobar
-`get_operation_catalog` antes de asumir que la instancia ya lo despliega.
-No es una medición de cobertura, flags o salud de una instancia. Para continuar el desarrollo,
-consultar el [diseño](smart-mix-design.md) y el [plan de continuación](smart-mix-implementation-plan.md),
-que también describen objetivos y gates todavía pendientes.
+This reference was checked against the code of release
+`d3e6ef6b94ab233680f3d1a8d0c2c43b5a7d917c` on 21 October 2026.
+The MCP observations described here belong to the additive 1.2.0 candidate; check
+`get_operation_catalog` before assuming an instance already serves it.
+It does not measure the coverage, flags or health of any instance. To continue development,
+see the [design](smart-mix-design.md) and the [continuation plan](smart-mix-implementation-plan.md),
+which also describe goals and gates that are still open.
 
-## Qué hace y qué datos utiliza
+## What it does and what data it uses
 
-Smart Mix publica un perfil por pista y calcula compatibilidad y planes de transición entre
-pistas. El perfil incluye tempo/confianza/estabilidad, tonalidad/Camelot, cues y beats locales
-de entrada/salida, energía, loudness y provenance de la medición. El planner entrega cues,
-duración, modo, tempo ratio, fase, ganancias y motivo de fallback; el reproductor ejecuta
-el plan. Recibir un plan no demuestra que se haya reproducido una transición.
+Smart Mix publishes one profile per track and computes compatibility and transition plans
+between tracks. The profile holds tempo, confidence and stability, key and Camelot code, local
+intro and outro cues and beats, energy, loudness and the provenance of the measurement. The
+planner returns cues, duration, mode, tempo ratio, phase, gains and a fallback reason; the
+player runs the plan. Receiving a plan does not prove that a transition was played.
 
-El análisis general de audio y los vectores Bliss siguen siendo subsistemas distintos.
-Sus estados `analysis_state`/`bliss_state` y sus contadores no acreditan la vigencia de
-`track_mix_profiles`. Bliss puede aportar una dimensión de similitud a la compatibilidad;
-no contiene por sí solo el perfil temporal ni un plan de crossfade.
+General audio analysis and Bliss vectors remain separate subsystems. Their
+`analysis_state`/`bliss_state` and their counters say nothing about whether
+`track_mix_profiles` are current. Bliss can add a similarity dimension to compatibility,
+but on its own it holds neither the temporal profile nor a crossfade plan.
 
 ```text
-Worker / daemon de análisis -> borrador Rust o fallback Python
-    -> validación de fuente, revisión y claim -> track_mix_profiles
-    -> lectura por UID / candidatos compatibles / planner FastAPI
-    -> plan versionado -> reproductor consumidor
-Campaña de backfill -> claims por lote -> tareas heavy por pista
-    -> estado de procesamiento + cobertura precalculada para Admin
+Analysis worker / daemon -> Rust draft or Python fallback
+    -> source, revision and claim validation -> track_mix_profiles
+    -> read by UID / compatible candidates / FastAPI planner
+    -> versioned plan -> consuming player
+Backfill campaign -> batch claims -> heavy tasks per track
+    -> processing state + precomputed coverage for Admin
 ```
 
-## Versiones y procedencia
+## Versions and provenance
 
-Los valores siguientes son los del código revisado, no valores descubiertos en vivo.
-`test_smart_mix_versions.py` comprueba que esta tabla siga los identificadores implementados.
+These values come from the reviewed code; they were not discovered from a live instance.
+`test_smart_mix_versions.py` checks that this table follows the implemented identifiers.
 
-| Identificador                   | Valor                | Significado                                              |
-| ------------------------------- | -------------------- | -------------------------------------------------------- |
-| `API_CONTRACT_VERSION`          | `2026-08`            | Contrato anunciado de integración/capabilities           |
-| `PROFILE_SCHEMA_VERSION`        | `1`                  | Esquema del perfil persistido y serializado              |
-| `ANALYZER_VERSION`              | `smart-mix-audio-v5` | Generación objetivo del análisis de perfiles             |
-| `MEASUREMENT_VERSION`           | `bs1770-v1`          | Provenance de loudness/true peak usada por el planner    |
-| `BEAT_GRID_FORMAT`              | `delta-ms-v1`        | Formato de beat grid                                     |
-| `PLANNER_IDENTIFIER`            | `smart-mix-v2`       | Identificador del lote de planes y de capabilities       |
-| `PLANNER_POLICY_VERSION`        | `2`                  | Versión numérica de cada plan individual                 |
-| `PLANNER_POLICY.rules_revision` | `7`                  | Revisión interna de reglas incluida en la clave de caché |
+| Identifier                      | Value                | Meaning                                               |
+| ------------------------------- | -------------------- | ----------------------------------------------------- |
+| `API_CONTRACT_VERSION`          | `2026-08`            | Advertised integration and capabilities contract      |
+| `PROFILE_SCHEMA_VERSION`        | `1`                  | Schema of the persisted and serialized profile        |
+| `ANALYZER_VERSION`              | `smart-mix-audio-v5` | Target generation of profile analysis                 |
+| `MEASUREMENT_VERSION`           | `bs1770-v1`          | Loudness and true peak provenance used by the planner |
+| `BEAT_GRID_FORMAT`              | `delta-ms-v1`        | Beat grid format                                      |
+| `PLANNER_IDENTIFIER`            | `smart-mix-v2`       | Identifier for plan batches and capabilities          |
+| `PLANNER_POLICY_VERSION`        | `2`                  | Numeric version of each individual plan               |
+| `PLANNER_POLICY.rules_revision` | `7`                  | Internal rules revision included in the cache key     |
 
-Cambiar reglas no implica necesariamente cambiar el identificador público del planner:
-la clave de caché incorpora ambas cosas.
+Changing the rules does not necessarily change the public planner identifier: the cache key
+includes both.
 
-Cada perfil conserva `profileRevision`, `sourceRevision`, `analyzer`, `analyzerVersion`,
-`profileVersion` y `analyzedAt`. `sourceRevision` es un hash de tamaño, mtime en nanosegundos
-e inode; no es un hash del contenido de audio ni un Git SHA. El SHA de release identifica
-el código; la revisión de fuente identifica el fichero analizado.
+Each profile keeps `profileRevision`, `sourceRevision`, `analyzer`, `analyzerVersion`,
+`profileVersion` and `analyzedAt`. `sourceRevision` is a hash of size, mtime in nanoseconds
+and inode; it is not a hash of the audio content or a Git SHA. The release SHA identifies the
+code; the source revision identifies the analyzed file.
 
-## Producción y publicación de perfiles
+## Producing and publishing profiles
 
-`audio_analysis.analyze_mix_profile` intenta obtener `mix_profile` del analizador Rust de
-`crate-cli`; cuando no lo obtiene usa `crate.smart_mix.analyzer` en Python. No asumir que
-haber instalado Rust equivale a estar usando su resultado: comprobar `analyzer` y calidad.
-El fallback Python limita el análisis de pistas largas a cabecera y cola; su resultado puede
-ser `partial`. Un fichero demasiado corto puede producir `unavailable`. Ni `full` ni `partial`
-son una garantía de confianza suficiente para cualquier transición.
+`audio_analysis.analyze_mix_profile` tries to get `mix_profile` from the Rust analyzer in
+`crate-cli`; when that fails it uses `crate.smart_mix.analyzer` in Python. Having Rust installed
+does not mean its result is the one in use: check `analyzer` and quality.
+The Python fallback limits analysis of long tracks to the head and tail, so its result can be
+`partial`. A file that is too short can produce `unavailable`. Neither `full` nor `partial`
+guarantees enough confidence for every transition.
 
-La publicación captura fuente y revisión del perfil antes del trabajo costoso. Después
-revalida fuente, ruta, propiedad del claim y revisión concurrente. Los resultados son:
+Publication captures the source and the profile revision before the expensive work. Afterwards
+it revalidates the source, the path, ownership of the claim and any concurrent revision. The
+outcomes are:
 
-| Resultado del worker | Interpretación                                    |
-| -------------------- | ------------------------------------------------- |
-| `published`          | Perfil persistido por esta ejecución              |
-| `unchanged`          | El resultado no mejora/reemplaza el perfil actual |
-| `superseded`         | Otra revisión ganó la publicación                 |
-| `lost_claim`         | La ejecución ya no posee el claim                 |
-| `source_changed`     | Cambió el fichero durante el análisis             |
-| `track_moved`        | Cambió la ruta de la pista                        |
+| Worker outcome   | Meaning                                                       |
+| ---------------- | ------------------------------------------------------------- |
+| `published`      | This run persisted the profile                                |
+| `unchanged`      | The result does not improve on or replace the current profile |
+| `superseded`     | Another revision won the publication                          |
+| `lost_claim`     | The run no longer owns the claim                              |
+| `source_changed` | The file changed during analysis                              |
+| `track_moved`    | The track's path changed                                      |
 
-La política permite promover un perfil de menor calidad a mayor calidad y, en igualdad de
-calidad y generación/fuente, preferir Rust. Un trabajo antiguo no debe degradar un perfil
-vigente. Un task que termina sin publicar no acredita un perfil nuevo: consultar `stored`,
-`outcome`, el perfil y su provenance. La invalidación por cambio de fuente marca
-`source_stale_at`; las lecturas normales excluyen ese perfil mientras se regenera.
+The policy allows a lower-quality profile to be promoted to a higher-quality one and, when
+quality and generation/source are equal, prefers Rust. An old job must not degrade a current
+profile. A task that finishes without publishing does not account for a new profile: check
+`stored`, `outcome`, the profile and its provenance. Invalidation after a source change sets
+`source_stale_at`; normal reads exclude that profile while it is regenerated.
 
-## Calidad, vigencia y procesamiento son ejes distintos
+## Quality, currency and processing are separate axes
 
-`quality` admite `full`, `partial`, `legacy` y `unavailable`. La tabla de pistas de Admin
-expone además este estado de perfil, en el orden de precedencia implementado:
+`quality` accepts `full`, `partial`, `legacy` and `unavailable`. The Admin track table also
+exposes this profile status, in the implemented order of precedence:
 
-| Estado de perfil | Significado                                                          |
-| ---------------- | -------------------------------------------------------------------- |
-| `missing`        | No existe fila de perfil para la pista                               |
-| `unavailable`    | Existe un perfil cuya calidad es `unavailable`                       |
-| `source_changed` | Perfil marcado por cambio de fuente                                  |
-| `outdated`       | Versión de analizador o esquema distinta de la objetivo              |
-| `current`        | Perfil no marcado stale, con versiones actuales y calidad utilizable |
+| Profile status   | Meaning                                                             |
+| ---------------- | ------------------------------------------------------------------- |
+| `missing`        | The track has no profile row                                        |
+| `unavailable`    | A profile exists and its quality is `unavailable`                   |
+| `source_changed` | Profile flagged by a source change                                  |
+| `outdated`       | Analyzer or schema version differs from the target                  |
+| `current`        | Profile not flagged stale, with current versions and usable quality |
 
-`failed` es un filtro sobre `processingState`, no un sexto estado de perfil. Una pista puede
-conservar un perfil utilizable y registrar un intento de procesamiento fallido. Leer también
-`processingAttempts`, `processingError`, `analyzedAt` y `sourceStaleAt`.
+`failed` is a filter on `processingState`, not a sixth profile status. A track can keep a
+usable profile and still record a failed processing attempt. Read `processingAttempts`,
+`processingError`, `analyzedAt` and `sourceStaleAt` as well.
 
-La cobertura precalculada usa `current_profiles` y `current_quality`. Los totales de `quality`
-pueden incluir perfiles antiguos: `full` total no equivale a `current_quality.full`.
-`missing_profiles = total_tracks - current_profiles`: incluye todo lo que falta para alcanzar
-cobertura vigente, también perfiles desactualizados o inutilizables. No equivale al filtro
-por pista `status=missing`. Los álbumes en cuarentena se excluyen de esta cobertura.
-Si falta el snapshot o corresponde a otro analizador, la lectura devuelve la estructura vacía;
-comprobar `refreshedAt` antes de interpretar ceros como una biblioteca sin pendientes.
+Precomputed coverage uses `current_profiles` and `current_quality`. The `quality` totals can
+include old profiles: the `full` total is not the same as `current_quality.full`.
+`missing_profiles = total_tracks - current_profiles`: it counts everything still needed to
+reach current coverage, including outdated and unusable profiles. It is not the same as the
+per-track `status=missing` filter. Quarantined albums are excluded from this coverage.
+If the snapshot is missing or belongs to another analyzer, the read returns the empty
+structure; check `refreshedAt` before reading zeros as a library with nothing pending.
 
-## Campaña, colas y backfill
+## Campaign, queues and backfill
 
-| Tarea                         | Cola          | Responsabilidad                           |
+| Task                          | Queue         | Responsibility                            |
 | ----------------------------- | ------------- | ----------------------------------------- |
-| `backfill_smart_mix_profiles` | `heavy`       | Coordinación de lotes y encolado de hijos |
-| `compute_smart_mix_profile`   | `heavy`       | Análisis y publicación por pista          |
-| `refresh_smart_mix_coverage`  | `maintenance` | Agregación de cobertura fuera del request |
+| `backfill_smart_mix_profiles` | `heavy`       | Coordinates batches and enqueues children |
+| `compute_smart_mix_profile`   | `heavy`       | Analysis and publication per track        |
+| `refresh_smart_mix_coverage`  | `maintenance` | Aggregates coverage outside the request   |
 
-El backfill aplica presión de recursos y limita el trabajo en vuelo. Su configuración Admin
-acepta `batchSize` de 1 a 100 (25 por defecto) y `maxAttempts` de 1 a 10 (3 por defecto).
-Los claims usan `SKIP LOCKED`, token, `target_generation` y intentos; una nueva versión del
-analizador renueva la elegibilidad de intentos de la generación anterior. Prioriza cola de
-reproducción, IDs offline suministrados, favoritos/colecciones y escuchas antes del resto.
-Puede promover perfiles Python cuando el CLI Rust está disponible.
+The backfill applies resource pressure and limits the work in flight. Its Admin settings
+accept `batchSize` from 1 to 100 (25 by default) and `maxAttempts` from 1 to 10 (3 by default).
+Claims use `SKIP LOCKED`, a token, `target_generation` and attempts; a new analyzer version
+makes attempts from the previous generation eligible again. It prioritizes the play queue,
+supplied offline IDs, favorites and collections, and listening history before everything else.
+It can promote Python profiles when the Rust CLI is available.
 
-La campaña persiste bajo `smart_mix:backfill_campaign`, con estados `running`, `paused`,
-`cancelled` y `completed`. `controlState=idle` también cubre la ausencia de campaña y campañas
-terminales; no significa por sí solo cobertura completa. Pausar o cancelar detiene la
-continuación de la campaña; no interrumpe por la fuerza análisis hijos ya aceptados. Reanudar
-reutiliza una campaña de la misma generación que esté running/paused. Una campaña que se
-completa ha agotado el trabajo reclamable en ese pase; puede conservar errores agotados o
-perfiles no vigentes. Comprobar cobertura y `processing.exhausted` antes de dar el backlog por
-resuelto. Un task coordinador `done` tampoco implica que todos sus hijos hayan terminado.
+The campaign is persisted under `smart_mix:backfill_campaign`, with the states `running`,
+`paused`, `cancelled` and `completed`. `controlState=idle` also covers a missing campaign and
+terminal campaigns; on its own it does not mean full coverage. Pausing or cancelling stops the
+campaign from continuing; it does not forcibly interrupt child analyses that were already
+accepted. Resuming reuses a running or paused campaign of the same generation. A campaign that
+completes has exhausted the claimable work in that pass; it can still leave exhausted errors or
+non-current profiles. Check coverage and `processing.exhausted` before treating the backlog as
+resolved. A coordinating task in `done` does not mean all of its children have finished either.
 
-## Planner, compatibilidad y caché
+## Planner, compatibility and cache
 
-- Un álbum automático preserva `gapless`; una transición manual usa una rampa corta.
-- En automático, perfiles ausentes conducen a fallback. `adaptive` permite crossfade sin
-  acreditar beatmatch. `beatmatch` exige permiso del contexto y referencias de beat válidas,
-  confianza BPM mínima, estabilidad local, compás compatible, ajuste de tempo admisible y
-  ventana suficiente. La política define los umbrales; el contrato no promete beatmatch.
-- Un perfil `partial` con beat local de cue explícito puede ser elegible. No reducir la regla
-  a `quality=full`. Los tempos y beats locales de outro/intro prevalecen sobre la referencia
-  global; se admite normalización a mitad/doble tempo al comparar.
-- Si falta ventana, el planner acorta o degrada la transición. Motivos como `missing_profile`,
-  `low_confidence`, `unstable_tempo`, `incompatible_tempo`, `incompatible_meter` e
-  `insufficient_window` explican el resultado; el cliente añade motivos de timeout/offline.
-- Ganancias y headroom tienen en cuenta loudness/true peak acreditados; la política limita
-  la suma prevista. Un valor planificado no sustituye la captura física de clipping/underrun.
+- An automatic album keeps `gapless`; a manual transition uses a short ramp.
+- In automatic mode, missing profiles lead to fallback. `adaptive` allows a crossfade without
+  claiming beatmatch. `beatmatch` requires permission from the context and valid beat
+  references, a minimum BPM confidence, local stability, a compatible meter, an acceptable tempo
+  adjustment and a long enough window. The policy defines the thresholds; the contract does not
+  promise beatmatch.
+- A `partial` profile with an explicit local cue beat can be eligible. Do not reduce the rule
+  to `quality=full`. Local outro and intro tempos and beats take precedence over the global
+  reference; half and double tempo normalization is allowed when comparing.
+- If the window is too short, the planner shortens or downgrades the transition. Reasons such as
+  `missing_profile`, `low_confidence`, `unstable_tempo`, `incompatible_tempo`,
+  `incompatible_meter` and `insufficient_window` explain the result; the client adds timeout
+  and offline reasons.
+- Gains and headroom take the recorded loudness and true peak into account; the policy caps the
+  expected sum. A planned value does not replace a physical capture of clipping and underruns.
 
-Compatibilidad combina el ajuste de transición (75 %) con Bliss (15 %) y género (10 %). El
-ajuste de transición (`smart_mix/transition_fit.py`) mezcla dos familias de pesos según la
-afinidad de beatmatch α:
+Compatibility combines transition fit (75%) with Bliss (15%) and genre (10%). Transition fit
+(`smart_mix/transition_fit.py`) blends two families of weights according to the beatmatch
+affinity α:
 
-- **Beatmatch** (α = 1): tempo estricto (cero al 12 %), armonía Camelot, viabilidad de
-  beatmatch con las mismas reglas que el planner, nivel de borde, brillo, silencio y
-  continuidad de danceability/valence.
-- **Entrada suave** (α = 0): salto de nivel entre los 5 s finales y los 5 s iniciales (LUFS
-  acreditados o, si no, energía de borde), con subidas penalizadas antes que bajadas; si el
-  outro del saliente es un fade (más de 6 dB bajo su loudness integrado), la referencia es ese
-  loudness integrado; brillo
-  espectral de borde; silencio entre pistas; pulso laxo (cero al 25 %, mitad/doble incluidos);
-  armonía con poco peso; continuidad de danceability/valence.
+- Beatmatch (α = 1): strict tempo (zero at 12%), Camelot harmony, beatmatch viability under the
+  same rules as the planner, edge level, brightness, silence, and danceability/valence
+  continuity.
+- Smooth entry (α = 0): the level jump between the last 5 s and the first 5 s (recorded LUFS or,
+  failing that, edge energy), with rises penalized more than drops; if the outgoing outro is a
+  fade (more than 6 dB below its integrated loudness), the reference is that integrated
+  loudness; edge spectral brightness; silence between tracks; loose pulse (zero at 25%, half
+  and double included); lightly weighted harmony; danceability/valence continuity.
 
-`context=auto` calcula α como prior de género (familias electrónicas ≈ 0,9; rock, metal y
-folk ≈ 0,1–0,15; desconocido 0,35) multiplicado por la evidencia rítmica del par (confianza
-BPM y estabilidad de outro/intro). `context=beatmatch` y `context=smooth` fijan α a 1 y 0.
-Un set de rock con batería estable y prior bajo queda en entrada suave; un tema electrónico
-sin grid fiable no se ordena como si se pudiera beatmatchear.
+`context=auto` computes α as a genre prior (electronic families ≈ 0.9; rock, metal and folk
+≈ 0.1–0.15; unknown 0.35) multiplied by the rhythmic evidence of the pair (BPM confidence and
+outro/intro stability). `context=beatmatch` and `context=smooth` fix α at 1 and 0.
+A rock set with steady drums and a low prior stays in smooth entry; an electronic track without
+a reliable grid is not ranked as if it could be beatmatched.
 
-La consulta hace una preselección acotada por señales y luego filtra candidatos reproducibles
-localmente antes del límite final; el ranking deduplica grabaciones/variantes. La ventana de
-BPM de la preselección es ±12 % (y mitad/doble) en beatmatch o con semilla electrónica, y
-±25 % en entrada suave o con semilla de prior bajo. El endpoint acepta `scope=local`, hasta
-100 resultados, `context` y una ventana de candidatos acotada. El desglose añade `transition`,
-`beatmatchAffinity`, `beatmatchable`, `tempoFlow`, `level`, `brightness` y `silence` sin
-cambiar los campos existentes. Un score alto no acredita que el reproductor vaya a ejecutar
-beatmatch ni que exista cobertura federada.
+The query makes a bounded preselection by signals, then filters candidates that can be played
+locally before the final limit; the ranking deduplicates recordings and variants. The BPM window
+for the preselection is ±12% (plus half and double) in beatmatch or with an electronic seed, and
+±25% in smooth entry or with a low-prior seed. The endpoint accepts `scope=local`, up to 100
+results, `context` and a bounded candidate window. The breakdown adds `transition`,
+`beatmatchAffinity`, `beatmatchable`, `tempoFlow`, `level`, `brightness` and `silence` without
+changing the existing fields. A high score does not mean the player will beatmatch, nor that
+federated coverage exists.
 
-Los lotes de planes cargan perfiles y caché en bloque. La clave incluye UID de ambos tracks,
-sus `profileRevision`, contexto, identificador del planner y revisión de reglas. Un cambio de
-perfil/reglas conduce a otra identidad de caché; no recomendar vaciar Redis como reparación
-rutinaria. Un POST de planificación puede escribir caché aunque no modifique la música.
+Plan batches load profiles and cache in bulk. The key includes the UIDs of both tracks, their
+`profileRevision`, the context, the planner identifier and the rules revision. A change of
+profile or rules leads to a different cache identity; do not recommend flushing Redis as a
+routine repair. A planning POST can write to the cache even though it does not modify music.
 
-## HTTP, permisos y consumidores
+## HTTP, permissions and consumers
 
-Estas rutas describen la aplicación. No son herramientas disponibles automáticamente para
-Crate Agent; un Bearer MCP no es una sesión Admin ni un PAT de VirtualDJ.
+These routes describe the application. They are not tools automatically available to
+Crate Agent; an MCP Bearer token is not an Admin session or a VirtualDJ PAT.
 
-| Ruta                                                                         | Uso y efecto relevante                                                                                       |
-| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `GET /api/capabilities`                                                      | Flags efectivos y contrato de clientes; no acredita su implementación ni readiness física                    |
-| `GET /api/tracks/by-entity/{uid}/mix-profile?detail=summary\|full`           | Perfil por UID; `full` incluye beat grid; 404 puede indicar ausencia o perfil invalidado                     |
-| `GET /api/tracks/by-entity/{uid}/compatible?context=auto\|beatmatch\|smooth` | Ranking local de candidatos; no desencadena análisis                                                         |
-| `POST /api/playback/transition-plans`                                        | Planificación por lote; usa caché                                                                            |
-| `POST /api/playback/continuation-token` y `/api/playback/continuation`       | Contrato para continuar planificación/cola en el runtime nativo                                              |
-| `GET /api/admin/smart-mix/status`                                            | Cobertura/campaña/tarea coordinadora; **puede encolar** `refresh_smart_mix_coverage` si falta o supera 600 s |
-| `GET /api/admin/smart-mix/tracks` y `/activity`                              | Paginación de perfiles/procesamiento y actividad de tareas                                                   |
-| `POST /api/admin/smart-mix/backfill` y `/backfill/resume\|pause\|cancel`     | Cambian el control de campaña                                                                                |
-| `POST /api/admin/smart-mix/tracks/{id}/reanalyze`                            | Encola análisis por pista con deduplicación                                                                  |
+| Route                                                                        | Use and relevant effect                                                                                                 |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/capabilities`                                                      | Effective flags and client contract; does not prove their implementation or physical readiness                          |
+| `GET /api/tracks/by-entity/{uid}/mix-profile?detail=summary\|full`           | Profile by UID; `full` includes the beat grid; a 404 can mean missing or invalidated                                    |
+| `GET /api/tracks/by-entity/{uid}/compatible?context=auto\|beatmatch\|smooth` | Local ranking of candidates; does not trigger analysis                                                                  |
+| `POST /api/playback/transition-plans`                                        | Batch planning; uses the cache                                                                                          |
+| `POST /api/playback/continuation-token` and `/api/playback/continuation`     | Contract for continuing planning and the queue in the native runtime                                                    |
+| `GET /api/admin/smart-mix/status`                                            | Coverage, campaign and coordinating task; can enqueue `refresh_smart_mix_coverage` if it is missing or older than 600 s |
+| `GET /api/admin/smart-mix/tracks` and `/activity`                            | Paginated profiles and processing, and task activity                                                                    |
+| `POST /api/admin/smart-mix/backfill` and `/backfill/resume\|pause\|cancel`   | Change campaign control                                                                                                 |
+| `POST /api/admin/smart-mix/tracks/{id}/reanalyze`                            | Enqueues analysis for one track, with deduplication                                                                     |
 
-Admin exige `library.analysis.manage`, incluso para sus lecturas. Los endpoints públicos de
-perfil/compatibles usan la autorización de sesión o el scope PAT `vdj.smart_mix.read` según
-el tipo de cliente; no intercambiar esos mecanismos con OAuth/grants MCP.
-El readplane Go implementa el resumen de perfil validado; `detail=full` y los fallos/staleness
-pertinentes vuelven a FastAPI según la ruta y configuración. No asumir que Go implementa todo
-el planner ni paridad PAT: el proxy selecciona transporte según autenticación.
+Admin requires `library.analysis.manage`, even for its reads. The public profile and compatible
+endpoints use session authorization or the PAT scope `vdj.smart_mix.read`, depending on the
+client type; do not swap those mechanisms for MCP OAuth or grants.
+The Go read plane implements the validated profile summary; `detail=full` and the relevant
+failures or staleness fall back to FastAPI depending on the route and configuration. Do not
+assume Go implements the whole planner or PAT parity: the proxy picks the transport by
+authentication.
 
-| Consumidor            | Lo que acredita el árbol revisado                                                                       | Lo que debe comprobarse aparte                                                                                   |
-| --------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Backend               | Perfiles, ranking, planner, administración y continuación nativa                                        | Flags, generaciones y salud de la instancia                                                                      |
-| Listen Android nativo | Adaptador de planes, dos decks/procesamiento nativo y continuación fuera de la WebView                  | APK instalado, flags/preferencias y gates de audio reales                                                        |
-| Listen web/desktop    | Crossfade y heurísticas de transición; la rama de planes del adaptador está dirigida a `android-native` | No afirmar paridad del ejecutor de planes por compartir el código TypeScript                                     |
-| Listen iOS            | Cliente móvil/media-session existente                                                                   | El plan de continuación mantiene la paridad Smart Mix nativa como R5; no acreditarla desde Android               |
-| VirtualDJ             | Código de negociación, cliente de perfiles/compatibles e integración Online Source                      | Host/licencia Pro, build instalado y gates R2/R3; no ejecutar un mezclador de Crate dentro de VDJ por inferencia |
+| Consumer              | What the reviewed tree shows                                                            | What must be checked separately                                                                        |
+| --------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Backend               | Profiles, ranking, planner, administration and native continuation                      | Flags, generations and instance health                                                                 |
+| Native Listen Android | Plan adapter, two decks with native processing, and continuation outside the WebView    | Installed APK, flags and preferences, and real audio gates                                             |
+| Listen web/desktop    | Crossfade and transition heuristics; the adapter's plan branch targets `android-native` | Do not claim plan executor parity because the TypeScript code is shared                                |
+| Listen iOS            | Existing mobile and media-session client                                                | The continuation plan keeps native Smart Mix parity as R5; do not infer it from Android                |
+| VirtualDJ             | Negotiation code, profile and compatible client, and the Online Source integration      | Pro host and license, installed build and gates R2/R3; do not infer that a Crate mixer runs inside VDJ |
 
-`CRATE_SMART_MIX_ENABLED` gobierna la capability base. Crossfade nativo depende además de
-`CRATE_ANDROID_NATIVE_CROSSFADE_ENABLED`; beatmatch depende de ambos y de
-`CRATE_ANDROID_BEATMATCH_ENABLED`; bass handoff añade `CRATE_ANDROID_BASS_HANDOFF_ENABLED`.
-Los helpers de configuración tienen default false. VirtualDJ usa además `CRATE_VDJ_ENABLED`
-y, para automation, `CRATE_VDJ_AUTOMATION_ENABLED`. El cliente aplica preferencias del usuario.
-No deducir valores desplegados de defaults ni de la existencia del código.
+`CRATE_SMART_MIX_ENABLED` controls the base capability. Native crossfade also depends on
+`CRATE_ANDROID_NATIVE_CROSSFADE_ENABLED`; beatmatch depends on both and on
+`CRATE_ANDROID_BEATMATCH_ENABLED`; bass handoff adds `CRATE_ANDROID_BASS_HANDOFF_ENABLED`.
+The configuration helpers default to false. VirtualDJ also uses `CRATE_VDJ_ENABLED` and, for
+automation, `CRATE_VDJ_AUTOMATION_ENABLED`. The client applies the user's preferences.
+Do not infer deployed values from defaults or from the existence of the code.
 
-El plan conserva un gate físico de R1 aplazado el 18 de octubre: captura externa de salida
-para clipping/underrun. Los logs QoE y las suites automáticas no lo sustituyen. Esta revisión
-documental no cierra ese gate ni los de plataformas futuras.
+The plan keeps an R1 physical gate that was deferred on 18 October: an external capture of the
+output to check clipping and underruns. QoE logs and automated suites do not replace it. This
+documentation review does not close that gate or the ones for future platforms.
 
-## Diagnóstico mediante Crate Agent (solo lectura)
+## Diagnosis through Crate Agent (read-only)
 
-1. Obtener `get_release_context` y distinguir SHA de release, `source_sha` de imagen,
-   `analyzerVersion`, `profileRevision` y versión de planner. Leer esta referencia y las
-   fuentes necesarias de esa release con `search_crate_context`/`read_crate_context`.
-2. Consultar `get_instance_status`, `get_runtime_policy`, `list_jobs`/`get_job` y
-   `read_diagnostics` dentro de sus grants, límites y antigüedad. `list_jobs` permite filtrar
-   los tipos Smart Mix registrados. Una lista paginada no representa toda la campaña;
-   respetar cursor y truncamiento.
-3. El contrato candidato MCP 1.2.0 añade `get_smart_mix_status` con el grant
-   `library.health.read`: lee cobertura y campaña almacenadas y, opcionalmente,
-   `track_uids` con un máximo de 50 UUIDs exactos. Devuelve timestamps independientes,
-   disponibilidad, antigüedad, versiones implementadas y estado de cada perfil; conserva
-   cobertura de analizadores antiguos como evidencia stale en vez de inventar ceros.
-   No calcula perfiles, candidatos ni planes, no refresca cobertura y no encola trabajo.
-   `get_analysis_status` sigue cubriendo solo `analysis` y `bliss`; no sustituye esta lectura.
-4. Cuando falte esa evidencia o el grant, declarar el dato no disponible y proponer al operador la
-   comprobación Admin apropiada. El GET de estado Admin puede encolar trabajo: no usarlo
-   como sustituto transparente de una observación MCP. Crate Agent no cambia flags, pausa,
-   reanaliza ni inicia campañas en esta fase.
+1. Get `get_release_context` and tell apart the release SHA, the image `source_sha`,
+   `analyzerVersion`, `profileRevision` and the planner version. Read this reference and the
+   sources needed for that release with `search_crate_context`/`read_crate_context`.
+2. Query `get_instance_status`, `get_runtime_policy`, `list_jobs`/`get_job` and
+   `read_diagnostics` within their grants, limits and age. `list_jobs` can filter by the
+   registered Smart Mix types. A paginated list does not represent the whole campaign;
+   respect the cursor and truncation.
+3. The MCP 1.2.0 candidate contract adds `get_smart_mix_status` with the
+   `library.health.read` grant: it reads the stored coverage and campaign and, optionally,
+   `track_uids`, up to 50 exact UUIDs. It returns independent timestamps, availability, age,
+   implemented versions and the status of each profile; it keeps coverage from old analyzers
+   as stale evidence instead of inventing zeros. It does not compute profiles, candidates or
+   plans, does not refresh coverage and does not enqueue work. `get_analysis_status` still
+   covers only `analysis` and `bliss`; it does not replace this read.
+4. When that evidence or the grant is missing, report the data as unavailable and suggest the
+   appropriate Admin check to the operator. The Admin status GET can enqueue work: do not use it
+   as a transparent substitute for an MCP observation. Crate Agent does not change flags, pause,
+   reanalyze or start campaigns in this phase.
 
-| Síntoma                              | Evidencia y siguiente comprobación                                                                                                                                                                         |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cobertura cero o parada              | Fecha/versión del snapshot, campaña y tareas por cola; distinguir snapshot ausente de cero real. Consultar `get_smart_mix_status`; si falta evidencia o grant, solicitar al operador la comprobación Admin |
-| Mucho `missing_profiles`             | Separar ausencia real, generación antigua, fuente cambiada y calidad `unavailable`; comprobar filtros por pista y `current_quality`                                                                        |
-| Campaña running sin avance           | Presión/ventana de recursos, heavy worker, claims y tareas hijos; consultar errores/agotados antes de reiniciar                                                                                            |
-| Task terminado pero sin perfil nuevo | Leer `outcome`, fuente/revisión y claim: `superseded`/`unchanged` no equivalen a publicación por ese task                                                                                                  |
-| Crossfade sin beatmatch              | Capability, preferencia, calidad/beat de cue, confianza/estabilidad, compás, ventana y `fallbackReason`                                                                                                    |
-| Mezcla antigua tras reanálisis       | Verificar `profileRevision`, reglas y plan instalado por el cliente; no confundir plan nuevo con adopción en el reproductor                                                                                |
+| Symptom                           | Evidence and next check                                                                                                                                                                                          |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Coverage at zero or stalled       | Snapshot date and version, campaign and tasks per queue; tell a missing snapshot apart from a real zero. Query `get_smart_mix_status`; if evidence or the grant is missing, ask the operator for the Admin check |
+| High `missing_profiles`           | Separate real absence, old generation, changed source and `unavailable` quality; check the per-track filters and `current_quality`                                                                               |
+| Campaign running without progress | Resource pressure and window, heavy worker, claims and child tasks; check errors and exhausted items before restarting                                                                                           |
+| Task finished but no new profile  | Read `outcome`, source/revision and claim: `superseded`/`unchanged` do not mean this task published                                                                                                              |
+| Crossfade without beatmatch       | Capability, preference, cue quality and beat, confidence and stability, meter, window and `fallbackReason`                                                                                                       |
+| Old mix after reanalysis          | Verify `profileRevision`, the rules and the plan installed by the client; do not confuse a new plan with the player adopting it                                                                                  |
 
-La lectura almacenada tiene cobertura parcial. No expone probes funcionales del host en vivo,
-aceptación física por plataforma, adopción del plan en cada reproductor ni una nueva validación
-del audio. Esas señales siguen no disponibles. Un enqueue no acredita finalización; un perfil
-`current` solo acredita versiones almacenadas compatibles con el código de la API, sin eliminar
-la antigüedad que declara su envelope. El contexto de release y sus `source_sha` siguen en el
-MCP de contexto, no se deducen de un tag de imagen ni de `get_smart_mix_status`.
+The stored read has partial coverage. It does not expose live functional host probes,
+physical acceptance per platform, plan adoption in each player or a new validation of the
+audio. Those signals remain unavailable. An enqueue does not prove completion; a `current` profile only shows
+stored versions compatible with the API code, and the age declared in its envelope still
+applies. The release context and its `source_sha` stay in the context MCP; they are not derived
+from an image tag or from `get_smart_mix_status`.
 
-## Evidencia de regresión y preguntas de aceptación
+## Regression evidence and acceptance questions
 
-Las suites `test_smart_mix_versions`, `test_smart_mix_publication`,
+The suites `test_smart_mix_versions`, `test_smart_mix_publication`,
 `test_smart_mix_source_invalidation`, `test_smart_mix_backfill`, `test_smart_mix_admin`,
-`test_smart_mix_planner`, `test_smart_mix_api` y `test_smart_mix_compatible_service`
-cubren las identidades, publicación concurrente, estados, control de campaña y contrato de
-planificación. Tests de readplane, Listen y Rust completan sus superficies; no sustituyen
-una prueba física o la comprobación de un binario distribuido.
+`test_smart_mix_planner`, `test_smart_mix_api` and `test_smart_mix_compatible_service`
+cover identities, concurrent publication, states, campaign control and the planning contract.
+Readplane, Listen and Rust tests cover their own surfaces; they do not replace a physical test
+or a check of a distributed binary.
 
-Crate Agent debe poder explicar Smart Mix frente a Bliss; diferenciar calidad, vigencia y error;
-seguir un backfill sin equiparar enqueue/finalización/cobertura; explicar elegibilidad de
-beats locales y fallbacks; y señalar los límites por plataforma y de evidencia MCP. Cada
-respuesta debe citar ruta y SHA del contexto. La respuesta correcta a la cobertura real
-Smart Mix puede ser que la credencial actual no la expone, aunque conozca el algoritmo.
+Crate Agent must be able to explain Smart Mix as distinct from Bliss; tell quality, currency
+and error apart; follow a backfill without equating enqueue, completion and coverage; explain
+local beat eligibility and fallbacks; and point out the per-platform limits and the limits of
+MCP evidence. Every answer must cite the path and the context SHA. The correct answer about
+real Smart Mix coverage can be that the current credential does not expose it, even when the
+agent knows the algorithm.
