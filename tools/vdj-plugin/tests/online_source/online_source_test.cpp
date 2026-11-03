@@ -290,16 +290,23 @@ public:
     }
 };
 
+int next_harness_instance()
+{
+    static std::atomic<int> instances = 0;
+    return ++instances;
+}
+
 struct Harness {
     std::shared_ptr<SharedVault> vault = std::make_shared<SharedVault>();
     MemorySettingsStore settings;
     RoutedHttp http;
     FakeHost host;
     FakeUi ui;
-    std::filesystem::path cache_path =
-        std::filesystem::temp_directory_path() / "crate-vdj-online-source-test.sqlite";
-    std::filesystem::path spool_path =
-        std::filesystem::temp_directory_path() / "crate-vdj-online-source-plays.jsonl";
+    int instance = next_harness_instance();
+    std::filesystem::path cache_path = std::filesystem::temp_directory_path() /
+        ("crate-vdj-online-source-test-" + std::to_string(instance) + ".sqlite");
+    std::filesystem::path spool_path = std::filesystem::temp_directory_path() /
+        ("crate-vdj-online-source-plays-" + std::to_string(instance) + ".jsonl");
     std::unique_ptr<OnlineSource> source;
 
     explicit Harness(bool connected = true, std::string capabilities = capabilities_json())
