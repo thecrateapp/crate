@@ -177,3 +177,59 @@ func TestAFailedUpWithNothingCreatedReturnsTheOriginalError(t *testing.T) {
 		t.Fatalf("error = %v", err)
 	}
 }
+
+type networkRunner struct {
+	recordingRunner
+	networks []string
+}
+
+func (r *networkRunner) Output(_ context.Context, name string, args ...string) (string, error) {
+	if len(args) >= 3 && args[len(args)-3] == "network" && args[len(args)-2] == "inspect" {
+		for _, network := range r.networks {
+			if network == args[len(args)-1] {
+				return "[]", nil
+			}
+		}
+		return "", errors.New("no such network")
+	}
+	return "", nil
+}
+
+func TestStackLeavesOutMonitoringOverlaysWhoseNetworkIsGone(t *testing.T) {
+	runner := &networkRunner{networks: []string{"crate-observability_prometheus-query", "crate-observability_traefik-metrics"}}
+	s := Stack{
+		Run:     runner,
+		Compose: []string{"sudo", "docker", "compose"},
+		Dir:     "/srv/crate",
+		Files: []string{
+			"docker-compose.yaml",
+			"deploy/observability/compose.projector-prometheus.yaml",
+			"deploy/observability/compose.traefik-metrics.yaml",
+			"deploy/observability/compose.app-metrics.yaml",
+		},
+	}
+	out := &bytes.Buffer{}
+
+	s.Up(context.Background(), out)
+
+	want := "/srv/crate $ sudo docker compose --project-directory /srv/crate -f /srv/crate/docker-compose.yaml" +
+		" -f /srv/crate/deploy/observability/compose.projector-prometheus.yaml" +
+		" -f /srv/crate/deploy/observability/compose.traefik-metrics.yaml --env-file /srv/crate/.env up -d"
+	if len(runner.calls) != 1 || runner.calls[0] != want {
+		t.Fatalf("got\n%s", strings.Join(runner.calls, "\n"))
+	}
+	if !strings.Contains(out.String(), "compose.app-metrics.yaml") {
+		t.Fatalf("no warning about the dropped overlay: %q", out.String())
+	}
+}
+
+func TestStackNeverChecksNetworksWithoutMonitoringOverlays(t *testing.T) {
+	runner := &failingUpRunner{}
+	s := Stack{Run: runner, Compose: []string{"docker", "compose"}, Dir: "/srv/crate", Files: []string{"docker-compose.yaml", "deploy/operator/compose.operator.yaml"}}
+
+	s.Command(context.Background(), "ps")
+
+	if len(runner.calls) != 0 {
+		t.Fatalf("unexpected calls %q", runner.calls)
+	}
+}

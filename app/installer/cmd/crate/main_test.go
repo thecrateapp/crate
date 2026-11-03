@@ -58,3 +58,12 @@ func TestDoctorFailsWithoutAnInstallation(t *testing.T) {
 		t.Fatalf("code %d, out %s, err %s", code, stdout.String(), stderr.String())
 	}
 }
+
+func TestObservabilityRejectsUnknownActionsBeforeTouchingDocker(t *testing.T) {
+	for _, args := range [][]string{{"observability"}, {"observability", "start"}, {"observability", "enable", "status"}} {
+		var stdout, stderr bytes.Buffer
+		if code := run(args, &stdout, &stderr); code != 2 || !strings.Contains(stderr.String(), "enable|disable|status") {
+			t.Fatalf("%v: code %d, stderr %q", args, code, stderr.String())
+		}
+	}
+}

@@ -157,7 +157,7 @@ func (w *wizard) stack(dir string) (stack.Stack, error) {
 	if err != nil {
 		return stack.Stack{}, err
 	}
-	return stack.Stack{Run: w.run, Compose: w.docker.Compose, Dir: dir, Files: install.ComposeFiles(values)}, nil
+	return stack.Stack{Run: w.run, Compose: w.docker.Compose, Dir: dir, Files: install.ComposeFiles(values), Env: values}, nil
 }
 
 func (w *wizard) existingAfterApply() *envfile.Values {

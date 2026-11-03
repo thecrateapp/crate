@@ -95,7 +95,7 @@ func Run(ctx context.Context, dir string, deps Deps) (Report, error) {
 
 	docker, state := deps.DetectDocker(ctx, deps.Run, host)
 	r.items = append(r.items, fromCheck("Docker", system.DockerCheck(state, docker, host)))
-	s := stack.Stack{Run: deps.Run, Compose: docker.Compose, Dir: dir, Files: install.ComposeFiles(values)}
+	s := stack.Stack{Run: deps.Run, Compose: docker.Compose, Dir: dir, Files: install.ComposeFiles(values), Env: values}
 	if state == system.DockerReady {
 		checkServices(ctx, r, s)
 	}

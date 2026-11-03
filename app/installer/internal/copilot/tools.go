@@ -560,7 +560,7 @@ func (s *Session) toolStart(ctx context.Context, _ *mcp.CallToolRequest, _ struc
 	if err != nil {
 		return nil, jobState{}, err
 	}
-	st := stack.Stack{Run: s.deps.Run, Compose: docker.Compose, Dir: s.dir, Files: install.ComposeFiles(values)}
+	st := stack.Stack{Run: s.deps.Run, Compose: docker.Compose, Dir: s.dir, Files: install.ComposeFiles(values), Env: values}
 	s.job = startJob(st, s.deps.HTTP, s.cfg.LocalURLs().API, startTimeout, s.agentStep(st, docker, values))
 	return nil, s.job.state(), nil
 }

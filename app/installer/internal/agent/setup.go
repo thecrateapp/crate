@@ -77,7 +77,7 @@ func (s Setup) script(ctx context.Context, out io.Writer, values *envfile.Values
 	run = append(run, "crate-api", filepath.Join(dir, "scripts", "agent_setup.py"))
 	run = append(run, args...)
 	run = append(run, "--in-container", "--profile", string(mode), "--env-file", install.EnvPath(dir))
-	name, full := s.Stack.Command(run...)
+	name, full := s.Stack.Command(ctx, run...)
 	if name == "sudo" && len(names) > 0 {
 		full = append([]string{"--preserve-env=" + strings.Join(names, ",")}, full...)
 	}
@@ -142,6 +142,7 @@ func (s *Setup) Transition(ctx context.Context, out io.Writer, m *manifest.Manif
 		return err
 	}
 	s.Stack.Files = install.ComposeFiles(values)
+	s.Stack.Env = values
 	if err := s.Stack.Up(ctx, out); err != nil {
 		return fmt.Errorf("start %s: %w", to.Name(), err)
 	}

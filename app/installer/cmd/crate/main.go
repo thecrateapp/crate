@@ -25,6 +25,8 @@ Usage:
   crate install [flags]                  install Crate, or change an existing installation
   crate configure [integration] [flags]  set up or change integrations (Last.fm, Soulseek, Crate Agent…)
   crate doctor [flags]                   check the installation, its services and its keys
+  crate observability <enable|disable|status> [flags]
+                                         optional monitoring with Prometheus and Grafana (Linux)
   crate mcp                              let an AI agent install Crate with you (MCP over stdio)
   crate version                          print the installer version
 
@@ -47,6 +49,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runConfigure(args[1:], stderr)
 	case "doctor":
 		return runDoctor(args[1:], stdout, stderr)
+	case "observability":
+		return runObservability(args[1:], stdout, stderr)
 	case "mcp":
 		return runMCP(stderr)
 	case "version", "--version":

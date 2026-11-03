@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/thecrateapp/crate/app/installer/internal/envfile"
+	"github.com/thecrateapp/crate/app/installer/internal/observability"
 	"github.com/thecrateapp/crate/app/installer/internal/system"
 )
 
@@ -20,24 +22,40 @@ type Stack struct {
 	Compose []string // e.g. ["docker", "compose"] or ["sudo", "docker", "compose"]
 	Dir     string
 	Files   []string // relative to Dir; empty means docker-compose.yaml
+	// Env is the installation's .env; it names the networks the monitoring
+	// overlays join. Nil means their default names.
+	Env *envfile.Values
 }
 
 // InfraBridge is the host socket the optional infrastructure relay of
 // Crate Operator needs.
 var InfraBridge = "/run/crate-infra/bridge.sock"
 
-// Command is the compose invocation for args in this installation.
-func (s Stack) Command(args ...string) (string, []string) {
+// Command is the compose invocation for args in this installation. A
+// monitoring overlay whose network is gone is left out, so a lost monitoring
+// network never stops Crate.
+func (s Stack) Command(ctx context.Context, args ...string) (string, []string) {
+	files, _ := s.ActiveFiles(ctx)
 	full := append(append([]string(nil), s.Compose[1:]...), "--project-directory", s.Dir)
-	files := s.Files
-	if len(files) == 0 {
-		files = []string{"docker-compose.yaml"}
-	}
 	for _, file := range files {
 		full = append(full, "-f", filepath.Join(s.Dir, file))
 	}
 	full = append(full, "--env-file", filepath.Join(s.Dir, ".env"))
 	return s.Compose[0], append(full, args...)
+}
+
+// ActiveFiles are the compose files commands use and the monitoring
+// overlays left out because their network does not exist.
+func (s Stack) ActiveFiles(ctx context.Context) (files, dropped []string) {
+	files = s.Files
+	if len(files) == 0 {
+		return []string{"docker-compose.yaml"}, nil
+	}
+	docker := s.Compose[:len(s.Compose)-1]
+	if len(docker) == 0 || s.Compose[len(s.Compose)-1] != "compose" {
+		return files, nil
+	}
+	return observability.Select(files, s.Env, observability.NetworkExists(ctx, s.Run, system.Docker{Docker: docker}))
 }
 
 func (s Stack) operator() bool {
@@ -50,7 +68,7 @@ func (s Stack) operator() bool {
 }
 
 func (s Stack) Pull(ctx context.Context, w io.Writer) error {
-	name, args := s.Command("pull")
+	name, args := s.Command(ctx, "pull")
 	return s.Run.Stream(ctx, w, s.Dir, name, args...)
 }
 
@@ -59,7 +77,10 @@ func (s Stack) Up(ctx context.Context, w io.Writer) error {
 	if _, err := os.Stat(InfraBridge); s.operator() && err != nil {
 		up = append(up, "--scale", "crate-infra-relay=0")
 	}
-	name, args := s.Command(up...)
+	if _, dropped := s.ActiveFiles(ctx); len(dropped) > 0 {
+		fmt.Fprintf(w, "Starting without %s: the monitoring network it joins is missing. Run `crate observability enable` to restore it.\n", strings.Join(dropped, ", "))
+	}
+	name, args := s.Command(ctx, up...)
 	err := s.Run.Stream(ctx, w, s.Dir, name, args...)
 	if err == nil {
 		return nil
@@ -74,7 +95,7 @@ func (s Stack) Up(ctx context.Context, w io.Writer) error {
 // startCreated starts the containers a failed up recreated but never started,
 // so a partial failure does not take the stack down.
 func (s Stack) startCreated(ctx context.Context, w io.Writer) []string {
-	name, args := s.Command("ps", "--all", "--status", "created", "--format", "{{.Service}}")
+	name, args := s.Command(ctx, "ps", "--all", "--status", "created", "--format", "{{.Service}}")
 	out, err := s.Run.Output(ctx, name, args...)
 	if err != nil {
 		return nil
@@ -83,7 +104,7 @@ func (s Stack) startCreated(ctx context.Context, w io.Writer) []string {
 	if len(services) == 0 {
 		return nil
 	}
-	name, args = s.Command(append([]string{"start"}, services...)...)
+	name, args = s.Command(ctx, append([]string{"start"}, services...)...)
 	if s.Run.Stream(ctx, w, s.Dir, name, args...) != nil {
 		return nil
 	}
@@ -92,13 +113,13 @@ func (s Stack) startCreated(ctx context.Context, w io.Writer) []string {
 
 // Restart restarts the services of a compose profile.
 func (s Stack) Restart(ctx context.Context, w io.Writer, profile string, services ...string) error {
-	name, args := s.Command(append([]string{"--profile", profile, "restart"}, services...)...)
+	name, args := s.Command(ctx, append([]string{"--profile", profile, "restart"}, services...)...)
 	return s.Run.Stream(ctx, w, s.Dir, name, args...)
 }
 
 // Remove stops and deletes the services of a compose profile.
 func (s Stack) Remove(ctx context.Context, w io.Writer, profile string, services ...string) error {
-	name, args := s.Command(append([]string{"--profile", profile, "rm", "-s", "-f"}, services...)...)
+	name, args := s.Command(ctx, append([]string{"--profile", profile, "rm", "-s", "-f"}, services...)...)
 	return s.Run.Stream(ctx, w, s.Dir, name, args...)
 }
 
@@ -137,7 +158,7 @@ type Service struct {
 
 // Services lists the project's containers, running or not.
 func (s Stack) Services(ctx context.Context) ([]Service, error) {
-	name, args := s.Command("ps", "--all", "--format", "json")
+	name, args := s.Command(ctx, "ps", "--all", "--format", "json")
 	out, err := s.Run.Output(ctx, name, args...)
 	if err != nil {
 		return nil, err

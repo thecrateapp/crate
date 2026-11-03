@@ -58,6 +58,7 @@ func Plan(cfg Config) []Action {
 		{"Write Crate's configuration", filepath.Join(cfg.InstallDir, "config.yaml")},
 		{"Write the read-plane routes for Traefik", filepath.Join(cfg.InstallDir, "deploy", "traefik", assets.FederationRoutes)},
 		{"Write the Crate Agent setup", filepath.Join(cfg.InstallDir, "scripts", assets.AgentSetup)},
+		{"Write the optional monitoring files (inactive until enabled)", filepath.Join(cfg.InstallDir, "deploy", "observability")},
 		{"Write Traefik's configuration", filepath.Join(traefik, "traefik.yml")},
 		{"Write the settings and secrets (owner-only)", EnvPath(cfg.InstallDir)},
 	}
@@ -79,18 +80,8 @@ func Apply(m *manifest.Manifest, cfg Config, existing *envfile.Values) error {
 			return fmt.Errorf("create %s: %w", dir, err)
 		}
 	}
-	for name, relative := range assets.Deployed {
-		data, err := assets.Read(name)
-		if err != nil {
-			return err
-		}
-		path := filepath.Join(cfg.InstallDir, filepath.FromSlash(relative))
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return fmt.Errorf("create %s: %w", filepath.Dir(path), err)
-		}
-		if err := os.WriteFile(path, data, 0o644); err != nil {
-			return fmt.Errorf("write %s: %w", path, err)
-		}
+	if err := WriteAssets(cfg.InstallDir, func(string) bool { return true }); err != nil {
+		return err
 	}
 	if err := os.WriteFile(filepath.Join(traefik, "traefik.yml"), []byte(TraefikStatic(cfg)), 0o644); err != nil {
 		return err
@@ -109,4 +100,25 @@ func Apply(m *manifest.Manifest, cfg Config, existing *envfile.Values) error {
 		return err
 	}
 	return envfile.Write(EnvPath(cfg.InstallDir), envfile.Render(values, EnvHeader, Sections(m)))
+}
+
+// WriteAssets writes the deployed files that keep accepts into installDir.
+func WriteAssets(installDir string, keep func(name string) bool) error {
+	for name, relative := range assets.Deployed {
+		if !keep(name) {
+			continue
+		}
+		data, err := assets.Read(name)
+		if err != nil {
+			return err
+		}
+		path := filepath.Join(installDir, filepath.FromSlash(relative))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return fmt.Errorf("create %s: %w", filepath.Dir(path), err)
+		}
+		if err := os.WriteFile(path, data, 0o644); err != nil {
+			return fmt.Errorf("write %s: %w", path, err)
+		}
+	}
+	return nil
 }

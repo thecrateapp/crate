@@ -135,6 +135,12 @@ func TestApplyWritesTheAgentSetupWithItsRepositoryLayout(t *testing.T) {
 		"deploy/hermes/runtime.py",
 		"deploy/operator/compose.operator.yaml",
 		"deploy/operator/config.operator.example.json",
+		"scripts/observability_setup.py",
+		"scripts/observability_preflight.py",
+		"scripts/observability-up.sh",
+		"deploy/observability/compose.standalone.yaml",
+		"deploy/observability/grafana/dashboards/app-overview.json",
+		"deploy/observability/compose.app-metrics.yaml",
 	} {
 		if info, err := os.Stat(filepath.Join(dir, path)); err != nil || info.Size() == 0 {
 			t.Errorf("%s: %v", path, err)

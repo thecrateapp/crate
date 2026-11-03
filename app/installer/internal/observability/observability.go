@@ -232,6 +232,10 @@ func Active(values *envfile.Values) bool {
 // monitoring network never stops the application from starting. It returns
 // the files to use and the overlays it left out.
 func Select(files []string, values *envfile.Values, exists func(network string) bool) (kept, dropped []string) {
+	if values == nil {
+		values = envfile.New()
+	}
+	checked := map[string]bool{}
 	for _, file := range files {
 		index := slices.IndexFunc(Overlays, func(o Overlay) bool { return o.File == file })
 		if index < 0 {
@@ -242,7 +246,12 @@ func Select(files []string, values *envfile.Values, exists func(network string) 
 		if strings.TrimSpace(network) == "" {
 			network = Networks[Overlays[index].Network]
 		}
-		if exists(network) {
+		found, ok := checked[network]
+		if !ok {
+			found = exists(network)
+			checked[network] = found
+		}
+		if found {
 			kept = append(kept, file)
 		} else {
 			dropped = append(dropped, file)

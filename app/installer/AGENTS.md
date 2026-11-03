@@ -30,6 +30,10 @@ for linux/darwin × amd64/arm64.
   Storage, secrets and the `crate_observer` role come from `scripts/observability_setup.py`
   (`prepare`, `role`, `status`), run like the agent setup in a throwaway `crate-api` container
   as root; it prints names and booleans only and never rotates a secret.
+  `crate observability enable|disable|status` (`internal/monitoring`) starts monitoring before it
+  adds the application overlays to `COMPOSE_FILE`; `agent.Activate` keeps them after the operator
+  overlay. `stack.Stack` leaves out an overlay whose network is missing, so a lost monitoring
+  network never stops Crate.
 - Reconfiguring must never rotate a generated secret or drop a line the user added to `.env`.
   `install.BuildEnv` keeps existing values; keep it that way.
 - `CRATE_IMAGE_TAG` follows `install.UpgradeImageTag`: a release installer (`vX.Y.Z`, the git
