@@ -25,7 +25,15 @@ class MixProfileResponse(SmartMixApiModel):
     duration_ms: int = Field(alias="durationMs", ge=0)
     quality: Literal["full", "partial", "legacy", "unavailable"]
     analyzed_at: datetime = Field(alias="analyzedAt")
-    bpm: float | None = Field(default=None, gt=0)
+    bpm: float | None = Field(
+        default=None,
+        gt=0,
+        description=(
+            "Global tempo. From analyzer v6, a whole (or half) BPM when the track keeps "
+            "a constant tempo that rounds to it within 25 ms over the track; otherwise "
+            "the fitted tempo."
+        ),
+    )
     bpm_confidence: float | None = Field(
         default=None,
         alias="bpmConfidence",
@@ -50,7 +58,14 @@ class MixProfileResponse(SmartMixApiModel):
         ge=1,
     )
     beat_grid_format: str | None = Field(default=None, alias="beatGridFormat")
-    beat_grid_ms: list[int] | None = Field(default=None, alias="beatGridMs")
+    beat_grid_ms: list[int] | None = Field(
+        default=None,
+        alias="beatGridMs",
+        description=(
+            "Absolute beat positions in ms. From analyzer v6, a constant grid at `bpm` "
+            "when the track keeps one tempo, otherwise the tracked beats."
+        ),
+    )
     key: str | None = None
     scale: str | None = None
     camelot: str | None = None
@@ -79,8 +94,26 @@ class MixProfileResponse(SmartMixApiModel):
     true_peak_dbfs: float | None = Field(default=None, alias="truePeakDbfs")
     integrated_lufs: float | None = Field(default=None, alias="integratedLufs")
     measurement_version: str | None = Field(default=None, alias="measurementVersion")
-    active_start_ms: int | None = Field(default=None, alias="activeStartMs", ge=0)
-    active_end_ms: int | None = Field(default=None, alias="activeEndMs", ge=0)
+    active_start_ms: int | None = Field(
+        default=None,
+        alias="activeStartMs",
+        ge=0,
+        description=(
+            "Musical start: first 50 ms RMS frame (25 ms hop) within 35 dB of the "
+            "loudest frame and above -55 dBFS. Not a -60 dB silence threshold."
+        ),
+    )
+    active_end_ms: int | None = Field(
+        default=None,
+        alias="activeEndMs",
+        ge=0,
+        description=(
+            "Musical end: end of the last 50 ms RMS frame within 35 dB of the loudest "
+            "frame and above -55 dBFS (for long tracks, of the last 120 s). A fade or "
+            "reverb tail can continue after it, so it usually falls 1-6 s before a "
+            "-60 dB end of sound such as Mixxx's."
+        ),
+    )
     duration_source: Literal["decoder", "library"] = Field(
         default="decoder", alias="durationSource"
     )
@@ -173,7 +206,16 @@ class TransitionPlanResponse(SmartMixApiModel):
         ge=0.94,
         le=1.06,
     )
-    beat_phase_offset_ms: int = Field(alias="beatPhaseOffsetMs", ge=0)
+    beat_phase_offset_ms: int = Field(
+        alias="beatPhaseOffsetMs",
+        ge=0,
+        description=(
+            "Beatmatch only, in output time (the outgoing tempo), below one outgoing "
+            "beat. The incoming track starts this much after `incomingCueMs` when the "
+            "outgoing reaches `outgoingCueMs`: in incoming track time, start at "
+            "incomingCueMs + beatPhaseOffsetMs * incomingTempoRatio. Never subtract it."
+        ),
+    )
     handoff_progress: float = Field(
         alias="handoffProgress",
         ge=0.0,

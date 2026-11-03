@@ -11,6 +11,9 @@ sources:
   - app/crate/smart_mix/versions.py
   - app/crate/smart_mix/models.py
   - app/crate/smart_mix/analyzer.py
+  - app/crate/smart_mix/key_detection.py
+  - app/crate/smart_mix/tempo_grid.py
+  - app/crate/smart_mix/cue_detection.py
   - app/crate/smart_mix/planner.py
   - app/crate/smart_mix/policy.py
   - app/crate/smart_mix/source.py
@@ -101,6 +104,49 @@ Each profile keeps `profileRevision`, `sourceRevision`, `analyzer`, `analyzerVer
 `profileVersion` and `analyzedAt`. `sourceRevision` is a hash of size, mtime in nanoseconds
 and inode; it is not a hash of the audio content or a Git SHA. The release SHA identifies the
 code; the source revision identifies the analyzed file.
+
+## Reading profile and plan fields
+
+Some fields are easy to misread from their names. Clients that execute plans or inject a
+profile into a deck (Android, Crate Decks) must follow these definitions.
+
+| Field                      | Meaning                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bpm`                      | Global tempo. A whole or half BPM when the track keeps a constant tempo that rounds to it within 25 ms over the track; otherwise the fitted tempo                                                                                                                                                                                       |
+| `beatGridMs`               | Absolute beat positions in ms (`delta-ms-v1` is only the storage encoding). A constant grid at `bpm` when the track keeps one tempo, otherwise the tracked beats. Only `detail=full` returns it                                                                                                                                         |
+| `activeStartMs`            | Musical start: the first 50 ms RMS frame within 35 dB of the loudest frame and above -55 dBFS                                                                                                                                                                                                                                           |
+| `activeEndMs`              | Musical end, by the same rule (for long tracks, over the last 120 s). A fade or reverb tail continues after it, so it falls 1-6 s before a -60 dB end of sound such as Mixxx's. It is not a silence threshold                                                                                                                           |
+| `introCueMs`, `outroCueMs` | Suggested mix points: the first beat at or after `activeStartMs` and the last beat 4 s before `activeEndMs`                                                                                                                                                                                                                             |
+| `beatPhaseOffsetMs`        | Plan field, beatmatch only. In output time and below one outgoing beat: the incoming track starts this much after `incomingCueMs` when the outgoing reaches `outgoingCueMs`. In incoming track time, start at `incomingCueMs + beatPhaseOffsetMs * incomingTempoRatio` (`NativeTransitionPlan.startIncomingCueMs()`); never subtract it |
+
+### Analyzer v6
+
+`smart-mix-audio-v6` (Rust and Python fallback alike) changes three measurements.
+
+- **Key.** v5 summed raw 2048-point FFT bins into pitch classes from 20 Hz. Below about
+  180 Hz a bin is wider than a semitone and the low bins fell on the harmonic series of a
+  flat F, so kick and bass read as F major, D minor or A minor: 81 % of the development
+  profiles were 7B, 8A or 7A. v6 maps an 8192-point FFT onto semitone bands from A1 to G#6,
+  each summing to one, and whitens them against their neighbours before matching the same
+  Krumhansl-Kessler profiles.
+- **Tempo and grid.** v5 published the tracked beats and took the tempo from a regression
+  of beat index against time, so a beat the tracker inserted or dropped while following the
+  off-beat through a break moved the BPM by about 1/N (128.346 for 128) and left that
+  section half a beat out. v6 fits the strongest constant pulse at twice the beat rate,
+  where an off-beat lines up with a beat. When the beats stay on it along the track it
+  publishes a constant grid, snaps the tempo to a whole or half BPM if that keeps the grid
+  within 25 ms over the track, and checks its phase: the majority of the tracked beats
+  chooses between the two half-beat phases, unless the bass and broadband onsets are both
+  clearly stronger on the other. Local `intro*`/`outro*` tempo and beats follow that grid;
+  their stability still comes from the tracked beats.
+- **Quality.** A profile is `full` only if its grid phase is clear: at least 70 % of the
+  tracked beats on the published phase of a constant grid or, without one, tracked beats
+  that never slide half a beat. Other profiles stay `partial`; the planner can still
+  beatmatch from their cue beats, but clients must not trust their whole grid.
+
+Moving to v6 marks v5 profiles `outdated`. Recomputing them is a backfill campaign, which
+nothing starts on its own. Until it runs, reads that ask for the current analyzer version
+(rule-based playlists that require a full profile, sonic neighbours) see fewer profiles.
 
 ## Producing and publishing profiles
 

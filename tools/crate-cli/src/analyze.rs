@@ -847,6 +847,14 @@ fn frame_rms(samples: &[f32], sample_rate: u32) -> (Vec<f32>, usize, usize) {
     (values, frame_length, hop_length)
 }
 
+/// Musical bounds and default cues: `(active_start, intro_cue, outro_cue, active_end)`.
+///
+/// The active bounds enclose the 50 ms RMS frames (25 ms hop) within 35 dB of the loudest
+/// frame and above -55 dBFS. They mark where the music is, not where sound stops: a fade
+/// or a reverb tail continues past the active end, which therefore falls 1-6 s before a
+/// -60 dB end of sound such as Mixxx's. The intro cue is the first beat at or after the
+/// start and the outro cue the last beat 4 s before the end. Same rule as the Python
+/// `cue_detection.detect_mix_cues`.
 fn detect_mix_cues(
     samples: &[f32],
     sample_rate: u32,
