@@ -89,4 +89,13 @@ go generate ./...                          # refresh embedded files
 go vet ./... && go test ./...
 go run ./cmd/crate install --dry-run       # walk the wizard without writing anything
 go run ./cmd/crate doctor --dir ~/crate    # check an installation
+make -C ../.. installer-observability-e2e # monitoring end to end in Docker-in-Docker (~10 min, ~8 GB)
 ```
+
+`installer-observability-e2e` builds the installer for Linux, starts a privileged
+`docker:28-dind` container and runs `scripts/installer-observability-e2e-scenarios.sh`
+in it against the published images of `CRATE_E2E_VERSION` (default `v3.1.3`): a default
+install without monitoring, `--observability=on`, status and doctor, disable, enable
+keeping Prometheus history and Grafana state, a reinstall that restarts Prometheus after a
+changed file, and a removed monitoring network. `KEEP=1` leaves the container for
+debugging. CI runs it only by hand or weekly (`installer-observability-e2e.yml`).
