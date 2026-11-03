@@ -544,6 +544,7 @@ _DJ_RESULTS = """
         p.key_camelot AS camelot,
         p.global_energy AS energy,
         (p.track_id IS NULL) AS analysis_required,
+        t.path,
         COALESCE(
             ts_rank(t.search_vector, to_tsquery('simple', :fts_query)), 0
         ) AS fts_rank
@@ -606,7 +607,14 @@ def dj_search_statement(query: DjSearchQuery, limit: int) -> tuple[Any, dict[str
     return text(_DJ_RESULTS.format(candidates=candidates)), params
 
 
-def search_dj_tracks(raw_query: str, limit: int) -> list[dict]:
+def search_dj_tracks(
+    raw_query: str, limit: int, *, include_path: bool = False
+) -> list[dict]:
+    """Run a DJ search.
+
+    Results never carry the server path unless ``include_path`` is set; the
+    API uses it to check the audio file and strips it before responding.
+    """
     query = parse_dj_query(raw_query)
     try:
         statement, params = dj_search_statement(query, limit)
@@ -614,12 +622,14 @@ def search_dj_tracks(raw_query: str, limit: int) -> list[dict]:
         return []
     with read_scope() as session:
         rows = session.execute(statement, params).mappings().all()
-    return [_dj_track_payload(row) for row in rows]
+    return [_dj_track_payload(row, include_path=include_path) for row in rows]
 
 
-def _dj_track_payload(row: Mapping[Any, Any]) -> dict:
+def _dj_track_payload(row: Mapping[Any, Any], *, include_path: bool) -> dict:
     item = _serialize_track_row(row)
     item.pop("fts_rank", None)
+    if not include_path:
+        item.pop("path", None)
     album_id = item.get("album_id")
     has_cover = bool(item.get("has_cover"))
     item["has_cover"] = has_cover

@@ -5,6 +5,8 @@ from fastapi import APIRouter, Request
 from crate.api.schemas.capabilities import (
     AccessTokenCapabilities,
     CapabilitiesResponse,
+    DecksCapabilities,
+    DecksFeature,
     SmartMixCapabilities,
     VDJCapabilities,
 )
@@ -25,6 +27,11 @@ from crate.smart_mix.versions import (
 router = APIRouter(prefix="/api", tags=["system"])
 
 AUTOMATION_SCOPE = "vdj.automation.execute"
+
+# Crate Decks contract (D13). Bump DECKS_CONTRACT_VERSION on every incompatible
+# change to S1-S7; each server phase appends its feature to _decks_features().
+DECKS_CONTRACT_VERSION = 1
+DECKS_MIN_CLIENT_VERSION = "0.1.0"
 
 
 @router.get(
@@ -61,8 +68,21 @@ def get_capabilities(request: Request) -> CapabilitiesResponse:
             automation=vdj_automation,
             listen_url=_listen_url(),
         ),
+        decks=DecksCapabilities(
+            available=True,
+            min_client_version=DECKS_MIN_CLIENT_VERSION,
+            contract_version=DECKS_CONTRACT_VERSION,
+            features=_decks_features(),
+        ),
         access_token=_access_token_capabilities(request, vdj_automation),
     )
+
+
+def _decks_features() -> list[DecksFeature]:
+    # None of the Decks-specific contracts (S3 library_cursor, S4
+    # profiles_batch, S5 beatmatch/bass_handoff/long_beatmatch, S7 cues) is
+    # served yet. Do not derive them from the Android Smart Mix flags.
+    return []
 
 
 def _listen_url() -> str | None:

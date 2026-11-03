@@ -22,6 +22,12 @@ func (s *Server) searchRoute(w http.ResponseWriter, r *http.Request) {
 		s.fallbackOrRouteMiss(w, r)
 		return
 	}
+	// fields=dj is FastAPI's DJ search (filters and `playable`); the native
+	// local search below would answer it with different data.
+	if r.URL.Query().Get("fields") != "" {
+		s.catalogUnavailable(w, r, "Search unavailable")
+		return
+	}
 	if !s.requireCatalogAuth(w, r) {
 		return
 	}

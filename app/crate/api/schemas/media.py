@@ -81,10 +81,23 @@ class FederationSearchStatusResponse(BaseModel):
     timed_out_peer_uids: list[str] = Field(default_factory=list)
 
 
+class SearchTrackResultResponse(TrackRefResponse):
+    playable: bool | None = Field(
+        default=None,
+        description=(
+            "Only in DJ search results (fields=dj, or an access-token DJ "
+            "query). True when the track's audio file is present in the "
+            "library, so its stream endpoints can serve it; false when the "
+            "row exists but the file is missing or unreadable. Checked on "
+            "every request. Omitted by the other search scopes."
+        ),
+    )
+
+
 class SearchResponse(BaseModel):
     artists: list[SearchArtistResultResponse] = Field(default_factory=list)
     albums: list[SearchAlbumResultResponse] = Field(default_factory=list)
-    tracks: list[TrackRefResponse] = Field(default_factory=list)
+    tracks: list[SearchTrackResultResponse] = Field(default_factory=list)
     federation: FederationSearchStatusResponse | None = None
 
 

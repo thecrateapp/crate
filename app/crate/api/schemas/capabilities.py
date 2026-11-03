@@ -1,4 +1,15 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+DecksFeature = Literal[
+    "library_cursor",
+    "profiles_batch",
+    "beatmatch",
+    "bass_handoff",
+    "long_beatmatch",
+    "cues",
+]
 
 
 class SmartMixCapabilities(BaseModel):
@@ -23,6 +34,27 @@ class VDJCapabilities(BaseModel):
     listen_url: str | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
+class DecksCapabilities(BaseModel):
+    available: bool = Field(
+        description="Whether this server accepts the Crate Decks desktop client."
+    )
+    min_client_version: str = Field(
+        description="Oldest Crate Decks version (semver) this server supports."
+    )
+    contract_version: int = Field(
+        description=(
+            "Version of the Decks server contract. It is bumped on every "
+            "incompatible change; additive changes only add features."
+        )
+    )
+    features: list[DecksFeature] = Field(
+        description=(
+            "Decks server contracts this instance serves. Clients must ignore "
+            "unknown values and degrade when a feature is missing."
+        )
+    )
+
+
 class AccessTokenCapabilities(BaseModel):
     scopes: list[str]
     automation: bool
@@ -31,6 +63,7 @@ class AccessTokenCapabilities(BaseModel):
 class CapabilitiesResponse(BaseModel):
     smart_mix: SmartMixCapabilities
     vdj: VDJCapabilities
+    decks: DecksCapabilities
     access_token: AccessTokenCapabilities | None = Field(
         default=None, exclude_if=lambda value: value is None
     )

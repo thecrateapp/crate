@@ -60,6 +60,10 @@ const loaders: Record<string, MarkdownLoader> = {
     import("../../../docs/README.md?raw").then((module) => module.default),
   "docs/api.md": () =>
     import("../../../docs/api.md?raw").then((module) => module.default),
+  "docs/technical/crate-decks.md": () =>
+    import("../../../docs/technical/crate-decks.md?raw").then(
+      (module) => module.default,
+    ),
   "docs/architecture.md": () =>
     import("../../../docs/architecture.md?raw").then(
       (module) => module.default,

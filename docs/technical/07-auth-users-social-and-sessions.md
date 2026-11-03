@@ -80,7 +80,8 @@ Auth is hybrid by design:
 - cookies are used for first-party web apps
 - JWT carries session/user identity
 - session rows enforce revocation and lifecycle
-- bearer tokens are used by native Listen clients
+- bearer tokens are used by native Listen clients and by Crate Decks, which
+  never receives cookies (see `listen-native-auth-contract.md`)
 
 There are separate cookie names for admin-style and listen-style web auth so
 both surfaces can coexist cleanly.

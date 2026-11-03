@@ -167,7 +167,7 @@ def test_dj_fields_search_returns_tracks_only(test_app) -> None:
     assert response.status_code == 200
     assert response.json()["artists"] == []
     assert response.json()["tracks"][0]["camelot"] == "8A"
-    dj_search.assert_called_once_with("bpm:120-128", 50)
+    dj_search.assert_called_once_with("bpm:120-128", 50, include_path=True)
 
 
 def test_invalid_dj_syntax_is_a_client_error(test_app) -> None:
@@ -188,7 +188,7 @@ def test_access_token_search_applies_filters_written_in_the_text(test_app) -> No
         )
 
     assert response.status_code == 200
-    dj_search.assert_called_once_with('artist:"Rival Schools"', 50)
+    dj_search.assert_called_once_with('artist:"Rival Schools"', 50, include_path=True)
     ordinary_search.assert_not_called()
 
 
@@ -237,7 +237,7 @@ def test_access_token_plain_text_search_uses_the_dj_search(test_app) -> None:
     assert response.status_code == 200
     assert response.json()["tracks"][0]["camelot"] == "8A"
     assert "path" not in response.json()["tracks"][0]
-    dj_search.assert_called_once_with("noah", 50)
+    dj_search.assert_called_once_with("noah", 50, include_path=True)
     ordinary_search.assert_not_called()
 
 

@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+_DECKS_CAPABILITIES = {
+    "available": True,
+    "min_client_version": "0.1.0",
+    "contract_version": 1,
+    "features": [],
+}
+
 
 def test_smart_mix_capabilities_default_to_disabled(test_app, monkeypatch):
     monkeypatch.delenv("CRATE_SMART_MIX_ENABLED", raising=False)
@@ -30,6 +37,7 @@ def test_smart_mix_capabilities_default_to_disabled(test_app, monkeypatch):
             "smart_mix_assistant": False,
             "automation": False,
         },
+        "decks": _DECKS_CAPABILITIES,
     }
 
 
@@ -64,6 +72,7 @@ def test_smart_mix_capabilities_support_local_environment_overrides(
             "smart_mix_assistant": False,
             "automation": False,
         },
+        "decks": _DECKS_CAPABILITIES,
     }
 
 
