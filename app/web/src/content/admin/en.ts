@@ -8,7 +8,7 @@ export const admin: AdminPage = {
   meta: {
     title: "Admin · Crate",
     description:
-      "Library health checks, staged imports, acquisition, enrichment, a signed genre taxonomy, analysis coverage, live operations, and opt-in AI agents over MCP and in Telegram for your Crate server.",
+      "Library health checks, staged imports, acquisition, enrichment, a signed genre taxonomy, analysis coverage, live operations, observability with a live stack map, and opt-in AI agents over MCP and in Telegram for your Crate server.",
   },
   eyebrow: "Admin",
   title: "Keep the library in shape.",
@@ -167,6 +167,7 @@ export const admin: AdminPage = {
         {
           title: "System",
           body: "System metrics, a view of the running stack and the service logs.",
+          link: { href: "#observability", label: "Observability" },
         },
         {
           title: "Crate Agent and Crate Operator",
@@ -179,6 +180,14 @@ export const admin: AdminPage = {
           body: "Features marked like this one use a language model the operator sets up in Admin: Gemini, DeepSeek, or Ollama on your own hardware. Crate works fully without them.",
           status: "optional-llm",
         },
+      ],
+    },
+    {
+      title: "Observability",
+      id: "observability",
+      lede: [
+        "The whole server on one screen, and every play measured.",
+        "Admin draws the host and every container as a live map and records how playback goes. Readings stay on your server and carry counts rather than identities.",
       ],
     },
     {

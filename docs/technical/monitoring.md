@@ -12,6 +12,11 @@ sources:
     deploy/observability/compose.standalone.yaml,
     deploy/observability/compose.observability.yaml,
     deploy/observability/prometheus.yml,
+    deploy/observability/recording-rules.yml,
+    deploy/observability/compose.app-metrics.yaml,
+    deploy/observability/compose.projector-prometheus.yaml,
+    deploy/observability/compose.traefik-metrics.yaml,
+    deploy/observability/grafana/dashboards/app-overview.json,
     deploy/observability/grafana/dashboards/infra-runtime.json,
     deploy/observability/grafana/dashboards/infra-data.json,
     scripts/observability-deploy.sh,
@@ -34,9 +39,12 @@ sources:
 # Monitoring
 
 Crate watches itself in two places. Admin shows how the application behaves,
-from metrics the application records itself. Grafana shows the infrastructure
-underneath it, from an optional Prometheus stack that runs as its own Compose
-project, `crate-observability`, next to the application project.
+from metrics the application records itself. Grafana shows the same application
+metrics over a longer window, next to the infrastructure underneath them, from an
+optional Prometheus stack that runs as its own Compose project,
+`crate-observability`, next to the application project.
+[Observability](observability.md) explains what each surface shows, and the
+[metrics reference](metrics-reference.md) lists every metric.
 
 ## What you see where
 
@@ -45,16 +53,16 @@ project, `crate-observability`, next to the application project.
 | Are API routes fast? Which fail?                 | Admin, System Health          | Application metrics, 15 minutes to 7 days                  |
 | Is playback starting and streaming smoothly?     | Admin, System Health          | Stream, transcode and playback start/stall metrics         |
 | Are workers keeping up? Is storage filling?      | Admin, System Health          | Queue, resource governor, storage and media worker metrics |
-| Which containers run, and are they healthy?      | Admin, Stack                  | Docker inventory                                           |
+| Which containers run, and are they healthy?      | Admin, Stack                  | Docker inventory, Prometheus for CPU and memory            |
 | What did the host, a container or PostgreSQL do? | Grafana, Crate infrastructure | Prometheus, 90 days or 10 GB                               |
+| How did the application behave last month?       | Grafana, Crate application    | Application metrics in Prometheus, 90 days or 10 GB        |
 | Is a library item broken?                        | Admin, Library Health         | Health checks and repairs, not metrics                     |
 
 System Health marks each figure as live, persisted, partial or stale, and never
-shows a missing value as zero. Application metrics (API, streams, transcoding,
-playback quality, workers) are not exported to Prometheus yet, so Grafana does
-not show them.
+shows a missing value as zero.
 
-Grafana has two provisioned dashboards:
+Grafana provisions six dashboards in the **Crate infrastructure** folder. Two
+cover the infrastructure:
 
 - **Host and containers:** scrape success and sample age, host CPU, memory,
   filesystem and load, CPU, memory, network and block IO per container, and
@@ -63,19 +71,40 @@ Grafana has two provisioned dashboards:
   transaction rate, mean time of the top 20 statements and block reads; Redis
   memory, connections, command rate, evictions and rejected connections.
 
+Four cover the application, from the exported metrics and the recording rules
+(see [Application metrics](#application-metrics)):
+
+- **Overview:** collectors up, API requests, error ratio, p95 latency and sample,
+  requests by client, stream p95 latency and concurrent streams.
+- **Playback:** startup p95, starts observed, stalls per start, stall p95, stalls
+  and recoveries, transcodes and their failure ratio, stream requests.
+- **Workers and projector:** queue depth, running tasks, task and queue wait p95,
+  task failure ratio, tasks by outcome, resource deferrals, collection from the
+  projector and workers, media packages.
+- **Telemetry health:** collectors up, scrape age, samples per scrape, sample
+  limit, scrape duration and rule evaluation.
+
 A target `up` means the scrape worked; `pg_up` and `redis_up` say whether the
 exporter reached its database. Neither proves that a listener can play music.
 
 ## Reaching Grafana
 
 Grafana listens only on the server's loopback (`127.0.0.1:3001` by default) and
-is never routed through Traefik. Open a tunnel and browse locally:
+is never routed through Traefik. From the repository, open a tunnel and the
+browser in one step (Ctrl-C closes the tunnel; `GRAFANA_LOCAL_PORT` changes the
+local port):
+
+```bash
+make observability-grafana
+```
+
+or open the tunnel by hand:
 
 ```bash
 ssh -N -L 3001:127.0.0.1:3001 crate@<server>
 ```
 
-Then open `http://127.0.0.1:3001`, sign in as `admin` with the password from the
+Then open `http://localhost:3001`, sign in as `admin` with the password from the
 `grafana-admin-password` secret file and open the **Crate infrastructure**
 folder.
 
@@ -119,6 +148,39 @@ data. History, dashboards and the `crate-prometheus` datasource carry over; the
 monitoring gap lasts a few minutes. A failed adoption restarts the old
 containers on their original data. `make observability-revert-adoption` returns
 to them until `make observability-retire-legacy` removes the stopped containers.
+
+## Application metrics
+
+With monitoring running, three overlays connect the application to it. Each joins
+a network the monitoring project creates, so each is applied only while that
+network exists, and `make deploy` ships them and keeps them in the application's
+Compose files:
+
+| Overlay                             | Joins              | What it enables                                    |
+| ----------------------------------- | ------------------ | -------------------------------------------------- |
+| `compose.app-metrics.yaml`          | `app-metrics`      | Application containers expose metrics on port 9200 |
+| `compose.projector-prometheus.yaml` | `prometheus-query` | Stack map CPU and memory readings                  |
+| `compose.traefik-metrics.yaml`      | `traefik-metrics`  | Requests through Edge on the Stack map             |
+
+With the independent monitoring project, set the network names in the
+application `.env`:
+
+```dotenv
+OBS_APP_METRICS_NETWORK=crate-observability_app-metrics
+OBS_PROMETHEUS_QUERY_NETWORK=crate-observability_prometheus-query
+OBS_TRAEFIK_METRICS_NETWORK=crate-observability_traefik-metrics
+```
+
+Traefik's metrics also need the internal `metrics` entrypoint in `traefik.yml`,
+described in the monitoring README. Deploy monitoring first, so the networks
+exist, and the application second. A monitoring deploy verifies only its own
+scrape jobs, so an application container that restarts does not roll monitoring
+back.
+
+New dashboards and rules run in shadow for 7 to 14 days before any alert reads
+them: compare the panels with System Health for the same windows and record
+Prometheus CPU, memory, disk growth and series per job. The monitoring README
+lists what to measure.
 
 ## One deploy at a time
 
@@ -166,8 +228,8 @@ missing summary or section is unavailable, never zero.
   disabled until enabled after the shadow period.
 - The monitoring release SHA is not reported by containers, so
   `get_stack_status` shows the deployment and its health but not the release.
-- Application metrics are not in Prometheus, so Grafana has no API, playback or
-  worker dashboards.
+- Radio, Music Paths and early-skip metrics stay in the PostgreSQL history;
+  they are not exported to Prometheus.
 - Metrics from a Docker Desktop or OrbStack virtual machine describe the VM, not
   the host.
 - Each Compose project creates its own networks. On a daemon with many networks

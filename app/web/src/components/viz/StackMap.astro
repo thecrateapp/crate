@@ -1,0 +1,208 @@
+---
+import { FLOWS, READINGS, STACK_MAP } from "../../content/admin/observability";
+
+const { image, portrait } = STACK_MAP;
+const srcset = STACK_MAP.widths.map((width) => `${image.image}-${width}.webp ${width}w`).join(", ");
+const summary = `${STACK_MAP.label}, ${STACK_MAP.sample.toLowerCase()}: ${READINGS.map((reading) => `${reading.label} ${reading.value} ${reading.unit}`).join(", ")}.`;
+---
+
+<figure class="stackmap" data-viz="stack-map" data-reveal aria-label={summary}>
+  <header class="viz-bar" data-enter>
+    <p class="viz-label"><b>{STACK_MAP.label}</b> {STACK_MAP.host}</p>
+    <p class="viz-label sample">{STACK_MAP.sample}</p>
+  </header>
+
+  <div class="bleed">
+    <div class="shot">
+      <picture>
+        <source media={portrait.media} srcset={portrait.image} width={portrait.width} height={portrait.height} />
+        <img
+          srcset={srcset}
+          sizes={STACK_MAP.sizes}
+          src={`${image.image}-1440.webp`}
+          width={image.width}
+          height={image.height}
+          alt={image.alt}
+          loading="lazy"
+          decoding="async"
+        />
+      </picture>
+      <video muted loop playsinline preload="none" disablepictureinpicture poster={`${image.image}-1440.webp`} aria-hidden="true" tabindex="-1">
+        <source src={`${STACK_MAP.video}.webm`} type="video/webm" />
+        <source src={`${STACK_MAP.video}.mp4`} type="video/mp4" />
+      </video>
+    </div>
+  </div>
+
+  <dl class="readings" data-enter style="--d:160ms">
+    {
+      READINGS.map((reading) => (
+        <div>
+          <dt class="viz-label">{reading.label}</dt>
+          <dd>
+            {reading.value}
+            <small>{reading.unit}</small>
+          </dd>
+        </div>
+      ))
+    }
+  </dl>
+
+  <div class="flows" data-enter style="--d:240ms">
+    {
+      FLOWS.map((flow) => (
+        <div>
+          <p class="viz-label">
+            <b>{flow.key}</b> {flow.meta}
+          </p>
+          <ul>
+            {flow.items.map((item) => (
+              <li>{item}</li>
+            ))}
+          </ul>
+        </div>
+      ))
+    }
+  </div>
+
+  <figcaption>{STACK_MAP.caption}</figcaption>
+</figure>
+
+<style>
+  .stackmap {
+    display: grid;
+    gap: 22px;
+    margin: 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .sample {
+    color: var(--amber);
+  }
+
+  .bleed {
+    width: min(100vw, 1600px);
+    margin-inline: calc(50% - min(50vw, 800px));
+  }
+
+  .shot {
+    position: relative;
+    aspect-ratio: 1440 / 645;
+    -webkit-mask-image: radial-gradient(ellipse 75% 85% at 50% 50%, #000 62%, transparent 100%);
+    mask-image: radial-gradient(ellipse 75% 85% at 50% 50%, #000 62%, transparent 100%);
+  }
+
+  .shot img,
+  .shot video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .shot video {
+    opacity: 0;
+    transition: opacity 0.4s var(--ease-snap);
+  }
+
+  .shot:global(.is-video) video {
+    opacity: 1;
+  }
+
+  .readings {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 20px;
+    margin: 0;
+  }
+
+  .readings div {
+    display: grid;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  .readings dd {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+    margin: 0;
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(2.4rem, 4.6vw, 4.4rem);
+    line-height: 0.85;
+    letter-spacing: -0.05em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .readings small {
+    font-family: var(--mono);
+    font-weight: 400;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    color: var(--fg-3);
+  }
+
+  .flows {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px clamp(24px, 4vw, 56px);
+  }
+
+  .flows ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .flows li {
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--fg-2);
+  }
+
+  figcaption {
+    max-width: 72ch;
+    color: var(--fg-3);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.6;
+  }
+
+  @media (max-width: 760px) {
+    .shot {
+      aspect-ratio: 780 / 897;
+      -webkit-mask-image: none;
+      mask-image: none;
+    }
+
+    .shot video {
+      display: none;
+    }
+
+    .readings {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .flows {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .shot video {
+      display: none;
+    }
+  }
+</style>

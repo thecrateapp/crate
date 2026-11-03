@@ -27,7 +27,7 @@ test("every live visual on /admin mounts when it comes into view", async ({
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
 
-  expect(await mountAll(page, "/admin")).toBe(9);
+  expect(await mountAll(page, "/admin")).toBe(10);
   expect(errors).toEqual([]);
 });
 
@@ -112,7 +112,7 @@ test("the home page shows four live pieces that link to their pages", async ({
   }
 });
 
-test("the home page leads with Smart Mix and AI agents and links to their chapters", async ({
+test("the home page leads with Smart Mix, AI agents and the Stack map and links to their chapters", async ({
   page,
 }) => {
   await page.goto("/");
@@ -120,7 +120,12 @@ test("the home page leads with Smart Mix and AI agents and links to their chapte
   const hrefs = await leads.evaluateAll((links) =>
     links.map((link) => link.getAttribute("href")),
   );
-  expect(hrefs).toEqual(["/listen#smart-mix", "/admin#mcp"]);
+  expect(hrefs).toEqual([
+    "/listen#smart-mix",
+    "/admin#mcp",
+    "/admin#observability",
+  ]);
+  await expect(leads.nth(2)).toContainText("Sample data");
   await expect(leads.nth(1)).toContainText(/MCP/);
   await expect(leads.nth(1)).toContainText(/approves them in Admin/);
   for (const href of hrefs) {
@@ -195,6 +200,9 @@ test("the home teasers are decorative and leave the card links with short names"
   );
   await expect(page.locator(".leads a").nth(1)).toHaveAccessibleName(
     "Let an agent look after the library. Agents in Admin",
+  );
+  await expect(page.locator(".leads a").nth(2)).toHaveAccessibleName(
+    "Your server, drawn live. Observability in Admin",
   );
 });
 
@@ -317,6 +325,34 @@ test("visuals load lazily instead of with the page", async ({ page }) => {
   );
 });
 
+test.describe("the Stack map on a phone", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("the Stack map shows the portrait still and never loads the loop", async ({
+    page,
+  }) => {
+    const requested: string[] = [];
+    page.on("request", (request) => {
+      if (/stack-map-3d\.(webm|mp4)$/.test(request.url()))
+        requested.push(request.url());
+    });
+    await page.goto("/admin#observability");
+    const map = page.locator('[data-viz="stack-map"]');
+    await map.scrollIntoViewIfNeeded();
+    await expect(map).toHaveAttribute("data-viz-ready", "");
+    await expect
+      .poll(() =>
+        map
+          .locator(".shot img")
+          .evaluate((img: HTMLImageElement) => img.currentSrc),
+      )
+      .toMatch(/stack-map-3d-portrait-780\.webp$/);
+    await expect(map.locator("video")).toBeHidden();
+    await page.waitForTimeout(500);
+    expect(requested).toEqual([]);
+  });
+});
+
 test.describe("reduced motion", () => {
   test.use({ reducedMotion: "reduce" });
 
@@ -357,5 +393,47 @@ test.describe("reduced motion", () => {
     await expect(chat.locator("[data-chat-status]")).toHaveText(
       "Approved in Telegram · queued · reported",
     );
+  });
+});
+
+test("the Stack map shows the 3D loop only while it is on screen", async ({
+  page,
+}) => {
+  await page.goto("/admin#observability");
+  const map = page.locator('[data-viz="stack-map"]');
+  await map.scrollIntoViewIfNeeded();
+  await expect(map).toHaveAttribute("data-viz-ready", "");
+  await expect(map.locator(".sample")).toHaveText("Sample data");
+  await expect(map.getByRole("button")).toHaveCount(0);
+  await expect(map.getByText("Sample data", { exact: true })).toHaveCount(1);
+  const video = map.locator("video");
+  await expect
+    .poll(() => video.evaluate((el: HTMLVideoElement) => el.paused))
+    .toBe(false);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect
+    .poll(() => video.evaluate((el: HTMLVideoElement) => el.paused))
+    .toBe(true);
+});
+
+test.describe("reduced motion", () => {
+  test.use({ reducedMotion: "reduce" });
+
+  test("the Stack map keeps its still image and never loads the loop", async ({
+    page,
+  }) => {
+    const requested: string[] = [];
+    page.on("request", (request) => {
+      if (/stack-map-3d\.(webm|mp4)$/.test(request.url()))
+        requested.push(request.url());
+    });
+    await page.goto("/admin#observability");
+    const map = page.locator('[data-viz="stack-map"]');
+    await map.scrollIntoViewIfNeeded();
+    await expect(map).toHaveAttribute("data-viz-ready", "");
+    await expect(map.locator(".shot img")).toBeVisible();
+    await expect(map.locator("video")).toBeHidden();
+    await page.waitForTimeout(500);
+    expect(requested).toEqual([]);
   });
 });

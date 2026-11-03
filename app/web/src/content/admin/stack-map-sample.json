@@ -1,0 +1,68 @@
+{
+  "host": {
+    "name": "crate",
+    "cpu_percent": 23,
+    "memory_used_gib": 8,
+    "memory_total_gib": 62.6
+  },
+  "projects": {
+    "application": "crate",
+    "observability": "crate-observability"
+  },
+  "application": [
+    ["crate-api", "crate-api", "healthy", 6.1, 1126],
+    ["crate-ui", "crate-ui", "healthy", 0.2, 9],
+    ["traefik", "traefik:v3.6", "none", 1.8, 140],
+    ["crate-listen", "crate-listen", "healthy", 0.1, 8],
+    ["crate-readplane", "crate-readplane", "healthy", 1.2, 10],
+    ["crate-projector", "crate-api", "healthy", 3.4, 276],
+    ["crate-analysis-worker", "crate-worker", "healthy", 41.3, 643],
+    ["crate-maintenance-worker", "crate-worker", "healthy", 2.6, 512],
+    ["crate-worker", "crate-worker", "healthy", 4.8, 588],
+    ["crate-fast-worker", "crate-worker", "healthy", 1.1, 401],
+    ["crate-playback-worker", "crate-worker", "healthy", 0.7, 362],
+    ["crate-media-worker", "crate-media-worker", "healthy", 0.1, 4],
+    ["crate-postgres", "postgres:15", "healthy", 5.2, 606],
+    ["crate-redis", "redis:7", "healthy", 0.9, 22],
+    ["crate-redis-durable", "redis:7", "healthy", 0.6, 32],
+    ["crate-site", "crate-site", "none", 0.1, 6],
+    ["crate-docs", "crate-docs", "none", 0.1, 9]
+  ],
+  "observability": [
+    ["crate-prometheus", "prom/prometheus:v3.15", "healthy", 2.1, 312],
+    ["crate-grafana", "grafana/grafana:13.3", "healthy", 0.4, 118],
+    ["crate-node-exporter", "prom/node-exporter:v1.12", "none", 0.3, 14],
+    ["crate-cadvisor", "ghcr.io/google/cadvisor:v0.60", "healthy", 0.6, 23],
+    ["crate-postgres-exporter", "postgres-exporter:v0.20", "none", 0.2, 12],
+    ["crate-redis-exporter", "redis_exporter:v1.96", "none", 0.5, 8],
+    ["crate-redis-durable-exporter", "redis_exporter:v1.96", "none", 0.4, 8],
+    ["crate-observability-docker-proxy", "haproxy:3.2", "healthy", 1.7, 12]
+  ],
+  "activity": {
+    "window_seconds": 10,
+    "listening": 3,
+    "projector_events": 3,
+    "requests": {
+      "listen-web": 6,
+      "listen-android": 3,
+      "listen-ios": 1,
+      "listen-desktop": 1,
+      "admin-web": 1,
+      "subsonic": 1,
+      "readplane": 2
+    },
+    "queues": {
+      "default": 1,
+      "fast": 2,
+      "maintenance": 1,
+      "heavy": 1,
+      "playback": 1
+    },
+    "ingress": {
+      "listen": 31,
+      "admin": 5,
+      "crate-api": 18,
+      "crate-readplane-interactive": 12
+    }
+  }
+}

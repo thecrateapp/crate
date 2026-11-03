@@ -214,6 +214,23 @@
     "order": 120
   },
   {
+    "sourcePath": "docs/technical/observability.md",
+    "route": "/operations/observability",
+    "section": "operations",
+    "title": "Observability",
+    "summary": "What Crate observes about itself, where each reading appears (System Health, the Stack map, Product, Grafana, alerts and MCP), how readings are collected and what they never contain.",
+    "keywords": [
+      "observability",
+      "system health",
+      "stack map",
+      "playback quality",
+      "telemetry",
+      "alerts",
+      "privacy"
+    ],
+    "order": 121
+  },
+  {
     "sourcePath": "docs/technical/monitoring.md",
     "route": "/operations/monitoring",
     "section": "operations",
@@ -486,6 +503,21 @@
     "summary": "Reference notes for Crate enrichment sources and flow.",
     "keywords": ["enrichment", "metadata", "providers"],
     "order": 50
+  },
+  {
+    "sourcePath": "docs/technical/metrics-reference.md",
+    "route": "/reference/metrics",
+    "section": "reference",
+    "title": "Metrics reference",
+    "summary": "Every application metric with its type, unit, labels, Prometheus name and where it appears, plus the recording rules and Grafana dashboards. Generated from the code.",
+    "keywords": [
+      "metrics",
+      "prometheus",
+      "recording rules",
+      "grafana",
+      "catalog"
+    ],
+    "order": 60
   },
   {
     "sourcePath": "docs/technical/ai-agents.md",
