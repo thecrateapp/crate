@@ -625,3 +625,41 @@ fn v6_keeps_a_fractional_tempo() {
     let worst = worst_beat_error_ms(&profile.beat_grid_ms, 127.6);
     assert!(worst <= 5.0, "a beat is {worst} ms off the kicks");
 }
+
+/// Clicks whose bar shifts half a beat between `shift_from` and `shift_to` (seconds): the
+/// music changes phase, so part of any single grid is on the off-beat.
+fn half_beat_shift(start_bpm: f32, end_bpm: f32, seconds: f32, shift: (f32, f32)) -> Vec<f32> {
+    let mut times = Vec::new();
+    let mut time = 0.0_f32;
+    while time < seconds - 1.0 {
+        let bpm = start_bpm + (end_bpm - start_bpm) * time / seconds;
+        let offset = if (shift.0..shift.1).contains(&time) {
+            30.0 / bpm
+        } else {
+            0.0
+        };
+        times.push(time + offset);
+        time += 60.0 / bpm;
+    }
+    accented_clicks(&times, seconds)
+}
+
+#[test]
+fn v6_keeps_an_ambiguous_grid_phase_partial() {
+    let samples = half_beat_shift(120.0, 120.0, 120.0, (20.0, 68.0));
+
+    let profile = analyze_smart_mix_samples(&samples, SAMPLE_RATE);
+
+    assert_eq!(profile.quality, "partial");
+}
+
+#[test]
+fn v6_keeps_a_half_beat_slide_partial_when_the_tempo_moves() {
+    let samples = half_beat_shift(118.0, 122.0, 150.0, (60.0, 90.0));
+
+    let profile = analyze_smart_mix_samples(&samples, SAMPLE_RATE);
+
+    assert_eq!(profile.quality, "partial");
+    assert!(profile.intro_tempo_stability.unwrap() >= 0.8);
+    assert!(profile.outro_tempo_stability.unwrap() >= 0.8);
+}
