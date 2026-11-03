@@ -134,10 +134,57 @@ def test_login_with_decks_app_header_returns_refresh_token(test_app, app_header)
     assert session_expiry - captured["before"] >= timedelta(days=30) - timedelta(
         seconds=5
     )
-    assert captured["kwargs"]["app_id"] == app_header
-    assert captured["kwargs"]["device_fingerprint"].startswith("ua:")
+    # Every Decks version stores its session under one app ID.
+    assert captured["kwargs"]["app_id"] == "crate-decks"
     # Decks is a bearer-only native client: tokens travel in the body only.
     assert _set_cookie_headers(response) == []
+
+
+# Two machines running the same Decks build send the same user agent, so a
+# fingerprint derived from headers would merge them into one session (logging
+# out on one would revoke the other). Only the per-install fingerprint the
+# client sends may identify the device.
+@pytest.mark.parametrize("app_header", ["decks/0.1.0", "Decks/1.2.3-beta.1+linux"])
+def test_decks_login_without_install_fingerprint_does_not_derive_one(
+    test_app, app_header
+):
+    response, captured = _login(
+        test_app, {"X-Crate-App": app_header, "User-Agent": "Mozilla/5.0"}
+    )
+
+    assert response.status_code == 200
+    assert captured["kwargs"]["device_fingerprint"] is None
+
+
+def test_decks_login_keeps_the_install_fingerprint(test_app):
+    response, captured = _login(
+        test_app,
+        {"X-Crate-App": "decks/0.2.0", "X-Device-Fingerprint": "install-7f3a9c"},
+    )
+
+    assert response.status_code == 200
+    assert captured["kwargs"]["app_id"] == "crate-decks"
+    assert captured["kwargs"]["device_fingerprint"] == "install-7f3a9c"
+
+
+def test_decks_heartbeat_keeps_the_canonical_app_id(test_app):
+    with (
+        patch(
+            "crate.api.auth._require_auth",
+            return_value={"id": 7, "session_id": "decks-session"},
+        ),
+        patch("crate.api.auth_cache.should_touch_session", return_value=True),
+        patch("crate.api.auth.touch_session") as touch,
+    ):
+        response = test_app.post(
+            "/api/auth/heartbeat",
+            json={},
+            headers={"X-Crate-App": "decks/0.3.0", "User-Agent": "Mozilla/5.0"},
+        )
+
+    assert response.status_code == 200
+    assert touch.call_args.kwargs["app_id"] == "crate-decks"
+    assert touch.call_args.kwargs["device_fingerprint"] is None
 
 
 @pytest.mark.parametrize(
@@ -190,7 +237,7 @@ def test_refresh_with_decks_token_rotates(test_app, session_app_id):
         ),
         patch("crate.api.auth.get_session", return_value=session),
         patch("crate.api.auth.get_user_by_id", return_value=dict(_USER)),
-        patch("crate.api.auth.touch_session", return_value=session),
+        patch("crate.api.auth.touch_session", return_value=session) as touch,
         patch("crate.api.auth.create_jwt", return_value="new-access") as create_jwt,
         patch(
             "crate.api.auth.create_refresh_jwt", return_value="new-refresh"
@@ -213,6 +260,8 @@ def test_refresh_with_decks_token_rotates(test_app, session_app_id):
         == LISTEN_ACCESS_TOKEN_EXPIRY_HOURS
     )
     assert _set_cookie_headers(response) == []
+    # Sessions from before the app ID was canonical move to it on refresh.
+    assert touch.call_args.kwargs["app_id"] == "crate-decks"
 
 
 def test_register_with_decks_app_header_returns_refresh_token(test_app):

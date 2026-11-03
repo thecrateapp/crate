@@ -39,7 +39,8 @@ so Listen, VirtualDJ and OpenSubsonic clients are not affected.
 Decks is a first-class native client with the same session policy as Listen. It
 sends `X-Crate-App: decks/<version>` on every request, logs in with email and
 password or with native OAuth (app ID `crate-decks`, PKCE, loopback callback on
-`http://127.0.0.1:<port>/callback`), and receives a refresh token. It is
+`http://127.0.0.1:<port>/callback`), and receives a refresh token. It also sends `X-Device-Fingerprint`, a random ID
+created once per install, so each machine keeps its own session. It is
 bearer-only: the server never sets auth cookies for it. The full rules are in
 the native authentication contract (`docs/technical/listen-native-auth-contract.md`,
 section "Native clients: Listen and Crate Decks").

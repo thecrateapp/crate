@@ -515,6 +515,15 @@ def _is_decks_client(request: Request, *, app_id: str | None = None) -> bool:
     ) or native_oauth_auth.is_decks_app_id(request.headers.get("x-crate-app"))
 
 
+def _session_app_id(app_id: str | None) -> str | None:
+    """Store every Decks build's session under `crate-decks`.
+
+    The header carries the version (`decks/0.1.0`), so storing it raw would stop
+    a device from finding its own session after an upgrade.
+    """
+    return native_oauth_auth.native_binding_app_id(app_id)
+
+
 def _is_refresh_capable_client(
     request: Request, *, app_id: str | None = None, return_to: str | None = None
 ) -> bool:
@@ -786,6 +795,11 @@ def _request_device_fingerprint(
     if explicit:
         return explicit
     if not _is_refresh_capable_client(request, app_id=app_id):
+        return None
+    if _is_decks_client(request, app_id=app_id):
+        # Every machine running the same Decks build sends the same headers, so
+        # a derived fingerprint would merge them into one session. Only the
+        # client's per-install X-Device-Fingerprint identifies a Decks device.
         return None
     source = "|".join(
         part
@@ -1357,7 +1371,7 @@ def _create_login_session(
     session_id: str | None = None,
 ) -> tuple[str, dict, str | None]:
     user = _ensure_user_active(user)
-    app = app_id or request.headers.get("x-crate-app")
+    app = _session_app_id(app_id or request.headers.get("x-crate-app"))
     session_expiry_hours = _session_expiry_hours(request, app_id=app)
     access_expiry_hours = _access_expiry_hours(request, app_id=app)
     expires_at_dt = datetime.now(timezone.utc) + timedelta(hours=session_expiry_hours)
@@ -2028,7 +2042,9 @@ def refresh_auth(request: Request, body: RefreshTokenRequest | None = None):
             session["id"],
             last_seen_ip=request.client.host if request.client else None,
             user_agent=request.headers.get("user-agent"),
-            app_id=session_app_id or request.headers.get("x-crate-app"),
+            app_id=_session_app_id(
+                session_app_id or request.headers.get("x-crate-app")
+            ),
             device_label=request.headers.get("x-device-label")
             or session.get("device_label"),
             device_fingerprint=_request_device_fingerprint(
@@ -2260,7 +2276,9 @@ def auth_heartbeat(request: Request, body: HeartbeatRequest):
                 user["session_id"],
                 last_seen_ip=request.client.host if request.client else None,
                 user_agent=request.headers.get("user-agent"),
-                app_id=body.app_id or request.headers.get("x-crate-app"),
+                app_id=_session_app_id(
+                    body.app_id or request.headers.get("x-crate-app")
+                ),
                 device_label=body.device_label or request.headers.get("x-device-label"),
                 device_fingerprint=_request_device_fingerprint(
                     request, app_id=body.app_id or request.headers.get("x-crate-app")

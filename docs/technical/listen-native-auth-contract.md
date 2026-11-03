@@ -112,6 +112,7 @@ policy as Listen. Source: `app/crate/api/auth.py` (`_is_refresh_capable_client`,
 | Refresh token          | Yes                                                                           | Yes                                                                                |
 | Access token / session | 1 h / 30 days                                                                 | 1 h / 30 days                                                                      |
 | Auth cookies           | Listen cookie names                                                           | None: tokens travel only in the JSON body                                          |
+| Device fingerprint     | `X-Device-Fingerprint`, or derived from the headers                           | `X-Device-Fingerprint` only, never derived                                         |
 
 Rules for Decks:
 
@@ -130,9 +131,16 @@ Rules for Decks:
 - Only `mode=login` is supported. Account linking (`native_link`) stays
   Tauri-only.
 - The handoff is bound to `crate-decks`, so the exchange accepts any
-  `decks/<version>` header (or `crate-decks`). The session stores the header
-  value as its `app_id`. Exchanging a Listen handoff from Decks, or a Decks
-  handoff from Listen, fails with `401`.
+  `decks/<version>` header (or `crate-decks`). Exchanging a Listen handoff
+  from Decks, or a Decks handoff from Listen, fails with `401`.
+- Every Decks session stores `crate-decks` as its `app_id`, whatever the
+  version in the header, so a device keeps its session across upgrades and
+  login methods.
+- Decks sends `X-Device-Fingerprint` with a random ID created once per install.
+  The server never derives one for Decks: every machine running the same build
+  sends the same headers, so a derived fingerprint would merge them into one
+  session, and logging out on one would revoke the others. Without the header,
+  each login creates a new session.
 - Decks stores the refresh token in the OS keychain and never in its
   configuration files.
 - `NATIVE_OAUTH_EXCHANGE_ENABLED` also switches off the Decks flow (`503`).
