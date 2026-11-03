@@ -10,9 +10,16 @@ interface Props {
   description: string;
   locale?: string;
   backdrop?: "full" | "dim";
+  ogType?: "website" | "article";
 }
 
-const { title, description, locale = "en", backdrop = "dim" } = Astro.props;
+const {
+  title,
+  description,
+  locale = "en",
+  backdrop = "dim",
+  ogType = "website",
+} = Astro.props;
 ---
 
 <!doctype html>
@@ -23,7 +30,7 @@ const { title, description, locale = "en", backdrop = "dim" } = Astro.props;
     <title>{title}</title>
     <meta name="description" content={description} />
     <meta name="theme-color" content="#0a0a0f" />
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={ogType} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={Astro.url.href} />

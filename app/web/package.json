@@ -13,6 +13,7 @@
     "budget": "node scripts/check-budget.mjs dist 122880"
   },
   "dependencies": {
+    "@astrojs/rss": "^4.0.19",
     "astro": "^5.0.0",
     "gsap": "^3.13.0",
     "lenis": "^1.1.13"

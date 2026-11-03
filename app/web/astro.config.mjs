@@ -6,6 +6,7 @@ export default defineConfig({
   trailingSlash: "never",
   server: { allowedHosts: [".dev.cratemusic.app"] },
   build: { format: "file" },
+  markdown: { shikiConfig: { theme: "css-variables" } },
   i18n: {
     defaultLocale: "en",
     locales: ["en"],

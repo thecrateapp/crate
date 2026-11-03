@@ -8,6 +8,8 @@ const PAGES = [
   "/developers",
   "/install",
   "/why",
+  "/blog",
+  "/blog/reads-from-snapshots",
 ];
 
 async function tabTo(page: Page, selector: string) {

@@ -1,0 +1,302 @@
+---
+import { getCollection, render } from "astro:content";
+import { t } from "../../i18n";
+import Base from "../../layouts/Base.astro";
+import {
+  formatPostDate,
+  publishedPosts,
+  readingMinutes,
+  sourceUrl,
+} from "../../lib/blog";
+
+export async function getStaticPaths() {
+  const posts = publishedPosts(await getCollection("blog"), {
+    includeDrafts: import.meta.env.DEV,
+  });
+  return posts.map((post) => ({ params: { slug: post.id }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+const minutes = readingMinutes(post.body ?? "");
+---
+
+<Base
+  title={`${post.data.title} · Crate`}
+  description={post.data.description}
+  ogType="article"
+>
+  <link
+    slot="head"
+    rel="alternate"
+    type="application/rss+xml"
+    title={t("blog.title")}
+    href="/blog/rss.xml"
+  />
+  <article class="post">
+    <header class="post-head" data-reveal>
+      <a class="u-link back" href="/blog" data-enter>&larr; {t("blog.back")}</a>
+      <p class="meta" data-enter style="--d:80ms">
+        <time datetime={formatPostDate(post.data.date)}>
+          {formatPostDate(post.data.date)}
+        </time>
+        <span aria-hidden="true">·</span>
+        {t("blog.minutes", "en", { minutes: String(minutes) })}
+        {
+          post.data.updated && (
+            <>
+              <span aria-hidden="true">·</span>
+              {t("blog.updated", "en", {
+                date: formatPostDate(post.data.updated),
+              })}
+            </>
+          )
+        }
+      </p>
+      <h1 class="display" data-split style="--d:120ms;--step:40ms">
+        {post.data.title}
+      </h1>
+      <p class="lede" data-enter style="--d:300ms">{post.data.description}</p>
+    </header>
+
+    <div class="prose">
+      <Content />
+    </div>
+
+    <footer class="sources">
+      <p class="label">{t("blog.sources")}</p>
+      <ul>
+        {
+          post.data.sources.map((source) => (
+            <li>
+              <a class="u-link" href={sourceUrl(source)}>
+                <code>{source}</code>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </footer>
+  </article>
+</Base>
+
+<script>
+  import { mountOnPage } from "../../scripts/motion/page";
+  import { initTextMotion } from "../../scripts/motion/text-motion";
+
+  mountOnPage(".post", () => initTextMotion());
+</script>
+
+<style>
+  .post {
+    position: relative;
+    z-index: 5;
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 20vh clamp(20px, 6vw, 96px) 14vh;
+  }
+
+  .post-head {
+    display: grid;
+    gap: 24px;
+    margin-bottom: 9vh;
+  }
+
+  .back,
+  .meta,
+  .label {
+    justify-self: start;
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    color: var(--fg-3);
+  }
+
+  .post-head .display {
+    font-size: clamp(2.6rem, 6.4vw, 6.25rem);
+    max-width: 16ch;
+  }
+
+  .lede {
+    margin: 0;
+    max-width: 44ch;
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: clamp(1.25rem, 1.9vw, 1.75rem);
+    line-height: 1.25;
+    color: var(--fg-2);
+  }
+
+  .prose,
+  .sources {
+    max-width: 70ch;
+    margin-left: clamp(0px, 10vw, 180px);
+  }
+
+  .prose {
+    font-size: clamp(1.0625rem, 1.15vw, 1.1875rem);
+    line-height: 1.72;
+    color: var(--fg-2);
+  }
+
+  .prose :global(p),
+  .prose :global(ul),
+  .prose :global(ol),
+  .prose :global(blockquote),
+  .prose :global(table),
+  .prose :global(pre),
+  .prose :global(figure) {
+    margin: 0 0 1.4em;
+  }
+
+  .prose :global(h2) {
+    margin: 2.4em 0 0.8em;
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: clamp(1.6rem, 2.4vw, 2.2rem);
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+    color: var(--fg);
+  }
+
+  .prose :global(h3) {
+    margin: 2em 0 0.6em;
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.3rem;
+    color: var(--fg);
+  }
+
+  .prose :global(strong) {
+    color: var(--fg);
+    font-weight: 600;
+  }
+
+  .prose :global(a) {
+    color: var(--cyan-hi);
+    text-underline-offset: 3px;
+  }
+
+  .prose :global(li) {
+    margin: 0.35em 0;
+  }
+
+  .prose :global(blockquote) {
+    padding-left: 1.2em;
+    border-left: 2px solid var(--cyan-hi);
+    color: var(--fg);
+  }
+
+  .prose :global(:not(pre) > code) {
+    padding: 0.1em 0.35em;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 0.86em;
+    color: var(--fg);
+  }
+
+  .prose :global(pre) {
+    overflow-x: auto;
+    padding: 18px 20px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    line-height: 1.6;
+  }
+
+  .prose :global(img) {
+    display: block;
+    width: calc(100% + clamp(0px, 10vw, 180px));
+    max-width: none;
+    height: auto;
+    margin: 2.2em 0 2.2em calc(-1 * clamp(0px, 10vw, 180px));
+    border: 1px solid var(--line);
+    border-radius: 6px;
+  }
+
+  .prose :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92em;
+  }
+
+  .prose :global(th),
+  .prose :global(td) {
+    padding: 10px 12px 10px 0;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .prose :global(th) {
+    font-family: var(--mono);
+    font-weight: 400;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  .prose :global(hr) {
+    margin: 3em 0;
+    border: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .sources {
+    margin-top: 8vh;
+    padding-top: 28px;
+    border-top: 1px solid var(--line);
+  }
+
+  .label {
+    color: var(--cyan-hi);
+  }
+
+  .sources ul {
+    display: grid;
+    gap: 10px;
+    margin: 18px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .sources code {
+    font-family: var(--mono);
+    font-size: 0.9rem;
+  }
+
+  :global(:root) {
+    --astro-code-foreground: #f1f5f9;
+    --astro-code-background: rgba(13, 14, 20, 0.88);
+    --astro-code-token-keyword: #67e8f9;
+    --astro-code-token-constant: #a5f3fc;
+    --astro-code-token-string: #fbbf24;
+    --astro-code-token-string-expression: #fbbf24;
+    --astro-code-token-comment: #7e8084;
+    --astro-code-token-function: #f1f5f9;
+    --astro-code-token-parameter: #cbd5e1;
+    --astro-code-token-punctuation: #999ca0;
+    --astro-code-token-link: #67e8f9;
+  }
+
+  @media (max-width: 760px) {
+    .post {
+      padding-top: 16vh;
+    }
+    .prose,
+    .sources {
+      margin-left: 0;
+    }
+  }
+</style>

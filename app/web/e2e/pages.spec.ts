@@ -8,6 +8,8 @@ const PAGES = [
   "/developers",
   "/install",
   "/why",
+  "/blog",
+  "/blog/reads-from-snapshots",
 ];
 const VIEWPORTS = [
   { width: 1440, height: 900 },
