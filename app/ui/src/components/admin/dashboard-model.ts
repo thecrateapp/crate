@@ -39,7 +39,7 @@ function taskName(value: unknown) {
     compute_bliss: "Bliss analysis",
     analyze_all: "Audio analysis",
   };
-  return name ? (names[name] ?? name.replace(/_/g, " ")) : "Unknown task";
+  return name ? names[name] ?? name.replace(/_/g, " ") : "Unknown task";
 }
 function progress(value: unknown) {
   const empty = {

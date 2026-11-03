@@ -1,0 +1,65 @@
+{
+  "samples": 6,
+  "from": "2026-10-31T13:24:07.551415+00:00",
+  "to": "2026-10-31T13:29:07.552308+00:00",
+  "max_aggregate_working_set_mib": 384.19,
+  "max_observed_cpu_cores": 0.0324,
+  "memory_peaks_mib": {
+    "crate-cadvisor": 24.57,
+    "crate-grafana": 245.82,
+    "crate-node-exporter": 7.5,
+    "crate-observability-docker-proxy": 10.68,
+    "crate-postgres-exporter": 7.66,
+    "crate-prometheus": 77.82,
+    "crate-redis-durable-exporter": 8.18,
+    "crate-redis-exporter": 8.49
+  },
+  "last_head_series": [
+    {
+      "metric": {
+        "__name__": "prometheus_tsdb_head_series",
+        "instance": "crate-prometheus:9090",
+        "job": "prometheus"
+      },
+      "value": [1793453347.555, "7985"]
+    }
+  ],
+  "last_scrape_duration": [
+    {
+      "metric": {
+        "job": "redis-cache"
+      },
+      "value": [1793453347.554, "0.579158198"]
+    },
+    {
+      "metric": {
+        "job": "postgresql"
+      },
+      "value": [1793453347.554, "0.277243208"]
+    },
+    {
+      "metric": {
+        "job": "redis-durable"
+      },
+      "value": [1793453347.554, "0.703311725"]
+    },
+    {
+      "metric": {
+        "job": "prometheus"
+      },
+      "value": [1793453347.554, "0.003689942"]
+    },
+    {
+      "metric": {
+        "job": "cadvisor"
+      },
+      "value": [1793453347.554, "0.063270291"]
+    },
+    {
+      "metric": {
+        "job": "node"
+      },
+      "value": [1793453347.554, "0.050431684"]
+    }
+  ]
+}

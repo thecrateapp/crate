@@ -285,6 +285,9 @@ export default defineConfig({
     emptyOutDir: true,
     rolldownOptions: {
       input: {
+        stackMap: fileURLToPath(
+          new URL("review-stack-map.html", import.meta.url),
+        ),
         review1BEContextMenus: fileURLToPath(
           new URL("review-1be-context-menus.html", import.meta.url),
         ),
@@ -451,6 +454,9 @@ export default defineConfig({
         ),
         adminDashboard: fileURLToPath(
           new URL("admin-dashboard-demo.html", import.meta.url),
+        ),
+        observabilityIntegrity: fileURLToPath(
+          new URL("review-observability-integrity.html", import.meta.url),
         ),
         adminSystemHealth: fileURLToPath(
           new URL("admin-system-health-demo.html", import.meta.url),

@@ -60,6 +60,9 @@ export default defineConfig({
           ) {
             return "graph-vendor";
           }
+          if (id.includes("/node_modules/three/")) {
+            return "three-vendor";
+          }
           if (
             id.includes("/node_modules/@radix-ui/") ||
             id.includes("/node_modules/cmdk/")

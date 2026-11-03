@@ -1339,6 +1339,13 @@ Rules:
 | More than about 10K points or shader effects                                | WebGL2, lazily created, context loss handled, always with a non-WebGL fallback | sound map for Radio and Paths (14K desktop)                                                                        |
 | Standard statistical charts                                                 | Nivo                                                                           | Insights bars and scatter, System metric streams, BPM histogram                                                    |
 
+- Declared exception (Diego, 2026-11-01): the optional 3D view of the Admin stack topology uses
+  three.js, including `three/examples/jsm` (Line2, post-processing, BufferGeometryUtils). It is
+  the only instrument allowed a 3D engine. It loads lazily as `three-vendor`, renders on demand,
+  keeps labels and hit targets as DOM, honours reduced motion and `data-crate-effects`, and the
+  2D SVG map remains the default and the fallback without WebGL2, on narrow layouts or after
+  context loss. Other instruments stay hand-built.
+
 - Instruments are hand-built; standard charts use Nivo. This needs the rule amendment [D1] in
   `AGENTS.md:69`, `app/ui/AGENTS.md:28`, `app/listen/AGENTS.md:60` and `app/shared/AGENTS.md`.
   Precedents: `EqBands` (shared, SVG) and Listen `components/stats/*`.

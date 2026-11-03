@@ -1,0 +1,12 @@
+{
+  "operations": 1,
+  "limit": 1000,
+  "rows_deleted_before_rollback": 1000,
+  "elapsed_ms": 35.116,
+  "rollback_restored_same_selected_rows": true,
+  "selected_rows": 1000,
+  "rows_available_fixture": 5760000,
+  "source": "final-source",
+  "index": "original-named covering index",
+  "caveat": "Single rollback smoke check only; no original-vs-cover write cost comparison; timed after canceled500 seed/VACUUM, not a stable performance distribution."
+}

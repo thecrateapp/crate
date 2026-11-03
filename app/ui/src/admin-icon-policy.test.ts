@@ -172,6 +172,10 @@ const approvedControls = new Map([
     { component: "PageHeaderAction", limit: 5 },
   ],
   [
+    "app/ui/src/pages/Stack.tsx:@/components/admin/StackMap",
+    { component: "StackMap", limit: 1 },
+  ],
+  [
     "app/ui/src/pages/Health.tsx:@/components/layout/PageHeader",
     { component: "PageHeaderAction", limit: 1 },
   ],

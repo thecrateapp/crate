@@ -1,5 +1,14 @@
 export type MetricField = "avg" | "max" | "count";
+export interface MetricReadStatus {
+  source?: string;
+  availability?: string;
+  reason?: string | null;
+  observed_at?: string | null;
+  age_seconds?: number | null;
+  window_minutes?: number;
+}
 export interface MetricSample {
+  source_gap?: boolean;
   timestamp: string;
   count?: number | null;
   avg?: number | null;
@@ -113,7 +122,12 @@ export function buildMetricSeries(
       const value = sample[field];
       points.push({
         x: time,
-        y: typeof value === "number" && Number.isFinite(value) ? value : null,
+        y:
+          !sample.source_gap &&
+          typeof value === "number" &&
+          Number.isFinite(value)
+            ? value
+            : null,
       });
     });
     return { id: field, data: points };

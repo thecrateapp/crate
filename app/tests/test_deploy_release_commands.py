@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -10,6 +11,65 @@ import yaml
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.mark.parametrize("operation", ["cmd_up", "cmd_rollback"])
+def test_application_update_keeps_legacy_monitoring_sentinel(tmp_path, operation):
+    sentinel = tmp_path / "monitoring-running"
+    sentinel.write_text("existing monitoring container\n")
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake = fake_bin / "docker"
+    fake.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json, os, pathlib, sys\n"
+        "with open(os.environ['DOCKER_TEST_LOG'], 'a') as output:\n"
+        "    output.write(json.dumps(sys.argv[1:]) + '\\n')\n"
+        "if '--remove-orphans' in sys.argv:\n"
+        "    pathlib.Path(os.environ['MONITORING_SENTINEL']).unlink(missing_ok=True)\n"
+    )
+    fake.chmod(0o755)
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    (backup / "changed_services").write_text("crate-api\n")
+    (tmp_path / ".deploy").mkdir()
+    log = tmp_path / "docker.jsonl"
+    shell = (
+        "log() { :; }\nrecord_agent_deployment() { :; }\n"
+        "cmd_verify() { :; }\ncompose_has_service() { return 0; }\n"
+        "COMPOSE=(docker compose --project-name crate)\n"
+        'dc() { "${COMPOSE[@]}" "$@"; }\n'
+        + _shell_function(operation)
+        + f"\n{operation}\n"
+    )
+
+    result = subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", shell],
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+            "BACKUP_DIR": str(backup),
+            "DEPLOY_ID": "fixture",
+            "DOCKER_TEST_LOG": str(log),
+            "MONITORING_SENTINEL": str(sentinel),
+        },
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert sentinel.is_file(), "An application update retired the monitoring sentinel"
+    commands = [json.loads(line) for line in log.read_text().splitlines()]
+    starts = [command for command in commands if "up" in command]
+    assert len(starts) == 1
+    assert starts[0][-1] == "crate-api"
+    assert "--remove-orphans" not in starts[0]
+
+
+def test_state_rollback_never_implicitly_retires_other_project_services():
+    assert "--remove-orphans" not in _shell_function("cmd_state_rollback")
 
 
 @pytest.mark.parametrize(
@@ -79,6 +139,110 @@ def _shell_function(name: str) -> str:
     script = (ROOT / "scripts/deploy-remote.sh").read_text()
     start = script.index(f"{name}() {{")
     return script[start : script.index("\n}\n", start) + 3]
+
+
+def _deployment_snapshot_fixture(tmp_path: Path) -> tuple[Path, list[str]]:
+    root = tmp_path / "snapshots"
+    root.mkdir()
+    names = [
+        "v9-ancient",
+        "v8-ancient",
+        "zzz-older",
+        "release-old",
+        "v3-backup",
+        "v2-backup",
+        "aaa-recent",
+        "bbb-most-recent",
+    ]
+    for index, name in enumerate(names, 1):
+        directory = root / name
+        directory.mkdir()
+        (directory / "payload").write_text(name)
+        timestamp = 1_700_000_000 + index * 100
+        os.utime(directory, (timestamp, timestamp))
+    return root, names
+
+
+def _run_snapshot_cleanup(root: Path, current: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [
+            "bash",
+            "-euo",
+            "pipefail",
+            "-c",
+            "log() { :; }\n"
+            "cleanup_legacy_cache_layout() { :; }\n"
+            "prune_unused_images() { :; }\n"
+            + _shell_function("cmd_cleanup")
+            + "\ncmd_cleanup\n",
+        ],
+        cwd=root.parent,
+        env={
+            "PATH": os.environ["PATH"],
+            "BACKUP_ROOT": str(root),
+            "BACKUP_DIR": str(root / current),
+            "DEPLOY_ID": current,
+        },
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+
+
+@pytest.mark.parametrize("current_timestamp", [1_700_000_050, 1_700_000_900])
+def test_cleanup_keeps_the_current_custom_snapshot_and_four_latest_by_age(
+    tmp_path: Path, current_timestamp: int
+) -> None:
+    root, _names = _deployment_snapshot_fixture(tmp_path)
+    current = root / "c0-custom-id"
+    current.mkdir()
+    (current / "payload").write_text("current snapshot")
+    os.utime(current, (current_timestamp, current_timestamp))
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "payload").write_text("external data")
+    link = root / "unrelated-symlink"
+    link.symlink_to(outside, target_is_directory=True)
+
+    result = _run_snapshot_cleanup(root, current.name)
+
+    assert result.returncode == 0, result.stderr
+    assert link.is_symlink()
+    assert (outside / "payload").read_text() == "external data"
+    expected = {
+        "c0-custom-id",
+        "v3-backup",
+        "v2-backup",
+        "aaa-recent",
+        "bbb-most-recent",
+    }
+    assert {
+        path.name for path in root.iterdir() if path.is_dir() and not path.is_symlink()
+    } == expected
+    assert (current / "payload").read_text() == "current snapshot"
+    for name in expected - {current.name}:
+        assert (root / name / "payload").read_text() == name
+
+
+@pytest.mark.parametrize("current_state", ["missing", "symlink"])
+def test_cleanup_never_prunes_without_a_real_current_snapshot(
+    tmp_path: Path, current_state: str
+) -> None:
+    root, names = _deployment_snapshot_fixture(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "payload").write_text("external data")
+    if current_state == "symlink":
+        (root / "c0-current").symlink_to(outside, target_is_directory=True)
+
+    _run_snapshot_cleanup(root, "c0-current")
+
+    assert {path.name for path in root.iterdir() if not path.is_symlink()} == set(names)
+    for name in names:
+        assert (root / name / "payload").read_text() == name
+    assert (outside / "payload").read_text() == "external data"
+    if current_state == "symlink":
+        assert (root / "c0-current").is_symlink()
 
 
 def _fake_docker(tmp_path: Path) -> tuple[dict, Path]:
@@ -275,14 +439,169 @@ def test_deploy_ships_the_operator_overlay_and_agent_tooling() -> None:
     }
     for file in tooling:
         assert (ROOT / file).is_file(), file
+    loop = 'for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}"; do'
     payload = deploy[
         deploy.index("prepare_payload() {") : deploy.index("sync_config() {")
     ]
-    assert payload.count('for file in "${AGENT_TOOLING[@]}"; do') == 2
+    assert payload.count(loop) == 2
     sync = deploy[deploy.index("sync_config() {") :]
-    assert sync.index('for file in "${AGENT_TOOLING[@]}"; do') < sync.index(
-        "deploy-remote.sh"
+    assert sync.index(loop) < sync.index("deploy-remote.sh")
+
+
+PROJECTOR_OVERLAY = "deploy/observability/compose.projector-prometheus.yaml"
+TRAEFIK_OVERLAY = "deploy/observability/compose.traefik-metrics.yaml"
+APP_METRICS_OVERLAY = "deploy/observability/compose.app-metrics.yaml"
+SUPERVISOR_OVERLAY = "deploy/observability/compose.supervisor-prometheus.yaml"
+
+
+def test_deploy_ships_the_monitoring_overlays() -> None:
+    deploy = (ROOT / "scripts/deploy.sh").read_text()
+    block = deploy[deploy.index("MONITORING_OVERLAYS=(") :]
+    overlays = block[len("MONITORING_OVERLAYS=(") : block.index(")")].split()
+
+    assert overlays == [
+        PROJECTOR_OVERLAY,
+        TRAEFIK_OVERLAY,
+        APP_METRICS_OVERLAY,
+        SUPERVISOR_OVERLAY,
+    ]
+    for file in overlays:
+        assert (ROOT / file).is_file(), file
+
+
+@pytest.mark.parametrize(
+    ("env", "networks", "expected"),
+    [
+        ("", "", []),
+        (
+            "",
+            "crate_prometheus-query crate_traefik-metrics crate_app-metrics",
+            [PROJECTOR_OVERLAY, TRAEFIK_OVERLAY, APP_METRICS_OVERLAY],
+        ),
+        (
+            "OBS_PROMETHEUS_QUERY_NETWORK=crate-observability_prometheus-query\n",
+            "crate_prometheus-query crate-observability_traefik-metrics",
+            [],
+        ),
+        (
+            (
+                "OBS_PROMETHEUS_QUERY_NETWORK=crate-observability_prometheus-query\n"
+                "OBS_TRAEFIK_METRICS_NETWORK=crate-observability_traefik-metrics\n"
+            ),
+            "crate-observability_prometheus-query",
+            [PROJECTOR_OVERLAY],
+        ),
+        (
+            "OBS_APP_METRICS_NETWORK=crate-observability_app-metrics\n",
+            "crate_app-metrics crate-observability_app-metrics",
+            [APP_METRICS_OVERLAY],
+        ),
+    ],
+)
+def test_remote_deploy_keeps_monitoring_overlays_while_their_networks_exist(
+    tmp_path: Path, env: str, networks: str, expected: list[str]
+) -> None:
+    for overlay in (PROJECTOR_OVERLAY, TRAEFIK_OVERLAY, APP_METRICS_OVERLAY):
+        (tmp_path / overlay).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / overlay).write_text("services: {}\n")
+    (tmp_path / ".env").write_text(env)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    docker = fake_bin / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        '[[ "$1 $2" == "network inspect" ]] || exit 2\n'
+        'for name in $FAKE_NETWORKS; do [[ "$3" == "$name" ]] && exit 0; done\n'
+        "exit 1\n"
     )
+    docker.chmod(0o755)
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+    selection = script[
+        script.index("env_file_value() {") : script.index("compose_has_service() {")
+    ]
+
+    result = subprocess.run(
+        [
+            "bash",
+            "-euo",
+            "pipefail",
+            "-c",
+            "COMPOSE=(docker compose)\n"
+            + selection
+            + "printf '%s\\n' \"${COMPOSE[@]}\"\n",
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+            "FAKE_NETWORKS": networks,
+        },
+    )
+
+    appended = result.stdout.splitlines()[2:]
+    assert appended == [part for file in expected for part in ("-f", file)]
+
+
+@pytest.mark.parametrize(
+    ("operator", "networks", "expected"),
+    [
+        ("", "crate_prometheus-query", [PROJECTOR_OVERLAY]),
+        ("deploy/operator/compose.operator.yaml", "", []),
+        (
+            "deploy/operator/compose.operator.yaml",
+            "crate_prometheus-query",
+            [PROJECTOR_OVERLAY, SUPERVISOR_OVERLAY],
+        ),
+    ],
+)
+def test_supervisor_joins_prometheus_only_with_a_running_operator(
+    tmp_path: Path, operator: str, networks: str, expected: list[str]
+) -> None:
+    for overlay in (PROJECTOR_OVERLAY, SUPERVISOR_OVERLAY):
+        (tmp_path / overlay).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / overlay).write_text("services: {}\n")
+    (tmp_path / ".env").write_text("")
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    docker = fake_bin / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        '[[ "$1 $2" == "network inspect" ]] || exit 2\n'
+        'for name in $FAKE_NETWORKS; do [[ "$3" == "$name" ]] && exit 0; done\n'
+        "exit 1\n"
+    )
+    docker.chmod(0o755)
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+    selection = script[
+        script.index("env_file_value() {") : script.index("compose_has_service() {")
+    ]
+
+    result = subprocess.run(
+        [
+            "bash",
+            "-euo",
+            "pipefail",
+            "-c",
+            f"COMPOSE=(docker compose)\nOPERATOR_OVERLAY={operator}\n"
+            + selection
+            + "printf '%s\\n' \"${COMPOSE[@]}\"\n",
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+            "FAKE_NETWORKS": networks,
+        },
+    )
+
+    appended = result.stdout.splitlines()[2:]
+    assert appended == [part for file in expected for part in ("-f", file)]
 
 
 def _make_dry_run(target: str, *variables: str) -> str:
@@ -324,6 +643,30 @@ def test_build_workflow_promotes_a_complete_manifest_after_selective_builds() ->
     assert workflow.index("Attest release manifest") < workflow.index(
         "Promote release manifest to stable"
     )
+
+
+def test_deploy_tooling_changes_skip_the_heavy_monitoring_matrix() -> None:
+    workflows = ROOT / ".github/workflows"
+    heavy = yaml.safe_load((workflows / "test-observability.yml").read_text())
+    light = yaml.safe_load((workflows / "test-deploy-tooling.yml").read_text())
+    tooling = {
+        "scripts/deploy-remote.sh": "app/tests/test_deploy_release_commands.py",
+        "scripts/application_orphans.py": "app/tests/test_application_orphans.py",
+    }
+    paths = {*tooling, *tooling.values()}
+
+    for event in ("pull_request", "push"):
+        assert not paths & set(heavy[True][event]["paths"])
+        assert paths <= set(light[True][event]["paths"])
+    heavy_runs = " ".join(
+        step.get("run", "") for job in heavy["jobs"].values() for step in job["steps"]
+    )
+    light_runs = " ".join(
+        step.get("run", "") for job in light["jobs"].values() for step in job["steps"]
+    )
+    assert not any(test in heavy_runs for test in tooling.values())
+    assert all(test in light_runs for test in tooling.values())
+    assert "docker" not in light_runs and "systemctl" not in light_runs
 
 
 def test_deploy_extracts_release_manifest_for_production_platform() -> None:
@@ -743,3 +1086,205 @@ def test_remote_state_rollback_restores_database_before_old_images() -> None:
     assert rollback_body.index("pg_restore") < rollback_body.index(
         'log "Restarting recovered release'
     )
+
+
+HOST_LOCK_FUNCTIONS = (
+    "host_lock_acquire",
+    "host_lease_field",
+    "host_lease_refuse_other",
+    "host_guard",
+    "cmd_host_lock",
+    "cmd_host_unlock",
+)
+MUTATING_STEPS = {
+    "backup",
+    "recovery-snapshot",
+    "config",
+    "pull",
+    "up",
+    "agent-context",
+    "rollback",
+    "state-rollback",
+    "cleanup",
+}
+
+
+def _flock_bin(tmp_path: Path) -> str:
+    """Real flock on Linux; an fcntl shim with the same fd semantics elsewhere."""
+    if shutil.which("flock"):
+        return os.environ["PATH"]
+    shim_dir = tmp_path / "flock-bin"
+    shim_dir.mkdir(exist_ok=True)
+    shim = shim_dir / "flock"
+    shim.write_text(
+        f"#!{__import__('sys').executable}\n"
+        "import fcntl, sys, time\n"
+        "args = sys.argv[1:]\n"
+        "wait = float(args[args.index('-w') + 1]) if '-w' in args else None\n"
+        "fd = int(args[-1])\n"
+        "deadline = time.monotonic() + (wait or 0)\n"
+        "while True:\n"
+        "    try:\n"
+        "        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)\n"
+        "        sys.exit(0)\n"
+        "    except BlockingIOError:\n"
+        "        if wait is not None and time.monotonic() >= deadline:\n"
+        "            sys.exit(1)\n"
+        "        time.sleep(0.05)\n"
+    )
+    shim.chmod(0o755)
+    return f"{shim_dir}{os.pathsep}{os.environ['PATH']}"
+
+
+def _host_lock_shell(tmp_path: Path, owner: str, body: str, *, confirm: str = ""):
+    functions = "\n".join(_shell_function(name) for name in HOST_LOCK_FUNCTIONS)
+    script = (
+        f"HOST_LOCK_DIR='{tmp_path / 'server/.deploy'}'\n"
+        f"HOST_LOCK_OWNER='{owner}'\n"
+        f"HOST_LOCK_CONFIRM='{confirm}'\n"
+        "HOST_LOCK_WAIT_SECONDS=1\n"
+        f"{functions}\n{body}\n"
+    )
+    return subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", script],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        env={**os.environ, "PATH": _flock_bin(tmp_path)},
+        check=False,
+    )
+
+
+def test_host_lease_serializes_owners_and_requires_confirmation_to_break(tmp_path):
+    lease = tmp_path / "server/.deploy/host-mutation.lease"
+
+    assert _host_lock_shell(tmp_path, "deploy-a", "cmd_host_lock").returncode == 0
+    assert "owner=deploy-a" in lease.read_text()
+
+    other = _host_lock_shell(tmp_path, "obs-b", "host_guard touch '$PWD/never'")
+    same = _host_lock_shell(
+        tmp_path, "deploy-a", f"host_guard touch '{tmp_path / 'ran'}'"
+    )
+    second = _host_lock_shell(tmp_path, "obs-b", "cmd_host_lock")
+    refused = _host_lock_shell(tmp_path, "obs-b", "cmd_host_unlock")
+
+    assert other.returncode == 1 and "held by deploy-a" in other.stderr
+    assert not (tmp_path / "never").exists()
+    assert same.returncode == 0 and (tmp_path / "ran").exists()
+    assert second.returncode == 1
+    assert refused.returncode == 1 and "break-host-lock" in refused.stderr
+    assert "owner=deploy-a" in lease.read_text()
+
+    broken = _host_lock_shell(
+        tmp_path, "obs-b", "cmd_host_unlock", confirm="break-host-lock"
+    )
+    assert broken.returncode == 0 and not lease.exists()
+    assert _host_lock_shell(tmp_path, "obs-b", "cmd_host_unlock").returncode == 0
+
+
+def test_host_guard_waits_for_a_running_mutation_then_fails_without_effect(tmp_path):
+    lock = tmp_path / "server/.deploy/host-mutation.lock"
+    lock.parent.mkdir(parents=True)
+    holder = subprocess.Popen(
+        [
+            __import__("sys").executable,
+            "-c",
+            (
+                "import fcntl, sys, time\n"
+                f"f = open({str(lock)!r}, 'a')\n"
+                "fcntl.flock(f, fcntl.LOCK_EX)\n"
+                "print('held', flush=True)\n"
+                "time.sleep(30)\n"
+            ),
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert holder.stdout.readline().strip() == "held"
+        result = _host_lock_shell(
+            tmp_path, "deploy-a", f"host_guard touch '{tmp_path / 'ran'}'"
+        )
+    finally:
+        holder.kill()
+        holder.wait()
+
+    assert result.returncode == 1
+    assert "kept the lock" in result.stderr
+    assert not (tmp_path / "ran").exists()
+    assert (
+        _host_lock_shell(
+            tmp_path, "deploy-a", f"host_guard touch '{tmp_path / 'ran'}'"
+        ).returncode
+        == 0
+    )
+
+
+def test_remote_dispatch_guards_every_mutating_step_and_leaves_reads_free():
+    script = (ROOT / "scripts/deploy-remote.sh").read_text()
+    dispatch = script[script.index('case "${1:-}" in') :]
+    routes = {}
+    for line in dispatch.splitlines()[1:]:
+        step, separator, action = line.strip().partition(") ")
+        if separator and not step.startswith("*"):
+            routes[step] = action.rstrip(" ;")
+
+    assert {
+        step for step, action in routes.items() if action.startswith("host_guard ")
+    } == (MUTATING_STEPS)
+    assert routes["host-lock"] == "cmd_host_lock"
+    assert routes["host-unlock"] == "cmd_host_unlock"
+    for step in ("release-preflight", "preflight", "verify", "ps", "diagnose"):
+        assert not routes[step].startswith("host_guard")
+
+
+def test_local_deploy_holds_the_lease_around_every_mutating_sequence():
+    script = (ROOT / "scripts/deploy.sh").read_text()
+
+    def body(name):
+        start = script.index(f"{name}() {{")
+        return script[start : script.index("\n}\n", start)]
+
+    for name, first_mutation in (
+        ("run_deploy", "remote_deploy backup"),
+        ("run_recovery_snapshot", "remote_deploy recovery-snapshot"),
+        ("run_rollback", "remote_deploy state-rollback"),
+        ("run_image_rollback", "remote_deploy rollback"),
+    ):
+        text = body(name)
+        assert text.index("acquire_host_lease") < text.index(first_mutation), name
+    assert "release_host_lease" in body("cleanup")
+    assert "remote_deploy host-lock" in body("acquire_host_lease")
+    assert "remote_deploy host-unlock" in body("release_host_lease")
+    assert "acquire_host_lease" not in body("run_preflight")
+
+
+def test_local_lease_release_runs_once_and_reports_a_failed_release(tmp_path):
+    script = (ROOT / "scripts/deploy.sh").read_text()
+    start = script.index("release_host_lease() {")
+    release = script[start : script.index("\n}\n", start) + 3]
+    calls = tmp_path / "calls"
+    shell = (
+        f"remote_deploy() {{ echo \"$1\" >> '{calls}'; return 1; }}\n"
+        "DEPLOY_ID=deploy-a\nHOST_LEASE_HELD=1\n"
+        f"{release}\nrelease_host_lease\nrelease_host_lease\n"
+    )
+
+    result = subprocess.run(
+        ["bash", "-euo", "pipefail", "-c", shell],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert calls.read_text().splitlines() == ["host-unlock"]
+    assert "make deploy-unlock DEPLOY_ID=deploy-a" in result.stderr
+
+
+def test_grafana_target_tunnels_loopback_grafana_and_opens_it() -> None:
+    output = _make_dry_run("observability-grafana", "GRAFANA_LOCAL_PORT=3999")
+
+    assert "-L 3999:127.0.0.1:3001 crate@95.216.3.27" in output
+    assert "ExitOnForwardFailure=yes" in output
+    assert 'open "http://localhost:3999"' in output

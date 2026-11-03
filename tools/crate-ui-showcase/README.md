@@ -1,5 +1,10 @@
 # Crate UI — Design System
 
+Stack Map: `Reviews/Admin/Stack Map` shares its scene and actual Admin component
+with [the standalone review](http://127.0.0.1:5186/review-stack-map.html). It uses
+local sample topology and exposes keyboard/pointer selection, related-service
+navigation, resource readings and explicit stale/unavailable states.
+
 Local Storybook: http://127.0.0.1:6006/?path=/docs/system-introduction--docs
 
 Use Node 22 from the repository root:
@@ -644,3 +649,8 @@ System/Listen web closure provides the same Coverage evidence without a second s
 See [scope, evidence and follow-up](./LISTEN_WEB_CLOSURE.md). Active Listen contracts are
 documented; the remaining 15 global entries retain their explicit Admin/gated/unreferenced
 classification. Native-device certification remains separate.
+
+Observability checkpoint: [Collection integrity](http://127.0.0.1:5186/review-observability-integrity.html).
+The actual System Health page has six fixture states: observed, Redis unavailable,
+empty, partial, stale and legacy. The scene is shared with Storybook and issues no
+backend requests. See `docs/technical/evidence/observability/pr1a-checkpoint-2.md`.

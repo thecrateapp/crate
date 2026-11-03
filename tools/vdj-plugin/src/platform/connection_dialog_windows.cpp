@@ -1,6 +1,7 @@
-#include "connection_dialog.hpp"
+#include "crate_vdj/connection_dialog.hpp"
 
 #include <windows.h>
+#include <shellapi.h>
 
 #include <string>
 
@@ -132,7 +133,10 @@ ConnectionDialogResult show_connection_dialog(const ConnectionDialogRequest& req
     add_control(window, L"STATIC", to_wide(kConnectionDialogExplanation).c_str(), 0, 0, 16, 12, 420, 48);
     add_control(window, L"STATIC", L"Server address", 0, 0, 16, 66, 420, 18);
     add_control(window, L"EDIT", to_wide(request.current_origin).c_str(), ES_AUTOHSCROLL, kOriginId, 16, 86, 420, 24);
-    add_control(window, L"STATIC", L"Access token", 0, 0, 16, 116, 420, 18);
+    const std::wstring token_label = request.current_origin.empty()
+        ? L"Access token"
+        : L"Access token (" + to_wide(kSavedTokenHint) + L")";
+    add_control(window, L"STATIC", token_label.c_str(), 0, 0, 16, 116, 420, 18);
     add_control(window, L"EDIT", L"", ES_AUTOHSCROLL | ES_PASSWORD, kTokenId, 16, 136, 420, 24);
     add_control(window, L"BUTTON", L"Connect", BS_DEFPUSHBUTTON, kConnectId, 236, 176, 96, 28);
     add_control(window, L"BUTTON", L"Cancel", BS_PUSHBUTTON, kCancelId, 340, 176, 96, 28);
@@ -154,6 +158,14 @@ ConnectionDialogResult show_connection_dialog(const ConnectionDialogRequest& req
 void show_connection_message(const std::string& title, const std::string& message)
 {
     MessageBoxW(nullptr, to_wide(message).c_str(), to_wide(title).c_str(), MB_OK | MB_ICONINFORMATION | MB_TOPMOST);
+}
+
+bool open_in_browser(const std::string& url)
+{
+    const auto result = reinterpret_cast<INT_PTR>(
+        ShellExecuteW(nullptr, L"open", to_wide(url).c_str(), nullptr, nullptr, SW_SHOWNORMAL)
+    );
+    return result > 32;
 }
 
 } // namespace crate::vdj

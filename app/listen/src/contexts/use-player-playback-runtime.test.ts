@@ -41,6 +41,8 @@ vi.mock("@/contexts/use-player-playback-observability", () => ({
     markSeekPosition: vi.fn(),
     recordProgress: vi.fn(),
     recordPlaybackQualityProgress: vi.fn(),
+    recordPlaybackIntent: vi.fn(),
+    recordPlaybackResult: vi.fn(),
     recordCurrentPlaybackQoe: vi.fn(),
   }),
 }));

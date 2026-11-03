@@ -2,13 +2,43 @@
 #include "crate_vdj/models.hpp"
 
 #include "../support/check.hpp"
+#include "../support/scripted_http.hpp"
 #include <chrono>
 #include <string>
 
 using namespace crate::vdj;
+using namespace crate::vdj::testing;
+
+namespace {
+
+void unauthorized_responses_are_reported()
+{
+    ScriptedHttpClient inner;
+    inner.serve("/api/ok", "{}");
+    inner.fail("/api/revoked", 401);
+    inner.fail("/api/broken", 500);
+    int reports = 0;
+    UnauthorizedObserverHttpClient http(inner, [&reports] { ++reports; });
+
+    CRATE_CHECK(std::holds_alternative<HttpResponse>(
+        http.request(HttpRequest{.url = std::string(kOrigin) + "/api/ok"})
+    ));
+    http.request(HttpRequest{.url = std::string(kOrigin) + "/api/broken"});
+    http.request(HttpRequest{.url = std::string(kOrigin) + "/api/missing"});
+    CRATE_CHECK(reports == 0);
+
+    const auto revoked = http.request(HttpRequest{.url = std::string(kOrigin) + "/api/revoked"});
+
+    CRATE_CHECK(reports == 1);
+    CRATE_CHECK(std::get<HttpError>(revoked).status_code == 401);
+}
+
+} // namespace
 
 int main()
 {
+    unauthorized_responses_are_reported();
+
     CRATE_CHECK(is_allowed_origin(
         "https://api.crate.example/api/capabilities",
         "https://api.crate.example"

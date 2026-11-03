@@ -1,0 +1,212 @@
+{
+  "scope": "Authenticated production web UI journey; aliases omit personal library payloads.",
+  "source_sha": "248636d511d7356b732b908bc07ba0b50fdb9b97",
+  "timezone": "Europe/Madrid",
+  "client_window": {
+    "start": "2026-10-31T11:10:29.495Z",
+    "last_playing_observation": "2026-10-31T11:36:16.391Z",
+    "pause_requested": "2026-10-31T11:36:42.644Z",
+    "pause_confirmed": "2026-10-31T11:38:05.538Z",
+    "local_start": "2026-10-31 12:10:29 CET",
+    "local_pause_requested": "2026-10-31 12:36:42 CET"
+  },
+  "timeline": [
+    {
+      "at": "2026-10-31T11:10:29.495Z",
+      "event": "authenticated_flow_start"
+    },
+    {
+      "at": "2026-10-31T11:13:27.617Z",
+      "event": "network_buffer_truncated"
+    },
+    {
+      "at": "2026-10-31T11:13:27.678Z",
+      "event": "infinite_enabled_observed",
+      "playing_intent": true,
+      "position_seconds": 30.713
+    },
+    {
+      "at": "2026-10-31T11:13:54.325Z",
+      "event": "natural_track_transition_observed"
+    },
+    {
+      "at": "2026-10-31T11:14:21.020Z",
+      "event": "partial_prerelease_last_available_track_started"
+    },
+    {
+      "at": "2026-10-31T11:15:03.567Z",
+      "event": "navigation_while_playing",
+      "position_seconds": 41.759
+    },
+    {
+      "at": "2026-10-31T11:16:58.664Z",
+      "event": "partial_prerelease_queue_empty_after_natural_end",
+      "playing_intent": false,
+      "position_seconds": 0,
+      "radio_requests_observed": 0
+    },
+    {
+      "at": "2026-10-31T11:18:23.932Z",
+      "event": "infinite_enabled_reconfirmed",
+      "repeat": "off",
+      "shuffle": false
+    },
+    {
+      "at": "2026-10-31T11:19:33.909Z",
+      "event": "published_album_last_track_started"
+    },
+    {
+      "at": "2026-10-31T11:20:15.712Z",
+      "event": "published_album_refill_observed",
+      "original_tracks": 5,
+      "total_tracks": 35,
+      "next_up": 30,
+      "radio_http_status": 200,
+      "response_header_seconds": 1.279
+    },
+    {
+      "at": "2026-10-31T11:23:32.134Z",
+      "event": "natural_transition_into_recommendation_observed",
+      "position_seconds": 55.092
+    },
+    {
+      "at": "2026-10-31T11:24:02.690Z",
+      "event": "client_tab_network_offline"
+    },
+    {
+      "at": "2026-10-31T11:24:03.629Z",
+      "event": "another_queue_track_selected_offline",
+      "position_seconds": 0
+    },
+    {
+      "at": "2026-10-31T11:24:18.733Z",
+      "event": "offline_hold_end",
+      "position_seconds": 14.412
+    },
+    {
+      "at": "2026-10-31T11:24:18.751Z",
+      "event": "client_tab_network_restored"
+    },
+    {
+      "at": "2026-10-31T11:24:54.093Z",
+      "event": "progress_after_network_restore",
+      "position_seconds": 49.656
+    },
+    {
+      "at": "2026-10-31T11:26:31.024Z",
+      "event": "navigation_after_restore",
+      "position_seconds": 146.73
+    },
+    {
+      "at": "2026-10-31T11:28:43.292Z",
+      "event": "next_track_progress_observed",
+      "alias": "track_7",
+      "position_seconds": 111.325
+    },
+    {
+      "at": "2026-10-31T11:31:10.457Z",
+      "event": "next_track_progress_observed",
+      "alias": "track_8",
+      "position_seconds": 99.305
+    },
+    {
+      "at": "2026-10-31T11:33:55.413Z",
+      "event": "next_track_progress_observed",
+      "alias": "track_9",
+      "position_seconds": 46.099
+    },
+    {
+      "at": "2026-10-31T11:36:16.391Z",
+      "event": "last_playing_observation",
+      "alias": "track_10",
+      "position_seconds": 79.663
+    },
+    {
+      "at": "2026-10-31T11:36:16.403Z",
+      "event": "network_buffer_truncated"
+    },
+    {
+      "at": "2026-10-31T11:36:42.644Z",
+      "event": "pause_requested",
+      "immediate_ui_state_still_playing": true,
+      "position_seconds": 105.965
+    },
+    {
+      "at": "2026-10-31T11:38:05.538Z",
+      "event": "pause_confirmed",
+      "playing_intent": false,
+      "position_seconds": 106.021
+    }
+  ],
+  "network_observations": {
+    "count": 446,
+    "statuses": {
+      "200": 384,
+      "204": 3,
+      "206": 15,
+      "404": 1
+    },
+    "failures": {
+      "ERR_ABORTED_cancelled": 22,
+      "ERR_INTERNET_DISCONNECTED_not_cancelled": 21
+    },
+    "unexpected_non_cancelled_failure_codes": 0,
+    "incremental_buffer_truncations": 2,
+    "historical_re_read_truncated": true,
+    "counts_are_complete_denominators": false,
+    "counts_may_include_duplicate_observations": true,
+    "raw_urls_headers_bodies_not_retained": true
+  },
+  "http_404": {
+    "request_started_at": "2026-10-31T11:26:31.508Z",
+    "normalized_category": "other",
+    "response_header_seconds": 2.761,
+    "resource_and_cause": "unverified; original record was no longer retained in the browser event buffer"
+  },
+  "qoe_http_204_observations": [
+    {
+      "request_started_at": "2026-10-31T11:10:31.868Z",
+      "response_header_seconds": 0.08
+    },
+    {
+      "request_started_at": "2026-10-31T11:14:22.734Z",
+      "response_header_seconds": 0.066
+    },
+    {
+      "request_started_at": "2026-10-31T11:19:35.496Z",
+      "response_header_seconds": 0.068
+    }
+  ],
+  "sentry": {
+    "http_200_observed_before_fault": true,
+    "http_200_observed_after_restore": true,
+    "error_vs_trace_envelope_type_verified": false,
+    "project_ingestion_symbolication_verified": false
+  },
+  "network_fault": {
+    "scope": "Listen tab only",
+    "start": "2026-10-31T11:24:02.690Z",
+    "end": "2026-10-31T11:24:18.751Z",
+    "requested_hold_seconds": 15,
+    "actual_elapsed_seconds": 16.061,
+    "ui_progress_during_offline_seconds": 14.412,
+    "audio_stall_or_audible_recovery_verified": false
+  },
+  "background_checkpoint": {
+    "at": "2026-10-31T11:27:54Z",
+    "original_application_containers_unchanged": 26,
+    "worker_and_projector_role_checks_healthy": 6,
+    "representative_enrichment_load_triggered": false
+  },
+  "cleanup": {
+    "playback_pause_verified": true,
+    "network": "online, no throughput/latency emulation",
+    "persistent_playback_preferences_changed": false
+  },
+  "limits": [
+    "Engine/UI progress is not physical audio verification.",
+    "No raw request or event bodies, personal library payloads, account identifiers or credentials retained.",
+    "Network observations are partial because the buffer overflowed twice; no total failure ratio or SLO is computed.",
+    "QoE204 and Sentry200 establish observed transport acceptance, not complete storage, ingestion or symbolication."
+  ]
+}

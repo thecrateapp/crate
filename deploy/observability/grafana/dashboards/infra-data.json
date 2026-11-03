@@ -1,0 +1,503 @@
+{
+  "uid": "crate-infra-data",
+  "title": "Crate infrastructure \u00b7 PostgreSQL and Redis",
+  "schemaVersion": 40,
+  "version": 1,
+  "editable": false,
+  "tags": ["crate", "infrastructure", "shadow"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [],
+  "panels": [
+    {
+      "title": "PostgreSQL reachable",
+      "type": "timeseries",
+      "description": "Exporter-level dependency probe. No data is not healthy.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "pg_up",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 1
+    },
+    {
+      "title": "PostgreSQL connections by state",
+      "type": "timeseries",
+      "description": "Database sessions, not the application SQLAlchemy pool.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (state) (pg_stat_activity_count)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{state}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 2
+    },
+    {
+      "title": "PostgreSQL locks",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (mode) (pg_locks_count)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{mode}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 3
+    },
+    {
+      "title": "PostgreSQL transaction rate",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(pg_stat_database_xact_commit[5m]) + rate(pg_stat_database_xact_rollback[5m]))",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 4
+    },
+    {
+      "title": "Statement mean execution time",
+      "type": "timeseries",
+      "description": "Top 20 statement IDs by exporter selection, no SQL text. Mean, not p95. Missing/zero-call statements stay absent.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(pg_stat_statements_seconds_total[5m]) / rate(pg_stat_statements_calls_total[5m])",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{queryid}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 5
+    },
+    {
+      "title": "PostgreSQL block read time",
+      "type": "timeseries",
+      "description": "Database IO timing; enabled by the existing deployment configuration.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(pg_stat_database_blk_read_time[5m]))",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 6
+    },
+    {
+      "title": "Redis reachable by role",
+      "type": "timeseries",
+      "description": "Independent cache/durable probes; zero indicates connection failure.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "redis_up",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{redis_role}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 7
+    },
+    {
+      "title": "Redis memory used",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "redis_memory_used_bytes",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{redis_role}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 8
+    },
+    {
+      "title": "Redis connections",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "redis_connected_clients",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{redis_role}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 9
+    },
+    {
+      "title": "Redis command rate",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(redis_commands_processed_total[5m])",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{redis_role}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 10
+    },
+    {
+      "title": "Redis evictions",
+      "type": "timeseries",
+      "description": "Durable Redis uses noeviction; investigate rejected writes/memory pressure separately.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(redis_evicted_keys_total[5m])",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{redis_role}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 11
+    },
+    {
+      "title": "Redis rejected connections",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(redis_rejected_connections_total[5m])",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{redis_role}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 12
+    }
+  ],
+  "templating": {
+    "list": []
+  }
+}

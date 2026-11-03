@@ -25,7 +25,10 @@ TOOL_NAMES = {
     "get_instance_inventory",
     "get_observability_summary",
     "get_pipeline_status",
+    "get_playback_quality",
+    "get_product_kpis",
     "get_smart_mix_status",
+    "get_stack_status",
     "list_library_issues",
     "inspect_artist",
     "list_jobs",
@@ -142,6 +145,9 @@ def test_discovery_filters_each_request_and_call_still_enforces_scope(transport_
                     "get_instance_inventory",
                     "get_observability_summary",
                     "get_pipeline_status",
+                    "get_playback_quality",
+                    "get_product_kpis",
+                    "get_stack_status",
                     "read_diagnostics",
                 }
                 result = await client.call_tool(

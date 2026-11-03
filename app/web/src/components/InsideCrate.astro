@@ -1,4 +1,5 @@
 ---
+import { STACK_MAP } from "../content/admin/observability";
 import { listen } from "../content/listen/en";
 import { t } from "../i18n";
 import AgentTeaser from "./inside/AgentTeaser.astro";
@@ -14,7 +15,9 @@ const smartMix = listen.chapters.find((chapter) => chapter.smartMix)!;
 const leads = [
   { id: "mix", href: `/listen#${smartMix.id}` },
   { id: "mcp", href: "/admin#mcp" },
+  { id: "stack", href: "/admin#observability" },
 ] as const;
+const still = STACK_MAP.image;
 ---
 
 <section class="inside" aria-labelledby="inside-title" data-reveal>
@@ -34,12 +37,26 @@ const leads = [
             <span class="viz-label lead-label">
               <b>{t(`inside.${lead.id}.label`, locale).split(" · ")[0]}</b>
               {t(`inside.${lead.id}.label`, locale).split(" · ").slice(1).join(" · ")}
+              {lead.id === "stack" && <span class="stack-sample"> · {t("inside.stack.sample", locale)}</span>}
             </span>
             <span class="lead-art">
               {lead.id === "mix" ? (
                 <MixTeaser stages={smartMix.smartMix!.stages} locale={locale} />
-              ) : (
+              ) : lead.id === "mcp" ? (
                 <AgentTeaser locale={locale} />
+              ) : (
+                <span class="stack-still">
+                  <img
+                    src={`${still.image}-768.webp`}
+                    srcset={`${still.image}-768.webp 768w, ${still.image}-1440.webp 1440w`}
+                    sizes="(min-width: 1000px) 60vw, 100vw"
+                    width={still.width}
+                    height={still.height}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </span>
               )}
             </span>
             <span class="lead-copy">
@@ -134,7 +151,7 @@ const leads = [
     padding-left: 0;
   }
 
-  .leads li:last-child a {
+  .leads li:nth-child(2) a {
     padding-right: 0;
   }
 
@@ -150,6 +167,44 @@ const leads = [
   .lead-art {
     display: block;
     min-width: 0;
+  }
+
+  .leads li + li[data-lead="stack"] {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    display: block;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .leads li[data-lead="stack"] a {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    grid-template-rows: auto auto;
+    align-items: end;
+    gap: 22px clamp(24px, 5vw, 80px);
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .leads li[data-lead="stack"] .lead-label {
+    grid-column: 1 / -1;
+  }
+
+  .stack-still {
+    position: relative;
+    display: block;
+    -webkit-mask-image: radial-gradient(ellipse 70% 80% at 50% 50%, #000 60%, transparent 100%);
+    mask-image: radial-gradient(ellipse 70% 80% at 50% 50%, #000 60%, transparent 100%);
+  }
+
+  .stack-still img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .stack-sample {
+    color: var(--amber);
   }
 
   .lead-copy {
@@ -195,9 +250,12 @@ const leads = [
     }
     .leads a,
     .leads li:first-child a,
-    .leads li:last-child a {
+    .leads li:nth-child(2) a {
       padding-left: 0;
       padding-right: 0;
+    }
+    .leads li[data-lead="stack"] a {
+      grid-template-columns: 1fr;
     }
   }
 

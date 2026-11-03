@@ -19,6 +19,9 @@ class VdjCatalogTrackResponse(BaseModel):
     bpm: float | None = None
     audio_key: str | None = None
     audio_scale: str | None = None
+    camelot: str | None = None
+    energy: float | None = None
+    album_id: int | None = None
     has_cover: bool = False
     cover_url: str | None = None
 

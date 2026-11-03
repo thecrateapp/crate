@@ -271,8 +271,9 @@ def _set_span_status(span: Any, status: str) -> None:
         set_status(status)
 
 
-def scrub_sentry_event(event: dict[str, Any]) -> dict[str, Any]:
+def scrub_sentry_event(event: dict[str, Any], hint: Any = None) -> dict[str, Any]:
     """Return a copy of an event with credentials and PII removed."""
+    del hint
     return _scrub_value(copy.deepcopy(event))
 
 

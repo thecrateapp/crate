@@ -7,6 +7,12 @@ import {
 import { ApiError } from "@/lib/api";
 import { getTrackCacheKey } from "./player-utils";
 import {
+  getPlaybackQoeRuntime,
+  recordPlaybackQoe,
+  type PlaybackContinuationOutcome,
+  type PlaybackContinuationSurface,
+} from "@/lib/playback-qoe";
+import {
   acknowledgeContinuationBatch,
   fetchContinuationBatch,
 } from "@/lib/radio-continuation";
@@ -64,8 +70,25 @@ export function usePlaybackRefillRuntime(options: Options) {
     needsGesture: false,
     terminal: false,
     suspended: false,
+    episode: null as {
+      startedAt: number;
+      surface: PlaybackContinuationSurface;
+    } | null,
   });
   const runRef = useRef<() => void>(() => {});
+
+  const endEpisode = useCallback((outcome: PlaybackContinuationOutcome) => {
+    const episode = state.current.episode;
+    if (!episode) return;
+    state.current.episode = null;
+    recordPlaybackQoe({
+      event: "continuation",
+      continuation: outcome,
+      surface: episode.surface,
+      durationMs: Date.now() - episode.startedAt,
+      runtime: getPlaybackQoeRuntime(),
+    });
+  }, []);
 
   const clearEofWait = useCallback(() => {
     const runtime = state.current;
@@ -79,12 +102,13 @@ export function usePlaybackRefillRuntime(options: Options) {
     if (!nativeOwnsBackgroundRefill()) return false;
     const runtime = state.current;
     if (runtime.waitingAtEnd) runtime.nativeHandoff = true;
+    endEpisode("native");
     if (runtime.graceTimer !== null) clearTimeout(runtime.graceTimer);
     runtime.graceTimer = null;
     runtime.inFlight?.abort();
     runtime.inFlight = null;
     return true;
-  }, []);
+  }, [endEpisode]);
 
   const settleAdvancedEof = useCallback(
     (index = latest.current.refs.currentIndexRef.current) => {
@@ -105,14 +129,16 @@ export function usePlaybackRefillRuntime(options: Options) {
       runtime.failures = 0;
       runtime.transportFailures = 0;
       refs.actionsRef.current.setBuffering(false);
+      endEpisode("recovered");
       clearEofWait();
       return true;
     },
-    [clearEofWait],
+    [clearEofWait, endEpisode],
   );
 
   const reset = useCallback(() => {
     const runtime = state.current;
+    endEpisode("cancelled");
     runtime.generation++;
     runtime.inFlight?.abort();
     runtime.inFlight = null;
@@ -127,15 +153,16 @@ export function usePlaybackRefillRuntime(options: Options) {
     runtime.terminal = false;
     runtime.suspended = true;
     runtime.nativeHandoff = false;
-  }, [clearEofWait]);
+  }, [clearEofWait, endEpisode]);
 
   const unavailable = useCallback(() => {
     if (!state.current.waitingAtEnd || yieldToNative() || settleAdvancedEof())
       return;
+    endEpisode("unavailable");
     reset();
     state.current.needsGesture = true;
     latest.current.refs.actionsRef.current.onUnavailable?.();
-  }, [reset, settleAdvancedEof, yieldToNative]);
+  }, [endEpisode, reset, settleAdvancedEof, yieldToNative]);
 
   const startEofDeadline = useCallback(() => {
     const runtime = state.current;
@@ -308,6 +335,7 @@ export function usePlaybackRefillRuntime(options: Options) {
         });
       };
       if (batch.status === "exhausted" || batch.status === "auth_required") {
+        endEpisode(batch.status === "exhausted" ? "exhausted" : "auth");
         runtime.terminal = true;
         clearEofWait();
         o.refs.actionsRef.current.setBuffering(false);
@@ -344,6 +372,7 @@ export function usePlaybackRefillRuntime(options: Options) {
         runtime.transportFailures = 0;
         if (runtime.waitingAtEnd)
           latest.current.refs.actionsRef.current.setBuffering(false);
+        endEpisode("recovered");
         clearEofWait();
       }
       await acknowledge();
@@ -355,6 +384,7 @@ export function usePlaybackRefillRuntime(options: Options) {
         error instanceof ApiError &&
         (error.status === 401 || error.status === 403)
       ) {
+        endEpisode("auth");
         runtime.terminal = true;
         clearEofWait();
         o.refs.actionsRef.current.setBuffering(false);
@@ -377,6 +407,7 @@ export function usePlaybackRefillRuntime(options: Options) {
     }
   }, [
     clearEofWait,
+    endEpisode,
     reset,
     schedule,
     settleAdvancedEof,
@@ -404,6 +435,13 @@ export function usePlaybackRefillRuntime(options: Options) {
     runtime.suspended = false;
     if (!runtime.waitingAtEnd) {
       runtime.waitingAtEnd = true;
+      runtime.episode = {
+        startedAt: Date.now(),
+        surface:
+          latest.current.refs.playSourceRef.current?.type === "radio"
+            ? "radio"
+            : "infinite",
+      };
       const refs = latest.current.refs;
       const track = refs.queueRef.current[refs.currentIndexRef.current];
       runtime.waitingTrack = track

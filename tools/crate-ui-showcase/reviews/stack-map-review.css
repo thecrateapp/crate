@@ -1,0 +1,43 @@
+.stack-map-review {
+  display: grid;
+  min-width: 0;
+  gap: 24px;
+  padding: clamp(20px, 3vw, 48px);
+  max-width: 1720px;
+  margin: 0 auto;
+}
+.stack-map-review__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.stack-map-review__header h1 {
+  margin: 0 0 10px;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: clamp(36px, 5vw, 54px);
+  font-weight: 700;
+  letter-spacing: -0.055em;
+  line-height: 1;
+}
+.stack-map-review__header p {
+  margin: 0;
+  max-width: 580px;
+  color: var(--text-muted);
+  font-family: var(--font-brand);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.stack-map-review__notice {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-subtle);
+}
+@media (max-width: 600px) {
+  .stack-map-review {
+    padding: 20px 16px;
+  }
+}

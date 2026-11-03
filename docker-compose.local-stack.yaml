@@ -16,10 +16,6 @@ services:
     labels:
       traefik.http.routers.traefik-secure.rule: Host(`traefik.crate.local`)
 
-  tidarr:
-    labels:
-      traefik.http.routers.tidarr.rule: Host(`search.crate.local`)
-
   crate-api:
     ports:
       - "${CRATE_API_PORT:-8585}:8585"

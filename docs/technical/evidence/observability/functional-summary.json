@@ -1,0 +1,133 @@
+{
+  "source_sha": "248636d511d7356b732b908bc07ba0b50fdb9b97",
+  "sample_window": {
+    "start": "2026-10-31T11:10:52.298183+00:00",
+    "end": "2026-10-31T11:35:52.303094+00:00",
+    "count": 26,
+    "duration_seconds": 1500.004911
+  },
+  "all_six_targets_up_in_all_samples": true,
+  "postgres_up_in_all_samples": true,
+  "both_redis_up_in_all_samples": true,
+  "monitoring_restarts_max": 0,
+  "monitoring_oom_killed": false,
+  "memory_working_set_mib": {
+    "min": 349.61328125,
+    "max": 384.171875,
+    "mean": 367.7542067307692
+  },
+  "metric_coverage_counts": {
+    "monitoring_memory_bytes": [
+      8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
+      8
+    ],
+    "monitoring_cpu_cores": [
+      6, 8, 8, 8, 8, 8, 8, 8, 7, 8, 8, 8, 8, 7, 8, 8, 8, 7, 8, 7, 8, 6, 7, 8, 7,
+      8
+    ],
+    "monitoring_throttled_seconds_per_second": [
+      6, 8, 8, 8, 8, 8, 8, 8, 7, 8, 8, 8, 8, 7, 8, 8, 8, 7, 8, 7, 8, 6, 7, 8, 7,
+      8
+    ]
+  },
+  "cpu_service_coverage_5m": [
+    8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0,
+    8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0
+  ],
+  "cpu_cores_5m_available_series_sums": {
+    "min": 0.03536775984838985,
+    "max": 0.04326840838152472,
+    "mean": 0.0383505996194799
+  },
+  "throttle_service_coverage_5m": [
+    8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0,
+    8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0
+  ],
+  "throttled_seconds_per_second_5m_available_series_sums": {
+    "min": 0.32610680107649254,
+    "max": 0.4125093075614643,
+    "mean": 0.3791295278765365
+  },
+  "io_service_coverage_5m": [
+    3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0,
+    3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0
+  ],
+  "io_bytes_per_second_5m_available_series_sums": {
+    "min": 7023.660558244647,
+    "max": 209205.87363214564,
+    "mean": 54566.17012081289
+  },
+  "head_series": {
+    "min": 6312.0,
+    "max": 6314.0,
+    "mean": 6313.2307692307695
+  },
+  "prometheus_disk_kib": {
+    "min": 3424,
+    "max": 5580,
+    "mean": 4463.846153846154
+  },
+  "per_service_memory": {
+    "crate-prometheus": {
+      "peak_working_set_mib": 64.2578125,
+      "limit_mib": 384
+    },
+    "crate-grafana": {
+      "peak_working_set_mib": 252.4296875,
+      "limit_mib": 256
+    },
+    "crate-node-exporter": {
+      "peak_working_set_mib": 8.1484375,
+      "limit_mib": 32
+    },
+    "crate-postgres-exporter": {
+      "peak_working_set_mib": 8.2421875,
+      "limit_mib": 64
+    },
+    "crate-redis-exporter": {
+      "peak_working_set_mib": 9.05859375,
+      "limit_mib": 32
+    },
+    "crate-redis-durable-exporter": {
+      "peak_working_set_mib": 8.46875,
+      "limit_mib": 32
+    },
+    "crate-cadvisor": {
+      "peak_working_set_mib": 29.91015625,
+      "limit_mib": 128
+    },
+    "crate-observability-docker-proxy": {
+      "peak_working_set_mib": 12.19921875,
+      "limit_mib": 16
+    }
+  },
+  "container_service_coverage": {
+    "observed": 30,
+    "expected": 34,
+    "excluded_companions": ["nginx", "slskd", "tidarr", "traefik"]
+  },
+  "scrape_duration_seconds_max": {
+    "prometheus": 0.016541693,
+    "node": 0.286217985,
+    "cadvisor": 0.580150126,
+    "postgresql": 0.264504287,
+    "redis-cache": 2.172987203,
+    "redis-durable": 1.457899946
+  },
+  "scrape_sample_age_seconds_max": {
+    "cadvisor": 22.02400016784668,
+    "node": 21.30400013923645,
+    "postgresql": 6.938000202178955,
+    "prometheus": 28.61400008201599,
+    "redis-cache": 11.522000074386597,
+    "redis-durable": 1.196000099182129
+  },
+  "limitations": [
+    "Samples are point observations, not a continuous availability proof.",
+    "2m CPU/throttle calculations have partial service coverage; no missing value is treated as zero.",
+    "5m CPU/throttle aggregate completeness is described by the matching coverage arrays.",
+    "IO rates cover three services; missing other-service rates are unknown.",
+    "Working-set memory is not exact process RSS; IO may count device layers.",
+    "This is not an application SLO or physical audio-quality verification."
+  ]
+}

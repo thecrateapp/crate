@@ -6,6 +6,7 @@ import FeatureList from "../components/FeatureList.astro";
 import Gallery from "../components/Gallery.astro";
 import PageHeader from "../components/PageHeader.astro";
 import McpAgents from "../components/admin/McpAgents.astro";
+import Observability from "../components/admin/Observability.astro";
 import AlbumSidecar from "../components/viz/AlbumSidecar.astro";
 import EnrichmentOrbit from "../components/viz/EnrichmentOrbit.astro";
 import GenreWheel from "../components/viz/GenreWheel.astro";
@@ -70,6 +71,7 @@ const splits: Record<string, { visual: unknown; side: "left" | "right" }> = {
             ) : (
               chapter.features && <FeatureList items={chapter.features} />
             )}
+            {chapter.id === "observability" && <Observability />}
             {chapter.id === "mcp" && <McpAgents />}
           </Chapter>
         );

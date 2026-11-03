@@ -1,5 +1,4 @@
 foreach(bundle IN ITEMS
-    "${CRATE_VDJ_CONTROL_BUNDLE}"
     "${CRATE_VDJ_ONLINE_SOURCE_BUNDLE}"
 )
     if(NOT EXISTS "${bundle}/Contents/Info.plist")
@@ -86,24 +85,4 @@ execute_process(
 if(NOT online_source_name_result EQUAL 0 OR
    NOT online_source_name STREQUAL "Crate")
     message(FATAL_ERROR "Online Source bundle does not declare the Crate display name")
-endif()
-
-execute_process(
-    COMMAND /usr/libexec/PlistBuddy
-        -c "Print :CFBundleIdentifier"
-        "${CRATE_VDJ_CONTROL_BUNDLE}/Contents/Info.plist"
-    OUTPUT_VARIABLE control_identifier
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-execute_process(
-    COMMAND /usr/libexec/PlistBuddy
-        -c "Print :CFBundleIdentifier"
-        "${CRATE_VDJ_ONLINE_SOURCE_BUNDLE}/Contents/Info.plist"
-    OUTPUT_VARIABLE online_source_identifier
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-)
-if(control_identifier STREQUAL online_source_identifier)
-    message(FATAL_ERROR
-        "The plugin bundles must have unique CFBundleIdentifier values"
-    )
 endif()

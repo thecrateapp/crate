@@ -1,12 +1,12 @@
 {
   "tracks": "48,213",
   "albums": "4,400",
-  "pytest": 6635,
-  "vitest": 6434,
-  "goTests": 374,
-  "rustTests": 288,
-  "taskTypes": 141,
-  "migrations": 138,
+  "pytest": 7506,
+  "vitest": 6799,
+  "goTests": 382,
+  "rustTests": 291,
+  "taskTypes": 144,
+  "migrations": 142,
   "taskQueues": {
     "maintenance": [
       "ai_catalog_refresh",
@@ -29,6 +29,9 @@
       "prepare_library_repairs",
       "repair_duplicate_tracks",
       "compute_analytics",
+      "compute_product_kpis",
+      "compute_observability_summary",
+      "compute_recommendation_skips",
       "check_new_releases",
       "promote_due_releases",
       "scan",

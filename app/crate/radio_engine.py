@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from crate.config import radio_rotation_enabled, transition_fit_enabled
+from crate.observability.recommendations import note_radio_relaxation
 from crate.recommendation_policy import RECENT_PLAY_WINDOW, canonical_key
 from crate.db.queries.recommendation_history import history_for_candidates
 
@@ -1965,6 +1966,7 @@ def _generate_batch(
                 ]
                 rows_for_selection = fallback_rows or candidate_rows
 
+        relaxation = "none"
         candidate = _select_radio_candidate_from_rows(
             rows_for_selection,
             drift,
@@ -1989,6 +1991,7 @@ def _generate_batch(
             **rotation_options,
         )
         if candidate is None and artist_batch_limit is not None:
+            relaxation = "artist_batch"
             candidate = _select_radio_candidate_from_rows(
                 rows_for_selection,
                 drift,
@@ -2013,6 +2016,7 @@ def _generate_batch(
                 **rotation_options,
             )
         if candidate is None and artist_session_limit is not None:
+            relaxation = "artist_session"
             candidate = _select_radio_candidate_from_rows(
                 rows_for_selection,
                 drift,
@@ -2038,6 +2042,7 @@ def _generate_batch(
             )
 
         if candidate is None and is_seeded_context_radio and radio_rotation_enabled():
+            relaxation = "consecutive"
             candidate = _select_radio_candidate_from_rows(
                 rows_for_selection,
                 drift,
@@ -2143,6 +2148,7 @@ def _generate_batch(
         )
         if radio_profile == "discovery" and _is_discovery_fresh_candidate(candidate):
             discovery_fresh_count += 1
+        note_radio_relaxation(relaxation)
 
     # Update session state
     session["used_track_ids"] = used_track_ids

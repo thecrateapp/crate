@@ -114,3 +114,8 @@ def create_schema(cur):
     )
 
     create_operator_generations_v134_schema(cur)
+    from crate.db.schema_sections.metric_minutes_v141 import (
+        create_metric_minute_snapshots_v141_schema,
+    )
+
+    create_metric_minute_snapshots_v141_schema(cur)

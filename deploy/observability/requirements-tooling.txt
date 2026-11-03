@@ -1,0 +1,2 @@
+# Independent release tooling; not an application container dependency.
+PyYAML==6.0.3

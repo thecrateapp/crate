@@ -1,5 +1,12 @@
 # Crate v3 visual progress preview
 
+Current Stack Map review: [standalone page](http://127.0.0.1:5186/review-stack-map.html).
+The real Admin instrument uses sample data, selectable service neighborhoods and
+an inspector; mobile switches between application and observability. Its scene
+is shared with Storybook `Reviews/Admin/Stack Map`. Observed, degraded, stale and
+unavailable samples make no backend requests. See the
+[checkpoint evidence](../../docs/technical/evidence/observability/stack-map-visual-checkpoint.md).
+
 A local review surface for the real `@crate/ui` components and current tokens. It uses fictional
 music/library data, bundled brand fonts and the existing workspace tooling. No backend or login
 is needed. It is separate from the Listen and Admin production entries.
@@ -907,3 +914,8 @@ Open <http://127.0.0.1:5186/review-admin-federation.html> or Storybook
 pending peers, a sample import, streaming activity, risk data and audit events. Use the controls to
 review loading, empty, unavailable and read-only states. Peer and policy actions are simulated in
 memory; no requests reach the API or another node.
+
+Observability checkpoint: [Collection integrity](http://127.0.0.1:5186/review-observability-integrity.html).
+The actual System Health page has six fixture states: observed, Redis unavailable,
+empty, partial, stale and legacy. The scene is shared with Storybook and issues no
+backend requests. See `docs/technical/evidence/observability/pr1a-checkpoint-2.md`.

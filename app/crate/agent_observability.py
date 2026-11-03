@@ -14,6 +14,7 @@ from crate.agent_diagnostics import (
     _safe,
 )
 from crate.db.queries import agent_observability as evidence_store
+from crate.db.queries import observability_summary as summary_store
 from crate.smart_mix import versions
 
 SERVICES = (
@@ -209,42 +210,142 @@ def _health(records, failure):
     payload = (record or {}).get("payload")
     payload = payload if isinstance(payload, dict) else {}
     score, raw_breaches = payload.get("score"), payload.get("breaches")
-    breaches = raw_breaches if isinstance(raw_breaches, list) else []
+    states = {"available", "empty", "stale", "partial", "unavailable"}
+    producer_state = payload.get("availability")
+    if not isinstance(producer_state, str):
+        producer_state = "unavailable"
+    score_valid = type(score) is int and 0 <= score <= 100
     valid = (
-        type(score) is int
-        and 0 <= score <= 100
+        (score_valid or (score is None and producer_state in states - {"available"}))
         and isinstance(raw_breaches, list)
-        and len(breaches) <= 10
+        and len(raw_breaches) <= 10
         and all(
             isinstance(item, dict)
             and isinstance(item.get("name"), str)
             and item.get("severity") in {"warning", "critical"}
-            for item in breaches
+            for item in raw_breaches
         )
     )
-    selected = (
-        {
-            "score": score,
-            "breaches": [
-                {
-                    "name": item["name"][:80],
-                    "severity": item["severity"],
-                    **{
-                        key: item[key]
-                        for key in ("value", "threshold")
-                        if type(item.get(key)) in {int, float}
-                        and math.isfinite(item[key])
-                    },
-                }
-                for item in breaches
-            ],
+    if not valid:
+        result = _source("health", record, None, failure, fresh=300)
+        if record and payload and not failure:
+            result["reason"] = (
+                "Stored health fields have invalid producer types or bounds"
+            )
+        return result
+    if payload.get("schema_version") != 2:
+        result = _source("health", record, None, failure, fresh=300)
+        result["reason"] = "Legacy health snapshot is unverified"
+        return result
+    inputs = {}
+    raw_inputs = payload.get("inputs")
+    raw_inputs = raw_inputs if isinstance(raw_inputs, dict) else {}
+    for key in ("api_latency", "api_requests", "api_errors", "queue_depth"):
+        raw = raw_inputs.get(key, {})
+        raw = raw if isinstance(raw, dict) else {}
+        state = raw.get("availability")
+        input_date = _date(raw.get("observed_at"))
+        inputs[key] = {
+            "availability": state
+            if isinstance(state, str) and state in states
+            else "unavailable",
+            "observed_at": input_date.isoformat() if input_date is not None else None,
+            **{
+                field: raw[field]
+                for field in ("sample_count", "eligible_count")
+                if type(raw.get(field)) is int and 0 <= raw[field] <= 2**63 - 1
+            },
         }
-        if valid
-        else None
+        if inputs[key]["availability"] == "available":
+            freshness, _reason = _fresh(inputs[key]["observed_at"], 300, 86400)
+            population = inputs[key].get(
+                "eligible_count" if key == "api_errors" else "sample_count", 0
+            )
+            if freshness != "available" or population <= 0:
+                inputs[key]["availability"] = (
+                    freshness if freshness != "available" else "unavailable"
+                )
+    if producer_state not in states or payload.get("source") != "redis_v2":
+        producer_state = "unavailable"
+    if producer_state == "available" and any(
+        value["availability"] != "available" for value in inputs.values()
+    ):
+        producer_state = "partial"
+    selected = {
+        "schema_version": 2,
+        "availability": producer_state,
+        "source": "redis_v2",
+        "coverage": "observed_only",
+        "score": score if producer_state == "available" else None,
+        "inputs": inputs,
+        "breaches": [
+            {
+                "name": item["name"][:80],
+                "severity": item["severity"],
+                **{
+                    key: item[key]
+                    for key in ("value", "threshold")
+                    if type(item.get(key)) in {int, float} and math.isfinite(item[key])
+                },
+            }
+            for item in (raw_breaches if isinstance(raw_breaches, list) else [])
+        ],
+    }
+    local = payload.get("collector_local")
+    if isinstance(local, dict):
+        local_state = local.get("availability")
+        if not isinstance(local_state, str) or local_state not in states:
+            local_state = "unavailable"
+        counters = local.get("counters")
+        allowed = {
+            "invalid_observation",
+            "labels_normalized",
+            "redis_unavailable",
+            "redis_error",
+            "buffer_full",
+            "cardinality_rejected",
+            "expired_before_flush",
+            "flush_error",
+            "source_changed",
+            "async_error",
+            "buffer_expired",
+        }
+        selected["collector_local"] = {
+            "scope": "process",
+            "coverage": "local_only",
+            "availability": local_state,
+            "counters": {
+                key: value
+                for key, value in (
+                    counters.items() if isinstance(counters, dict) else []
+                )
+                if key in allowed and type(value) is int and 0 <= value <= 2**63 - 1
+            },
+        }
+        if local_state in {"partial", "unavailable"} and producer_state == "available":
+            producer_state = local_state
+            selected.update(availability=producer_state, score=None)
+    observed = _date(payload.get("observed_at"))
+    dates = []
+    for value in inputs.values():
+        input_date = _date(value["observed_at"])
+        if input_date is not None:
+            dates.append(input_date)
+    if observed is not None:
+        dates.append(observed)
+    selected["observed_at"] = min(dates).isoformat() if dates else None
+    result = _source(
+        "health",
+        {**record, "observed_at": selected["observed_at"]} if record else record,
+        selected,
+        failure,
+        fresh=300,
     )
-    result = _source("health", record, selected, failure, fresh=300)
-    if record and payload and not valid and not failure:
-        result["reason"] = "Stored health fields have invalid producer types or bounds"
+    if result["availability"] == "available" and producer_state != "available":
+        result["availability"] = {"partial": "stale", "empty": "unavailable"}.get(
+            producer_state, producer_state
+        )
+        result["reason"] = f"Health input observations are {producer_state}"
     return result
 
 
@@ -701,3 +802,136 @@ def get_smart_mix_status(track_uids=None):
             "Request omitted exact track UUIDs in smaller batches"
         )
     return result
+
+
+SUMMARY_FRESH_SECONDS = 900
+KPI_GROUPS = (
+    "users",
+    "devices",
+    "listening",
+    "library",
+    "acquisition",
+    "engagement",
+    "federation",
+    "streams",
+)
+
+
+def _summary():
+    try:
+        return summary_store.read_observability_summary(), None
+    except Exception:  # noqa: BLE001 — failures must not leak DB DSNs or credentials.
+        return {}, "Persisted evidence source failed"
+
+
+def _summary_section(record, name):
+    payload = record.get("payload")
+    section = payload.get(name) if isinstance(payload, dict) else None
+    return section if isinstance(section, dict) else {}
+
+
+def _summary_source(name, record, failure, section, selected):
+    if not failure and not record:
+        failure = "Observability summary is opt-in and has not run"
+    elif not failure and record.get("oversized"):
+        failure = "Stored summary exceeds 49152 byte bound"
+    source = _source(
+        name,
+        {"observed_at": record.get("observed_at")} if record else None,
+        selected,
+        failure,
+        SUMMARY_FRESH_SECONDS,
+    )
+    state = section.get("availability")
+    if source["availability"] != "unavailable" and state in {"unavailable", "empty"}:
+        source.update(
+            availability="unavailable",
+            reason=section.get("reason") or state,
+            coverage="unavailable",
+        )
+    elif source["availability"] == "available" and state == "stale":
+        source.update(availability="stale", reason=section.get("reason"))
+    source["interpretation"] = (
+        "Persisted opt-in summary; missing values are unknown, never zero"
+    )
+    return source
+
+
+def get_playback_quality():
+    """Stored playback startup, stall and recovery figures with their sample."""
+    record, failure = _summary()
+    playback = _summary_section(record, "playback")
+    return _result(
+        "playback_quality",
+        {
+            "playback": _summary_source(
+                "observability_summary:playback", record, failure, playback, playback
+            )
+        },
+        data={
+            "window_minutes": playback.get("window_minutes"),
+            "minimum_startups": playback.get("minimum_startups"),
+        },
+    )
+
+
+def get_product_kpis(window_days=30):
+    """Stored daily product KPIs for 7 or 30 days, segments under 3 suppressed."""
+    if window_days not in (7, 30):
+        raise DiagnosticError("INVALID_ARGUMENT", "window_days must be 7 or 30")
+    record, failure = _summary()
+    kpis = _summary_section(record, "product_kpis")
+    windows = kpis.get("windows") or {}
+    breakdowns = kpis.get("breakdowns") or {}
+    sources = {}
+    for group in KPI_GROUPS:
+        selected = {
+            key: value
+            for key, value in {
+                "kpis": (windows.get(str(window_days)) or {}).get(group),
+                "breakdowns": breakdowns.get(group),
+            }.items()
+            if value
+        }
+        sources[group] = _summary_source(
+            f"observability_summary:product_kpis:{group}",
+            record,
+            failure,
+            kpis,
+            selected,
+        )
+    return _result(
+        "product_kpis",
+        sources,
+        data={
+            "window_days": window_days,
+            "end": kpis.get("end"),
+            "computed_at": kpis.get("computed_at"),
+            "minimum_sample": kpis.get("minimum_sample"),
+            "aggregation": "Each KPI has days, latest, sum and mean. Read latest for snapshot KPIs and sum or mean for daily ones.",
+        },
+    )
+
+
+def get_stack_status():
+    """Stored application and monitoring deployment state from the Stack inventory."""
+    record, failure = _summary()
+    stack = _summary_section(record, "stack")
+    return _result(
+        "stack_status",
+        {
+            name: _summary_source(
+                f"observability_summary:stack:{name}",
+                record,
+                failure,
+                stack,
+                stack.get(name),
+            )
+            for name in ("application", "monitoring")
+        },
+        data={
+            "host": stack.get("host"),
+            "inventory_observed_at": stack.get("observed_at"),
+            "resources": stack.get("resources") or "live_only",
+        },
+    )

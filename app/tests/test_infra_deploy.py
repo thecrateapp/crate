@@ -1,5 +1,6 @@
 """Regression gates for actual host trust closure and immutable config transitions."""
 
+import hashlib
 import json
 import os
 import shutil
@@ -17,15 +18,79 @@ from deploy.operator.infra_deploy import (
     REQUIRED,
     configured_inputs,
     environment_versions,
+    generated_backup_inputs,
     host_inputs,
     staged_inputs,
     validate_host,
 )
 from deploy.operator.infra_executor import Executor, HealthCoverageError, Runner
 from tests import test_infra_bridge as shared_fixtures
+from tests import test_sentry_release_contract as sentry_contract
 from tests.test_infra_bridge import FakeCommands, confirm, prepare, release
 
 lab = shared_fixtures.lab
+
+
+@pytest.mark.parametrize("worker_release", ["missing", "stale", "current"])
+def test_metadata_only_selection_prediction_matches_real_deploy_shell(
+    tmp_path, worker_release
+):
+    manifest = sentry_contract._manifest()
+    candidate = sentry_contract.manifest_module.render_release_env(manifest)
+    old = candidate
+    key = "CRATE_WORKER_SENTRY_RELEASE"
+    if worker_release == "missing":
+        old = "".join(
+            line
+            for line in old.splitlines(keepends=True)
+            if not line.startswith(key + "=")
+        )
+    elif worker_release == "stale":
+        old = old.replace(key + "=crate-" + "a" * 40, key + "=crate-" + "f" * 40)
+    (tmp_path / ".env").write_text(old)
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    (backup / ".env").write_text(old)
+    deployment = tmp_path / ".deploy"
+    deployment.mkdir()
+    (deployment / "release.env.candidate").write_text(candidate)
+    original = {".env": hashlib.sha256(old.encode()).hexdigest()}
+    for name in ("docker-compose.yaml", "docker-compose.project.yaml"):
+        content = b"services: {}\n"
+        (tmp_path / name).write_bytes(content)
+        (backup / name).write_bytes(content)
+        original[name] = hashlib.sha256(content).hexdigest()
+    _, predicted = generated_backup_inputs(
+        original, dict(original), old.encode(), manifest, "metadata-only-regression"
+    )
+    script = (
+        Path(__file__).resolve().parents[2] / "scripts/deploy-remote.sh"
+    ).read_text()
+    result = sentry_contract._shell(
+        tmp_path,
+        "\nBACKUP_DIR=backup\n"
+        + sentry_contract._function(script, "cmd_pull")
+        + "\ndocker() { printf 'unexpected pull\\n' >> attempted-pulls; return 1; }\n"
+        + "record_changed_release_services\ncmd_pull\n",
+    )
+    assert result.returncode == 0, result.stderr
+    expected = (
+        set()
+        if worker_release == "current"
+        else {
+            "crate-worker",
+            "crate-fast-worker",
+            "crate-maintenance-worker",
+            "crate-projector",
+        }
+    )
+    assert set((backup / "changed_services").read_text().splitlines()) == expected
+    assert (backup / "changed_image_refs").read_bytes() == b""
+    assert not (tmp_path / "attempted-pulls").exists()
+    for name in ("changed_image_refs", "changed_services"):
+        assert (
+            predicted[name] == hashlib.sha256((backup / name).read_bytes()).hexdigest()
+        )
 
 
 @pytest.mark.parametrize(
@@ -76,6 +141,7 @@ def test_expected_staging_and_env_transition_is_not_rebased(lab):
         root / "release-manifest.json"
     ).read_bytes()
     assert [args[-1] for args, _ in lab.runner.calls if args[0] == "/bin/bash"] == [
+        "host-lock",
         "release-preflight",
         "backup",
         "preflight",
@@ -83,6 +149,7 @@ def test_expected_staging_and_env_transition_is_not_rebased(lab):
         "pull",
         "up",
         "verify",
+        "host-unlock",
     ]
 
 
@@ -111,7 +178,14 @@ def test_external_change_between_stages_stops_without_unreviewed_rollback(lab):
         == "indeterminate"
     )
     steps = [args[-1] for args, _ in lab.runner.calls if args[0] == "/bin/bash"]
-    assert steps == ["release-preflight", "backup", "preflight", "config"]
+    assert steps == [
+        "host-lock",
+        "release-preflight",
+        "backup",
+        "preflight",
+        "config",
+        "host-unlock",
+    ]
 
 
 @pytest.mark.parametrize(
@@ -533,7 +607,7 @@ def test_operator_deploy_seals_staged_bundle_and_activates_context_after_verify(
         == approval["agent-context.tar.gz"]
     )
     stages = [args[-1] for args, _ in lab.runner.calls if args[0] == "/bin/bash"]
-    assert stages[-2:] == ["verify", "agent-context"]
+    assert stages[-3:] == ["verify", "agent-context", "host-unlock"]
 
 
 def test_operator_deploy_rejects_missing_context_before_effects(lab):

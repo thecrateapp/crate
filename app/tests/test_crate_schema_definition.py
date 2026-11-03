@@ -1,5 +1,6 @@
 """Contract tests for the Crates schema DDL source."""
 
+from contextlib import contextmanager
 from importlib import import_module
 from pathlib import Path
 
@@ -13,6 +14,13 @@ class RecordingExecutor:
 
     def execute(self, statement: str) -> None:
         self.statements.append(" ".join(statement.split()))
+
+    def get_context(self):
+        return self
+
+    @contextmanager
+    def autocommit_block(self):
+        yield
 
 
 def test_crate_migration_uses_the_bootstrap_schema_definition(monkeypatch) -> None:
@@ -124,7 +132,79 @@ def test_crate_migration_follows_the_current_main_head() -> None:
     assert scripts.get_revision("138").down_revision == "137"
     assert scripts.get_revision("139").down_revision == "138"
     assert scripts.get_revision("140").down_revision == "139"
-    assert scripts.get_heads() == ["140"]
+    assert scripts.get_revision("141").down_revision == "140"
+    assert scripts.get_heads() == ["142"]
+    assert scripts.get_revision("142").down_revision == "141"
+
+
+def test_metric_minute_migration_uses_immutable_schema_definition(monkeypatch):
+    root = Path(__file__).resolve().parents[1] / "crate" / "db"
+    assert (root / "migrations/versions/141_metric_minute_snapshots.py").is_file()
+    assert (root / "schema_sections/metric_minutes_v141.py").is_file()
+    migration = import_module(
+        "crate.db.migrations.versions.141_metric_minute_snapshots"
+    )
+    schema = import_module("crate.db.schema_sections.metric_minutes_v141")
+    migration_executor = RecordingExecutor()
+    schema_executor = RecordingExecutor()
+    monkeypatch.setattr(migration, "op", migration_executor)
+
+    migration.upgrade()
+    schema.create_metric_minute_snapshots_v141_schema(schema_executor)
+
+    assert migration_executor.statements == schema_executor.statements
+    statements = "\n".join(migration_executor.statements)
+    assert "CREATE TABLE IF NOT EXISTS metric_minute_snapshots" in statements
+    assert "metric_rollups" not in statements
+
+
+def test_product_kpi_migration_uses_immutable_schema_and_a_concurrent_brin_index(
+    monkeypatch,
+):
+    migration = import_module("crate.db.migrations.versions.142_product_kpi_daily")
+    schema = import_module("crate.db.schema_sections.product_kpis_v142")
+    migration_executor = RecordingExecutor()
+    schema_executor = RecordingExecutor()
+    monkeypatch.setattr(migration, "op", migration_executor)
+
+    migration.upgrade()
+    schema.create_product_kpi_daily_v142_schema(schema_executor)
+
+    statements = migration_executor.statements
+    assert statements[: len(schema_executor.statements)] == schema_executor.statements
+    assert "CREATE TABLE IF NOT EXISTS product_kpi_daily" in statements[0]
+    assert any(
+        "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_user_play_events_created_brin"
+        in sql
+        and "USING brin (created_at)" in sql
+        for sql in statements
+    )
+
+    downgrade = RecordingExecutor()
+    monkeypatch.setattr(migration, "op", downgrade)
+    migration.downgrade()
+    assert any(
+        "DROP TABLE IF EXISTS product_kpi_daily" in sql for sql in downgrade.statements
+    )
+
+
+def test_metric_minute_migration_downgrade_keeps_legacy_rollups(monkeypatch):
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "crate/db/migrations/versions/141_metric_minute_snapshots.py"
+    )
+    assert path.is_file()
+    migration = import_module(
+        "crate.db.migrations.versions.141_metric_minute_snapshots"
+    )
+    executor = RecordingExecutor()
+    monkeypatch.setattr(migration, "op", executor)
+
+    migration.downgrade()
+
+    statements = "\n".join(executor.statements)
+    assert "DROP TABLE IF EXISTS metric_minute_snapshots" in statements
+    assert "metric_rollups" not in statements
 
 
 def test_deployed_revisions_keep_their_numbers_ahead_of_branch_revisions() -> None:

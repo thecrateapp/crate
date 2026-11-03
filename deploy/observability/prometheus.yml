@@ -1,0 +1,88 @@
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+  evaluation_interval: 30s
+  external_labels:
+    app: crate
+
+rule_files:
+  - /etc/prometheus/recording-rules.yml
+
+# Shadow-only: recording rules and dashboards, no alert receivers.
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: [crate-prometheus:9090]
+    sample_limit: 5000
+
+  - job_name: node
+    static_configs:
+      - targets: [crate-node-exporter:9100]
+    sample_limit: 5000
+
+  - job_name: cadvisor
+    static_configs:
+      - targets: [crate-cadvisor:8080]
+    sample_limit: 10000
+    metric_relabel_configs:
+      - source_labels: [container_label_com_docker_compose_service]
+        regex: (crate-.+|nginx|traefik|slskd)
+        action: keep
+
+  - job_name: postgresql
+    # Query statistics are more expensive than host/Redis counters.
+    scrape_interval: 60s
+    static_configs:
+      - targets: [crate-postgres-exporter:9187]
+    sample_limit: 5000
+
+  - job_name: redis-cache
+    static_configs:
+      - targets: [crate-redis-exporter:9121]
+        labels:
+          redis_role: cache
+    sample_limit: 3000
+
+  - job_name: redis-durable
+    static_configs:
+      - targets: [crate-redis-durable-exporter:9121]
+        labels:
+          redis_role: durable
+    sample_limit: 3000
+
+  - job_name: traefik
+    dns_sd_configs:
+      - names: [traefik]
+        type: A
+        port: 8082
+        refresh_interval: 30s
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: traefik_(router|entrypoint)_requests_total
+        action: keep
+    sample_limit: 1000
+
+  - job_name: crate-app
+    scrape_interval: 15s
+    dns_sd_configs:
+      - names:
+          - crate-api
+          - crate-worker
+          - crate-fast-worker
+          - crate-maintenance-worker
+          - crate-analysis-worker
+          - crate-playback-worker
+          - crate-projector
+          - crate-readplane
+          - crate-media-worker
+        type: A
+        port: 9200
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__meta_dns_name]
+        target_label: service
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: crate_.+
+        action: keep
+    sample_limit: 20000

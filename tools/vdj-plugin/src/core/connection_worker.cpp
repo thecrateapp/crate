@@ -64,6 +64,15 @@ bool ConnectionWorker::disconnect()
     return cleared;
 }
 
+void ConnectionWorker::request_check()
+{
+    {
+        std::lock_guard lock(mutex_);
+        check_requested_ = true;
+    }
+    wakeup_.notify_all();
+}
+
 std::optional<CancellationToken> ConnectionWorker::begin_operation_locked()
 {
     if (stopping_) {
@@ -85,13 +94,14 @@ void ConnectionWorker::run()
     }
     while (!stopping_) {
         wakeup_.wait_for(lock, wake_interval_, [this] {
-            return stopping_ || pending_.has_value();
+            return stopping_ || pending_.has_value() || check_requested_;
         });
         const auto cancellation = begin_operation_locked();
         if (!cancellation.has_value()) {
             break;
         }
         auto request = std::exchange(pending_, std::nullopt);
+        const bool check_requested = std::exchange(check_requested_, false);
         lock.unlock();
         if (request.has_value()) {
             const auto result = session_.connect(
@@ -104,6 +114,9 @@ void ConnectionWorker::run()
             if (result.error != ConnectError::Cancelled) {
                 on_connect_(result);
             }
+        } else if (check_requested) {
+            session_.check_now(ConnectionSession::Clock::now(), *cancellation);
+            on_change_();
         } else {
             session_.refresh_if_due(ConnectionSession::Clock::now(), *cancellation);
             on_change_();

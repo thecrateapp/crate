@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import time
 import uuid
 from datetime import datetime, timezone
 
 from crate.recommendation_policy import RECENT_PLAY_WINDOW, canonical_key
 from crate.music_path_validation import validate_music_path
+from crate.observability.recommendations import observe_music_path_plan
 
 from crate.db.queries.recommendation_history import history_for_candidates
 
@@ -131,6 +133,36 @@ def build_music_path_plan(
     now: datetime | None = None,
     previous_tracks: list[dict] | None = None,
 ) -> dict | None:
+    started = time.perf_counter()
+    engine, plan = _plan_music_path(
+        origin_type,
+        origin_value,
+        dest_type,
+        dest_value,
+        waypoints=waypoints,
+        step_count=step_count,
+        user_id=user_id,
+        selection_seed=selection_seed,
+        now=now,
+        previous_tracks=previous_tracks,
+    )
+    observe_music_path_plan(engine, plan, step_count, started)
+    return plan
+
+
+def _plan_music_path(
+    origin_type: str,
+    origin_value: str,
+    dest_type: str,
+    dest_value: str,
+    *,
+    waypoints: list[dict] | None,
+    step_count: int,
+    user_id: int | None,
+    selection_seed: str | None,
+    now: datetime | None,
+    previous_tracks: list[dict] | None,
+) -> tuple[str, dict | None]:
     now = now or datetime.now(timezone.utc)
     selection_seed = selection_seed if selection_seed is not None else uuid.uuid4().hex
     history = (
@@ -168,7 +200,7 @@ def build_music_path_plan(
             diagnostics=scene_metadata,
         )
         if scene_tracks:
-            return {
+            return "scene", {
                 "origin_label": origin_label,
                 "dest_label": dest_label,
                 "resolved_waypoints": [],
@@ -182,7 +214,7 @@ def build_music_path_plan(
     origin_vec = resolve_bliss_centroid(origin_type, origin_value)
     dest_vec = resolve_bliss_centroid(dest_type, dest_value)
     if not origin_vec or not dest_vec:
-        return None
+        return "acoustic", None
 
     waypoint_vecs, resolved_waypoints = resolve_waypoints(waypoints)
     endpoint_contexts = load_endpoint_contexts(
@@ -209,7 +241,7 @@ def build_music_path_plan(
         selection_seed=selection_seed,
         diagnostics=acoustic_diagnostics,
     )
-    return {
+    return "acoustic", {
         "origin_label": origin_label,
         "dest_label": dest_label,
         "resolved_waypoints": resolved_waypoints,

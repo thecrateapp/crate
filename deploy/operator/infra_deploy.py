@@ -4,7 +4,7 @@ import ast
 import hashlib
 from pathlib import Path
 
-from scripts.release_manifest import render_release_env
+from scripts.release_manifest import SENTRY_RELEASE_ENVIRONMENTS, render_release_env
 
 from .infra_policy import trusted_file
 
@@ -22,6 +22,10 @@ OPTIONAL = (
     ".deploy/release-manifest.json.candidate",
     ".deploy/agent-context.candidate.tar.gz",
     "deploy/traefik/federation-readplane.yml",
+    "deploy/observability/compose.projector-prometheus.yaml",
+    "deploy/observability/compose.traefik-metrics.yaml",
+    "deploy/observability/compose.app-metrics.yaml",
+    "deploy/observability/compose.supervisor-prometheus.yaml",
     "app/config.yaml",
 )
 DIRECTORIES = (".deploy", ".deploy-backups")
@@ -264,6 +268,12 @@ def generated_backup_inputs(original, assets, environment, manifest, plan_id):
         expected = entry["repository"] + "@" + entry["digest"]
         if force or current != expected:
             images.add(expected)
+            services.update(entry["services"])
+            if name == "worker":
+                services.add("crate-fast-worker")
+    for name, key in SENTRY_RELEASE_ENVIRONMENTS.items():
+        entry = manifest["images"][name]
+        if old.get(key, "") != "crate-" + entry["source_sha"]:
             services.update(entry["services"])
             if name == "worker":
                 services.add("crate-fast-worker")

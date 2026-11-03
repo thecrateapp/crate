@@ -1,0 +1,421 @@
+{
+  "overlay_source_sha": "248636d511d7356b732b908bc07ba0b50fdb9b97",
+  "application_release_marker": "7460a43ebf953a1fed5ac20ec812908b2763398a",
+  "kind": "short infrastructure shadow sample; not the authenticated C0 functional flow",
+  "window": {
+    "start": "2026-10-31T10:32:24.452354+00:00",
+    "end": "2026-10-31T10:37:24.453298+00:00",
+    "samples": 6,
+    "duration_seconds": 300.000944
+  },
+  "budget": {
+    "memory_mib": 944,
+    "cpu_cores": 1
+  },
+  "observed": {
+    "monitoring_memory_working_set_mib": {
+      "min": 239.06640625,
+      "max": 343.0625,
+      "mean": 319.9908854166667
+    },
+    "monitoring_cpu_cores_2m_rate": {
+      "scope": "Sums of available series; missing services are unknown, not zero.",
+      "available_series_sums": {
+        "min": 0.01883712129287686,
+        "max": 0.08938442407144787,
+        "mean": 0.03644868026770437
+      },
+      "complete_samples": 3,
+      "complete_sample_sums": {
+        "min": 0.03155837768270923,
+        "max": 0.08938442407144787,
+        "mean": 0.051220363082477544
+      }
+    },
+    "monitoring_throttled_seconds_per_second_2m_rate": {
+      "scope": "Sums of available series; missing services are unknown, not zero.",
+      "available_series_sums": {
+        "min": 0.25029388142347175,
+        "max": 0.45248252971679914,
+        "mean": 0.32279703588088426
+      },
+      "complete_samples": 3,
+      "complete_sample_sums": {
+        "min": 0.32273710561205016,
+        "max": 0.45248252971679914,
+        "mean": 0.3709552887536808
+      }
+    },
+    "head_series": {
+      "min": 6245.0,
+      "max": 6267.0,
+      "mean": 6261.666666666667
+    },
+    "prometheus_disk_kib": {
+      "min": 324,
+      "max": 724,
+      "mean": 524
+    },
+    "var_available_bytes_min": 105638043648,
+    "monitoring_write_bytes_per_second": {
+      "scope": "Only three of eight services have IO series; missing services are unknown, not zero. Device layers may be counted more than once.",
+      "available_series_sums": {
+        "min": 3880.915854304817,
+        "max": 2928575.4268030347,
+        "mean": 563423.3144441437
+      }
+    },
+    "monitoring_read_bytes_per_second": {
+      "scope": "Only three of eight services have IO series; missing services are unknown, not zero. Device layers may be counted more than once.",
+      "available_series_sums": {
+        "min": 153.31636472525827,
+        "max": 784624.2063474886,
+        "mean": 205900.1558787059
+      }
+    }
+  },
+  "health": {
+    "target_up_all_samples": true,
+    "postgres_up_all_samples": true,
+    "redis_up_all_samples": true,
+    "restarts": 0,
+    "oom_killed": false
+  },
+  "coverage": {
+    "running_service_groups": 34,
+    "exported_service_groups": 30,
+    "excluded_companions": ["nginx", "slskd", "tidarr", "traefik"],
+    "cause": "Current metric relabel allowlist keeps only crate-.+ service labels; coverage gap, not a runtime registration failure."
+  },
+  "scrape_duration_seconds_max": {
+    "prometheus": 0.010332957,
+    "node": 0.189568063,
+    "cadvisor": 0.175213958,
+    "postgresql": 0.164656263,
+    "redis-cache": 1.7768601990000001,
+    "redis-durable": 0.753148953
+  },
+  "scrape_sample_age_seconds_max": {
+    "cadvisor": 24.17799997329712,
+    "node": 23.45799994468689,
+    "postgresql": 39.092000007629395,
+    "prometheus": 0.7679998874664307,
+    "redis-cache": 13.675999879837036,
+    "redis-durable": 3.3499999046325684
+  },
+  "limitations": [
+    "Five-minute infrastructure-only sample; no application SLO or load-test claim.",
+    "No extrapolation of retention/disk growth from fresh TSDB.",
+    "Working-set memory is not exact process RSS.",
+    "Authenticated user flow and Sentry event ingestion/symbolication remain unverified.",
+    "External-probe host deferred by Diego.",
+    "CPU/throttling omit one service in three samples; aggregate sums are partial and missing values are unknown.",
+    "Filesystem IO rates cover only three of eight monitoring services; five are unknown, not zero."
+  ],
+  "metric_coverage": {
+    "monitoring_memory_bytes": [
+      {
+        "at": "2026-10-31T10:32:24.452354+00:00",
+        "expected": 8,
+        "observed": 8,
+        "missing_services": []
+      },
+      {
+        "at": "2026-10-31T10:33:24.452515+00:00",
+        "expected": 8,
+        "observed": 8,
+        "missing_services": []
+      },
+      {
+        "at": "2026-10-31T10:34:24.452706+00:00",
+        "expected": 8,
+        "observed": 8,
+        "missing_services": []
+      },
+      {
+        "at": "2026-10-31T10:35:24.452852+00:00",
+        "expected": 8,
+        "observed": 8,
+        "missing_services": []
+      },
+      {
+        "at": "2026-10-31T10:36:24.453078+00:00",
+        "expected": 8,
+        "observed": 8,
+        "missing_services": []
+      },
+      {
+        "at": "2026-10-31T10:37:24.453298+00:00",
+        "expected": 8,
+        "observed": 8,
+        "missing_services": []
+      }
+    ],
+    "monitoring_cpu_cores": [
+      {
+        "at": "2026-10-31T10:32:24.452354+00:00",
+        "expected": 8,
+        "observed": 8,
+        "missing_services": []
+      },
+      {
+        "at": "2026-10-31T10:33:24.452515+00:00",
+        "expected": 8,
+        "observed": 7,
+        "missing_services": ["crate-grafana"]
+      },
+      {
+        "at": "2026-10-31T10:34:24.452706+00:00",
+        "expected": 8,
+        "observed": 8,
+        "missing_services": []
+      },
+      {
+        "at": "2026-10-31T10:35:24.452852+00:00",
+        "expected": 8,
+        "observed": 7,
+        "missing_services": ["crate-cadvisor"]
+      },
+      {
+        "at": "2026-10-31T10:36:24.453078+00:00",
+        "expected": 8,
+        "observed": 7,
+        "missing_services": ["crate-cadvisor"]
+      },
+      {
+        "at": "2026-10-31T10:37:24.453298+00:00",
+        "expected": 8,
+        "observed": 8,
+        "missing_services": []
+      }
+    ],
+    "monitoring_throttled_seconds_per_second": [
+      {
+        "at": "2026-10-31T10:32:24.452354+00:00",
+        "expected": 8,
+        "observed": 8,
+        "missing_services": []
+      },
+      {
+        "at": "2026-10-31T10:33:24.452515+00:00",
+        "expected": 8,
+        "observed": 7,
+        "missing_services": ["crate-grafana"]
+      },
+      {
+        "at": "2026-10-31T10:34:24.452706+00:00",
+        "expected": 8,
+        "observed": 8,
+        "missing_services": []
+      },
+      {
+        "at": "2026-10-31T10:35:24.452852+00:00",
+        "expected": 8,
+        "observed": 7,
+        "missing_services": ["crate-cadvisor"]
+      },
+      {
+        "at": "2026-10-31T10:36:24.453078+00:00",
+        "expected": 8,
+        "observed": 7,
+        "missing_services": ["crate-cadvisor"]
+      },
+      {
+        "at": "2026-10-31T10:37:24.453298+00:00",
+        "expected": 8,
+        "observed": 8,
+        "missing_services": []
+      }
+    ],
+    "monitoring_write_bytes_per_second": [
+      {
+        "timestamp": 1793442744.452,
+        "expected": 8,
+        "observed": 3,
+        "missing_services": [
+          "crate-cadvisor",
+          "crate-node-exporter",
+          "crate-postgres-exporter",
+          "crate-redis-durable-exporter",
+          "crate-redis-exporter"
+        ]
+      },
+      {
+        "timestamp": 1793442804.452,
+        "expected": 8,
+        "observed": 3,
+        "missing_services": [
+          "crate-cadvisor",
+          "crate-node-exporter",
+          "crate-postgres-exporter",
+          "crate-redis-durable-exporter",
+          "crate-redis-exporter"
+        ]
+      },
+      {
+        "timestamp": 1793442864.452,
+        "expected": 8,
+        "observed": 3,
+        "missing_services": [
+          "crate-cadvisor",
+          "crate-node-exporter",
+          "crate-postgres-exporter",
+          "crate-redis-durable-exporter",
+          "crate-redis-exporter"
+        ]
+      },
+      {
+        "timestamp": 1793442924.452,
+        "expected": 8,
+        "observed": 3,
+        "missing_services": [
+          "crate-cadvisor",
+          "crate-node-exporter",
+          "crate-postgres-exporter",
+          "crate-redis-durable-exporter",
+          "crate-redis-exporter"
+        ]
+      },
+      {
+        "timestamp": 1793442984.452,
+        "expected": 8,
+        "observed": 3,
+        "missing_services": [
+          "crate-cadvisor",
+          "crate-node-exporter",
+          "crate-postgres-exporter",
+          "crate-redis-durable-exporter",
+          "crate-redis-exporter"
+        ]
+      },
+      {
+        "timestamp": 1793443044.452,
+        "expected": 8,
+        "observed": 3,
+        "missing_services": [
+          "crate-cadvisor",
+          "crate-node-exporter",
+          "crate-postgres-exporter",
+          "crate-redis-durable-exporter",
+          "crate-redis-exporter"
+        ]
+      }
+    ],
+    "monitoring_read_bytes_per_second": [
+      {
+        "timestamp": 1793442744.452,
+        "expected": 8,
+        "observed": 3,
+        "missing_services": [
+          "crate-cadvisor",
+          "crate-node-exporter",
+          "crate-postgres-exporter",
+          "crate-redis-durable-exporter",
+          "crate-redis-exporter"
+        ]
+      },
+      {
+        "timestamp": 1793442804.452,
+        "expected": 8,
+        "observed": 3,
+        "missing_services": [
+          "crate-cadvisor",
+          "crate-node-exporter",
+          "crate-postgres-exporter",
+          "crate-redis-durable-exporter",
+          "crate-redis-exporter"
+        ]
+      },
+      {
+        "timestamp": 1793442864.452,
+        "expected": 8,
+        "observed": 3,
+        "missing_services": [
+          "crate-cadvisor",
+          "crate-node-exporter",
+          "crate-postgres-exporter",
+          "crate-redis-durable-exporter",
+          "crate-redis-exporter"
+        ]
+      },
+      {
+        "timestamp": 1793442924.452,
+        "expected": 8,
+        "observed": 3,
+        "missing_services": [
+          "crate-cadvisor",
+          "crate-node-exporter",
+          "crate-postgres-exporter",
+          "crate-redis-durable-exporter",
+          "crate-redis-exporter"
+        ]
+      },
+      {
+        "timestamp": 1793442984.452,
+        "expected": 8,
+        "observed": 3,
+        "missing_services": [
+          "crate-cadvisor",
+          "crate-node-exporter",
+          "crate-postgres-exporter",
+          "crate-redis-durable-exporter",
+          "crate-redis-exporter"
+        ]
+      },
+      {
+        "timestamp": 1793443044.452,
+        "expected": 8,
+        "observed": 3,
+        "missing_services": [
+          "crate-cadvisor",
+          "crate-node-exporter",
+          "crate-postgres-exporter",
+          "crate-redis-durable-exporter",
+          "crate-redis-exporter"
+        ]
+      }
+    ]
+  },
+  "per_service_memory": {
+    "crate-prometheus": {
+      "peak_working_set_mib": 41.1484375,
+      "limit_mib": 384,
+      "peak_fraction": 0.10715738932291667
+    },
+    "crate-grafana": {
+      "peak_working_set_mib": 237.5234375,
+      "limit_mib": 256,
+      "peak_fraction": 0.927825927734375
+    },
+    "crate-node-exporter": {
+      "peak_working_set_mib": 7.33984375,
+      "limit_mib": 32,
+      "peak_fraction": 0.2293701171875
+    },
+    "crate-postgres-exporter": {
+      "peak_working_set_mib": 7.921875,
+      "limit_mib": 64,
+      "peak_fraction": 0.123779296875
+    },
+    "crate-redis-exporter": {
+      "peak_working_set_mib": 7.80078125,
+      "limit_mib": 32,
+      "peak_fraction": 0.2437744140625
+    },
+    "crate-redis-durable-exporter": {
+      "peak_working_set_mib": 8.28125,
+      "limit_mib": 32,
+      "peak_fraction": 0.2587890625
+    },
+    "crate-cadvisor": {
+      "peak_working_set_mib": 24.28125,
+      "limit_mib": 128,
+      "peak_fraction": 0.189697265625
+    },
+    "crate-observability-docker-proxy": {
+      "peak_working_set_mib": 10.75390625,
+      "limit_mib": 16,
+      "peak_fraction": 0.672119140625
+    }
+  }
+}

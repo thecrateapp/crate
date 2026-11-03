@@ -1,0 +1,69 @@
+{
+  "direction": "Final immutable snapshot to historical pre-optimization baseline. Patch verified by applying to final files and comparing bytes with baseline.",
+  "changed_files": [
+    {
+      "path": "app/crate/agent_observability.py",
+      "final_sha256": "25e9caac62938a9e772959a53bb75feb128649a8386b3c067828b47b0d994d5c",
+      "baseline_sha256": "ce8c3847453ffa52f9176bd97ebef783ee47a05662cfcbda10adc1623f7c5235",
+      "final_exists": true,
+      "baseline_exists": true
+    },
+    {
+      "path": "app/crate/api/admin_metrics.py",
+      "final_sha256": "37a6f47871379574aa752839b010b944ac01f8c1bfe060a93ab9d1c0dda441a4",
+      "baseline_sha256": "86b7ff4801fd865955a87499db790a25ff850bbdf2e207101f0e8de44dc1fcc0",
+      "final_exists": true,
+      "baseline_exists": true
+    },
+    {
+      "path": "app/crate/api/schemas/metrics.py",
+      "final_sha256": "e986f31b5f7281e868bcff86b0a08cac3ff8c6779ebc2ca04580d354036fa6e8",
+      "baseline_sha256": "59f47119469f0a2989a83846e78a622568e2f31666b741a323207c0c8e54c20f",
+      "final_exists": true,
+      "baseline_exists": true
+    },
+    {
+      "path": "app/crate/db/queries/metric_minutes.py",
+      "final_sha256": "5d22948994c2383349a627e1e01843d2df3f5f3eba078ef0a558e50224a5b80f",
+      "baseline_sha256": "86d17f780e0076135e4a7030e49c323e11dd68984e8a0470c4e3979a79110111",
+      "final_exists": true,
+      "baseline_exists": true
+    },
+    {
+      "path": "app/crate/db/repositories/metric_minutes.py",
+      "final_sha256": "d7afe5266cde0f38aeda15f362c95e88e94b0754ba455186950ec5d71ebf7bd9",
+      "baseline_sha256": "273853a9dc3665dc47846a80ea33f031513cbcf14b1efdcf6eb73c68d93be88c",
+      "final_exists": true,
+      "baseline_exists": true
+    },
+    {
+      "path": "app/crate/db/schema_sections/metric_minutes_v141.py",
+      "final_sha256": "fb1cba1b2a8331ec3b7cd4a6252dd71ebf0db3adc471ad927127e8003872033d",
+      "baseline_sha256": "625ecc6def473405a835458d73e310e191deb9ba590f484ee63c10cb5a30589e",
+      "final_exists": true,
+      "baseline_exists": true
+    },
+    {
+      "path": "app/crate/metrics.py",
+      "final_sha256": "3100b8708cf71d75a076121136745c14a9f1a60c2b0e15011f2609fe98ae1fcf",
+      "baseline_sha256": "4176f0f3c73973ce28f3af6e0aa69821133249ac54caa866588a541a72a6e742",
+      "final_exists": true,
+      "baseline_exists": true
+    },
+    {
+      "path": "app/crate/observability/metric_buckets.py",
+      "final_sha256": "afa249b0f9579fd9b340a99bbcbe0812a2990878cd8d752cddd74dee190b80da",
+      "baseline_sha256": "f51a91eef9d0f21d5af7bf99d40de4bb3242b21c38e442a6840029426f0ecad3",
+      "final_exists": true,
+      "baseline_exists": true
+    },
+    {
+      "path": "app/crate/worker.py",
+      "final_sha256": "747a47c367341b21f4a4e6313c6ab46be5d8185fbf23861bcdba7e5cf56eeafe",
+      "baseline_sha256": "b4df32101ac2bb511da67168d5f09df30ed1cb632c70ab59b1ebd4e65881519f",
+      "final_exists": true,
+      "baseline_exists": true
+    }
+  ],
+  "patch_bytes": 36611
+}

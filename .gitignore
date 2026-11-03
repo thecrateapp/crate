@@ -41,6 +41,8 @@ playwright-report/listen-visual/
 test-results/listen-visual/
 playwright-report/admin-e2e/
 test-results/admin-e2e/
+test-results/site-capture/
+test-results/site-capture-runs/
 .playwright-mcp/
 desktop-artifacts/
 artifacts/

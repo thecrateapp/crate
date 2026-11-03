@@ -36,6 +36,7 @@ struct ConnectionStatus {
     ConnectionIdentity identity;
     ConnectionFeatures features;
     std::string message;
+    std::string listen_url;
 };
 
 class CapabilityClient {

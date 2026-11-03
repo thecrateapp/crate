@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use serde_json::json;
 
+use crate::metrics;
 use crate::observability;
 use crate::package::{build_album_package, build_track_artifact, PackageJob, TrackArtifactJob};
 
@@ -78,7 +79,9 @@ fn handle_request<W: Write>(request: Request, writer: &mut W) -> io::Result<()> 
                 match job {
                     Ok(job) => {
                         let job_id = job.job_id.clone();
+                        let timer = metrics::start_package("album");
                         let package_result = build_album_package(job);
+                        timer.finish(package_result.ok);
                         status = if package_result.ok { 200 } else { 500 };
                         if !package_result.ok {
                             observability::capture_job_failure(
@@ -110,7 +113,9 @@ fn handle_request<W: Write>(request: Request, writer: &mut W) -> io::Result<()> 
                 match job {
                     Ok(job) => {
                         let job_id = job.job_id.clone();
+                        let timer = metrics::start_package("track");
                         let artifact_result = build_track_artifact(job);
+                        timer.finish(artifact_result.ok);
                         status = if artifact_result.ok { 200 } else { 500 };
                         if !artifact_result.ok {
                             observability::capture_job_failure(
@@ -159,6 +164,7 @@ fn handle_request<W: Write>(request: Request, writer: &mut W) -> io::Result<()> 
         sentry::protocol::SpanStatus::Ok
     });
     transaction.finish();
+    metrics::record_request(&request.path, status);
     result
 }
 

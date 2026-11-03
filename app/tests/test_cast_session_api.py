@@ -69,19 +69,24 @@ def _stored_session(**overrides) -> dict:
 
 
 def test_cast_session_metrics_never_use_lease_or_item_cardinality():
+    from crate.api.cast import router
     from crate.api.metrics_middleware import _normalize_path
 
-    assert (
-        _normalize_path("/api/cast/sessions/opaque-lease/items/private-item/stream")
-        == "/api/cast/sessions/{lease}/items/{item_id}/stream"
-    )
-    assert (
-        _normalize_path("/api/cast/sessions/opaque-lease/items/private-item/spectrum")
-        == "/api/cast/sessions/{lease}/items/{item_id}/spectrum"
-    )
-    assert _normalize_path("/api/cast/sessions/opaque-lease/state") == (
-        "/api/cast/sessions/{lease}/state"
-    )
+    templates = {route.path for route in router.routes}
+    for raw, template in (
+        (
+            "/api/cast/sessions/opaque-lease/items/private-item/stream",
+            "/api/cast/sessions/{lease}/items/{item_id}/stream",
+        ),
+        (
+            "/api/cast/sessions/opaque-lease/items/private-item/spectrum",
+            "/api/cast/sessions/{lease}/items/{item_id}/spectrum",
+        ),
+        ("/api/cast/sessions/opaque-lease/state", "/api/cast/sessions/{lease}/state"),
+    ):
+        assert template in templates
+        assert _normalize_path(raw, route_path=template) == template
+        assert "opaque-lease" not in _normalize_path(raw, route_path=None)
 
 
 def test_create_cast_session_resolves_queue_and_returns_scoped_urls(

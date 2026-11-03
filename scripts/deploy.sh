@@ -22,6 +22,7 @@ REMOTE_SCRIPT_PATH="${SERVER_PATH}/.deploy/deploy-remote.sh"
 DEPLOY_CANDIDATE_DIR=""
 TMP_DIR=""
 ROLLBACK_ENABLED=1
+HOST_LEASE_HELD=0
 
 log() {
   printf '\n==> %s\n' "$*"
@@ -33,6 +34,7 @@ fail() {
 }
 
 cleanup() {
+  release_host_lease
   if [[ -n "$TMP_DIR" && -d "$TMP_DIR" ]]; then
     rm -rf "$TMP_DIR"
   fi
@@ -151,6 +153,18 @@ require_deploy_id() {
   fi
 }
 
+acquire_host_lease() {
+  remote_deploy host-lock
+  HOST_LEASE_HELD=1
+}
+
+release_host_lease() {
+  [[ "$HOST_LEASE_HELD" == "1" ]] || return 0
+  HOST_LEASE_HELD=0
+  remote_deploy host-unlock ||
+    printf 'Could not release the host mutation lease; run make deploy-unlock DEPLOY_ID=%s\n' "$DEPLOY_ID" >&2
+}
+
 prepare_remote_script() {
   log "Checking remote host"
   ssh_remote "mkdir -p '$SERVER_PATH' '$SERVER_PATH/.deploy' && command -v docker >/dev/null && docker compose version >/dev/null"
@@ -194,6 +208,13 @@ AGENT_TOOLING=(
   deploy/operator/provenance-docker.haproxy.cfg
 )
 
+MONITORING_OVERLAYS=(
+  deploy/observability/compose.projector-prometheus.yaml
+  deploy/observability/compose.traefik-metrics.yaml
+  deploy/observability/compose.app-metrics.yaml
+  deploy/observability/compose.supervisor-prometheus.yaml
+)
+
 prepare_payload() {
   TMP_DIR="$(mktemp -d)"
   mkdir -p "$TMP_DIR/deploy/traefik" "$TMP_DIR/deploy/hermes"
@@ -207,7 +228,7 @@ prepare_payload() {
       cp -a "$ROOT_DIR/deploy/hermes/." "$TMP_DIR/deploy/hermes/"
     fi
     local file
-    for file in "${AGENT_TOOLING[@]}"; do
+    for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}"; do
       if [[ -f "$ROOT_DIR/$file" ]]; then
         mkdir -p "$TMP_DIR/$(dirname "$file")"
         cp "$ROOT_DIR/$file" "$TMP_DIR/$file"
@@ -221,7 +242,7 @@ prepare_payload() {
       git -C "$ROOT_DIR" archive "$DEPLOY_REF" deploy/hermes | tar -x -C "$TMP_DIR"
     fi
     local file
-    for file in "${AGENT_TOOLING[@]}"; do
+    for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}"; do
       if git -C "$ROOT_DIR" cat-file -e "${DEPLOY_REF}:${file}" 2>/dev/null; then
         git -C "$ROOT_DIR" archive "$DEPLOY_REF" "$file" | tar -x -C "$TMP_DIR"
       fi
@@ -340,7 +361,7 @@ sync_config() {
     scp -r "$TMP_DIR/deploy/hermes/." "$REMOTE:$SERVER_PATH/deploy/hermes/"
   fi
   local file
-  for file in "${AGENT_TOOLING[@]}"; do
+  for file in "${AGENT_TOOLING[@]}" "${MONITORING_OVERLAYS[@]}"; do
     if [[ -f "$TMP_DIR/$file" ]]; then
       ssh_remote "mkdir -p '$SERVER_PATH/$(dirname "$file")'"
       scp "$TMP_DIR/$file" "$REMOTE:$SERVER_PATH/$file"
@@ -402,6 +423,7 @@ run_deploy() {
   local_preflight
 
   prepare_remote_script
+  acquire_host_lease
   stage_remote_preflight_payload
   remote_deploy release-preflight
   ssh_remote "rm -rf '$DEPLOY_CANDIDATE_DIR'"
@@ -429,6 +451,7 @@ run_recovery_snapshot() {
   require_deploy_id
   prepare_remote_script
   resolve_remote_release_settings
+  acquire_host_lease
   remote_deploy recovery-snapshot
   log "Recovery snapshot ${DEPLOY_ID} completed; production remains quiesced for deploy"
 }
@@ -440,6 +463,7 @@ run_rollback() {
   fi
   prepare_remote_script
   resolve_remote_release_settings
+  acquire_host_lease
   remote_deploy state-rollback
   log "Production rollback ${DEPLOY_ID} completed"
 }
@@ -451,17 +475,27 @@ run_image_rollback() {
   fi
   prepare_remote_script
   resolve_remote_release_settings
+  acquire_host_lease
   remote_deploy rollback
   log "Application image rollback ${DEPLOY_ID} completed"
 }
 
+run_unlock() {
+  require_deploy_id
+  prepare_remote_script
+  resolve_remote_release_settings
+  remote_deploy host-unlock
+  log "Host mutation lease ${DEPLOY_ID} released"
+}
+
 case "$ACTION" in
   deploy) run_deploy ;;
+  unlock) run_unlock ;;
   preflight) run_preflight ;;
   recovery-snapshot) run_recovery_snapshot ;;
   rollback) run_rollback ;;
   image-rollback) run_image_rollback ;;
   *)
-    fail "unknown action '${ACTION}' (expected deploy, preflight, recovery-snapshot, rollback or image-rollback)"
+    fail "unknown action '${ACTION}' (expected deploy, preflight, recovery-snapshot, rollback, image-rollback or unlock)"
     ;;
 esac

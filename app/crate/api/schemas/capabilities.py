@@ -20,6 +20,7 @@ class VDJCapabilities(BaseModel):
     online_source: bool
     smart_mix_assistant: bool
     automation: bool
+    listen_url: str | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class AccessTokenCapabilities(BaseModel):

@@ -20,6 +20,10 @@ BACKUP_ROOT="${SERVER_PATH}/.deploy-backups"
 BACKUP_DIR="${BACKUP_ROOT}/${DEPLOY_ID}"
 ROLLBACK_TAG="rollback-${DEPLOY_ID}"
 IMAGE_PREFIX="${DEPLOY_IMAGE_REGISTRY}/${DEPLOY_IMAGE_OWNER}"
+HOST_LOCK_DIR="${SERVER_PATH}/.deploy"
+HOST_LOCK_OWNER="$DEPLOY_ID"
+HOST_LOCK_CONFIRM="$DEPLOY_CONFIRM"
+HOST_LOCK_WAIT_SECONDS="${HOST_LOCK_WAIT_SECONDS:-600}"
 
 cd "$SERVER_PATH"
 
@@ -39,8 +43,8 @@ select_operator_overlay() {
 }
 select_operator_overlay
 # A running Crate Operator keeps its overlay through every stage: without it
-# crate-api and the workers lose the operator identity and --remove-orphans
-# removes the operator containers.
+# crate-api and the workers lose the operator identity. Service retirement is
+# explicit: application deployment must not remove other project members.
 OPERATOR_OVERLAY=""
 select_running_operator_overlay() {
   [[ -n "$(docker ps -q -f name='^crate-operator$')" ]] || return 0
@@ -77,6 +81,14 @@ RELEASE_ENV_KEYS=(
   CRATE_CAST_RECEIVER_IMAGE
   CRATE_SITE_IMAGE
   CRATE_DOCS_IMAGE
+)
+SENTRY_RELEASE_ENV_KEYS=(
+  CRATE_API_SENTRY_RELEASE
+  CRATE_READPLANE_SENTRY_RELEASE
+  CRATE_WORKER_SENTRY_RELEASE
+  CRATE_ANALYSIS_WORKER_SENTRY_RELEASE
+  CRATE_PLAYBACK_WORKER_SENTRY_RELEASE
+  CRATE_MEDIA_WORKER_SENTRY_RELEASE
 )
 # Agent images are optional: older manifests do not carry them. A deployment
 # only recreates a Crate Agent that is already running.
@@ -152,6 +164,26 @@ env_value() {
   env_file_value .env "$key"
 }
 
+select_monitoring_overlays() {
+  local overlay variable default network
+  while read -r overlay variable default; do
+    [[ -f "$overlay" ]] || continue
+    network="$(env_value "$variable")"
+    docker network inspect "${network:-$default}" >/dev/null 2>&1 || continue
+    COMPOSE+=(-f "$overlay")
+  done <<'OVERLAYS'
+deploy/observability/compose.projector-prometheus.yaml OBS_PROMETHEUS_QUERY_NETWORK crate_prometheus-query
+deploy/observability/compose.traefik-metrics.yaml OBS_TRAEFIK_METRICS_NETWORK crate_traefik-metrics
+deploy/observability/compose.app-metrics.yaml OBS_APP_METRICS_NETWORK crate_app-metrics
+OVERLAYS
+  overlay=deploy/observability/compose.supervisor-prometheus.yaml
+  [[ -n "${OPERATOR_OVERLAY:-}" && -f "$overlay" ]] || return 0
+  network="$(env_value OBS_PROMETHEUS_QUERY_NETWORK)"
+  docker network inspect "${network:-crate_prometheus-query}" >/dev/null 2>&1 || return 0
+  COMPOSE+=(-f "$overlay")
+}
+select_monitoring_overlays
+
 compose_has_service() {
   local service="$1"
   if [[ -z "$(env_value REDIS_PASSWORD)" ]]; then
@@ -202,7 +234,7 @@ set_env_value() {
 is_release_env_key() {
   local candidate="$1"
   local key
-  for key in "${RELEASE_ENV_KEYS[@]}" "${OPTIONAL_RELEASE_ENV_KEYS[@]}"; do
+  for key in "${RELEASE_ENV_KEYS[@]}" "${OPTIONAL_RELEASE_ENV_KEYS[@]}" "${SENTRY_RELEASE_ENV_KEYS[@]}"; do
     [[ "$candidate" == "$key" ]] && return 0
   done
   return 1
@@ -227,6 +259,8 @@ validate_release_env_file() {
     fi
     if [[ "$key" == "CRATE_RELEASE_SHA" ]]; then
       [[ "$value" =~ ^[0-9a-f]{40}$ ]] || return 1
+    elif [[ "$key" == CRATE_*_SENTRY_RELEASE ]]; then
+      [[ "$value" =~ ^crate-[0-9a-f]{40}$ ]] || return 1
     elif [[ ! "$value" =~ ^[^[:space:]]+@sha256:[0-9a-f]{64}$ ]]; then
       log "Release image reference is not immutable: ${key}"
       return 1
@@ -247,6 +281,11 @@ apply_release_env() {
   local value
 
   validate_release_env_file "$file"
+  for key in "${SENTRY_RELEASE_ENV_KEYS[@]}"; do
+    if ! grep -q "^${key}=" "$file"; then
+      set_env_value "$key" ""
+    fi
+  done
   while IFS='=' read -r key value; do
     [[ -n "$key" ]] && set_env_value "$key" "$value"
   done < "$file"
@@ -404,6 +443,12 @@ cmd_release_preflight() {
 
   log "Validating candidate compose with the production environment"
   CRATE_RELEASE_SHA="$release_sha" \
+  CRATE_API_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_API_SENTRY_RELEASE)" \
+  CRATE_READPLANE_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_READPLANE_SENTRY_RELEASE)" \
+  CRATE_WORKER_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_WORKER_SENTRY_RELEASE)" \
+  CRATE_ANALYSIS_WORKER_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_ANALYSIS_WORKER_SENTRY_RELEASE)" \
+  CRATE_PLAYBACK_WORKER_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_PLAYBACK_WORKER_SENTRY_RELEASE)" \
+  CRATE_MEDIA_WORKER_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_MEDIA_WORKER_SENTRY_RELEASE)" \
   CRATE_API_IMAGE="$(env_file_value "$release_env" CRATE_API_IMAGE)" \
   CRATE_READPLANE_IMAGE="$(env_file_value "$release_env" CRATE_READPLANE_IMAGE)" \
   CRATE_WORKER_IMAGE="$(env_file_value "$release_env" CRATE_WORKER_IMAGE)" \
@@ -805,6 +850,15 @@ record_changed_release_services() {
       printf '%s\n' "$service" >> "$BACKUP_DIR/changed_services"
     done
   done
+  for key in "${SENTRY_RELEASE_ENV_KEYS[@]}"; do
+    new_ref="$(env_file_value "$candidate_env" "$key")"
+    old_ref="$(env_file_value "$old_env" "$key")"
+    [[ "$new_ref" != "$old_ref" ]] || continue
+    read -r -a services <<< "${RELEASE_ENV_SERVICES[${key%_SENTRY_RELEASE}_IMAGE]}"
+    for service in "${services[@]}"; do
+      printf '%s\n' "$service" >> "$BACKUP_DIR/changed_services"
+    done
+  done
   sort -u -o "$BACKUP_DIR/changed_image_refs" "$BACKUP_DIR/changed_image_refs"
   sort -u -o "$BACKUP_DIR/changed_services" "$BACKUP_DIR/changed_services"
 }
@@ -875,7 +929,7 @@ cmd_up() {
     return 0
   fi
   log "Restarting only ${#services[@]} changed application service(s)"
-  dc up -d --no-build --no-deps --remove-orphans "${services[@]}"
+  dc up -d --no-build --no-deps "${services[@]}"
 }
 
 cmd_verify() {
@@ -1046,7 +1100,7 @@ cmd_rollback() {
   log "Restoring ${#rollback_services[@]} service(s) changed by the failed release"
   dc pull --ignore-buildable "${rollback_services[@]}" >/dev/null 2>&1 || \
     log "Registry pull failed during rollback; using preserved local images"
-  "${COMPOSE[@]}" up -d --no-build --no-deps --remove-orphans "${rollback_services[@]}"
+  "${COMPOSE[@]}" up -d --no-build --no-deps "${rollback_services[@]}"
   DEPLOY_PUBLIC_CHECKS=0 cmd_verify
 }
 
@@ -1160,23 +1214,34 @@ cmd_state_rollback() {
   log "Restarting recovered release ${target_tag}"
   dc pull --ignore-buildable "${PROJECT_SERVICES[@]}" >/dev/null 2>&1 || \
     log "Registry pull failed during state rollback; using preserved local images"
-  dc up -d --no-build --remove-orphans
+  dc up -d --no-build
   DEPLOY_PUBLIC_CHECKS=0 cmd_verify
   log "State rollback ${DEPLOY_ID} completed at schema ${expected_schema}"
 }
 
 cmd_cleanup() {
-  local snapshots=()
-  local index
-
-  log "Keeping the latest 5 deploy snapshots"
+  log "Keeping the current and 4 latest deploy snapshots"
   if [[ -d "$BACKUP_ROOT" ]]; then
-    mapfile -t snapshots < <(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -print | sort -r)
-    for index in "${!snapshots[@]}"; do
-      if (( index >= 5 )); then
-        rm -rf "${snapshots[$index]}"
-      fi
-    done
+    python3 - "$BACKUP_ROOT" "$BACKUP_DIR" <<'PY'
+import shutil
+import sys
+from pathlib import Path
+
+root, current = map(Path, sys.argv[1:])
+if current.is_symlink() or not current.is_dir():
+    print("Skipping snapshot cleanup: current deployment backup is missing")
+    raise SystemExit(0)
+
+snapshots = [path for path in root.iterdir() if not path.is_symlink() and path.is_dir()]
+keep = {current}
+for path in sorted(snapshots, key=lambda path: path.stat().st_mtime_ns, reverse=True):
+    if path in keep:
+        continue
+    if len(keep) < 5:
+        keep.add(path)
+    else:
+        shutil.rmtree(path)
+PY
   fi
 
   cleanup_legacy_cache_layout
@@ -1256,23 +1321,75 @@ cmd_diagnose() {
   dc logs --tail=120 crate-api crate-readplane crate-worker crate-fast-worker crate-projector crate-maintenance-worker crate-analysis-worker crate-playback-worker crate-media-worker crate-ui crate-listen crate-site crate-docs || true
 }
 
+host_lock_acquire() {
+  mkdir -p "$HOST_LOCK_DIR"
+  exec 9>>"$HOST_LOCK_DIR/host-mutation.lock"
+  if ! flock -w "$HOST_LOCK_WAIT_SECONDS" 9; then
+    echo "Another host mutation kept the lock for ${HOST_LOCK_WAIT_SECONDS}s; nothing changed" >&2
+    exit 1
+  fi
+}
+
+host_lease_field() {
+  local lease="$HOST_LOCK_DIR/host-mutation.lease"
+  [[ -f "$lease" ]] || return 0
+  sed -n "s/^$1=//p" "$lease"
+}
+
+host_lease_refuse_other() {
+  local owner
+  owner="$(host_lease_field owner)"
+  if [[ -n "$owner" && "$owner" != "$HOST_LOCK_OWNER" ]]; then
+    echo "Host mutation lease is held by ${owner} since $(host_lease_field since); nothing changed" >&2
+    exit 1
+  fi
+}
+
+host_guard() {
+  host_lock_acquire
+  host_lease_refuse_other
+  "$@"
+}
+
+cmd_host_lock() {
+  host_lock_acquire
+  host_lease_refuse_other
+  local lease="$HOST_LOCK_DIR/host-mutation.lease"
+  printf 'owner=%s\nsince=%s\n' "$HOST_LOCK_OWNER" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$lease.tmp"
+  mv -f "$lease.tmp" "$lease"
+}
+
+cmd_host_unlock() {
+  host_lock_acquire
+  local owner
+  owner="$(host_lease_field owner)"
+  [[ -n "$owner" ]] || return 0
+  if [[ "$owner" != "$HOST_LOCK_OWNER" && "$HOST_LOCK_CONFIRM" != "break-host-lock" ]]; then
+    echo "Host mutation lease is held by ${owner}; release it only with confirmation break-host-lock" >&2
+    exit 1
+  fi
+  rm -f "$HOST_LOCK_DIR/host-mutation.lease"
+}
+
 case "${1:-}" in
+  host-lock) cmd_host_lock ;;
+  host-unlock) cmd_host_unlock ;;
   release-preflight) cmd_release_preflight ;;
   preflight) cmd_preflight ;;
-  backup) cmd_backup ;;
-  recovery-snapshot) cmd_recovery_snapshot ;;
-  config) cmd_config ;;
-  pull) cmd_pull ;;
-  up) cmd_up ;;
+  backup) host_guard cmd_backup ;;
+  recovery-snapshot) host_guard cmd_recovery_snapshot ;;
+  config) host_guard cmd_config ;;
+  pull) host_guard cmd_pull ;;
+  up) host_guard cmd_up ;;
   verify) cmd_verify ;;
-  agent-context) cmd_agent_context ;;
-  rollback) cmd_rollback ;;
-  state-rollback) cmd_state_rollback ;;
-  cleanup) cmd_cleanup ;;
+  agent-context) host_guard cmd_agent_context ;;
+  rollback) host_guard cmd_rollback ;;
+  state-rollback) host_guard cmd_state_rollback ;;
+  cleanup) host_guard cmd_cleanup ;;
   ps) cmd_ps ;;
   diagnose) cmd_diagnose ;;
   *)
-    printf 'Usage: %s {release-preflight|preflight|backup|recovery-snapshot|config|pull|up|verify|agent-context|rollback|state-rollback|cleanup|ps|diagnose}\n' "$0" >&2
+    printf 'Usage: %s {host-lock|host-unlock|release-preflight|preflight|backup|recovery-snapshot|config|pull|up|verify|agent-context|rollback|state-rollback|cleanup|ps|diagnose}\n' "$0" >&2
     exit 2
     ;;
 esac

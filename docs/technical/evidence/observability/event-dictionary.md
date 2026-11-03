@@ -1,0 +1,48 @@
+# Observability event dictionary — C0 review draft
+
+This defines the next instrumentation cuts. PR0 exports infrastructure only; these
+application contracts are not implemented or established by a successful scrape.
+Use seconds, UTC bucket timestamps and monotonic clocks for elapsed durations.
+A rate is unknown/partial when its denominator or telemetry delivery is incomplete.
+
+| Concept                       | Definition                                                                                                                                                | Boundary / exclusions                                                                                                                                                                                                                                           |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Playback attempt              | One accepted intent to start a track, including automatic queue advancement. A retry belongs to that logical attempt.                                     | Transport/engine retry counters are separate; do not count the same intent in JS and native layers twice.                                                                                                                                                       |
+| Started                       | The playback engine confirms progress for that attempt.                                                                                                   | Engine confirmation is not verified physical sound. Report one terminal startup outcome: started, failed or cancelled.                                                                                                                                          |
+| Startup failure               | An attempt ends without starting after its bounded retry policy is exhausted, with a finite cause.                                                        | Voluntary stop/skip, transfer cancellation and superseded intent are cancelled, not failed. A failure after start is an interruption, not another startup failure.                                                                                              |
+| Startup latency               | Monotonic time from accepted intent to engine-confirmed start.                                                                                            | Keep runtime/engine, local/federated and cold/warm coverage separate. Do not record cancelled/failed attempts as zero-second starts.                                                                                                                            |
+| Stall                         | After start, playback still requested but engine progress is blocked. One start/end pair defines an episode.                                              | Exclude deliberate pause, seeking, repeat/track boundary and deliberate offline/end-of-queue. Close and account duration even on terminal error, skip or abandonment.                                                                                           |
+| Recovery                      | Actual engine progress resumes after an involuntary interruption/stall.                                                                                   | A scheduled retry or resolved HTTP request is not recovery. Expose retries exhausted and episodes with no recovery.                                                                                                                                             |
+| Active observed playback time | Union of observed intervals while playback is requested, including stall time.                                                                            | Exclude deliberate pauses and intervals where collection was suspended/unknown. Stall ratio uses stalled seconds over this denominator.                                                                                                                         |
+| Refill required               | Infinite continuation needs additional playable reserve under the current queue policy.                                                                   | A logical need differs from individual HTTP retries. Preserve repeat-one/all priority and approved shuffle behavior.                                                                                                                                            |
+| Refill resolved               | A refill operation finishes with a typed outcome and number of playable items appended.                                                                   | HTTP200 with no append is not successful continuation. Include no coherent candidates, unavailable catalog, cancellation and transport failures separately.                                                                                                     |
+| Starvation                    | At a boundary where the engine needs the next item, Infinite is eligible but no playable item is available.                                               | Exclude deliberate finite end, user pause/stop, repeat modes and intentional offline. Measure episodes and duration, including unclosed/abandoned episodes; separate network and coordination causes.                                                           |
+| Recommendation early skip     | Proposed constant for review: voluntary skip before30 seconds of observed playback for a recommendation that actually started, without a completed event. | Calculate asynchronously from existing user_play_events and recommendation provenance. Short/unknown-duration tracks and missing provenance require separate coverage; no ranking change. Freeze threshold/revision in PR2A fixtures before comparing releases. |
+| Telemetry delivery            | Accepted/rejected/dropped/expired/send_failed batches/events, plus last successful delivery and known coverage.                                           | Bounded retries + temporal deduplication are best effort, not exactly-once. Missing telemetry is not zero failures.                                                                                                                                             |
+
+Counters are monotonic per process and tolerate reset. Gauges are sampled state.
+Histograms include shared finite buckets. Runtime/engine/origin/outcome/cause,
+normalized route, queue, provider allowlist, recommendation surface and
+rules_revision are bounded dimensions. Never export user/track/session IDs,
+paths, raw URLs, search text, tokens or peer identities as metric labels. Attempt
+IDs stay in bounded event/trace context used for deduplication, not series labels.
+
+Proposed SLOs remain review targets rather than achieved claims. Below20 eligible
+attempts in15 minutes, show insufficient coverage for rate-based notifications;
+availability failures and prolonged starvation still need their own rules.
+
+## Functional-flow finding: intent and source support
+
+The2026-10-31 web journey observed Infinite enabled while the last available
+track of a partial pre-release album ended with an empty queue and no radio
+request. The published-album contrast appended30 tracks and advanced naturally.
+Current code removes the radio seed for pre-release albums, then the refill
+runtime rejects sources without radio metadata.
+
+Refill observability must distinguish **user intent** from **runtime support**.
+Record a finite unsupported reason such as missing_seed/prerelease instead of
+silently dropping the episode from eligibility/coverage. A user-requested Infinite
+continuation must not disappear from the denominator merely because metadata or
+source construction failed. Any intentional product exclusion must be explicit
+and reviewed. This evidence proposes instrumentation semantics; it does not
+change the player or recommendation ranking.

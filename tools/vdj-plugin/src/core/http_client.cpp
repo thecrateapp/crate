@@ -1,6 +1,7 @@
 #include "crate_vdj/http_client.hpp"
 
 #include <string>
+#include <utility>
 
 namespace crate::vdj {
 
@@ -99,6 +100,26 @@ bool append_bounded_body(std::string& body, std::string_view chunk, std::size_t 
     }
     body.append(chunk);
     return true;
+}
+
+UnauthorizedObserverHttpClient::UnauthorizedObserverHttpClient(
+    HttpClient& inner,
+    std::function<void()> on_unauthorized
+)
+    : inner_(inner)
+    , on_unauthorized_(std::move(on_unauthorized))
+{
+}
+
+HttpResult UnauthorizedObserverHttpClient::request(const HttpRequest& request)
+{
+    auto result = inner_.request(request);
+    if (const auto* error = std::get_if<HttpError>(&result);
+        error != nullptr && error->code == HttpErrorCode::HttpStatus &&
+        error->status_code == 401) {
+        on_unauthorized_();
+    }
+    return result;
 }
 
 } // namespace crate::vdj

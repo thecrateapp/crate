@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { MetricChart } from "./MetricChart";
@@ -17,6 +17,75 @@ const data = [
   { timestamp: "2026-10-24T10:03:00Z", count: 8, avg: 1, max: 1 },
 ];
 describe("MetricChart", () => {
+  it("keeps unchanged measurements out of unrelated parent renders", () => {
+    const view = render(
+      <MetricChart
+        stream={metricStreams[1]!}
+        data={data}
+        intervalSeconds={60}
+      />,
+    );
+    const renders = charts.length;
+    view.rerender(
+      <MetricChart
+        stream={metricStreams[1]!}
+        data={data}
+        intervalSeconds={60}
+      />,
+    );
+    expect(charts).toHaveLength(renders);
+  });
+  it("updates new measurements, granularity and availability", () => {
+    const view = render(
+      <MetricChart
+        stream={metricStreams[1]!}
+        data={data}
+        intervalSeconds={60}
+      />,
+    );
+    const renders = charts.length;
+    const replacement = [{ ...data[0]!, count: 19 }];
+    view.rerender(
+      <MetricChart
+        stream={metricStreams[1]!}
+        data={replacement}
+        intervalSeconds={3600}
+        status={{ source: "postgresql_v2", availability: "stale" }}
+      />,
+    );
+    expect(charts.length).toBeGreaterThan(renders);
+    expect(charts[charts.length - 1]!.data).toMatchObject([
+      { id: "count", data: [{ y: 19 }] },
+    ]);
+    expect(screen.getByText(/3,600 s buckets/)).toBeVisible();
+    expect(screen.getByText("Source: PostgreSQL v2 · stale")).toBeVisible();
+  });
+  it("responds to motion availability without changed props", () => {
+    const visibility = vi.spyOn(document, "visibilityState", "get");
+    try {
+      visibility.mockReturnValue("visible");
+      render(
+        <MetricChart
+          stream={metricStreams[1]!}
+          data={data}
+          intervalSeconds={60}
+        />,
+      );
+      expect(charts[charts.length - 1]!.animate).toBe(true);
+      act(() => {
+        visibility.mockReturnValue("hidden");
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      expect(charts[charts.length - 1]!.animate).toBe(false);
+      act(() => {
+        visibility.mockReturnValue("visible");
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      expect(charts[charts.length - 1]!.animate).toBe(true);
+    } finally {
+      visibility.mockRestore();
+    }
+  });
   it("draws real chronological positions without filled areas and exposes units/granularity", () => {
     render(
       <MetricChart

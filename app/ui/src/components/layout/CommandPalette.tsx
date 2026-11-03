@@ -167,6 +167,11 @@ export function CommandPalette() {
       capabilities: ["ops.health.view"],
     },
     {
+      label: "Product",
+      path: "/product",
+      capabilities: ["ops.health.view"],
+    },
+    {
       label: "Playback Delivery",
       path: "/playback",
       capabilities: ["ops.health.view"],

@@ -27,6 +27,7 @@ type MediaMetrics struct {
 	fallbacks     map[string]int64
 	artworkMisses map[string]int64
 	openLatency   map[string]int64
+	openSeconds   float64
 }
 
 func NewMediaMetrics() *MediaMetrics {
@@ -59,6 +60,7 @@ func (m *MediaMetrics) RecordOpenLatency(milliseconds float64) {
 	}
 	m.mu.Lock()
 	m.openLatency[bucket]++
+	m.openSeconds += milliseconds / 1000
 	m.mu.Unlock()
 }
 func (m *MediaMetrics) RecordNativeArtwork(hit bool, reason string) {

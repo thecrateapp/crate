@@ -5,12 +5,13 @@ section: operations
 audience: [operator]
 status: canonical
 order: 120
-verified: 2026-10-26
+verified: 2026-11-01
 sources:
   [
     docker-compose.yaml,
     docker-compose.home.yaml,
     scripts/deploy-remote.sh,
+    scripts/observability-deploy-remote.sh,
     app/crate/projector.py,
     deploy/hermes/context_server.py,
     deploy/hermes/activate_context.py,
@@ -27,6 +28,11 @@ The optional [independent deterministic operator](./crate-operator.md) documents
 standalone incident persistence, job watches, delivery retries and the external
 watchdog. Its opt-in deployment and native callback integration remain separate
 from the read-only Crate Agent.
+
+[Monitoring](monitoring.md) explains what Admin and Grafana show, how to reach
+Grafana and how the independent monitoring project is deployed. Application,
+Operator and monitoring deploys share a host mutation lease; a deploy that finds
+another owner changes nothing.
 
 ## Runtime responsibilities
 
@@ -177,3 +183,28 @@ For the opt-in Crate Operator, use the [candidate and consolidated rollout
 contract](hermes-operator-release.md): root-owned host assets, independent native
 recovery, health coverage, exact release context, provenance gates and rollback.
 Crate Agent, the read-only profile, remains the default.
+
+## Sentry release identity
+
+Managed deployments derive each backend Sentry release from the image's
+`source_sha` in `release-manifest.json`, using `crate-<source_sha>`. Reusing an image
+preserves its release; `CRATE_RELEASE_SHA` identifies the full deployment and can
+be newer than an individual runtime's source revision.
+
+The generated runtime variables are `CRATE_API_SENTRY_RELEASE`,
+`CRATE_READPLANE_SENTRY_RELEASE`, `CRATE_WORKER_SENTRY_RELEASE`,
+`CRATE_ANALYSIS_WORKER_SENTRY_RELEASE`, `CRATE_PLAYBACK_WORKER_SENTRY_RELEASE`, and
+`CRATE_MEDIA_WORKER_SENTRY_RELEASE`. Default/fast/maintenance workers and projector
+share the worker image's release. DSNs and frontend build releases are unchanged.
+
+Without a managed value, the production Compose services retain the manual
+`SENTRY_RELEASE` fallback. The deploy does not overwrite that custom value.
+Older release environment files remain accepted; applying one clears missing
+managed release values so an older image cannot inherit a newer release.
+Rollback restores the previous Compose files and `.env` together before restarting
+the affected services. Changing only release metadata recreates the affected
+runtime without pulling its unchanged image.
+
+The standalone Home Compose currently does not wire Sentry runtime variables;
+this metadata change does not enable telemetry there. Frontend source releases
+remain embedded in their immutable image builds.

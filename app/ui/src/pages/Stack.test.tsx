@@ -5,12 +5,25 @@ import snapshot from "../../../../tests/admin-e2e/fixtures/stack-snapshot.json";
 import { api } from "@/lib/api";
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 import { Stack } from "./Stack";
+import { supportsWebGL2 } from "@/components/admin/stack-map-3d/webgl-support";
+import { STACK_MAP_VIEW_STORAGE_KEY } from "@/components/admin/stack-map-3d/stack-map-view-preference";
 vi.mock("@/lib/api", () => ({ api: vi.fn() }));
+vi.mock("@/components/admin/stack-map-3d/webgl-support", () => ({
+  supportsWebGL2: vi.fn(() => true),
+}));
+vi.mock("@/components/admin/stack-map-3d/StackMap3DStage", () => ({
+  default: () => <div data-testid="stack-map-3d" />,
+}));
 let stream: {
   onopen: ((event: Event) => void) | null;
   onmessage: ((event: MessageEvent) => void) | null;
   onerror: ((event: Event) => void) | null;
   close: ReturnType<typeof vi.fn>;
+  listeners: Map<string, (event: MessageEvent) => void>;
+  addEventListener: (
+    type: string,
+    listener: (event: MessageEvent) => void,
+  ) => void;
 };
 const created = vi.fn();
 beforeEach(() => {
@@ -24,7 +37,15 @@ beforeEach(() => {
   created.mockClear();
   vi.stubGlobal("EventSource", function (url: string) {
     created(url);
-    stream = { onopen: null, onmessage: null, onerror: null, close: vi.fn() };
+    const listeners = new Map<string, (event: MessageEvent) => void>();
+    stream = {
+      onopen: null,
+      onmessage: null,
+      onerror: null,
+      close: vi.fn(),
+      listeners,
+      addEventListener: (type, listener) => listeners.set(type, listener),
+    };
     return stream;
   });
   vi.spyOn(window, "setTimeout");
@@ -180,8 +201,8 @@ describe("Stack typographic controls", () => {
     const logs = screen.getByRole("button", { name: "Show logs for worker" });
     const stop = screen.getByRole("button", { name: "Stop service worker" });
     const start = screen.getByRole("button", { name: "Start service scanner" });
-    const external = screen.getByRole("link", { name: "Open service tidarr" });
-    expect(external).toHaveAttribute("href", "https://search.lespedants.org");
+    const external = screen.getByRole("link", { name: "Open service traefik" });
+    expect(external).toHaveAttribute("href", "https://traefik.lespedants.org");
     expect(external).toHaveAttribute("target", "_blank");
     for (const action of [restart, logs, stop, start, external]) {
       expect(action).toHaveAttribute("data-variant", "ghost");
@@ -413,9 +434,9 @@ describe("Stack typographic controls", () => {
     await user.click(screen.getByRole("radio", { name: "All" }));
     await user.type(
       screen.getByRole("searchbox", { name: "Search stack services" }),
-      "8686",
+      "443",
     );
-    expect(screen.getByText("tidarr", { exact: true })).toBeVisible();
+    expect(screen.getByText("traefik", { exact: true })).toBeVisible();
     expect(created).toHaveBeenCalledOnce();
     act(() =>
       stream.onmessage?.({
@@ -433,5 +454,129 @@ describe("Stack typographic controls", () => {
     expect(api).toHaveBeenCalledWith("/api/admin/stack-snapshot?fresh=1");
     unmount();
     expect(stream.close).toHaveBeenCalledOnce();
+  });
+});
+
+describe("Stack runtime map", () => {
+  const inventory = {
+    schema_version: 1,
+    availability: "available",
+    reason: null,
+    host: { id: "crate-production", name: "Crate production" },
+    stacks: [
+      { id: "application", kind: "application", project: "crate" },
+      {
+        id: "observability",
+        kind: "observability",
+        project: "crate-observability",
+      },
+    ],
+    services: [
+      {
+        id: "crate/crate-api",
+        stack_id: "application",
+        service: "crate-api",
+        project: "crate",
+        container_id: "a".repeat(64),
+        container_name: "crate-api",
+        image: "ghcr.io/crate/api:1",
+        runtime_state: "running",
+        health: "healthy",
+        status: "Up 1 hour (healthy)",
+        actions: [],
+      },
+    ],
+  };
+
+  it("renders the topology map only when the snapshot carries an inventory", async () => {
+    const { unmount } = renderWithAdminProviders(<Stack />);
+    expect(
+      await screen.findByRole("region", { name: "Stack summary" }),
+    ).toBeVisible();
+    expect(screen.queryByRole("region", { name: "Stack topology" })).toBeNull();
+    unmount();
+
+    vi.mocked(api).mockImplementation(async () => ({ ...snapshot, inventory }));
+    renderWithAdminProviders(<Stack />);
+
+    expect(
+      await screen.findByRole("region", { name: "Stack topology" }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Inspect API" })).toBeVisible();
+  });
+
+  it("offers a persisted 3D view of the runtime map", async () => {
+    const user = userEvent.setup();
+    vi.mocked(api).mockImplementation(async () => ({ ...snapshot, inventory }));
+    const { unmount } = renderWithAdminProviders(<Stack />);
+    const map = await screen.findByRole("region", { name: "Stack topology" });
+    await user.click(within(map).getByRole("radio", { name: "3D" }));
+
+    expect(await within(map).findByTestId("stack-map-3d")).toBeInTheDocument();
+    expect(window.localStorage.getItem(STACK_MAP_VIEW_STORAGE_KEY)).toBe("3d");
+    unmount();
+
+    renderWithAdminProviders(<Stack />);
+    const restored = await screen.findByRole("region", {
+      name: "Stack topology",
+    });
+    expect(await within(restored).findByTestId("stack-map-3d")).toBeVisible();
+    window.localStorage.clear();
+  });
+
+  it("keeps the 2D map when WebGL2 is missing or the map is narrow", async () => {
+    vi.mocked(supportsWebGL2).mockReturnValue(false);
+    window.localStorage.setItem(STACK_MAP_VIEW_STORAGE_KEY, "3d");
+    vi.mocked(api).mockImplementation(async () => ({ ...snapshot, inventory }));
+    const { unmount } = renderWithAdminProviders(<Stack />);
+    const map = await screen.findByRole("region", { name: "Stack topology" });
+
+    expect(within(map).getByRole("radio", { name: "3D" })).toBeDisabled();
+    expect(
+      within(map).getByRole("button", { name: "Inspect API" }),
+    ).toBeVisible();
+    expect(within(map).getByText(/no WebGL2/)).toBeVisible();
+    unmount();
+
+    vi.mocked(supportsWebGL2).mockReturnValue(true);
+    vi.stubGlobal("innerWidth", 640);
+    renderWithAdminProviders(<Stack />);
+    const narrow = await screen.findByRole("region", {
+      name: "Stack topology",
+    });
+    expect(within(narrow).getByRole("radio", { name: "3D" })).toBeDisabled();
+    expect(within(narrow).getByText(/880 px/)).toBeVisible();
+    window.localStorage.clear();
+  });
+
+  it("feeds activity frames from the existing stack stream into the map", async () => {
+    vi.mocked(api).mockImplementation(async () => ({ ...snapshot, inventory }));
+    renderWithAdminProviders(<Stack />);
+    await screen.findByRole("region", { name: "Stack topology" });
+
+    act(() => {
+      stream.listeners.get("activity")?.(
+        new MessageEvent("activity", {
+          data: JSON.stringify({
+            schema: 1,
+            sequence: 1,
+            observed_at: new Date().toISOString(),
+            window_seconds: 5,
+            availability: "available",
+            requests: {},
+            queues: {},
+            projector: { events: 0 },
+            listening: 0,
+            sources: {},
+          }),
+        }),
+      );
+    });
+
+    expect(document.querySelector("[data-live-status]")).toHaveAttribute(
+      "data-live-status",
+      "live",
+    );
+    expect(created).toHaveBeenCalledTimes(1);
   });
 });

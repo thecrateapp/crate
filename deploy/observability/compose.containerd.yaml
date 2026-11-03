@@ -1,0 +1,39 @@
+# Select explicitly with OBS_CONTAINERD=1 only for Docker's overlayfs image store.
+volumes:
+  observability-runtime-proxy: {}
+
+services:
+  crate-observability-docker-proxy:
+    volumes:
+      - ./deploy/observability/runtime-proxy.haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - type: bind
+        source: ${OBS_CONTAINERD_SOCKET:-/run/containerd/containerd.sock}
+        target: /var/run/crate-containerd.sock
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: volume
+        source: observability-runtime-proxy
+        target: /run/crate-runtime-proxy
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:2375/_ping]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  crate-cadvisor:
+    command:
+      - --docker=tcp://crate-observability-docker-proxy:2375
+      - --containerd=/run/crate-runtime-proxy/containerd.sock
+      - --containerd-namespace=moby
+      - --housekeeping_interval=30s
+      - --docker_only=true
+      - --store_container_labels=false
+      - --whitelisted_container_labels=com.docker.compose.service
+      - --enable_metrics=cpu,memory,diskIO,network
+      - --disable_root_cgroup_stats=true
+    volumes:
+      - type: volume
+        source: observability-runtime-proxy
+        target: /run/crate-runtime-proxy
+        read_only: true
