@@ -14,6 +14,7 @@ import (
 	"github.com/thecrateapp/crate/app/installer/internal/doctor"
 	"github.com/thecrateapp/crate/app/installer/internal/install"
 	"github.com/thecrateapp/crate/app/installer/internal/manifest"
+	"github.com/thecrateapp/crate/app/installer/internal/monitoring"
 	"github.com/thecrateapp/crate/app/installer/internal/secrets"
 	"github.com/thecrateapp/crate/app/installer/internal/stack"
 	"github.com/thecrateapp/crate/app/installer/internal/system"
@@ -513,6 +514,7 @@ func (s *Session) toolApply(ctx context.Context, _ *mcp.CallToolRequest, _ struc
 		s.cfg.AdminPassword, s.cfg.AdminPasswordGenerated = password, true
 	}
 	s.cfg.DockerGID = system.SocketGroup(ctx, s.deps.Run, s.host)
+	s.cfg.KeepMonitoringFiles = monitoring.KeepFiles(s.dir, s.version)
 	if err := install.Apply(s.manifest, s.cfg, s.existing); err != nil {
 		return nil, ApplyOut{}, err
 	}

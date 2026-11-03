@@ -82,7 +82,8 @@ func (w *wizard) monitoringStep(ctx context.Context) error {
 	}
 	w.mon.active = w.existing != nil && observability.Active(w.existing)
 	w.mon.stored = w.storedMonitoring()
-	if release := storedValue(w.mon.stored, "OBS_RELEASE"); !observability.MayWrite(release, w.opts.Version) {
+	if monitoring.KeepFiles(w.cfg.InstallDir, w.opts.Version) {
+		release := storedValue(w.mon.stored, "OBS_RELEASE")
 		w.mon.keepFiles = true
 		ui.StatusRow(w.out, ui.ToneWarn, "Monitoring", "set up by crate "+release, "This installer is older; it leaves monitoring as it is. Use crate "+release+" or newer to change it.")
 		return nil
@@ -126,6 +127,13 @@ func (w *wizard) monitoringStep(ctx context.Context) error {
 	want, err := w.confirm("Set up monitoring?", description, w.mon.active)
 	if err != nil {
 		return err
+	}
+	if !want && w.mon.active {
+		off, err := w.confirm("Turn monitoring off?", "Crate restarts once without it and the monitoring containers stop. Its history, settings and passwords are kept.", false)
+		if err != nil {
+			return err
+		}
+		want = !off
 	}
 	w.mon.want = want
 	if !want || w.mon.stored != nil {
