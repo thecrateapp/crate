@@ -25,6 +25,7 @@ const (
 
 	ObservabilitySetup     = "observability_setup.py"
 	ObservabilityPreflight = "observability_preflight.py"
+	ObservabilityUp        = "observability-up.sh"
 )
 
 // ObservabilityDir holds the monitoring files, embedded under the same
@@ -69,6 +70,7 @@ var Sources = withObservability(map[string]string{
 
 	ObservabilitySetup:     "scripts/observability_setup.py",
 	ObservabilityPreflight: "scripts/observability_preflight.py",
+	ObservabilityUp:        "scripts/observability-up.sh",
 })
 
 func withObservability(sources map[string]string) map[string]string {
