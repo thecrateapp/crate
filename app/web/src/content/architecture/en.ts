@@ -194,7 +194,7 @@ export const architecture: ArchitecturePage = {
     {
       title: "One planner, two players that don't trust it",
       body: [
-        "Smart Mix transitions are planned once, by a pure Python planner on the server. The Android player and the VirtualDJ plugin, still in development, validate every plan again before they run it, against the tracks, cue points and limits they actually have.",
+        "Smart Mix transitions are planned once, by a pure Python planner on the server. The Android player validates every plan again before it runs it, against the tracks, cue points and limits it actually has. Crate Decks, in development, will do the same.",
         "Shared fixtures pin the contract. Python and Java read the same transition plans, Python and Rust the same beat grids, so a plan means the same thing on the server and on the phone.",
       ],
       facts: ["Python", "Rust", "Java"],

@@ -46,7 +46,7 @@ test("the genre wheel explains where an inherited EQ comes from", async ({
   await expect(wheel.locator("[data-walk-preset]")).toHaveText("jazz");
 });
 
-test("Listen points Jams and Decks at the roadmap on /developers, which keeps shipped Smart Mix work off it", async ({
+test("Listen points Jams and Crate Decks at the roadmap on /developers, which keeps shipped work off it", async ({
   page,
 }) => {
   await page.goto("/listen");
@@ -59,9 +59,9 @@ test("Listen points Jams and Decks at the roadmap on /developers, which keeps sh
   await expect(roadmap).toBeInViewport();
   await expect(roadmap.locator(".status-badge")).toHaveCount(2);
   await expect(roadmap).toContainText("Jams");
-  await expect(roadmap).toContainText("VirtualDJ");
+  await expect(roadmap).toContainText("Crate Decks");
   expect(await roadmap.textContent()).not.toMatch(
-    /smart mix|beatmatch|bass swap|automix/i,
+    /smart mix|beatmatch|bass swap|automix|virtualdj/i,
   );
 });
 
@@ -206,7 +206,7 @@ test("the home teasers are decorative and leave the card links with short names"
   );
 });
 
-test("the Smart Mix chapter ships Beatmatch and Bass swap on Android and keeps VirtualDJ coming soon", async ({
+test("the Smart Mix chapter ships Beatmatch and Bass swap on Android and VirtualDJ, and keeps Crate Decks coming", async ({
   page,
 }) => {
   await page.goto("/listen");
@@ -219,18 +219,43 @@ test("the Smart Mix chapter ships Beatmatch and Bass swap on Android and keeps V
 
   const status = (name: string) =>
     chapter.locator(`[data-platform="${name}"] .status-badge`);
-  await expect(chapter.locator("[data-platform]")).toHaveCount(4);
+  await expect(chapter.locator("[data-platform]")).toHaveCount(5);
   await expect(status("Android")).toHaveText("Available");
   await expect(chapter.locator('[data-platform="Android"]')).toContainText(
     "Smart Mix, Beatmatch and Bass swap",
   );
   await expect(status("Web and desktop")).toHaveText("Available");
   await expect(status("iOS")).toHaveText("Planned");
-  await expect(status("VirtualDJ")).toHaveText("In development");
-  await expect(page.locator('[id="10-decks"] .status-badge')).toHaveText(
-    "In development",
-  );
+  await expect(status("VirtualDJ")).toHaveText("Available");
+  await expect(status("Crate Decks")).toHaveText("In development");
   expect(await page.locator("main").textContent()).not.toMatch(/automix/i);
+});
+
+test("For DJs offers the VirtualDJ plugin from its own release and keeps Crate Decks in development", async ({
+  page,
+}) => {
+  await page.goto("/listen");
+  const chapter = page.locator('[id="10-for-djs"]');
+  await expect(page.locator('.toc a[href="#10-for-djs"]')).toHaveCount(1);
+
+  const badge = (title: string) =>
+    chapter.locator("h3", { hasText: title }).locator(".status-badge");
+  await expect(badge("VirtualDJ plugin")).toHaveText("Available");
+  await expect(badge("Crate Decks")).toHaveText("In development");
+
+  const downloads = chapter.locator("[data-plugin-download]");
+  await expect(downloads).toHaveCount(3);
+  for (const href of await downloads.evaluateAll((links) =>
+    links.map((link) => link.getAttribute("href")),
+  )) {
+    expect(href).toMatch(
+      /^https:\/\/github\.com\/thecrateapp\/crate\/releases\/download\/crate-vdj-v[\d.]+\/Crate-VirtualDJ-/,
+    );
+  }
+  await expect(
+    chapter.locator('[data-plugin-download][data-tested="false"]'),
+  ).toHaveCount(2);
+  await expect(chapter).toContainText("VirtualDJ Pro");
 });
 
 test("the Smart Mix transition plays forward as the page scrolls", async ({

@@ -1,0 +1,130 @@
+---
+import type { PluginInstall } from "../../content/listen/en";
+import { VDJ_PLUGIN_VERSION, vdjPluginDownloads } from "../../lib/downloads";
+
+interface Props {
+  content: PluginInstall;
+}
+
+const { content } = Astro.props;
+---
+
+<section class="plugin" aria-labelledby="vdj-plugin-title" data-reveal>
+  <header>
+    <p class="eyebrow" id="vdj-plugin-title">{content.eyebrow}</p>
+    <p class="version viz-label">v{VDJ_PLUGIN_VERSION}</p>
+  </header>
+
+  <ul class="builds">
+    {
+      vdjPluginDownloads.map((build) => (
+        <li>
+          <span class="platform">{build.platform}</span>
+          <a class="u-link" href={build.url} data-plugin-download data-tested={String(build.tested)}>
+            {build.label}
+          </a>
+          {!build.tested && <span class="untested">{content.untested}</span>}
+        </li>
+      ))
+    }
+  </ul>
+
+  <p class="requirement">{content.requirement}</p>
+
+  <ol class="steps">
+    {
+      content.steps.map((step) => (
+        <li>
+          {step.body}
+          {step.code && <code>{step.code}</code>}
+        </li>
+      ))
+    }
+  </ol>
+</section>
+
+<style>
+  .plugin {
+    display: grid;
+    gap: 22px;
+    margin-top: 40px;
+    padding-top: 28px;
+    border-top: 1px solid var(--line);
+  }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .eyebrow,
+  .version {
+    margin: 0;
+  }
+
+  .builds {
+    display: grid;
+    gap: 14px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .builds li {
+    display: grid;
+    grid-template-columns: 96px 120px minmax(0, 1fr);
+    align-items: baseline;
+    gap: 6px 18px;
+  }
+
+  .platform {
+    color: var(--fg-3);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .untested {
+    color: var(--amber);
+    font-size: 13px;
+  }
+
+  .requirement {
+    margin: 0;
+    color: var(--fg-2);
+    font-size: 15px;
+  }
+
+  .steps {
+    display: grid;
+    gap: 12px;
+    margin: 0;
+    padding-left: 22px;
+    color: var(--fg-2);
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  code {
+    display: block;
+    width: fit-content;
+    max-width: 100%;
+    margin-top: 8px;
+    padding: 8px 12px;
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+
+  @media (max-width: 640px) {
+    .builds li {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
