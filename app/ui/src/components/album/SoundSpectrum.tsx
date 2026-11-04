@@ -9,27 +9,37 @@ export interface SpectrumFeature {
   values: { label?: string; value: number }[];
 }
 
-// The graphic draws in a 100 x 24 box stretched to the row: x is the value in percent.
-const BASELINE = 16;
-const RIDGE_HEIGHT = 13;
+// Geometry of the approved mockup: each row is a 600 x 50 drawing scaled uniformly, so
+// ridges, marks and glow keep their proportions at any width (capped in CSS).
+const WIDTH = 600;
+const ROW_HEIGHT = 50;
+const AXIS_HEIGHT = 30;
+const X0 = 150;
+const X1 = 510;
+const BASELINE = 26;
+const RIDGE_HEIGHT = 20;
 const BANDWIDTH = 0.035;
-const STEPS = 100;
-const GRID = [25, 50, 75];
+const STEPS = 120;
+const GRID = [0, 0.25, 0.5, 0.75, 1];
 
 function percent(value: number) {
   return `${Math.round(value * 100)}%`;
 }
 
-function coordinate(value: number) {
-  return Number(value.toFixed(2));
+function round(value: number) {
+  return Number(value.toFixed(1));
 }
 
-/** Gaussian density of the track values, scaled so its peak touches the ridge top. */
+function x(value: number) {
+  return round(X0 + (X1 - X0) * value);
+}
+
+/** Gaussian density of the track values, scaled so its peak reaches the ridge top. */
 function ridgePoints(values: number[]) {
   const heights = Array.from({ length: STEPS + 1 }, (_, step) => {
-    const x = step / STEPS;
+    const at = step / STEPS;
     return values.reduce(
-      (sum, value) => sum + Math.exp(-0.5 * ((x - value) / BANDWIDTH) ** 2),
+      (sum, value) => sum + Math.exp(-0.5 * ((at - value) / BANDWIDTH) ** 2),
       0,
     );
   });
@@ -37,7 +47,7 @@ function ridgePoints(values: number[]) {
   return heights
     .map(
       (height, step) =>
-        `${step},${coordinate(BASELINE - (height / peak) * RIDGE_HEIGHT)}`,
+        `${x(step / STEPS)},${round(BASELINE - (height / peak) * RIDGE_HEIGHT)}`,
     )
     .join(" ");
 }
@@ -65,7 +75,7 @@ function SpectrumRow({
   feature: SpectrumFeature;
   index: number;
 }) {
-  const gradient = `sound-spectrum-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const id = `sound-spectrum-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const values = feature.values.map((entry) => entry.value);
   const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
   const album = values.length > 1;
@@ -78,9 +88,6 @@ function SpectrumRow({
       className="sound-spectrum-row"
       style={{ "--row": index } as CSSProperties}
     >
-      <span data-slot="sound-spectrum-label" className="sound-spectrum-label">
-        {feature.label}
-      </span>
       <TooltipHint content={description}>
         <div
           role="img"
@@ -88,45 +95,57 @@ function SpectrumRow({
           tabIndex={0}
           className="sound-spectrum-graphic"
         >
-          <svg
-            viewBox="0 0 100 24"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
+          <svg viewBox={`0 0 ${WIDTH} ${ROW_HEIGHT}`} aria-hidden="true">
             <defs>
-              <linearGradient id={gradient} x1="0" x2="1">
-                <stop offset="0" className="sound-spectrum-stop-from" />
-                <stop offset="1" className="sound-spectrum-stop-to" />
+              <filter
+                id={`${id}-glow`}
+                x="-50%"
+                y="-50%"
+                width="200%"
+                height="200%"
+              >
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <linearGradient id={`${id}-fill`} x1="0" x2="1">
+                <stop offset="0" className="sound-spectrum-fill-from" />
+                <stop offset="1" className="sound-spectrum-fill-to" />
+              </linearGradient>
+              <linearGradient id={`${id}-ridge`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" className="sound-spectrum-ridge-from" />
+                <stop offset="1" className="sound-spectrum-ridge-to" />
               </linearGradient>
             </defs>
-            {GRID.map((x) => (
+            {GRID.map((at) => (
               <line
-                key={x}
+                key={at}
                 className="sound-spectrum-grid"
-                x1={x}
-                x2={x}
+                x1={x(at)}
+                x2={x(at)}
                 y1="0"
-                y2="24"
-                vectorEffect="non-scaling-stroke"
+                y2={ROW_HEIGHT}
               />
             ))}
-            <line
-              className="sound-spectrum-baseline"
-              x1="0"
-              x2="100"
-              y1={BASELINE}
-              y2={BASELINE}
-              vectorEffect="non-scaling-stroke"
-            />
+            <text
+              data-slot="sound-spectrum-label"
+              className="sound-spectrum-label"
+              x="20"
+              y={BASELINE + 4}
+            >
+              {feature.label}
+            </text>
             <rect
               data-slot="sound-spectrum-fill"
               className="sound-spectrum-fill"
-              x="0"
-              y={BASELINE - 1.5}
-              width={coordinate(mean * 100)}
-              height="3"
-              rx="1.5"
-              fill={`url(#${gradient})`}
+              x={X0}
+              y={BASELINE - 3}
+              width={round((X1 - X0) * mean)}
+              height="6"
+              rx="3"
+              fill={`url(#${id}-fill)`}
             />
             {ridge ? (
               <g
@@ -134,13 +153,12 @@ function SpectrumRow({
                 className="sound-spectrum-ridge"
               >
                 <polygon
-                  className="sound-spectrum-ridge-area"
-                  points={`0,${BASELINE} ${ridge} 100,${BASELINE}`}
+                  points={`${X0},${BASELINE} ${ridge} ${X1},${BASELINE}`}
+                  fill={`url(#${id}-ridge)`}
                 />
                 <polyline
                   className="sound-spectrum-ridge-line"
                   points={ridge}
-                  vectorEffect="non-scaling-stroke"
                 />
               </g>
             ) : null}
@@ -150,29 +168,35 @@ function SpectrumRow({
                     key={track}
                     data-slot="sound-spectrum-tick"
                     className="sound-spectrum-tick"
-                    x1={coordinate(value * 100)}
-                    x2={coordinate(value * 100)}
-                    y1={BASELINE - 5}
-                    y2={BASELINE + 5}
-                    vectorEffect="non-scaling-stroke"
+                    x1={x(value)}
+                    x2={x(value)}
+                    y1={BASELINE - 7}
+                    y2={BASELINE + 7}
                   />
                 ))
               : null}
-            <line
+            <rect
               data-slot="sound-spectrum-mean"
               className="sound-spectrum-mean"
-              x1={coordinate(mean * 100)}
-              x2={coordinate(mean * 100)}
-              y1={BASELINE - 14}
-              y2={BASELINE + 7}
-              vectorEffect="non-scaling-stroke"
+              x={round(x(mean) - 2)}
+              y={BASELINE - 12}
+              width="4"
+              height="24"
+              rx="2"
+              filter={`url(#${id}-glow)`}
             />
+            <text
+              data-slot="sound-spectrum-value"
+              className="sound-spectrum-value"
+              x="570"
+              y={BASELINE + 6}
+              textAnchor="end"
+            >
+              {percent(mean)}
+            </text>
           </svg>
         </div>
       </TooltipHint>
-      <span data-slot="sound-spectrum-value" className="sound-spectrum-value">
-        {percent(mean)}
-      </span>
     </li>
   );
 }
@@ -196,15 +220,31 @@ export function SoundSpectrum({
       data-animated={animate ? "true" : "false"}
       className="sound-spectrum"
     >
-      <div aria-hidden="true" className="sound-spectrum-axis">
-        <span />
-        <span className="sound-spectrum-ticks">
-          {[0, 25, 50, 75, 100].map((tick) => (
-            <span key={tick}>{tick}</span>
-          ))}
-        </span>
-        <span />
-      </div>
+      <svg
+        viewBox={`0 0 ${WIDTH} ${AXIS_HEIGHT}`}
+        aria-hidden="true"
+        className="sound-spectrum-axis"
+      >
+        {GRID.map((at) => (
+          <g key={at}>
+            <text
+              className="sound-spectrum-axis-label"
+              x={x(at)}
+              y="20"
+              textAnchor="middle"
+            >
+              {Math.round(at * 100)}
+            </text>
+            <line
+              className="sound-spectrum-grid"
+              x1={x(at)}
+              x2={x(at)}
+              y1="24"
+              y2={AXIS_HEIGHT}
+            />
+          </g>
+        ))}
+      </svg>
       <ul aria-label="Sound features" className="sound-spectrum-rows">
         {features.map((feature, index) => (
           <SpectrumRow key={feature.label} feature={feature} index={index} />

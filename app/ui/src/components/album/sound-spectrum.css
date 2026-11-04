@@ -1,93 +1,84 @@
-/* Sound spectrum (album audio analysis): one row per sound feature. */
+/* Sound spectrum (audio analysis): the approved mockup's instrument, drawn per row in a
+   600 x 50 box that scales uniformly, on its own dark panel. */
 .sound-spectrum {
-  display: grid;
-  gap: 0.25rem;
-  min-width: 0;
+  width: 100%;
+  max-width: 40rem;
+  padding: 0.25rem 0 0.75rem;
+  border-radius: 0.5rem;
+  background: var(--surface-app);
 }
 
 .sound-spectrum-axis,
-.sound-spectrum-row {
-  display: grid;
-  grid-template-columns: minmax(6.5rem, 9rem) minmax(0, 1fr) 3.75rem;
-  align-items: center;
-  gap: 0.875rem;
-}
-
-.sound-spectrum-ticks {
-  display: flex;
-  justify-content: space-between;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
+.sound-spectrum-graphic svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
 }
 
 .sound-spectrum-rows {
-  display: grid;
-  gap: 0.375rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.sound-spectrum-label {
-  overflow: hidden;
-  color: var(--text-muted);
+.sound-spectrum-graphic {
+  border-radius: 0.25rem;
+  outline-offset: -2px;
+}
+
+.sound-spectrum-grid {
+  stroke: var(--text-primary);
+  stroke-opacity: 0.08;
+}
+
+.sound-spectrum-axis-label {
+  fill: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  letter-spacing: 0.06em;
-  text-overflow: ellipsis;
+  font-size: 9px;
+}
+
+.sound-spectrum-label {
+  fill: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  white-space: nowrap;
 }
 
 .sound-spectrum-value {
-  color: var(--text-primary);
+  fill: var(--text-primary);
   font-family: var(--font-mono);
-  font-size: 1.125rem;
+  font-size: 18px;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
-  text-align: right;
 }
 
-.sound-spectrum-graphic {
-  height: 2.75rem;
-  border-radius: 0.25rem;
-  outline-offset: 2px;
-}
-
-.sound-spectrum-graphic svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
-.sound-spectrum-grid,
-.sound-spectrum-baseline {
-  stroke: var(--border-quiet);
-  stroke-width: 1;
-}
-
-.sound-spectrum-stop-from {
+.sound-spectrum-fill-from {
   stop-color: var(--accent-action);
   stop-opacity: 0;
 }
 
-.sound-spectrum-stop-to {
+.sound-spectrum-fill-to {
   stop-color: var(--accent-action-hi);
-  stop-opacity: 0.6;
+  stop-opacity: 0.55;
 }
 
-.sound-spectrum-ridge-area {
-  fill: var(--accent-action-hi);
-  fill-opacity: 0.16;
+.sound-spectrum-ridge-from {
+  stop-color: var(--accent-action-hi);
+  stop-opacity: 0.45;
+}
+
+.sound-spectrum-ridge-to {
+  stop-color: var(--accent-action);
+  stop-opacity: 0.02;
 }
 
 .sound-spectrum-ridge-line {
   fill: none;
   stroke: var(--accent-action-hi);
-  stroke-opacity: 0.85;
-  stroke-width: 1.25;
+  stroke-opacity: 0.8;
+  stroke-width: 1.2;
 }
 
 .sound-spectrum-tick {
@@ -96,12 +87,8 @@
   stroke-width: 1.5;
 }
 
-/* The mean stands above the ridge in the text colour so it never reads as a track. */
 .sound-spectrum-mean {
-  stroke: var(--text-primary);
-  stroke-linecap: round;
-  stroke-width: 3;
-  filter: drop-shadow(0 0 4px var(--accent-action-hi));
+  fill: var(--accent-action-hi);
 }
 
 /* Entrance: the fill grows from 0, the ridge rises, then the marks appear, row by row. */

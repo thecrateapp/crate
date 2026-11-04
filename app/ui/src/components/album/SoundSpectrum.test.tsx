@@ -59,7 +59,8 @@ describe("SoundSpectrum", () => {
           .querySelector('[data-slot="sound-spectrum-fill"]')
           ?.getAttribute("width"),
       ),
-    ).toEqual(["49.25", "62.25"]);
+      // The fill spans 360 units at 100%, as in the approved mockup.
+    ).toEqual(["177.3", "224.1"]);
   });
 
   it("marks every track and draws a density ridge for an album", () => {
