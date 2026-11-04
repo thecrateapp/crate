@@ -156,6 +156,74 @@ def mark_status(
         return int(cast(CursorResult, result).rowcount or 0)
 
 
+STATUS_AUDIT_ACTION = "error_issue.status.update"
+
+
+def record_status_change(
+    issue_id: str,
+    *,
+    status: str,
+    substatus: str | None = None,
+    actor_id: int | None,
+    task_id: str | None = None,
+    at: datetime | None = None,
+    session: Session | None = None,
+) -> bool:
+    """Apply a status a person set in Sentry and audit it in the same transaction.
+
+    The audit row only carries ids and statuses, never the issue title or event text.
+    Returns False when the issue no longer exists locally (nothing is audited).
+    """
+    valid_id = _uuid(issue_id)
+    stamp = at or _now()
+    with optional_scope(session) as current:
+        previous = (
+            current.execute(
+                text(
+                    """
+                    SELECT short_id, external_id, provider, status, substatus
+                    FROM error_issues
+                    WHERE id = CAST(:id AS uuid)
+                    FOR UPDATE
+                    """
+                ),
+                {"id": valid_id},
+            )
+            .mappings()
+            .first()
+        )
+        if previous is None:
+            return False
+        mark_status([valid_id], status, substatus=substatus, at=stamp, session=current)
+        details = {
+            "issue_id": valid_id,
+            "provider": previous["provider"],
+            "external_id": previous["external_id"],
+            "from": {"status": previous["status"], "substatus": previous["substatus"]},
+            "to": {"status": status, "substatus": substatus},
+        }
+        current.execute(
+            text(
+                """
+                INSERT INTO audit_log
+                    (timestamp, action, target_type, target_name, details_json,
+                     user_id, task_id)
+                VALUES (:ts, :action, 'error_issue', :target, CAST(:details AS jsonb),
+                        :user_id, :task_id)
+                """
+            ),
+            {
+                "ts": stamp,
+                "action": STATUS_AUDIT_ACTION,
+                "target": previous["short_id"],
+                "details": json.dumps(details, separators=(",", ":")),
+                "user_id": actor_id,
+                "task_id": task_id,
+            },
+        )
+        return True
+
+
 def set_digest(
     issue_id: str,
     *,
@@ -238,9 +306,11 @@ def record_fix_request(
 
 __all__ = [
     "ISSUE_STATUSES",
+    "STATUS_AUDIT_ACTION",
     "mark_status",
     "purge_closed",
     "record_fix_request",
+    "record_status_change",
     "set_digest",
     "upsert_issues",
 ]

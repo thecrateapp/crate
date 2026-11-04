@@ -363,3 +363,21 @@ def test_actor_reports_timeout_before_dramatiq_retry(monkeypatch):
             "max_retries": 2,
         }
     ]
+
+
+def test_error_inbox_tasks_have_handler_pool_and_registry():
+    from crate.actors import TASK_POOL_CONFIG, TaskPoolConfig
+    from crate.task_registry import TASK_TYPES
+    from crate.worker import TASK_HANDLERS
+
+    expected = {
+        # Scheduled, deferrable; Sentry calls with external effects never retry.
+        "sync_error_issues": TaskPoolConfig("maintenance", 1, 120, 0),
+        # A person waits for these.
+        "update_error_issue_status": TaskPoolConfig("fast", 0, 30, 0),
+        "test_error_tracking_connection": TaskPoolConfig("fast", 0, 30, 0),
+    }
+    for task_type, pool in expected.items():
+        assert TASK_POOL_CONFIG[task_type] == pool
+        assert callable(TASK_HANDLERS[task_type])
+        assert task_type in TASK_TYPES

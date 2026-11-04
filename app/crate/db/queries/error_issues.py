@@ -315,6 +315,44 @@ def open_ids_not_in(
         return _impl(current)
 
 
+def sync_state(
+    external_ids: Sequence[str],
+    *,
+    provider: str = "sentry",
+    session: Session | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Stored state of the given issues, by external id, for a sync pass to compare.
+
+    The sync keeps the service learned from the latest event when it scores a
+    refreshed row, and fetches events for issues that are new, changed or have no
+    digest yet.
+    """
+    ids = list(dict.fromkeys(str(value) for value in external_ids))
+    if not ids:
+        return {}
+    params = {"ids": ids, "provider": provider}
+
+    def _impl(current: Session) -> dict[str, dict[str, Any]]:
+        rows = current.execute(
+            text(
+                """
+                SELECT id::text AS id, external_id, service, status, last_seen,
+                       digest_hash
+                FROM error_issues
+                WHERE provider = :provider
+                  AND external_id = ANY(CAST(:ids AS text[]))
+                """
+            ),
+            params,
+        ).mappings()
+        return {row["external_id"]: dict(row) for row in rows}
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
 def untriaged_open(
     *, limit: int, session: Session | None = None
 ) -> list[dict[str, Any]]:
@@ -356,5 +394,6 @@ __all__ = [
     "list_issues",
     "open_ids_not_in",
     "summary",
+    "sync_state",
     "untriaged_open",
 ]

@@ -600,6 +600,15 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ("compute_recommendation_skips",),
     ),
     (
+        "crate.worker_handlers.error_inbox",
+        "ERROR_INBOX_TASK_HANDLERS",
+        (
+            "sync_error_issues",
+            "update_error_issue_status",
+            "test_error_tracking_connection",
+        ),
+    ),
+    (
         "crate.worker_handlers.ai_configuration",
         "AI_CONFIGURATION_TASK_HANDLERS",
         ("ai_catalog_refresh", "ai_profile_test"),

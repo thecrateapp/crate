@@ -168,6 +168,11 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     "compute_product_kpis": TaskTypeInfo("Product KPIs", "analysis"),
     "compute_observability_summary": TaskTypeInfo("Observability Summary", "analysis"),
     "compute_recommendation_skips": TaskTypeInfo("Recommendation skips", "analysis"),
+    "sync_error_issues": TaskTypeInfo("Error Inbox Sync", "analysis"),
+    "update_error_issue_status": TaskTypeInfo("Error Issue Status Change", "analysis"),
+    "test_error_tracking_connection": TaskTypeInfo(
+        "Error Tracking Connection Test", "analysis"
+    ),
     "refresh_user_listening_stats": TaskTypeInfo("Listening Stats Refresh", "analysis"),
     "refresh_dirty_listening_stats": TaskTypeInfo(
         "Pending Listening Stats Sweep", "analysis"
