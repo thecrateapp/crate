@@ -126,7 +126,38 @@ def _handle_generate_playlist_description(
     }
 
 
+def _handle_propose_genre_taxonomy_node(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    del config
+    from crate.ai.consumers import resume_action
+    from crate.genre_taxonomy_proposals import build_genre_taxonomy_node_proposal
+
+    slug = str(params.get("slug") or "").strip().lower()
+    if not slug:
+        return {"status": "failed", "error": "Genre not found"}
+    try:
+        ai_call = resume_action(
+            "genres.taxonomy.propose",
+            params.get("ai_acceptance"),
+            actor_id=params.get("actor_user_id"),
+            job_id=task_id,
+        )
+        # The builder revalidates the accepted call before returning.
+        proposal = build_genre_taxonomy_node_proposal(slug, ai_call=ai_call)
+    except AIConfigurationError as error:
+        return _failed(error)
+    if not proposal.get("ok"):
+        return {
+            "status": "failed",
+            "error": "Genre not found",
+            "reason": proposal.get("reason"),
+        }
+    return proposal
+
+
 AI_PROPOSAL_TASK_HANDLERS: dict[str, TaskHandler] = {
     "propose_genre_eq": _handle_propose_genre_eq,
     "generate_playlist_description": _handle_generate_playlist_description,
+    "propose_genre_taxonomy_node": _handle_propose_genre_taxonomy_node,
 }

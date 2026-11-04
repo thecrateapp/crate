@@ -659,7 +659,11 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "crate.worker_handlers.ai_proposals",
         "AI_PROPOSAL_TASK_HANDLERS",
-        ("propose_genre_eq", "generate_playlist_description"),
+        (
+            "propose_genre_eq",
+            "generate_playlist_description",
+            "propose_genre_taxonomy_node",
+        ),
     ),
     (
         "crate.worker_handlers.acquisition",

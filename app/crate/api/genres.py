@@ -29,7 +29,6 @@ from crate.api.schemas.genres import (
     GenreTaxonomyRawTagClassificationUpdateResponse,
     GenreTaxonomyNodeProposalApplyRequest,
     GenreTaxonomyNodeProposalApplyResponse,
-    GenreTaxonomyNodeProposalResponse,
     GenreTaxonomyNodeUpdateRequest,
     GenreTaxonomyNodeUpdateResponse,
     GenreTaxonomyRebuildProposalRequest,
@@ -89,7 +88,7 @@ from crate.genre_taxonomy import (
     invalidate_runtime_taxonomy_cache,
     resolve_genre_eq_preset,
 )
-from crate.genre_taxonomy_proposals import build_genre_taxonomy_node_proposal
+from crate.genre_taxonomy_proposals import node_proposal_input_fingerprint
 
 router = APIRouter(prefix="/api/genres", tags=["genres"])
 
@@ -633,27 +632,66 @@ def delete_taxonomy_node(request: Request, slug: str):
 
 @router.post(
     "/taxonomy/{slug}/proposal",
-    response_model=GenreTaxonomyNodeProposalResponse,
-    responses=_GENRE_ADMIN_RESPONSES,
-    summary="Generate a reviewable AI proposal for one taxonomy node",
+    status_code=202,
+    response_model=TaskEnqueueResponse,
+    responses=merge_responses(
+        _GENRE_ADMIN_RESPONSES,
+        {
+            404: error_response("Genre not found."),
+            503: error_response("The AI taxonomy proposal action is unavailable."),
+        },
+    ),
+    summary="Queue a reviewable AI proposal for one taxonomy node",
 )
 def infer_taxonomy_node_proposal(
     request: Request,
     slug: str,
 ):
+    """Queue the proposal on the ai queue; the task result holds it.
+
+    The model is never called inside the request (SM3-D8). Follow the returned
+    task with /api/events/task/{task_id}; its result has the shape of
+    GenreTaxonomyNodeProposalResponse.
+    """
     actor = _require_genre_curator(request)
     canonical_slug = (slug or "").strip().lower()
     if not canonical_slug:
         raise HTTPException(status_code=400, detail="Slug is required")
-    from crate.ai.consumers import resolve_call
-
-    proposal = build_genre_taxonomy_node_proposal(
-        canonical_slug,
-        ai_call=resolve_call("genres.taxonomy.propose", actor_id=actor.get("id")),
-    )
-    if not proposal.get("ok"):
+    fingerprint = node_proposal_input_fingerprint(canonical_slug)
+    if fingerprint is None:
         raise HTTPException(status_code=404, detail="Genre not found")
-    return proposal
+
+    from crate.ai.consumers import accept_action
+    from crate.ai.contracts import AIConfigurationError
+
+    try:
+        acceptance = accept_action("genres.taxonomy.propose")
+    except AIConfigurationError as error:
+        raise HTTPException(
+            status_code=503,
+            detail=error.message,
+            headers={"X-Crate-Error": error.code},
+        ) from None
+
+    dedup_key = f"genre-taxonomy-proposal:{canonical_slug}:{fingerprint[:16]}"
+    params = {
+        "slug": canonical_slug,
+        "actor_user_id": actor.get("id"),
+        "ai_acceptance": acceptance,
+    }
+    task_id = create_task_dedup(
+        "propose_genre_taxonomy_node", params, dedup_key=dedup_key
+    )
+    if task_id is not None:
+        return {"task_id": task_id, "status": "queued", "deduplicated": False}
+    active = find_active_task_by_type_params(
+        "propose_genre_taxonomy_node", dedup_key=dedup_key
+    )
+    if active is None:
+        raise HTTPException(
+            status_code=409, detail="A proposal for this genre just finished"
+        )
+    return {"task_id": active, "status": "queued", "deduplicated": True}
 
 
 @router.post(

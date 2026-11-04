@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { useApi } from "@/hooks/use-api";
 import { useTaskPoll } from "@/hooks/use-task-poll";
 import { ApiError, api } from "@/lib/api";
+import { waitForTask } from "@/lib/tasks";
 import { useActionLLMStatus } from "@/hooks/use-llm";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { GenrePill } from "@crate/ui/domain/genres/GenrePill";
@@ -89,6 +90,15 @@ export interface TaxonomyTree {
     signature_valid: boolean;
     key_id: string | null;
   };
+}
+
+// Covers queueing behind other AI work plus capacity requeues (5-30s each).
+const PROPOSAL_TASK_TIMEOUT_MS = 10 * 60 * 1000;
+
+class ProposalTaskError extends Error {
+  constructor(message?: string) {
+    super(message ?? "");
+  }
 }
 
 interface TaxonomyNodeProposal {
@@ -226,6 +236,8 @@ function NodeDetailPanel({
   const [coverBroken, setCoverBroken] = useState(false);
   const [coverVersion, setCoverVersion] = useState(0);
   const baselineNode = useRef(node);
+  const proposalTask = useRef<AbortController | null>(null);
+  useEffect(() => () => proposalTask.current?.abort(), []);
 
   useEffect(() => {
     const previous = baselineNode.current;
@@ -360,12 +372,25 @@ function NodeDetailPanel({
   };
 
   const inferNodeProposal = async () => {
+    proposalTask.current?.abort();
+    const controller = new AbortController();
+    proposalTask.current = controller;
     setSavingKey("proposal");
     try {
-      const result = await api<TaxonomyNodeProposal>(
+      // The proposal is built in the ai queue; the request only returns the task.
+      const queued = await api<{ task_id: string }>(
         `/api/genres/taxonomy/${node.slug}/proposal`,
         "POST",
       );
+      const task = await waitForTask(
+        queued.task_id,
+        PROPOSAL_TASK_TIMEOUT_MS,
+        controller.signal,
+      );
+      if (task.status !== "completed" || !task.result) {
+        throw new ProposalTaskError(task.error);
+      }
+      const result = task.result as unknown as TaxonomyNodeProposal;
       setProposal(result);
       if (result.description) {
         setDescriptionDraft(result.description);
@@ -380,10 +405,18 @@ function NodeDetailPanel({
         });
       }
       toast.success("AI proposal staged for review");
-    } catch {
-      toast.error("Failed to infer taxonomy node");
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      toast.error(
+        error instanceof ProposalTaskError && error.message
+          ? error.message
+          : "Failed to infer taxonomy node",
+      );
     } finally {
-      setSavingKey(null);
+      if (proposalTask.current === controller) {
+        proposalTask.current = null;
+        setSavingKey(null);
+      }
     }
   };
 

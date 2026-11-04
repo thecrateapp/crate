@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import math
 import re
@@ -105,6 +107,32 @@ def _rank_candidate_targets(
         )
 
     return sorted(targets, key=score)
+
+
+def node_proposal_input_fingerprint(slug: str) -> str | None:
+    """Hash of what a node proposal is built from, or None for an unknown genre.
+
+    Requests see the curated node (cached runtime catalog) or the raw genre
+    summary; editing either changes the hash, so a new proposal is queued.
+    """
+    canonical_slug = _normalize_slug(slug)
+    node = get_genre_catalog().get(canonical_slug)
+    if node:
+        source = {"kind": "taxonomy_node", **node}
+    else:
+        detail = get_genre_detail(canonical_slug)
+        if not detail:
+            return None
+        source = {
+            "kind": "raw_genre",
+            "slug": canonical_slug,
+            "name": detail.get("name"),
+            "artist_count": detail.get("artist_count"),
+            "album_count": detail.get("album_count"),
+        }
+    return hashlib.sha256(
+        json.dumps(source, sort_keys=True, default=str).encode()
+    ).hexdigest()
 
 
 def build_genre_taxonomy_node_proposal(

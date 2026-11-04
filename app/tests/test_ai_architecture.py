@@ -25,10 +25,6 @@ HTTP_MODEL_CALL_EXCEPTIONS: dict[tuple[str, str], str] = {
     ("crate.api.paths", "api_regenerate_path"): "SMQ.PR4",
     ("crate.api.paths", "api_preview_path"): "SMQ.PR4",
     ("crate.api.artwork", "api_analyze_artist_hero_candidate"): "SMQ.PR5",
-    # POST /api/genres/taxonomy/{slug}/proposal (genres.taxonomy.propose); the
-    # admin's taxonomy editor uses it for the description, relations and EQ
-    # proposal. Missing from the SM3-D8 inventory: no SMQ PR owns it yet.
-    ("crate.api.genres", "infer_taxonomy_node_proposal"): "unassigned",
 }
 
 # Compatibility shims for the frozen crate.db facade. Nothing calls them, but
