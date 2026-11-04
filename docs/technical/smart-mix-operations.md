@@ -15,6 +15,8 @@ sources:
   - app/crate/smart_mix/tempo_grid.py
   - app/crate/smart_mix/cue_detection.py
   - app/crate/smart_mix/planner.py
+  - app/crate/smart_mix/evaluation.py
+  - tools/smart-mix-eval/README.md
   - app/crate/smart_mix/policy.py
   - app/crate/smart_mix/source.py
   - app/crate/api/smart_mix.py
@@ -451,6 +453,22 @@ audio. Those signals remain unavailable. An enqueue does not prove completion; a
 stored versions compatible with the API code, and the age declared in its envelope still
 applies. The release context and its `source_sha` stay in the context MCP; they are not derived
 from an image tag or from `get_smart_mix_status`.
+
+## Offline plan evaluation
+
+Smart Mix 3 measures every planner change offline before it reaches a client (see
+`tools/smart-mix-eval/README.md`). `build_dataset.py` builds a fixed set
+of real edges from the compatible-tracks service, stratified by root genre and tempo band;
+`run_eval.py` plans it with a planner and scores each plan with the pure metrics of
+`crate.smart_mix.evaluation`: policy violations, phrase alignment, bass overlap, harmonic
+clash, energy step and vocal clash; `render_pair.py` and `blind_session.py` render pairs and run
+the blind listening test.
+
+- The tools read a development library through read-only PostgreSQL sessions and the pure
+  planner; they write no rows and no plan cache. They are never run against production without
+  Diego's authorization.
+- Profiles without phrases (analyzer v5 and v6) get phrase alignment from an 8-bar grid and no
+  vocal metric. Compare planners on the same profile generation.
 
 ## Regression evidence and acceptance questions
 
