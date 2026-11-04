@@ -5,7 +5,9 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate_cli::analyze::{analyze_smart_mix_samples, rms_frame_geometry};
+use crate_cli::analyze::{
+    analyze_smart_mix_samples, analyze_smart_mix_segments, rms_frame_geometry, AudioTail,
+};
 use crate_cli::mix_profile::SmartMixProfileResult;
 use crate_cli::structure::{
     downbeats_from_anchor, segment_phrases, EnergyFrames, Structure, MAX_ENERGY_CURVE_BARS,
@@ -35,7 +37,13 @@ struct FixtureCase {
     name: String,
     bar_db: Vec<f64>,
     bar_bands: Option<Vec<[f64; 3]>>,
+    #[serde(default = "trusted")]
+    grid_trusted: bool,
     expected: Expected,
+}
+
+fn trusted() -> bool {
+    true
 }
 
 #[derive(Deserialize)]
@@ -58,10 +66,86 @@ struct ExpectedPhrase {
 }
 
 fn fixture() -> Fixture {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../app/tests/fixtures/smart_mix/structure_v1.json");
-    serde_json::from_str(&fs::read_to_string(path).expect("fixture must exist"))
-        .expect("fixture must be valid JSON")
+    load_cases(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../app/tests/fixtures/smart_mix/structure_v1.json"),
+    )
+}
+
+fn load_cases(path: &std::path::Path) -> Fixture {
+    serde_json::from_str(&fs::read_to_string(path).expect("cases must exist"))
+        .expect("cases must be valid JSON")
+}
+
+/// Replays bar-level cases and lists every disagreement with the Python reference:
+/// phrases exactly, energies within 1e-3, curve bytes within 1 and confidence within
+/// 1e-3.
+fn replay(fixture: &Fixture) -> Vec<String> {
+    assert_eq!(fixture.sample_rate, SAMPLE_RATE);
+    assert_eq!(fixture.band_hop, BAND_HOP);
+    assert_eq!(fixture.first_beat_ms, FIRST_BEAT_MS);
+    assert_eq!(fixture.beat_ms, BEAT_MS);
+    let mut mismatches = Vec::new();
+    for case in &fixture.cases {
+        let inputs = bar_inputs(&case.bar_db, case.bar_bands.as_deref());
+        let structure = segment(&inputs, &inputs.beats, &inputs.downbeats, case.grid_trusted);
+        let expected = &case.expected;
+        let curve_matches = match (&structure.energy_curve, &expected.energy_curve) {
+            (None, None) => true,
+            (Some(curve), Some(wanted)) => {
+                curve.len() == wanted.len()
+                    && curve
+                        .iter()
+                        .zip(wanted)
+                        .all(|(byte, wanted)| byte.abs_diff(*wanted) <= 1)
+            }
+            _ => false,
+        };
+        if !curve_matches {
+            mismatches.push(format!("{}: energy curve", case.name));
+        }
+        let layout: Vec<(u64, u64, u32, &str)> = structure
+            .phrases
+            .iter()
+            .map(|phrase| (phrase.start_beat, phrase.start_ms, phrase.bars, phrase.kind))
+            .collect();
+        let wanted_layout: Vec<(u64, u64, u32, &str)> = expected
+            .phrases
+            .iter()
+            .map(|phrase| {
+                (
+                    phrase.start_beat,
+                    phrase.start_ms,
+                    phrase.bars,
+                    phrase.kind.as_str(),
+                )
+            })
+            .collect();
+        if layout != wanted_layout {
+            mismatches.push(format!(
+                "{}: phrases {layout:?} vs {wanted_layout:?}",
+                case.name
+            ));
+        }
+        for (phrase, wanted) in structure.phrases.iter().zip(&expected.phrases) {
+            let delta_matches = match (phrase.delta_energy, wanted.delta_energy) {
+                (None, None) => true,
+                (Some(delta), Some(wanted)) => (f64::from(delta) - wanted).abs() <= 2e-3,
+                _ => false,
+            };
+            if (f64::from(phrase.energy) - wanted.energy).abs() > 1e-3 || !delta_matches {
+                mismatches.push(format!("{}: phrase energy", case.name));
+            }
+        }
+        let confidence = f64::from(structure.structure_confidence);
+        if (confidence - expected.structure_confidence).abs() > 1e-3 {
+            mismatches.push(format!(
+                "{}: confidence {confidence} vs {}",
+                case.name, expected.structure_confidence
+            ));
+        }
+    }
+    mismatches
 }
 
 struct BarInputs {
@@ -113,7 +197,7 @@ fn bar_inputs(bar_db: &[f64], bar_bands: Option<&[[f64; 3]]>) -> BarInputs {
     }
 }
 
-fn segment(inputs: &BarInputs, beats: &[u64], downbeats: &[u64]) -> Structure {
+fn segment(inputs: &BarInputs, beats: &[u64], downbeats: &[u64], grid_trusted: bool) -> Structure {
     let (frame_length, hop) = rms_frame_geometry(SAMPLE_RATE);
     let frames = EnergyFrames {
         rms: &inputs.rms,
@@ -122,12 +206,35 @@ fn segment(inputs: &BarInputs, beats: &[u64], downbeats: &[u64]) -> Structure {
         bands_db: &inputs.bands,
         band_hop: BAND_HOP,
     };
-    segment_phrases(beats, downbeats, &frames, SAMPLE_RATE)
+    segment_phrases(beats, downbeats, &frames, SAMPLE_RATE, grid_trusted)
 }
 
 fn segment_levels(bar_db: &[f64]) -> Structure {
     let inputs = bar_inputs(bar_db, None);
-    segment(&inputs, &inputs.beats, &inputs.downbeats)
+    segment(&inputs, &inputs.beats, &inputs.downbeats, true)
+}
+
+fn layout(structure: &Structure) -> Vec<(u64, &'static str)> {
+    structure
+        .phrases
+        .iter()
+        .map(|phrase| (phrase.start_beat / 4, phrase.kind))
+        .collect()
+}
+
+/// The DJ layout of the shared fixture, bar by bar: intro, build, peak, break, peak, outro.
+fn dj_bar_db() -> Vec<f64> {
+    let mut levels = vec![-28.0; 16];
+    levels.extend((0..8).map(|bar| (100.0 * (-28.0 + 9.7 * f64::from(bar) / 7.0)).round() / 100.0));
+    levels.extend([-12.0; 16]);
+    levels.extend([-27.0; 8]);
+    levels.extend([-12.0; 8]);
+    levels.extend([-26.3; 8]);
+    levels
+}
+
+fn dj_layout() -> Vec<(u64, &'static str)> {
+    [0, 16, 24, 40, 48, 56].into_iter().zip(DJ_KINDS).collect()
 }
 
 fn blocks(lengths: &[usize]) -> Vec<f64> {
@@ -226,60 +333,26 @@ fn profile_downbeats(profile: &SmartMixProfileResult) -> Vec<u64> {
 
 #[test]
 fn fixture_cases_match_the_python_reference() {
-    let fixture = fixture();
-    assert_eq!(fixture.sample_rate, SAMPLE_RATE);
-    assert_eq!(fixture.band_hop, BAND_HOP);
-    assert_eq!(fixture.first_beat_ms, FIRST_BEAT_MS);
-    assert_eq!(fixture.beat_ms, BEAT_MS);
-    for case in &fixture.cases {
-        let inputs = bar_inputs(&case.bar_db, case.bar_bands.as_deref());
-        let structure = segment(&inputs, &inputs.beats, &inputs.downbeats);
-        let expected = &case.expected;
-        assert_eq!(
-            structure.energy_curve, expected.energy_curve,
-            "{}: energy curve",
-            case.name
-        );
-        assert_eq!(
-            structure.phrases.len(),
-            expected.phrases.len(),
-            "{}: phrase count",
-            case.name
-        );
-        for (phrase, wanted) in structure.phrases.iter().zip(&expected.phrases) {
-            assert_eq!(
-                (phrase.start_beat, phrase.start_ms, phrase.bars, phrase.kind),
-                (
-                    wanted.start_beat,
-                    wanted.start_ms,
-                    wanted.bars,
-                    wanted.kind.as_str()
-                ),
-                "{}",
-                case.name
-            );
-            assert!(
-                (f64::from(phrase.energy) - wanted.energy).abs() <= 1e-3,
-                "{}",
-                case.name
-            );
-            match (phrase.delta_energy, wanted.delta_energy) {
-                (None, None) => {}
-                (Some(delta), Some(wanted)) => {
-                    assert!((f64::from(delta) - wanted).abs() <= 2e-3, "{}", case.name)
-                }
-                other => panic!("{}: delta energy {other:?}", case.name),
-            }
-        }
-        assert!(
-            (f64::from(structure.structure_confidence) - expected.structure_confidence).abs()
-                <= 1e-3,
-            "{}: confidence {} vs {}",
-            case.name,
-            structure.structure_confidence,
-            expected.structure_confidence
-        );
-    }
+    let mismatches = replay(&fixture());
+
+    assert!(mismatches.is_empty(), "{mismatches:#?}");
+}
+
+/// Replays an external case file in the fixture format, such as fuzz cases generated
+/// from the Python reference: `SMART_MIX_STRUCTURE_CASES=<path> cargo test -- --ignored`.
+#[test]
+#[ignore = "needs SMART_MIX_STRUCTURE_CASES"]
+fn external_cases_match_the_python_reference() {
+    let path = std::env::var("SMART_MIX_STRUCTURE_CASES").expect("SMART_MIX_STRUCTURE_CASES");
+    let fixture = load_cases(std::path::Path::new(&path));
+    let mismatches = replay(&fixture);
+
+    eprintln!(
+        "{} cases, {} mismatches",
+        fixture.cases.len(),
+        mismatches.len()
+    );
+    assert!(mismatches.is_empty(), "{mismatches:#?}");
 }
 
 #[test]
@@ -375,10 +448,15 @@ fn energy_curve_one_byte_per_bar() {
 
 #[test]
 fn caps_phrase_count() {
-    let structure = segment_levels(&blocks(&[8; 263]));
+    let levels: Vec<f64> = (0..263_u32)
+        .flat_map(|block| std::iter::repeat_n(-12.0 - f64::from(block * 7 % 13), 8))
+        .collect();
+
+    let structure = segment_levels(&levels);
 
     assert_eq!(structure.energy_curve.unwrap().len(), MAX_ENERGY_CURVE_BARS);
-    assert!((64..=MAX_PHRASES).contains(&structure.phrases.len()));
+    // Every boundary differs, so the cost search can stop just under the cap.
+    assert!((MAX_PHRASES - 10..=MAX_PHRASES).contains(&structure.phrases.len()));
     assert!(structure
         .phrases
         .iter()
@@ -405,8 +483,8 @@ fn bar_energy_ignores_grid_offsets_up_to_the_edge_guard() {
     let late: Vec<u64> = inputs.beats.iter().map(|beat| beat + 30).collect();
     let late_downbeats: Vec<u64> = late.iter().step_by(4).copied().collect();
 
-    let on_grid = segment(&inputs, &inputs.beats, &inputs.downbeats);
-    let shifted = segment(&inputs, &late, &late_downbeats);
+    let on_grid = segment(&inputs, &inputs.beats, &inputs.downbeats, true);
+    let shifted = segment(&inputs, &late, &late_downbeats, true);
 
     assert_eq!(shifted.energy_curve, on_grid.energy_curve);
     let kinds = |structure: &Structure| -> Vec<&'static str> {
@@ -419,7 +497,7 @@ fn bar_energy_ignores_grid_offsets_up_to_the_edge_guard() {
 fn segment_phrases_without_downbeats_has_no_structure() {
     let inputs = bar_inputs(&blocks(&[16, 16]), None);
 
-    let structure = segment(&inputs, &inputs.beats, &[]);
+    let structure = segment(&inputs, &inputs.beats, &[], true);
 
     assert!(structure.phrases.is_empty());
     assert!(structure.energy_curve.is_none());
@@ -455,4 +533,126 @@ fn profile_serializes_the_structure_for_the_python_reader() {
     assert!(unavailable["phrases"].is_null());
     assert!(unavailable["energyCurve"].is_null());
     assert!(unavailable["structureConfidence"].is_null());
+}
+
+#[test]
+fn silent_bar_at_the_end_of_each_peak_keeps_the_boundaries() {
+    let mut levels = dj_bar_db();
+    levels[39] = -60.0;
+    levels[55] = -60.0;
+
+    assert_eq!(layout(&segment_levels(&levels)), dj_layout());
+}
+
+#[test]
+fn silent_bar_before_the_drop_keeps_the_build() {
+    let mut levels = dj_bar_db();
+    levels[23] = -60.0;
+
+    assert_eq!(layout(&segment_levels(&levels)), dj_layout());
+}
+
+#[test]
+fn gap_bars_inside_steady_music_leave_it_body() {
+    let one_gap = [vec![-8.0; 7], vec![-60.0]].concat();
+    let two_gaps = [vec![-8.0; 6], vec![-60.0; 2]].concat();
+    let half = [one_gap.repeat(4), two_gaps.repeat(4)].concat();
+
+    let structure = segment_levels(&half.repeat(2));
+
+    assert!(!structure.phrases.is_empty());
+    assert!(structure.phrases.iter().all(|phrase| phrase.kind == "body"));
+}
+
+#[test]
+fn phrases_cover_the_bars_cue_detection_counts_as_music() {
+    let fade: Vec<f64> = (0..24)
+        .map(|bar| (100.0 * (-8.0 - 41.0 * f64::from(bar) / 23.0)).round() / 100.0)
+        .collect();
+    let active_bars = 32 + fade.iter().filter(|level| **level >= -43.0).count() as u64;
+    let loud = segment_levels(&[vec![-8.0; 32], fade, vec![-70.0; 4]].concat());
+    let last = loud.phrases.last().unwrap();
+    assert!(last.start_beat / 4 + u64::from(last.bars) <= active_bars);
+    assert_eq!(loud.phrases[0].start_beat, 0);
+
+    let quiet = segment_levels(&[vec![-53.0; 8], vec![-22.0; 32], vec![-53.0; 8]].concat());
+    let last = quiet.phrases.last().unwrap();
+    assert_eq!(quiet.phrases[0].start_beat, 0);
+    assert_eq!(last.start_beat / 4 + u64::from(last.bars), 48);
+}
+
+#[test]
+fn doubtful_grid_halves_the_confidence() {
+    let inputs = bar_inputs(&dj_bar_db(), None);
+
+    let trusted = segment(&inputs, &inputs.beats, &inputs.downbeats, true);
+    let doubtful = segment(&inputs, &inputs.beats, &inputs.downbeats, false);
+
+    assert_eq!(layout(&doubtful), layout(&trusted));
+    assert!((doubtful.structure_confidence - 0.5 * trusted.structure_confidence).abs() <= 1e-4);
+}
+
+#[test]
+fn corrupt_frames_do_not_poison_the_rest_of_the_track() {
+    let levels = dj_bar_db();
+    let bands = vec![[-20.0, -30.0, -40.0]; levels.len()];
+    let clean_inputs = bar_inputs(&levels, Some(&bands));
+    let mut dirty_inputs = bar_inputs(&levels, Some(&bands));
+    dirty_inputs.rms[200] = f32::NAN;
+    dirty_inputs.rms[900] = f32::INFINITY;
+    dirty_inputs.bands[300][1] = f32::NAN;
+    dirty_inputs.bands[1_500][0] = f32::NEG_INFINITY;
+
+    let clean = segment(
+        &clean_inputs,
+        &clean_inputs.beats,
+        &clean_inputs.downbeats,
+        true,
+    );
+    let dirty = segment(
+        &dirty_inputs,
+        &dirty_inputs.beats,
+        &dirty_inputs.downbeats,
+        true,
+    );
+
+    assert_eq!(layout(&dirty), layout(&clean));
+    let (clean_curve, dirty_curve) = (clean.energy_curve.unwrap(), dirty.energy_curve.unwrap());
+    assert_eq!(dirty_curve.len(), clean_curve.len());
+    assert!(dirty_curve
+        .iter()
+        .zip(&clean_curve)
+        .all(|(dirty, clean)| dirty.abs_diff(*clean) <= 1));
+    assert!(dirty.structure_confidence.is_finite());
+}
+
+#[test]
+fn truncated_analysis_has_no_structure() {
+    let samples = structured_audio(&DJ_SECTIONS, 4);
+    let head = &samples[..40 * SAMPLE_RATE as usize];
+    let tail_start = samples.len() - 20 * SAMPLE_RATE as usize;
+
+    let profile = analyze_smart_mix_segments(
+        head,
+        Some(AudioTail {
+            samples: &samples[tail_start..],
+            start_ms: tail_start as u64 * 1_000 / u64::from(SAMPLE_RATE),
+        }),
+        SAMPLE_RATE,
+        Some(samples.len() as u64 * 1_000 / u64::from(SAMPLE_RATE)),
+        None,
+    );
+
+    assert_eq!(profile.quality, "partial");
+    assert_eq!(profile.phrases, Some(Vec::new()));
+    assert_eq!(profile.energy_curve, None);
+    assert_eq!(profile.structure_confidence, Some(0.0));
+}
+
+#[test]
+fn rms_frame_geometry_uses_whole_samples() {
+    assert_eq!(rms_frame_geometry(22_050), (1_102, 551));
+    assert_eq!(rms_frame_geometry(11_025), (551, 275));
+    assert_eq!(rms_frame_geometry(8_000), (400, 200));
+    assert_eq!(rms_frame_geometry(4_000), (256, 128));
 }

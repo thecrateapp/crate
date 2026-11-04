@@ -8,6 +8,11 @@ import numpy as np
 MIN_ACTIVE_DBFS = -55.0
 ACTIVE_RANGE_DB = 35.0
 DEFAULT_MIX_WINDOW_MS = 4_000
+# RMS frames of 1/20 s (50 ms) in whole samples, with half a frame of hop. The Rust
+# analyzer uses the same integers, so both read the same frames.
+RMS_FRAMES_PER_SECOND = 20
+RMS_MIN_FRAME_SAMPLES = 256
+RMS_MIN_HOP_SAMPLES = 128
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,8 +25,8 @@ class MixCuePoints:
 
 def rms_frame_geometry(sample_rate: int) -> tuple[int, int]:
     """Length and hop, in samples, of the 50 ms RMS frames with a 25 ms hop."""
-    frame_length = max(256, round(sample_rate * 0.05))
-    return frame_length, max(128, frame_length // 2)
+    frame_length = max(RMS_MIN_FRAME_SAMPLES, sample_rate // RMS_FRAMES_PER_SECOND)
+    return frame_length, max(RMS_MIN_HOP_SAMPLES, frame_length // 2)
 
 
 def frame_rms(audio: np.ndarray, sample_rate: int) -> np.ndarray:

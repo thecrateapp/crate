@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import math
 import warnings
 from dataclasses import dataclass
@@ -15,6 +16,7 @@ from crate.smart_mix.models import (
     TrackMixProfileDraft,
 )
 from crate.smart_mix.structure import (
+    LOW_BAND_HZ,
     MID_BAND_HZ,
     NO_STRUCTURE,
     EnergyFrames,
@@ -29,13 +31,15 @@ from crate.smart_mix.tempo_grid import (
 from crate.smart_mix.versions import ANALYZER_VERSION, PYTHON_ANALYZER
 
 
+log = logging.getLogger(__name__)
+
 ANALYZER_NAME = PYTHON_ANALYZER
 TARGET_SAMPLE_RATE = 22_050
 HOP_LENGTH = 256
 TEMPO_PRIOR_OCTAVES = 1.5
 _FFT_SIZE = 2048
 _MEL_BANDS = 128
-_LOW_BAND_HZ = 200.0
+_LOW_BAND_HZ = LOW_BAND_HZ
 _DOWNBEAT_WINDOW_SECONDS = 0.046
 _DOWNBEAT_MIN_BEATS = 16
 _DOWNBEAT_MIN_CONFIDENCE = 0.65
@@ -129,8 +133,19 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
     key, scale, camelot, key_confidence = _key_features(audio, sample_rate)
     rms = frame_rms(audio, sample_rate)
     cues = detect_mix_cues(audio, sample_rate, beat_grid_ms, rms=rms)
-    structure = _structure_features(
-        beat_grid_ms, downbeat_anchor_ms, rms, bands, sample_rate
+    structure = (
+        # The planner takes outgoing phrases from the end of the track, which a
+        # head-and-tail scan never segments: no structure beats a truncated one.
+        NO_STRUCTURE
+        if loaded.tail is not None
+        else _structure_features(
+            beat_grid_ms,
+            downbeat_anchor_ms,
+            rms,
+            bands,
+            sample_rate,
+            grid_trusted=clear_phase,
+        )
     )
     intro = _window_features(
         audio,
@@ -390,16 +405,26 @@ def _structure_features(
     rms: np.ndarray,
     bands: np.ndarray,
     sample_rate: int,
+    *,
+    grid_trusted: bool,
 ) -> StructureDraft:
+    """The structure, or none when segmentation fails: it must never fail a profile."""
     downbeats = downbeats_from_anchor(beat_grid_ms, downbeat_anchor_ms)
     if not downbeats:
         return NO_STRUCTURE
-    return segment_phrases(
-        beat_grid_ms,
-        downbeats,
-        EnergyFrames(rms=rms, bands_db=bands, band_hop=HOP_LENGTH),
-        sample_rate,
-    )
+    try:
+        return segment_phrases(
+            beat_grid_ms,
+            downbeats,
+            EnergyFrames(rms=rms, bands_db=bands, band_hop=HOP_LENGTH),
+            sample_rate,
+            grid_trusted=grid_trusted,
+        )
+    except Exception:
+        log.warning(
+            "Smart Mix structure failed; keeping the profile without it", exc_info=True
+        )
+        return NO_STRUCTURE
 
 
 def _standardized(values: np.ndarray) -> np.ndarray:

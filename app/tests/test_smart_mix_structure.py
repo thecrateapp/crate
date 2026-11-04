@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import statistics
 import time
 from pathlib import Path
@@ -24,6 +25,16 @@ BAR_MS = 4 * BEAT_MS
 FIRST_BEAT_MS = 1_000
 BAND_HOP = 256
 FIXTURE = Path(__file__).parent / "fixtures/smart_mix/structure_v1.json"
+# The DJ layout of the shared fixture, bar by bar: intro, build, peak, break, peak, outro.
+DJ_BAR_DB = (
+    [-28.0] * 16
+    + [round(-28.0 + 9.7 * bar / 7, 2) for bar in range(8)]
+    + [-12.0] * 16
+    + [-27.0] * 8
+    + [-12.0] * 8
+    + [-26.3] * 8
+)
+DJ_START_BARS = (0, 16, 24, 40, 48, 56)
 
 
 @pytest.fixture(scope="module")
@@ -82,6 +93,20 @@ def _bar_level_inputs(
     return beats, beats[::4], frames
 
 
+def _segment(levels: list[float], *, bar_bands=None, **options):
+    from crate.smart_mix.structure import segment_phrases
+
+    return segment_phrases(
+        *_bar_level_inputs(levels, bar_bands=bar_bands),
+        sample_rate=SAMPLE_RATE,
+        **options,
+    )
+
+
+def _layout(draft) -> list[tuple[int, str]]:
+    return [(phrase.start_beat // 4, phrase.kind) for phrase in draft.phrases]
+
+
 def _blocks(lengths: list[int], *, loud: float = -12.0, quiet: float = -24.0):
     levels: list[float] = []
     for index, length in enumerate(lengths):
@@ -107,6 +132,10 @@ def test_segments_on_eight_bar_multiples(dj_track) -> None:
         phrase.start_ms == dj_track.beat_grid_ms[phrase.start_beat]
         for phrase in phrases
     )
+    last = phrases[-1]
+    end_ms = dj_track.beat_grid_ms[last.start_beat] + last.bars * BAR_MS
+    assert phrases[0].start_ms >= dj_track.active_start_ms - BAR_MS
+    assert end_ms <= dj_track.active_end_ms + BAR_MS
 
 
 def test_detects_break_and_peak_kinds(dj_track) -> None:
@@ -189,14 +218,16 @@ def test_energy_curve_one_byte_per_bar(dj_track) -> None:
 
 def test_caps_phrase_count() -> None:
     from crate.smart_mix.models import MAX_ENERGY_CURVE_BARS, MAX_PHRASES
-    from crate.smart_mix.structure import segment_phrases
 
-    draft = segment_phrases(
-        *_bar_level_inputs(_blocks([8] * 263)), sample_rate=SAMPLE_RATE
-    )
+    levels: list[float] = []
+    for block in range(263):
+        levels += [-12.0 - block * 7 % 13] * 8
+
+    draft = _segment(levels)
 
     assert len(draft.energy_curve) == MAX_ENERGY_CURVE_BARS
-    assert 64 <= len(draft.phrases) <= MAX_PHRASES
+    # Every boundary differs, so the cost search can stop just under the cap.
+    assert MAX_PHRASES - 10 <= len(draft.phrases) <= MAX_PHRASES
     assert {phrase.bars for phrase in draft.phrases} <= {8, 16, 32}
     for current, following in zip(draft.phrases, draft.phrases[1:], strict=False):
         assert following.start_beat == current.start_beat + 4 * current.bars
@@ -310,6 +341,7 @@ def test_segmentation_matches_the_fixture_shared_with_rust(case) -> None:
     draft = segment_phrases(
         *_bar_level_inputs(case["barDb"], bar_bands=case["barBands"]),
         sample_rate=SAMPLE_RATE,
+        grid_trusted=case.get("gridTrusted", True),
     )
 
     expected = case["expected"]
@@ -327,3 +359,180 @@ def test_segmentation_matches_the_fixture_shared_with_rust(case) -> None:
     curve = expected["energyCurve"]
     assert draft.energy_curve == (None if curve is None else bytes(curve))
     assert draft.structure_confidence == expected["structureConfidence"]
+
+
+def test_silent_bar_at_the_end_of_each_peak_keeps_the_boundaries() -> None:
+    levels = list(DJ_BAR_DB)
+    levels[39] = levels[55] = -60.0
+
+    assert _layout(_segment(levels)) == list(zip(DJ_START_BARS, DJ_KINDS, strict=True))
+
+
+def test_silent_bar_before_the_drop_keeps_the_build() -> None:
+    levels = list(DJ_BAR_DB)
+    levels[23] = -60.0
+
+    assert _layout(_segment(levels)) == list(zip(DJ_START_BARS, DJ_KINDS, strict=True))
+
+
+def test_gap_bars_inside_steady_music_leave_it_body() -> None:
+    one_gap = [-8.0] * 7 + [-60.0]
+    two_gaps = [-8.0] * 6 + [-60.0] * 2
+
+    draft = _segment((one_gap * 4 + two_gaps * 4) * 2)
+
+    assert draft.phrases
+    assert {phrase.kind for phrase in draft.phrases} == {"body"}
+
+
+def test_kinds_without_main_phrases_are_body() -> None:
+    from crate.smart_mix.structure import _kinds
+
+    spans = [(0, 8), (8, 16), (16, 24)]
+
+    assert _kinds([-30.0, -33.0, -30.5], [0.0] * 3, spans, -20.0) == ["body"] * 3
+
+
+def test_structure_failure_never_fails_the_profile(
+    tmp_path: Path, monkeypatch, caplog
+) -> None:
+    from crate.smart_mix import analyzer
+
+    track = tmp_path / "dj.wav"
+    write_structured_track(track, DJ_SECTIONS[:3])
+
+    def broken(*args, **kwargs):
+        raise ValueError("segmentation exploded")
+
+    monkeypatch.setattr(analyzer, "segment_phrases", broken)
+    profile = analyzer.analyze_mix_profile(track)
+
+    assert profile.bpm == pytest.approx(120.0, abs=1.0)
+    assert (profile.phrases, profile.energy_curve) == ((), None)
+    assert profile.structure_confidence == 0.0
+    assert "segmentation exploded" in caplog.text
+
+
+def test_truncated_analysis_has_no_structure(tmp_path: Path, monkeypatch) -> None:
+    from crate.smart_mix import analyzer
+
+    monkeypatch.setattr(analyzer, "FULL_SCAN_HEAD_SECONDS", 40)
+    monkeypatch.setattr(analyzer, "FULL_SCAN_TAIL_SECONDS", 20)
+    track = tmp_path / "long.wav"
+    write_structured_track(track, DJ_SECTIONS)
+
+    profile = analyzer.analyze_mix_profile(track)
+
+    assert profile.quality == "partial"
+    assert (profile.phrases, profile.energy_curve) == ((), None)
+    assert profile.structure_confidence == 0.0
+
+
+def test_phrases_cover_the_bars_cue_detection_counts_as_music() -> None:
+    fade = [round(-8.0 - 41.0 * bar / 23, 2) for bar in range(24)]
+    loud = _segment([-8.0] * 32 + fade + [-70.0] * 4)
+    # Cue detection treats frames 35 dB under the loudest one (-43 dBFS) as silence.
+    active_bars = 32 + sum(level >= -43.0 for level in fade)
+    last = loud.phrases[-1]
+    assert last.start_beat // 4 + last.bars <= active_bars
+
+    quiet = _segment([-53.0] * 8 + [-22.0] * 32 + [-53.0] * 8)
+    # With a -22 dBFS peak the floor is -55 dBFS, so the -53 dBFS edges are music.
+    assert quiet.phrases[0].start_beat == 0
+    assert quiet.phrases[-1].start_beat // 4 + quiet.phrases[-1].bars == 48
+
+
+def test_doubtful_grid_halves_the_confidence() -> None:
+    trusted = _segment(DJ_BAR_DB)
+    doubtful = _segment(DJ_BAR_DB, grid_trusted=False)
+
+    assert _layout(doubtful) == _layout(trusted)
+    assert doubtful.structure_confidence == pytest.approx(
+        0.5 * trusted.structure_confidence, abs=1e-4
+    )
+
+
+def test_corrupt_frames_do_not_poison_the_rest_of_the_track() -> None:
+    from crate.smart_mix.structure import EnergyFrames, segment_phrases
+
+    beats, downbeats, frames = _bar_level_inputs(
+        DJ_BAR_DB, bar_bands=[[-20.0, -30.0, -40.0]] * len(DJ_BAR_DB)
+    )
+    rms = np.array(frames.rms, dtype=np.float64)
+    bands = np.array(frames.bands_db, dtype=np.float64)
+    rms[200], rms[900] = np.nan, np.inf
+    bands[300, 1], bands[1_500, 0] = np.nan, -np.inf
+    corrupt = EnergyFrames(rms=rms, bands_db=bands, band_hop=frames.band_hop)
+
+    clean = segment_phrases(beats, downbeats, frames, SAMPLE_RATE)
+    dirty = segment_phrases(beats, downbeats, corrupt, SAMPLE_RATE)
+
+    assert _layout(dirty) == _layout(clean)
+    assert len(dirty.energy_curve) == len(clean.energy_curve)
+    assert (
+        max(
+            abs(left - right)
+            for left, right in zip(dirty.energy_curve, clean.energy_curve, strict=True)
+        )
+        <= 1
+    )
+    assert math.isfinite(dirty.structure_confidence)
+
+
+def test_novelty_plateau_counts_as_one_aligned_peak() -> None:
+    draft = _segment(
+        [-24.0] * 16 + [-18.0] + [-12.0] * 15 + [-24.0] * 16 + [-12.0] * 16
+    )
+
+    assert [start for start, _ in _layout(draft)] == [0, 16, 32, 48]
+    assert draft.structure_confidence == pytest.approx(1.0)
+
+
+def test_rms_frame_geometry_uses_whole_samples() -> None:
+    from crate.smart_mix.cue_detection import rms_frame_geometry
+
+    assert rms_frame_geometry(22_050) == (1_102, 551)
+    assert rms_frame_geometry(11_025) == (551, 275)
+    assert rms_frame_geometry(8_000) == (400, 200)
+    assert rms_frame_geometry(4_000) == (256, 128)
+
+
+def test_a_long_fade_does_not_move_the_phrase_grid() -> None:
+    fade = [round(-8.0 - 41.0 * bar / 23, 2) for bar in range(24)]
+
+    draft = _segment([-8.0] * 32 + fade + [-70.0] * 4)
+
+    assert draft.phrases[0].start_beat == 0
+
+
+def test_a_gap_does_not_make_the_bar_before_it_a_peak() -> None:
+    levels = list(DJ_BAR_DB)
+    levels[39] = levels[55] = -60.0
+
+    assert _segment(levels).structure_confidence == pytest.approx(
+        _segment(DJ_BAR_DB).structure_confidence, abs=0.05
+    )
+
+
+def test_the_grid_that_explains_most_section_changes_wins() -> None:
+    # 2.5 dB steps every eight bars from bar 5 and one 15 dB entry at bar 26: the
+    # regular changes, not the single entry, set the phrase grid.
+    levels = []
+    for bar in range(96):
+        small = -2.5 if ((bar - 5) // 8) % 2 == 0 and bar >= 5 else 0.0
+        levels.append(round(-20.4 + small + (15.0 if bar >= 26 else 0.0), 2))
+
+    draft = _segment(levels)
+
+    assert {start % 8 for start, _ in _layout(draft)} == {5}
+
+
+def test_a_short_fade_in_does_not_anchor_the_grid() -> None:
+    # Two rising bars, then 8-bar sections from bar 3: the onset at bar 2 is a pickup.
+    levels = [-28.7, -18.9, -9.3]
+    for bar in range(3, 75):
+        levels.append(-9.3 if ((bar - 3) // 8) % 2 == 0 else -14.3)
+
+    draft = _segment(levels)
+
+    assert draft.phrases[0].start_beat // 4 == 3

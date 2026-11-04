@@ -18,7 +18,8 @@ use crate::beat_tracking;
 use crate::key_detection::detect_key;
 use crate::loudness::{LoudnessMeter, LoudnessSummary, MEASUREMENT_VERSION};
 use crate::mix_profile::{to_camelot, SmartMixProfileResult, ANALYZER_VERSION};
-use crate::structure::{self, EnergyFrames, Structure};
+pub use crate::structure::rms_frame_geometry;
+use crate::structure::{self, EnergyFrames, Structure, ACTIVE_RANGE_DB, MIN_ACTIVE_DBFS};
 use crate::tempo_grid::{self, ConstantGrid};
 use crate::{collect_audio_files, parse_extensions};
 
@@ -843,12 +844,6 @@ fn tempo_features(beat_frames: &[usize], onsets: &[f32], sample_rate: u32) -> Te
     }
 }
 
-/// Length and hop, in samples, of the 50 ms RMS frames with a 25 ms hop.
-pub fn rms_frame_geometry(sample_rate: u32) -> (usize, usize) {
-    let frame_length = ((sample_rate as f32 * 0.05).round() as usize).max(256);
-    (frame_length, (frame_length / 2).max(128))
-}
-
 fn frame_rms(samples: &[f32], sample_rate: u32) -> (Vec<f32>, usize, usize) {
     let (frame_length, hop_length) = rms_frame_geometry(sample_rate);
     if samples.is_empty() {
@@ -905,7 +900,7 @@ fn cues_from_rms(
         .map(|rms| compute_loudness_db(*rms))
         .collect();
     let peak = dbfs.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-    let threshold = (-55.0_f32).max(peak - 35.0);
+    let threshold = (MIN_ACTIVE_DBFS as f32).max(peak - ACTIVE_RANGE_DB as f32);
     let active_frames: Vec<usize> = dbfs
         .iter()
         .enumerate()
@@ -1115,23 +1110,6 @@ pub fn analyze_smart_mix_segments(
         .flatten()
         .or(intro_downbeat_ms);
     let time_signature = downbeat_anchor_ms.map(|_| 4);
-    let downbeats = structure::downbeats_from_anchor(&beat_grid_ms, downbeat_anchor_ms);
-    let structure = if downbeats.is_empty() {
-        Structure::none()
-    } else {
-        structure::segment_phrases(
-            &beat_grid_ms,
-            &downbeats,
-            &EnergyFrames {
-                rms: &rms,
-                rms_frame_length,
-                rms_hop,
-                bands_db: &features.bands,
-                band_hop: beat_tracking::HOP_SIZE,
-            },
-            sample_rate,
-        )
-    };
     let global = signal_features(samples, sample_rate);
     let intro_lufs = loudness.zip(intro_cue_ms).and_then(|(summary, start_ms)| {
         summary.window_lufs(start_ms, start_ms + MEASUREMENT_WINDOW_MS)
@@ -1151,6 +1129,32 @@ pub fn analyze_smart_mix_segments(
             tempo_grid::half_beat_slides(&tracked_ms) == 0
                 && !tempo_grid::bass_contests_tracked_beats(&tracked_ms, &features, sample_rate)
         }
+    };
+    // The planner takes outgoing phrases from the end of the track, which a head-and-tail
+    // scan never segments: no structure beats a truncated one.
+    let downbeats = structure::downbeats_from_anchor(&beat_grid_ms, downbeat_anchor_ms);
+    let grid_trusted = clear_phase
+        && constant_grid
+            .as_ref()
+            .is_none_or(|grid| !grid.tempo_deviates);
+    let structure = if tail.is_some() || downbeats.is_empty() {
+        Structure::none()
+    } else {
+        structure::guarded(|| {
+            structure::segment_phrases(
+                &beat_grid_ms,
+                &downbeats,
+                &EnergyFrames {
+                    rms: &rms,
+                    rms_frame_length,
+                    rms_hop,
+                    bands_db: &features.bands,
+                    band_hop: beat_tracking::HOP_SIZE,
+                },
+                sample_rate,
+                grid_trusted,
+            )
+        })
     };
     let quality = if tail.is_none()
         && beat_grid_ms.len() >= 12

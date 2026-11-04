@@ -111,38 +111,6 @@ def test_readers_accept_the_previous_analyzer_while_writers_target_the_new_one()
     )
 
 
-STRUCTURE_CONSTANTS = (
-    "BEATS_PER_BAR",
-    "UNIT_BARS",
-    "PHRASE_UNITS",
-    "MIN_STRUCTURE_BARS",
-    "BAND_COUNT",
-    "MID_BAND_HZ",
-    "ENERGY_FLOOR_DB",
-    "SILENCE_DB",
-    "BAR_EDGE_GUARD_MS",
-    "NOVELTY_WINDOW_BARS",
-    "NOVELTY_NOISE_DB",
-    "SPECTRAL_WEIGHT",
-    "OFFSET_ZERO_BONUS_DB",
-    "BOUNDARY_COST_DB",
-    "HYPERBAR_16_BONUS_DB",
-    "HYPERBAR_32_BONUS_DB",
-    "CAP_SEARCH_STEPS",
-    "PEAK_MIN_DB",
-    "SUPPORT_PEAKS",
-    "BAR_JITTER_LIMIT",
-    "CONTRAST_DB",
-    "PEAK_WITHIN_DB",
-    "PEAK_ABOVE_TYPICAL_DB",
-    "MAIN_WITHIN_TYPICAL_DB",
-    "BREAK_BELOW_DB",
-    "BUILD_RISE_DB",
-    "MAX_PHRASES",
-    "MAX_ENERGY_CURVE_BARS",
-)
-
-
 def test_rust_structure_constants_match_python() -> None:
     from crate.smart_mix import structure
 
@@ -159,12 +127,18 @@ def test_rust_structure_constants_match_python() -> None:
             )
         return product
 
-    for name in STRUCTURE_CONSTANTS:
-        match = re.search(rf"pub const {name}: [^=]+= ([^;]+);", source)
-        assert match is not None, name
-        rust[name] = value(match.group(1).strip())
+    for name, expression in re.findall(
+        r"^\s*(?:pub )?const ([A-Z0-9_]+): [^=]+= ([^;]+);", source, re.MULTILINE
+    ):
+        rust[name] = value(expression.strip())
+    python = {
+        name: entry if isinstance(entry, tuple) else float(entry)
+        for name, entry in vars(structure).items()
+        if name.isupper()
+        and not isinstance(entry, bool)
+        and isinstance(entry, int | float | tuple)
+    }
 
-    for name in STRUCTURE_CONSTANTS:
-        python = getattr(structure, name)
-        expected = python if isinstance(python, tuple) else float(python)
+    assert set(rust) == set(python)
+    for name, expected in python.items():
         assert rust[name] == expected, name

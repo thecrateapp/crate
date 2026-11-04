@@ -1,15 +1,19 @@
 //! Phrase segmentation and per-bar energy for Smart Mix profiles (SM3-D2).
 //!
-//! Same algorithm and constants as `app/crate/smart_mix/structure.py`, which documents
-//! it; `app/tests/fixtures/smart_mix/structure_v1.json` holds cases both must agree on
-//! and `test_smart_mix_versions.py` checks that the constants match.
+//! Same algorithm, constants and order of floating-point operations as
+//! `app/crate/smart_mix/structure.py`, which documents the rules;
+//! `app/tests/fixtures/smart_mix/structure_v1.json` holds cases both must agree on and
+//! `test_smart_mix_versions.py` checks that the constants match.
 //!
 //! The segmentation reuses frames the analyzer already computed: the cue-detection RMS
 //! frames give each bar its energy and the low/mid/high mel band levels of the beat
-//! tracker give its spectral balance. Novelty at bar boundaries places phrases of 8, 16
-//! or 32 bars on an 8-bar grid; kinds follow rules over phrase energy and position.
+//! tracker give its spectral balance. Phrases cover the bars that hold music as cue
+//! detection defines it, short silent gaps are missing data, and novelty peaks place
+//! phrases of 8, 16 or 32 bars on an 8-bar grid; kinds follow rules over phrase level
+//! and position.
 
 use std::collections::HashMap;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use serde::Serialize;
 
@@ -19,18 +23,28 @@ pub const UNIT_BARS: usize = 8;
 pub const PHRASE_UNITS: [usize; 3] = [4, 2, 1];
 pub const MIN_STRUCTURE_BARS: usize = 2 * UNIT_BARS;
 pub const BAND_COUNT: usize = 3;
+pub const LOW_BAND_HZ: f32 = 200.0;
 pub const MID_BAND_HZ: f32 = 2_000.0;
+/// Cue detection's music: frames within this range of the loudest one and above the floor.
+pub const MIN_ACTIVE_DBFS: f64 = -55.0;
+pub const ACTIVE_RANGE_DB: f64 = 35.0;
+/// RMS frames of 1/20 s (50 ms) in whole samples, with half a frame of hop.
+pub const RMS_FRAMES_PER_SECOND: u32 = 20;
+pub const RMS_MIN_FRAME_SAMPLES: usize = 256;
+pub const RMS_MIN_HOP_SAMPLES: usize = 128;
+pub const MAX_PHRASES: usize = 120;
+pub const MAX_ENERGY_CURVE_BARS: usize = 2048;
 /// Energy scale of the profile: RMS dBFS mapped linearly from -60 (0) to 0 (1).
 pub const ENERGY_FLOOR_DB: f64 = -60.0;
-/// Bars this quiet are silence: phrases start and end on the bars inside them.
-pub const SILENCE_DB: f64 = -50.0;
 /// Bar energy skips this much at each end of the bar, so a grid a few tens of ms off
 /// neither pulls in the next section nor drops the downbeat in one analyzer only.
 pub const BAR_EDGE_GUARD_MS: u64 = 50;
+pub const MAX_GAP_BARS: usize = 2;
 pub const NOVELTY_WINDOW_BARS: usize = 4;
 pub const NOVELTY_NOISE_DB: f64 = 0.5;
 pub const SPECTRAL_WEIGHT: f64 = 0.5;
-pub const OFFSET_ZERO_BONUS_DB: f64 = 1.0;
+/// The first music bar keeps the grid unless another start beats its confidence by this.
+pub const OFFSET_ZERO_PREFERENCE: f64 = 0.05;
 pub const BOUNDARY_COST_DB: f64 = 1.0;
 pub const HYPERBAR_16_BONUS_DB: f64 = 0.25;
 pub const HYPERBAR_32_BONUS_DB: f64 = 0.5;
@@ -38,18 +52,18 @@ pub const CAP_SEARCH_STEPS: usize = 20;
 pub const PEAK_MIN_DB: f64 = 1.0;
 pub const SUPPORT_PEAKS: f64 = 3.0;
 pub const BAR_JITTER_LIMIT: f64 = 0.08;
+pub const GRID_DOUBT_FACTOR: f64 = 0.5;
 pub const CONTRAST_DB: f64 = 2.0;
 pub const PEAK_WITHIN_DB: f64 = 1.5;
 pub const PEAK_ABOVE_TYPICAL_DB: f64 = 1.5;
 pub const MAIN_WITHIN_TYPICAL_DB: f64 = 1.5;
 pub const BREAK_BELOW_DB: f64 = 3.0;
 pub const BUILD_RISE_DB: f64 = 1.5;
-pub const MAX_PHRASES: usize = 120;
-pub const MAX_ENERGY_CURVE_BARS: usize = 2048;
-const EPSILON: f64 = 1e-9;
+/// Tolerance for ties and thresholds, well above the float noise between analyzers.
+pub const EPSILON: f64 = 1e-6;
 
 /// A phrase of `bars` bars from the downbeat at `start_beat` (an index into the beat
-/// grid). `energy` is the mean bar energy on the profile energy scale and
+/// grid). `energy` is the mean bar power on the profile energy scale and
 /// `delta_energy` its change from the previous phrase, absent on the first.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -93,10 +107,48 @@ pub struct EnergyFrames<'a> {
     pub band_hop: usize,
 }
 
+/// Length and hop, in samples, of the 50 ms RMS frames with a 25 ms hop.
+pub fn rms_frame_geometry(sample_rate: u32) -> (usize, usize) {
+    let frame_length = ((sample_rate / RMS_FRAMES_PER_SECOND) as usize).max(RMS_MIN_FRAME_SAMPLES);
+    (frame_length, (frame_length / 2).max(RMS_MIN_HOP_SAMPLES))
+}
+
+/// Runs a segmentation, or returns no structure if it panics: a structure failure must
+/// never fail the profile.
+pub fn guarded(segment: impl FnOnce() -> Structure) -> Structure {
+    catch_unwind(AssertUnwindSafe(segment)).unwrap_or_else(|_| {
+        eprintln!("smart mix structure failed; keeping the profile without it");
+        Structure::none()
+    })
+}
+
 struct Bar {
     start_beat: u64,
     start_ms: u64,
     end_ms: u64,
+}
+
+struct BarFeatures {
+    levels: Vec<f64>,
+    shapes: Vec<[f64; BAND_COUNT]>,
+    music: Vec<bool>,
+}
+
+/// A run of equal novelty from bar `first` to bar `last` (inclusive).
+struct Peak {
+    first: usize,
+    last: usize,
+    value: f64,
+}
+
+impl Peak {
+    fn distance(&self, bar: usize) -> usize {
+        if (self.first..=self.last).contains(&bar) {
+            0
+        } else {
+            bar.abs_diff(self.first).min(bar.abs_diff(self.last))
+        }
+    }
 }
 
 /// Every fourth beat of the grid, in phase with the downbeat anchor.
@@ -114,50 +166,57 @@ pub fn downbeats_from_anchor(beat_grid_ms: &[u64], downbeat_anchor_ms: Option<u6
         .collect()
 }
 
+/// Phrases, energy curve and confidence; `grid_trusted = false` halves the confidence.
 pub fn segment_phrases(
     beat_grid_ms: &[u64],
     downbeats_ms: &[u64],
     frames: &EnergyFrames<'_>,
     sample_rate: u32,
+    grid_trusted: bool,
 ) -> Structure {
     let bars = bars(beat_grid_ms, downbeats_ms);
     if bars.is_empty() || sample_rate == 0 {
         return Structure::none();
     }
-    let (levels, shapes) = bar_features(&bars, frames, sample_rate);
-    let curve: Vec<u8> = levels.iter().map(|level| energy_byte(*level)).collect();
-    let active: Vec<usize> = levels
+    let features = bar_features(&bars, frames, sample_rate);
+    let curve: Vec<u8> = features
+        .levels
+        .iter()
+        .map(|level| energy_byte(*level))
+        .collect();
+    let music: Vec<usize> = features
+        .music
         .iter()
         .enumerate()
-        .filter_map(|(index, level)| (*level >= SILENCE_DB).then_some(index))
+        .filter_map(|(index, is_music)| is_music.then_some(index))
         .collect();
-    let unsegmented = |curve: Vec<u8>| Structure {
-        phrases: Vec::new(),
-        energy_curve: Some(curve),
-        structure_confidence: 0.0,
-    };
-    let (Some(&first), Some(&last_active)) = (active.first(), active.last()) else {
+    let (Some(&first), Some(&last_music)) = (music.first(), music.last()) else {
         return unsegmented(curve);
     };
-    let last = last_active + 1;
+    let last = last_music + 1;
     if last - first < MIN_STRUCTURE_BARS {
         return unsegmented(curve);
     }
-    let novelty = novelty(&levels[first..last], &shapes[first..last]);
-    let offset = grid_offset(&novelty);
-    let units = (last - first - offset) / UNIT_BARS;
-    let lengths = capped_partition(&novelty, offset, units);
-    let mut starts = vec![offset];
-    for length in lengths {
-        starts.push(starts[starts.len() - 1] + length * UNIT_BARS);
+    let levels = &features.levels[first..last];
+    let gaps = gaps(&features.music[first..last]);
+    let novelty = novelty(levels, &features.shapes[first..last], &gaps);
+    let span = &bars[first..last];
+    let (starts, mut confidence) = best_grid(&novelty, &peaks(&novelty, &gaps), span);
+    if !grid_trusted {
+        confidence *= GRID_DOUBT_FACTOR;
     }
-    let absolute: Vec<usize> = starts.iter().map(|start| first + start).collect();
-    let phrases = phrases(&bars, &levels, &absolute);
-    let structure_confidence = confidence(&novelty, &starts, &bars[first..last]);
     Structure {
-        phrases,
+        phrases: phrases(span, levels, &gaps, &starts),
         energy_curve: Some(curve),
-        structure_confidence,
+        structure_confidence: round4(confidence) as f32,
+    }
+}
+
+fn unsegmented(curve: Vec<u8>) -> Structure {
+    Structure {
+        phrases: Vec::new(),
+        energy_curve: Some(curve),
+        structure_confidence: 0.0,
     }
 }
 
@@ -191,37 +250,64 @@ fn bars(beat_grid_ms: &[u64], downbeats_ms: &[u64]) -> Vec<Bar> {
         .collect()
 }
 
-/// Each bar's energy (dBFS) and spectral balance (band levels minus their mean): the
-/// mean power of the RMS frames wholly inside the bar and the band frames centred
-/// inside it, both leaving out `BAR_EDGE_GUARD_MS` at each end.
-fn bar_features(
-    bars: &[Bar],
-    frames: &EnergyFrames<'_>,
-    sample_rate: u32,
-) -> (Vec<f64>, Vec<[f64; BAND_COUNT]>) {
+/// Each bar's energy (dBFS), spectral balance (band levels minus their mean) and whether
+/// it holds music: the RMS frames wholly inside the bar and the band frames centred
+/// inside it, both leaving out `BAR_EDGE_GUARD_MS` at each end. Non-finite frames count
+/// as silence.
+fn bar_features(bars: &[Bar], frames: &EnergyFrames<'_>, sample_rate: u32) -> BarFeatures {
     let rate = u64::from(sample_rate);
     let frame_length = frames.rms_frame_length;
     let hop = frames.rms_hop.max(1);
     let band_hop = frames.band_hop.max(1);
-    let mut power_sums = Vec::with_capacity(frames.rms.len() + 1);
+    let power: Vec<f64> = frames
+        .rms
+        .iter()
+        .map(|value| {
+            let value = if value.is_finite() && *value > 0.0 {
+                f64::from(*value)
+            } else {
+                0.0
+            };
+            value * value
+        })
+        .collect();
+    let mut power_sums = Vec::with_capacity(power.len() + 1);
     power_sums.push(0.0_f64);
-    for value in frames.rms {
-        let power = f64::from(*value) * f64::from(*value);
-        power_sums.push(power_sums[power_sums.len() - 1] + power);
+    for value in &power {
+        power_sums.push(power_sums[power_sums.len() - 1] + value);
+    }
+    let peak = power.iter().copied().fold(0.0_f64, f64::max);
+    let threshold = if peak > 0.0 {
+        let floor_db = MIN_ACTIVE_DBFS.max(10.0 * peak.log10() - ACTIVE_RANGE_DB);
+        10.0_f64.powf(floor_db / 10.0)
+    } else {
+        f64::INFINITY
+    };
+    let mut music_counts = Vec::with_capacity(power.len() + 1);
+    music_counts.push(0_usize);
+    for value in &power {
+        music_counts.push(music_counts[music_counts.len() - 1] + usize::from(*value >= threshold));
     }
     let mut band_sums = Vec::with_capacity(frames.bands_db.len() + 1);
     band_sums.push([0.0_f64; BAND_COUNT]);
     for bands in frames.bands_db {
         let mut sums = band_sums[band_sums.len() - 1];
         for (sum, level) in sums.iter_mut().zip(bands) {
-            *sum += f64::from(*level);
+            *sum += if level.is_finite() {
+                f64::from(*level)
+            } else {
+                0.0
+            };
         }
         band_sums.push(sums);
     }
-    let frame_count = frames.rms.len();
+    let frame_count = power.len();
     let band_count = frames.bands_db.len();
-    let mut levels = Vec::with_capacity(bars.len());
-    let mut shapes = Vec::with_capacity(bars.len());
+    let mut features = BarFeatures {
+        levels: Vec::with_capacity(bars.len()),
+        shapes: Vec::with_capacity(bars.len()),
+        music: Vec::with_capacity(bars.len()),
+    };
     for bar in bars {
         let start = ((bar.start_ms + BAR_EDGE_GUARD_MS) * rate / 1_000) as usize;
         let end = (bar.end_ms.saturating_sub(BAR_EDGE_GUARD_MS) * rate / 1_000) as usize;
@@ -232,11 +318,15 @@ fn bar_features(
             0
         };
         let mean_power = if last > first {
+            features
+                .music
+                .push(music_counts[last] > music_counts[first]);
             (power_sums[last] - power_sums[first]) / (last - first) as f64
         } else {
+            features.music.push(false);
             0.0
         };
-        levels.push(power_db(mean_power));
+        features.levels.push(power_db(mean_power));
         let band_first = ceil_div(start, band_hop).min(band_count);
         let band_last = ceil_div(end, band_hop).min(band_count);
         if band_last > band_first {
@@ -244,62 +334,132 @@ fn bar_features(
             let means: [f64; BAND_COUNT] = std::array::from_fn(|band| {
                 (band_sums[band_last][band] - band_sums[band_first][band]) / count
             });
-            let centre = means.iter().sum::<f64>() / BAND_COUNT as f64;
-            shapes.push(means.map(|mean| mean - centre));
+            let centre = sum(means.iter().copied()) / BAND_COUNT as f64;
+            features.shapes.push(means.map(|mean| mean - centre));
         } else {
-            shapes.push([0.0; BAND_COUNT]);
+            features.shapes.push([0.0; BAND_COUNT]);
         }
     }
-    (levels, shapes)
+    features
 }
 
-/// Novelty at each bar boundary `0..=levels.len()`; the two ends stay 0.
-fn novelty(levels: &[f64], shapes: &[[f64; BAND_COUNT]]) -> Vec<f64> {
+/// Runs of at most `MAX_GAP_BARS` silent bars between music bars.
+fn gaps(music: &[bool]) -> Vec<bool> {
+    let mut gaps = vec![false; music.len()];
+    let mut index = 0;
+    while index < music.len() {
+        if music[index] {
+            index += 1;
+            continue;
+        }
+        let mut end = index;
+        while end < music.len() && !music[end] {
+            end += 1;
+        }
+        if end - index <= MAX_GAP_BARS {
+            gaps[index..end].fill(true);
+        }
+        index = end;
+    }
+    gaps
+}
+
+/// Novelty at each bar boundary `0..=levels.len()`. Gap bars and boundaries without four
+/// bars of music range on each side stay 0: a truncated window cannot tell a pickup or a
+/// fade-in from a section change.
+fn novelty(levels: &[f64], shapes: &[[f64; BAND_COUNT]], gaps: &[bool]) -> Vec<f64> {
     let count = levels.len();
     let mut novelty = vec![0.0; count + 1];
-    for boundary in 1..count {
-        let low = boundary.saturating_sub(NOVELTY_WINDOW_BARS);
-        let high = (boundary + NOVELTY_WINDOW_BARS).min(count);
-        let before = mean(&levels[low..boundary]);
-        let after = mean(&levels[boundary..high]);
-        let band_mean = |range: &[[f64; BAND_COUNT]], band: usize| {
-            range.iter().map(|shape| shape[band]).sum::<f64>() / range.len() as f64
+    for boundary in NOVELTY_WINDOW_BARS..=count.saturating_sub(NOVELTY_WINDOW_BARS) {
+        if gaps[boundary] {
+            continue;
+        }
+        let before: Vec<usize> = (boundary.saturating_sub(NOVELTY_WINDOW_BARS)..boundary)
+            .filter(|bar| !gaps[*bar])
+            .collect();
+        let after: Vec<usize> = (boundary..(boundary + NOVELTY_WINDOW_BARS).min(count))
+            .filter(|bar| !gaps[*bar])
+            .collect();
+        if before.is_empty() || after.is_empty() {
+            continue;
+        }
+        let window_mean = |bars: &[usize], value: &dyn Fn(usize) -> f64| {
+            sum(bars.iter().map(|bar| value(*bar))) / bars.len() as f64
         };
-        let spectral: f64 = (0..BAND_COUNT)
-            .map(|band| {
-                (band_mean(&shapes[boundary..high], band) - band_mean(&shapes[low..boundary], band))
-                    .abs()
-            })
-            .sum();
-        novelty[boundary] =
-            ((after - before).abs() + SPECTRAL_WEIGHT * spectral - NOVELTY_NOISE_DB).max(0.0);
+        let change = (window_mean(&after, &|bar| levels[bar])
+            - window_mean(&before, &|bar| levels[bar]))
+        .abs();
+        let mut spectral = 0.0;
+        // `band` indexes the inner array of every bar in both windows, not `shapes`.
+        #[allow(clippy::needless_range_loop)]
+        for band in 0..BAND_COUNT {
+            spectral += (window_mean(&after, &|bar| shapes[bar][band])
+                - window_mean(&before, &|bar| shapes[bar][band]))
+            .abs();
+        }
+        novelty[boundary] = (change + SPECTRAL_WEIGHT * spectral - NOVELTY_NOISE_DB).max(0.0);
     }
     novelty
 }
 
-/// The first of the opening eight active bars on which the 8-bar grid starts.
-fn grid_offset(novelty: &[f64]) -> usize {
+/// Local maxima of the novelty over the non-gap boundaries; a plateau is one.
+fn peaks(novelty: &[f64], gaps: &[bool]) -> Vec<Peak> {
     let count = novelty.len() - 1;
-    let mut best_offset = 0;
+    let positions: Vec<usize> = (1..count).filter(|bar| !gaps[*bar]).collect();
+    let values: Vec<f64> = positions.iter().map(|bar| novelty[*bar]).collect();
+    let mut peaks = Vec::new();
+    let mut index = 0;
+    while index < values.len() {
+        let mut end = index;
+        while end + 1 < values.len() && (values[end + 1] - values[index]).abs() <= EPSILON {
+            end += 1;
+        }
+        let value = values[index];
+        let left = if index > 0 { values[index - 1] } else { 0.0 };
+        let right = values.get(end + 1).copied().unwrap_or(0.0);
+        if value >= PEAK_MIN_DB - EPSILON && value > left + EPSILON && value > right + EPSILON {
+            peaks.push(Peak {
+                first: positions[index],
+                last: positions[end],
+                value,
+            });
+        }
+        index = end + 1;
+    }
+    peaks
+}
+
+/// Phrase starts (and the end) of the grid that best explains the section changes: for a
+/// grid starting on each of the first eight music bars, the partition's confidence, the
+/// first bar winning unless another beats it by `OFFSET_ZERO_PREFERENCE`.
+fn best_grid(novelty: &[f64], peaks: &[Peak], bars: &[Bar]) -> (Vec<usize>, f64) {
+    let count = novelty.len() - 1;
+    let mut best_starts = Vec::new();
+    let mut best_confidence = f64::NEG_INFINITY;
     let mut best_score = f64::NEG_INFINITY;
     for offset in 0..UNIT_BARS {
         if count < offset + UNIT_BARS {
             break;
         }
-        let mut score: f64 = (offset..count)
-            .step_by(UNIT_BARS)
-            .filter(|boundary| *boundary >= 1)
-            .map(|boundary| novelty[boundary])
-            .sum();
-        if offset == 0 {
-            score += OFFSET_ZERO_BONUS_DB;
+        let units = (count - offset) / UNIT_BARS;
+        let mut starts = vec![offset];
+        for length in capped_partition(novelty, offset, units) {
+            starts.push(starts[starts.len() - 1] + length * UNIT_BARS);
         }
+        let confidence = confidence(peaks, &starts, bars);
+        let score = confidence
+            + if offset == 0 {
+                OFFSET_ZERO_PREFERENCE
+            } else {
+                0.0
+            };
         if score > best_score + EPSILON {
-            best_offset = offset;
+            best_starts = starts;
+            best_confidence = confidence;
             best_score = score;
         }
     }
-    best_offset
+    (best_starts, best_confidence)
 }
 
 /// Phrase lengths in units; raises the boundary cost while over `MAX_PHRASES`.
@@ -362,21 +522,30 @@ fn partition(novelty: &[f64], offset: usize, units: usize, cost: f64) -> Vec<usi
     lengths
 }
 
-fn phrases(bars: &[Bar], levels: &[f64], starts: &[usize]) -> Vec<Phrase> {
+fn phrases(bars: &[Bar], levels: &[f64], gaps: &[bool], starts: &[usize]) -> Vec<Phrase> {
+    let level_of = |first: usize, last: usize| -> Option<f64> {
+        let members: Vec<f64> = (first..last)
+            .filter(|bar| !gaps[*bar])
+            .map(|bar| levels[bar])
+            .collect();
+        (!members.is_empty()).then(|| power_level(&members))
+    };
     let spans: Vec<(usize, usize)> = starts.windows(2).map(|pair| (pair[0], pair[1])).collect();
-    let phrase_levels: Vec<f64> = spans
-        .iter()
-        .map(|(start, end)| mean(&levels[*start..*end]))
+    let mut phrase_levels = Vec::with_capacity(spans.len());
+    let mut rises = Vec::with_capacity(spans.len());
+    for &(start, end) in &spans {
+        phrase_levels.push(level_of(start, end).unwrap_or(ENERGY_FLOOR_DB));
+        let middle = (start + end) / 2;
+        rises.push(match (level_of(start, middle), level_of(middle, end)) {
+            (Some(early), Some(late)) => late - early,
+            _ => 0.0,
+        });
+    }
+    let typical_levels: Vec<f64> = (starts[0]..starts[starts.len() - 1])
+        .filter(|bar| !gaps[*bar])
+        .map(|bar| levels[bar])
         .collect();
-    let rises: Vec<f64> = spans
-        .iter()
-        .map(|(start, end)| {
-            let middle = (start + end) / 2;
-            mean(&levels[middle..*end]) - mean(&levels[*start..middle])
-        })
-        .collect();
-    let typical = median(&levels[starts[0]..starts[starts.len() - 1]]);
-    let kinds = kinds(&phrase_levels, &rises, &spans, typical);
+    let kinds = kinds(&phrase_levels, &rises, &spans, median(&typical_levels));
     let mut previous: Option<f64> = None;
     spans
         .iter()
@@ -407,26 +576,33 @@ fn kinds(
     let count = levels.len();
     let top = levels.iter().copied().fold(f64::NEG_INFINITY, f64::max);
     let bottom = levels.iter().copied().fold(f64::INFINITY, f64::min);
-    if count < 2 || top - bottom < CONTRAST_DB {
+    if count < 2 || top - bottom < CONTRAST_DB - EPSILON {
         return vec!["body"; count];
     }
     let peak: Vec<bool> = levels
         .iter()
-        .map(|level| *level >= top - PEAK_WITHIN_DB && *level >= typical + PEAK_ABOVE_TYPICAL_DB)
+        .map(|level| {
+            *level >= top - PEAK_WITHIN_DB - EPSILON
+                && *level >= typical + PEAK_ABOVE_TYPICAL_DB - EPSILON
+        })
         .collect();
-    let (main, reference) = if peak.iter().any(|is_peak| *is_peak) {
+    let (main, reference) = if peak.contains(&true) {
         (peak.clone(), top)
     } else {
         (
             levels
                 .iter()
-                .map(|level| *level >= typical - MAIN_WITHIN_TYPICAL_DB)
-                .collect(),
+                .map(|level| *level >= typical - MAIN_WITHIN_TYPICAL_DB - EPSILON)
+                .collect::<Vec<bool>>(),
             typical,
         )
     };
-    let first_main = main.iter().position(|is_main| *is_main).unwrap_or(0);
-    let last_main = main.iter().rposition(|is_main| *is_main).unwrap_or(0);
+    let (Some(first_main), Some(last_main)) = (
+        main.iter().position(|is_main| *is_main),
+        main.iter().rposition(|is_main| *is_main),
+    ) else {
+        return vec!["body"; count];
+    };
     let middle = 0.5 * (spans[0].0 + spans[count - 1].1) as f64;
     spans
         .iter()
@@ -434,7 +610,10 @@ fn kinds(
         .map(|(index, &(start, end))| {
             if peak[index] {
                 "peak"
-            } else if index + 1 < count && peak[index + 1] && rises[index] >= BUILD_RISE_DB {
+            } else if index + 1 < count
+                && peak[index + 1]
+                && rises[index] >= BUILD_RISE_DB - EPSILON
+            {
                 "build"
             } else if index < first_main && (start as f64) < middle {
                 "intro"
@@ -442,7 +621,7 @@ fn kinds(
                 "outro"
             } else if first_main < index
                 && index < last_main
-                && levels[index] <= reference - BREAK_BELOW_DB
+                && levels[index] <= reference - BREAK_BELOW_DB + EPSILON
             {
                 "break"
             } else {
@@ -452,15 +631,7 @@ fn kinds(
         .collect()
 }
 
-fn confidence(novelty: &[f64], boundaries: &[usize], bars: &[Bar]) -> f32 {
-    let count = novelty.len() - 1;
-    let peaks: Vec<usize> = (1..count)
-        .filter(|boundary| {
-            novelty[*boundary] >= PEAK_MIN_DB
-                && novelty[*boundary] > novelty[boundary - 1]
-                && novelty[*boundary] >= novelty[boundary + 1]
-        })
-        .collect();
+fn confidence(peaks: &[Peak], boundaries: &[usize], bars: &[Bar]) -> f64 {
     if peaks.is_empty() {
         return 0.0;
     }
@@ -468,7 +639,7 @@ fn confidence(novelty: &[f64], boundaries: &[usize], bars: &[Bar]) -> f32 {
     for peak in peaks {
         let distance = boundaries
             .iter()
-            .map(|boundary| peak.abs_diff(*boundary))
+            .map(|boundary| peak.distance(*boundary))
             .min()
             .unwrap_or(usize::MAX);
         let weight = match distance {
@@ -476,8 +647,8 @@ fn confidence(novelty: &[f64], boundaries: &[usize], bars: &[Bar]) -> f32 {
             1 => 0.5,
             _ => 0.0,
         };
-        total += novelty[peak];
-        aligned += weight * novelty[peak];
+        total += peak.value;
+        aligned += weight * peak.value;
         support += weight;
     }
     let durations: Vec<f64> = bars[..bars.len().saturating_sub(1)]
@@ -494,7 +665,7 @@ fn confidence(novelty: &[f64], boundaries: &[usize], bars: &[Bar]) -> f32 {
         .collect();
     let jitter = median(&residuals) / typical;
     let regularity = (1.0 - jitter / BAR_JITTER_LIMIT).clamp(0.0, 1.0);
-    round4((aligned / total) * (support / SUPPORT_PEAKS).min(1.0) * regularity) as f32
+    (aligned / total) * (support / SUPPORT_PEAKS).min(1.0) * regularity
 }
 
 fn energy(level_db: f64) -> f64 {
@@ -512,8 +683,22 @@ fn power_db(mean_power: f64) -> f64 {
     (10.0 * mean_power.log10()).clamp(ENERGY_FLOOR_DB, 0.0)
 }
 
+/// Level (dB) of the mean power of bars given in dB.
+fn power_level(levels_db: &[f64]) -> f64 {
+    let powers: Vec<f64> = levels_db
+        .iter()
+        .map(|level| 10.0_f64.powf(level / 10.0))
+        .collect();
+    power_db(mean(&powers))
+}
+
+/// A plain left-to-right sum, the order the Python analyzer adds in.
+fn sum(values: impl Iterator<Item = f64>) -> f64 {
+    values.fold(0.0, |total, value| total + value)
+}
+
 fn mean(values: &[f64]) -> f64 {
-    values.iter().sum::<f64>() / values.len() as f64
+    sum(values.iter().copied()) / values.len() as f64
 }
 
 fn median(values: &[f64]) -> f64 {
@@ -527,10 +712,34 @@ fn median(values: &[f64]) -> f64 {
     }
 }
 
+/// Four decimals with halves away from zero, written as the Python analyzer writes it.
 fn round4(value: f64) -> f64 {
-    (value * 10_000.0).round() / 10_000.0
+    let scaled = value * 10_000.0;
+    (scaled.abs() + 0.5).floor().copysign(scaled) / 10_000.0
 }
 
 fn ceil_div(numerator: usize, denominator: usize) -> usize {
     numerator.div_ceil(denominator)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn kinds_without_main_phrases_are_body() {
+        let spans = [(0, 8), (8, 16), (16, 24)];
+
+        assert_eq!(
+            kinds(&[-30.0, -33.0, -30.5], &[0.0; 3], &spans, -20.0),
+            ["body"; 3]
+        );
+    }
+
+    #[test]
+    fn a_panicking_segmentation_leaves_no_structure() {
+        let structure = guarded(|| panic!("segmentation exploded"));
+
+        assert_eq!(structure, Structure::none());
+    }
 }

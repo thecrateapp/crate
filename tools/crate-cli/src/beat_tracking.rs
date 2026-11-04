@@ -6,7 +6,7 @@
 
 use realfft::RealFftPlanner;
 
-use crate::structure::{BAND_COUNT, MID_BAND_HZ};
+use crate::structure::{BAND_COUNT, LOW_BAND_HZ, MID_BAND_HZ};
 
 pub const FFT_SIZE: usize = 2048;
 pub const HOP_SIZE: usize = 512;
@@ -18,7 +18,6 @@ const START_BPM: f32 = 120.0;
 const PRIOR_OCTAVES: f32 = 1.5;
 const MAX_TEMPO: f32 = 320.0;
 const TIGHTNESS: f32 = 100.0;
-const LOW_BAND_HZ: f32 = 200.0;
 const CHROMA_MIN_HZ: f32 = 55.0;
 const CHROMA_MAX_HZ: f32 = 5_000.0;
 const DOWNBEAT_WINDOW_FRAMES: usize = 2;
