@@ -115,16 +115,21 @@ VDJ_ONLINE_SOURCES := $(HOME)/Library/Application Support/VirtualDJ/PluginsMacAr
 
 VDJ_TESTED_VERSION ?= 8.5.9307
 VDJ_DIST_DIR ?= dist/vdj
+VDJ_ARCH ?= arm64
+VDJ_MACOS_MINIMUM ?= 12.0
+VDJ_PACKAGE_DIR ?= build/vdj-package-$(VDJ_ARCH)
 
 .PHONY: vdj-package
-vdj-package: ## Build and package the VirtualDJ plugin for macOS arm64 (VIRTUALDJ_SDK_ROOT=)
+vdj-package: ## Build and package the VirtualDJ plugin for macOS (VIRTUALDJ_SDK_ROOT=, VDJ_ARCH=arm64|x86_64)
 	@test -n "$(VIRTUALDJ_SDK_ROOT)" || { echo "$(RED)Set VIRTUALDJ_SDK_ROOT to the folder with vdjPlugin8.h and vdjOnlineSource.h$(NC)"; exit 1; }
-	@cmake -S tools/vdj-plugin -B $(VDJ_BUILD_DIR) -DCMAKE_BUILD_TYPE=Release \
+	@cmake -S tools/vdj-plugin -B $(VDJ_PACKAGE_DIR) -DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_OSX_ARCHITECTURES=$(VDJ_ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=$(VDJ_MACOS_MINIMUM) \
 		-DCRATE_VDJ_BUILD_REAL_PLUGIN=ON -DVirtualDJSDK_ROOT="$(VIRTUALDJ_SDK_ROOT)" >/dev/null
-	@cmake --build $(VDJ_BUILD_DIR) --target crate_vdj_online_source_plugin --parallel
-	@python3 tools/vdj-plugin/packaging/package_macos.py $(VDJ_BUILD_DIR)/Crate.bundle $(VDJ_DIST_DIR) \
+	@cmake --build $(VDJ_PACKAGE_DIR) --target crate_vdj_online_source_plugin --parallel
+	@python3 tools/vdj-plugin/packaging/package_macos.py $(VDJ_PACKAGE_DIR)/Crate.bundle $(VDJ_DIST_DIR) \
+		--arch $(VDJ_ARCH) \
 		--contract-header tools/vdj-plugin/include/crate_vdj/contract_negotiator.hpp \
-		--tested-virtualdj $(VDJ_TESTED_VERSION)
+		$(if $(VDJ_TESTED_VERSION),--tested-virtualdj $(VDJ_TESTED_VERSION))
 
 .PHONY: vdj-dev
 vdj-dev: ## Build the VirtualDJ plugin, install it and open VirtualDJ against the dev stack (VIRTUALDJ_SDK_ROOT=, VIRTUALDJ_APP=)

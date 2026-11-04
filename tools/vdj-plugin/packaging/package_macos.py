@@ -1,10 +1,8 @@
-"""Package the VirtualDJ Online Source as a macOS arm64 archive."""
+"""Package the VirtualDJ Online Source as a macOS archive."""
 
 from __future__ import annotations
 
 import argparse
-import hashlib
-import json
 import plistlib
 import re
 import shutil
@@ -12,22 +10,56 @@ import subprocess
 import sys
 import tempfile
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
-PLATFORM = "macos-arm64"
-INSTALL_PATH = "~/Library/Application Support/VirtualDJ/PluginsMacArm/OnlineSources"
-FORBIDDEN_NAMES = {"vdjPlugin8.h", "vdjOnlineSource.h", "vdjDsp8.h", "vdjVideo8.h"}
-TOKEN_PATTERN = re.compile(rb"crv_[A-Za-z0-9_-]{40,}")
+from common import (
+    PackagingError,
+    base_manifest,
+    shipped_file_problems,
+    supported_contracts,
+    write_checksum,
+    write_manifest,
+)
+
+INSTALL_FOLDERS = {
+    "arm64": "PluginsMacArm",
+    "x86_64": "Plugins64",
+}
+SYSTEM_LIBRARY_PREFIXES = ("/System/Library/", "/usr/lib/")
 
 
-class PackagingError(RuntimeError):
-    pass
+@dataclass(frozen=True)
+class MachOInspection:
+    exports: str
+    archs: set[str]
+    libraries: list[str]
+    minimum_macos: str
 
 
-def nm_exports(binary: Path) -> str:
-    return subprocess.run(
-        ["nm", "-gU", str(binary)], check=True, capture_output=True, text=True
-    ).stdout
+def _run(*command: str) -> str:
+    return subprocess.run(command, check=True, capture_output=True, text=True).stdout
+
+
+def parse_minimum_macos(load_commands: str) -> str:
+    match = re.search(r"\bminos\s+(\S+)", load_commands)
+    if match is None:
+        raise PackagingError("the executable has no LC_BUILD_VERSION")
+    return match.group(1)
+
+
+def inspect_macho(binary: Path) -> MachOInspection:
+    libraries = [
+        line.split(" (compatibility")[0].strip()
+        for line in _run("otool", "-L", str(binary)).splitlines()[1:]
+        if line.strip()
+    ]
+    return MachOInspection(
+        exports=_run("nm", "-gU", str(binary)),
+        archs=set(_run("lipo", "-archs", str(binary)).split()),
+        libraries=libraries,
+        minimum_macos=parse_minimum_macos(_run("otool", "-l", str(binary))),
+    )
 
 
 def adhoc_sign(bundle: Path) -> None:
@@ -37,13 +69,26 @@ def adhoc_sign(bundle: Path) -> None:
     )
 
 
+def platform_name(arch: str) -> str:
+    return f"macos-{arch}"
+
+
 def _info(bundle: Path) -> dict:
     with (bundle / "Contents" / "Info.plist").open("rb") as source:
         return plistlib.load(source)
 
 
+def _binary(bundle: Path) -> Path:
+    return (
+        bundle / "Contents" / "MacOS" / str(_info(bundle).get("CFBundleExecutable", ""))
+    )
+
+
 def validate_bundle(
-    bundle: Path, *, exports: Callable[[Path], str] = nm_exports
+    bundle: Path,
+    *,
+    arch: str,
+    inspect: Callable[[Path], MachOInspection] = inspect_macho,
 ) -> list[str]:
     if not (bundle / "Contents" / "Info.plist").is_file():
         return [f"{bundle} has no Info.plist"]
@@ -51,69 +96,73 @@ def validate_bundle(
     info = _info(bundle)
     if info.get("CFBundleName") != "Crate" or info.get("CFBundleExecutable") != "Crate":
         problems.append("the bundle must be named Crate: VirtualDJ keys tracks by it")
-    binary = bundle / "Contents" / "MacOS" / str(info.get("CFBundleExecutable", ""))
+    binary = _binary(bundle)
     if not binary.is_file():
         problems.append(f"missing executable {binary.name}")
-    elif "_DllGetClassObject" not in exports(binary):
-        problems.append("the executable does not export DllGetClassObject")
+    else:
+        inspection = inspect(binary)
+        if "_DllGetClassObject" not in inspection.exports:
+            problems.append("the executable does not export DllGetClassObject")
+        if inspection.archs != {arch}:
+            built = ", ".join(sorted(inspection.archs))
+            problems.append(f"the executable is built for {built}, expected {arch}")
+        problems.extend(
+            f"the executable links {library}, which users do not have"
+            for library in inspection.libraries
+            if not library.startswith(SYSTEM_LIBRARY_PREFIXES)
+        )
     for path in bundle.rglob("*"):
-        if not path.is_file():
-            continue
-        if path.name in FORBIDDEN_NAMES or "probe" in path.name.lower():
-            problems.append(f"{path.name} must not ship")
-        elif TOKEN_PATTERN.search(path.read_bytes()):
-            problems.append(f"{path.name} contains an access token")
+        if path.is_file():
+            problems.extend(shipped_file_problems(path))
     return problems
-
-
-def supported_contracts(header: Path) -> list[str]:
-    match = re.search(
-        r"supported_contract_versions\s*=\s*\{([^}]*)\}", header.read_text()
-    )
-    if match is None:
-        raise PackagingError(f"no supported contract versions in {header}")
-    return re.findall(r'"([^"]+)"', match.group(1))
 
 
 def build_manifest(
     *,
+    arch: str,
     version: str,
     contracts: list[str],
     tested_virtualdj: list[str],
+    minimum_macos: str,
     archive: str,
     sha256: str,
 ) -> dict:
-    return {
-        "plugin": "Crate",
-        "version": version,
-        "platform": PLATFORM,
-        "archive": archive,
-        "sha256": sha256,
-        "crate_contracts": contracts,
-        "virtualdj_tested": tested_virtualdj,
-        "requires": "VirtualDJ Pro",
-        "install_path": INSTALL_PATH,
-        "signing": "ad-hoc",
-    }
+    manifest = base_manifest(
+        platform=platform_name(arch),
+        version=version,
+        contracts=contracts,
+        tested_virtualdj=tested_virtualdj,
+        archive=archive,
+        sha256=sha256,
+        install_path=(
+            "~/Library/Application Support/VirtualDJ/"
+            f"{INSTALL_FOLDERS[arch]}/OnlineSources"
+        ),
+        signing="ad-hoc",
+    )
+    manifest["minimum_macos"] = minimum_macos
+    return manifest
 
 
 def package(
     bundle: Path,
     output: Path,
     *,
+    arch: str,
     contract_header: Path,
     tested_virtualdj: list[str],
-    exports: Callable[[Path], str] = nm_exports,
+    inspect: Callable[[Path], MachOInspection] = inspect_macho,
     sign: Callable[[Path], None] = adhoc_sign,
 ) -> Path:
-    problems = validate_bundle(bundle, exports=exports)
+    problems = validate_bundle(bundle, arch=arch, inspect=inspect)
     if problems:
         raise PackagingError("; ".join(problems))
     version = str(_info(bundle)["CFBundleShortVersionString"])
     contracts = supported_contracts(contract_header)
-    archive_name = f"Crate-VirtualDJ-{PLATFORM}-{version}.zip"
+    minimum_macos = inspect(_binary(bundle)).minimum_macos
+    platform = platform_name(arch)
     output.mkdir(parents=True, exist_ok=True)
-    archive = output / archive_name
+    archive = output / f"Crate-VirtualDJ-{platform}-{version}.zip"
     with tempfile.TemporaryDirectory() as staging:
         staged = Path(staging) / "Crate.bundle"
         shutil.copytree(bundle, staged, symlinks=True)
@@ -122,17 +171,19 @@ def package(
         shutil.make_archive(
             str(archive.with_suffix("")), "zip", staging, "Crate.bundle"
         )
-    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
-    (output / f"{archive_name}.sha256").write_text(f"{digest}  {archive_name}\n")
-    manifest = build_manifest(
-        version=version,
-        contracts=contracts,
-        tested_virtualdj=tested_virtualdj,
-        archive=archive_name,
-        sha256=digest,
-    )
-    (output / f"manifest-{PLATFORM}.json").write_text(
-        json.dumps(manifest, indent=2) + "\n"
+    digest = write_checksum(archive)
+    write_manifest(
+        output,
+        platform,
+        build_manifest(
+            arch=arch,
+            version=version,
+            contracts=contracts,
+            tested_virtualdj=tested_virtualdj,
+            minimum_macos=minimum_macos,
+            archive=archive.name,
+            sha256=digest,
+        ),
     )
     return archive
 
@@ -141,13 +192,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("bundle", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--arch", choices=sorted(INSTALL_FOLDERS), default="arm64")
     parser.add_argument("--contract-header", type=Path, required=True)
-    parser.add_argument("--tested-virtualdj", action="append", required=True)
+    parser.add_argument("--tested-virtualdj", action="append", default=[])
     args = parser.parse_args()
     try:
         archive = package(
             args.bundle,
             args.output,
+            arch=args.arch,
             contract_header=args.contract_header,
             tested_virtualdj=args.tested_virtualdj,
         )
