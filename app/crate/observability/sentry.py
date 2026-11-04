@@ -44,6 +44,10 @@ _SUBSONIC_TARGET = re.compile(
 )
 
 
+# Service name claimed by the process entry point; see ``init_sentry``.
+_entry_point_service: str | None = None
+
+
 @dataclass(frozen=True)
 class SentrySettings:
     service: str
@@ -92,8 +96,17 @@ def load_settings(service: str) -> SentrySettings:
     )
 
 
-def init_sentry(service: str) -> bool:
-    """Initialize Sentry once for a process and attach the service tag."""
+def init_sentry(service: str, *, entry_point: bool = True) -> bool:
+    """Initialize Sentry once for a process and attach the service tag.
+
+    The process entry point (API factory, worker launcher, projector) owns the
+    ``service`` tag. A module that initialises Sentry as an import side effect,
+    such as ``crate.broker``, passes ``entry_point=False``: it tags the process
+    only until an entry point does, so an API process that imports the broker
+    to enqueue tasks keeps ``service=api`` in either import order.
+    """
+    global _entry_point_service
+
     settings = load_settings(service)
     if not settings.enabled:
         return False
@@ -103,15 +116,20 @@ def init_sentry(service: str) -> bool:
             "dsn": settings.dsn,
             "environment": settings.environment,
             "send_default_pii": False,
+            "include_local_variables": False,
             "traces_sample_rate": settings.traces_sample_rate,
             "profiles_sample_rate": settings.profiles_sample_rate,
-            "before_send": scrub_sentry_event,
+            "before_send": filter_sentry_event,
             "before_breadcrumb": scrub_sentry_breadcrumb,
         }
         if settings.release:
             init_kwargs["release"] = settings.release
         sentry_sdk.init(**init_kwargs)
 
+    if entry_point:
+        _entry_point_service = settings.service
+    elif _entry_point_service is not None:
+        return True
     sentry_sdk.set_tag("service", settings.service)
     return True
 
@@ -271,6 +289,29 @@ def _set_span_status(span: Any, status: str) -> None:
         set_status(status)
 
 
+def filter_sentry_event(
+    event: dict[str, Any], hint: Any = None
+) -> dict[str, Any] | None:
+    """Drop expected external conditions, then scrub the event that is sent.
+
+    A provider rate limit is not a Crate error. Dropping it here covers every
+    capture path: the task exception helper and also the Dramatiq worker's own
+    ``Failed to process message`` error log of the same exception.
+    """
+    if _is_provider_rate_limit(hint):
+        return None
+    return scrub_sentry_event(event, hint)
+
+
+def _is_provider_rate_limit(hint: Any) -> bool:
+    exc_info = hint.get("exc_info") if isinstance(hint, dict) else None
+    if not isinstance(exc_info, tuple) or len(exc_info) < 2:
+        return False
+    from crate.provider_rate_limits import ProviderRateLimited
+
+    return isinstance(exc_info[1], ProviderRateLimited)
+
+
 def scrub_sentry_event(event: dict[str, Any], hint: Any = None) -> dict[str, Any]:
     """Return a copy of an event with credentials and PII removed."""
     del hint
@@ -322,7 +363,8 @@ def _scrub_value(value: Any, key: str | None = None) -> Any:
 def _is_sensitive_key(key: str) -> bool:
     normalized = key.lower().replace("-", "_")
     return (
-        normalized in {"cookies", "set_cookie", "set_cookie_header"}
+        # A bare `key` is how provider clients name their API key (setlistfm).
+        normalized in {"cookies", "set_cookie", "set_cookie_header", "key"}
         or normalized in _SENSITIVE_QUERY_KEYS
         or any(part in normalized for part in _SENSITIVE_KEY_PARTS)
     )

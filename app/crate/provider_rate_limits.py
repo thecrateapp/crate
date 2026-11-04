@@ -27,6 +27,18 @@ return allowed - now
 """
 
 
+class ProviderRateLimited(RuntimeError):
+    """An external provider refused a request because Crate hit its rate limit.
+
+    This is an expected external condition, not a Crate defect. Tasks keep their
+    usual failure and retry semantics, but Sentry never reports it as an error
+    event (``crate.observability.sentry.filter_sentry_event`` drops it).
+    """
+
+    provider: str = "unknown"
+    retry_after_seconds: float | None = None
+
+
 def _fallback_wait(key: str, interval_seconds: float) -> float:
     now = time.time()
     with _FALLBACK_LOCK:
@@ -73,4 +85,4 @@ def wait_for_provider_slot(provider: str, interval_seconds: float) -> float:
     return wait_seconds
 
 
-__all__ = ["reserve_provider_slot", "wait_for_provider_slot"]
+__all__ = ["ProviderRateLimited", "reserve_provider_slot", "wait_for_provider_slot"]
