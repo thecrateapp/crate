@@ -661,3 +661,58 @@ def test_collect_tavily_maps_search_results_to_bounded_safe_sources(monkeypatch)
     ]
     assert request["headers"]["Authorization"] == "Bearer tavily-test-key"
     assert "api_key" not in request["json"]
+
+
+def test_web_collection_stops_at_its_total_deadline(monkeypatch):
+    # Review M10: collection plus the 90s model call must fit the 300s task.
+    from crate import artist_bio_research as research
+
+    clock = {"now": 1000.0}
+    calls = []
+
+    def collector(label):
+        def collect(*_args, **_kwargs):
+            calls.append(label)
+            clock["now"] += 40
+            return [
+                research._source(
+                    label, label, f"https://{label}.example", "Text", "web"
+                )
+            ]
+
+        return collect
+
+    monkeypatch.setattr(research.time, "monotonic", lambda: clock["now"])
+    monkeypatch.setattr(research, "_collect_musicbrainz", collector("mb"))
+    monkeypatch.setattr(research, "_collect_wikipedia", collector("wiki"))
+    monkeypatch.setattr(research, "_collect_lastfm", collector("lastfm"))
+    monkeypatch.setattr(research, "_collect_web_search", collector("web"))
+    monkeypatch.setattr(
+        research,
+        "_get_public_page",
+        lambda url: calls.append("official") or "Official text",
+    )
+
+    sources = research.collect_artist_research_sources(
+        {"name": "Band", "urls_json": {"site": "https://band.example"}},
+        budget_seconds=100,
+    )
+
+    # 40s each: the third collector starts at 80s, the fourth would start at 120s.
+    assert calls == ["mb", "wiki", "lastfm"]
+    assert [source["url"] for source in sources] == [
+        "https://mb.example",
+        "https://wiki.example",
+        "https://lastfm.example",
+    ]
+
+
+def test_collection_budget_shrinks_inside_a_short_task():
+    import time
+
+    from crate import artist_bio_research as research
+    from crate.ai import requeue
+
+    assert research.collection_budget_seconds() == research.COLLECTION_BUDGET_SECONDS
+    with requeue.concurrency_window("ai", 0, deadline=time.monotonic() + 150):
+        assert research.collection_budget_seconds() <= 150 - 90 - 15
