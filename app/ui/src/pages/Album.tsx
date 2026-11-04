@@ -1,6 +1,6 @@
 import { useLibrarySearch } from "@/hooks/use-library-search";
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useParams, useNavigate, useSearchParams } from "react-router";
 import { useApi } from "@/hooks/use-api";
 import { analysisForTrack } from "@/components/album/audio-analysis";
 import { AlbumHeader } from "@/components/album/AlbumHeader";
@@ -43,6 +43,12 @@ import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { ActionButton } from "@crate/ui/primitives/ActionGroup";
 import { MediaCover } from "@crate/ui/domain/media/MediaCover";
 import { LoadingState, EmptyState } from "@crate/ui/domain/states";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@crate/ui/shadcn/tabs";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import {
   Loader2,
@@ -607,6 +613,14 @@ export function SplitAlbumDialog({
   );
 }
 
+// Album page sections. The active one lives in ?tab= so it can be linked and survives
+// a reload; every album opens on Tracks.
+const ALBUM_TABS = [
+  { value: "tracks", label: "Tracks" },
+  { value: "analysis", label: "Audio analysis" },
+  { value: "related", label: "Related" },
+] as const;
+
 export function Album() {
   const {
     albumId: albumIdParam,
@@ -618,6 +632,20 @@ export function Album() {
     albumSlug?: string;
   }>();
   const albumId = albumIdParam ? Number(albumIdParam) : undefined;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const albumTab =
+    ALBUM_TABS.find((tab) => tab.value === requestedTab)?.value ?? "tracks";
+  const chooseAlbumTab = (value: string) =>
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (value === "tracks") next.delete("tab");
+        else next.set("tab", value);
+        return next;
+      },
+      { replace: true },
+    );
   const { data, loading, error, refetch } = useApi<AlbumData>(
     albumApiPath({
       albumId,
@@ -1160,45 +1188,53 @@ export function Album() {
           </div>
         )}
 
-        <AudioProfileCard
-          analysisData={Object.fromEntries(
-            data.tracks.flatMap((track, index) => {
-              const analysis = analysisForTrack(analysisData, track);
-              return analysis ? [[String(index), analysis]] : [];
-            }),
-          )}
-          totalTracks={data.track_count}
-        />
-
-        <div>
-          <MonoLabel as="h2" tone="accent" className="mb-4">
-            Tracks
-          </MonoLabel>
-          <TrackTable
-            tracks={tableTracks}
-            artist={data.artist}
-            artistId={data.artist_id}
-            artistSlug={data.artist_slug}
-            album={data.name}
-            albumId={data.id}
-            albumSlug={data.slug}
-            albumCover={albumCoverApiUrl({
-              albumId: data.id,
-              albumEntityUid: data.entity_uid,
-              albumSlug: data.slug,
-              artistName: data.artist,
-              albumName: data.name,
-            })}
-            analysisData={analysisData ?? undefined}
-            syncingLyricsTrackKey={syncingLyricsTrackKey}
-            onSyncTrackLyrics={
-              canEditMetadata ? queueTrackLyricsSync : undefined
-            }
-            onTrackQuarantined={refetch}
-          />
-        </div>
-
-        <RelatedAlbums albumId={data.id} />
+        <Tabs value={albumTab} onValueChange={chooseAlbumTab} className="gap-6">
+          <TabsList aria-label="Album sections">
+            {ALBUM_TABS.map((tab) => (
+              <TabsTrigger key={tab.value} value={tab.value}>
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <TabsContent value="tracks" className="min-w-0">
+            <TrackTable
+              tracks={tableTracks}
+              artist={data.artist}
+              artistId={data.artist_id}
+              artistSlug={data.artist_slug}
+              album={data.name}
+              albumId={data.id}
+              albumSlug={data.slug}
+              albumCover={albumCoverApiUrl({
+                albumId: data.id,
+                albumEntityUid: data.entity_uid,
+                albumSlug: data.slug,
+                artistName: data.artist,
+                albumName: data.name,
+              })}
+              analysisData={analysisData ?? undefined}
+              syncingLyricsTrackKey={syncingLyricsTrackKey}
+              onSyncTrackLyrics={
+                canEditMetadata ? queueTrackLyricsSync : undefined
+              }
+              onTrackQuarantined={refetch}
+            />
+          </TabsContent>
+          <TabsContent value="analysis" className="min-w-0">
+            <AudioProfileCard
+              analysisData={Object.fromEntries(
+                data.tracks.flatMap((track, index) => {
+                  const analysis = analysisForTrack(analysisData, track);
+                  return analysis ? [[String(index), analysis]] : [];
+                }),
+              )}
+              totalTracks={data.track_count}
+            />
+          </TabsContent>
+          <TabsContent value="related" className="min-w-0">
+            <RelatedAlbums albumId={data.id} />
+          </TabsContent>
+        </Tabs>
 
         <MoveAlbumToArtistDialog
           open={showMoveAlbum}
