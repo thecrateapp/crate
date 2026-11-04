@@ -348,7 +348,9 @@ budget caps the transport, which kills its child at that point, also on the
 legacy Ollama and LiteLLM paths. Every AI task's limit leaves room for the
 longest action maximum (90 s) after the margin. Network work before the call
 has its own bound so it cannot eat that room: biography research stops starting
-collectors after 100 s, and a remote hero candidate download stops after 30 s.
+collectors after 100 s, and a remote hero candidate download checks its 30 s
+budget after every socket read, so it stops within 42 s (each read waits at most
+12 s) even when the server trickles bytes.
 
 ### Provider capacity: wait, do not fail
 

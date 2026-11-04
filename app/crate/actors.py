@@ -94,7 +94,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "propose_genre_taxonomy_node": TaskPoolConfig("ai", 0, 180, 0),
     # Replays the deterministic scene plan, then one music_paths.refine call (≤ 8s).
     "refine_music_path": TaskPoolConfig("ai", 0, 120, 0),
-    # Loads one candidate (a fanart download stops after 30s), then one
+    # Loads one candidate (a fanart download stops within 30s + one 12s read), then one
     # artwork.hero.analyze call (≤ 90s).
     "analyze_artist_hero_candidate": TaskPoolConfig("ai", 0, 180, 0),
     # User-initiated (priority 0) — these should run ASAP

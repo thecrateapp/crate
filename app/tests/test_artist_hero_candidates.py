@@ -45,8 +45,8 @@ def test_candidate_tokens_are_signed_and_tamper_evident(monkeypatch):
     assert decode_candidate_token(token, expected_artist_id=8) is None
 
 
-def test_remote_candidate_stops_streaming_after_size_limit(monkeypatch):
-    from crate.artist_hero_candidates import _MAX_BYTES, _download_remote_candidate
+def _streaming_response(raw):
+    """A requests response over ``raw``, a stub of urllib3's stream."""
 
     class Response:
         headers = {"content-type": "image/jpeg"}
@@ -61,45 +61,62 @@ def test_remote_candidate_stops_streaming_after_size_limit(monkeypatch):
             return None
 
         def iter_content(self, *, chunk_size):
-            assert chunk_size == 1024 * 1024
-            yield b"x" * (_MAX_BYTES // 2)
-            yield b"x" * (_MAX_BYTES // 2 + 1)
+            # Like urllib3, a chunk only comes back once chunk_size bytes arrived.
+            while True:
+                received = 0
+                while received < chunk_size:
+                    piece = raw.read1(chunk_size - received)
+                    if not piece:
+                        break
+                    received += len(piece)
+                if not received:
+                    return
+                yield b"x" * received
+
+    response = Response()
+    response.raw = raw
+    return response
+
+
+def test_remote_candidate_stops_streaming_after_size_limit(monkeypatch):
+    from crate import artist_hero_candidates as hero
+
+    class Raw:
+        left = hero._MAX_BYTES + 1
+
+        def read1(self, amt=None, decode_content=None):
+            size = min(amt or self.left, self.left, 1024 * 1024)
+            self.left -= size
+            return b"x" * size
 
     monkeypatch.setattr(
-        "crate.artist_hero_candidates.requests.get", lambda *args, **kwargs: Response()
+        hero.requests, "get", lambda *args, **kwargs: _streaming_response(Raw())
     )
 
-    assert _download_remote_candidate("https://example.test/large.jpg") is None
+    assert hero._download_remote_candidate("https://example.test/large.jpg") is None
 
 
 def test_remote_candidate_stops_streaming_after_its_time_budget(monkeypatch):
-    # A trickling server must not eat the ai task's time for the model call.
+    # A server that sends a byte every 11 s never trips the read timeout, so only
+    # a deadline checked after every socket read keeps the ai task's time for the
+    # model call.
     from crate import artist_hero_candidates as hero
 
     clock = {"now": 100.0}
 
-    class Response:
-        headers = {"content-type": "image/jpeg"}
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            return None
-
-        def raise_for_status(self):
-            return None
-
-        def iter_content(self, *, chunk_size):
-            for _ in range(10):
-                clock["now"] += 10
-                yield b"x"
+    class Raw:
+        def read1(self, amt=None, decode_content=None):
+            clock["now"] += hero._READ_TIMEOUT_SECONDS - 1
+            return b"x"
 
     monkeypatch.setattr(hero.time, "monotonic", lambda: clock["now"])
-    monkeypatch.setattr(hero.requests, "get", lambda *args, **kwargs: Response())
+    monkeypatch.setattr(
+        hero.requests, "get", lambda *args, **kwargs: _streaming_response(Raw())
+    )
 
     assert hero._download_remote_candidate("https://example.test/slow.jpg") is None
-    assert clock["now"] - 100.0 <= hero._DOWNLOAD_BUDGET_SECONDS + 10
+    elapsed = clock["now"] - 100.0
+    assert elapsed <= hero._DOWNLOAD_BUDGET_SECONDS + hero._READ_TIMEOUT_SECONDS
 
 
 def test_discovery_returns_all_valid_sources_with_same_origin_previews(

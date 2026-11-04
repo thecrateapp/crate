@@ -30,6 +30,8 @@ _TOKEN_TTL_SECONDS = 60 * 60
 # Total time for one remote download, on top of the per-read timeout. Analysis
 # loads its candidate inside a 180s ai task that keeps 90s for the model call.
 _DOWNLOAD_BUDGET_SECONDS = 30
+_READ_TIMEOUT_SECONDS = 12
+_READ_SIZE = 64 * 1024
 
 
 @dataclass(frozen=True)
@@ -164,15 +166,19 @@ def _download_remote_candidate(url: str) -> bytes | None:
     deadline = time.monotonic() + _DOWNLOAD_BUDGET_SECONDS
     try:
         with requests.get(
-            url, timeout=(3, 12), headers={"Accept": "image/*"}, stream=True
+            url,
+            timeout=(3, _READ_TIMEOUT_SECONDS),
+            headers={"Accept": "image/*"},
+            stream=True,
         ) as response:
             response.raise_for_status()
             content_type = response.headers.get("content-type", "")
             if content_type and not content_type.startswith("image/"):
                 return None
-            for chunk in response.iter_content(chunk_size=1024 * 1024):
-                if not chunk:
-                    continue
+            # read1 returns after one socket read, so the deadline is checked at
+            # least every read timeout; iter_content would block until a whole
+            # chunk arrived and let a trickling server outlive the budget.
+            while chunk := response.raw.read1(_READ_SIZE, decode_content=True):
                 total += len(chunk)
                 if total > _MAX_BYTES or time.monotonic() > deadline:
                     return None
