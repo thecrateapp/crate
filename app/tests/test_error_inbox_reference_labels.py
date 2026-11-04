@@ -5,7 +5,10 @@ from collections import Counter
 from pathlib import Path
 
 LABELS_PATH = (
-    Path(__file__).resolve().parent / "fixtures" / "error_inbox" / "reference_labels.json"
+    Path(__file__).resolve().parent
+    / "fixtures"
+    / "error_inbox"
+    / "reference_labels.json"
 )
 CLASSIFICATIONS = {
     "bug",
