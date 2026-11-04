@@ -8,16 +8,25 @@
 #include "crate_vdj/media_access_client.hpp"
 #include "crate_vdj/metadata_cache.hpp"
 #include "crate_vdj/models.hpp"
+#include "crate_vdj/play_events.hpp"
 #include "crate_vdj/request_coordinator.hpp"
 
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstddef>
+#include <cstdint>
+#include <deque>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace crate::vdj {
@@ -48,6 +57,11 @@ public:
     virtual void add(const std::string& id, const std::string& name) = 0;
 };
 
+struct QueuedSong {
+    std::string source;
+    std::string title;
+};
+
 class HostPort {
 public:
     virtual ~HostPort() = default;
@@ -55,6 +69,11 @@ public:
     virtual std::optional<std::string> loaded_track_path() = 0;
     virtual bool send_command(const std::string& command) = 0;
     virtual bool open_url(const std::string& url) = 0;
+    virtual int deck_count() = 0;
+    virtual std::optional<DeckReading> read_deck(int deck) = 0;
+    virtual bool automix_active() = 0;
+    virtual std::string browsed_folder_path() = 0;
+    virtual std::vector<QueuedSong> automix_queue(int count) = 0;
 };
 
 class ConnectionUi {
@@ -81,13 +100,18 @@ struct OnlineSourceDependencies {
     ConnectionSettingsStore& settings;
     ConnectionSession::CredentialFactory credentials;
     std::string metadata_cache_path;
+    std::filesystem::path play_events_path;
     HostPort& host;
     ConnectionUi& ui;
     std::function<void(const std::string&)> log;
+    bool run_automix_worker = true;
 };
 
 inline constexpr std::string_view kCurrentCompatibleFolderId = "crate:compatible:current";
 inline constexpr std::string_view kCompatibleFolderPrefix = "crate:compatible:";
+inline constexpr std::string_view kAutomixFolderId = "crate:automix:queue";
+inline constexpr std::string_view kAutomixFolderName = "Crate Automix";
+inline constexpr std::string_view kAutomixFolderPath = "onlinemusic:/Crate/Crate Automix";
 inline constexpr std::string_view kNoticePrefix = "crate:notice:";
 inline constexpr std::string_view kNoProfileNoticeId = "crate:notice:no-profile";
 
@@ -118,10 +142,12 @@ public:
     CallbackStatus folder(const std::string& folder_id, TrackSink& sink);
     std::vector<std::string_view> context_menu(const std::string& unique_id);
     CallbackStatus select_context_menu(const std::string& unique_id, std::size_t index);
+    void tick(std::chrono::system_clock::time_point now);
 
 private:
     struct ServerClients;
     struct TrackFacts {
+        std::string title;
         std::string artist;
         std::string album;
         int album_id = 0;
@@ -142,6 +168,20 @@ private:
     CallbackStatus compatible_folder(const std::string& seed_uid, TrackSink& sink);
     std::optional<std::string> current_crate_track_uid();
     void log(const std::string& message) const;
+    void flush_plays(std::chrono::system_clock::time_point now);
+    void run_worker();
+    void feed_automix(
+        const std::vector<std::optional<DeckReading>>& decks,
+        std::chrono::system_clock::time_point now
+    );
+    std::optional<SearchTrack> choose_automix_track(const std::string& anchor);
+    void continue_automix_addition(std::chrono::system_clock::time_point now);
+    void enqueue_automix_addition();
+    bool browser_busy(std::chrono::system_clock::time_point now) const;
+    void mark_browser_activity();
+    bool ignoring_browser_activity() const;
+    CallbackStatus automix_folder(TrackSink& sink);
+    std::optional<std::string> uid_for_title(const std::string& title);
 
     HostPort& host_;
     ConnectionUi& ui_;
@@ -158,6 +198,39 @@ private:
     std::mutex facts_mutex_;
     std::unordered_map<std::string, TrackFacts> track_facts_;
     ConnectionWorker connection_;
+    PlayTracker tracker_;
+    PlayEventSpool spool_;
+    struct AutomixState {
+        std::string seed;
+        std::vector<std::string> planned;
+        std::unordered_set<std::string> played;
+        std::deque<std::string> recent;
+        bool replan = false;
+        std::string expected_next_title;
+        std::chrono::system_clock::time_point next_action_at{};
+    };
+    struct AutomixAddition {
+        std::string uid;
+        bool next = false;
+        std::string previous_folder;
+        std::chrono::system_clock::time_point chosen_at{};
+        std::chrono::system_clock::time_point navigated_at{};
+        bool navigated = false;
+    };
+    AutomixState automix_;
+    std::optional<AutomixAddition> automix_addition_;
+    std::mutex automix_listing_mutex_;
+    std::vector<SearchTrack> automix_listing_;
+    std::atomic<bool> automix_listed_ = false;
+    std::atomic<bool> browser_searching_ = false;
+    std::atomic<std::int64_t> last_browser_activity_ms_ = 0;
+    std::atomic<std::int64_t> ignore_browser_activity_until_ms_ = 0;
+    std::chrono::system_clock::time_point last_flush_attempt_{};
+    bool run_worker_;
+    std::mutex worker_mutex_;
+    std::condition_variable worker_wakeup_;
+    bool worker_stopping_ = false;
+    std::thread worker_;
 };
 
 } // namespace crate::vdj

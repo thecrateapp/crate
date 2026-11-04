@@ -85,6 +85,52 @@ builds and installs `Crate.bundle` and opens VirtualDJ trusting the mkcert
 development CA through `CRATE_VDJ_CA_BUNDLE`. The current steps live in §6 of
 the [implementation plan](../../docs/technical/smart-mix-implementation-plan.md).
 
+## Packages
+
+`make vdj-package VIRTUALDJ_SDK_ROOT=<sdk> VDJ_ARCH=arm64|x86_64` builds
+`Crate.bundle` in Release for macOS 12 or later, checks its exports,
+architecture, metadata and that it links only system libraries, signs it
+ad-hoc and writes `Crate-VirtualDJ-macos-<arch>-<version>.zip`, its `.sha256`
+and `manifest-macos-<arch>.json` to `dist/vdj/`.
+
+The `VirtualDJ Plugin Packages` workflow builds macOS arm64, macOS x86_64 and
+Windows x64 packages on pull requests that touch packaging and on demand,
+taking the SDK headers from the `VIRTUALDJ_SDK_ZIP_B64` secret and checking
+them against pinned hashes. The Windows `Crate.dll` links curl, SQLite and the
+C runtime statically, because VirtualDJ does not look for dependent DLLs next
+to the plugin. Pushing a `crate-vdj-v<version>` tag that matches the plugin
+version publishes the three packages as a prerelease that never becomes the
+latest Crate release.
+
+None of the packages is notarized or Authenticode-signed; they are meant for
+internal testing. `virtualdj_tested` in each manifest lists the VirtualDJ
+versions verified in the host.
+
+### Install on macOS
+
+With VirtualDJ closed (`PluginsMacArm` on Apple silicon, `Plugins64` on Intel):
+
+```sh
+shasum -a 256 -c Crate-VirtualDJ-macos-arm64-<version>.zip.sha256
+dest="$HOME/Library/Application Support/VirtualDJ/PluginsMacArm/OnlineSources"
+mkdir -p "$dest"
+rm -rf "$dest/Crate.bundle"
+ditto -x -k Crate-VirtualDJ-macos-arm64-<version>.zip "$dest"
+xattr -dr com.apple.quarantine "$dest/Crate.bundle"
+```
+
+### Install on Windows
+
+With VirtualDJ closed, extract `Crate.dll` into `Plugins64\OnlineSources`
+inside the VirtualDJ home folder (`%LOCALAPPDATA%\VirtualDJ` by default, or
+`Documents\VirtualDJ` on older installs).
+
+### Connect
+
+Create a token in Listen (Settings, Access tokens), open VirtualDJ, enable the
+Crate source under Online Sources and connect with the server URL and the
+token. The token is stored in the Keychain or the Windows Credential Manager.
+
 ## Metadata cache
 
 Search results and catalog pages use a local SQLite cache. Entries are scoped

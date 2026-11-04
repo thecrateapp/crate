@@ -18,6 +18,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <vector>
 
 #ifndef E_FAIL
 #define E_FAIL ((HRESULT)0x80004005L)
@@ -209,6 +210,85 @@ public:
         return open_in_browser(url);
     }
 
+    int deck_count() override
+    {
+        double decks = 0;
+        if (plugin_.cb == nullptr || plugin_.GetInfo("get_decks", &decks) != S_OK) {
+            return 0;
+        }
+        return static_cast<int>(decks);
+    }
+
+    std::string browsed_folder_path() override
+    {
+        std::array<char, 2048> path = {};
+        if (plugin_.cb == nullptr ||
+            plugin_.GetStringInfo("get_browsed_folder_path", path.data(), static_cast<int>(path.size())) !=
+                S_OK) {
+            return {};
+        }
+        return path.data();
+    }
+
+    bool automix_active() override
+    {
+        double active = 0;
+        return plugin_.cb != nullptr && plugin_.GetInfo("automix", &active) == S_OK && active != 0;
+    }
+
+    std::vector<QueuedSong> automix_queue(int count) override
+    {
+        std::vector<QueuedSong> queue;
+        if (plugin_.cb == nullptr) {
+            return queue;
+        }
+        for (int index = 1; index <= count; ++index) {
+            const std::string position = " " + std::to_string(index);
+            std::array<char, 4096> source = {};
+            if (plugin_.GetStringInfo(
+                    ("get_automix_song filepath" + position).c_str(),
+                    source.data(),
+                    static_cast<int>(source.size())
+                ) != S_OK ||
+                source[0] == '\0') {
+                break;
+            }
+            std::array<char, 1024> title = {};
+            plugin_.GetStringInfo(
+                ("get_automix_song title" + position).c_str(),
+                title.data(),
+                static_cast<int>(title.size())
+            );
+            queue.push_back(QueuedSong{source.data(), title.data()});
+        }
+        return queue;
+    }
+
+    std::optional<DeckReading> read_deck(int deck) override
+    {
+        if (plugin_.cb == nullptr) {
+            return std::nullopt;
+        }
+        const std::string prefix = "deck " + std::to_string(deck) + " ";
+        std::array<char, 4096> filepath = {};
+        if (plugin_.GetStringInfo(
+                (prefix + "get_filepath").c_str(),
+                filepath.data(),
+                static_cast<int>(filepath.size())
+            ) != S_OK ||
+            filepath[0] == '\0') {
+            return std::nullopt;
+        }
+        DeckReading reading;
+        reading.filepath = filepath.data();
+        double audible = 0;
+        reading.audible =
+            plugin_.GetInfo((prefix + "is_audible").c_str(), &audible) == S_OK && audible != 0;
+        plugin_.GetInfo((prefix + "get_time elapsed").c_str(), &reading.elapsed_ms);
+        plugin_.GetInfo((prefix + "get_time total").c_str(), &reading.total_ms);
+        return reading;
+    }
+
 private:
     IVdjPlugin8& plugin_;
 };
@@ -239,6 +319,7 @@ public:
                       return std::make_unique<SystemCredentialStore>(std::string(kCredentialService), account);
                   },
               .metadata_cache_path = utf8_path(default_metadata_cache_path()),
+              .play_events_path = default_play_events_path(),
               .host = host_,
               .ui = ui_,
               .log = trace,

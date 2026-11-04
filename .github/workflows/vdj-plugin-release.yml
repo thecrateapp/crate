@@ -1,0 +1,140 @@
+name: VirtualDJ Plugin Packages
+
+on:
+  push:
+    tags: ["crate-vdj-v*"]
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "tools/vdj-plugin/packaging/**"
+      - "tools/vdj-plugin/CMakeLists.txt"
+      - ".github/actions/virtualdj-sdk/**"
+      - ".github/workflows/vdj-plugin-release.yml"
+  workflow_dispatch:
+
+jobs:
+  macos:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x86_64]
+    name: macos (${{ matrix.arch }})
+    steps:
+      - uses: actions/checkout@v6
+
+      - id: sdk
+        uses: ./.github/actions/virtualdj-sdk
+        with:
+          sdk-zip-base64: ${{ secrets.VIRTUALDJ_SDK_ZIP_B64 }}
+
+      - name: Build and package
+        run: >-
+          make vdj-package
+          VIRTUALDJ_SDK_ROOT="${{ steps.sdk.outputs.root }}"
+          VDJ_ARCH=${{ matrix.arch }}
+          ${{ matrix.arch == 'x86_64' && 'VDJ_TESTED_VERSION=' || '' }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vdj-macos-${{ matrix.arch }}
+          path: dist/vdj/
+          if-no-files-found: error
+
+  windows:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - id: sdk
+        uses: ./.github/actions/virtualdj-sdk
+        with:
+          sdk-zip-base64: ${{ secrets.VIRTUALDJ_SDK_ZIP_B64 }}
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.LOCALAPPDATA }}\vcpkg\archives
+          key: vcpkg-x64-windows-static-curl-sqlite3-${{ runner.os }}-v1
+
+      - name: Install static dependencies
+        run: vcpkg install curl sqlite3 --triplet x64-windows-static
+
+      - name: Build
+        run: |
+          cmake -S tools/vdj-plugin -B build/vdj-windows `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows-static `
+            -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded `
+            -DCRATE_VDJ_BUILD_REAL_PLUGIN=ON `
+            -DVirtualDJSDK_ROOT="${{ steps.sdk.outputs.root }}"
+          cmake --build build/vdj-windows --config Release --target crate_vdj_online_source_plugin --parallel
+
+      - name: Put dumpbin on PATH
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $dumpbin = & $vswhere -latest -products * -find "VC\Tools\MSVC\**\bin\Hostx64\x64\dumpbin.exe" | Select-Object -First 1
+          if (-not $dumpbin) { throw "dumpbin.exe not found" }
+          Split-Path $dumpbin | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Packaging tests on Windows
+        working-directory: tools/vdj-plugin/packaging
+        run: |
+          python -m pip install pytest
+          python -m pytest tests -q
+
+      - name: Package
+        run: >-
+          python tools/vdj-plugin/packaging/package_windows.py
+          build/vdj-windows/Release/Crate.dll dist/vdj
+          --version-header build/vdj-windows/generated/crate_vdj/version.hpp
+          --contract-header tools/vdj-plugin/include/crate_vdj/contract_negotiator.hpp
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vdj-windows-x64
+          path: dist/vdj/
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/crate-vdj-v')
+    needs: [macos, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: vdj-*
+          path: dist
+          merge-multiple: true
+
+      - name: Check the tag matches the plugin version
+        run: |
+          expected="${GITHUB_REF_NAME#crate-vdj-v}"
+          for manifest in dist/manifest-*.json; do
+            version="$(jq -r .version "$manifest")"
+            if [ "$version" != "$expected" ]; then
+              echo "::error::$manifest is version $version, the tag says $expected"
+              exit 1
+            fi
+          done
+          (cd dist && sha256sum -c ./*.sha256)
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          name: Crate for VirtualDJ ${{ github.ref_name }}
+          prerelease: true
+          make_latest: false
+          files: dist/*
+          body: |
+            Crate Online Source for VirtualDJ Pro. Internal testing build.
+
+            - macOS packages are signed ad-hoc and not notarized: remove the quarantine attribute after installing (see `tools/vdj-plugin/README.md`).
+            - The macOS Intel and Windows x64 packages have not been verified in VirtualDJ yet; `virtualdj_tested` in each manifest lists the versions that have.
+            - Each archive has a `.sha256` and a `manifest-<platform>.json` with the Crate contracts it supports and its install path.

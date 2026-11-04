@@ -64,6 +64,7 @@ add_library(crate_vdj_core STATIC
     src/online_source/vdj_track_path.cpp
     src/online_source/online_source.cpp
     src/core/request_coordinator.cpp
+    src/automix/play_events.cpp
     src/mapping/compatible_tracks.cpp
     src/client/stream_resolver.cpp
     src/mapping/mix_profile.cpp
@@ -391,6 +392,12 @@ if(CRATE_VDJ_BUILD_TESTS)
         NAME crate_vdj_online_source_test
         COMMAND crate_vdj_online_source_test
     )
+
+    add_executable(crate_vdj_play_events_test
+        tests/automix/play_events_test.cpp
+    )
+    target_link_libraries(crate_vdj_play_events_test PRIVATE crate_vdj_core)
+    add_test(NAME crate_vdj_play_events_test COMMAND crate_vdj_play_events_test)
 
     add_executable(crate_vdj_cache_migration_test
         tests/cache/cache_migration_test.cpp
