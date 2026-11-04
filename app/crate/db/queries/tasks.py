@@ -106,6 +106,23 @@ def count_pending_tasks_in_pool(pool: str) -> int:
         )
 
 
+def find_latest_task_by_dedup_key(task_type: str, dedup_key: str) -> dict | None:
+    """The most recent task of a type with this dedup key, in any status."""
+    with read_scope() as session:
+        row = (
+            session.execute(
+                text(
+                    "SELECT id, status FROM tasks WHERE type = :type AND dedup_key = :key "
+                    "ORDER BY created_at DESC LIMIT 1"
+                ),
+                {"type": task_type, "key": dedup_key},
+            )
+            .mappings()
+            .first()
+        )
+    return {"id": str(row["id"]), "status": str(row["status"])} if row else None
+
+
 def get_task(task_id: str) -> dict | None:
     with read_scope() as session:
         row = (

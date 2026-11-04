@@ -54,11 +54,8 @@ from crate.db.queries.genres_library_detail import get_genre_upcoming_shows
 from crate.db.cache_store import get_volatile_cache, set_volatile_cache
 from crate.db.queries.tasks import list_tasks
 from crate.db.repositories.auth import get_user_by_id
-from crate.db.repositories.tasks import (
-    create_task,
-    create_task_dedup,
-    find_active_task_by_type_params,
-)
+from crate.api.ai_tasks import queue_ai_task
+from crate.db.repositories.tasks import create_task
 from crate.db.queries.sound_intelligence import get_sound_intelligence_health
 from crate.db.repositories.genres_taxonomy_edges import (
     VALID_RELATION_TYPES,
@@ -679,19 +676,7 @@ def infer_taxonomy_node_proposal(
         "actor_user_id": actor.get("id"),
         "ai_acceptance": acceptance,
     }
-    task_id = create_task_dedup(
-        "propose_genre_taxonomy_node", params, dedup_key=dedup_key
-    )
-    if task_id is not None:
-        return {"task_id": task_id, "status": "queued", "deduplicated": False}
-    active = find_active_task_by_type_params(
-        "propose_genre_taxonomy_node", dedup_key=dedup_key
-    )
-    if active is None:
-        raise HTTPException(
-            status_code=409, detail="A proposal for this genre just finished"
-        )
-    return {"task_id": active, "status": "queued", "deduplicated": True}
+    return queue_ai_task("propose_genre_taxonomy_node", params, dedup_key=dedup_key)
 
 
 @router.post(
@@ -1185,12 +1170,4 @@ def generate_genre_eq(
         "actor_user_id": actor.get("id"),
         "ai_acceptance": acceptance,
     }
-    task_id = create_task_dedup("propose_genre_eq", params, dedup_key=dedup_key)
-    if task_id is not None:
-        return {"task_id": task_id, "status": "queued", "deduplicated": False}
-    active = find_active_task_by_type_params("propose_genre_eq", dedup_key=dedup_key)
-    if active is None:
-        raise HTTPException(
-            status_code=409, detail="An EQ proposal for this genre just finished"
-        )
-    return {"task_id": active, "status": "queued", "deduplicated": True}
+    return queue_ai_task("propose_genre_eq", params, dedup_key=dedup_key)

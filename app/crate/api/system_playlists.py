@@ -61,11 +61,8 @@ from crate.db.repositories.playlists_generation_state import (
 )
 from crate.playlist_blueprints import blueprint_curation_key, find_playlist_blueprint
 from crate.playlist_rule_contract import validate_smart_rules
-from crate.db.repositories.tasks import (
-    create_task,
-    create_task_dedup,
-    find_active_task_by_type_params,
-)
+from crate.api.ai_tasks import queue_ai_task
+from crate.db.repositories.tasks import create_task
 
 router = APIRouter(prefix="/api/admin/system-playlists", tags=["admin"])
 
@@ -818,19 +815,7 @@ def admin_generate_playlist_description(
         "actor_user_id": actor.get("id"),
         "ai_acceptance": acceptance,
     }
-    task_id = create_task_dedup(
-        "generate_playlist_description", params, dedup_key=dedup_key
-    )
-    if task_id is not None:
-        return {"task_id": task_id, "status": "queued", "deduplicated": False}
-    active = find_active_task_by_type_params(
-        "generate_playlist_description", dedup_key=dedup_key
-    )
-    if active is None:
-        raise HTTPException(
-            status_code=409, detail="A description for this playlist just finished"
-        )
-    return {"task_id": active, "status": "queued", "deduplicated": True}
+    return queue_ai_task("generate_playlist_description", params, dedup_key=dedup_key)
 
 
 @router.post(
