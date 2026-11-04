@@ -169,6 +169,7 @@ def _structure_payload(track_id: int, profile: TrackMixProfile) -> dict:
         "profileVersion": profile.profile_version,
         "durationMs": profile.duration_ms,
         "structureConfidence": profile.structure_confidence,
+        "vocalDetector": profile.vocal_detector,
         "phrases": None
         if phrases is None
         else [

@@ -52,6 +52,7 @@ const structure: SmartMixTrackStructureData = {
   ],
   energyCurve: [0, 51, 102, 153, 204, 255],
   barStartsMs: [500, 2_500, 4_500, 6_500, 8_500, 10_500],
+  vocalDetector: null,
 };
 
 describe("SmartMixStructure", () => {
@@ -92,6 +93,43 @@ describe("SmartMixStructure", () => {
     );
     expect(lane).toHaveAttribute("vector-effect", "non-scaling-stroke");
     expect(screen.getByText("Confidence 82%")).toBeInTheDocument();
+  });
+
+  it("renders the voice lane per phrase", () => {
+    const voiced: SmartMixTrackStructureData = {
+      ...structure,
+      vocalDetector: "yamnet-1",
+      phrases: (structure.phrases ?? []).map((phrase, index) => ({
+        ...phrase,
+        vocalPresence: [255, 0, 51][index] ?? null,
+      })),
+    };
+    const { container } = render(<SmartMixStructure structure={voiced} />);
+
+    const lane = [
+      ...container.querySelectorAll('[data-slot="voice-lane"] > span'),
+    ] as HTMLElement[];
+    expect(lane.map((segment) => segment.style.opacity)).toEqual([
+      "1",
+      "0",
+      "0.2",
+    ]);
+    expect(lane[1]).toHaveStyle({ left: "16.5%", width: "32%" });
+    expect(screen.getByText("Voice · yamnet-1")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("list", { name: "Phrases" })).getAllByRole(
+        "listitem",
+      )[0],
+    ).toHaveAccessibleName(
+      "Intro, 8 bars, 0:00.5 to 0:16.5, energy 40%, voice 100%",
+    );
+  });
+
+  it("draws no voice lane without a voice detector", () => {
+    const { container } = render(<SmartMixStructure structure={structure} />);
+
+    expect(container.querySelector('[data-slot="voice-lane"]')).toBeNull();
+    expect(screen.queryByText(/^Voice ·/)).toBeNull();
   });
 
   it("tells a profile without structure from one that could not be segmented", () => {

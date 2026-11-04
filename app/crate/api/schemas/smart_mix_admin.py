@@ -147,6 +147,8 @@ class SmartMixTrackStructureResponse(SmartMixAdminModel):
     profile_version: int = Field(alias="profileVersion", ge=1)
     duration_ms: int = Field(alias="durationMs", ge=0)
     structure_confidence: float | None = Field(alias="structureConfidence")
+    # Model that computed the per-phrase voice (SM3-D13); null when there is none.
+    vocal_detector: str | None = Field(default=None, alias="vocalDetector")
     phrases: list[SmartMixPhraseItem] | None
     energy_curve: list[int] | None = Field(alias="energyCurve")
     bar_starts_ms: list[int] | None = Field(alias="barStartsMs")

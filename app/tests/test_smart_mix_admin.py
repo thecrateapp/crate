@@ -819,6 +819,7 @@ def test_track_structure_serves_phrases_energy_and_bars(pg_db, test_app) -> None
     assert body["analyzerVersion"] == ANALYZER_VERSION
     assert body["durationMs"] == 60_000
     assert body["structureConfidence"] == 0.75
+    assert body["vocalDetector"] == "yamnet-1"
     assert body["phrases"] == [
         {
             "startBeat": 0,
@@ -880,6 +881,7 @@ def test_track_structure_tells_unanalyzed_from_unsegmented(pg_db, test_app) -> N
     assert before["analyzerVersion"] == "smart-mix-audio-v6"
     assert after["phrases"] == []
     assert after["structureConfidence"] == 0.0
+    assert (before["vocalDetector"], after["vocalDetector"]) == (None, None)
     assert len(after["energyCurve"]) == len(after["barStartsMs"]) == 25
 
 
