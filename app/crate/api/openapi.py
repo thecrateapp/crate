@@ -198,6 +198,11 @@ _TAG_METADATA = [
         "description": "First-run setup and bootstrap helpers.",
     },
     {
+        "name": "errors",
+        "x-displayName": "Error Inbox",
+        "description": "Application errors synced from Sentry, their status and the connection. Reads PostgreSQL only.",
+    },
+    {
         "name": "agents",
         "x-displayName": "Agent Integrations",
         "description": "Human administration of service and delegated access, activity and exact plan decisions.",
@@ -259,6 +264,7 @@ _TAG_GROUPS = [
             "setup",
             "admin",
             "agents",
+            "errors",
         ],
     },
     {"name": "Compatibility", "tags": ["subsonic"]},

@@ -71,7 +71,9 @@ def test_distribution_contains_every_tool_schema_and_no_private_configuration():
 
     artifact = export_contract()
     definitions = {row["name"]: row for row in artifact["tools"]}
-    assert len(definitions) == 74
+    assert len(definitions) == 77
+    assert len(artifact["scopes"]) == 33
+    assert definitions["get_error_issue"]["base_grant"] == "ops.errors.read"
     assert definitions["search_tidal_missing_artist"]["read_only"] is False
     assert definitions["preview_tidal_artist_acquisition"]["read_only"] is False
     assert definitions["apply_tidal_artist_acquisition"]["read_only"] is False

@@ -4,6 +4,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, RootModel
 
+from crate.api.schemas.error_inbox import ErrorSummary
+
 Availability = Literal["available", "empty", "stale", "partial", "unavailable"]
 
 
@@ -74,6 +76,7 @@ class MetricsDashboardResponse(BaseModel):
     timeseries: dict[str, list[dict[str, Any]]]
     timeseries_status: dict[str, dict[str, Any]] = Field(default_factory=dict)
     route_latency_status: dict[str, Any] = Field(default_factory=dict)
+    errors: ErrorSummary | None = None
 
 
 class MetricsRoutesResponse(BaseModel):

@@ -103,6 +103,15 @@ _LIMITS = {
         "refresh": False,
     },
     "get_stack_status": {"live_probe": False, "stored_evidence_only": True},
+    "get_error_summary": {
+        "top_critical": 3,
+        "titles": False,
+        "event_text": False,
+        "fresh_seconds": 900,
+        "sentry_calls": False,
+    },
+    "list_error_issues": {"page_size": 100, "sentry_calls": False},
+    "get_error_issue": {"issues": 1, "triages": 3, "sentry_calls": False},
     "search_shows": {"rows": 50, "offset": 10000},
     "preview_shows_import": {
         "shows": 50,

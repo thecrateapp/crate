@@ -1827,6 +1827,43 @@ def test_openapi_exposes_typed_authenticated_product_kpis(test_app):
     )
 
 
+def test_openapi_types_error_inbox_routes_and_marks_them_authenticated(test_app):
+    schema = test_app.get("/openapi.json").json()
+    expected = {
+        ("/api/admin/errors", "get"): ("200", "ErrorIssueList"),
+        ("/api/admin/errors/summary", "get"): ("200", "ErrorSummary"),
+        ("/api/admin/errors/{issue_id}", "get"): ("200", "ErrorIssueDetail"),
+        ("/api/admin/errors/{issue_id}/status", "post"): (
+            "202",
+            "TaskEnqueueResponse",
+        ),
+        ("/api/admin/errors/connection", "get"): ("200", "ErrorTrackingConnection"),
+        ("/api/admin/errors/connection", "put"): ("200", "ErrorTrackingConnection"),
+        ("/api/admin/errors/connection/test", "post"): ("202", "TaskEnqueueResponse"),
+    }
+    for (path, method), (status, model) in expected.items():
+        operation = schema["paths"][path][method]
+        assert operation["tags"] == ["errors"]
+        assert operation["security"] == [{"cookieAuth": []}, {"bearerAuth": []}]
+        assert (
+            operation["responses"][status]["content"]["application/json"]["schema"][
+                "$ref"
+            ]
+            == f"#/components/schemas/{model}"
+        )
+    put = schema["components"]["schemas"]["ErrorTrackingConnectionUpdate"]
+    assert put["properties"]["token"]["writeOnly"] is True
+    assert (
+        "token"
+        not in schema["components"]["schemas"]["ErrorTrackingConnection"]["properties"]
+    )
+    dashboard = schema["components"]["schemas"]["MetricsDashboardResponse"]
+    assert "errors" in dashboard["properties"]
+    admin = test_app.get("/openapi-admin-system.json").json()
+    assert "errors" in {tag["name"] for tag in admin["tags"]}
+    assert "/api/admin/errors/summary" in admin["paths"]
+
+
 def test_openapi_native_confirmation_uses_independent_hmac_security(test_app):
     data = test_app.get("/openapi.json").json()
     native = data["paths"]["/api/internal/agent-telegram/events"]["post"]

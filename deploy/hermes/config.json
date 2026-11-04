@@ -70,7 +70,10 @@
           "get_observability_summary",
           "get_playback_quality",
           "get_product_kpis",
-          "get_stack_status"
+          "get_stack_status",
+          "get_error_summary",
+          "list_error_issues",
+          "get_error_issue"
         ],
         "prompts": false,
         "resources": false

@@ -158,6 +158,7 @@ def test_crate_agent_preset_matches_the_documented_read_only_grants():
         "ops.audit.read",
         "ops.schedules.read",
         "ops.runtime.read",
+        "ops.errors.read",
     }
     principal = _principal(frozenset(preset.scopes))
     exposed = {name for name in CATALOG | ACTION_CATALOG if _allowed(principal, name)}
