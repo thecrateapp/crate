@@ -324,6 +324,11 @@ it("draws the stored phrase structure in the track profile for analysis managers
     undefined,
   );
   await user.click(screen.getByRole("button", { name: "Show audio profile" }));
+  // The structure is read when its tab opens, not with the dialog.
+  expect(
+    mockApi.mock.calls.some(([url]) => String(url).endsWith("/structure")),
+  ).toBe(false);
+  await user.click(screen.getByRole("tab", { name: "Phrases" }));
 
   const phrases = await screen.findByRole("list", { name: "Phrases" });
   expect(phrases).toHaveTextContent("body · 16");

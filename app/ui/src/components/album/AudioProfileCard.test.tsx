@@ -1,5 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
-import { beforeEach, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AudioProfileCard } from "./AudioProfileCard";
 import type { AudioAnalysisTrack } from "./audio-analysis";
 vi.mock("@nivo/radar", () => ({ ResponsiveRadar: () => null }));
@@ -94,7 +95,7 @@ it("provides an explicit empty state when no analysis was returned", () => {
   ).toBeInTheDocument();
 });
 
-it("groups track dialog cues separately from profile provenance and retains the measured values", () => {
+it("groups track dialog cues separately from profile provenance and retains the measured values", async () => {
   render(
     <AudioProfileCard
       totalTracks={1}
@@ -135,6 +136,7 @@ it("groups track dialog cues separately from profile provenance and retains the 
   );
   const sound = screen.getByRole("region", { name: "Sound profile" });
   expect(within(sound).getByText("Energy")).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("tab", { name: "Smart Mix" }));
   const mix = screen
     .getByRole("heading", { name: "Smart Mix" })
     .closest("section")!;
@@ -163,6 +165,7 @@ it("groups track dialog cues separately from profile provenance and retains the 
     screen.getByRole("region", { name: "Audio analysis" }),
   ).not.toHaveClass("border-t");
   expect(within(mix).queryByText("Profile revision")).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("tab", { name: "Provenance" }));
   const provenance = screen.getByRole("region", {
     name: "Analysis provenance",
   });
@@ -205,31 +208,94 @@ it("retains the existing album loudness summary and provenance by default", () =
   ).not.toBeInTheDocument();
 });
 
-it("gives the phrase structure the dialog's full width, outside the Smart Mix column", () => {
-  render(
+const dialogTrack = {
+  track: {
+    ...empty,
+    tempo: 120,
+    energy: 0.7,
+    smart_mix: { quality: "full", analyzer_version: "test-analyzer" },
+  },
+};
+
+function renderDialog(structure = true) {
+  return render(
     <AudioProfileCard
       totalTracks={1}
       presentation="track-dialog"
-      analysisData={{
-        track: {
-          ...empty,
-          tempo: 120,
-          smart_mix: { quality: "full", analyzer_version: "test-analyzer" },
-        },
-      }}
-      smartMixStructure={<div data-testid="phrase-structure" />}
+      analysisData={dialogTrack}
+      smartMixStructure={
+        structure ? <div data-testid="phrase-structure" /> : undefined
+      }
     />,
   );
+}
 
-  const structure = screen.getByTestId("phrase-structure");
-  const mix = screen
-    .getByRole("heading", { name: "Smart Mix" })
-    .closest("section")!;
-  expect(mix).not.toContainElement(structure);
-  const slot = structure.closest('[data-slot="smart-mix-structure"]')!;
-  expect(slot.parentElement).toHaveAttribute(
-    "data-audio-profile-layout",
-    "track-dialog",
-  );
-  expect(slot).toHaveClass("lg:col-span-2");
+describe("track dialog tabs", () => {
+  beforeEach(() => window.sessionStorage.clear());
+
+  it("keeps the key readings above tabs that open on Sound", () => {
+    renderDialog();
+
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Sound",
+      "Smart Mix",
+      "Phrases",
+      "Provenance",
+    ]);
+    expect(screen.getByRole("tab", { name: "Sound" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByText("Tempo")).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Sound profile" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("phrase-structure")).not.toBeInTheDocument();
+  });
+
+  it("shows the phrase structure in its own tab at full width", async () => {
+    renderDialog();
+
+    await userEvent.click(screen.getByRole("tab", { name: "Phrases" }));
+
+    const structure = screen.getByTestId("phrase-structure");
+    expect(screen.getByRole("tabpanel")).toContainElement(structure);
+    expect(
+      screen.queryByRole("heading", { name: "Smart Mix" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("leaves Phrases out without a structure", () => {
+    renderDialog(false);
+
+    expect(
+      screen.queryByRole("tab", { name: "Phrases" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens on the last tab chosen in this session", async () => {
+    const first = renderDialog();
+    await userEvent.click(screen.getByRole("tab", { name: "Phrases" }));
+    first.unmount();
+
+    renderDialog();
+
+    expect(screen.getByRole("tab", { name: "Phrases" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("falls back to Sound when the remembered tab is not offered", async () => {
+    const first = renderDialog();
+    await userEvent.click(screen.getByRole("tab", { name: "Phrases" }));
+    first.unmount();
+
+    renderDialog(false);
+
+    expect(screen.getByRole("tab", { name: "Sound" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
 });

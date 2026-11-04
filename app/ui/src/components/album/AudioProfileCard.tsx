@@ -1,10 +1,16 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { ResponsiveRadar } from "@nivo/radar";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { Meter } from "@crate/ui/primitives/Meter";
 import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@crate/ui/shadcn/tabs";
 import type { AudioAnalysisTrack, SmartMixAnalysis } from "./audio-analysis";
 
 const FEATURES = [
@@ -224,6 +230,26 @@ function MixDetails({
   );
 }
 
+// The last tab chosen in the track dialog, for this browser session: reviewing many
+// tracks in a row reopens each dialog where the previous one was left.
+const TAB_STORAGE_KEY = "crate.audio-profile.tab";
+
+function rememberedTab(): string | null {
+  try {
+    return window.sessionStorage.getItem(TAB_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function rememberTab(value: string) {
+  try {
+    window.sessionStorage.setItem(TAB_STORAGE_KEY, value);
+  } catch {
+    // Storage can be unavailable (private mode); the tab then resets.
+  }
+}
+
 export function AudioProfileCard({
   analysisData,
   totalTracks,
@@ -237,6 +263,7 @@ export function AudioProfileCard({
   smartMixStructure?: ReactNode;
 }) {
   const motionAllowed = useMotionAllowed();
+  const [chosenTab, setChosenTab] = useState(rememberedTab);
   const tracks = Object.values(analysisData);
   const total = totalTracks ?? tracks.length;
   const analyzed = tracks.filter(
@@ -378,6 +405,196 @@ export function AudioProfileCard({
       ) : null}
     </>
   );
+  // The track dialog groups sections in tabs; the album card keeps them ruled.
+  const sectionClass = detailed
+    ? "space-y-4"
+    : "space-y-4 border-t border-border-quiet pt-5";
+  const smartMixSection = (
+    <section className={sectionClass}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <MonoLabel as="h3" tone="accent">
+          Smart Mix
+        </MonoLabel>
+        <InfoBadge>
+          {profiles.length} / {total} profiles
+        </InfoBadge>
+      </div>
+      {!detailed ? profileBadges : null}
+      <dl
+        className={
+          detailed
+            ? "grid min-w-0 gap-4 sm:grid-cols-2"
+            : "grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        }
+      >
+        <Reading
+          label={
+            single ? "Integrated loudness" : "Mean track integrated loudness"
+          }
+        >
+          {number(
+            mean(profiles.map((profile) => profile.integrated_lufs)),
+            1,
+            " LUFS",
+          )}
+        </Reading>
+        <Reading label={single ? "True peak" : "Highest track true peak"}>
+          {number(
+            finite(profiles.map((profile) => profile.true_peak_dbfs)).length
+              ? Math.max(
+                  ...finite(profiles.map((profile) => profile.true_peak_dbfs)),
+                )
+              : null,
+            1,
+            " dBFS",
+          )}
+        </Reading>
+        {!detailed ? (
+          <Reading label="Track loudness range">
+            {range(
+              profiles.map((profile) => profile.integrated_lufs),
+              "LUFS",
+            )}
+          </Reading>
+        ) : null}
+      </dl>
+      {!single ? (
+        <p className="text-sm text-text-muted">
+          Loudness values summarize measured tracks; they are not an integrated
+          measurement of the album.
+        </p>
+      ) : null}
+      {single && profiles[0] ? (
+        <>
+          {detailed ? (
+            <MonoLabel as="h3" tone="accent">
+              Tempo and mix cues
+            </MonoLabel>
+          ) : null}
+          <MixDetails
+            profile={profiles[0]}
+            group={detailed ? "mixing" : "all"}
+          />
+        </>
+      ) : null}
+      {!profiles.length ? (
+        <p className="text-sm text-text-muted">
+          No Smart Mix profile is available.
+        </p>
+      ) : null}
+    </section>
+  );
+  const blissSection = (
+    <section className={sectionClass}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <MonoLabel as="h3" tone="accent">
+          Bliss similarity
+        </MonoLabel>
+        <InfoBadge>
+          {bliss.filter((entry) => entry.available).length} / {total} vectors
+          available
+        </InfoBadge>
+      </div>
+      <p className="text-sm text-text-muted">
+        Similarity embeddings support related tracks and radio. Vector contents
+        are not displayed.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {[
+          ...new Set(
+            bliss.flatMap((entry) =>
+              entry.available && entry.dimensions != null
+                ? [entry.dimensions]
+                : [],
+            ),
+          ),
+        ].map((dimension) => (
+          <InfoBadge key={dimension}>{dimension} dimensions</InfoBadge>
+        ))}
+      </div>
+      {single && bliss[0]?.available ? (
+        <dl className="grid gap-4 sm:grid-cols-2">
+          <Reading label="Embedding state">
+            {bliss[0]?.state || "Available"}
+          </Reading>
+          <Reading label="Profile vector reference">
+            {bliss[0].revision || "—"}
+          </Reading>
+          <Reading label="Computed">{timestamp(bliss[0].computed_at)}</Reading>
+          <Reading label="Model version">
+            {bliss[0].model_version || "—"}
+          </Reading>
+        </dl>
+      ) : null}
+    </section>
+  );
+  const tabs = detailed
+    ? [
+        {
+          value: "sound",
+          label: "Sound",
+          content: (
+            <InstrumentPanel
+              as="section"
+              headingLevel={3}
+              label={{ children: "Sound profile", tone: "accent" }}
+            >
+              <div className="space-y-5">
+                {features}
+                {!featureData.length ? (
+                  <p className="m-0 text-sm text-text-muted">
+                    No measured sound features are available.
+                  </p>
+                ) : null}
+              </div>
+            </InstrumentPanel>
+          ),
+        },
+        { value: "smart-mix", label: "Smart Mix", content: smartMixSection },
+        ...(profiles[0] && smartMixStructure
+          ? [
+              {
+                value: "phrases",
+                label: "Phrases",
+                content: (
+                  <div data-slot="smart-mix-structure" className="min-w-0">
+                    {smartMixStructure}
+                  </div>
+                ),
+              },
+            ]
+          : []),
+        {
+          value: "provenance",
+          label: "Provenance",
+          content: (
+            <div className="space-y-6">
+              {profiles[0] ? (
+                <InstrumentPanel
+                  as="section"
+                  headingLevel={3}
+                  label={{ children: "Analysis provenance", tone: "accent" }}
+                  description="Versions and source references for this measured profile."
+                >
+                  <div className="space-y-4">
+                    {profileBadges}
+                    <MixDetails profile={profiles[0]} group="provenance" />
+                  </div>
+                </InstrumentPanel>
+              ) : null}
+              {blissSection}
+            </div>
+          ),
+        },
+      ]
+    : [];
+  const offered = (value: string | null) =>
+    tabs.some((entry) => entry.value === value);
+  const tab = chosenTab && offered(chosenTab) ? chosenTab : "sound";
+  const chooseTab = (value: string) => {
+    setChosenTab(value);
+    rememberTab(value);
+  };
   return (
     <InstrumentPanel
       as="section"
@@ -436,179 +653,37 @@ export function AudioProfileCard({
               )}
             </Reading>
           </dl>
-          <div
-            className={
-              detailed
-                ? "grid min-w-0 gap-x-8 gap-y-6 lg:grid-cols-2"
-                : "space-y-6"
-            }
-            data-audio-profile-layout={detailed ? "track-dialog" : "album"}
-          >
-            {detailed ? (
-              <InstrumentPanel
-                as="section"
-                headingLevel={3}
-                label={{ children: "Sound profile", tone: "accent" }}
-              >
-                <div className="space-y-5">
-                  {features}
-                  {!featureData.length ? (
-                    <p className="m-0 text-sm text-text-muted">
-                      No measured sound features are available.
-                    </p>
-                  ) : null}
-                </div>
-              </InstrumentPanel>
-            ) : (
-              features
-            )}
-            <section className="space-y-4 border-t border-border-quiet pt-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <MonoLabel as="h3" tone="accent">
-                  Smart Mix
-                </MonoLabel>
-                <InfoBadge>
-                  {profiles.length} / {total} profiles
-                </InfoBadge>
-              </div>
-              {!detailed ? profileBadges : null}
-              <dl
-                className={
-                  detailed
-                    ? "grid min-w-0 gap-4 sm:grid-cols-2"
-                    : "grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-                }
-              >
-                <Reading
-                  label={
-                    single
-                      ? "Integrated loudness"
-                      : "Mean track integrated loudness"
-                  }
-                >
-                  {number(
-                    mean(profiles.map((profile) => profile.integrated_lufs)),
-                    1,
-                    " LUFS",
-                  )}
-                </Reading>
-                <Reading
-                  label={single ? "True peak" : "Highest track true peak"}
-                >
-                  {number(
-                    finite(profiles.map((profile) => profile.true_peak_dbfs))
-                      .length
-                      ? Math.max(
-                          ...finite(
-                            profiles.map((profile) => profile.true_peak_dbfs),
-                          ),
-                        )
-                      : null,
-                    1,
-                    " dBFS",
-                  )}
-                </Reading>
-                {!detailed ? (
-                  <Reading label="Track loudness range">
-                    {range(
-                      profiles.map((profile) => profile.integrated_lufs),
-                      "LUFS",
-                    )}
-                  </Reading>
-                ) : null}
-              </dl>
-              {!single ? (
-                <p className="text-sm text-text-muted">
-                  Loudness values summarize measured tracks; they are not an
-                  integrated measurement of the album.
-                </p>
-              ) : null}
-              {single && profiles[0] ? (
-                <>
-                  {detailed ? (
-                    <MonoLabel as="h3" tone="accent">
-                      Tempo and mix cues
-                    </MonoLabel>
-                  ) : null}
-                  <MixDetails
-                    profile={profiles[0]}
-                    group={detailed ? "mixing" : "all"}
-                  />
-                </>
-              ) : null}
-              {!profiles.length ? (
-                <p className="text-sm text-text-muted">
-                  No Smart Mix profile is available.
-                </p>
-              ) : null}
-            </section>
-            {detailed && single && profiles[0] && smartMixStructure ? (
-              // Phrases need the dialog's full width to stay readable.
-              <div
-                data-slot="smart-mix-structure"
-                className="min-w-0 border-t border-border-quiet pt-5 lg:col-span-2"
-              >
-                {smartMixStructure}
-              </div>
-            ) : null}
-            {detailed && profiles[0] ? (
-              <InstrumentPanel
-                as="section"
-                headingLevel={3}
-                label={{ children: "Analysis provenance", tone: "accent" }}
-                description="Versions and source references for this measured profile."
-              >
-                <div className="space-y-4">
-                  {profileBadges}
-                  <MixDetails profile={profiles[0]} group="provenance" />
-                </div>
-              </InstrumentPanel>
-            ) : null}
-            <section className="space-y-4 border-t border-border-quiet pt-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <MonoLabel as="h3" tone="accent">
-                  Bliss similarity
-                </MonoLabel>
-                <InfoBadge>
-                  {bliss.filter((entry) => entry.available).length} / {total}{" "}
-                  vectors available
-                </InfoBadge>
-              </div>
-              <p className="text-sm text-text-muted">
-                Similarity embeddings support related tracks and radio. Vector
-                contents are not displayed.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  ...new Set(
-                    bliss.flatMap((entry) =>
-                      entry.available && entry.dimensions != null
-                        ? [entry.dimensions]
-                        : [],
-                    ),
-                  ),
-                ].map((dimension) => (
-                  <InfoBadge key={dimension}>{dimension} dimensions</InfoBadge>
+          {detailed ? (
+            <Tabs
+              value={tab}
+              onValueChange={chooseTab}
+              className="gap-6"
+              data-audio-profile-layout="track-dialog"
+            >
+              <TabsList aria-label="Audio profile sections">
+                {tabs.map((entry) => (
+                  <TabsTrigger key={entry.value} value={entry.value}>
+                    {entry.label}
+                  </TabsTrigger>
                 ))}
-              </div>
-              {single && bliss[0]?.available ? (
-                <dl className="grid gap-4 sm:grid-cols-2">
-                  <Reading label="Embedding state">
-                    {bliss[0]?.state || "Available"}
-                  </Reading>
-                  <Reading label="Profile vector reference">
-                    {bliss[0].revision || "—"}
-                  </Reading>
-                  <Reading label="Computed">
-                    {timestamp(bliss[0].computed_at)}
-                  </Reading>
-                  <Reading label="Model version">
-                    {bliss[0].model_version || "—"}
-                  </Reading>
-                </dl>
-              ) : null}
-            </section>
-          </div>
+              </TabsList>
+              {tabs.map((entry) => (
+                <TabsContent
+                  key={entry.value}
+                  value={entry.value}
+                  className="min-w-0"
+                >
+                  {entry.content}
+                </TabsContent>
+              ))}
+            </Tabs>
+          ) : (
+            <div className="space-y-6" data-audio-profile-layout="album">
+              {features}
+              {smartMixSection}
+              {blissSection}
+            </div>
+          )}
         </div>
       )}
     </InstrumentPanel>
