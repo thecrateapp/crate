@@ -76,6 +76,57 @@ def _handle_propose_genre_eq(task_id: str, params: dict, config: dict) -> dict:
     }
 
 
+def _handle_generate_playlist_description(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    del config
+    from crate.ai.consumers import resume_action, revalidate_call
+    from crate.db.repositories.playlists import (
+        get_playlist,
+        get_playlist_tracks,
+        update_playlist,
+    )
+    from crate.llm.prompts.playlist_description import generate_playlist_description
+
+    try:
+        playlist_id = int(params["playlist_id"])
+    except (KeyError, TypeError, ValueError):
+        return {"status": "failed", "error": "Playlist is required"}
+    playlist = get_playlist(playlist_id)
+    if not playlist or playlist.get("scope") != "system":
+        return {"status": "failed", "error": "System playlist not found"}
+    rules = params.get("smart_rules")
+    if rules is None:
+        rules = playlist.get("smart_rules")
+    try:
+        ai_call = resume_action(
+            "playlists.description.generate",
+            params.get("ai_acceptance"),
+            actor_id=params.get("actor_user_id"),
+            job_id=task_id,
+        )
+        response = generate_playlist_description(
+            name=playlist.get("name") or "Untitled playlist",
+            category=playlist.get("category"),
+            smart_rules=rules,
+            tracks=get_playlist_tracks(playlist_id)[:60],
+            ai_call=ai_call,
+        )
+        applied = False
+        if params.get("apply"):
+            revalidate_call(ai_call)
+            update_playlist(playlist_id, description=response.description)
+            applied = True
+    except AIConfigurationError as error:
+        return _failed(error)
+    return {
+        "playlist_id": playlist_id,
+        "description": response.description,
+        "applied": applied,
+    }
+
+
 AI_PROPOSAL_TASK_HANDLERS: dict[str, TaskHandler] = {
     "propose_genre_eq": _handle_propose_genre_eq,
+    "generate_playlist_description": _handle_generate_playlist_description,
 }

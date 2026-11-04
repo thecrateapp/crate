@@ -119,12 +119,29 @@ def test_actual_bio_enqueue_rejects_changed_actor_before_research(
     assert runtime.usage.list_invocations({})["items"] == []
 
 
+def _system_playlist() -> int:
+    from crate.db.repositories.playlists import create_playlist
+
+    return create_playlist("Mix", scope="system")
+
+
+def _record_playlist_writes(monkeypatch, writes) -> None:
+    import crate.db.repositories.playlists as playlists
+
+    original = playlists.update_playlist
+
+    def record(playlist_id, **kwargs):
+        writes.append(kwargs)
+        return original(playlist_id, **kwargs)
+
+    monkeypatch.setattr(playlists, "update_playlist", record)
+
+
 @pytest.mark.parametrize("operation", ["eq", "playlist"])
 def test_inflight_domain_apply_rechecks_real_actor(
     legacy_runtime, monkeypatch, operation
 ):
     actor = create_user("curator@example.test", role="curator")
-    request = SimpleNamespace(state=SimpleNamespace(user=actor))
     writes = []
 
     def generated(**kwargs):
@@ -156,20 +173,27 @@ def test_inflight_domain_apply_rechecks_real_actor(
             result = ai_proposals._handle_propose_genre_eq("eq-job", params, {})
             raise AIConfigurationError(result["error_code"], result["error"])
     else:
-        from crate.api import system_playlists as api
+        # SMQ.PR3: the description and its apply run in the worker.
+        from crate.worker_handlers import ai_proposals
 
-        monkeypatch.setattr(api, "_require_system_playlist", lambda _: {"name": "Mix"})
-        monkeypatch.setattr(api, "get_playlist_tracks", lambda _: [])
-        monkeypatch.setattr(api, "update_playlist", lambda *a, **k: writes.append(k))
+        playlist_id = _system_playlist()
+        _record_playlist_writes(monkeypatch, writes)
         monkeypatch.setattr(
             "crate.llm.prompts.playlist_description.generate_playlist_description",
             generated,
         )
+        params = {
+            "playlist_id": playlist_id,
+            "apply": True,
+            "actor_user_id": actor["id"],
+            "ai_acceptance": consumers.accept_action("playlists.description.generate"),
+        }
 
         def invoke():
-            return api.admin_generate_playlist_description(
-                request, 1, api.GeneratePlaylistDescriptionRequest(apply=True)
+            result = ai_proposals._handle_generate_playlist_description(
+                "playlist-job", params, {}
             )
+            raise AIConfigurationError(result["error_code"], result["error"])
 
     with pytest.raises(AIConfigurationError) as error:
         invoke()

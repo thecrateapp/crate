@@ -41,6 +41,9 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     "ai_catalog_refresh": TaskTypeInfo("AI Model Catalog Refresh", "enrichment"),
     "ai_profile_test": TaskTypeInfo("AI Synthetic Profile Test", "enrichment"),
     "propose_genre_eq": TaskTypeInfo("Genre EQ Proposal", "enrichment"),
+    "generate_playlist_description": TaskTypeInfo(
+        "Playlist Description Draft", "playlists"
+    ),
     "library_sync": TaskTypeInfo("Library Scan", "library"),
     "library_pipeline": TaskTypeInfo("Library Pipeline", "library"),
     "scan": TaskTypeInfo("Health Check", "library"),

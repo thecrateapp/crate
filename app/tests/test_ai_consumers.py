@@ -346,12 +346,15 @@ def test_configuration_revoked_after_generation_blocks_application(
             result = ai_proposals._handle_propose_genre_eq("eq-job", params, {})
             raise AIConfigurationError(result["error_code"], result["error"])
     else:
-        from crate.api import system_playlists as api
+        # SMQ.PR3: the description and its apply run in the worker.
+        import crate.db.repositories.playlists as playlists
+        from crate.ai.consumers import accept_action
+        from crate.worker_handlers import ai_proposals
 
-        monkeypatch.setattr(api, "_require_playlist_curator", lambda _: domain_actor)
-        monkeypatch.setattr(api, "_require_system_playlist", lambda _: {"name": "Mix"})
-        monkeypatch.setattr(api, "get_playlist_tracks", lambda _: [])
-        monkeypatch.setattr(api, "update_playlist", lambda *a, **k: writes.append(k))
+        playlist_id = playlists.create_playlist("Mix", scope="system")
+        monkeypatch.setattr(
+            playlists, "update_playlist", lambda *a, **k: writes.append(k)
+        )
         monkeypatch.setattr(
             "crate.llm.prompts.playlist_description.generate_playlist_description",
             lambda **k: generated(
@@ -359,11 +362,18 @@ def test_configuration_revoked_after_generation_blocks_application(
                 SimpleNamespace(description="Private draft"),
             ),
         )
+        params = {
+            "playlist_id": playlist_id,
+            "apply": True,
+            "actor_user_id": domain_actor["id"],
+            "ai_acceptance": accept_action("playlists.description.generate"),
+        }
 
         def invoke():
-            return api.admin_generate_playlist_description(
-                None, 1, api.GeneratePlaylistDescriptionRequest(apply=True)
+            result = ai_proposals._handle_generate_playlist_description(
+                "playlist-job", params, {}
             )
+            raise AIConfigurationError(result["error_code"], result["error"])
 
     with pytest.raises(AIConfigurationError, match="changed"):
         invoke()

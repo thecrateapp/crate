@@ -108,11 +108,6 @@ class GeneratePlaylistDescriptionRequest(BaseModel):
     smart_rules: dict[str, Any] | None = None
 
 
-class GeneratePlaylistDescriptionResponse(BaseModel):
-    description: str
-    applied: bool = False
-
-
 class SystemPlaylistBlueprintResponse(BaseModel):
     key: str
     name: str

@@ -21,10 +21,6 @@ AI_QUEUES = {"ai", "ai_bulk"}
 # stale entry fails test_exceptions_are_still_needed. New entries need an
 # approved plan change first.
 HTTP_MODEL_CALL_EXCEPTIONS: dict[tuple[str, str], str] = {
-    (
-        "crate.api.system_playlists",
-        "admin_generate_playlist_description",
-    ): "SMQ.PR3",
     ("crate.api.paths", "api_create_path"): "SMQ.PR4",
     ("crate.api.paths", "api_regenerate_path"): "SMQ.PR4",
     ("crate.api.paths", "api_preview_path"): "SMQ.PR4",
