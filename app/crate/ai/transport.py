@@ -208,15 +208,30 @@ def _usage(provider, data):
 
 
 def generate(
-    context, *, api_key, prompt, response_schema, system="", image=None, media_type=None
+    context,
+    *,
+    api_key,
+    prompt,
+    response_schema,
+    system="",
+    image=None,
+    media_type=None,
+    max_seconds: float | None = None,
 ) -> NativeResponse:
-    """Translate pinned native controls, execute once and discard reasoning text."""
+    """Translate pinned native controls, execute once and discard reasoning text.
+
+    ``max_seconds`` (the running task's remaining budget) can only shorten the
+    profile's timeout.
+    """
     started = time.monotonic()
     try:
         provider = context["provider"]
         model_id = context["model_id"]
         config = ProfileConfig.model_validate(context["config"])
-        deadline = started + config.timeout_seconds
+        timeout = float(config.timeout_seconds)
+        if max_seconds is not None:
+            timeout = min(timeout, max_seconds)
+        deadline = started + timeout
         reasoning = config.reasoning
         instruction = (
             (system + "\n\n" if system else "")
@@ -346,9 +361,21 @@ def generate(
 
 
 def generate_legacy(
-    context, *, api_key, prompt, response_schema, system="", image=None, media_type=None
+    context,
+    *,
+    api_key,
+    prompt,
+    response_schema,
+    system="",
+    image=None,
+    media_type=None,
+    max_seconds: float | None = None,
 ) -> NativeResponse:
-    """Preserve native omitted options through explicitly injected old provider APIs."""
+    """Preserve native omitted options through explicitly injected old provider APIs.
+
+    ``max_seconds`` (the running task's remaining budget) shortens the inherited
+    deadline; the child is killed at that bound whatever the old client does.
+    """
     started = time.monotonic()
     legacy_config = context if context["mode"] == "legacy" else context["config"]
     timeout = legacy_config.get("legacy_deadline_seconds")
@@ -356,6 +383,8 @@ def generate_legacy(
         raise AIConfigurationError(
             "AI_LEGACY_LIMITS_UNKNOWN", "Inherited native timeout is unknown"
         )
+    if max_seconds is not None:
+        timeout = min(float(timeout), max_seconds)
     body = {
         "context": context,
         "prompt": prompt,
@@ -363,6 +392,7 @@ def generate_legacy(
         "system": system,
         "image": base64.b64encode(image).decode() if image else None,
         "media_type": media_type,
+        "task_bounded": max_seconds is not None,
     }
     data = _request_json(
         provider=context["provider"],
@@ -425,10 +455,18 @@ def _legacy_response(packet):
         "endpoint": context.get("endpoint"),
         "post": post,
     }
+    timeout_seconds = options["timeout_seconds"]
+    if body.get("task_bounded"):
+        # Inside a task the old client gets the remaining budget, so it times
+        # out cleanly before the parent has to kill this process.
+        remaining = float(packet["timeout_seconds"])
+        timeout_seconds = (
+            remaining if timeout_seconds is None else min(timeout_seconds, remaining)
+        )
     kwargs = {
         "system": body["system"],
         "model": context.get("legacy_model") or context["config"]["legacy_model"],
-        "timeout_seconds": options["timeout_seconds"],
+        "timeout_seconds": timeout_seconds,
         "max_tokens": options["max_tokens"],
         "private_response": True,
         "_injected": injected,

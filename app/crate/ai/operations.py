@@ -71,6 +71,7 @@ def run_probe(context, *, actor_id, job_id, idempotency_key):
             "AI_RUNTIME_UNAVAILABLE", "Synthetic transport is not available"
         ) from None
     config = context["config"]
+    requeue.require_call_budget()
     invocation = requeue.reserve_with_capacity_wait(
         lambda: usage.reserve_invocation(
             context,
@@ -86,8 +87,10 @@ def run_probe(context, *, actor_id, job_id, idempotency_key):
     started = time.monotonic()
     try:
         key = service.load_context_key(context)
+        budget = requeue.require_call_budget()
         result = execute_probe(
             context,
+            **({} if budget is None else {"max_seconds": budget}),
             api_key=key,
             prompt='Return {"ok":true} for this synthetic compatibility check.',
             response_schema={

@@ -79,7 +79,7 @@ def _parse(text):
     return json.loads(cleaned.strip())
 
 
-def execute_probe(context, *, api_key, prompt, response_schema):
+def execute_probe(context, *, api_key, prompt, response_schema, max_seconds=None):
     """One exact-profile synthetic call. Operations owns its reservation/finish."""
     config = ProfileConfig.model_validate(context["config"])
     if (
@@ -94,6 +94,7 @@ def execute_probe(context, *, api_key, prompt, response_schema):
         api_key=api_key,
         prompt=prompt,
         response_schema=response_schema,
+        **({} if max_seconds is None else {"max_seconds": max_seconds}),
     )
     try:
         data = _parse(result.text)
@@ -220,6 +221,8 @@ def execute_structured(
     admitted["schema_fingerprint"] = _hash(schema)
     admitted["config_fingerprint"] = context_fingerprint(admitted)
     key = idempotency_key or (f"job:{job_id}:{action_id}" if job_id else str(uuid4()))
+    # Inside an AI-lane task, never reserve a call the task cannot finish.
+    requeue.require_call_budget()
     # A concurrency refusal transmits nothing; AI-lane tasks wait for capacity.
     invocation = requeue.reserve_with_capacity_wait(
         lambda: usage.reserve_invocation(
@@ -241,6 +244,9 @@ def execute_structured(
         # Close the acceptance-to-network race; the loaded key remains pinned in memory.
         configuration.revalidate_context(pinned)
         require_action_authority(action_id, actor_id)
+        # The transport kills the call at this bound, so it ends before the task.
+        budget = requeue.require_call_budget()
+        bounded = {} if budget is None else {"max_seconds": budget}
         call = transport.generate_legacy if legacy else transport.generate
         result = call(
             pinned,
@@ -250,6 +256,7 @@ def execute_structured(
             response_schema=schema,
             image=image,
             media_type=media_type,
+            **bounded,
         )
         try:
             data = _parse(result.text)

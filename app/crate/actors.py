@@ -24,6 +24,7 @@ import dramatiq
 import crate.broker  # noqa: F401
 from crate.ai.queues import AI_QUEUES
 from crate.ai.requeue import (
+    AI_CALL_DEADLINE_MARGIN_SECONDS,
     AI_CONCURRENCY_REQUEUE_LIMIT,
     AIConcurrencyDeferred,
     concurrency_window,
@@ -662,6 +663,8 @@ def _requeue_for_ai_capacity(task_type: str, task_id: str, attempt: int) -> None
 
 def _execute_task(task_type: str, task_id: str, ai_requeues: int = 0):
     """Generic wrapper: read PG task → run handler → update PG → check memory."""
+    # Dramatiq's time limit runs from here; AI calls must end before it.
+    message_started = time.monotonic()
     from crate.config import load_config
     from crate.db.queries.tasks import get_task
     from crate.db.repositories.task_control import acknowledge_cancellation
@@ -859,7 +862,12 @@ def _execute_task(task_type: str, task_id: str, ai_requeues: int = 0):
             config = load_config()
             queue = get_queue_for_task(task_type)
             if queue in AI_QUEUES:
-                with concurrency_window(queue, ai_requeues):
+                deadline = (
+                    message_started
+                    + TASK_POOL_CONFIG[task_type].time_limit_seconds
+                    - AI_CALL_DEADLINE_MARGIN_SECONDS
+                )
+                with concurrency_window(queue, ai_requeues, deadline=deadline):
                     result = handler(task_id, task.get("params", {}), config)
             else:
                 result = handler(task_id, task.get("params", {}), config)
