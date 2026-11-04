@@ -54,6 +54,9 @@ CPU_FIELDS = ("entity_uid", "seconds", "decode_cpu", "model_cpu")
 WINDOWS_PREFIX = "vocals_windows_"
 CPU_PREFIX = "vocals_cpu_"
 META_PREFIX = "vocals_meta_"
+# YAMNet's voice scores in music sit around 1e-4 and its thresholds land there too;
+# four decimals would move them by up to half a step.
+SCORE_DECIMALS = 6
 FOLDS = 5
 # Candidate window thresholds, readable values from 1e-4 to 0.9. Voice scores of the
 # AudioSet models sit mostly far below 0.5, so the low end is dense.
@@ -269,8 +272,8 @@ def window_row(phrase: PhraseWindows) -> dict[str, Any]:
         "start_ms": phrase.start_ms,
         "end_ms": phrase.end_ms,
         "n_windows": len(phrase.scores),
-        "mean": "" if phrase.mean is None else f"{phrase.mean:.4f}",
-        "windows": " ".join(f"{score:.4f}" for score in phrase.scores),
+        "mean": "" if phrase.mean is None else f"{phrase.mean:.{SCORE_DECIMALS}f}",
+        "windows": " ".join(f"{score:.{SCORE_DECIMALS}f}" for score in phrase.scores),
     }
 
 

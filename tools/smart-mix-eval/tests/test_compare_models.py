@@ -123,7 +123,8 @@ def test_scores_csv_matches_export_format(tmp_path: Path) -> None:
         {"phrase_index": 2, "start_ms": 2_500, "end_ms": 2_500},
     ]
     centres = [0.48, 0.96, 1.44, 1.92, 2.4]
-    scores = [0.1234, 0.5, 0.25, 1.0, 0.0]
+    # YAMNet's voice scores sit around 1e-4 in music: six decimals keep them apart.
+    scores = [0.000234, 0.5, 0.25, 1.0, 0.0]
 
     phrases = phrase_windows("track", rows, centres, scores)
     path = tmp_path / "vocals_windows_test.csv"
@@ -140,12 +141,12 @@ def test_scores_csv_matches_export_format(tmp_path: Path) -> None:
         "start_ms": "0",
         "end_ms": "1000",
         "n_windows": "2",
-        "mean": "0.3117",
-        "windows": "0.1234 0.5000",
+        "mean": "0.250117",
+        "windows": "0.000234 0.500000",
     }
     # A window belongs to the phrase its centre falls in; an empty phrase has none.
     assert [phrase.scores for phrase in phrases] == [
-        (0.1234, 0.5),
+        (0.000234, 0.5),
         (0.25, 1.0, 0.0),
         (),
     ]

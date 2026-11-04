@@ -151,7 +151,7 @@ For each backend, `score` writes to `--output`:
 
 - `vocals_windows_<backend>.csv`: `entity_uid,phrase_index,start_ms,end_ms`, the keys
   of `vocals_labels.csv`, then `n_windows`, `mean` and `windows`, the space-separated
-  window scores (4 decimals).
+  window scores (6 decimals: YAMNet's sit around 0.0001 in music).
 - `vocals_cpu_<backend>.csv`: `entity_uid,seconds,decode_cpu,model_cpu`, in process CPU
   seconds with every thread counted. Decoding happens once per sample rate, so backends
   with the same rate report the same decode time.
