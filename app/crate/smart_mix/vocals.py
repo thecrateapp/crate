@@ -74,6 +74,8 @@ def phrase_vocal_presence(
 
 
 def _beat_ms(beat_grid_ms: Sequence[int], phrase: Phrase, bars: int) -> int:
+    if not beat_grid_ms:
+        return phrase.start_ms
     beat = phrase.start_beat + bars * BEATS_PER_BAR
     if beat < len(beat_grid_ms):
         return int(beat_grid_ms[beat])

@@ -158,6 +158,7 @@ HTTP_ROUTES = frozenset(
         "/api/admin/smart-mix/status",
         "/api/admin/smart-mix/tracks",
         "/api/admin/smart-mix/tracks/:param/reanalyze",
+        "/api/admin/smart-mix/tracks/:param/structure",
         "/api/admin/stack-snapshot",
         "/api/admin/stack-stream",
         "/api/admin/system-playlists",

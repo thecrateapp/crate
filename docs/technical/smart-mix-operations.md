@@ -145,7 +145,7 @@ not be segmented, which is different from null.
 Profile reads leave the structure out unless the planner segments by phrase
 (`planner_reads_structure`, only `smart-mix-v3`), so planning with `smart-mix-v2` reads the
 same columns as before. The public profile endpoint and the plan responses do not include the
-structure yet.
+structure yet; Admin reads it through `GET /api/admin/smart-mix/tracks/{id}/structure`.
 
 `PROFILE_SCHEMA_VERSION` stays `1`: the VirtualDJ plugin 1.0.0 refuses capabilities and
 profiles of any other schema. Readers accept every schema up to the current one
@@ -458,6 +458,7 @@ Crate Agent; an MCP Bearer token is not an Admin session or a VirtualDJ PAT.
 | `GET /api/admin/smart-mix/tracks` and `/activity`                            | Paginated profiles and processing, and task activity                                                                    |
 | `POST /api/admin/smart-mix/backfill` and `/backfill/resume\|pause\|cancel`   | Change campaign control                                                                                                 |
 | `POST /api/admin/smart-mix/tracks/{id}/reanalyze`                            | Enqueues analysis for one track, with deduplication                                                                     |
+| `GET /api/admin/smart-mix/tracks/{id}/structure`                             | Stored phrases (with end and voice byte), energy curve and bar starts of one profile, for review in Admin               |
 
 Admin requires `library.analysis.manage`, even for its reads. The public profile and compatible
 endpoints use session authorization or the PAT scope `vdj.smart_mix.read`, depending on the

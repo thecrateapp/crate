@@ -13,6 +13,7 @@ from crate.api.schemas.smart_mix_admin import (
     SmartMixBackfillResponse,
     SmartMixReanalyzeResponse,
     SmartMixTrackListResponse,
+    SmartMixTrackStructureResponse,
 )
 from crate.db.jobs.analysis_storage import resolve_smart_mix_track
 from crate.db.jobs.smart_mix_backfill import (
@@ -28,7 +29,11 @@ from crate.db.queries.smart_mix_admin import (
 from crate.db.queries.smart_mix_admin_activity import get_smart_mix_activity
 from crate.db.queries.smart_mix_admin_tracks import list_smart_mix_tracks
 from crate.db.queries.tasks import list_tasks
+from crate.db.repositories.smart_mix import get_track_mix_profile
 from crate.db.repositories.tasks import create_task_dedup
+from crate.smart_mix.models import TrackMixProfile
+from crate.smart_mix.structure import downbeats_from_anchor
+from crate.smart_mix.vocals import phrase_spans_ms
 
 
 router = APIRouter(prefix="/api/admin/smart-mix", tags=["admin"])
@@ -133,6 +138,65 @@ def smart_mix_tracks(
             "nextBefore": page[-1]["track_id"] if len(rows) > limit else None,
         }
     )
+
+
+@router.get(
+    "/tracks/{track_id}/structure",
+    response_model=SmartMixTrackStructureResponse,
+)
+def smart_mix_track_structure(
+    track_id: int, request: Request
+) -> SmartMixTrackStructureResponse:
+    _require_manage(request)
+    profile = get_track_mix_profile(
+        track_id, include_beat_grid=True, include_structure=True
+    )
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Smart Mix profile not found")
+    return SmartMixTrackStructureResponse.model_validate(
+        _structure_payload(track_id, profile)
+    )
+
+
+def _structure_payload(track_id: int, profile: TrackMixProfile) -> dict:
+    phrases = profile.phrases
+    curve = profile.energy_curve
+    vocals = profile.vocal_presence
+    spans = phrase_spans_ms(phrases or (), profile.beat_grid_ms)
+    return {
+        "trackId": track_id,
+        "trackEntityUid": profile.track_entity_uid,
+        "analyzerVersion": profile.analyzer_version,
+        "profileVersion": profile.profile_version,
+        "durationMs": profile.duration_ms,
+        "structureConfidence": profile.structure_confidence,
+        "phrases": None
+        if phrases is None
+        else [
+            {
+                "startBeat": phrase.start_beat,
+                "startMs": phrase.start_ms,
+                "endMs": end_ms,
+                "bars": phrase.bars,
+                "energy": phrase.energy,
+                "deltaEnergy": phrase.delta_energy,
+                "kind": phrase.kind,
+                "vocalPresence": None if vocals is None else vocals[index],
+            }
+            for index, (phrase, (_start_ms, end_ms)) in enumerate(
+                zip(phrases, spans, strict=True)
+            )
+        ],
+        "energyCurve": None if curve is None else list(curve),
+        # The curve holds one byte per bar from the first downbeat of the grid.
+        "barStartsMs": None
+        if curve is None
+        else list(
+            downbeats_from_anchor(profile.beat_grid_ms, profile.downbeat_anchor_ms)[
+                : len(curve)
+            ]
+        ),
+    }
 
 
 @router.post(

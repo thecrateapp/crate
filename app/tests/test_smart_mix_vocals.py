@@ -137,6 +137,8 @@ def test_phrase_spans_end_at_the_next_phrase_or_after_the_last_bars() -> None:
         (32_500, 48_500),
     ]
     assert vocals.phrase_spans_ms((), beat_grid) == []
+    # Without a grid the last phrase cannot be measured and gets no length.
+    assert vocals.phrase_spans_ms(phrases[-1:], ()) == [(32_500, 32_500)]
 
 
 def test_the_analyzer_does_not_run_the_detector() -> None:

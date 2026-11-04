@@ -120,6 +120,38 @@ class SmartMixActivityResponse(SmartMixAdminModel):
     rate_window_minutes: int = Field(alias="rateWindowMinutes", ge=1)
 
 
+class SmartMixPhraseItem(SmartMixAdminModel):
+    start_beat: int = Field(alias="startBeat", ge=0)
+    start_ms: int = Field(alias="startMs", ge=0)
+    end_ms: int = Field(alias="endMs", ge=0)
+    bars: int = Field(ge=1)
+    energy: float = Field(ge=0.0, le=1.0)
+    delta_energy: float | None = Field(default=None, alias="deltaEnergy")
+    kind: Literal["intro", "build", "peak", "break", "outro", "body"]
+    vocal_presence: int | None = Field(
+        default=None, alias="vocalPresence", ge=0, le=255
+    )
+
+
+class SmartMixTrackStructureResponse(SmartMixAdminModel):
+    """Stored phrases and per-bar energy of one profile, for review in Admin.
+
+    ``phrases`` is null for a profile analyzed before the structure existed and empty
+    for a track that could not be segmented. ``barStartsMs`` gives the start of each
+    ``energyCurve`` bar.
+    """
+
+    track_id: int = Field(alias="trackId")
+    track_entity_uid: str = Field(alias="trackEntityUid")
+    analyzer_version: str = Field(alias="analyzerVersion")
+    profile_version: int = Field(alias="profileVersion", ge=1)
+    duration_ms: int = Field(alias="durationMs", ge=0)
+    structure_confidence: float | None = Field(alias="structureConfidence")
+    phrases: list[SmartMixPhraseItem] | None
+    energy_curve: list[int] | None = Field(alias="energyCurve")
+    bar_starts_ms: list[int] | None = Field(alias="barStartsMs")
+
+
 class SmartMixReanalyzeResponse(SmartMixAdminModel):
     task_id: str | None = Field(default=None, alias="taskId")
     status: Literal["queued", "already_queued"]
@@ -166,4 +198,5 @@ __all__ = [
     "SmartMixAdminStatusResponse",
     "SmartMixBackfillRequest",
     "SmartMixBackfillResponse",
+    "SmartMixTrackStructureResponse",
 ]
