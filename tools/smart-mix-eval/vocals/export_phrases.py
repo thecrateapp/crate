@@ -110,6 +110,25 @@ def phrase_rows(
     ]
 
 
+def stored_phrase_rows(
+    entity_uid: str,
+) -> tuple[dict[str, Any], list[dict[str, Any]]] | None:
+    """The track and one row per stored phrase, or None without v7 phrases.
+
+    Needs Crate's database variables (``database_environment``) and ``app`` on the path.
+    """
+    from crate.db.jobs.analysis_storage import resolve_smart_mix_track
+    from crate.db.repositories.smart_mix import get_track_mix_profile_by_entity_uid
+
+    track = resolve_smart_mix_track(track_entity_uid=entity_uid)
+    profile = get_track_mix_profile_by_entity_uid(
+        entity_uid, include_beat_grid=True, include_structure=True
+    )
+    if track is None or profile is None or not profile.phrases:
+        return None
+    return track, phrase_rows(entity_uid, profile.phrases, profile.beat_grid_ms)
+
+
 def merge_rows(
     existing: Sequence[dict[str, Any]],
     fresh: Sequence[dict[str, Any]],
@@ -193,22 +212,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     if str(APP_ROOT) not in sys.path:
         sys.path.insert(0, str(APP_ROOT))
-    from crate.db.jobs.analysis_storage import resolve_smart_mix_track
-    from crate.db.repositories.smart_mix import get_track_mix_profile_by_entity_uid
     from crate.smart_mix.vocals import VOCAL_DETECTOR_VERSION, phrase_vocal_presence
 
     labels: list[dict[str, Any]] = []
     scores: list[dict[str, Any]] = []
     exported: set[str] = set()
     for uid in uids:
-        track = resolve_smart_mix_track(track_entity_uid=uid)
-        profile = get_track_mix_profile_by_entity_uid(
-            uid, include_beat_grid=True, include_structure=True
-        )
-        if track is None or profile is None or not profile.phrases:
+        stored = stored_phrase_rows(uid)
+        if stored is None:
             print(f"{uid}  skipped: no stored phrases (analyze it with v7 first)")
             continue
-        rows = phrase_rows(uid, profile.phrases, profile.beat_grid_ms)
+        track, rows = stored
         print(f"{uid}  {track.get('artist') or '?'} - {track.get('title') or '?'}")
         for row in rows:
             print(

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import csv
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -274,6 +275,46 @@ def test_export_reads_a_local_database_only_and_read_only() -> None:
         tool.database_environment(
             "postgresql://crate:secret@95.216.3.27:5432/crate", allow_remote=False
         )
+
+
+def test_export_loads_stored_phrases_of_v7_tracks_only(monkeypatch) -> None:
+    from crate.db.jobs import analysis_storage
+    from crate.db.repositories import smart_mix as smart_mix_repository
+
+    tool = _export_tool()
+    phrase = Phrase(
+        start_beat=0, start_ms=0, bars=8, energy=0.5, delta_energy=None, kind="intro"
+    )
+    tracks = {
+        "v7": {"path": "/music/a.flac", "title": "A"},
+        "v6": {"path": "/music/b.flac", "title": "B"},
+    }
+    profiles = {
+        "v7": SimpleNamespace(phrases=(phrase,), beat_grid_ms=(0, 500, 16_500)),
+        "v6": SimpleNamespace(phrases=(), beat_grid_ms=(0, 500)),
+    }
+    requests = []
+
+    def profile(uid, **flags):
+        requests.append(flags)
+        return profiles.get(uid)
+
+    monkeypatch.setattr(
+        analysis_storage,
+        "resolve_smart_mix_track",
+        lambda *, track_entity_uid: tracks.get(track_entity_uid),
+    )
+    monkeypatch.setattr(
+        smart_mix_repository, "get_track_mix_profile_by_entity_uid", profile
+    )
+
+    track, rows = tool.stored_phrase_rows("v7")
+
+    assert track == tracks["v7"]
+    assert rows == tool.phrase_rows("v7", profiles["v7"].phrases, (0, 500, 16_500))
+    assert tool.stored_phrase_rows("v6") is None
+    assert tool.stored_phrase_rows("missing") is None
+    assert requests[0] == {"include_beat_grid": True, "include_structure": True}
 
 
 def test_export_reads_track_ids_once_in_order(tmp_path: Path) -> None:
