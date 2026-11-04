@@ -27,6 +27,30 @@ BACKFILL_TASK_TYPE = "backfill_smart_mix_profiles"
 CAMPAIGN_STATE_KEY = "smart_mix:backfill_campaign"
 COVERAGE_STATE_KEY = "smart_mix:coverage"
 LIVE_COVERAGE_MAX_AGE_SECONDS = 10
+# Campaigns saved before the target recorded a profile schema targeted schema 1.
+LEGACY_CAMPAIGN_PROFILE_VERSION = 1
+
+
+def smart_mix_target_generation() -> str:
+    """The claim generation of the current target: analyzer version and schema.
+
+    Schema 1 keeps the bare analyzer version, the generation every existing claim
+    carries. A schema bump on the same analyzer is a new generation, so claims of
+    the previous schema neither count as in flight nor use up the new retry budget.
+    """
+    if PROFILE_SCHEMA_VERSION == 1:
+        return SMART_MIX_ANALYZER_VERSION
+    return f"{SMART_MIX_ANALYZER_VERSION}+schema{PROFILE_SCHEMA_VERSION}"
+
+
+def campaign_targets_current(campaign: dict[str, Any] | None) -> bool:
+    """Whether a saved campaign targets this build's analyzer and profile schema."""
+    return (
+        campaign is not None
+        and campaign.get("target") == SMART_MIX_ANALYZER_VERSION
+        and campaign.get("profile_version", LEGACY_CAMPAIGN_PROFILE_VERSION)
+        == PROFILE_SCHEMA_VERSION
+    )
 
 
 def claim_smart_mix_backfill_batch(
@@ -44,6 +68,7 @@ def claim_smart_mix_backfill_batch(
     worker = claimed_by or (
         f"{os.environ.get('CRATE_RUNTIME', 'runtime')}:{socket.gethostname()}"
     )
+    target_generation = smart_mix_target_generation()
     with optional_scope(session) as active_session:
         rows = (
             active_session.execute(
@@ -123,7 +148,7 @@ def claim_smart_mix_backfill_batch(
                     WHERE la.quarantined_at IS NULL
                       AND (
                           profile.track_id IS NULL
-                          OR profile.profile_version <> 1
+                          OR profile.profile_version <> :profile_version
                           OR profile.analyzer_version <> :analyzer_version
                           OR profile.quality = 'unavailable'
                           OR profile.source_stale_at IS NOT NULL
@@ -142,7 +167,7 @@ def claim_smart_mix_backfill_batch(
                               )
                               AND (
                                   processing.target_generation
-                                      IS DISTINCT FROM :analyzer_version
+                                      IS DISTINCT FROM :target_generation
                                   OR processing.attempts < :max_attempts
                               )
                           )
@@ -150,7 +175,7 @@ def claim_smart_mix_backfill_batch(
                     ORDER BY
                         COALESCE(
                             profile.analyzer = :python_analyzer
-                            AND profile.profile_version = 1
+                            AND profile.profile_version = :profile_version
                             AND profile.analyzer_version = :analyzer_version
                             AND profile.quality <> 'unavailable'
                             AND profile.source_stale_at IS NULL,
@@ -165,6 +190,8 @@ def claim_smart_mix_backfill_batch(
                 {
                     "pipeline": SMART_MIX_PIPELINE,
                     "analyzer_version": SMART_MIX_ANALYZER_VERSION,
+                    "profile_version": PROFILE_SCHEMA_VERSION,
+                    "target_generation": target_generation,
                     "offline_track_ids": offline_ids,
                     "max_attempts": retry_limit,
                     "limit": batch_size,
@@ -188,7 +215,7 @@ def claim_smart_mix_backfill_batch(
                     )
                     VALUES (
                         :track_id, :pipeline, 'analyzing', :claimed_by, NOW(),
-                        1, :priority, NULL, :analyzer_version, NOW()
+                        1, :priority, NULL, :target_generation, NOW()
                     )
                     ON CONFLICT (track_id, pipeline) DO UPDATE SET
                         state = 'analyzing',
@@ -212,7 +239,7 @@ def claim_smart_mix_backfill_batch(
                     "pipeline": SMART_MIX_PIPELINE,
                     "claimed_by": claim_token,
                     "priority": int(row["priority"]),
-                    "analyzer_version": SMART_MIX_ANALYZER_VERSION,
+                    "target_generation": target_generation,
                 },
             )
             claimed.append({**dict(row), "claim_token": claim_token})
@@ -252,13 +279,13 @@ def count_smart_mix_in_flight(*, session=None) -> int:
                     FROM track_processing_state
                     WHERE pipeline = :pipeline
                       AND state = 'analyzing'
-                      AND target_generation = :analyzer_version
+                      AND target_generation = :target_generation
                       AND claimed_at >= NOW() - INTERVAL '2 hours'
                     """
                 ),
                 {
                     "pipeline": SMART_MIX_PIPELINE,
-                    "analyzer_version": SMART_MIX_ANALYZER_VERSION,
+                    "target_generation": smart_mix_target_generation(),
                 },
             ).scalar_one()
         )
@@ -308,7 +335,7 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                                 AS is_source_changed,
                             processing.state,
                             processing.attempts,
-                            processing.target_generation = :analyzer_version
+                            processing.target_generation = :target_generation
                                 AS targets_current
                         FROM eligible
                         LEFT JOIN track_mix_profiles profile
@@ -365,6 +392,7 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                     "pipeline": SMART_MIX_PIPELINE,
                     "profile_version": PROFILE_SCHEMA_VERSION,
                     "analyzer_version": SMART_MIX_ANALYZER_VERSION,
+                    "target_generation": smart_mix_target_generation(),
                     "max_attempts": max(1, int(max_attempts)),
                 },
             )
@@ -452,13 +480,16 @@ def get_smart_mix_campaign() -> dict[str, Any] | None:
 
 def start_smart_mix_campaign(*, batch_size: int, max_attempts: int) -> dict[str, Any]:
     current = get_smart_mix_campaign()
-    continues = bool(current) and (
-        current.get("target") == SMART_MIX_ANALYZER_VERSION
+    # Only a running or paused campaign of this target continues with its counters;
+    # anything else (another analyzer or schema, cancelled, completed) starts anew.
+    continues = current is not None and (
+        campaign_targets_current(current)
         and current.get("status") in {"running", "paused"}
     )
     campaign = {
         **(current if continues and current else {}),
         "target": SMART_MIX_ANALYZER_VERSION,
+        "profile_version": PROFILE_SCHEMA_VERSION,
         "status": "running",
         "batch_size": max(1, min(int(batch_size), MAX_BACKFILL_BATCH_SIZE)),
         "max_attempts": max(1, min(int(max_attempts), 10)),
@@ -550,6 +581,7 @@ def save_smart_mix_campaign(campaign: dict[str, Any]) -> None:
 __all__ = [
     "CAMPAIGN_STATE_KEY",
     "COVERAGE_STATE_KEY",
+    "campaign_targets_current",
     "claim_smart_mix_backfill_batch",
     "complete_smart_mix_campaign",
     "count_smart_mix_in_flight",
@@ -559,5 +591,6 @@ __all__ = [
     "release_smart_mix_claims",
     "save_smart_mix_campaign",
     "set_smart_mix_campaign_status",
+    "smart_mix_target_generation",
     "start_smart_mix_campaign",
 ]

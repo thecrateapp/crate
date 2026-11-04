@@ -26,6 +26,7 @@ from crate.db.jobs.analysis_storage import (
     resolve_smart_mix_track,
 )
 from crate.db.jobs.smart_mix_backfill import (
+    campaign_targets_current,
     claim_smart_mix_backfill_batch,
     complete_smart_mix_campaign,
     count_smart_mix_in_flight,
@@ -1408,11 +1409,21 @@ def _handle_backfill_smart_mix_profiles(
 
 
 def _smart_mix_campaign_running(campaign: dict | None) -> TypeGuard[dict]:
-    return campaign is not None and campaign.get("status") == "running"
+    # A campaign of another analyzer or schema (left running across a deploy) never
+    # claims for this one; an operator starts a campaign for the current target.
+    return (
+        campaign is not None
+        and campaign.get("status") == "running"
+        and campaign_targets_current(campaign)
+    )
 
 
 def _campaign_control(campaign: dict | None) -> str:
-    return str(campaign.get("status")) if campaign else "idle"
+    if not campaign:
+        return "idle"
+    if not campaign_targets_current(campaign):
+        return "superseded"
+    return str(campaign.get("status"))
 
 
 def _handle_refresh_smart_mix_coverage(

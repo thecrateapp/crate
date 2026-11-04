@@ -16,6 +16,7 @@ from crate.api.schemas.smart_mix_admin import (
 )
 from crate.db.jobs.analysis_storage import resolve_smart_mix_track
 from crate.db.jobs.smart_mix_backfill import (
+    campaign_targets_current,
     queue_next_smart_mix_batch,
     set_smart_mix_campaign_status,
     start_smart_mix_campaign,
@@ -63,6 +64,9 @@ def _active_backfill_task(tasks: list[dict] | None = None) -> dict | None:
 
 
 def _control_state(campaign: dict | None) -> Literal["idle", "running", "paused"]:
+    # A campaign of another analyzer or schema claims nothing: offer a new start.
+    if not campaign_targets_current(campaign):
+        return "idle"
     status = (campaign or {}).get("status")
     if status == "running":
         return "running"

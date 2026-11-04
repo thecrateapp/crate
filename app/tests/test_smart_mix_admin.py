@@ -634,3 +634,114 @@ def _insert_profile(
                 "stale": source_stale,
             },
         )
+
+
+def test_operator_restarts_the_backfill_from_the_cancelled_v6_campaign(
+    pg_db, test_app
+) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        get_smart_mix_campaign,
+        save_smart_mix_campaign,
+    )
+    from crate.smart_mix.versions import PROFILE_SCHEMA_VERSION
+
+    save_smart_mix_campaign(
+        {
+            "target": "smart-mix-audio-v6",
+            "status": "cancelled",
+            "batch_size": 25,
+            "max_attempts": 3,
+            "batches": 1_555,
+            "claimed": 38_865,
+            "sequence": 1_600,
+        }
+    )
+    assert test_app.get("/api/admin/smart-mix/status").json()["controlState"] == (
+        "idle"
+    )
+
+    started = test_app.post(
+        "/api/admin/smart-mix/backfill", json={"batchSize": 50, "maxAttempts": 3}
+    )
+
+    assert started.status_code == 200
+    assert started.json()["status"] == "queued"
+    campaign = get_smart_mix_campaign()
+    assert {
+        key: campaign[key]
+        for key in ("target", "profile_version", "status", "batches", "claimed")
+    } == {
+        "target": ANALYZER_VERSION,
+        "profile_version": PROFILE_SCHEMA_VERSION,
+        "status": "running",
+        "batches": 0,
+        "claimed": 0,
+    }
+    assert _task_dedup_key(started.json()["taskId"]) == (
+        f"smart-mix:backfill:{ANALYZER_VERSION}:1601"
+    )
+    status = test_app.get("/api/admin/smart-mix/status").json()
+    assert status["controlState"] == "running"
+    assert status["campaign"]["target"] == ANALYZER_VERSION
+
+    assert test_app.post("/api/admin/smart-mix/backfill/pause").json()["status"] == (
+        "paused"
+    )
+    assert test_app.get("/api/admin/smart-mix/status").json()["controlState"] == (
+        "paused"
+    )
+    # The worker picks up the queued batch, sees the pause and stops.
+    _finish_task(started.json()["taskId"])
+    resumed = test_app.post(
+        "/api/admin/smart-mix/backfill/resume",
+        json={"batchSize": 50, "maxAttempts": 3},
+    )
+    assert resumed.json()["status"] == "resumed"
+    assert _task_dedup_key(resumed.json()["taskId"]) == (
+        f"smart-mix:backfill:{ANALYZER_VERSION}:1602"
+    )
+    assert get_smart_mix_campaign()["status"] == "running"
+
+    assert test_app.post("/api/admin/smart-mix/backfill/cancel").json()["status"] == (
+        "cancelled"
+    )
+    assert test_app.post("/api/admin/smart-mix/backfill/pause").status_code == 409
+
+
+def test_status_reports_a_running_campaign_of_another_target_as_idle(
+    test_app, monkeypatch
+) -> None:
+    from crate.api import smart_mix_admin
+
+    monkeypatch.setattr(smart_mix_admin, "get_smart_mix_admin_status", _coverage)
+    monkeypatch.setattr(
+        smart_mix_admin,
+        "get_smart_mix_campaign_status",
+        lambda: {**_campaign(), "target": "smart-mix-audio-v6"},
+    )
+    monkeypatch.setattr(smart_mix_admin, "_backfill_tasks", lambda: [])
+    monkeypatch.setattr(
+        smart_mix_admin, "create_task_dedup", lambda *_args, **_kwargs: None
+    )
+
+    status = test_app.get("/api/admin/smart-mix/status").json()
+
+    # Nothing claims for v6 any more: the operator starts a campaign for the target.
+    assert status["controlState"] == "idle"
+    assert status["campaign"]["target"] == "smart-mix-audio-v6"
+
+
+def _task_dedup_key(task_id: str) -> str:
+    with transaction_scope() as session:
+        return session.execute(
+            text("SELECT dedup_key FROM tasks WHERE id = :id"), {"id": task_id}
+        ).scalar_one()
+
+
+def _finish_task(task_id: str) -> None:
+    with transaction_scope() as session:
+        session.execute(
+            text("UPDATE tasks SET status = 'completed' WHERE id = :id"),
+            {"id": task_id},
+        )

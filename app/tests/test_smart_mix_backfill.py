@@ -5,9 +5,26 @@ import uuid
 
 from sqlalchemy import text
 
+import pytest
+
+from crate.db.jobs import smart_mix_backfill
 from crate.db.jobs.smart_mix_backfill import claim_smart_mix_backfill_batch
 from crate.db.tx import read_scope, transaction_scope
-from crate.smart_mix.versions import ANALYZER_VERSION
+from crate.smart_mix.models import MixProfileQuality, TrackMixProfileDraft
+from crate.smart_mix.versions import ANALYZER_VERSION, PROFILE_SCHEMA_VERSION
+
+# The production campaign Smart Mix 3 starts from: v6, cancelled after claiming
+# 38,865 tracks. Campaigns written before schemas were tracked have no
+# profile_version.
+CANCELLED_V6_CAMPAIGN = {
+    "target": "smart-mix-audio-v6",
+    "status": "cancelled",
+    "batch_size": 25,
+    "max_attempts": 3,
+    "batches": 1_555,
+    "claimed": 38_865,
+    "sequence": 1_600,
+}
 
 
 def test_backfill_claims_tracks_in_user_value_order(pg_db, tmp_path: Path) -> None:
@@ -248,9 +265,7 @@ def test_backfill_handler_pauses_before_claiming_when_governor_denies(
 ) -> None:
     from crate.worker_handlers import analysis
 
-    monkeypatch.setattr(
-        analysis, "get_smart_mix_campaign", lambda: {"status": "running"}
-    )
+    monkeypatch.setattr(analysis, "get_smart_mix_campaign", _running_campaign)
     monkeypatch.setattr(
         "crate.resource_governor.wait_while_pressured",
         lambda **_kwargs: False,
@@ -604,6 +619,7 @@ def _insert_profile(
     analyzer_version: str,
     analyzer: str = "crate-rust",
     quality: str = "full",
+    profile_version: int = PROFILE_SCHEMA_VERSION,
 ) -> None:
     with transaction_scope() as session:
         session.execute(
@@ -614,13 +630,14 @@ def _insert_profile(
                     analyzer_version, source_revision, quality, analyzed_at
                 )
                 VALUES (
-                    :track_id, 1, :revision, :analyzer,
+                    :track_id, :profile_version, :revision, :analyzer,
                     :analyzer_version, 'source', :quality, NOW()
                 )
                 """
             ),
             {
                 "track_id": track_id,
+                "profile_version": profile_version,
                 "revision": f"revision-{track_id}",
                 "analyzer": analyzer,
                 "analyzer_version": analyzer_version,
@@ -814,6 +831,7 @@ def _handler_harness(monkeypatch, *, campaigns, in_flight, claimed=()):
 def _running_campaign(**overrides) -> dict:
     return {
         "target": ANALYZER_VERSION,
+        "profile_version": PROFILE_SCHEMA_VERSION,
         "status": "running",
         "batch_size": 10,
         "max_attempts": 3,
@@ -1009,3 +1027,259 @@ def test_campaign_start_resets_counters_for_a_new_target_and_keeps_a_paused_one(
         7,
     )
     assert get_smart_mix_campaign()["batch_size"] == 20
+
+
+def _bump_schema(monkeypatch) -> int:
+    """Run the backfill, the publisher and the writer as the next schema would."""
+    from crate.db.jobs import analysis_storage
+    from crate.db.repositories import library_analysis_writes
+
+    next_schema = PROFILE_SCHEMA_VERSION + 1
+    for module in (smart_mix_backfill, analysis_storage, library_analysis_writes):
+        monkeypatch.setattr(module, "PROFILE_SCHEMA_VERSION", next_schema)
+    return next_schema
+
+
+def _v7_draft() -> TrackMixProfileDraft:
+    return TrackMixProfileDraft(
+        analyzer="crate-rust",
+        analyzer_version=ANALYZER_VERSION,
+        duration_ms=180_000,
+        quality=MixProfileQuality.FULL,
+        bpm=120.0,
+        bpm_confidence=0.95,
+        tempo_stability=0.97,
+        beat_anchor_ms=500,
+        downbeat_anchor_ms=500,
+        time_signature=4,
+        beat_grid_ms=(500, 1_000, 1_500),
+        phrases=(),
+        energy_curve=bytes(2),
+        structure_confidence=0.0,
+    )
+
+
+def _publish_claims(claimed: list[dict]) -> list[str]:
+    from crate.db.jobs.analysis_storage import (
+        capture_smart_mix_source,
+        publish_smart_mix_profile,
+    )
+
+    return [
+        str(
+            publish_smart_mix_profile(
+                capture_smart_mix_source(
+                    int(row["id"]), row["path"], claim_token=row["claim_token"]
+                ),
+                _v7_draft(),
+            )
+        )
+        for row in claimed
+    ]
+
+
+def _stored_versions(track_ids: list[int]) -> set[tuple[str, int]]:
+    with read_scope() as session:
+        return {
+            (row.analyzer_version, row.profile_version)
+            for row in session.execute(
+                text(
+                    """
+                    SELECT analyzer_version, profile_version
+                    FROM track_mix_profiles WHERE track_id = ANY(:ids)
+                    """
+                ),
+                {"ids": track_ids},
+            )
+        }
+
+
+def test_backfill_targets_rows_not_at_current_analyzer_and_schema(
+    pg_db, tmp_path: Path, monkeypatch
+) -> None:
+    del pg_db
+    v5, v6, missing, v7_previous_schema, current = _create_tracks(tmp_path, count=5)
+    previous_schema = PROFILE_SCHEMA_VERSION
+    current_schema = _bump_schema(monkeypatch)
+    _insert_profile(v5, analyzer_version="smart-mix-audio-v5")
+    _insert_profile(v6, analyzer_version="smart-mix-audio-v6")
+    _insert_profile(
+        v7_previous_schema,
+        analyzer_version=ANALYZER_VERSION,
+        profile_version=previous_schema,
+    )
+    _insert_profile(
+        current, analyzer_version=ANALYZER_VERSION, profile_version=current_schema
+    )
+    # v7 rows written before the schema bump finished their v7 claim already; the
+    # schema target is a new generation, so their retry budget starts again.
+    _insert_processing(
+        v7_previous_schema,
+        state="done",
+        attempts=3,
+        target_generation=ANALYZER_VERSION,
+    )
+
+    claimed = claim_smart_mix_backfill_batch(
+        limit=10, max_attempts=3, claimed_by="test-worker"
+    )
+
+    assert sorted(row["id"] for row in claimed) == sorted(
+        [v5, v6, missing, v7_previous_schema]
+    )
+    assert _processing_row(v7_previous_schema)["attempts"] == 1
+    assert claim_smart_mix_backfill_batch(limit=10, claimed_by="test-worker") == []
+
+
+@pytest.mark.parametrize("next_schema", [False, True], ids=["current", "bumped"])
+def test_a_freshly_written_current_profile_is_never_claimed_again(
+    pg_db, tmp_path: Path, monkeypatch, next_schema: bool
+) -> None:
+    del pg_db
+    track_ids = _create_tracks(tmp_path, count=3)
+    for track_id in track_ids:
+        _insert_profile(track_id, analyzer_version="smart-mix-audio-v6")
+    schema = _bump_schema(monkeypatch) if next_schema else PROFILE_SCHEMA_VERSION
+
+    claimed = claim_smart_mix_backfill_batch(
+        limit=10, max_attempts=10, claimed_by="test-worker"
+    )
+    assert _publish_claims(claimed) == ["published"] * 3
+
+    assert _stored_versions(track_ids) == {(ANALYZER_VERSION, schema)}
+    assert (
+        claim_smart_mix_backfill_batch(
+            limit=10,
+            max_attempts=10,
+            claimed_by="test-worker",
+            promote_python_profiles=True,
+        )
+        == []
+    )
+
+
+def test_fresh_campaign_after_the_cancelled_v6_one_claims_old_rows_once(
+    pg_db, tmp_path: Path
+) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        get_smart_mix_campaign,
+        refresh_smart_mix_coverage,
+        save_smart_mix_campaign,
+        start_smart_mix_campaign,
+    )
+
+    rewritten, abandoned, in_flight, v5, missing = _create_tracks(tmp_path, count=5)
+    # Rewritten to v6 by the cancelled campaign.
+    _insert_profile(rewritten, analyzer_version="smart-mix-audio-v6")
+    _insert_processing(
+        rewritten, state="done", attempts=1, target_generation="smart-mix-audio-v6"
+    )
+    # Claimed by the cancelled campaign and never finished.
+    _insert_profile(abandoned, analyzer_version="smart-mix-audio-v5")
+    _insert_processing(
+        abandoned,
+        state="analyzing",
+        attempts=1,
+        target_generation="smart-mix-audio-v6",
+        claimed_hours_ago=3,
+    )
+    # A v6 analysis still running when v7 starts: claimable once its claim expires.
+    _insert_profile(in_flight, analyzer_version="smart-mix-audio-v5")
+    _insert_processing(
+        in_flight,
+        state="analyzing",
+        attempts=1,
+        target_generation="smart-mix-audio-v6",
+    )
+    _insert_profile(v5, analyzer_version="smart-mix-audio-v5")
+    save_smart_mix_campaign(dict(CANCELLED_V6_CAMPAIGN))
+
+    campaign = start_smart_mix_campaign(batch_size=50, max_attempts=3)
+
+    assert {
+        key: campaign[key]
+        for key in (
+            "target",
+            "profile_version",
+            "status",
+            "batches",
+            "claimed",
+            "sequence",
+        )
+    } == {
+        "target": ANALYZER_VERSION,
+        "profile_version": PROFILE_SCHEMA_VERSION,
+        "status": "running",
+        "batches": 0,
+        "claimed": 0,
+        "sequence": 1_600,
+    }
+    assert get_smart_mix_campaign()["target"] == ANALYZER_VERSION
+
+    claimed = claim_smart_mix_backfill_batch(
+        limit=50, max_attempts=3, claimed_by="task:fresh"
+    )
+    assert sorted(row["id"] for row in claimed) == sorted(
+        [rewritten, abandoned, v5, missing]
+    )
+    assert {_processing_row(row["id"])["target_generation"] for row in claimed} == {
+        ANALYZER_VERSION
+    }
+
+    assert _publish_claims(claimed) == ["published"] * 4
+    assert claim_smart_mix_backfill_batch(limit=50, claimed_by="task:fresh") == []
+    coverage = refresh_smart_mix_coverage(max_attempts=3)
+    assert coverage["current_profiles"] == 4
+    assert coverage["profile_version"] == PROFILE_SCHEMA_VERSION
+
+
+def test_campaigns_of_another_target_never_claim_for_the_current_one(
+    monkeypatch,
+) -> None:
+    for stale in (
+        {**CANCELLED_V6_CAMPAIGN, "status": "running"},
+        _running_campaign(target="smart-mix-audio-v6"),
+        _running_campaign(profile_version=PROFILE_SCHEMA_VERSION - 1),
+        # Campaigns written before the schema was recorded targeted schema 1.
+        {
+            key: value
+            for key, value in _running_campaign().items()
+            if key != "profile_version"
+        }
+        if PROFILE_SCHEMA_VERSION != 1
+        else _running_campaign(target="smart-mix-audio-v5"),
+    ):
+        analysis, calls = _handler_harness(
+            monkeypatch, campaigns=[stale], in_flight=[0]
+        )
+
+        result = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+
+        assert result == {"claimed": 0, "queued": 0, "control": "superseded"}
+        assert calls["claims"] == calls["next"] == calls["completed"] == []
+
+
+def test_starting_over_a_paused_campaign_of_another_target_starts_a_new_one(
+    pg_db,
+) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        save_smart_mix_campaign,
+        start_smart_mix_campaign,
+    )
+
+    save_smart_mix_campaign(
+        {**CANCELLED_V6_CAMPAIGN, "status": "paused", "batches": 9, "claimed": 90}
+    )
+    restarted = start_smart_mix_campaign(batch_size=20, max_attempts=3)
+    assert (restarted["target"], restarted["batches"], restarted["claimed"]) == (
+        ANALYZER_VERSION,
+        0,
+        0,
+    )
+
+    save_smart_mix_campaign(
+        _running_campaign(status="paused", profile_version=PROFILE_SCHEMA_VERSION - 1)
+    )
+    assert start_smart_mix_campaign(batch_size=20, max_attempts=3)["batches"] == 0
