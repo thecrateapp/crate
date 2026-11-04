@@ -180,6 +180,7 @@ stage_remote_preflight_payload() {
     "$TMP_DIR/docker-compose.project.yaml" \
     "$TMP_DIR/release-manifest.json" \
     "$TMP_DIR/release.env" \
+    "$ROOT_DIR/scripts/worker_queue_contract.py" \
     "$REMOTE:$DEPLOY_CANDIDATE_DIR/"
 }
 
@@ -336,6 +337,13 @@ local_preflight() {
       -f "$TMP_DIR/docker-compose.yaml" \
       -f "$TMP_DIR/docker-compose.project.yaml" \
       config -q
+    log "Checking that every required worker queue has a consumer"
+    docker compose \
+      --env-file "$TMP_DIR/.env" \
+      -f "$TMP_DIR/docker-compose.yaml" \
+      -f "$TMP_DIR/docker-compose.project.yaml" \
+      config --format json \
+      | python3 -I "$ROOT_DIR/scripts/worker_queue_contract.py" -
   fi
 
   check_image_manifests

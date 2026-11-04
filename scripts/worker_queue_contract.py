@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""Fail a deploy preflight when a required Dramatiq queue has no consumer.
+
+Reads the rendered Compose model (``docker compose config --format json``) from
+a file or from standard input. Tasks sent to a queue nobody consumes stay
+pending forever, so the AI lanes (SM3-D8) must be consumed by some worker.
+
+Usage: docker compose ... config --format json | worker_queue_contract.py -
+"""
+
+from __future__ import annotations
+
+import json
+import shlex
+import sys
+
+# Keep in sync with crate.ai.queues.AI_QUEUES (checked by the deploy tests).
+REQUIRED_QUEUES = ("ai", "ai_bulk")
+
+
+def worker_queues(command) -> set[str]:
+    if isinstance(command, str):
+        command = shlex.split(command)
+    if not isinstance(command, list) or "worker" not in command:
+        return set()
+    try:
+        raw = command[command.index("--queues") + 1]
+    except (ValueError, IndexError):
+        return set()
+    return {queue.strip() for queue in str(raw).split(",") if queue.strip()}
+
+
+def consumers(model: dict) -> dict[str, list[str]]:
+    services = model.get("services") or {}
+    found: dict[str, list[str]] = {queue: [] for queue in REQUIRED_QUEUES}
+    for name, service in sorted(services.items()):
+        queues = worker_queues((service or {}).get("command"))
+        for queue in REQUIRED_QUEUES:
+            if queue in queues:
+                found[queue].append(name)
+    return found
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) != 2:
+        print("usage: worker_queue_contract.py <compose.json|->", file=sys.stderr)
+        return 2
+    source = sys.stdin if argv[1] == "-" else open(argv[1], encoding="utf-8")
+    with source:
+        try:
+            model = json.load(source)
+        except json.JSONDecodeError:
+            print("Could not read the rendered Compose model", file=sys.stderr)
+            return 2
+    if not isinstance(model, dict):
+        print("The rendered Compose model is not an object", file=sys.stderr)
+        return 2
+    found = consumers(model)
+    missing = [queue for queue, names in found.items() if not names]
+    if missing:
+        print(
+            "No worker consumes the required queue(s): "
+            + ", ".join(missing)
+            + ". crate-worker must run with --queues including them.",
+            file=sys.stderr,
+        )
+        return 1
+    for queue, names in found.items():
+        print(f"Queue {queue} consumed by {', '.join(names)}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))
