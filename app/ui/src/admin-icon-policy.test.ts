@@ -384,6 +384,12 @@ const approvedLibraryControls = new Map<string, number>([
     "app/ui/src/components/album/AudioProfileCard.tsx:./SoundSpectrum:SoundSpectrum",
     1,
   ],
+  // The album readings beside it: hand-built SVG strips (an axis, a range, track marks
+  // and the mean) in the spectrum's language, with no glyph and no button.
+  [
+    "app/ui/src/components/album/AudioProfileCard.tsx:./AlbumReadings:AlbumReadings",
+    1,
+  ],
   [
     "app/ui/src/components/album/TrackTable.tsx:./AudioProfileCard:AudioProfileCard",
     1,

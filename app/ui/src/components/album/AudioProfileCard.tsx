@@ -9,6 +9,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@crate/ui/shadcn/tabs";
+import { AlbumReadings, type ReadingSeries } from "./AlbumReadings";
 import type { AudioAnalysisTrack, SmartMixAnalysis } from "./audio-analysis";
 import { SoundSpectrum, type SpectrumFeature } from "./SoundSpectrum";
 
@@ -20,6 +21,12 @@ const FEATURES = [
   ["spectral_complexity", "Complexity"],
   ["instrumentalness", "Instrumental"],
 ] as const;
+// The library's usual range for each album reading (dev library of 136k tracks: Smart
+// Mix tempo p1–p99 is 80–185 BPM, loudness p1–p99 is -26 to -8 dB, dynamic range p95 is
+// 36 dB). Album values outside it sit on its edges.
+const TEMPO_SCALE = [60, 200] as const;
+const LOUDNESS_SCALE = [-30, -5] as const;
+const DYNAMIC_RANGE_SCALE = [0, 50] as const;
 function finite(values: (number | null | undefined)[]) {
   return values.filter(
     (value): value is number =>
@@ -344,6 +351,38 @@ export function AudioProfileCard({
       return values.length ? [{ label, values }] : [];
     },
   );
+  const series = (
+    pick: (track: AudioAnalysisTrack) => number | null | undefined,
+  ) =>
+    Object.entries(analysisData).flatMap(([entry, track]) => {
+      const value = pick(track);
+      return typeof value === "number" && Number.isFinite(value)
+        ? [{ label: trackLabels?.[entry], value }]
+        : [];
+    });
+  const readings: ReadingSeries[] = [
+    {
+      label: single ? "Tempo" : "Mean tempo",
+      unit: "BPM",
+      digits: single ? 1 : 0,
+      domain: TEMPO_SCALE,
+      values: series((track) => track.smart_mix?.bpm ?? track.tempo),
+    },
+    {
+      label: single ? "Loudness" : "Mean loudness",
+      unit: "dB",
+      digits: 1,
+      domain: LOUDNESS_SCALE,
+      values: series((track) => track.loudness),
+    },
+    {
+      label: single ? "Dynamic range" : "Mean dynamic range",
+      unit: "dB",
+      digits: 1,
+      domain: DYNAMIC_RANGE_SCALE,
+      values: series((track) => track.dynamic_range),
+    },
+  ];
   const features = (
     <>
       {spectrumFeatures.length ? (
@@ -579,36 +618,30 @@ export function AudioProfileCard({
               ) : null}
             </div>
           ) : null}
-          <dl
-            className={
-              detailed
-                ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
-                : "grid grid-cols-2 gap-4 lg:grid-cols-4"
-            }
-          >
-            <Reading label={single ? "Tempo" : "Mean tempo"}>
-              {number(
-                mean(
-                  tracks.map((track) => track.smart_mix?.bpm ?? track.tempo),
-                ),
-                1,
-                " BPM",
-              )}
-            </Reading>
-            <Reading label={single ? "Key" : "Most frequent key"}>
-              {key || "—"}
-            </Reading>
-            <Reading label={single ? "Loudness" : "Mean loudness"}>
-              {number(mean(tracks.map((track) => track.loudness)), 1, " dB")}
-            </Reading>
-            <Reading label={single ? "Dynamic range" : "Mean dynamic range"}>
-              {number(
-                mean(tracks.map((track) => track.dynamic_range)),
-                1,
-                " dB",
-              )}
-            </Reading>
-          </dl>
+          {detailed ? (
+            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Reading label="Tempo">
+                {number(
+                  mean(
+                    tracks.map((track) => track.smart_mix?.bpm ?? track.tempo),
+                  ),
+                  1,
+                  " BPM",
+                )}
+              </Reading>
+              <Reading label="Key">{key || "—"}</Reading>
+              <Reading label="Loudness">
+                {number(mean(tracks.map((track) => track.loudness)), 1, " dB")}
+              </Reading>
+              <Reading label="Dynamic range">
+                {number(
+                  mean(tracks.map((track) => track.dynamic_range)),
+                  1,
+                  " dB",
+                )}
+              </Reading>
+            </dl>
+          ) : null}
           {detailed ? (
             <Tabs
               value={tab}
@@ -635,7 +668,27 @@ export function AudioProfileCard({
             </Tabs>
           ) : (
             <div className="space-y-6" data-audio-profile-layout="album">
-              {features}
+              {/* Readings on the left in the spectrum's language, the spectrum on the
+                  right at a size that sits beside them (approved mockup B). */}
+              <div className="grid gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
+                <div data-slot="audio-profile-column" className="min-w-0">
+                  <AlbumReadings
+                    readings={readings}
+                    keys={Object.entries(dominantKeys).map(([name, count]) => ({
+                      key: name,
+                      count,
+                    }))}
+                    keyLabel={single ? "Key" : "Most frequent key"}
+                    animate={motionAllowed}
+                  />
+                </div>
+                <div
+                  data-slot="audio-profile-column"
+                  className="min-w-0 space-y-5"
+                >
+                  {features}
+                </div>
+              </div>
               {smartMixSection}
               {blissSection}
             </div>

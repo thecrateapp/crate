@@ -300,6 +300,85 @@ describe("track dialog tabs", () => {
   });
 });
 
+it("lays out the album's readings beside the sound spectrum", () => {
+  render(
+    <AudioProfileCard
+      totalTracks={3}
+      analysisData={{
+        "0": {
+          ...empty,
+          tempo: 80,
+          key: "F",
+          scale: "major",
+          loudness: -14,
+          dynamic_range: 20,
+          energy: 0.6,
+          smart_mix: { bpm: 81 },
+        },
+        "1": {
+          ...empty,
+          tempo: 112,
+          key: "F",
+          scale: "major",
+          loudness: -16,
+          dynamic_range: 30,
+          energy: 0.7,
+        },
+        "2": { ...empty, tempo: 65, key: "D", scale: "minor", energy: 0.5 },
+      }}
+      trackLabels={{
+        "0": "World In My Eyes",
+        "1": "Halo",
+        "2": "Personal Jesus",
+      }}
+    />,
+  );
+
+  const layout = document.querySelector('[data-audio-profile-layout="album"]')!;
+  const [readings, sound] = [
+    ...layout.querySelectorAll('[data-slot="audio-profile-column"]'),
+  ];
+  // Smart Mix's tempo wins over the library's when both exist, as before.
+  expect(
+    within(readings as HTMLElement).getByRole("img", {
+      name: "Mean tempo: 86 BPM, from 65 BPM (Personal Jesus) to 112 BPM (Halo)",
+    }),
+  ).toBeInTheDocument();
+  expect(
+    within(readings as HTMLElement).getByRole("img", {
+      name: "Mean loudness: -15.0 dB, from -16.0 dB (Halo) to -14.0 dB (World In My Eyes)",
+    }),
+  ).toBeInTheDocument();
+  expect(
+    within(readings as HTMLElement).getByRole("img", {
+      name: "Mean dynamic range: 25.0 dB, from 20.0 dB (World In My Eyes) to 30.0 dB (Halo)",
+    }),
+  ).toBeInTheDocument();
+  expect(
+    within(within(readings as HTMLElement).getByRole("list", { name: "Keys" }))
+      .getAllByRole("listitem")
+      .map((chip) => chip.textContent),
+  ).toEqual(["F major ×2", "D minor ×1"]);
+  expect(
+    within(sound as HTMLElement).getByRole("list", { name: "Sound features" }),
+  ).toBeInTheDocument();
+});
+
+it("keeps the track dialog's plain readings above its tabs", () => {
+  render(
+    <AudioProfileCard
+      totalTracks={1}
+      presentation="track-dialog"
+      analysisData={{ track: { ...empty, tempo: 119.5 } }}
+    />,
+  );
+
+  expect(screen.getByText("119.5 BPM")).toBeInTheDocument();
+  expect(
+    document.querySelector('[data-slot="album-readings"]'),
+  ).not.toBeInTheDocument();
+});
+
 it("draws the sound features as a spectrum that names the album's extremes", () => {
   render(
     <AudioProfileCard
