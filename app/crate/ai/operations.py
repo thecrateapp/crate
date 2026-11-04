@@ -4,7 +4,7 @@ import importlib
 import time
 
 from crate.ai import configuration as service
-from crate.ai import requeue
+from crate.ai import guard, requeue
 from crate.ai.contracts import AIConfigurationError
 from crate.db.queries.tasks import get_task
 from crate.db.repositories import ai_usage as usage
@@ -63,6 +63,7 @@ def run_probe(context, *, actor_id, job_id, idempotency_key):
     Return {compatible:bool,usage:dict|None,reported_model:str|None}; no source/response.
     This operation owns reservation/finalization; transport must never retry/fallback.
     """
+    guard.require_ai_task("run_probe")
     service.revalidate_context(context)
     try:
         execute_probe = importlib.import_module("crate.ai.runtime").execute_probe

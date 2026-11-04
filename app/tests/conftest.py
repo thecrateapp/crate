@@ -13,6 +13,10 @@ import atexit
 import os
 import sys
 import types
+
+# Unit tests call AI handlers and the runtime directly, outside an AI-lane task;
+# tests/test_ai_lane_guard.py enforces the production default itself.
+os.environ.setdefault("CRATE_AI_LANE_GUARD", "off")
 from contextlib import suppress
 from unittest.mock import MagicMock
 

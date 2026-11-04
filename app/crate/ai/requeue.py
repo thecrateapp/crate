@@ -96,6 +96,11 @@ def concurrency_window(
         _window.reset(token)
 
 
+def inside_ai_task() -> bool:
+    """Whether the current thread runs an ai/ai_bulk task (the actor's window)."""
+    return _window.get() is not None
+
+
 def call_budget_seconds() -> float | None:
     """Seconds a provider call may still take inside this task; None outside one."""
     window = _window.get()
@@ -220,6 +225,7 @@ __all__ = [
     "CAPACITY_WAIT_PROGRESS",
     "call_budget_seconds",
     "concurrency_window",
+    "inside_ai_task",
     "require_call_budget",
     "requeue_delay_ms",
     "reservation_options",

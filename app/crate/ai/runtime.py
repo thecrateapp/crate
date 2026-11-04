@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel
 
-from crate.ai import configuration, requeue, transport
+from crate.ai import configuration, guard, requeue, transport
 from crate.ai.actions import get_action
 from crate.ai.contracts import AIConfigurationError, ProfileConfig
 from crate.ai.consumers import require_action_authority
@@ -130,6 +130,7 @@ def execute_structured(
     server-owned context plus stable job/idempotency identity at execution. No raw
     result is saved in activity; repeat claims fail instead of paying twice.
     """
+    guard.require_ai_task("execute_structured", action_id)
     action = get_action(action_id)
     pinned = deepcopy(
         context
