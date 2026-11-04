@@ -165,3 +165,19 @@ def test_pools_stop_within_the_shared_shutdown_timeout():
         for command in commands
     )
     assert worker.POOL_STOP_GRACE_SECONDS > worker.POOL_SHUTDOWN_TIMEOUT_SECONDS
+
+
+def test_ai_pools_size_their_database_pool_from_their_threads(monkeypatch):
+    monkeypatch.setenv("CRATE_AI_WORKER_THREADS", "3")
+    monkeypatch.delenv("CRATE_SQLALCHEMY_POOL_SIZE", raising=False)
+    general, interactive, bulk = worker._dramatiq_commands(
+        ["default", "ai", "ai_bulk"], 2
+    )
+
+    # Each running task holds a handler and a heartbeat session.
+    assert worker._pool_environment(general) is None
+    assert worker._pool_environment(interactive)["CRATE_SQLALCHEMY_POOL_SIZE"] == "6"
+    assert worker._pool_environment(bulk)["CRATE_SQLALCHEMY_POOL_SIZE"] == "2"
+
+    monkeypatch.setenv("CRATE_SQLALCHEMY_POOL_SIZE", "8")
+    assert worker._pool_environment(interactive)["CRATE_SQLALCHEMY_POOL_SIZE"] == "8"

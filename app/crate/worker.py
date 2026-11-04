@@ -86,6 +86,23 @@ def _dramatiq_commands(queues: Sequence[str], processes: int) -> list[list[str]]
     return commands
 
 
+def _pool_environment(command: Sequence[str]) -> dict[str, str] | None:
+    """Environment for an AI pool process; None keeps the inherited one.
+
+    Every running task holds a handler session and a heartbeat session, so an
+    AI pool with T threads needs at least 2T pooled connections.
+    """
+    queues = list(command[command.index("--queues") + 1 :])
+    if not queues or any(queue not in AI_QUEUES for queue in queues):
+        return None
+    threads = int(command[command.index("--threads") + 1])
+    configured = _env_int("CRATE_SQLALCHEMY_POOL_SIZE", 2) or 2
+    return {
+        **os.environ,
+        "CRATE_SQLALCHEMY_POOL_SIZE": str(max(configured, 2 * threads)),
+    }
+
+
 def _request_pool_stop(
     processes: Sequence, stopping: threading.Event, signum: int
 ) -> None:
@@ -277,7 +294,9 @@ def run_worker(config: dict):
         queues, int(config.get("worker_processes", 6))
     ):
         log.info("Starting Dramatiq: %s", " ".join(dramatiq_cmd))
-        procs.append(subprocess.Popen(dramatiq_cmd))
+        procs.append(
+            subprocess.Popen(dramatiq_cmd, env=_pool_environment(dramatiq_cmd))
+        )
 
     stopping = threading.Event()
 
