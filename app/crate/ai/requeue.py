@@ -173,7 +173,8 @@ def _bulk_wait(window: _Window, reason: str) -> None:
 def reserve_with_capacity_wait(reserve: Callable[[], T]) -> T:
     """Call ``reserve`` and apply the lane's capacity policy.
 
-    ai: a concurrency refusal requeues the task (AIConcurrencyDeferred).
+    ai: a concurrency refusal requeues the task (AIConcurrencyDeferred), but
+    only before its first reservation, because a requeue re-runs the handler.
     ai_bulk: yield first while interactive tasks are pending, then hold the
     item on refusals; after AI_CONCURRENCY_REQUEUE_LIMIT waits the batch stops
     waiting for every later item, so it ends with the results already paid for.
@@ -181,17 +182,22 @@ def reserve_with_capacity_wait(reserve: Callable[[], T]) -> T:
     window = _window.get()
     if window is None or window.queue != AI_BULK_QUEUE:
         try:
-            return reserve()
+            reserved = reserve()
         except AIConfigurationError as error:
             if (
                 error.code != AI_CONCURRENCY_CODE
                 or window is None
                 or window.queue != AI_QUEUE
                 or window.requeues >= AI_CONCURRENCY_REQUEUE_LIMIT
+                # A requeue re-runs the whole handler: only before any paid call.
+                or window.state.get("reserved")
             ):
                 raise
             _measure("ai.capacity.requeue", window.queue)
             raise AIConcurrencyDeferred(window.requeues + 1) from None
+        if window is not None:
+            window.state["reserved"] = int(window.state.get("reserved") or 0) + 1
+        return reserved
 
     exhausted = bool(window.state.get("exhausted"))
     waited = 0

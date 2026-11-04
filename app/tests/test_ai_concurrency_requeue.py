@@ -292,3 +292,20 @@ def test_running_task_returns_to_pending_for_requeue(pg_db):
     request_cancellation(task_id)
     assert requeue_running_task(task_id, progress="again") is None
     assert get_task(task_id)["status"] == "running"
+
+
+def test_requeue_only_before_the_first_paid_call(monkeypatch):
+    # A requeue re-runs the whole handler; after a paid call it would repeat it.
+    calls = []
+
+    def reserve():
+        calls.append(1)
+        if len(calls) == 2:
+            raise AIConfigurationError("AI_CONCURRENCY_LIMIT", "busy")
+        return {"id": "first", "claimed": True}
+
+    with requeue.concurrency_window("ai", 0):
+        assert requeue.reserve_with_capacity_wait(reserve)["id"] == "first"
+        with pytest.raises(AIConfigurationError) as error:
+            requeue.reserve_with_capacity_wait(reserve)
+    assert error.value.code == "AI_CONCURRENCY_LIMIT"
