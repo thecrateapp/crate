@@ -17,6 +17,10 @@ READABLE_ANALYZER_VERSIONS = (
     "smart-mix-audio-v6",
     "smart-mix-audio-v5",
 )
+# Readers accept every profile schema up to the current one. Schema 2 only adds the
+# nullable structure columns, so a schema-1 row still describes the track; Admin
+# coverage, the backfill and track status measure progress against the current one.
+READABLE_PROFILE_VERSIONS = tuple(range(PROFILE_SCHEMA_VERSION, 0, -1))
 PYTHON_ANALYZER = "crate-python"
 MEASUREMENT_VERSION = "bs1770-v1"
 PLANNER_IDENTIFIER = PLANNER_POLICY.identifier
@@ -41,6 +45,7 @@ __all__ = [
     "PROFILE_SCHEMA_VERSION",
     "PYTHON_ANALYZER",
     "READABLE_ANALYZER_VERSIONS",
+    "READABLE_PROFILE_VERSIONS",
     "STRUCTURE_PLANNER_IDENTIFIERS",
     "planner_reads_structure",
 ]

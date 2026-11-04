@@ -163,3 +163,32 @@ def test_only_phrase_planners_read_the_profile_structure() -> None:
     assert versions.planner_reads_structure(versions.PLANNER_IDENTIFIER) is False
     assert versions.planner_reads_structure("smart-mix-v2") is False
     assert versions.planner_reads_structure("smart-mix-v3") is True
+
+
+def test_readers_accept_every_profile_schema_up_to_the_current_one() -> None:
+    readable = versions.READABLE_PROFILE_VERSIONS
+    assert readable[0] == versions.PROFILE_SCHEMA_VERSION
+    assert readable[-1] == 1
+    assert list(readable) == sorted(set(readable), reverse=True)
+    assert len(readable) == versions.PROFILE_SCHEMA_VERSION
+
+
+# Only the code that measures progress towards the target (backfill claims, coverage
+# and the Admin track status) compares a profile with the current schema; readers
+# accept every readable one.
+TARGET_SCHEMA_MODULES = {
+    "app/crate/db/jobs/smart_mix_backfill.py",
+    "app/crate/db/queries/smart_mix_admin_tracks.py",
+}
+
+
+def test_profile_readers_never_require_the_exact_current_schema() -> None:
+    pattern = re.compile(r"profile_version\s*(?:=|<>|!=)\s*:")
+    offenders = sorted(
+        str(path.relative_to(REPO_ROOT))
+        for path in (REPO_ROOT / "app/crate").rglob("*.py")
+        if "migrations" not in path.parts
+        and pattern.search(path.read_text())
+        and str(path.relative_to(REPO_ROOT)) not in TARGET_SCHEMA_MODULES
+    )
+    assert offenders == []

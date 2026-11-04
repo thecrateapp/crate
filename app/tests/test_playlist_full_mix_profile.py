@@ -94,6 +94,31 @@ def test_full_mix_selection_and_count_require_current_full_profiles(
     assert execute_smart_rules(rules, count_only=True) == 8
 
 
+def test_full_mix_selection_reads_every_known_profile_schema(pg_db, monkeypatch):
+    # After a schema bump, rows of the previous schema keep qualifying until the
+    # backfill rewrites them; a schema this build does not know never does.
+    current_schema = PROFILE_SCHEMA_VERSION + 1
+    monkeypatch.setattr(
+        "crate.db.repositories.playlists_rule_engine_executor.READABLE_PROFILE_VERSIONS",
+        tuple(range(current_schema, 0, -1)),
+    )
+    previous = _track(pg_db, 1, profile_version=PROFILE_SCHEMA_VERSION)
+    current = _track(pg_db, 2, profile_version=current_schema)
+    _track(pg_db, 3, profile_version=current_schema + 1)
+    rules = {
+        "rules": [],
+        "limit": 10,
+        "sort": "title",
+        "require_full_mix_profile": True,
+    }
+
+    assert execute_smart_rules(rules, count_only=True) == 2
+    assert [row["id"] for row in execute_smart_rules(rules)] == [
+        previous["id"],
+        current["id"],
+    ]
+
+
 # Profiles of the previous analyzer stay current for readers until the backfill campaign
 # recomputes them; only the version they were written by changes.
 PREVIOUS_ANALYZER_VERSION = "smart-mix-audio-v5"
