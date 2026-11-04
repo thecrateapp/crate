@@ -19,6 +19,11 @@ IMPLICIT_LABELS = ("service", "target")
 
 FAMILIES = (
     (
+        "ai.capacity.",
+        "AI capacity",
+        "Tasks on the AI lanes that found no free provider slot, per lane: an ai task requeued before its first paid call, or an ai_bulk item waiting inside its task budget.",
+    ),
+    (
         "api.request.",
         "API requests",
         "Requests to the FastAPI application by route template, method, status class and latency class, and requests per client application.",

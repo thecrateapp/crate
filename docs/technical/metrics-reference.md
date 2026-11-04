@@ -37,9 +37,18 @@ bytes and ratios. **Prometheus** is the exported family name, without the
 not exported is still in System Health or the PostgreSQL history. See
 [Observability](observability.md) for what each surface shows.
 
-The catalogue defines 840 metrics; 78 are exported to Prometheus.
+The catalogue defines 842 metrics; 78 are exported to Prometheus.
 
 ## Metrics by family
+
+### AI capacity
+
+Tasks on the AI lanes that found no free provider slot, per lane: an ai task requeued before its first paid call, or an ai_bulk item waiting inside its task budget.
+
+| Metric | Type | Unit | Labels | Prometheus | Shown in |
+| --- | --- | --- | --- | --- | --- |
+| `ai.capacity.requeue` | counter | 1 | `queue` | not exported | PostgreSQL history only |
+| `ai.capacity.wait` | counter | 1 | `queue` | not exported | PostgreSQL history only |
 
 ### API requests
 
