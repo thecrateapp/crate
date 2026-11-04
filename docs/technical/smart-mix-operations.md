@@ -137,8 +137,8 @@ and `structureConfidence`. Readers accept v7, v6 and v5 profiles
 
 Migration 147 stores the structure in nullable `track_mix_profiles` columns: `phrases`
 (JSON list of `start_beat`, `start_ms`, `bars`, `energy`, `delta_energy`, `kind`),
-`energy_curve` (one byte per bar), `vocal_presence` (one byte per phrase; always null while
-the voice detector is off) and `structure_confidence` (REAL, four decimals). Profiles written
+`energy_curve` (one byte per bar), `vocal_presence` (one byte per phrase, see "Voice per
+phrase" below) and `structure_confidence` (REAL, four decimals). Profiles written
 before v7 keep null structure. An empty phrase list with confidence 0 means the track could
 not be segmented, which is different from null.
 
@@ -148,12 +148,44 @@ same columns as before. The public profile endpoint and the plan responses do no
 structure yet; Admin reads it through `GET /api/admin/smart-mix/tracks/{id}/structure` and,
 for accounts with `library.analysis.manage`, draws it in a track's audio profile (album track
 list, **Show audio profile**): a 1 px rule at each phrase boundary, the kind and length of each
-phrase, and the energy curve as a 1 px lane, on the track's time axis.
+phrase, a 1 px voice lane and the energy curve as a 1 px lane, on the track's time axis.
 
 `PROFILE_SCHEMA_VERSION` stays `1`: the VirtualDJ plugin 1.0.0 refuses capabilities and
 profiles of any other schema. Readers accept every schema up to the current one
 (`READABLE_PROFILE_VERSIONS`), and the backfill, coverage and campaign target the analyzer
 and the schema together, so a later schema bump needs no other server change.
+
+### Voice per phrase
+
+Since SM3-D13 a profile with phrases also says how much of each phrase has an audible sung or
+spoken voice, so a transition can avoid laying one voice over another.
+
+- **Model.** YAMNet (Google, AudioSet, Apache-2.0), ported to PyTorch in
+  `crate/smart_mix/voice_model.py` with Google's original weights. The analysis image builds
+  them in its `yamnet-weights` stage: it downloads `yamnet.h5`, the class map and the licence,
+  checks their sha256 and converts the weights with `scripts/convert_yamnet_weights.py` to
+  `/app/models/yamnet.npz` (licence at `/app/models/yamnet.LICENSE`). Essentia's packaged
+  YAMNet graph is not used: its models are licensed for non-commercial use only. The port
+  matches Google's TensorFlow reference within 5e-6 (`test_smart_mix_voice_model.py`).
+- **Byte.** YAMNet scores 0.975 s patches every 0.48 s; a patch is voiced when its highest
+  AudioSet voice class (speech, narration, singing, choir, chant, rapping) reaches
+  `WINDOW_THRESHOLD`. A phrase's byte is the share of its voiced patches (0-255) and it counts
+  as voiced from `VOCAL_THRESHOLD` (`crate/smart_mix/vocals.py`). Both thresholds are
+  provisional until gate SG1b calibrates them on hand-reviewed phrases with
+  `tools/smart-mix-eval/vocals/compare_models.py`.
+- **Where it runs.** `compute_smart_mix_profile` adds the voice after the analysis, from the
+  Rust analyzer or the Python fallback, so both analyzers stay identical. Without torch or the
+  weights (`PANNS=off`, or `CRATE_YAMNET_WEIGHTS` pointing nowhere), or when decoding or the
+  model fails, the profile is published without voice and the worker logs a warning.
+- **Cost.** About 0.7 s of CPU per minute of audio with the analysis worker's single native
+  thread (`OMP_NUM_THREADS=1`); `test_voice_overhead_within_budget` (run with `--benchmark`)
+  fails above 1.5 s.
+- **Storage.** Migration 148 adds `vocal_detector` (`yamnet-1`), set together with
+  `vocal_presence` or not at all. Voice ships inside `smart-mix-audio-v7`, so a draft that
+  brings a detector the stored profile lacks replaces it at the same quality, and a run
+  without the model never strips stored voice. Reanalyzing a v7 track from Admin therefore
+  adds its voice; changing the detector name recomputes every profile through the backfill
+  without a new analyzer version.
 
 ### Analyzer v6
 

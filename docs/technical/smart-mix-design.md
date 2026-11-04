@@ -154,6 +154,11 @@ All the pending work is part of the same feature: contracts, backfill, Android, 
 
 ### Audio measurements with verifiable semantics
 
+Per-phrase voice (Smart Mix 3, SM3-D13) is a model measurement, not a signal heuristic: YAMNet
+with Google's Apache-2.0 weights runs after the analysis and stores one byte per phrase with
+the detector that produced it. Operation, cost and calibration are in
+[smart-mix-operations.md](smart-mix-operations.md#voice-per-phrase).
+
 Two representations are used for different purposes. The mono/resampled downmix remains valid for onsets, tempo, energy and key. Loudness and true peak are computed over the source channels with a meter that conforms to the declared algorithm; never over the mono average. `introLufs` and `outroLufs` are the loudness of documented windows; `integratedLufs` is the measurement of the whole program if it could be computed. `truePeakDbfs` is the maximum true peak across channels and not the sample peak of the downmix. Silence, a signal that is too short, an unsupported layout or an interrupted analysis produce `null` for the measurement that could not be obtained, not an invented number.
 
 Integrate an existing meter with PCM streaming instead of writing another BS.1770 approximation in each language. Proposal: an adapter over the libebur128 family/a compatible implementation in production; once build and license are verified in the current images, pin the implementation and version in both backends. FFmpeg `ebur128` can act as an independent acceptance oracle and as an explicit fallback if the native dependency is not available. The adapter interface must allow testing the analyzers with a fake meter, but acceptance runs the real one. The choice of binding is an implementation decision within SM02: it does not alter the units, fixtures or gates. Primary references: [ITU-R BS.1770-5](https://www.itu.int/rec/R-REC-BS.1770-5-202311-I/en), [FFmpeg's ebur128 implementation](https://ffmpeg.org/doxygen/8.0/f__ebur128_8c_source.html).
