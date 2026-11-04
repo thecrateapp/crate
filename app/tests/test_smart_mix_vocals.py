@@ -1,13 +1,14 @@
-"""Optional per-phrase voice detector (SM3-D2, SM1.PR4).
+"""Per-phrase voice of Smart Mix profiles (SM3-D13).
 
-The detector stays off until it reaches the design's precision and recall on phrases
-labelled by hand (design §10, gate SG1). These tests use synthetic audio built here,
-never the segmentation output.
+YAMNet scores 0.975 s patches (``crate.smart_mix.voice_model``, with its own parity
+tests); these tests feed hand-made patch scores and a fake model, never the network.
 """
 
 from __future__ import annotations
 
 import csv
+import logging
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -15,91 +16,127 @@ import numpy as np
 import pytest
 
 from crate.smart_mix import vocals
-from crate.smart_mix.models import Phrase
+from crate.smart_mix.models import MixProfileQuality, Phrase, TrackMixProfileDraft
+from crate.smart_mix.voice_model import VoiceWindows
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LABELS_CSV = REPO_ROOT / "tools/smart-mix-eval/vocals_labels.csv"
 SCORES_CSV = REPO_ROOT / "tools/smart-mix-eval/vocals_scores.csv"
-RATE = 22_050
-SPAN_MS = 4_000
+VOICED = min(1.0, vocals.WINDOW_THRESHOLD * 2)
+UNVOICED = vocals.WINDOW_THRESHOLD / 2
+# Windows are centred every 480 ms from 488 ms: each span holds four of them.
+SPANS = [(400 + 1_920 * k, 2_320 + 1_920 * k) for k in range(3)]
 
 
-def _seconds(ms: int) -> np.ndarray:
-    return np.arange(int(RATE * ms / 1_000)) / RATE
+def _windows(scores: list[float]) -> VoiceWindows:
+    values = np.asarray(scores, dtype=np.float32)
+    return VoiceWindows(centres_ms=np.arange(len(values)) * 480 + 488, scores=values)
 
 
-def _sung(ms: int) -> np.ndarray:
-    """A sustained vowel: 220 Hz with vibrato and formant-shaped harmonics."""
-    t = _seconds(ms)
-    f0 = 220.0 * (1.0 + 0.01 * np.sin(2 * np.pi * 5.5 * t))
-    phase = 2 * np.pi * np.cumsum(f0) / RATE
-    voice = np.zeros_like(t)
-    for harmonic in range(1, 16):
-        frequency = 220.0 * harmonic
-        formants = np.exp(-(((frequency - 700.0) / 300.0) ** 2)) + 0.6 * np.exp(
-            -(((frequency - 1_200.0) / 400.0) ** 2)
+def _phrases(count: int) -> tuple[Phrase, ...]:
+    return tuple(
+        Phrase(
+            start_beat=32 * index,
+            start_ms=500 + 16_000 * index,
+            bars=8,
+            energy=0.5,
+            delta_energy=None if index == 0 else 0.0,
+            kind="body",
         )
-        voice += (0.05 + formants) * np.sin(harmonic * phase) / harmonic
-    return 0.3 * voice / np.max(np.abs(voice))
-
-
-def _kick(ms: int) -> np.ndarray:
-    t = _seconds(ms)
-    beat = (t % 0.5) < 0.12
-    return 0.6 * beat * np.sin(2 * np.pi * 55.0 * t) * np.exp(-(t % 0.5) * 20)
-
-
-def _noise(ms: int) -> np.ndarray:
-    return 0.2 * np.random.default_rng(7).standard_normal(_seconds(ms).size)
-
-
-def _spans(count: int) -> list[tuple[int, int]]:
-    return [(index * SPAN_MS, (index + 1) * SPAN_MS) for index in range(count)]
-
-
-def test_one_byte_per_phrase() -> None:
-    audio = np.concatenate([_sung(SPAN_MS), _kick(SPAN_MS)])
-
-    presence = vocals.phrase_vocal_presence(audio, RATE, _spans(2))
-
-    assert isinstance(presence, bytes)
-    assert len(presence) == 2
-    assert vocals.phrase_vocal_presence(audio, RATE, []) == b""
-
-
-def test_scores_a_sung_phrase_above_drums_noise_and_silence() -> None:
-    audio = np.concatenate(
-        [
-            _sung(SPAN_MS),
-            _kick(SPAN_MS),
-            _noise(SPAN_MS),
-            np.zeros(_seconds(SPAN_MS).size),
-        ]
+        for index in range(count)
     )
 
-    sung, kick, noise, silence = vocals.phrase_vocal_presence(audio, RATE, _spans(4))
 
-    assert sung >= vocals.VOCAL_THRESHOLD
-    assert max(kick, noise) < vocals.VOCAL_THRESHOLD
-    assert silence == 0
-
-
-def test_a_voice_over_a_kick_still_scores_as_voice() -> None:
-    audio = _sung(SPAN_MS) + 0.5 * _kick(SPAN_MS)
-
-    [score] = vocals.phrase_vocal_presence(audio, RATE, _spans(1))
-
-    assert score >= vocals.VOCAL_THRESHOLD
-
-
-def test_spans_outside_the_audio_score_zero() -> None:
-    audio = _sung(SPAN_MS)
-
-    presence = vocals.phrase_vocal_presence(
-        audio, RATE, [(0, SPAN_MS), (SPAN_MS, 2 * SPAN_MS)]
+def _draft(phrases: tuple[Phrase, ...] | None) -> TrackMixProfileDraft:
+    return TrackMixProfileDraft(
+        analyzer="crate-rust",
+        analyzer_version="smart-mix-audio-v7",
+        duration_ms=60_000,
+        quality=MixProfileQuality.FULL,
+        bpm=120.0,
+        bpm_confidence=0.95,
+        tempo_stability=0.97,
+        beat_anchor_ms=500,
+        downbeat_anchor_ms=500,
+        time_signature=4,
+        beat_grid_ms=tuple(500 + 500 * beat for beat in range(110)),
+        phrases=phrases,
+        energy_curve=None if phrases is None else bytes(8 * len(phrases)),
+        structure_confidence=None if phrases is None else 0.6,
     )
 
-    assert presence[1] == 0
+
+class _FakeModel:
+    def __init__(self, windows: VoiceWindows | Exception) -> None:
+        self.windows = windows
+        self.audio: list[np.ndarray] = []
+
+    def voice_windows(self, audio: np.ndarray) -> VoiceWindows:
+        self.audio.append(audio)
+        if isinstance(self.windows, Exception):
+            raise self.windows
+        return self.windows
+
+
+def test_phrase_byte_is_fraction_of_voiced_windows() -> None:
+    windows = _windows([VOICED] * 4 + [UNVOICED] * 4 + [VOICED, UNVOICED] * 2)
+
+    assert vocals.phrase_vocal_presence(windows, SPANS) == bytes([255, 0, 128])
+
+
+def test_spans_without_windows_score_zero() -> None:
+    windows = _windows([VOICED] * 4)
+
+    assert vocals.phrase_vocal_presence(windows, SPANS[:2]) == bytes([255, 0])
+
+
+def test_no_voice_without_phrases() -> None:
+    assert vocals.phrase_vocal_presence(_windows([VOICED]), []) == b""
+    model = _FakeModel(_windows([VOICED]))
+
+    draft = vocals.add_vocal_presence(_draft(None), "/music/track.flac", model=model)
+
+    assert draft.vocal_presence is None
+    assert model.audio == []
+
+
+def test_missing_model_leaves_voice_null(monkeypatch) -> None:
+    monkeypatch.setattr(vocals, "load_voice_model", lambda: None)
+    draft = _draft(_phrases(3))
+
+    assert vocals.add_vocal_presence(draft, "/music/track.flac") is draft
+
+
+def test_voice_is_added_with_its_detector(monkeypatch) -> None:
+    monkeypatch.setattr(
+        vocals, "load_audio", lambda _path: np.zeros(16_000, dtype=np.float32)
+    )
+    windows = _windows([VOICED] * 34 + [UNVOICED] * 34 + [VOICED] * 34)
+    draft = _draft(_phrases(3))
+
+    voiced = vocals.add_vocal_presence(
+        draft, "/music/track.flac", model=_FakeModel(windows)
+    )
+
+    assert voiced.vocal_detector == vocals.VOCAL_DETECTOR
+    assert voiced.vocal_presence == vocals.phrase_vocal_presence(
+        windows, vocals.phrase_spans_ms(draft.phrases, draft.beat_grid_ms)
+    )
+    assert replace(voiced, vocal_presence=None, vocal_detector=None) == draft
+
+
+def test_a_failing_model_keeps_the_profile_without_voice(monkeypatch, caplog) -> None:
+    monkeypatch.setattr(
+        vocals, "load_audio", lambda _path: np.zeros(16_000, dtype=np.float32)
+    )
+    draft = _draft(_phrases(3))
+    model = _FakeModel(RuntimeError("out of memory"))
+
+    with caplog.at_level(logging.WARNING):
+        result = vocals.add_vocal_presence(draft, "/music/track.flac", model=model)
+
+    assert result is draft
+    assert "voice" in caplog.text
 
 
 def test_phrase_spans_end_at_the_next_phrase_or_after_the_last_bars() -> None:
@@ -143,7 +180,8 @@ def test_phrase_spans_end_at_the_next_phrase_or_after_the_last_bars() -> None:
 
 
 def test_the_analyzer_does_not_run_the_detector() -> None:
-    # SG1 decides whether it is switched on; until then profiles keep no voice bytes.
+    # Voice is added by the profile task after the analysis (Rust or Python), so both
+    # analyzers stay identical and the parity tests keep holding.
     source = (REPO_ROOT / "app/crate/smart_mix/analyzer.py").read_text()
 
     assert "vocals" not in source

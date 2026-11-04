@@ -38,6 +38,7 @@ PHRASE_KINDS = ("intro", "build", "peak", "break", "outro", "body")
 PHRASE_BAR_LENGTHS = (8, 16, 32)
 MAX_PHRASES = 120
 MAX_ENERGY_CURVE_BARS = 2048
+MAX_VOCAL_DETECTOR = 32
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,6 +157,7 @@ class TrackMixProfileDraft:
     phrases: tuple[Phrase, ...] | None = None
     energy_curve: bytes | None = None
     vocal_presence: bytes | None = None
+    vocal_detector: str | None = None
     structure_confidence: float | None = None
 
     def __post_init__(self) -> None:
@@ -262,6 +264,7 @@ class TrackMixProfile:
     phrases: tuple[Phrase, ...] | None = None
     energy_curve: bytes | None = None
     vocal_presence: bytes | None = None
+    vocal_detector: str | None = None
     structure_confidence: float | None = None
 
     def __post_init__(self) -> None:
@@ -544,6 +547,7 @@ def mix_profile_draft_from_payload(payload: Mapping[str, Any]) -> TrackMixProfil
         phrases=_phrases_from_payload(value("phrases", "phrases")),
         energy_curve=_bytes_from_payload(value("energy_curve", "energyCurve")),
         vocal_presence=_bytes_from_payload(value("vocal_presence", "vocalPresence")),
+        vocal_detector=value("vocal_detector", "vocalDetector"),
         structure_confidence=value("structure_confidence", "structureConfidence"),
     )
 
@@ -612,6 +616,15 @@ def _validate_structure(profile: Any) -> None:
         if phrases is None or len(vocals) != len(phrases):
             raise ValueError("vocal_presence needs one byte per phrase")
         object.__setattr__(profile, "vocal_presence", vocals)
+    detector = getattr(profile, "vocal_detector", None)
+    if (detector is None) != (vocals is None):
+        raise ValueError("vocal_presence and vocal_detector go together")
+    if detector is not None and (
+        not isinstance(detector, str) or not 0 < len(detector) <= MAX_VOCAL_DETECTOR
+    ):
+        raise ValueError(
+            f"vocal_detector must name the detector in 1-{MAX_VOCAL_DETECTOR} characters"
+        )
     confidence = profile.structure_confidence
     if confidence is not None:
         object.__setattr__(

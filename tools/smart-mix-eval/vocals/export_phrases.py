@@ -46,7 +46,6 @@ SCORE_FIELDS = (
 )
 DSN_ENVIRONMENT_VARIABLE = "SMART_MIX_EVAL_DSN"
 LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
-ANALYSIS_SAMPLE_RATE = 22_050
 
 
 class UnsafeDatabaseError(RuntimeError):
@@ -212,7 +211,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     if str(APP_ROOT) not in sys.path:
         sys.path.insert(0, str(APP_ROOT))
-    from crate.smart_mix.vocals import VOCAL_DETECTOR_VERSION, phrase_vocal_presence
+    from crate.smart_mix.vocals import (
+        VOCAL_DETECTOR_VERSION,
+        load_audio,
+        load_voice_model,
+        phrase_vocal_presence,
+    )
+
+    model = load_voice_model() if args.score else None
+    if args.score and model is None:
+        print(
+            "No YAMNet model: set CRATE_YAMNET_WEIGHTS to the converted yamnet.npz "
+            "(app/scripts/convert_yamnet_weights.py).",
+            file=sys.stderr,
+        )
+        return 2
 
     labels: list[dict[str, Any]] = []
     scores: list[dict[str, Any]] = []
@@ -231,18 +244,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         labels.extend(rows)
         exported.add(uid)
-        if args.score:
-            import librosa
-
-            audio, _ = librosa.load(
-                local_path(track["path"], args.library_root, args.music_root),
-                sr=ANALYSIS_SAMPLE_RATE,
-                mono=True,
+        if model is not None:
+            windows = model.voice_windows(
+                load_audio(
+                    local_path(track["path"], args.library_root, args.music_root)
+                )
             )
             presence = phrase_vocal_presence(
-                audio,
-                ANALYSIS_SAMPLE_RATE,
-                [(row["start_ms"], row["end_ms"]) for row in rows],
+                windows, [(row["start_ms"], row["end_ms"]) for row in rows]
             )
             scores.extend(
                 {

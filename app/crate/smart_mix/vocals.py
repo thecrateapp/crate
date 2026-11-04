@@ -1,98 +1,115 @@
-"""Optional voice presence per phrase for Smart Mix profiles (SM3-D2).
+"""Voice presence per phrase for Smart Mix profiles (SM3-D13).
 
-A cheap spectral heuristic, not a source separator. A sung or spoken voice puts most of
-a frame's power in the telephone band (300 to 3,400 Hz) and, being harmonic, keeps that
-band peaky: its spectral flatness is low. Kicks and bass fall below the band, hi-hats and
-noise spread across it flat. Each STFT frame scores the product of two ramps, the band's
-share of the frame's power and how tonal the band is; a phrase scores the mean of its
-audible frames, as one byte (0 to 255).
+YAMNet (``crate.smart_mix.voice_model``) scores each 0.975 s patch of the track for the
+AudioSet voice classes. A phrase's byte is the share of the patches centred inside it
+that reach ``WINDOW_THRESHOLD``, from 0 (none) to 255 (all), and the phrase counts as
+voiced from ``VOCAL_THRESHOLD``. The spectral heuristic this replaced (detector version
+1) found no voice on clearly sung tracks at gate SG1 and was dropped.
 
-Harmonic leads and pads inside the band look like voice to it. That is why the detector
-stays off: the analyzer does not call it, and profiles keep ``vocal_presence`` null,
-until it reaches ``MIN_PRECISION`` and ``MIN_RECALL`` on the hand-labelled phrases of
-``tools/smart-mix-eval/vocals_labels.csv`` (design §10, gate SG1).
+The profile task adds the voice after the analysis, Rust or Python, so both analyzers
+stay identical. Without the model (no torch or no weights) or when it fails, the profile
+is stored without voice.
+
+Both thresholds are provisional until gate SG1b calibrates them on the reviewed labels
+(``tools/smart-mix-eval/vocals_labels.csv``) with
+``tools/smart-mix-eval/vocals/compare_models.py``. YAMNet gives the voice classes low
+probabilities over dense music, so the window threshold is small.
 """
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
+from dataclasses import replace
+from pathlib import Path
+from typing import Protocol
 
 import numpy as np
 
+from crate.smart_mix.models import TrackMixProfileDraft
 from crate.smart_mix.phrase_grid import phrase_spans_ms
+from crate.smart_mix.voice_model import SAMPLE_RATE, VoiceWindows, load_voice_model
 
-VOCAL_DETECTOR_VERSION = 1
-VOICE_BAND_HZ = (300.0, 3_400.0)
-FFT_SIZE = 2_048
-HOP_LENGTH = 1_024
-# Frames quieter than this carry no voice and are left out of the phrase mean.
-SILENCE_DB = -50.0
-# Share of the frame's power inside the voice band: none below the floor, full above.
-BAND_SHARE_FLOOR = 0.40
-BAND_SHARE_FULL = 0.80
-# Spectral flatness of the voice band: tonal (full) below, noise (none) above.
-TONAL_FLATNESS = 0.10
-NOISY_FLATNESS = 0.45
-# A phrase with a byte at or above this counts as having voice.
-VOCAL_THRESHOLD = 128
-# Design §10: the detector is switched on only above both, on 100 labelled phrases.
+log = logging.getLogger(__name__)
+
+VOCAL_DETECTOR = "yamnet-1"
+# Scores CSV version: 1 was the spectral heuristic, 2 is YAMNet.
+VOCAL_DETECTOR_VERSION = 2
+# Provisional until SG1b: voice-class score that makes a patch voiced.
+WINDOW_THRESHOLD = 0.003
+# Provisional until SG1b: a phrase is voiced when a quarter of its patches are.
+VOCAL_THRESHOLD = 64
+# Design §10.
 MIN_PRECISION = 0.8
 MIN_RECALL = 0.7
-_EPSILON = 1e-12
+
+
+class VoiceModel(Protocol):
+    def voice_windows(self, waveform: np.ndarray) -> VoiceWindows: ...
 
 
 def phrase_vocal_presence(
-    audio: np.ndarray, sample_rate: int, spans_ms: Sequence[tuple[int, int]]
+    windows: VoiceWindows, spans_ms: Sequence[tuple[int, int]]
 ) -> bytes:
-    """One byte per span: 0 for no voice up to 255 for voice in every audible frame."""
-    if not spans_ms:
-        return b""
-    samples = np.asarray(audio, dtype=np.float64)
-    scores = _frame_scores(samples, sample_rate)
-    return bytes(
-        _span_byte(scores, sample_rate, start_ms, end_ms)
-        for start_ms, end_ms in spans_ms
-    )
+    """One byte per span: the share of its patches that reach WINDOW_THRESHOLD."""
+    centres = np.asarray(windows.centres_ms)
+    voiced = np.asarray(windows.scores) >= WINDOW_THRESHOLD
+    presence = bytearray()
+    for start_ms, end_ms in spans_ms:
+        inside = (centres >= start_ms) & (centres < end_ms)
+        count = int(inside.sum())
+        presence.append(round(255 * int(voiced[inside].sum()) / count) if count else 0)
+    return bytes(presence)
 
 
-def _frame_scores(audio: np.ndarray, sample_rate: int) -> np.ndarray:
-    """Voice score of each STFT frame (NaN for silent frames); frame i starts at i * hop."""
-    if audio.size < FFT_SIZE or sample_rate <= 0:
-        return np.empty(0)
-    frames = np.lib.stride_tricks.sliding_window_view(audio, FFT_SIZE)[::HOP_LENGTH]
-    loudness_db = 10.0 * np.log10(np.mean(frames**2, axis=1) + _EPSILON)
-    power = np.abs(np.fft.rfft(frames * np.hanning(FFT_SIZE), axis=1)) ** 2
-    frequencies = np.fft.rfftfreq(FFT_SIZE, 1.0 / sample_rate)
-    in_band = (frequencies >= VOICE_BAND_HZ[0]) & (frequencies <= VOICE_BAND_HZ[1])
-    band = power[:, in_band] + _EPSILON
-    share = band.sum(axis=1) / (power.sum(axis=1) + _EPSILON)
-    flatness = np.exp(np.mean(np.log(band), axis=1)) / np.mean(band, axis=1)
-    scores = _ramp(share, BAND_SHARE_FLOOR, BAND_SHARE_FULL) * _ramp(
-        flatness, NOISY_FLATNESS, TONAL_FLATNESS
-    )
-    return np.where(loudness_db >= SILENCE_DB, scores, np.nan)
+def load_audio(path: str | Path) -> np.ndarray:
+    """Mono audio at YAMNet's 16 kHz, with Essentia when present, else librosa."""
+    try:
+        from essentia.standard import MonoLoader
+    except ImportError:
+        import librosa
+
+        audio, _rate = librosa.load(str(path), sr=SAMPLE_RATE, mono=True)
+        return np.asarray(audio, dtype=np.float32)
+    loader = MonoLoader(filename=str(path), sampleRate=SAMPLE_RATE, resampleQuality=4)
+    return np.asarray(loader(), dtype=np.float32)
 
 
-def _span_byte(scores: np.ndarray, sample_rate: int, start_ms: int, end_ms: int) -> int:
-    first = int(np.ceil(start_ms * sample_rate / 1_000 / HOP_LENGTH))
-    last = int((end_ms * sample_rate / 1_000 - FFT_SIZE) // HOP_LENGTH)
-    audible = scores[max(first, 0) : max(last + 1, 0)]
-    audible = audible[~np.isnan(audible)]
-    if audible.size == 0:
-        return 0
-    return int(round(255 * float(np.mean(audible))))
-
-
-def _ramp(values: np.ndarray, none: float, full: float) -> np.ndarray:
-    """0 at ``none``, 1 at ``full``, linear in between (either direction)."""
-    return np.clip((values - none) / (full - none), 0.0, 1.0)
+def add_vocal_presence(
+    draft: TrackMixProfileDraft,
+    path: str | Path,
+    *,
+    model: VoiceModel | None = None,
+) -> TrackMixProfileDraft:
+    """The draft with one voice byte per phrase, or unchanged when there is no voice."""
+    if not draft.phrases:
+        return draft
+    voice_model = model if model is not None else load_voice_model()
+    if voice_model is None:
+        return draft
+    try:
+        windows = voice_model.voice_windows(load_audio(path))
+        presence = phrase_vocal_presence(
+            windows, phrase_spans_ms(draft.phrases, draft.beat_grid_ms)
+        )
+    except Exception:
+        log.warning(
+            "Smart Mix voice failed for %s; storing no voice", path, exc_info=True
+        )
+        return draft
+    return replace(draft, vocal_presence=presence, vocal_detector=VOCAL_DETECTOR)
 
 
 __all__ = [
     "MIN_PRECISION",
     "MIN_RECALL",
+    "VOCAL_DETECTOR",
     "VOCAL_DETECTOR_VERSION",
     "VOCAL_THRESHOLD",
+    "WINDOW_THRESHOLD",
+    "add_vocal_presence",
+    "load_audio",
+    "load_voice_model",
     "phrase_spans_ms",
     "phrase_vocal_presence",
 ]
