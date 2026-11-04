@@ -157,3 +157,9 @@ def test_rust_structure_constants_match_python() -> None:
     assert set(rust) == set(python)
     for name, expected in python.items():
         assert rust[name] == expected, name
+
+
+def test_only_phrase_planners_read_the_profile_structure() -> None:
+    assert versions.planner_reads_structure(versions.PLANNER_IDENTIFIER) is False
+    assert versions.planner_reads_structure("smart-mix-v2") is False
+    assert versions.planner_reads_structure("smart-mix-v3") is True

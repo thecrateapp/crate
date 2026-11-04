@@ -198,6 +198,10 @@ def upsert_track_mix_profile_draft(
             active_end_ms=draft.active_end_ms,
             integrated_lufs=draft.integrated_lufs,
             measurement_version=draft.measurement_version,
+            phrases=draft.phrases,
+            energy_curve=draft.energy_curve,
+            vocal_presence=draft.vocal_presence,
+            structure_confidence=draft.structure_confidence,
             analyzed_at=datetime.now(UTC),
         )
         return upsert_track_mix_profile(

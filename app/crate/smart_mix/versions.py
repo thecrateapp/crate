@@ -21,6 +21,14 @@ PYTHON_ANALYZER = "crate-python"
 MEASUREMENT_VERSION = "bs1770-v1"
 PLANNER_IDENTIFIER = PLANNER_POLICY.identifier
 PLANNER_POLICY_VERSION = PLANNER_POLICY.version
+# Planners whose plans read phrases and the energy curve (SM3-D3). Profile reads for
+# any other planner leave the structure columns out, so v2 planning reads what it did
+# before the structure was persisted.
+STRUCTURE_PLANNER_IDENTIFIERS = frozenset({"smart-mix-v3"})
+
+
+def planner_reads_structure(planner_identifier: str) -> bool:
+    return planner_identifier in STRUCTURE_PLANNER_IDENTIFIERS
 
 
 __all__ = [
@@ -33,4 +41,6 @@ __all__ = [
     "PROFILE_SCHEMA_VERSION",
     "PYTHON_ANALYZER",
     "READABLE_ANALYZER_VERSIONS",
+    "STRUCTURE_PLANNER_IDENTIFIERS",
+    "planner_reads_structure",
 ]

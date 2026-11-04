@@ -168,6 +168,33 @@ def test_batch_plans_deduplicate_edges_and_load_profiles_once(
     assert len(planned) == 1
 
 
+def test_v2_plans_read_profiles_without_the_structure(test_app, monkeypatch) -> None:
+    from crate.api import smart_mix
+
+    reads: list[dict] = []
+
+    def fake_profiles(entity_uids, **kwargs):
+        reads.append(kwargs)
+        return [_profile(uid) for uid in entity_uids]
+
+    monkeypatch.setattr(
+        smart_mix, "get_track_mix_profiles_by_entity_uids", fake_profiles
+    )
+    monkeypatch.setattr(smart_mix, "get_smart_mix_plan_caches", lambda _keys: {})
+    monkeypatch.setattr(smart_mix, "set_smart_mix_plan_caches", lambda _plans: None)
+
+    response = test_app.post(
+        "/api/playback/transition-plans",
+        json={
+            "plannerVersion": "smart-mix-v2",
+            "edges": [_edge(str(uuid.uuid4()), str(uuid.uuid4()))],
+        },
+    )
+
+    assert response.status_code == 200
+    assert reads == [{"include_structure": False}]
+
+
 def test_bass_handoff_follows_the_request_and_splits_the_plan_cache(
     test_app,
     monkeypatch,

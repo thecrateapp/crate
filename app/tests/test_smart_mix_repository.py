@@ -4,7 +4,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 import uuid
 
-from sqlalchemy import text
+from sqlalchemy import event, text
 
 from crate.db.repositories.smart_mix import (
     get_track_mix_profile,
@@ -14,7 +14,7 @@ from crate.db.repositories.smart_mix import (
     upsert_track_mix_profile,
 )
 from crate.db.tx import transaction_scope
-from crate.smart_mix.models import MixProfileQuality, TrackMixProfile
+from crate.smart_mix.models import MixProfileQuality, Phrase, TrackMixProfile
 
 
 def test_repository_upserts_reads_and_skips_unchanged_revision(pg_db) -> None:
@@ -156,6 +156,59 @@ def test_profile_is_deleted_with_its_library_track(pg_db) -> None:
         )
 
     assert get_track_mix_profile(track_id) is None
+
+
+def test_profile_reads_load_the_structure_only_when_asked(pg_db) -> None:
+    del pg_db
+    from crate.db.engine import get_engine
+
+    track_id, track_uid = _create_track("structure-columns")
+    phrases = (
+        Phrase(
+            start_beat=0,
+            start_ms=500,
+            bars=32,
+            energy=0.7,
+            delta_energy=None,
+            kind="body",
+        ),
+    )
+    upsert_track_mix_profile(
+        track_id,
+        replace(
+            _profile(track_uid),
+            phrases=phrases,
+            energy_curve=bytes(range(32)),
+            structure_confidence=0.5,
+        ),
+    )
+    statements: list[str] = []
+
+    def capture(_conn, _cursor, statement, *_args) -> None:
+        if "track_mix_profiles" in statement:
+            statements.append(statement)
+
+    engine = get_engine()
+    event.listen(engine, "before_cursor_execute", capture)
+    try:
+        [plain] = get_track_mix_profiles_by_entity_uids([track_uid])
+        plain_sql = list(statements)
+        statements.clear()
+        [structured] = get_track_mix_profiles_by_entity_uids(
+            [track_uid], include_structure=True
+        )
+        structured_sql = list(statements)
+    finally:
+        event.remove(engine, "before_cursor_execute", capture)
+
+    # A v2 plan read costs what it did before the structure existed.
+    assert len(plain_sql) == 1
+    for column in ("phrases", "energy_curve", "vocal_presence", "structure_confidence"):
+        assert column not in plain_sql[0]
+        assert column in structured_sql[0]
+    assert plain is not None and plain.phrases is None
+    assert structured is not None and structured.phrases == phrases
+    assert structured.energy_curve == bytes(range(32))
 
 
 def _create_track(name: str) -> tuple[int, str]:

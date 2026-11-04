@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 import uuid
 
@@ -15,7 +16,7 @@ from crate.db.repositories.library_processing_state import (
 )
 from crate.db.repositories.smart_mix import get_track_mix_profile
 from crate.db.tx import read_scope, transaction_scope
-from crate.smart_mix.models import MixProfileQuality, TrackMixProfileDraft
+from crate.smart_mix.models import MixProfileQuality, Phrase, TrackMixProfileDraft
 
 
 def test_smart_mix_storage_upserts_without_mutating_legacy_analysis(
@@ -197,6 +198,131 @@ def test_invalid_embedded_profile_does_not_rollback_legacy_analysis(
     assert row["bpm"] == 123.0
     assert row["quality"] == "unavailable"
     assert row["state"] == "failed"
+
+
+STRUCTURE_PHRASES = (
+    Phrase(
+        start_beat=0,
+        start_ms=500,
+        bars=8,
+        energy=0.61,
+        delta_energy=None,
+        kind="intro",
+    ),
+    Phrase(
+        start_beat=32,
+        start_ms=16_500,
+        bars=16,
+        energy=0.8125,
+        delta_energy=0.2025,
+        kind="peak",
+    ),
+)
+STRUCTURE_CURVE = bytes((0, 12, 200, 255, 128, 64))
+
+
+def test_persists_structure_fields(pg_db, tmp_path: Path) -> None:
+    del pg_db
+    path = tmp_path / "structure.flac"
+    path.write_bytes(b"structured-source")
+    track_id, _track_uid = _create_track(path)
+    draft = replace(
+        _draft(),
+        phrases=STRUCTURE_PHRASES,
+        energy_curve=STRUCTURE_CURVE,
+        vocal_presence=bytes((12, 240)),
+        structure_confidence=0.8234,
+    )
+
+    assert store_smart_mix_profile_result(track_id, path, draft) is True
+
+    profile = get_track_mix_profile(track_id, include_structure=True)
+    assert profile is not None
+    assert profile.phrases == STRUCTURE_PHRASES
+    assert profile.energy_curve == STRUCTURE_CURVE
+    assert profile.vocal_presence == bytes((12, 240))
+    assert profile.structure_confidence == 0.8234
+    # Readers that do not plan by phrase never load the structure.
+    summary = get_track_mix_profile(track_id)
+    assert summary is not None
+    assert (
+        summary.phrases,
+        summary.energy_curve,
+        summary.vocal_presence,
+        summary.structure_confidence,
+    ) == (None, None, None, None)
+    with read_scope() as session:
+        stored = (
+            session.execute(
+                text(
+                    """
+                    SELECT phrases, energy_curve
+                    FROM track_mix_profiles WHERE track_id = :track_id
+                    """
+                ),
+                {"track_id": track_id},
+            )
+            .mappings()
+            .one()
+        )
+    assert stored["phrases"] == [phrase.to_dict() for phrase in STRUCTURE_PHRASES]
+    assert bytes(stored["energy_curve"]) == STRUCTURE_CURVE
+
+
+def test_unsegmented_structure_stays_distinct_from_no_structure(
+    pg_db, tmp_path: Path
+) -> None:
+    del pg_db
+    path = tmp_path / "unsegmented.flac"
+    path.write_bytes(b"unsegmented-source")
+    track_id, _track_uid = _create_track(path)
+    draft = replace(
+        _draft(), phrases=(), energy_curve=bytes(4), structure_confidence=0.0
+    )
+
+    assert store_smart_mix_profile_result(track_id, path, draft) is True
+
+    profile = get_track_mix_profile(track_id, include_structure=True)
+    assert profile is not None
+    assert profile.phrases == ()
+    assert profile.energy_curve == bytes(4)
+    assert profile.structure_confidence == 0.0
+
+
+def test_v1_profile_reads_with_null_structure(pg_db, tmp_path: Path) -> None:
+    del pg_db
+    path = tmp_path / "schema-one.flac"
+    path.write_bytes(b"schema-one-source")
+    track_id, _track_uid = _create_track(path)
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO track_mix_profiles (
+                    track_id, profile_version, profile_revision, analyzer,
+                    analyzer_version, source_revision, quality, bpm, analyzed_at
+                )
+                VALUES (
+                    :track_id, 1, 'schema-one', 'crate-rust', 'smart-mix-audio-v6',
+                    'source', 'full', 126.0, NOW()
+                )
+                """
+            ),
+            {"track_id": track_id},
+        )
+
+    profile = get_track_mix_profile(track_id, include_structure=True)
+
+    assert profile is not None
+    assert profile.profile_version == 1
+    assert profile.analyzer_version == "smart-mix-audio-v6"
+    assert profile.bpm == 126.0
+    assert (
+        profile.phrases,
+        profile.energy_curve,
+        profile.vocal_presence,
+        profile.structure_confidence,
+    ) == (None, None, None, None)
 
 
 def _create_track(path: Path, *, bpm: float | None = None) -> tuple[int, str]:

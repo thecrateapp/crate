@@ -10,10 +10,12 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     LargeBinary,
+    REAL,
     SmallInteger,
     Text,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from crate.db.engine import Base
@@ -79,6 +81,10 @@ class TrackMixProfileRow(Base):
     active_end_ms: Mapped[int | None] = mapped_column(BIGINT)
     integrated_lufs: Mapped[float | None] = mapped_column(Float)
     measurement_version: Mapped[str | None] = mapped_column(Text)
+    phrases: Mapped[list | None] = mapped_column(JSONB)
+    energy_curve: Mapped[bytes | None] = mapped_column(LargeBinary)
+    vocal_presence: Mapped[bytes | None] = mapped_column(LargeBinary)
+    structure_confidence: Mapped[float | None] = mapped_column(REAL)
     source_stale_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     analyzed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
