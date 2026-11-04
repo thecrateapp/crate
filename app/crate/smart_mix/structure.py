@@ -65,9 +65,8 @@ from crate.smart_mix.models import (
     Phrase,
     StructureDraft,
 )
+from crate.smart_mix.phrase_grid import BEATS_PER_BAR, downbeats_from_anchor
 
-
-BEATS_PER_BAR = 4
 UNIT_BARS = 8
 # Phrase lengths in 8-bar units (32, 16 and 8 bars), longest first: ties keep it.
 PHRASE_UNITS = (4, 2, 1)
@@ -147,19 +146,6 @@ class _BarFeatures:
     levels: list[float]
     shapes: list[tuple[float, ...]]
     music: list[bool]
-
-
-def downbeats_from_anchor(
-    beat_grid_ms: Sequence[int], downbeat_anchor_ms: int | None
-) -> tuple[int, ...]:
-    """Every fourth beat of the grid, in phase with the downbeat anchor."""
-    if downbeat_anchor_ms is None:
-        return ()
-    try:
-        anchor = list(beat_grid_ms).index(downbeat_anchor_ms)
-    except ValueError:
-        return ()
-    return tuple(beat_grid_ms[anchor % BEATS_PER_BAR :: BEATS_PER_BAR])
 
 
 def segment_phrases(
@@ -581,6 +567,7 @@ def _ceil_div(numerator: int, denominator: int) -> int:
 
 __all__ = [
     "ACTIVE_RANGE_DB",
+    "BEATS_PER_BAR",
     "EnergyFrames",
     "MIN_ACTIVE_DBFS",
     "NO_STRUCTURE",

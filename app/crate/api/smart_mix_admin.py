@@ -32,8 +32,7 @@ from crate.db.queries.tasks import list_tasks
 from crate.db.repositories.smart_mix import get_track_mix_profile
 from crate.db.repositories.tasks import create_task_dedup
 from crate.smart_mix.models import TrackMixProfile
-from crate.smart_mix.structure import downbeats_from_anchor
-from crate.smart_mix.vocals import phrase_spans_ms
+from crate.smart_mix.phrase_grid import downbeats_from_anchor, phrase_spans_ms
 
 
 router = APIRouter(prefix="/api/admin/smart-mix", tags=["admin"])

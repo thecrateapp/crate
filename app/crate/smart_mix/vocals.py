@@ -19,13 +19,12 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from crate.smart_mix.models import Phrase
+from crate.smart_mix.phrase_grid import phrase_spans_ms
 
 VOCAL_DETECTOR_VERSION = 1
 VOICE_BAND_HZ = (300.0, 3_400.0)
 FFT_SIZE = 2_048
 HOP_LENGTH = 1_024
-BEATS_PER_BAR = 4
 # Frames quieter than this carry no voice and are left out of the phrase mean.
 SILENCE_DB = -50.0
 # Share of the frame's power inside the voice band: none below the floor, full above.
@@ -42,23 +41,6 @@ MIN_RECALL = 0.7
 _EPSILON = 1e-12
 
 
-def phrase_spans_ms(
-    phrases: Sequence[Phrase], beat_grid_ms: Sequence[int]
-) -> list[tuple[int, int]]:
-    """Start and end (ms) of each phrase.
-
-    A phrase ends where the next starts; the last one ends ``bars`` bars after its
-    start on the beat grid, continued at the grid's median beat when it runs past it.
-    """
-    spans: list[tuple[int, int]] = []
-    for current, following in zip(phrases, phrases[1:]):
-        spans.append((current.start_ms, following.start_ms))
-    if phrases:
-        last = phrases[-1]
-        spans.append((last.start_ms, _beat_ms(beat_grid_ms, last, last.bars)))
-    return spans
-
-
 def phrase_vocal_presence(
     audio: np.ndarray, sample_rate: int, spans_ms: Sequence[tuple[int, int]]
 ) -> bytes:
@@ -71,19 +53,6 @@ def phrase_vocal_presence(
         _span_byte(scores, sample_rate, start_ms, end_ms)
         for start_ms, end_ms in spans_ms
     )
-
-
-def _beat_ms(beat_grid_ms: Sequence[int], phrase: Phrase, bars: int) -> int:
-    if not beat_grid_ms:
-        return phrase.start_ms
-    beat = phrase.start_beat + bars * BEATS_PER_BAR
-    if beat < len(beat_grid_ms):
-        return int(beat_grid_ms[beat])
-    beat_length = (
-        float(np.median(np.diff(beat_grid_ms))) if len(beat_grid_ms) > 1 else 0
-    )
-    last = len(beat_grid_ms) - 1
-    return int(round(beat_grid_ms[last] + (beat - last) * beat_length))
 
 
 def _frame_scores(audio: np.ndarray, sample_rate: int) -> np.ndarray:
