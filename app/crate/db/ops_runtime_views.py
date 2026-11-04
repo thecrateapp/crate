@@ -11,6 +11,7 @@ DEFAULT_QUEUE_BREAKDOWN = {
     "running": dict.fromkeys(_QUEUE_POOLS, 0),
     "pending": dict.fromkeys(_QUEUE_POOLS, 0),
     "oldest_pending": {},
+    "capacity_waiting": {"ai": 0, "ai_bulk": 0},
 }
 DEFAULT_DB_HEAVY_GATE = {"active": 0, "pending": 0, "blocking": False}
 
@@ -34,6 +35,10 @@ def _coerce_queue_breakdown(value: dict | None) -> dict:
             pool: task
             for pool, task in (oldest.items() if isinstance(oldest, dict) else [])
             if pool in _QUEUE_POOLS and isinstance(task, dict)
+        },
+        "capacity_waiting": {
+            lane: int((value.get("capacity_waiting") or {}).get(lane) or 0)
+            for lane in ("ai", "ai_bulk")
         },
     }
 

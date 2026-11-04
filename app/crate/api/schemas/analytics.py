@@ -142,6 +142,10 @@ class WorkerQueueBreakdownResponse(BaseModel):
         default_factory=dict,
         description="Oldest pending task per queue, for queues with pending work.",
     )
+    capacity_waiting: dict[str, int] = Field(
+        default_factory=dict,
+        description="AI-lane tasks waiting for provider capacity, per lane.",
+    )
 
 
 class DbHeavyGateResponse(BaseModel):

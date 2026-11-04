@@ -232,6 +232,7 @@ def execute_structured(
             output_tokens=output_tokens,
             actor_id=actor_id,
             job_id=job_id,
+            **requeue.reservation_options(),
         )
     )
     if not invocation["claimed"]:

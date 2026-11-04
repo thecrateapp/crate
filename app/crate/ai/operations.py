@@ -80,6 +80,7 @@ def run_probe(context, *, actor_id, job_id, idempotency_key):
             output_tokens=config["max_output_tokens"],
             actor_id=actor_id,
             job_id=job_id,
+            **requeue.reservation_options(),
         )
     )
     if not invocation["claimed"]:

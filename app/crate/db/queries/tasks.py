@@ -48,6 +48,17 @@ def _pool_counts_template() -> dict[str, int]:
     return dict.fromkeys(QUEUE_POOLS, 0)
 
 
+def _coerce_capacity_waiting(value) -> dict[str, int]:
+    source = value
+    if isinstance(value, str):
+        try:
+            source = json.loads(value)
+        except json.JSONDecodeError:
+            source = {}
+    source = source if isinstance(source, dict) else {}
+    return {lane: int(source.get(lane) or 0) for lane in ("ai", "ai_bulk")}
+
+
 def _coerce_oldest_pending(value) -> dict[str, dict]:
     source = value
     if isinstance(value, str):
@@ -80,6 +91,19 @@ def _coerce_pool_counts(value) -> dict[str, int]:
         for pool in counts:
             counts[pool] = int(source.get(pool) or 0)
     return counts
+
+
+def count_pending_tasks_in_pool(pool: str) -> int:
+    """Pending tasks of one pool (indexed by idx_tasks_dispatch)."""
+    with read_scope() as session:
+        return int(
+            session.execute(
+                text(
+                    "SELECT COUNT(*) FROM tasks WHERE status = 'pending' AND pool = :pool"
+                ),
+                {"pool": pool},
+            ).scalar_one()
+        )
 
 
 def get_task(task_id: str) -> dict | None:
@@ -196,6 +220,18 @@ def get_task_activity_snapshot(
                             'ai', COUNT(*) FILTER (WHERE status = 'pending' AND pool = 'ai'),
                             'ai_bulk', COUNT(*) FILTER (WHERE status = 'pending' AND pool = 'ai_bulk')
                         ) AS pending_by_pool,
+                        jsonb_build_object(
+                            'ai', COUNT(*) FILTER (
+                                WHERE pool = 'ai'
+                                  AND status IN ('pending', 'running')
+                                  AND progress LIKE 'Waiting for AI provider capacity%'
+                            ),
+                            'ai_bulk', COUNT(*) FILTER (
+                                WHERE pool = 'ai_bulk'
+                                  AND status IN ('pending', 'running')
+                                  AND progress LIKE 'Waiting for AI provider capacity%'
+                            )
+                        ) AS capacity_waiting_by_pool,
                         COUNT(*) FILTER (
                             WHERE status = 'running' AND type = ANY(:db_heavy_types)
                         ) AS db_heavy_running_count,
@@ -216,6 +252,7 @@ def get_task_activity_snapshot(
                     task_counts.pending_count,
                     task_counts.running_by_pool,
                     task_counts.pending_by_pool,
+                    task_counts.capacity_waiting_by_pool,
                     task_counts.db_heavy_running_count,
                     task_counts.db_heavy_pending_count,
                     COALESCE(
@@ -258,6 +295,9 @@ def get_task_activity_snapshot(
             "running": _coerce_pool_counts(row.get("running_by_pool")),
             "pending": _coerce_pool_counts(row.get("pending_by_pool")),
             "oldest_pending": _coerce_oldest_pending(row.get("oldest_pending_by_pool")),
+            "capacity_waiting": _coerce_capacity_waiting(
+                row.get("capacity_waiting_by_pool")
+            ),
         },
         "db_heavy_gate": {
             "active": int(row.get("db_heavy_running_count") or 0),

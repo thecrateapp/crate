@@ -142,6 +142,20 @@ def _stop_siblings(
     return exited.returncode
 
 
+def _recover_stale_work() -> None:
+    """Fail zombie tasks, then give their abandoned AI reservations back.
+
+    A killed task never reaches finish_invocation, so its provider slot would
+    stay taken; reclaiming keeps the charged tokens (no daily refund).
+    """
+    cleanup_zombie_tasks(heartbeat_timeout_min=5, no_heartbeat_timeout_min=3)
+    from crate.db.repositories.ai_usage import reclaim_abandoned_invocations
+
+    reclaimed = reclaim_abandoned_invocations()
+    if reclaimed:
+        log.warning("Reclaimed %d abandoned AI provider reservation(s)", reclaimed)
+
+
 def _env_int(name: str, default: int = 0) -> int:
     try:
         return int(os.environ.get(name, str(default)) or default)
@@ -448,13 +462,11 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
             except Exception:
                 pass
 
-        # Zombie task cleanup every 30s (heartbeat-based)
+        # Zombie task cleanup and AI slot reclamation every 30s
         if now - last_zombie_check > 30:
             last_zombie_check = now
             try:
-                cleanup_zombie_tasks(
-                    heartbeat_timeout_min=5, no_heartbeat_timeout_min=3
-                )
+                _recover_stale_work()
             except Exception:
                 log.debug("Zombie cleanup failed", exc_info=True)
 

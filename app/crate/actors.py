@@ -869,7 +869,9 @@ def _execute_task(task_type: str, task_id: str, ai_requeues: int = 0):
                     + TASK_POOL_CONFIG[task_type].time_limit_seconds
                     - AI_CALL_DEADLINE_MARGIN_SECONDS
                 )
-                with concurrency_window(queue, ai_requeues, deadline=deadline):
+                with concurrency_window(
+                    queue, ai_requeues, deadline=deadline, task_id=task_id
+                ):
                     result = handler(task_id, task.get("params", {}), config)
             else:
                 result = handler(task_id, task.get("params", {}), config)
