@@ -125,6 +125,56 @@ describe("SmartMixStructure", () => {
     );
   });
 
+  it("staggers phrase labels on two rows so neighbours never collide", () => {
+    render(<SmartMixStructure structure={structure} />);
+
+    const phrases = within(
+      screen.getByRole("list", { name: "Phrases" }),
+    ).getAllByRole("listitem");
+    expect(phrases.map((phrase) => phrase.dataset.row)).toEqual([
+      "0",
+      "1",
+      "0",
+    ]);
+  });
+
+  it("lists every phrase in a table", () => {
+    const voiced: SmartMixTrackStructureData = {
+      ...structure,
+      vocalDetector: "yamnet-1",
+      phrases: (structure.phrases ?? []).map((phrase, index) => ({
+        ...phrase,
+        vocalPresence: [255, 0, 51][index] ?? null,
+      })),
+    };
+    render(<SmartMixStructure structure={voiced} />);
+
+    const table = screen.getByRole("table", { name: "Phrase list" });
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(
+      rows.map((row) =>
+        within(row)
+          .getAllByRole("cell")
+          .map((cell) => cell.textContent),
+      ),
+    ).toEqual([
+      ["1", "Intro", "8", "0:00.5–0:16.5", "40%", "100%"],
+      ["2", "Peak", "16", "0:16.5–0:48.5", "80%", "0%"],
+      ["3", "Break", "8", "0:48.5–1:04.5", "30%", "20%"],
+    ]);
+  });
+
+  it("leaves the voice column out of the table without a detector", () => {
+    render(<SmartMixStructure structure={structure} />);
+
+    const table = screen.getByRole("table", { name: "Phrase list" });
+    expect(
+      within(table)
+        .getAllByRole("columnheader")
+        .map((header) => header.textContent),
+    ).toEqual(["#", "Kind", "Bars", "Span", "Energy"]);
+  });
+
   it("draws no voice lane without a voice detector", () => {
     const { container } = render(<SmartMixStructure structure={structure} />);
 

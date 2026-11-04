@@ -534,7 +534,6 @@ export function AudioProfileCard({
                     profile={profiles[0]}
                     group={detailed ? "mixing" : "all"}
                   />
-                  {detailed ? smartMixStructure : null}
                 </>
               ) : null}
               {!profiles.length ? (
@@ -543,6 +542,15 @@ export function AudioProfileCard({
                 </p>
               ) : null}
             </section>
+            {detailed && single && profiles[0] && smartMixStructure ? (
+              // Phrases need the dialog's full width to stay readable.
+              <div
+                data-slot="smart-mix-structure"
+                className="min-w-0 border-t border-border-quiet pt-5 lg:col-span-2"
+              >
+                {smartMixStructure}
+              </div>
+            ) : null}
             {detailed && profiles[0] ? (
               <InstrumentPanel
                 as="section"

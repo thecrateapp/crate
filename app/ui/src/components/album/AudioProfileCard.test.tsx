@@ -204,3 +204,32 @@ it("retains the existing album loudness summary and provenance by default", () =
     screen.queryByRole("region", { name: "Analysis provenance" }),
   ).not.toBeInTheDocument();
 });
+
+it("gives the phrase structure the dialog's full width, outside the Smart Mix column", () => {
+  render(
+    <AudioProfileCard
+      totalTracks={1}
+      presentation="track-dialog"
+      analysisData={{
+        track: {
+          ...empty,
+          tempo: 120,
+          smart_mix: { quality: "full", analyzer_version: "test-analyzer" },
+        },
+      }}
+      smartMixStructure={<div data-testid="phrase-structure" />}
+    />,
+  );
+
+  const structure = screen.getByTestId("phrase-structure");
+  const mix = screen
+    .getByRole("heading", { name: "Smart Mix" })
+    .closest("section")!;
+  expect(mix).not.toContainElement(structure);
+  const slot = structure.closest('[data-slot="smart-mix-structure"]')!;
+  expect(slot.parentElement).toHaveAttribute(
+    "data-audio-profile-layout",
+    "track-dialog",
+  );
+  expect(slot).toHaveClass("lg:col-span-2");
+});

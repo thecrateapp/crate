@@ -123,7 +123,10 @@ export function SmartMixStructure({
       {boundaries.length > 0 || lane ? (
         <div className="min-w-0">
           {phrases?.length ? (
-            <ol aria-label="Phrases" className="relative m-0 h-6 list-none p-0">
+            <ol
+              aria-label="Phrases"
+              className="relative m-0 h-10 list-none p-0"
+            >
               {phrases.map((phrase, index) => (
                 <TooltipHint
                   key={`${phrase.startBeat}:${index}`}
@@ -133,10 +136,17 @@ export function SmartMixStructure({
                     tabIndex={0}
                     aria-label={phraseDescription(phrase)}
                     data-kind={phrase.kind}
-                    className="absolute inset-y-0 min-w-0 overflow-hidden border-l border-border-quiet pl-1 whitespace-nowrap"
+                    data-row={index % 2}
+                    className="absolute h-1/2 min-w-0 overflow-hidden border-l border-border-quiet pl-1 text-ellipsis whitespace-nowrap"
                     style={{
+                      // Neighbours sit on alternate rows, so a label has room up to the
+                      // next phrase on its own row.
+                      top: index % 2 ? "50%" : "0",
                       left: `${x(phrase.startMs)}%`,
-                      width: `${rounded(x(phrase.endMs) - x(phrase.startMs))}%`,
+                      width: `${rounded(
+                        x(phrases[index + 2]?.startMs ?? lastEnd) -
+                          x(phrase.startMs),
+                      )}%`,
                     }}
                   >
                     <MonoLabel
@@ -173,7 +183,7 @@ export function SmartMixStructure({
             aria-hidden="true"
             viewBox="0 0 100 100"
             preserveAspectRatio="none"
-            className="block h-12 w-full overflow-visible"
+            className="block h-16 w-full overflow-visible"
           >
             <line
               x1="0"
@@ -214,6 +224,53 @@ export function SmartMixStructure({
             <MonoLabel as="span">{clock(span)}</MonoLabel>
           </div>
         </div>
+      ) : null}
+      {phrases?.length ? (
+        <table
+          aria-label="Phrase list"
+          className="w-full border-collapse text-sm tabular-nums"
+        >
+          <thead>
+            <tr className="text-left text-text-muted">
+              {["#", "Kind", "Bars", "Span", "Energy"].map((header) => (
+                <th key={header} scope="col" className="py-1 pr-3 font-normal">
+                  {header}
+                </th>
+              ))}
+              {detector ? (
+                <th scope="col" className="py-1 pr-3 font-normal">
+                  Voice
+                </th>
+              ) : null}
+            </tr>
+          </thead>
+          <tbody>
+            {phrases.map((phrase, index) => {
+              const voice = voiceShare(phrase);
+              return (
+                <tr
+                  key={`${phrase.startBeat}:${index}`}
+                  className="border-t border-border-quiet"
+                >
+                  <td className="py-1 pr-3">{index + 1}</td>
+                  <td className="py-1 pr-3">{KIND_NAMES[phrase.kind]}</td>
+                  <td className="py-1 pr-3">{phrase.bars}</td>
+                  <td className="py-1 pr-3">
+                    {clock(phrase.startMs)}–{clock(phrase.endMs)}
+                  </td>
+                  <td className="py-1 pr-3">
+                    {Math.round(phrase.energy * 100)}%
+                  </td>
+                  {detector ? (
+                    <td className="py-1 pr-3">
+                      {voice == null ? "—" : `${Math.round(voice * 100)}%`}
+                    </td>
+                  ) : null}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       ) : null}
     </figure>
   );
