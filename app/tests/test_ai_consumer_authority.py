@@ -134,15 +134,27 @@ def test_inflight_domain_apply_rechecks_real_actor(
         )
 
     if operation == "eq":
-        from crate.api import genres as api
+        # SMQ.PR2: the proposal and its apply run in the worker.
+        from crate.db.repositories.genres_taxonomy_nodes import (
+            upsert_genre_taxonomy_node,
+        )
+        from crate.worker_handlers import ai_proposals
 
-        monkeypatch.setattr(api, "get_genre_taxonomy_node_id", lambda _: 1)
-        monkeypatch.setattr(api, "get_genre_detail", lambda _: {})
-        monkeypatch.setattr(api, "set_genre_eq_gains", lambda *a, **k: writes.append(k))
+        upsert_genre_taxonomy_node("rock", name="Rock")
+        monkeypatch.setattr(
+            ai_proposals, "set_genre_eq_gains", lambda *a, **k: writes.append(k)
+        )
         monkeypatch.setattr("crate.llm.prompts.eq_preset.generate_eq_preset", generated)
+        params = {
+            "slug": "rock",
+            "apply": True,
+            "actor_user_id": actor["id"],
+            "ai_acceptance": consumers.accept_action("genres.eq.propose"),
+        }
 
         def invoke():
-            return api.generate_genre_eq(request, "rock", apply=True)
+            result = ai_proposals._handle_propose_genre_eq("eq-job", params, {})
+            raise AIConfigurationError(result["error_code"], result["error"])
     else:
         from crate.api import system_playlists as api
 

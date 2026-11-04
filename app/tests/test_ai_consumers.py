@@ -317,12 +317,17 @@ def test_configuration_revoked_after_generation_blocks_application(
         return result
 
     if operation == "eq":
-        from crate.api import genres as api
+        # SMQ.PR2: the proposal and its apply run in the worker.
+        from crate.ai.consumers import accept_action
+        from crate.db.repositories.genres_taxonomy_nodes import (
+            upsert_genre_taxonomy_node,
+        )
+        from crate.worker_handlers import ai_proposals
 
-        monkeypatch.setattr(api, "_require_genre_curator", lambda _: domain_actor)
-        monkeypatch.setattr(api, "get_genre_taxonomy_node_id", lambda _: 1)
-        monkeypatch.setattr(api, "get_genre_detail", lambda _: {})
-        monkeypatch.setattr(api, "set_genre_eq_gains", lambda *a, **k: writes.append(k))
+        upsert_genre_taxonomy_node("rock", name="Rock")
+        monkeypatch.setattr(
+            ai_proposals, "set_genre_eq_gains", lambda *a, **k: writes.append(k)
+        )
         monkeypatch.setattr(
             "crate.llm.prompts.eq_preset.generate_eq_preset",
             lambda **k: generated(
@@ -330,9 +335,16 @@ def test_configuration_revoked_after_generation_blocks_application(
                 SimpleNamespace(gains=[0.0] * 10, reasoning="Review"),
             ),
         )
+        params = {
+            "slug": "rock",
+            "apply": True,
+            "actor_user_id": domain_actor["id"],
+            "ai_acceptance": accept_action("genres.eq.propose"),
+        }
 
         def invoke():
-            return api.generate_genre_eq(None, "rock", apply=True)
+            result = ai_proposals._handle_propose_genre_eq("eq-job", params, {})
+            raise AIConfigurationError(result["error_code"], result["error"])
     else:
         from crate.api import system_playlists as api
 

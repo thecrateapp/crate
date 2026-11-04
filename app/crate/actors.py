@@ -84,6 +84,8 @@ class TaskPoolConfig(NamedTuple):
 TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "ai_catalog_refresh": TaskPoolConfig("ai_bulk", 0, 180, 0),
     "ai_profile_test": TaskPoolConfig("ai", 0, 180, 0),
+    # One genres.eq.propose call (≤ 45s) plus the optional apply.
+    "propose_genre_eq": TaskPoolConfig("ai", 0, 120, 0),
     # User-initiated (priority 0) — these should run ASAP
     "tidal_download": TaskPoolConfig(
         "default", 0, 14400, 0

@@ -657,6 +657,11 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ("ai_catalog_refresh", "ai_profile_test"),
     ),
     (
+        "crate.worker_handlers.ai_proposals",
+        "AI_PROPOSAL_TASK_HANDLERS",
+        ("propose_genre_eq",),
+    ),
+    (
         "crate.worker_handlers.acquisition",
         "ACQUISITION_TASK_HANDLERS",
         (
