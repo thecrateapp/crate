@@ -133,8 +133,9 @@ def test_crate_migration_follows_the_current_main_head() -> None:
     assert scripts.get_revision("139").down_revision == "138"
     assert scripts.get_revision("140").down_revision == "139"
     assert scripts.get_revision("141").down_revision == "140"
-    assert scripts.get_heads() == ["142"]
     assert scripts.get_revision("142").down_revision == "141"
+    assert scripts.get_heads() == ["143"]
+    assert scripts.get_revision("143").down_revision == "142"
 
 
 def test_metric_minute_migration_uses_immutable_schema_definition(monkeypatch):
@@ -240,6 +241,49 @@ def test_deployed_revisions_keep_their_numbers_ahead_of_branch_revisions() -> No
 
     for revision, stem in expected.items():
         assert Path(scripts.get_revision(revision).path).stem == stem
+
+
+def test_error_inbox_migration_uses_immutable_schema_definition(monkeypatch):
+    migration = import_module("crate.db.migrations.versions.143_error_inbox")
+    schema = import_module("crate.db.schema_sections.error_inbox_v143")
+    migration_executor = RecordingExecutor()
+    schema_executor = RecordingExecutor()
+    monkeypatch.setattr(migration, "op", migration_executor)
+
+    migration.upgrade()
+    schema.create_error_inbox_v143_schema(schema_executor)
+
+    assert migration_executor.statements == schema_executor.statements
+    statements = "\n".join(migration_executor.statements)
+    assert "CREATE TABLE IF NOT EXISTS error_issues" in statements
+    assert "UNIQUE (provider, external_id)" in statements
+    assert "CREATE TABLE IF NOT EXISTS error_issue_triage" in statements
+    assert "REFERENCES error_issues(id) ON DELETE CASCADE" in statements
+    assert "UNIQUE (issue_id, kind, digest_hash)" in statements
+    # Soft link: migration 130 owns ai_invocations and must stay reversible on its own.
+    assert "REFERENCES ai_invocations" not in statements
+    for index in (
+        "idx_error_issues_status_score",
+        "idx_error_issues_group_key",
+        "idx_error_issues_last_seen",
+    ):
+        assert f"CREATE INDEX IF NOT EXISTS {index}" in statements
+
+    downgrade = RecordingExecutor()
+    monkeypatch.setattr(migration, "op", downgrade)
+    migration.downgrade()
+    assert downgrade.statements == [
+        "DROP TABLE IF EXISTS error_issue_triage",
+        "DROP TABLE IF EXISTS error_issues",
+    ]
+
+
+def test_error_inbox_tables_are_part_of_the_bootstrap_schema() -> None:
+    source = (
+        Path(__file__).resolve().parents[1] / "crate/db/schema_bootstrap.py"
+    ).read_text()
+
+    assert "create_error_inbox_v143_schema(cur)" in source
 
 
 def test_crate_bootstrap_includes_presentation_settings() -> None:

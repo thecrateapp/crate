@@ -119,3 +119,8 @@ def create_schema(cur):
     )
 
     create_metric_minute_snapshots_v141_schema(cur)
+    from crate.db.schema_sections.error_inbox_v143 import (
+        create_error_inbox_v143_schema,
+    )
+
+    create_error_inbox_v143_schema(cur)
