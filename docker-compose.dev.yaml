@@ -317,7 +317,8 @@ services:
         condition: service_healthy
       slskd:
         condition: service_started
-    mem_limit: 1536m
+    # Measured: the ai/ai_bulk pools add ~0.7 GB at peak (docs: smart-mix-operations).
+    mem_limit: 2304m
     mem_reservation: 512m
     cpus: "0.75"
     command:

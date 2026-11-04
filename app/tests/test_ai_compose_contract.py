@@ -134,3 +134,33 @@ def test_crate_worker_stop_grace_covers_the_pool_drain(filename, services):
         assert grace.endswith(("s", "m")), name
         seconds = int(grace[:-1]) * (60 if grace.endswith("m") else 1)
         assert seconds >= POOL_STOP_GRACE_SECONDS, name
+
+
+def _megabytes(value: str) -> int:
+    value = str(value).strip().lower()
+    if value.endswith("g"):
+        return int(float(value[:-1]) * 1024)
+    if value.endswith("m"):
+        return int(value[:-1])
+    raise AssertionError(f"unexpected memory value {value}")
+
+
+@pytest.mark.parametrize(
+    "filename,service,minimum",
+    [
+        # Measured (review I4): the AI pools add ~180 MiB idle and up to ~0.7 GB
+        # at peak (OCR + vision decode + transport children) to crate-worker.
+        ("docker-compose.yaml", "crate-worker", 2304),
+        ("docker-compose.dev.yaml", "worker", 2304),
+        ("docker-compose.home.yaml", "crate-worker", 2304),
+        (
+            "app/installer/internal/assets/files/docker-compose.home.yaml",
+            "crate-worker",
+            2304,
+        ),
+        ("docker-compose.project.yaml", "crate-worker", 2816),
+    ],
+)
+def test_crate_worker_memory_covers_the_ai_pools(filename, service, minimum):
+    services = yaml.safe_load((ROOT / filename).read_text())["services"]
+    assert _megabytes(services[service]["mem_limit"]) >= minimum

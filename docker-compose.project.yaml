@@ -37,7 +37,8 @@ services:
     cpus: "0.5"
 
   crate-worker:
-    mem_limit: 2g
+    # Measured: the ai/ai_bulk pools add ~0.7 GB at peak (docs: smart-mix-operations).
+    mem_limit: 2816m
     mem_reservation: 768m
     cpus: "1.5"
 
