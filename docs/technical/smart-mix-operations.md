@@ -25,6 +25,7 @@ sources:
   - app/crate/api/schemas/smart_mix_admin.py
   - app/crate/db/jobs/analysis_storage.py
   - app/crate/db/jobs/smart_mix_backfill.py
+  - app/crate/db/migrations/versions/147_smart_mix_structure.py
   - app/crate/db/queries/smart_mix_admin_tracks.py
   - app/crate/db/queries/smart_mix_compatible.py
   - app/crate/db/repositories/smart_mix.py
@@ -133,7 +134,23 @@ profile into a deck (Android, Crate Decks) must follow these definitions.
 (SM3-D2): phrases of 8, 16 or 32 bars with a heuristic kind, one energy byte per bar
 and `structureConfidence`. Readers accept v7, v6 and v5 profiles
 (`READABLE_ANALYZER_VERSIONS`); writers, the backfill and Admin coverage target v7.
-The profile schema stays `1` until the structure columns are persisted.
+
+Migration 147 stores the structure in nullable `track_mix_profiles` columns: `phrases`
+(JSON list of `start_beat`, `start_ms`, `bars`, `energy`, `delta_energy`, `kind`),
+`energy_curve` (one byte per bar), `vocal_presence` (one byte per phrase; always null while
+the voice detector is off) and `structure_confidence` (REAL, four decimals). Profiles written
+before v7 keep null structure. An empty phrase list with confidence 0 means the track could
+not be segmented, which is different from null.
+
+Profile reads leave the structure out unless the planner segments by phrase
+(`planner_reads_structure`, only `smart-mix-v3`), so planning with `smart-mix-v2` reads the
+same columns as before. The public profile endpoint and the plan responses do not include the
+structure yet.
+
+`PROFILE_SCHEMA_VERSION` stays `1`: the VirtualDJ plugin 1.0.0 refuses capabilities and
+profiles of any other schema. Readers accept every schema up to the current one
+(`READABLE_PROFILE_VERSIONS`), and the backfill, coverage and campaign target the analyzer
+and the schema together, so a later schema bump needs no other server change.
 
 ### Analyzer v6
 
@@ -181,11 +198,9 @@ The profile schema stays `1` until the structure columns are persisted.
   track table shows v5 ones as `outdated`: they measure backfill progress, not what
   readers can use.
 - **Recomputing is a backfill campaign.** Deploying does not start one. Started from Admin,
-  it claims every v5 profile (and missing ones) with target generation v6. A campaign
-  left `running` at deploy keeps going: the coordinator checks only its status and every
-  claim uses the deployed target, so it starts recomputing the whole library with v6
-  while its stored `target` still reads v5 (agent observability reports that mismatch).
-  Pause it before deploying if the recompute should wait.
+  it claims every v5 profile (and missing ones) with target generation v6. Until v7, a
+  campaign left `running` at deploy kept going under the new target; since v7 a campaign of
+  another target stops claiming (see [Campaign, queues and backfill](#campaign-queues-and-backfill)).
 - When the backfill has finished, remove v5 from `READABLE_ANALYZER_VERSIONS`.
 
 ## Producing and publishing profiles
@@ -251,19 +266,65 @@ structure; check `refreshedAt` before reading zeros as a library with nothing pe
 
 The backfill applies resource pressure and limits the work in flight. Its Admin settings
 accept `batchSize` from 1 to 100 (25 by default) and `maxAttempts` from 1 to 10 (3 by default).
-Claims use `SKIP LOCKED`, a token, `target_generation` and attempts; a new analyzer version
+Claims use `SKIP LOCKED`, a token, `target_generation` and attempts. A track is claimable
+unless its profile is at the target analyzer and profile schema, current and usable; a
+profile the backfill just wrote is never claimed again. `target_generation` is the analyzer
+version (with `+schemaN` appended for schemas above 1), so a new analyzer version or schema
 makes attempts from the previous generation eligible again. It prioritizes the play queue,
 supplied offline IDs, favorites and collections, and listening history before everything else.
-It can promote Python profiles when the Rust CLI is available.
+It can promote Python profiles when the Rust CLI is available, within `maxAttempts`.
 
 The campaign is persisted under `smart_mix:backfill_campaign`, with the states `running`,
 `paused`, `cancelled` and `completed`. `controlState=idle` also covers a missing campaign and
 terminal campaigns; on its own it does not mean full coverage. Pausing or cancelling stops the
 campaign from continuing; it does not forcibly interrupt child analyses that were already
-accepted. Resuming reuses a running or paused campaign of the same generation. A campaign that
+accepted. A campaign records its target: `target` (analyzer version) and `profile_version`
+(missing on campaigns saved before v7, which count as schema 1). Resuming reuses a running or
+paused campaign of the same target with its counters. A campaign of another target never
+claims for the deployed one: the coordinator stops it with `control: superseded`, Admin
+reports `controlState=idle` while still showing the old campaign, and starting (or resuming)
+creates a new campaign for the deployed target with zeroed counters. A campaign that
 completes has exhausted the claimable work in that pass; it can still leave exhausted errors or
 non-current profiles. Check coverage and `processing.exhausted` before treating the backlog as
 resolved. A coordinating task in `done` does not mean all of its children have finished either.
+
+### Running the v7 backfill (Smart Mix 3)
+
+Production holds a `cancelled` campaign with `target` `smart-mix-audio-v6`. After the release
+with v7 and migration 147 is deployed through the normal process, recompute the library like
+this. The queues do not change: the coordinator and each analysis run on `heavy`.
+
+1. **Check the starting point.** Open Admin, Analysis, Smart Mix, or call
+   `GET /api/admin/smart-mix/status` with an account that has `library.analysis.manage`.
+   Expect `analyzerVersion` `smart-mix-audio-v7`, `profileVersion` `1`, `controlState`
+   `idle`, `campaign.target` `smart-mix-audio-v6` with `campaign.status` `cancelled`, and
+   `activeTask` null. If `refreshedAt` is null or older than ten minutes, the call queues a
+   coverage refresh: read it again a minute later. Coverage starts close to 0 % and `versions`
+   lists the v6 and v5 profiles still being served. If `activeTask` is not null, wait for it
+   to finish (it exits at once for a cancelled campaign) or cancel it from Tasks.
+2. **Start the campaign.** Press **Start backfill** (batch size 25, 3 attempts), or call
+   `POST /api/admin/smart-mix/backfill` with `{"batchSize": 25, "maxAttempts": 3}`. The answer
+   is `{"status": "queued", "taskId": "…"}` and the campaign becomes `target`
+   `smart-mix-audio-v7`, `profile_version` `1`, `status` `running`, `batches` and `claimed`
+   `0`. Raise `batchSize` (up to 100) only if the heavy worker keeps up.
+3. **Watch it.** `controlState` `running`; `campaign.batches` and `campaign.claimed` grow;
+   `currentProfiles` and `coveragePercent` rise; `processing.active`, `failed` and `exhausted`
+   show the work and its errors; `GET /api/admin/smart-mix/activity` gives
+   `tracksPerMinute`. The campaign claims every profile that is not v7: the v6 profiles the
+   cancelled campaign rewrote, v5 profiles, tracks without a profile, `unavailable` and
+   source-changed profiles. Claims the v6 campaign left in `analyzing` become claimable two
+   hours after they were taken. Each rewritten track is claimed once.
+4. **Pause, resume or cancel.** **Pause backfill** or `POST /api/admin/smart-mix/backfill/pause`
+   (only from `running`, 409 otherwise); **Resume backfill** or
+   `POST /api/admin/smart-mix/backfill/resume` with the same body as the start, which keeps
+   the counters; **Cancel backfill** or `POST /api/admin/smart-mix/backfill/cancel` (from
+   `running` or `paused`). None of them interrupts analyses already handed to the heavy queue.
+   Starting again after a cancel opens a new v7 campaign that only claims what is still not
+   v7.
+5. **Close it.** The campaign turns `completed` when a pass claims nothing and nothing is in
+   flight. Then check `processing.exhausted` and the track list filters `outdated` and
+   `failed`, and use **Reanalyze track** for the ones worth retrying. Once the backfill has
+   finished, a later release can drop v6 and v5 from `READABLE_ANALYZER_VERSIONS`.
 
 ## AI worker lanes and sizing
 
