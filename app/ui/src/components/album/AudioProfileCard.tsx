@@ -55,7 +55,9 @@ function timestamp(value: string | null | undefined) {
 function range(values: (number | null | undefined)[], unit: string) {
   const samples = finite(values);
   return samples.length
-    ? `${Math.min(...samples).toFixed(1)}–${Math.max(...samples).toFixed(1)} ${unit}`
+    ? `${Math.min(...samples).toFixed(1)}–${Math.max(...samples).toFixed(
+        1,
+      )} ${unit}`
     : "—";
 }
 function Reading({ label, children }: { label: string; children: ReactNode }) {
@@ -226,10 +228,13 @@ export function AudioProfileCard({
   analysisData,
   totalTracks,
   presentation = "album",
+  smartMixStructure,
 }: {
   analysisData: Record<string, AudioAnalysisTrack>;
   totalTracks?: number;
   presentation?: "album" | "track-dialog";
+  /** Phrase structure of the single track, shown in the track dialog only. */
+  smartMixStructure?: ReactNode;
 }) {
   const motionAllowed = useMotionAllowed();
   const tracks = Object.values(analysisData);
@@ -529,6 +534,7 @@ export function AudioProfileCard({
                     profile={profiles[0]}
                     group={detailed ? "mixing" : "all"}
                   />
+                  {detailed ? smartMixStructure : null}
                 </>
               ) : null}
               {!profiles.length ? (

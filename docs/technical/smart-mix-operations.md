@@ -145,7 +145,10 @@ not be segmented, which is different from null.
 Profile reads leave the structure out unless the planner segments by phrase
 (`planner_reads_structure`, only `smart-mix-v3`), so planning with `smart-mix-v2` reads the
 same columns as before. The public profile endpoint and the plan responses do not include the
-structure yet; Admin reads it through `GET /api/admin/smart-mix/tracks/{id}/structure`.
+structure yet; Admin reads it through `GET /api/admin/smart-mix/tracks/{id}/structure` and,
+for accounts with `library.analysis.manage`, draws it in a track's audio profile (album track
+list, **Show audio profile**): a 1 px rule at each phrase boundary, the kind and length of each
+phrase, and the energy curve as a 1 px lane, on the track's time axis.
 
 `PROFILE_SCHEMA_VERSION` stays `1`: the VirtualDJ plugin 1.0.0 refuses capabilities and
 profiles of any other schema. Readers accept every schema up to the current one

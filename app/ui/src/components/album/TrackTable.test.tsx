@@ -255,6 +255,100 @@ it("opens a wide scrollable track profile and preserves Escape, close and trigge
   expect(trigger).toHaveFocus();
 });
 
+function grantCapabilities(capabilities: string[]) {
+  vi.mocked(useAuth).mockReturnValue({
+    ...vi.mocked(useAuth)(),
+    hasCapability: vi.fn((capability: string) =>
+      capabilities.includes(capability),
+    ),
+  });
+}
+
+const profiledTrack = {
+  track_id: 44,
+  tempo: 124,
+  key: "A",
+  scale: "minor",
+  energy: 0.8,
+  mood: null,
+  danceability: null,
+  valence: null,
+  acousticness: null,
+  instrumentalness: null,
+  loudness: null,
+  dynamic_range: null,
+  spectral_complexity: null,
+  smart_mix: { quality: "full", analyzer_version: "smart-mix-audio-v7" },
+};
+
+it("draws the stored phrase structure in the track profile for analysis managers", async () => {
+  grantCapabilities(["library.track.remove", "library.analysis.manage"]);
+  mockApi.mockImplementation(async (url) =>
+    String(url) === "/api/admin/smart-mix/tracks/44/structure"
+      ? {
+          trackId: 44,
+          analyzerVersion: "smart-mix-audio-v7",
+          profileVersion: 1,
+          durationMs: 79_000,
+          structureConfidence: 0.7,
+          phrases: [
+            {
+              startBeat: 0,
+              startMs: 0,
+              endMs: 32_000,
+              bars: 16,
+              energy: 0.7,
+              deltaEnergy: null,
+              kind: "body",
+              vocalPresence: null,
+            },
+          ],
+          energyCurve: [100, 200],
+          barStartsMs: [0, 2_000],
+        }
+      : {},
+  );
+  const user = userEvent.setup();
+  render(
+    <TrackTable
+      tracks={[track]}
+      artist="Converge"
+      analysisData={{ concubine: profiledTrack }}
+    />,
+  );
+
+  expect(mockApi).not.toHaveBeenCalledWith(
+    "/api/admin/smart-mix/tracks/44/structure",
+    expect.anything(),
+    undefined,
+  );
+  await user.click(screen.getByRole("button", { name: "Show audio profile" }));
+
+  const phrases = await screen.findByRole("list", { name: "Phrases" });
+  expect(phrases).toHaveTextContent("body · 16");
+});
+
+it("does not request the phrase structure without analysis management", async () => {
+  const user = userEvent.setup();
+  render(
+    <TrackTable
+      tracks={[track]}
+      artist="Converge"
+      analysisData={{ concubine: profiledTrack }}
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "Show audio profile" }));
+
+  expect(
+    screen.getByRole("dialog", { name: "Concubine · Audio profile" }),
+  ).toBeInTheDocument();
+  expect(screen.queryByRole("list", { name: "Phrases" })).toBeNull();
+  expect(
+    mockApi.mock.calls.some(([url]) => String(url).endsWith("/structure")),
+  ).toBe(false);
+});
+
 it("blocks repeated quarantine confirmation until the task finishes", async () => {
   mockApi.mockResolvedValueOnce({ task_id: "pending-quarantine" });
   let finish!: (result: Awaited<ReturnType<typeof waitForTask>>) => void;

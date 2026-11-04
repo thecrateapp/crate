@@ -112,6 +112,7 @@ interface AlbumSearchResult {
 export type { AudioAnalysisTrack } from "./audio-analysis";
 import { analysisForTrack, type AudioAnalysisTrack } from "./audio-analysis";
 import { AudioProfileCard } from "./AudioProfileCard";
+import { SmartMixTrackStructure } from "@/components/SmartMixStructure";
 import { InfoBadge, type InfoBadgeTone } from "@crate/ui/primitives/InfoBadge";
 import { ActionButton, ActionLink } from "@crate/ui/primitives/ActionGroup";
 import { MediaCover } from "@crate/ui/domain/media/MediaCover";
@@ -472,6 +473,8 @@ function TrackAudioInfo({
   title: string;
 }) {
   const [open, setOpen] = useState(false);
+  const { hasCapability } = useAuth();
+  const trackId = track.track_id;
   return (
     <>
       <ActionButton label="Show audio profile" onClick={() => setOpen(true)}>
@@ -495,6 +498,11 @@ function TrackAudioInfo({
             analysisData={{ track }}
             totalTracks={1}
             presentation="track-dialog"
+            smartMixStructure={
+              trackId != null && hasCapability("library.analysis.manage") ? (
+                <SmartMixTrackStructure trackId={trackId} />
+              ) : null
+            }
           />
         </ModalBody>
       </AppModal>

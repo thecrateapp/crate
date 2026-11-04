@@ -371,6 +371,12 @@ const approvedControls = new Map([
 // direct children and icon props remain independently audited, opaque spreads fail,
 // and each exact path/source/export may appear only this many times in source.
 const approvedLibraryControls = new Map<string, number>([
+  // Smart Mix 3 plan, SM1.PR4: the track profile's phrase strip for gate SG1. A
+  // hand-built SVG instrument (rules and an energy lane) with no glyph and no button.
+  [
+    "app/ui/src/components/album/TrackTable.tsx:@/components/SmartMixStructure:SmartMixTrackStructure",
+    1,
+  ],
   [
     "app/ui/src/pages/Insights.tsx:@/components/insights/InsightEntityLists:InsightOpportunities",
     1,
