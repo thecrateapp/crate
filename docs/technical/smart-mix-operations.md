@@ -98,7 +98,7 @@ These values come from the reviewed code; they were not discovered from a live i
 | ------------------------------- | -------------------- | ----------------------------------------------------- |
 | `API_CONTRACT_VERSION`          | `2026-08`            | Advertised integration and capabilities contract      |
 | `PROFILE_SCHEMA_VERSION`        | `1`                  | Schema of the persisted and serialized profile        |
-| `ANALYZER_VERSION`              | `smart-mix-audio-v6` | Target generation of profile analysis                 |
+| `ANALYZER_VERSION`              | `smart-mix-audio-v7` | Target generation of profile analysis                 |
 | `MEASUREMENT_VERSION`           | `bs1770-v1`          | Loudness and true peak provenance used by the planner |
 | `BEAT_GRID_FORMAT`              | `delta-ms-v1`        | Beat grid format                                      |
 | `PLANNER_IDENTIFIER`            | `smart-mix-v2`       | Identifier for plan batches and capabilities          |
@@ -126,6 +126,14 @@ profile into a deck (Android, Crate Decks) must follow these definitions.
 | `activeEndMs`              | Musical end, by the same rule (for long tracks, over the last 120 s). A fade or reverb tail continues after it, so it falls 1-6 s before a -60 dB end of sound such as Mixxx's. It is not a silence threshold                                                                                                                           |
 | `introCueMs`, `outroCueMs` | Suggested mix points: the first beat at or after `activeStartMs` and the last beat 4 s before `activeEndMs`                                                                                                                                                                                                                             |
 | `beatPhaseOffsetMs`        | Plan field, beatmatch only. In output time and below one outgoing beat: the incoming track starts this much after `incomingCueMs` when the outgoing reaches `outgoingCueMs`. In incoming track time, start at `incomingCueMs + beatPhaseOffsetMs * incomingTempoRatio` (`NativeTransitionPlan.startIncomingCueMs()`); never subtract it |
+
+### Analyzer v7
+
+`smart-mix-audio-v7` keeps every v6 measurement and adds the structure of Smart Mix 3
+(SM3-D2): phrases of 8, 16 or 32 bars with a heuristic kind, one energy byte per bar
+and `structureConfidence`. Readers accept v7, v6 and v5 profiles
+(`READABLE_ANALYZER_VERSIONS`); writers, the backfill and Admin coverage target v7.
+The profile schema stays `1` until the structure columns are persisted.
 
 ### Analyzer v6
 
