@@ -10,8 +10,14 @@ Phrases are 8, 16 or 32 bars on an 8-bar grid. The grid starts on one of the fir
 eight downbeats, the one whose boundaries collect the most novelty (the first downbeat
 unless another clearly wins). A dynamic programme then keeps the grid boundaries whose
 novelty pays for a fixed cost, so steady stretches merge into 16- and 32-bar phrases;
-boundaries on 16- and 32-bar multiples get a small bonus. Phrase kinds follow simple
-rules over each phrase's energy relative to the loudest phrase and its position.
+boundaries on 16- and 32-bar multiples get a small bonus.
+
+Kinds follow rules over phrase energy and position. A peak is within 1.5 dB of the
+loudest phrase and 1.5 dB above the track's typical (median bar) level, so a steady
+groove has none. The main part runs from the first to the last peak or, without peaks,
+between the first and last phrases near the typical level. Quieter phrases before it
+are intro, after it outro, and inside it break when 3 dB under the peaks (or under the
+typical level). A rising phrase just before a peak is a build; the rest is body.
 
 ``structure_confidence`` multiplies how much of the novelty peaks falls on the chosen
 boundaries, whether at least three section changes support the grid, and how regular
@@ -62,6 +68,8 @@ SUPPORT_PEAKS = 3.0
 BAR_JITTER_LIMIT = 0.08
 CONTRAST_DB = 2.0
 PEAK_WITHIN_DB = 1.5
+PEAK_ABOVE_TYPICAL_DB = 1.5
+MAIN_WITHIN_TYPICAL_DB = 1.5
 BREAK_BELOW_DB = 3.0
 BUILD_RISE_DB = 1.5
 _EPSILON = 1e-9
@@ -294,7 +302,8 @@ def _phrases(
         - _mean(levels[start : (start + end) // 2])
         for start, end in spans
     ]
-    kinds = _kinds(phrase_levels, rises, spans)
+    typical = _median(levels[starts[0] : starts[-1]])
+    kinds = _kinds(phrase_levels, rises, spans, typical)
     phrases: list[Phrase] = []
     previous: float | None = None
     for (start, end), level, kind in zip(spans, phrase_levels, kinds):
@@ -314,15 +323,26 @@ def _phrases(
 
 
 def _kinds(
-    levels: list[float], rises: list[float], spans: list[tuple[int, int]]
+    levels: list[float],
+    rises: list[float],
+    spans: list[tuple[int, int]],
+    typical: float,
 ) -> list[str]:
     count = len(levels)
     top = max(levels)
     if count < 2 or top - min(levels) < CONTRAST_DB:
         return ["body"] * count
-    peak = [level >= top - PEAK_WITHIN_DB for level in levels]
-    first_peak = peak.index(True)
-    last_peak = count - 1 - peak[::-1].index(True)
+    peak = [
+        level >= top - PEAK_WITHIN_DB and level >= typical + PEAK_ABOVE_TYPICAL_DB
+        for level in levels
+    ]
+    if any(peak):
+        main, reference = peak, top
+    else:
+        main = [level >= typical - MAIN_WITHIN_TYPICAL_DB for level in levels]
+        reference = typical
+    first_main = main.index(True)
+    last_main = count - 1 - main[::-1].index(True)
     middle = 0.5 * (spans[0][0] + spans[-1][1])
     kinds = []
     for index, (start, end) in enumerate(spans):
@@ -330,11 +350,14 @@ def _kinds(
             kind = "peak"
         elif index + 1 < count and peak[index + 1] and rises[index] >= BUILD_RISE_DB:
             kind = "build"
-        elif index < first_peak and start < middle:
+        elif index < first_main and start < middle:
             kind = "intro"
-        elif index > last_peak and end > middle:
+        elif index > last_main and end > middle:
             kind = "outro"
-        elif first_peak < index < last_peak and levels[index] <= top - BREAK_BELOW_DB:
+        elif (
+            first_main < index < last_main
+            and levels[index] <= reference - BREAK_BELOW_DB
+        ):
             kind = "break"
         else:
             kind = "body"

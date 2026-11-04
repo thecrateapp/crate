@@ -247,3 +247,17 @@ def test_cue_detection_reuses_precomputed_rms_frames() -> None:
     assert detect_mix_cues(
         audio, SAMPLE_RATE, grid, rms=frame_rms(audio, SAMPLE_RATE)
     ) == detect_mix_cues(audio, SAMPLE_RATE, grid)
+
+
+def test_steady_groove_is_body_between_intro_and_outro() -> None:
+    from crate.smart_mix.structure import segment_phrases
+
+    wobble = [-12.0, -12.4, -11.8, -12.2] * 24
+    levels = [-20.0] * 16 + wobble + [-19.0] * 16
+
+    draft = segment_phrases(*_bar_level_inputs(levels), sample_rate=SAMPLE_RATE)
+
+    kinds = [phrase.kind for phrase in draft.phrases]
+    assert kinds[0] == "intro"
+    assert kinds[-1] == "outro"
+    assert set(kinds[1:-1]) == {"body"}
