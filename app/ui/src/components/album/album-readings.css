@@ -1,22 +1,24 @@
 /* Album readings (audio analysis, beside the sound spectrum): each mean over a strip on
    the library's usual scale, with a mark per track and the mean glowing, in the
    spectrum's language (approved mockup B). The strip keeps a fixed height so its marks
-   weigh the same at any column width. */
+   weigh the same at any column width. Beside the spectrum the rows share its height;
+   stacked, there is no extra room and they keep their own. */
 .album-readings {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
   margin: 0;
 }
 
 .album-reading {
   display: grid;
+  flex: 1 1 auto;
+  align-content: center;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: baseline;
   column-gap: 1rem;
   padding: 0.625rem 0;
   border-bottom: 1px solid var(--border-quiet-subtle);
-}
-
-.album-reading:first-child {
-  padding-top: 0;
 }
 
 .album-reading:last-child {

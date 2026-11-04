@@ -669,9 +669,14 @@ export function AudioProfileCard({
           ) : (
             <div className="space-y-6" data-audio-profile-layout="album">
               {/* Readings on the left in the spectrum's language, the spectrum on the
-                  right at a size that sits beside them (approved mockup B). */}
-              <div className="grid gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
-                <div data-slot="audio-profile-column" className="min-w-0">
+                  right (approved mockup B). The pair is capped so the spectrum stays
+                  smaller than the card on wide screens, and the readings spread to
+                  the spectrum's height. */}
+              <div className="grid max-w-[78rem] gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+                <div
+                  data-slot="audio-profile-column"
+                  className="min-w-0 lg:flex lg:flex-col"
+                >
                   <AlbumReadings
                     readings={readings}
                     keys={Object.entries(dominantKeys).map(([name, count]) => ({
