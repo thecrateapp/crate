@@ -63,6 +63,21 @@ def test_rust_analyzer_version_matches_python() -> None:
     assert source.count(f'"{versions.ANALYZER_VERSION}"') == 1
 
 
+def test_worker_binary_is_built_from_the_current_analyzer() -> None:
+    # app/Dockerfile copies this committed binary into the x86_64 worker images
+    # instead of building tools/crate-cli. A stale binary keeps writing profiles of
+    # the previous analyzer, which the store keeps as "unchanged".
+    binary = (APP_ROOT / "bin/crate-cli-linux-amd64").read_bytes()
+    embedded = {
+        match.group().decode()
+        for match in re.finditer(rb"smart-mix-audio-v\d+", binary)
+    }
+
+    assert embedded == {versions.ANALYZER_VERSION}, (
+        "rebuild app/bin/crate-cli-linux-amd64 with `make crate-cli-linux`"
+    )
+
+
 def test_rust_beat_grid_format_matches_python() -> None:
     source = (REPO_ROOT / "tools/crate-cli/src/mix_profile.rs").read_text()
 
