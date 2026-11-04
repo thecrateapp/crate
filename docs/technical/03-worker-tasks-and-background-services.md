@@ -53,8 +53,9 @@ run every concern inside a single container anymore.
 
 Current production split:
 
-- `crate-worker`: `fast,default` queues, service loop, scheduler, watcher,
-  imports, cleanup, health snapshot, and write-capable general work. Telegram
+- `crate-worker`: `fast,default` queues, the `ai` and `ai_bulk` lanes in their
+  own pools, service loop, scheduler, watcher, imports, cleanup, health
+  snapshot, and write-capable general work. Telegram
   control is Crate Agent or Crate Operator (see `crate-agent.md`); the worker
   no longer runs a bot.
 - `crate-maintenance-worker`: `maintenance` queue for repair/sync/enrichment
@@ -163,6 +164,11 @@ Queues:
 - `maintenance` — repair, sync, enrichment and other deferrable maintenance
 - `heavy` — reserved for heavier CPU paths
 - `playback` — playback preparation and transcode jobs
+- `ai` — every interactive task that calls an AI provider, at most 300 s
+- `ai_bulk` — long AI batches such as the genre taxonomy runs
+
+No other queue may run a task that calls a model, and no route calls one; see
+[Where model calls run](ai-agents.md#where-model-calls-run).
 
 Bandcamp work is split by cost and risk:
 
@@ -327,9 +333,9 @@ publication outcomes and the diagnostic sequence.
 
 Verified against implementation and tests on 2026-10-21. Queue assignment is defined by
 `actors.py` task policy and the deployed Compose commands, not by a task's display label.
-`crate-fast-worker` adds `fast` capacity; `crate-worker` consumes `fast,default`, the
-maintenance/analysis/playback workers consume their named queue, and projector and Rust
-media worker have separate loops. A running container alone does not prove that the
+`crate-fast-worker` adds `fast` capacity; `crate-worker` consumes `fast,default`, `ai` and
+`ai_bulk`, the maintenance/analysis/playback workers consume their named queue, and projector
+and Rust media worker have separate loops. A running container alone does not prove that the
 required queue is consumed or that a particular handler is progressing.
 
 Before claiming a task, the actor evaluates the resource governor, DB-heavy coordination,

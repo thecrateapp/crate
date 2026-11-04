@@ -28,6 +28,12 @@ sources:
   - app/crate/db/repositories/smart_mix.py
   - app/crate/worker_handlers/analysis.py
   - app/crate/actors.py
+  - app/crate/ai/queues.py
+  - app/crate/ai/requeue.py
+  - app/crate/worker.py
+  - app/crate/db/repositories/ai_usage.py
+  - docker-compose.yaml
+  - docker-compose.project.yaml
   - app/crate/agent_observability.py
   - app/crate/db/queries/agent_observability.py
   - app/tests/test_mcp_observability.py
@@ -248,6 +254,71 @@ accepted. Resuming reuses a running or paused campaign of the same generation. A
 completes has exhausted the claimable work in that pass; it can still leave exhausted errors or
 non-current profiles. Check coverage and `processing.exhausted` before treating the backlog as
 resolved. A coordinating task in `done` does not mean all of its children have finished either.
+
+## AI worker lanes and sizing
+
+No shipped Smart Mix task calls a model: profiles, plans and backfill keep the queues above.
+Any Smart Mix work that calls a model has to run on the `ai` lane, like every other AI task
+(see [Where model calls run](ai-agents.md#where-model-calls-run)), so its capacity is the
+capacity described here.
+
+`crate-worker` runs `worker --queues default,fast,ai,ai_bulk` (`default,ai,ai_bulk` in the home
+profile). Next to its general pool it starts one Dramatiq process per AI lane, each with its
+own threads. No other service consumes the AI lanes.
+
+| Variable                       | Default | Lane      | Meaning                                    |
+| ------------------------------ | ------: | --------- | ------------------------------------------ |
+| `CRATE_AI_WORKER_THREADS`      |       2 | `ai`      | Interactive AI tasks that can run at once  |
+| `CRATE_AI_BULK_WORKER_THREADS` |       1 | `ai_bulk` | AI batches (taxonomy) that can run at once |
+
+Values are clamped to 1–16, and a value that is not an integer uses the default. They are read
+when `crate-worker` starts, so a change needs a restart of that container. `docker-compose.yaml`
+and the dev, home and federation-dev Compose files forward both; the home installer lists them as
+tuning variables. A thread is held for the whole task, including the wait for the provider: up
+to 300 s on `ai` and up to two hours for a taxonomy batch.
+
+Size the lanes in this order:
+
+1. **Provider slots.** Each provider connection admits at most `max_concurrent` calls at once
+   (2 by default, 1–8, set per connection under AI models in Admin). An `ai` thread beyond the
+   slots of the connection that serves the interactive actions only adds capacity requeues: the
+   task waits 5–30 s per attempt and fails after ten. Keep `CRATE_AI_WORKER_THREADS` at or
+   below that connection's `max_concurrent`, unless the actions are bound to different
+   connections.
+2. **Bulk shares those slots.** On a connection with more than one slot, a bulk reservation
+   leaves one free, and a batch yields while `ai` has pending tasks. With the defaults (two
+   slots, two `ai` threads, one bulk thread) a taxonomy batch uses at most one slot. A second
+   bulk thread runs a second batch on the same slots; raise it only when the bulk actions are
+   bound to a connection with slots to spare.
+3. **Priority does not reorder a lane.** Dramatiq applies task priority only among the messages
+   a pool process has already prefetched (twice its threads), so each lane runs close to first
+   in, first out. Queued show extractions (priority 2) or i18n drafts (priority 3) delay an EQ
+   or playlist proposal (priority 0) on the same lane. Add `ai` threads for that only when the
+   provider has slots for them; otherwise raise the connection's `max_concurrent` first.
+4. **Memory.** Measured in a container started from the worker image, with idle pools: 498 MiB
+   of cgroup usage, of which the two idle AI pools take about 180 MiB (93 MB per AI worker
+   process). Per running call, the transport child takes 44 MB (49 MB on the legacy path), an
+   `ai` worker with its handler modules loaded 136 MB, and Tesseract on a 2400×3400 poster
+   162 MB. At peak, with the default threads, the AI pools add about 0.7 GB (two show
+   extractions with OCR and image decoding, plus a bulk batch). `crate-worker` therefore has `mem_limit: 2304m` in `docker-compose.yaml` and
+   the dev and home files, and `2816m` in `docker-compose.project.yaml`. Each additional thread
+   can add one more call with its transport child and its handler's working set, so raise the
+   limit together with the threads.
+5. **Database connections.** Every running task holds a handler session and a heartbeat
+   session, so each AI pool process starts with `CRATE_SQLALCHEMY_POOL_SIZE` set to at least
+   twice its threads (4 for `ai` and 2 for `ai_bulk` with the defaults), plus the configured
+   overflow. Count them against PostgreSQL's `max_connections` when raising threads.
+6. **Stopping.** Every pool runs with a 90 s shutdown timeout, the longest an AI call may last,
+   and `crate-worker` has `stop_grace_period: 2m`, so a stop or a deploy lets in-flight calls
+   finish. If one pool exits on its own, the other pools get one SIGTERM and 105 s to drain, and
+   the container restarts with every lane.
+
+To see whether the sizing fits, open the Admin Tasks page: it shows `ai` and `ai_bulk` with their
+running and pending tasks and how long the oldest pending task has waited, and draws a task that
+waits for provider capacity as deferred. The ops snapshot counts those tasks per lane, the
+`ai.capacity.requeue` and `ai.capacity.wait` metrics count the requeues and bulk waits, and the
+task's progress reads "Waiting for AI provider capacity". Steady requeues mean more threads than
+provider slots; a growing wait with no requeues means too few threads.
 
 ## Planner, compatibility and cache
 
