@@ -142,7 +142,7 @@ def test_scores_csv_matches_export_format(tmp_path: Path) -> None:
         "end_ms": "1000",
         "n_windows": "2",
         "mean": "0.250117",
-        "windows": "0.000234 0.500000",
+        "windows": "0.000234 0.5",
     }
     # A window belongs to the phrase its centre falls in; an empty phrase has none.
     assert [phrase.scores for phrase in phrases] == [
@@ -336,10 +336,26 @@ def test_evaluate_writes_the_report_with_recommended_thresholds(
             flat.append((*key, (0.5, 0.5)))
     # One unlabelled phrase, one that moved since labelling, one without windows.
     labels.append({**labels[0], "phrase_index": 2, "start_ms": 30_000, "vocal": ""})
-    labels.append({**labels[0], "phrase_index": 3, "start_ms": 40_000, "vocal": 1})
+    labels.append(
+        {
+            **labels[0],
+            "phrase_index": 3,
+            "start_ms": 40_000,
+            "end_ms": 50_000,
+            "vocal": 1,
+        }
+    )
     good.append(("track-0", 3, 41_000, 50_000, (0.9,)))
     flat.append(("track-0", 3, 41_000, 50_000, (0.9,)))
-    labels.append({**labels[0], "phrase_index": 4, "start_ms": 50_000, "vocal": 0})
+    labels.append(
+        {
+            **labels[0],
+            "phrase_index": 4,
+            "start_ms": 50_000,
+            "end_ms": 50_100,
+            "vocal": 0,
+        }
+    )
     good.append(("track-0", 4, 50_000, 50_100, ()))
     flat.append(("track-0", 4, 50_000, 50_100, (0.1,)))
     labels_path = tmp_path / "vocals_labels.csv"
@@ -425,3 +441,119 @@ def test_evaluate_needs_a_windows_file_per_backend(
 
     assert code == 2
     assert "vocals_windows_panns.csv" in capsys.readouterr().err
+
+
+def _labelled(uid: str, index: int, vocal: int, end_ms: int = 10_000) -> dict:
+    start_ms = index * 10_000
+    return {
+        "entity_uid": uid,
+        "phrase_index": index,
+        "start_ms": start_ms,
+        "end_ms": start_ms + end_ms,
+        "bars": 8,
+        "kind": "body",
+        "vocal": str(vocal),
+    }
+
+
+def test_recommended_thresholds_are_one_pair_fitted_on_every_label() -> None:
+    # Per-fold medians of window and byte could pair values no fold chose together.
+    rng = random.Random(3)
+    labels, windows = [], []
+    for track in range(12):
+        uid = f"track-{track:02d}"
+        for index, vocal in enumerate((1, 0, 1)):
+            labels.append(_labelled(uid, index, vocal))
+            scores = tuple(
+                rng.uniform(0.002, 0.02) if vocal else rng.uniform(0.0, 0.004)
+                for _ in range(20)
+            )
+            windows.append(
+                PhraseWindows(
+                    uid, index, index * 10_000, index * 10_000 + 10_000, scores
+                )
+            )
+
+    report = compare_models.evaluate(labels, {"model": windows})
+
+    phrases = [
+        LabelledPhrase(p.entity_uid, labels[i]["vocal"] == "1", p.mean or 0.0, p.scores)
+        for i, p in enumerate(windows)
+    ]
+    fitted = compare_models.choose_thresholds(phrases)
+    assert report["backends"]["model"]["recommended"] == {
+        "window_threshold": fitted.window,
+        "byte_threshold": fitted.byte,
+        "fitted_on": "all labels, not held out",
+    }
+
+
+def test_window_scores_keep_six_significant_digits(tmp_path: Path) -> None:
+    phrase = PhraseWindows("uid", 0, 0, 1_000, (0.0000996, 0.000123456, 0.5))
+    path = tmp_path / "windows.csv"
+
+    write_windows(path, [phrase])
+    [read] = read_windows(path)
+
+    assert read.scores == pytest.approx(phrase.scores, rel=1e-5)
+    assert read.scores[0] < 0.0001
+    assert read.mean == pytest.approx(phrase.mean, rel=1e-5)
+
+
+def test_non_finite_window_scores_fail_loudly(tmp_path: Path) -> None:
+    path = tmp_path / "windows.csv"
+    _write_csv(
+        path,
+        WINDOW_FIELDS,
+        [
+            {
+                "entity_uid": "uid",
+                "phrase_index": 0,
+                "start_ms": 0,
+                "end_ms": 1_000,
+                "n_windows": 2,
+                "mean": "",
+                "windows": "0.1 nan",
+            }
+        ],
+    )
+
+    with pytest.raises(ValueError, match="finite"):
+        read_windows(path)
+
+
+def test_a_phrase_whose_end_moved_is_left_out() -> None:
+    labels = [_labelled("uid", 0, 1), _labelled("uid", 1, 0, end_ms=8_000)]
+    windows = [
+        PhraseWindows("uid", 0, 0, 10_000, (0.5,)),
+        PhraseWindows("uid", 1, 10_000, 20_000, (0.0,)),
+    ]
+
+    report = compare_models.evaluate(labels, {"model": windows})
+
+    assert report["phrases"]["left_out"]["moved"] == 1
+    assert report["phrases"]["evaluated"] == 1
+
+
+def test_a_track_that_fails_to_decode_is_skipped(tmp_path: Path, capsys) -> None:
+    def decode(path: Path, rate: int) -> list[float]:
+        if path.name == "broken.flac":
+            raise RuntimeError("corrupt file")
+        return [0.0] * (rate * 3)
+
+    backend = Backend("Low", 16_000, (), lambda _models: lambda a: ([0.5], [0.2]))
+    rows = [{"phrase_index": 0, "start_ms": 0, "end_ms": 2_000}]
+    tracks = [
+        ("uid-1", Path("broken.flac"), rows),
+        ("uid-2", Path("ok.flac"), rows),
+    ]
+
+    skipped = score_tracks(
+        tracks, {"low": backend}, {"low": backend.load(None)}, decode, tmp_path
+    )
+
+    assert skipped == ["uid-1"]
+    assert [
+        p.entity_uid for p in read_windows(tmp_path / "vocals_windows_low.csv")
+    ] == ["uid-2"]
+    assert "uid-1" in capsys.readouterr().err

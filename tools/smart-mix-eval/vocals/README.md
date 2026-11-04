@@ -180,7 +180,8 @@ python3 tools/smart-mix-eval/vocals/compare_models.py evaluate \
   fixed grid (`WINDOW_THRESHOLDS`, 0.0001 to 0.9), byte thresholds from 1 to 255.
   Ties keep the lowest of both.
 - **Metrics:** precision, recall, F1, specificity and NPV pool the held-out folds,
-  next to an "always voice" baseline. `report.json` recommends, per backend, the median
-  of the thresholds chosen in each fold.
+  next to an "always voice" baseline. `report.json` recommends, per backend, one pair
+  fitted on every label (not held out, so its own metrics would be optimistic) and
+  lists the pair each fold chose, to show how stable the choice is.
 - **Cost:** CPU per track (mean, p50 and p95) and per minute of audio, model size and
   the run's peak RSS, when `score`'s files are in `--windows`.

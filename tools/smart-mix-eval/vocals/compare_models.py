@@ -56,7 +56,8 @@ CPU_PREFIX = "vocals_cpu_"
 META_PREFIX = "vocals_meta_"
 # YAMNet's voice scores in music sit around 1e-4 and its thresholds land there too;
 # four decimals would move them by up to half a step.
-SCORE_DECIMALS = 6
+# Significant digits: YAMNet's voice scores sit around 1e-4 to 1e-2.
+SCORE_DIGITS = 6
 FOLDS = 5
 # Candidate window thresholds, readable values from 1e-4 to 0.9. Voice scores of the
 # AudioSet models sit mostly far below 0.5, so the low end is dense.
@@ -272,8 +273,8 @@ def window_row(phrase: PhraseWindows) -> dict[str, Any]:
         "start_ms": phrase.start_ms,
         "end_ms": phrase.end_ms,
         "n_windows": len(phrase.scores),
-        "mean": "" if phrase.mean is None else f"{phrase.mean:.{SCORE_DECIMALS}f}",
-        "windows": " ".join(f"{score:.{SCORE_DECIMALS}f}" for score in phrase.scores),
+        "mean": "" if phrase.mean is None else f"{phrase.mean:.{SCORE_DIGITS}g}",
+        "windows": " ".join(f"{score:.{SCORE_DIGITS}g}" for score in phrase.scores),
     }
 
 
@@ -286,17 +287,25 @@ def write_windows(path: Path, phrases: Iterable[PhraseWindows]) -> None:
 
 
 def read_windows(path: Path) -> list[PhraseWindows]:
-    return [
-        PhraseWindows(
-            entity_uid=row["entity_uid"],
-            phrase_index=int(row["phrase_index"]),
-            start_ms=int(row["start_ms"]),
-            end_ms=int(row["end_ms"]),
-            scores=tuple(float(value) for value in row["windows"].split()),
-            mean=float(row["mean"]) if row["mean"] else None,
+    """Phrases with their window scores; the mean is recomputed from the windows."""
+    phrases = []
+    for row in read_csv(path):
+        scores = tuple(float(value) for value in row["windows"].split())
+        if not all(math.isfinite(score) for score in scores):
+            raise ValueError(
+                f"{path}: phrase {row['entity_uid']}#{row['phrase_index']} has a "
+                "window score that is not finite"
+            )
+        phrases.append(
+            PhraseWindows(
+                entity_uid=row["entity_uid"],
+                phrase_index=int(row["phrase_index"]),
+                start_ms=int(row["start_ms"]),
+                end_ms=int(row["end_ms"]),
+                scores=scores,
+            )
         )
-        for row in read_csv(path)
-    ]
+    return phrases
 
 
 def phrase_byte(scores: Sequence[float], window_threshold: float) -> int:
@@ -569,8 +578,12 @@ def score_tracks(
     scorers: Mapping[str, Scorer],
     decode: Decoder,
     output: Path,
-) -> None:
-    """Decode each track once per sample rate and append each backend's rows."""
+) -> list[str]:
+    """Decode each track once per sample rate and append each backend's rows.
+
+    A track that fails to decode or score is skipped with a note on stderr, so one
+    bad file does not end a long run; the skipped UIDs are returned.
+    """
     output.mkdir(parents=True, exist_ok=True)
     rates = sorted({backend.sample_rate for backend in backends.values()})
     handles, windows, cpu = {}, {}, {}
@@ -584,26 +597,36 @@ def score_tracks(
             cpu[name] = csv.DictWriter(handles[name][1], fieldnames=CPU_FIELDS)
             windows[name].writeheader()
             cpu[name].writeheader()
+        skipped: list[str] = []
         for number, (uid, path, rows) in enumerate(tracks, start=1):
-            audio, decode_cpu = {}, {}
-            for rate in rates:
-                started = time.process_time()
-                audio[rate] = decode(path, rate)
-                decode_cpu[rate] = time.process_time() - started
+            results = {}
+            try:
+                audio, decode_cpu = {}, {}
+                for rate in rates:
+                    started = time.process_time()
+                    audio[rate] = decode(path, rate)
+                    decode_cpu[rate] = time.process_time() - started
+                for name, backend in backends.items():
+                    samples = audio[backend.sample_rate]
+                    started = time.process_time()
+                    centres, scores = scorers[name](samples)
+                    results[name] = (
+                        phrase_windows(uid, rows, centres, scores),
+                        len(samples),
+                        time.process_time() - started,
+                    )
+            except Exception as error:  # noqa: BLE001 - one bad file must not end the run
+                print(f"{number} {uid}  skipped: {error}", file=sys.stderr, flush=True)
+                skipped.append(uid)
+                continue
             progress = []
             for name, backend in backends.items():
-                samples = audio[backend.sample_rate]
-                started = time.process_time()
-                centres, scores = scorers[name](samples)
-                model_cpu = time.process_time() - started
-                windows[name].writerows(
-                    window_row(phrase)
-                    for phrase in phrase_windows(uid, rows, centres, scores)
-                )
+                phrases, sample_count, model_cpu = results[name]
+                windows[name].writerows(window_row(phrase) for phrase in phrases)
                 cpu[name].writerow(
                     {
                         "entity_uid": uid,
-                        "seconds": f"{len(samples) / backend.sample_rate:.1f}",
+                        "seconds": f"{sample_count / backend.sample_rate:.1f}",
                         "decode_cpu": f"{decode_cpu[backend.sample_rate]:.2f}",
                         "model_cpu": f"{model_cpu:.2f}",
                     }
@@ -612,6 +635,7 @@ def score_tracks(
                     handle.flush()
                 progress.append(f"{name} {model_cpu:.1f}s")
             print(f"{number} {uid}  " + ", ".join(progress), flush=True)
+        return skipped
     finally:
         for pair in handles.values():
             for handle in pair:
@@ -702,7 +726,9 @@ def run_score(args: argparse.Namespace) -> int:
     scorers = {
         name: backend.load(args.models_dir) for name, backend in backends.items()
     }
-    score_tracks(tracks, backends, scorers, decode_with_essentia, args.output)
+    skipped = score_tracks(tracks, backends, scorers, decode_with_essentia, args.output)
+    if skipped:
+        print(f"{len(skipped)} tracks skipped: " + ", ".join(skipped), file=sys.stderr)
     # Linux reports ru_maxrss in KiB.
     peak_rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
     for name, backend in backends.items():
@@ -755,7 +781,11 @@ def evaluate(
         found = {name: p for name, p in scored.items() if p is not None}
         if len(found) < len(scored):
             left_out["not_scored"] += 1
-        elif any(p.start_ms != int(row["start_ms"]) for p in found.values()):
+        elif any(
+            p.start_ms != int(row["start_ms"])
+            or (row.get("end_ms") not in (None, "") and p.end_ms != int(row["end_ms"]))
+            for p in found.values()
+        ):
             left_out["moved"] += 1
         elif any(not p.scores for p in found.values()):
             left_out["no_windows"] += 1
@@ -797,16 +827,17 @@ def evaluate(
         result = cross_validate(
             phrases, folds=folds, window_thresholds=window_thresholds
         )
+        # One pair fitted on every label: the held-out metrics above describe the
+        # per-fold pairs, and medians of window and byte taken apart could pair values
+        # no fold chose together.
+        fitted = choose_thresholds(phrases, window_thresholds) if phrases else None
         recommended = (
             {
-                "window_threshold": statistics.median(
-                    t.window for t in result.thresholds
-                ),
-                "byte_threshold": round(
-                    statistics.median(t.byte for t in result.thresholds)
-                ),
+                "window_threshold": fitted.window,
+                "byte_threshold": fitted.byte,
+                "fitted_on": "all labels, not held out",
             }
-            if result.thresholds
+            if fitted is not None
             else None
         )
         report["backends"][name] = {
@@ -847,7 +878,8 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         "has voice when its byte reaches the byte threshold. Both thresholds are",
         f"chosen by {report['folds']}-fold cross-validation grouped by track, with",
         "the best F1 on the training folds; the other metrics pool the held-out",
-        "folds. The thresholds shown are the median of the folds.",
+        "folds. The thresholds shown are one pair fitted on every label, so they are",
+        "not held out; each fold's own pair is listed under Backends.",
         "",
         "| Backend | AUC | Precision | Recall | F1 | Specificity | NPV |"
         " Window threshold | Byte threshold |",
