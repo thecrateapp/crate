@@ -1,9 +1,13 @@
 import logging
 import os
+import subprocess
+import sys
 import threading
-from collections.abc import Iterator, MutableMapping
+import time
+from collections.abc import Iterator, MutableMapping, Sequence
 from importlib import import_module
 
+from crate.ai.queues import AI_QUEUES, lane_threads
 from crate.db.cache_store import set_cache
 from crate.db.init_db import init_db
 from crate.db.queries.tasks import get_task_activity_snapshot
@@ -24,7 +28,69 @@ def _normalise_queues(value) -> list[str]:
     else:
         parts = []
     queues = [str(part).strip() for part in parts if str(part).strip()]
-    return queues or ["fast", "heavy", "default", "maintenance"]
+    return queues or ["fast", "heavy", "default", "maintenance", *AI_QUEUES]
+
+
+def _dramatiq_commands(queues: Sequence[str], processes: int) -> list[list[str]]:
+    """One Dramatiq pool for the general queues and one per AI lane.
+
+    AI lanes wait on provider latency, so each gets a single process with its own
+    thread count instead of sharing the general single-threaded processes.
+    """
+    base = [sys.executable, "-m", "dramatiq", "crate.actors"]
+    general = [queue for queue in queues if queue not in AI_QUEUES]
+    commands = []
+    if general:
+        commands.append(
+            [
+                *base,
+                "--processes",
+                str(processes),
+                "--threads",
+                "1",
+                "--queues",
+                *general,
+            ]
+        )
+    for lane in AI_QUEUES:
+        if lane in queues:
+            commands.append(
+                [
+                    *base,
+                    "--processes",
+                    "1",
+                    "--threads",
+                    str(lane_threads(lane)),
+                    "--queues",
+                    lane,
+                ]
+            )
+    return commands
+
+
+def _supervise_pools(processes: Sequence, *, grace_seconds: float = 30) -> int:
+    """Wait for the first pool to exit, stop the rest and return its exit code.
+
+    A dead lane must not leave its queue silently unconsumed: the container exits
+    and its restart policy brings every pool back together.
+    """
+    while True:
+        for process in processes:
+            code = process.poll()
+            if code is not None:
+                for other in processes:
+                    if other is not process and other.poll() is None:
+                        other.terminate()
+                deadline = time.monotonic() + grace_seconds
+                for other in processes:
+                    if other is process:
+                        continue
+                    try:
+                        other.wait(timeout=max(0.0, deadline - time.monotonic()))
+                    except subprocess.TimeoutExpired:
+                        other.kill()
+                return code
+        time.sleep(1)
 
 
 def _env_int(name: str, default: int = 0) -> int:
@@ -57,10 +123,7 @@ def _is_cancelled(task_id: str) -> bool:
 
 def run_worker(config: dict):
     """Start Dramatiq workers + scheduler/watcher service loop."""
-    import subprocess
     import signal
-    import sys
-    import threading
 
     logging.basicConfig(
         level=logging.INFO,
@@ -146,31 +209,25 @@ def run_worker(config: dict):
     else:
         log.info("Projector daemon disabled for queues: %s", ",".join(queues))
 
-    # Start Dramatiq workers via CLI (this manages its own process pool)
-    dramatiq_cmd = [
-        sys.executable,
-        "-m",
-        "dramatiq",
-        "crate.actors",
-        "--processes",
-        str(config.get("worker_processes", 6)),
-        "--threads",
-        "1",
-        "--queues",
-        *queues,
-    ]
-    log.info("Starting Dramatiq: %s", " ".join(dramatiq_cmd))
-    proc = subprocess.Popen(dramatiq_cmd)
+    # Start Dramatiq workers via CLI (each command manages its own process pool)
+    procs = []
+    for dramatiq_cmd in _dramatiq_commands(
+        queues, int(config.get("worker_processes", 6))
+    ):
+        log.info("Starting Dramatiq: %s", " ".join(dramatiq_cmd))
+        procs.append(subprocess.Popen(dramatiq_cmd))
 
     def handle_signal(signum, frame):
         log.info("Received signal %d, shutting down...", signum)
         service_stop.set()
-        proc.send_signal(signum)
+        for proc in procs:
+            if proc.poll() is None:
+                proc.send_signal(signum)
 
     signal.signal(signal.SIGTERM, handle_signal)
     signal.signal(signal.SIGINT, handle_signal)
 
-    exit_code = proc.wait()
+    exit_code = _supervise_pools(procs)
     service_stop.set()
     log.info("Dramatiq exited with code %d", exit_code)
     sys.exit(exit_code)

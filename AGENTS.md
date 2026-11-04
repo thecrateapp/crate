@@ -27,7 +27,7 @@ the rules you need when editing it; read the one closest to the files you touch.
 ```
 crate-api                (FastAPI, Python 3.13)  → :8585, /music read-only
 crate-readplane          (Go)                    → low-latency snapshot/read routes + SSE relay, FastAPI fallback
-crate-worker             (Python + Dramatiq)     → default + fast queues, service loop (scheduler, watcher, recovery), /music rw
+crate-worker             (Python + Dramatiq)     → default + fast queues, ai + ai_bulk pools, service loop (scheduler, watcher, recovery), /music rw
 crate-fast-worker        (Python + Dramatiq)     → extra fast-queue capacity, /music rw
 crate-maintenance-worker (Python + Dramatiq)     → repair, sync, enrichment, maintenance queue, /music rw
 crate-analysis-worker    (Python + native DSP)   → heavy queue, analysis and bliss daemons, /music read-only

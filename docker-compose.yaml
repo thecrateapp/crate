@@ -563,6 +563,8 @@ services:
       - MAINTENANCE_WORKER_PROCESSES=${MAINTENANCE_WORKER_PROCESSES:-1}
       - ANALYSIS_WORKER_PROCESSES=${ANALYSIS_WORKER_PROCESSES:-1}
       - PLAYBACK_WORKER_PROCESSES=${PLAYBACK_WORKER_PROCESSES:-1}
+      - CRATE_AI_WORKER_THREADS=${CRATE_AI_WORKER_THREADS:-2}
+      - CRATE_AI_BULK_WORKER_THREADS=${CRATE_AI_BULK_WORKER_THREADS:-1}
       - CRATE_CONFIG=/app/config.yaml
       - DATA_DIR=/data
       - CACHE_DIR=/cache
@@ -658,7 +660,7 @@ services:
       [
         "worker",
         "--queues",
-        "default,fast",
+        "default,fast,ai,ai_bulk",
         "--processes",
         "${CRATE_WORKER_PROCESSES:-3}",
         "--no-daemons",

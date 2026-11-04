@@ -9,18 +9,21 @@ Long-form background: `docs/technical/03-worker-tasks-and-background-services.md
 
 ## Runtime map (production, `docker-compose.yaml`)
 
-| Container                   | Command                                                    | Queues / loops                                                                                                                    | `/music` |
-| --------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| `crate-worker`              | `worker --queues default,fast --no-daemons --no-projector` | default + fast, service loop (scheduler, watcher, zombie cleanup, stale-pending redispatch, media-worker bridge, health snapshot) | rw       |
-| `crate-fast-worker`         | `worker --queues fast --no-service-loop ...`               | fast only (extends `crate-worker`)                                                                                                | rw       |
-| `crate-maintenance-worker`  | `worker --queues maintenance --no-service-loop ...`        | maintenance                                                                                                                       | rw       |
-| `crate-analysis-worker`     | `worker --queues heavy --no-service-loop --no-projector`   | heavy + analysis/bliss daemons                                                                                                    | **ro**   |
-| `crate-playback-worker`     | `worker --queues playback ...`                             | playback (ffmpeg transcodes into `/cache`)                                                                                        | **ro**   |
-| `crate-projector`           | `projector`                                                | outbox relay + domain-event projection + snapshot warming                                                                         | ro       |
-| `crate-media-worker` (Rust) | HTTP on :8687                                              | album/track ZIP packages, Redis progress/cancel                                                                                   | ro       |
+| Container                   | Command                                                               | Queues / loops                                                                                                                                                           | `/music` |
+| --------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
+| `crate-worker`              | `worker --queues default,fast,ai,ai_bulk --no-daemons --no-projector` | default + fast; `ai` and `ai_bulk` in their own pools; service loop (scheduler, watcher, zombie cleanup, stale-pending redispatch, media-worker bridge, health snapshot) | rw       |
+| `crate-fast-worker`         | `worker --queues fast --no-service-loop ...`                          | fast only (extends `crate-worker`)                                                                                                                                       | rw       |
+| `crate-maintenance-worker`  | `worker --queues maintenance --no-service-loop ...`                   | maintenance                                                                                                                                                              | rw       |
+| `crate-analysis-worker`     | `worker --queues heavy --no-service-loop --no-projector`              | heavy + analysis/bliss daemons                                                                                                                                           | **ro**   |
+| `crate-playback-worker`     | `worker --queues playback ...`                                        | playback (ffmpeg transcodes into `/cache`)                                                                                                                               | **ro**   |
+| `crate-projector`           | `projector`                                                           | outbox relay + domain-event projection + snapshot warming                                                                                                                | ro       |
+| `crate-media-worker` (Rust) | HTTP on :8687                                                         | album/track ZIP packages, Redis progress/cancel                                                                                                                          | ro       |
 
-`run_worker()` in `worker.py` starts optional threads per CLI flag, then execs
-`python -m dramatiq crate.actors --processes N --threads 1 --queues ...`. `orchestrator.py`
+`run_worker()` in `worker.py` starts optional threads per CLI flag, then runs
+`python -m dramatiq crate.actors --processes N --threads 1 --queues ...` for the general
+queues plus one `--processes 1 --threads T` pool per AI lane it consumes
+(`CRATE_AI_WORKER_THREADS`, default 2; `CRATE_AI_BULK_WORKER_THREADS`, default 1). When any
+pool exits, the others stop and the container restarts. `orchestrator.py`
 is legacy (`worker --legacy` only); do not extend it or `claim_next_task`.
 
 ## Task lifecycle
@@ -78,7 +81,10 @@ than 300s. The `tasks` row is the source of truth; Redis messages can be lost or
   `heavy` and `playback` containers mount `/music:ro` in both dev and production compose.
 - Pick the queue by behaviour: `fast` = short interactive I/O (enforced by
   `tests/test_task_queue_routing.py`); `default` = user-initiated mutations, imports, downloads;
-  `maintenance` = deferrable scheduled/batch; `heavy` = CPU/DSP; `playback` = stream variants.
+  `maintenance` = deferrable scheduled/batch; `heavy` = CPU/DSP; `playback` = stream variants;
+  `ai` = any task that calls an AI provider, at most 300s; `ai_bulk` = long AI batches. AI work
+  goes only to `ai`/`ai_bulk` (`tests/test_actor_config.py`), keeps `max_retries=0`, and runs
+  outside the runtime policy pool slots.
   Priority 0 user-facing, 1 follow-ups, 2 scheduled, 3 background batch.
 - Set `time_limit_seconds` to a realistic upper bound; long loops must chunk or delegate
   (see `enrich_artists`, `analysis._try_complete_parent`) instead of raising the limit.

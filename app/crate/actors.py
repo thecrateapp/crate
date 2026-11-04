@@ -58,6 +58,13 @@ DOWNLOAD_SEM_MAX = _env_int("CRATE_DOWNLOAD_SEM_MAX", 2)
 #   default — mixed: sync, pipeline, downloads, management
 #   maintenance — deferrable repair/sync/export work
 #   playback — interactive playback delivery and stream variant preparation
+#   ai      — every interactive AI-provider call (≤ 300s; crate.ai.queues)
+#   ai_bulk — long AI-provider batches such as the genre taxonomy runs
+#
+# A task that calls a model (directly or through a domain helper) belongs in
+# ai or ai_bulk and nowhere else; tests/test_actor_config.py enforces it. Paid
+# AI work keeps max_retries=0: the runtime reserves before transmitting and a
+# connection-concurrency refusal is requeued by the actor, not retried.
 
 
 class TaskPoolConfig(NamedTuple):
@@ -68,8 +75,8 @@ class TaskPoolConfig(NamedTuple):
 
 
 TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
-    "ai_catalog_refresh": TaskPoolConfig("maintenance", 0, 180, 0),
-    "ai_profile_test": TaskPoolConfig("maintenance", 0, 180, 0),
+    "ai_catalog_refresh": TaskPoolConfig("ai_bulk", 0, 180, 0),
+    "ai_profile_test": TaskPoolConfig("ai", 0, 180, 0),
     # User-initiated (priority 0) — these should run ASAP
     "tidal_download": TaskPoolConfig(
         "default", 0, 14400, 0
@@ -146,7 +153,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "library_pipeline": TaskPoolConfig("maintenance", 2, 7200, 0),
     "health_check": TaskPoolConfig("maintenance", 2, 1500, 0),
     "quality_check": TaskPoolConfig("maintenance", 2, 1800, 0),
-    "show_extract": TaskPoolConfig("maintenance", 2, 180, 0),
+    "show_extract": TaskPoolConfig("ai", 2, 180, 0),
     "agent_maintenance": TaskPoolConfig("maintenance", 2, 1800, 0),
     "agent_tidal_download": TaskPoolConfig("default", 0, 14400, 0),
     "agent_control": TaskPoolConfig("fast", 0, 60, 0),
@@ -193,8 +200,8 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "refresh_smart_mix_coverage": TaskPoolConfig("maintenance", 3, 300, 0),
     "backfill_track_audio_fingerprints": TaskPoolConfig("heavy", 3, 14400, 0),
     "index_genres": TaskPoolConfig("maintenance", 3, 600, 0),
-    "infer_genre_taxonomy": TaskPoolConfig("maintenance", 3, 3600, 0),
-    "rebuild_genre_taxonomy_proposals": TaskPoolConfig("maintenance", 3, 7200, 0),
+    "infer_genre_taxonomy": TaskPoolConfig("ai_bulk", 3, 3600, 0),
+    "rebuild_genre_taxonomy_proposals": TaskPoolConfig("ai_bulk", 3, 7200, 0),
     "enrich_genre_descriptions": TaskPoolConfig("maintenance", 3, 3600, 0),
     "sync_musicbrainz_genre_graph": TaskPoolConfig("maintenance", 3, 5400, 0),
     "cleanup_invalid_genre_taxonomy": TaskPoolConfig("maintenance", 3, 900, 0),
@@ -211,7 +218,8 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "repair_artwork_variants": TaskPoolConfig("maintenance", 3, 3600, 1),
     "backfill_similarities": TaskPoolConfig("maintenance", 3, 3600, 0),
     "normalize_artist_bios": TaskPoolConfig("maintenance", 2, 3600, 0),
-    "research_artist_bio": TaskPoolConfig("default", 1, 900, 1),
+    # Web collection (bounded request timeouts) plus one model call of ≤ 90s.
+    "research_artist_bio": TaskPoolConfig("ai", 1, 300, 0),
     "sync_shows": TaskPoolConfig("maintenance", 3, 3600, 1),
     "bandcamp_connect_credentials": TaskPoolConfig("maintenance", 1, 900, 0),
     "bandcamp_sync_collection": TaskPoolConfig("maintenance", 2, 7200, 1),
@@ -241,8 +249,8 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "refresh_system_smart_playlists": TaskPoolConfig("maintenance", 3, 1800, 0),
     "persist_playlist_cover": TaskPoolConfig("fast", 0, 120, 1),
     "crate_download": TaskPoolConfig("default", 0, 7200, 0),
-    # Listen i18n
-    "draft_i18n_translation": TaskPoolConfig("maintenance", 3, 900, 0),
+    # Listen i18n: one draft call (i18n.listen.draft allows ≤ 90s).
+    "draft_i18n_translation": TaskPoolConfig("ai", 3, 300, 0),
 }
 
 # DB-heavy tasks — only one at a time via Redis mutex

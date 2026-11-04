@@ -660,6 +660,26 @@ def test_global_admission_limit_applies_across_pools(pg_db, isolated_policy_env)
     assert _task_state(second)["status"] == "pending"
 
 
+def test_ai_lanes_are_admitted_outside_runtime_pool_limits(pg_db, isolated_policy_env):
+    # SM3-D8: AI lanes are sized by crate-worker threads and provider connection
+    # limits; the runtime policy neither blocks them nor counts them.
+    runtime_policy.update_runtime_policy(
+        {"max_running": 1, "pools": dict.fromkeys(POOLS, 1)}, expected_revision=0
+    )
+    work = create_task("compute_analytics", pool="maintenance", dispatch=False)
+    assert start_task(work) is not None
+    lanes = [
+        create_task("show_extract", pool="ai", dispatch=False),
+        create_task("show_extract", pool="ai", dispatch=False),
+        create_task("infer_genre_taxonomy", pool="ai_bulk", dispatch=False),
+    ]
+    assert all(start_task(task_id) is not None for task_id in lanes)
+    next_work = create_task("compute_analytics", pool="heavy", dispatch=False)
+    update_task(work, status="completed")
+    assert start_task(next_work) is not None
+    assert "ai" not in POOLS and "ai_bulk" not in POOLS
+
+
 def test_control_reservation_is_independent_and_limited_to_one_running_command(
     pg_db, isolated_policy_env
 ):

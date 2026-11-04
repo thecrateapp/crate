@@ -45,3 +45,68 @@ def test_inference_services_receive_explicit_credential_ring(filename, prefix):
                 assert environment.get(variable) == "${" + variable + ":-}", name
             else:
                 assert variable not in environment, name
+
+
+def _worker_queues(service) -> set[str]:
+    command = service.get("command")
+    if not isinstance(command, list) or command[:1] != ["worker"]:
+        return set()
+    if "--queues" not in command:
+        return set()
+    return set(command[command.index("--queues") + 1].split(","))
+
+
+@pytest.mark.parametrize(
+    "filename,consumers",
+    [
+        ("docker-compose.yaml", {"crate-worker"}),
+        ("docker-compose.dev.yaml", {"worker"}),
+        ("docker-compose.home.yaml", {"crate-worker"}),
+        (
+            "app/installer/internal/assets/files/docker-compose.home.yaml",
+            {"crate-worker"},
+        ),
+        ("docker-compose.federation-dev.yaml", {"node-a-worker", "node-b-worker"}),
+    ],
+)
+def test_only_crate_worker_consumes_the_ai_lanes(filename, consumers):
+    services = yaml.safe_load((ROOT / filename).read_text())["services"]
+    for lane in ("ai", "ai_bulk"):
+        assert {
+            name
+            for name, service in services.items()
+            if lane in _worker_queues(service)
+        } == consumers, lane
+    for name in consumers:
+        environment = _environment(services, name)
+        assert environment["CRATE_AI_WORKER_THREADS"] == "${CRATE_AI_WORKER_THREADS:-2}"
+        assert (
+            environment["CRATE_AI_BULK_WORKER_THREADS"]
+            == "${CRATE_AI_BULK_WORKER_THREADS:-1}"
+        )
+
+
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "deploy/operator/compose.operator.yaml",
+        "app/installer/internal/assets/files/compose.operator.yaml",
+    ],
+)
+def test_crate_worker_health_requires_ai_lane_consumers(filename):
+    services = yaml.safe_load((ROOT / filename).read_text())["services"]
+    queues = services["crate-worker"]["environment"]["CRATE_READINESS_QUEUES"]
+    assert {"ai", "ai_bulk"} <= set(queues.split(","))
+    for name, service in services.items():
+        if name == "crate-worker":
+            continue
+        environment = service.get("environment") or {}
+        other = str(environment.get("CRATE_READINESS_QUEUES", "")).split(",")
+        assert not {"ai", "ai_bulk"} & set(other), name
+
+
+def test_install_manifest_declares_ai_lane_tuning():
+    manifest = yaml.safe_load((ROOT / "deploy/install/integrations.yaml").read_text())
+    assert {"CRATE_AI_WORKER_THREADS", "CRATE_AI_BULK_WORKER_THREADS"} <= set(
+        manifest["tuning"]
+    )
