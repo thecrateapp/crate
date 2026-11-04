@@ -12,6 +12,7 @@ const PAGES = [
   "/blog/reads-from-snapshots",
   "/blog/smart-mix-planned-on-the-server",
   "/blog/a-beat-grid-in-a-few-bytes",
+  "/blog/observing-a-home-server",
 ];
 const VIEWPORTS = [
   { width: 1440, height: 900 },

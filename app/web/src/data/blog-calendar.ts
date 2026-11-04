@@ -1,4 +1,4 @@
-// Engineering blog calendar. The blog launches with three posts, then one a week on Tuesdays,
+// Engineering blog calendar. The blog launches with four posts, then one a week on Tuesdays,
 // with a break over the holidays.
 // Every post takes one engineering problem Crate had and explains how it was solved.
 // Writing guide: docs/technical/engineering-blog.md. Validated by blog-calendar.test.ts.
@@ -51,6 +51,19 @@ export const calendar: CalendarEntry[] = [
     sources: [
       "app/crate/smart_mix/beat_grid.py",
       "tools/crate-cli/src/mix_profile.rs",
+    ],
+  },
+  {
+    slug: "observing-a-home-server",
+    title: "Observing a home server without a monitoring team",
+    problem:
+      "When a home server running a dozen containers gets slow, its owner has no on-call team and no time to learn a full monitoring stack.",
+    publishOn: "2026-11-10",
+    status: "published",
+    sources: [
+      "docs/technical/observability.md",
+      "docs/technical/monitoring.md",
+      "app/crate/observability",
     ],
   },
   {
@@ -146,23 +159,11 @@ export const calendar: CalendarEntry[] = [
     sources: ["docs/technical/ai-agents.md", "app/crate/ai"],
   },
   {
-    slug: "drawing-a-home-server-live",
-    title: "Drawing a home server live",
-    problem:
-      "When a home server is slow, its owner needs to see which container is busy and who is playing without writing Prometheus queries.",
-    publishOn: "2027-02-02",
-    status: "planned",
-    sources: [
-      "docs/technical/observability.md",
-      "docs/technical/monitoring.md",
-    ],
-  },
-  {
     slug: "one-install-command",
     title: "One install command",
     problem:
       "Self-hosted software loses most of its users between reading the README and getting the first page to load.",
-    publishOn: "2027-02-09",
+    publishOn: "2027-02-02",
     status: "planned",
     sources: ["docs/technical/00-quickstart.md", "app/installer"],
   },
@@ -171,7 +172,7 @@ export const calendar: CalendarEntry[] = [
     title: "Image-first deploys with automatic rollback",
     problem:
       "Deploying a dozen containers by copying files to a server works until a half-finished deploy takes production down.",
-    publishOn: "2027-02-16",
+    publishOn: "2027-02-09",
     status: "planned",
     sources: ["docs/technical/10-development-deployment-and-operations.md"],
   },
@@ -180,7 +181,7 @@ export const calendar: CalendarEntry[] = [
     title: "Speaking OpenSubsonic",
     problem:
       "People already have favourite Subsonic apps, and a new server that ignores them asks too much.",
-    publishOn: "2027-02-23",
+    publishOn: "2027-02-16",
     status: "planned",
     sources: ["docs/technical/opensubsonic.md", "app/crate/api/subsonic"],
   },
@@ -189,7 +190,7 @@ export const calendar: CalendarEntry[] = [
     title: "Album downloads from a Rust worker",
     problem:
       "Zipping a lossless album in Python blocks a worker for minutes and gives the user no progress and no way to cancel.",
-    publishOn: "2027-03-02",
+    publishOn: "2027-02-23",
     status: "planned",
     sources: ["app/media-worker"],
   },
@@ -198,7 +199,7 @@ export const calendar: CalendarEntry[] = [
     title: "Why Crate Decks is a Mixxx fork",
     problem:
       "A DJ client built as a VirtualDJ plugin hits limits the plugin SDK will never lift.",
-    publishOn: "2027-03-09",
+    publishOn: "2027-03-02",
     status: "planned",
     sources: ["docs/technical/crate-decks.md"],
   },
