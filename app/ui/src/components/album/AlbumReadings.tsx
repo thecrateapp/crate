@@ -182,7 +182,9 @@ export function AlbumReadings({
   animate: boolean;
 }) {
   const ranked = [...keys].sort((a, b) => b.count - a.count);
-  const shown = ranked.slice(0, MAX_KEYS);
+  // One key on one track is already the value; the list only counts several.
+  const counted = ranked.length > 1 || (ranked[0]?.count ?? 0) > 1;
+  const shown = counted ? ranked.slice(0, MAX_KEYS) : [];
   const folded = ranked.length - shown.length;
 
   return (

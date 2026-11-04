@@ -296,16 +296,6 @@ export function AudioProfileCard({
     },
     {},
   );
-  const key = Object.entries(dominantKeys).sort((a, b) => b[1] - a[1])[0]?.[0];
-  const moodSamples = new Map<string, number[]>();
-  for (const track of tracks)
-    for (const [mood, score] of Object.entries(track.mood ?? {}))
-      if (Number.isFinite(score))
-        moodSamples.set(mood, [...(moodSamples.get(mood) ?? []), score]);
-  const moods = [...moodSamples]
-    .map(([mood, samples]) => ({ mood, score: mean(samples)! }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 5);
   const qualities = [
     ...new Set(profiles.map((profile) => profile.quality).filter(Boolean)),
   ];
@@ -403,20 +393,47 @@ export function AudioProfileCard({
   const spectrum = spectrumFeatures.length ? (
     <SoundSpectrum features={spectrumFeatures} animate={motionAllowed} />
   ) : null;
-  const features = (
-    <>
-      {spectrum}
-      {moods.length ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <MonoLabel as="span">Mood</MonoLabel>
-          {moods.map(({ mood, score }) => (
-            <InfoBadge key={mood}>
-              {mood} {Math.round(score * 100)}%
-            </InfoBadge>
-          ))}
+  // Readings in the spectrum's language, the spectrum and the mood rose (approved
+  // mockups B and A), for an album or a single track. Columns follow the space the block
+  // gets, not the window, so the album page and the track dialog share it: three from
+  // 72rem, two from 56rem with the rose under the readings, one below. The row is capped
+  // so the spectrum stays smaller than the card on wide screens, and the readings spread
+  // to the spectrum's height.
+  const analysisBlock = (
+    <div className="@container">
+      <div className="grid max-w-[104rem] gap-x-10 gap-y-6 @4xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] @6xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)_minmax(0,4fr)]">
+        <div
+          data-slot="audio-profile-column"
+          className="min-w-0 @4xl:flex @4xl:flex-col"
+        >
+          <AlbumReadings
+            readings={readings}
+            keys={Object.entries(dominantKeys).map(([name, count]) => ({
+              key: name,
+              count,
+            }))}
+            keyLabel={single ? "Key" : "Most frequent key"}
+            animate={motionAllowed}
+          />
         </div>
-      ) : null}
-    </>
+        <div data-slot="audio-profile-column" className="min-w-0">
+          {spectrum}
+        </div>
+        <div
+          data-slot="audio-profile-column"
+          className="flex min-w-0 flex-col gap-2"
+        >
+          {moodSeries.length ? (
+            <>
+              <MonoLabel as="span">Mood</MonoLabel>
+              <div className="flex flex-1 items-center">
+                <MoodRose moods={moodSeries} animate={motionAllowed} />
+              </div>
+            </>
+          ) : null}
+        </div>
+      </div>
+    </div>
   );
   // The track dialog groups sections in tabs; the album card keeps them ruled.
   const sectionClass = detailed
@@ -553,7 +570,7 @@ export function AudioProfileCard({
               label={{ children: "Sound profile", tone: "accent" }}
             >
               <div className="space-y-5">
-                {features}
+                {analysisBlock}
                 {!featureData.length ? (
                   <p className="m-0 text-sm text-text-muted">
                     No measured sound features are available.
@@ -637,30 +654,6 @@ export function AudioProfileCard({
             </div>
           ) : null}
           {detailed ? (
-            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Reading label="Tempo">
-                {number(
-                  mean(
-                    tracks.map((track) => track.smart_mix?.bpm ?? track.tempo),
-                  ),
-                  1,
-                  " BPM",
-                )}
-              </Reading>
-              <Reading label="Key">{key || "—"}</Reading>
-              <Reading label="Loudness">
-                {number(mean(tracks.map((track) => track.loudness)), 1, " dB")}
-              </Reading>
-              <Reading label="Dynamic range">
-                {number(
-                  mean(tracks.map((track) => track.dynamic_range)),
-                  1,
-                  " dB",
-                )}
-              </Reading>
-            </dl>
-          ) : null}
-          {detailed ? (
             <Tabs
               value={tab}
               onValueChange={chooseTab}
@@ -686,42 +679,7 @@ export function AudioProfileCard({
             </Tabs>
           ) : (
             <div className="space-y-6" data-audio-profile-layout="album">
-              {/* Readings in the spectrum's language, the spectrum and the mood rose
-                  (approved mockups B and A). The row is capped so the spectrum stays
-                  smaller than the card on wide screens, and the readings spread to
-                  the spectrum's height. Below xl the rose wraps under the readings. */}
-              <div className="grid max-w-[104rem] gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)_minmax(0,4fr)]">
-                <div
-                  data-slot="audio-profile-column"
-                  className="min-w-0 lg:flex lg:flex-col"
-                >
-                  <AlbumReadings
-                    readings={readings}
-                    keys={Object.entries(dominantKeys).map(([name, count]) => ({
-                      key: name,
-                      count,
-                    }))}
-                    keyLabel={single ? "Key" : "Most frequent key"}
-                    animate={motionAllowed}
-                  />
-                </div>
-                <div data-slot="audio-profile-column" className="min-w-0">
-                  {spectrum}
-                </div>
-                <div
-                  data-slot="audio-profile-column"
-                  className="flex min-w-0 flex-col gap-2"
-                >
-                  {moodSeries.length ? (
-                    <>
-                      <MonoLabel as="span">Mood</MonoLabel>
-                      <div className="flex flex-1 items-center">
-                        <MoodRose moods={moodSeries} animate={motionAllowed} />
-                      </div>
-                    </>
-                  ) : null}
-                </div>
-              </div>
+              {analysisBlock}
               {smartMixSection}
               {blissSection}
             </div>

@@ -149,6 +149,20 @@ describe("AlbumReadings", () => {
     expect(chips[1]).not.toHaveAttribute("data-dominant");
   });
 
+  it("leaves out the key list for a single track", () => {
+    render(
+      <AlbumReadings
+        readings={[]}
+        keys={[{ key: "F major", count: 1 }]}
+        keyLabel="Key"
+        animate={false}
+      />,
+    );
+
+    expect(reading("Key")).toHaveTextContent("F major");
+    expect(screen.queryByRole("list", { name: "Keys" })).toBeNull();
+  });
+
   it("folds keys past the sixth into a count", () => {
     const many = ["C", "D", "E", "F", "G", "A", "B", "C#"].map(
       (note, index) => ({

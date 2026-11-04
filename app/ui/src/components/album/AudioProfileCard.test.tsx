@@ -233,7 +233,7 @@ function renderDialog(structure = true) {
 describe("track dialog tabs", () => {
   beforeEach(() => window.sessionStorage.clear());
 
-  it("keeps the key readings above tabs that open on Sound", () => {
+  it("opens on Sound with the track's readings", () => {
     renderDialog();
 
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
@@ -389,19 +389,36 @@ it("draws the album's moods as a rose beside the spectrum", () => {
   expect(screen.queryByText("sad 50%")).not.toBeInTheDocument();
 });
 
-it("keeps the track dialog's plain readings above its tabs", () => {
+it("shows a single track's readings, spectrum and moods in the dialog's Sound tab", () => {
   render(
     <AudioProfileCard
       totalTracks={1}
       presentation="track-dialog"
-      analysisData={{ track: { ...empty, tempo: 119.5 } }}
+      analysisData={{
+        track: {
+          ...empty,
+          tempo: 119.5,
+          key: "F",
+          scale: "major",
+          energy: 0.7,
+          mood: { sad: 0.6 },
+        },
+      }}
     />,
   );
 
-  expect(screen.getByText("119.5 BPM")).toBeInTheDocument();
+  const sound = screen.getByRole("region", { name: "Sound profile" });
   expect(
-    document.querySelector('[data-slot="album-readings"]'),
-  ).not.toBeInTheDocument();
+    within(sound).getByRole("img", { name: "Tempo: 119.5 BPM" }),
+  ).toBeInTheDocument();
+  expect(
+    within(sound).getByRole("list", { name: "Sound features" }),
+  ).toBeInTheDocument();
+  expect(
+    within(sound).getByRole("img", { name: "Mood: sad 60%" }),
+  ).toBeInTheDocument();
+  // One key on one track needs no count.
+  expect(within(sound).queryByRole("list", { name: "Keys" })).toBeNull();
 });
 
 it("draws the sound features as a spectrum that names the album's extremes", () => {
