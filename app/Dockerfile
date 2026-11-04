@@ -82,6 +82,32 @@ ENTRYPOINT ["python", "-m", "crate"]
 CMD ["worker"]
 
 
+# YAMNet (Google, tensorflow/models research/audioset/yamnet, Apache-2.0) for the
+# Smart Mix per-phrase voice (SM3-D13). Google's Keras weights are converted here to
+# the .npz crate.smart_mix.voice_model loads, so the analysis image needs neither
+# h5py nor TensorFlow. Essentia's packaged YAMNet graph is non-commercial, so it is
+# not used.
+FROM python:3.13-slim AS yamnet-weights
+
+ARG YAMNET_H5_SHA256=13c3308955bbfaef262f175ac9c40e47b134573a93984f009220dd7cc12a1744
+ARG YAMNET_CLASS_MAP_SHA256=cdf24d193e196d9e95912a2667051ae203e92a2ba09449218ccb40ef787c6df2
+ARG YAMNET_LICENSE_SHA256=5b17814bf0de8cf65069bc6d7cc38cff19fcaa864d243423ad3ef3db01b52385
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=cache,target=/root/.cache/pip pip install h5py numpy
+WORKDIR /yamnet
+RUN curl -fsSL --retry 5 -o yamnet.h5 https://storage.googleapis.com/audioset/yamnet.h5 && \
+    curl -fsSL --retry 5 -o yamnet_class_map.csv \
+        https://raw.githubusercontent.com/tensorflow/models/master/research/audioset/yamnet/yamnet_class_map.csv && \
+    curl -fsSL --retry 5 -o LICENSE \
+        https://raw.githubusercontent.com/tensorflow/models/master/LICENSE && \
+    echo "$YAMNET_H5_SHA256  yamnet.h5" | sha256sum -c - && \
+    echo "$YAMNET_CLASS_MAP_SHA256  yamnet_class_map.csv" | sha256sum -c - && \
+    echo "$YAMNET_LICENSE_SHA256  LICENSE" | sha256sum -c -
+COPY scripts/convert_yamnet_weights.py ./
+RUN python convert_yamnet_weights.py yamnet.h5 yamnet_class_map.csv yamnet.npz
+
+
 FROM worker-core-deps AS worker-analysis-deps
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -112,6 +138,11 @@ RUN if [ "$PANNS" = "on" ] || { [ "$PANNS" = "auto" ] && [ "$(uname -m)" = "x86_
         apt-get purge -y --auto-remove curl && \
         rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*; \
     fi
+
+# Smart Mix voice model: without torch (PANNS=off) it is ignored and profiles keep
+# no voice.
+COPY --from=yamnet-weights /yamnet/yamnet.npz /app/models/yamnet.npz
+COPY --from=yamnet-weights /yamnet/LICENSE /app/models/yamnet.LICENSE
 
 
 FROM worker-analysis-deps AS worker-analysis
