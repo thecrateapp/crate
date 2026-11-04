@@ -58,3 +58,7 @@ autonomous Compose identity, application orphan protection and the local
 configuration artifact. [Checkpoint D2](deployment-checkpoint-d2.md) covers remote
 deploy and rollback, the shared host mutation lease and adoption of the old
 overlay, rehearsed with real images.
+
+Error Inbox: the [Sentry backlog triage of 2026-11](sentry-triage-2026-11.md)
+labels the 79 open errors, records the gate EG1 decisions and lists the source
+changes that cut the noise. Its labels are the reference set for the AI triage.
