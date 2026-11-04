@@ -1,24 +1,22 @@
 {
   "hooks": {
-    "PostToolUse": [
+    "PreToolUse": [
       {
-        "matcher": "Edit|Write|Bash",
+        "matcher": "Bash|Grep",
         "hooks": [
           {
             "type": "command",
-            "command": "code-review-graph update --skip-flows",
-            "timeout": 30
+            "command": "graphify hook-guard search",
+            "timeout": 10
           }
         ]
-      }
-    ],
-    "SessionStart": [
+      },
       {
-        "matcher": "",
+        "matcher": "Read|Glob",
         "hooks": [
           {
             "type": "command",
-            "command": "code-review-graph status",
+            "command": "graphify hook-guard read",
             "timeout": 10
           }
         ]

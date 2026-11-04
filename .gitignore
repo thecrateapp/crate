@@ -67,8 +67,8 @@ app/bin/crate-cli-linux-arm64
 *.tsbuildinfo
 worktrees/
 .vite/
-# Added by code-review-graph
-.code-review-graph/
+# graphify knowledge graph: built locally (`graphify update .`) and kept fresh by its git hooks
+graphify-out/
 
 # Non-canonical local documentation and personal editor state.
 # Canonical docs are declared in docs/manifest.json.
