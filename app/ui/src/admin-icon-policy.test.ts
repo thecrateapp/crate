@@ -377,6 +377,21 @@ const approvedLibraryControls = new Map<string, number>([
     "app/ui/src/components/album/TrackTable.tsx:@/components/SmartMixStructure:SmartMixTrackStructure",
     1,
   ],
+  // Audio profile sound spectrum, replacing the nivo radar: a hand-built SVG
+  // instrument (density ridges, fills and marks) with no glyph and no button, reached
+  // through the audio profile card on the album page and in the track dialog.
+  [
+    "app/ui/src/components/album/AudioProfileCard.tsx:./SoundSpectrum:SoundSpectrum",
+    1,
+  ],
+  [
+    "app/ui/src/components/album/TrackTable.tsx:./AudioProfileCard:AudioProfileCard",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Album.tsx:@/components/album/AudioProfileCard:AudioProfileCard",
+    1,
+  ],
   [
     "app/ui/src/pages/Insights.tsx:@/components/insights/InsightEntityLists:InsightOpportunities",
     1,

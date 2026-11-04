@@ -1,9 +1,7 @@
 import { useState, type ReactNode } from "react";
-import { ResponsiveRadar } from "@nivo/radar";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
-import { Meter } from "@crate/ui/primitives/Meter";
 import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
 import {
   Tabs,
@@ -12,6 +10,7 @@ import {
   TabsTrigger,
 } from "@crate/ui/shadcn/tabs";
 import type { AudioAnalysisTrack, SmartMixAnalysis } from "./audio-analysis";
+import { SoundSpectrum, type SpectrumFeature } from "./SoundSpectrum";
 
 const FEATURES = [
   ["danceability", "Danceability"],
@@ -21,21 +20,6 @@ const FEATURES = [
   ["spectral_complexity", "Complexity"],
   ["instrumentalness", "Instrumental"],
 ] as const;
-const CHART_THEME = {
-  text: {
-    fill: "var(--color-text-muted)",
-    fontSize: 12,
-    fontFamily: "var(--font-mono)",
-  },
-  grid: { line: { stroke: "var(--color-border-quiet)" } },
-  tooltip: {
-    container: {
-      background: "var(--surface-popover)",
-      color: "var(--color-text-primary)",
-      fontSize: 12,
-    },
-  },
-};
 function finite(values: (number | null | undefined)[]) {
   return values.filter(
     (value): value is number =>
@@ -255,12 +239,15 @@ export function AudioProfileCard({
   totalTracks,
   presentation = "album",
   smartMixStructure,
+  trackLabels,
 }: {
   analysisData: Record<string, AudioAnalysisTrack>;
   totalTracks?: number;
   presentation?: "album" | "track-dialog";
   /** Phrase structure of the single track, shown in the track dialog only. */
   smartMixStructure?: ReactNode;
+  /** Track names by analysisData key, to name the extremes of each sound feature. */
+  trackLabels?: Record<string, string>;
 }) {
   const motionAllowed = useMotionAllowed();
   const [chosenTab, setChosenTab] = useState(rememberedTab);
@@ -341,57 +328,26 @@ export function AudioProfileCard({
       ) : null}
     </div>
   );
+  const spectrumFeatures: SpectrumFeature[] = FEATURES.flatMap(
+    ([featureKey, label]) => {
+      const values = Object.entries(analysisData).flatMap(([entry, track]) => {
+        const value = track[featureKey];
+        return typeof value === "number" && Number.isFinite(value)
+          ? [
+              {
+                label: trackLabels?.[entry],
+                value: Math.min(1, Math.max(0, value)),
+              },
+            ]
+          : [];
+      });
+      return values.length ? [{ label, values }] : [];
+    },
+  );
   const features = (
     <>
-      {featureData.length ? (
-        <div
-          className={
-            detailed
-              ? "grid min-w-0 gap-5"
-              : "grid min-w-0 gap-6 md:grid-cols-2"
-          }
-        >
-          <div
-            className={
-              detailed
-                ? "grid min-w-0 gap-x-5 gap-y-3 sm:grid-cols-2"
-                : "space-y-3"
-            }
-          >
-            {featureData.map((feature) => (
-              <Meter
-                key={feature.feature}
-                label={feature.feature}
-                value={feature.value}
-                max={100}
-                valueText={`${feature.value}%`}
-              />
-            ))}
-          </div>
-          {featureData.length >= 3 ? (
-            <div
-              className="h-60 min-w-0"
-              role="img"
-              aria-label="Measured audio features radar"
-            >
-              <ResponsiveRadar
-                data={featureData}
-                keys={["value"]}
-                indexBy="feature"
-                maxValue={100}
-                margin={{ top: 30, right: 70, bottom: 30, left: 70 }}
-                gridLabelOffset={14}
-                dotSize={4}
-                colors={["var(--color-accent-action-hi)"]}
-                dotColor="var(--color-accent-action-hi)"
-                fillOpacity={0.15}
-                theme={CHART_THEME}
-                animate={motionAllowed}
-                isInteractive={false}
-              />
-            </div>
-          ) : null}
-        </div>
+      {spectrumFeatures.length ? (
+        <SoundSpectrum features={spectrumFeatures} animate={motionAllowed} />
       ) : null}
       {moods.length ? (
         <div className="flex flex-wrap items-center gap-2">

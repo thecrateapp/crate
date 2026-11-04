@@ -299,3 +299,28 @@ describe("track dialog tabs", () => {
     );
   });
 });
+
+it("draws the sound features as a spectrum that names the album's extremes", () => {
+  render(
+    <AudioProfileCard
+      totalTracks={2}
+      analysisData={{
+        "0": { ...empty, energy: 0.4, danceability: 0.5 },
+        "1": { ...empty, energy: 0.8, danceability: 0.7 },
+      }}
+      trackLabels={{ "0": "Halo", "1": "Clean" }}
+    />,
+  );
+
+  expect(
+    screen.getByRole("list", { name: "Sound features" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("img", {
+      name: "Energy: mean 60%, from 40% (Halo) to 80% (Clean)",
+    }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("img", { name: "Measured audio features radar" }),
+  ).not.toBeInTheDocument();
+});

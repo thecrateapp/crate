@@ -1229,6 +1229,13 @@ export function Album() {
                 }),
               )}
               totalTracks={data.track_count}
+              trackLabels={Object.fromEntries(
+                data.tracks.flatMap((track, index) =>
+                  analysisForTrack(analysisData, track)
+                    ? [[String(index), track.tags.title || track.filename]]
+                    : [],
+                ),
+              )}
             />
           </TabsContent>
           <TabsContent value="related" className="min-w-0">
