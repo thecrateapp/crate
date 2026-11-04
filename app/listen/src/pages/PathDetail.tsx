@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router";
 import { BackLink } from "@crate/ui/domain/navigation";
 import { ErrorState } from "@crate/ui/domain/states";
 import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
+import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { notify } from "@crate/ui/lib/notify";
 import { PathCoverJourney } from "@/components/paths/PathCoverJourney";
 import { PathDetailHeaderView } from "./PathDetailHeaderView";
@@ -99,6 +100,17 @@ export function PathDetail() {
           onDelete={() => setConfirmingDelete(true)}
         />
       </div>
+      {path.refinement?.status === "pending" ? (
+        <MonoLabel
+          as="p"
+          tone="accent"
+          role="status"
+          aria-label={t("paths.refinement.pending")}
+          className="mb-4"
+        >
+          {t("paths.refinement.pending")}
+        </MonoLabel>
+      ) : null}
       <PathWarnings path={path} />
       <div className="mb-6">
         <PathCoverJourney

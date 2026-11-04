@@ -226,6 +226,15 @@ describe("scopesForUrl", () => {
     expect(scopesForUrl("/api/playlists")).toEqual(["playlists"]);
   });
 
+  // Music Paths: the refinement worker invalidates "path:{id}" (SMQ.PR4)
+  it("returns path scope with id", () => {
+    expect(scopesForUrl("/api/paths/12")).toEqual(["paths", "path:12"]);
+  });
+
+  it("returns paths scope for the list page", () => {
+    expect(scopesForUrl("/api/paths")).toEqual(["paths"]);
+  });
+
   // Curation
   it("returns curation scope", () => {
     expect(scopesForUrl("/api/curation")).toEqual(["curation"]);

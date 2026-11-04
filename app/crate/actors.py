@@ -92,6 +92,8 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "generate_playlist_description": TaskPoolConfig("ai", 0, 120, 0),
     # One genres.taxonomy.propose call (≤ 90s) after catalog and evidence reads.
     "propose_genre_taxonomy_node": TaskPoolConfig("ai", 0, 180, 0),
+    # Replays the deterministic scene plan, then one music_paths.refine call (≤ 8s).
+    "refine_music_path": TaskPoolConfig("ai", 0, 120, 0),
     # User-initiated (priority 0) — these should run ASAP
     "tidal_download": TaskPoolConfig(
         "default", 0, 14400, 0

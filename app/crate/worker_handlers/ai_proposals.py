@@ -156,8 +156,30 @@ def _handle_propose_genre_taxonomy_node(
     return proposal
 
 
+def _handle_refine_music_path(task_id: str, params: dict, config: dict) -> dict:
+    del config
+    from crate.music_paths import refine_stored_music_path
+
+    try:
+        arguments = {
+            "path_id": int(params["path_id"]),
+            "user_id": int(params["user_id"]),
+            "revision": int(params["revision"]),
+            "selection_seed": str(params["selection_seed"]),
+            "planned_at": str(params["planned_at"]),
+            "previous_track_ids": list(params.get("previous_track_ids") or []),
+            "previous_song_keys": list(params.get("previous_song_keys") or []),
+        }
+    except (KeyError, TypeError, ValueError):
+        return {"status": "failed", "error": "Invalid refinement task parameters"}
+    return refine_stored_music_path(
+        **arguments, ai_acceptance=params.get("ai_acceptance"), job_id=task_id
+    )
+
+
 AI_PROPOSAL_TASK_HANDLERS: dict[str, TaskHandler] = {
     "propose_genre_eq": _handle_propose_genre_eq,
     "generate_playlist_description": _handle_generate_playlist_description,
     "propose_genre_taxonomy_node": _handle_propose_genre_taxonomy_node,
+    "refine_music_path": _handle_refine_music_path,
 }

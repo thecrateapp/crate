@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from crate import music_paths
+from crate.music_paths_refinement import RefinementOutcome
 from crate.db import paths_scene
 from crate.db.queries import paths_scene_queries
 from crate.track_versions import track_song_identity
@@ -49,7 +50,9 @@ def _catalog(monkeypatch, rows, *, history):
         music_paths, "resolve_endpoint_label", lambda _kind, value: value
     )
     monkeypatch.setattr(
-        music_paths, "refine_music_path_with_llm", lambda **kwargs: kwargs["tracks"]
+        music_paths,
+        "refine_music_path_from_cache",
+        lambda **kwargs: RefinementOutcome(kwargs["tracks"]),
     )
     monkeypatch.setattr(
         paths_scene,

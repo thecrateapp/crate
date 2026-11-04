@@ -2140,5 +2140,6 @@
   "paths.warnings.quality": "Algunes transicions poden resultar menys fluides o variades.",
   "paths.warnings.unavailable": "{count, plural, one {# tema desat no està disponible i s’ometrà.} other {# temes desats no estan disponibles i s’ometran.}}",
   "paths.warnings.trackUnavailable": "No disponible",
-  "paths.warnings.noneAvailable": "Cap dels temes desats està disponible per reproduir."
+  "paths.warnings.noneAvailable": "Cap dels temes desats està disponible per reproduir.",
+  "paths.refinement.pending": "IA · Refinant"
 }

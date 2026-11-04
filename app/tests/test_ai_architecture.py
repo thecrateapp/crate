@@ -21,22 +21,10 @@ AI_QUEUES = {"ai", "ai_bulk"}
 # stale entry fails test_exceptions_are_still_needed. New entries need an
 # approved plan change first.
 HTTP_MODEL_CALL_EXCEPTIONS: dict[tuple[str, str], str] = {
-    ("crate.api.paths", "api_create_path"): "SMQ.PR4",
-    ("crate.api.paths", "api_regenerate_path"): "SMQ.PR4",
-    ("crate.api.paths", "api_preview_path"): "SMQ.PR4",
     ("crate.api.artwork", "api_analyze_artist_hero_candidate"): "SMQ.PR5",
 }
 
-# Compatibility shims for the frozen crate.db facade. Nothing calls them, but
-# they reach the inline Music Paths refinement that SMQ.PR4 makes asynchronous.
-FACADE_SHIM_EXCEPTIONS: dict[tuple[str, str], str] = {
-    ("crate.db.paths_llm_refinement", "refine_music_path_with_llm"): "SMQ.PR4",
-    ("crate.db.paths_scene", "compute_scene_path"): "SMQ.PR4",
-    ("crate.db.paths_service_planning", "build_music_path_plan"): "SMQ.PR4",
-    ("crate.db.paths_service_writes", "create_music_path"): "SMQ.PR4",
-    ("crate.db.paths_service_writes", "preview_music_path"): "SMQ.PR4",
-    ("crate.db.paths_service_writes", "regenerate_music_path"): "SMQ.PR4",
-}
+FACADE_SHIM_EXCEPTIONS: dict[tuple[str, str], str] = {}
 
 
 def _forbidden_import(source: str, name: str) -> bool:

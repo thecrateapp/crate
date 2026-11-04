@@ -663,6 +663,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "propose_genre_eq",
             "generate_playlist_description",
             "propose_genre_taxonomy_node",
+            "refine_music_path",
         ),
     ),
     (

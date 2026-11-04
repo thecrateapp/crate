@@ -298,7 +298,33 @@ def test_real_runtime_actor_and_db_boundaries(
 
         monkeypatch.setattr(refinement, "execute_structured", revoke_after_runtime)
 
-    def invoke():
+    from crate.ai import consumers
+
+    def review():
+        """The refine_music_path worker step (SMQ.PR4) over the real runtime."""
+        prepared = paths_scene.prepare_scene_path(
+            origin_type="genre",
+            origin_value="rock",
+            dest_type="genre",
+            dest_value="punk",
+            step_count=5,
+            user_id=actor["id"],
+        )
+        try:
+            call = consumers.resume_action(
+                "music_paths.refine",
+                consumers.accept_action("music_paths.refine"),
+                actor_id=actor["id"],
+                job_id=f"refine-{len(calls)}",
+            )
+        except AIConfigurationError:
+            return prepared["tracks"]
+        return refinement.refine_music_path_with_llm(
+            **prepared, actor_id=actor["id"], ai_call=call
+        )
+
+    def request():
+        """The request path: deterministic, or a cached review applied inline."""
         return music_paths.compute_scene_path(
             origin_type="genre",
             origin_value="rock",
@@ -308,9 +334,9 @@ def test_real_runtime_actor_and_db_boundaries(
             user_id=actor["id"],
         )
 
-    result = invoke()
+    result = review()
     expected = [1, 4, 3] if timing in {"authorized", "cached"} else [1, 2, 3]
-    assert [track["track_id"] for track in result] == expected
+    assert [track["id"] for track in result] == expected
     assert len(calls) == (0 if timing == "before" else 1)
     assert bool(cache) == (timing in {"authorized", "cached"})
     rows = runtime.usage.list_invocations({})["items"]
@@ -318,8 +344,9 @@ def test_real_runtime_actor_and_db_boundaries(
         assert rows[0]["actor_id"] == actor["id"]
         assert rows[0]["status"] == ("failed" if timing == "during" else "succeeded")
     if timing == "cached":
+        assert [track["track_id"] for track in request()] == [1, 4, 3]
         update_user_status(actor["id"], "suspended")
-        assert [track["track_id"] for track in invoke()] == [1, 2, 3]
+        assert [track["track_id"] for track in request()] == [1, 2, 3]
         assert len(calls) == 1
 
 
