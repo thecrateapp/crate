@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import UTC, datetime
 import hashlib
 import json
@@ -14,11 +14,13 @@ from sqlalchemy.orm import Session
 from crate.db.orm.library import LibraryTrack
 from crate.db.repositories.smart_mix import (
     ANY_PROFILE_REVISION,
+    stored_structure_confidence,
     upsert_track_mix_profile,
 )
 from crate.db.tx import optional_scope
 from crate.smart_mix.beat_grid import FORMAT_NAME
 from crate.smart_mix.models import TrackMixProfile, TrackMixProfileDraft
+from crate.smart_mix.versions import PROFILE_SCHEMA_VERSION
 
 
 def update_track_analysis(
@@ -144,64 +146,71 @@ def upsert_track_mix_profile_draft(
         ).scalar_one_or_none()
         if entity_uid is None:
             return False
+        # Hash the values as stored, so equal rows always carry equal revisions.
+        stored = replace(
+            draft,
+            structure_confidence=stored_structure_confidence(
+                draft.structure_confidence
+            ),
+        )
         profile_payload = json.dumps(
-            asdict(draft),
+            asdict(stored),
             default=str,
             separators=(",", ":"),
             sort_keys=True,
         )
         profile_revision = hashlib.sha256(
-            f"1:{source_revision}:{profile_payload}".encode()
+            f"{PROFILE_SCHEMA_VERSION}:{source_revision}:{profile_payload}".encode()
         ).hexdigest()
         profile = TrackMixProfile(
             track_entity_uid=str(entity_uid),
-            profile_version=1,
+            profile_version=PROFILE_SCHEMA_VERSION,
             profile_revision=profile_revision,
-            analyzer=draft.analyzer,
-            analyzer_version=draft.analyzer_version,
+            analyzer=stored.analyzer,
+            analyzer_version=stored.analyzer_version,
             source_revision=source_revision,
-            duration_ms=draft.duration_ms,
-            quality=draft.quality,
-            bpm=draft.bpm,
-            bpm_confidence=draft.bpm_confidence,
-            tempo_stability=draft.tempo_stability,
-            beat_anchor_ms=draft.beat_anchor_ms,
-            downbeat_anchor_ms=draft.downbeat_anchor_ms,
-            time_signature=draft.time_signature,
-            beat_grid_format=FORMAT_NAME if draft.beat_grid_ms else None,
-            beat_grid_ms=draft.beat_grid_ms,
-            key=draft.key,
-            scale=draft.scale,
-            camelot=draft.camelot,
-            key_confidence=draft.key_confidence,
-            intro_cue_ms=draft.intro_cue_ms,
-            outro_cue_ms=draft.outro_cue_ms,
-            intro_bpm=draft.intro_bpm,
-            intro_beat_ms=draft.intro_beat_ms,
-            outro_bpm=draft.outro_bpm,
-            outro_beat_ms=draft.outro_beat_ms,
-            intro_tempo_stability=draft.intro_tempo_stability,
-            outro_tempo_stability=draft.outro_tempo_stability,
-            intro_downbeat_ms=draft.intro_downbeat_ms,
-            outro_downbeat_ms=draft.outro_downbeat_ms,
-            intro_lufs=draft.intro_lufs,
-            outro_lufs=draft.outro_lufs,
-            true_peak_dbfs=draft.true_peak_dbfs,
-            intro_energy=draft.intro_energy,
-            outro_energy=draft.outro_energy,
-            intro_spectral_density=draft.intro_spectral_density,
-            outro_spectral_density=draft.outro_spectral_density,
-            global_energy=draft.global_energy,
-            danceability=draft.danceability,
-            valence=draft.valence,
-            active_start_ms=draft.active_start_ms,
-            active_end_ms=draft.active_end_ms,
-            integrated_lufs=draft.integrated_lufs,
-            measurement_version=draft.measurement_version,
-            phrases=draft.phrases,
-            energy_curve=draft.energy_curve,
-            vocal_presence=draft.vocal_presence,
-            structure_confidence=draft.structure_confidence,
+            duration_ms=stored.duration_ms,
+            quality=stored.quality,
+            bpm=stored.bpm,
+            bpm_confidence=stored.bpm_confidence,
+            tempo_stability=stored.tempo_stability,
+            beat_anchor_ms=stored.beat_anchor_ms,
+            downbeat_anchor_ms=stored.downbeat_anchor_ms,
+            time_signature=stored.time_signature,
+            beat_grid_format=FORMAT_NAME if stored.beat_grid_ms else None,
+            beat_grid_ms=stored.beat_grid_ms,
+            key=stored.key,
+            scale=stored.scale,
+            camelot=stored.camelot,
+            key_confidence=stored.key_confidence,
+            intro_cue_ms=stored.intro_cue_ms,
+            outro_cue_ms=stored.outro_cue_ms,
+            intro_bpm=stored.intro_bpm,
+            intro_beat_ms=stored.intro_beat_ms,
+            outro_bpm=stored.outro_bpm,
+            outro_beat_ms=stored.outro_beat_ms,
+            intro_tempo_stability=stored.intro_tempo_stability,
+            outro_tempo_stability=stored.outro_tempo_stability,
+            intro_downbeat_ms=stored.intro_downbeat_ms,
+            outro_downbeat_ms=stored.outro_downbeat_ms,
+            intro_lufs=stored.intro_lufs,
+            outro_lufs=stored.outro_lufs,
+            true_peak_dbfs=stored.true_peak_dbfs,
+            intro_energy=stored.intro_energy,
+            outro_energy=stored.outro_energy,
+            intro_spectral_density=stored.intro_spectral_density,
+            outro_spectral_density=stored.outro_spectral_density,
+            global_energy=stored.global_energy,
+            danceability=stored.danceability,
+            valence=stored.valence,
+            active_start_ms=stored.active_start_ms,
+            active_end_ms=stored.active_end_ms,
+            integrated_lufs=stored.integrated_lufs,
+            measurement_version=stored.measurement_version,
+            phrases=stored.phrases,
+            energy_curve=stored.energy_curve,
+            vocal_presence=stored.vocal_presence,
+            structure_confidence=stored.structure_confidence,
             analyzed_at=datetime.now(UTC),
         )
         return upsert_track_mix_profile(

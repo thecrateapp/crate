@@ -325,6 +325,70 @@ def test_v1_profile_reads_with_null_structure(pg_db, tmp_path: Path) -> None:
     ) == (None, None, None, None)
 
 
+def test_profile_revision_hashes_the_stored_values(pg_db, tmp_path: Path) -> None:
+    del pg_db
+    from crate.db.repositories.library_analysis_writes import (
+        upsert_track_mix_profile_draft,
+    )
+
+    first_path = tmp_path / "first.flac"
+    second_path = tmp_path / "second.flac"
+    first_path.write_bytes(b"first")
+    second_path.write_bytes(b"second")
+    first_id, _ = _create_track(first_path)
+    second_id, _ = _create_track(second_path)
+    structured = replace(
+        _draft(), phrases=STRUCTURE_PHRASES, energy_curve=STRUCTURE_CURVE
+    )
+
+    # The confidence column is a REAL that holds four decimals: both drafts store the
+    # same row, so they must carry the same revision.
+    assert upsert_track_mix_profile_draft(
+        first_id, "same-source", replace(structured, structure_confidence=0.82341234)
+    )
+    assert upsert_track_mix_profile_draft(
+        second_id, "same-source", replace(structured, structure_confidence=0.82341236)
+    )
+
+    first = get_track_mix_profile(first_id, include_structure=True)
+    second = get_track_mix_profile(second_id, include_structure=True)
+    assert first is not None and second is not None
+    assert first.structure_confidence == second.structure_confidence == 0.8234
+    assert first.profile_revision == second.profile_revision
+
+
+def test_draft_upsert_writes_the_current_profile_schema(
+    pg_db, tmp_path: Path, monkeypatch
+) -> None:
+    del pg_db
+    from crate.db.repositories import library_analysis_writes
+
+    current_path = tmp_path / "current-schema.flac"
+    next_path = tmp_path / "next-schema.flac"
+    current_path.write_bytes(b"current")
+    next_path.write_bytes(b"next")
+    current_id, _ = _create_track(current_path)
+    next_id, _ = _create_track(next_path)
+
+    assert library_analysis_writes.upsert_track_mix_profile_draft(
+        current_id, "same-source", _draft()
+    )
+    monkeypatch.setattr(
+        library_analysis_writes,
+        "PROFILE_SCHEMA_VERSION",
+        library_analysis_writes.PROFILE_SCHEMA_VERSION + 1,
+    )
+    assert library_analysis_writes.upsert_track_mix_profile_draft(
+        next_id, "same-source", _draft()
+    )
+
+    current = get_track_mix_profile(current_id)
+    upgraded = get_track_mix_profile(next_id)
+    assert current is not None and upgraded is not None
+    assert upgraded.profile_version == current.profile_version + 1
+    assert upgraded.profile_revision != current.profile_revision
+
+
 def _create_track(path: Path, *, bpm: float | None = None) -> tuple[int, str]:
     suffix = uuid.uuid4().hex
     artist = f"Storage Artist {suffix}"

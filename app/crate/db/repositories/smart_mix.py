@@ -30,8 +30,13 @@ _STRUCTURE_COLUMNS = (
     TrackMixProfileRow.vocal_presence,
     TrackMixProfileRow.structure_confidence,
 )
-# structure_confidence is a REAL; the analyzers round it to four decimals.
+# structure_confidence is a REAL: four decimals survive it exactly.
 _STRUCTURE_CONFIDENCE_DIGITS = 4
+
+
+def stored_structure_confidence(value: float | None) -> float | None:
+    """The structure confidence as the profile column stores and reads it back."""
+    return None if value is None else round(float(value), _STRUCTURE_CONFIDENCE_DIGITS)
 
 
 def upsert_track_mix_profile(
@@ -308,7 +313,9 @@ def _profile_values(
         ),
         "energy_curve": profile.energy_curve,
         "vocal_presence": profile.vocal_presence,
-        "structure_confidence": profile.structure_confidence,
+        "structure_confidence": stored_structure_confidence(
+            profile.structure_confidence
+        ),
         "source_stale_at": None,
         "analyzed_at": profile.analyzed_at,
     }
@@ -389,7 +396,6 @@ def _row_to_profile(
 
 
 def _row_structure(row: TrackMixProfileRow) -> dict[str, Any]:
-    confidence = row.structure_confidence
     return {
         "phrases": (
             None
@@ -400,9 +406,5 @@ def _row_structure(row: TrackMixProfileRow) -> dict[str, Any]:
         "vocal_presence": (
             None if row.vocal_presence is None else bytes(row.vocal_presence)
         ),
-        "structure_confidence": (
-            None
-            if confidence is None
-            else round(float(confidence), _STRUCTURE_CONFIDENCE_DIGITS)
-        ),
+        "structure_confidence": stored_structure_confidence(row.structure_confidence),
     }
