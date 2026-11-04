@@ -1,11 +1,11 @@
 /* Sound spectrum (audio analysis): the approved mockup's instrument, drawn per row in a
-   600 x 50 box that scales uniformly, on its own dark panel. */
+   600 x 50 box that scales uniformly. Like GenreWheel and StackMap it sits straight on
+   the page and takes the card's width, so it keeps its presence; a panel in the page
+   colour would only vanish. */
 .sound-spectrum {
   width: 100%;
-  max-width: 40rem;
-  padding: 0.25rem 0 0.75rem;
-  border-radius: 0.5rem;
-  background: var(--surface-app);
+  max-width: 56rem;
+  padding: 0.25rem 0 0.5rem;
 }
 
 .sound-spectrum-axis,
