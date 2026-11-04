@@ -24,6 +24,48 @@ namespace {
 constexpr std::string_view kOnlineSourceFolderId = "Crate";
 constexpr int kMaxFolderPages = 5;
 constexpr std::size_t kMaxRememberedTracks = 5000;
+constexpr std::size_t kAutomixLookahead = 2;
+constexpr std::size_t kAutomixRecentTracks = 4;
+constexpr auto kAutomixActionSpacing = std::chrono::seconds(5);
+constexpr auto kBrowserQuietPeriod = std::chrono::seconds(5);
+constexpr auto kBrowserWaitLimit = std::chrono::seconds(30);
+constexpr auto kListingWaitLimit = std::chrono::seconds(3);
+
+std::int64_t epoch_milliseconds(std::chrono::system_clock::time_point time)
+{
+    return std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch()).count();
+}
+
+std::string casefolded(std::string_view value)
+{
+    std::string folded(value);
+    std::transform(folded.begin(), folded.end(), folded.begin(), [](unsigned char character) {
+        return static_cast<char>(std::tolower(character));
+    });
+    return folded;
+}
+
+std::string netsearch_path(const std::string& uid)
+{
+    return "\"netsearch://plugin-Crate/" + uid + "\"";
+}
+
+std::optional<std::string> incoming_crate_track(const std::vector<std::optional<DeckReading>>& decks)
+{
+    std::optional<std::string> incoming;
+    double shortest_elapsed = 0;
+    for (const auto& reading : decks) {
+        if (!reading.has_value() || !reading->audible) {
+            continue;
+        }
+        const auto uid = crate_uid_from_vdj_filepath(reading->filepath);
+        if (uid.has_value() && (!incoming.has_value() || reading->elapsed_ms < shortest_elapsed)) {
+            incoming = uid;
+            shortest_elapsed = reading->elapsed_ms;
+        }
+    }
+    return incoming;
+}
 
 std::string percent(double value)
 {
@@ -317,10 +359,12 @@ void OnlineSource::tick(std::chrono::system_clock::time_point now)
         return;
     }
     const int reported_decks = host_.deck_count();
-    const int decks = reported_decks > 0 ? std::min(reported_decks, 4) : 2;
+    const int deck_total = reported_decks > 0 ? std::min(reported_decks, 4) : 2;
+    std::vector<std::optional<DeckReading>> decks;
     bool recorded = false;
-    for (int deck = 1; deck <= decks; ++deck) {
-        for (auto& event : tracker_.observe(deck, host_.read_deck(deck), now)) {
+    for (int deck = 1; deck <= deck_total; ++deck) {
+        decks.push_back(host_.read_deck(deck));
+        for (auto& event : tracker_.observe(deck, decks.back(), now)) {
             if (const auto facts = facts_for(event.track_entity_uid)) {
                 event.title = facts->title;
                 event.artist = facts->artist;
@@ -335,6 +379,233 @@ void OnlineSource::tick(std::chrono::system_clock::time_point now)
     if (recorded || now - last_flush_attempt_ >= std::chrono::seconds(30)) {
         flush_plays(now);
     }
+    feed_automix(decks, now);
+}
+
+void OnlineSource::feed_automix(
+    const std::vector<std::optional<DeckReading>>& decks,
+    std::chrono::system_clock::time_point now
+)
+{
+    const auto status = session_.status();
+    if (!status.features.automation || !status.features.smart_mix_assistant ||
+        !host_.automix_active()) {
+        return;
+    }
+    const auto seed = incoming_crate_track(decks);
+    if (!seed.has_value()) {
+        return;
+    }
+    if (*seed != automix_.seed) {
+        const auto planned = std::find(automix_.planned.begin(), automix_.planned.end(), *seed);
+        const auto facts = facts_for(*seed);
+        const bool from_queue = planned != automix_.planned.end() ||
+            (facts.has_value() && !facts->title.empty() &&
+             casefolded(facts->title) == casefolded(automix_.expected_next_title));
+        automix_.replan = !automix_.seed.empty() && !from_queue;
+        if (planned == automix_.planned.end()) {
+            if (automix_.replan) {
+                automix_.planned.clear();
+            }
+        } else {
+            automix_.planned.erase(automix_.planned.begin(), planned + 1);
+        }
+        automix_.seed = *seed;
+        automix_.played.insert(*seed);
+        automix_.recent.push_back(*seed);
+        if (automix_.recent.size() > kAutomixRecentTracks) {
+            automix_.recent.pop_front();
+        }
+        log("automix seed id=" + *seed + (automix_.replan ? " manual" : ""));
+    }
+
+    const auto queue = host_.automix_queue(static_cast<int>(kAutomixLookahead) + 1);
+    automix_.expected_next_title = queue.empty() ? "" : queue.front().title;
+    if (automix_addition_.has_value()) {
+        continue_automix_addition(now);
+        return;
+    }
+    if (now < automix_.next_action_at) {
+        return;
+    }
+    if (!automix_.replan && queue.size() >= kAutomixLookahead) {
+        return;
+    }
+
+    std::string anchor = *seed;
+    if (!automix_.replan && !queue.empty() && queue.back().source == "Crate") {
+        if (!automix_.planned.empty()) {
+            anchor = automix_.planned.back();
+        } else if (const auto by_title = uid_for_title(queue.back().title)) {
+            anchor = *by_title;
+        }
+    }
+    const auto pick = choose_automix_track(anchor);
+    automix_.next_action_at = now + kAutomixActionSpacing;
+    if (!pick.has_value()) {
+        log("automix found no track anchor=" + anchor);
+        automix_.replan = false;
+        return;
+    }
+    log("automix chose id=" + pick->entity_uid + " anchor=" + anchor + " queued=" +
+        std::to_string(queue.size()));
+    {
+        std::lock_guard lock(automix_listing_mutex_);
+        automix_listing_.insert(automix_listing_.begin(), *pick);
+        if (automix_listing_.size() > kAutomixLookahead + 2) {
+            automix_listing_.resize(kAutomixLookahead + 2);
+        }
+    }
+    automix_addition_ = AutomixAddition{
+        .uid = pick->entity_uid,
+        .next = automix_.replan,
+        .chosen_at = now,
+    };
+    automix_.replan = false;
+    continue_automix_addition(now);
+}
+
+void OnlineSource::continue_automix_addition(std::chrono::system_clock::time_point now)
+{
+    auto& addition = *automix_addition_;
+    if (!addition.navigated) {
+        const bool busy = browser_busy(now);
+        if (busy && now - addition.chosen_at < kBrowserWaitLimit) {
+            return;
+        }
+        const std::string previous = busy ? std::string() : host_.browsed_folder_path();
+        if (previous.empty() || previous == kAutomixFolderPath) {
+            enqueue_automix_addition();
+            return;
+        }
+        addition.previous_folder = previous;
+        addition.navigated = true;
+        addition.navigated_at = now;
+        automix_listed_ = false;
+        ignore_browser_activity_until_ms_ = epoch_milliseconds(now + std::chrono::seconds(10));
+        host_.send_command("browser_gotofolder \"" + std::string(kAutomixFolderPath) + "\"");
+        return;
+    }
+    if (!automix_listed_ && now - addition.navigated_at < kListingWaitLimit) {
+        return;
+    }
+    host_.send_command("browser_gotofolder \"" + addition.previous_folder + "\"");
+    ignore_browser_activity_until_ms_ = epoch_milliseconds(now + std::chrono::seconds(2));
+    enqueue_automix_addition();
+}
+
+void OnlineSource::enqueue_automix_addition()
+{
+    const auto addition = *automix_addition_;
+    automix_addition_.reset();
+    const std::string verb = addition.next ? "automix_add_next" : "playlist_add";
+    const bool sent = host_.send_command(verb + " " + netsearch_path(addition.uid));
+    log("automix " + verb + " id=" + addition.uid + (addition.navigated ? " listed" : "") +
+        (sent ? "" : " failed"));
+    if (sent) {
+        if (addition.next) {
+            automix_.planned.insert(automix_.planned.begin(), addition.uid);
+        } else {
+            automix_.planned.push_back(addition.uid);
+        }
+    }
+}
+
+bool OnlineSource::browser_busy(std::chrono::system_clock::time_point now) const
+{
+    if (browser_searching_) {
+        return true;
+    }
+    const auto last = last_browser_activity_ms_.load();
+    const auto current = epoch_milliseconds(now);
+    return last > 0 && current >= last &&
+        current - last < std::chrono::duration_cast<std::chrono::milliseconds>(kBrowserQuietPeriod).count();
+}
+
+void OnlineSource::mark_browser_activity()
+{
+    if (!ignoring_browser_activity()) {
+        last_browser_activity_ms_ = epoch_milliseconds(std::chrono::system_clock::now());
+    }
+}
+
+bool OnlineSource::ignoring_browser_activity() const
+{
+    return epoch_milliseconds(std::chrono::system_clock::now()) <= ignore_browser_activity_until_ms_.load();
+}
+
+CallbackStatus OnlineSource::automix_folder(TrackSink& sink)
+{
+    const auto server = clients();
+    std::vector<SearchTrack> listing;
+    {
+        std::lock_guard lock(automix_listing_mutex_);
+        listing = automix_listing_;
+    }
+    const std::string language = host_.language();
+    for (const auto& track : listing) {
+        sink.add(track_entry(server == nullptr ? std::string() : server->origin, track, language));
+    }
+    sink.finish();
+    automix_listed_ = true;
+    log("automix folder listed tracks=" + std::to_string(listing.size()));
+    return CallbackStatus::Done;
+}
+
+std::optional<std::string> OnlineSource::uid_for_title(const std::string& title)
+{
+    if (title.empty()) {
+        return std::nullopt;
+    }
+    const auto wanted = casefolded(title);
+    std::lock_guard lock(facts_mutex_);
+    for (const auto& [uid, facts] : track_facts_) {
+        if (casefolded(facts.title) == wanted) {
+            return uid;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<SearchTrack> OnlineSource::choose_automix_track(const std::string& anchor)
+{
+    const auto server = clients();
+    if (server == nullptr) {
+        return std::nullopt;
+    }
+    CancellationSource cancellation;
+    const auto result = server->compatible.fetch(anchor, cancellation.token());
+    if (!result.ok()) {
+        return std::nullopt;
+    }
+    std::vector<SearchTrack> candidates;
+    for (const auto& item : result.value->items) {
+        candidates.push_back(compatible_track_as_search_track(item));
+    }
+    remember(candidates);
+
+    std::unordered_set<std::string> excluded(automix_.played.begin(), automix_.played.end());
+    excluded.insert(automix_.planned.begin(), automix_.planned.end());
+    excluded.insert(anchor);
+    std::unordered_set<std::string> recent_artists;
+    std::unordered_set<std::string> recent_albums;
+    std::vector<std::string> window(automix_.recent.begin(), automix_.recent.end());
+    window.push_back(anchor);
+    for (const auto& uid : window) {
+        if (const auto facts = facts_for(uid)) {
+            recent_artists.insert(casefolded(facts->artist));
+            recent_albums.insert(casefolded(facts->album));
+        }
+    }
+    for (const auto& candidate : candidates) {
+        if (excluded.contains(candidate.entity_uid) ||
+            recent_artists.contains(casefolded(candidate.artist)) ||
+            (!candidate.album.empty() && recent_albums.contains(casefolded(candidate.album)))) {
+            continue;
+        }
+        return candidate;
+    }
+    return std::nullopt;
 }
 
 void OnlineSource::flush_plays(std::chrono::system_clock::time_point now)
@@ -401,6 +672,10 @@ void OnlineSource::logout()
 CallbackStatus OnlineSource::search(const std::string& query, TrackSink& sink)
 {
     log("online search callback query=" + query);
+    if (!ignoring_browser_activity()) {
+        browser_searching_ = !query.empty();
+    }
+    mark_browser_activity();
     const auto request = searches_.begin();
     if (!request.has_value()) {
         return CallbackStatus::Cancelled;
@@ -443,6 +718,7 @@ CallbackStatus OnlineSource::search(const std::string& query, TrackSink& sink)
 void OnlineSource::cancel_search()
 {
     log("online search cancel callback");
+    mark_browser_activity();
     searches_.cancel_all();
 }
 
@@ -488,6 +764,9 @@ CallbackStatus OnlineSource::folder_list(FolderSink& sink)
         sink.add(folder.id, catalog_folder_label(folder.id, folder.name, language));
     }
     sink.add(std::string(kCurrentCompatibleFolderId), std::string(compatible_folder_label(language)));
+    if (session_.status().features.automation) {
+        sink.add(std::string(kAutomixFolderId), std::string(kAutomixFolderName));
+    }
     return CallbackStatus::Done;
 }
 
@@ -510,6 +789,13 @@ CallbackStatus OnlineSource::folder(const std::string& folder_id, TrackSink& sin
     }
     if (folder_id.starts_with(kCompatibleFolderPrefix)) {
         return compatible_folder(folder_id.substr(kCompatibleFolderPrefix.size()), sink);
+    }
+    if (folder_id == kAutomixFolderId) {
+        return automix_folder(sink);
+    }
+    if (!ignoring_browser_activity()) {
+        browser_searching_ = false;
+        mark_browser_activity();
     }
 
     const auto request = folders_.begin();

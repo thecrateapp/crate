@@ -8,6 +8,8 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstdio>
+#include <exception>
 #include <filesystem>
 #include <functional>
 #include <future>
@@ -190,6 +192,9 @@ public:
     std::vector<std::string> opened;
     std::map<int, DeckReading> decks;
     int layout_decks = 2;
+    bool automix = true;
+    std::vector<QueuedSong> queue;
+    std::string browsed_folder = "onlinemusic:/Crate/Genres";
 
     std::string language() override
     {
@@ -216,6 +221,25 @@ public:
     int deck_count() override
     {
         return layout_decks;
+    }
+
+    bool automix_active() override
+    {
+        return automix;
+    }
+
+    std::string browsed_folder_path() override
+    {
+        return browsed_folder;
+    }
+
+    std::vector<QueuedSong> automix_queue(int count) override
+    {
+        std::vector<QueuedSong> songs;
+        for (int index = 0; index < count && index < static_cast<int>(queue.size()); ++index) {
+            songs.push_back(queue[static_cast<std::size_t>(index)]);
+        }
+        return songs;
     }
 
     std::optional<DeckReading> read_deck(int deck) override
@@ -266,16 +290,23 @@ public:
     }
 };
 
+int next_harness_instance()
+{
+    static std::atomic<int> instances = 0;
+    return ++instances;
+}
+
 struct Harness {
     std::shared_ptr<SharedVault> vault = std::make_shared<SharedVault>();
     MemorySettingsStore settings;
     RoutedHttp http;
     FakeHost host;
     FakeUi ui;
-    std::filesystem::path cache_path =
-        std::filesystem::temp_directory_path() / "crate-vdj-online-source-test.sqlite";
-    std::filesystem::path spool_path =
-        std::filesystem::temp_directory_path() / "crate-vdj-online-source-plays.jsonl";
+    int instance = next_harness_instance();
+    std::filesystem::path cache_path = std::filesystem::temp_directory_path() /
+        ("crate-vdj-online-source-test-" + std::to_string(instance) + ".sqlite");
+    std::filesystem::path spool_path = std::filesystem::temp_directory_path() /
+        ("crate-vdj-online-source-plays-" + std::to_string(instance) + ".jsonl");
     std::unique_ptr<OnlineSource> source;
 
     explicit Harness(bool connected = true, std::string capabilities = capabilities_json())
@@ -315,8 +346,12 @@ struct Harness {
     ~Harness()
     {
         source.reset();
-        std::filesystem::remove(cache_path);
-        std::filesystem::remove(spool_path);
+        std::error_code cache_error;
+        std::filesystem::remove(cache_path, cache_error);
+        CRATE_CHECK(!cache_error);
+        std::error_code spool_error;
+        std::filesystem::remove(spool_path, spool_error);
+        CRATE_CHECK(!spool_error);
     }
 };
 
@@ -657,6 +692,227 @@ void decks_beyond_the_layout_are_not_read()
     CRATE_CHECK(harness.http.bodies_sent_to("/api/me/play-events").empty());
 }
 
+struct Candidate {
+    std::string uid;
+    std::string artist;
+    std::string album;
+};
+
+std::string compatible_json(const std::string& seed, const std::vector<Candidate>& candidates)
+{
+    std::string items;
+    for (std::size_t index = 0; index < candidates.size(); ++index) {
+        const auto& candidate = candidates[index];
+        if (!items.empty()) {
+            items += ",";
+        }
+        items += R"({"trackId":)" + std::to_string(100 + index) + R"(,"trackEntityUid":")" + candidate.uid +
+            R"(","title":"Song )" + candidate.uid + R"(","artist":")" + candidate.artist +
+            R"(","album":")" + candidate.album + R"(","score":0.9,"confidence":0.9,"scoreBreakdown":{"plannerVersion":2,"overall":0.9,"signalConfidence":0.9,"tempo":1.0,"harmonic":1.0,"harmonicRelationship":"same","energy":0.9,"danceability":0.9,"valence":0.9,"bliss":0.8,"genre":1.0},"fallbackReasons":[]})";
+    }
+    return R"({"seedTrackEntityUid":")" + seed + R"(","scope":"local","plannerVersion":"smart-mix-v2","context":"auto","items":[)" + items + "]}";
+}
+
+std::string crate_path(const std::string& uid)
+{
+    return "netsearch://plugin-Crate/" + uid;
+}
+
+struct AutomixHarness {
+    Harness harness{true, capabilities_json(true, "2026-08", true)};
+
+    AutomixHarness()
+    {
+        harness.http.route("/api/me/play-events", R"({"id":1})");
+        harness.http.route(
+            "/api/tracks/by-entity/seed/compatible",
+            compatible_json("seed", {{"same-artist", "Seed Band", "Other"}, {"a", "Band A", "Album A"}, {"b", "Band B", "Album B"}})
+        );
+        harness.http.route(
+            "/api/tracks/by-entity/a/compatible",
+            compatible_json("a", {{"seed", "Seed Band", "Seed Album"}, {"a-album", "Band C", "Album A"}, {"c", "Band C", "Album C"}})
+        );
+        harness.http.route(
+            "/api/tracks/by-entity/manual/compatible",
+            compatible_json("manual", {{"m", "Band M", "Album M"}})
+        );
+        harness.http.route(
+            "/api/vdj/catalog/folders/crate%3Agenre%3A7",
+            R"json({"folders":[],"tracks":[{"entity_uid":"seed","title":"Seed","artist":"Seed Band","album":"Seed Album"}],"next_cursor":null})json"
+        );
+        RecordingSink listed;
+        harness.source->folder("crate:genre:7", listed);
+        harness.host.decks[1] = DeckReading{crate_path("seed"), true, 10'000, 200'000};
+    }
+
+    std::vector<std::string> commands_after(std::chrono::system_clock::time_point at)
+    {
+        harness.source->tick(at);
+        return harness.host.commands;
+    }
+};
+
+const std::string kGoToAutomix = "browser_gotofolder \"onlinemusic:/Crate/Crate Automix\"";
+const std::string kBackToGenres = "browser_gotofolder \"onlinemusic:/Crate/Genres\"";
+
+std::vector<std::string> list_automix_folder(AutomixHarness& automix)
+{
+    RecordingSink sink;
+    automix.harness.source->folder(std::string(kAutomixFolderId), sink);
+    std::vector<std::string> uids;
+    for (const auto& track : sink.tracks) {
+        uids.push_back(track.unique_id);
+    }
+    return uids;
+}
+
+void automix_lists_a_track_in_vdj_before_queueing_it()
+{
+    AutomixHarness automix;
+
+    CRATE_CHECK(automix.commands_after(kPlayStart) == std::vector<std::string>{kGoToAutomix});
+    CRATE_CHECK(list_automix_folder(automix) == std::vector<std::string>{"a"});
+
+    const auto commands = automix.commands_after(kPlayStart + 1s);
+
+    CRATE_CHECK(commands.size() == 3);
+    CRATE_CHECK(commands[1] == kBackToGenres);
+    CRATE_CHECK(commands[2] == "playlist_add \"netsearch://plugin-Crate/a\"");
+}
+
+void automix_chains_the_second_track_from_the_first_and_never_repeats_an_album()
+{
+    AutomixHarness automix;
+    automix.commands_after(kPlayStart);
+    list_automix_folder(automix);
+    automix.commands_after(kPlayStart + 1s);
+    automix.harness.host.queue = {{"Crate", ""}};
+
+    automix.commands_after(kPlayStart + 10s);
+    list_automix_folder(automix);
+    const auto commands = automix.commands_after(kPlayStart + 11s);
+
+    CRATE_CHECK(commands.back() == "playlist_add \"netsearch://plugin-Crate/c\"");
+}
+
+void automix_waits_while_two_tracks_are_queued()
+{
+    AutomixHarness automix;
+    automix.harness.host.queue = {{"Crate", ""}, {"/Users/dj/Music/own.mp3", "Own Track"}};
+
+    CRATE_CHECK(automix.commands_after(kPlayStart).empty());
+}
+
+void a_manual_change_puts_a_fitting_track_right_next()
+{
+    AutomixHarness automix;
+    automix.harness.host.queue = {{"Crate", ""}, {"Crate", ""}};
+    automix.commands_after(kPlayStart);
+    automix.harness.host.decks[1] = DeckReading{crate_path("manual"), true, 1'000, 200'000};
+
+    CRATE_CHECK(automix.commands_after(kPlayStart + 10s) == std::vector<std::string>{kGoToAutomix});
+    list_automix_folder(automix);
+    const auto commands = automix.commands_after(kPlayStart + 11s);
+
+    CRATE_CHECK(commands.back() == "automix_add_next \"netsearch://plugin-Crate/m\"");
+}
+
+void a_track_coming_from_the_queue_is_not_a_manual_change()
+{
+    AutomixHarness automix;
+    automix.harness.http.route(
+        "/api/vdj/catalog/folders/crate%3Agenre%3A8",
+        R"json({"folders":[],"tracks":[{"entity_uid":"queued","title":"Queued Song","artist":"Queue Band","album":"Queue Album"}],"next_cursor":null})json"
+    );
+    automix.harness.http.route(
+        "/api/tracks/by-entity/queued/compatible",
+        compatible_json("queued", {{"q", "Band Q", "Album Q"}})
+    );
+    RecordingSink listed;
+    automix.harness.source->folder("crate:genre:8", listed);
+    automix.harness.host.queue = {{"Crate", "Queued Song"}, {"Crate", "Other Song"}};
+    automix.commands_after(kPlayStart);
+
+    automix.harness.host.decks[1] = DeckReading{crate_path("queued"), true, 1'000, 200'000};
+    automix.harness.host.queue = {{"Crate", "Other Song"}};
+    automix.commands_after(kPlayStart + 10s);
+    list_automix_folder(automix);
+    const auto commands = automix.commands_after(kPlayStart + 11s);
+
+    CRATE_CHECK(commands.back() == "playlist_add \"netsearch://plugin-Crate/q\"");
+}
+
+void a_track_is_queued_anyway_if_vdj_never_lists_the_folder()
+{
+    AutomixHarness automix;
+    automix.commands_after(kPlayStart);
+
+    CRATE_CHECK(automix.commands_after(kPlayStart + 1s).size() == 1);
+    const auto commands = automix.commands_after(kPlayStart + 3s);
+
+    CRATE_CHECK(commands.size() == 3);
+    CRATE_CHECK(commands[1] == kBackToGenres);
+    CRATE_CHECK(commands[2] == "playlist_add \"netsearch://plugin-Crate/a\"");
+}
+
+void a_busy_browser_is_never_moved()
+{
+    AutomixHarness automix;
+    automix.harness.source->cancel_search();
+
+    CRATE_CHECK(automix.commands_after(std::chrono::system_clock::now()).empty());
+}
+
+void an_open_search_is_never_left()
+{
+    AutomixHarness automix;
+    automix.harness.http.route("/api/search?q=kneecap", kSearchJson);
+    RecordingSink results;
+    automix.harness.source->search("kneecap", results);
+    const auto later = std::chrono::system_clock::now() + 10s;
+
+    CRATE_CHECK(automix.commands_after(later).empty());
+    const auto queued = automix.commands_after(later + 31s);
+
+    CRATE_CHECK(queued == std::vector<std::string>{"playlist_add \"netsearch://plugin-Crate/a\""});
+}
+
+void opening_a_folder_ends_the_search()
+{
+    AutomixHarness automix;
+    automix.harness.http.route("/api/search?q=kneecap", kSearchJson);
+    automix.harness.http.route("/api/vdj/catalog/folders/crate%3Agenre%3A1", folder_page_json("track-9", ""));
+    RecordingSink results;
+    automix.harness.source->search("kneecap", results);
+    RecordingSink folder;
+    automix.harness.source->folder("crate:genre:1", folder);
+
+    CRATE_CHECK(automix.commands_after(std::chrono::system_clock::now() + 10s) == std::vector<std::string>{kGoToAutomix});
+}
+
+void an_unknown_browser_folder_is_never_left()
+{
+    AutomixHarness automix;
+    automix.harness.host.browsed_folder.clear();
+
+    const auto commands = automix.commands_after(kPlayStart);
+
+    CRATE_CHECK(commands == std::vector<std::string>{"playlist_add \"netsearch://plugin-Crate/a\""});
+}
+
+void automix_does_nothing_without_permission_or_with_automix_off()
+{
+    Harness without_automation;
+    without_automation.http.route("/api/tracks/by-entity/seed/compatible", compatible_json("seed", {{"a", "Band A", "Album A"}}));
+    without_automation.host.decks[1] = DeckReading{crate_path("seed"), true, 10'000, 200'000};
+    without_automation.source->tick(kPlayStart);
+    CRATE_CHECK(without_automation.host.commands.empty());
+
+    AutomixHarness stopped;
+    stopped.harness.host.automix = false;
+    CRATE_CHECK(stopped.commands_after(kPlayStart).empty());
+}
+
 void camelot_keys_map_to_virtualdj_keys()
 {
     CRATE_CHECK(vdj_key_from_camelot("8A") == vdj_key_number("A", "minor"));
@@ -679,30 +935,53 @@ void keys_and_cover_urls_map_to_virtualdj()
 
 } // namespace
 
+void run(const char* name, void (*test)())
+{
+    std::printf("%s\n", name);
+    std::fflush(stdout);
+    try {
+        test();
+    } catch (const std::exception& error) {
+        std::fprintf(stderr, "%s threw: %s\n", name, error.what());
+        std::exit(EXIT_FAILURE);
+    }
+}
+
 int main()
 {
-    search_publishes_tracks_once_with_absolute_covers();
-    a_new_search_supersedes_one_in_flight();
-    cancel_search_leaves_the_list_untouched();
-    a_cancel_after_the_response_does_not_publish();
-    a_disconnected_source_finishes_empty_lists();
-    folder_pages_are_published_together();
-    a_new_folder_cancels_one_still_paging();
-    folder_list_adds_the_compatible_folder();
-    current_compatible_folder_without_a_crate_track_is_empty();
-    an_unknown_track_only_offers_compatible_tracks();
-    a_listed_track_offers_its_artist_and_album();
-    names_with_quotes_fall_back_to_a_text_search();
-    a_track_that_cannot_load_says_why();
-    a_ready_track_resolves_to_a_ticketed_stream();
-    search_tracks_show_camelot_and_energy();
-    compatible_tracks_show_crate_fields();
-    a_seed_without_profile_shows_a_notice();
-    camelot_keys_map_to_virtualdj_keys();
-    plays_are_reported_with_the_track_names();
-    plays_wait_in_the_spool_until_crate_answers();
-    decks_beyond_the_layout_are_not_read();
-    a_track_opens_its_album_in_listen();
-    open_in_crate_needs_a_listen_url();
-    keys_and_cover_urls_map_to_virtualdj();
+    run("search_publishes_tracks_once_with_absolute_covers", search_publishes_tracks_once_with_absolute_covers);
+    run("a_new_search_supersedes_one_in_flight", a_new_search_supersedes_one_in_flight);
+    run("cancel_search_leaves_the_list_untouched", cancel_search_leaves_the_list_untouched);
+    run("a_cancel_after_the_response_does_not_publish", a_cancel_after_the_response_does_not_publish);
+    run("a_disconnected_source_finishes_empty_lists", a_disconnected_source_finishes_empty_lists);
+    run("folder_pages_are_published_together", folder_pages_are_published_together);
+    run("a_new_folder_cancels_one_still_paging", a_new_folder_cancels_one_still_paging);
+    run("folder_list_adds_the_compatible_folder", folder_list_adds_the_compatible_folder);
+    run("current_compatible_folder_without_a_crate_track_is_empty", current_compatible_folder_without_a_crate_track_is_empty);
+    run("an_unknown_track_only_offers_compatible_tracks", an_unknown_track_only_offers_compatible_tracks);
+    run("a_listed_track_offers_its_artist_and_album", a_listed_track_offers_its_artist_and_album);
+    run("names_with_quotes_fall_back_to_a_text_search", names_with_quotes_fall_back_to_a_text_search);
+    run("a_track_that_cannot_load_says_why", a_track_that_cannot_load_says_why);
+    run("a_ready_track_resolves_to_a_ticketed_stream", a_ready_track_resolves_to_a_ticketed_stream);
+    run("search_tracks_show_camelot_and_energy", search_tracks_show_camelot_and_energy);
+    run("compatible_tracks_show_crate_fields", compatible_tracks_show_crate_fields);
+    run("a_seed_without_profile_shows_a_notice", a_seed_without_profile_shows_a_notice);
+    run("camelot_keys_map_to_virtualdj_keys", camelot_keys_map_to_virtualdj_keys);
+    run("plays_are_reported_with_the_track_names", plays_are_reported_with_the_track_names);
+    run("plays_wait_in_the_spool_until_crate_answers", plays_wait_in_the_spool_until_crate_answers);
+    run("decks_beyond_the_layout_are_not_read", decks_beyond_the_layout_are_not_read);
+    run("automix_lists_a_track_in_vdj_before_queueing_it", automix_lists_a_track_in_vdj_before_queueing_it);
+    run("automix_chains_the_second_track_from_the_first_and_never_repeats_an_album", automix_chains_the_second_track_from_the_first_and_never_repeats_an_album);
+    run("automix_waits_while_two_tracks_are_queued", automix_waits_while_two_tracks_are_queued);
+    run("a_manual_change_puts_a_fitting_track_right_next", a_manual_change_puts_a_fitting_track_right_next);
+    run("a_track_coming_from_the_queue_is_not_a_manual_change", a_track_coming_from_the_queue_is_not_a_manual_change);
+    run("a_track_is_queued_anyway_if_vdj_never_lists_the_folder", a_track_is_queued_anyway_if_vdj_never_lists_the_folder);
+    run("a_busy_browser_is_never_moved", a_busy_browser_is_never_moved);
+    run("an_unknown_browser_folder_is_never_left", an_unknown_browser_folder_is_never_left);
+    run("an_open_search_is_never_left", an_open_search_is_never_left);
+    run("opening_a_folder_ends_the_search", opening_a_folder_ends_the_search);
+    run("automix_does_nothing_without_permission_or_with_automix_off", automix_does_nothing_without_permission_or_with_automix_off);
+    run("a_track_opens_its_album_in_listen", a_track_opens_its_album_in_listen);
+    run("open_in_crate_needs_a_listen_url", open_in_crate_needs_a_listen_url);
+    run("keys_and_cover_urls_map_to_virtualdj", keys_and_cover_urls_map_to_virtualdj);
 }
