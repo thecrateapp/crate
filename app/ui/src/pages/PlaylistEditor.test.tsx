@@ -12,9 +12,11 @@ import {
   vi,
 } from "vitest";
 
+const routeParams = vi.hoisted(() => ({ playlistId: "42" }));
+
 vi.mock("react-router", () => ({
   useNavigate: () => vi.fn(),
-  useParams: () => ({ playlistId: "42" }),
+  useParams: () => routeParams,
 }));
 
 vi.mock("@/hooks/use-api", () => ({
@@ -39,6 +41,7 @@ vi.mock("sonner", () => ({
   toast: {
     error: vi.fn(),
     success: vi.fn(),
+    info: vi.fn(),
   },
 }));
 
@@ -165,6 +168,7 @@ function sendSnapshot(surface: typeof editorSurface) {
 
 describe("PlaylistEditor", () => {
   beforeEach(() => {
+    routeParams.playlistId = "42";
     vi.clearAllMocks();
     mockApi.mockReset();
     eventSources.length = 0;
@@ -391,6 +395,75 @@ describe("PlaylistEditor", () => {
       "Generated description",
     );
     expect(toast.success).toHaveBeenCalledWith("AI description generated");
+  });
+
+  it("keeps an edited description when the AI task finishes", async () => {
+    let finishTask: ((value: TaskCompletion) => void) | null = null;
+    mockApi.mockImplementation((url: string) =>
+      Promise.resolve(
+        url.endsWith("/ai-description") ? { task_id: "describe-3" } : {},
+      ),
+    );
+    mockWaitForTask.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishTask = resolve;
+        }),
+    );
+    render(<PlaylistEditor />);
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", { name: "Generate description with AI" }),
+    );
+    await waitFor(() => expect(mockWaitForTask).toHaveBeenCalled());
+    const field = screen.getByRole("textbox", { name: "Description" });
+    await user.clear(field);
+    await user.type(field, "My own words");
+
+    await act(async () => {
+      finishTask?.({
+        status: "completed",
+        result: { description: "Generated description", applied: false },
+      });
+    });
+
+    expect(field).toHaveValue("My own words");
+    expect(toast.info).toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalledWith("AI description generated");
+  });
+
+  it("abandons the AI description when the editor opens another playlist", async () => {
+    let finishTask: ((value: TaskCompletion) => void) | null = null;
+    let signal: AbortSignal | undefined;
+    mockApi.mockImplementation((url: string) =>
+      Promise.resolve(
+        url.endsWith("/ai-description") ? { task_id: "describe-4" } : {},
+      ),
+    );
+    mockWaitForTask.mockImplementation((_id, _timeout, taskSignal) => {
+      signal = taskSignal;
+      return new Promise((resolve) => {
+        finishTask = resolve;
+      });
+    });
+    const { rerender } = render(<PlaylistEditor />);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Generate description with AI" }),
+    );
+    await waitFor(() => expect(signal).toBeDefined());
+
+    routeParams.playlistId = "99";
+    rerender(<PlaylistEditor />);
+    expect(signal?.aborted).toBe(true);
+    await act(async () => {
+      finishTask?.({
+        status: "completed",
+        result: { description: "Copy for playlist 42", applied: false },
+      });
+    });
+
+    expect(screen.queryByDisplayValue("Copy for playlist 42")).toBeNull();
+    expect(toast.success).not.toHaveBeenCalledWith("AI description generated");
   });
 
   it("reports a failed AI description task without touching the draft", async () => {

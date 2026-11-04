@@ -64,6 +64,7 @@ vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
     error: vi.fn(),
+    info: vi.fn(),
   },
 }));
 
@@ -454,6 +455,67 @@ describe("GenreTaxonomyTree", () => {
     expect(
       screen.getByText("Enrichment proposal ready to review"),
     ).toBeVisible();
+  });
+
+  it("keeps the curator's edits when the proposal arrives", async () => {
+    llmStatusMock.mockReturnValue({ available: true });
+    apiMock.mockResolvedValueOnce({ task_id: "proposal-5" });
+    let finishTask: ((value: unknown) => void) | null = null;
+    waitForTaskMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishTask = resolve;
+        }),
+    );
+    renderTree({ canCurate: true });
+    fireEvent.click(screen.getByText("Hardcore"));
+    fireEvent.click(screen.getByRole("button", { name: "Enrich with AI" }));
+    await waitFor(() => expect(waitForTaskMock).toHaveBeenCalled());
+    const description =
+      document.querySelector<HTMLTextAreaElement>("#genre-description")!;
+    fireEvent.change(description, { target: { value: "Curator copy" } });
+
+    await act(async () => {
+      finishTask?.({
+        status: "completed",
+        result: {
+          description: "AI copy",
+          aliases: [],
+          relations: [],
+          eq_gains: [1, 2, 1, 0, -1, 0, 1, 2, 1, 0],
+          eq_reasoning: "Presence.",
+          reasoning: "Lineage.",
+        },
+      });
+    });
+
+    expect(description.value).toBe("Curator copy");
+    // The paid proposal is still staged for review (EQ curve included).
+    expect(screen.getByTestId("eq-editor")).toHaveAttribute(
+      "data-ai-gains",
+      "1,2,1,0,-1,0,1,2,1,0",
+    );
+    expect(toast.info).toHaveBeenCalled();
+  });
+
+  it("abandons the proposal when another genre is selected", async () => {
+    llmStatusMock.mockReturnValue({ available: true });
+    apiMock.mockResolvedValueOnce({ task_id: "proposal-6" });
+    let signal: AbortSignal | undefined;
+    waitForTaskMock.mockImplementationOnce(
+      (_id: string, _timeout: number, taskSignal: AbortSignal) => {
+        signal = taskSignal;
+        return new Promise(() => {});
+      },
+    );
+    renderTree({ canCurate: true });
+    fireEvent.click(screen.getByText("Hardcore"));
+    fireEvent.click(screen.getByRole("button", { name: "Enrich with AI" }));
+    await waitFor(() => expect(signal).toBeDefined());
+
+    fireEvent.click(screen.getByText("Punk"));
+
+    expect(signal?.aborted).toBe(true);
   });
 
   it("reports a failed proposal task and stages nothing", async () => {

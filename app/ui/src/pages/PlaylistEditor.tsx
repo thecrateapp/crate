@@ -560,7 +560,9 @@ export function PlaylistEditor() {
   const [previewKey, setPreviewKey] = useState<string | null>(null);
   const previewRequest = useRef(0);
   const describeTask = useRef<AbortController | null>(null);
-  useEffect(() => () => describeTask.current?.abort(), []);
+  // "Duplicate" reuses this component for another playlist: a pending draft
+  // belongs to the playlist it was requested for.
+  useEffect(() => () => describeTask.current?.abort(), [id]);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [removingCover, setRemovingCover] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -758,6 +760,9 @@ export function PlaylistEditor() {
     }
   };
 
+  const descriptionRef = useRef(description);
+  descriptionRef.current = description;
+
   const handleGenerateDescription = useCallback(async () => {
     if (!llmAvailable) {
       toast.error(llmUnavailableReason);
@@ -766,6 +771,7 @@ export function PlaylistEditor() {
     describeTask.current?.abort();
     const controller = new AbortController();
     describeTask.current = controller;
+    const requestedDescription = descriptionRef.current;
     setDescribing(true);
     try {
       // The model runs in the ai queue; the request only returns the task.
@@ -785,6 +791,13 @@ export function PlaylistEditor() {
       const description = task.result?.description;
       if (task.status !== "completed" || typeof description !== "string") {
         throw new Error(task.error || "Failed to generate description");
+      }
+      if (controller.signal.aborted) return;
+      if (descriptionRef.current !== requestedDescription) {
+        toast.info(
+          "AI description ready, but you edited the description meanwhile; it was not replaced.",
+        );
+        return;
       }
       setField("description", description);
       toast.success("AI description generated");

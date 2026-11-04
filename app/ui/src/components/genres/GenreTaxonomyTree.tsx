@@ -238,6 +238,8 @@ function NodeDetailPanel({
   const baselineNode = useRef(node);
   const proposalTask = useRef<AbortController | null>(null);
   useEffect(() => () => proposalTask.current?.abort(), []);
+  const draftsRef = useRef({ descriptionDraft, relationDrafts });
+  draftsRef.current = { descriptionDraft, relationDrafts };
 
   useEffect(() => {
     const previous = baselineNode.current;
@@ -375,6 +377,7 @@ function NodeDetailPanel({
     proposalTask.current?.abort();
     const controller = new AbortController();
     proposalTask.current = controller;
+    const requested = draftsRef.current;
     setSavingKey("proposal");
     try {
       // The proposal is built in the ai queue; the request only returns the task.
@@ -390,12 +393,19 @@ function NodeDetailPanel({
       if (task.status !== "completed" || !task.result) {
         throw new ProposalTaskError(task.error);
       }
+      if (controller.signal.aborted) return;
       const result = task.result as unknown as TaxonomyNodeProposal;
       setProposal(result);
-      if (result.description) {
+      // Never overwrite what the curator typed while the proposal was built.
+      const current = draftsRef.current;
+      const descriptionEdited =
+        current.descriptionDraft !== requested.descriptionDraft;
+      const relationsEdited =
+        current.relationDrafts !== requested.relationDrafts;
+      if (result.description && !descriptionEdited) {
         setDescriptionDraft(result.description);
       }
-      if (result.relations.length > 0) {
+      if (result.relations.length > 0 && !relationsEdited) {
         setRelationDrafts((prev) => {
           const next = { ...prev };
           for (const relation of result.relations) {
@@ -404,7 +414,11 @@ function NodeDetailPanel({
           return next;
         });
       }
-      toast.success("AI proposal staged for review");
+      if (descriptionEdited || relationsEdited) {
+        toast.info("AI proposal staged; your edits made meanwhile were kept.");
+      } else {
+        toast.success("AI proposal staged for review");
+      }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       toast.error(
