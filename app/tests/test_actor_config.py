@@ -56,7 +56,8 @@ def test_ai_lane_destinations_follow_sm3_d8():
     expected = {
         "infer_genre_taxonomy": "ai_bulk",
         "rebuild_genre_taxonomy_proposals": "ai_bulk",
-        "ai_catalog_refresh": "ai_bulk",
+        # An admin-triggered refresh must not wait behind a taxonomy batch.
+        "ai_catalog_refresh": "ai",
         "research_artist_bio": "ai",
         "draft_i18n_translation": "ai",
         "show_extract": "ai",
