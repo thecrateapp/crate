@@ -19,22 +19,42 @@ REQUIRED_QUEUES = ("ai", "ai_bulk")
 
 
 def worker_queues(command) -> set[str]:
+    """Queues named by --queues X or --queues=X in a worker command."""
     if isinstance(command, str):
         command = shlex.split(command)
     if not isinstance(command, list) or "worker" not in command:
         return set()
-    try:
-        raw = command[command.index("--queues") + 1]
-    except (ValueError, IndexError):
+    raw = None
+    for index, arg in enumerate(command):
+        arg = str(arg)
+        if arg == "--queues" and index + 1 < len(command):
+            raw = command[index + 1]
+        elif arg.startswith("--queues="):
+            raw = arg.split("=", 1)[1]
+    if raw is None:
         return set()
     return {queue.strip() for queue in str(raw).split(",") if queue.strip()}
+
+
+def runs_by_default(service: dict) -> bool:
+    """False for services that start no container (scale or replicas 0) or that
+    only run with an opt-in profile."""
+    if service.get("profiles"):
+        return False
+    if str(service.get("scale", 1)) == "0":
+        return False
+    replicas = (service.get("deploy") or {}).get("replicas")
+    return replicas is None or str(replicas) != "0"
 
 
 def consumers(model: dict) -> dict[str, list[str]]:
     services = model.get("services") or {}
     found: dict[str, list[str]] = {queue: [] for queue in REQUIRED_QUEUES}
     for name, service in sorted(services.items()):
-        queues = worker_queues((service or {}).get("command"))
+        service = service or {}
+        if not runs_by_default(service):
+            continue
+        queues = worker_queues(service.get("command"))
         for queue in REQUIRED_QUEUES:
             if queue in queues:
                 found[queue].append(name)

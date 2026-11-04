@@ -1379,3 +1379,28 @@ def test_worker_queue_contract_matches_the_ai_lanes() -> None:
 
     contract = runpy.run_path(str(ROOT / "scripts/worker_queue_contract.py"))
     assert contract["REQUIRED_QUEUES"] == AI_QUEUES
+
+
+@pytest.mark.parametrize(
+    "service,consumes",
+    [
+        ({"command": ["worker", "--queues=default,ai,ai_bulk"]}, True),
+        ({"command": "worker --queues=default,ai,ai_bulk --processes 2"}, True),
+        ({"command": ["worker", "--queues", "ai,ai_bulk"], "scale": 0}, False),
+        (
+            {
+                "command": ["worker", "--queues", "ai,ai_bulk"],
+                "deploy": {"replicas": 0},
+            },
+            False,
+        ),
+        (
+            {"command": ["worker", "--queues", "ai,ai_bulk"], "profiles": ["agent"]},
+            False,
+        ),
+    ],
+    ids=["equals-list", "equals-string", "scale-0", "replicas-0", "profile"],
+)
+def test_worker_queue_contract_reads_every_command_form(service, consumes) -> None:
+    result = _queue_contract({"crate-worker": service})
+    assert (result.returncode == 0) is consumes, result.stderr
