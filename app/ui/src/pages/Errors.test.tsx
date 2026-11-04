@@ -3,10 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { apiMock, useApiMock, pollTaskMock } = vi.hoisted(() => ({
+const { apiMock, useApiMock, pollTaskMock, refetchMock } = vi.hoisted(() => ({
   apiMock: vi.fn(),
   useApiMock: vi.fn(),
   pollTaskMock: vi.fn(),
+  refetchMock: vi.fn(),
 }));
 
 vi.mock("@/hooks/use-api", () => ({ useApi: useApiMock }));
@@ -53,9 +54,10 @@ function serve({
           : null,
     loading: false,
     error: null,
-    refetch: vi.fn(),
+    refetch: refetchMock,
   }));
-  apiMock.mockImplementation(async (url: string) => {
+  apiMock.mockImplementation(async (url: string, method = "GET") => {
+    if (method === "PUT") return connection;
     const query = new URLSearchParams(url.split("?")[1]);
     const service = query.get("service");
     return {
@@ -90,6 +92,7 @@ describe("Errors", () => {
     apiMock.mockReset();
     useApiMock.mockReset();
     pollTaskMock.mockReset();
+    refetchMock.mockReset();
   });
 
   it("renders critical lane first", async () => {
@@ -163,12 +166,113 @@ describe("Errors", () => {
     expect(
       screen.getByRole("button", { name: "Open the Sentry connection" }),
     ).toBeInTheDocument();
+    // The settings live in the drawer, not in the page body.
     expect(
-      screen.getByRole("form", { name: "Sentry connection settings" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("form", { name: "Sentry connection settings" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
     // Nothing to list until a connection exists.
     expect(apiMock).not.toHaveBeenCalled();
+  });
+
+  it("not configured state opens the drawer", async () => {
+    serve({
+      summary: NOT_CONFIGURED_SUMMARY,
+      issues: [],
+      connection: NOT_CONFIGURED_CONNECTION,
+    });
+    renderWithAdminProviders(<Errors />, {
+      route: "/errors",
+      auth: only("ops.errors.view", "ops.runtime.manage"),
+    });
+
+    const cta = screen.getByRole("button", {
+      name: "Open the Sentry connection",
+    });
+    await userEvent.click(cta);
+
+    const drawer = await screen.findByRole("dialog", {
+      name: "Sentry connection",
+    });
+    expect(
+      within(drawer).getByRole("form", { name: "Sentry connection settings" }),
+    ).toBeInTheDocument();
+    expect(within(drawer).getByText("Not configured")).toBeInTheDocument();
+    expect(within(drawer).getByLabelText("Token")).toBeRequired();
+
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    await waitFor(() => expect(cta).toHaveFocus());
+  });
+
+  it("opens the Sentry connection in a side drawer", async () => {
+    serve();
+    renderWithAdminProviders(<Errors />, {
+      route: "/errors",
+      auth: only("ops.errors.view", "ops.runtime.manage"),
+    });
+    await issueTable();
+
+    const trigger = screen.getByRole("button", { name: /^Sentry connection/ });
+    expect(trigger).toHaveAccessibleName("Sentry connection, connected");
+    expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByRole("form", { name: "Sentry connection settings" }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(trigger);
+
+    const drawer = await screen.findByRole("dialog", {
+      name: "Sentry connection",
+    });
+    expect(drawer).toHaveAttribute("data-side", "right");
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    // Status first, then the settings form.
+    const status = within(drawer).getByRole("region", { name: "Status" });
+    const settings = within(drawer).getByRole("region", { name: "Settings" });
+    expect(
+      status.compareDocumentPosition(settings) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(status).getByText("Connected")).toBeInTheDocument();
+    expect(
+      within(status).getByRole("button", { name: "Test connection" }),
+    ).toBeEnabled();
+
+    // Saving keeps the drawer open and refreshes the page data.
+    await userEvent.click(within(drawer).getByRole("button", { name: "Save" }));
+    expect(apiMock).toHaveBeenCalledWith(
+      "/api/admin/errors/connection",
+      "PUT",
+      expect.objectContaining({ organization: "example-org" }),
+    );
+    expect(refetchMock).toHaveBeenCalled();
+    expect(
+      screen.getByRole("dialog", { name: "Sentry connection" }),
+    ).toBeInTheDocument();
+
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it("hides the connection button without runtime manage", async () => {
+    serve();
+    renderWithAdminProviders(<Errors />, {
+      route: "/errors",
+      auth: only("ops.errors.view"),
+    });
+    await issueTable();
+
+    expect(
+      screen.queryByRole("button", { name: /Sentry connection/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("points viewers without runtime access to someone who has it", () => {
@@ -209,6 +313,16 @@ describe("Errors", () => {
       screen.getAllByText(/It may have been revoked or mistyped/).length,
     ).toBeGreaterThan(0);
     expect(screen.getByText("Last sync failed")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Sentry connection/ }),
+    ).toHaveAccessibleName("Sentry connection, needs attention");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Open the Sentry connection" }),
+    );
+    expect(
+      await screen.findByRole("dialog", { name: "Sentry connection" }),
+    ).toBeInTheDocument();
   });
 
   it("keeps the last good issues visible when Sentry is unreachable", async () => {

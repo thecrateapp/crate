@@ -100,6 +100,32 @@ describe("ConnectionPanel", () => {
     expect(field("Token")).toHaveValue("");
   });
 
+  it("shows the status block before the settings, in one column", () => {
+    renderPanel(sampleConnection());
+
+    const status = screen.getByRole("region", { name: "Status" });
+    const settings = screen.getByRole("region", { name: "Settings" });
+    expect(
+      status.compareDocumentPosition(settings) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(status).getByText("Connected")).toBeInTheDocument();
+    expect(within(status).getByText("Read access")).toBeInTheDocument();
+    expect(within(status).getByText("Last sync")).toBeInTheDocument();
+    expect(
+      within(status).getByRole("button", { name: "Test connection" }),
+    ).toBeInTheDocument();
+    expect(
+      within(settings).getByRole("form", {
+        name: "Sentry connection settings",
+      }),
+    ).toBeInTheDocument();
+    // The drawer header owns the title and description now.
+    expect(
+      screen.queryByText(/Where Crate reads issues from/),
+    ).not.toBeInTheDocument();
+  });
+
   it("requires a token before the first save", () => {
     renderPanel(NOT_CONFIGURED_CONNECTION);
 

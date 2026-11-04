@@ -85,6 +85,7 @@ const supportingScope = [
   "app/ui/src/pages/Errors.tsx",
   "app/ui/src/pages/ErrorDetail.tsx",
   "app/ui/src/components/errors/ConnectionPanel.tsx",
+  "app/ui/src/components/errors/ConnectionSheet.tsx",
   "app/ui/src/components/errors/IssueStatusActions.tsx",
   "app/ui/src/components/errors/IssueTable.tsx",
   "app/ui/src/components/errors/StackFrames.tsx",
@@ -476,8 +477,17 @@ const approvedLibraryControls = new Map<string, number>([
   ["app/ui/src/pages/Errors.tsx:@/components/ui/AdminSelect:AdminSelect", 3],
   ["app/ui/src/pages/Errors.tsx:@crate/ui/primitives/ErrorState:ErrorState", 2],
   [
-    "app/ui/src/pages/Errors.tsx:@/components/errors/ConnectionPanel:ConnectionPanel",
-    2,
+    "app/ui/src/pages/Errors.tsx:@/components/errors/ConnectionSheet:ConnectionSheet",
+    1,
+  ],
+  // The drawer keeps the shared close control (conventional UX glyph).
+  [
+    "app/ui/src/components/errors/ConnectionSheet.tsx:@crate/ui/shadcn/sheet:SheetContent",
+    1,
+  ],
+  [
+    "app/ui/src/components/errors/ConnectionSheet.tsx:./ConnectionPanel:ConnectionPanel",
+    1,
   ],
   [
     "app/ui/src/pages/ErrorDetail.tsx:@crate/ui/domain/navigation/BackLink:BackLink",

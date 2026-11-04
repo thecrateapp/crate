@@ -1,3 +1,4 @@
+import { useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 
 import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
@@ -7,15 +8,13 @@ import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
+import { StatusDot, type StatusDotTone } from "@crate/ui/primitives/StatusDot";
 import { Button } from "@crate/ui/shadcn/button";
 
 import { OpsPageHero, OpsPanel } from "@/components/admin/ops-surfaces";
 import { RelativeTime } from "@/components/admin/RelativeTime";
 import { useCursorList } from "@/components/agents/connections/use-cursor-list";
-import {
-  ConnectionPanel,
-  focusConnectionPanel,
-} from "@/components/errors/ConnectionPanel";
+import { ConnectionSheet } from "@/components/errors/ConnectionSheet";
 import { IssueTable } from "@/components/errors/IssueTable";
 import {
   PageHeaderAction,
@@ -65,7 +64,32 @@ function SyncBadge({ summary }: { summary: ErrorSummary }) {
   );
 }
 
-function ConnectionPointer({ code }: { code?: string | null }) {
+type OpenConnection = (event: MouseEvent<HTMLElement>) => void;
+
+/** A quiet reading of the connection for the header button, from the summary. */
+function connectionDot(summary: ErrorSummary | null): {
+  tone: StatusDotTone;
+  label: string;
+} | null {
+  if (!summary) return null;
+  if (!summary.configured) return { tone: "off", label: "not configured" };
+  if (summary.sync?.status === "failed")
+    return {
+      tone: "warn",
+      label: needsConnectionFix(summary.sync.error_code)
+        ? "needs attention"
+        : "sync failing",
+    };
+  return { tone: "on", label: "connected" };
+}
+
+function ConnectionPointer({
+  code,
+  onOpen,
+}: {
+  code?: string | null;
+  onOpen: OpenConnection;
+}) {
   const { hasCapability } = useAuth();
   if (!hasCapability(RUNTIME_MANAGE))
     return code === undefined || needsConnectionFix(code) ? (
@@ -75,13 +99,24 @@ function ConnectionPointer({ code }: { code?: string | null }) {
     ) : null;
   if (code !== undefined && !needsConnectionFix(code)) return null;
   return (
-    <Button type="button" variant="outline" onClick={focusConnectionPanel}>
+    <Button
+      type="button"
+      variant="outline"
+      aria-haspopup="dialog"
+      onClick={onOpen}
+    >
       Open the Sentry connection
     </Button>
   );
 }
 
-function SyncNotice({ summary }: { summary: ErrorSummary }) {
+function SyncNotice({
+  summary,
+  onOpenConnection,
+}: {
+  summary: ErrorSummary;
+  onOpenConnection: OpenConnection;
+}) {
   const { sync } = summary;
   if (!sync || sync.status === "ok") return null;
   if (sync.status === "partial")
@@ -108,7 +143,7 @@ function SyncNotice({ summary }: { summary: ErrorSummary }) {
           </>
         ) : null}
       </span>
-      <ConnectionPointer code={sync.error_code} />
+      <ConnectionPointer code={sync.error_code} onOpen={onOpenConnection} />
     </div>
   );
 }
@@ -212,10 +247,12 @@ function EmptyIssues({
   summary,
   filters,
   onClear,
+  onOpenConnection,
 }: {
   summary: ErrorSummary;
   filters: IssueFilters;
   onClear: () => void;
+  onOpenConnection: OpenConnection;
 }) {
   const { sync } = summary;
   if (sync?.status === "failed")
@@ -223,7 +260,9 @@ function EmptyIssues({
       <EmptyState
         title={problemTitle(sync.error_code)}
         description={problemText(sync.error_code)}
-        action={<ConnectionPointer code={sync.error_code} />}
+        action={
+          <ConnectionPointer code={sync.error_code} onOpen={onOpenConnection} />
+        }
       />
     );
   if (hasActiveFilters(filters))
@@ -256,7 +295,8 @@ function EmptyIssues({
 /**
  * The Error Inbox: Sentry issues synced into PostgreSQL by a worker every five
  * minutes. Reads never call Sentry; status changes and the connection test run
- * as worker tasks. Filters live in the URL.
+ * as worker tasks. Filters live in the URL. People who manage the runtime
+ * configure the Sentry connection in a side drawer.
  */
 export function Errors() {
   const { hasCapability } = useAuth();
@@ -280,7 +320,18 @@ export function Errors() {
     list.reload();
   }
 
+  // Several controls open the connection drawer; closing it returns focus to
+  // the one that did (ConnectionSheet falls back to the header button).
+  const [connectionOpen, setConnectionOpen] = useState(false);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const connectionButtonRef = useRef<HTMLButtonElement>(null);
+  const openConnection: OpenConnection = (event) => {
+    openerRef.current = event.currentTarget;
+    setConnectionOpen(true);
+  };
+
   const data = summary.data;
+  const dot = connectionDot(data);
   const header = (
     <OpsPageHero
       title="Errors"
@@ -288,6 +339,20 @@ export function Errors() {
       compactActions
       actions={
         <PageHeaderActions>
+          {canManageRuntime ? (
+            <Button
+              ref={connectionButtonRef}
+              type="button"
+              variant="ghost"
+              aria-haspopup="dialog"
+              aria-expanded={connectionOpen}
+              onClick={openConnection}
+            >
+              {dot ? <StatusDot tone={dot.tone} /> : null}
+              Sentry connection
+              {dot ? <span className="sr-only">, {dot.label}</span> : null}
+            </Button>
+          ) : null}
           <PageHeaderAction label="Refresh" onClick={refresh}>
             <RefreshCw data-admin-ux="header-refresh" aria-hidden="true" />
           </PageHeaderAction>
@@ -308,101 +373,113 @@ export function Errors() {
     </OpsPageHero>
   );
 
+  let body: ReactNode;
   if (!data)
-    return (
-      <div className="space-y-6">
-        {header}
-        {summary.loading ? (
-          <LoadingState label="Loading errors" />
-        ) : (
-          <ErrorState
-            message="Could not load the error inbox."
-            onRetry={summary.refetch}
+    body = summary.loading ? (
+      <LoadingState label="Loading errors" />
+    ) : (
+      <ErrorState
+        message="Could not load the error inbox."
+        onRetry={summary.refetch}
+      />
+    );
+  else if (!data.configured)
+    body = (
+      <EmptyState
+        variant="panel"
+        titleAs="h2"
+        title="Error tracking is not set up"
+        description="Connect a Sentry organization to see its issues here. Crate reads them every 5 minutes; the only thing it sends to Sentry is a status change someone makes."
+        action={<ConnectionPointer onOpen={openConnection} />}
+      />
+    );
+  else
+    body = (
+      <>
+        {/* With no rows, the empty state already explains a failed sync. */}
+        {list.items.length > 0 ? (
+          <SyncNotice summary={data} onOpenConnection={openConnection} />
+        ) : null}
+        <OpsPanel title="Filters">
+          <Filters
+            filters={filters}
+            summary={data}
+            releases={knownReleases(list.items)}
+            onChange={changeFilters}
           />
-        )}
-      </div>
+        </OpsPanel>
+        <OpsPanel
+          title="Issues"
+          action={
+            list.items.length > 0 ? (
+              <MonoLabel as="span">
+                {formatCount(list.items.length)} loaded
+              </MonoLabel>
+            ) : null
+          }
+        >
+          {list.loading ? (
+            <LoadingState label="Loading issues" />
+          ) : list.error && list.items.length === 0 ? (
+            <ErrorState message="Could not load issues." onRetry={list.retry} />
+          ) : list.items.length === 0 ? (
+            <EmptyIssues
+              summary={data}
+              filters={filters}
+              onClear={() => changeFilters(DEFAULT_FILTERS)}
+              onOpenConnection={openConnection}
+            />
+          ) : (
+            <IssueTable
+              issues={list.items}
+              footer={
+                list.nextCursor || list.moreFailed ? (
+                  <div className="flex flex-wrap items-center gap-3 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={list.loadingMore}
+                      aria-busy={list.loadingMore || undefined}
+                      onClick={list.moreFailed ? list.retry : list.loadMore}
+                    >
+                      {list.loadingMore
+                        ? "Loading…"
+                        : list.moreFailed
+                          ? "Retry loading more"
+                          : "Load more"}
+                    </Button>
+                    {list.moreFailed ? (
+                      <p
+                        role="alert"
+                        className="text-sm text-state-warning-text"
+                      >
+                        Could not load more issues.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null
+              }
+            />
+          )}
+        </OpsPanel>
+      </>
     );
 
-  if (!data.configured)
-    return (
-      <div className="space-y-6">
-        {header}
-        <EmptyState
-          variant="panel"
-          titleAs="h2"
-          title="Error tracking is not set up"
-          description="Connect a Sentry organization to see its issues here. Crate reads them every 5 minutes; the only thing it sends to Sentry is a status change someone makes."
-          action={<ConnectionPointer />}
-        />
-        {canManageRuntime ? <ConnectionPanel onChanged={refresh} /> : null}
-      </div>
-    );
-
-  const releases = knownReleases(list.items);
+  // One tree for every state, so saving in the drawer (which can turn "not
+  // configured" into the inbox) keeps the drawer open.
   return (
     <div className="space-y-6">
       {header}
-      {/* With no rows, the empty state already explains a failed sync. */}
-      {list.items.length > 0 ? <SyncNotice summary={data} /> : null}
-      <OpsPanel title="Filters">
-        <Filters
-          filters={filters}
-          summary={data}
-          releases={releases}
-          onChange={changeFilters}
+      {body}
+      {canManageRuntime ? (
+        <ConnectionSheet
+          open={connectionOpen}
+          onOpenChange={setConnectionOpen}
+          onChanged={refresh}
+          returnFocusRef={openerRef}
+          fallbackFocusRef={connectionButtonRef}
         />
-      </OpsPanel>
-      <OpsPanel
-        title="Issues"
-        action={
-          list.items.length > 0 ? (
-            <MonoLabel as="span">
-              {formatCount(list.items.length)} loaded
-            </MonoLabel>
-          ) : null
-        }
-      >
-        {list.loading ? (
-          <LoadingState label="Loading issues" />
-        ) : list.error && list.items.length === 0 ? (
-          <ErrorState message="Could not load issues." onRetry={list.retry} />
-        ) : list.items.length === 0 ? (
-          <EmptyIssues
-            summary={data}
-            filters={filters}
-            onClear={() => changeFilters(DEFAULT_FILTERS)}
-          />
-        ) : (
-          <IssueTable
-            issues={list.items}
-            footer={
-              list.nextCursor || list.moreFailed ? (
-                <div className="flex flex-wrap items-center gap-3 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={list.loadingMore}
-                    aria-busy={list.loadingMore || undefined}
-                    onClick={list.moreFailed ? list.retry : list.loadMore}
-                  >
-                    {list.loadingMore
-                      ? "Loading…"
-                      : list.moreFailed
-                        ? "Retry loading more"
-                        : "Load more"}
-                  </Button>
-                  {list.moreFailed ? (
-                    <p role="alert" className="text-sm text-state-warning-text">
-                      Could not load more issues.
-                    </p>
-                  ) : null}
-                </div>
-              ) : null
-            }
-          />
-        )}
-      </OpsPanel>
-      {canManageRuntime ? <ConnectionPanel onChanged={refresh} /> : null}
+      ) : null}
     </div>
   );
 }

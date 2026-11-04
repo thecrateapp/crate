@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { LoadingState } from "@crate/ui/domain/states/LoadingState";
@@ -8,7 +8,6 @@ import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
 import { Button } from "@crate/ui/shadcn/button";
 import { Input } from "@crate/ui/shadcn/input";
 
-import { OpsPanel } from "@/components/admin/ops-surfaces";
 import { RelativeTime } from "@/components/admin/RelativeTime";
 import { StatusBadge, type StatusTone } from "@/components/admin/StatusBadge";
 import { useApi } from "@/hooks/use-api";
@@ -28,17 +27,7 @@ import {
   type SyncState,
 } from "@/lib/error-inbox";
 
-export const CONNECTION_PANEL_ID = "error-tracking-connection";
 const CONNECTION_URL = `${ERRORS_API}/connection`;
-
-/** Scroll to the panel and put focus in its first field. */
-export function focusConnectionPanel() {
-  const panel = document.getElementById(CONNECTION_PANEL_ID);
-  panel?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-  panel
-    ?.querySelector<HTMLInputElement>("input")
-    ?.focus({ preventScroll: true });
-}
 
 function connectionState(connection: ErrorTrackingConnection): {
   label: string;
@@ -93,6 +82,29 @@ function Detail({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+function Section({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  const headingId = useId();
+  return (
+    <section aria-labelledby={headingId} className="min-w-0 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <MonoLabel as="h3" tone="accent" id={headingId}>
+          {title}
+        </MonoLabel>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 function ConnectionStatus({
   connection,
   testing,
@@ -103,8 +115,12 @@ function ConnectionStatus({
   onTest: () => void;
 }) {
   const { access, sync } = connection;
+  const state = connectionState(connection);
   return (
-    <div className="min-w-0 space-y-4">
+    <Section
+      title="Status"
+      action={<StatusBadge tone={state.tone}>{state.label}</StatusBadge>}
+    >
       <dl className="border-t border-border-quiet">
         <Detail label="Token">
           {connection.has_token ? "Token stored" : "No token stored"}
@@ -191,7 +207,7 @@ function ConnectionStatus({
               : "Save the settings and a token first."}
         </p>
       </div>
-    </div>
+    </Section>
   );
 }
 
@@ -341,9 +357,10 @@ function savedKey(connection: ErrorTrackingConnection): string {
 }
 
 /**
- * Sentry connection settings, visible with ops.runtime.manage only. Saving
- * stores the settings (and a typed token); "Test connection" enqueues a worker
- * task and waits for it: this page never calls Sentry.
+ * Sentry connection status and settings, the body of the connection drawer
+ * (ops.runtime.manage only). Saving stores the settings (and a typed token);
+ * "Test connection" enqueues a worker task and waits for it: the page itself
+ * never calls Sentry.
  */
 export function ConnectionPanel({ onChanged }: { onChanged?: () => void }) {
   const connection = useApi<ErrorTrackingConnection>(CONNECTION_URL);
@@ -389,40 +406,29 @@ export function ConnectionPanel({ onChanged }: { onChanged?: () => void }) {
     );
   }
 
-  const state = data ? connectionState(data) : null;
+  if (!data)
+    return connection.loading ? (
+      <LoadingState label="Loading the Sentry connection" />
+    ) : (
+      <ErrorState
+        message="Could not load the Sentry connection."
+        onRetry={connection.refetch}
+      />
+    );
   return (
-    <div id={CONNECTION_PANEL_ID} className="scroll-mt-6">
-      <OpsPanel
-        title="Sentry connection"
-        description="Where Crate reads issues from. The token is stored encrypted and never shown again."
-        action={
-          state ? (
-            <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
-          ) : null
-        }
-      >
-        {data ? (
-          <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
-            <ConnectionForm
-              key={savedKey(data)}
-              connection={data}
-              onSaved={refresh}
-            />
-            <ConnectionStatus
-              connection={data}
-              testing={testing}
-              onTest={() => void testConnection()}
-            />
-          </div>
-        ) : connection.loading ? (
-          <LoadingState label="Loading the Sentry connection" />
-        ) : (
-          <ErrorState
-            message="Could not load the Sentry connection."
-            onRetry={connection.refetch}
-          />
-        )}
-      </OpsPanel>
+    <div className="min-w-0 space-y-8">
+      <ConnectionStatus
+        connection={data}
+        testing={testing}
+        onTest={() => void testConnection()}
+      />
+      <Section title="Settings">
+        <ConnectionForm
+          key={savedKey(data)}
+          connection={data}
+          onSaved={refresh}
+        />
+      </Section>
     </div>
   );
 }
