@@ -364,6 +364,31 @@ it("lays out the album's readings beside the sound spectrum", () => {
   ).toBeInTheDocument();
 });
 
+it("draws the album's moods as a rose beside the spectrum", () => {
+  render(
+    <AudioProfileCard
+      totalTracks={2}
+      analysisData={{
+        "0": { ...empty, energy: 0.6, mood: { sad: 0.6, happy: 0.4 } },
+        "1": { ...empty, energy: 0.7, mood: { sad: 0.4, happy: 0.2 } },
+      }}
+      trackLabels={{ "0": "Halo", "1": "Clean" }}
+    />,
+  );
+
+  const columns = document.querySelectorAll(
+    '[data-audio-profile-layout="album"] [data-slot="audio-profile-column"]',
+  );
+  expect(columns).toHaveLength(3);
+  expect(
+    within(columns[2] as HTMLElement).getByRole("img", {
+      name: "Mood: sad 50%, happy 30%",
+    }),
+  ).toBeInTheDocument();
+  // The rose replaces the album's mood badges.
+  expect(screen.queryByText("sad 50%")).not.toBeInTheDocument();
+});
+
 it("keeps the track dialog's plain readings above its tabs", () => {
   render(
     <AudioProfileCard

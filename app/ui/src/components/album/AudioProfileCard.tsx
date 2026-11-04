@@ -10,6 +10,7 @@ import {
   TabsTrigger,
 } from "@crate/ui/shadcn/tabs";
 import { AlbumReadings, type ReadingSeries } from "./AlbumReadings";
+import { MoodRose, type MoodSeries } from "./MoodRose";
 import type { AudioAnalysisTrack, SmartMixAnalysis } from "./audio-analysis";
 import { SoundSpectrum, type SpectrumFeature } from "./SoundSpectrum";
 
@@ -383,11 +384,28 @@ export function AudioProfileCard({
       values: series((track) => track.dynamic_range),
     },
   ];
+  const moodSeries: MoodSeries[] = [
+    ...new Set(tracks.flatMap((track) => Object.keys(track.mood ?? {}))),
+  ].flatMap((mood) => {
+    const values = Object.entries(analysisData).flatMap(([entry, track]) => {
+      const value = track.mood?.[mood];
+      return typeof value === "number" && Number.isFinite(value)
+        ? [
+            {
+              label: trackLabels?.[entry],
+              value: Math.min(1, Math.max(0, value)),
+            },
+          ]
+        : [];
+    });
+    return values.length ? [{ mood, values }] : [];
+  });
+  const spectrum = spectrumFeatures.length ? (
+    <SoundSpectrum features={spectrumFeatures} animate={motionAllowed} />
+  ) : null;
   const features = (
     <>
-      {spectrumFeatures.length ? (
-        <SoundSpectrum features={spectrumFeatures} animate={motionAllowed} />
-      ) : null}
+      {spectrum}
       {moods.length ? (
         <div className="flex flex-wrap items-center gap-2">
           <MonoLabel as="span">Mood</MonoLabel>
@@ -668,11 +686,11 @@ export function AudioProfileCard({
             </Tabs>
           ) : (
             <div className="space-y-6" data-audio-profile-layout="album">
-              {/* Readings on the left in the spectrum's language, the spectrum on the
-                  right (approved mockup B). The pair is capped so the spectrum stays
+              {/* Readings in the spectrum's language, the spectrum and the mood rose
+                  (approved mockups B and A). The row is capped so the spectrum stays
                   smaller than the card on wide screens, and the readings spread to
-                  the spectrum's height. */}
-              <div className="grid max-w-[78rem] gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+                  the spectrum's height. Below xl the rose wraps under the readings. */}
+              <div className="grid max-w-[104rem] gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)_minmax(0,4fr)]">
                 <div
                   data-slot="audio-profile-column"
                   className="min-w-0 lg:flex lg:flex-col"
@@ -687,11 +705,21 @@ export function AudioProfileCard({
                     animate={motionAllowed}
                   />
                 </div>
+                <div data-slot="audio-profile-column" className="min-w-0">
+                  {spectrum}
+                </div>
                 <div
                   data-slot="audio-profile-column"
-                  className="min-w-0 space-y-5"
+                  className="flex min-w-0 flex-col gap-2"
                 >
-                  {features}
+                  {moodSeries.length ? (
+                    <>
+                      <MonoLabel as="span">Mood</MonoLabel>
+                      <div className="flex flex-1 items-center">
+                        <MoodRose moods={moodSeries} animate={motionAllowed} />
+                      </div>
+                    </>
+                  ) : null}
                 </div>
               </div>
               {smartMixSection}

@@ -390,6 +390,12 @@ const approvedLibraryControls = new Map<string, number>([
     "app/ui/src/components/album/AudioProfileCard.tsx:./AlbumReadings:AlbumReadings",
     1,
   ],
+  // The album's mood rose beside them: a hand-built SVG instrument (rings, petals and
+  // track marks) with no glyph and no button.
+  [
+    "app/ui/src/components/album/AudioProfileCard.tsx:./MoodRose:MoodRose",
+    1,
+  ],
   [
     "app/ui/src/components/album/TrackTable.tsx:./AudioProfileCard:AudioProfileCard",
     1,
