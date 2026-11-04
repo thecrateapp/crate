@@ -202,3 +202,24 @@ def test_contexts_cover_dj_and_listen_defaults() -> None:
     assert CONTEXTS["dj"].allow_long_beatmatch and CONTEXTS["dj"].allow_bass_handoff
     assert not CONTEXTS["listen"].allow_bass_handoff
     assert replace(CONTEXTS["dj"], allow_beatmatch=False) != CONTEXTS["dj"]
+
+
+def test_load_profiles_reads_the_stored_structure(monkeypatch) -> None:
+    # Phrase metrics fall back to the 8-bar grid when a profile carries no phrases,
+    # so a loader that skips the structure columns measures v7 profiles like v6.
+    from crate.db.repositories import smart_mix as repository
+
+    import run_eval
+
+    reads = []
+
+    def fake_profiles(uids, **options):
+        reads.append(options)
+        return [None] * len(uids)
+
+    monkeypatch.setattr(
+        repository, "get_track_mix_profiles_by_entity_uids", fake_profiles
+    )
+
+    assert run_eval.load_profiles([OUT, IN]) == {OUT: None, IN: None}
+    assert reads == [{"include_beat_grid": True, "include_structure": True}]

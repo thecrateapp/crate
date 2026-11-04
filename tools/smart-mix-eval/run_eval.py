@@ -416,7 +416,9 @@ def load_profiles(uids: Sequence[str]) -> dict[str, TrackMixProfile | None]:
     profiles: dict[str, TrackMixProfile | None] = {}
     for start in range(0, len(uids), 500):
         batch = list(uids[start : start + 500])
-        loaded = get_track_mix_profiles_by_entity_uids(batch, include_beat_grid=True)
+        loaded = get_track_mix_profiles_by_entity_uids(
+            batch, include_beat_grid=True, include_structure=True
+        )
         profiles.update(zip(batch, loaded, strict=True))
     return profiles
 
