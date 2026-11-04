@@ -180,6 +180,14 @@ std::filesystem::path default_metadata_cache_path()
     return std::filesystem::temp_directory_path() / "crate-vdj-metadata.sqlite";
 }
 
+std::filesystem::path default_play_events_path()
+{
+    if (const auto directory = user_data_directory()) {
+        return *directory / "VirtualDJ" / "Cache" / "crate-play-events.jsonl";
+    }
+    return std::filesystem::temp_directory_path() / "crate-vdj-play-events.jsonl";
+}
+
 std::string utf8_path(const std::filesystem::path& path)
 {
     const auto value = path.u8string();

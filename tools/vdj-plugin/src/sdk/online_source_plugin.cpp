@@ -209,6 +209,40 @@ public:
         return open_in_browser(url);
     }
 
+    int deck_count() override
+    {
+        double decks = 0;
+        if (plugin_.cb == nullptr || plugin_.GetInfo("get_decks", &decks) != S_OK) {
+            return 0;
+        }
+        return static_cast<int>(decks);
+    }
+
+    std::optional<DeckReading> read_deck(int deck) override
+    {
+        if (plugin_.cb == nullptr) {
+            return std::nullopt;
+        }
+        const std::string prefix = "deck " + std::to_string(deck) + " ";
+        std::array<char, 4096> filepath = {};
+        if (plugin_.GetStringInfo(
+                (prefix + "get_filepath").c_str(),
+                filepath.data(),
+                static_cast<int>(filepath.size())
+            ) != S_OK ||
+            filepath[0] == '\0') {
+            return std::nullopt;
+        }
+        DeckReading reading;
+        reading.filepath = filepath.data();
+        double audible = 0;
+        reading.audible =
+            plugin_.GetInfo((prefix + "is_audible").c_str(), &audible) == S_OK && audible != 0;
+        plugin_.GetInfo((prefix + "get_time elapsed").c_str(), &reading.elapsed_ms);
+        plugin_.GetInfo((prefix + "get_time total").c_str(), &reading.total_ms);
+        return reading;
+    }
+
 private:
     IVdjPlugin8& plugin_;
 };
@@ -239,6 +273,7 @@ public:
                       return std::make_unique<SystemCredentialStore>(std::string(kCredentialService), account);
                   },
               .metadata_cache_path = utf8_path(default_metadata_cache_path()),
+              .play_events_path = default_play_events_path(),
               .host = host_,
               .ui = ui_,
               .log = trace,

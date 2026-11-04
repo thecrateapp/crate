@@ -1,4 +1,5 @@
 #include "crate_vdj/online_source.hpp"
+#include "crate_vdj/play_events.hpp"
 #include "crate_vdj/translations.hpp"
 
 #include "../support/check.hpp"
@@ -10,6 +11,7 @@
 #include <filesystem>
 #include <functional>
 #include <future>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -99,22 +101,33 @@ public:
 
     void route(const std::string& prefix, std::string body)
     {
-        std::lock_guard lock(mutex_);
-        routes_.emplace_back(prefix, HttpResponse{.status_code = 200, .body = std::move(body)});
+        set(prefix, HttpResponse{.status_code = 200, .body = std::move(body)});
     }
 
     void fail(const std::string& prefix, int status)
     {
+        set(prefix, HttpError{.code = HttpErrorCode::HttpStatus, .status_code = status, .message = "HTTP " + std::to_string(status)});
+    }
+
+    std::vector<std::string> bodies_sent_to(const std::string& prefix)
+    {
         std::lock_guard lock(mutex_);
-        routes_.emplace_back(
-            prefix,
-            HttpError{.code = HttpErrorCode::HttpStatus, .status_code = status, .message = "HTTP " + std::to_string(status)}
-        );
+        std::vector<std::string> bodies;
+        for (const auto& [path, body] : sent_) {
+            if (path.starts_with(prefix)) {
+                bodies.push_back(body);
+            }
+        }
+        return bodies;
     }
 
     HttpResult request(const HttpRequest& request) override
     {
         const std::string path = request.url.substr(std::string(kOrigin).size());
+        {
+            std::lock_guard lock(mutex_);
+            sent_.emplace_back(path, request.body);
+        }
         if (!gated_prefix.empty() && path.starts_with(gated_prefix)) {
             ++gated_;
             while (!request.cancellation.cancelled()) {
@@ -152,8 +165,21 @@ public:
     }
 
 private:
+    void set(const std::string& prefix, HttpResult result)
+    {
+        std::lock_guard lock(mutex_);
+        for (auto& [existing, response] : routes_) {
+            if (existing == prefix) {
+                response = std::move(result);
+                return;
+            }
+        }
+        routes_.emplace_back(prefix, std::move(result));
+    }
+
     std::mutex mutex_;
     std::vector<std::pair<std::string, HttpResult>> routes_;
+    std::vector<std::pair<std::string, std::string>> sent_;
     std::atomic<int> gated_ = 0;
 };
 
@@ -162,6 +188,8 @@ public:
     std::optional<std::string> track_path;
     std::vector<std::string> commands;
     std::vector<std::string> opened;
+    std::map<int, DeckReading> decks;
+    int layout_decks = 2;
 
     std::string language() override
     {
@@ -183,6 +211,17 @@ public:
     {
         opened.push_back(url);
         return true;
+    }
+
+    int deck_count() override
+    {
+        return layout_decks;
+    }
+
+    std::optional<DeckReading> read_deck(int deck) override
+    {
+        const auto found = decks.find(deck);
+        return found == decks.end() ? std::nullopt : std::optional<DeckReading>(found->second);
     }
 };
 
@@ -235,11 +274,14 @@ struct Harness {
     FakeUi ui;
     std::filesystem::path cache_path =
         std::filesystem::temp_directory_path() / "crate-vdj-online-source-test.sqlite";
+    std::filesystem::path spool_path =
+        std::filesystem::temp_directory_path() / "crate-vdj-online-source-plays.jsonl";
     std::unique_ptr<OnlineSource> source;
 
     explicit Harness(bool connected = true, std::string capabilities = capabilities_json())
     {
         std::filesystem::remove(cache_path);
+        std::filesystem::remove(spool_path);
         http.route("/api/auth/me", me_json());
         http.route("/api/capabilities", std::move(capabilities));
         if (connected) {
@@ -254,9 +296,11 @@ struct Harness {
                     return std::make_unique<VaultCredentialStore>(vault, account);
                 },
             .metadata_cache_path = utf8_path(cache_path),
+            .play_events_path = spool_path,
             .host = host,
             .ui = ui,
             .log = {},
+            .run_automix_worker = false,
         });
         source->start();
         if (connected) {
@@ -272,6 +316,7 @@ struct Harness {
     {
         source.reset();
         std::filesystem::remove(cache_path);
+        std::filesystem::remove(spool_path);
     }
 };
 
@@ -558,6 +603,60 @@ void open_in_crate_needs_a_listen_url()
     CRATE_CHECK(harness.source->context_menu("track-1").size() == 3);
 }
 
+const auto kPlayStart = std::chrono::system_clock::time_point{} + std::chrono::hours(24 * 20000);
+
+void plays_are_reported_with_the_track_names()
+{
+    Harness harness;
+    harness.http.route("/api/search?q=noah", kProfiledSearchJson);
+    harness.http.route("/api/me/play-events", R"({"id":1})");
+    RecordingSink sink;
+    CRATE_CHECK(harness.source->search("noah", sink) == CallbackStatus::Done);
+
+    harness.host.decks[1] = DeckReading{"netsearch://plugin-Crate/track-1", true, 0, 193'500};
+    harness.source->tick(kPlayStart);
+    harness.source->tick(kPlayStart + 40s);
+    harness.host.decks.erase(1);
+    harness.source->tick(kPlayStart + 41s);
+
+    const auto sent = harness.http.bodies_sent_to("/api/me/play-events");
+    CRATE_CHECK(sent.size() == 1);
+    CRATE_CHECK(sent[0].find("\"title\":\"Noah\"") != std::string::npos);
+    CRATE_CHECK(sent[0].find("\"artist\":\"Birds In Row\"") != std::string::npos);
+    CRATE_CHECK(PlayEventSpool(harness.spool_path).pending().empty());
+}
+
+void plays_wait_in_the_spool_until_crate_answers()
+{
+    Harness harness;
+    harness.http.fail("/api/me/play-events", 503);
+    harness.host.decks[1] = DeckReading{"netsearch://plugin-Crate/track-1", true, 0, 193'500};
+    harness.source->tick(kPlayStart);
+    harness.host.decks.erase(1);
+    harness.source->tick(kPlayStart + 40s);
+
+    CRATE_CHECK(PlayEventSpool(harness.spool_path).pending().size() == 1);
+
+    harness.http.route("/api/me/play-events", R"({"id":1})");
+    harness.source->tick(kPlayStart + 50s);
+    CRATE_CHECK(PlayEventSpool(harness.spool_path).pending().size() == 1);
+    harness.source->tick(kPlayStart + 75s);
+
+    CRATE_CHECK(PlayEventSpool(harness.spool_path).pending().empty());
+}
+
+void decks_beyond_the_layout_are_not_read()
+{
+    Harness harness;
+    harness.http.route("/api/me/play-events", R"({"id":1})");
+    harness.host.decks[3] = DeckReading{"netsearch://plugin-Crate/track-1", true, 0, 193'500};
+    harness.source->tick(kPlayStart);
+    harness.host.decks.erase(3);
+    harness.source->tick(kPlayStart + 40s);
+
+    CRATE_CHECK(harness.http.bodies_sent_to("/api/me/play-events").empty());
+}
+
 void camelot_keys_map_to_virtualdj_keys()
 {
     CRATE_CHECK(vdj_key_from_camelot("8A") == vdj_key_number("A", "minor"));
@@ -600,6 +699,9 @@ int main()
     compatible_tracks_show_crate_fields();
     a_seed_without_profile_shows_a_notice();
     camelot_keys_map_to_virtualdj_keys();
+    plays_are_reported_with_the_track_names();
+    plays_wait_in_the_spool_until_crate_answers();
+    decks_beyond_the_layout_are_not_read();
     a_track_opens_its_album_in_listen();
     open_in_crate_needs_a_listen_url();
     keys_and_cover_urls_map_to_virtualdj();

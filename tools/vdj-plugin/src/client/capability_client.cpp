@@ -15,6 +15,7 @@ namespace {
 constexpr std::string_view kCatalogScope = "vdj.catalog.read";
 constexpr std::string_view kMediaScope = "vdj.media.read";
 constexpr std::string_view kSmartMixScope = "vdj.smart_mix.read";
+constexpr std::string_view kPlayEventsScope = "vdj.play_events.write";
 
 ConnectionStatus status_of(ConnectionState state, std::string message)
 {
@@ -176,6 +177,7 @@ ConnectionStatus CapabilityClient::check(
     status.features.automation =
         effective.automation && token_automation_granted(*capabilities_body.body);
     status.listen_url = https_listen_url(*capabilities_body.body);
+    status.features.play_events = has_scope(scopes, kPlayEventsScope);
     if (!effective.online_source) {
         status.state = ConnectionState::ServerDisabled;
         status.message = "the server does not offer the Online Source";
