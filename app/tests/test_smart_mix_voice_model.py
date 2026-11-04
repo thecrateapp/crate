@@ -95,3 +95,29 @@ def test_converted_weights_reproduce_the_reference_scores() -> None:
 
     assert set(voice_model.VOICE_CLASSES) <= set(model.class_names)
     np.testing.assert_allclose(scores, np.load(FIXTURE)["scores"], atol=2e-3)
+
+
+# Measured with one native thread, as the analysis worker runs: about 0.7 s of CPU per
+# minute of audio. SG1b approves the final budget; this guards against regressions.
+VOICE_CPU_SECONDS_PER_AUDIO_MINUTE = 1.5
+
+
+@pytest.mark.benchmark
+def test_voice_overhead_within_budget() -> None:
+    import time
+
+    path = Path(os.environ.get(voice_model.WEIGHTS_ENV, voice_model.DEFAULT_WEIGHTS))
+    if not path.is_file():
+        pytest.skip("YAMNet weights are not converted here")
+    torch = pytest.importorskip("torch")
+    torch.set_num_threads(1)
+    model = voice_model.YamnetModel.load(path)
+    minutes = 3
+    audio = np.tile(_synthetic(), int(minutes * 60 / 3.3) + 1)[: minutes * 60 * 16_000]
+    model.class_scores(audio[:16_000])
+
+    started = time.process_time()
+    model.voice_windows(audio)
+    elapsed = time.process_time() - started
+
+    assert elapsed / minutes <= VOICE_CPU_SECONDS_PER_AUDIO_MINUTE
