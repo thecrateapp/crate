@@ -4,6 +4,7 @@ import { sentryVitePlugin } from "@sentry/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
+import { createSentrySourcePathRewriter } from "../shared/web/sentry-source-paths";
 
 const require = createRequire(import.meta.url);
 const lodashEsRoot = path.dirname(require.resolve("lodash-es/package.json"));
@@ -12,8 +13,8 @@ const listenPublic = path.resolve(__dirname, "../listen/public");
 const stubs = path.resolve(__dirname, "./src/lib/stubs");
 const sentryUploadEnabled = Boolean(
   process.env.SENTRY_AUTH_TOKEN &&
-    process.env.SENTRY_ORG &&
-    process.env.SENTRY_PROJECT,
+  process.env.SENTRY_ORG &&
+  process.env.SENTRY_PROJECT,
 );
 const sentryRelease =
   process.env.SENTRY_RELEASE ||
@@ -68,7 +69,13 @@ export default defineConfig({
             project: process.env.SENTRY_PROJECT,
             authToken: process.env.SENTRY_AUTH_TOKEN,
             release: { name: sentryRelease },
-            sourcemaps: { filesToDeleteAfterUpload: "**/*.map" },
+            sourcemaps: {
+              filesToDeleteAfterUpload: "**/*.map",
+              rewriteSources: createSentrySourcePathRewriter({
+                repoRoot: path.resolve(__dirname, "../.."),
+                distDir: path.resolve(__dirname, "dist"),
+              }),
+            },
           }),
         ]
       : []),

@@ -1484,9 +1484,9 @@
       ],
       "knownIssues": [],
       "fingerprints": {
-        "app/shared/ui/primitives/VtNavLink.tsx": "f00774a4abefb0429396cedf6a44e691baf4484733fa2613485892310d6b0449",
+        "app/shared/ui/primitives/VtNavLink.tsx": "2cd630e31f02b00783fd65daa85deaed1ebf93fb4e41c113007b238d1111d320",
         "tools/crate-ui-showcase/stories/VtNavLink.stories.tsx": "01d804a2ad0fd5126c398568cf3a461b3cc24774cf86452ac762fd028041b06b",
-        "tools/crate-ui-showcase/docs/VtNavLink.mdx": "a2c1aa54432ad6ad7f2981cbe08e782e8e37540add914bd043a6fdf6e4a8bb9d"
+        "tools/crate-ui-showcase/docs/VtNavLink.mdx": "b4476111a438563eafbbc10f6f1c60258a06092566e0cdc8c02a37820ee204f4"
       },
       "category": "Navigation"
     },

@@ -12,7 +12,7 @@ import { DocHeading } from "../components/DocHeading";
 
 <DocHeading as="h2">Contract</DocHeading>
 
-Native router link with active aria-current and supported view transitions. Modified clicks and prevented clicks retain native authority. Unsupported browsers and transparent Linux chrome navigate immediately; the fixture uses only a MemoryRouter, without real history or native operations.
+Native router link with active aria-current and supported view transitions. Modified clicks and prevented clicks retain native authority. Unsupported browsers and transparent Linux chrome navigate immediately. When the browser skips a transition (the viewport resizes or another transition starts), its rejected `ready` and `finished` promises are handled because the navigation has already happened; a failing navigation callback still surfaces. The fixture uses only a MemoryRouter, without real history or native operations.
 
 The approved mockup and Diego's later amendments are the visual reference. This entry documents actual existing components; native device, assistive technology and complete consumer certification remain separate. No production requests, credentials or persistent preference writes occur here.
 

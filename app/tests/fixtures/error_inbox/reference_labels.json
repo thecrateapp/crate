@@ -1,0 +1,638 @@
+{
+  "version": 1,
+  "source": "Sentry organisation ninja-development, unresolved issues of category error on 2026-11-04",
+  "labels": [
+    {
+      "short_id": "CRATE-ADMIN-4",
+      "group": "G5",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-11",
+      "decision": "resolve"
+    },
+    {
+      "short_id": "CRATE-ADMIN-5",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-ADMIN-R",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-ADMIN-8",
+      "group": "G3",
+      "classification": "infrastructure",
+      "severity": "medium",
+      "duplicate_of": "CRATE-LISTEN-7",
+      "decision": "fingerprint"
+    },
+    {
+      "short_id": "CRATE-ADMIN-A",
+      "group": "G4",
+      "classification": "bug",
+      "severity": "medium",
+      "duplicate_of": null,
+      "decision": "resolve"
+    },
+    {
+      "short_id": "CRATE-ADMIN-B",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-ADMIN-R",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-ADMIN-C",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-ADMIN-R",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-ADMIN-D",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-ADMIN-R",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-ADMIN-E",
+      "group": "G3",
+      "classification": "infrastructure",
+      "severity": "medium",
+      "duplicate_of": "CRATE-LISTEN-7",
+      "decision": "fingerprint"
+    },
+    {
+      "short_id": "CRATE-ADMIN-G",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-ADMIN-R",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-ADMIN-H",
+      "group": "G5",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-11",
+      "decision": "reload"
+    },
+    {
+      "short_id": "CRATE-ADMIN-J",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-ADMIN-R",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-ADMIN-K",
+      "group": "G4",
+      "classification": "bug",
+      "severity": "medium",
+      "duplicate_of": "CRATE-ADMIN-A",
+      "decision": "resolve"
+    },
+    {
+      "short_id": "CRATE-ADMIN-M",
+      "group": "G3",
+      "classification": "infrastructure",
+      "severity": "medium",
+      "duplicate_of": "CRATE-LISTEN-7",
+      "decision": "fingerprint"
+    },
+    {
+      "short_id": "CRATE-ADMIN-N",
+      "group": "G3",
+      "classification": "infrastructure",
+      "severity": "medium",
+      "duplicate_of": "CRATE-LISTEN-7",
+      "decision": "fingerprint"
+    },
+    {
+      "short_id": "CRATE-ADMIN-P",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-ADMIN-R",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-ADMIN-Q",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-ADMIN-R",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-ADMIN-R",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": null,
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-ADMIN-S",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-ADMIN-R",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-ADMIN-T",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-ADMIN-R",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-ADMIN-V",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-ADMIN-R",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-API-7",
+      "group": "G1",
+      "classification": "noise",
+      "severity": "low",
+      "duplicate_of": null,
+      "decision": "resolve"
+    },
+    {
+      "short_id": "CRATE-DOCS-1",
+      "group": "G8",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": null,
+      "decision": "resolve"
+    },
+    {
+      "short_id": "CRATE-LISTEN-10",
+      "group": "G9",
+      "classification": "bug",
+      "severity": "high",
+      "duplicate_of": null,
+      "decision": "fix"
+    },
+    {
+      "short_id": "CRATE-LISTEN-11",
+      "group": "G5",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": null,
+      "decision": "reload"
+    },
+    {
+      "short_id": "CRATE-LISTEN-12",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-13",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-14",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-15",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-16",
+      "group": "G9",
+      "classification": "bug",
+      "severity": "medium",
+      "duplicate_of": null,
+      "decision": "fix"
+    },
+    {
+      "short_id": "CRATE-LISTEN-17",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-18",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-19",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-1A",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-1B",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-1C",
+      "group": "G9",
+      "classification": "bug",
+      "severity": "high",
+      "duplicate_of": null,
+      "decision": "fix"
+    },
+    {
+      "short_id": "CRATE-LISTEN-1D",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-1E",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-1F",
+      "group": "G7",
+      "classification": "noise",
+      "severity": "low",
+      "duplicate_of": null,
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-1G",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-1H",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-1J",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-1K",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-1M",
+      "group": "G6",
+      "classification": "bug",
+      "severity": "medium",
+      "duplicate_of": "CRATE-LISTEN-G",
+      "decision": "fix"
+    },
+    {
+      "short_id": "CRATE-LISTEN-1N",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-5",
+      "group": "G5",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-11",
+      "decision": "reload"
+    },
+    {
+      "short_id": "CRATE-LISTEN-6",
+      "group": "G7",
+      "classification": "noise",
+      "severity": "low",
+      "duplicate_of": null,
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-7",
+      "group": "G3",
+      "classification": "infrastructure",
+      "severity": "medium",
+      "duplicate_of": null,
+      "decision": "fingerprint"
+    },
+    {
+      "short_id": "CRATE-LISTEN-8",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": null,
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-9",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-A",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-B",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-C",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-D",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-F",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-G",
+      "group": "G6",
+      "classification": "bug",
+      "severity": "medium",
+      "duplicate_of": null,
+      "decision": "fix"
+    },
+    {
+      "short_id": "CRATE-LISTEN-H",
+      "group": "G6",
+      "classification": "bug",
+      "severity": "medium",
+      "duplicate_of": "CRATE-LISTEN-G",
+      "decision": "fix"
+    },
+    {
+      "short_id": "CRATE-LISTEN-J",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-K",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-M",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-N",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-P",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-Q",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-R",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-S",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-T",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-V",
+      "group": "G6",
+      "classification": "bug",
+      "severity": "medium",
+      "duplicate_of": "CRATE-LISTEN-G",
+      "decision": "fix"
+    },
+    {
+      "short_id": "CRATE-LISTEN-W",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-X",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-Y",
+      "group": "G2",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": "CRATE-LISTEN-8",
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-LISTEN-Z",
+      "group": "G9",
+      "classification": "client_environment",
+      "severity": "low",
+      "duplicate_of": null,
+      "decision": "resolve"
+    },
+    {
+      "short_id": "CRATE-MEDIA-WORKER-1",
+      "group": "G1",
+      "classification": "noise",
+      "severity": "low",
+      "duplicate_of": "CRATE-API-7",
+      "decision": "resolve"
+    },
+    {
+      "short_id": "CRATE-READPLANE-3",
+      "group": "G8",
+      "classification": "infrastructure",
+      "severity": "medium",
+      "duplicate_of": null,
+      "decision": "resolve"
+    },
+    {
+      "short_id": "CRATE-READPLANE-4",
+      "group": "G8",
+      "classification": "noise",
+      "severity": "low",
+      "duplicate_of": null,
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-READPLANE-5",
+      "group": "G1",
+      "classification": "noise",
+      "severity": "low",
+      "duplicate_of": "CRATE-API-7",
+      "decision": "resolve"
+    },
+    {
+      "short_id": "CRATE-WORKERS-9",
+      "group": "G1",
+      "classification": "noise",
+      "severity": "low",
+      "duplicate_of": "CRATE-API-7",
+      "decision": "resolve"
+    },
+    {
+      "short_id": "CRATE-WORKERS-A",
+      "group": "G8",
+      "classification": "external_dependency",
+      "severity": "medium",
+      "duplicate_of": null,
+      "decision": "filter"
+    },
+    {
+      "short_id": "CRATE-WORKERS-B",
+      "group": "G8",
+      "classification": "bug",
+      "severity": "low",
+      "duplicate_of": null,
+      "decision": "fix"
+    },
+    {
+      "short_id": "CRATE-WORKERS-C",
+      "group": "G8",
+      "classification": "bug",
+      "severity": "high",
+      "duplicate_of": null,
+      "decision": "fix"
+    },
+    {
+      "short_id": "CRATE-WORKERS-D",
+      "group": "G8",
+      "classification": "bug",
+      "severity": "high",
+      "duplicate_of": "CRATE-WORKERS-C",
+      "decision": "fix"
+    }
+  ]
+}
