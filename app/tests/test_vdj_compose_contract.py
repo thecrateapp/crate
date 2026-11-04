@@ -16,7 +16,9 @@ def _environment(service):
     return environment
 
 
-@pytest.mark.parametrize("filename", ["docker-compose.yaml", "docker-compose.home.yaml"])
+@pytest.mark.parametrize(
+    "filename", ["docker-compose.yaml", "docker-compose.home.yaml"]
+)
 @pytest.mark.parametrize("flag", VDJ_FLAGS)
 def test_api_reads_vdj_flags_from_the_env_file_and_defaults_off(filename, flag):
     services = yaml.safe_load((ROOT / filename).read_text())["services"]
