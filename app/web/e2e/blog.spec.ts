@@ -9,6 +9,26 @@ test("the navigation links to the blog", async ({ page }) => {
   await expect(page.locator("h1")).toBeVisible();
 });
 
+test("the index header and posts become visible once motion runs", async ({
+  page,
+}) => {
+  await page.goto("/blog");
+  for (const selector of [
+    ".page-header .eyebrow",
+    ".page-header h1",
+    ".posts li",
+  ]) {
+    await expect
+      .poll(() =>
+        page
+          .locator(selector)
+          .first()
+          .evaluate((element) => getComputedStyle(element).opacity),
+      )
+      .toBe("1");
+  }
+});
+
 test("the index lists posts newest first and opens them", async ({ page }) => {
   await page.goto("/blog");
   const first = page.locator(".posts li a").first();

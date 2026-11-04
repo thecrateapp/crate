@@ -1,6 +1,7 @@
 ---
 import { getCollection } from "astro:content";
 import PageHeader from "../../components/PageHeader.astro";
+import { calendar } from "../../data/blog-calendar";
 import { t } from "../../i18n";
 import Base from "../../layouts/Base.astro";
 import {
@@ -12,6 +13,7 @@ import {
 
 const posts = publishedPosts(await getCollection("blog"), {
   includeDrafts: import.meta.env.DEV,
+  order: calendar.map((entry) => entry.slug),
 });
 ---
 
@@ -66,6 +68,13 @@ const posts = publishedPosts(await getCollection("blog"), {
     }
   </section>
 </Base>
+
+<script>
+  import { mountOnPage } from "../../scripts/motion/page";
+  import { initTextMotion } from "../../scripts/motion/text-motion";
+
+  mountOnPage(".posts", () => initTextMotion());
+</script>
 
 <style>
   .rss {

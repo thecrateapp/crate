@@ -38,6 +38,19 @@ describe("publishedPosts", () => {
     ]);
   });
 
+  it("breaks ties on the same day with the calendar order", () => {
+    const sameDay = [
+      entry("b", "2026-11-10"),
+      entry("c", "2026-11-10"),
+      entry("a", "2026-11-10"),
+    ];
+    expect(
+      publishedPosts(sameDay, { order: ["c", "a", "b"] }).map(
+        (post) => post.id,
+      ),
+    ).toEqual(["c", "a", "b"]);
+  });
+
   it("can include drafts for local preview", () => {
     expect(
       publishedPosts(posts, { includeDrafts: true }).map((post) => post.id),

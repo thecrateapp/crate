@@ -18,11 +18,23 @@ const WORDS_PER_MINUTE = 220;
 
 export function publishedPosts<T extends BlogEntry>(
   posts: T[],
-  { includeDrafts = false } = {},
+  {
+    includeDrafts = false,
+    order = [],
+  }: { includeDrafts?: boolean; order?: string[] } = {},
 ): T[] {
+  const rank = (id: string) => {
+    const index = order.indexOf(id);
+    return index === -1 ? order.length : index;
+  };
   return posts
     .filter((post) => includeDrafts || !post.data.draft)
-    .sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+    .sort(
+      (a, b) =>
+        b.data.date.getTime() - a.data.date.getTime() ||
+        rank(a.id) - rank(b.id) ||
+        a.id.localeCompare(b.id),
+    );
 }
 
 export function readingWords(markdown: string): number {

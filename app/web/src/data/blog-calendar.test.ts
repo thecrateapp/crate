@@ -37,12 +37,12 @@ describe("blog calendar", () => {
     }
   });
 
-  it("publishes on Tuesdays in increasing order", () => {
+  it("publishes on Tuesdays, never going back in time", () => {
     let previous = "";
     for (const entry of calendar) {
       const day = new Date(`${entry.publishOn}T00:00:00Z`).getUTCDay();
       expect(day, entry.slug).toBe(2);
-      expect(entry.publishOn > previous, entry.slug).toBe(true);
+      expect(entry.publishOn >= previous, entry.slug).toBe(true);
       previous = entry.publishOn;
     }
   });
