@@ -132,6 +132,14 @@ dataset was built, for example after a reanalysis) or `missing`. To compare two 
 fairly, run both on the same profiles: after the analyzer v7 backfill, rerun `smart-mix-v2`
 too instead of comparing against a report computed on v5 or v6 profiles.
 
+## Committed baseline
+
+`baselines/dev-2026-11-04/` keeps the SM0 baseline: the 300-edge `dataset.jsonl` built from the
+development library on 2026-11-04 (all profiles `smart-mix-audio-v5`), its
+`dataset.meta.json`, and `smart-mix-v2.report.md`, the `smart-mix-v2` report with the `dj`
+context. Later phases plan this same file: rebuilding the set after a reanalysis would give
+different edges, because the compatible-tracks ranking reads the profiles.
+
 ## Planners and contexts
 
 `--planner` picks an entry of `PLANNERS` in `run_eval.py`; today only `smart-mix-v2`. A new
