@@ -113,6 +113,19 @@ VIRTUALDJ_APP ?= /Applications/VirtualDJ.app
 VDJ_BUILD_DIR ?= build/vdj-macos
 VDJ_ONLINE_SOURCES := $(HOME)/Library/Application Support/VirtualDJ/PluginsMacArm/OnlineSources
 
+VDJ_TESTED_VERSION ?= 8.5.9307
+VDJ_DIST_DIR ?= dist/vdj
+
+.PHONY: vdj-package
+vdj-package: ## Build and package the VirtualDJ plugin for macOS arm64 (VIRTUALDJ_SDK_ROOT=)
+	@test -n "$(VIRTUALDJ_SDK_ROOT)" || { echo "$(RED)Set VIRTUALDJ_SDK_ROOT to the folder with vdjPlugin8.h and vdjOnlineSource.h$(NC)"; exit 1; }
+	@cmake -S tools/vdj-plugin -B $(VDJ_BUILD_DIR) -DCMAKE_BUILD_TYPE=Release \
+		-DCRATE_VDJ_BUILD_REAL_PLUGIN=ON -DVirtualDJSDK_ROOT="$(VIRTUALDJ_SDK_ROOT)" >/dev/null
+	@cmake --build $(VDJ_BUILD_DIR) --target crate_vdj_online_source_plugin --parallel
+	@python3 tools/vdj-plugin/packaging/package_macos.py $(VDJ_BUILD_DIR)/Crate.bundle $(VDJ_DIST_DIR) \
+		--contract-header tools/vdj-plugin/include/crate_vdj/contract_negotiator.hpp \
+		--tested-virtualdj $(VDJ_TESTED_VERSION)
+
 .PHONY: vdj-dev
 vdj-dev: ## Build the VirtualDJ plugin, install it and open VirtualDJ against the dev stack (VIRTUALDJ_SDK_ROOT=, VIRTUALDJ_APP=)
 	@test -n "$(VIRTUALDJ_SDK_ROOT)" || { echo "$(RED)Set VIRTUALDJ_SDK_ROOT to the folder with vdjPlugin8.h and vdjOnlineSource.h$(NC)"; exit 1; }

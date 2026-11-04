@@ -85,6 +85,29 @@ builds and installs `Crate.bundle` and opens VirtualDJ trusting the mkcert
 development CA through `CRATE_VDJ_CA_BUNDLE`. The current steps live in §6 of
 the [implementation plan](../../docs/technical/smart-mix-implementation-plan.md).
 
+## Install a macOS package
+
+`make vdj-package VIRTUALDJ_SDK_ROOT=<sdk>` builds `Crate.bundle` in Release,
+checks its exports and metadata, signs it ad-hoc and writes
+`Crate-VirtualDJ-macos-arm64-<version>.zip`, its `.sha256` and
+`manifest-macos-arm64.json` to `dist/vdj/`. The package is for Apple silicon
+and VirtualDJ Pro; it is not notarized, so it is meant for internal testing.
+
+With VirtualDJ closed:
+
+```sh
+shasum -a 256 -c Crate-VirtualDJ-macos-arm64-<version>.zip.sha256
+dest="$HOME/Library/Application Support/VirtualDJ/PluginsMacArm/OnlineSources"
+mkdir -p "$dest"
+rm -rf "$dest/Crate.bundle"
+ditto -x -k Crate-VirtualDJ-macos-arm64-<version>.zip "$dest"
+xattr -dr com.apple.quarantine "$dest/Crate.bundle"
+```
+
+Create a token in Listen (Settings, Access tokens), open VirtualDJ,
+enable the Crate source under Online Sources and connect with the server URL
+and the token. The token is stored in the Keychain.
+
 ## Metadata cache
 
 Search results and catalog pages use a local SQLite cache. Entries are scoped

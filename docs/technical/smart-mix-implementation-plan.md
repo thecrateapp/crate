@@ -134,7 +134,7 @@ node scripts/check-docs.mjs
 
 From `app/listen/android`: `./gradlew :app:testDebugUnitTest` for unit tests and `./gradlew :app:connectedDebugAndroidTest` for instrumentation on an explicitly selected device. From `app/readplane`: `go test ./internal/routes ./internal/catalog ./internal/snapshots` when its contract is touched. Add Ruff/Pyright and the existing frontend checks according to the affected files; do not replace the repository gates with this minimal list.
 
-The existing targets `make cap-android-smart-mix-artifacts` and its local test variant produce an APK explicitly pointed at dev. The `prod-artifacts` variant requires an explicit choice of environment and is not part of the default CI. `make vdj-test`, `vdj-build` and `vdj-package` are deliverables of V09/V10: do not assume yet that they exist.
+The existing targets `make cap-android-smart-mix-artifacts` and its local test variant produce an APK explicitly pointed at dev. The `prod-artifacts` variant requires an explicit choice of environment and is not part of the default CI. `make vdj-test` (V09) and `make vdj-package` (V10, macOS arm64) exist; `vdj-build` and the Windows and macOS Intel packages are still pending.
 
 ## 3. Shared platform: P01 to P06
 
@@ -686,6 +686,8 @@ VH01 ruled out local paths and `file://` in `GetStreamUrl` (R31). It is only via
 5. Consume the X03 evidence and repeat on the packages: installation, update, credentials, media and Crate Automix.
 
 **DoD:** installable packages per platform with documented requirements (Pro, architecture, signing); A, B and Crate Automix verified on a real host.
+
+**Status 2026-11-02 (R2, macOS arm64):** `make vdj-package` builds `Crate.bundle` in Release, checks that `Info.plist` declares `Crate`, that it exports `DllGetClassObject` and that it ships no SDK headers, probe or tokens; it signs it ad-hoc and writes the zip, its `.sha256` and `manifest-macos-arm64.json` to `dist/vdj/` (version, contracts from `contract_negotiator.hpp`, tested VDJ 8.5.9307, Pro, install path, signing). Installation and the quarantine `xattr` are in the plugin README. The packaging script `packaging/package_macos.py` has tests in CI. Pending: the R2 gate in production on the package after the deploy, Windows x64, macOS Intel, Developer ID and notarization, SBOM and license inventory, release workflow.
 
 ## 7. Integration, acceptance and operation: X01 to X04
 
