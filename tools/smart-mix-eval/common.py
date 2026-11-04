@@ -103,6 +103,15 @@ def git_commit() -> str | None:
     return completed.stdout.strip() or None
 
 
+def display_path(path: Path) -> str:
+    """A path relative to the repository when it lives inside it."""
+    resolved = Path(path).resolve()
+    try:
+        return str(resolved.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(resolved)
+
+
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     rows = []
     for line in path.read_text().splitlines():

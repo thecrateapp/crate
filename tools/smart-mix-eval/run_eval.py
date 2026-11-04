@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from common import (
+    display_path,
     ensure_app_on_path,
     git_commit,
     open_read_only_database,
@@ -463,7 +464,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "context": args.context,
             "contextValues": context.to_dict(),
             "dataset": {
-                "path": str(args.dataset),
+                "path": display_path(args.dataset),
                 "edges": len(rows),
                 "sha256": hashlib.sha256(args.dataset.read_bytes()).hexdigest(),
             },
