@@ -28,6 +28,7 @@ _STRUCTURE_COLUMNS = (
     TrackMixProfileRow.phrases,
     TrackMixProfileRow.energy_curve,
     TrackMixProfileRow.vocal_presence,
+    TrackMixProfileRow.vocal_detector,
     TrackMixProfileRow.structure_confidence,
 )
 # structure_confidence is a REAL: four decimals survive it exactly.
@@ -313,6 +314,7 @@ def _profile_values(
         ),
         "energy_curve": profile.energy_curve,
         "vocal_presence": profile.vocal_presence,
+        "vocal_detector": profile.vocal_detector,
         "structure_confidence": stored_structure_confidence(
             profile.structure_confidence
         ),
@@ -406,5 +408,6 @@ def _row_structure(row: TrackMixProfileRow) -> dict[str, Any]:
         "vocal_presence": (
             None if row.vocal_presence is None else bytes(row.vocal_presence)
         ),
+        "vocal_detector": row.vocal_detector,
         "structure_confidence": stored_structure_confidence(row.structure_confidence),
     }

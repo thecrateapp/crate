@@ -231,6 +231,7 @@ def test_persists_structure_fields(pg_db, tmp_path: Path) -> None:
         phrases=STRUCTURE_PHRASES,
         energy_curve=STRUCTURE_CURVE,
         vocal_presence=bytes((12, 240)),
+        vocal_detector="yamnet-1",
         structure_confidence=0.8234,
     )
 
@@ -241,6 +242,7 @@ def test_persists_structure_fields(pg_db, tmp_path: Path) -> None:
     assert profile.phrases == STRUCTURE_PHRASES
     assert profile.energy_curve == STRUCTURE_CURVE
     assert profile.vocal_presence == bytes((12, 240))
+    assert profile.vocal_detector == "yamnet-1"
     assert profile.structure_confidence == 0.8234
     # Readers that do not plan by phrase never load the structure.
     summary = get_track_mix_profile(track_id)
@@ -249,8 +251,9 @@ def test_persists_structure_fields(pg_db, tmp_path: Path) -> None:
         summary.phrases,
         summary.energy_curve,
         summary.vocal_presence,
+        summary.vocal_detector,
         summary.structure_confidence,
-    ) == (None, None, None, None)
+    ) == (None, None, None, None, None)
     with read_scope() as session:
         stored = (
             session.execute(

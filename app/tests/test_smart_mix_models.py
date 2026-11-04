@@ -376,13 +376,34 @@ def test_phrase_rejects_invalid_values(overrides) -> None:
             )
         },
         {"energy_curve": bytes(MAX_ENERGY_CURVE_BARS + 1)},
-        {"phrases": (phrase(),), "vocal_presence": bytes(2)},
-        {"vocal_presence": bytes(1)},
+        {
+            "phrases": (phrase(),),
+            "vocal_presence": bytes(2),
+            "vocal_detector": "yamnet-1",
+        },
+        {"vocal_presence": bytes(1), "vocal_detector": "yamnet-1"},
+        # Voice and its detector go together.
+        {"phrases": (phrase(),), "vocal_presence": bytes(1)},
+        {"phrases": (phrase(),), "vocal_detector": "yamnet-1"},
+        {"phrases": (phrase(),), "vocal_presence": bytes(1), "vocal_detector": ""},
+        {
+            "phrases": (phrase(),),
+            "vocal_presence": bytes(1),
+            "vocal_detector": "y" * 33,
+        },
     ],
 )
 def test_structure_rejects_overlapping_or_oversized_values(structure) -> None:
     with pytest.raises((TypeError, ValueError)):
         profile(**structure)
+
+
+def test_voice_is_kept_with_its_detector() -> None:
+    stored = profile(
+        phrases=(phrase(),), vocal_presence=bytearray([200]), vocal_detector="yamnet-1"
+    )
+
+    assert (stored.vocal_presence, stored.vocal_detector) == (bytes([200]), "yamnet-1")
 
 
 def test_structure_draft_clamps_confidence_and_normalizes_bytes() -> None:

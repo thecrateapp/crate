@@ -203,7 +203,13 @@ def test_profile_reads_load_the_structure_only_when_asked(pg_db) -> None:
 
     # A v2 plan read costs what it did before the structure existed.
     assert len(plain_sql) == 1
-    for column in ("phrases", "energy_curve", "vocal_presence", "structure_confidence"):
+    for column in (
+        "phrases",
+        "energy_curve",
+        "vocal_presence",
+        "vocal_detector",
+        "structure_confidence",
+    ):
         assert column not in plain_sql[0]
         assert column in structured_sql[0]
     assert plain is not None and plain.phrases is None

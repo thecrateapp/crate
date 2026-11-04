@@ -797,6 +797,7 @@ def _structured_profile(track_id: int, **overrides) -> None:
         ),
         energy_curve=bytes(range(0, 250, 10)),
         vocal_presence=bytes((0, 200)),
+        vocal_detector="yamnet-1",
         structure_confidence=0.75,
         analyzed_at=datetime(2026, 11, 4, tzinfo=UTC),
     )
@@ -852,11 +853,16 @@ def test_track_structure_tells_unanalyzed_from_unsegmented(pg_db, test_app) -> N
         phrases=None,
         energy_curve=None,
         vocal_presence=None,
+        vocal_detector=None,
         structure_confidence=None,
         analyzer_version="smart-mix-audio-v6",
     )
     _structured_profile(
-        unsegmented, phrases=(), vocal_presence=None, structure_confidence=0.0
+        unsegmented,
+        phrases=(),
+        vocal_presence=None,
+        vocal_detector=None,
+        structure_confidence=0.0,
     )
 
     before = test_app.get(f"/api/admin/smart-mix/tracks/{unanalyzed}/structure").json()
