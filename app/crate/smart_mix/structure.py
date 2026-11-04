@@ -3,12 +3,13 @@
 The segmentation reuses frames the analyzer already computed: the 50 ms RMS frames of
 cue detection give each bar its energy, and low/mid/high band levels of the beat
 tracker's mel spectrogram give its spectral balance. Bars run from downbeat to
-downbeat. A section change shows as novelty at a bar boundary: the change of mean
-energy and spectral balance between the four bars before and the four bars after it.
+downbeat; phrases cover the active bars, from the first to the last bar above -50 dBFS.
+A section change shows as novelty at a bar boundary: the change of mean energy and
+spectral balance between the four bars before and the four bars after it.
 
 Phrases are 8, 16 or 32 bars on an 8-bar grid. The grid starts on one of the first
-eight downbeats, the one whose boundaries collect the most novelty (the first downbeat
-unless another clearly wins). A dynamic programme then keeps the grid boundaries whose
+eight active bars, the one whose boundaries collect the most novelty (the first active
+bar unless another clearly wins). A dynamic programme then keeps the grid boundaries whose
 novelty pays for a fixed cost, so steady stretches merge into 16- and 32-bar phrases;
 boundaries on 16- and 32-bar multiples get a small bonus.
 
@@ -53,8 +54,12 @@ BAND_COUNT = 3
 MID_BAND_HZ = 2_000.0
 # Energy scale of the profile: RMS dBFS mapped linearly from -60 (0) to 0 (1).
 ENERGY_FLOOR_DB = -60.0
-# A window this quiet is silence; a change into or out of it is not a section change.
+# Bars this quiet are silence: phrases start and end on the bars inside them.
 SILENCE_DB = -50.0
+# Bar energy skips this much at each end of the bar, so a grid a few tens of ms off
+# (the Python and Rust grids can differ that much) neither pulls in the next section
+# nor drops the downbeat in one analyzer only.
+BAR_EDGE_GUARD_MS = 50
 NOVELTY_WINDOW_BARS = 4
 NOVELTY_NOISE_DB = 0.5
 SPECTRAL_WEIGHT = 0.5
@@ -123,17 +128,19 @@ def segment_phrases(
         return NO_STRUCTURE
     levels, shapes = _bar_features(bars, energy_frames, sample_rate)
     curve = bytes(_energy_byte(level) for level in levels)
-    if len(bars) < MIN_STRUCTURE_BARS:
+    active = [index for index, level in enumerate(levels) if level >= SILENCE_DB]
+    if not active or active[-1] + 1 - active[0] < MIN_STRUCTURE_BARS:
         return StructureDraft(phrases=(), energy_curve=curve, structure_confidence=0.0)
-    novelty = _novelty(levels, shapes)
+    first, last = active[0], active[-1] + 1
+    novelty = _novelty(levels[first:last], shapes[first:last])
     offset = _grid_offset(novelty)
-    units = (len(bars) - offset) // UNIT_BARS
+    units = (last - first - offset) // UNIT_BARS
     lengths = _capped_partition(novelty, offset, units)
     starts = [offset]
     for length in lengths:
         starts.append(starts[-1] + length * UNIT_BARS)
-    phrases = _phrases(bars, levels, starts)
-    confidence = _confidence(novelty, starts, bars)
+    phrases = _phrases(bars, levels, [first + start for start in starts])
+    confidence = _confidence(novelty, starts, bars[first:last])
     return StructureDraft(
         phrases=phrases, energy_curve=curve, structure_confidence=confidence
     )
@@ -163,7 +170,8 @@ def _bar_features(
     """Each bar's energy (dBFS) and spectral balance (band levels minus their mean).
 
     A bar's energy is the mean power of the RMS frames that lie wholly inside it; its
-    balance comes from the band frames centred inside it.
+    balance comes from the band frames centred inside it. Both leave out the first and
+    last ``BAR_EDGE_GUARD_MS`` of the bar.
     """
     frame_length, hop = rms_frame_geometry(sample_rate)
     power = np.square(np.asarray(frames.rms, dtype=np.float64))
@@ -174,8 +182,8 @@ def _bar_features(
     levels: list[float] = []
     shapes: list[tuple[float, ...]] = []
     for bar in bars:
-        start = bar.start_ms * sample_rate // 1_000
-        end = bar.end_ms * sample_rate // 1_000
+        start = (bar.start_ms + BAR_EDGE_GUARD_MS) * sample_rate // 1_000
+        end = (bar.end_ms - BAR_EDGE_GUARD_MS) * sample_rate // 1_000
         first = min(power.size, _ceil_div(start, hop))
         last = (
             min(power.size, (end - frame_length) // hop + 1)
@@ -212,8 +220,6 @@ def _novelty(levels: list[float], shapes: list[tuple[float, ...]]) -> list[float
         high = min(count, boundary + NOVELTY_WINDOW_BARS)
         before = _mean(levels[low:boundary])
         after = _mean(levels[boundary:high])
-        if before < SILENCE_DB or after < SILENCE_DB:
-            continue
         spectral = sum(
             abs(
                 _mean([shape[band] for shape in shapes[boundary:high]])
@@ -384,6 +390,8 @@ def _confidence(novelty: list[float], boundaries: list[int], bars: list[_Bar]) -
         aligned += weight * novelty[peak]
         support += weight
     durations = [float(bar.end_ms - bar.start_ms) for bar in bars[:-1]]
+    if not durations:
+        return 0.0
     typical = _median(durations)
     jitter = _median([abs(duration - typical) for duration in durations]) / typical
     regularity = min(1.0, max(0.0, 1.0 - jitter / BAR_JITTER_LIMIT))

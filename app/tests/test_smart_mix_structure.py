@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import statistics
 import time
 from pathlib import Path
@@ -21,6 +22,8 @@ from tests.smart_mix_structure_audio import (
 
 BAR_MS = 4 * BEAT_MS
 FIRST_BEAT_MS = 1_000
+BAND_HOP = 256
+FIXTURE = Path(__file__).parent / "fixtures/smart_mix/structure_v1.json"
 
 
 @pytest.fixture(scope="module")
@@ -37,8 +40,18 @@ def _downbeats(profile) -> tuple[int, ...]:
     return profile.beat_grid_ms[phase::4]
 
 
-def _bar_level_inputs(bar_db: list[float], *, sample_rate: int = SAMPLE_RATE):
-    """A steady 120 BPM grid whose bars hold the given RMS levels (dBFS)."""
+def _bar_level_inputs(
+    bar_db: list[float],
+    *,
+    bar_bands: list[list[float]] | None = None,
+    sample_rate: int = SAMPLE_RATE,
+):
+    """A steady 120 BPM grid whose bars hold the given RMS and band levels (dB).
+
+    Frames take the level of the bar their centre falls in; outside the bars the RMS
+    is -90 dBFS and the bands -80 dB (zero bands when ``bar_bands`` is None). The Rust
+    tests build the shared fixture inputs the same way.
+    """
     from crate.smart_mix.cue_detection import rms_frame_geometry
     from crate.smart_mix.structure import EnergyFrames
 
@@ -46,18 +59,25 @@ def _bar_level_inputs(bar_db: list[float], *, sample_rate: int = SAMPLE_RATE):
     total_samples = (
         (FIRST_BEAT_MS + len(bar_db) * BAR_MS + 1_000) * sample_rate // 1_000
     )
+
+    def bar_of(centres_ms: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        bars = np.floor((centres_ms - FIRST_BEAT_MS) / BAR_MS).astype(int)
+        return bars, (bars >= 0) & (bars < len(bar_db))
+
     frame_length, hop_length = rms_frame_geometry(sample_rate)
     starts = np.arange(0, total_samples - frame_length + 1, hop_length)
-    centres_ms = (starts + frame_length / 2) * 1_000 / sample_rate
-    bars = np.floor((centres_ms - FIRST_BEAT_MS) / BAR_MS).astype(int)
+    bars, inside = bar_of((starts + frame_length / 2) * 1_000 / sample_rate)
     levels = np.full(starts.size, -90.0)
-    inside = (bars >= 0) & (bars < len(bar_db))
     levels[inside] = np.asarray(bar_db)[bars[inside]]
-    band_frames = 1 + total_samples // 256
+    band_count = 1 + total_samples // BAND_HOP
+    if bar_bands is None:
+        bands = np.zeros((band_count, 3))
+    else:
+        bars, inside = bar_of(np.arange(band_count) * BAND_HOP * 1_000 / sample_rate)
+        bands = np.full((band_count, 3), -80.0)
+        bands[inside] = np.asarray(bar_bands, dtype=np.float64)[bars[inside]]
     frames = EnergyFrames(
-        rms=10.0 ** (levels / 20.0),
-        bands_db=np.zeros((band_frames, 3)),
-        band_hop=256,
+        rms=10.0 ** (levels / 20.0), bands_db=bands, band_hop=BAND_HOP
     )
     return beats, beats[::4], frames
 
@@ -261,3 +281,49 @@ def test_steady_groove_is_body_between_intro_and_outro() -> None:
     assert kinds[0] == "intro"
     assert kinds[-1] == "outro"
     assert set(kinds[1:-1]) == {"body"}
+
+
+def test_bar_energy_ignores_grid_offsets_up_to_the_edge_guard() -> None:
+    from crate.smart_mix.structure import segment_phrases
+
+    levels = _blocks([16, 8, 16, 8, 16, 16])
+    beats, downbeats, frames = _bar_level_inputs(levels)
+    late = tuple(beat + 30 for beat in beats)
+
+    on_grid = segment_phrases(beats, downbeats, frames, SAMPLE_RATE)
+    shifted = segment_phrases(late, late[::4], frames, SAMPLE_RATE)
+
+    assert shifted.energy_curve == on_grid.energy_curve
+    assert [phrase.kind for phrase in shifted.phrases] == [
+        phrase.kind for phrase in on_grid.phrases
+    ]
+
+
+def _fixture_cases() -> list[dict]:
+    return json.loads(FIXTURE.read_text())["cases"]
+
+
+@pytest.mark.parametrize("case", _fixture_cases(), ids=lambda case: case["name"])
+def test_segmentation_matches_the_fixture_shared_with_rust(case) -> None:
+    from crate.smart_mix.structure import segment_phrases
+
+    draft = segment_phrases(
+        *_bar_level_inputs(case["barDb"], bar_bands=case["barBands"]),
+        sample_rate=SAMPLE_RATE,
+    )
+
+    expected = case["expected"]
+    assert [phrase.to_dict() for phrase in draft.phrases] == [
+        {
+            "start_beat": phrase["startBeat"],
+            "start_ms": phrase["startMs"],
+            "bars": phrase["bars"],
+            "energy": phrase["energy"],
+            "delta_energy": phrase["deltaEnergy"],
+            "kind": phrase["kind"],
+        }
+        for phrase in expected["phrases"]
+    ]
+    curve = expected["energyCurve"]
+    assert draft.energy_curve == (None if curve is None else bytes(curve))
+    assert draft.structure_confidence == expected["structureConfidence"]
