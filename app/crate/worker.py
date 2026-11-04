@@ -10,6 +10,7 @@ from importlib import import_module
 from crate.ai.queues import AI_QUEUES, lane_threads
 from crate.db.cache_store import set_cache
 from crate.db.init_db import init_db
+from crate.db.ops_runtime_views import DEFAULT_QUEUE_BREAKDOWN
 from crate.db.queries.tasks import get_task_activity_snapshot
 from crate.db.repositories.tasks import (
     cleanup_zombie_tasks,
@@ -480,22 +481,7 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
                         "active": int(activity["running_count"]),
                     },
                     "queue_breakdown": activity.get("queue_breakdown")
-                    or {
-                        "running": {
-                            "fast": 0,
-                            "default": 0,
-                            "heavy": 0,
-                            "maintenance": 0,
-                            "playback": 0,
-                        },
-                        "pending": {
-                            "fast": 0,
-                            "default": 0,
-                            "heavy": 0,
-                            "maintenance": 0,
-                            "playback": 0,
-                        },
-                    },
+                    or DEFAULT_QUEUE_BREAKDOWN,
                     "db_heavy_gate": activity.get("db_heavy_gate")
                     or {
                         "active": 0,

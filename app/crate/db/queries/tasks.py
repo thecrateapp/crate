@@ -41,8 +41,31 @@ def _coerce_json_list(value) -> list[dict]:
     return []
 
 
+QUEUE_POOLS = ("fast", "default", "heavy", "maintenance", "playback", "ai", "ai_bulk")
+
+
 def _pool_counts_template() -> dict[str, int]:
-    return {"fast": 0, "default": 0, "heavy": 0, "maintenance": 0, "playback": 0}
+    return dict.fromkeys(QUEUE_POOLS, 0)
+
+
+def _coerce_oldest_pending(value) -> dict[str, dict]:
+    source = value
+    if isinstance(value, str):
+        try:
+            source = json.loads(value)
+        except json.JSONDecodeError:
+            return {}
+    if not isinstance(source, dict):
+        return {}
+    oldest = {}
+    for pool, task in source.items():
+        if pool in QUEUE_POOLS and isinstance(task, dict) and task.get("id"):
+            oldest[pool] = {
+                "id": str(task["id"]),
+                "type": str(task.get("type") or ""),
+                "created_at": task.get("created_at"),
+            }
+    return oldest
 
 
 def _coerce_pool_counts(value) -> dict[str, int]:
@@ -154,6 +177,12 @@ def get_task_activity_snapshot(
                             ),
                             'playback', COUNT(*) FILTER (
                                 WHERE status IN ('running', 'delegated', 'completing') AND pool = 'playback'
+                            ),
+                            'ai', COUNT(*) FILTER (
+                                WHERE status IN ('running', 'delegated', 'completing') AND pool = 'ai'
+                            ),
+                            'ai_bulk', COUNT(*) FILTER (
+                                WHERE status IN ('running', 'delegated', 'completing') AND pool = 'ai_bulk'
                             )
                         ) AS running_by_pool,
                         jsonb_build_object(
@@ -163,7 +192,9 @@ def get_task_activity_snapshot(
                             ),
                             'heavy', COUNT(*) FILTER (WHERE status = 'pending' AND pool = 'heavy'),
                             'maintenance', COUNT(*) FILTER (WHERE status = 'pending' AND pool = 'maintenance'),
-                            'playback', COUNT(*) FILTER (WHERE status = 'pending' AND pool = 'playback')
+                            'playback', COUNT(*) FILTER (WHERE status = 'pending' AND pool = 'playback'),
+                            'ai', COUNT(*) FILTER (WHERE status = 'pending' AND pool = 'ai'),
+                            'ai_bulk', COUNT(*) FILTER (WHERE status = 'pending' AND pool = 'ai_bulk')
                         ) AS pending_by_pool,
                         COUNT(*) FILTER (
                             WHERE status = 'running' AND type = ANY(:db_heavy_types)
@@ -172,6 +203,13 @@ def get_task_activity_snapshot(
                             WHERE status = 'pending' AND type = ANY(:db_heavy_types)
                         ) AS db_heavy_pending_count
                     FROM tasks
+                ),
+                oldest_pending AS (
+                    SELECT DISTINCT ON (COALESCE(pool, 'default'))
+                        COALESCE(pool, 'default') AS pool, id, type, created_at
+                    FROM tasks
+                    WHERE status = 'pending'
+                    ORDER BY COALESCE(pool, 'default'), created_at ASC
                 )
                 SELECT
                     task_counts.running_count,
@@ -180,6 +218,17 @@ def get_task_activity_snapshot(
                     task_counts.pending_by_pool,
                     task_counts.db_heavy_running_count,
                     task_counts.db_heavy_pending_count,
+                    COALESCE(
+                        (SELECT jsonb_object_agg(
+                            oldest_pending.pool,
+                            jsonb_build_object(
+                                'id', oldest_pending.id,
+                                'type', oldest_pending.type,
+                                'created_at', oldest_pending.created_at
+                            )
+                        ) FROM oldest_pending),
+                        '{}'::jsonb
+                    ) AS oldest_pending_by_pool,
                     COALESCE(
                         (SELECT jsonb_agg(to_jsonb(running) ORDER BY running.priority ASC, running.updated_at DESC) FROM running),
                         '[]'::jsonb
@@ -208,6 +257,7 @@ def get_task_activity_snapshot(
         "queue_breakdown": {
             "running": _coerce_pool_counts(row.get("running_by_pool")),
             "pending": _coerce_pool_counts(row.get("pending_by_pool")),
+            "oldest_pending": _coerce_oldest_pending(row.get("oldest_pending_by_pool")),
         },
         "db_heavy_gate": {
             "active": int(row.get("db_heavy_running_count") or 0),

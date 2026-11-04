@@ -121,6 +121,14 @@ class WorkerPoolBreakdownResponse(BaseModel):
     heavy: int = 0
     maintenance: int = 0
     playback: int = 0
+    ai: int = 0
+    ai_bulk: int = 0
+
+
+class WorkerQueueOldestTaskResponse(BaseModel):
+    id: str
+    type: str
+    created_at: datetime | str | None = None
 
 
 class WorkerQueueBreakdownResponse(BaseModel):
@@ -129,6 +137,10 @@ class WorkerQueueBreakdownResponse(BaseModel):
     )
     pending: WorkerPoolBreakdownResponse = Field(
         default_factory=WorkerPoolBreakdownResponse
+    )
+    oldest_pending: dict[str, WorkerQueueOldestTaskResponse] = Field(
+        default_factory=dict,
+        description="Oldest pending task per queue, for queues with pending work.",
     )
 
 

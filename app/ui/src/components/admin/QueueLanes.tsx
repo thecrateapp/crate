@@ -4,7 +4,7 @@ import type { CSSProperties } from "react";
 
 import { useMotionAllowed } from "@crate/ui/lib/motion-gate";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
-import { cn } from "@/lib/utils";
+import { cn, timeAgo } from "@/lib/utils";
 import { taskLabel } from "@/lib/task-catalog";
 
 export const QUEUE_LANE_ORDER = [
@@ -13,7 +13,11 @@ export const QUEUE_LANE_ORDER = [
   "fast",
   "heavy",
   "playback",
+  "ai",
+  "ai_bulk",
 ] as const;
+
+const LANE_COUNT_WORDS: Record<number, string> = { 5: "five", 7: "seven" };
 
 export type QueueLaneName = (typeof QUEUE_LANE_ORDER)[number];
 export type QueueLaneCounts = Record<QueueLaneName, number>;
@@ -59,9 +63,16 @@ function timestampAtLeast(
   );
 }
 
+export interface QueueLaneOldestTask {
+  id: string;
+  type: string;
+  created_at?: string | null;
+}
+
 export interface QueueLaneBreakdown {
   running: QueueLaneCounts;
   pending: QueueLaneCounts;
+  oldest_pending?: Partial<Record<QueueLaneName, QueueLaneOldestTask>>;
 }
 
 const LANE_WORKERS: Record<QueueLaneName, string> = {
@@ -70,6 +81,8 @@ const LANE_WORKERS: Record<QueueLaneName, string> = {
   fast: "worker ×3 · fast-worker ×2",
   heavy: "analysis-worker",
   playback: "playback-worker",
+  ai: "worker · ai pool",
+  ai_bulk: "worker · ai_bulk pool",
 };
 
 const GOVERNED_TASK_TYPES = new Set([
@@ -156,9 +169,16 @@ function isDeferred(task: QueueLaneTask) {
       : progress && typeof progress === "object"
         ? JSON.stringify(progress)
         : "";
-  return /deferred by resource governor|paused by resource governor/i.test(
+  return /deferred by resource governor|paused by resource governor|waiting for ai provider capacity/i.test(
     message,
   );
+}
+
+function deferralLabel(task: QueueLaneTask) {
+  const progress = typeof task.progress === "string" ? task.progress : "";
+  return /waiting for ai provider capacity/i.test(progress)
+    ? "Waiting for AI provider capacity"
+    : "Waiting on resource governor";
 }
 
 function TaskChip({
@@ -203,9 +223,7 @@ function TaskChip({
   const content = (
     <>
       <span className="truncate">{task.type}</span>
-      {deferred ? (
-        <span className="sr-only">Waiting on resource governor</span>
-      ) : null}
+      {deferred ? <span className="sr-only">{deferralLabel(task)}</span> : null}
     </>
   );
 
@@ -625,7 +643,10 @@ export function QueueLanes({
           </MonoLabel>
           <span>
             {taskTypeCount == null ? "—" : taskTypeCount.toLocaleString()} task
-            types · five queues
+            types ·{" "}
+            {LANE_COUNT_WORDS[QUEUE_LANE_ORDER.length] ??
+              QUEUE_LANE_ORDER.length}{" "}
+            queues
           </span>
         </p>
         <p className="m-0 inline-flex items-center font-mono text-[9px] uppercase tracking-[0.12em] text-text-muted">
@@ -645,6 +666,11 @@ export function QueueLanes({
           const laneQueued = tasksForLane(queuedTasks, lane);
           const laneDone = tasksForLane(visibleTerminalTasks, lane);
           const latestDone = laneDone.slice(0, 1);
+          const oldest = breakdown.oldest_pending?.[lane];
+          const oldestLabel =
+            queued > 0 && oldest?.created_at
+              ? ` · oldest ${timeAgo(oldest.created_at)}`
+              : "";
 
           return (
             <li
@@ -672,7 +698,7 @@ export function QueueLanes({
                   {LANE_WORKERS[lane]}
                 </span>
                 <span className="font-mono text-[8px] uppercase tracking-[0.1em] text-text-subtle max-[760px]:col-span-2">
-                  {running} running · {queued} queued
+                  {running} running · {queued} queued{oldestLabel}
                 </span>
               </div>
 

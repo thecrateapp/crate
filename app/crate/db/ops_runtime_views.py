@@ -6,9 +6,11 @@ from crate.db.cache_settings import get_setting
 from crate.db.ops_runtime import get_ops_runtime_state
 
 DEFAULT_MAX_WORKERS = 3
+_QUEUE_POOLS = ("fast", "default", "heavy", "maintenance", "playback", "ai", "ai_bulk")
 DEFAULT_QUEUE_BREAKDOWN = {
-    "running": {"fast": 0, "default": 0, "heavy": 0, "maintenance": 0, "playback": 0},
-    "pending": {"fast": 0, "default": 0, "heavy": 0, "maintenance": 0, "playback": 0},
+    "running": dict.fromkeys(_QUEUE_POOLS, 0),
+    "pending": dict.fromkeys(_QUEUE_POOLS, 0),
+    "oldest_pending": {},
 }
 DEFAULT_DB_HEAVY_GATE = {"active": 0, "pending": 0, "blocking": False}
 
@@ -24,9 +26,15 @@ def _coerce_pool_counts(value: dict | None) -> dict:
 def _coerce_queue_breakdown(value: dict | None) -> dict:
     if not isinstance(value, dict):
         return DEFAULT_QUEUE_BREAKDOWN
+    oldest = value.get("oldest_pending")
     return {
         "running": _coerce_pool_counts(value.get("running")),
         "pending": _coerce_pool_counts(value.get("pending")),
+        "oldest_pending": {
+            pool: task
+            for pool, task in (oldest.items() if isinstance(oldest, dict) else [])
+            if pool in _QUEUE_POOLS and isinstance(task, dict)
+        },
     }
 
 

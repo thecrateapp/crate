@@ -146,7 +146,7 @@ LABEL_VALUES = {
         "auth",
     ),
     "playback_continuation_surface": ("radio", "infinite"),
-    "queue": ("default", "fast", "maintenance", "heavy", "playback"),
+    "queue": ("default", "fast", "maintenance", "heavy", "playback", "ai", "ai_bulk"),
     "radio_batch_outcome": (
         "ok",
         "retryable_empty",
