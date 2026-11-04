@@ -487,11 +487,12 @@ function TrackAudioInfo({
         description="Measured audio features, Smart Mix readiness and similarity references for this track."
         closeLabel="Close audio profile"
         size="3xl"
-        panelClassName="max-h-[calc(100dvh-2rem)] min-w-0"
+        // Fixed height: switching tabs must not resize the dialog.
+        panelClassName="h-[min(56rem,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] min-w-0"
         headerClassName="shrink-0"
       >
         <ModalBody
-          className="min-w-0 px-5 py-5"
+          className="min-w-0 px-5 py-5 [scrollbar-gutter:stable]"
           data-slot="audio-profile-scroll"
         >
           <AudioProfileCard

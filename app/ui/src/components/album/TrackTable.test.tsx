@@ -377,3 +377,25 @@ it("blocks repeated quarantine confirmation until the task finishes", async () =
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument(),
   );
 });
+
+it("keeps the audio profile dialog the same size on every tab", async () => {
+  const user = userEvent.setup();
+  render(
+    <TrackTable
+      tracks={[track]}
+      artist="Converge"
+      analysisData={{ concubine: profiledTrack }}
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "Show audio profile" }));
+
+  // A fixed height, not one that follows the open tab; the body scrolls instead
+  // and keeps the scrollbar's room so the width does not jump either.
+  expect(document.querySelector('[data-app-modal-panel="true"]')).toHaveClass(
+    "h-[min(56rem,calc(100dvh-2rem))]",
+  );
+  expect(
+    document.querySelector('[data-slot="audio-profile-scroll"]'),
+  ).toHaveClass("[scrollbar-gutter:stable]");
+});
