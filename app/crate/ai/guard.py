@@ -16,10 +16,7 @@ import os
 
 from crate.ai.contracts import AIConfigurationError
 
-ALLOWED_OUTSIDE_AI_TASKS: dict[str, str] = {
-    # POST /api/artwork/artists/{id}/hero-candidates/analyze, until SMQ.PR5.
-    "artwork.hero.analyze": "SMQ.PR5",
-}
+ALLOWED_OUTSIDE_AI_TASKS: dict[str, str] = {}
 
 
 def enforced() -> bool:

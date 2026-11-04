@@ -186,6 +186,7 @@ LABEL_VALUES = {
         "ai_catalog_refresh",
         "ai_profile_test",
         "analyze_album_full",
+        "analyze_artist_hero_candidate",
         "analyze_all",
         "analyze_tracks",
         "apply_cover",

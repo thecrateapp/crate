@@ -20,9 +20,7 @@ AI_QUEUES = {"ai", "ai_bulk"}
 # SMQ PR that moves it to an AI-lane task, and that PR deletes the entry; a
 # stale entry fails test_exceptions_are_still_needed. New entries need an
 # approved plan change first.
-HTTP_MODEL_CALL_EXCEPTIONS: dict[tuple[str, str], str] = {
-    ("crate.api.artwork", "api_analyze_artist_hero_candidate"): "SMQ.PR5",
-}
+HTTP_MODEL_CALL_EXCEPTIONS: dict[tuple[str, str], str] = {}
 
 FACADE_SHIM_EXCEPTIONS: dict[tuple[str, str], str] = {}
 

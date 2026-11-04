@@ -65,6 +65,22 @@ function originLabel(origin: string) {
   return origin.replace(/-/g, " ");
 }
 
+// The analysis runs in the ai queue; this covers waiting behind other AI work
+// plus capacity requeues (5-30s each) on top of the 180s task.
+const ANALYSIS_TASK_TIMEOUT_MS = 10 * 60 * 1000;
+
+async function responseError(response: Response, fallback: string) {
+  const text = await response.text().catch(() => "");
+  try {
+    const payload = JSON.parse(text) as { detail?: unknown; error?: unknown };
+    const message = payload.detail ?? payload.error;
+    if (typeof message === "string" && message.trim()) return message;
+  } catch {
+    // Not JSON: fall back to the raw body.
+  }
+  return text || fallback;
+}
+
 async function waitForQueuedTask(response: Response, fallback: string) {
   if (!response.ok) throw new Error(await response.text());
   const result = (await response.json()) as { task_id?: string };
@@ -93,6 +109,8 @@ export function ArtistArtworkGallery({
   const [analyses, setAnalyses] = useState<Record<string, CandidateAnalysis>>(
     {},
   );
+  const [analyzing, setAnalyzing] = useState<Record<string, boolean>>({});
+  const analysisTasks = useRef(new Map<string, AbortController>());
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [discovering, setDiscovering] = useState(false);
@@ -124,6 +142,14 @@ export function ArtistArtworkGallery({
   useEffect(() => {
     void loadAssets();
   }, [loadAssets]);
+
+  // Stop waiting for analyses when the artist changes or the gallery unmounts.
+  useEffect(() => {
+    const tasks = analysisTasks.current;
+    return () => {
+      for (const controller of tasks.values()) controller.abort();
+    };
+  }, [base]);
 
   async function upload(file: File) {
     if (!file.type.startsWith("image/")) {
@@ -229,30 +255,56 @@ export function ArtistArtworkGallery({
   }
 
   async function analyze(candidate: ArtworkCandidate) {
-    setBusy(`analyze:${candidate.id}`);
+    analysisTasks.current.get(candidate.id)?.abort();
+    const controller = new AbortController();
+    analysisTasks.current.set(candidate.id, controller);
+    setAnalyzing((current) => ({ ...current, [candidate.id]: true }));
     try {
+      // The model runs in the ai queue; the request only returns the task.
       const response = await fetch(`${base}/hero-candidates/analyze`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ candidate: candidate.id }),
+        signal: controller.signal,
       });
-      if (response.status === 409) {
-        toast.info("The configured model does not support image analysis");
-        return;
+      if (!response.ok) {
+        throw new Error(await responseError(response, "Image analysis failed"));
       }
-      if (!response.ok) throw new Error(await response.text());
-      const analysis = (await response.json()) as CandidateAnalysis;
+      const queued = (await response.json()) as { task_id: string };
+      const task = await waitForTask(
+        queued.task_id,
+        ANALYSIS_TASK_TIMEOUT_MS,
+        controller.signal,
+      );
+      if (controller.signal.aborted) return;
+      const analysis = task.result as CandidateAnalysis | undefined;
+      if (
+        task.status !== "completed" ||
+        typeof analysis?.summary !== "string"
+      ) {
+        throw new Error(task.error || "Image analysis failed");
+      }
       setAnalyses((current) => ({
         ...current,
         [candidate.id]: analysis,
       }));
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
       toast.error(
-        error instanceof Error ? error.message : "Image analysis failed",
+        error instanceof Error && error.message
+          ? error.message
+          : "Image analysis failed",
       );
     } finally {
-      setBusy(null);
+      if (analysisTasks.current.get(candidate.id) === controller) {
+        analysisTasks.current.delete(candidate.id);
+        setAnalyzing((current) => {
+          const next = { ...current };
+          delete next[candidate.id];
+          return next;
+        });
+      }
     }
   }
 
@@ -445,6 +497,7 @@ export function ArtistArtworkGallery({
           <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {candidates.map((candidate) => {
               const analysis = analyses[candidate.id];
+              const pending = analyzing[candidate.id] === true;
               return (
                 <article
                   key={candidate.id}
@@ -470,6 +523,15 @@ export function ArtistArtworkGallery({
                     <div className="flex flex-wrap gap-1.5">
                       <InfoBadge>Desktop {candidate.desktop.score}</InfoBadge>
                       <InfoBadge>Mobile {candidate.mobile.score}</InfoBadge>
+                      {pending ? (
+                        <InfoBadge
+                          active
+                          role="status"
+                          data-hero-analysis-pending
+                        >
+                          AI · Analyzing
+                        </InfoBadge>
+                      ) : null}
                     </div>
                     {analysis ? (
                       <div className="rounded-md border border-primary/20 bg-primary/5 p-2.5">
@@ -490,8 +552,10 @@ export function ArtistArtworkGallery({
                             ? `Analyze with ${heroAI.model_id}`
                             : "Image analysis action unavailable"
                         }
-                        disabled={busy !== null || !heroAI?.available}
-                        loading={busy === `analyze:${candidate.id}`}
+                        disabled={
+                          busy !== null || pending || !heroAI?.available
+                        }
+                        loading={pending}
                         onClick={() => void analyze(candidate)}
                       >
                         <Bot

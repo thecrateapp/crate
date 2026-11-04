@@ -45,6 +45,9 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
         "Genre Taxonomy Proposal", "enrichment"
     ),
     "refine_music_path": TaskTypeInfo("Music Path Refinement", "enrichment"),
+    "analyze_artist_hero_candidate": TaskTypeInfo(
+        "Artist Hero Candidate Analysis", "artwork"
+    ),
     "generate_playlist_description": TaskTypeInfo(
         "Playlist Description Draft", "playlists"
     ),

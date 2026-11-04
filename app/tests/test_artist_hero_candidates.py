@@ -72,6 +72,36 @@ def test_remote_candidate_stops_streaming_after_size_limit(monkeypatch):
     assert _download_remote_candidate("https://example.test/large.jpg") is None
 
 
+def test_remote_candidate_stops_streaming_after_its_time_budget(monkeypatch):
+    # A trickling server must not eat the ai task's time for the model call.
+    from crate import artist_hero_candidates as hero
+
+    clock = {"now": 100.0}
+
+    class Response:
+        headers = {"content-type": "image/jpeg"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def raise_for_status(self):
+            return None
+
+        def iter_content(self, *, chunk_size):
+            for _ in range(10):
+                clock["now"] += 10
+                yield b"x"
+
+    monkeypatch.setattr(hero.time, "monotonic", lambda: clock["now"])
+    monkeypatch.setattr(hero.requests, "get", lambda *args, **kwargs: Response())
+
+    assert hero._download_remote_candidate("https://example.test/slow.jpg") is None
+    assert clock["now"] - 100.0 <= hero._DOWNLOAD_BUDGET_SECONDS + 10
+
+
 def test_discovery_returns_all_valid_sources_with_same_origin_previews(
     monkeypatch, tmp_path
 ):
@@ -116,18 +146,37 @@ def test_discovery_returns_all_valid_sources_with_same_origin_previews(
     assert candidates[0].desktop.score >= candidates[-1].desktop.score
 
 
-def test_visual_analysis_falls_back_without_a_vision_capable_model(monkeypatch):
-    from tests.ai_consumer_fakes import pin_actions
+def test_visual_analysis_keeps_the_closed_error_code(monkeypatch):
+    # The analysis runs in an ai task, which reports the code; no silent None.
+    import pytest
 
-    pin_actions(monkeypatch)
+    from crate.ai.contracts import AIConfigurationError
     from crate.artist_hero_candidates import analyze_candidate_image
 
-    monkeypatch.setattr(
-        "crate.artist_hero_candidates.ask_image_structured",
-        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("unsupported")),
-    )
+    def refuse(*args, **kwargs):
+        raise AIConfigurationError(
+            "AI_ACTION_NEEDS_IMAGE", "Action requires image input"
+        )
 
-    assert analyze_candidate_image(_image_bytes((2400, 1000))) is None
+    monkeypatch.setattr("crate.artist_hero_candidates.ask_image_structured", refuse)
+
+    with pytest.raises(AIConfigurationError) as error:
+        analyze_candidate_image(
+            _image_bytes((2400, 1000)),
+            ai_call={"context": {}, "actor_id": 1, "job_id": "job"},
+        )
+    assert error.value.code == "AI_ACTION_NEEDS_IMAGE"
+
+
+def test_candidate_fingerprint_ignores_the_token_expiry():
+    from crate.artist_hero_candidates import candidate_fingerprint
+
+    photo = {"origin": "local-photo", "reference": "artist.jpg", "expires_at": 1}
+    later = {**photo, "expires_at": 2}
+    background = {**photo, "origin": "local-background"}
+
+    assert candidate_fingerprint(photo) == candidate_fingerprint(later)
+    assert candidate_fingerprint(photo) != candidate_fingerprint(background)
 
 
 def test_candidate_catalog_endpoint_returns_ranked_candidates(test_app, tmp_path):

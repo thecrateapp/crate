@@ -10,9 +10,12 @@ stored.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from crate.ai.contracts import AIConfigurationError
 from crate.db.repositories.genres_taxonomy_metadata import set_genre_eq_gains
+from crate.db.repositories.library import get_library_artist_by_id
+from crate.storage_layout import resolve_artist_dir
 from crate.worker_handlers import TaskHandler
 
 log = logging.getLogger(__name__)
@@ -177,9 +180,60 @@ def _handle_refine_music_path(task_id: str, params: dict, config: dict) -> dict:
     )
 
 
+def _handle_analyze_artist_hero_candidate(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    """Analyze one signed hero candidate; the result is the visual analysis."""
+    from crate.ai.consumers import resume_action
+    from crate.artist_hero_candidates import (
+        analyze_candidate_image,
+        load_candidate_content,
+    )
+
+    try:
+        artist_id = int(params["artist_id"])
+    except (KeyError, TypeError, ValueError):
+        return {"status": "failed", "error": "Artist is required"}
+    artist = get_library_artist_by_id(artist_id)
+    if not artist:
+        return {"status": "failed", "error": "Artist not found"}
+    library = Path(config["library_path"]).resolve()
+    artist_dir = resolve_artist_dir(
+        library,
+        artist,
+        fallback_name=str(artist.get("name") or ""),
+        existing_only=True,
+    )
+    if not artist_dir or not artist_dir.is_dir():
+        return {"status": "failed", "error": "Artist directory not found"}
+    artist_dir = artist_dir.resolve()
+    if not artist_dir.is_relative_to(library):
+        return {"status": "failed", "error": "Artist directory is outside the library"}
+    try:
+        # Stale or revoked acceptances fail here, before any download.
+        ai_call = resume_action(
+            "artwork.hero.analyze",
+            params.get("ai_acceptance"),
+            actor_id=params.get("actor_user_id"),
+            job_id=task_id,
+        )
+        loaded = load_candidate_content(
+            str(params.get("candidate") or ""),
+            artist_id=artist_id,
+            artist_dir=artist_dir,
+        )
+        if loaded is None:
+            return {"status": "failed", "error": "Candidate not found"}
+        analysis = analyze_candidate_image(loaded[0], ai_call=ai_call)
+    except AIConfigurationError as error:
+        return _failed(error)
+    return analysis.model_dump(mode="json")
+
+
 AI_PROPOSAL_TASK_HANDLERS: dict[str, TaskHandler] = {
     "propose_genre_eq": _handle_propose_genre_eq,
     "generate_playlist_description": _handle_generate_playlist_description,
     "propose_genre_taxonomy_node": _handle_propose_genre_taxonomy_node,
     "refine_music_path": _handle_refine_music_path,
+    "analyze_artist_hero_candidate": _handle_analyze_artist_hero_candidate,
 }

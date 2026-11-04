@@ -7,7 +7,6 @@ import hashlib
 import hmac
 import io
 import json
-import logging
 import math
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -24,11 +23,13 @@ from crate.lastfm import get_fanart_all_images
 from crate.llm.provider import ask_image_structured
 from crate.utils import PHOTO_NAMES
 
-log = logging.getLogger(__name__)
 
 _MAX_CANDIDATES = 12
 _MAX_BYTES = 25 * 1024 * 1024
 _TOKEN_TTL_SECONDS = 60 * 60
+# Total time for one remote download, on top of the per-read timeout. Analysis
+# loads its candidate inside a 180s ai task that keeps 90s for the model call.
+_DOWNLOAD_BUDGET_SECONDS = 30
 
 
 @dataclass(frozen=True)
@@ -151,9 +152,16 @@ def decode_candidate_token(
         return None
 
 
+def candidate_fingerprint(payload: dict[str, object]) -> str:
+    """Stable identity of a decoded candidate; tokens change on every discovery."""
+    identity = f"{payload.get('origin') or ''}\0{payload.get('reference') or ''}"
+    return hashlib.sha256(identity.encode()).hexdigest()[:32]
+
+
 def _download_remote_candidate(url: str) -> bytes | None:
     chunks: list[bytes] = []
     total = 0
+    deadline = time.monotonic() + _DOWNLOAD_BUDGET_SECONDS
     try:
         with requests.get(
             url, timeout=(3, 12), headers={"Accept": "image/*"}, stream=True
@@ -166,7 +174,7 @@ def _download_remote_candidate(url: str) -> bytes | None:
                 if not chunk:
                     continue
                 total += len(chunk)
-                if total > _MAX_BYTES:
+                if total > _MAX_BYTES or time.monotonic() > deadline:
                     return None
                 chunks.append(chunk)
     except (requests.RequestException, TypeError, AttributeError):
@@ -292,27 +300,26 @@ def load_candidate_content(
 
 
 def analyze_candidate_image(
-    content: bytes, *, actor_id=None
-) -> ArtistHeroVisualAnalysis | None:
+    content: bytes, *, ai_call: dict
+) -> ArtistHeroVisualAnalysis:
+    """Ask the accepted vision model once; runs only in the ai-lane task.
+
+    ``ai_call`` comes from ``resume_action("artwork.hero.analyze", ...)``.
+    Failures surface as AIConfigurationError with their closed code.
+    """
     prompt = (
         "Evaluate this artist photo for a music app hero. Desktop is a 1480x600 "
         "canvas with text on the left; mobile is a 1080x1350 canvas with text near "
         "the bottom. Score whether important faces and bodies can remain visible, "
         "give a normalized focal point for each format, and explain briefly."
     )
-    try:
-        from crate.ai.consumers import resolve_call
-
-        return ask_image_structured(
-            ArtistHeroVisualAnalysis,
-            prompt,
-            action_id="artwork.hero.analyze",
-            **resolve_call("artwork.hero.analyze", actor_id=actor_id),
-            private_response=True,
-            image=content,
-            media_type="image/jpeg",
-            system="You are an editorial art director. Do not propose generative edits.",
-        )
-    except (RuntimeError, ValueError):
-        log.info("Vision analysis unavailable for artist hero candidate", exc_info=True)
-        return None
+    return ask_image_structured(
+        ArtistHeroVisualAnalysis,
+        prompt,
+        action_id="artwork.hero.analyze",
+        **ai_call,
+        private_response=True,
+        image=content,
+        media_type="image/jpeg",
+        system="You are an editorial art director. Do not propose generative edits.",
+    )

@@ -100,17 +100,18 @@ def test_bio_provenance_uses_result_model_without_rereading_global(monkeypatch):
 
 def test_hero_routes_its_action_and_keeps_default_image_detail(monkeypatch):
     from crate import artist_hero_candidates as hero
-    from tests.ai_consumer_fakes import pin_actions
 
-    pin_actions(monkeypatch)
     calls = []
     monkeypatch.setattr(
         hero,
         "ask_image_structured",
         lambda *a, **k: calls.append(k) or SimpleNamespace(),
     )
-    assert hero.analyze_candidate_image(b"image") is not None
+    call = {"context": {"private": "pinned"}, "actor_id": 7, "job_id": "job"}
+    assert hero.analyze_candidate_image(b"image", ai_call=call) is not None
     assert calls[0]["action_id"] == "artwork.hero.analyze"
+    assert calls[0]["context"] is call["context"]
+    assert calls[0]["job_id"] == "job"
     assert calls[0].get("image_detail", "default") == "default"
     assert calls[0]["private_response"] is True
 
