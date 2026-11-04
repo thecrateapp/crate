@@ -8,6 +8,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 from scipy.io import wavfile
+from tests.smart_mix_structure_audio import (
+    DJ_KINDS,
+    DJ_SECTIONS,
+    write_structured_track,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -71,14 +76,7 @@ def test_python_and_rust_mix_profiles_stay_within_tolerance(tmp_path: Path) -> N
     from crate.smart_mix.analyzer import analyze_mix_profile
 
     python_profile = analyze_mix_profile(track)
-    result = subprocess.run(
-        [_crate_cli_binary(), "analyze", "--file", track],
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    rust_profile = json.loads(result.stdout)["mixProfile"]
+    rust_profile = _rust_profile(track)
 
     assert rust_profile["bpm"] == python_profile.bpm == 120.0
     assert abs(rust_profile["introCueMs"] - python_profile.intro_cue_ms) <= 550
@@ -94,6 +92,63 @@ def test_python_and_rust_mix_profiles_stay_within_tolerance(tmp_path: Path) -> N
     assert rust_profile["outroLufs"] is not None
     assert rust_profile["truePeakDbfs"] <= 0.5
     assert python_profile.measurement_version is None
+
+
+def test_python_and_rust_structure_stay_within_tolerance(tmp_path: Path) -> None:
+    from crate.smart_mix.analyzer import analyze_mix_profile
+    from crate.smart_mix.structure import downbeats_from_anchor
+
+    track = tmp_path / "structure-120.wav"
+    write_structured_track(track, DJ_SECTIONS)
+
+    python_profile = analyze_mix_profile(track)
+    rust_profile = _rust_profile(track)
+
+    beat_ms = 60_000 / python_profile.bpm
+    python_phrases = python_profile.phrases
+    rust_phrases = rust_profile["phrases"]
+    assert tuple(phrase["kind"] for phrase in rust_phrases) == DJ_KINDS
+    assert [phrase.kind for phrase in python_phrases] == list(DJ_KINDS)
+    assert [phrase["bars"] for phrase in rust_phrases] == [
+        phrase.bars for phrase in python_phrases
+    ]
+    assert all(
+        abs(rust["startMs"] - python.start_ms) <= beat_ms
+        for rust, python in zip(rust_phrases, python_phrases, strict=True)
+    )
+    python_downbeats = downbeats_from_anchor(
+        python_profile.beat_grid_ms, python_profile.downbeat_anchor_ms
+    )
+    rust_downbeats = downbeats_from_anchor(
+        tuple(rust_profile["beatGridMs"]), rust_profile["downbeatAnchorMs"]
+    )
+    bar_ms = 4 * beat_ms
+    shift = round((rust_downbeats[0] - python_downbeats[0]) / bar_ms)
+    python_curve = python_profile.energy_curve
+    rust_curve = rust_profile["energyCurve"]
+    pairs = [
+        (python_curve[bar + shift], value)
+        for bar, value in enumerate(rust_curve)
+        if 0 <= bar + shift < len(python_curve)
+    ]
+    assert len(pairs) >= min(len(python_curve), len(rust_curve)) - 1
+    assert max(abs(python - rust) for python, rust in pairs) <= 2
+    assert rust_profile["vocalPresence"] is None
+    assert (
+        abs(rust_profile["structureConfidence"] - python_profile.structure_confidence)
+        <= 0.2
+    )
+
+
+def _rust_profile(track: Path) -> dict:
+    result = subprocess.run(
+        [_crate_cli_binary(), "analyze", "--file", track],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    return json.loads(result.stdout)["mixProfile"]
 
 
 def test_missing_crate_cli_fails_when_ci_requires_it(

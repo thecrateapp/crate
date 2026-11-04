@@ -18,6 +18,7 @@ use crate::beat_tracking;
 use crate::key_detection::detect_key;
 use crate::loudness::{LoudnessMeter, LoudnessSummary, MEASUREMENT_VERSION};
 use crate::mix_profile::{to_camelot, SmartMixProfileResult, ANALYZER_VERSION};
+use crate::structure::{self, EnergyFrames, Structure};
 use crate::tempo_grid::{self, ConstantGrid};
 use crate::{collect_audio_files, parse_extensions};
 
@@ -842,9 +843,14 @@ fn tempo_features(beat_frames: &[usize], onsets: &[f32], sample_rate: u32) -> Te
     }
 }
 
-fn frame_rms(samples: &[f32], sample_rate: u32) -> (Vec<f32>, usize, usize) {
+/// Length and hop, in samples, of the 50 ms RMS frames with a 25 ms hop.
+pub fn rms_frame_geometry(sample_rate: u32) -> (usize, usize) {
     let frame_length = ((sample_rate as f32 * 0.05).round() as usize).max(256);
-    let hop_length = (frame_length / 2).max(128);
+    (frame_length, (frame_length / 2).max(128))
+}
+
+fn frame_rms(samples: &[f32], sample_rate: u32) -> (Vec<f32>, usize, usize) {
+    let (frame_length, hop_length) = rms_frame_geometry(sample_rate);
     if samples.is_empty() {
         return (Vec::new(), frame_length, hop_length);
     }
@@ -872,6 +878,25 @@ fn detect_mix_cues(
     beat_grid_ms: &[u64],
 ) -> (Option<u64>, Option<u64>, Option<u64>, Option<u64>) {
     let (rms_values, frame_length, hop_length) = frame_rms(samples, sample_rate);
+    cues_from_rms(
+        samples.len(),
+        sample_rate,
+        beat_grid_ms,
+        &rms_values,
+        frame_length,
+        hop_length,
+    )
+}
+
+/// `detect_mix_cues` over RMS frames the caller already computed with `frame_rms`.
+fn cues_from_rms(
+    sample_count: usize,
+    sample_rate: u32,
+    beat_grid_ms: &[u64],
+    rms_values: &[f32],
+    frame_length: usize,
+    hop_length: usize,
+) -> (Option<u64>, Option<u64>, Option<u64>, Option<u64>) {
     if rms_values.is_empty() {
         return (None, None, None, None);
     }
@@ -889,7 +914,7 @@ fn detect_mix_cues(
     let (Some(first), Some(last)) = (active_frames.first(), active_frames.last()) else {
         return (None, None, None, None);
     };
-    let duration_ms = samples.len() as u64 * 1_000 / u64::from(sample_rate);
+    let duration_ms = sample_count as u64 * 1_000 / u64::from(sample_rate);
     let active_start_ms = *first as u64 * hop_length as u64 * 1_000 / u64::from(sample_rate);
     let active_end_ms = duration_ms.min(
         (*last as u64 * hop_length as u64 + frame_length as u64) * 1_000 / u64::from(sample_rate),
@@ -1025,8 +1050,15 @@ pub fn analyze_smart_mix_segments(
     .or(tempo.frame_bpm);
     let (key, scale, key_confidence) = detect_key(samples, sample_rate);
     let camelot = to_camelot(&key, &scale).map(str::to_owned);
-    let (active_start_ms, intro_cue_ms, mut outro_cue_ms, mut active_end_ms) =
-        detect_mix_cues(samples, sample_rate, &beat_grid_ms);
+    let (rms, rms_frame_length, rms_hop) = frame_rms(samples, sample_rate);
+    let (active_start_ms, intro_cue_ms, mut outro_cue_ms, mut active_end_ms) = cues_from_rms(
+        samples.len(),
+        sample_rate,
+        &beat_grid_ms,
+        &rms,
+        rms_frame_length,
+        rms_hop,
+    );
     let intro = signal_features(
         window_samples(samples, sample_rate, intro_cue_ms, false),
         sample_rate,
@@ -1083,6 +1115,23 @@ pub fn analyze_smart_mix_segments(
         .flatten()
         .or(intro_downbeat_ms);
     let time_signature = downbeat_anchor_ms.map(|_| 4);
+    let downbeats = structure::downbeats_from_anchor(&beat_grid_ms, downbeat_anchor_ms);
+    let structure = if downbeats.is_empty() {
+        Structure::none()
+    } else {
+        structure::segment_phrases(
+            &beat_grid_ms,
+            &downbeats,
+            &EnergyFrames {
+                rms: &rms,
+                rms_frame_length,
+                rms_hop,
+                bands_db: &features.bands,
+                band_hop: beat_tracking::HOP_SIZE,
+            },
+            sample_rate,
+        )
+    };
     let global = signal_features(samples, sample_rate);
     let intro_lufs = loudness.zip(intro_cue_ms).and_then(|(summary, start_ms)| {
         summary.window_lufs(start_ms, start_ms + MEASUREMENT_WINDOW_MS)
@@ -1158,6 +1207,10 @@ pub fn analyze_smart_mix_segments(
         intro_spectral_density: intro.2,
         outro_spectral_density: outro.2,
         global_energy: global.1,
+        phrases: Some(structure.phrases),
+        energy_curve: structure.energy_curve,
+        vocal_presence: None,
+        structure_confidence: Some(structure.structure_confidence),
     }
 }
 

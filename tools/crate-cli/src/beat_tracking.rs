@@ -6,6 +6,8 @@
 
 use realfft::RealFftPlanner;
 
+use crate::structure::{BAND_COUNT, MID_BAND_HZ};
+
 pub const FFT_SIZE: usize = 2048;
 pub const HOP_SIZE: usize = 512;
 const MEL_BANDS: usize = 128;
@@ -77,20 +79,35 @@ fn mel_filterbank(sample_rate: u32) -> Vec<Vec<(usize, f32)>> {
 }
 
 /// Per-hop signals shared by beat and downbeat tracking, aligned on the onset envelope.
+/// `bands` are not shifted: band frame `i` is the STFT frame centred on `i * HOP_SIZE`,
+/// holding the mean mel level (dB) below 200 Hz, below 2 kHz and above.
 pub struct FrameFeatures {
     pub onsets: Vec<f32>,
     pub low_onsets: Vec<f32>,
     pub chroma: Vec<[f32; 12]>,
+    pub bands: Vec<[f32; BAND_COUNT]>,
+}
+
+fn band_count_below(sample_rate: u32, hz: f32) -> usize {
+    let max_mel = hz_to_mel(sample_rate as f32 / 2.0);
+    (0..MEL_BANDS)
+        .take_while(|band| mel_to_hz(max_mel * (*band + 1) as f32 / (MEL_BANDS + 1) as f32) < hz)
+        .count()
 }
 
 fn low_band_count(sample_rate: u32) -> usize {
-    let max_mel = hz_to_mel(sample_rate as f32 / 2.0);
-    (0..MEL_BANDS)
-        .take_while(|band| {
-            mel_to_hz(max_mel * (*band + 1) as f32 / (MEL_BANDS + 1) as f32) < LOW_BAND_HZ
-        })
-        .count()
-        .max(1)
+    band_count_below(sample_rate, LOW_BAND_HZ).max(1)
+}
+
+fn band_levels(mel_db: &[f32], low_bands: usize, mid_bands: usize) -> [f32; BAND_COUNT] {
+    let mean = |values: &[f32]| {
+        values.iter().map(|value| f64::from(*value)).sum::<f64>() / values.len() as f64
+    };
+    [
+        mean(&mel_db[..low_bands]) as f32,
+        mean(&mel_db[low_bands..mid_bands]) as f32,
+        mean(&mel_db[mid_bands..]) as f32,
+    ]
 }
 
 fn pitch_classes(sample_rate: u32) -> Vec<Option<usize>> {
@@ -121,6 +138,7 @@ pub fn frame_features(samples: &[f32], sample_rate: u32) -> FrameFeatures {
             onsets: Vec::new(),
             low_onsets: Vec::new(),
             chroma: Vec::new(),
+            bands: Vec::new(),
         };
     }
     let filters = mel_filterbank(sample_rate);
@@ -176,6 +194,11 @@ pub fn frame_features(samples: &[f32], sample_rate: u32) -> FrameFeatures {
     for value in mel_db.iter_mut() {
         *value = value.max(floor);
     }
+    let mid_bands = band_count_below(sample_rate, MID_BAND_HZ).max(low_bands + 1);
+    let bands = mel_db
+        .chunks_exact(MEL_BANDS)
+        .map(|frame| band_levels(frame, low_bands, mid_bands))
+        .collect();
 
     let lead = 1 + FFT_SIZE / (2 * HOP_SIZE);
     let mut onsets = vec![0.0_f32; frames];
@@ -196,6 +219,7 @@ pub fn frame_features(samples: &[f32], sample_rate: u32) -> FrameFeatures {
         onsets,
         low_onsets,
         chroma,
+        bands,
     }
 }
 
@@ -724,6 +748,7 @@ mod tests {
             onsets: vec![0.2; frames],
             low_onsets: vec![0.1; frames],
             chroma: vec![[0.0; 12]; frames],
+            bands: Vec::new(),
         };
         let mut chord = 0;
         for beat in 0..beats {
