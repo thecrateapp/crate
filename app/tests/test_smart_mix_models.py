@@ -5,7 +5,11 @@ from datetime import UTC, datetime
 import pytest
 
 from crate.smart_mix.models import (
+    MAX_ENERGY_CURVE_BARS,
+    MAX_PHRASES,
     MixProfileQuality,
+    Phrase,
+    StructureDraft,
     TrackMixProfile,
     TransitionContext,
     TransitionFallbackReason,
@@ -261,3 +265,131 @@ def test_legacy_profile_has_no_accredited_measurement() -> None:
 
     assert payload["measurementVersion"] is None
     assert payload["integratedLufs"] is None
+
+
+def phrase(**overrides) -> Phrase:
+    values = {
+        "start_beat": 0,
+        "start_ms": 1_000,
+        "bars": 16,
+        "energy": 0.6,
+        "delta_energy": None,
+        "kind": "intro",
+    }
+    values.update(overrides)
+    return Phrase(**values)
+
+
+def test_rust_payload_carries_the_structure() -> None:
+    draft = mix_profile_draft_from_payload(
+        {
+            "durationMs": 150_000,
+            "quality": "full",
+            "phrases": [
+                {
+                    "startBeat": 0,
+                    "startMs": 1_000,
+                    "bars": 16,
+                    "energy": 0.46,
+                    "deltaEnergy": None,
+                    "kind": "intro",
+                },
+                {
+                    "startBeat": 64,
+                    "startMs": 33_000,
+                    "bars": 32,
+                    "energy": 0.75,
+                    "deltaEnergy": 0.29,
+                    "kind": "peak",
+                },
+            ],
+            "energyCurve": [117, 118, 193, 255],
+            "vocalPresence": None,
+            "structureConfidence": 0.89,
+        }
+    )
+
+    assert draft.phrases == (
+        phrase(energy=0.46),
+        phrase(
+            start_beat=64,
+            start_ms=33_000,
+            bars=32,
+            energy=0.75,
+            delta_energy=0.29,
+            kind="peak",
+        ),
+    )
+    assert draft.energy_curve == bytes([117, 118, 193, 255])
+    assert draft.vocal_presence is None
+    assert draft.structure_confidence == 0.89
+
+
+def test_profiles_before_structure_keep_it_null() -> None:
+    draft = mix_profile_draft_from_payload({"durationMs": 150_000, "quality": "full"})
+
+    assert (draft.phrases, draft.energy_curve, draft.vocal_presence) == (
+        None,
+        None,
+        None,
+    )
+    assert draft.structure_confidence is None
+    assert profile().phrases is None
+    assert profile().structure_confidence is None
+
+
+def test_phrase_serializes_the_stored_shape() -> None:
+    assert phrase(delta_energy=-0.1, kind="break").to_dict() == {
+        "start_beat": 0,
+        "start_ms": 1_000,
+        "bars": 16,
+        "energy": 0.6,
+        "delta_energy": -0.1,
+        "kind": "break",
+    }
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"bars": 12},
+        {"kind": "drop"},
+        {"start_beat": -4},
+        {"energy": float("nan")},
+        {"delta_energy": 1.5},
+    ],
+)
+def test_phrase_rejects_invalid_values(overrides) -> None:
+    with pytest.raises((TypeError, ValueError)):
+        phrase(**overrides)
+
+
+@pytest.mark.parametrize(
+    "structure",
+    [
+        {"phrases": (phrase(), phrase(start_beat=32, start_ms=17_000))},
+        {"phrases": (phrase(start_beat=64 * index) for index in range(2))},
+        {
+            "phrases": tuple(
+                phrase(start_beat=32 * index, start_ms=1_000 + 16_000 * index, bars=8)
+                for index in range(MAX_PHRASES + 1)
+            )
+        },
+        {"energy_curve": bytes(MAX_ENERGY_CURVE_BARS + 1)},
+        {"phrases": (phrase(),), "vocal_presence": bytes(2)},
+        {"vocal_presence": bytes(1)},
+    ],
+)
+def test_structure_rejects_overlapping_or_oversized_values(structure) -> None:
+    with pytest.raises((TypeError, ValueError)):
+        profile(**structure)
+
+
+def test_structure_draft_clamps_confidence_and_normalizes_bytes() -> None:
+    draft = StructureDraft(
+        phrases=[phrase()], energy_curve=bytearray([1, 2]), structure_confidence=1.4
+    )
+
+    assert draft.phrases == (phrase(),)
+    assert draft.energy_curve == b"\x01\x02"
+    assert draft.structure_confidence == 1.0

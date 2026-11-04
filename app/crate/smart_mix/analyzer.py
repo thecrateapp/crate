@@ -7,9 +7,20 @@ from pathlib import Path
 
 import numpy as np
 
-from crate.smart_mix.cue_detection import detect_mix_cues
+from crate.smart_mix.cue_detection import detect_mix_cues, frame_rms
 from crate.smart_mix.key_detection import detect_key
-from crate.smart_mix.models import MixProfileQuality, TrackMixProfileDraft
+from crate.smart_mix.models import (
+    MixProfileQuality,
+    StructureDraft,
+    TrackMixProfileDraft,
+)
+from crate.smart_mix.structure import (
+    MID_BAND_HZ,
+    NO_STRUCTURE,
+    EnergyFrames,
+    downbeats_from_anchor,
+    segment_phrases,
+)
 from crate.smart_mix.tempo_grid import (
     bass_contests_tracked_beats,
     fit_tempo,
@@ -53,7 +64,7 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
             quality=MixProfileQuality.UNAVAILABLE,
         )
 
-    onset_envelope, low_onsets, chroma = _frame_features(audio, sample_rate)
+    onset_envelope, low_onsets, chroma, bands = _frame_features(audio, sample_rate)
     tempo = librosa.feature.tempo(
         onset_envelope=onset_envelope,
         sr=sample_rate,
@@ -116,7 +127,11 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
         ),
     )
     key, scale, camelot, key_confidence = _key_features(audio, sample_rate)
-    cues = detect_mix_cues(audio, sample_rate, beat_grid_ms)
+    rms = frame_rms(audio, sample_rate)
+    cues = detect_mix_cues(audio, sample_rate, beat_grid_ms, rms=rms)
+    structure = _structure_features(
+        beat_grid_ms, downbeat_anchor_ms, rms, bands, sample_rate
+    )
     intro = _window_features(
         audio,
         sample_rate,
@@ -181,6 +196,10 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
         global_energy=global_features["energy"],
         danceability=_danceability(bpm_confidence, tempo_stability, bpm),
         valence=None,
+        phrases=structure.phrases,
+        energy_curve=structure.energy_curve,
+        vocal_presence=None,
+        structure_confidence=structure.structure_confidence,
     )
 
 
@@ -328,7 +347,7 @@ def _tempo_features(
 
 def _frame_features(
     audio: np.ndarray, sample_rate: int
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     import librosa
 
     power = np.abs(librosa.stft(audio, n_fft=_FFT_SIZE, hop_length=HOP_LENGTH)) ** 2
@@ -338,6 +357,7 @@ def _frame_features(
     )
     centers = librosa.mel_frequencies(n_mels=_MEL_BANDS + 2, fmax=sample_rate / 2)[1:-1]
     low_bands = max(1, int(np.sum(centers < _LOW_BAND_HZ)))
+    mid_bands = max(low_bands + 1, int(np.sum(centers < MID_BAND_HZ)))
     onsets = librosa.onset.onset_strength(
         S=mel_db, sr=sample_rate, hop_length=HOP_LENGTH, n_fft=_FFT_SIZE
     )
@@ -349,7 +369,37 @@ def _frame_features(
         chroma = librosa.feature.chroma_stft(S=power, sr=sample_rate)
     lead = 1 + _FFT_SIZE // (2 * HOP_LENGTH)
     chroma = np.pad(chroma, ((0, 0), (lead - 1, 0)), mode="edge")[:, : onsets.size]
-    return onsets, low_onsets, chroma.T
+    return onsets, low_onsets, chroma.T, _band_energies(mel_db, low_bands, mid_bands)
+
+
+def _band_energies(mel_db: np.ndarray, low_bands: int, mid_bands: int) -> np.ndarray:
+    """Mean mel level (dB) below 200 Hz, below 2 kHz and above, per STFT frame."""
+    return np.stack(
+        (
+            mel_db[:low_bands].mean(axis=0),
+            mel_db[low_bands:mid_bands].mean(axis=0),
+            mel_db[mid_bands:].mean(axis=0),
+        ),
+        axis=1,
+    )
+
+
+def _structure_features(
+    beat_grid_ms: tuple[int, ...],
+    downbeat_anchor_ms: int | None,
+    rms: np.ndarray,
+    bands: np.ndarray,
+    sample_rate: int,
+) -> StructureDraft:
+    downbeats = downbeats_from_anchor(beat_grid_ms, downbeat_anchor_ms)
+    if not downbeats:
+        return NO_STRUCTURE
+    return segment_phrases(
+        beat_grid_ms,
+        downbeats,
+        EnergyFrames(rms=rms, bands_db=bands, band_hop=HOP_LENGTH),
+        sample_rate,
+    )
 
 
 def _standardized(values: np.ndarray) -> np.ndarray:
