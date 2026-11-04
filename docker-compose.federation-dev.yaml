@@ -229,6 +229,8 @@ services:
     cpus: "0.25"
 
   node-a-worker:
+    # The pools drain in-flight tasks on SIGTERM (crate.worker POOL_STOP_GRACE_SECONDS).
+    stop_grace_period: 2m
     build:
       context: ./app
       target: worker-core
@@ -544,6 +546,8 @@ services:
     cpus: "0.25"
 
   node-b-worker:
+    # The pools drain in-flight tasks on SIGTERM (crate.worker POOL_STOP_GRACE_SECONDS).
+    stop_grace_period: 2m
     build:
       context: ./app
       target: worker-core

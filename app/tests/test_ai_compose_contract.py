@@ -110,3 +110,27 @@ def test_install_manifest_declares_ai_lane_tuning():
     assert {"CRATE_AI_WORKER_THREADS", "CRATE_AI_BULK_WORKER_THREADS"} <= set(
         manifest["tuning"]
     )
+
+
+@pytest.mark.parametrize(
+    "filename,services",
+    [
+        ("docker-compose.yaml", ["crate-worker"]),
+        ("docker-compose.dev.yaml", ["worker"]),
+        ("docker-compose.home.yaml", ["crate-worker"]),
+        (
+            "app/installer/internal/assets/files/docker-compose.home.yaml",
+            ["crate-worker"],
+        ),
+        ("docker-compose.federation-dev.yaml", ["node-a-worker", "node-b-worker"]),
+    ],
+)
+def test_crate_worker_stop_grace_covers_the_pool_drain(filename, services):
+    from crate.worker import POOL_STOP_GRACE_SECONDS
+
+    compose = yaml.safe_load((ROOT / filename).read_text())["services"]
+    for name in services:
+        grace = str(compose[name].get("stop_grace_period") or "")
+        assert grace.endswith(("s", "m")), name
+        seconds = int(grace[:-1]) * (60 if grace.endswith("m") else 1)
+        assert seconds >= POOL_STOP_GRACE_SECONDS, name

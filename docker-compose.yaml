@@ -533,6 +533,8 @@ services:
       traefik.http.services.crate-readplane.loadbalancer.server.port: 8686
 
   crate-worker:
+    # The pools drain in-flight tasks on SIGTERM (crate.worker POOL_STOP_GRACE_SECONDS).
+    stop_grace_period: 2m
     logging: *default-logging
     image: ${CRATE_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}}
     build:

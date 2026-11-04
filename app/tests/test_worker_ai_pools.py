@@ -85,39 +85,83 @@ def test_cli_default_queues_include_ai_lanes(monkeypatch):
     assert {"ai", "ai_bulk"} <= set(worker._normalise_queues(captured["worker_queues"]))
 
 
-class _FakeProcess:
-    def __init__(self, exits_after=None, code=0):
-        self.exits_after = exits_after
-        self.code = code
-        self.polls = 0
-        self.terminated = False
+# A child that behaves like a Dramatiq parent (dramatiq/cli.py termhandler): the
+# first SIGTERM drains the in-flight task, a second one exits at once with
+# RET_KILLED (1). With exit_after it also stops on its own, like an OOM kill.
+_DRAMATIQ_LIKE = r"""
+import signal, sys, time
+drain, exit_after, code = float(sys.argv[1]), float(sys.argv[2]), int(sys.argv[3])
+state = {"stopping": False}
+def term(signum, frame):
+    if state["stopping"]:
+        sys.exit(1)
+    state["stopping"] = True
+signal.signal(signal.SIGTERM, term)
+started = time.monotonic()
+while not state["stopping"]:
+    if exit_after >= 0 and time.monotonic() - started >= exit_after:
+        sys.exit(code)
+    time.sleep(0.05)
+end = time.monotonic() + drain
+while time.monotonic() < end:
+    time.sleep(0.05)
+sys.exit(0)
+"""
 
-    def poll(self):
-        self.polls += 1
-        if self.terminated:
-            return -15
-        if self.exits_after is not None and self.polls >= self.exits_after:
-            return self.code
-        return None
 
-    def terminate(self):
-        self.terminated = True
+def _pool(drain, *, exit_after=-1.0, code=0):
+    import subprocess
 
-    def kill(self):
-        self.terminated = True
-
-    def wait(self, timeout=None):
-        return self.poll()
+    return subprocess.Popen(
+        [sys.executable, "-c", _DRAMATIQ_LIKE, str(drain), str(exit_after), str(code)]
+    )
 
 
-def test_one_pool_exit_stops_the_others_and_keeps_its_code(monkeypatch):
-    monkeypatch.setattr(worker.time, "sleep", lambda _seconds: None)
-    general = _FakeProcess()
-    lane = _FakeProcess(exits_after=3, code=7)
-    bulk = _FakeProcess()
+def test_requested_stop_lets_busy_pools_drain():
+    import signal
+    import threading
+    import time
 
-    code = worker._supervise_pools([general, lane, bulk])
+    idle, busy = _pool(0.2), _pool(2.0)
+    time.sleep(0.3)
+    stopping = threading.Event()
 
-    assert code == 7
-    assert general.terminated and bulk.terminated
-    assert not lane.terminated
+    worker._request_pool_stop([idle, busy], stopping, signal.SIGTERM)
+    code = worker._supervise_pools([idle, busy], stopping=stopping, poll_seconds=0.05)
+
+    # The idle pool exits first; the busy one must not get a second SIGTERM.
+    assert code == 0
+    assert busy.returncode == 0
+
+
+def test_unexpected_exit_sends_one_sigterm_and_waits_for_the_drain():
+    general = _pool(0.0, exit_after=0.3, code=3)
+    lane = _pool(1.5)
+
+    code = worker._supervise_pools([general, lane], grace_seconds=10, poll_seconds=0.05)
+
+    assert code == 3
+    assert lane.returncode == 0
+
+
+def test_unexpected_exit_kills_a_sibling_that_outlives_the_grace():
+    general = _pool(0.0, exit_after=0.2, code=3)
+    stuck = _pool(30.0)
+
+    code = worker._supervise_pools(
+        [general, stuck], grace_seconds=0.5, poll_seconds=0.05
+    )
+
+    assert code == 3
+    assert stuck.returncode == -9
+
+
+def test_pools_stop_within_the_shared_shutdown_timeout():
+    commands = worker._dramatiq_commands(["default", "fast", "ai", "ai_bulk"], 3)
+
+    timeout_ms = str(worker.POOL_SHUTDOWN_TIMEOUT_SECONDS * 1000)
+    assert all(
+        _option(command, "--worker-shutdown-timeout") == timeout_ms
+        for command in commands
+    )
+    assert worker.POOL_STOP_GRACE_SECONDS > worker.POOL_SHUTDOWN_TIMEOUT_SECONDS

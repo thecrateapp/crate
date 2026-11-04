@@ -1,5 +1,6 @@
 import logging
 import os
+import signal
 import subprocess
 import sys
 import threading
@@ -32,13 +33,29 @@ def _normalise_queues(value) -> list[str]:
     return queues or ["fast", "heavy", "default", "maintenance", *AI_QUEUES]
 
 
+# Dramatiq --worker-shutdown-timeout for every pool: on SIGTERM each pool stops
+# consuming and gives in-flight tasks this long (an AI call is at most 90s).
+POOL_SHUTDOWN_TIMEOUT_SECONDS = 90
+# How long the siblings of a pool that died on its own get to drain before they
+# are killed; a little more than their own shutdown timeout. The compose
+# stop_grace_period of crate-worker covers it as well.
+POOL_STOP_GRACE_SECONDS = POOL_SHUTDOWN_TIMEOUT_SECONDS + 15
+
+
 def _dramatiq_commands(queues: Sequence[str], processes: int) -> list[list[str]]:
     """One Dramatiq pool for the general queues and one per AI lane.
 
     AI lanes wait on provider latency, so each gets a single process with its own
     thread count instead of sharing the general single-threaded processes.
     """
-    base = [sys.executable, "-m", "dramatiq", "crate.actors"]
+    base = [
+        sys.executable,
+        "-m",
+        "dramatiq",
+        "crate.actors",
+        "--worker-shutdown-timeout",
+        str(POOL_SHUTDOWN_TIMEOUT_SECONDS * 1000),
+    ]
     general = [queue for queue in queues if queue not in AI_QUEUES]
     commands = []
     if general:
@@ -69,29 +86,60 @@ def _dramatiq_commands(queues: Sequence[str], processes: int) -> list[list[str]]
     return commands
 
 
-def _supervise_pools(processes: Sequence, *, grace_seconds: float = 30) -> int:
-    """Wait for the first pool to exit, stop the rest and return its exit code.
+def _request_pool_stop(
+    processes: Sequence, stopping: threading.Event, signum: int
+) -> None:
+    """A requested stop: flag it first, then exactly one signal per pool.
 
-    A dead lane must not leave its queue silently unconsumed: the container exits
-    and its restart policy brings every pool back together.
+    A Dramatiq parent drains on the first SIGTERM and kills its workers on the
+    second, which would cut AI calls short and leak their provider slots.
     """
-    while True:
-        for process in processes:
-            code = process.poll()
-            if code is not None:
-                for other in processes:
-                    if other is not process and other.poll() is None:
-                        other.terminate()
-                deadline = time.monotonic() + grace_seconds
-                for other in processes:
-                    if other is process:
-                        continue
-                    try:
-                        other.wait(timeout=max(0.0, deadline - time.monotonic()))
-                    except subprocess.TimeoutExpired:
-                        other.kill()
-                return code
-        time.sleep(1)
+    stopping.set()
+    for process in processes:
+        if process.poll() is None:
+            process.send_signal(signum)
+
+
+def _supervise_pools(
+    processes: Sequence,
+    *,
+    stopping: threading.Event | None = None,
+    grace_seconds: float = POOL_STOP_GRACE_SECONDS,
+    poll_seconds: float = 1.0,
+) -> int:
+    """Run until the pools stop; return the exit code the container should use.
+
+    On a requested stop every pool already has its one SIGTERM, so the
+    supervisor only waits for all of them to drain. When a pool exits on its own
+    (OOM, memory recycling, crash) its siblings get one SIGTERM and
+    ``grace_seconds`` to drain before they are killed, so the restart policy
+    brings every lane back together instead of leaving a queue unconsumed.
+    """
+    stopping = stopping if stopping is not None else threading.Event()
+    while not stopping.is_set():
+        exited = next((p for p in processes if p.poll() is not None), None)
+        if exited is not None and not stopping.is_set():
+            return _stop_siblings(processes, exited, grace_seconds, poll_seconds)
+        time.sleep(poll_seconds)
+    while any(process.poll() is None for process in processes):
+        time.sleep(poll_seconds)
+    return next((p.returncode for p in processes if p.returncode), 0)
+
+
+def _stop_siblings(
+    processes: Sequence, exited, grace_seconds: float, poll_seconds: float
+) -> int:
+    siblings = [p for p in processes if p is not exited and p.poll() is None]
+    for process in siblings:
+        process.send_signal(signal.SIGTERM)
+    deadline = time.monotonic() + grace_seconds
+    while time.monotonic() < deadline and any(p.poll() is None for p in siblings):
+        time.sleep(poll_seconds)
+    for process in siblings:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+    return exited.returncode
 
 
 def _env_int(name: str, default: int = 0) -> int:
@@ -124,7 +172,6 @@ def _is_cancelled(task_id: str) -> bool:
 
 def run_worker(config: dict):
     """Start Dramatiq workers + scheduler/watcher service loop."""
-    import signal
 
     logging.basicConfig(
         level=logging.INFO,
@@ -218,17 +265,17 @@ def run_worker(config: dict):
         log.info("Starting Dramatiq: %s", " ".join(dramatiq_cmd))
         procs.append(subprocess.Popen(dramatiq_cmd))
 
+    stopping = threading.Event()
+
     def handle_signal(signum, frame):
         log.info("Received signal %d, shutting down...", signum)
         service_stop.set()
-        for proc in procs:
-            if proc.poll() is None:
-                proc.send_signal(signum)
+        _request_pool_stop(procs, stopping, signum)
 
     signal.signal(signal.SIGTERM, handle_signal)
     signal.signal(signal.SIGINT, handle_signal)
 
-    exit_code = _supervise_pools(procs)
+    exit_code = _supervise_pools(procs, stopping=stopping)
     service_stop.set()
     log.info("Dramatiq exited with code %d", exit_code)
     sys.exit(exit_code)
