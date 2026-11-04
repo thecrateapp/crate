@@ -6,6 +6,7 @@ import "./index.css";
 import App from "./App";
 import { AppErrorBoundary } from "@crate/ui/primitives/AppErrorBoundary";
 import { captureRenderError, initSentry } from "./lib/sentry";
+import { installStaleChunkReload } from "./lib/stale-chunk-reload";
 
 const disposeFocusRingMotion = installFocusRingMotion();
 import.meta.hot?.dispose(disposeFocusRingMotion);
@@ -13,6 +14,7 @@ applyCrateIdentity();
 const disposePreferences = initializeUiPreferences();
 import.meta.hot?.dispose(disposePreferences);
 
+installStaleChunkReload();
 initSentry();
 
 createRoot(document.getElementById("root")!).render(

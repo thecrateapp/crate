@@ -1,29 +1,55 @@
 import * as Sentry from "@sentry/capacitor";
-import { init as initReactSentry } from "@sentry/react";
+import {
+  init as initReactSentry,
+  rewriteFramesIntegration,
+} from "@sentry/react";
 
-import { scrubSentryEvent } from "../../../shared/web/sentry";
+import {
+  createSentryBeforeSend,
+  createSentryFrameNormalizer,
+  resolveSentryEnvironment,
+  sentryAppOrigin,
+} from "../../../shared/web/sentry";
+import { isStaleChunkReloadPending } from "./stale-chunk-reload";
 
 let initialized = false;
 
 export function initNativeSentry(): void {
   const dsn = import.meta.env.VITE_SENTRY_DSN?.trim();
   if (initialized || !dsn) return;
+  const environment = resolveSentryEnvironment(
+    import.meta.env.VITE_SENTRY_ENVIRONMENT,
+    window.location,
+  );
+  if (!environment) return;
 
   Sentry.init(
     {
       dsn,
-      environment: import.meta.env.VITE_SENTRY_ENVIRONMENT || "development",
+      environment,
       release: import.meta.env.VITE_SENTRY_RELEASE || undefined,
       sendDefaultPii: false,
       enableNative: true,
       enableNativeCrashHandling: true,
       enableCaptureFailedRequests: true,
-      integrations: [Sentry.browserTracingIntegration()],
+      integrations: [
+        Sentry.browserTracingIntegration(),
+        // Replaces the Capacitor SDK's default RewriteFrames (same name), which
+        // left Android frames as bare `/assets/...` and iOS ones as
+        // `app:///assets/...`; every runtime now uses `app:///assets/...`.
+        rewriteFramesIntegration({
+          iteratee: createSentryFrameNormalizer(
+            sentryAppOrigin(window.location),
+          ),
+        }),
+      ],
       tracesSampleRate: parseSampleRate(
         import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE,
         0.1,
       ),
-      beforeSend: scrubSentryEvent,
+      beforeSend: createSentryBeforeSend({
+        suppress: isStaleChunkReloadPending,
+      }),
     },
     initReactSentry,
   );

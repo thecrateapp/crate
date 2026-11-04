@@ -24,14 +24,23 @@ export function VtNavLink({ onClick, to, ...props }: NavLinkProps) {
         navigate(to);
         return;
       }
-      document.startViewTransition(() => {
+      const transition = document.startViewTransition(() => {
         flushSync(() => {
           navigate(to);
         });
       });
+      // The browser skips the animation when the viewport resizes or another
+      // transition starts ("InvalidStateError: Transition was aborted because
+      // of invalid state") and rejects these promises; the navigation itself
+      // already happened. updateCallbackDone stays unhandled so a failure of
+      // the navigation callback is still reported.
+      transition?.ready?.catch(ignoreSkippedTransition);
+      transition?.finished?.catch(ignoreSkippedTransition);
     },
     [navigate, onClick, to],
   );
 
   return <NavLink to={to} onClick={handleClick} {...props} />;
 }
+
+function ignoreSkippedTransition(): void {}

@@ -52,6 +52,44 @@ describe("VtNavLink", () => {
     expect(startViewTransition).not.toHaveBeenCalled();
   });
 
+  it("handles transitions the browser skips so they are not unhandled rejections", async () => {
+    // CRATE-LISTEN-1F: WebKit aborts the animation when the viewport resizes.
+    const skipped = () =>
+      Promise.reject(
+        new DOMException(
+          "Transition was aborted because of invalid state. Viewport size changed",
+          "InvalidStateError",
+        ),
+      );
+    const ready = skipped();
+    const finished = skipped();
+    const updateCallbackDone = Promise.resolve();
+    const readyCatch = vi.spyOn(ready, "catch");
+    const finishedCatch = vi.spyOn(finished, "catch");
+    const updateCatch = vi.spyOn(updateCallbackDone, "catch");
+    Object.defineProperty(document, "startViewTransition", {
+      configurable: true,
+      value: vi.fn((update: () => void) => {
+        update();
+        return {
+          ready,
+          finished,
+          updateCallbackDone,
+        } as unknown as ViewTransition;
+      }),
+    });
+    renderNavigation();
+
+    fireEvent.click(screen.getByRole("link", { name: "Library" }));
+
+    expect(screen.getByTestId("current-path").textContent).toBe("/library");
+    expect(readyCatch).toHaveBeenCalledOnce();
+    expect(finishedCatch).toHaveBeenCalledOnce();
+    // A failing navigation callback must still surface.
+    expect(updateCatch).not.toHaveBeenCalled();
+    await expect(ready.catch(() => "handled")).resolves.toBe("handled");
+  });
+
   it("keeps view transitions outside the transparent Linux Tauri window", () => {
     const startViewTransition = installViewTransition();
     renderNavigation();

@@ -13,6 +13,7 @@ import {
 } from "./lib/offline";
 import { shouldRegisterServiceWorker } from "./lib/platform";
 import { initRuntimeSentry, reportRuntimeError } from "./lib/runtime-sentry";
+import { installStaleChunkReload } from "./lib/stale-chunk-reload";
 import { bootstrapNativeSessionStore } from "./lib/server-store";
 import { renderSecureSessionError } from "./lib/secure-session-error";
 import { syncThemeColor } from "./lib/theme-color";
@@ -119,6 +120,7 @@ async function bootstrap(): Promise<void> {
 }
 
 async function start(): Promise<void> {
+  installStaleChunkReload();
   await initRuntimeSentry().catch(() => undefined);
 
   try {
