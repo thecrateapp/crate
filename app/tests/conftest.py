@@ -390,5 +390,5 @@ def pytest_collection_modifyitems(config, items):
         return
     skip_benchmark = pytest.mark.skip(reason="timing benchmark: run with --benchmark")
     for item in items:
-        if "benchmark" in item.keywords:
+        if item.get_closest_marker("benchmark") is not None:
             item.add_marker(skip_benchmark)
