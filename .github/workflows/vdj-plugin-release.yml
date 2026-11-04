@@ -108,6 +108,8 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v6
+
       - uses: actions/download-artifact@v7
         with:
           pattern: vdj-*
@@ -126,15 +128,11 @@ jobs:
           done
           (cd dist && sha256sum -c ./*.sha256)
 
-      - uses: softprops/action-gh-release@v3
+      - name: Publish the VirtualDJ plugin release
+        uses: softprops/action-gh-release@v3
         with:
           name: Crate for VirtualDJ ${{ github.ref_name }}
           prerelease: true
           make_latest: false
+          body_path: docs/releases/${{ github.ref_name }}.md
           files: dist/*
-          body: |
-            Crate Online Source for VirtualDJ Pro. Internal testing build.
-
-            - macOS packages are signed ad-hoc and not notarized: remove the quarantine attribute after installing (see `tools/vdj-plugin/README.md`).
-            - The macOS Intel and Windows x64 packages have not been verified in VirtualDJ yet; `virtualdj_tested` in each manifest lists the versions that have.
-            - Each archive has a `.sha256` and a `manifest-<platform>.json` with the Crate contracts it supports and its install path.
