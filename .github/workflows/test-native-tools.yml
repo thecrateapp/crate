@@ -6,6 +6,7 @@ on:
     paths:
       - "app/crate/smart_mix/**"
       - "tools/smart-mix-lab/**"
+      - "tools/smart-mix-eval/**"
       - "app/tests/test_smart_mix_rust_parity.py"
       - "app/media-worker/**"
       - "tools/crate-cli/**"
@@ -17,6 +18,7 @@ on:
     paths:
       - "app/crate/smart_mix/**"
       - "tools/smart-mix-lab/**"
+      - "tools/smart-mix-eval/**"
       - "app/tests/test_smart_mix_rust_parity.py"
       - "app/media-worker/**"
       - "tools/crate-cli/**"
@@ -88,6 +90,7 @@ jobs:
           pip install -r requirements-test.txt "librosa>=0.10"
           python -m pytest tests/test_smart_mix_rust_parity.py -q
           python -m pytest ../tools/smart-mix-lab/tests -q
+          python -m pytest ../tools/smart-mix-eval/tests -q
 
   media-worker:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
