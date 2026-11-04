@@ -168,3 +168,25 @@ it("gates AI navigation by configuration read capability", () => {
     "/ai",
   );
 });
+it("lists Errors between Logs and Stack for error viewers", () => {
+  renderWithAdminProviders(<Sidebar />, {
+    auth: only("ops.logs.view", "ops.errors.view", "ops.runtime.manage"),
+  });
+  const nav = screen.getByRole("navigation", { name: "Admin navigation" });
+  const names = within(nav)
+    .getAllByRole("link")
+    .map((link) => link.textContent);
+  expect(
+    names.slice(names.indexOf("Logs"), names.indexOf("Stack") + 1),
+  ).toEqual(["Logs", "Errors", "Stack"]);
+  expect(screen.getByRole("link", { name: "Errors" })).toHaveAttribute(
+    "href",
+    "/errors",
+  );
+});
+it("hides Errors from people without the inbox capability", () => {
+  renderWithAdminProviders(<Sidebar />, { auth: only("ops.logs.view") });
+  expect(
+    screen.queryByRole("link", { name: "Errors" }),
+  ).not.toBeInTheDocument();
+});

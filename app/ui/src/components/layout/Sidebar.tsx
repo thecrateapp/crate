@@ -138,6 +138,11 @@ const navItems = [
     capabilities: ["ops.logs.view"],
   },
   {
+    to: "/errors",
+    label: "Errors",
+    capabilities: ["ops.errors.view"],
+  },
+  {
     to: "/stack",
     label: "Stack",
     capabilities: ["ops.runtime.manage"],

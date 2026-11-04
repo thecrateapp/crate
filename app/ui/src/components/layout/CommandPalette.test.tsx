@@ -197,6 +197,38 @@ describe("CommandPalette", () => {
     ).toBeVisible();
   });
 
+  it("offers the Errors inbox only to error viewers", async () => {
+    const user = userEvent.setup();
+    mockAuth(["ops.errors.view"]);
+
+    const { unmount } = render(
+      <MemoryRouter>
+        <CommandPalette />
+      </MemoryRouter>,
+    );
+    await user.keyboard("{Control>}k{/Control}");
+    const dialog = screen.getByRole("dialog", { name: "Command palette" });
+    expect(
+      await within(dialog).findByRole("option", { name: "Errors" }),
+    ).toBeVisible();
+    unmount();
+
+    mockAuth(["ops.logs.view"]);
+    render(
+      <MemoryRouter>
+        <CommandPalette />
+      </MemoryRouter>,
+    );
+    await user.keyboard("{Control>}k{/Control}");
+    const next = screen.getByRole("dialog", { name: "Command palette" });
+    expect(
+      await within(next).findByRole("option", { name: "Logs" }),
+    ).toBeVisible();
+    expect(
+      within(next).queryByRole("option", { name: "Errors" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("offers named icon-free commands, keyboard selection and an explicit close action", async () => {
     const user = userEvent.setup();
     mockAuth(["admin.access", "library.import.manage"]);
