@@ -18,6 +18,8 @@ Store results by `entity_uid`, edge id or index, never by title or artist. The o
 | `run_eval.py`                                  | Plans the edge set with a planner and writes `report.json` and `report.md` |
 | `app/crate/smart_mix/evaluation.py`            | The metrics: pure functions over a plan and two profiles                   |
 | `app/crate/db/queries/smart_mix_evaluation.py` | Read-only session guard and seed sampling used by the tools                |
+| `render_pair.py`                               | Renders a plan and its two audio files to a WAV for listening              |
+| `blind_session.py`                             | Blind A/B rating of rendered pairs into `ratings.csv`                      |
 | `reference/`                                   | Analyzer reference tools (Queen Mary, KeyFinder, kick) used to measure v6  |
 | `tests/`                                       | Unit tests of the tools                                                    |
 
@@ -76,6 +78,8 @@ Tests:
 cd app && ../.venv/bin/python -m pytest tests/test_smart_mix_evaluation.py \
   tests/test_smart_mix_evaluation_queries.py ../tools/smart-mix-eval/tests -q
 ```
+
+The render tests need FFmpeg; they skip without it unless `CRATE_REQUIRE_FFMPEG=1`.
 
 ## The edge set
 
@@ -177,6 +181,53 @@ violations, phrase alignment, bass overlap, key clashes, energy step and duratio
 p50 and p95 (linear interpolation) where they apply. With `--compare`, it adds current minus
 baseline overall and per stratum; `report.json` keeps every plan and metric per edge for paired
 analysis.
+
+## Listening: renders and blind sessions
+
+Numbers cannot hear a transition, so SG3 also asks for a blind listening test. Both tools only
+read local audio files; they never touch a database.
+
+`render_pair.py` renders 30–60 s around a transition with FFmpeg, as the Android engine plays
+the plan: 12 s of context each side of the mix (more after it when the outgoing cue is too early
+for the pre-roll), the outgoing track from `outgoingCueMs` until the end of the mix, the incoming
+track from its start position and time-stretched with `atempo` in beatmatch, `volume`
+expressions for the crossfade and loudness staging (the formulas of
+`crate.smart_mix.evaluation`), a 150 Hz `lowshelf` at −24 dB swapped through `asendcmd` for the
+bass handoff, and 50 ms `afade` at both ends. Output: 16-bit stereo WAV, 44.1 kHz by default.
+
+```bash
+python tools/smart-mix-eval/render_pair.py \
+  --report tools/smart-mix-eval/out/dev/smart-mix-v2/report.json --edge e0001 \
+  --outgoing <outgoing audio> --incoming <incoming audio> \
+  --output tools/smart-mix-eval/out/renders/e0001-v2.wav
+```
+
+`--plan plan.json` takes a plan in its API form instead of a report edge, and `--seconds` sets
+the excerpt length. The renderer leaves out one engine behaviour: after the mix Android ramps
+the incoming tempo back to 1.0 over 4 s, while the render keeps the mix tempo until the end of
+the excerpt.
+
+`blind_session.py` takes a manifest of pairs with two renders each, shuffles the pairs and the
+A/B sides with `--seed`, plays A then B with `ffplay` (`--player` changes it; `r` replays), asks
+for a 1–5 rating of each and appends them to `ratings.csv` without labels. An interrupted
+session resumes with the same seed. At the end it writes the labels into the CSV and prints,
+per label, the mean rating, wins, ties, losses, the share of pairs won or tied and the worst
+rating (SG3: the AI wins or ties in at least 60 % of the pairs and no render is rated below 2).
+Do not open `ratings.csv` before the end.
+
+```json
+{
+  "pairs": [
+    {
+      "pair": "e0001",
+      "renders": {
+        "smart-mix-v3": "v3/e0001.wav",
+        "smart-mix-v3-ai": "ai/e0001.wav"
+      }
+    }
+  ]
+}
+```
 
 ## Limits
 

@@ -81,11 +81,15 @@ jobs:
           cache: "pip"
           cache-dependency-path: app/requirements*.txt
 
+      - name: Install FFmpeg for the Smart Mix render tests
+        run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg)
+
       - name: Check Python and Rust Smart Mix parity
         working-directory: app
         env:
           CRATE_CLI_BINARY: /tmp/crate-cli-build/crate-cli
           CRATE_REQUIRE_CRATE_CLI: "1"
+          CRATE_REQUIRE_FFMPEG: "1"
         run: |
           pip install -r requirements-test.txt "librosa>=0.10"
           python -m pytest tests/test_smart_mix_rust_parity.py -q
