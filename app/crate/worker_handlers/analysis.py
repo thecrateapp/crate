@@ -1282,6 +1282,11 @@ def _handle_compute_smart_mix_profile(task_id: str, params: dict, config: dict) 
             "track_id": track_id,
         }
 
+    # Voice per phrase (SM3-D13); a voice failure leaves the draft as it was.
+    from crate.smart_mix.vocals import add_vocal_presence
+
+    draft = add_vocal_presence(draft, path)
+
     try:
         outcome = publish_smart_mix_profile(capture, draft)
     except Exception as exc:

@@ -1283,3 +1283,49 @@ def test_starting_over_a_paused_campaign_of_another_target_starts_a_new_one(
         _running_campaign(status="paused", profile_version=PROFILE_SCHEMA_VERSION - 1)
     )
     assert start_smart_mix_campaign(batch_size=20, max_attempts=3)["batches"] == 0
+
+
+def test_profile_task_publishes_the_draft_with_its_phrase_voice(monkeypatch) -> None:
+    # Voice is added after the analysis, Rust or Python (SM3-D13).
+    from dataclasses import replace
+
+    from crate.smart_mix.models import MixProfileQuality, TrackMixProfileDraft
+    from crate.worker_handlers import analysis
+
+    draft = TrackMixProfileDraft(
+        analyzer="crate-rust",
+        analyzer_version="smart-mix-audio-v7",
+        duration_ms=10_000,
+        quality=MixProfileQuality.PARTIAL,
+    )
+    voiced = replace(draft, analyzer="voiced")
+    monkeypatch.setattr(
+        analysis,
+        "resolve_smart_mix_track",
+        lambda **_kwargs: {"id": 7, "path": "/music/artist/album/track.flac"},
+        raising=False,
+    )
+    monkeypatch.setattr("crate.audio_analysis.analyze_mix_profile", lambda _path: draft)
+    voice_calls: list[tuple[TrackMixProfileDraft, str]] = []
+    monkeypatch.setattr(
+        "crate.smart_mix.vocals.add_vocal_presence",
+        lambda value, path: voice_calls.append((value, str(path))) or voiced,
+    )
+    monkeypatch.setattr(
+        analysis, "capture_smart_mix_source", lambda *_args, **_kwargs: "capture"
+    )
+    published: list[TrackMixProfileDraft] = []
+    monkeypatch.setattr(
+        analysis,
+        "publish_smart_mix_profile",
+        lambda _capture, value: (
+            published.append(value) or analysis.SmartMixPublication.PUBLISHED
+        ),
+    )
+    monkeypatch.setattr(analysis, "emit_task_event", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(analysis, "refresh_live_smart_mix_coverage", lambda: None)
+
+    analysis._handle_compute_smart_mix_profile("task-1", {"track_id": 7}, {})
+
+    assert voice_calls == [(draft, "/music/artist/album/track.flac")]
+    assert published == [voiced]
