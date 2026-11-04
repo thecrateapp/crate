@@ -290,18 +290,38 @@ def model_calling_task_types() -> frozenset[str]:
     )
 
 
-def imported_names(module: str) -> set[Node]:
-    """Every (source module, name) a module imports, at any depth."""
-    parsed = _parsed(module)
-    assert parsed is not None
+def _from_imports(module: str, nodes, is_package: bool) -> set[Node]:
     names: set[Node] = set()
-    for node in ast.walk(parsed.tree):
+    for node in nodes:
         if isinstance(node, ast.ImportFrom):
-            source = _absolute(module, node.level, node.module, parsed.is_package)
+            source = _absolute(module, node.level, node.module, is_package)
             for alias in node.names:
                 names.add((source, alias.name))
                 names.add(canonical(source, alias.name))
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                parent, _, name = alias.name.rpartition(".")
+                if parent:
+                    names.add((parent, name))
     return names
+
+
+def imports_by_function(module: str) -> dict[str, set[Node]]:
+    """(source, name) pairs imported by each function, plus "<module>" scope."""
+    parsed = _parsed(module)
+    assert parsed is not None
+    scopes: dict[str, set[Node]] = {}
+    inside: set[int] = set()
+    for qualname, function in _functions(parsed.tree):
+        nodes = list(ast.walk(function))
+        inside.update(id(node) for node in nodes)
+        scopes[qualname] = _from_imports(module, nodes, parsed.is_package)
+    scopes["<module>"] = _from_imports(
+        module,
+        [node for node in ast.walk(parsed.tree) if id(node) not in inside],
+        parsed.is_package,
+    )
+    return scopes
 
 
 def api_modules() -> list[str]:
