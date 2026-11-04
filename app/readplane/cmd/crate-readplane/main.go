@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -199,7 +200,11 @@ func main() {
 	if metricsServer != nil {
 		_ = metricsServer.Shutdown(shutdownCtx)
 	}
-	if err := httpServer.Shutdown(shutdownCtx); err != nil {
+	forced, err := drainHTTPServer(shutdownCtx, httpServer)
+	if forced {
+		logger.Info("http shutdown drain deadline reached; closed remaining long-lived connections")
+	}
+	if err != nil {
 		logger.Warn("http shutdown failed", "error", err)
 		observability.CaptureOperationError(err, "shutdown.http", nil)
 	}
@@ -210,6 +215,31 @@ func main() {
 	if durableRedisClient != nil {
 		_ = durableRedisClient.Close()
 	}
+}
+
+// httpDrainer is the part of *http.Server used to stop it.
+type httpDrainer interface {
+	Shutdown(ctx context.Context) error
+	Close() error
+}
+
+// drainHTTPServer stops accepting connections and waits for in-flight requests
+// until ctx expires, then closes whatever is still open. SSE subscribers (cache
+// events, home discovery stream) end only when their request context does, and
+// Shutdown does not cancel it, so with any client connected the drain always
+// runs into the deadline. That is the normal end of an orderly shutdown, not a
+// failure: forced reports it and the deadline is not returned as an error.
+// Upstream timeouts inside requests are reported where they happen, not here.
+func drainHTTPServer(ctx context.Context, server httpDrainer) (forced bool, err error) {
+	err = server.Shutdown(ctx)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		return false, err
+	}
+	// Shutdown already closed the listeners; closing one twice is not a failure.
+	if closeErr := server.Close(); closeErr != nil && !errors.Is(closeErr, net.ErrClosed) {
+		return true, closeErr
+	}
+	return true, nil
 }
 
 func runHealthcheck() {
