@@ -4,6 +4,7 @@ import importlib
 import time
 
 from crate.ai import configuration as service
+from crate.ai import requeue
 from crate.ai.contracts import AIConfigurationError
 from crate.db.queries.tasks import get_task
 from crate.db.repositories import ai_usage as usage
@@ -70,13 +71,15 @@ def run_probe(context, *, actor_id, job_id, idempotency_key):
             "AI_RUNTIME_UNAVAILABLE", "Synthetic transport is not available"
         ) from None
     config = context["config"]
-    invocation = usage.reserve_invocation(
-        context,
-        idempotency_key=f"probe:{actor_id}:{idempotency_key}",
-        input_tokens=config["max_input_tokens"],
-        output_tokens=config["max_output_tokens"],
-        actor_id=actor_id,
-        job_id=job_id,
+    invocation = requeue.reserve_with_capacity_wait(
+        lambda: usage.reserve_invocation(
+            context,
+            idempotency_key=f"probe:{actor_id}:{idempotency_key}",
+            input_tokens=config["max_input_tokens"],
+            output_tokens=config["max_output_tokens"],
+            actor_id=actor_id,
+            job_id=job_id,
+        )
     )
     if not invocation["claimed"]:
         return {"status": "duplicate"}

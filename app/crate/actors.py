@@ -22,6 +22,13 @@ import dramatiq
 
 # Broker must be imported before actor registration
 import crate.broker  # noqa: F401
+from crate.ai.queues import AI_QUEUES
+from crate.ai.requeue import (
+    AI_CONCURRENCY_REQUEUE_LIMIT,
+    AIConcurrencyDeferred,
+    concurrency_window,
+    requeue_delay_ms,
+)
 from crate.db.repositories.tasks_shared import DB_HEAVY_TASKS
 
 log = logging.getLogger(__name__)
@@ -591,7 +598,62 @@ def clear_download_slots():
 # ── Generic task executor ─────────────────────────────────────────
 
 
-def _execute_task(task_type: str, task_id: str):
+def _send_later(task_type: str, task_id: str, delay_ms: int, ai_requeues: int = 0):
+    """Send the task's message again, keeping its AI capacity attempt count."""
+    actor = _actors.get(task_type)
+    if not actor:
+        return
+    options: dict[str, Any] = {"args": (task_id,), "delay": delay_ms}
+    if ai_requeues:
+        options["kwargs"] = {"ai_requeues": ai_requeues}
+    actor.send_with_options(**options)
+
+
+def _requeue_for_ai_capacity(task_type: str, task_id: str, attempt: int) -> None:
+    """Put an AI task refused for connection concurrency back in its queue."""
+    from crate.db.repositories.tasks import requeue_running_task
+    from crate.worker import _is_cancelled
+
+    delay_ms = requeue_delay_ms()
+    requeued = requeue_running_task(
+        task_id,
+        progress=(
+            "Waiting for AI provider capacity; "
+            f"retry {attempt}/{AI_CONCURRENCY_REQUEUE_LIMIT} in {delay_ms // 1000}s"
+        ),
+    )
+    if requeued is None:
+        if _is_cancelled(task_id):
+            from crate.db.repositories.task_control import acknowledge_cancellation
+
+            acknowledged = acknowledge_cancellation(task_id)
+            if acknowledged:
+                from crate.db.events import _publish_to_redis
+
+                _publish_to_redis(
+                    task_id,
+                    "task_done",
+                    {
+                        "type": "task_done",
+                        "status": acknowledged["status"],
+                        "task_type": task_type,
+                    },
+                    "",
+                )
+        log.info("Task %s (%s) not requeued: no longer running", task_id, task_type)
+        return
+    _send_later(task_type, task_id, delay_ms, ai_requeues=attempt)
+    log.info(
+        "Task %s (%s) waiting for AI provider capacity; requeue %d/%d in %dms",
+        task_id,
+        task_type,
+        attempt,
+        AI_CONCURRENCY_REQUEUE_LIMIT,
+        delay_ms,
+    )
+
+
+def _execute_task(task_type: str, task_id: str, ai_requeues: int = 0):
     """Generic wrapper: read PG task → run handler → update PG → check memory."""
     from crate.config import load_config
     from crate.db.queries.tasks import get_task
@@ -633,12 +695,12 @@ def _execute_task(task_type: str, task_id: str):
             task_id,
             progress=f"Deferred by resource governor: {resource_decision.reason}",
         )
-        actor = _actors.get(task_type)
-        if actor:
-            actor.send_with_options(
-                args=(task_id,),
-                delay=max(1, resource_decision.defer_seconds) * 1000,
-            )
+        _send_later(
+            task_type,
+            task_id,
+            max(1, resource_decision.defer_seconds) * 1000,
+            ai_requeues,
+        )
         return
 
     # DB-heavy mutex — check BEFORE marking as running
@@ -734,9 +796,8 @@ def _execute_task(task_type: str, task_id: str):
                 fresh.get("status"),
             )
         else:
-            actor = _actors.get(task_type)
-            if fresh and fresh.get("status") == "pending" and actor:
-                actor.send_with_options(args=(task_id,), delay=TASK_REQUEUE_DELAY_MS)
+            if fresh and fresh.get("status") == "pending":
+                _send_later(task_type, task_id, TASK_REQUEUE_DELAY_MS, ai_requeues)
             log.info("Task %s (%s) waiting for runtime admission", task_id, task_type)
         if is_db_heavy:
             _release_db_heavy_lock(task_id)
@@ -789,7 +850,12 @@ def _execute_task(task_type: str, task_id: str):
                 authority_failed = True
         if not authority_failed:
             config = load_config()
-            result = handler(task_id, task.get("params", {}), config)
+            queue = get_queue_for_task(task_type)
+            if queue in AI_QUEUES:
+                with concurrency_window(queue, ai_requeues):
+                    result = handler(task_id, task.get("params", {}), config)
+            else:
+                result = handler(task_id, task.get("params", {}), config)
 
         if not authority_failed and _is_cancelled(task_id):
             if isinstance(result, dict) and result.get("_delegated"):
@@ -958,6 +1024,10 @@ def _execute_task(task_type: str, task_id: str):
             log.debug("Task event publish failed", exc_info=True)
         raise  # let dramatiq handle retry logic
 
+    except AIConcurrencyDeferred as deferred:
+        # Nothing was transmitted: the provider connection had no free slot.
+        _requeue_for_ai_capacity(task_type, task_id, deferred.attempt)
+
     except BaseException as e:
         if e.__class__.__name__ != "TimeLimitExceeded":
             raise
@@ -1046,11 +1116,11 @@ _actors: dict[str, dramatiq.Actor] = {}
 def _make_actor_fn(task_type: str):
     """Create a closure that calls _execute_task for a specific task type."""
 
-    def actor_fn(task_id: str):
+    def actor_fn(task_id: str, ai_requeues: int = 0):
         from crate.observability.sentry import task_scope
 
         with task_scope(task_type, task_id, get_queue_for_task(task_type)):
-            _execute_task(task_type, task_id)
+            _execute_task(task_type, task_id, ai_requeues=ai_requeues)
 
     actor_fn.__name__ = task_type
     actor_fn.__qualname__ = task_type

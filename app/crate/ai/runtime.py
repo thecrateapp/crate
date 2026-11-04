@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel
 
-from crate.ai import configuration, transport
+from crate.ai import configuration, requeue, transport
 from crate.ai.actions import get_action
 from crate.ai.contracts import AIConfigurationError, ProfileConfig
 from crate.ai.consumers import require_action_authority
@@ -220,13 +220,16 @@ def execute_structured(
     admitted["schema_fingerprint"] = _hash(schema)
     admitted["config_fingerprint"] = context_fingerprint(admitted)
     key = idempotency_key or (f"job:{job_id}:{action_id}" if job_id else str(uuid4()))
-    invocation = usage.reserve_invocation(
-        admitted,
-        idempotency_key=f"action:{actor_id}:{key}",
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        actor_id=actor_id,
-        job_id=job_id,
+    # A concurrency refusal transmits nothing; AI-lane tasks wait for capacity.
+    invocation = requeue.reserve_with_capacity_wait(
+        lambda: usage.reserve_invocation(
+            admitted,
+            idempotency_key=f"action:{actor_id}:{key}",
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            actor_id=actor_id,
+            job_id=job_id,
+        )
     )
     if not invocation["claimed"]:
         raise AIConfigurationError(
