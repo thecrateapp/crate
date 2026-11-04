@@ -372,7 +372,7 @@ class SentryClient:
             with self._client.stream(
                 method,
                 url,
-                params=params,
+                params=tuple(params) if params is not None else None,
                 json=body,
                 headers=headers,
                 extensions=extensions,

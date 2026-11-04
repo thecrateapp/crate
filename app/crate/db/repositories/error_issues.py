@@ -6,9 +6,10 @@ import json
 import uuid
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import text
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from crate.db.tx import optional_scope
@@ -152,7 +153,7 @@ def mark_status(
             ),
             {"status": status, "substatus": substatus, "at": at or _now(), "ids": ids},
         )
-        return int(result.rowcount or 0)
+        return int(cast(CursorResult, result).rowcount or 0)
 
 
 def set_digest(
@@ -190,7 +191,7 @@ def set_digest(
                 "crate_score": crate_score,
             },
         )
-        return result.rowcount == 1
+        return cast(CursorResult, result).rowcount == 1
 
 
 def purge_closed(
@@ -211,7 +212,7 @@ def purge_closed(
             ),
             {"cutoff": cutoff},
         )
-        return int(result.rowcount or 0)
+        return int(cast(CursorResult, result).rowcount or 0)
 
 
 def record_fix_request(
@@ -232,7 +233,7 @@ def record_fix_request(
             ),
             {"id": _uuid(issue_id), "at": at or _now(), "user_id": user_id},
         )
-        return result.rowcount == 1
+        return cast(CursorResult, result).rowcount == 1
 
 
 __all__ = [
