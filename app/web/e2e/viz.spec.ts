@@ -241,6 +241,7 @@ test("For DJs offers the VirtualDJ plugin from its own release and keeps Crate D
   const badge = (title: string) =>
     chapter.locator("h3", { hasText: title }).locator(".status-badge");
   await expect(badge("VirtualDJ plugin")).toHaveText("Available");
+  await expect(badge("Queue from Crate")).toHaveText("Available");
   await expect(badge("Crate Decks")).toHaveText("In development");
 
   const downloads = chapter.locator("[data-plugin-download]");
@@ -256,6 +257,8 @@ test("For DJs offers the VirtualDJ plugin from its own release and keeps Crate D
     chapter.locator('[data-plugin-download][data-tested="false"]'),
   ).toHaveCount(2);
   await expect(chapter).toContainText("VirtualDJ Pro");
+  await expect(chapter).toContainText("CRATE_VDJ_ENABLED");
+  await expect(chapter).toContainText("CRATE_VDJ_AUTOMATION_ENABLED");
 });
 
 test("the Smart Mix transition plays forward as the page scrolls", async ({

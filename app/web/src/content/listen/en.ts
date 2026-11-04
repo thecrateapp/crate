@@ -478,8 +478,8 @@ export const listen: ListenPage = {
         },
         {
           title: "Queue from Crate",
-          status: "in-development",
-          body: "While VirtualDJ mixes on its own, Crate keeps its queue two tracks ahead with compatible picks and no repeated artist or album nearby. Off unless the server operator enables it.",
+          status: "available",
+          body: "While VirtualDJ mixes on its own, Crate keeps its queue two tracks ahead with compatible picks and no repeated artist or album nearby. It needs the automation permission on the token and CRATE_VDJ_AUTOMATION_ENABLED on the server.",
         },
         {
           title: "Crate Decks",
@@ -491,7 +491,7 @@ export const listen: ListenPage = {
       plugin: {
         eyebrow: "Install the VirtualDJ plugin",
         requirement:
-          "Needs VirtualDJ Pro and an access token created in Listen, under Settings, Access tokens.",
+          "Needs VirtualDJ Pro, CRATE_VDJ_ENABLED on the server and an access token created in Listen, under Settings, Access tokens.",
         untested: "Experimental: not yet tested in VirtualDJ",
         steps: [
           {
