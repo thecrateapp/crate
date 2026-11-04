@@ -396,12 +396,13 @@ export function AudioProfileCard({
   // Readings in the spectrum's language, the spectrum and the mood rose (approved
   // mockups B and A), for an album or a single track. Columns follow the space the block
   // gets, not the window, so the album page and the track dialog share it: three from
-  // 72rem, two from 56rem with the rose under the readings, one below. The row is capped
+  // 72rem (the spectrum takes half up to 80rem, so its labels stay legible in the
+  // dialog), two from 56rem with the rose under the readings, one below. The row is capped
   // so the spectrum stays smaller than the card on wide screens, and the readings spread
   // to the spectrum's height.
   const analysisBlock = (
     <div className="@container">
-      <div className="grid max-w-[104rem] gap-x-10 gap-y-6 @4xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] @6xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)_minmax(0,4fr)]">
+      <div className="grid max-w-[104rem] gap-x-10 gap-y-6 @4xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] @6xl:grid-cols-[minmax(0,4fr)_minmax(0,8fr)_minmax(0,4fr)] @7xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)_minmax(0,4fr)]">
         <div
           data-slot="audio-profile-column"
           className="min-w-0 @4xl:flex @4xl:flex-col"
