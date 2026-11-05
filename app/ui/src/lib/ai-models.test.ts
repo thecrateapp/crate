@@ -26,6 +26,7 @@ import {
   dailyTokenBudget,
   dailyUsageSeries,
   eligibleModels,
+  errorSummaryEgress,
   FEATURE_AREAS,
   featureAreaLabel,
   featureModelView,
@@ -53,6 +54,7 @@ import {
   reasoningPresets,
   reasoningValue,
   savedProfileOptions,
+  sendsErrorSummaries,
   splitConnections,
   summaryModel,
   usageToday,
@@ -87,6 +89,7 @@ describe("FEATURE_AREAS / featureAreaLabel", () => {
       "genres",
       "discovery",
       "translation",
+      "ops",
     ]);
   });
 
@@ -97,6 +100,7 @@ describe("FEATURE_AREAS / featureAreaLabel", () => {
     expect(featureAreaLabel("genres")).toBe("Genres");
     expect(featureAreaLabel("discovery")).toBe("Discovery");
     expect(featureAreaLabel("translation")).toBe("Translations");
+    expect(featureAreaLabel("ops")).toBe("Operations");
   });
 
   it("falls back to humanizeKey for unknown groups", () => {
@@ -135,6 +139,14 @@ describe("featureSends", () => {
       "i18n.listen.draft",
       "Sends: interface text with its keys and placeholders",
     ],
+    [
+      "ops.error.triage",
+      "Sends: the scrubbed error summary and up to 10 similar issues",
+    ],
+    [
+      "ops.error.investigate",
+      "Sends: the scrubbed error summary, its counts and releases, and similar issues",
+    ],
   ];
 
   it.each(cases)("maps %s", (id, expected) => {
@@ -144,6 +156,30 @@ describe("featureSends", () => {
   it("falls back to the action description for unknown actions", () => {
     expect(featureSends(action("unknown.action", "Custom description"))).toBe(
       "Custom description",
+    );
+  });
+});
+
+describe("error summary egress", () => {
+  it("applies only to error inbox features", () => {
+    expect(sendsErrorSummaries("ops.error.triage")).toBe(true);
+    expect(sendsErrorSummaries("ops.error.investigate")).toBe(true);
+    expect(sendsErrorSummaries("genres.eq.propose")).toBe(false);
+  });
+
+  it("names the cloud provider the summaries leave for", () => {
+    expect(errorSummaryEgress("gemini")).toBe(
+      "Error summaries leave this server for Gemini.",
+    );
+    expect(errorSummaryEgress("deepseek")).toBe(
+      "Error summaries leave this server for DeepSeek.",
+    );
+  });
+
+  it("stays silent for Ollama and warns when the provider is unknown", () => {
+    expect(errorSummaryEgress("ollama")).toBeNull();
+    expect(errorSummaryEgress(null)).toBe(
+      "Error summaries leave this server for the chosen provider.",
     );
   });
 });

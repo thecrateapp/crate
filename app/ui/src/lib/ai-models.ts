@@ -22,6 +22,7 @@ export const FEATURE_AREAS = [
   "genres",
   "discovery",
   "translation",
+  "ops",
 ] as const;
 
 const FEATURE_AREA_LABELS: Record<string, string> = {
@@ -31,6 +32,7 @@ const FEATURE_AREA_LABELS: Record<string, string> = {
   genres: "Genres",
   discovery: "Discovery",
   translation: "Translations",
+  ops: "Operations",
 };
 
 export function featureAreaLabel(group: string): string {
@@ -50,10 +52,30 @@ const FEATURE_SENDS: Record<string, string> = {
   "playlists.description.generate": "Sends: playlist rules and up to 60 tracks",
   "music_paths.refine": "Sends: the computed path and the allowed alternatives",
   "i18n.listen.draft": "Sends: interface text with its keys and placeholders",
+  "ops.error.triage":
+    "Sends: the scrubbed error summary and up to 10 similar issues",
+  "ops.error.investigate":
+    "Sends: the scrubbed error summary, its counts and releases, and similar issues",
 };
 
 export function featureSends(action: Action): string {
   return FEATURE_SENDS[action.id] ?? action.description;
+}
+
+/** Features whose input is the error summary of an issue from the error tracker. */
+export function sendsErrorSummaries(actionId: string): boolean {
+  return actionId.startsWith("ops.error.");
+}
+
+/**
+ * The data-egress line for error features bound to `provider`. Ollama runs on
+ * the operator's own server, so nothing leaves; an unknown provider warns.
+ */
+export function errorSummaryEgress(provider: string | null): string | null {
+  if (provider === "ollama") return null;
+  return provider
+    ? `Error summaries leave this server for ${providerLabel(provider)}.`
+    : "Error summaries leave this server for the chosen provider.";
 }
 
 const PROVIDER_LABELS: Record<string, string> = {

@@ -92,6 +92,54 @@ const ACTIONS: Action[] = [
   },
 ];
 
+/** An error inbox feature; added by tests that need one, not in the default set. */
+export function errorTriageAction(): Action {
+  return {
+    id: "ops.error.triage",
+    label: "Triage error issue",
+    group: "ops",
+    input: "text",
+    permission: "ops.errors.manage",
+    location: "/errors",
+    description:
+      "Classify an error issue from its sanitized digest and pick duplicates only from the listed candidates.",
+    maxima: {
+      timeout_seconds: 45,
+      max_output_tokens: 2048,
+      max_input_tokens: 131072,
+      max_image_pixels: null,
+      max_proposals: null,
+      max_selected: null,
+    },
+  };
+}
+
+export const OLLAMA_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+
+/** A usable Ollama connection on the operator's own server. */
+export function ollamaConnection(): Connection {
+  return {
+    id: OLLAMA_ID,
+    persistent_id: OLLAMA_ID,
+    label: "Home Ollama",
+    provider: "ollama",
+    revision: 1,
+    endpoint: "http://ollama:11434",
+    enabled: true,
+    model_count: 2,
+    catalog_status: "ready",
+    catalog_error_code: null,
+    catalog_updated_at: null,
+    max_concurrent: 2,
+    daily_calls: 100,
+    daily_tokens: 1000000,
+    source: "stored",
+    has_key: false,
+    last4: null,
+    read_only: false,
+  };
+}
+
 const CONNECTIONS: Connection[] = [
   {
     id: STUDIO_ID,

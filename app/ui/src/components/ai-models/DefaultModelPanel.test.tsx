@@ -11,6 +11,7 @@ import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 import {
   aiSnapshot,
   catalog,
+  errorTriageAction,
   migratedSnapshot,
   STUDIO_ID,
 } from "./test-fixtures";
@@ -770,6 +771,52 @@ describe("DefaultModelPanel", () => {
       within(staysOff).getByText("Turn them on in Features after saving."),
     ).toBeVisible();
     expect(within(staysOff).queryByText("Propose genre EQ")).toBeNull();
+  });
+
+  it("warns that error summaries leave the server when error features take the model", async () => {
+    const snapshot = aiSnapshot();
+    snapshot.actions.push(errorTriageAction());
+    apiMock.mockResolvedValueOnce(
+      result([...firstUseOutcomes, outcome("ops.error.triage", "applied")]),
+    );
+    const user = userEvent.setup();
+    renderWithAdminProviders(
+      <DefaultModelPanel snapshot={snapshot} refresh={vi.fn()} />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Use for all features" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Triage error issue")).toBeVisible();
+    expect(
+      within(dialog).getByRole("note", { name: "Data leaving this server" }),
+    ).toHaveTextContent("Error summaries leave this server for Gemini.");
+  });
+
+  it("does not warn when error features keep their current model", async () => {
+    const snapshot = aiSnapshot();
+    snapshot.actions.push(errorTriageAction());
+    apiMock.mockResolvedValueOnce(
+      result([
+        ...firstUseOutcomes,
+        outcome("ops.error.triage", "kept_current", "AI_CONTEXT_TOO_SMALL"),
+      ]),
+    );
+    const user = userEvent.setup();
+    renderWithAdminProviders(
+      <DefaultModelPanel snapshot={snapshot} refresh={vi.fn()} />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Use for all features" }),
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).queryByRole("note", { name: "Data leaving this server" }),
+    ).not.toBeInTheDocument();
   });
 
   it("says when a kept feature stays off", async () => {
