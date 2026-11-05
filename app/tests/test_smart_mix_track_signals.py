@@ -8,6 +8,7 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 
 import numpy as np
+import pytest
 
 from crate.db.repositories.smart_mix_signals import (
     TrackMixSignals,
@@ -213,6 +214,72 @@ def test_older_signal_of_the_same_file_still_joins_the_row(pg_db) -> None:
         voice_hop_ms=480,
         voice_scores=b"\x10",
     )
+
+
+def test_signal_stores_refuse_a_time_without_a_time_zone(pg_db) -> None:
+    del pg_db
+    track_id, _uid = _create_track("signals-naive")
+    naive = datetime(2026, 11, 5, 12, 0)
+
+    # The guard compares read times across workers: a naive one would be read in the
+    # session's time zone, not in the worker's.
+    with pytest.raises(ValueError, match="time zone"):
+        store_track_mix_beats(
+            track_id,
+            "revision-a",
+            tracker="beat-this-small0-dbn",
+            beats_ms=BEATS,
+            downbeats_ms=DOWNBEATS,
+            beats_per_bar=4,
+            updated_at=naive,
+        )
+    with pytest.raises(ValueError, match="time zone"):
+        store_track_mix_voice(
+            track_id,
+            "revision-a",
+            detector="yamnet-2",
+            hop_ms=480,
+            scores=b"\x10",
+            updated_at=naive,
+        )
+
+    assert get_track_mix_signals(track_id) is None
+
+
+def test_a_signal_the_revision_guard_keeps_out_is_logged(pg_db, caplog) -> None:
+    del pg_db
+    track_id, _uid = _create_track("signals-guard-log")
+    replaced_at = datetime(2026, 11, 5, 12, 0, tzinfo=UTC)
+    logger = "crate.db.repositories.smart_mix_signals"
+    with caplog.at_level(logging.DEBUG, logger=logger):
+        store_track_mix_beats(
+            track_id,
+            "revision-b",
+            tracker="beat-this-small0-dbn",
+            beats_ms=BEATS,
+            downbeats_ms=DOWNBEATS,
+            beats_per_bar=4,
+            updated_at=replaced_at,
+        )
+        assert [r for r in caplog.records if r.name == logger] == []
+
+        store_track_mix_voice(
+            track_id,
+            "revision-a",
+            detector="yamnet-2",
+            hop_ms=480,
+            scores=b"\x10",
+            updated_at=replaced_at - timedelta(minutes=5),
+        )
+
+    records = [r for r in caplog.records if r.name == logger]
+    assert len(records) == 1
+    assert records[0].levelno == logging.INFO
+    message = records[0].getMessage()
+    assert str(track_id) in message
+    assert "revision-a" in message
+    assert "voice" in message
+    assert get_track_mix_signals(track_id).source_revision == "revision-b"
 
 
 # The profile task (SM3-D16): the model outputs stored for the captured file and the

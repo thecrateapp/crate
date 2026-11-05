@@ -7,13 +7,15 @@ version reads them instead of running the models again. One row per track: beats
 voice of the same source revision share it, and storing either for another revision
 replaces the row whole, since the other half described the old file.
 
-``updated_at`` is when the storing task read the file. Signals of another revision
-replace the row only when they were read after the row's, so a slow task that read
-the file before it was replaced never overwrites the newer file's signals.
+``updated_at`` is when the storing task read the file, with a time zone. Signals of
+another revision replace the row only when they were read after the row's, so a slow
+task that read the file before it was replaced never overwrites the newer file's
+signals; such a store writes nothing and is logged at info.
 """
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -25,6 +27,8 @@ from sqlalchemy.orm import Session
 
 from crate.db.orm.smart_mix import TrackMixSignalsRow
 from crate.db.tx import optional_scope, read_scope
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,9 +86,10 @@ def store_track_mix_beats(
 ) -> None:
     """Keep the model beats of ``source_revision``; its voice windows stay.
 
-    ``updated_at`` is when the task read the file (default: now).
+    ``updated_at`` is when the task read the file (default: now); it needs a time zone.
     """
     _upsert(
+        "beats",
         track_id,
         source_revision,
         {
@@ -111,9 +116,10 @@ def store_track_mix_voice(
 ) -> None:
     """Keep the voice windows of ``source_revision``; its beats stay.
 
-    ``updated_at`` is when the task read the file (default: now).
+    ``updated_at`` is when the task read the file (default: now); it needs a time zone.
     """
     _upsert(
+        "voice",
         track_id,
         source_revision,
         {
@@ -128,6 +134,7 @@ def store_track_mix_voice(
 
 
 def _upsert(
+    signal: str,
     track_id: int,
     source_revision: str,
     values: dict[str, Any],
@@ -136,6 +143,9 @@ def _upsert(
     updated_at: datetime | None,
     session: Session | None,
 ) -> None:
+    if updated_at is not None and updated_at.utcoffset() is None:
+        # PostgreSQL would read it in the session's time zone, not the worker's.
+        raise ValueError("updated_at needs a time zone")
     statement = insert(TrackMixSignalsRow).values(
         track_id=int(track_id),
         source_revision=source_revision,
@@ -164,7 +174,15 @@ def _upsert(
         where=or_(same_source, read_later),
     )
     with optional_scope(session) as current:
-        current.execute(statement)
+        stored = current.execute(statement).rowcount
+    if not stored:
+        log.info(
+            "Track %s: not storing the %s of source revision %s; the stored signals "
+            "of another revision were read later",
+            track_id,
+            signal,
+            source_revision,
+        )
 
 
 __all__ = [
