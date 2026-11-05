@@ -159,6 +159,24 @@ with Google's Apache-2.0 weights runs after the analysis and stores one byte per
 the detector that produced it. Operation, cost and calibration are in
 [smart-mix-operations.md](smart-mix-operations.md#voice-per-phrase).
 
+The bar and the phrases of Smart Mix 3 rest on model beats too. Beat This! (`small0`, MIT
+code and weights) with madmom's DBN (BSD code; madmom's CC BY-NC-SA model files ship unused)
+gives beats, downbeats and the bar length (SM3-D14), and both analyzers anchor the bar on
+its downbeats or give the track no downbeat. Phrases count bars of four beats, so a track
+the DBN hears in three gets `time_signature` 3, no downbeat and no phrases, and goes to
+crossfade (SM3-D16). Both models' outputs are kept per track in `track_mix_signals` for the
+file revision they read, with the name of the model that produced them (`beat_tracker`,
+`vocal_detector`), so a later analyzer version reuses them instead of paying for the models
+again: Beat This! is about 13-21 s of CPU per track on one thread, three quarters of a
+profile. The phrase segmentation adds harmony (chroma) and timbre (MFCC) to the level and
+band balance of its section novelty (SM3-D17), for a few milliseconds per track. Measured
+offline against All-In-One with madmom as arbiter, on 144 phrase-mixed tracks, the downbeat
+is right on 97 of the 131 anchored tracks (84 of 92 where the arbiter agrees) and section
+F1 at ±3 s goes from 0.45 with the earlier heuristic to 0.53. All-In-One is an automatic
+reference, so these figures measure agreement, not correctness. Models, licences, cost,
+stored signals and the measurement are in
+[smart-mix-operations.md](smart-mix-operations.md#models-licences-and-cost).
+
 Two representations are used for different purposes. The mono/resampled downmix remains valid for onsets, tempo, energy and key. Loudness and true peak are computed over the source channels with a meter that conforms to the declared algorithm; never over the mono average. `introLufs` and `outroLufs` are the loudness of documented windows; `integratedLufs` is the measurement of the whole program if it could be computed. `truePeakDbfs` is the maximum true peak across channels and not the sample peak of the downmix. Silence, a signal that is too short, an unsupported layout or an interrupted analysis produce `null` for the measurement that could not be obtained, not an invented number.
 
 Integrate an existing meter with PCM streaming instead of writing another BS.1770 approximation in each language. Proposal: an adapter over the libebur128 family/a compatible implementation in production; once build and license are verified in the current images, pin the implementation and version in both backends. FFmpeg `ebur128` can act as an independent acceptance oracle and as an explicit fallback if the native dependency is not available. The adapter interface must allow testing the analyzers with a fake meter, but acceptance runs the real one. The choice of binding is an implementation decision within SM02: it does not alter the units, fixtures or gates. Primary references: [ITU-R BS.1770-5](https://www.itu.int/rec/R-REC-BS.1770-5-202311-I/en), [FFmpeg's ebur128 implementation](https://ffmpeg.org/doxygen/8.0/f__ebur128_8c_source.html).

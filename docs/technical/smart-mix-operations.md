@@ -14,9 +14,13 @@ sources:
   - app/crate/smart_mix/key_detection.py
   - app/crate/smart_mix/tempo_grid.py
   - app/crate/smart_mix/cue_detection.py
+  - app/crate/smart_mix/structure.py
+  - app/crate/smart_mix/beat_model.py
+  - app/crate/smart_mix/vocals.py
   - app/crate/smart_mix/planner.py
   - app/crate/smart_mix/evaluation.py
   - tools/smart-mix-eval/README.md
+  - tools/smart-mix-eval/structure/README.md
   - app/crate/smart_mix/policy.py
   - app/crate/smart_mix/source.py
   - app/crate/api/smart_mix.py
@@ -153,10 +157,12 @@ compares the four bars before it with the four after it, gap bars left out:
 A dynamic programme keeps the 8-bar grid boundaries whose novelty pays 4 dB each
 (`BOUNDARY_COST_DB`; boundaries on 16- and 32-bar multiples get 0.25 and 0.5 dB of bonus).
 Harmony alone never pays that cost: it decides a boundary together with level, balance or
-timbre. Chroma and MFCC are recomputed from the audio and not stored. The Rust chroma is not
+timbre. Chroma and MFCC are recomputed from the audio and not stored; the harmony and timbre
+terms (SM3-D17) add about 6 ms per track in Python and 4 ms in Rust. The Rust chroma is not
 librosa's, so Python–Rust parity on real audio keeps its tolerance; the shared fixtures
 `structure_v1.json` (frames) and `structure_v2.json` (per-bar features with chroma and MFCC)
-pin the algorithm.
+pin the algorithm. How the phrases compare with an automatic reference is in
+[Measurement of the structure](#measurement-of-the-structure).
 
 Migration 147 stores the structure in nullable `track_mix_profiles` columns: `phrases`
 (JSON list of `start_beat`, `start_ms`, `bars`, `energy`, `delta_energy`, `kind`),
@@ -178,6 +184,24 @@ profiles of any other schema. Readers accept every schema up to the current one
 (`READABLE_PROFILE_VERSIONS`), and the backfill, coverage and campaign target the analyzer
 and the schema together, so a later schema bump needs no other server change.
 
+### Models, licences and cost
+
+The v7 profile task runs two models next to the analyzer's own signal processing. Both
+outputs carry the name of what produced them, so a reader or a later analyzer knows where
+a stored beat or voice byte came from, and both are kept per track (see "Stored model
+signals" below).
+
+| Model                                                     | Licence                                            | Output and provenance                                                       | CPU per track, one thread                                                  |
+| --------------------------------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Beat This! `small0` with madmom's DBN (SM3-D14)           | Beat This! MIT (code and weights); madmom code BSD | Beats, downbeats and beats per bar; `beat_tracker` = `beat-this-small0-dbn` | 12.8 s on a 237 s track, 21.1 s on a 367 s one, plus 0.8-1.0 s for the DBN |
+| YAMNet, Google's weights in a PyTorch port (SM3-D13)      | Apache-2.0                                         | Voice per 0.48 s patch and per phrase; `vocal_detector` = `yamnet-2`        | About 0.7 s per minute of audio                                            |
+| None: harmony and timbre novelty of the phrases (SM3-D17) | —                                                  | Phrase boundaries, under `analyzerVersion` `smart-mix-audio-v7`             | About 6 ms (Python) and 4 ms (Rust)                                        |
+
+Two more models serve only the offline measurement and never run in the worker: All-In-One
+(MIT), the reference for sections and downbeats, and madmom's downbeat networks (CC
+BY-NC-SA 4.0), the arbiter. madmom's package in the analysis image ships those network
+files too, unused: the DBN needs none.
+
 ### Beats and downbeats
 
 Since SM3-D14 the beats and the bar come from a model, because the onset heuristic put the
@@ -194,7 +218,8 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   installed next to torch against the installed version (`requirements-beat-this.txt`).
   `CRATE_BEAT_THIS_CHECKPOINT` names the checkpoint (`final0` needs the build arguments
   documented in the Dockerfile) and `CRATE_BEAT_THIS_WEIGHTS` overrides the path. Nothing is
-  downloaded at run time.
+  downloaded at run time. `small0` stays: its raw downbeats agree with All-In-One as often
+  as the larger `final0`'s (see [Measurement of the structure](#measurement-of-the-structure)).
 - **madmom.** Its PyPI release (0.16.1) does not build on Python 3.13, so the
   `madmom-build` stage builds a wheel from a pinned commit of `CPJKU/madmom` against the
   analysis image's numpy, and the image installs only the wheel, under the same constraint
@@ -216,7 +241,10 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   track has no downbeat and no phrases. The Rust cue downbeats (`introDownbeatMs`,
   `outroDownbeatMs`) take the same rule over the 32 beats around each cue. A `crate-cli`
   whose `analyze --help` does not list `--beats` would track its own beats after the model
-  ran, so the worker logs a warning and the Python analyzer takes the beats instead.
+  ran, so the worker logs a warning and the Python analyzer takes the beats instead. When
+  that probe fails (a timeout on a loaded worker, for example), it logs a warning once and
+  is not run again for 60 s (`PROBE_RETRY_SECONDS`); meanwhile each track logs at info that
+  the probe is backing off and goes to the Python analyzer as well.
 - **Meter.** The DBN keeps one bar length per track, 3 or 4 beats, and `beats_per_bar` is
   read from its downbeats: the beats from each downbeat to the next, when every bar has as
   many (otherwise null). Phrases, the planner and Crate Decks count bars of four, so with
@@ -225,7 +253,8 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   constant bar, the bar is anchored as above and `time_signature` is 4 when the track has a
   downbeat. Before, a 3/4 track only lost its downbeat when its downbeats missed the 60 %
   share, and its profile never said it was in three. The DBN chose 3 beats for 5 of the
-  145 tracks of the SMB.PR3 measurement.
+  145 tracks of the SMB.PR3 measurement; All-In-One hears three beats on 3 of them and on
+  no other track.
 - **Fallback.** Without torch, `beat_this`, madmom or the weights, when the model fails or
   finds no beats, and for tracks over 600 s, the analysis keeps its own tracker and
   heuristic and the worker logs it. Without madmom the model is off: it never runs
@@ -238,9 +267,11 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   tracker the stored profile lacks, or another one (`beat-this-small0-dbn` over the
   `beat-this-small0` of the first, peak-picking builds), replaces it at the same quality,
   and a run without the model never replaces a profile whose beats came from it.
-- **Cost.** About 15 s of CPU for a 240 s track with one thread (`TORCH_NUM_THREADS`), plus
-  1-3 s for the DBN; `test_beat_model_overhead_within_budget` (run with `--benchmark`)
-  fails above 25 s.
+- **Cost.** With one thread (`TORCH_NUM_THREADS`) on the development machine, `small0`
+  takes 12.8 s of CPU on a 237 s track and 21.1 s on a 367 s one, and the DBN 0.8-1.0 s;
+  with decoding and resampling, the whole step takes 14.7 s and 25.4 s.
+  `test_beat_model_overhead_within_budget` (run with `--benchmark`) fails above 25 s for a
+  240 s track. Stored beats skip the step on later analyses (see "Stored model signals").
 
 ### Voice per phrase
 
@@ -316,8 +347,10 @@ with its beats stored, a backfill of the library takes about 3 days instead of 1
   revision, so the task reads the revision again before each store: if the file changed in
   between, it stores nothing and logs `the file changed during the task` (publication
   drops that draft too, as `source_changed`). Each row's `updated_at` is when its task read
-  the file, and signals of another revision replace the row only when they were read
-  later, so a slow task that read the old file never overwrites the new file's signals.
+  the file (with a time zone; the stores refuse one without), and signals of another
+  revision replace the row only when they were read later, so a slow task that read the
+  old file never overwrites the new file's signals. Such a store writes nothing and logs at
+  info which signal of which revision it kept out.
 - **A file rewritten in place.** The revision sees size, mtime and inode, not the audio: a
   file rewritten with the same size, mtime and inode (a tool that restores the mtime, for
   example) keeps its stored signals and its profile. Reanalysing the track does not
@@ -336,10 +369,59 @@ with its beats stored, a backfill of the library takes about 3 days instead of 1
   is rounded on its own, so the phrase byte can miss the geometric mean of the float scores
   that SG1b calibrated by one: 1,369 of 1,400 synthetic phrases and 14 of 15 phrases of a
   real track match it exactly (`test_phrase_bytes_from_window_bytes_match_float_scores`).
+  On the SG1b calibration set at `VOCAL_THRESHOLD = 90`, the byte path gives precision
+  0.8824 and recall 0.7832 against 0.8825 and 0.7837 from the float scores, so the
+  calibration holds and the phrase byte is computed the same way in both cases.
 - **Failures.** A failed read only means running the models again, and a failed write
   only means not keeping their output: the worker logs a warning and the profile goes on.
 - **Size.** 3.4 KB for a 4:21 track and 4.8 KB for a 6:02 one (`pg_column_size` of the
   row; integer arrays are stored uncompressed), so about 0.5 GB for 140,000 tracks.
+
+### Measurement of the structure
+
+SMB.PR3 measured the v7 bar and phrase structure offline with
+`tools/smart-mix-eval/structure/` (its README has the scripts, images and commands) on 145
+tracks from the SG1b calibration set and the Crate Decks spike set, analysed outside the
+database. 144 are in genres mixed by phrase; the one extreme-metal track is mixed by crossfade
+and left out of the table. The analysis ran the branch's final `crate-cli` on Beat This!
+beats with the DBN, as the worker does.
+
+- **Reference.** All-In-One (MIT): its sections, edge silence left out, and its downbeats.
+- **Arbiter.** madmom's RNN and DBN downbeats (CC BY-NC-SA 4.0 networks, offline only). A
+  track has an arbiter when All-In-One and madmom share at least 90 % of their downbeats
+  within 70 ms: 96 of the 144.
+- **Downbeat right.** The grid's bars hit at least 90 % of All-In-One's downbeats inside the
+  grid within 70 ms, counted among the tracks that got a downbeat: the analyzer may
+  abstain, but must not anchor the wrong beat.
+- **Phrase boundaries on downbeats.** At least 90 % of a track's phrase boundaries lie
+  within 120 ms of an All-In-One downbeat.
+- **Sections.** `mir_eval.segment.detection` between the phrase boundaries and All-In-One's
+  section boundaries (one-to-one matching, first and last boundary trimmed) at ±0.5 s, ±3
+  s and ±1 bar; precision, recall and F1 averaged per track. Phrases (8, 16 and 32 bars)
+  are finer than sections, which keeps precision low by construction.
+
+| Phrase-mixed genres (144 tracks)                  | Old v7 heuristic   | v7 with Beat This! and its DBN (SMB.PR2c)                  | Plus the SM3-D17 novelty |
+| ------------------------------------------------- | ------------------ | ---------------------------------------------------------- | ------------------------ |
+| Tracks with phrases                               | 119                | 131                                                        | 131                      |
+| Downbeat right among the anchored tracks          | —                  | 97 of 131 against All-In-One; 84 of 92 with arbiter (91 %) | Same                     |
+| Phrase boundaries on All-In-One downbeats (≥90 %) | 32 of 119          | 61 of 131                                                  | 66 of 131                |
+| Sections ±0.5 s: precision / recall / F1          | 0.28 / 0.23 / 0.25 | 0.36 / 0.32 / 0.33                                         | 0.38 / 0.38 / 0.36       |
+| Sections ±3 s: precision / recall / F1            | 0.51 / 0.43 / 0.45 | 0.54 / 0.49 / 0.49                                         | 0.55 / 0.55 / 0.53       |
+| Sections ±1 bar: precision / recall / F1          | 0.42 / 0.35 / 0.38 | 0.47 / 0.43 / 0.43                                         | 0.49 / 0.48 / 0.47       |
+
+- **Arbiter subset.** Section F1 at ±3 s goes 0.43, 0.50 and 0.54 in the same three
+  columns.
+- **SM3-D17 acceptance.** F1 at ±3 s of at least 0.52 with precision not below SMB.PR2c's
+  and at most 0.5 s more per track: 0.53, precision 0.55 against 0.54, and milliseconds.
+- **Meter.** The DBN reads 3 beats per bar on 5 of the 145 tracks; All-In-One agrees on 3
+  of them and hears three beats nowhere else. Those tracks get no phrases (SM3-D16).
+- **Checkpoint.** `small0` against `final0`: their raw downbeats agree with All-In-One on 38
+  and 37 of 56 tracks, and on 31 and 30 of the arbiter tracks.
+- **Cost.** See "Models, licences and cost" above; the novelty stays far under the 0.5 s
+  that SM3-D17 allowed.
+- **Caveats.** All-In-One is an automatic reference: the numbers measure agreement with it,
+  not correctness, and the arbiter subset is selected by agreement, so it is the easier
+  part of the set.
 
 ### Analyzer v6
 
@@ -728,6 +810,11 @@ the blind listening test.
   Diego's authorization.
 - Profiles without phrases (analyzer v5 and v6) get phrase alignment from an 8-bar grid and no
   vocal metric. Compare planners on the same profile generation.
+
+The analyzer's structure is measured apart, on audio files rather than plans:
+`tools/smart-mix-eval/structure/` scores beats, downbeats and phrases against All-In-One
+with madmom as arbiter (see [Measurement of the structure](#measurement-of-the-structure)).
+It reads no database.
 
 ## Regression evidence and acceptance questions
 
