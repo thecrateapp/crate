@@ -93,6 +93,16 @@ def test_worker_binary_takes_model_beats() -> None:
     )
 
 
+def test_worker_binary_segments_with_harmony_and_timbre() -> None:
+    # SM3-D17 kept the analyzer version, so a binary built before it would keep writing
+    # v7 phrases from level and band balance only; its analyze help names the novelty.
+    binary = (APP_ROOT / "bin/crate-cli-linux-amd64").read_bytes()
+
+    assert b"harmony and timbre novelty" in binary, (
+        "rebuild app/bin/crate-cli-linux-amd64 with `make crate-cli-linux`"
+    )
+
+
 def test_rust_beat_grid_format_matches_python() -> None:
     source = (REPO_ROOT / "tools/crate-cli/src/mix_profile.rs").read_text()
 
