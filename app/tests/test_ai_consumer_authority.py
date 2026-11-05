@@ -24,6 +24,8 @@ ACTIONS = [
     ("genres.eq.propose", "curator"),
     ("playlists.description.generate", "curator"),
     ("i18n.listen.draft", "admin"),
+    ("ops.error.triage", "ops"),
+    ("ops.error.investigate", "ops"),
 ]
 
 

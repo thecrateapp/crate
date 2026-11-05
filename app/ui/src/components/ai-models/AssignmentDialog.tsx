@@ -11,9 +11,11 @@ import {
 
 import {
   connectionName,
+  errorSummaryEgress,
   formatCount,
   outcomeGroups,
   reasonText,
+  sendsErrorSummaries,
   staysOffAfterApply,
 } from "@/lib/ai-models";
 
@@ -83,6 +85,7 @@ function limitsText(connection: Connection): string {
 export function AssignmentDialog({
   open,
   modelId,
+  provider = null,
   connections,
   result,
   actions,
@@ -92,6 +95,8 @@ export function AssignmentDialog({
 }: {
   open: boolean;
   modelId: string;
+  /** Provider of the chosen model; error features warn unless it is Ollama. */
+  provider?: string | null;
   /** Every connection whose limits start to apply if this activates. */
   connections: Connection[];
   result: ModelAssignmentResult | null;
@@ -122,6 +127,12 @@ export function AssignmentDialog({
     outcome.reason ? reasonText(outcome.reason) : null;
   const adjustments = (outcome: AssignmentOutcome) =>
     outcome.adjustments.map((adjustment) => ADJUSTMENT_NOTES[adjustment]);
+  const egress = outcomes.some(
+    (outcome) =>
+      outcome.outcome === "applied" && sendsErrorSummaries(outcome.action_id),
+  )
+    ? errorSummaryEgress(provider)
+    : null;
 
   return (
     <Dialog
@@ -152,6 +163,16 @@ export function AssignmentDialog({
               reports usage.
             </p>
           </div>
+        ) : null}
+
+        {egress ? (
+          <p
+            role="note"
+            aria-label="Data leaving this server"
+            className="rounded-md border border-state-warning/25 bg-state-warning/10 p-3 text-sm text-state-warning-text"
+          >
+            {egress}
+          </p>
         ) : null}
 
         <div className="max-h-[50vh] space-y-4 overflow-y-auto">

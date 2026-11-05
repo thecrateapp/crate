@@ -32,6 +32,8 @@ IDS = {
     "playlists.description.generate",
     "music_paths.refine",
     "i18n.listen.draft",
+    "ops.error.triage",
+    "ops.error.investigate",
 }
 
 
@@ -508,6 +510,8 @@ def test_action_locations_point_to_existing_admin_surfaces():
     assert get_action("artists.bio.research").location == "/browse"
     assert get_action("i18n.listen.draft").location == "/i18n"
     assert get_action("music_paths.refine").location == "/settings"
+    assert get_action("ops.error.triage").location == "/errors"
+    assert get_action("ops.error.investigate").location == "/errors"
 
 
 def test_discovery_process_start_failure_is_closed(monkeypatch):

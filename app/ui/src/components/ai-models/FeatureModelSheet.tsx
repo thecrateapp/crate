@@ -13,7 +13,13 @@ import {
 
 import { TechnicalDetails } from "@/components/admin/TechnicalDetails";
 import { AdminSelect } from "@/components/ui";
-import { initialFeatureChoice, savedProfileOptions } from "@/lib/ai-models";
+import {
+  errorSummaryEgress,
+  findConnection,
+  initialFeatureChoice,
+  savedProfileOptions,
+  sendsErrorSummaries,
+} from "@/lib/ai-models";
 import { formatRelativeTime } from "@/lib/utils";
 
 import { reportFailure, writeAI } from "./api";
@@ -60,6 +66,29 @@ export function FeatureModelSheet({
   const selectedProfile =
     profiles.find((option) => option.profile.id === profileId) ?? null;
   const modelPath = `/actions/${encodeURIComponent(action.id)}/model`;
+  const providerOf = (connectionId: string | null | undefined) =>
+    connectionId
+      ? (findConnection(snapshot, connectionId)?.provider ?? null)
+      : null;
+  // Error features send the issue's summary to whichever provider is bound.
+  const egress = sendsErrorSummaries(action.id)
+    ? [
+        ...new Set(
+          [
+            errorSummaryEgress(
+              providerOf(
+                source === "model"
+                  ? choice.connectionId
+                  : selectedProfile?.version.connection_id,
+              ),
+            ),
+            offerDefault && defaultModel
+              ? errorSummaryEgress(providerOf(defaultModel.connection_id))
+              : null,
+          ].filter((line): line is string => line !== null),
+        ),
+      ]
+    : [];
 
   async function run(write: () => Promise<unknown>, success: string) {
     setBusy(true);
@@ -122,6 +151,18 @@ export function FeatureModelSheet({
         </SheetHeader>
 
         <div className="space-y-5 px-4 pb-6">
+          {egress.length > 0 ? (
+            <div
+              role="note"
+              aria-label="Data leaving this server"
+              className="space-y-1 rounded-md border border-state-warning/25 bg-state-warning/10 p-3 text-sm text-state-warning-text"
+            >
+              {egress.map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+            </div>
+          ) : null}
+
           {offerDefault && defaultModel ? (
             <Button
               variant="outline"

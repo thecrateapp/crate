@@ -284,10 +284,12 @@ def execute_structured(
                 "AI_RESPONSE_INVALID", "Provider returned invalid structured data"
             ) from None
         require_action_authority(action_id, actor_id)
-        # Domain services can stamp the actual model without rereading global config.
+        # Domain services can stamp the actual model without rereading global config,
+        # and link a stored result to its invocation record.
         object.__setattr__(
             value, "_ai_model_id", result.reported_model or pinned["model_id"]
         )
+        object.__setattr__(value, "_ai_invocation_id", str(invocation["id"]))
         status, code = "succeeded", None
         return value
     except AIConfigurationError as error:

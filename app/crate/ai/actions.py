@@ -1,4 +1,4 @@
-"""The eleven registered operations, independent of provider and persistence."""
+"""The thirteen registered operations, independent of provider and persistence."""
 
 from crate.ai.contracts import AIAction, AIConfigurationError, ActionMaxima
 
@@ -156,6 +156,30 @@ ACTIONS: dict[str, AIAction] = {
             90,
             16000,
             "Draft translations while preserving keys and placeholders for review.",
+        ),
+        _action(
+            "ops.error.triage",
+            "Triage error issue",
+            "ops",
+            "text",
+            "ops.errors.manage",
+            "/errors",
+            45,
+            2048,
+            "Classify an error issue from its sanitized digest and pick duplicates "
+            "only from the listed candidates.",
+        ),
+        _action(
+            "ops.error.investigate",
+            "Investigate error issue",
+            "ops",
+            "text",
+            "ops.errors.manage",
+            "/errors",
+            90,
+            4096,
+            "Propose a cause and a concrete next step for one error issue from its "
+            "sanitized digest.",
         ),
     )
 }

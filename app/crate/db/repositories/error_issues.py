@@ -390,16 +390,95 @@ def audit_fix_request(
         return cast(CursorResult, result).rowcount == 1
 
 
+TRIAGE_KINDS = frozenset({"triage", "investigation"})
+
+
+def _uuid_or_none(value: Any) -> str | None:
+    if value is None:
+        return None
+    try:
+        return str(uuid.UUID(str(value)))
+    except ValueError:
+        return None
+
+
+def save_triage(
+    issue_id: str,
+    *,
+    kind: str,
+    digest_hash: str,
+    classification: str,
+    severity: str,
+    summary: str,
+    confidence: float,
+    hypothesis: str | None = None,
+    next_step: str | None = None,
+    duplicate_of: str | None = None,
+    suspected_frames: Sequence[int] = (),
+    invocation_id: str | None = None,
+    session: Session | None = None,
+) -> str | None:
+    """Store a validated triage or investigation once per issue, kind and digest.
+
+    Only validated output reaches this, never the prompt or the raw response.
+    Returns the new row id, or None when the issue is gone or that digest already
+    has a result of this kind. A duplicate purged in the meantime is stored as NULL.
+    """
+    if kind not in TRIAGE_KINDS:
+        raise ValueError(f"Unsupported triage kind: {kind!r}")
+    params = {
+        "issue_id": _uuid(issue_id),
+        "kind": kind,
+        "digest_hash": digest_hash,
+        "invocation_id": _uuid_or_none(invocation_id),
+        "classification": classification,
+        "severity": severity,
+        "duplicate_of": _uuid_or_none(duplicate_of),
+        "summary": summary,
+        "hypothesis": hypothesis,
+        "suspected_frames": json.dumps([int(index) for index in suspected_frames]),
+        "next_step": next_step,
+        "confidence": float(confidence),
+    }
+    with optional_scope(session) as current:
+        return current.execute(
+            text(
+                """
+                INSERT INTO error_issue_triage (
+                    issue_id, kind, digest_hash, invocation_id, classification,
+                    severity, duplicate_of, summary, hypothesis, suspected_frames,
+                    next_step, confidence
+                )
+                SELECT i.id, :kind, :digest_hash, CAST(:invocation_id AS uuid),
+                       :classification, :severity,
+                       (
+                           SELECT d.id FROM error_issues d
+                           WHERE d.id = CAST(:duplicate_of AS uuid) AND d.id <> i.id
+                       ),
+                       :summary, :hypothesis, CAST(:suspected_frames AS jsonb),
+                       :next_step, :confidence
+                FROM error_issues i
+                WHERE i.id = CAST(:issue_id AS uuid)
+                ON CONFLICT (issue_id, kind, digest_hash) DO NOTHING
+                RETURNING id::text
+                """
+            ),
+            params,
+        ).scalar_one_or_none()
+
+
 __all__ = [
     "FIX_AUDIT_ACTION",
     "ISSUE_STATUSES",
     "STATUS_AUDIT_ACTION",
+    "TRIAGE_KINDS",
     "audit_fix_request",
     "mark_status",
     "purge_closed",
     "record_fix_request",
     "record_status_change",
     "release_fix_request",
+    "save_triage",
     "set_digest",
     "upsert_issues",
 ]

@@ -319,7 +319,7 @@ def test_first_use_activates_every_feature_with_action_limits(pg_db, monkeypatch
     assert result["revision"] == state["revision"]
     assert result["review_fingerprint"] == service.snapshot()["review_fingerprint"]
     bindings = store.list_bindings()
-    assert len(bindings) == 11
+    assert len(bindings) == len(ACTIONS)
     labels = {p["id"]: p["label"] for p in store.list_profiles()}
     for binding in bindings:
         assert labels[binding["profile_id"]] == ACTIONS[binding["action_id"]].label
@@ -842,7 +842,7 @@ def test_reapplying_the_same_default_changes_nothing(pg_db, monkeypatch):
     again = assign("env:gemini", "gemini-3.8-flash", LEVEL_HIGH)
 
     assert again["activation"] is False
-    assert len(again["outcomes"]) == 11
+    assert len(again["outcomes"]) == len(ACTIONS)
     assert {o["outcome"] for o in again["outcomes"]} == {"unchanged"}
     assert scalar("SELECT COUNT(*) FROM ai_profile_versions") == versions
     assert {b["action_id"]: b["revision"] for b in store.list_bindings()} == revisions
@@ -922,13 +922,13 @@ def test_concurrent_assignments_have_one_winner(pg_db, monkeypatch):
     winner = winners[0]
     assert store.configuration_state()["default_model"]["model_id"] == winner
     bindings = store.list_bindings()
-    assert len(bindings) == 11
+    assert len(bindings) == len(ACTIONS)
     for binding in bindings:
         version = store.get_profile_version(
             binding["profile_id"], binding["profile_version"]
         )
         assert version["model_id"] == winner
-    assert len(store.list_profiles()) == 11
+    assert len(store.list_profiles()) == len(ACTIONS)
     assert audit_count("ai.configuration.activate") == 1
     assert audit_count("ai.default_model.update") == 1
 

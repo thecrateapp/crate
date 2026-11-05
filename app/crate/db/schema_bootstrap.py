@@ -129,3 +129,8 @@ def create_schema(cur):
     )
 
     create_error_inbox_grant_v144_schema(cur)
+    from crate.db.schema_sections.ai_action_error_inbox_v145 import (
+        create_ai_action_error_inbox_v145_schema,
+    )
+
+    create_ai_action_error_inbox_v145_schema(cur)

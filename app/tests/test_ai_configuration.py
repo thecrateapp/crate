@@ -82,7 +82,7 @@ def test_bindings_rollback_activation_and_atomic_audit(pg_db):
     ]
     state = config.activate_configuration(changes, 0, None)
     assert state["active"] and state["revision"] == 1
-    assert len(config.list_bindings()) == 11
+    assert len(config.list_bindings()) == len(ACTIONS)
     with transaction_scope() as session:
         before = session.execute(text("SELECT count(*) FROM audit_log")).scalar_one()
         with pytest.raises(RuntimeError):

@@ -9,7 +9,9 @@ import {
   activityFixture,
   aiSnapshot,
   catalog,
+  errorTriageAction,
   migratedSnapshot,
+  ollamaConnection,
   PROFILE_ID,
   STUDIO_ID,
 } from "./test-fixtures";
@@ -611,6 +613,85 @@ describe("FeaturesPanel", () => {
     expect(
       screen.queryByRole("option", { name: /^Kept settings/ }),
     ).not.toBeInTheDocument();
+  });
+
+  it("warns that error summaries leave the server unless the model runs on Ollama", async () => {
+    const snapshot = migratedSnapshot();
+    snapshot.actions.push(errorTriageAction());
+    snapshot.connections.push(ollamaConnection());
+    const user = userEvent.setup();
+    renderPanel(snapshot);
+
+    const operations = screen.getByRole("region", { name: "Operations" });
+    expect(
+      within(operations).getByText(
+        "Sends: the scrubbed error summary and up to 10 similar issues",
+      ),
+    ).toBeVisible();
+    expect(
+      within(row("Triage error issue")).getByText("Not set"),
+    ).toBeVisible();
+
+    const sheet = await openSheet(user, "Triage error issue");
+    const note = within(sheet).getByRole("note", {
+      name: "Data leaving this server",
+    });
+    expect(note).toHaveTextContent(
+      "Error summaries leave this server for Gemini.",
+    );
+
+    await choose(user, sheet, "Connection", "Home Ollama");
+    expect(
+      within(sheet).queryByRole("note", { name: "Data leaving this server" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(
+      within(sheet).getByRole("radio", { name: "Use a saved profile" }),
+    );
+    await choose(
+      user,
+      sheet,
+      "Saved profile",
+      "Poster · gemini-3.8-flash · Updated 2 hours ago",
+    );
+    expect(
+      within(sheet).getByRole("note", { name: "Data leaving this server" }),
+    ).toHaveTextContent("Error summaries leave this server for Gemini.");
+  });
+
+  it("names the default model's provider when error features can return to it", async () => {
+    const snapshot = migratedSnapshot();
+    snapshot.actions.push(errorTriageAction());
+    snapshot.connections.push(ollamaConnection());
+    snapshot.default_model!.features.push({
+      action_id: "ops.error.triage",
+      status: "override",
+      reason: null,
+    });
+    const user = userEvent.setup();
+    renderPanel(snapshot);
+
+    const sheet = await openSheet(user, "Triage error issue");
+    await choose(user, sheet, "Connection", "Home Ollama");
+
+    expect(
+      within(sheet).getByRole("button", { name: "Use the default model" }),
+    ).toBeVisible();
+    expect(
+      within(sheet).getByRole("note", { name: "Data leaving this server" }),
+    ).toHaveTextContent("Error summaries leave this server for Gemini.");
+  });
+
+  it("does not warn about error summaries for other features", async () => {
+    const user = userEvent.setup();
+    renderPanel(migratedSnapshot());
+
+    const sheet = await openSheet(user, "Propose genre EQ");
+
+    expect(
+      within(sheet).queryByRole("note", { name: "Data leaving this server" }),
+    ).not.toBeInTheDocument();
+    expect(sheet.textContent).not.toContain("Error summaries");
   });
 
   it("keeps identifiers in the sheet's technical details", async () => {
