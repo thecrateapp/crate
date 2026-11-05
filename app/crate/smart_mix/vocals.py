@@ -1,19 +1,20 @@
 """Voice presence per phrase for Smart Mix profiles (SM3-D13).
 
 YAMNet (``crate.smart_mix.voice_model``) scores each 0.975 s patch of the track for the
-AudioSet voice classes. A phrase's byte is the share of the patches centred inside it
-that reach ``WINDOW_THRESHOLD``, from 0 (none) to 255 (all), and the phrase counts as
-voiced from ``VOCAL_THRESHOLD``. The spectral heuristic this replaced (detector version
-1) found no voice on clearly sung tracks at gate SG1 and was dropped.
+AudioSet voice classes. A phrase's byte is the geometric mean of the scores of the
+patches centred inside it on a log scale, from ``LOG_FLOOR`` or less (0) to 1 (255), and
+the phrase counts as voiced from ``VOCAL_THRESHOLD``. The byte stores no threshold, so the
+voiced cut can move without analysing the library again. The spectral heuristic this
+replaced (detector version 1) found no voice on clearly sung tracks at gate SG1 and was
+dropped; ``yamnet-1`` stored the share of patches above a fixed score.
 
 The profile task adds the voice after the analysis, Rust or Python, so both analyzers
 stay identical. Without the model (no torch or no weights) or when it fails, the profile
 is stored without voice.
 
-Both thresholds are provisional until gate SG1b calibrates them on the reviewed labels
-(``tools/smart-mix-eval/vocals_labels.csv``) with
-``tools/smart-mix-eval/vocals/compare_models.py``. YAMNet gives the voice classes low
-probabilities over dense music, so the window threshold is small.
+Gate SG1b (2026-11-05) calibrated the cut against synced lyrics on 2,721 phrases of 275
+production tracks in 20 genres (``docs/technical/smart-mix-operations.md``). YAMNet gives
+the voice classes low probabilities over dense music, so the scale reaches down to 10^-4.
 """
 
 from __future__ import annotations
@@ -26,19 +27,20 @@ from typing import Protocol
 
 import numpy as np
 
-from crate.smart_mix.models import TrackMixProfileDraft
+from crate.smart_mix.models import (
+    VOCAL_LOG_FLOOR as LOG_FLOOR,
+    VOCAL_THRESHOLD,
+    TrackMixProfileDraft,
+)
 from crate.smart_mix.phrase_grid import phrase_spans_ms
 from crate.smart_mix.voice_model import SAMPLE_RATE, VoiceWindows, load_voice_model
 
 log = logging.getLogger(__name__)
 
-VOCAL_DETECTOR = "yamnet-1"
-# Scores CSV version: 1 was the spectral heuristic, 2 is YAMNet.
-VOCAL_DETECTOR_VERSION = 2
-# Provisional until SG1b: voice-class score that makes a patch voiced.
-WINDOW_THRESHOLD = 0.003
-# Provisional until SG1b: a phrase is voiced when a quarter of its patches are.
-VOCAL_THRESHOLD = 64
+VOCAL_DETECTOR = "yamnet-2"
+# Scores CSV version: 1 was the spectral heuristic, 2 YAMNet's share of voiced patches,
+# 3 YAMNet's geometric mean.
+VOCAL_DETECTOR_VERSION = 3
 # Design §10.
 MIN_PRECISION = 0.8
 MIN_RECALL = 0.7
@@ -51,14 +53,21 @@ class VoiceModel(Protocol):
 def phrase_vocal_presence(
     windows: VoiceWindows, spans_ms: Sequence[tuple[int, int]]
 ) -> bytes:
-    """One byte per span: the share of its patches that reach WINDOW_THRESHOLD."""
+    """One byte per span: the geometric mean of its patch scores on the log scale.
+
+    A span without patches scores 0.
+    """
     centres = np.asarray(windows.centres_ms)
-    voiced = np.asarray(windows.scores) >= WINDOW_THRESHOLD
+    logs = np.log10(np.maximum(np.asarray(windows.scores, dtype=np.float64), LOG_FLOOR))
+    floor = np.log10(LOG_FLOOR)
     presence = bytearray()
     for start_ms, end_ms in spans_ms:
-        inside = (centres >= start_ms) & (centres < end_ms)
-        count = int(inside.sum())
-        presence.append(round(255 * int(voiced[inside].sum()) / count) if count else 0)
+        inside = logs[(centres >= start_ms) & (centres < end_ms)]
+        if not inside.size:
+            presence.append(0)
+            continue
+        level = (float(inside.mean()) - floor) / -floor
+        presence.append(round(255 * min(1.0, max(0.0, level))))
     return bytes(presence)
 
 
@@ -106,7 +115,7 @@ __all__ = [
     "VOCAL_DETECTOR",
     "VOCAL_DETECTOR_VERSION",
     "VOCAL_THRESHOLD",
-    "WINDOW_THRESHOLD",
+    "LOG_FLOOR",
     "add_vocal_presence",
     "load_audio",
     "load_voice_model",

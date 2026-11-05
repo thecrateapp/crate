@@ -39,6 +39,13 @@ PHRASE_BAR_LENGTHS = (8, 16, 32)
 MAX_PHRASES = 120
 MAX_ENERGY_CURVE_BARS = 2048
 MAX_VOCAL_DETECTOR = 32
+# Scale of the per-phrase voice byte (crate.smart_mix.vocals): the geometric mean of the
+# phrase's YAMNet voice scores on a log scale, LOG_FLOOR or less is 0 and 1 is 255. Kept
+# here, without numpy, so the API can read it.
+VOCAL_LOG_FLOOR = 1e-4
+# Gate SG1b (2026-11-05): a phrase has voice from this byte, a geometric mean voice score
+# of about 0.0026. Against synced lyrics: precision 0.88, recall 0.78, specificity 0.66.
+VOCAL_THRESHOLD = 90
 
 
 @dataclass(frozen=True, slots=True)

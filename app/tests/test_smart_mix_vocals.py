@@ -22,8 +22,9 @@ from crate.smart_mix.voice_model import VoiceWindows
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LABELS_CSV = REPO_ROOT / "tools/smart-mix-eval/vocals_labels.csv"
 SCORES_CSV = REPO_ROOT / "tools/smart-mix-eval/vocals_scores.csv"
-VOICED = min(1.0, vocals.WINDOW_THRESHOLD * 2)
-UNVOICED = vocals.WINDOW_THRESHOLD / 2
+# The byte's log scale runs from LOG_FLOOR (0) to a score of 1 (255).
+VOICED = 1.0
+UNVOICED = vocals.LOG_FLOOR
 # Windows are centred every 480 ms from 488 ms: each span holds four of them.
 SPANS = [(400 + 1_920 * k, 2_320 + 1_920 * k) for k in range(3)]
 
@@ -78,10 +79,25 @@ class _FakeModel:
         return self.windows
 
 
-def test_phrase_byte_is_fraction_of_voiced_windows() -> None:
+def test_phrase_byte_is_the_geometric_mean_on_a_log_scale() -> None:
     windows = _windows([VOICED] * 4 + [UNVOICED] * 4 + [VOICED, UNVOICED] * 2)
 
+    # Half way between the floor and 1 in logs is the middle byte.
     assert vocals.phrase_vocal_presence(windows, SPANS) == bytes([255, 0, 128])
+
+
+def test_scores_under_the_floor_count_as_the_floor() -> None:
+    windows = _windows([0.0] * 4 + [0.001] * 4)
+
+    # A quarter of the way from the floor (10^-4) to 1 in logs.
+    assert vocals.phrase_vocal_presence(windows, SPANS[:2]) == bytes([0, 64])
+
+
+def test_the_calibrated_threshold_is_a_mean_voice_score_of_about_0_26_percent() -> None:
+    # SG1b: calibrated on 2,721 phrases of 275 production tracks against synced lyrics.
+    at_threshold = 10 ** (np.log10(vocals.LOG_FLOOR) * (1 - vocals.VOCAL_THRESHOLD / 255))
+
+    assert at_threshold == pytest.approx(0.0026, rel=0.01)
 
 
 def test_spans_without_windows_score_zero() -> None:

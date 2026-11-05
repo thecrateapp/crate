@@ -167,12 +167,24 @@ spoken voice, so a transition can avoid laying one voice over another.
   `/app/models/yamnet.npz` (licence at `/app/models/yamnet.LICENSE`). Essentia's packaged
   YAMNet graph is not used: its models are licensed for non-commercial use only. The port
   matches Google's TensorFlow reference within 5e-6 (`test_smart_mix_voice_model.py`).
-- **Byte.** YAMNet scores 0.975 s patches every 0.48 s; a patch is voiced when its highest
-  AudioSet voice class (speech, narration, singing, choir, chant, rapping) reaches
-  `WINDOW_THRESHOLD`. A phrase's byte is the share of its voiced patches (0-255) and it counts
-  as voiced from `VOCAL_THRESHOLD` (`crate/smart_mix/vocals.py`). Both thresholds are
-  provisional until gate SG1b calibrates them on hand-reviewed phrases with
-  `tools/smart-mix-eval/vocals/compare_models.py`.
+- **Byte.** YAMNet scores 0.975 s patches every 0.48 s; a patch's voice score is its highest
+  AudioSet voice class (speech, narration, singing, choir, chant, rapping). A phrase's byte
+  is the geometric mean of its patch scores on a log scale, from `LOG_FLOOR` (10^-4) or less
+  (0) to 1 (255), and the phrase counts as voiced from `VOCAL_THRESHOLD`
+  (`crate/smart_mix/vocals.py`). The byte stores no threshold, so the voiced cut can move
+  without analysing the library again.
+- **Calibration (gate SG1b, 2026-11-05).** Measured against synced lyrics instead of hand
+  labels: 358 production tracks with LRCLIB synced lyrics from 20 genres, analysed with v7
+  outside the database; a phrase is voiced when lyric lines cover a quarter of it and
+  unvoiced when none touches it. 2,721 phrases of 275 tracks qualified (76 % voiced). The
+  share of voiced patches, the arithmetic mean and the geometric mean separate equally well
+  (AUC 0.79-0.80); the geometric mean was kept because it stores no threshold. At
+  `VOCAL_THRESHOLD = 90` (a mean score of about 0.0026): precision 0.88, recall 0.78,
+  specificity 0.66, which meets the design's precision 0.8 and recall 0.7. Lyrics miss
+  backing vocals and ad-libs, so these figures are a lower bound. YAMNet is strong on
+  alternative rock, post-punk, new wave, pop and hip-hop (AUC 0.86-1.0) and weak on black
+  and death metal, industrial metal, post-hardcore, synthpop and trip-hop (0.64-0.67).
+  v7 found no phrases on 66 of the 358 tracks, mostly extreme and industrial metal.
 - **Where it runs.** `compute_smart_mix_profile` adds the voice after the analysis, from the
   Rust analyzer or the Python fallback, so both analyzers stay identical. Without torch or the
   weights (`PANNS=off`, or `CRATE_YAMNET_WEIGHTS` pointing nowhere), or when decoding or the
@@ -180,7 +192,8 @@ spoken voice, so a transition can avoid laying one voice over another.
 - **Cost.** About 0.7 s of CPU per minute of audio with the analysis worker's single native
   thread (`OMP_NUM_THREADS=1`); `test_voice_overhead_within_budget` (run with `--benchmark`)
   fails above 1.5 s.
-- **Storage.** Migration 148 adds `vocal_detector` (`yamnet-1`), set together with
+- **Storage.** Migration 148 adds `vocal_detector` (`yamnet-2`; `yamnet-1` stored the share
+  of patches above a fixed score and only ever existed in development), set together with
   `vocal_presence` or not at all. Voice ships inside `smart-mix-audio-v7`, so a draft that
   brings a detector the stored profile lacks replaces it at the same quality, and a run
   without the model never strips stored voice. Reanalyzing a v7 track from Admin therefore
