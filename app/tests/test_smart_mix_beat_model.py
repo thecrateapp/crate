@@ -192,17 +192,41 @@ def test_returns_milliseconds() -> None:
 
     track = beat_model.track_beats(_clicks(4.0), SAMPLE_RATE, model=model)
 
-    # Whole, positive, strictly increasing milliseconds, like the tracked beats.
+    # Whole, positive, strictly increasing milliseconds, like the tracked beats; the
+    # bar holds the beats from one downbeat to the next.
     assert track == BeatTrack(
         tracker="beat-this-fake",
         beats_ms=(1, 500, 1_020, 1_520, 2_040),
         downbeats_ms=(500, 2_040),
+        beats_per_bar=3,
     )
     assert track.to_payload() == {
         "tracker": "beat-this-fake",
         "beats_ms": [1, 500, 1_020, 1_520, 2_040],
         "downbeats_ms": [500, 2_040],
+        "beats_per_bar": 3,
     }
+
+
+_GRID_MS = tuple(range(500, 6_501, 500))
+
+
+@pytest.mark.parametrize(
+    ("downbeats_ms", "expected"),
+    [
+        pytest.param((500, 2_000, 3_500, 5_000), 3, id="three"),
+        pytest.param((500, 2_500, 4_500, 6_500), 4, id="four"),
+        # A pickup before the first downbeat and the bar after the last one count
+        # for nothing.
+        pytest.param((1_000, 3_000, 5_000), 4, id="four-after-a-pickup"),
+        pytest.param((500, 2_500, 4_000, 6_000), None, id="irregular"),
+        pytest.param((500,), None, id="one-downbeat"),
+        pytest.param((), None, id="no-downbeats"),
+    ],
+)
+def test_beats_per_bar_from_downbeats(downbeats_ms, expected) -> None:
+    # With its DBN, Beat This! keeps one bar length per track, 3 or 4 beats.
+    assert beat_model.beats_per_bar_from_downbeats(_GRID_MS, downbeats_ms) == expected
 
 
 def test_no_beats_returns_none() -> None:

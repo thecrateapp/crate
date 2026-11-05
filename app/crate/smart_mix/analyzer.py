@@ -29,7 +29,7 @@ from crate.smart_mix.tempo_grid import (
     fit_tempo,
     half_beat_slides,
 )
-from crate.smart_mix.phrase_grid import downbeat_anchor_from_model
+from crate.smart_mix.phrase_grid import BEATS_PER_BAR, downbeat_anchor_from_model
 from crate.smart_mix.versions import ANALYZER_VERSION, PYTHON_ANALYZER
 
 if TYPE_CHECKING:
@@ -130,13 +130,17 @@ def analyze_mix_profile(
                 1, round(_DOWNBEAT_WINDOW_SECONDS * sample_rate / HOP_LENGTH)
             ),
         )
+    elif beats.beats_per_bar not in (None, BEATS_PER_BAR):
+        # Phrases and the planner count bars of four beats: a track the DBN hears in
+        # another meter (3/4) says so and gets no downbeat and no phrases (SM3-D16).
+        downbeat_anchor_ms, time_signature = None, beats.beats_per_bar
     else:
         # The model's downbeats decide the bar alone: a track whose downbeats hold no
         # clear phase of the grid gets no downbeat, and no phrases.
         downbeat_anchor_ms = downbeat_anchor_from_model(
             beat_grid_ms, beats.downbeats_ms
         )
-        time_signature = None if downbeat_anchor_ms is None else 4
+        time_signature = None if downbeat_anchor_ms is None else BEATS_PER_BAR
     key, scale, camelot, key_confidence = _key_features(audio, sample_rate)
     rms = frame_rms(audio, sample_rate)
     cues = detect_mix_cues(audio, sample_rate, beat_grid_ms, rms=rms)

@@ -386,6 +386,45 @@ def test_model_downbeats_without_a_clear_bar_leave_no_downbeat(
     assert profile.beat_tracker == "beat-this-test"
 
 
+def test_three_four_meter_gets_no_phrases(tmp_path: Path) -> None:
+    # Phrases and their consumers count bars of four beats: a track the DBN hears in
+    # 3/4 says so and gets no downbeat and no phrases, so it goes to crossfade
+    # (SM3-D16).
+    from crate.smart_mix.analyzer import analyze_mix_profile
+    from crate.smart_mix.beat_model import BeatTrack
+    from tests.smart_mix_structure_audio import (
+        BEAT_MS,
+        DJ_SECTIONS,
+        LEAD_SECONDS,
+        write_structured_track,
+    )
+
+    track = tmp_path / "structured.wav"
+    write_structured_track(track, DJ_SECTIONS)
+    first_ms = round(LEAD_SECONDS * 1_000)
+    beats = tuple(
+        range(
+            first_ms,
+            first_ms + 4 * sum(section.bars for section in DJ_SECTIONS) * BEAT_MS,
+            BEAT_MS,
+        )
+    )
+    four = BeatTrack("beat-this-test", beats, beats[::4], beats_per_bar=4)
+    three = BeatTrack("beat-this-test", beats, beats[::3], beats_per_bar=3)
+
+    in_four = analyze_mix_profile(track, beats=four)
+    in_three = analyze_mix_profile(track, beats=three)
+
+    assert (in_four.time_signature, in_four.downbeat_anchor_ms) == (4, first_ms)
+    assert in_four.phrases
+    assert in_three.time_signature == 3
+    assert in_three.downbeat_anchor_ms is None
+    assert in_three.phrases == ()
+    assert in_three.energy_curve is None
+    assert in_three.beat_tracker == "beat-this-test"
+    assert in_three.beat_grid_ms == in_four.beat_grid_ms
+
+
 def test_external_beats_stop_at_the_analysed_head(monkeypatch, tmp_path: Path) -> None:
     from crate.smart_mix import analyzer
 

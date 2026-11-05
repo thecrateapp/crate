@@ -25,6 +25,7 @@ import logging
 import math
 import os
 import re
+from bisect import bisect_left
 from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import lru_cache
@@ -57,11 +58,17 @@ _READ_BLOCK_FRAMES = 65_536
 
 @dataclass(frozen=True, slots=True)
 class BeatTrack:
-    """Model beats and downbeats in whole, positive, strictly increasing milliseconds."""
+    """Model beats and downbeats in whole, positive, strictly increasing milliseconds.
+
+    ``beats_per_bar`` is the bar length the DBN chose (3 or 4), or None when the bars
+    are not all the same length. Both analyzers phrase only bars of four beats: any
+    other length gives the profile that time signature, no downbeat and no phrases.
+    """
 
     tracker: str
     beats_ms: tuple[int, ...]
     downbeats_ms: tuple[int, ...]
+    beats_per_bar: int | None = None
 
     def to_payload(self) -> dict[str, Any]:
         """The JSON that ``crate-cli analyze --beats`` reads."""
@@ -69,7 +76,25 @@ class BeatTrack:
             "tracker": self.tracker,
             "beats_ms": list(self.beats_ms),
             "downbeats_ms": list(self.downbeats_ms),
+            "beats_per_bar": self.beats_per_bar,
         }
+
+
+def beats_per_bar_from_downbeats(
+    beats_ms: Sequence[int], downbeats_ms: Sequence[int]
+) -> int | None:
+    """The beats from each downbeat to the next, when every bar has as many.
+
+    The DBN keeps one bar length per track, 3 or 4 beats; the beats before the first
+    downbeat and after the last one form no whole bar and do not count.
+    """
+    beats = sorted(beats_ms)
+    starts = [bisect_left(beats, downbeat) for downbeat in sorted(downbeats_ms)]
+    lengths = {end - start for start, end in zip(starts, starts[1:])}
+    if len(lengths) != 1:
+        return None
+    (length,) = lengths
+    return length if length > 0 else None
 
 
 class BeatModel(Protocol):
@@ -190,10 +215,12 @@ def track_beats(
     if not beats_ms:
         log.info("Beat This! found no beats; the analysis keeps its own beat tracker")
         return None
+    downbeats_ms = _milliseconds(downbeats)
     return BeatTrack(
         tracker=beat_model.tracker,
         beats_ms=beats_ms,
-        downbeats_ms=_milliseconds(downbeats),
+        downbeats_ms=downbeats_ms,
+        beats_per_bar=beats_per_bar_from_downbeats(beats_ms, downbeats_ms),
     )
 
 
@@ -291,6 +318,7 @@ __all__ = [
     "BeatThisModel",
     "BeatTrack",
     "beat_tracker_name",
+    "beats_per_bar_from_downbeats",
     "checkpoint_name",
     "load_beat_model",
     "track_beats",
