@@ -70,6 +70,13 @@ def supports_analyze_beats() -> bool:
     return help_text is not None and "--beats" in help_text
 
 
+def analyze_beats_probe_backing_off() -> bool:
+    """Whether ``analyze --help`` failed less than ``PROBE_RETRY_SECONDS`` ago, so
+    ``supports_analyze_beats`` answers False without having asked the binary."""
+    binary = find_binary()
+    return binary is not None and _analyze_help.backing_off(binary)
+
+
 class _HelpProbe:
     """The help a crate-cli call prints, or None when it fails.
 
@@ -86,8 +93,7 @@ class _HelpProbe:
     def __call__(self, binary: str) -> str | None:
         if binary in self._replies:
             return self._replies[binary]
-        failed_at = self._failed_at.get(binary)
-        if failed_at is not None and _clock() - failed_at < PROBE_RETRY_SECONDS:
+        if self.backing_off(binary):
             return None
         try:
             reply = subprocess.run(
@@ -109,6 +115,11 @@ class _HelpProbe:
         self._failed_at.pop(binary, None)
         self._replies[binary] = reply
         return reply
+
+    def backing_off(self, binary: str) -> bool:
+        """Whether a failure of ``binary`` is less than ``PROBE_RETRY_SECONDS`` old."""
+        failed_at = self._failed_at.get(binary)
+        return failed_at is not None and _clock() - failed_at < PROBE_RETRY_SECONDS
 
     def cache_clear(self) -> None:
         self._replies.clear()

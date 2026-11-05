@@ -542,6 +542,50 @@ def test_model_beats_go_to_python_when_crate_cli_cannot_take_them(
     assert "--beats" not in caplog.text
 
 
+def test_model_beats_go_to_python_while_the_beats_probe_backs_off(
+    monkeypatch, tmp_path: Path, caplog
+) -> None:
+    import logging
+    import subprocess
+
+    import crate.audio_analysis as audio_analysis
+    from crate import crate_cli
+    from crate.smart_mix import analyzer
+
+    beats = _model_beats(0)
+    probes: list[list[str]] = []
+
+    def broken_probe(args, **_kwargs):
+        probes.append(list(args))
+        raise subprocess.TimeoutExpired(args, 5)
+
+    monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
+    monkeypatch.setattr(crate_cli, "is_available", lambda: True)
+    monkeypatch.setattr(crate_cli, "has_subcommands", lambda: True)
+    monkeypatch.setattr(crate_cli, "_clock", lambda: 1_000.0)
+    monkeypatch.setattr(crate_cli.subprocess, "run", broken_probe)
+    monkeypatch.setattr(
+        analyzer, "analyze_mix_profile", lambda _path, beats=None: "python draft"
+    )
+    crate_cli._analyze_help.cache_clear()
+    try:
+        with caplog.at_level(logging.INFO, logger=audio_analysis.__name__):
+            for name in ("a.flac", "b.flac"):
+                draft = audio_analysis.analyze_mix_profile(tmp_path / name, beats)
+                assert draft == "python draft"
+    finally:
+        crate_cli._analyze_help.cache_clear()
+
+    # The binary may well take --beats: its analyze --help timed out once and is not
+    # asked again for a minute, so the worker says that rather than blaming the binary.
+    assert probes == [["/usr/local/bin/crate-cli", "analyze", "--help"]]
+    records = [r for r in caplog.records if r.name == audio_analysis.__name__]
+    assert "does not take model beats" not in caplog.text
+    assert len(records) == 2
+    assert all("backing off" in record.getMessage() for record in records)
+    assert all(record.levelno == logging.INFO for record in records)
+
+
 def _bar_features(bar_starts, kick_beats, beats, spacing=20):
     frames = beats * spacing + spacing
     onsets = np.full(frames, 0.2)

@@ -380,6 +380,7 @@ def _analyze_rust(filepath: str, beats=None) -> dict | None:
     """
     try:
         from crate.crate_cli import (
+            analyze_beats_probe_backing_off,
             has_subcommands,
             is_available,
             run_analyze,
@@ -389,12 +390,21 @@ def _analyze_rust(filepath: str, beats=None) -> dict | None:
         if not is_available() or not has_subcommands():
             return None
         if beats is not None and not supports_analyze_beats():
-            log.warning(
-                "crate-cli does not take model beats (--beats); the Python analyzer "
-                "analyses %s with the %s beats",
-                filepath,
-                beats.tracker,
-            )
+            if analyze_beats_probe_backing_off():
+                # The probe failure was logged once; the binary may take --beats.
+                log.info(
+                    "crate-cli analyze --help failed recently and is backing off; the "
+                    "Python analyzer analyses %s with the %s beats",
+                    filepath,
+                    beats.tracker,
+                )
+            else:
+                log.warning(
+                    "crate-cli does not take model beats (--beats); the Python "
+                    "analyzer analyses %s with the %s beats",
+                    filepath,
+                    beats.tracker,
+                )
             return None
         data = run_analyze(
             file=filepath, beats=None if beats is None else beats.to_payload()
