@@ -171,7 +171,9 @@ def test_desktop_release_uploads_native_debug_symbols() -> None:
     )
 
 
-def test_desktop_symbol_upload_sends_only_the_app_and_never_blocks_the_release() -> None:
+def test_desktop_symbol_upload_sends_only_the_app_and_never_blocks_the_release() -> (
+    None
+):
     workflow = yaml.safe_load(
         (ROOT / ".github/workflows/build-desktop.yml").read_text()
     )
@@ -182,7 +184,9 @@ def test_desktop_symbol_upload_sends_only_the_app_and_never_blocks_the_release()
     # Only the shipped binary and its PDB/dSYM: the whole target folder carries
     # build scripts and proc macros that Sentry rejects on Windows.
     assert "app/listen-desktop/scripts/debug-symbol-files.mjs" in symbol_step["run"]
-    assert "--wait-for 120 app/listen-desktop/src-tauri/target" not in symbol_step["run"]
+    assert (
+        "--wait-for 120 app/listen-desktop/src-tauri/target" not in symbol_step["run"]
+    )
 
     # A Sentry failure leaves a warning; packaging and the release upload go on.
     assert "::warning" in symbol_step["run"]
