@@ -169,11 +169,16 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   documented in the Dockerfile) and `CRATE_BEAT_THIS_WEIGHTS` overrides the path. Nothing is
   downloaded at run time.
 - **Where it runs.** `compute_smart_mix_profile` runs it before the analysis
-  (`crate/smart_mix/beat_model.py`) and passes the beats to the Python analyzer, which uses
-  them instead of librosa's tracker, still fits the constant grid, and anchors the bar on
-  the grid phase (beat index mod 4) that collects the most model downbeats within 70 ms,
-  if that phase holds at least 60 % of the model downbeats inside the grid. Otherwise the
-  track has no downbeat and no phrases.
+  (`crate/smart_mix/beat_model.py`) and passes the beats to the Rust analyzer
+  (`crate-cli analyze --file <track> --beats <json>`, a temporary file with `tracker`,
+  `beats_ms` and `downbeats_ms`) or, without `crate-cli`, to the Python fallback. Both use
+  them instead of their own tracker, still fit the constant grid, and anchor the bar on the
+  grid phase (beat index mod 4) that collects the most model downbeats within 70 ms, if
+  that phase holds at least 60 % of the model downbeats inside the grid. Otherwise the
+  track has no downbeat and no phrases. The Rust cue downbeats (`introDownbeatMs`,
+  `outroDownbeatMs`) take the same rule over the 32 beats around each cue. A `crate-cli`
+  whose `analyze --help` does not list `--beats` is not given them: it tracks its own
+  beats and its profile has no `beat_tracker`.
 - **Fallback.** Without torch, `beat_this` or the weights (`PANNS=off`), when the model fails
   or finds no beats, and for tracks over 600 s, the analysis keeps its own tracker and
   heuristic and the worker logs it.

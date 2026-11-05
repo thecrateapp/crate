@@ -58,6 +58,9 @@ pub struct SmartMixProfileResult {
     /// One byte per phrase once a vocal detector qualifies (SM1.PR4); absent until then.
     pub vocal_presence: Option<Vec<u8>>,
     pub structure_confidence: Option<f32>,
+    /// The model that gave the beats and downbeats (`analyze --beats`, SM3-D14); null
+    /// with the analyzer's own tracker.
+    pub beat_tracker: Option<String>,
 }
 
 impl SmartMixProfileResult {
@@ -105,6 +108,7 @@ impl SmartMixProfileResult {
             energy_curve: None,
             vocal_presence: None,
             structure_confidence: None,
+            beat_tracker: None,
         }
     }
 }

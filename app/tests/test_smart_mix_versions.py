@@ -159,6 +159,26 @@ def test_rust_structure_constants_match_python() -> None:
         assert rust[name] == expected, name
 
 
+def test_rust_model_downbeat_rule_matches_python() -> None:
+    # Both analyzers take the bar from Beat This! downbeats with the same rule (SM3-D14).
+    from crate.smart_mix import phrase_grid
+
+    source = (REPO_ROOT / "tools/crate-cli/src/beat_tracking.rs").read_text()
+    rust = {
+        name: float(value)
+        for name, value in re.findall(
+            r"^pub const (MODEL_DOWNBEAT_[A-Z_]+): [^=]+= ([^;]+);",
+            source,
+            re.MULTILINE,
+        )
+    }
+
+    assert rust == {
+        "MODEL_DOWNBEAT_TOLERANCE_MS": phrase_grid.MODEL_DOWNBEAT_TOLERANCE_MS,
+        "MODEL_DOWNBEAT_MIN_SHARE": phrase_grid.MODEL_DOWNBEAT_MIN_SHARE,
+    }
+
+
 def test_only_phrase_planners_read_the_profile_structure() -> None:
     assert versions.planner_reads_structure(versions.PLANNER_IDENTIFIER) is False
     assert versions.planner_reads_structure("smart-mix-v2") is False

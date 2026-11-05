@@ -140,9 +140,88 @@ def test_python_and_rust_structure_stay_within_tolerance(tmp_path: Path) -> None
     )
 
 
-def _rust_profile(track: Path) -> dict:
+def test_python_and_rust_take_the_same_model_beats(tmp_path: Path) -> None:
+    # Beat This! gives both analyzers the same beats and downbeats (SM3-D14); the
+    # clicks accent every fourth beat from 1 s, the model hears the bar two beats later.
+    from crate.smart_mix.analyzer import analyze_mix_profile
+
+    track = tmp_path / "model-120.wav"
+    _write_click_track(
+        track,
+        bpm=120.0,
+        duration_seconds=20.0,
+        leading_silence_seconds=1.0,
+        trailing_silence_seconds=1.0,
+    )
+    beats = _model_beats(range(1_000, 18_501, 500), phase=2)
+
+    python_profile = analyze_mix_profile(track, beats=beats)
+    rust_profile = _rust_profile(track, beats=beats)
+
+    assert rust_profile["beatTracker"] == python_profile.beat_tracker
+    assert python_profile.beat_tracker == "beat-this-test"
+    assert rust_profile["bpm"] == python_profile.bpm == 120.0
+    assert len(rust_profile["beatGridMs"]) == len(python_profile.beat_grid_ms)
+    assert all(
+        abs(rust - python) <= 1
+        for rust, python in zip(
+            rust_profile["beatGridMs"], python_profile.beat_grid_ms, strict=True
+        )
+    )
+    assert rust_profile["downbeatAnchorMs"] == python_profile.downbeat_anchor_ms
+    assert python_profile.downbeat_anchor_ms == 2_000
+
+
+def test_python_and_rust_structure_agree_with_model_beats(tmp_path: Path) -> None:
+    from crate.smart_mix.analyzer import analyze_mix_profile
+    from tests.smart_mix_structure_audio import BEAT_MS, LEAD_SECONDS
+
+    track = tmp_path / "structure-model-120.wav"
+    write_structured_track(track, DJ_SECTIONS)
+    first_ms = round(LEAD_SECONDS * 1_000)
+    beat_count = 4 * sum(section.bars for section in DJ_SECTIONS)
+    beats = _model_beats(
+        range(first_ms, first_ms + beat_count * BEAT_MS, BEAT_MS), phase=0
+    )
+
+    python_profile = analyze_mix_profile(track, beats=beats)
+    rust_profile = _rust_profile(track, beats=beats)
+
+    assert rust_profile["downbeatAnchorMs"] == python_profile.downbeat_anchor_ms
+    assert python_profile.downbeat_anchor_ms == first_ms
+    rust_phrases = rust_profile["phrases"]
+    assert tuple(phrase["kind"] for phrase in rust_phrases) == DJ_KINDS
+    assert tuple(phrase.kind for phrase in python_profile.phrases) == DJ_KINDS
+    assert [phrase["bars"] for phrase in rust_phrases] == [
+        phrase.bars for phrase in python_profile.phrases
+    ]
+    assert all(
+        abs(rust["startMs"] - python.start_ms) <= BEAT_MS
+        for rust, python in zip(rust_phrases, python_profile.phrases, strict=True)
+    )
+    python_curve = python_profile.energy_curve
+    rust_curve = rust_profile["energyCurve"]
+    assert abs(len(python_curve) - len(rust_curve)) <= 1
+    assert max(abs(a - b) for a, b in zip(python_curve, rust_curve)) <= 2
+
+
+def _model_beats(beats_ms, *, phase: int):
+    from crate.smart_mix.beat_model import BeatTrack
+
+    beats = tuple(beats_ms)
+    return BeatTrack(
+        tracker="beat-this-test", beats_ms=beats, downbeats_ms=beats[phase::4]
+    )
+
+
+def _rust_profile(track: Path, *, beats=None) -> dict:
+    args = [_crate_cli_binary(), "analyze", "--file", track]
+    if beats is not None:
+        beats_path = track.with_suffix(".beats.json")
+        beats_path.write_text(json.dumps(beats.to_payload()))
+        args += ["--beats", beats_path]
     result = subprocess.run(
-        [_crate_cli_binary(), "analyze", "--file", track],
+        args,
         check=True,
         capture_output=True,
         text=True,

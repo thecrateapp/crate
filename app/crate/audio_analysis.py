@@ -66,7 +66,7 @@ def analyze_mix_profile(filepath: str | Path, beats=None):
     from crate.smart_mix.analyzer import analyze_mix_profile as analyze
     from crate.smart_mix.models import mix_profile_draft_from_payload
 
-    rust_result = _analyze_rust(str(filepath))
+    rust_result = _analyze_rust(str(filepath), beats)
     payload = rust_result.get("mix_profile") if rust_result else None
     if isinstance(payload, dict):
         return mix_profile_draft_from_payload(payload)
@@ -371,14 +371,20 @@ def analyze_batch(filepaths: list) -> list:
     return [analyze_track(fp) for fp in filepaths]
 
 
-def _analyze_rust(filepath: str) -> dict | None:
-    """Try analyzing with crate-cli. Returns result dict or None to fall back."""
+def _analyze_rust(filepath: str, beats=None) -> dict | None:
+    """Try analyzing with crate-cli. Returns result dict or None to fall back.
+
+    ``beats`` (a ``BeatTrack``) reach a crate-cli that takes ``--beats``; an older one
+    tracks its own and its profile carries no ``beatTracker``.
+    """
     try:
         from crate.crate_cli import run_analyze, is_available, has_subcommands
 
         if not is_available() or not has_subcommands():
             return None
-        data = run_analyze(file=filepath)
+        data = run_analyze(
+            file=filepath, beats=None if beats is None else beats.to_payload()
+        )
         if not data or data.get("error"):
             return None
         return {

@@ -2,11 +2,15 @@
 //!
 //! Ports the librosa pipeline used by the Python analyzer (`onset_strength`,
 //! `feature.tempo` and `beat.beat_track`, after Ellis 2007) so both analyzers
-//! place beats with the same method.
+//! place beats with the same method. Beats and downbeats from a model (Beat This!,
+//! SM3-D14) replace the tracker and the downbeat heuristic when the worker passes them.
+
+use std::path::Path;
 
 use realfft::RealFftPlanner;
+use serde::Deserialize;
 
-use crate::structure::{BAND_COUNT, LOW_BAND_HZ, MID_BAND_HZ};
+use crate::structure::{BAND_COUNT, BEATS_PER_BAR, LOW_BAND_HZ, MID_BAND_HZ};
 
 pub const FFT_SIZE: usize = 2048;
 pub const HOP_SIZE: usize = 512;
@@ -28,6 +32,45 @@ const REFINE_LOOKAHEAD_MS: f64 = 12.0;
 const REFINE_WINDOW_MS: f64 = 2.0;
 const REFINE_RISE_MS: usize = 3;
 const REFINE_MIN_RISE: f64 = 0.5;
+/// Beat This! downbeats (SM3-D14): a model downbeat votes for the bar phase of the grid
+/// beat within this distance, and the winning phase must hold this share of the model
+/// downbeats that fall within the grid. Same constants as the Python analyzer
+/// (`crate.smart_mix.phrase_grid`).
+pub const MODEL_DOWNBEAT_TOLERANCE_MS: u64 = 70;
+pub const MODEL_DOWNBEAT_MIN_SHARE: f64 = 0.6;
+/// Model beats sit on the attack while the onset envelope peaks a frame later: the onset
+/// frame of a model beat is the envelope's peak within this distance, where the tracker's
+/// beats sit, so beat strength and stability read the same envelope values.
+const MODEL_BEAT_ONSET_WINDOW_MS: f64 = 35.0;
+
+/// Beats and downbeats from a model, as the worker writes them for `analyze --beats`:
+/// `{"tracker": "beat-this-small0", "beats_ms": [...], "downbeats_ms": [...]}`.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct ExternalBeats {
+    #[serde(default)]
+    pub tracker: Option<String>,
+    pub beats_ms: Vec<u64>,
+    #[serde(default)]
+    pub downbeats_ms: Vec<u64>,
+}
+
+impl ExternalBeats {
+    pub fn load(path: &Path) -> Result<Self, String> {
+        let text = std::fs::read_to_string(path).map_err(|error| format!("beats: {error}"))?;
+        let beats: Self = serde_json::from_str(&text).map_err(|error| format!("beats: {error}"))?;
+        Ok(beats.normalized())
+    }
+
+    /// Positive, strictly increasing positions.
+    pub fn normalized(mut self) -> Self {
+        for positions in [&mut self.beats_ms, &mut self.downbeats_ms] {
+            positions.retain(|position| *position > 0);
+            positions.sort_unstable();
+            positions.dedup();
+        }
+        self
+    }
+}
 
 fn hz_to_mel(hz: f32) -> f32 {
     let f_sp = 200.0 / 3.0;
@@ -356,6 +399,83 @@ pub fn window_downbeat_phase(features: &FrameFeatures, beats: &[usize]) -> Optio
     let scores = downbeat_scores(features, beats)?;
     let (phase, margin) = best_phase(&scores, 0..beats.len())?;
     (margin >= DOWNBEAT_MARGIN).then_some(phase)
+}
+
+fn nearest_beat_index(beat_grid_ms: &[u64], position: u64) -> usize {
+    let after = beat_grid_ms.partition_point(|beat| *beat < position);
+    if after == 0 {
+        return 0;
+    }
+    if after == beat_grid_ms.len() {
+        return after - 1;
+    }
+    let before = after - 1;
+    if position - beat_grid_ms[before] <= beat_grid_ms[after] - position {
+        before
+    } else {
+        after
+    }
+}
+
+/// Index of the first downbeat in `beat_grid_ms`: the bar phase (index mod 4) that
+/// collects the most model downbeats, each voting for its nearest grid beat within
+/// `MODEL_DOWNBEAT_TOLERANCE_MS`, if it holds `MODEL_DOWNBEAT_MIN_SHARE` of the model
+/// downbeats between the first and the last beat (within the tolerance).
+pub fn downbeat_phase_from_model(beat_grid_ms: &[u64], downbeats_ms: &[u64]) -> Option<usize> {
+    let (first, last) = (*beat_grid_ms.first()?, *beat_grid_ms.last()?);
+    let mut votes = [0_usize; BEATS_PER_BAR];
+    let mut counted = 0_usize;
+    for &downbeat in downbeats_ms {
+        if downbeat + MODEL_DOWNBEAT_TOLERANCE_MS < first
+            || downbeat > last + MODEL_DOWNBEAT_TOLERANCE_MS
+        {
+            continue;
+        }
+        counted += 1;
+        let index = nearest_beat_index(beat_grid_ms, downbeat);
+        if beat_grid_ms[index].abs_diff(downbeat) <= MODEL_DOWNBEAT_TOLERANCE_MS {
+            votes[index % BEATS_PER_BAR] += 1;
+        }
+    }
+    if counted == 0 {
+        return None;
+    }
+    // On a tie the earlier phase wins; a tie never reaches a share above one half.
+    let phase = (0..BEATS_PER_BAR)
+        .max_by(|left, right| votes[*left].cmp(&votes[*right]).then(right.cmp(left)))?;
+    (votes[phase] as f64 >= MODEL_DOWNBEAT_MIN_SHARE * counted as f64).then_some(phase)
+}
+
+/// Onset frame of each model beat: the onset envelope's peak within
+/// `MODEL_BEAT_ONSET_WINDOW_MS`, never before the previous beat's frame.
+pub fn model_beat_frames(beats_ms: &[u64], onsets: &[f32], sample_rate: u32) -> Vec<usize> {
+    if sample_rate == 0 {
+        return Vec::new();
+    }
+    let frame_ms = HOP_SIZE as f64 * 1_000.0 / f64::from(sample_rate);
+    let window = ((MODEL_BEAT_ONSET_WINDOW_MS / frame_ms).round() as usize).max(1);
+    let mut previous = 0_usize;
+    beats_ms
+        .iter()
+        .map(|beat| {
+            let centre = (*beat as f64 / frame_ms).round() as usize;
+            let start = centre.saturating_sub(window).max(previous);
+            let end = (centre + window + 1).min(onsets.len());
+            let frame = if start < end {
+                (start..end).fold(start, |best, frame| {
+                    if onsets[frame] > onsets[best] {
+                        frame
+                    } else {
+                        best
+                    }
+                })
+            } else {
+                centre.max(previous)
+            };
+            previous = frame;
+            frame
+        })
+        .collect()
 }
 
 fn frames_per_second(sample_rate: u32) -> f32 {
@@ -809,6 +929,140 @@ mod tests {
         let features = bar_features(&bars, &bars, beats);
 
         assert_eq!(downbeat_phase(&features, &beat_frames(beats)), None);
+    }
+
+    fn model_grid(beats: u64) -> Vec<u64> {
+        (0..beats).map(|beat| 1_000 + 500 * beat).collect()
+    }
+
+    fn on_phase(grid: &[u64], phase: usize, beats: std::ops::Range<usize>) -> Vec<u64> {
+        beats
+            .filter(|beat| beat % 4 == phase)
+            .map(|beat| grid[beat])
+            .collect()
+    }
+
+    #[test]
+    fn model_downbeat_constants_match_the_python_analyzer() {
+        assert_eq!(MODEL_DOWNBEAT_TOLERANCE_MS, 70);
+        assert_eq!(MODEL_DOWNBEAT_MIN_SHARE, 0.6);
+    }
+
+    #[test]
+    fn downbeat_phase_from_model_downbeats() {
+        let grid = model_grid(64);
+        // A pickup: the bar starts on the third beat, with two stray downbeats.
+        let mut downbeats = on_phase(&grid, 2, 0..64);
+        downbeats.extend([grid[4], grid[40]]);
+        downbeats.sort_unstable();
+        assert_eq!(downbeat_phase_from_model(&grid, &downbeats), Some(2));
+
+        // Jitter within the tolerance still votes.
+        let jittered: Vec<u64> = on_phase(&grid, 3, 0..64)
+            .iter()
+            .enumerate()
+            .map(|(index, beat)| if index % 2 == 0 { beat - 60 } else { beat + 60 })
+            .collect();
+        assert_eq!(downbeat_phase_from_model(&grid, &jittered), Some(3));
+
+        // Downbeats outside the grid neither vote nor dilute the share.
+        let mut outside = vec![10, 200, grid[63] + 2_000, grid[63] + 4_000];
+        outside.extend(on_phase(&grid, 1, 0..64));
+        outside.sort_unstable();
+        assert_eq!(downbeat_phase_from_model(&grid, &outside), Some(1));
+
+        // Six of ten on one phase is exactly the share.
+        let mut exact = on_phase(&grid, 0, 0..24);
+        exact.extend([grid[1], grid[5], grid[9], grid[13]]);
+        exact.sort_unstable();
+        assert_eq!(exact.len(), 10);
+        assert_eq!(downbeat_phase_from_model(&grid, &exact), Some(0));
+
+        // A drifting tracked grid: each downbeat votes for its nearest beat.
+        let drifting: Vec<u64> = (0..40_u64)
+            .map(|beat| 1_000 + 480 * beat + 2 * beat * beat)
+            .collect();
+        let late: Vec<u64> = (1..40).step_by(4).map(|beat| drifting[beat] + 20).collect();
+        assert_eq!(downbeat_phase_from_model(&drifting, &late), Some(1));
+    }
+
+    #[test]
+    fn no_downbeat_below_min_share() {
+        let grid = model_grid(64);
+        let mut split = on_phase(&grid, 0, 0..32);
+        split.extend(on_phase(&grid, 2, 32..64));
+        let waltz: Vec<u64> = (0..64).step_by(3).map(|beat| grid[beat]).collect();
+        let off_by_more: Vec<u64> = on_phase(&grid, 3, 0..64)
+            .iter()
+            .map(|beat| beat + MODEL_DOWNBEAT_TOLERANCE_MS + 30)
+            .collect();
+        let mut below = on_phase(&grid, 0, 0..20);
+        below.extend([grid[1], grid[5], grid[9], grid[13]]);
+
+        assert_eq!(downbeat_phase_from_model(&grid, &split), None);
+        assert_eq!(downbeat_phase_from_model(&grid, &waltz), None);
+        assert_eq!(downbeat_phase_from_model(&grid, &off_by_more), None);
+        assert_eq!(downbeat_phase_from_model(&grid, &below), None);
+        assert_eq!(downbeat_phase_from_model(&grid, &[]), None);
+        assert_eq!(
+            downbeat_phase_from_model(&[], &on_phase(&grid, 0, 0..64)),
+            None
+        );
+    }
+
+    #[test]
+    fn external_beats_read_the_python_payload() {
+        let beats: ExternalBeats = serde_json::from_str(
+            r#"{"tracker": "beat-this-small0", "beats_ms": [1500, 0, 500, 1000, 1000],
+                "downbeats_ms": [1500, 500]}"#,
+        )
+        .unwrap();
+        let beats = beats.normalized();
+
+        assert_eq!(beats.tracker.as_deref(), Some("beat-this-small0"));
+        assert_eq!(beats.beats_ms, vec![500, 1_000, 1_500]);
+        assert_eq!(beats.downbeats_ms, vec![500, 1_500]);
+    }
+
+    #[test]
+    fn model_beats_take_the_onset_peak_as_their_frame() {
+        let samples = clicks(120.0, 10.0);
+        let onsets = onset_strength(&samples, SAMPLE_RATE);
+        // The clicks start at 0 s, every 500 ms; the model hears the attacks.
+        let beats_ms: Vec<u64> = (1..19).map(|beat| 500 * beat).collect();
+
+        let frames = model_beat_frames(&beats_ms, &onsets, SAMPLE_RATE);
+
+        assert_eq!(frames.len(), beats_ms.len());
+        for (frame, beat) in frames.iter().zip(&beats_ms) {
+            let window = &onsets[frame.saturating_sub(2)..(frame + 3).min(onsets.len())];
+            assert_eq!(
+                onsets[*frame],
+                window.iter().copied().fold(0.0_f32, f32::max)
+            );
+            let ms = *frame as f64 * HOP_SIZE as f64 * 1_000.0 / f64::from(SAMPLE_RATE);
+            assert!(
+                (ms - *beat as f64).abs() <= 50.0,
+                "beat {beat} on frame {ms} ms"
+            );
+        }
+        assert!(frames.windows(2).all(|pair| pair[0] <= pair[1]));
+    }
+
+    #[test]
+    fn close_model_beats_keep_their_frames_in_order() {
+        let onsets: Vec<f32> = (0..40)
+            .map(|frame| if frame % 7 == 0 { 1.0 } else { 0.1 })
+            .collect();
+        // Beats closer than the snapping window may not swap frames.
+        let beats_ms: Vec<u64> = vec![100, 140, 180, 600];
+
+        let frames = model_beat_frames(&beats_ms, &onsets, SAMPLE_RATE);
+
+        assert!(
+            frames.windows(2).all(|pair| pair[0] <= pair[1]),
+            "{frames:?}"
+        );
     }
 
     #[test]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 
@@ -43,6 +44,93 @@ def test_run_analyze_returns_none_when_binary_lacks_analyze(monkeypatch):
 
     assert crate_cli.run_analyze(file="/music/track.flac") is None
     assert calls == [["/usr/local/bin/crate-cli", "--help"]]
+
+
+_BEATS = {
+    "tracker": "beat-this-small0",
+    "beats_ms": [500, 1_000, 1_500],
+    "downbeats_ms": [500],
+}
+
+
+def _analyze_harness(monkeypatch, *, supports_beats: bool) -> list[dict]:
+    import json
+
+    from crate import crate_cli, resource_governor
+
+    monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
+    monkeypatch.setattr(crate_cli, "supports_command", lambda _name: True)
+    monkeypatch.setattr(crate_cli, "supports_analyze_beats", lambda: supports_beats)
+    monkeypatch.setattr(crate_cli, "_find_panns_model", lambda: None)
+    monkeypatch.setattr(resource_governor, "low_priority_command", list)
+    calls: list[dict] = []
+
+    def fake_run(args, **kwargs):
+        call = {"args": list(args)}
+        if "--beats" in args:
+            beats_path = Path(args[args.index("--beats") + 1])
+            call["beats_path"] = beats_path
+            call["beats"] = json.loads(beats_path.read_text())
+        calls.append(call)
+        return SimpleNamespace(returncode=0, stdout='{"bpm": 120}', stderr="")
+
+    monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
+    return calls
+
+
+def test_run_analyze_passes_model_beats_in_a_temporary_file(monkeypatch):
+    from crate import crate_cli
+
+    calls = _analyze_harness(monkeypatch, supports_beats=True)
+
+    assert crate_cli.run_analyze(file="/music/track.flac", beats=_BEATS) == {"bpm": 120}
+    [call] = calls
+    assert call["args"][:4] == [
+        "/usr/local/bin/crate-cli",
+        "analyze",
+        "--file",
+        "/music/track.flac",
+    ]
+    assert call["beats"] == _BEATS
+    # The file only lives for the call.
+    assert not call["beats_path"].exists()
+
+
+def test_run_analyze_keeps_an_older_binary_without_beats(monkeypatch):
+    from crate import crate_cli
+
+    calls = _analyze_harness(monkeypatch, supports_beats=False)
+
+    assert crate_cli.run_analyze(file="/music/track.flac", beats=_BEATS) == {"bpm": 120}
+    assert "--beats" not in calls[0]["args"]
+    # Beats only go with a single file.
+    calls.clear()
+    monkeypatch.setattr(crate_cli, "supports_analyze_beats", lambda: True)
+    crate_cli.run_analyze(directory="/music", beats=_BEATS)
+    assert "--beats" not in calls[0]["args"]
+
+
+def test_beats_support_reads_the_analyze_help(monkeypatch):
+    from crate import crate_cli
+
+    monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
+    helps = {
+        "new": "Options:\n  -f, --file <FILE>\n      --beats <BEATS>\n",
+        "old": "Options:\n  -f, --file <FILE>\n      --model-path <MODEL_PATH>\n",
+    }
+    for version, expected in (("new", True), ("old", False)):
+        calls: list[list[str]] = []
+
+        def fake_run(args, version=version, **kwargs):
+            calls.append(list(args))
+            return SimpleNamespace(returncode=0, stdout=helps[version], stderr="")
+
+        monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
+        crate_cli.supports_analyze_beats.cache_clear()
+
+        assert crate_cli.supports_analyze_beats() is expected
+        assert calls == [["/usr/local/bin/crate-cli", "analyze", "--help"]]
+    crate_cli.supports_analyze_beats.cache_clear()
 
 
 def test_run_analyze_runs_at_background_priority(monkeypatch):

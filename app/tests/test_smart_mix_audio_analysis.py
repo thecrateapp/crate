@@ -224,7 +224,7 @@ def test_backfill_analysis_prefers_the_rust_profile(
     monkeypatch.setattr(
         audio_analysis,
         "_analyze_rust",
-        lambda _path: {
+        lambda _path, _beats=None: {
             "mix_profile": {
                 "analyzer": "crate-rust",
                 "analyzerVersion": "smart-mix-audio-v2",
@@ -256,7 +256,9 @@ def test_backfill_analysis_falls_back_to_python_without_crate_cli(
         leading_silence_seconds=0.0,
         trailing_silence_seconds=0.0,
     )
-    monkeypatch.setattr(audio_analysis, "_analyze_rust", lambda _path: None)
+    monkeypatch.setattr(
+        audio_analysis, "_analyze_rust", lambda _path, _beats=None: None
+    )
 
     draft = audio_analysis.analyze_mix_profile(track)
 
@@ -399,6 +401,42 @@ def test_external_beats_stop_at_the_analysed_head(monkeypatch, tmp_path: Path) -
     assert profile.beat_grid_ms[0] == 1_000
     assert max(profile.beat_grid_ms) <= 10_000
     assert profile.quality == "partial"
+
+
+def test_profile_analysis_passes_model_beats_to_rust(
+    monkeypatch, tmp_path: Path
+) -> None:
+    import crate.audio_analysis as audio_analysis
+    from crate import crate_cli
+
+    beats = _model_beats(2)
+    calls: list[dict] = []
+    monkeypatch.setattr(crate_cli, "is_available", lambda: True)
+    monkeypatch.setattr(crate_cli, "has_subcommands", lambda: True)
+
+    def run_analyze(**kwargs):
+        calls.append(kwargs)
+        return {
+            "mixProfile": {
+                "analyzer": "crate-rust",
+                "analyzerVersion": "smart-mix-audio-v7",
+                "durationMs": 20_000,
+                "quality": "partial",
+                "beatTracker": "beat-this-test",
+            }
+        }
+
+    monkeypatch.setattr(crate_cli, "run_analyze", run_analyze)
+
+    draft = audio_analysis.analyze_mix_profile(tmp_path / "track.flac", beats)
+    plain = audio_analysis.analyze_mix_profile(tmp_path / "track.flac")
+
+    assert calls == [
+        {"file": str(tmp_path / "track.flac"), "beats": beats.to_payload()},
+        {"file": str(tmp_path / "track.flac"), "beats": None},
+    ]
+    assert (draft.analyzer, draft.beat_tracker) == ("crate-rust", "beat-this-test")
+    assert plain.analyzer == "crate-rust"
 
 
 def test_profile_analysis_passes_model_beats_to_the_python_analyzer(

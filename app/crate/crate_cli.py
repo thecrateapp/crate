@@ -5,8 +5,12 @@ import logging
 import os
 import shutil
 import subprocess
+import tempfile
+from collections.abc import Mapping
+from contextlib import ExitStack
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -61,6 +65,22 @@ def supports_command(command: str) -> bool:
     except Exception:
         return False
     return command.lower() in result.stdout.lower()
+
+
+@lru_cache(maxsize=1)
+def supports_analyze_beats() -> bool:
+    """Whether ``analyze`` takes model beats (``--beats``, SM3-D14); older binaries
+    track the beats themselves."""
+    binary = find_binary()
+    if not binary:
+        return False
+    try:
+        result = subprocess.run(
+            [binary, "analyze", "--help"], capture_output=True, text=True, timeout=5
+        )
+    except Exception:
+        return False
+    return "--beats" in result.stdout
 
 
 def _scan_timeout() -> int:
@@ -290,9 +310,17 @@ def _find_panns_model() -> str | None:
 
 
 def run_analyze(
-    directory: str = "", file: str = "", extensions: str = "flac,mp3,m4a,ogg,opus"
+    directory: str = "",
+    file: str = "",
+    extensions: str = "flac,mp3,m4a,ogg,opus",
+    *,
+    beats: Mapping[str, Any] | None = None,
 ) -> dict | None:
-    """Run audio analysis with Rust CLI. Returns AnalysisResult(s) or None."""
+    """Run audio analysis with Rust CLI. Returns AnalysisResult(s) or None.
+
+    ``beats`` (``BeatTrack.to_payload()``) replaces the tracker of a single file's
+    analysis when the binary supports it; it goes through a temporary JSON file.
+    """
     binary = find_binary()
     if not binary or not supports_command("analyze"):
         return None
@@ -308,17 +336,28 @@ def run_analyze(
         return None
     from crate.resource_governor import low_priority_command
 
-    try:
-        result = subprocess.run(
-            low_priority_command(args), capture_output=True, text=True, timeout=3600
-        )
-        if result.returncode != 0:
-            log.warning("crate-cli analyze failed: %s", result.stderr[:200])
+    with ExitStack() as cleanup:
+        if beats is not None and file and supports_analyze_beats():
+            scratch = cleanup.enter_context(
+                tempfile.TemporaryDirectory(prefix="crate-cli-beats-")
+            )
+            beats_path = Path(scratch) / "beats.json"
+            beats_path.write_text(json.dumps(dict(beats)))
+            args.extend(["--beats", str(beats_path)])
+        try:
+            result = subprocess.run(
+                low_priority_command(args),
+                capture_output=True,
+                text=True,
+                timeout=3600,
+            )
+            if result.returncode != 0:
+                log.warning("crate-cli analyze failed: %s", result.stderr[:200])
+                return None
+            return json.loads(result.stdout)
+        except Exception:
+            log.warning("crate-cli analyze subprocess failed", exc_info=True)
             return None
-        return json.loads(result.stdout)
-    except Exception:
-        log.warning("crate-cli analyze subprocess failed", exc_info=True)
-        return None
 
 
 def run_bliss(

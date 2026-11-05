@@ -96,6 +96,10 @@ enum Command {
         /// Path to PANNs CNN14 ONNX model for ML features (mood, danceability, etc.)
         #[arg(long)]
         model_path: Option<PathBuf>,
+        /// JSON with a model's beats_ms and downbeats_ms (Beat This!), used instead of
+        /// the beat tracker and the downbeat heuristic; needs --file
+        #[arg(long)]
+        beats: Option<PathBuf>,
     },
 }
 
@@ -193,6 +197,7 @@ fn main() {
             dir,
             extensions,
             model_path,
-        } => analyze::run_analyze(file, dir, extensions, model_path),
+            beats,
+        } => analyze::run_analyze(file, dir, extensions, model_path, beats),
     }
 }
