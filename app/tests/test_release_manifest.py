@@ -129,6 +129,7 @@ def test_backend_change_selects_backend_compatibility_group() -> None:
                 "worker",
             },
         ),
+        ("app/requirements-beat-this.txt", {"analysis-worker"}),
         ("package-lock.json", {"cast-receiver", "listen", "ui"}),
         ("package.json", {"cast-receiver", "listen", "ui"}),
         ("app/ui/Dockerfile.dockerignore", {"ui"}),
