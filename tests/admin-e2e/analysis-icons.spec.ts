@@ -6,6 +6,10 @@ import {
 } from "./fixtures";
 import snapshot from "./fixtures/ops-snapshot.json";
 import analysis from "./fixtures/analysis-status.json";
+
+// Readings reuse the form-field rhythm; the Smart Mix backfill settings are
+// real form fields with inputs.
+const readings = '.crate-form-field:not([data-slot="form-field"])';
 for (const width of [1440, 768, 390]) {
   test.describe(`Analysis text controls ${width}`, () => {
     test.use({ viewport: { width, height: 1100 } });
@@ -37,7 +41,7 @@ for (const width of [1440, 768, 390]) {
       );
       for (const family of ["Bricolage Grotesque", "JetBrains Mono", "Roboto"])
         expect(loaded).toContain(family);
-      for (const field of await main.locator(".crate-form-field").all()) {
+      for (const field of await main.locator(readings).all()) {
         await expect(field.locator(":scope > :first-child")).toHaveCSS(
           "font-family",
           /JetBrains Mono/,
@@ -61,6 +65,15 @@ for (const width of [1440, 768, 390]) {
         "danger",
       );
       await expect(main.getByText("Marea", { exact: true })).toBeVisible();
+      await expect(
+        main.getByText("Day · 4 in flight", { exact: true }),
+      ).toBeVisible();
+      await expect(main.getByLabel("Night start", { exact: true })).toHaveValue(
+        "01:00",
+      );
+      await expect(
+        main.getByLabel("Night in flight", { exact: true }),
+      ).toHaveValue("8");
       await expect(
         main.getByRole("article", {
           name: "Last audio fingerprint",
@@ -112,7 +125,7 @@ for (const width of [1440, 768, 390]) {
         ),
       ).toBe(true);
       const fields = await main
-        .locator(".crate-form-field")
+        .locator(readings)
         .evaluateAll((nodes) =>
           nodes.map(
             (node) =>

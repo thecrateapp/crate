@@ -1129,6 +1129,7 @@ const approvedUx = new Map([
   ["SmartMixCoverage:mix-resume-loading", ["@crate/ui/icons", "Loader2"]],
   ["SmartMixCoverage:mix-pause-loading", ["@crate/ui/icons", "Loader2"]],
   ["SmartMixCoverage:mix-cancel-loading", ["@crate/ui/icons", "Loader2"]],
+  ["SmartMixCoverage:mix-apply-loading", ["@crate/ui/icons", "Loader2"]],
   ["SmartMixTracks:mix-reanalyze-loading", ["@crate/ui/icons", "Loader2"]],
   ["SmartMixTracks:mix-load-more-loading", ["@crate/ui/icons", "Loader2"]],
   ["SystemHealth:system-health-loading", ["lucide-react", "Loader2"]],
