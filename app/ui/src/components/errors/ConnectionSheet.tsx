@@ -47,8 +47,8 @@ export function ConnectionSheet({
         <SheetHeader>
           <SheetTitle>Sentry connection</SheetTitle>
           <SheetDescription>
-            Where Crate reads issues from. The token is stored encrypted and
-            never shown again.
+            Where Crate reads issues from, and where Launch fix sends them.
+            Tokens are stored encrypted and never shown again.
           </SheetDescription>
         </SheetHeader>
         <div className="px-4 pb-6">

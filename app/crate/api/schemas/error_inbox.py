@@ -1,7 +1,7 @@
 """Error inbox admin API models.
 
-The Sentry token is accepted only on `PUT /api/admin/errors/connection` and is never
-part of a response: the connection only reports `has_token`.
+The Sentry and GitHub tokens are accepted only on `PUT /api/admin/errors/connection`
+and are never part of a response: the connection only reports `has_token`.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
+from crate.error_inbox.autofix import MAX_NOTE_LENGTH
 from crate.error_inbox.sentry_client import SUBSTATUSES
 
 IssueStatus = Literal["unresolved", "resolved", "ignored"]
@@ -111,6 +112,18 @@ class ErrorTriage(BaseModel):
     created_at: datetime
 
 
+class ErrorIssueFix(BaseModel):
+    """Launch fix for one issue; the detail carries it only when E3 is configured."""
+
+    repository: str
+    workflow: str
+    actions_url: str
+    # The workflow only accepts Crate short ids (`CRATE-API-1F`).
+    supported: bool
+    # Set while the 24-hour window after the last request is open.
+    available_at: datetime | None = None
+
+
 class ErrorIssueDetail(ErrorIssueSummary):
     provider: Literal["sentry"]
     external_id: str
@@ -118,10 +131,12 @@ class ErrorIssueDetail(ErrorIssueSummary):
     digest_event_id: str | None = None
     digest_hash: str | None = None
     fix_requested_by: int | None = None
+    fix_requested_by_name: str | None = None
     closed_at: datetime | None = None
     created_at: datetime
     triages: list[ErrorTriage] = Field(default_factory=list)
     write_access: bool | None = None
+    fix: ErrorIssueFix | None = None
 
 
 class ErrorSyncTruncation(BaseModel):
@@ -176,6 +191,16 @@ class ErrorTrackingAccess(BaseModel):
     error_code: str | None = None
 
 
+class ErrorFixConnection(BaseModel):
+    """Launch fix settings. The GitHub token itself is never returned."""
+
+    repository: str
+    workflow: str
+    ref: str
+    has_token: bool
+    actions_url: str
+
+
 class ErrorTrackingConnection(BaseModel):
     configured: bool
     provider: Literal["sentry"] = "sentry"
@@ -186,16 +211,48 @@ class ErrorTrackingConnection(BaseModel):
     has_token: bool
     access: ErrorTrackingAccess | None = None
     sync: ErrorSyncState | None = None
+    fix: ErrorFixConnection | None = None
+
+
+def _new_secret(value: SecretStr | None) -> str | None:
+    if value is None:
+        return None
+    secret = value.get_secret_value()
+    return secret if secret.strip() else None
+
+
+class ErrorFixSettingsUpdate(BaseModel):
+    """Launch fix settings. `token` is write-only; omitted, null or blank keeps it."""
+
+    repository: str = Field(max_length=201)
+    workflow: str = Field(max_length=105)
+    ref: str | None = Field(default=None, max_length=100)
+    token: SecretStr | None = Field(default=None, json_schema_extra={"writeOnly": True})
+
+    def settings(self) -> dict[str, object]:
+        return {
+            "repository": self.repository,
+            "workflow": self.workflow,
+            "ref": self.ref,
+        }
+
+    def new_token(self) -> str | None:
+        return _new_secret(self.token)
 
 
 class ErrorTrackingConnectionUpdate(BaseModel):
-    """Connection settings. `token` is write-only; omitted, null or blank keeps it."""
+    """Connection settings. `token` is write-only; omitted, null or blank keeps it.
+
+    `fix` omitted keeps the Launch fix settings; `null` turns Launch fix off and
+    revokes its GitHub token.
+    """
 
     base_url: str | None = Field(default=None, max_length=2048)
     organization: str = Field(max_length=200)
     projects: list[str] | None = Field(default=None, max_length=200)
     environments: list[str] | None = Field(default=None, max_length=50)
     token: SecretStr | None = Field(default=None, json_schema_extra={"writeOnly": True})
+    fix: ErrorFixSettingsUpdate | None = None
 
     def settings(self) -> dict[str, object]:
         return {
@@ -206,10 +263,19 @@ class ErrorTrackingConnectionUpdate(BaseModel):
         }
 
     def new_token(self) -> str | None:
-        if self.token is None:
-            return None
-        value = self.token.get_secret_value()
-        return value if value.strip() else None
+        return _new_secret(self.token)
+
+    @property
+    def updates_fix(self) -> bool:
+        return "fix" in self.model_fields_set
+
+
+class ErrorFixRequest(BaseModel):
+    """Launch fix. The note goes to a public repository's Actions run as it is."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    note: str = Field(default="", max_length=MAX_NOTE_LENGTH)
 
 
 class ErrorIssueStatusChange(BaseModel):
@@ -230,7 +296,11 @@ class ErrorIssueStatusChange(BaseModel):
 
 __all__ = [
     "Digest",
+    "ErrorFixConnection",
+    "ErrorFixRequest",
+    "ErrorFixSettingsUpdate",
     "ErrorIssueDetail",
+    "ErrorIssueFix",
     "ErrorIssueList",
     "ErrorIssueStatusChange",
     "ErrorIssueSummary",

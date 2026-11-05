@@ -14,6 +14,7 @@ import { useApi } from "@/hooks/use-api";
 import { useTaskPoll } from "@/hooks/use-task-poll";
 import { api } from "@/lib/api";
 import { apiErrorText } from "@/lib/agent-plan-presentation";
+import { FixSettingsForm, fixState } from "./FixSettingsForm";
 import {
   ERRORS_API,
   accessText,
@@ -356,11 +357,15 @@ function savedKey(connection: ErrorTrackingConnection): string {
   ]);
 }
 
+function savedFixKey(connection: ErrorTrackingConnection): string {
+  return JSON.stringify([connection.organization, connection.fix]);
+}
+
 /**
  * Sentry connection status and settings, the body of the connection drawer
- * (ops.runtime.manage only). Saving stores the settings (and a typed token);
- * "Test connection" enqueues a worker task and waits for it: the page itself
- * never calls Sentry.
+ * (ops.runtime.manage only), plus the Launch fix settings. Saving stores the
+ * settings (and a typed token); "Test connection" enqueues a worker task and
+ * waits for it: the page itself never calls Sentry or GitHub.
  */
 export function ConnectionPanel({ onChanged }: { onChanged?: () => void }) {
   const connection = useApi<ErrorTrackingConnection>(CONNECTION_URL);
@@ -425,6 +430,20 @@ export function ConnectionPanel({ onChanged }: { onChanged?: () => void }) {
       <Section title="Settings">
         <ConnectionForm
           key={savedKey(data)}
+          connection={data}
+          onSaved={refresh}
+        />
+      </Section>
+      <Section
+        title="Launch fix"
+        action={
+          <StatusBadge tone={fixState(data).tone}>
+            {fixState(data).label}
+          </StatusBadge>
+        }
+      >
+        <FixSettingsForm
+          key={savedFixKey(data)}
           connection={data}
           onSaved={refresh}
         />

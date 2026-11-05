@@ -23,6 +23,7 @@ import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 import {
   NOT_CONFIGURED_CONNECTION,
   sampleConnection,
+  sampleFixConnection,
 } from "@/test/error-inbox-fixtures";
 
 import { ConnectionPanel, connectionTestOutcome } from "./ConnectionPanel";
@@ -41,6 +42,8 @@ function renderPanel(connection: ErrorTrackingConnection, onChanged = vi.fn()) {
 const form = () =>
   screen.getByRole("form", { name: "Sentry connection settings" });
 const field = (name: string) => within(form()).getByLabelText(name);
+const fixForm = () => screen.getByRole("form", { name: "Launch fix settings" });
+const fixField = (name: string) => within(fixForm()).getByLabelText(name);
 
 describe("ConnectionPanel", () => {
   beforeEach(() => {
@@ -228,6 +231,134 @@ describe("ConnectionPanel", () => {
       screen.getByText(/Sentry rejected the token. It may have been revoked/),
     ).toBeInTheDocument();
     expect(screen.getByText(/Without event:write/)).toBeInTheDocument();
+  });
+
+  it("configures Launch fix with a write-only GitHub token", async () => {
+    apiMock.mockResolvedValue(sampleConnection());
+    const onChanged = renderPanel(sampleConnection());
+
+    const section = screen.getByRole("region", { name: "Launch fix" });
+    expect(within(section).getByText("Off")).toBeInTheDocument();
+    expect(fixField("Repository")).toHaveValue("thecrateapp/crate");
+    expect(fixField("Workflow")).toHaveValue("error-autofix.yml");
+    expect(fixField("Branch")).toHaveValue("main");
+    const token = fixField("GitHub token");
+    expect(token).toHaveAttribute("type", "password");
+    expect(token).toHaveAttribute("autocomplete", "new-password");
+    expect(token).toBeRequired();
+    expect(
+      within(fixForm()).queryByRole("button", { name: "Turn off" }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.type(token, "github_pat_new_token");
+    await userEvent.click(
+      within(fixForm()).getByRole("button", { name: "Save Launch fix" }),
+    );
+
+    // The stored Sentry settings go along unchanged; only `fix` is new.
+    expect(apiMock).toHaveBeenLastCalledWith(
+      "/api/admin/errors/connection",
+      "PUT",
+      {
+        base_url: "https://sentry.io",
+        organization: "example-org",
+        projects: [
+          "crate-api",
+          "crate-workers",
+          "crate-readplane",
+          "crate-listen",
+        ],
+        environments: ["production"],
+        fix: {
+          repository: "thecrateapp/crate",
+          workflow: "error-autofix.yml",
+          ref: "main",
+          token: "github_pat_new_token",
+        },
+      },
+    );
+    expect(apiMock.mock.lastCall![2]).not.toHaveProperty("token");
+    expect(toastMock.success).toHaveBeenCalledWith("Launch fix saved");
+    expect(onChanged).toHaveBeenCalled();
+    expect(fixField("GitHub token")).toHaveValue("");
+  });
+
+  it("keeps the stored GitHub token and turns Launch fix off", async () => {
+    apiMock.mockResolvedValue(sampleConnection());
+    renderPanel(
+      sampleConnection({ fix: sampleFixConnection({ ref: "release" }) }),
+    );
+
+    const section = screen.getByRole("region", { name: "Launch fix" });
+    expect(within(section).getByText("Ready")).toBeInTheDocument();
+    expect(fixField("Branch")).toHaveValue("release");
+    expect(fixField("GitHub token")).not.toBeRequired();
+    expect(fixField("GitHub token")).toHaveValue("");
+
+    await userEvent.click(
+      within(fixForm()).getByRole("button", { name: "Save Launch fix" }),
+    );
+    expect(apiMock.mock.lastCall![2].fix).toEqual({
+      repository: "thecrateapp/crate",
+      workflow: "error-autofix.yml",
+      ref: "release",
+    });
+
+    await userEvent.click(
+      within(fixForm()).getByRole("button", { name: "Turn off" }),
+    );
+    expect(apiMock.mock.lastCall![2]).toMatchObject({
+      organization: "example-org",
+      fix: null,
+    });
+    expect(toastMock.success).toHaveBeenLastCalledWith(
+      "Launch fix is off and its GitHub token was deleted",
+    );
+  });
+
+  it("flags Launch fix settings without a token", () => {
+    renderPanel(
+      sampleConnection({ fix: sampleFixConnection({ has_token: false }) }),
+    );
+
+    const section = screen.getByRole("region", { name: "Launch fix" });
+    expect(within(section).getByText("Token missing")).toBeInTheDocument();
+    expect(fixField("GitHub token")).toBeRequired();
+  });
+
+  it("asks for the Sentry settings before Launch fix", () => {
+    renderPanel(NOT_CONFIGURED_CONNECTION);
+
+    const section = screen.getByRole("region", { name: "Launch fix" });
+    expect(
+      within(section).getByText(/Save the Sentry settings first/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("form", { name: "Launch fix settings" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows why the API refused the Launch fix settings", async () => {
+    apiMock.mockRejectedValue(
+      Object.assign(
+        new Error(
+          '{"detail":"The GitHub token must be a fine-grained personal access token (github_pat_...)"}',
+        ),
+        { status: 422, code: "ERROR_TRACKING_INVALID" },
+      ),
+    );
+    renderPanel(sampleConnection());
+
+    await userEvent.type(fixField("GitHub token"), "ghp_classic");
+    await userEvent.click(
+      within(fixForm()).getByRole("button", { name: "Save Launch fix" }),
+    );
+
+    expect(within(fixForm()).getByRole("alert")).toHaveTextContent(
+      /fine-grained personal access token/,
+    );
+    expect(toastMock.success).not.toHaveBeenCalled();
+    expect(fixField("GitHub token")).toHaveValue("ghp_classic");
   });
 });
 

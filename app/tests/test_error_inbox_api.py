@@ -520,6 +520,7 @@ def test_connection_defaults_when_unset(api):
         "has_token": False,
         "access": None,
         "sync": None,
+        "fix": None,
     }
 
 
@@ -741,6 +742,7 @@ def test_no_outbound_http_in_handlers(api, monkeypatch):
     monkeypatch.setattr(requests.Session, "send", refuse)
     monkeypatch.setattr(urllib.request, "urlopen", refuse)
     monkeypatch.setattr("crate.error_inbox.sentry_client.SentryClient.__init__", refuse)
+    monkeypatch.setattr("crate.error_inbox.github_client.GitHubClient.__init__", refuse)
 
     issue_id = seed_issues(_row(1))["1"]
     set_digest(issue_id)
@@ -751,6 +753,11 @@ def test_no_outbound_http_in_handlers(api, monkeypatch):
                 "base_url": "https://sentry.example.com",
                 "organization": ORGANIZATION,
                 "token": TOKEN,
+                "fix": {
+                    "repository": "thecrateapp/crate",
+                    "workflow": "error-autofix.yml",
+                    "token": "github_pat_synthetic_no_outbound",
+                },
             },
         ),
         api.get(f"{BASE}/connection"),
@@ -759,6 +766,7 @@ def test_no_outbound_http_in_handlers(api, monkeypatch):
         api.get(f"{BASE}/summary"),
         api.get(f"{BASE}/{issue_id}"),
         api.post(f"{BASE}/{issue_id}/status", json={"status": "resolved"}),
+        api.post(f"{BASE}/{issue_id}/fix", json={"note": "No network here."}),
     ]
 
     assert [response.status_code for response in responses] == [
@@ -768,6 +776,7 @@ def test_no_outbound_http_in_handlers(api, monkeypatch):
         200,
         200,
         200,
+        202,
         202,
     ]
     assert calls == []

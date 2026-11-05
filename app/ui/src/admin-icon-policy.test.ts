@@ -89,6 +89,9 @@ const supportingScope = [
   "app/ui/src/components/errors/IssueStatusActions.tsx",
   "app/ui/src/components/errors/IssueTable.tsx",
   "app/ui/src/components/errors/StackFrames.tsx",
+  // Launch fix (E3.PR2): text actions and the shared dialog close control.
+  "app/ui/src/components/errors/LaunchFix.tsx",
+  "app/ui/src/components/errors/FixSettingsForm.tsx",
   "app/ui/src/components/system-health/ErrorsTile.tsx",
 ];
 const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
@@ -507,6 +510,20 @@ const approvedLibraryControls = new Map<string, number>([
   ],
   [
     "app/ui/src/components/errors/ConnectionPanel.tsx:@crate/ui/primitives/ErrorState:ErrorState",
+    1,
+  ],
+  // Launch fix (E3.PR2): text buttons; children audited in the scope above.
+  [
+    "app/ui/src/pages/ErrorDetail.tsx:@/components/errors/LaunchFix:LaunchFix",
+    1,
+  ],
+  [
+    "app/ui/src/components/errors/ConnectionPanel.tsx:./FixSettingsForm:FixSettingsForm",
+    1,
+  ],
+  // The shared confirmation: close control and busy glyph are its own.
+  [
+    "app/ui/src/components/errors/LaunchFix.tsx:@crate/ui/composites/ConfirmDialog:ConfirmDialog",
     1,
   ],
   [

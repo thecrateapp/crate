@@ -5,7 +5,7 @@ section: operations
 audience: [operator, developer]
 status: canonical
 order: 121
-verified: 2026-11-04
+verified: 2026-11-05
 sources:
   [
     app/crate/metrics.py,
@@ -27,10 +27,15 @@ sources:
     app/crate/error_inbox/priority.py,
     app/crate/error_inbox/digest.py,
     app/crate/error_inbox/sentry_client.py,
+    app/crate/error_inbox/autofix.py,
+    app/crate/error_inbox/github_client.py,
     app/crate/worker_handlers/error_inbox.py,
     app/ui/src/pages/Errors.tsx,
     app/ui/src/pages/ErrorDetail.tsx,
     app/ui/src/components/errors/ConnectionPanel.tsx,
+    app/ui/src/components/errors/FixSettingsForm.tsx,
+    app/ui/src/components/errors/LaunchFix.tsx,
+    .github/workflows/error-autofix.yml,
     app/ui/src/components/system-health/ErrorsTile.tsx,
     deploy/observability/recording-rules.yml,
     deploy/observability/compose.app-metrics.yaml,
@@ -224,6 +229,7 @@ request calls Sentry, so a slow or unavailable Sentry never slows the page down.
 - **Actions.** _Resolve in next release_, _Ignore until escalating_ and _Reopen_
   change the issue in Sentry first and then in Crate. Each runs as a worker task;
   the buttons wait until it finishes. _Open in Sentry_ links to the issue.
+  _Launch fix_ asks GitHub Actions to try a fix ([Launch fix](#launch-fix)).
 - **System Health** shows a tile with open, critical, new and regressed issues in
   the last 24 hours and the top three of the critical lane. It comes in the
   existing dashboard response; when the summary cannot be built the tile says it
@@ -264,8 +270,8 @@ breadcrumbs go first, then source lines.
 | Capability           | Grants                                                               |
 | -------------------- | -------------------------------------------------------------------- |
 | `ops.errors.view`    | The Errors page, the issue detail and the Errors entry in navigation |
-| `ops.errors.manage`  | Resolve, Ignore and Reopen                                           |
-| `ops.runtime.manage` | The Sentry connection panel: settings, token and the connection test |
+| `ops.errors.manage`  | Resolve, Ignore, Reopen and Launch fix                               |
+| `ops.runtime.manage` | The connection drawer: Sentry and Launch fix settings and tokens     |
 
 System Health stays open to `ops.health.view`; its tile links to the inbox only
 for people who can open it.
@@ -293,6 +299,53 @@ for:
 _Test connection_ enqueues a worker task that checks the token's scopes and
 records whether Crate can read and write; the panel shows the result and when it
 was checked.
+
+### Launch fix
+
+_Launch fix_ hands one issue to the autofix workflow of the Crate repository,
+`.github/workflows/error-autofix.yml`. An agent there tries to reproduce the error
+with a failing test, fixes it and opens a **draft** pull request with
+`Fixes <SHORT-ID>`; a person reviews and merges it like any other. Crate never
+merges, and neither a model nor the triage can launch a fix: only a person can.
+
+1. Someone with `ops.errors.manage` presses **Launch fix** in the issue detail. A
+   confirmation warns that the repository is public: the short id and the optional
+   note (at most 500 characters) will be visible to anyone in the workflow run.
+2. The API checks that Launch fix is configured, that the workflow accepts the
+   short id (`^CRATE-[A-Z0-9-]+-[0-9A-Z]+$`, at most 64 characters) and that no
+   fix was launched for the issue in the last 24 hours. It then queues
+   `dispatch_error_fix` (fast queue, 30 s, no retries) and answers `202`. It never
+   calls GitHub itself.
+3. The task claims the issue (`fix_requested_at`, `fix_requested_by`), so a second
+   launch within 24 hours is refused even if two tasks race. It sends one
+   `workflow_dispatch` with only two inputs, `sentry_issue` and `note`, and writes
+   an `error_issue.fix.dispatch` entry to the audit log with ids and settings,
+   never the note or event text. If GitHub refuses, the claim is released and the
+   task fails with a typed code (`GITHUB_AUTH`, `GITHUB_FORBIDDEN`,
+   `GITHUB_NOT_FOUND`, `GITHUB_VALIDATION`, ...).
+4. The detail shows "Fix requested by X at HH:MM", when the button is available
+   again and a link to the workflow runs on GitHub. Viewers without
+   `ops.errors.manage` see the state and the link, not the button.
+
+The workflow reads the event from Sentry with its own read-only secret; Crate's
+Sentry token and the issue digest never reach GitHub. The workflow does nothing
+unless the repository variable `AUTOFIX_ENABLED` is `true`, so a dispatch before
+then starts a run that ends at once.
+
+The **Launch fix** section of the connection drawer (`ops.runtime.manage`) holds
+the settings:
+
+- **Repository** (`owner/name`), **workflow** (the file name) and **branch** the
+  run starts from: `thecrateapp/crate`, `error-autofix.yml` and `main`.
+- **GitHub token**: a fine-grained personal access token limited to that
+  repository with Actions read and write
+  ([operations](operations.md#launch-fix-token)). Classic tokens (`ghp_`) are
+  refused because they cannot be limited that way. It is stored encrypted like the
+  Sentry token, never shown again and only replaced when a new one is typed.
+- **Turn off** removes the settings and deletes the stored GitHub token. The
+  button disappears from every issue.
+
+The button only appears when the settings and a token are stored.
 
 ## Prometheus and Grafana
 

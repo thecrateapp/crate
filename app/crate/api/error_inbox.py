@@ -4,12 +4,13 @@ Reads come from PostgreSQL and `ops_runtime_state`; writes enqueue worker tasks.
 handler calls Sentry, GitHub or a model (EI-D3). Errors carry their code in the
 `X-Crate-Error` header and the message in `detail`, like the other admin routers.
 
-The Sentry token is accepted only by `PUT /connection`. It is never returned, never
-logged and never echoed in a validation error.
+The Sentry and GitHub tokens are accepted only by `PUT /connection`. They are never
+returned, never logged and never echoed in a validation error.
 """
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
@@ -26,6 +27,7 @@ from crate.api.permissions import require_permission
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.api.schemas.error_inbox import (
     Classification,
+    ErrorFixRequest,
     ErrorIssueDetail,
     ErrorIssueList,
     ErrorIssueStatusChange,
@@ -42,6 +44,7 @@ from crate.db.repositories.tasks import (
     find_active_task_by_type_params,
 )
 from crate.error_inbox import views
+from crate.error_inbox.autofix import next_request_at, supports_short_id
 from crate.error_inbox.config import ErrorTrackingConfigError, save_config
 from crate.error_inbox.state import record_access, write_access
 
@@ -51,6 +54,7 @@ CONNECTION = "ops.runtime.manage"
 STATUS_TASK = "update_error_issue_status"
 CONNECTION_TEST_TASK = "test_error_tracking_connection"
 CONNECTION_TEST_DEDUP_KEY = "error-tracking:connection-test"
+FIX_TASK = "dispatch_error_fix"
 
 
 def _fail(status: int, code: str, message: str) -> NoReturn:
@@ -105,6 +109,13 @@ _STATUS_CONFLICT: OpenApiResponses = {
     409: error_response(
         "ERROR_TRACKING_NOT_CONFIGURED, or ERROR_TRACKING_WRITE_SCOPE_MISSING when the "
         "token is known to lack event:write."
+    )
+}
+_FIX_CONFLICT: OpenApiResponses = {
+    409: error_response(
+        "ERROR_FIX_NOT_CONFIGURED; ERROR_FIX_UNSUPPORTED_ISSUE when the workflow does "
+        "not accept the short id; ERROR_FIX_RECENTLY_REQUESTED within 24 hours of the "
+        "last request."
     )
 }
 
@@ -192,15 +203,24 @@ def get_connection(request: Request):
 def put_connection(request: Request, body: ErrorTrackingConnectionUpdate):
     require_permission(request, CONNECTION)
     current = views.stored_connection().config
-    # Triage and fix settings are not edited here (E2/E3): keep the stored ones.
+    # Triage settings are not edited here (E2): keep the stored ones. Launch fix
+    # settings are kept unless the body carries `fix` (null turns it off).
     preserved = (
         {key: current.to_settings()[key] for key in ("triage", "fix")}
         if current
         else {}
     )
+    github_token = None
+    if body.updates_fix:
+        preserved["fix"] = body.fix.settings() if body.fix else None
+        github_token = body.fix.new_token() if body.fix else None
     token = body.new_token()
     try:
-        saved = save_config({**preserved, **body.settings()}, sentry_token=token)
+        saved = save_config(
+            {**preserved, **body.settings()},
+            sentry_token=token,
+            github_token=github_token,
+        )
     except ErrorTrackingConfigError as error:
         _fail(422, "ERROR_TRACKING_INVALID", error.message)
     if token is not None:
@@ -290,6 +310,48 @@ def change_status(request: Request, issue_id: str, body: ErrorIssueStatusChange)
     return {
         "task_id": _enqueue(STATUS_TASK, params, dedup_key=dedup_key, actor_id=actor_id)
     }
+
+
+@router.post(
+    "/{issue_id}/fix",
+    status_code=202,
+    response_model=TaskEnqueueResponse,
+    response_model_exclude_none=True,
+    responses=merge_responses(
+        AUTH_ERROR_RESPONSES,
+        _NOT_FOUND,
+        _FIX_CONFLICT,
+        {422: error_response("The note is longer than 500 characters.")},
+    ),
+    summary="Queue Launch fix: dispatch the autofix workflow for an issue",
+)
+def launch_fix(request: Request, issue_id: str, body: ErrorFixRequest):
+    actor = require_permission(request, MANAGE)
+    issue = get_issue(issue_id)
+    if issue is None:
+        _fail(404, "ERROR_ISSUE_NOT_FOUND", "Error issue not found")
+    config = views.stored_connection().config
+    if config is None or not config.fix_ready:
+        _fail(409, "ERROR_FIX_NOT_CONFIGURED", "Launch fix is not configured")
+    if not supports_short_id(issue["short_id"]):
+        _fail(
+            409,
+            "ERROR_FIX_UNSUPPORTED_ISSUE",
+            "The autofix workflow only accepts Crate short ids such as CRATE-API-1F",
+        )
+    if next_request_at(issue.get("fix_requested_at"), datetime.now(timezone.utc)):
+        _fail(
+            409,
+            "ERROR_FIX_RECENTLY_REQUESTED",
+            "A fix for this issue was launched less than 24 hours ago",
+        )
+    actor_id = int(actor["id"])
+    params = {"issue_id": issue["id"], "note": body.note, "actor_id": actor_id}
+    # One pending dispatch per issue; the task enforces the 24-hour window.
+    task_id = _enqueue(
+        FIX_TASK, params, dedup_key=f"error-fix:{issue['id']}", actor_id=actor_id
+    )
+    return {"task_id": task_id}
 
 
 __all__ = ["router"]

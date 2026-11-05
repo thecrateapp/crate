@@ -1,6 +1,7 @@
-"""A fake Sentry organisation behind `httpx.MockTransport` for the error inbox tasks.
+"""A fake Sentry organisation and a fake GitHub behind `httpx.MockTransport` for the
+error inbox tasks.
 
-Nothing here reaches the network: the client factory always injects the transport.
+Nothing here reaches the network: the client factories always inject the transport.
 """
 
 from __future__ import annotations
@@ -12,9 +13,15 @@ from typing import Any
 
 import httpx
 
+from crate.error_inbox.github_client import GitHubClient
 from crate.error_inbox.sentry_client import SentryClient
 
 TOKEN = "sntrys_synthetic_inbox_token"
+GITHUB_TOKEN = "github_pat_synthetic_fix_dispatch_token"
+FIX_SETTINGS = {"repository": "thecrateapp/crate", "workflow": "error-autofix.yml"}
+DISPATCH_PATH = (
+    "/repos/thecrateapp/crate/actions/workflows/error-autofix.yml/dispatches"
+)
 ORGANIZATION = "ninja-development"
 ISSUES_PATH = f"/api/0/organizations/{ORGANIZATION}/issues/"
 _ISSUE = re.compile(rf"^{re.escape(ISSUES_PATH)}(\d+)/$")
@@ -191,3 +198,41 @@ def configure(**overrides: Any):
     }
     payload.update(overrides)
     return save_config(payload, sentry_token=TOKEN)
+
+
+def configure_fix(github_token: str | None = GITHUB_TOKEN, **fix: Any):
+    """Error tracking plus Launch fix, with a GitHub token unless told otherwise."""
+    from crate.error_inbox.config import save_config
+
+    payload = {
+        "organization": ORGANIZATION,
+        "projects": ["crate-api", "crate-workers"],
+        "environments": ["production"],
+        "fix": {**FIX_SETTINGS, **fix},
+    }
+    return save_config(payload, sentry_token=TOKEN, github_token=github_token)
+
+
+class FakeGitHub:
+    """Answers `workflow_dispatch` with `status` and records every request."""
+
+    def __init__(self, status: int = 204, headers: dict[str, str] | None = None):
+        self.status = status
+        self.headers = headers or {}
+        self.requests: list[httpx.Request] = []
+        self.tokens: list[str] = []
+
+    def factory(self, token: str) -> GitHubClient:
+        self.tokens.append(token)
+        return GitHubClient(token, transport=httpx.MockTransport(self))
+
+    def bodies(self) -> list[dict[str, Any]]:
+        return [json.loads(request.content) for request in self.requests]
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        return httpx.Response(
+            self.status,
+            headers=self.headers,
+            json=None if self.status == 204 else {"message": "synthetic body"},
+        )
