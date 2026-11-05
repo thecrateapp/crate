@@ -389,3 +389,109 @@ def test_untriaged_open_skips_triaged_digest(pg_db):
     assert [row["id"] for row in rows] == [ids["1"], ids["6"], ids["3"]]
     assert rows[0]["digest_hash"] == "one"
     assert [row["id"] for row in untriaged_open(limit=1)] == [ids["1"]]
+
+
+def test_sync_state(pg_db):
+    from crate.db.queries.error_issues import sync_state
+    from crate.db.repositories.error_issues import upsert_issues
+
+    upsert_issues([_row(1), _row(2, status="resolved")], synced_at=NOW)
+    ids = _ids()
+    _digest(ids["1"], "h1", service="worker-fast")
+
+    state = sync_state(["1", "2", "404", "1"])
+
+    assert sorted(state) == ["1", "2"]
+    assert state["1"] == {
+        "id": ids["1"],
+        "external_id": "1",
+        "service": "worker-fast",
+        "status": "unresolved",
+        "last_seen": NOW - timedelta(hours=1),
+        "digest_hash": "h1",
+    }
+    assert state["2"]["digest_hash"] is None
+    assert state["2"]["status"] == "resolved"
+    assert sync_state([]) == {}
+
+
+def test_record_status_change_audits_in_the_same_transaction(pg_db):
+    from crate.db.repositories.error_issues import (
+        STATUS_AUDIT_ACTION,
+        record_status_change,
+        upsert_issues,
+    )
+
+    upsert_issues([_row(1)], synced_at=NOW)
+    issue_id = _ids()["1"]
+
+    assert record_status_change(
+        issue_id,
+        status="ignored",
+        substatus="archived_until_escalating",
+        actor_id=3,
+        task_id="task-9",
+        at=NOW,
+    )
+    assert (
+        record_status_change(
+            "00000000-0000-0000-0000-000000000001",
+            status="resolved",
+            actor_id=3,
+        )
+        is False
+    )
+
+    assert _column(issue_id, "status") == "ignored"
+    assert _column(issue_id, "substatus") == "archived_until_escalating"
+    assert _column(issue_id, "closed_at") == NOW
+    with _scope() as session:
+        rows = (
+            session.execute(
+                text(
+                    "SELECT action, target_type, target_name, details_json, user_id, "
+                    "task_id FROM audit_log WHERE target_type = 'error_issue'"
+                )
+            )
+            .mappings()
+            .all()
+        )
+    assert [dict(row) for row in rows] == [
+        {
+            "action": STATUS_AUDIT_ACTION,
+            "target_type": "error_issue",
+            "target_name": "CRATE-API-1",
+            "details_json": {
+                "issue_id": issue_id,
+                "provider": "sentry",
+                "external_id": "1",
+                "from": {"status": "unresolved", "substatus": "ongoing"},
+                "to": {"status": "ignored", "substatus": "archived_until_escalating"},
+            },
+            "user_id": 3,
+            "task_id": "task-9",
+        }
+    ]
+
+
+def test_record_status_change_rolls_back_with_the_caller(pg_db):
+    from crate.db.repositories.error_issues import record_status_change, upsert_issues
+
+    upsert_issues([_row(1)], synced_at=NOW)
+    issue_id = _ids()["1"]
+
+    try:
+        with _scope() as session:
+            record_status_change(
+                issue_id, status="resolved", actor_id=1, session=session
+            )
+            raise RuntimeError("caller failed")
+    except RuntimeError:
+        pass
+
+    assert _column(issue_id, "status") == "unresolved"
+    with _scope() as session:
+        count = session.execute(
+            text("SELECT count(*) FROM audit_log WHERE target_type = 'error_issue'")
+        ).scalar_one()
+    assert count == 0

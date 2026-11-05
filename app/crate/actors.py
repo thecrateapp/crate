@@ -157,6 +157,10 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "compute_product_kpis": TaskPoolConfig("maintenance", 2, 900, 0),
     "compute_observability_summary": TaskPoolConfig("maintenance", 2, 120, 0),
     "compute_recommendation_skips": TaskPoolConfig("maintenance", 2, 300, 0),
+    # Error inbox: Sentry calls with external effects never retry.
+    "sync_error_issues": TaskPoolConfig("maintenance", 1, 120, 0),
+    "update_error_issue_status": TaskPoolConfig("fast", 0, 30, 0),
+    "test_error_tracking_connection": TaskPoolConfig("fast", 0, 30, 0),
     "check_new_releases": TaskPoolConfig("maintenance", 2, 7200, 1),
     "promote_due_releases": TaskPoolConfig("maintenance", 2, 900, 0),
     "scan": TaskPoolConfig("maintenance", 2, 1800, 0),
