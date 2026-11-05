@@ -9,6 +9,7 @@ import pytest
 from crate.error_inbox.config import (
     ErrorTrackingConfigError,
     load_config,
+    load_github_token,
     load_sentry_token,
     parse_config,
     save_config,
@@ -104,6 +105,8 @@ def test_parse_config_defaults_and_normalises():
         {"triage": {"automatic": "yes"}},
         {"fix": {"repository": "thecrateapp", "workflow": "error-autofix.yml"}},
         {"fix": {"repository": "thecrateapp/crate", "workflow": "../x.yml"}},
+        {"fix": {"repository": "../crate", "workflow": "error-autofix.yml"}},
+        {"fix": {"repository": "thecrateapp/.", "workflow": "error-autofix.yml"}},
         {
             "fix": {
                 "repository": "thecrateapp/crate",
@@ -132,6 +135,11 @@ def test_parse_config_keeps_fix_settings():
     assert config.fix.repository == "thecrateapp/crate"
     assert config.fix.ref == "main"
     assert config.fix.secret_ref is None
+    assert config.fix.has_token is False
+    assert config.fix_ready is False
+    assert config.fix.actions_url == (
+        "https://github.com/thecrateapp/crate/actions/workflows/error-autofix.yml"
+    )
 
 
 def _stored_settings():
@@ -198,3 +206,82 @@ def test_load_sentry_token_without_secret_is_typed():
 
     with pytest.raises(ErrorTrackingConfigError):
         load_sentry_token(config)
+
+
+FIX = {"repository": "thecrateapp/crate", "workflow": "error-autofix.yml"}
+GITHUB_TOKEN = "github_pat_synthetic_config_token"
+
+
+def test_github_token_is_stored_encrypted_and_rotated(pg_db):
+    from crate.credentials import CredentialSecretError, load_secret
+
+    first = save_config(
+        {"organization": "ninja-development", "fix": {**FIX, "secret_ref": "forged"}},
+        sentry_token="sntrys_one",
+        github_token=GITHUB_TOKEN,
+    )
+
+    assert first.fix is not None and first.fix_ready is True
+    assert first.fix.secret_ref not in {None, "forged", first.secret_ref}
+    assert GITHUB_TOKEN not in json.dumps(_stored_settings())
+    assert load_github_token(first) == GITHUB_TOKEN
+    # The Sentry and GitHub tokens are separate secrets in separate scopes.
+    assert load_sentry_token(first) == "sntrys_one"
+
+    kept = save_config({"organization": "ninja-development", "fix": FIX})
+    assert kept.fix is not None and kept.fix.secret_ref == first.fix.secret_ref
+
+    second = save_config(
+        {"organization": "ninja-development", "fix": FIX},
+        github_token="github_pat_two",
+    )
+    assert second.fix is not None
+    assert load_github_token(second) == "github_pat_two"
+    with pytest.raises(CredentialSecretError):
+        load_secret(first.fix.secret_ref)
+
+
+def test_turning_fix_off_revokes_the_github_token(pg_db):
+    from crate.credentials import CredentialSecretError, load_secret
+
+    on = save_config(
+        {"organization": "ninja-development", "fix": FIX}, github_token=GITHUB_TOKEN
+    )
+    assert on.fix is not None
+
+    off = save_config({"organization": "ninja-development"})
+
+    assert off.fix is None
+    assert _stored_settings()["fix"] is None
+    with pytest.raises(CredentialSecretError):
+        load_secret(on.fix.secret_ref)
+
+
+@pytest.mark.parametrize(
+    "payload,token,message",
+    [
+        ({"fix": FIX}, "ghp_classic_token_value", "fine-grained"),
+        ({"fix": FIX}, "github_pat_with space", "Invalid GitHub token"),
+        ({"fix": FIX}, "", "Invalid GitHub token"),
+        ({}, GITHUB_TOKEN, "needs the fix repository and workflow"),
+    ],
+)
+def test_github_token_must_be_fine_grained_and_need_fix(pg_db, payload, token, message):
+    with pytest.raises(ErrorTrackingConfigError) as caught:
+        save_config(
+            {"organization": "ninja-development", **payload}, github_token=token
+        )
+
+    assert message in caught.value.message
+    assert token not in caught.value.message or not token
+    assert load_config() is None
+
+
+def test_load_github_token_without_fix_is_typed():
+    without_fix = parse_config({"organization": "ninja-development"})
+    without_token = parse_config({"organization": "ninja-development", "fix": FIX})
+
+    for config in (without_fix, without_token):
+        with pytest.raises(ErrorTrackingConfigError) as caught:
+            load_github_token(config)
+        assert caught.value.code == "ERROR_FIX_NOT_CONFIGURED"
