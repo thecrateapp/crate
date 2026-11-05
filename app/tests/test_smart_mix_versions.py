@@ -81,10 +81,14 @@ def test_worker_binary_is_built_from_the_current_analyzer() -> None:
 def test_worker_binary_takes_model_beats() -> None:
     # The profile task hands Beat This! beats (SM3-D14) only to a crate-cli whose
     # analyze takes --beats; the same analyzer version built without it would keep
-    # its own tracker in every x86_64 worker image.
+    # its own tracker in every x86_64 worker image. One that takes the beats but not
+    # the DBN's bar length (SM3-D16) would phrase 3/4 tracks in bars of four.
     binary = (APP_ROOT / "bin/crate-cli-linux-amd64").read_bytes()
 
     assert b"downbeats_ms" in binary and b"beatTracker" in binary, (
+        "rebuild app/bin/crate-cli-linux-amd64 with `make crate-cli-linux`"
+    )
+    assert b"beats_per_bar" in binary, (
         "rebuild app/bin/crate-cli-linux-amd64 with `make crate-cli-linux`"
     )
 
