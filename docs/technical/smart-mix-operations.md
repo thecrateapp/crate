@@ -137,10 +137,12 @@ and `structureConfidence`. Readers accept v7, v6 and v5 profiles
 (`READABLE_ANALYZER_VERSIONS`); writers, the backfill and Admin coverage target v7.
 
 Phrases follow a novelty curve at bar boundaries (`structure.py`, mirrored by
-`structure.rs`). Each bar gets its mean RMS level, the balance of three mel bands, its mean
-chroma and the mean of 13 MFCC, from the frames centred in the bar less 50 ms at each end.
-The novelty of a boundary compares the four bars before it with the four after it, gap bars
-left out:
+`structure.rs`). Each bar gets its mean RMS level from the cue-detection RMS frames that lie
+wholly inside it, and the balance of three mel bands, its mean chroma and the mean of 13
+MFCC from the spectrogram frames centred inside it; both leave out 50 ms at each end of the
+bar. In both analyzers the chroma frames lag the band frames by 1,024 samples (about 46 ms),
+the onset envelope's alignment, which the downbeat features need. The novelty of a boundary
+compares the four bars before it with the four after it, gap bars left out:
 
 - level change plus half the balance change, less 0.5 dB and never below 0 (the v7 measure);
 - plus harmony (SM3-D17): 2 dB (`HARMONY_WEIGHT`) per unit of cosine distance between the
@@ -193,13 +195,15 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   `CRATE_BEAT_THIS_CHECKPOINT` names the checkpoint (`final0` needs the build arguments
   documented in the Dockerfile) and `CRATE_BEAT_THIS_WEIGHTS` overrides the path. Nothing is
   downloaded at run time.
-- **madmom.** Its PyPI release (0.16.1) does not build on Python 3.13, so the `madmom-wheel`
-  stage builds a wheel from a pinned commit of `CPJKU/madmom` against the analysis
-  image's numpy, and the image installs only the wheel, under the same constraint that
-  keeps torch and numpy where they were; there are no compilers in the image. madmom's code
-  is BSD (`/app/models/madmom.LICENSE`); its package also ships model files under CC
-  BY-NC-SA 4.0 that Crate does not use (the DBN needs none), which is acceptable for Crate
-  as free and open-source software.
+- **madmom.** Its PyPI release (0.16.1) does not build on Python 3.13, so the
+  `madmom-build` stage builds a wheel from a pinned commit of `CPJKU/madmom` against the
+  analysis image's numpy, and the image installs only the wheel, under the same constraint
+  that keeps torch and numpy where they were; there are no compilers in the image. The
+  build reaches that stage through the `madmom-wheel` alias only when the image installs
+  torch; without torch the alias points at the empty `madmom-skip` stage and the image
+  gets neither madmom nor its licence. madmom's code is BSD (`/app/models/madmom.LICENSE`);
+  its package also ships model files under CC BY-NC-SA 4.0 that Crate does not use (the
+  DBN needs none), which is acceptable for Crate as free and open-source software.
 - **Where it runs.** `compute_smart_mix_profile` runs it before the analysis
   (`crate/smart_mix/beat_model.py`), unless the beats of this file are stored (see "Stored
   model signals" below), and passes the beats to the Rust analyzer
