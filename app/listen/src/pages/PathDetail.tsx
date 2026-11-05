@@ -101,15 +101,16 @@ export function PathDetail() {
         />
       </div>
       {path.refinement?.status === "pending" ? (
-        <MonoLabel
-          as="p"
-          tone="accent"
-          role="status"
-          aria-label={t("paths.refinement.pending")}
-          className="mb-4"
-        >
-          {t("paths.refinement.pending")}
-        </MonoLabel>
+        <div className="mb-4">
+          <MonoLabel
+            as="p"
+            tone="accent"
+            role="status"
+            aria-label={t("paths.refinement.pending")}
+          >
+            {t("paths.refinement.pending")}
+          </MonoLabel>
+        </div>
       ) : null}
       <PathWarnings path={path} />
       <div className="mb-6">
