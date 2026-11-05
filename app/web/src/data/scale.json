@@ -1,11 +1,11 @@
 {
   "tracks": "48,213",
   "albums": "4,400",
-  "pytest": 7854,
-  "vitest": 6939,
+  "pytest": 7897,
+  "vitest": 6954,
   "goTests": 435,
   "rustTests": 318,
-  "taskTypes": 152,
+  "taskTypes": 153,
   "migrations": 144,
   "taskQueues": {
     "ai": [
@@ -87,6 +87,7 @@
       "agent_control",
       "update_error_issue_status",
       "test_error_tracking_connection",
+      "dispatch_error_fix",
       "compute_bliss",
       "analyze_tracks",
       "analyze_all",
