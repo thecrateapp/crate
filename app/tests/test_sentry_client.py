@@ -386,6 +386,33 @@ def test_check_scopes_reads_the_token_scopes():
     assert scope_access(frozenset({"org:read"})) == {"read": False, "write": False}
 
 
+@pytest.mark.parametrize("region", ["https://us.sentry.io", "https://de.sentry.io"])
+def test_regional_host_reads_scopes_from_sentry_io(region):
+    # The regional hosts answer 404 for the API root; only sentry.io serves it.
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if request.url.path == "/api/0/":
+            if request.url.host != "sentry.io":
+                return httpx.Response(404, json={"detail": "Not found"})
+            return httpx.Response(200, json={"auth": {"scopes": ["event:write"]}})
+        return httpx.Response(200, json=[_issue(1)])
+
+    config = parse_config({"base_url": region, "organization": "example-org"})
+    client = _client(handler, config=config)
+
+    assert client.check_scopes() == frozenset({"event:write"})
+    client.list_unresolved()
+
+    root, listing = seen
+    assert (root.url.host, root.headers["authorization"]) == (
+        "sentry.io",
+        f"Bearer {TOKEN}",
+    )
+    assert listing.url.host == region.removeprefix("https://")
+
+
 SELF_HOSTED = parse_config(
     {"base_url": "https://sentry.home.lan:9000", "organization": "home"}
 )

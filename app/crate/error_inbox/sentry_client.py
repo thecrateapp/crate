@@ -33,6 +33,8 @@ log = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT_SECONDS = 15.0
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+# Sentry's cloud serves the API root only here, not on the regional hosts.
+SENTRY_CLOUD_ROOT = "https://sentry.io"
 PAGE_SIZE = 100
 DEFAULT_MAX_PAGES = 5
 # Errors only: performance issues (N+1, slow queries) belong to their own backlog.
@@ -366,8 +368,12 @@ class SentryClient:
         *,
         params: list[tuple[str, str]] | None = None,
         body: Mapping[str, Any] | None = None,
+        origin: str | None = None,
     ) -> tuple[Any, httpx.Headers]:
-        url, headers, extensions = self._target(path)
+        # `origin` is only ever SENTRY_CLOUD_ROOT, for a cloud configuration.
+        url, headers, extensions = (
+            (f"{origin}{path}", {}, {}) if origin else self._target(path)
+        )
         try:
             with self._client.stream(
                 method,
@@ -490,8 +496,14 @@ class SentryClient:
             ) from None
 
     def check_scopes(self) -> frozenset[str]:
-        """Scopes of the token, read from the API root (`auth.scopes`)."""
-        data, _ = self._request("GET", "/api/0/")
+        """Scopes of the token, read from the API root (`auth.scopes`).
+
+        On Sentry's cloud the root is only served by `sentry.io`: the regional
+        hosts (`us.sentry.io`, `de.sentry.io`) answer 404 for it, so a regional
+        base URL asks `sentry.io` for this one call.
+        """
+        origin = SENTRY_CLOUD_ROOT if self._config.is_cloud else None
+        data, _ = self._request("GET", "/api/0/", origin=origin)
         auth = data.get("auth") if isinstance(data, Mapping) else None
         scopes = auth.get("scopes") if isinstance(auth, Mapping) else None
         if not isinstance(scopes, list):
