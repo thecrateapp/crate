@@ -2,6 +2,10 @@
 # model: BEAT_THIS_CHECKPOINT=final0 and
 # BEAT_THIS_SHA256=8c328b45f59d8dd3dff219253ff6a8d6482be57d0133a29140e2febbf8eb8331.
 ARG BEAT_THIS_CHECKPOINT=small0
+# PyTorch, PANNs, Beat This! and madmom for the analysis worker: on installs them on
+# every architecture (release images), auto on x86_64 only, off nowhere (see
+# worker-analysis-deps).
+ARG PANNS=auto
 
 FROM python:3.13-slim AS base
 
@@ -150,8 +154,8 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # the wheel reaches the image, without the compilers. madmom's code is BSD; its package
 # also ships model files under CC BY-NC-SA 4.0 that Crate does not use (the DBN needs
 # none), which is acceptable for Crate as free and open-source software. The licence
-# goes to /app/models/madmom.LICENSE.
-FROM worker-analysis-python AS madmom-wheel
+# travels with the wheel and is installed with it as /app/models/madmom.LICENSE.
+FROM worker-analysis-python AS madmom-build
 
 ARG MADMOM_COMMIT=27f032e8947204902c675e5e341a3faf5dc86dae
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential git \
@@ -166,6 +170,25 @@ RUN git init -q . && \
     git checkout -q FETCH_HEAD && \
     git submodule update -q --init --depth 1 && \
     pip wheel --no-build-isolation --no-deps --wheel-dir /wheels .
+RUN cp LICENSE /wheels/madmom.LICENSE
+
+
+# Images without torch never install madmom, so they take an empty /wheels instead of
+# fetching and compiling it.
+FROM scratch AS madmom-skip
+WORKDIR /wheels
+
+
+# madmom-wheel follows the torch rule of worker-analysis-deps: PANNS=on builds madmom
+# on every architecture, auto on amd64 (x86_64) only, off nowhere. BuildKit builds
+# only the stages the target reaches, so the other branch costs nothing. Release
+# images are amd64 and arm64; auto on another architecture names no stage here.
+FROM madmom-build AS madmom-on
+FROM madmom-skip AS madmom-off
+FROM madmom-build AS madmom-auto-amd64
+FROM madmom-skip AS madmom-auto-arm64
+FROM madmom-auto-${TARGETARCH} AS madmom-auto
+FROM madmom-${PANNS} AS madmom-wheel
 
 
 FROM worker-analysis-python AS worker-analysis-deps
@@ -180,8 +203,9 @@ FROM worker-analysis-python AS worker-analysis-deps
 # torch is pinned because Beat This! needs torchaudio, which stopped at 2.11 while
 # torch moved on: torchaudio 2.11.1 (requirements-beat-this.txt) declares only
 # torch>=2.11, so an unpinned torch would pair itself with a torchaudio nobody ran on
-# it. Bump both together and check Beat This! on the new pair.
-ARG PANNS=auto
+# it. Bump both together and check Beat This! on the new pair. madmom's licence ships
+# with madmom, so images without torch carry neither.
+ARG PANNS
 ARG TORCH_VERSION=2.15.0
 COPY requirements-beat-this.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
@@ -198,6 +222,8 @@ RUN --mount=type=cache,target=/root/.cache/pip \
         pip freeze | grep -iE '^(numpy|torch)==' | sort > /tmp/analysis-installed.txt && \
         sort /tmp/analysis-constraint.txt | cmp -s - /tmp/analysis-installed.txt && \
         python -c "import torchaudio, beat_this.inference, madmom.features.downbeats" && \
+        mkdir -p /app/models && \
+        cp /tmp/madmom-wheels/madmom.LICENSE /app/models/madmom.LICENSE && \
         rm /tmp/analysis-constraint.txt /tmp/analysis-installed.txt; \
     fi
 
@@ -221,7 +247,6 @@ COPY --from=yamnet-weights /yamnet/LICENSE /app/models/yamnet.LICENSE
 ARG BEAT_THIS_CHECKPOINT
 ENV CRATE_BEAT_THIS_CHECKPOINT=${BEAT_THIS_CHECKPOINT}
 COPY --from=beat-this-weights /beat-this/ /app/models/
-COPY --from=madmom-wheel /madmom/LICENSE /app/models/madmom.LICENSE
 
 
 FROM worker-analysis-deps AS worker-analysis
