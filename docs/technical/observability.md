@@ -272,17 +272,23 @@ for people who can open it.
 
 ### Connecting Sentry
 
-The connection panel at the bottom of the Errors page asks for:
+The **Sentry connection** button in the Errors page header opens a side drawer
+(only for `ops.runtime.manage`) with the connection status and a form that asks
+for:
 
 - **Base URL**: `https://sentry.io` by default; `us.sentry.io`, `de.sentry.io` or a
-  self-hosted HTTPS address also work.
+  self-hosted HTTPS address also work. With a regional host the token scope check
+  still goes to `sentry.io`, the only cloud host that serves the API root.
 - **Organization**: the organization slug.
 - **Projects** and **environments**: comma-separated; empty means every project
   the token can see and every environment.
-- **Token**: from a Sentry internal integration with `org:read`, `project:read`
-  and `event:read`. Add `event:write` to resolve and ignore from Crate; without
-  it the inbox works read-only and hides the status actions. The token is stored
-  encrypted, is never shown again and is only replaced when a new one is typed.
+- **Token**: the token of a Sentry internal integration (Settings > Developer
+  Settings > Custom Integrations; create it under **Tokens**, not the client
+  secret) with Organization, Project and Issue & Event read access, which gives
+  `org:read`, `project:read` and `event:read`. Issue & Event write access
+  (`event:write`) lets Crate resolve and ignore; without it the inbox works
+  read-only and hides the status actions. The token is stored encrypted, is never
+  shown again and is only replaced when a new one is typed.
 
 _Test connection_ enqueues a worker task that checks the token's scopes and
 records whether Crate can read and write; the panel shows the result and when it
