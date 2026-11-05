@@ -208,6 +208,80 @@ def test_record_fix_request(pg_db):
     issue = get_issue(issue_id)
     assert issue["fix_requested_at"] == NOW
     assert issue["fix_requested_by"] == user["id"]
+    # Without a display name the username shows ("requested by X").
+    assert issue["fix_requested_by_name"] == user["username"]
+
+
+def test_record_fix_request_cooldown_release_and_audit(pg_db):
+    import json
+
+    from crate.db.queries.error_issues import get_issue
+    from crate.db.repositories.error_issues import (
+        FIX_AUDIT_ACTION,
+        audit_fix_request,
+        record_fix_request,
+        release_fix_request,
+        upsert_issues,
+    )
+
+    first = pg_db.create_user("first-fixer@test.com", "Diego")
+    second = pg_db.create_user("second-fixer@test.com")
+    upsert_issues([_row(1)], synced_at=NOW)
+    issue_id = _ids()["1"]
+    day = timedelta(hours=24)
+
+    assert record_fix_request(issue_id, user_id=first["id"], at=NOW, cooldown=day)
+    # Within the window nobody else can claim the issue.
+    later = NOW + timedelta(hours=23)
+    assert not record_fix_request(
+        issue_id, user_id=second["id"], at=later, cooldown=day
+    )
+    assert _column(issue_id, "fix_requested_by") == first["id"]
+
+    # After it, a new claim wins; releasing it restores the previous request.
+    next_day = NOW + timedelta(hours=25)
+    assert record_fix_request(issue_id, user_id=second["id"], at=next_day, cooldown=day)
+    assert release_fix_request(
+        issue_id, requested_at=next_day, previous_at=NOW, previous_by=first["id"]
+    )
+    assert _column(issue_id, "fix_requested_at") == NOW
+    assert _column(issue_id, "fix_requested_by") == first["id"]
+    # A release only undoes its own claim.
+    assert not release_fix_request(
+        issue_id, requested_at=next_day, previous_at=None, previous_by=None
+    )
+    assert _column(issue_id, "fix_requested_at") == NOW
+    missing = "00000000-0000-0000-0000-000000000000"
+    assert not record_fix_request(missing, user_id=None, at=NOW, cooldown=day)
+
+    assert audit_fix_request(
+        issue_id,
+        actor_id=first["id"],
+        task_id="task-1",
+        at=NOW,
+        details={"issue_id": issue_id, "has_note": False},
+    )
+    assert not audit_fix_request(missing, actor_id=None, details={})
+    with _scope() as session:
+        audit = (
+            session.execute(
+                text(
+                    "SELECT action, target_type, target_name, details_json, user_id, "
+                    "task_id, timestamp FROM audit_log WHERE action = :action"
+                ),
+                {"action": FIX_AUDIT_ACTION},
+            )
+            .mappings()
+            .one()
+        )
+    assert audit["target_type"] == "error_issue"
+    assert audit["target_name"] == "CRATE-API-1"
+    assert audit["user_id"] == first["id"]
+    assert audit["task_id"] == "task-1"
+    assert audit["details_json"] == {"issue_id": issue_id, "has_note": False}
+    assert json.dumps(audit["details_json"]).find("IntegrityError") == -1
+    assert get_issue(issue_id)["fix_requested_by"] == first["id"]
+    assert get_issue(issue_id)["fix_requested_by_name"] == "Diego"
 
 
 def test_purge_closed_cascades_triage(pg_db):

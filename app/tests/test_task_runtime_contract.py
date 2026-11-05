@@ -385,6 +385,8 @@ def test_error_inbox_tasks_have_handler_pool_and_registry():
         # A person waits for these.
         "update_error_issue_status": TaskPoolConfig("fast", 0, 30, 0),
         "test_error_tracking_connection": TaskPoolConfig("fast", 0, 30, 0),
+        # One GitHub workflow_dispatch; never retried, or a run could start twice.
+        "dispatch_error_fix": TaskPoolConfig("fast", 0, 30, 0),
     }
     for task_type, pool in expected.items():
         assert TASK_POOL_CONFIG[task_type] == pool

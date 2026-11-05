@@ -227,6 +227,7 @@ LABEL_VALUES = {
         "delete_artist_artwork_asset",
         "delete_artist_hero_composition",
         "derive_artist_hero",
+        "dispatch_error_fix",
         "draft_i18n_translation",
         "enrich_artist",
         "enrich_artists",
