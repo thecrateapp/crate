@@ -385,6 +385,37 @@ def test_workflow_is_gated_and_least_privileged() -> None:
     assert "--force" not in push
 
 
+def test_agent_commands_have_their_sandbox() -> None:
+    # CLAUDE_CODE_SUBPROCESS_ENV_SCRUB runs every agent command in bubblewrap with a
+    # socat proxy. The action installs them only for allowed_non_write_users, so the
+    # first EG3 run (CRATE-LISTEN-16) failed every Bash call with "socat not installed".
+    workflow = yaml.safe_load(WORKFLOW_PATH.read_text())
+    fix = workflow["jobs"]["fix"]
+    assert fix["env"]["CLAUDE_CODE_SUBPROCESS_ENV_SCRUB"] == "1"
+
+    names = [step.get("name") for step in fix["steps"]]
+    sandbox = fix["steps"][names.index("Install the command sandbox")]
+    assert names.index("Install the command sandbox") < names.index("Run the agent")
+    assert "continue-on-error" not in sandbox
+    assert "timeout-minutes" in sandbox
+    script = sandbox["run"]
+    assert "bubblewrap" in script and "socat" in script
+    assert "kernel.apparmor_restrict_unprivileged_userns=0" in script
+    # Fails here, before the agent, when the sandbox cannot start.
+    assert re.search(r"^bwrap .*\btrue$", script, re.MULTILINE)
+    assert re.search(r"^command -v socat$", script, re.MULTILINE)
+
+
+def test_summary_names_denied_tools_without_their_input() -> None:
+    workflow = yaml.safe_load(WORKFLOW_PATH.read_text())
+    steps = _steps(workflow["jobs"]["fix"])
+    package = steps["Package the fix"]["run"]
+    assert "permission_denials" in package
+    assert ".tool_name" in package
+    # The log and the summary are public: a denied command can carry event text.
+    assert "tool_input" not in package
+
+
 def test_prompt_states_the_fixed_rules() -> None:
     prompt = PROMPT.read_text()
     for phrase in (
