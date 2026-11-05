@@ -8,6 +8,8 @@ on:
       - "app/crate/**"
       - "app/tests/**"
       - "app/requirements*.txt"
+      - ".github/autofix/**"
+      - ".github/workflows/error-autofix.yml"
       - ".github/workflows/test-backend.yml"
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
@@ -15,6 +17,8 @@ on:
       - "app/crate/**"
       - "app/tests/**"
       - "app/requirements*.txt"
+      - ".github/autofix/**"
+      - ".github/workflows/error-autofix.yml"
       - ".github/workflows/test-backend.yml"
 
 concurrency:
