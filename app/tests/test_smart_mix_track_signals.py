@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime, timedelta
 
 import numpy as np
 
@@ -135,6 +136,85 @@ def test_signals_of_a_new_source_revision_replace_the_row(pg_db) -> None:
     )
 
 
+def test_older_signal_does_not_overwrite_newer(pg_db) -> None:
+    del pg_db
+    track_id, _uid = _create_track("signals-older")
+    replaced_at = datetime(2026, 11, 5, 12, 0, tzinfo=UTC)
+    store_track_mix_beats(
+        track_id,
+        "revision-b",
+        tracker="beat-this-small0-dbn",
+        beats_ms=BEATS,
+        downbeats_ms=DOWNBEATS,
+        beats_per_bar=4,
+        updated_at=replaced_at,
+    )
+
+    # A slow task that read the file before it was replaced finishes afterwards.
+    read_before = replaced_at - timedelta(minutes=5)
+    store_track_mix_voice(
+        track_id,
+        "revision-a",
+        detector="yamnet-2",
+        hop_ms=480,
+        scores=b"\x10",
+        updated_at=read_before,
+    )
+    store_track_mix_beats(
+        track_id,
+        "revision-a",
+        tracker="beat-this-small0-dbn",
+        beats_ms=BEATS[:3],
+        downbeats_ms=DOWNBEATS[:1],
+        beats_per_bar=3,
+        updated_at=read_before,
+    )
+
+    assert get_track_mix_signals(track_id) == TrackMixSignals(
+        source_revision="revision-b",
+        beat_tracker="beat-this-small0-dbn",
+        beats_ms=BEATS,
+        downbeats_ms=DOWNBEATS,
+        beats_per_bar=4,
+    )
+
+
+def test_older_signal_of_the_same_file_still_joins_the_row(pg_db) -> None:
+    del pg_db
+    track_id, _uid = _create_track("signals-older-same")
+    read_at = datetime(2026, 11, 5, 12, 0, tzinfo=UTC)
+    store_track_mix_beats(
+        track_id,
+        "revision-a",
+        tracker="beat-this-small0-dbn",
+        beats_ms=BEATS,
+        downbeats_ms=DOWNBEATS,
+        beats_per_bar=4,
+        updated_at=read_at,
+    )
+
+    # Another task read the same file earlier: its voice describes this audio too.
+    store_track_mix_voice(
+        track_id,
+        "revision-a",
+        detector="yamnet-2",
+        hop_ms=480,
+        scores=b"\x10",
+        updated_at=read_at - timedelta(minutes=5),
+    )
+
+    assert get_track_mix_signals(track_id) == TrackMixSignals(
+        source_revision="revision-a",
+        beat_tracker="beat-this-small0-dbn",
+        beats_ms=BEATS,
+        downbeats_ms=DOWNBEATS,
+        beats_per_bar=4,
+        vocal_detector="yamnet-2",
+        voice_hop_ms=480,
+        voice_scores=b"\x10",
+    )
+
+
 # The profile task (SM3-D16): the model outputs stored for the captured file and the
 # current tracker or detector replace running the models; anything else runs them and
 # stores what they give.
@@ -151,6 +231,8 @@ class _Harness:
     kept_beats: list[tuple] = field(default_factory=list)
     kept_voice: list[tuple] = field(default_factory=list)
     published: list[TrackMixProfileDraft] = field(default_factory=list)
+    captured_at: datetime | None = None
+    stamps: list[datetime] = field(default_factory=list)
 
 
 def _profile_task(
@@ -161,6 +243,7 @@ def _profile_task(
     voice_windows: VoiceWindows | None = None,
     draft: TrackMixProfileDraft | None = None,
     store_error: Exception | None = None,
+    source_now: str = SOURCE,
 ) -> _Harness:
     from crate.db.jobs.analysis_storage import SmartMixCapture
     from crate.smart_mix import vocals
@@ -171,17 +254,20 @@ def _profile_task(
     monkeypatch.setattr(
         analysis, "resolve_smart_mix_track", lambda **_kwargs: {"id": 7, "path": PATH}
     )
-    monkeypatch.setattr(
-        analysis,
-        "capture_smart_mix_source",
-        lambda track_id, path, *, claim_token=None: SmartMixCapture(
+
+    def capture(track_id, path, *, claim_token=None):
+        harness.captured_at = datetime.now(UTC)
+        return SmartMixCapture(
             track_id=track_id,
             path=path,
             source_revision=SOURCE,
             expected_profile_revision=None,
             claim_token=claim_token,
-        ),
-    )
+        )
+
+    monkeypatch.setattr(analysis, "capture_smart_mix_source", capture)
+    # The file as it is when the task stores what the models read from it.
+    monkeypatch.setattr(analysis, "smart_mix_source_revision", lambda _path: source_now)
 
     def lookup(track_id):
         assert track_id == 7
@@ -189,14 +275,16 @@ def _profile_task(
             raise stored
         return stored
 
-    def keep_beats(track_id, source_revision, **values):
+    def keep_beats(track_id, source_revision, *, updated_at, **values):
         if store_error is not None:
             raise store_error
+        harness.stamps.append(updated_at)
         harness.kept_beats.append((track_id, source_revision, values))
 
-    def keep_voice(track_id, source_revision, **values):
+    def keep_voice(track_id, source_revision, *, updated_at, **values):
         if store_error is not None:
             raise store_error
+        harness.stamps.append(updated_at)
         harness.kept_voice.append((track_id, source_revision, values))
 
     def beat_model(path):
@@ -429,3 +517,40 @@ def test_signal_store_failure_keeps_profile(monkeypatch, caplog) -> None:
     assert "stored signals" in caplog.text
     assert "store the Beat This! beats" in caplog.text
     assert "store the voice windows" in caplog.text
+
+
+def test_signal_not_stored_when_source_changed_during_task(monkeypatch, caplog) -> None:
+    with caplog.at_level(logging.WARNING):
+        harness = _profile_task(
+            monkeypatch,
+            stored=None,
+            model_beats=_model_track(),
+            voice_windows=_voice([1.0] * 102),
+            draft=_draft(phrases=True),
+            source_now="source-after",
+        )
+
+    # The models read a file that is no longer there: their outputs describe neither.
+    assert harness.model_calls == [PATH]
+    assert len(harness.voice_model_calls) == 1
+    assert harness.kept_beats == []
+    assert harness.kept_voice == []
+    assert caplog.text.count("changed during the task") == 2
+
+
+def test_signals_carry_the_time_the_source_was_read(monkeypatch) -> None:
+    harness = _profile_task(
+        monkeypatch,
+        stored=None,
+        model_beats=_model_track(),
+        voice_windows=_voice([1.0] * 102),
+        draft=_draft(phrases=True),
+    )
+
+    # Both are stamped with when the task read the file, not when it stored them,
+    # so a slower task that read an older file never replaces them.
+    [beats_at, voice_at] = harness.stamps
+    assert beats_at == voice_at
+    assert beats_at.tzinfo is not None
+    assert harness.captured_at is not None
+    assert beats_at <= harness.captured_at

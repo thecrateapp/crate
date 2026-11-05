@@ -308,6 +308,12 @@ with its beats stored, a backfill of the library takes about 3 days instead of 1
   replaces the row whole, since the other half described the old file. The voice is still
   computed only for a draft with phrases, so storing it adds no cost, and a track the model
   gives no beats stores none.
+- **A file replaced during the task.** The models read the file after the task captured its
+  revision, so the task reads the revision again before each store: if the file changed in
+  between, it stores nothing and logs `the file changed during the task` (publication
+  drops that draft too, as `source_changed`). Each row's `updated_at` is when its task read
+  the file, and signals of another revision replace the row only when they were read
+  later, so a slow task that read the old file never overwrites the new file's signals.
 - **How a later version uses them.** A new analyzer version that keeps
   `beat-this-small0-dbn` and `yamnet-2` reanalyses the library through the backfill as
   usual, and every profile task finds the signals of its track: only decoding, the Rust

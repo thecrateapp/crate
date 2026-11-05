@@ -6,15 +6,20 @@ bar length are kept per track, with YAMNet's voice windows. They hold while the 
 version reads them instead of running the models again. One row per track: beats and
 voice of the same source revision share it, and storing either for another revision
 replaces the row whole, since the other half described the old file.
+
+``updated_at`` is when the storing task read the file. Signals of another revision
+replace the row only when they were read after the row's, so a slow task that read
+the file before it was replaced never overwrites the newer file's signals.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -72,9 +77,13 @@ def store_track_mix_beats(
     beats_ms: Sequence[int],
     downbeats_ms: Sequence[int],
     beats_per_bar: int | None,
+    updated_at: datetime | None = None,
     session: Session | None = None,
 ) -> None:
-    """Keep the model beats of ``source_revision``; its voice windows stay."""
+    """Keep the model beats of ``source_revision``; its voice windows stay.
+
+    ``updated_at`` is when the task read the file (default: now).
+    """
     _upsert(
         track_id,
         source_revision,
@@ -85,6 +94,7 @@ def store_track_mix_beats(
             "beats_per_bar": beats_per_bar,
         },
         kept=_VOICE_COLUMNS,
+        updated_at=updated_at,
         session=session,
     )
 
@@ -96,9 +106,13 @@ def store_track_mix_voice(
     detector: str,
     hop_ms: int,
     scores: bytes,
+    updated_at: datetime | None = None,
     session: Session | None = None,
 ) -> None:
-    """Keep the voice windows of ``source_revision``; its beats stay."""
+    """Keep the voice windows of ``source_revision``; its beats stay.
+
+    ``updated_at`` is when the task read the file (default: now).
+    """
     _upsert(
         track_id,
         source_revision,
@@ -108,6 +122,7 @@ def store_track_mix_voice(
             "voice_scores": bytes(scores),
         },
         kept=_BEAT_COLUMNS,
+        updated_at=updated_at,
         session=session,
     )
 
@@ -118,15 +133,17 @@ def _upsert(
     values: dict[str, Any],
     *,
     kept: tuple[str, ...],
+    updated_at: datetime | None,
     session: Session | None,
 ) -> None:
     statement = insert(TrackMixSignalsRow).values(
         track_id=int(track_id),
         source_revision=source_revision,
-        updated_at=func.now(),
+        updated_at=func.now() if updated_at is None else updated_at,
         **values,
     )
     same_source = TrackMixSignalsRow.source_revision == source_revision
+    read_later = TrackMixSignalsRow.updated_at <= statement.excluded.updated_at
     statement = statement.on_conflict_do_update(
         index_elements=[TrackMixSignalsRow.track_id],
         set_={
@@ -139,8 +156,12 @@ def _upsert(
                 )
                 for column in kept
             },
-            "updated_at": func.now(),
+            "updated_at": func.greatest(
+                TrackMixSignalsRow.updated_at, statement.excluded.updated_at
+            ),
         },
+        # Another file's signals replace the row only when read after it was.
+        where=or_(same_source, read_later),
     )
     with optional_scope(session) as current:
         current.execute(statement)
