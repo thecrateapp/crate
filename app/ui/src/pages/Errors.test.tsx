@@ -60,8 +60,13 @@ function serve({
     if (method === "PUT") return connection;
     const query = new URLSearchParams(url.split("?")[1]);
     const service = query.get("service");
+    const classification = query.get("classification");
     return {
-      items: issues.filter((issue) => !service || issue.service === service),
+      items: issues.filter(
+        (issue) =>
+          (!service || issue.service === service) &&
+          (!classification || issue.classification === classification),
+      ),
       next_cursor: null,
     };
   });
@@ -380,6 +385,72 @@ describe("Errors", () => {
           .map((link) => link.textContent),
       ).toEqual(["UpstreamUnavailable: api-unavailable (502)"]),
     );
+  });
+
+  it("filters by class with chips", async () => {
+    serve();
+    renderWithAdminProviders(
+      <>
+        <Errors />
+        <Location />
+      </>,
+      { route: "/errors" },
+    );
+    await issueTable();
+    const classes = screen.getByRole("radiogroup", { name: "Class" });
+    expect(
+      within(classes)
+        .getAllByRole("radio")
+        .map((radio) => radio.textContent),
+    ).toEqual([
+      "All",
+      "Bug",
+      "Infrastructure",
+      "External dependency",
+      "Client environment",
+      "Noise",
+    ]);
+    expect(within(classes).getByRole("radio", { name: "All" })).toBeChecked();
+
+    await userEvent.click(
+      within(classes).getByRole("radio", { name: "Infrastructure" }),
+    );
+
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenLastCalledWith(
+        expect.stringContaining("classification=infrastructure"),
+      ),
+    );
+    expect(
+      screen.getByRole("status", { name: "Current location" }),
+    ).toHaveTextContent("/errors?classification=infrastructure");
+    const table = await issueTable();
+    await waitFor(() =>
+      expect(
+        within(table)
+          .getAllByRole("link")
+          .map((link) => link.textContent),
+      ).toEqual(["UpstreamUnavailable: api-unavailable (502)"]),
+    );
+
+    await userEvent.click(within(classes).getByRole("radio", { name: "All" }));
+    expect(
+      screen.getByRole("status", { name: "Current location" }),
+    ).toHaveTextContent(/^\/errors$/);
+  });
+
+  it("starts with the class chip from the address", async () => {
+    serve();
+    renderWithAdminProviders(<Errors />, {
+      route: "/errors?classification=noise",
+    });
+    await issueTable();
+    expect(
+      within(screen.getByRole("radiogroup", { name: "Class" })).getByRole(
+        "radio",
+        { name: "Noise" },
+      ),
+    ).toBeChecked();
   });
 
   it("explains an empty filter result and clears it", async () => {

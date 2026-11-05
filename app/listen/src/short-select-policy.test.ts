@@ -42,6 +42,10 @@ const DYNAMIC_SELECTS: Record<string, string> = {
     "Available audio formats are catalog facets.",
   'app/ui/src/components/system-health/MetricChart.tsx:Select:selected ?? ""':
     "Inspectable samples are the points of the live metric series.",
+  "app/ui/src/pages/Errors.tsx:AdminSelect:filters.service":
+    "Services are the ones with open issues, returned by the error summary API.",
+  "app/ui/src/pages/Errors.tsx:AdminSelect:filters.release":
+    "Releases come from the issues listed by the error inbox API.",
   "app/ui/src/pages/Logs.tsx:AdminSelect:category":
     "Log categories come from the operational API.",
   "app/ui/src/pages/Logs.tsx:AdminSelect:workerId":

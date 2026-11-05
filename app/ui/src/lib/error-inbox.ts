@@ -199,6 +199,7 @@ export interface EnqueuedTask {
 
 export type LaneFilter = "all" | "critical";
 export type StatusFilter = IssueStatus | "all";
+export type ClassFilter = IssueClassification | "all";
 
 export interface IssueFilters {
   lane: LaneFilter;

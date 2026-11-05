@@ -7,7 +7,10 @@ import { RefreshCw } from "@crate/ui/icons";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { MonoLabel } from "@crate/ui/primitives/MonoLabel";
-import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
+import {
+  SegmentedControl,
+  type SegmentedControlItem,
+} from "@crate/ui/primitives/SegmentedControl";
 import { StatusDot, type StatusDotTone } from "@crate/ui/primitives/StatusDot";
 import { Button } from "@crate/ui/shadcn/button";
 
@@ -37,14 +40,24 @@ import {
   needsConnectionFix,
   problemText,
   problemTitle,
+  type ClassFilter,
   type ErrorIssueSummary,
   type ErrorSummary,
+  type IssueClassification,
   type IssueFilters,
   type LaneFilter,
   type StatusFilter,
 } from "@/lib/error-inbox";
 
 const SUMMARY_URL = `${ERRORS_API}/summary`;
+
+// Five fixed classes: short static choices use chips, like Lane and Status.
+const CLASS_ITEMS: SegmentedControlItem<ClassFilter>[] = [
+  { value: "all", label: "All" },
+  ...(
+    Object.entries(CLASSIFICATION_LABEL) as [IssueClassification, string][]
+  ).map(([value, label]) => ({ value, label })),
+];
 
 const issueId = (issue: ErrorIssueSummary) => issue.id;
 
@@ -212,15 +225,14 @@ function Filters({
       </div>
       <div className="crate-form-field">
         <MonoLabel as="span">Class</MonoLabel>
-        <AdminSelect
-          ariaLabel="Classification"
-          value={filters.classification}
-          onChange={(value) => set("classification", value)}
-          placeholder="All classes"
-          allowClear
-          options={Object.entries(CLASSIFICATION_LABEL).map(
-            ([value, label]) => ({ value, label }),
-          )}
+        <SegmentedControl<ClassFilter>
+          as="radio"
+          label="Class"
+          value={(filters.classification || "all") as ClassFilter}
+          onValueChange={(value) =>
+            set("classification", value === "all" ? "" : value)
+          }
+          items={CLASS_ITEMS}
         />
       </div>
       <div className="crate-form-field">
