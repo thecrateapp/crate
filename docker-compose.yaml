@@ -880,6 +880,12 @@ services:
         "--no-telegram",
       ]
 
+  # Heavy queue: audio analysis and the Smart Mix profile backfill.
+  # ANALYSIS_WORKER_PROCESSES is how many analyses can run at once, so it is the
+  # backfill's night maximum: set it to the night limit in Admin (Analysis,
+  # Smart Mix, "Night in flight"). By day the backfill uses fewer and the rest
+  # serve other heavy work. Size cpus and mem_limit for that many processes;
+  # docker-compose.project.yaml does it for the project server.
   crate-analysis-worker:
     logging: *default-logging
     image: ${CRATE_ANALYSIS_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-analysis-worker:${CRATE_IMAGE_TAG:-latest}}
