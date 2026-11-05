@@ -67,20 +67,36 @@ def supports_command(command: str) -> bool:
     return command.lower() in result.stdout.lower()
 
 
-@lru_cache(maxsize=1)
 def supports_analyze_beats() -> bool:
     """Whether ``analyze`` takes model beats (``--beats``, SM3-D14); older binaries
-    track the beats themselves."""
+    track the beats themselves.
+
+    The answer of a binary that replied is kept for the process. A probe that fails,
+    such as a timeout on a loaded worker, answers False for this call only.
+    """
     binary = find_binary()
     if not binary:
         return False
     try:
-        result = subprocess.run(
-            [binary, "analyze", "--help"], capture_output=True, text=True, timeout=5
-        )
+        return "--beats" in _analyze_help(binary)
     except Exception:
+        log.warning(
+            "crate-cli analyze --help failed; this analysis does not hand it model beats",
+            exc_info=True,
+        )
         return False
-    return "--beats" in result.stdout
+
+
+@lru_cache(maxsize=4)
+def _analyze_help(binary: str) -> str:
+    """``analyze --help`` of ``binary``; a failed call raises, so it is never cached."""
+    return subprocess.run(
+        [binary, "analyze", "--help"],
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=True,
+    ).stdout
 
 
 def _scan_timeout() -> int:

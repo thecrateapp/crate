@@ -136,11 +136,48 @@ def test_beats_support_reads_the_analyze_help(monkeypatch):
             return SimpleNamespace(returncode=0, stdout=helps[version], stderr="")
 
         monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
-        crate_cli.supports_analyze_beats.cache_clear()
+        crate_cli._analyze_help.cache_clear()
 
         assert crate_cli.supports_analyze_beats() is expected
+        assert crate_cli.supports_analyze_beats() is expected
+        # The answer of a binary that replied is kept.
         assert calls == [["/usr/local/bin/crate-cli", "analyze", "--help"]]
-    crate_cli.supports_analyze_beats.cache_clear()
+    crate_cli._analyze_help.cache_clear()
+
+
+def test_a_failed_beats_probe_is_asked_again(monkeypatch, caplog):
+    import logging
+    import subprocess
+
+    from crate import crate_cli
+
+    monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
+    replies = [
+        subprocess.TimeoutExpired(["crate-cli", "analyze", "--help"], 5),
+        SimpleNamespace(returncode=0, stdout="      --beats <BEATS>\n", stderr=""),
+    ]
+    calls: list[list[str]] = []
+
+    def fake_run(args, **kwargs):
+        calls.append(list(args))
+        reply = replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+    monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
+    crate_cli._analyze_help.cache_clear()
+    try:
+        with caplog.at_level(logging.WARNING, logger=crate_cli.__name__):
+            # A loaded worker can miss the 5 s timeout: that must not turn the model
+            # beats off until the worker restarts.
+            assert crate_cli.supports_analyze_beats() is False
+        assert "analyze --help" in caplog.text
+        assert crate_cli.supports_analyze_beats() is True
+        assert crate_cli.supports_analyze_beats() is True
+        assert len(calls) == 2
+    finally:
+        crate_cli._analyze_help.cache_clear()
 
 
 def test_run_analyze_runs_at_background_priority(monkeypatch):
