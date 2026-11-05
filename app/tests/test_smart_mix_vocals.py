@@ -205,6 +205,109 @@ def test_audio_falls_back_to_librosa_without_essentia(monkeypatch) -> None:
     assert audio.dtype == np.float32 and len(audio) == 4
 
 
+def test_window_bytes_use_the_phrase_log_scale() -> None:
+    # SM3-D16 stores one byte per window, on the scale of the phrase bytes.
+    windows = _windows([VOICED, UNVOICED, 0.0, 0.1, 0.001])
+
+    stored = vocals.voice_window_bytes(windows)
+
+    # 0.1 is three quarters of the way from the floor (10^-4) to 1 in logs.
+    assert stored == vocals.VoiceWindowBytes(
+        detector=vocals.VOCAL_DETECTOR, hop_ms=480, scores=bytes([255, 0, 0, 191, 64])
+    )
+
+
+def test_phrase_bytes_from_window_bytes_match_float_scores() -> None:
+    # A phrase byte from stored window bytes is the mean of bytes each rounded on
+    # their own: it can miss the one from the float scores by one, never more.
+    rng = np.random.default_rng(16)
+    differences = []
+    for _track in range(200):
+        windows = _windows(list(10 ** rng.uniform(-5.0, 0.0, size=600)))
+        starts = np.cumsum(rng.choice([16_000, 32_000, 64_000], size=8)) - 15_000
+        spans = list(zip(starts[:-1].tolist(), starts[1:].tolist()))
+        exact = np.frombuffer(vocals.phrase_vocal_presence(windows, spans), np.uint8)
+        stored = np.frombuffer(
+            vocals.phrase_vocal_presence_from_windows(
+                vocals.voice_window_bytes(windows), spans
+            ),
+            np.uint8,
+        )
+        differences.extend(np.abs(exact.astype(int) - stored.astype(int)).tolist())
+
+    assert max(differences) <= 1
+    assert sum(differences) / len(differences) < 0.25
+
+
+def test_stored_windows_of_the_detector_replace_the_model(monkeypatch) -> None:
+    monkeypatch.setattr(vocals, "load_audio", _no_audio)
+    windows = _windows([VOICED] * 34 + [UNVOICED] * 34 + [VOICED] * 34)
+    stored = vocals.voice_window_bytes(windows)
+    draft = _draft(_phrases(3))
+    model = _FakeModel(AssertionError("stored windows replace YAMNet"))
+    kept: list[vocals.VoiceWindowBytes] = []
+
+    voiced = vocals.add_vocal_presence(
+        draft, "/music/track.flac", model=model, stored=stored, keep=kept.append
+    )
+
+    assert model.audio == []
+    assert kept == []
+    assert voiced.vocal_detector == vocals.VOCAL_DETECTOR
+    assert voiced.vocal_presence == _presence(windows, draft)
+    assert voiced.vocal_presence[:2] == bytes([255, 0])
+
+
+def test_windows_of_another_detector_are_computed_again_and_kept(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(vocals, "load_audio", _no_audio)
+    windows = _windows([VOICED] * 34 + [UNVOICED] * 34 + [VOICED] * 34)
+    old = vocals.VoiceWindowBytes(detector="yamnet-1", hop_ms=480, scores=bytes(102))
+    draft = _draft(_phrases(3))
+    model = _FakeModel(windows)
+    kept: list[vocals.VoiceWindowBytes] = []
+
+    voiced = vocals.add_vocal_presence(
+        draft, "/music/track.flac", model=model, stored=old, keep=kept.append
+    )
+
+    assert len(model.audio) == 1
+    assert kept == [vocals.voice_window_bytes(windows)]
+    # The fresh windows give the bytes their stored copy will give.
+    assert voiced.vocal_presence == _presence(windows, draft)
+
+
+def test_a_failing_store_keeps_the_voice(monkeypatch, caplog) -> None:
+    monkeypatch.setattr(vocals, "load_audio", _no_audio)
+    windows = _windows([VOICED] * 102)
+
+    def broken(_windows):
+        raise RuntimeError("database is down")
+
+    with caplog.at_level(logging.WARNING):
+        voiced = vocals.add_vocal_presence(
+            _draft(_phrases(3)),
+            "/music/track.flac",
+            model=_FakeModel(windows),
+            keep=broken,
+        )
+
+    assert voiced.vocal_presence == bytes([255, 255, 255])
+    assert "voice windows" in caplog.text
+
+
+def _no_audio(_path) -> np.ndarray:
+    return np.zeros(16_000, dtype=np.float32)
+
+
+def _presence(windows: VoiceWindows, draft: TrackMixProfileDraft) -> bytes:
+    return vocals.phrase_vocal_presence_from_windows(
+        vocals.voice_window_bytes(windows),
+        vocals.phrase_spans_ms(draft.phrases, draft.beat_grid_ms),
+    )
+
+
 def test_phrase_spans_end_at_the_next_phrase_or_after_the_last_bars() -> None:
     beat_grid = tuple(500 + 500 * beat for beat in range(80))
     phrases = (

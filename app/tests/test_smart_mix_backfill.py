@@ -315,7 +315,7 @@ def test_compute_profile_handler_resolves_track_inside_worker(monkeypatch) -> No
         analysis,
         "capture_smart_mix_source",
         lambda track_id, path, *, claim_token=None: (
-            captured.append((track_id, str(path), claim_token)) or "capture"
+            captured.append((track_id, str(path), claim_token)) or _capture()
         ),
     )
     monkeypatch.setattr(
@@ -354,7 +354,7 @@ def test_failed_profiles_also_refresh_the_live_coverage(monkeypatch) -> None:
         lambda **_kwargs: {"id": 7, "path": "/music/artist/album/track.flac"},
     )
     monkeypatch.setattr(
-        analysis, "capture_smart_mix_source", lambda *_args, **_kwargs: "capture"
+        analysis, "capture_smart_mix_source", lambda *_args, **_kwargs: _capture()
     )
 
     def broken(_path, _beats=None):
@@ -385,7 +385,7 @@ def test_a_profile_that_cannot_be_stored_is_recorded_as_failed(monkeypatch) -> N
         lambda **_kwargs: {"id": 7, "path": "/music/artist/album/track.flac"},
     )
     monkeypatch.setattr(
-        analysis, "capture_smart_mix_source", lambda *_args, **_kwargs: "capture"
+        analysis, "capture_smart_mix_source", lambda *_args, **_kwargs: _capture()
     )
     _without_beat_model(monkeypatch)
     monkeypatch.setattr(
@@ -1317,10 +1317,10 @@ def test_profile_task_publishes_the_draft_with_its_phrase_voice(monkeypatch) -> 
     voice_calls: list[tuple[TrackMixProfileDraft, str]] = []
     monkeypatch.setattr(
         "crate.smart_mix.vocals.add_vocal_presence",
-        lambda value, path: voice_calls.append((value, str(path))) or voiced,
+        lambda value, path, **_kwargs: voice_calls.append((value, str(path))) or voiced,
     )
     monkeypatch.setattr(
-        analysis, "capture_smart_mix_source", lambda *_args, **_kwargs: "capture"
+        analysis, "capture_smart_mix_source", lambda *_args, **_kwargs: _capture()
     )
     published: list[TrackMixProfileDraft] = []
     monkeypatch.setattr(
@@ -1344,11 +1344,33 @@ def _without_beat_model(monkeypatch) -> None:
     monkeypatch.setattr(
         "crate.smart_mix.beat_model.track_file_beats", lambda _path: None
     )
+    _without_stored_signals(monkeypatch)
+
+
+def _without_stored_signals(monkeypatch) -> None:
+    # Nor touch the stored model signals (test_smart_mix_track_signals.py).
+    from crate.worker_handlers import analysis
+
+    monkeypatch.setattr(analysis, "get_track_mix_signals", lambda _track_id: None)
+    monkeypatch.setattr(analysis, "store_track_mix_beats", lambda *_a, **_k: None)
+    monkeypatch.setattr(analysis, "store_track_mix_voice", lambda *_a, **_k: None)
+
+
+def _capture():
+    from crate.db.jobs.analysis_storage import SmartMixCapture
+
+    return SmartMixCapture(
+        track_id=7,
+        path="/music/artist/album/track.flac",
+        source_revision="source",
+        expected_profile_revision=None,
+    )
 
 
 def _profile_task_harness(monkeypatch, draft: TrackMixProfileDraft) -> list:
     from crate.worker_handlers import analysis
 
+    _without_stored_signals(monkeypatch)
     monkeypatch.setattr(
         analysis,
         "resolve_smart_mix_track",
@@ -1356,10 +1378,11 @@ def _profile_task_harness(monkeypatch, draft: TrackMixProfileDraft) -> list:
         raising=False,
     )
     monkeypatch.setattr(
-        "crate.smart_mix.vocals.add_vocal_presence", lambda value, _path: value
+        "crate.smart_mix.vocals.add_vocal_presence",
+        lambda value, _path, **_kwargs: value,
     )
     monkeypatch.setattr(
-        analysis, "capture_smart_mix_source", lambda *_args, **_kwargs: "capture"
+        analysis, "capture_smart_mix_source", lambda *_args, **_kwargs: _capture()
     )
     published: list[TrackMixProfileDraft] = []
     monkeypatch.setattr(
