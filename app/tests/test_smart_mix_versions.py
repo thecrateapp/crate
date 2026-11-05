@@ -78,6 +78,17 @@ def test_worker_binary_is_built_from_the_current_analyzer() -> None:
     )
 
 
+def test_worker_binary_takes_model_beats() -> None:
+    # The profile task hands Beat This! beats (SM3-D14) only to a crate-cli whose
+    # analyze takes --beats; the same analyzer version built without it would keep
+    # its own tracker in every x86_64 worker image.
+    binary = (APP_ROOT / "bin/crate-cli-linux-amd64").read_bytes()
+
+    assert b"downbeats_ms" in binary and b"beatTracker" in binary, (
+        "rebuild app/bin/crate-cli-linux-amd64 with `make crate-cli-linux`"
+    )
+
+
 def test_rust_beat_grid_format_matches_python() -> None:
     source = (REPO_ROOT / "tools/crate-cli/src/mix_profile.rs").read_text()
 
