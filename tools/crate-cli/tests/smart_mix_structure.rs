@@ -6,8 +6,10 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate_cli::analyze::{
-    analyze_smart_mix_samples, analyze_smart_mix_segments, rms_frame_geometry, AudioTail,
+    analyze_smart_mix_samples, analyze_smart_mix_segments, analyze_smart_mix_segments_with_beats,
+    rms_frame_geometry, AudioTail,
 };
+use crate_cli::beat_tracking::ExternalBeats;
 use crate_cli::mix_profile::SmartMixProfileResult;
 use crate_cli::structure::{
     downbeats_from_anchor, segment_phrases, EnergyFrames, Structure, MAX_ENERGY_CURVE_BARS,
@@ -329,6 +331,58 @@ fn dj_profile() -> SmartMixProfileResult {
 
 fn profile_downbeats(profile: &SmartMixProfileResult) -> Vec<u64> {
     downbeats_from_anchor(&profile.beat_grid_ms, profile.downbeat_anchor_ms)
+}
+
+/// Beat This! beats on every beat of `structured_audio`, with a downbeat on the first
+/// beat of each bar of `beats_per_bar` beats.
+fn model_bars(beats_per_bar: usize) -> ExternalBeats {
+    let bars: usize = DJ_SECTIONS.iter().map(|section| section.bars).sum();
+    let beats_ms: Vec<u64> = (0..(bars * beats_per_bar) as u64)
+        .map(|beat| FIRST_BEAT_MS + beat * BEAT_MS)
+        .collect();
+    ExternalBeats {
+        tracker: Some("beat-this-test".to_string()),
+        downbeats_ms: beats_ms.iter().step_by(beats_per_bar).copied().collect(),
+        beats_ms,
+        beats_per_bar: Some(beats_per_bar as u8),
+    }
+}
+
+fn model_profile(beats_per_bar: usize) -> SmartMixProfileResult {
+    analyze_smart_mix_segments_with_beats(
+        &structured_audio(&DJ_SECTIONS, beats_per_bar),
+        None,
+        SAMPLE_RATE,
+        None,
+        None,
+        Some(&model_bars(beats_per_bar)),
+    )
+}
+
+#[test]
+fn three_four_meter_gets_no_phrases() {
+    // Phrases and their consumers count bars of four beats: a track the DBN hears in
+    // 3/4 says so and gets no downbeat and no phrases, so it goes to crossfade
+    // (SM3-D16).
+    let in_four = model_profile(4);
+    let in_three = model_profile(3);
+
+    assert_eq!(in_four.time_signature, Some(4));
+    assert_eq!(in_four.downbeat_anchor_ms, Some(FIRST_BEAT_MS));
+    assert!(in_four
+        .phrases
+        .as_ref()
+        .is_some_and(|phrases| !phrases.is_empty()));
+    assert_eq!(in_three.time_signature, Some(3));
+    assert_eq!(in_three.downbeat_anchor_ms, None);
+    assert_eq!(in_three.intro_downbeat_ms, None);
+    assert_eq!(in_three.outro_downbeat_ms, None);
+    assert!(in_three
+        .phrases
+        .as_ref()
+        .is_some_and(|phrases| phrases.is_empty()));
+    assert_eq!(in_three.energy_curve, None);
+    assert_eq!(in_three.beat_tracker.as_deref(), Some("beat-this-test"));
 }
 
 #[test]

@@ -205,6 +205,37 @@ def test_python_and_rust_structure_agree_with_model_beats(tmp_path: Path) -> Non
     assert max(abs(a - b) for a, b in zip(python_curve, rust_curve)) <= 2
 
 
+@pytest.mark.parametrize("beats_per_bar", [3, 4])
+def test_python_and_rust_take_the_same_model_meter(
+    tmp_path: Path, beats_per_bar: int
+) -> None:
+    # The DBN's bar length reaches both analyzers (SM3-D16): bars of four are phrased
+    # as before, and a 3/4 track gets its time signature and no downbeat or phrases.
+    from crate.smart_mix.analyzer import analyze_mix_profile
+    from crate.smart_mix.beat_model import BeatTrack
+    from tests.smart_mix_structure_audio import BEAT_MS, LEAD_SECONDS
+
+    track = tmp_path / f"structure-model-{beats_per_bar}.wav"
+    write_structured_track(track, DJ_SECTIONS, beats_per_bar=beats_per_bar)
+    first_ms = round(LEAD_SECONDS * 1_000)
+    beat_count = beats_per_bar * sum(section.bars for section in DJ_SECTIONS)
+    beats = tuple(range(first_ms, first_ms + beat_count * BEAT_MS, BEAT_MS))
+    model = BeatTrack(
+        "beat-this-test", beats, beats[::beats_per_bar], beats_per_bar=beats_per_bar
+    )
+
+    python_profile = analyze_mix_profile(track, beats=model)
+    rust_profile = _rust_profile(track, beats=model)
+
+    assert rust_profile["timeSignature"] == python_profile.time_signature
+    assert python_profile.time_signature == beats_per_bar
+    assert rust_profile["downbeatAnchorMs"] == python_profile.downbeat_anchor_ms
+    assert [phrase["bars"] for phrase in rust_profile["phrases"]] == [
+        phrase.bars for phrase in python_profile.phrases
+    ]
+    assert bool(python_profile.phrases) is (beats_per_bar == 4)
+
+
 def _model_beats(beats_ms, *, phase: int):
     from crate.smart_mix.beat_model import BeatTrack
 

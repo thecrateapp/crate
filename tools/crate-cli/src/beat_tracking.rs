@@ -44,7 +44,9 @@ pub const MODEL_DOWNBEAT_MIN_SHARE: f64 = 0.6;
 const MODEL_BEAT_ONSET_WINDOW_MS: f64 = 35.0;
 
 /// Beats and downbeats from a model, as the worker writes them for `analyze --beats`:
-/// `{"tracker": "beat-this-small0", "beats_ms": [...], "downbeats_ms": [...]}`.
+/// `{"tracker": "beat-this-small0-dbn", "beats_ms": [...], "downbeats_ms": [...],
+/// "beats_per_bar": 4}`. `beats_per_bar` is the bar length the model's DBN chose (3 or
+/// 4), absent or null when its bars are not all the same length.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct ExternalBeats {
     #[serde(default)]
@@ -52,6 +54,8 @@ pub struct ExternalBeats {
     pub beats_ms: Vec<u64>,
     #[serde(default)]
     pub downbeats_ms: Vec<u64>,
+    #[serde(default)]
+    pub beats_per_bar: Option<u8>,
 }
 
 impl ExternalBeats {
@@ -61,14 +65,23 @@ impl ExternalBeats {
         Ok(beats.normalized())
     }
 
-    /// Positive, strictly increasing positions.
+    /// Positive, strictly increasing positions, and a positive bar length or none.
     pub fn normalized(mut self) -> Self {
         for positions in [&mut self.beats_ms, &mut self.downbeats_ms] {
             positions.retain(|position| *position > 0);
             positions.sort_unstable();
             positions.dedup();
         }
+        self.beats_per_bar = self.beats_per_bar.filter(|beats| *beats > 0);
         self
+    }
+
+    /// The model's bar length when it is not four beats (3/4 from the DBN). Phrases and
+    /// their consumers count bars of four, so such a track gets that time signature and
+    /// no downbeat and no phrases (SM3-D16), as in the Python analyzer.
+    pub fn other_meter(&self) -> Option<u8> {
+        self.beats_per_bar
+            .filter(|beats| *beats > 0 && usize::from(*beats) != BEATS_PER_BAR)
     }
 }
 
@@ -1014,7 +1027,7 @@ mod tests {
     fn external_beats_read_the_python_payload() {
         let beats: ExternalBeats = serde_json::from_str(
             r#"{"tracker": "beat-this-small0", "beats_ms": [1500, 0, 500, 1000, 1000],
-                "downbeats_ms": [1500, 500]}"#,
+                "downbeats_ms": [1500, 500], "beats_per_bar": 3}"#,
         )
         .unwrap();
         let beats = beats.normalized();
@@ -1022,6 +1035,25 @@ mod tests {
         assert_eq!(beats.tracker.as_deref(), Some("beat-this-small0"));
         assert_eq!(beats.beats_ms, vec![500, 1_000, 1_500]);
         assert_eq!(beats.downbeats_ms, vec![500, 1_500]);
+        assert_eq!(beats.beats_per_bar, Some(3));
+        assert_eq!(beats.other_meter(), Some(3));
+    }
+
+    #[test]
+    fn only_a_bar_other_than_four_is_another_meter() {
+        for (payload, beats_per_bar) in [
+            (r#"{"beats_ms": [500], "beats_per_bar": 4}"#, Some(4)),
+            (r#"{"beats_ms": [500], "beats_per_bar": null}"#, None),
+            (r#"{"beats_ms": [500]}"#, None),
+            (r#"{"beats_ms": [500], "beats_per_bar": 0}"#, None),
+        ] {
+            let beats = serde_json::from_str::<ExternalBeats>(payload)
+                .unwrap()
+                .normalized();
+
+            assert_eq!(beats.beats_per_bar, beats_per_bar, "{payload}");
+            assert_eq!(beats.other_meter(), None, "{payload}");
+        }
     }
 
     #[test]

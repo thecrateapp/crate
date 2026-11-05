@@ -866,6 +866,7 @@ fn model_beats(phase: usize, first_ms: u64, last_ms: u64) -> ExternalBeats {
         tracker: Some("beat-this-test".to_string()),
         downbeats_ms: beats_ms.iter().skip(phase).step_by(4).copied().collect(),
         beats_ms,
+        beats_per_bar: Some(4),
     }
 }
 

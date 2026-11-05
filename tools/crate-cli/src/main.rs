@@ -96,8 +96,8 @@ enum Command {
         /// Path to PANNs CNN14 ONNX model for ML features (mood, danceability, etc.)
         #[arg(long)]
         model_path: Option<PathBuf>,
-        /// JSON with a model's beats_ms and downbeats_ms (Beat This!), used instead of
-        /// the beat tracker and the downbeat heuristic; needs --file
+        /// JSON with a model's beats_ms, downbeats_ms and beats_per_bar (Beat This!),
+        /// used instead of the beat tracker and the downbeat heuristic; needs --file
         #[arg(long)]
         beats: Option<PathBuf>,
     },

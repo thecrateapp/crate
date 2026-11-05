@@ -1159,7 +1159,11 @@ pub fn analyze_smart_mix_segments_with_beats(
         .zip(outro_local)
         .map(|(intro, outro)| 0.5 * (intro.stability + outro.stability));
     let bpm_confidence = tempo.confidence(cue_stability.unwrap_or(tempo_stability));
+    let other_meter = beats.and_then(ExternalBeats::other_meter);
     let (intro_downbeat_ms, outro_downbeat_ms, downbeat_anchor_ms) = match beats {
+        // Phrases and the planner count bars of four beats: a track the DBN hears in
+        // another meter (3/4) says so and gets no downbeat and no phrases (SM3-D16).
+        Some(_) if other_meter.is_some() => (None, None, None),
         // The model's downbeats decide the bar alone: a track whose downbeats hold no
         // clear phase of the grid gets no downbeat, and no phrases.
         Some(external) => {
@@ -1191,7 +1195,7 @@ pub fn analyze_smart_mix_segments_with_beats(
             (intro_downbeat_ms, outro_downbeat_ms, downbeat_anchor_ms)
         }
     };
-    let time_signature = downbeat_anchor_ms.map(|_| 4);
+    let time_signature = other_meter.or(downbeat_anchor_ms.map(|_| 4));
     let global = signal_features(samples, sample_rate);
     let intro_lufs = loudness.zip(intro_cue_ms).and_then(|(summary, start_ms)| {
         summary.window_lufs(start_ms, start_ms + MEASUREMENT_WINDOW_MS)
