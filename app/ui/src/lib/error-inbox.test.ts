@@ -5,7 +5,10 @@ import { sampleIssue, sampleIssues } from "@/test/error-inbox-fixtures";
 import {
   DEFAULT_FILTERS,
   apiErrorCode,
+  clockText,
   filtersFromParams,
+  fixProblemText,
+  fixUrl,
   filtersToParams,
   hasActiveFilters,
   issuesUrl,
@@ -123,5 +126,35 @@ describe("presentation", () => {
     ]);
     expect(substatusLabel("archived_until_escalating")).toBe("Archived");
     expect(substatusLabel(null)).toBeNull();
+  });
+});
+
+describe("Launch fix", () => {
+  it("builds the fix URL from the issue id", () => {
+    expect(fixUrl("a b")).toBe("/api/admin/errors/a%20b/fix");
+  });
+
+  it("shows the clock today and the day before it otherwise", () => {
+    const now = new Date(2026, 10, 5, 18, 30);
+    expect(clockText(new Date(2026, 10, 5, 9, 7).toISOString(), now)).toBe(
+      "09:07",
+    );
+    expect(clockText(new Date(2026, 10, 4, 23, 59).toISOString(), now)).toBe(
+      "4 Nov, 23:59",
+    );
+    expect(clockText("not a date", now)).toBe("an unknown time");
+  });
+
+  it("words the API refusals plainly", () => {
+    expect(fixProblemText("ERROR_FIX_RECENTLY_REQUESTED")).toBe(
+      "A fix for this issue was launched less than 24 hours ago.",
+    );
+    expect(fixProblemText("ERROR_FIX_NOT_CONFIGURED")).toMatch(
+      /not configured/,
+    );
+    expect(fixProblemText("ERROR_FIX_UNSUPPORTED_ISSUE")).toMatch(
+      /CRATE-API-1F/,
+    );
+    expect(fixProblemText(null)).toBe("Could not launch the fix. Try again.");
   });
 });

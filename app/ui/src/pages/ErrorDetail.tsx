@@ -19,6 +19,7 @@ import { SeverityMeter } from "@/components/admin/status-indicators";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { TechnicalDetails } from "@/components/admin/TechnicalDetails";
 import { IssueStatusActions } from "@/components/errors/IssueStatusActions";
+import { FixRequestState, LaunchFix } from "@/components/errors/LaunchFix";
 import { StackFrames } from "@/components/errors/StackFrames";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
@@ -217,6 +218,9 @@ function IssueView({
         {canManage && issue.write_access !== false ? (
           <IssueStatusActions issue={issue} onChanged={onChanged} />
         ) : null}
+        {canManage && issue.fix ? (
+          <LaunchFix issue={issue} fix={issue.fix} onChanged={onChanged} />
+        ) : null}
         {issue.permalink ? (
           <Button asChild variant="ghost">
             <a href={issue.permalink} target="_blank" rel="noopener noreferrer">
@@ -233,6 +237,7 @@ function IssueView({
           store a token with that scope.
         </p>
       ) : null}
+      <FixRequestState issue={issue} />
 
       <section
         aria-label="Issue metrics"

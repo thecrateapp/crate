@@ -1,5 +1,6 @@
 // Error Inbox admin API (/api/admin/errors). The admin reads PostgreSQL through
-// these endpoints; status changes and the connection test enqueue worker tasks.
+// these endpoints; status changes, the connection test and Launch fix enqueue
+// worker tasks.
 
 import type { StatusTone } from "@/components/admin/StatusBadge";
 
@@ -100,6 +101,18 @@ export interface ErrorTriage {
   created_at: string;
 }
 
+/** Launch fix for one issue; present only when it is configured. */
+export interface ErrorIssueFix {
+  repository: string;
+  workflow: string;
+  /** The workflow's runs on GitHub. */
+  actions_url: string;
+  /** False when the workflow does not accept this issue's short id. */
+  supported: boolean;
+  /** Set while the 24-hour window after the last request is open. */
+  available_at: string | null;
+}
+
 export interface ErrorIssueDetail extends ErrorIssueSummary {
   provider: "sentry";
   external_id: string;
@@ -107,12 +120,14 @@ export interface ErrorIssueDetail extends ErrorIssueSummary {
   digest_event_id: string | null;
   digest_hash: string | null;
   fix_requested_by: number | null;
+  fix_requested_by_name: string | null;
   closed_at: string | null;
   created_at: string;
   /** Newest first; empty until automatic triage exists. */
   triages: ErrorTriage[];
   /** The token's Sentry write scope: false means status actions are unavailable. */
   write_access: boolean | null;
+  fix: ErrorIssueFix | null;
 }
 
 export interface SyncState {
@@ -158,6 +173,15 @@ export interface ConnectionAccess {
   error_code: string | null;
 }
 
+export interface FixConnection {
+  repository: string;
+  workflow: string;
+  ref: string;
+  /** The GitHub token itself is never returned. */
+  has_token: boolean;
+  actions_url: string;
+}
+
 export interface ErrorTrackingConnection {
   configured: boolean;
   provider: "sentry";
@@ -169,11 +193,21 @@ export interface ErrorTrackingConnection {
   has_token: boolean;
   access: ConnectionAccess | null;
   sync: SyncState | null;
+  /** Launch fix settings; null when it is off. */
+  fix: FixConnection | null;
 }
 
 export interface ErrorIssuePage {
   items: ErrorIssueSummary[];
   next_cursor: string | null;
+}
+
+export interface FixSettingsUpdate {
+  repository: string;
+  workflow: string;
+  ref?: string;
+  /** Write-only: omitted keeps the stored GitHub token. */
+  token?: string;
 }
 
 export interface ConnectionUpdate {
@@ -183,6 +217,15 @@ export interface ConnectionUpdate {
   environments?: string[];
   /** Write-only: omitted keeps the stored token. */
   token?: string;
+  /** Omitted keeps the Launch fix settings; null turns Launch fix off. */
+  fix?: FixSettingsUpdate | null;
+}
+
+/** The workflow refuses longer notes (`error-autofix.yml`). */
+export const MAX_FIX_NOTE_LENGTH = 500;
+
+export interface FixRequest {
+  note: string;
 }
 
 export interface StatusChange {
@@ -272,6 +315,10 @@ export function issuesUrl(filters: IssueFilters): string {
 
 export function issueUrl(id: string): string {
   return `${ERRORS_API}/${encodeURIComponent(id)}`;
+}
+
+export function fixUrl(id: string): string {
+  return `${issueUrl(id)}/fix`;
 }
 
 export function issuePath(id: string): string {
@@ -402,6 +449,25 @@ export function substatusTone(substatus: string | null): StatusTone {
 }
 
 const syncFormat = new Intl.NumberFormat("en");
+const clockFormat = new Intl.DateTimeFormat("en-GB", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+const dayFormat = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+});
+
+/** "14:05" today, "4 Nov, 14:05" another day, in the browser's time zone. */
+export function clockText(value: string, now: Date = new Date()): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "an unknown time";
+  const clock = clockFormat.format(date);
+  return date.toDateString() === now.toDateString()
+    ? clock
+    : `${dayFormat.format(date)}, ${clock}`;
+}
 
 export function formatCount(value: number | null | undefined): string {
   return value == null ? "—" : syncFormat.format(value);
@@ -444,6 +510,25 @@ export function problemText(code: string | null | undefined): string {
       return "Crate cannot read the stored token. Store it again.";
     default:
       return `Sentry answered in a way Crate did not expect (${code}).`;
+  }
+}
+
+/**
+ * Why the API refused to queue Launch fix (`ERROR_FIX_*`). GitHub's answers
+ * arrive later, as the task's error message, already in plain words.
+ */
+export function fixProblemText(code: string | null | undefined): string {
+  switch (code) {
+    case "ERROR_FIX_NOT_CONFIGURED":
+      return "Launch fix is not configured. Set it up in the Sentry connection.";
+    case "ERROR_FIX_UNSUPPORTED_ISSUE":
+      return "The autofix workflow only accepts Crate short ids such as CRATE-API-1F.";
+    case "ERROR_FIX_RECENTLY_REQUESTED":
+      return "A fix for this issue was launched less than 24 hours ago.";
+    case "ERROR_ISSUE_NOT_FOUND":
+      return "This issue is no longer in the inbox.";
+    default:
+      return "Could not launch the fix. Try again.";
   }
 }
 

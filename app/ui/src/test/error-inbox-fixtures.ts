@@ -6,9 +6,11 @@
 import type {
   Digest,
   ErrorIssueDetail,
+  ErrorIssueFix,
   ErrorIssueSummary,
   ErrorSummary,
   ErrorTrackingConnection,
+  FixConnection,
   SyncState,
 } from "@/lib/error-inbox";
 
@@ -429,10 +431,43 @@ export function sampleDetail(
     digest_event_id: "9f3c2b1a0e8d4c7b6a5f4e3d2c1b0a99",
     digest_hash: "4f9a1c7e2b3d5a60",
     fix_requested_by: null,
+    fix_requested_by_name: null,
     closed_at: null,
     created_at: minutesAgo(60 * 24 * 19),
     triages: [],
     write_access: true,
+    fix: null,
+    ...overrides,
+  };
+}
+
+const ACTIONS_URL =
+  "https://github.com/thecrateapp/crate/actions/workflows/error-autofix.yml";
+
+/** Launch fix as the detail carries it when it is configured. */
+export function sampleFix(
+  overrides: Partial<ErrorIssueFix> = {},
+): ErrorIssueFix {
+  return {
+    repository: "thecrateapp/crate",
+    workflow: "error-autofix.yml",
+    actions_url: ACTIONS_URL,
+    supported: true,
+    available_at: null,
+    ...overrides,
+  };
+}
+
+/** Launch fix as the connection carries it. */
+export function sampleFixConnection(
+  overrides: Partial<FixConnection> = {},
+): FixConnection {
+  return {
+    repository: "thecrateapp/crate",
+    workflow: "error-autofix.yml",
+    ref: "main",
+    has_token: true,
+    actions_url: ACTIONS_URL,
     ...overrides,
   };
 }
@@ -456,6 +491,7 @@ export function sampleConnection(
       error_code: null,
     },
     sync: sampleSync(),
+    fix: null,
     ...overrides,
   };
 }
@@ -470,4 +506,5 @@ export const NOT_CONFIGURED_CONNECTION: ErrorTrackingConnection = {
   has_token: false,
   access: null,
   sync: null,
+  fix: null,
 };

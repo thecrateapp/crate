@@ -20,8 +20,13 @@ vi.mock("@/hooks/use-task-poll", () => ({
 vi.mock("sonner", () => ({ toast: toastMock }));
 
 import type { ErrorIssueDetail } from "@/lib/error-inbox";
+import { clockText } from "@/lib/error-inbox";
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
-import { sampleDetail } from "@/test/error-inbox-fixtures";
+import {
+  minutesAgo,
+  sampleDetail,
+  sampleFix,
+} from "@/test/error-inbox-fixtures";
 
 import { ErrorDetail } from "./ErrorDetail";
 
@@ -54,6 +59,7 @@ function renderDetail(
 
 const resolveButton = () =>
   screen.queryByRole("button", { name: "Resolve in next release" });
+const launchButton = () => screen.queryByRole("button", { name: "Launch fix" });
 
 describe("ErrorDetail", () => {
   beforeEach(() => {
@@ -218,6 +224,161 @@ describe("ErrorDetail", () => {
     );
     expect(pollTaskMock).not.toHaveBeenCalled();
     expect(resolveButton()).toBeEnabled();
+  });
+
+  it("launch fix shows public repo warning", async () => {
+    const detail = sampleDetail({ fix: sampleFix() });
+    apiMock.mockResolvedValue({ task_id: "task-fix" });
+    renderDetail(detail);
+
+    await userEvent.click(launchButton()!);
+
+    const dialog = screen.getByRole("dialog", {
+      name: "Launch a fix for CRATE-WORKERS-3K?",
+    });
+    expect(within(dialog).getByRole("note")).toHaveTextContent(
+      "thecrateapp/crate is a public repository. The short id and your note will be visible to anyone in the workflow run.",
+    );
+    expect(apiMock).not.toHaveBeenCalled();
+    const note = within(dialog).getByLabelText("Note for the agent (optional)");
+    expect(note).toHaveAttribute("maxlength", "500");
+    await userEvent.type(note, "  Started after the last deploy. ");
+    expect(
+      within(dialog).getByText("33 of 500 characters. Public."),
+    ).toBeInTheDocument();
+
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Launch fix" }),
+    );
+
+    expect(apiMock).toHaveBeenCalledWith(
+      `/api/admin/errors/${detail.id}/fix`,
+      "POST",
+      { note: "Started after the last deploy." },
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Launching…" })).toBeDisabled();
+    expect(pollTaskMock).toHaveBeenCalledWith(
+      "task-fix",
+      expect.any(Function),
+      expect.any(Function),
+    );
+    const onComplete = pollTaskMock.mock.calls[0]![1] as () => void;
+    act(() => onComplete());
+    expect(toastMock.success).toHaveBeenCalledWith(
+      "Fix launched for CRATE-WORKERS-3K. Follow the run on GitHub.",
+    );
+    expect(refetchMock).toHaveBeenCalled();
+  });
+
+  it("launch fix hidden without config", () => {
+    renderDetail(sampleDetail({ fix: null }));
+    expect(launchButton()).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /Workflow runs on GitHub/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("launch fix hidden without manage capability", () => {
+    renderDetail(sampleDetail({ fix: sampleFix() }), {
+      auth: only("ops.errors.view"),
+    });
+
+    expect(launchButton()).not.toBeInTheDocument();
+    // Viewers still see the workflow runs.
+    expect(
+      screen.getByRole("link", { name: /Workflow runs on GitHub/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows who launched the last fix and when it can run again", () => {
+    const requestedAt = minutesAgo(5);
+    const availableAt = new Date(
+      Date.parse(requestedAt) + 24 * 3_600_000,
+    ).toISOString();
+    renderDetail(
+      sampleDetail({
+        fix_requested_at: requestedAt,
+        fix_requested_by: 1,
+        fix_requested_by_name: "Diego",
+        fix: sampleFix({ available_at: availableAt }),
+      }),
+    );
+
+    expect(
+      screen.getByText(`Fix requested by Diego at ${clockText(requestedAt)}.`, {
+        exact: false,
+      }),
+    ).toBeInTheDocument();
+    const runs = screen.getByRole("link", { name: /Workflow runs on GitHub/ });
+    expect(runs).toHaveAttribute(
+      "href",
+      "https://github.com/thecrateapp/crate/actions/workflows/error-autofix.yml",
+    );
+    expect(runs).toHaveAttribute("target", "_blank");
+    expect(runs).toHaveAttribute("rel", "noopener noreferrer");
+    expect(launchButton()).toBeDisabled();
+    expect(
+      screen.getByText(
+        `Launch fix is available again at ${clockText(availableAt)}.`,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("launch fix explains short ids the workflow refuses", () => {
+    renderDetail(sampleDetail({ fix: sampleFix({ supported: false }) }));
+
+    expect(launchButton()).toBeDisabled();
+    expect(
+      screen.getByText(/only accepts Crate short ids/),
+    ).toBeInTheDocument();
+  });
+
+  it("launch fix reports a refusal and reloads the issue", async () => {
+    apiMock.mockRejectedValue(
+      Object.assign(new Error('{"detail":"Recently requested"}'), {
+        status: 409,
+        code: "ERROR_FIX_RECENTLY_REQUESTED",
+      }),
+    );
+    renderDetail(sampleDetail({ fix: sampleFix() }));
+
+    await userEvent.click(launchButton()!);
+    await userEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Launch fix",
+      }),
+    );
+
+    expect(toastMock.error).toHaveBeenCalledWith(
+      "A fix for this issue was launched less than 24 hours ago.",
+    );
+    expect(pollTaskMock).not.toHaveBeenCalled();
+    expect(refetchMock).toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("launch fix reports a failed dispatch", async () => {
+    apiMock.mockResolvedValue({ task_id: "task-fix" });
+    renderDetail(sampleDetail({ fix: sampleFix() }));
+
+    await userEvent.click(launchButton()!);
+    await userEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Launch fix",
+      }),
+    );
+    const onFailed = pollTaskMock.mock.calls[0]![2] as (error?: string) => void;
+    act(() =>
+      onFailed(
+        "The GitHub token cannot run this workflow (it needs Actions write)",
+      ),
+    );
+
+    expect(toastMock.error).toHaveBeenCalledWith(
+      "The GitHub token cannot run this workflow (it needs Actions write)",
+    );
+    expect(launchButton()).toBeEnabled();
   });
 
   it("says when an issue has no digest yet", () => {
