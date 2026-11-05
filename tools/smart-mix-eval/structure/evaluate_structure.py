@@ -6,7 +6,8 @@ For each analyzed track with an All-In-One result:
 - **Downbeat.** The grid's bars (the anchor and every fourth grid beat) are right when
   they hit at least 90 % of All-In-One's downbeats inside the grid within 70 ms.
   Reported as coverage (tracks with a downbeat) and accuracy among them: abstaining is
-  allowed, a wrong anchor is not. The model's own downbeats are scored the same way.
+  allowed, a wrong anchor is not. The model's own downbeats are scored against all
+  of All-In-One's, not only those inside the grid.
 - **Phrase boundaries on downbeats.** At least 90 % of the phrase boundaries fall within
   120 ms of an All-In-One downbeat. The baseline is scored on this too.
 - **Sections.** Phrase boundaries against All-In-One's section boundaries with

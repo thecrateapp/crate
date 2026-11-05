@@ -26,7 +26,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from structure_eval import read_list
+from structure_eval import read_list, require_unique_stems
 
 # The profile fields of crate-cli's mixProfile that the evaluation reads.
 RUST_FIELDS = (
@@ -128,6 +128,7 @@ def main() -> int:
     paths = list(args.paths)
     if args.list:
         paths += [Path(line) for line in read_list(args.list)]
+    require_unique_stems(paths)
     for path in paths:
         target = args.output / f"{path.stem}.json"
         if target.exists():

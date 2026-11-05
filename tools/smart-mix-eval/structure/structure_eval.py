@@ -60,9 +60,25 @@ def read_json_dir(folder: Path) -> dict[str, dict[str, Any]]:
     }
 
 
+def require_unique_stems(paths: Iterable[str | Path]) -> None:
+    """Refuse paths that share a file stem: results are stored per stem."""
+    counts = Counter(Path(path).stem for path in paths)
+    shared_stems = sorted(stem for stem, count in counts.items() if count > 1)
+    if shared_stems:
+        raise ValueError(
+            "Several files share a stem, and results are stored per stem: "
+            + ", ".join(shared_stems)
+        )
+
+
 def read_list(path: Path) -> list[str]:
-    """The non-empty lines of a list file, stripped (paths may hold ``#``)."""
-    return [line.strip() for line in path.read_text().splitlines() if line.strip()]
+    """The non-empty lines of a list file, stripped (paths may hold ``#``).
+
+    Raises ``ValueError`` when two paths share a file stem.
+    """
+    paths = [line.strip() for line in path.read_text().splitlines() if line.strip()]
+    require_unique_stems(paths)
+    return paths
 
 
 def shared(
@@ -265,7 +281,8 @@ def load_baseline(
     ``end_ms``, ``bars`` and ``kind``, and optionally ``genre``, ``path``,
     ``phrase_index`` and ``structure_confidence``. A row with phrase index -1 or no
     ``start_ms`` is a track the baseline gave no phrases. Rows of a track with no path
-    in either file are skipped.
+    in either file are skipped, and so are tracks whose stem another track shares (with
+    a warning), since they could be scored against each other's reference.
     """
     tracks: dict[str, BaselineTrack] = {}
     for track_file in track_files:
@@ -299,4 +316,11 @@ def load_baseline(
                 )
     for track in tracks.values():
         track.phrases.sort(key=lambda phrase: (phrase.start, phrase.end))
-    return {track.stem: track for track in tracks.values()}
+    counts = Counter(track.stem for track in tracks.values())
+    ambiguous = sorted(stem for stem, count in counts.items() if count > 1)
+    if ambiguous:
+        warnings.warn(
+            "Baseline tracks left out, their stem is shared: " + ", ".join(ambiguous),
+            stacklevel=2,
+        )
+    return {track.stem: track for track in tracks.values() if counts[track.stem] == 1}

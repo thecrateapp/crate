@@ -86,7 +86,7 @@ package ships stay unused there (see the operations doc).
   hit at least 90 % of All-In-One's downbeats inside the grid within 70 ms. Reported as
   coverage (tracks with a downbeat) and accuracy among the anchored tracks, since the
   analyzer may abstain but must not anchor the wrong beat. The model's own downbeats are
-  scored the same way against All-In-One.
+  scored against all of All-In-One's downbeats, not only those inside the grid.
 - **Phrase boundaries on downbeats.** At least 90 % of the phrase boundaries within 120 ms
   of an All-In-One downbeat.
 - **Sections.** `mir_eval.segment.detection` between phrase boundaries and All-In-One's

@@ -29,6 +29,7 @@ from structure_eval import (
     meter_summary,
     phrase_intervals,
     read_list,
+    require_unique_stems,
     section_changes,
     section_intervals,
     shared,
@@ -199,6 +200,36 @@ def test_baseline_reads_both_export_formats(tmp_path: Path) -> None:
     assert first.bar_seconds() == 2.0
     assert baseline["02. Night Goat"].phrases == []
     assert baseline["02. Night Goat"].bar_seconds() is None
+
+
+def test_runner_lists_refuse_two_files_with_the_same_stem(tmp_path: Path) -> None:
+    listed = tmp_path / "tracks.txt"
+    listed.write_text(
+        "/music/a/01. Intro.flac\n/music/b/01. Intro.mp3\n/music/c.flac\n"
+    )
+
+    # Results are written per stem: the second intro would be skipped as done.
+    with pytest.raises(ValueError, match="01. Intro"):
+        read_list(listed)
+    with pytest.raises(ValueError, match="01. Intro"):
+        require_unique_stems(["/x/01. Intro.flac", Path("/y/01. Intro.flac")])
+    assert require_unique_stems(["/x/a.flac", "/x/b.flac"]) is None
+
+
+def test_baseline_leaves_out_tracks_that_share_a_stem(tmp_path: Path) -> None:
+    phrases = tmp_path / "phrases.csv"
+    phrases.write_text(
+        "genre,entity_uid,path,phrase_index,start_ms,end_ms,bars,kind\n"
+        "pop,uid-a,/music/a/01. Intro.flac,0,0,16000,8,intro\n"
+        "rock,uid-b,/music/b/01. Intro.flac,0,0,16000,8,intro\n"
+        "rock,uid-c,/music/c/02. Song.flac,0,0,16000,8,intro\n"
+    )
+
+    # Matched by stem, either track could be scored against the other's reference.
+    with pytest.warns(UserWarning, match="01. Intro"):
+        baseline = load_baseline([phrases])
+
+    assert set(baseline) == {"02. Song"}
 
 
 def test_read_list_skips_blank_lines(tmp_path: Path) -> None:
