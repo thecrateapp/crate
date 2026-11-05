@@ -314,6 +314,13 @@ with its beats stored, a backfill of the library takes about 3 days instead of 1
   drops that draft too, as `source_changed`). Each row's `updated_at` is when its task read
   the file, and signals of another revision replace the row only when they were read
   later, so a slow task that read the old file never overwrites the new file's signals.
+- **A file rewritten in place.** The revision sees size, mtime and inode, not the audio: a
+  file rewritten with the same size, mtime and inode (a tool that restores the mtime, for
+  example) keeps its stored signals and its profile. Reanalysing the track does not
+  change that: the task reuses the signals of that revision and publication finds nothing
+  to replace (`unchanged`). To force a recompute, change the file's mtime (`touch` it on
+  the host) and reanalyse the track: the new revision runs both models, replaces the row
+  and publishes a new profile.
 - **How a later version uses them.** A new analyzer version that keeps
   `beat-this-small0-dbn` and `yamnet-2` reanalyses the library through the backfill as
   usual, and every profile task finds the signals of its track: only decoding, the Rust
