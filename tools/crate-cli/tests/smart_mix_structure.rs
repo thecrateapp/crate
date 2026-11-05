@@ -9,7 +9,7 @@ use crate_cli::analyze::{
     analyze_smart_mix_samples, analyze_smart_mix_segments, analyze_smart_mix_segments_with_beats,
     rms_frame_geometry, AudioTail,
 };
-use crate_cli::beat_tracking::{mfcc, ExternalBeats};
+use crate_cli::beat_tracking::{frame_features, mfcc, ExternalBeats, HOP_SIZE};
 use crate_cli::mix_profile::SmartMixProfileResult;
 use crate_cli::structure::{
     downbeats_from_anchor, segment_bars, segment_phrases, Bar, BarFeatures, EnergyFrames,
@@ -891,4 +891,123 @@ fn mfcc_matches_orthonormal_dct() {
             "coefficient {index}: {value} vs {wanted}"
         );
     }
+}
+
+/// A rate at which a 2 s bar is 50 band frames of 512 samples and 80 RMS hops, so
+/// every bar of a section is the same frames and its features are the same numbers.
+const TILED_RATE: u32 = 12_800;
+
+/// Clicks on every beat over a sustained chord at one level, from `FIRST_BEAT_MS`: A
+/// minor (A, C, E) for the first `change_bar` bars, then A# minor (A#, C#, F), which
+/// shares no pitch class with it. Both chords sit between 440 and 700 Hz, well inside
+/// the middle band, so the level and the band balance stay put while the chroma and
+/// the MFCC change. One bar of each chord is tiled (the tones are multiples of 0.5 Hz),
+/// so nothing but the chord change varies from bar to bar.
+fn chord_change_audio(bars: usize, change_bar: usize) -> Vec<f32> {
+    let rate = f64::from(TILED_RATE);
+    let bar_samples = (BAR_MS * u64::from(TILED_RATE) / 1_000) as usize;
+    let beat_samples = bar_samples / 4;
+    let pulse_length = (0.025 * rate).round() as usize;
+    let bar_of = |chord: [f64; 3]| -> Vec<f32> {
+        (0..bar_samples)
+            .map(|index| {
+                let time = index as f64 / rate;
+                let tones: f64 = chord
+                    .iter()
+                    .map(|frequency| (2.0 * std::f64::consts::PI * frequency * time).sin())
+                    .sum();
+                let beat_offset = index % beat_samples;
+                let click = if beat_offset < pulse_length {
+                    let level = if index < beat_samples { 0.5 } else { 0.2 };
+                    level * (-7.0 * beat_offset as f64 / (pulse_length - 1) as f64).exp()
+                } else {
+                    0.0
+                };
+                (0.05 * tones + click) as f32
+            })
+            .collect()
+    };
+    let minor_a = bar_of([440.0, 523.0, 659.0]);
+    let minor_a_sharp = bar_of([466.0, 554.0, 698.0]);
+    let silence = vec![0.0_f32; (FIRST_BEAT_MS * u64::from(TILED_RATE) / 1_000) as usize];
+    let mut audio = silence.clone();
+    for bar in 0..bars {
+        audio.extend(if bar < change_bar {
+            &minor_a
+        } else {
+            &minor_a_sharp
+        });
+    }
+    audio.extend(&silence);
+    audio
+}
+
+/// The cue-detection RMS frames `analyze` gives the segmentation: 50 ms frames with a
+/// 25 ms hop, whole frames only.
+fn cue_rms_frames(samples: &[f32], rate: u32) -> Vec<f32> {
+    let (frame_length, hop) = rms_frame_geometry(rate);
+    (0..=samples.len() - frame_length)
+        .step_by(hop)
+        .map(|start| {
+            let frame = &samples[start..start + frame_length];
+            let sum: f32 = frame.iter().map(|sample| sample * sample).sum();
+            (sum / frame.len() as f32).sqrt()
+        })
+        .collect()
+}
+
+#[test]
+fn analyze_hands_chroma_and_mfcc_to_the_segmentation() {
+    // Level and band balance alone see one 32-bar phrase; the chord and the timbre
+    // change at bar 16 (SM3-D17). The profile's phrases must be those of the
+    // segmentation with the analyzer's chroma and MFCC, not those without.
+    let bars = 32;
+    let audio = chord_change_audio(bars, 16);
+    let beats_ms: Vec<u64> = (0..(bars * 4) as u64)
+        .map(|beat| FIRST_BEAT_MS + beat * BEAT_MS)
+        .collect();
+    let beats = ExternalBeats {
+        tracker: Some("beat-this-test".to_string()),
+        downbeats_ms: beats_ms.iter().step_by(4).copied().collect(),
+        beats_ms,
+        beats_per_bar: Some(4),
+    };
+
+    let profile =
+        analyze_smart_mix_segments_with_beats(&audio, None, TILED_RATE, None, None, Some(&beats));
+
+    let features = frame_features(&audio, TILED_RATE);
+    let rms = cue_rms_frames(&audio, TILED_RATE);
+    let (frame_length, hop) = rms_frame_geometry(TILED_RATE);
+    let downbeats = profile_downbeats(&profile);
+    let start_bars = |chroma: &[[f32; 12]], mfcc: &[[f32; MFCC_COEFFICIENTS]]| -> Vec<u64> {
+        let frames = EnergyFrames {
+            rms: &rms,
+            rms_frame_length: frame_length,
+            rms_hop: hop,
+            bands_db: &features.bands,
+            band_hop: HOP_SIZE,
+            chroma,
+            mfcc,
+        };
+        segment_phrases(&profile.beat_grid_ms, &downbeats, &frames, TILED_RATE, true)
+            .phrases
+            .iter()
+            .map(|phrase| phrase.start_beat / 4)
+            .collect()
+    };
+    let with_tonal = start_bars(&features.chroma, &features.mfcc);
+    let level_only = start_bars(&[], &[]);
+    let analysed: Vec<u64> = profile
+        .phrases
+        .as_ref()
+        .expect("a profile with a downbeat has phrases")
+        .iter()
+        .map(|phrase| phrase.start_beat / 4)
+        .collect();
+
+    assert_eq!(profile.downbeat_anchor_ms, Some(FIRST_BEAT_MS));
+    assert_eq!(level_only, [0]);
+    assert_eq!(with_tonal, [0, 16]);
+    assert_eq!(analysed, with_tonal);
 }
