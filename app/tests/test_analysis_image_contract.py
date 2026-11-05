@@ -127,6 +127,10 @@ def test_images_without_torch_neither_fetch_nor_compile_madmom() -> None:
         stages = _reachable("worker-analysis", {"PANNS": panns, "TARGETARCH": arch})
 
         assert _fetches_or_compiles_madmom(stages) == [], (panns, arch)
+        # A misspelt alias would reach no stage at all (BuildKit would then pull it as
+        # an image and fail), which the check above alone cannot tell from skipping.
+        assert {"madmom-wheel", "madmom-skip"} <= stages, (panns, arch)
+        assert "madmom-build" not in stages, (panns, arch)
 
 
 def test_images_with_torch_build_madmom() -> None:
@@ -134,6 +138,8 @@ def test_images_with_torch_build_madmom() -> None:
         stages = _reachable("worker-analysis", {"PANNS": panns, "TARGETARCH": arch})
 
         assert _fetches_or_compiles_madmom(stages) != [], (panns, arch)
+        assert {"madmom-wheel", "madmom-build"} <= stages, (panns, arch)
+        assert "madmom-skip" not in stages, (panns, arch)
 
 
 def test_madmom_licence_ships_only_with_madmom() -> None:
