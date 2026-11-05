@@ -29,6 +29,7 @@ sources:
   - app/crate/db/queries/smart_mix_admin_tracks.py
   - app/crate/db/queries/smart_mix_compatible.py
   - app/crate/db/repositories/smart_mix.py
+  - app/crate/db/repositories/smart_mix_signals.py
   - app/crate/worker_handlers/analysis.py
   - app/crate/actors.py
   - app/crate/ai/queues.py
@@ -180,9 +181,11 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   BY-NC-SA 4.0 that Crate does not use (the DBN needs none), which is acceptable for Crate
   as free and open-source software.
 - **Where it runs.** `compute_smart_mix_profile` runs it before the analysis
-  (`crate/smart_mix/beat_model.py`) and passes the beats to the Rust analyzer
+  (`crate/smart_mix/beat_model.py`), unless the beats of this file are stored (see "Stored
+  model signals" below), and passes the beats to the Rust analyzer
   (`crate-cli analyze --file <track> --beats <json>`, a temporary file with `tracker`,
-  `beats_ms` and `downbeats_ms`) or, without `crate-cli`, to the Python fallback. Both use
+  `beats_ms`, `downbeats_ms` and `beats_per_bar`) or, without `crate-cli`, to the Python
+  fallback. Both use
   them instead of their own tracker, still fit the constant grid, and anchor the bar on the
   grid phase (beat index mod 4) that collects the most model downbeats within 70 ms, if
   that phase holds at least 60 % of the model downbeats inside the grid. Otherwise the
@@ -190,6 +193,15 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   `outroDownbeatMs`) take the same rule over the 32 beats around each cue. A `crate-cli`
   whose `analyze --help` does not list `--beats` would track its own beats after the model
   ran, so the worker logs a warning and the Python analyzer takes the beats instead.
+- **Meter.** The DBN keeps one bar length per track, 3 or 4 beats, and `beats_per_bar` is
+  read from its downbeats: the beats from each downbeat to the next, when every bar has as
+  many (otherwise null). Phrases, the planner and Crate Decks count bars of four, so with
+  any other length (SM3-D16) both analyzers give the profile that `time_signature` and no
+  downbeat, cue downbeats or phrases, and the track goes to crossfade. With 4, or without a
+  constant bar, the bar is anchored as above and `time_signature` is 4 when the track has a
+  downbeat. Before, a 3/4 track only lost its downbeat when its downbeats missed the 60 %
+  share, and its profile never said it was in three. The DBN chose 3 beats for 5 of the
+  145 tracks of the SMB.PR3 measurement.
 - **Fallback.** Without torch, `beat_this`, madmom or the weights, when the model fails or
   finds no beats, and for tracks over 600 s, the analysis keeps its own tracker and
   heuristic and the worker logs it. Without madmom the model is off: it never runs
@@ -223,7 +235,9 @@ spoken voice, so a transition can avoid laying one voice over another.
   is the geometric mean of its patch scores on a log scale, from `LOG_FLOOR` (10^-4) or less
   (0) to 1 (255), and the phrase counts as voiced from `VOCAL_THRESHOLD`
   (`crate/smart_mix/vocals.py`). The byte stores no threshold, so the voiced cut can move
-  without analysing the library again.
+  without analysing the library again. Since SM3-D16 the patch scores are stored as one byte
+  each on the same scale, and a phrase byte is the mean of its patch bytes (see "Stored
+  model signals" below), within one of the geometric mean of the float scores.
 - **Calibration (gate SG1b, 2026-11-05).** Measured against synced lyrics instead of hand
   labels: 358 production tracks with LRCLIB synced lyrics from 20 genres, analysed with v7
   outside the database; a phrase is voiced when lyric lines cover a quarter of it and
@@ -250,6 +264,45 @@ spoken voice, so a transition can avoid laying one voice over another.
   without the model never strips stored voice. Reanalyzing a v7 track from Admin therefore
   adds its voice; changing the detector name recomputes every profile through the backfill
   without a new analyzer version.
+
+### Stored model signals
+
+Since SM3-D16 the outputs of both models are kept per track, apart from the profile, so a
+later analyzer version that only changes the Rust step (the grid, the downbeat rule, the
+phrases) does not run them again. Beat This! is about three quarters of a profile's cost:
+with its beats stored, a backfill of the library takes about 3 days instead of 12-13.
+
+- **What.** Migration 150 adds `track_mix_signals`, one row per track that goes with it
+  (`ON DELETE CASCADE`), written by `crate/db/repositories/smart_mix_signals.py`:
+  `source_revision`; Beat This!'s `beat_tracker`, `beats_ms` and `downbeats_ms` after the
+  DBN, and `beats_per_bar`; YAMNet's `vocal_detector`, `voice_hop_ms` (480) and
+  `voice_scores`, one byte per 0.48 s patch on the scale of the phrase bytes. The model
+  logits are not kept (about 13 GB for the library): they would only matter to change the
+  post-processing itself.
+- **When they are reused.** `compute_smart_mix_profile` reads the row once, for the source
+  revision it captured (`smart_mix_source_revision`: size, mtime and inode, so a rename
+  keeps it, and a retag or a replaced file does not). Stored beats are reused when
+  `beat_tracker` is the current tracker name, without loading Beat This!; stored voice
+  when `vocal_detector` is the current detector. Otherwise the model runs and its output
+  is stored. Beats and voice of the same file share the row; either of a new revision
+  replaces the row whole, since the other half described the old file. The voice is still
+  computed only for a draft with phrases, so storing it adds no cost, and a track the model
+  gives no beats stores none.
+- **How a later version uses them.** A new analyzer version that keeps
+  `beat-this-small0-dbn` and `yamnet-2` reanalyses the library through the backfill as
+  usual, and every profile task finds the signals of its track: only decoding, the Rust
+  analysis and the phrase voice from the stored bytes run. Changing the checkpoint, the
+  post-processing or the detector changes the name, and each track runs that model again
+  on its next profile.
+- **Phrase voice.** A phrase byte is the mean of its patch bytes whether YAMNet ran or not,
+  so a profile built from stored windows is the one the model would give. Each patch byte
+  is rounded on its own, so the phrase byte can miss the geometric mean of the float scores
+  that SG1b calibrated by one: 1,369 of 1,400 synthetic phrases and 14 of 15 phrases of a
+  real track match it exactly (`test_phrase_bytes_from_window_bytes_match_float_scores`).
+- **Failures.** A failed read only means running the models again, and a failed write
+  only means not keeping their output: the worker logs a warning and the profile goes on.
+- **Size.** 3.4 KB for a 4:21 track and 4.8 KB for a 6:02 one (`pg_column_size` of the
+  row; integer arrays are stored uncompressed), so about 0.5 GB for 140,000 tracks.
 
 ### Analyzer v6
 
