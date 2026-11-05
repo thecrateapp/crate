@@ -320,11 +320,31 @@ def test_sentry_down_keeps_previous_rows(pg_db, failure, code):
     assert result["status"] == "failed"
     assert result["error_code"] == code
     assert code in result["error"]
+    # Sentry being down is shown on the page, not reported to Sentry.
+    assert result["expected"] is True
     assert _rows() == before
     state = _state()
     assert state["status"] == "failed"
     assert state["error_code"] == code
     assert state["last_success_at"] == first_state["finished_at"]
+
+
+def test_unexpected_sentry_response_is_still_reported(pg_db):
+    # A listing that is not a list points at a Crate/Sentry mismatch, not at the
+    # settings, so the worker keeps reporting it.
+    configure()
+    fake = _fake_with(raw_issue(1))
+    fake.fail = lambda request: (
+        httpx.Response(200, json={"unexpected": True})
+        if request.url.path.endswith("/issues/")
+        else None
+    )
+
+    result = _sync(fake)
+
+    assert result["status"] == "failed"
+    assert result["error_code"] == "SENTRY_INVALID_RESPONSE"
+    assert result["expected"] is False
 
 
 def test_auth_error_surfaces_in_runtime_state(pg_db, caplog):
@@ -342,6 +362,7 @@ def test_auth_error_surfaces_in_runtime_state(pg_db, caplog):
 
     assert result["status"] == "failed"
     assert result["error_code"] == "SENTRY_AUTH"
+    assert result["expected"] is True
     assert _rows() == before
     state = _state()
     assert state["error_code"] == "SENTRY_AUTH"

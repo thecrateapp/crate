@@ -92,8 +92,39 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+# Failures caused by Sentry or by the connection settings, which the Errors page
+# and the System Health tile already explain. The task still fails, but the
+# worker does not report it to Sentry. Codes that point at a Crate bug (an
+# unexpected response, an unreadable stored token, an invalid request) are not
+# listed and are still reported.
+EXPECTED_FAILURE_CODES = frozenset(
+    {
+        "ERROR_ISSUE_NOT_FOUND",
+        "ERROR_TRACKING_INVALID",
+        "ERROR_TRACKING_NOT_CONFIGURED",
+        "ERROR_TRACKING_TOKEN_MISSING",
+        "SENTRY_AUTH",
+        "SENTRY_FORBIDDEN",
+        "SENTRY_HOST_DISALLOWED",
+        "SENTRY_NOT_FOUND",
+        "SENTRY_RATE_LIMITED",
+        "SENTRY_REDIRECT",
+        "SENTRY_SERVER",
+        "SENTRY_TIMEOUT",
+        "SENTRY_UNAVAILABLE",
+        "SENTRY_WRITE_SCOPE_MISSING",
+    }
+)
+
+
 def _failed(code: str, message: str, **extra: Any) -> dict[str, Any]:
-    return {"status": "failed", "error_code": code, "error": message, **extra}
+    return {
+        "status": "failed",
+        "error_code": code,
+        "error": message,
+        "expected": code in EXPECTED_FAILURE_CODES,
+        **extra,
+    }
 
 
 # -- access (EI-D4) -----------------------------------------------------------
@@ -170,6 +201,7 @@ class _SyncReport:
         }
         if self.status == "failed":
             result["error"] = f"Error inbox sync failed ({self.error_code})"
+            result["expected"] = self.error_code in EXPECTED_FAILURE_CODES
         return result
 
 

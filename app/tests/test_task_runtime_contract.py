@@ -30,7 +30,15 @@ def test_task_handler_registry_imports_modules_lazily():
     assert "crate.worker_handlers.analysis" not in sys.modules
 
 
-def test_actor_treats_handler_error_result_as_failed(monkeypatch):
+@pytest.mark.parametrize(
+    "result, reported",
+    [
+        ({"error": "boom"}, True),
+        # A failure the handler marks expected stays failed but is not reported.
+        ({"status": "failed", "error": "boom", "expected": True}, False),
+    ],
+)
+def test_actor_treats_handler_error_result_as_failed(monkeypatch, result, reported):
     from crate import actors
     from crate.worker import TASK_HANDLERS
 
@@ -84,7 +92,7 @@ def test_actor_treats_handler_error_result_as_failed(monkeypatch):
         raising=False,
     )
     monkeypatch.setitem(
-        TASK_HANDLERS, "scan", lambda task_id, params, config: {"error": "boom"}
+        TASK_HANDLERS, "scan", lambda task_id, params, config: dict(result)
     )
 
     actors._execute_task("scan", "child-task")
@@ -94,7 +102,7 @@ def test_actor_treats_handler_error_result_as_failed(monkeypatch):
         for update in updates
     )
     assert fan_in == [("parent-task", "scan", "child-task")]
-    assert captured == [
+    expected_capture = [
         {
             "task_type": "scan",
             "task_id": "child-task",
@@ -104,6 +112,7 @@ def test_actor_treats_handler_error_result_as_failed(monkeypatch):
             "max_retries": 0,
         }
     ]
+    assert captured == (expected_capture if reported else [])
 
 
 def test_actor_treats_conflict_result_as_failed(monkeypatch):
