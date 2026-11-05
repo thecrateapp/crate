@@ -42,7 +42,7 @@ from crate.db.orm.playlist import (
 )
 from crate.db.orm.releases import NewRelease
 from crate.db.orm.settings import Setting
-from crate.db.orm.smart_mix import TrackMixProfileRow
+from crate.db.orm.smart_mix import TrackMixProfileRow, TrackMixSignalsRow
 from crate.db.orm.tidal import TidalDownload, TidalMonitoredArtist
 from crate.db.orm.user import (
     AuthInvite,
@@ -87,6 +87,7 @@ __all__ = [
     "TidalDownload",
     "TidalMonitoredArtist",
     "TrackMixProfileRow",
+    "TrackMixSignalsRow",
     "User",
     "UserBandcampItem",
     "UserFollowedPlaylist",

@@ -200,6 +200,26 @@ def _structure_columns(connection) -> dict[str, tuple[str, str]]:
 
 
 def _insert_schema_one_profile(connection) -> int:
+    track_id = _insert_track(connection)
+    connection.execute(
+        text(
+            """
+            INSERT INTO track_mix_profiles (
+                track_id, profile_version, profile_revision, analyzer,
+                analyzer_version, source_revision, quality, bpm, analyzed_at
+            )
+            VALUES (
+                :track_id, 1, 'revision', 'crate-rust', 'smart-mix-audio-v6',
+                'source', 'full', 124.0, NOW()
+            )
+            """
+        ),
+        {"track_id": track_id},
+    )
+    return track_id
+
+
+def _insert_track(connection) -> int:
     suffix = uuid.uuid4().hex
     connection.execute(
         text(
@@ -246,21 +266,6 @@ def _insert_schema_one_profile(connection) -> int:
             "uid": str(uuid.uuid4()),
         },
     ).scalar_one()
-    connection.execute(
-        text(
-            """
-            INSERT INTO track_mix_profiles (
-                track_id, profile_version, profile_revision, analyzer,
-                analyzer_version, source_revision, quality, bpm, analyzed_at
-            )
-            VALUES (
-                :track_id, 1, 'revision', 'crate-rust', 'smart-mix-audio-v6',
-                'source', 'full', 124.0, NOW()
-            )
-            """
-        ),
-        {"track_id": track_id},
-    )
     return int(track_id)
 
 
@@ -363,3 +368,103 @@ def _profile_column(connection, column: str) -> tuple[str, str] | None:
         {"column": column},
     ).first()
     return None if row is None else (row.data_type, row.is_nullable)
+
+
+TRACK_SIGNAL_COLUMNS = {
+    "track_id": ("bigint", "NO"),
+    "source_revision": ("text", "NO"),
+    "beat_tracker": ("text", "YES"),
+    "beats_ms": ("ARRAY", "YES"),
+    "downbeats_ms": ("ARRAY", "YES"),
+    "beats_per_bar": ("smallint", "YES"),
+    "vocal_detector": ("text", "YES"),
+    "voice_hop_ms": ("smallint", "YES"),
+    "voice_scores": ("bytea", "YES"),
+    "updated_at": ("timestamp with time zone", "NO"),
+}
+
+
+def test_track_signals_migration_up_down(pg_db, monkeypatch) -> None:
+    del pg_db
+    from crate.db.engine import get_engine
+
+    migration = import_module(
+        "crate.db.migrations.versions.150_smart_mix_track_signals"
+    )
+    assert (migration.revision, migration.down_revision) == ("150", "149")
+    with get_engine().connect() as connection:
+        assert (
+            connection.execute(text("SELECT current_database()"))
+            .scalar_one()
+            .startswith("crate_test_case_")
+        )
+        context = MigrationContext.configure(connection)
+        monkeypatch.setattr(migration, "op", Operations(context))
+
+        with context.begin_transaction():
+            migration.downgrade()
+            migration.downgrade()
+        assert _track_signal_columns(connection) == {}
+
+        with context.begin_transaction():
+            migration.upgrade()
+            migration.upgrade()
+        assert _track_signal_columns(connection) == TRACK_SIGNAL_COLUMNS
+
+
+def test_track_signals_go_with_their_track(pg_db) -> None:
+    del pg_db
+    from crate.db.engine import get_engine
+
+    with get_engine().connect() as connection:
+        track_id = _insert_track(connection)
+        connection.execute(
+            text(
+                """
+                INSERT INTO track_mix_signals (
+                    track_id, source_revision, beat_tracker, beats_ms, downbeats_ms,
+                    beats_per_bar
+                )
+                VALUES (
+                    :track_id, 'source', 'beat-this-small0-dbn',
+                    ARRAY[500, 1000, 1500, 2000], ARRAY[500], 4
+                )
+                """
+            ),
+            {"track_id": track_id},
+        )
+        connection.execute(
+            text("DELETE FROM library_tracks WHERE id = :track_id"),
+            {"track_id": track_id},
+        )
+        remaining = connection.execute(
+            text("SELECT COUNT(*) FROM track_mix_signals WHERE track_id = :track_id"),
+            {"track_id": track_id},
+        ).scalar_one()
+        connection.rollback()
+
+    assert remaining == 0
+
+
+def test_bootstrap_schema_creates_the_track_signals_table() -> None:
+    source = (
+        ROOT / "app" / "crate" / "db" / "schema_sections" / "library_catalog.py"
+    ).read_text()
+
+    assert "create_smart_mix_track_signals_v150_schema(cur)" in source
+
+
+def _track_signal_columns(connection) -> dict[str, tuple[str, str]]:
+    return {
+        row.column_name: (row.data_type, row.is_nullable)
+        for row in connection.execute(
+            text(
+                """
+                SELECT column_name, data_type, is_nullable
+                FROM information_schema.columns
+                WHERE table_schema = current_schema()
+                  AND table_name = 'track_mix_signals'
+                """
+            )
+        )
+    }
