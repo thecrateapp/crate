@@ -96,18 +96,28 @@ def test_run_analyze_passes_model_beats_in_a_temporary_file(monkeypatch):
     assert not call["beats_path"].exists()
 
 
-def test_run_analyze_keeps_an_older_binary_without_beats(monkeypatch):
+def test_run_analyze_keeps_an_older_binary_without_beats(monkeypatch, caplog):
+    import logging
+
     from crate import crate_cli
 
     calls = _analyze_harness(monkeypatch, supports_beats=False)
 
-    assert crate_cli.run_analyze(file="/music/track.flac", beats=_BEATS) == {"bpm": 120}
+    with caplog.at_level(logging.WARNING, logger=crate_cli.__name__):
+        assert crate_cli.run_analyze(file="/music/track.flac", beats=_BEATS) == {
+            "bpm": 120
+        }
     assert "--beats" not in calls[0]["args"]
+    # Dropping the model beats is never silent.
+    assert "--beats" in caplog.text
     # Beats only go with a single file.
     calls.clear()
+    caplog.clear()
     monkeypatch.setattr(crate_cli, "supports_analyze_beats", lambda: True)
-    crate_cli.run_analyze(directory="/music", beats=_BEATS)
+    with caplog.at_level(logging.WARNING, logger=crate_cli.__name__):
+        crate_cli.run_analyze(directory="/music", beats=_BEATS)
     assert "--beats" not in calls[0]["args"]
+    assert "--beats" in caplog.text
 
 
 def test_beats_support_reads_the_analyze_help(monkeypatch):

@@ -344,6 +344,11 @@ def run_analyze(
             beats_path = Path(scratch) / "beats.json"
             beats_path.write_text(json.dumps(dict(beats)))
             args.extend(["--beats", str(beats_path)])
+        elif beats is not None:
+            log.warning(
+                "crate-cli analyze takes model beats (--beats) only for one file and "
+                "from a binary that lists it; this run tracks its own beats"
+            )
         try:
             result = subprocess.run(
                 low_priority_command(args),

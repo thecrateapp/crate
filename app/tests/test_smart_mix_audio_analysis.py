@@ -413,6 +413,7 @@ def test_profile_analysis_passes_model_beats_to_rust(
     calls: list[dict] = []
     monkeypatch.setattr(crate_cli, "is_available", lambda: True)
     monkeypatch.setattr(crate_cli, "has_subcommands", lambda: True)
+    monkeypatch.setattr(crate_cli, "supports_analyze_beats", lambda: True)
 
     def run_analyze(**kwargs):
         calls.append(kwargs)
@@ -457,6 +458,49 @@ def test_profile_analysis_passes_model_beats_to_the_python_analyzer(
     assert audio_analysis.analyze_mix_profile(tmp_path / "t.flac", beats) == "draft"
     assert audio_analysis.analyze_mix_profile(tmp_path / "t.flac") == "draft"
     assert received == [beats, None]
+
+
+def test_model_beats_go_to_python_when_crate_cli_cannot_take_them(
+    monkeypatch, tmp_path: Path, caplog
+) -> None:
+    import logging
+
+    import crate.audio_analysis as audio_analysis
+    from crate import crate_cli
+    from crate.smart_mix import analyzer
+
+    beats = _model_beats(0)
+    received: list[object] = []
+    rust_runs: list[dict] = []
+    monkeypatch.setattr(crate_cli, "is_available", lambda: True)
+    monkeypatch.setattr(crate_cli, "has_subcommands", lambda: True)
+    monkeypatch.setattr(crate_cli, "supports_analyze_beats", lambda: False)
+    monkeypatch.setattr(
+        crate_cli, "run_analyze", lambda **kwargs: rust_runs.append(kwargs)
+    )
+    monkeypatch.setattr(
+        analyzer,
+        "analyze_mix_profile",
+        lambda _path, beats=None: received.append(beats) or "python draft",
+    )
+
+    with caplog.at_level(logging.WARNING, logger=audio_analysis.__name__):
+        draft = audio_analysis.analyze_mix_profile(tmp_path / "t.flac", beats)
+
+    # An older crate-cli would track its own beats after the model ran: the Python
+    # analyzer takes them instead, and the worker says why.
+    assert draft == "python draft"
+    assert received == [beats]
+    assert rust_runs == []
+    assert "--beats" in caplog.text
+
+    # Without model beats that crate-cli still runs.
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger=audio_analysis.__name__):
+        audio_analysis.analyze_mix_profile(tmp_path / "t.flac")
+    assert rust_runs == [{"file": str(tmp_path / "t.flac"), "beats": None}]
+    assert received == [beats, None]
+    assert "--beats" not in caplog.text
 
 
 def _bar_features(bar_starts, kick_beats, beats, spacing=20):

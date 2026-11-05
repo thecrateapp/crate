@@ -188,8 +188,8 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   that phase holds at least 60 % of the model downbeats inside the grid. Otherwise the
   track has no downbeat and no phrases. The Rust cue downbeats (`introDownbeatMs`,
   `outroDownbeatMs`) take the same rule over the 32 beats around each cue. A `crate-cli`
-  whose `analyze --help` does not list `--beats` is not given them: it tracks its own
-  beats and its profile has no `beat_tracker`.
+  whose `analyze --help` does not list `--beats` would track its own beats after the model
+  ran, so the worker logs a warning and the Python analyzer takes the beats instead.
 - **Fallback.** Without torch, `beat_this`, madmom or the weights, when the model fails or
   finds no beats, and for tracks over 600 s, the analysis keeps its own tracker and
   heuristic and the worker logs it. Without madmom the model is off: it never runs
