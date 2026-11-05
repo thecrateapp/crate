@@ -702,7 +702,11 @@ fn cue_downbeat_ms(
     let count = CUE_DOWNBEAT_BEATS.min(beat_frames.len());
     let start = window_start(beat_frames.len(), nearest, count);
     let phase = beat_tracking::window_downbeat_phase(features, &beat_frames[start..start + count])?;
-    let first = start + phase;
+    bar_downbeat_near(beat_grid_ms, start + phase, nearest)
+}
+
+/// The downbeat nearest beat `nearest` of the bars that start on beat `first`.
+fn bar_downbeat_near(beat_grid_ms: &[u64], first: usize, nearest: usize) -> Option<u64> {
     let bars = ((nearest as f64 - first as f64) / 4.0).round().max(0.0) as usize;
     let mut index = first + bars * 4;
     while index >= beat_grid_ms.len() && index >= 4 {
