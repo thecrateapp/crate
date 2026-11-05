@@ -57,9 +57,34 @@ def fresh_model_cache():
     beat_model.load_beat_model.cache_clear()
 
 
-def test_missing_weights_returns_none(monkeypatch, tmp_path, fresh_model_cache) -> None:
+def _installed(monkeypatch, *missing: str) -> None:
+    """Pretend every Beat This! dependency is installed except ``missing``."""
+    monkeypatch.setattr(beat_model, "_installed", lambda module: module not in missing)
+
+
+def _no_model_load(monkeypatch) -> None:
+    def no_load(*_args, **_kwargs):
+        raise AssertionError("the model must not load")
+
+    monkeypatch.setattr(beat_model, "BeatThisModel", no_load)
+
+
+def _levels(caplog) -> set[int]:
+    return {
+        record.levelno
+        for record in caplog.records
+        if record.name == beat_model.__name__
+    }
+
+
+def test_missing_weights_return_none_with_a_warning(
+    monkeypatch, tmp_path, caplog, fresh_model_cache
+) -> None:
     del fresh_model_cache
-    monkeypatch.setenv(beat_model.WEIGHTS_ENV, str(tmp_path / "missing.ckpt"))
+    _installed(monkeypatch)
+    _no_model_load(monkeypatch)
+    missing = tmp_path / "missing.ckpt"
+    monkeypatch.setenv(beat_model.WEIGHTS_ENV, str(missing))
     try:
         import torch
     except ImportError:
@@ -71,8 +96,67 @@ def test_missing_weights_returns_none(monkeypatch, tmp_path, fresh_model_cache) 
 
         monkeypatch.setattr(torch.hub, "load_state_dict_from_url", no_download)
 
-    assert beat_model.load_beat_model() is None
-    assert beat_model.track_beats(_clicks(10.0), SAMPLE_RATE) is None
+    with caplog.at_level(logging.INFO, logger=beat_model.__name__):
+        assert beat_model.load_beat_model() is None
+        assert beat_model.track_beats(_clicks(10.0), SAMPLE_RATE) is None
+
+    # An image with torch but without the weights is broken, not configured off.
+    assert _levels(caplog) == {logging.WARNING}
+    assert str(missing) in caplog.text
+
+
+def test_without_torch_the_model_is_off_at_info(
+    monkeypatch, tmp_path, caplog, fresh_model_cache
+) -> None:
+    del fresh_model_cache
+    # PANNS=off builds the analysis image without torch on purpose.
+    _installed(monkeypatch, "torch", "beat_this")
+    _no_model_load(monkeypatch)
+    weights = tmp_path / "beat_this-small0.ckpt"
+    weights.write_bytes(b"checkpoint")
+    monkeypatch.setenv(beat_model.WEIGHTS_ENV, str(weights))
+
+    with caplog.at_level(logging.INFO, logger=beat_model.__name__):
+        assert beat_model.load_beat_model() is None
+
+    assert _levels(caplog) == {logging.INFO}
+
+
+def test_missing_beat_this_returns_none_with_a_warning(
+    monkeypatch, tmp_path, caplog, fresh_model_cache
+) -> None:
+    del fresh_model_cache
+    _installed(monkeypatch, "beat_this")
+    _no_model_load(monkeypatch)
+    weights = tmp_path / "beat_this-small0.ckpt"
+    weights.write_bytes(b"checkpoint")
+    monkeypatch.setenv(beat_model.WEIGHTS_ENV, str(weights))
+
+    with caplog.at_level(logging.INFO, logger=beat_model.__name__):
+        assert beat_model.load_beat_model() is None
+
+    assert _levels(caplog) == {logging.WARNING}
+    assert "beat_this" in caplog.text
+
+
+def test_a_failing_load_returns_none_with_a_warning(
+    monkeypatch, tmp_path, caplog, fresh_model_cache
+) -> None:
+    del fresh_model_cache
+    _installed(monkeypatch)
+    weights = tmp_path / "beat_this-small0.ckpt"
+    weights.write_bytes(b"checkpoint")
+    monkeypatch.setenv(beat_model.WEIGHTS_ENV, str(weights))
+
+    def broken(*_args, **_kwargs):
+        raise ImportError("libtorchaudio.so: undefined symbol")
+
+    monkeypatch.setattr(beat_model, "BeatThisModel", broken)
+
+    with caplog.at_level(logging.INFO, logger=beat_model.__name__):
+        assert beat_model.load_beat_model() is None
+
+    assert _levels(caplog) == {logging.WARNING}
 
 
 def test_long_track_skips_model() -> None:

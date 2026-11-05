@@ -16,6 +16,7 @@ by default, ``final0`` if it proves clearly better) and the profile records it i
 
 from __future__ import annotations
 
+import importlib.util
 import logging
 import math
 import os
@@ -40,6 +41,8 @@ MODELS_DIR = Path("/app/models")
 BEAT_TRACKER = f"beat-this-{DEFAULT_CHECKPOINT}"
 THREADS_ENV = "TORCH_NUM_THREADS"
 _CHECKPOINT_NAME = re.compile(r"[a-z0-9_-]{1,20}")
+# Besides torch, which only PANNS=off builds leave out.
+_MODEL_MODULES = ("beat_this",)
 _READ_BLOCK_FRAMES = 65_536
 
 
@@ -110,23 +113,48 @@ def _torch_threads() -> int:
 
 @lru_cache(maxsize=1)
 def load_beat_model() -> BeatModel | None:
-    """The process-wide model, or None without torch, ``beat_this`` or the weights.
+    """The process-wide model, or None when it cannot run.
 
-    ``beat_this`` downloads any checkpoint it cannot open as a file, so the file is
-    checked first: the weights only ever come from the image.
+    Only an image built without torch (``PANNS=off``) lacks the model on purpose, and
+    that is logged at info. With torch, a missing package or missing weights mean a
+    broken image, so they are logged as warnings. ``beat_this`` downloads any
+    checkpoint it cannot open as a file, so the file is checked first: the weights only
+    ever come from the image.
     """
+    if not _installed("torch"):
+        log.info("No torch in this image; Smart Mix keeps its own beat tracker")
+        return None
+    missing = [module for module in _MODEL_MODULES if not _installed(module)]
+    if missing:
+        log.warning(
+            "Beat This! needs %s, which is not installed; Smart Mix keeps its own "
+            "beat tracker",
+            ", ".join(missing),
+        )
+        return None
     path = weights_path()
     if not path.is_file():
-        log.info("No Beat This! weights at %s; Smart Mix keeps its own tracker", path)
+        log.warning(
+            "No Beat This! weights at %s; Smart Mix keeps its own beat tracker", path
+        )
         return None
     try:
         return BeatThisModel(path, beat_tracker_name())
-    except ImportError:
-        log.info("Beat This! is not installed; Smart Mix keeps its own tracker")
-        return None
     except Exception:
-        log.warning("Beat This! weights at %s could not be loaded", path, exc_info=True)
+        log.warning(
+            "Beat This! at %s could not be loaded; Smart Mix keeps its own beat tracker",
+            path,
+            exc_info=True,
+        )
         return None
+
+
+def _installed(module: str) -> bool:
+    """Whether ``module`` can be imported, without importing it."""
+    try:
+        return importlib.util.find_spec(module) is not None
+    except (ImportError, ValueError):
+        return False
 
 
 def track_beats(

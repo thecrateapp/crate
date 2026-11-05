@@ -179,9 +179,11 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   `outroDownbeatMs`) take the same rule over the 32 beats around each cue. A `crate-cli`
   whose `analyze --help` does not list `--beats` is not given them: it tracks its own
   beats and its profile has no `beat_tracker`.
-- **Fallback.** Without torch, `beat_this` or the weights (`PANNS=off`), when the model fails
-  or finds no beats, and for tracks over 600 s, the analysis keeps its own tracker and
-  heuristic and the worker logs it.
+- **Fallback.** Without torch, `beat_this` or the weights, when the model fails or finds no
+  beats, and for tracks over 600 s, the analysis keeps its own tracker and heuristic and
+  the worker logs it. Only an image without torch (`PANNS=off`) leaves the model out on
+  purpose and logs it at info; with torch, a missing `beat_this` or missing weights mean a
+  broken image and log a warning.
 - **Storage.** Migration 149 adds `beat_tracker` (`beat-this-small0`), null with the
   analyzer's own tracker. It is part of the profile revision. Beat This! ships inside
   `smart-mix-audio-v7`: a draft that brings a tracker the stored profile lacks replaces it
