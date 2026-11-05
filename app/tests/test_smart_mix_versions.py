@@ -174,6 +174,31 @@ def test_rust_structure_constants_match_python() -> None:
         assert rust[name] == expected, name
 
 
+def test_novelty_constants_match_between_python_and_rust() -> None:
+    # SM3-D17: both analyzers weigh harmony and timbre alike, over the same windows,
+    # and charge the same cost per phrase boundary.
+    from crate.smart_mix import structure
+
+    expected = {
+        "HARMONY_WEIGHT": 2.0,
+        "TIMBRE_WEIGHT": 8.0,
+        "MFCC_COEFFICIENTS": 13,
+        "BOUNDARY_COST_DB": 4.0,
+        "NOVELTY_WINDOW_BARS": 4,
+    }
+    source = (REPO_ROOT / "tools/crate-cli/src/structure.rs").read_text()
+    rust = {
+        name: float(value)
+        for name, value in re.findall(
+            r"^pub const ([A-Z_]+): [^=]+= ([0-9.]+);", source, re.MULTILINE
+        )
+        if name in expected
+    }
+
+    assert {name: getattr(structure, name) for name in expected} == expected
+    assert rust == {name: float(value) for name, value in expected.items()}
+
+
 def test_rust_model_downbeat_rule_matches_python() -> None:
     # Both analyzers take the bar from Beat This! downbeats with the same rule (SM3-D14).
     from crate.smart_mix import phrase_grid

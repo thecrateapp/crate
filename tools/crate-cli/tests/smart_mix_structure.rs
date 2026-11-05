@@ -9,11 +9,11 @@ use crate_cli::analyze::{
     analyze_smart_mix_samples, analyze_smart_mix_segments, analyze_smart_mix_segments_with_beats,
     rms_frame_geometry, AudioTail,
 };
-use crate_cli::beat_tracking::ExternalBeats;
+use crate_cli::beat_tracking::{mfcc, ExternalBeats};
 use crate_cli::mix_profile::SmartMixProfileResult;
 use crate_cli::structure::{
-    downbeats_from_anchor, segment_phrases, EnergyFrames, Structure, MAX_ENERGY_CURVE_BARS,
-    MAX_PHRASES,
+    downbeats_from_anchor, segment_bars, segment_phrases, Bar, BarFeatures, EnergyFrames,
+    Structure, MAX_ENERGY_CURVE_BARS, MAX_PHRASES, MFCC_COEFFICIENTS,
 };
 use serde::Deserialize;
 
@@ -207,6 +207,8 @@ fn segment(inputs: &BarInputs, beats: &[u64], downbeats: &[u64], grid_trusted: b
         rms_hop: hop,
         bands_db: &inputs.bands,
         band_hop: BAND_HOP,
+        chroma: &[],
+        mfcc: &[],
     };
     segment_phrases(beats, downbeats, &frames, SAMPLE_RATE, grid_trusted)
 }
@@ -709,4 +711,184 @@ fn rms_frame_geometry_uses_whole_samples() {
     assert_eq!(rms_frame_geometry(11_025), (551, 275));
     assert_eq!(rms_frame_geometry(8_000), (400, 200));
     assert_eq!(rms_frame_geometry(4_000), (256, 128));
+}
+
+// Harmony and timbre novelty (SM3-D17), mirroring the Python tests and the per-bar
+// fixture structure_v2.json.
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FeatureFixture {
+    mfcc_reference: MfccReference,
+    cases: Vec<FeatureCase>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MfccReference {
+    mel_db: Vec<f32>,
+    mfcc: Vec<f64>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FeatureCase {
+    name: String,
+    bars: Vec<[u64; 3]>,
+    levels: Vec<f64>,
+    shapes: Vec<[f64; 3]>,
+    music: Vec<bool>,
+    chroma: Vec<[f64; 12]>,
+    mfcc: Vec<[f64; MFCC_COEFFICIENTS]>,
+    grid_trusted: bool,
+    expected: FeatureExpected,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FeatureExpected {
+    phrases: Vec<ExpectedPhrase>,
+    structure_confidence: f64,
+}
+
+fn feature_fixture() -> FeatureFixture {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../app/tests/fixtures/smart_mix/structure_v2.json");
+    serde_json::from_str(&fs::read_to_string(path).expect("cases must exist"))
+        .expect("cases must be valid JSON")
+}
+
+/// Bars of a steady 120 BPM grid from `FIRST_BEAT_MS`.
+fn steady_bars(count: usize) -> Vec<Bar> {
+    (0..count as u64)
+        .map(|bar| Bar {
+            start_beat: 4 * bar,
+            start_ms: FIRST_BEAT_MS + bar * BAR_MS,
+            end_ms: FIRST_BEAT_MS + (bar + 1) * BAR_MS,
+        })
+        .collect()
+}
+
+fn one_hot(pitch_class: usize) -> [f64; 12] {
+    std::array::from_fn(|index| if index == pitch_class { 1.0 } else { 0.0 })
+}
+
+fn phrase_start_bars(
+    shapes: &[[f64; 3]],
+    chroma: &[[f64; 12]],
+    mfcc: &[[f64; MFCC_COEFFICIENTS]],
+) -> Vec<u64> {
+    let features = BarFeatures {
+        levels: vec![-12.0; shapes.len()],
+        shapes: shapes.to_vec(),
+        music: vec![true; shapes.len()],
+        chroma: chroma.to_vec(),
+        mfcc: mfcc.to_vec(),
+    };
+    segment_bars(&steady_bars(shapes.len()), &features, true)
+        .phrases
+        .iter()
+        .map(|phrase| phrase.start_beat / 4)
+        .collect()
+}
+
+#[test]
+fn structure_v2_fixture_matches() {
+    let fixture = feature_fixture();
+    let mut mismatches = Vec::new();
+    for case in &fixture.cases {
+        let bars: Vec<Bar> = case
+            .bars
+            .iter()
+            .map(|&[start_beat, start_ms, end_ms]| Bar {
+                start_beat,
+                start_ms,
+                end_ms,
+            })
+            .collect();
+        let features = BarFeatures {
+            levels: case.levels.clone(),
+            shapes: case.shapes.clone(),
+            music: case.music.clone(),
+            chroma: case.chroma.clone(),
+            mfcc: case.mfcc.clone(),
+        };
+        let structure = segment_bars(&bars, &features, case.grid_trusted);
+        let layout: Vec<(u64, u64, u32, &str)> = structure
+            .phrases
+            .iter()
+            .map(|phrase| (phrase.start_beat, phrase.start_ms, phrase.bars, phrase.kind))
+            .collect();
+        let wanted: Vec<(u64, u64, u32, &str)> = case
+            .expected
+            .phrases
+            .iter()
+            .map(|phrase| {
+                (
+                    phrase.start_beat,
+                    phrase.start_ms,
+                    phrase.bars,
+                    phrase.kind.as_str(),
+                )
+            })
+            .collect();
+        if layout != wanted {
+            mismatches.push(format!("{}: phrases {layout:?} vs {wanted:?}", case.name));
+        }
+        for (phrase, wanted) in structure.phrases.iter().zip(&case.expected.phrases) {
+            let delta_matches = match (phrase.delta_energy, wanted.delta_energy) {
+                (None, None) => true,
+                (Some(delta), Some(wanted)) => (f64::from(delta) - wanted).abs() <= 1e-4,
+                _ => false,
+            };
+            if (f64::from(phrase.energy) - wanted.energy).abs() > 1e-4 || !delta_matches {
+                mismatches.push(format!("{}: phrase energy", case.name));
+            }
+        }
+        let confidence = f64::from(structure.structure_confidence);
+        if (confidence - case.expected.structure_confidence).abs() > 1e-4 {
+            mismatches.push(format!("{}: confidence {confidence}", case.name));
+        }
+    }
+
+    assert!(fixture.cases.len() >= 4);
+    assert!(mismatches.is_empty(), "{mismatches:#?}");
+}
+
+#[test]
+fn harmony_change_is_a_boundary() {
+    // Harmony adds at most 2 dB, under the 4 dB boundary cost: a chord change from C to
+    // F# at bar 16 splits a section whose band balance shifts by 2.5 dB of v7 novelty,
+    // which alone does not. Same case as the Python test.
+    let shapes: Vec<[f64; 3]> = [[1.5, 0.0, -1.5]; 16]
+        .into_iter()
+        .chain([[-1.5, 0.0, 1.5]; 16])
+        .collect();
+    let mut timbre = [10.0; MFCC_COEFFICIENTS];
+    timbre[0] = -120.0;
+    timbre[1] = 80.0;
+    let mfcc = vec![timbre; 32];
+    let chord_change: Vec<[f64; 12]> = [one_hot(0); 16]
+        .into_iter()
+        .chain([one_hot(6); 16])
+        .collect();
+    let same_chord = vec![one_hot(0); 32];
+
+    assert!(phrase_start_bars(&shapes, &chord_change, &mfcc).contains(&16));
+    assert!(!phrase_start_bars(&shapes, &same_chord, &mfcc).contains(&16));
+}
+
+#[test]
+fn mfcc_matches_orthonormal_dct() {
+    let reference = feature_fixture().mfcc_reference;
+
+    let coefficients = mfcc(&reference.mel_db);
+
+    assert_eq!(reference.mfcc.len(), MFCC_COEFFICIENTS);
+    for (index, (value, wanted)) in coefficients.iter().zip(&reference.mfcc).enumerate() {
+        assert!(
+            (f64::from(*value) - wanted).abs() <= 1e-3,
+            "coefficient {index}: {value} vs {wanted}"
+        );
+    }
 }

@@ -1236,6 +1236,8 @@ pub fn analyze_smart_mix_segments_with_beats(
                     rms_hop,
                     bands_db: &features.bands,
                     band_hop: beat_tracking::HOP_SIZE,
+                    chroma: &features.chroma,
+                    mfcc: &features.mfcc,
                 },
                 sample_rate,
                 grid_trusted,

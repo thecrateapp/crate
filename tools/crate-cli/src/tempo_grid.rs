@@ -426,6 +426,7 @@ mod tests {
             low_onsets: vec![0.05; frames],
             chroma: vec![[0.0; 12]; frames],
             bands: Vec::new(),
+            mfcc: Vec::new(),
         };
         for (values, peaks) in [
             (&mut features.onsets, broad),

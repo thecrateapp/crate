@@ -10,7 +10,7 @@ use std::path::Path;
 use realfft::RealFftPlanner;
 use serde::Deserialize;
 
-use crate::structure::{BAND_COUNT, BEATS_PER_BAR, LOW_BAND_HZ, MID_BAND_HZ};
+use crate::structure::{BAND_COUNT, BEATS_PER_BAR, LOW_BAND_HZ, MFCC_COEFFICIENTS, MID_BAND_HZ};
 
 pub const FFT_SIZE: usize = 2048;
 pub const HOP_SIZE: usize = 512;
@@ -134,13 +134,15 @@ fn mel_filterbank(sample_rate: u32) -> Vec<Vec<(usize, f32)>> {
 }
 
 /// Per-hop signals shared by beat and downbeat tracking, aligned on the onset envelope.
-/// `bands` are not shifted: band frame `i` is the STFT frame centred on `i * HOP_SIZE`,
-/// holding the mean mel level (dB) below 200 Hz, below 2 kHz and above.
+/// `bands` and `mfcc` are not shifted: frame `i` is the STFT frame centred on
+/// `i * HOP_SIZE`, holding the mean mel level (dB) below 200 Hz, below 2 kHz and above,
+/// and the first `MFCC_COEFFICIENTS` MFCC of its mel levels.
 pub struct FrameFeatures {
     pub onsets: Vec<f32>,
     pub low_onsets: Vec<f32>,
     pub chroma: Vec<[f32; 12]>,
     pub bands: Vec<[f32; BAND_COUNT]>,
+    pub mfcc: Vec<[f32; MFCC_COEFFICIENTS]>,
 }
 
 fn band_count_below(sample_rate: u32, hz: f32) -> usize {
@@ -163,6 +165,43 @@ fn band_levels(mel_db: &[f32], low_bands: usize, mid_bands: usize) -> [f32; BAND
         mean(&mel_db[low_bands..mid_bands]) as f32,
         mean(&mel_db[mid_bands..]) as f32,
     ]
+}
+
+/// Rows of the orthonormal DCT-II over `bands` values, one per kept coefficient: the MFCC
+/// of librosa (`feature.mfcc` on a dB mel spectrogram) and `scipy.fft.dct(norm="ortho")`.
+fn dct_basis(bands: usize) -> Vec<Vec<f64>> {
+    let size = bands as f64;
+    (0..MFCC_COEFFICIENTS)
+        .map(|coefficient| {
+            let scale = if coefficient == 0 {
+                (1.0 / size).sqrt()
+            } else {
+                (2.0 / size).sqrt()
+            };
+            (0..bands)
+                .map(|band| {
+                    let angle = std::f64::consts::PI * coefficient as f64 * (2 * band + 1) as f64
+                        / (2.0 * size);
+                    scale * angle.cos()
+                })
+                .collect()
+        })
+        .collect()
+}
+
+fn mfcc_with(basis: &[Vec<f64>], mel_db: &[f32]) -> [f32; MFCC_COEFFICIENTS] {
+    std::array::from_fn(|coefficient| {
+        basis[coefficient]
+            .iter()
+            .zip(mel_db)
+            .map(|(weight, level)| weight * f64::from(*level))
+            .sum::<f64>() as f32
+    })
+}
+
+/// The first `MFCC_COEFFICIENTS` MFCC of one frame of mel levels (dB).
+pub fn mfcc(mel_db: &[f32]) -> [f32; MFCC_COEFFICIENTS] {
+    mfcc_with(&dct_basis(mel_db.len()), mel_db)
 }
 
 fn pitch_classes(sample_rate: u32) -> Vec<Option<usize>> {
@@ -194,6 +233,7 @@ pub fn frame_features(samples: &[f32], sample_rate: u32) -> FrameFeatures {
             low_onsets: Vec::new(),
             chroma: Vec::new(),
             bands: Vec::new(),
+            mfcc: Vec::new(),
         };
     }
     let filters = mel_filterbank(sample_rate);
@@ -254,6 +294,11 @@ pub fn frame_features(samples: &[f32], sample_rate: u32) -> FrameFeatures {
         .chunks_exact(MEL_BANDS)
         .map(|frame| band_levels(frame, low_bands, mid_bands))
         .collect();
+    let basis = dct_basis(MEL_BANDS);
+    let mfcc = mel_db
+        .chunks_exact(MEL_BANDS)
+        .map(|frame| mfcc_with(&basis, frame))
+        .collect();
 
     let lead = 1 + FFT_SIZE / (2 * HOP_SIZE);
     let mut onsets = vec![0.0_f32; frames];
@@ -275,6 +320,7 @@ pub fn frame_features(samples: &[f32], sample_rate: u32) -> FrameFeatures {
         low_onsets,
         chroma,
         bands,
+        mfcc,
     }
 }
 
@@ -881,6 +927,7 @@ mod tests {
             low_onsets: vec![0.1; frames],
             chroma: vec![[0.0; 12]; frames],
             bands: Vec::new(),
+            mfcc: Vec::new(),
         };
         let mut chord = 0;
         for beat in 0..beats {
@@ -1103,5 +1150,19 @@ mod tests {
 
         assert_eq!(estimate_tempo(&onsets, SAMPLE_RATE), None);
         assert!(track_beats(&onsets, SAMPLE_RATE).is_empty());
+    }
+
+    #[test]
+    fn frame_features_return_mfcc_on_the_band_frames() {
+        let samples = clicks(120.0, 3.0);
+
+        let features = frame_features(&samples, SAMPLE_RATE);
+
+        assert_eq!(features.mfcc.len(), features.bands.len());
+        assert!(features.mfcc.len() > 100);
+        assert!(features
+            .mfcc
+            .iter()
+            .all(|frame| frame.iter().all(|value| value.is_finite())));
     }
 }

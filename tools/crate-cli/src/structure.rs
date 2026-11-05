@@ -2,15 +2,16 @@
 //!
 //! Same algorithm, constants and order of floating-point operations as
 //! `app/crate/smart_mix/structure.py`, which documents the rules;
-//! `app/tests/fixtures/smart_mix/structure_v1.json` holds cases both must agree on and
+//! `app/tests/fixtures/smart_mix/structure_v1.json` (frames) and `structure_v2.json`
+//! (per-bar features with chroma and MFCC) hold cases both must agree on and
 //! `test_smart_mix_versions.py` checks that the constants match.
 //!
 //! The segmentation reuses frames the analyzer already computed: the cue-detection RMS
-//! frames give each bar its energy and the low/mid/high mel band levels of the beat
-//! tracker give its spectral balance. Phrases cover the bars that hold music as cue
-//! detection defines it, short silent gaps are missing data, and novelty peaks place
-//! phrases of 8, 16 or 32 bars on an 8-bar grid; kinds follow rules over phrase level
-//! and position.
+//! frames give each bar its energy, and the low/mid/high mel band levels, chroma and
+//! MFCC of the beat tracker give its spectral balance, harmony and timbre (SM3-D17).
+//! Phrases cover the bars that hold music as cue detection defines it, short silent gaps
+//! are missing data, and novelty peaks place phrases of 8, 16 or 32 bars on an 8-bar
+//! grid; kinds follow rules over phrase level and position.
 
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -43,9 +44,14 @@ pub const MAX_GAP_BARS: usize = 2;
 pub const NOVELTY_WINDOW_BARS: usize = 4;
 pub const NOVELTY_NOISE_DB: f64 = 0.5;
 pub const SPECTRAL_WEIGHT: f64 = 0.5;
+/// Harmony and timbre novelty (SM3-D17): dB per unit of chroma cosine distance and of
+/// standardised MFCC distance, the first 13 MFCC of the mel bands.
+pub const HARMONY_WEIGHT: f64 = 2.0;
+pub const TIMBRE_WEIGHT: f64 = 8.0;
+pub const MFCC_COEFFICIENTS: usize = 13;
 /// The first music bar keeps the grid unless another start beats its confidence by this.
 pub const OFFSET_ZERO_PREFERENCE: f64 = 0.05;
-pub const BOUNDARY_COST_DB: f64 = 1.0;
+pub const BOUNDARY_COST_DB: f64 = 4.0;
 pub const HYPERBAR_16_BONUS_DB: f64 = 0.25;
 pub const HYPERBAR_32_BONUS_DB: f64 = 0.5;
 pub const CAP_SEARCH_STEPS: usize = 20;
@@ -98,13 +104,17 @@ impl Structure {
 /// Frames the analyzer computed for other features. `rms` are the cue-detection RMS
 /// frames, frame `i` starting at `i * rms_hop`; `bands_db` holds per STFT frame the mean
 /// level (dB) of the mel bands below 200 Hz, below 2 kHz and above, frame `i` centred on
-/// sample `i * band_hop`.
+/// sample `i * band_hop`. `chroma` and `mfcc` are per-frame rows on the same frames, as
+/// the beat tracker computes them (its chroma lags by the onset envelope's lead); empty
+/// slices leave harmony and timbre out of the novelty.
 pub struct EnergyFrames<'a> {
     pub rms: &'a [f32],
     pub rms_frame_length: usize,
     pub rms_hop: usize,
     pub bands_db: &'a [[f32; BAND_COUNT]],
     pub band_hop: usize,
+    pub chroma: &'a [[f32; 12]],
+    pub mfcc: &'a [[f32; MFCC_COEFFICIENTS]],
 }
 
 /// Length and hop, in samples, of the 50 ms RMS frames with a 25 ms hop.
@@ -122,16 +132,21 @@ pub fn guarded(segment: impl FnOnce() -> Structure) -> Structure {
     })
 }
 
-struct Bar {
-    start_beat: u64,
-    start_ms: u64,
-    end_ms: u64,
+/// A bar from the downbeat at `start_beat` (an index into the beat grid).
+pub struct Bar {
+    pub start_beat: u64,
+    pub start_ms: u64,
+    pub end_ms: u64,
 }
 
-struct BarFeatures {
-    levels: Vec<f64>,
-    shapes: Vec<[f64; BAND_COUNT]>,
-    music: Vec<bool>,
+/// Per bar: level (dBFS), spectral balance (band levels minus their mean, dB), whether it
+/// holds music, mean chroma and mean MFCC.
+pub struct BarFeatures {
+    pub levels: Vec<f64>,
+    pub shapes: Vec<[f64; BAND_COUNT]>,
+    pub music: Vec<bool>,
+    pub chroma: Vec<[f64; 12]>,
+    pub mfcc: Vec<[f64; MFCC_COEFFICIENTS]>,
 }
 
 /// A run of equal novelty from bar `first` to bar `last` (inclusive).
@@ -178,7 +193,15 @@ pub fn segment_phrases(
     if bars.is_empty() || sample_rate == 0 {
         return Structure::none();
     }
-    let features = bar_features(&bars, frames, sample_rate);
+    segment_bars(
+        &bars,
+        &bar_features(&bars, frames, sample_rate),
+        grid_trusted,
+    )
+}
+
+/// The segmentation from per-bar features, the input the shared fixtures give.
+pub fn segment_bars(bars: &[Bar], features: &BarFeatures, grid_trusted: bool) -> Structure {
     let curve: Vec<u8> = features
         .levels
         .iter()
@@ -199,7 +222,13 @@ pub fn segment_phrases(
     }
     let levels = &features.levels[first..last];
     let gaps = gaps(&features.music[first..last]);
-    let novelty = novelty(levels, &features.shapes[first..last], &gaps);
+    let novelty = novelty(
+        levels,
+        &features.shapes[first..last],
+        &gaps,
+        &features.chroma[first..last],
+        &features.mfcc[first..last],
+    );
     let span = &bars[first..last];
     let (starts, mut confidence) = best_grid(&novelty, &peaks(&novelty, &gaps), span);
     if !grid_trusted {
@@ -250,10 +279,10 @@ fn bars(beat_grid_ms: &[u64], downbeats_ms: &[u64]) -> Vec<Bar> {
         .collect()
 }
 
-/// Each bar's energy (dBFS), spectral balance (band levels minus their mean) and whether
-/// it holds music: the RMS frames wholly inside the bar and the band frames centred
-/// inside it, both leaving out `BAR_EDGE_GUARD_MS` at each end. Non-finite frames count
-/// as silence.
+/// Each bar's energy (dBFS), spectral balance (band levels minus their mean), chroma,
+/// MFCC and whether it holds music: the RMS frames wholly inside the bar and the band
+/// frames centred inside it (for chroma and MFCC, the frames all three arrays hold), all
+/// leaving out `BAR_EDGE_GUARD_MS` at each end. Non-finite frames count as silence.
 fn bar_features(bars: &[Bar], frames: &EnergyFrames<'_>, sample_rate: u32) -> BarFeatures {
     let rate = u64::from(sample_rate);
     let frame_length = frames.rms_frame_length;
@@ -303,10 +332,15 @@ fn bar_features(bars: &[Bar], frames: &EnergyFrames<'_>, sample_rate: u32) -> Ba
     }
     let frame_count = power.len();
     let band_count = frames.bands_db.len();
+    let tonal_frames = band_count.min(frames.chroma.len()).min(frames.mfcc.len());
+    let chroma_sums = prefix_sums(&frames.chroma[..tonal_frames]);
+    let mfcc_sums = prefix_sums(&frames.mfcc[..tonal_frames]);
     let mut features = BarFeatures {
         levels: Vec::with_capacity(bars.len()),
         shapes: Vec::with_capacity(bars.len()),
         music: Vec::with_capacity(bars.len()),
+        chroma: Vec::with_capacity(bars.len()),
+        mfcc: Vec::with_capacity(bars.len()),
     };
     for bar in bars {
         let start = ((bar.start_ms + BAR_EDGE_GUARD_MS) * rate / 1_000) as usize;
@@ -339,8 +373,43 @@ fn bar_features(bars: &[Bar], frames: &EnergyFrames<'_>, sample_rate: u32) -> Ba
         } else {
             features.shapes.push([0.0; BAND_COUNT]);
         }
+        let tonal_first = band_first.min(tonal_frames);
+        let tonal_last = band_last.min(tonal_frames);
+        features
+            .chroma
+            .push(window_of(&chroma_sums, tonal_first, tonal_last));
+        features
+            .mfcc
+            .push(window_of(&mfcc_sums, tonal_first, tonal_last));
     }
     features
+}
+
+/// Running sums of `f32` frame rows in `f64`, non-finite values as 0.
+fn prefix_sums<const N: usize>(frames: &[[f32; N]]) -> Vec<[f64; N]> {
+    let mut sums = Vec::with_capacity(frames.len() + 1);
+    sums.push([0.0_f64; N]);
+    for frame in frames {
+        let mut next = sums[sums.len() - 1];
+        for (total, value) in next.iter_mut().zip(frame) {
+            *total += if value.is_finite() {
+                f64::from(*value)
+            } else {
+                0.0
+            };
+        }
+        sums.push(next);
+    }
+    sums
+}
+
+/// Mean row of the frames `first..last` from their running sums; zeros without frames.
+fn window_of<const N: usize>(sums: &[[f64; N]], first: usize, last: usize) -> [f64; N] {
+    if last <= first {
+        return [0.0; N];
+    }
+    let count = (last - first) as f64;
+    std::array::from_fn(|column| (sums[last][column] - sums[first][column]) / count)
 }
 
 /// Runs of at most `MAX_GAP_BARS` silent bars between music bars.
@@ -367,22 +436,20 @@ fn gaps(music: &[bool]) -> Vec<bool> {
 /// Novelty at each bar boundary `0..=levels.len()`. Gap bars and boundaries without four
 /// bars of music range on each side stay 0: a truncated window cannot tell a pickup or a
 /// fade-in from a section change.
-fn novelty(levels: &[f64], shapes: &[[f64; BAND_COUNT]], gaps: &[bool]) -> Vec<f64> {
+fn novelty(
+    levels: &[f64],
+    shapes: &[[f64; BAND_COUNT]],
+    gaps: &[bool],
+    chroma: &[[f64; 12]],
+    mfcc: &[[f64; MFCC_COEFFICIENTS]],
+) -> Vec<f64> {
     let count = levels.len();
     let mut novelty = vec![0.0; count + 1];
-    for boundary in NOVELTY_WINDOW_BARS..=count.saturating_sub(NOVELTY_WINDOW_BARS) {
-        if gaps[boundary] {
+    let (harmony, timbre) = harmony_timbre(chroma, mfcc, gaps);
+    for boundary in 0..=count {
+        let Some((before, after)) = novelty_windows(boundary, gaps) else {
             continue;
-        }
-        let before: Vec<usize> = (boundary.saturating_sub(NOVELTY_WINDOW_BARS)..boundary)
-            .filter(|bar| !gaps[*bar])
-            .collect();
-        let after: Vec<usize> = (boundary..(boundary + NOVELTY_WINDOW_BARS).min(count))
-            .filter(|bar| !gaps[*bar])
-            .collect();
-        if before.is_empty() || after.is_empty() {
-            continue;
-        }
+        };
         let window_mean = |bars: &[usize], value: &dyn Fn(usize) -> f64| {
             sum(bars.iter().map(|bar| value(*bar))) / bars.len() as f64
         };
@@ -397,9 +464,92 @@ fn novelty(levels: &[f64], shapes: &[[f64; BAND_COUNT]], gaps: &[bool]) -> Vec<f
                 - window_mean(&before, &|bar| shapes[bar][band]))
             .abs();
         }
-        novelty[boundary] = (change + SPECTRAL_WEIGHT * spectral - NOVELTY_NOISE_DB).max(0.0);
+        novelty[boundary] = (change + SPECTRAL_WEIGHT * spectral - NOVELTY_NOISE_DB).max(0.0)
+            + HARMONY_WEIGHT * harmony[boundary]
+            + TIMBRE_WEIGHT * timbre[boundary];
     }
     novelty
+}
+
+/// The non-gap bars of the windows before and after a boundary, if it has novelty.
+fn novelty_windows(boundary: usize, gaps: &[bool]) -> Option<(Vec<usize>, Vec<usize>)> {
+    let count = gaps.len();
+    if boundary < NOVELTY_WINDOW_BARS || boundary + NOVELTY_WINDOW_BARS > count || gaps[boundary] {
+        return None;
+    }
+    let before: Vec<usize> = (boundary - NOVELTY_WINDOW_BARS..boundary)
+        .filter(|bar| !gaps[*bar])
+        .collect();
+    let after: Vec<usize> = (boundary..(boundary + NOVELTY_WINDOW_BARS).min(count))
+        .filter(|bar| !gaps[*bar])
+        .collect();
+    (!before.is_empty() && !after.is_empty()).then_some((before, after))
+}
+
+/// Harmony and timbre at each bar boundary `0..=gaps.len()`, unweighted (SM3-D17):
+/// the cosine distance between the mean chroma of the windows (0 when either is silent)
+/// and the distance between their mean MFCC over `sqrt(MFCC_COEFFICIENTS)`, each
+/// coefficient standardised over the bars. Boundaries without windows get 0.
+fn harmony_timbre(
+    chroma: &[[f64; 12]],
+    mfcc: &[[f64; MFCC_COEFFICIENTS]],
+    gaps: &[bool],
+) -> (Vec<f64>, Vec<f64>) {
+    let count = gaps.len();
+    let mut harmony = vec![0.0; count + 1];
+    let mut timbre = vec![0.0; count + 1];
+    let standard = standardized_columns(mfcc);
+    for boundary in 0..=count {
+        let Some((before, after)) = novelty_windows(boundary, gaps) else {
+            continue;
+        };
+        harmony[boundary] =
+            cosine_distance(&window_mean(chroma, &before), &window_mean(chroma, &after));
+        timbre[boundary] = distance(
+            &window_mean(&standard, &before),
+            &window_mean(&standard, &after),
+        ) / (MFCC_COEFFICIENTS as f64).sqrt();
+    }
+    (harmony, timbre)
+}
+
+/// Each column minus its mean, over its standard deviation (1 when within `EPSILON`).
+fn standardized_columns<const N: usize>(rows: &[[f64; N]]) -> Vec<[f64; N]> {
+    let mut standard = rows.to_vec();
+    if rows.is_empty() {
+        return standard;
+    }
+    let count = rows.len() as f64;
+    for column in 0..N {
+        let mean = sum(rows.iter().map(|row| row[column])) / count;
+        let deviation = (sum(rows
+            .iter()
+            .map(|row| (row[column] - mean) * (row[column] - mean)))
+            / count)
+            .sqrt();
+        let scale = if deviation > EPSILON { deviation } else { 1.0 };
+        for (target, row) in standard.iter_mut().zip(rows) {
+            target[column] = (row[column] - mean) / scale;
+        }
+    }
+    standard
+}
+
+fn window_mean<const N: usize>(rows: &[[f64; N]], bars: &[usize]) -> [f64; N] {
+    std::array::from_fn(|column| sum(bars.iter().map(|bar| rows[*bar][column])) / bars.len() as f64)
+}
+
+fn cosine_distance(left: &[f64], right: &[f64]) -> f64 {
+    let denominator = sum(left.iter().map(|value| value * value)).sqrt()
+        * sum(right.iter().map(|value| value * value)).sqrt();
+    if denominator == 0.0 {
+        return 0.0;
+    }
+    1.0 - sum(left.iter().zip(right).map(|(a, b)| a * b)) / denominator
+}
+
+fn distance(left: &[f64], right: &[f64]) -> f64 {
+    sum(left.iter().zip(right).map(|(a, b)| (b - a) * (b - a))).sqrt()
 }
 
 /// Local maxima of the novelty over the non-gap boundaries; a plateau is one.

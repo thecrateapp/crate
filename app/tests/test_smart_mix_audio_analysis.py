@@ -597,3 +597,19 @@ def test_frame_features_return_aligned_mfcc() -> None:
     assert mfcc.shape == (bands.shape[0], 13)
     assert chroma.shape[0] == bands.shape[0]
     assert np.isfinite(mfcc).all()
+
+
+def test_mfcc_is_the_orthonormal_dct_of_the_mel_levels() -> None:
+    # The reference frame the Rust analyzer's MFCC is checked against
+    # (tools/crate-cli/tests/smart_mix_structure.rs, mfcc_matches_orthonormal_dct).
+    import json
+
+    import librosa
+
+    fixture = Path(__file__).parent / "fixtures/smart_mix/structure_v2.json"
+    reference = json.loads(fixture.read_text())["mfccReference"]
+    mel_db = np.asarray(reference["melDb"], dtype=np.float32)[:, None]
+
+    mfcc = librosa.feature.mfcc(S=mel_db, n_mfcc=13)[:, 0]
+
+    assert mfcc.tolist() == pytest.approx(reference["mfcc"], abs=1e-3)

@@ -84,7 +84,8 @@ enum Command {
         #[arg(long, default_value = "quick")]
         mode: String,
     },
-    /// Analyze audio features (BPM, key, loudness, energy, mood, danceability)
+    /// Analyze audio features (BPM, key, loudness, energy, mood, danceability; Smart Mix
+    /// phrases from level, band balance, harmony and timbre novelty)
     #[cfg(feature = "analysis")]
     Analyze {
         #[arg(short, long)]
