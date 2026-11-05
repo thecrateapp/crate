@@ -131,6 +131,8 @@ class SmartMixPhraseItem(SmartMixAdminModel):
     vocal_presence: int | None = Field(
         default=None, alias="vocalPresence", ge=0, le=255
     )
+    # The calibrated cut applied by the server (VOCAL_THRESHOLD), null without voice.
+    voiced: bool | None = Field(default=None)
 
 
 class SmartMixTrackStructureResponse(SmartMixAdminModel):

@@ -16,7 +16,10 @@ export interface SmartMixPhrase {
   energy: number;
   deltaEnergy: number | null;
   kind: SmartMixPhraseKind;
+  /** The phrase's voice byte (YAMNet's geometric mean on a log scale). */
   vocalPresence: number | null;
+  /** Whether the byte reaches the calibrated cut; decided by the server. */
+  voiced: boolean | null;
 }
 
 export interface SmartMixTrackStructureData {
@@ -51,23 +54,26 @@ function clock(ms: number) {
   return `${Math.floor(ms / 60_000)}:${seconds}`;
 }
 
-function voiceShare(phrase: SmartMixPhrase) {
-  return phrase.vocalPresence == null ? null : phrase.vocalPresence / 255;
+// Phrases without voice stay faintly visible so the lane still shows the phrase grid.
+const UNVOICED_OPACITY = 0.15;
+
+function voiceOpacity(phrase: SmartMixPhrase) {
+  if (phrase.voiced == null) return 0;
+  return phrase.voiced ? 1 : UNVOICED_OPACITY;
 }
 
 function phraseDescription(phrase: SmartMixPhrase) {
-  const voice = voiceShare(phrase);
   return `${KIND_NAMES[phrase.kind]}, ${phrase.bars} bars, ${clock(
     phrase.startMs,
   )} to ${clock(phrase.endMs)}, energy ${Math.round(phrase.energy * 100)}%${
-    voice == null ? "" : `, voice ${Math.round(voice * 100)}%`
+    phrase.voiced == null ? "" : phrase.voiced ? ", voice" : ", no voice"
   }`;
 }
 
 /**
  * Phrase strip for reviewing the Smart Mix segmentation (gate SG1): a 1 px rule at
  * every phrase boundary, a mono label with the kind and length of each phrase, a 1 px
- * voice lane whose opacity is the share of each phrase with voice (SM3-D13), and the
+ * voice lane lit on the phrases with voice (SM3-D13), and the
  * per-bar energy as a 1 px lane under them, all on the track's time axis.
  */
 export function SmartMixStructure({
@@ -173,7 +179,7 @@ export function SmartMixStructure({
                   style={{
                     left: `${x(phrase.startMs)}%`,
                     width: `${rounded(x(phrase.endMs) - x(phrase.startMs))}%`,
-                    opacity: rounded(voiceShare(phrase) ?? 0),
+                    opacity: voiceOpacity(phrase),
                   }}
                 />
               ))}
@@ -246,7 +252,6 @@ export function SmartMixStructure({
           </thead>
           <tbody>
             {phrases.map((phrase, index) => {
-              const voice = voiceShare(phrase);
               return (
                 <tr
                   key={`${phrase.startBeat}:${index}`}
@@ -263,7 +268,11 @@ export function SmartMixStructure({
                   </td>
                   {detector ? (
                     <td className="py-1 pr-3">
-                      {voice == null ? "—" : `${Math.round(voice * 100)}%`}
+                      {phrase.voiced == null
+                        ? "—"
+                        : phrase.voiced
+                          ? "Yes"
+                          : "No"}
                     </td>
                   ) : null}
                 </tr>

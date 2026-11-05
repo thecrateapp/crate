@@ -301,6 +301,7 @@ it("draws the stored phrase structure in the track profile for analysis managers
               deltaEnergy: null,
               kind: "body",
               vocalPresence: null,
+              voiced: null,
             },
           ],
           energyCurve: [100, 200],

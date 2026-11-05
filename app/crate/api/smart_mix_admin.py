@@ -31,7 +31,7 @@ from crate.db.queries.smart_mix_admin_tracks import list_smart_mix_tracks
 from crate.db.queries.tasks import list_tasks
 from crate.db.repositories.smart_mix import get_track_mix_profile
 from crate.db.repositories.tasks import create_task_dedup
-from crate.smart_mix.models import TrackMixProfile
+from crate.smart_mix.models import VOCAL_THRESHOLD, TrackMixProfile
 from crate.smart_mix.phrase_grid import downbeats_from_anchor, phrase_spans_ms
 
 
@@ -182,6 +182,7 @@ def _structure_payload(track_id: int, profile: TrackMixProfile) -> dict:
                 "deltaEnergy": phrase.delta_energy,
                 "kind": phrase.kind,
                 "vocalPresence": None if vocals is None else vocals[index],
+                "voiced": None if vocals is None else vocals[index] >= VOCAL_THRESHOLD,
             }
             for index, (phrase, (_start_ms, end_ms)) in enumerate(
                 zip(phrases, spans, strict=True)

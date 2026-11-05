@@ -830,6 +830,7 @@ def test_track_structure_serves_phrases_energy_and_bars(pg_db, test_app) -> None
             "deltaEnergy": None,
             "kind": "intro",
             "vocalPresence": 0,
+            "voiced": False,
         },
         {
             "startBeat": 32,
@@ -840,6 +841,8 @@ def test_track_structure_serves_phrases_energy_and_bars(pg_db, test_app) -> None
             "deltaEnergy": 0.4,
             "kind": "peak",
             "vocalPresence": 200,
+            # The API applies the calibrated cut so the admin never repeats it.
+            "voiced": True,
         },
     ]
     assert body["energyCurve"] == list(range(0, 250, 10))

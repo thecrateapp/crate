@@ -28,6 +28,7 @@ const structure: SmartMixTrackStructureData = {
       deltaEnergy: null,
       kind: "intro",
       vocalPresence: null,
+      voiced: null,
     },
     {
       startBeat: 32,
@@ -38,6 +39,7 @@ const structure: SmartMixTrackStructureData = {
       deltaEnergy: 0.4,
       kind: "peak",
       vocalPresence: null,
+      voiced: null,
     },
     {
       startBeat: 96,
@@ -48,6 +50,7 @@ const structure: SmartMixTrackStructureData = {
       deltaEnergy: -0.5,
       kind: "break",
       vocalPresence: null,
+      voiced: null,
     },
   ],
   energyCurve: [0, 51, 102, 153, 204, 255],
@@ -95,13 +98,14 @@ describe("SmartMixStructure", () => {
     expect(screen.getByText("Confidence 82%")).toBeInTheDocument();
   });
 
-  it("renders the voice lane per phrase", () => {
+  it("lights the voice lane on phrases with voice and dims the rest", () => {
     const voiced: SmartMixTrackStructureData = {
       ...structure,
-      vocalDetector: "yamnet-1",
+      vocalDetector: "yamnet-2",
       phrases: (structure.phrases ?? []).map((phrase, index) => ({
         ...phrase,
-        vocalPresence: [255, 0, 51][index] ?? null,
+        vocalPresence: [200, 40, 80][index] ?? null,
+        voiced: [true, false, false][index] ?? null,
       })),
     };
     const { container } = render(<SmartMixStructure structure={voiced} />);
@@ -111,17 +115,17 @@ describe("SmartMixStructure", () => {
     ] as HTMLElement[];
     expect(lane.map((segment) => segment.style.opacity)).toEqual([
       "1",
-      "0",
-      "0.2",
+      "0.15",
+      "0.15",
     ]);
     expect(lane[1]).toHaveStyle({ left: "16.5%", width: "32%" });
-    expect(screen.getByText("Voice · yamnet-1")).toBeInTheDocument();
+    expect(screen.getByText("Voice · yamnet-2")).toBeInTheDocument();
     expect(
       within(screen.getByRole("list", { name: "Phrases" })).getAllByRole(
         "listitem",
       )[0],
     ).toHaveAccessibleName(
-      "Intro, 8 bars, 0:00.5 to 0:16.5, energy 40%, voice 100%",
+      "Intro, 8 bars, 0:00.5 to 0:16.5, energy 40%, voice",
     );
   });
 
@@ -141,10 +145,11 @@ describe("SmartMixStructure", () => {
   it("lists every phrase in a table", () => {
     const voiced: SmartMixTrackStructureData = {
       ...structure,
-      vocalDetector: "yamnet-1",
+      vocalDetector: "yamnet-2",
       phrases: (structure.phrases ?? []).map((phrase, index) => ({
         ...phrase,
-        vocalPresence: [255, 0, 51][index] ?? null,
+        vocalPresence: [200, 40, 80][index] ?? null,
+        voiced: [true, false, false][index] ?? null,
       })),
     };
     render(<SmartMixStructure structure={voiced} />);
@@ -158,9 +163,9 @@ describe("SmartMixStructure", () => {
           .map((cell) => cell.textContent),
       ),
     ).toEqual([
-      ["1", "Intro", "8", "0:00.5–0:16.5", "40%", "100%"],
-      ["2", "Peak", "16", "0:16.5–0:48.5", "80%", "0%"],
-      ["3", "Break", "8", "0:48.5–1:04.5", "30%", "20%"],
+      ["1", "Intro", "8", "0:00.5–0:16.5", "40%", "Yes"],
+      ["2", "Peak", "16", "0:16.5–0:48.5", "80%", "No"],
+      ["3", "Break", "8", "0:48.5–1:04.5", "30%", "No"],
     ]);
   });
 
