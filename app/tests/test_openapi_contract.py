@@ -1837,6 +1837,7 @@ def test_openapi_types_error_inbox_routes_and_marks_them_authenticated(test_app)
             "202",
             "TaskEnqueueResponse",
         ),
+        ("/api/admin/errors/{issue_id}/fix", "post"): ("202", "TaskEnqueueResponse"),
         ("/api/admin/errors/connection", "get"): ("200", "ErrorTrackingConnection"),
         ("/api/admin/errors/connection", "put"): ("200", "ErrorTrackingConnection"),
         ("/api/admin/errors/connection/test", "post"): ("202", "TaskEnqueueResponse"),
@@ -1857,6 +1858,14 @@ def test_openapi_types_error_inbox_routes_and_marks_them_authenticated(test_app)
         "token"
         not in schema["components"]["schemas"]["ErrorTrackingConnection"]["properties"]
     )
+    fix_put = schema["components"]["schemas"]["ErrorFixSettingsUpdate"]
+    assert fix_put["properties"]["token"]["writeOnly"] is True
+    assert (
+        "token"
+        not in schema["components"]["schemas"]["ErrorFixConnection"]["properties"]
+    )
+    launch = schema["components"]["schemas"]["ErrorFixRequest"]
+    assert launch["properties"]["note"]["maxLength"] == 500
     dashboard = schema["components"]["schemas"]["MetricsDashboardResponse"]
     assert "errors" in dashboard["properties"]
     admin = test_app.get("/openapi-admin-system.json").json()

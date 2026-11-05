@@ -138,7 +138,10 @@ def list_issues(
 _DETAIL_SQL = f"""
     SELECT {_LIST_COLUMNS}, {_CRITICAL} AS critical,
            i.provider, i.external_id, i.digest, i.digest_event_id, i.digest_hash,
-           i.fix_requested_by, i.closed_at, i.created_at,
+           i.fix_requested_by,
+           COALESCE(NULLIF(requester.name, ''), requester.username)
+               AS fix_requested_by_name,
+           i.closed_at, i.created_at,
            COALESCE(
                (
                    SELECT json_agg(
@@ -165,6 +168,7 @@ _DETAIL_SQL = f"""
                '[]'::json
            ) AS triages
     FROM error_issues i
+    LEFT JOIN users requester ON requester.id = i.fix_requested_by
     {_CURRENT_TRIAGE}
 """
 

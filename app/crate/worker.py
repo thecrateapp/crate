@@ -727,6 +727,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "sync_error_issues",
             "update_error_issue_status",
             "test_error_tracking_connection",
+            "dispatch_error_fix",
         ),
     ),
     (

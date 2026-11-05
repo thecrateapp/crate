@@ -4,6 +4,10 @@ The base URL accepts Sentry's cloud hosts or an administrator-chosen HTTPS host 
 self-hosted installs. Self-hosted hosts get the same guard as Ollama discovery:
 private and loopback addresses are allowed, metadata and link-local ones are not,
 and the client re-checks every resolved address before it connects.
+
+`fix` configures Launch fix (E3): the GitHub repository, workflow file and ref that
+`dispatch_error_fix` dispatches, and a fine-grained GitHub token stored like the
+Sentry one. Both tokens live in `credential_secrets`; `settings` only keeps refs.
 """
 
 from __future__ import annotations
@@ -19,6 +23,7 @@ from crate.ai.contracts import AIConfigurationError
 from crate.ai.discovery import _METADATA_HOSTS, _check_address
 from crate.credentials import CredentialSecretError, load_secret
 from crate.db.repositories.error_tracking_settings import (
+    GITHUB_TOKEN_SCOPE,
     SENTRY_TOKEN_SCOPE,
     read_error_tracking_settings,
     save_error_tracking_settings,
@@ -30,6 +35,10 @@ MAX_PROJECTS = 50
 MAX_ENVIRONMENTS = 10
 MAX_DAILY_TRIAGE = 500
 MAX_TOKEN_LENGTH = 512
+# Fine-grained personal access tokens: they can be limited to one repository and to
+# Actions read and write. Classic tokens (`ghp_`) cannot, so they are refused.
+GITHUB_TOKEN_PREFIX = "github_pat_"
+GITHUB_WEB_ROOT = "https://github.com"
 _SLUG = re.compile(r"^[a-z0-9][a-z0-9_-]{0,49}$")
 _ENVIRONMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
 _REPOSITORY = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
@@ -62,6 +71,15 @@ class FixSettings:
     ref: str = "main"
     secret_ref: str | None = None
 
+    @property
+    def has_token(self) -> bool:
+        return bool(self.secret_ref)
+
+    @property
+    def actions_url(self) -> str:
+        """The workflow's runs on GitHub, where a dispatched fix shows up."""
+        return f"{GITHUB_WEB_ROOT}/{self.repository}/actions/workflows/{self.workflow}"
+
 
 @dataclass(frozen=True, slots=True)
 class ErrorTrackingConfig:
@@ -81,6 +99,11 @@ class ErrorTrackingConfig:
     @property
     def is_cloud(self) -> bool:
         return self.hostname in SENTRY_CLOUD_HOSTS
+
+    @property
+    def fix_ready(self) -> bool:
+        """Launch fix is configured: repository, workflow and a stored GitHub token."""
+        return self.fix is not None and self.fix.has_token
 
     def to_settings(self) -> dict[str, Any]:
         return {
@@ -214,7 +237,11 @@ def _fix(value: Any) -> FixSettings | None:
     repository = value.get("repository")
     workflow = value.get("workflow")
     ref = value.get("ref") or "main"
-    if not isinstance(repository, str) or not _REPOSITORY.match(repository):
+    if (
+        not isinstance(repository, str)
+        or not _REPOSITORY.match(repository)
+        or any(part in {".", ".."} for part in repository.split("/"))
+    ):
         raise _invalid("fix.repository must look like owner/name")
     if not isinstance(workflow, str) or not _WORKFLOW.match(workflow):
         raise _invalid("fix.workflow must be a workflow file name")
@@ -267,26 +294,56 @@ def load_config(*, session=None) -> ErrorTrackingConfig | None:
     return None if raw is None else parse_config(raw)
 
 
+def _token_shape_ok(token: Any) -> bool:
+    return (
+        isinstance(token, str)
+        and bool(token)
+        and len(token) <= MAX_TOKEN_LENGTH
+        and not any(ord(char) <= 32 for char in token)
+    )
+
+
 def _validated_token(token: Any) -> str:
-    if (
-        not isinstance(token, str)
-        or not token
-        or len(token) > MAX_TOKEN_LENGTH
-        or any(ord(char) <= 32 for char in token)
-    ):
+    if not _token_shape_ok(token):
         raise _invalid("Invalid Sentry token")
     return token
 
 
+def _validated_github_token(token: Any) -> str:
+    if not _token_shape_ok(token):
+        raise _invalid("Invalid GitHub token")
+    if not token.startswith(GITHUB_TOKEN_PREFIX):
+        raise _invalid(
+            "The GitHub token must be a fine-grained personal access token "
+            f"({GITHUB_TOKEN_PREFIX}...)"
+        )
+    return token
+
+
 def save_config(
-    payload: Mapping[str, Any], *, sentry_token: str | None = None, session=None
+    payload: Mapping[str, Any],
+    *,
+    sentry_token: str | None = None,
+    github_token: str | None = None,
+    session=None,
 ) -> ErrorTrackingConfig:
-    """Validate and store settings. Secret refs in the payload are ignored."""
+    """Validate and store settings. Secret refs in the payload are ignored.
+
+    Without `fix` the stored GitHub token is revoked: turning Launch fix off leaves
+    no credential behind.
+    """
     if sentry_token is not None:
         sentry_token = _validated_token(sentry_token)
+    if github_token is not None:
+        github_token = _validated_github_token(github_token)
     candidate = parse_config({**payload, "secret_ref": None})
+    if github_token is not None and candidate.fix is None:
+        raise _invalid("A GitHub token needs the fix repository and workflow")
     stored = save_error_tracking_settings(
-        candidate.to_settings(), sentry_token=sentry_token, session=session
+        candidate.to_settings(),
+        sentry_token=sentry_token,
+        github_token=github_token,
+        session=session,
     )
     return parse_config(stored)
 
@@ -312,8 +369,31 @@ def load_sentry_token(config: ErrorTrackingConfig, *, session=None) -> str:
     return token
 
 
+def load_github_token(config: ErrorTrackingConfig, *, session=None) -> str:
+    """The fine-grained GitHub token of Launch fix; only `dispatch_error_fix` reads it."""
+    if config.fix is None or not config.fix.secret_ref:
+        raise ErrorTrackingConfigError(
+            "ERROR_FIX_NOT_CONFIGURED", "Launch fix is not configured"
+        )
+    try:
+        payload = load_secret(
+            config.fix.secret_ref, scope=GITHUB_TOKEN_SCOPE, session=session
+        )
+    except CredentialSecretError:
+        raise ErrorTrackingConfigError(
+            "ERROR_FIX_TOKEN_UNAVAILABLE", "The GitHub token cannot be read"
+        ) from None
+    token = payload.get("token")
+    if not isinstance(token, str) or not token:
+        raise ErrorTrackingConfigError(
+            "ERROR_FIX_TOKEN_UNAVAILABLE", "The GitHub token cannot be read"
+        )
+    return token
+
+
 __all__ = [
     "DEFAULT_BASE_URL",
+    "GITHUB_TOKEN_PREFIX",
     "SENTRY_CLOUD_HOSTS",
     "ErrorTrackingConfig",
     "ErrorTrackingConfigError",
@@ -321,6 +401,7 @@ __all__ = [
     "TriageSettings",
     "check_resolved_address",
     "load_config",
+    "load_github_token",
     "load_sentry_token",
     "parse_config",
     "save_config",

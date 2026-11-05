@@ -1,10 +1,11 @@
-"""Error inbox tasks: the Sentry sync, status changes and the connection test.
+"""Error inbox tasks: the Sentry sync, status changes, the connection test and the
+Launch fix dispatch.
 
-Only these tasks talk to Sentry (EI-D3); the admin reads PostgreSQL. No HTTP call
-runs inside a database transaction: every repository call opens and closes its own
-scope between requests. The token is handed to the client and nothing else: it never
-reaches a log line, a task result or the runtime state, and neither do response
-bodies or event text.
+Only these tasks talk to Sentry or GitHub (EI-D3); the admin reads PostgreSQL. No
+HTTP call runs inside a database transaction: every repository call opens and closes
+its own scope between requests. Tokens are handed to the clients and nothing else:
+they never reach a log line, a task result or the runtime state, and neither do
+response bodies or event text.
 
 Runtime state (`ops_runtime_state`) the admin API and MCP read; the keys and the
 write-access check live in `crate.error_inbox.state`:
@@ -25,6 +26,11 @@ change. `update_error_issue_status` refuses without calling Sentry only when the
 recorded access belongs to the current token and says `write: false`. Unknown access
 (never checked, a different token, or Sentry did not report scopes) lets Sentry
 decide, and a 403 comes back as `SENTRY_FORBIDDEN`.
+
+`dispatch_error_fix` (Launch fix, E3) starts `.github/workflows/error-autofix.yml`
+for one issue with only its short id and the person's note. It claims the issue
+first (`fix_requested_at`, at most once every 24 hours), dispatches once without
+retries, and audits the request; a failed dispatch gives the claim back.
 """
 
 from __future__ import annotations
@@ -39,19 +45,30 @@ from typing import Any
 from crate.db.ops_runtime import get_ops_runtime_state, set_ops_runtime_state
 from crate.db.queries.error_issues import get_issue, open_ids_not_in, sync_state
 from crate.db.repositories.error_issues import (
+    audit_fix_request,
     mark_status,
     purge_closed,
+    record_fix_request,
     record_status_change,
+    release_fix_request,
     set_digest,
     upsert_issues,
+)
+from crate.error_inbox.autofix import (
+    MAX_NOTE_LENGTH,
+    REQUEST_COOLDOWN,
+    AutofixInputError,
+    workflow_inputs,
 )
 from crate.error_inbox.config import (
     ErrorTrackingConfig,
     ErrorTrackingConfigError,
     load_config,
+    load_github_token,
     load_sentry_token,
 )
 from crate.error_inbox.digest import build_digest, digest_hash, group_key
+from crate.error_inbox.github_client import GitHubAPIError, GitHubClient
 from crate.error_inbox.priority import crate_score
 from crate.error_inbox.state import (
     ACCESS_STATE_KEY,
@@ -76,6 +93,7 @@ from crate.worker_handlers import TaskHandler, is_cancelled
 log = logging.getLogger(__name__)
 
 ClientFactory = Callable[[ErrorTrackingConfig, str], SentryClient]
+GitHubClientFactory = Callable[[str], GitHubClient]
 
 MAX_LIST_PAGES = 5
 MAX_EVENT_FETCHES = 25
@@ -99,10 +117,22 @@ def _now() -> datetime:
 # listed and are still reported.
 EXPECTED_FAILURE_CODES = frozenset(
     {
+        "ERROR_FIX_NOT_CONFIGURED",
+        "ERROR_FIX_RECENTLY_REQUESTED",
+        "ERROR_FIX_UNSUPPORTED_ISSUE",
         "ERROR_ISSUE_NOT_FOUND",
         "ERROR_TRACKING_INVALID",
         "ERROR_TRACKING_NOT_CONFIGURED",
         "ERROR_TRACKING_TOKEN_MISSING",
+        "GITHUB_AUTH",
+        "GITHUB_FORBIDDEN",
+        "GITHUB_NOT_FOUND",
+        "GITHUB_RATE_LIMITED",
+        "GITHUB_REDIRECT",
+        "GITHUB_SERVER",
+        "GITHUB_TIMEOUT",
+        "GITHUB_UNAVAILABLE",
+        "GITHUB_VALIDATION",
         "SENTRY_AUTH",
         "SENTRY_FORBIDDEN",
         "SENTRY_HOST_DISALLOWED",
@@ -577,6 +607,116 @@ def check_connection(*, client_factory: ClientFactory | None = None) -> dict[str
     return {"status": "succeeded", "access": access}
 
 
+# -- Launch fix (E3) ----------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class _FixRequest:
+    issue_id: str
+    note: str
+    actor_id: int
+
+
+def _fix_request(params: Mapping[str, Any]) -> _FixRequest:
+    issue_id = params.get("issue_id")
+    note = params.get("note", "")
+    actor_id = params.get("actor_id")
+    if (
+        not isinstance(issue_id, str)
+        or not isinstance(note, str)
+        or len(note) > MAX_NOTE_LENGTH
+        or isinstance(actor_id, bool)
+        or not isinstance(actor_id, int)
+    ):
+        raise ValueError("Invalid fix request")
+    return _FixRequest(issue_id=issue_id, note=note, actor_id=actor_id)
+
+
+def dispatch_fix(
+    task_id: str,
+    params: Mapping[str, Any],
+    *,
+    client_factory: GitHubClientFactory | None = None,
+) -> dict[str, Any]:
+    """Dispatch the autofix workflow for one issue, at most once every 24 hours.
+
+    The issue is claimed before GitHub is called, so a second dispatch of the same
+    issue cannot pass while the first is in flight; a failed dispatch releases the
+    claim. Only the short id and the note leave Crate.
+    """
+    try:
+        request = _fix_request(params)
+    except ValueError:
+        return _failed("ERROR_FIX_INVALID_REQUEST", "Invalid fix request")
+    issue = get_issue(request.issue_id)
+    if issue is None:
+        return _failed("ERROR_ISSUE_NOT_FOUND", "The issue is no longer in the inbox")
+    try:
+        config = load_config()
+        if config is None or config.fix is None:
+            return _failed("ERROR_FIX_NOT_CONFIGURED", "Launch fix is not configured")
+        fix = config.fix
+        inputs = workflow_inputs(issue["short_id"], request.note)
+        token = load_github_token(config)
+    except (ErrorTrackingConfigError, AutofixInputError) as error:
+        return _failed(error.code, error.message)
+
+    requested_at = _now()
+    if not record_fix_request(
+        request.issue_id,
+        user_id=request.actor_id,
+        at=requested_at,
+        cooldown=REQUEST_COOLDOWN,
+    ):
+        return _failed(
+            "ERROR_FIX_RECENTLY_REQUESTED",
+            "A fix for this issue was launched less than 24 hours ago",
+        )
+
+    def release() -> None:
+        release_fix_request(
+            request.issue_id,
+            requested_at=requested_at,
+            previous_at=issue.get("fix_requested_at"),
+            previous_by=issue.get("fix_requested_by"),
+        )
+
+    try:
+        with (client_factory or GitHubClient)(token) as client:
+            client.dispatch_workflow(fix.repository, fix.workflow, fix.ref, inputs)
+    except GitHubAPIError as error:
+        # Includes timeouts, where GitHub may have started the run: the person can
+        # try again at once and the workflow's concurrency group queues a repeat.
+        log.warning("Launch fix dispatch failed: %s", error.code)
+        release()
+        return _failed(error.code, str(error))
+    except Exception:
+        release()
+        raise
+    audit_fix_request(
+        request.issue_id,
+        actor_id=request.actor_id,
+        task_id=task_id,
+        at=requested_at,
+        details={
+            "issue_id": request.issue_id,
+            "provider": issue["provider"],
+            "external_id": issue["external_id"],
+            "repository": fix.repository,
+            "workflow": fix.workflow,
+            "ref": fix.ref,
+            "has_note": bool(request.note),
+        },
+    )
+    return {
+        "status": "succeeded",
+        "issue_id": request.issue_id,
+        "short_id": issue["short_id"],
+        "requested_at": requested_at.isoformat(),
+        "actions_url": fix.actions_url,
+    }
+
+
 # -- task handlers --------------------------------------------------------------
 
 
@@ -594,10 +734,15 @@ def _handle_test_error_tracking_connection(
     return check_connection()
 
 
+def _handle_dispatch_error_fix(task_id: str, params: dict, config: dict) -> dict:
+    return dispatch_fix(task_id, params)
+
+
 ERROR_INBOX_TASK_HANDLERS: dict[str, TaskHandler] = {
     "sync_error_issues": _handle_sync_error_issues,
     "update_error_issue_status": _handle_update_error_issue_status,
     "test_error_tracking_connection": _handle_test_error_tracking_connection,
+    "dispatch_error_fix": _handle_dispatch_error_fix,
 }
 
 __all__ = [
@@ -608,6 +753,7 @@ __all__ = [
     "MAX_STATUS_REFRESHES",
     "SYNC_STATE_KEY",
     "check_connection",
+    "dispatch_fix",
     "known_write_access",
     "sync_issues",
     "update_issue_status",

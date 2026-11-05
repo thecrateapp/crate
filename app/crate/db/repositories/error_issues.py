@@ -288,8 +288,16 @@ def record_fix_request(
     *,
     user_id: int | None,
     at: datetime | None = None,
+    cooldown: timedelta | None = None,
     session: Session | None = None,
 ) -> bool:
+    """Record who launched a fix and when.
+
+    With `cooldown`, the row is only claimed when no fix was requested within it, in
+    one statement, so two dispatches of the same issue cannot both pass. Returns
+    False when the issue is gone or, with `cooldown`, was requested too recently.
+    """
+    stamp = at or _now()
     with optional_scope(session) as current:
         result = current.execute(
             text(
@@ -297,9 +305,87 @@ def record_fix_request(
                 UPDATE error_issues
                 SET fix_requested_at = :at, fix_requested_by = :user_id
                 WHERE id = CAST(:id AS uuid)
+                  AND (
+                      CAST(:not_since AS timestamptz) IS NULL
+                      OR fix_requested_at IS NULL
+                      OR fix_requested_at <= CAST(:not_since AS timestamptz)
+                  )
                 """
             ),
-            {"id": _uuid(issue_id), "at": at or _now(), "user_id": user_id},
+            {
+                "id": _uuid(issue_id),
+                "at": stamp,
+                "user_id": user_id,
+                "not_since": stamp - cooldown if cooldown is not None else None,
+            },
+        )
+        return cast(CursorResult, result).rowcount == 1
+
+
+def release_fix_request(
+    issue_id: str,
+    *,
+    requested_at: datetime,
+    previous_at: datetime | None,
+    previous_by: int | None,
+    session: Session | None = None,
+) -> bool:
+    """Undo a claim whose dispatch failed, unless another request replaced it."""
+    with optional_scope(session) as current:
+        result = current.execute(
+            text(
+                """
+                UPDATE error_issues
+                SET fix_requested_at = :previous_at, fix_requested_by = :previous_by
+                WHERE id = CAST(:id AS uuid) AND fix_requested_at = :requested_at
+                """
+            ),
+            {
+                "id": _uuid(issue_id),
+                "requested_at": requested_at,
+                "previous_at": previous_at,
+                "previous_by": previous_by,
+            },
+        )
+        return cast(CursorResult, result).rowcount == 1
+
+
+FIX_AUDIT_ACTION = "error_issue.fix.dispatch"
+
+
+def audit_fix_request(
+    issue_id: str,
+    *,
+    actor_id: int | None,
+    details: Mapping[str, Any],
+    task_id: str | None = None,
+    at: datetime | None = None,
+    session: Session | None = None,
+) -> bool:
+    """Audit a dispatched fix. `details` carries ids and settings, never event text
+    or the note. Returns False when the issue no longer exists (nothing is audited).
+    """
+    with optional_scope(session) as current:
+        result = current.execute(
+            text(
+                """
+                INSERT INTO audit_log
+                    (timestamp, action, target_type, target_name, details_json,
+                     user_id, task_id)
+                SELECT :ts, :action, 'error_issue', i.short_id,
+                       CAST(:details AS jsonb), :user_id, :task_id
+                FROM error_issues i
+                WHERE i.id = CAST(:id AS uuid)
+                """
+            ),
+            {
+                "id": _uuid(issue_id),
+                "ts": at or _now(),
+                "action": FIX_AUDIT_ACTION,
+                "details": json.dumps(dict(details), separators=(",", ":")),
+                "user_id": actor_id,
+                "task_id": task_id,
+            },
         )
         return cast(CursorResult, result).rowcount == 1
 
@@ -382,13 +468,16 @@ def save_triage(
 
 
 __all__ = [
+    "FIX_AUDIT_ACTION",
     "ISSUE_STATUSES",
     "STATUS_AUDIT_ACTION",
     "TRIAGE_KINDS",
+    "audit_fix_request",
     "mark_status",
     "purge_closed",
     "record_fix_request",
     "record_status_change",
+    "release_fix_request",
     "save_triage",
     "set_digest",
     "upsert_issues",

@@ -166,6 +166,27 @@ jobs:
             echo "$delimiter"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Install the command sandbox
+        # CLAUDE_CODE_SUBPROCESS_ENV_SCRUB runs every agent command in bubblewrap behind a
+        # socat proxy. The action installs them only for allowed_non_write_users, and without
+        # them every Bash call fails ("socat not installed"). Ubuntu 24.04+ also blocks the
+        # unprivileged user namespaces bubblewrap needs, through AppArmor. Fail here, before
+        # the agent, if the sandbox still cannot start.
+        timeout-minutes: 5
+        run: |
+          for attempt in 1 2 3; do
+            sudo apt-get update -qq \
+              && sudo apt-get install -y --no-install-recommends bubblewrap socat \
+              && break
+            echo "apt-get attempt $attempt failed, retrying"
+            sleep 5
+          done
+          if [[ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          command -v socat
+          bwrap --ro-bind / / --dev /dev --proc /proc --unshare-all true
+
       - name: Run the agent
         uses: anthropics/claude-code-action@c0949c50a78c1ec8ce2647db36629b870e715d0c # v1.0.268
         with:
@@ -201,6 +222,16 @@ jobs:
           commits="$(git_safe rev-list --count "$GITHUB_SHA..refs/heads/$BRANCH" 2>/dev/null || echo 0)"
           if [[ -f "$report" && ! -L "$report" ]]; then
             head -c 30000 "$report" > "$out/report.md"
+          fi
+          # Names only: a denied command can carry event text, and the summary is public.
+          execution="$RUNNER_TEMP/claude-execution-output.json"
+          denied=""
+          if [[ -f "$execution" && ! -L "$execution" ]]; then
+            denied="$(jq -r '[.[]? | select(.type? == "result") | .permission_denials[]?.tool_name] | unique | join(", ")' "$execution" 2>/dev/null || true)"
+          fi
+          if [[ -n "$denied" ]]; then
+            echo "Denied tools: $denied"
+            printf '**Denied tools:** %s\n\n' "$denied" >> "$GITHUB_STEP_SUMMARY"
           fi
           if [[ "$commits" == "0" ]]; then
             echo "has_commits=false" >> "$GITHUB_OUTPUT"

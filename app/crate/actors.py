@@ -188,6 +188,8 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "sync_error_issues": TaskPoolConfig("maintenance", 1, 120, 0),
     "update_error_issue_status": TaskPoolConfig("fast", 0, 30, 0),
     "test_error_tracking_connection": TaskPoolConfig("fast", 0, 30, 0),
+    # Launch fix: one workflow_dispatch to GitHub, never retried.
+    "dispatch_error_fix": TaskPoolConfig("fast", 0, 30, 0),
     "check_new_releases": TaskPoolConfig("maintenance", 2, 7200, 1),
     "promote_due_releases": TaskPoolConfig("maintenance", 2, 900, 0),
     "scan": TaskPoolConfig("maintenance", 2, 1800, 0),

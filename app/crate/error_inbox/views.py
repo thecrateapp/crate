@@ -1,8 +1,8 @@
 """Read models of the error inbox for the admin API, System Health and MCP.
 
 Everything comes from PostgreSQL (`error_issues`, `settings`, `ops_runtime_state`):
-no function here calls Sentry, GitHub or a model (EI-D3). The Sentry token never
-leaves `credential_secrets`; these views only say whether one is stored.
+no function here calls Sentry, GitHub or a model (EI-D3). The Sentry and GitHub
+tokens never leave `credential_secrets`; these views only say whether one is stored.
 """
 
 from __future__ import annotations
@@ -10,14 +10,16 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from crate.db.queries import error_issues
+from crate.error_inbox.autofix import next_request_at, supports_short_id
 from crate.error_inbox.config import (
     DEFAULT_BASE_URL,
     ErrorTrackingConfig,
     ErrorTrackingConfigError,
+    FixSettings,
     parse_config,
 )
 from crate.error_inbox.state import access_view, sync_view, write_access
@@ -75,6 +77,18 @@ def _iso(value: Any) -> str | None:
     return value if isinstance(value, str) else None
 
 
+def _fix_connection(fix: FixSettings | None) -> dict[str, Any] | None:
+    if fix is None:
+        return None
+    return {
+        "repository": fix.repository,
+        "workflow": fix.workflow,
+        "ref": fix.ref,
+        "has_token": fix.has_token,
+        "actions_url": fix.actions_url,
+    }
+
+
 def connection_view(stored: StoredConnection | None = None) -> dict[str, Any]:
     """`ErrorTrackingConnection`: settings, token presence, access and last sync."""
     stored = stored or stored_connection()
@@ -91,6 +105,7 @@ def connection_view(stored: StoredConnection | None = None) -> dict[str, Any]:
         # panel; saving a new token resets it (see `record_access`).
         "access": access_view(stored.access_state),
         "sync": sync_view(stored.sync_state),
+        "fix": _fix_connection(config.fix if config else None),
     }
 
 
@@ -114,8 +129,28 @@ def inbox_summary(*, now: datetime | None = None, top: int = 3) -> dict[str, Any
     }
 
 
+def fix_view(
+    config: ErrorTrackingConfig | None,
+    issue: Mapping[str, Any],
+    *,
+    now: datetime | None = None,
+) -> dict[str, Any] | None:
+    """`ErrorIssueFix`: Launch fix for this issue, or None when it is not configured."""
+    if config is None or config.fix is None or not config.fix_ready:
+        return None
+    return {
+        "repository": config.fix.repository,
+        "workflow": config.fix.workflow,
+        "actions_url": config.fix.actions_url,
+        "supported": supports_short_id(issue.get("short_id")),
+        "available_at": next_request_at(
+            issue.get("fix_requested_at"), now or datetime.now(timezone.utc)
+        ),
+    }
+
+
 def issue_detail(issue_id: str) -> dict[str, Any] | None:
-    """`ErrorIssueDetail` with the current token's known write access."""
+    """`ErrorIssueDetail` with the current token's known write access and Launch fix."""
     issue = error_issues.get_issue(issue_id)
     if issue is None:
         return None
@@ -125,12 +160,14 @@ def issue_detail(issue_id: str) -> dict[str, Any] | None:
         "write_access": write_access(stored.config, stored.access_state)
         if stored.configured
         else None,
+        "fix": fix_view(stored.config, issue),
     }
 
 
 __all__ = [
     "StoredConnection",
     "connection_view",
+    "fix_view",
     "inbox_summary",
     "issue_detail",
     "stored_connection",
