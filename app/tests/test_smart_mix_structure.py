@@ -536,3 +536,271 @@ def test_a_short_fade_in_does_not_anchor_the_grid() -> None:
     draft = _segment(levels)
 
     assert draft.phrases[0].start_beat // 4 == 3
+
+
+# Harmony and timbre novelty (SM3-D17).
+
+FIXTURE_V2 = Path(__file__).parent / "fixtures/smart_mix/structure_v2.json"
+PITCH_C, PITCH_F_SHARP = 0, 6
+TIMBRE_SHIFT = [
+    5.0,
+    -3.0,
+    2.0,
+    1.0,
+    -1.0,
+    0.5,
+    -0.5,
+    0.25,
+    -0.25,
+    0.1,
+    -0.1,
+    0.05,
+    -0.05,
+]
+
+
+def _one_hot(pitch_class: int) -> list[float]:
+    return [1.0 if index == pitch_class else 0.0 for index in range(12)]
+
+
+def _bar_feature_inputs(levels, *, shapes=None, chroma=None, mfcc=None, music=None):
+    """Bars of a steady 120 BPM grid from ``FIRST_BEAT_MS`` holding per-bar features."""
+    from crate.smart_mix.structure import _Bar, _BarFeatures
+
+    count = len(levels)
+    bars = [
+        _Bar(
+            start_beat=4 * bar,
+            start_ms=FIRST_BEAT_MS + bar * BAR_MS,
+            end_ms=FIRST_BEAT_MS + (bar + 1) * BAR_MS,
+        )
+        for bar in range(count)
+    ]
+    features = _BarFeatures(
+        levels=list(levels),
+        shapes=[tuple(shape) for shape in (shapes or [(0.0, 0.0, 0.0)] * count)],
+        music=[True] * count if music is None else list(music),
+        chroma=np.asarray(np.zeros((count, 12)) if chroma is None else chroma, float),
+        mfcc=np.asarray(np.zeros((count, 13)) if mfcc is None else mfcc, float),
+    )
+    return bars, features
+
+
+def _phrase_start_bars(levels, **features) -> list[int]:
+    from crate.smart_mix.structure import _segment_bars
+
+    draft = _segment_bars(*_bar_feature_inputs(levels, **features), grid_trusted=True)
+    return [phrase.start_beat // 4 for phrase in draft.phrases]
+
+
+def test_harmony_change_at_same_level_is_a_boundary() -> None:
+    # Harmony adds at most HARMONY_WEIGHT (2 dB), under the 4 dB boundary cost, so it
+    # decides a boundary together with other changes: here a band balance shift worth
+    # 2.5 dB of v7 novelty, which alone does not split the section.
+    levels = [-12.0] * 32
+    shapes = [(1.5, 0.0, -1.5)] * 16 + [(-1.5, 0.0, 1.5)] * 16
+    mfcc = [[-120.0, 80.0] + [10.0] * 11] * 32
+    chord_change = [_one_hot(PITCH_C)] * 16 + [_one_hot(PITCH_F_SHARP)] * 16
+    same_chord = [_one_hot(PITCH_C)] * 32
+
+    assert 16 in _phrase_start_bars(
+        levels, shapes=shapes, chroma=chord_change, mfcc=mfcc
+    )
+    assert 16 not in _phrase_start_bars(
+        levels, shapes=shapes, chroma=same_chord, mfcc=mfcc
+    )
+
+
+def test_timbre_change_at_same_level_is_a_boundary() -> None:
+    levels = [-12.0] * 32
+    chroma = [_one_hot(PITCH_C)] * 32
+
+    assert 16 in _phrase_start_bars(
+        levels, chroma=chroma, mfcc=[[0.0] * 13] * 16 + [TIMBRE_SHIFT] * 16
+    )
+    assert 16 not in _phrase_start_bars(levels, chroma=chroma, mfcc=[[0.0] * 13] * 32)
+
+
+def test_mfcc_scale_does_not_change_novelty() -> None:
+    from crate.smart_mix.structure import _harmony_timbre
+
+    rng = np.random.default_rng(7)
+    chroma = rng.random((24, 12))
+    mfcc = 20.0 * rng.standard_normal((24, 13))
+    gaps = [bar == 12 for bar in range(24)]
+
+    harmony, timbre = _harmony_timbre(chroma, mfcc, gaps)
+    scaled_harmony, scaled_timbre = _harmony_timbre(chroma, 10.0 * mfcc, gaps)
+
+    assert max(timbre) > 0.0
+    assert scaled_harmony == harmony
+    assert scaled_timbre == pytest.approx(timbre, rel=1e-9, abs=1e-12)
+
+
+def test_gaps_and_edges_have_no_harmony_or_timbre() -> None:
+    from crate.smart_mix.structure import NOVELTY_WINDOW_BARS, _harmony_timbre
+
+    rng = np.random.default_rng(11)
+    count = 24
+    gaps = [bar in (10, 11) for bar in range(count)]
+
+    harmony, timbre = _harmony_timbre(
+        rng.random((count, 12)), rng.standard_normal((count, 13)), gaps
+    )
+
+    assert len(harmony) == len(timbre) == count + 1
+    silent = {
+        boundary
+        for boundary in range(count + 1)
+        if boundary < NOVELTY_WINDOW_BARS
+        or boundary > count - NOVELTY_WINDOW_BARS
+        or boundary in (10, 11)
+    }
+    assert all(harmony[boundary] == timbre[boundary] == 0.0 for boundary in silent)
+    assert all(
+        harmony[boundary] > 0.0 and timbre[boundary] > 0.0
+        for boundary in range(count + 1)
+        if boundary not in silent
+    )
+
+
+def test_zero_chroma_and_flat_mfcc_give_no_nan() -> None:
+    from crate.smart_mix.structure import _harmony_timbre
+
+    rng = np.random.default_rng(3)
+    count = 24
+    mfcc = rng.standard_normal((count, 13))
+    mfcc[:, 3] = 7.3
+    gaps = [False] * count
+
+    harmony, timbre = _harmony_timbre(np.zeros((count, 12)), mfcc, gaps)
+    _, flat_timbre = _harmony_timbre(
+        np.zeros((count, 12)), np.full((count, 13), 7.3), gaps
+    )
+
+    assert harmony == [0.0] * (count + 1)
+    assert all(math.isfinite(value) for value in timbre)
+    # A constant coefficient divides by 1: rounding noise in its mean stays noise.
+    assert max(flat_timbre) < 1e-9
+
+
+def test_bar_features_with_fewer_mfcc_frames() -> None:
+    from crate.smart_mix.structure import EnergyFrames, _bar_features, _bars
+
+    beats, downbeats, frames = _bar_level_inputs([-12.0] * 16)
+    band_count = frames.bands_db.shape[0]
+    centres_ms = np.arange(band_count) * BAND_HOP * 1_000 / SAMPLE_RATE
+    bar_of = np.floor((centres_ms - FIRST_BEAT_MS) / BAR_MS).astype(int)
+    chroma = np.array([_one_hot(bar % 12) for bar in bar_of])
+    mfcc = (bar_of[:, None] + np.arange(13)[None, :]).astype(float)
+    # The MFCC frames stop in the middle of bar 8.
+    cut = int(np.searchsorted(centres_ms, FIRST_BEAT_MS + 8.5 * BAR_MS))
+    short = EnergyFrames(
+        rms=frames.rms,
+        bands_db=frames.bands_db,
+        band_hop=frames.band_hop,
+        chroma=chroma,
+        mfcc=mfcc[:cut],
+    )
+
+    features = _bar_features(_bars(beats, downbeats), short, SAMPLE_RATE)
+
+    assert features.chroma.shape == (16, 12) and features.mfcc.shape == (16, 13)
+    for bar in range(9):
+        assert list(features.chroma[bar]) == pytest.approx(_one_hot(bar % 12))
+        assert list(features.mfcc[bar]) == pytest.approx(list(bar + np.arange(13.0)))
+    assert not features.chroma[9:].any() and not features.mfcc[9:].any()
+
+
+@pytest.mark.parametrize("case", _fixture_cases(), ids=lambda case: case["name"])
+def test_without_chroma_and_mfcc_novelty_is_v7(case) -> None:
+    from crate.smart_mix.structure import (
+        EnergyFrames,
+        _bar_features,
+        _bars,
+        _gaps,
+        _harmony_timbre,
+        segment_phrases,
+    )
+
+    beats, downbeats, frames = _bar_level_inputs(
+        case["barDb"], bar_bands=case["barBands"]
+    )
+    empty = EnergyFrames(
+        rms=frames.rms,
+        bands_db=frames.bands_db,
+        band_hop=frames.band_hop,
+        chroma=np.empty((0, 12)),
+        mfcc=np.empty((0, 13)),
+    )
+
+    features = _bar_features(_bars(beats, downbeats), empty, SAMPLE_RATE)
+    harmony, timbre = _harmony_timbre(
+        features.chroma, features.mfcc, _gaps(features.music)
+    )
+    draft = segment_phrases(
+        beats, downbeats, empty, SAMPLE_RATE, grid_trusted=case.get("gridTrusted", True)
+    )
+
+    assert set(harmony) <= {0.0} and set(timbre) <= {0.0}
+    assert [(p.start_beat, p.bars, p.kind) for p in draft.phrases] == [
+        (p["startBeat"], p["bars"], p["kind"]) for p in case["expected"]["phrases"]
+    ]
+
+
+def test_structure_v2_fixture() -> None:
+    from crate.smart_mix.structure import _Bar, _BarFeatures, _segment_bars
+
+    cases = json.loads(FIXTURE_V2.read_text())["cases"]
+    mismatches = []
+    for case in cases:
+        bars = [_Bar(*bar) for bar in case["bars"]]
+        features = _BarFeatures(
+            levels=list(case["levels"]),
+            shapes=[tuple(shape) for shape in case["shapes"]],
+            music=list(case["music"]),
+            chroma=np.asarray(case["chroma"], dtype=float).reshape(-1, 12),
+            mfcc=np.asarray(case["mfcc"], dtype=float).reshape(-1, 13),
+        )
+        draft = _segment_bars(bars, features, grid_trusted=case["gridTrusted"])
+        expected = case["expected"]
+        phrases = [
+            {
+                "startBeat": phrase.start_beat,
+                "startMs": phrase.start_ms,
+                "bars": phrase.bars,
+                "energy": phrase.energy,
+                "deltaEnergy": phrase.delta_energy,
+                "kind": phrase.kind,
+            }
+            for phrase in draft.phrases
+        ]
+        if phrases != expected["phrases"]:
+            mismatches.append(f"{case['name']}: phrases {phrases}")
+        if draft.structure_confidence != expected["structureConfidence"]:
+            mismatches.append(f"{case['name']}: {draft.structure_confidence}")
+
+    assert len(cases) >= 4
+    assert mismatches == []
+
+
+def test_analyzer_passes_chroma_and_mfcc_to_the_segmentation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from crate.smart_mix import analyzer
+
+    track = tmp_path / "dj.wav"
+    write_structured_track(track, DJ_SECTIONS[:3])
+    seen = []
+
+    def capture(beat_grid_ms, downbeats_ms, frames, sample_rate, **options):
+        seen.append(frames)
+        return analyzer.NO_STRUCTURE
+
+    monkeypatch.setattr(analyzer, "segment_phrases", capture)
+    analyzer.analyze_mix_profile(track)
+
+    (frames,) = seen
+    band_frames = frames.bands_db.shape[0]
+    assert frames.chroma.shape == (band_frames, 12)
+    assert frames.mfcc.shape == (band_frames, 13)

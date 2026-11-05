@@ -136,6 +136,26 @@ profile into a deck (Android, Crate Decks) must follow these definitions.
 and `structureConfidence`. Readers accept v7, v6 and v5 profiles
 (`READABLE_ANALYZER_VERSIONS`); writers, the backfill and Admin coverage target v7.
 
+Phrases follow a novelty curve at bar boundaries (`structure.py`, mirrored by
+`structure.rs`). Each bar gets its mean RMS level, the balance of three mel bands, its mean
+chroma and the mean of 13 MFCC, from the frames centred in the bar less 50 ms at each end.
+The novelty of a boundary compares the four bars before it with the four after it, gap bars
+left out:
+
+- level change plus half the balance change, less 0.5 dB and never below 0 (the v7 measure);
+- plus harmony (SM3-D17): 2 dB (`HARMONY_WEIGHT`) per unit of cosine distance between the
+  two mean chromas;
+- plus timbre: 8 dB (`TIMBRE_WEIGHT`) per unit of distance between the two mean MFCC over
+  √13, each coefficient standardised over the bars from the first to the last music bar.
+
+A dynamic programme keeps the 8-bar grid boundaries whose novelty pays 4 dB each
+(`BOUNDARY_COST_DB`; boundaries on 16- and 32-bar multiples get 0.25 and 0.5 dB of bonus).
+Harmony alone never pays that cost: it decides a boundary together with level, balance or
+timbre. Chroma and MFCC are recomputed from the audio and not stored. The Rust chroma is not
+librosa's, so Python–Rust parity on real audio keeps its tolerance; the shared fixtures
+`structure_v1.json` (frames) and `structure_v2.json` (per-bar features with chroma and MFCC)
+pin the algorithm.
+
 Migration 147 stores the structure in nullable `track_mix_profiles` columns: `phrases`
 (JSON list of `start_beat`, `start_ms`, `bars`, `energy`, `delta_energy`, `kind`),
 `energy_curve` (one byte per bar), `vocal_presence` (one byte per phrase, see "Voice per

@@ -18,6 +18,7 @@ from crate.smart_mix.models import (
 )
 from crate.smart_mix.structure import (
     LOW_BAND_HZ,
+    MFCC_COEFFICIENTS,
     MID_BAND_HZ,
     NO_STRUCTURE,
     EnergyFrames,
@@ -83,7 +84,9 @@ def analyze_mix_profile(
             quality=MixProfileQuality.UNAVAILABLE,
         )
 
-    onset_envelope, low_onsets, chroma, bands = _frame_features(audio, sample_rate)
+    onset_envelope, low_onsets, chroma, bands, mfcc = _frame_features(
+        audio, sample_rate
+    )
     frame_ms = HOP_LENGTH * 1_000 / sample_rate
     if beats is None:
         tracked_ms, beat_frames = _tracked_beats(onset_envelope, sample_rate)
@@ -152,8 +155,13 @@ def analyze_mix_profile(
         else _structure_features(
             beat_grid_ms,
             downbeat_anchor_ms,
-            rms,
-            bands,
+            EnergyFrames(
+                rms=rms,
+                bands_db=bands,
+                band_hop=HOP_LENGTH,
+                chroma=chroma,
+                mfcc=mfcc,
+            ),
             sample_rate,
             grid_trusted=clear_phase,
         )
@@ -426,7 +434,12 @@ def _tempo_features(
 
 def _frame_features(
     audio: np.ndarray, sample_rate: int
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Onsets, bass onsets, chroma, band levels and MFCC, one row per STFT frame.
+
+    Chroma lags with the onset envelope (the downbeat features read them together);
+    bands and MFCC are not shifted: frame ``i`` is centred on ``i * HOP_LENGTH``.
+    """
     import librosa
 
     power = np.abs(librosa.stft(audio, n_fft=_FFT_SIZE, hop_length=HOP_LENGTH)) ** 2
@@ -448,7 +461,10 @@ def _frame_features(
         chroma = librosa.feature.chroma_stft(S=power, sr=sample_rate)
     lead = 1 + _FFT_SIZE // (2 * HOP_LENGTH)
     chroma = np.pad(chroma, ((0, 0), (lead - 1, 0)), mode="edge")[:, : onsets.size]
-    return onsets, low_onsets, chroma.T, _band_energies(mel_db, low_bands, mid_bands)
+    bands = _band_energies(mel_db, low_bands, mid_bands)
+    # The orthonormal DCT-II of the mel levels, as the Rust analyzer computes it.
+    mfcc = librosa.feature.mfcc(S=mel_db, n_mfcc=MFCC_COEFFICIENTS).T[: bands.shape[0]]
+    return onsets, low_onsets, chroma.T, bands, mfcc
 
 
 def _band_energies(mel_db: np.ndarray, low_bands: int, mid_bands: int) -> np.ndarray:
@@ -466,8 +482,7 @@ def _band_energies(mel_db: np.ndarray, low_bands: int, mid_bands: int) -> np.nda
 def _structure_features(
     beat_grid_ms: tuple[int, ...],
     downbeat_anchor_ms: int | None,
-    rms: np.ndarray,
-    bands: np.ndarray,
+    frames: EnergyFrames,
     sample_rate: int,
     *,
     grid_trusted: bool,
@@ -480,7 +495,7 @@ def _structure_features(
         return segment_phrases(
             beat_grid_ms,
             downbeats,
-            EnergyFrames(rms=rms, bands_db=bands, band_hop=HOP_LENGTH),
+            frames,
             sample_rate,
             grid_trusted=grid_trusted,
         )

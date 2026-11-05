@@ -14,17 +14,29 @@ holds ``activeStartMs`` and the last one ends no later than the bar that holds
 a drop, a dropout): they are missing data for the novelty, the phrase levels and the
 typical level, and a phrase boundary never lands on one. Longer silences are music.
 
-A section change shows as novelty at a bar boundary: the change of mean bar level (dB)
-and spectral balance between the four bars before and the four bars after it, gaps
-left out. Boundaries closer than four bars to either end of the music get none: a
-truncated window cannot tell a pickup or a fade-in from a section change. Its peaks are the local maxima of at least 1 dB, skipping gap bars; a run of
+A section change shows as novelty at a bar boundary, comparing the four bars before it
+with the four bars after it, gaps left out: the change of mean bar level (dB) and
+spectral balance, less 0.5 dB of noise and never below 0, plus harmony and timbre
+(SM3-D17), so a section that changes chords or sound without changing level counts too.
+Harmony is ``HARMONY_WEIGHT`` times the cosine distance between the mean chroma of the
+two windows (0 when either is silent). Timbre is ``TIMBRE_WEIGHT`` times the distance
+between their mean MFCC divided by the square root of ``MFCC_COEFFICIENTS``, each
+coefficient standardised over the bars from the first to the last music bar (gaps
+included; a constant one divides by 1), so loudness (the first coefficient) and colour
+weigh alike. A bar's chroma and MFCC are the means of the band frames centred inside
+it, the frames that exist in all three arrays; without chroma or MFCC frames both terms
+are 0 and the novelty is v7's. Boundaries closer than four bars to either end of the
+music get none: a truncated window cannot tell a pickup or a fade-in from a section
+change. Its peaks are the local maxima of at least 1 dB, skipping gap bars; a run of
 equal values is one peak, so a long fade or ramp makes one wide peak. Phrases are 8, 16
 or 32 bars on an 8-bar grid. For a grid starting on each of the first eight music bars,
-a dynamic programme keeps the grid boundaries whose novelty pays for a fixed cost, so
-steady stretches merge into 16- and 32-bar phrases (boundaries on 16- and 32-bar
-multiples get a small bonus). The grid with the highest confidence wins: the one whose
-boundaries explain the most section changes. The first music bar keeps the grid unless
-another start beats it by ``OFFSET_ZERO_PREFERENCE``.
+a dynamic programme keeps the grid boundaries whose novelty pays for a fixed cost of
+``BOUNDARY_COST_DB``, so steady stretches merge into 16- and 32-bar phrases (boundaries
+on 16- and 32-bar multiples get a small bonus). Harmony alone (at most 2 dB) never pays
+the cost; it decides a boundary together with level, balance or timbre. The grid with
+the highest confidence wins: the one whose boundaries explain the most section changes.
+The first music bar keeps the grid unless another start beats it by
+``OFFSET_ZERO_PREFERENCE``.
 
 Kinds follow rules over phrase level (mean power, in dB) and position. A peak is within
 1.5 dB of the loudest phrase and 1.5 dB above the track's typical (median bar) level, so
@@ -46,8 +58,8 @@ with the same constants and the same order of floating-point operations.
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -84,8 +96,13 @@ MAX_GAP_BARS = 2
 NOVELTY_WINDOW_BARS = 4
 NOVELTY_NOISE_DB = 0.5
 SPECTRAL_WEIGHT = 0.5
+# Harmony and timbre novelty (SM3-D17): dB per unit of chroma cosine distance and of
+# standardised MFCC distance, the first 13 MFCC of the mel bands.
+HARMONY_WEIGHT = 2.0
+TIMBRE_WEIGHT = 8.0
+MFCC_COEFFICIENTS = 13
 OFFSET_ZERO_PREFERENCE = 0.05
-BOUNDARY_COST_DB = 1.0
+BOUNDARY_COST_DB = 4.0
 HYPERBAR_16_BONUS_DB = 0.25
 HYPERBAR_32_BONUS_DB = 0.5
 CAP_SEARCH_STEPS = 20
@@ -112,12 +129,17 @@ class EnergyFrames:
     ``rms`` holds the cue-detection RMS frames (``cue_detection.frame_rms``).
     ``bands_db`` holds, per beat-tracker STFT frame, the mean level (dB) of the mel
     bands below 200 Hz, below 2 kHz and above; frame ``i`` is centred on sample
-    ``i * band_hop``.
+    ``i * band_hop``. ``chroma`` (12 pitch classes) and ``mfcc``
+    (``MFCC_COEFFICIENTS``) are per-frame rows on the same frames, as the analyzer
+    computes them for the beat tracker (its chroma lags by the onset envelope's lead);
+    empty arrays leave harmony and timbre out of the novelty.
     """
 
     rms: np.ndarray
     bands_db: np.ndarray
     band_hop: int
+    chroma: np.ndarray = field(default_factory=lambda: np.empty((0, 12)))
+    mfcc: np.ndarray = field(default_factory=lambda: np.empty((0, MFCC_COEFFICIENTS)))
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,6 +168,9 @@ class _BarFeatures:
     levels: list[float]
     shapes: list[tuple[float, ...]]
     music: list[bool]
+    # Mean chroma (bars x 12) and MFCC (bars x MFCC_COEFFICIENTS) per bar.
+    chroma: np.ndarray
+    mfcc: np.ndarray
 
 
 def segment_phrases(
@@ -160,7 +185,17 @@ def segment_phrases(
     bars = _bars(beat_grid_ms, downbeats_ms)
     if not bars or sample_rate <= 0:
         return NO_STRUCTURE
-    features = _bar_features(bars, energy_frames, sample_rate)
+    return _segment_bars(
+        bars,
+        _bar_features(bars, energy_frames, sample_rate),
+        grid_trusted=grid_trusted,
+    )
+
+
+def _segment_bars(
+    bars: list[_Bar], features: _BarFeatures, *, grid_trusted: bool
+) -> StructureDraft:
+    """The segmentation from per-bar features, the input the shared fixtures give."""
     curve = bytes(_energy_byte(level) for level in features.levels)
     music = [index for index, is_music in enumerate(features.music) if is_music]
     if not music or music[-1] + 1 - music[0] < MIN_STRUCTURE_BARS:
@@ -168,7 +203,13 @@ def segment_phrases(
     first, last = music[0], music[-1] + 1
     levels = features.levels[first:last]
     gaps = _gaps(features.music[first:last])
-    novelty = _novelty(levels, features.shapes[first:last], gaps)
+    novelty = _novelty(
+        levels,
+        features.shapes[first:last],
+        gaps,
+        features.chroma[first:last],
+        features.mfcc[first:last],
+    )
     span = bars[first:last]
     starts, confidence = _best_grid(novelty, _peaks(novelty, gaps), span)
     if not grid_trusted:
@@ -201,20 +242,26 @@ def _bars(beat_grid_ms: Sequence[int], downbeats_ms: Sequence[int]) -> list[_Bar
 def _bar_features(
     bars: list[_Bar], frames: EnergyFrames, sample_rate: int
 ) -> _BarFeatures:
-    """Each bar's energy (dBFS), spectral balance and whether it holds music.
+    """Each bar's energy (dBFS), spectral balance, chroma, MFCC and whether it holds music.
 
     Energy is the mean power of the RMS frames that lie wholly inside the bar; the
     balance (band levels minus their mean) comes from the band frames centred inside
-    it. Both leave out the first and last ``BAR_EDGE_GUARD_MS`` of the bar. Frames are
-    read as 32-bit floats, as the Rust analyzer keeps them, and non-finite ones count
-    as silence.
+    it, and so do the mean chroma and MFCC, over the frames that exist in the band,
+    chroma and MFCC arrays alike (none: zeros). All leave out the first and last
+    ``BAR_EDGE_GUARD_MS`` of the bar. Frames are read as 32-bit floats, as the Rust
+    analyzer keeps them, and non-finite ones count as silence.
     """
     frame_length, hop = rms_frame_geometry(sample_rate)
     with np.errstate(over="ignore", invalid="ignore"):
         rms = np.asarray(frames.rms, dtype=np.float32)
         bands = np.asarray(frames.bands_db, dtype=np.float32).reshape(-1, BAND_COUNT)
+        chroma = np.asarray(frames.chroma, dtype=np.float32).reshape(-1, 12)
+        mfcc = np.asarray(frames.mfcc, dtype=np.float32).reshape(-1, MFCC_COEFFICIENTS)
     rms = np.where(np.isfinite(rms) & (rms > 0.0), rms, 0.0).astype(np.float64)
     bands = np.where(np.isfinite(bands), bands, 0.0).astype(np.float64)
+    tonal_frames = min(bands.shape[0], chroma.shape[0], mfcc.shape[0])
+    chroma_sums = _prefix_sums(chroma[:tonal_frames])
+    mfcc_sums = _prefix_sums(mfcc[:tonal_frames])
     power = rms * rms
     power_sums = np.concatenate(([0.0], np.cumsum(power)))
     peak = float(power.max()) if power.size else 0.0
@@ -229,7 +276,9 @@ def _bar_features(
     levels: list[float] = []
     shapes: list[tuple[float, ...]] = []
     music: list[bool] = []
-    for bar in bars:
+    bar_chroma = np.zeros((len(bars), 12))
+    bar_mfcc = np.zeros((len(bars), MFCC_COEFFICIENTS))
+    for index, bar in enumerate(bars):
         start = (bar.start_ms + BAR_EDGE_GUARD_MS) * sample_rate // 1_000
         end = (bar.end_ms - BAR_EDGE_GUARD_MS) * sample_rate // 1_000
         first = min(power.size, _ceil_div(start, hop))
@@ -257,7 +306,24 @@ def _bar_features(
             shapes.append(tuple(mean - centre for mean in means))
         else:
             shapes.append((0.0,) * BAND_COUNT)
-    return _BarFeatures(levels=levels, shapes=shapes, music=music)
+        tonal_first = min(tonal_frames, band_first)
+        tonal_last = min(tonal_frames, band_last)
+        if tonal_last > tonal_first:
+            count = tonal_last - tonal_first
+            bar_chroma[index] = (
+                chroma_sums[tonal_last] - chroma_sums[tonal_first]
+            ) / count
+            bar_mfcc[index] = (mfcc_sums[tonal_last] - mfcc_sums[tonal_first]) / count
+    return _BarFeatures(
+        levels=levels, shapes=shapes, music=music, chroma=bar_chroma, mfcc=bar_mfcc
+    )
+
+
+def _prefix_sums(frames: np.ndarray) -> np.ndarray:
+    """Running sums of float32 frame rows in float64, non-finite values as 0."""
+    with np.errstate(invalid="ignore"):
+        values = np.where(np.isfinite(frames), frames, 0.0).astype(np.float64)
+    return np.vstack((np.zeros(values.shape[1]), np.cumsum(values, axis=0)))
 
 
 def _gaps(music: list[bool]) -> list[bool]:
@@ -278,7 +344,11 @@ def _gaps(music: list[bool]) -> list[bool]:
 
 
 def _novelty(
-    levels: list[float], shapes: list[tuple[float, ...]], gaps: list[bool]
+    levels: list[float],
+    shapes: list[tuple[float, ...]],
+    gaps: list[bool],
+    chroma: np.ndarray,
+    mfcc: np.ndarray,
 ) -> list[float]:
     """Novelty at each bar boundary 0..len(levels).
 
@@ -286,21 +356,12 @@ def _novelty(
     """
     count = len(levels)
     novelty = [0.0] * (count + 1)
-    for boundary in range(NOVELTY_WINDOW_BARS, count - NOVELTY_WINDOW_BARS + 1):
-        if gaps[boundary]:
+    harmony, timbre = _harmony_timbre(chroma, mfcc, gaps)
+    for boundary in range(count + 1):
+        windows = _novelty_windows(boundary, gaps)
+        if windows is None:
             continue
-        before = [
-            bar
-            for bar in range(max(0, boundary - NOVELTY_WINDOW_BARS), boundary)
-            if not gaps[bar]
-        ]
-        after = [
-            bar
-            for bar in range(boundary, min(count, boundary + NOVELTY_WINDOW_BARS))
-            if not gaps[bar]
-        ]
-        if not before or not after:
-            continue
+        before, after = windows
         change = abs(
             _mean([levels[bar] for bar in after])
             - _mean([levels[bar] for bar in before])
@@ -311,10 +372,102 @@ def _novelty(
                 _mean([shapes[bar][band] for bar in after])
                 - _mean([shapes[bar][band] for bar in before])
             )
-        novelty[boundary] = max(
-            0.0, change + SPECTRAL_WEIGHT * spectral - NOVELTY_NOISE_DB
+        novelty[boundary] = (
+            max(0.0, change + SPECTRAL_WEIGHT * spectral - NOVELTY_NOISE_DB)
+            + HARMONY_WEIGHT * harmony[boundary]
+            + TIMBRE_WEIGHT * timbre[boundary]
         )
     return novelty
+
+
+def _novelty_windows(
+    boundary: int, gaps: list[bool]
+) -> tuple[list[int], list[int]] | None:
+    """The non-gap bars of the windows before and after a boundary, if it has novelty."""
+    count = len(gaps)
+    if (
+        boundary < NOVELTY_WINDOW_BARS
+        or boundary > count - NOVELTY_WINDOW_BARS
+        or gaps[boundary]
+    ):
+        return None
+    before = [
+        bar
+        for bar in range(max(0, boundary - NOVELTY_WINDOW_BARS), boundary)
+        if not gaps[bar]
+    ]
+    after = [
+        bar
+        for bar in range(boundary, min(count, boundary + NOVELTY_WINDOW_BARS))
+        if not gaps[bar]
+    ]
+    if not before or not after:
+        return None
+    return before, after
+
+
+def _harmony_timbre(
+    chroma: np.ndarray, mfcc: np.ndarray, gaps: list[bool]
+) -> tuple[list[float], list[float]]:
+    """Harmony and timbre at each bar boundary 0..len(gaps), unweighted (SM3-D17).
+
+    ``chroma`` and ``mfcc`` hold one row per bar. Boundaries without novelty windows
+    get 0, as do windows of silent chroma.
+    """
+    count = len(gaps)
+    harmony = [0.0] * (count + 1)
+    timbre = [0.0] * (count + 1)
+    chroma_rows = np.asarray(chroma, dtype=np.float64).reshape(-1, 12).tolist()
+    standard = _standardized_columns(
+        np.asarray(mfcc, dtype=np.float64).reshape(-1, MFCC_COEFFICIENTS).tolist()
+    )
+    for boundary in range(count + 1):
+        windows = _novelty_windows(boundary, gaps)
+        if windows is None:
+            continue
+        before, after = windows
+        harmony[boundary] = _cosine_distance(
+            _window_mean(chroma_rows, before), _window_mean(chroma_rows, after)
+        )
+        timbre[boundary] = _distance(
+            _window_mean(standard, before), _window_mean(standard, after)
+        ) / math.sqrt(MFCC_COEFFICIENTS)
+    return harmony, timbre
+
+
+def _standardized_columns(rows: list[list[float]]) -> list[list[float]]:
+    """Each column minus its mean, over its standard deviation (1 when within EPSILON)."""
+    if not rows:
+        return []
+    columns = []
+    for column in zip(*rows, strict=True):
+        mean = _mean(column)
+        deviation = math.sqrt(
+            _mean([(value - mean) * (value - mean) for value in column])
+        )
+        scale = deviation if deviation > EPSILON else 1.0
+        columns.append([(value - mean) / scale for value in column])
+    return [list(row) for row in zip(*columns, strict=True)]
+
+
+def _window_mean(rows: list[list[float]], bars: list[int]) -> list[float]:
+    return [
+        _sum(rows[bar][column] for bar in bars) / len(bars)
+        for column in range(len(rows[bars[0]]))
+    ]
+
+
+def _cosine_distance(left: list[float], right: list[float]) -> float:
+    denominator = math.sqrt(_sum(value * value for value in left)) * math.sqrt(
+        _sum(value * value for value in right)
+    )
+    if denominator == 0.0:
+        return 0.0
+    return 1.0 - _sum(a * b for a, b in zip(left, right, strict=True)) / denominator
+
+
+def _distance(left: list[float], right: list[float]) -> float:
+    return math.sqrt(_sum((b - a) * (b - a) for a, b in zip(left, right, strict=True)))
 
 
 def _peaks(novelty: list[float], gaps: list[bool]) -> list[_Peak]:
@@ -534,7 +687,7 @@ def _power_level(levels_db: Sequence[float]) -> float:
     return _power_db(_mean([10.0 ** (level / 10.0) for level in levels_db]))
 
 
-def _sum(values: Sequence[float]) -> float:
+def _sum(values: Iterable[float]) -> float:
     # A plain left-to-right sum, the order the Rust analyzer adds in (the built-in
     # ``sum`` compensates rounding and would differ in the last bits).
     total = 0.0

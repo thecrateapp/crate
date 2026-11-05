@@ -19,6 +19,7 @@ app/tests/fixtures/recommendations/concubine.mix_edges.json
 
 # Smart Mix structure cases shared with crate-cli: keep the per-bar arrays compact.
 app/tests/fixtures/smart_mix/structure_v1.json
+app/tests/fixtures/smart_mix/structure_v2.json
 
 # Keep historical measurement summaries and complete musical records compact.
 docs/technical/evidence/music-paths/*.json

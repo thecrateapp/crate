@@ -584,3 +584,16 @@ def test_downbeat_phase_needs_a_consistent_bar(bars, kicks, beats, expected) -> 
     beat_frames, features = _bar_features(set(bars), set(kicks), beats)
 
     assert _downbeat_phase(beat_frames, window_frames=2, **features) == expected
+
+
+def test_frame_features_return_aligned_mfcc() -> None:
+    from crate.smart_mix.analyzer import _frame_features
+
+    rng = np.random.default_rng(5)
+    audio = (0.1 * rng.standard_normal(3 * SAMPLE_RATE)).astype(np.float32)
+
+    _, _, chroma, bands, mfcc = _frame_features(audio, SAMPLE_RATE)
+
+    assert mfcc.shape == (bands.shape[0], 13)
+    assert chroma.shape[0] == bands.shape[0]
+    assert np.isfinite(mfcc).all()
