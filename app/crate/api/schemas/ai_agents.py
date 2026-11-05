@@ -4,6 +4,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
 
+from crate.ai.actions import ACTIONS
 from crate.ai.contracts import (
     AIAction,
     LegacyProfileConfig,
@@ -28,6 +29,8 @@ Revision = Annotated[int, Field(ge=0, le=2147483647)]
 Stamp = Annotated[str, Field(max_length=100)]
 Code = Annotated[str, Field(max_length=80, pattern=r"^[A-Z0-9_]+$")]
 Fingerprint = Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+# Lists with one entry per registered action are bounded by the registry.
+MAX_ACTIONS = len(ACTIONS)
 
 
 class ConnectionCreate(ClosedModel):
@@ -97,7 +100,7 @@ class BindingChange(ClosedModel):
 
 
 class BindingBatch(ClosedModel):
-    changes: list[BindingChange] = Field(min_length=1, max_length=11)
+    changes: list[BindingChange] = Field(min_length=1, max_length=MAX_ACTIONS)
 
 
 class Activation(ClosedModel):
@@ -181,7 +184,7 @@ class Binding(ClosedModel):
 
 
 class BindingsResponse(ClosedModel):
-    bindings: list[Binding] = Field(max_length=11)
+    bindings: list[Binding] = Field(max_length=MAX_ACTIONS)
 
 
 class Engine(ClosedModel):
@@ -213,7 +216,7 @@ class DefaultModelState(ClosedModel):
     reasoning: ReasoningConfig
     available: bool
     error_code: Code | None
-    features: list[DefaultModelFeature] = Field(max_length=11)
+    features: list[DefaultModelFeature] = Field(max_length=MAX_ACTIONS)
 
 
 class Snapshot(ClosedModel):
@@ -221,12 +224,12 @@ class Snapshot(ClosedModel):
     revision: Revision
     migrated: bool
     review_fingerprint: Fingerprint
-    legacy_actions: list[LegacyActionPreview] = Field(max_length=11)
-    actions: list[AIAction] = Field(max_length=11)
+    legacy_actions: list[LegacyActionPreview] = Field(max_length=MAX_ACTIONS)
+    actions: list[AIAction] = Field(max_length=MAX_ACTIONS)
     engines: list[Engine] = Field(max_length=3)
     connections: list[ConnectionMetadata] = Field(max_length=1003)
     profiles: list[ProfileWithVersions] = Field(max_length=1000)
-    bindings: list[Binding] = Field(max_length=11)
+    bindings: list[Binding] = Field(max_length=MAX_ACTIONS)
     default_model: DefaultModelState | None = None
 
 
@@ -262,7 +265,7 @@ class ModelAssignmentResult(ClosedModel):
     activation: bool  # dry run: applying would activate; apply: it activated
     revision: Revision
     review_fingerprint: Fingerprint
-    outcomes: list[AssignmentOutcome] = Field(max_length=11)
+    outcomes: list[AssignmentOutcome] = Field(max_length=MAX_ACTIONS)
 
 
 class ActivationResponse(ClosedModel):
