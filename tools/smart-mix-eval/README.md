@@ -21,6 +21,7 @@ Store results by `entity_uid`, edge id or index, never by title or artist. The o
 | `render_pair.py`                               | Renders a plan and its two audio files to a WAV for listening              |
 | `blind_session.py`                             | Blind A/B rating of rendered pairs into `ratings.csv`                      |
 | `reference/`                                   | Analyzer reference tools (Queen Mary, KeyFinder, kick) used to measure v6  |
+| `structure/`                                   | Beats, downbeats and phrases against All-In-One and madmom (SMB.PR3)       |
 | `tests/`                                       | Unit tests of the tools                                                    |
 
 `tools/smart-mix-lab/` is the other lab: device captures, engine benchmarks and release
