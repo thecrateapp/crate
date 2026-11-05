@@ -1,5 +1,6 @@
 import logging
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable, Mapping, TypeGuard
 
@@ -44,6 +45,7 @@ from crate.db.repositories.library import (
     update_track_analysis,
 )
 from crate.db.repositories.tasks import create_task
+from crate.smart_mix.backfill_window import backfill_window_limit
 from crate.task_progress import TaskProgress, emit_progress, entity_label
 from crate.worker_handlers import TaskHandler, is_cancelled
 
@@ -68,9 +70,16 @@ _MAX_BACKFILL_FINGERPRINT_LIMIT = 50_000
 # Concurrency / backpressure constants
 _POPULARITY_CHUNK_SLEEP_SECONDS = 0.25
 _WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS = 300
-_SMART_MIX_BACKFILL_POLL_SECONDS = 15
+# The night-window limit keeps only a few analyses in flight, so a slot freed by
+# a finished analysis should be refilled within seconds rather than a poll later.
+_SMART_MIX_BACKFILL_POLL_SECONDS = 3
 _SMART_MIX_BACKFILL_MAX_WAIT_SECONDS = 600
 _sleep = time.sleep
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)
+
 
 # Registry of post-processing functions for fan-out coordinators.
 # Keyed by the child task_type. Called once by the last chunk to complete.
@@ -1338,24 +1347,33 @@ def _handle_backfill_smart_mix_profiles(
     ):
         return {"claimed": 0, "queued": 0, "paused": True}
 
-    batch_size = max(1, min(int(campaign.get("batch_size") or 25), 100))
-    max_attempts = int(campaign.get("max_attempts") or 3)
+    # Only the claims of this backfill count as in flight; imports and manual
+    # reanalyses never take a backfill claim. The night window sets how many may
+    # be in flight. A change of window, or of the settings, applies to the next
+    # claim; analyses already accepted keep running.
+    window = backfill_window_limit(campaign, now=_now())
     in_flight = count_smart_mix_in_flight()
     waited = 0
-    while in_flight >= batch_size and waited < _SMART_MIX_BACKFILL_MAX_WAIT_SECONDS:
+    while in_flight >= window.limit and waited < _SMART_MIX_BACKFILL_MAX_WAIT_SECONDS:
         _sleep(_SMART_MIX_BACKFILL_POLL_SECONDS)
         waited += _SMART_MIX_BACKFILL_POLL_SECONDS
         campaign = get_smart_mix_campaign()
         if not _smart_mix_campaign_running(campaign):
             return {"claimed": 0, "queued": 0, "control": _campaign_control(campaign)}
+        window = backfill_window_limit(campaign, now=_now())
         in_flight = count_smart_mix_in_flight()
-    if in_flight >= batch_size:
+    if in_flight >= window.limit:
         return {
             "claimed": 0,
             "queued": 0,
             "deferred": True,
+            "window": window.window,
+            "limit": window.limit,
             "next_task_id": queue_next_smart_mix_batch(),
         }
+
+    batch_size = max(1, min(int(campaign.get("batch_size") or 25), 100))
+    max_attempts = int(campaign.get("max_attempts") or 3)
 
     offline_ids = [
         int(track_id)
@@ -1365,7 +1383,7 @@ def _handle_backfill_smart_mix_profiles(
     from crate.crate_cli import has_subcommands, is_available
 
     claimed = claim_smart_mix_backfill_batch(
-        limit=batch_size - in_flight,
+        limit=min(batch_size, window.limit - in_flight),
         offline_track_ids=offline_ids,
         max_attempts=max_attempts,
         claimed_by=f"task:{task_id}",
@@ -1401,6 +1419,8 @@ def _handle_backfill_smart_mix_profiles(
         "claimed": len(claimed),
         "queued": queued,
         "released": len(released),
+        "window": window.window,
+        "limit": window.limit,
         "next_task_id": queue_next_smart_mix_batch(
             batches=1 if claimed else 0, claimed=len(claimed)
         ),

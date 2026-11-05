@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 import uuid
 
+import pytest
 from sqlalchemy import text
 
 from crate.db.jobs.smart_mix_backfill import claim_smart_mix_backfill_batch
@@ -757,7 +759,12 @@ def test_in_flight_counts_only_fresh_claims_of_the_current_target(
     assert count_smart_mix_in_flight() == 1
 
 
-def _handler_harness(monkeypatch, *, campaigns, in_flight, claimed=()):
+# 13:00 and 03:00 in Madrid (CET): outside and inside the default night window.
+DAY = datetime(2026, 1, 16, 12, 0, tzinfo=UTC)
+NIGHT = datetime(2026, 1, 16, 2, 0, tzinfo=UTC)
+
+
+def _handler_harness(monkeypatch, *, campaigns, in_flight, claimed=(), now=DAY):
     from crate.worker_handlers import analysis
 
     calls: dict[str, list] = {
@@ -765,7 +772,16 @@ def _handler_harness(monkeypatch, *, campaigns, in_flight, claimed=()):
         "children": [],
         "completed": [],
         "next": [],
+        "released": [],
     }
+    instants = iter(now if isinstance(now, list) else [now])
+    clock = {"value": None}
+
+    def current_time():
+        clock["value"] = next(instants, clock["value"])
+        return clock["value"]
+
+    monkeypatch.setattr(analysis, "_now", current_time)
     campaign_values = iter(campaigns)
     current = {"value": None}
 
@@ -793,7 +809,11 @@ def _handler_harness(monkeypatch, *, campaigns, in_flight, claimed=()):
             or f"child-{len(calls['children'])}"
         ),
     )
-    monkeypatch.setattr(analysis, "release_smart_mix_claims", lambda _ids: 0)
+    monkeypatch.setattr(
+        analysis,
+        "release_smart_mix_claims",
+        lambda ids: calls["released"].append(list(ids)) or 0,
+    )
     monkeypatch.setattr(
         analysis, "refresh_smart_mix_coverage", lambda **_kwargs: {"total_tracks": 1}
     )
@@ -844,7 +864,7 @@ def test_backfill_handler_claims_free_capacity_and_chains_the_next_batch(
         {"id": 6, "entity_uid": "uid-6", "claim_token": "task:task-1:b"},
     ]
     analysis, calls = _handler_harness(
-        monkeypatch, campaigns=[_running_campaign()], in_flight=[8], claimed=claimed
+        monkeypatch, campaigns=[_running_campaign()], in_flight=[2], claimed=claimed
     )
 
     result = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
@@ -921,6 +941,202 @@ def test_pausing_during_the_wait_stops_before_claiming(monkeypatch) -> None:
     assert result == {"claimed": 0, "queued": 0, "control": "paused"}
     assert calls["claims"] == []
     assert calls["next"] == []
+
+
+ACROSS_MIDNIGHT = {"start": "22:00", "end": "06:00", "timezone": "Europe/Madrid"}
+
+
+@pytest.mark.parametrize(
+    ("now", "window", "in_flight", "expected_window", "expected_claims"),
+    [
+        # 03:00 and 13:00 in Madrid with the default 01:00-08:00 window.
+        (NIGHT, None, 5, "night", 3),
+        (DAY, None, 1, "day", 3),
+        # 23:30 in Madrid, inside a window that crosses midnight.
+        (
+            datetime(2026, 1, 15, 22, 30, tzinfo=UTC),
+            ACROSS_MIDNIGHT,
+            0,
+            "night",
+            8,
+        ),
+        # 13:00 in Madrid, outside the window that crosses midnight.
+        (DAY, ACROSS_MIDNIGHT, 0, "day", 4),
+        # 07:30 CEST just after spring forward and 07:30 CET just after fall back:
+        # a fixed UTC offset would put one of them in the day.
+        (datetime(2026, 3, 29, 5, 30, tzinfo=UTC), None, 2, "night", 6),
+        (datetime(2026, 10, 25, 6, 30, tzinfo=UTC), None, 2, "night", 6),
+        # 08:30 CEST on a summer morning: already day.
+        (datetime(2026, 7, 16, 6, 30, tzinfo=UTC), None, 2, "day", 2),
+    ],
+)
+def test_backfill_limit_follows_night_window(
+    monkeypatch, now, window, in_flight, expected_window, expected_claims
+) -> None:
+    campaign = _running_campaign(batch_size=25)
+    if window is not None:
+        campaign["night_window"] = window
+    analysis, calls = _handler_harness(
+        monkeypatch,
+        campaigns=[campaign],
+        in_flight=[in_flight],
+        claimed=[{"id": 5, "entity_uid": "uid-5", "claim_token": "token-5"}],
+        now=now,
+    )
+
+    result = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+
+    assert calls["claims"][0]["limit"] == expected_claims
+    assert result["window"] == expected_window
+    assert result["limit"] == (8 if expected_window == "night" else 4)
+
+
+def test_window_concurrency_comes_from_the_campaign_and_batch_size_caps_a_pass(
+    monkeypatch,
+) -> None:
+    analysis, calls = _handler_harness(
+        monkeypatch,
+        campaigns=[
+            _running_campaign(batch_size=3, night_concurrency=12),
+            _running_campaign(batch_size=25, day_concurrency=2),
+        ],
+        in_flight=[0, 1],
+        now=[NIGHT, DAY],
+    )
+
+    analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+    analysis._handle_backfill_smart_mix_profiles("task-2", {}, {})
+
+    assert [claim["limit"] for claim in calls["claims"]] == [3, 1]
+
+
+def test_day_limit_keeps_a_saturated_backfill_from_claiming(monkeypatch) -> None:
+    analysis, calls = _handler_harness(
+        monkeypatch,
+        campaigns=[_running_campaign(batch_size=25)] * 100,
+        in_flight=[4] * 100,
+        now=DAY,
+    )
+    monkeypatch.setattr(analysis, "_SMART_MIX_BACKFILL_MAX_WAIT_SECONDS", 30)
+
+    result = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+
+    assert result["deferred"] is True
+    assert (result["window"], result["limit"]) == ("day", 4)
+    assert calls["claims"] == []
+
+
+def test_window_change_applies_on_the_next_batch_without_cancelling(
+    monkeypatch,
+) -> None:
+    # 07:59 and 08:00 in Madrid: eight analyses were accepted during the night.
+    last_night_minute = datetime(2026, 1, 16, 6, 59, tzinfo=UTC)
+    first_day_minute = datetime(2026, 1, 16, 7, 0, tzinfo=UTC)
+    analysis, calls = _handler_harness(
+        monkeypatch,
+        campaigns=[_running_campaign(batch_size=25)] * 100,
+        in_flight=[8, 8, 5, 5, 3],
+        now=[last_night_minute] + [first_day_minute] * 100,
+    )
+    monkeypatch.setattr(analysis, "_SMART_MIX_BACKFILL_POLL_SECONDS", 5)
+    monkeypatch.setattr(analysis, "_SMART_MIX_BACKFILL_MAX_WAIT_SECONDS", 15)
+
+    morning = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+    later = analysis._handle_backfill_smart_mix_profiles("task-2", {}, {})
+
+    assert morning["deferred"] is True
+    assert (morning["window"], morning["limit"]) == ("day", 4)
+    assert calls["released"] == []
+    assert [claim["limit"] for claim in calls["claims"]] == [1]
+    assert (later["window"], later["limit"]) == ("day", 4)
+
+
+def test_night_start_lets_a_waiting_coordinator_claim_more(monkeypatch) -> None:
+    # 00:59 and 01:00 in Madrid.
+    analysis, calls = _handler_harness(
+        monkeypatch,
+        campaigns=[_running_campaign(batch_size=25)] * 10,
+        in_flight=[4, 4],
+        now=[
+            datetime(2026, 1, 15, 23, 59, tzinfo=UTC),
+            datetime(2026, 1, 16, 0, 0, tzinfo=UTC),
+        ],
+    )
+
+    result = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+
+    assert [claim["limit"] for claim in calls["claims"]] == [4]
+    assert (result["window"], result["limit"]) == ("night", 8)
+
+
+def test_non_backfill_analysis_not_counted(pg_db, tmp_path: Path, monkeypatch) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        count_smart_mix_in_flight,
+        save_smart_mix_campaign,
+    )
+    from crate.db.repositories.tasks import create_task
+    from crate.worker_handlers import analysis
+
+    backfill, imported, reanalyzing, reanalyzed = _create_tracks(tmp_path, count=4)
+    _insert_processing(
+        backfill, state="analyzing", attempts=1, target_generation=ANALYZER_VERSION
+    )
+    # An import being analyzed holds claims in the analysis and bliss pipelines.
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO track_processing_state (
+                    track_id, pipeline, state, claimed_by, claimed_at, attempts
+                )
+                VALUES
+                    (:track_id, 'analysis', 'analyzing', 'analysis-daemon', NOW(), 1),
+                    (:track_id, 'bliss', 'analyzing', 'bliss-daemon', NOW(), 1)
+                """
+            ),
+            {"track_id": imported},
+        )
+    # A manual reanalysis runs as a task without a backfill claim, and one that
+    # finished leaves a done row without a claim.
+    manual_task = create_task(
+        "compute_smart_mix_profile",
+        {"track_id": reanalyzing},
+        dedup_key=f"smart-mix-profile:{reanalyzing}",
+        dispatch=False,
+    )
+    with transaction_scope() as session:
+        session.execute(
+            text("UPDATE tasks SET status = 'running' WHERE id = :id"),
+            {"id": manual_task},
+        )
+    _insert_processing(
+        reanalyzed, state="done", attempts=1, target_generation=ANALYZER_VERSION
+    )
+
+    assert count_smart_mix_in_flight() == 1
+
+    save_smart_mix_campaign(_running_campaign(batch_size=25))
+    claims: list[dict] = []
+    monkeypatch.setattr(analysis, "_now", lambda: DAY)
+    monkeypatch.setattr(
+        "crate.resource_governor.wait_while_pressured", lambda **_kwargs: True
+    )
+    monkeypatch.setattr(
+        analysis,
+        "claim_smart_mix_backfill_batch",
+        lambda **kwargs: claims.append(kwargs) or [],
+    )
+    monkeypatch.setattr(
+        analysis, "refresh_smart_mix_coverage", lambda **_kwargs: {"total_tracks": 4}
+    )
+    monkeypatch.setattr(
+        analysis, "queue_next_smart_mix_batch", lambda **_kwargs: "task-next"
+    )
+
+    analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+
+    assert [claim["limit"] for claim in claims] == [3]
 
 
 def test_a_pause_during_a_batch_survives_the_batch_finishing(pg_db) -> None:
@@ -1009,3 +1225,47 @@ def test_campaign_start_resets_counters_for_a_new_target_and_keeps_a_paused_one(
         7,
     )
     assert get_smart_mix_campaign()["batch_size"] == 20
+
+
+def test_campaign_stores_the_night_window_and_keeps_it_when_omitted(pg_db) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        get_smart_mix_campaign,
+        save_smart_mix_campaign,
+        start_smart_mix_campaign,
+    )
+
+    # A campaign saved before the night window existed reads the defaults.
+    save_smart_mix_campaign(_running_campaign(status="paused"))
+    resumed = start_smart_mix_campaign(batch_size=20, max_attempts=3)
+    assert (
+        resumed["night_window"],
+        resumed["night_concurrency"],
+        resumed["day_concurrency"],
+    ) == (
+        {"start": "01:00", "end": "08:00", "timezone": "Europe/Madrid"},
+        8,
+        4,
+    )
+
+    configured = start_smart_mix_campaign(
+        batch_size=20,
+        max_attempts=3,
+        night_window=ACROSS_MIDNIGHT,
+        night_concurrency=6,
+        day_concurrency=2,
+    )
+    assert configured["night_window"] == ACROSS_MIDNIGHT
+
+    # Omitted settings survive a resume and a new campaign after a cancel.
+    start_smart_mix_campaign(batch_size=25, max_attempts=3, day_concurrency=3)
+    save_smart_mix_campaign({**get_smart_mix_campaign(), "status": "cancelled"})
+    restarted = start_smart_mix_campaign(batch_size=25, max_attempts=3)
+
+    assert (restarted["batches"], restarted["claimed"]) == (0, 0)
+    assert (
+        restarted["night_window"],
+        restarted["night_concurrency"],
+        restarted["day_concurrency"],
+    ) == (ACROSS_MIDNIGHT, 6, 3)
+    assert get_smart_mix_campaign()["day_concurrency"] == 3

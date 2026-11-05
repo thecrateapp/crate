@@ -12,6 +12,7 @@ from sqlalchemy import text
 
 from crate.db.ops_runtime import get_ops_runtime_state, set_ops_runtime_state
 from crate.db.tx import optional_scope, read_scope
+from crate.smart_mix.backfill_window import merge_backfill_window_settings
 from crate.smart_mix.versions import (
     ANALYZER_VERSION,
     PROFILE_SCHEMA_VERSION,
@@ -450,7 +451,20 @@ def get_smart_mix_campaign() -> dict[str, Any] | None:
     return get_ops_runtime_state(CAMPAIGN_STATE_KEY)
 
 
-def start_smart_mix_campaign(*, batch_size: int, max_attempts: int) -> dict[str, Any]:
+def start_smart_mix_campaign(
+    *,
+    batch_size: int,
+    max_attempts: int,
+    night_window: dict[str, str] | None = None,
+    night_concurrency: int | None = None,
+    day_concurrency: int | None = None,
+) -> dict[str, Any]:
+    """Start, resume or reconfigure the campaign.
+
+    The night window settings describe the machine rather than one pass, so an
+    omitted setting keeps the value stored in the previous campaign, even a
+    finished one, and falls back to the default when there is none.
+    """
     current = get_smart_mix_campaign()
     continues = bool(current) and (
         current.get("target") == SMART_MIX_ANALYZER_VERSION
@@ -462,6 +476,12 @@ def start_smart_mix_campaign(*, batch_size: int, max_attempts: int) -> dict[str,
         "status": "running",
         "batch_size": max(1, min(int(batch_size), MAX_BACKFILL_BATCH_SIZE)),
         "max_attempts": max(1, min(int(max_attempts), 10)),
+        **merge_backfill_window_settings(
+            current,
+            night_window=night_window,
+            night_concurrency=night_concurrency,
+            day_concurrency=day_concurrency,
+        ),
     }
     if not continues:
         campaign.update({"batches": 0, "claimed": 0})
