@@ -226,6 +226,7 @@ def test_invalid_requests_are_refused_before_sentry(params):
 
     assert result["status"] == "failed"
     assert result["error_code"] == "ERROR_ISSUE_INVALID_REQUEST"
+    assert result["expected"] is False
 
 
 def test_unknown_issue_and_missing_configuration(pg_db):
@@ -284,6 +285,7 @@ def test_connection_test_auth_error(pg_db):
 
     assert result["status"] == "failed"
     assert result["error_code"] == "SENTRY_AUTH"
+    assert result["expected"] is True
     assert result["access"] == {"read": False, "write": False}
     assert TOKEN not in json.dumps(result)
     state = _access_state()
