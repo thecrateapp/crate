@@ -233,7 +233,7 @@ describe("ErrorDetail", () => {
 
     await userEvent.click(launchButton()!);
 
-    const dialog = screen.getByRole("dialog", {
+    const dialog = screen.getByRole("alertdialog", {
       name: "Launch a fix for CRATE-WORKERS-3K?",
     });
     expect(within(dialog).getByRole("note")).toHaveTextContent(
@@ -256,7 +256,7 @@ describe("ErrorDetail", () => {
       "POST",
       { note: "Started after the last deploy." },
     );
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Launching…" })).toBeDisabled();
     expect(pollTaskMock).toHaveBeenCalledWith(
       "task-fix",
@@ -345,7 +345,7 @@ describe("ErrorDetail", () => {
 
     await userEvent.click(launchButton()!);
     await userEvent.click(
-      within(screen.getByRole("dialog")).getByRole("button", {
+      within(screen.getByRole("alertdialog")).getByRole("button", {
         name: "Launch fix",
       }),
     );
@@ -355,7 +355,38 @@ describe("ErrorDetail", () => {
     );
     expect(pollTaskMock).not.toHaveBeenCalled();
     expect(refetchMock).toHaveBeenCalled();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("launch fix keeps the note when the API refuses for another reason", async () => {
+    apiMock.mockRejectedValue(
+      Object.assign(new Error('{"detail":"Not configured"}'), {
+        status: 409,
+        code: "ERROR_FIX_NOT_CONFIGURED",
+      }),
+    );
+    renderDetail(sampleDetail({ fix: sampleFix() }));
+
+    await userEvent.click(launchButton()!);
+    const dialog = screen.getByRole("alertdialog");
+    await userEvent.type(
+      within(dialog).getByLabelText("Note for the agent (optional)"),
+      "Keep me",
+    );
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Launch fix" }),
+    );
+
+    expect(toastMock.error).toHaveBeenCalledWith(
+      "Launch fix is not configured. Set it up in the Sentry connection.",
+    );
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("alertdialog")).getByLabelText(
+        "Note for the agent (optional)",
+      ),
+    ).toHaveValue("Keep me");
+    expect(refetchMock).not.toHaveBeenCalled();
   });
 
   it("launch fix reports a failed dispatch", async () => {
@@ -364,7 +395,7 @@ describe("ErrorDetail", () => {
 
     await userEvent.click(launchButton()!);
     await userEvent.click(
-      within(screen.getByRole("dialog")).getByRole("button", {
+      within(screen.getByRole("alertdialog")).getByRole("button", {
         name: "Launch fix",
       }),
     );

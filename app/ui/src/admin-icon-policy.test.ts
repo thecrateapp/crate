@@ -521,14 +521,9 @@ const approvedLibraryControls = new Map<string, number>([
     "app/ui/src/components/errors/ConnectionPanel.tsx:./FixSettingsForm:FixSettingsForm",
     1,
   ],
-  // The confirmation keeps the shared close control (conventional UX glyph);
-  // its footer only holds text buttons.
+  // The shared confirmation: close control and busy glyph are its own.
   [
-    "app/ui/src/components/errors/LaunchFix.tsx:@crate/ui/shadcn/dialog:DialogContent",
-    1,
-  ],
-  [
-    "app/ui/src/components/errors/LaunchFix.tsx:@crate/ui/shadcn/dialog:DialogFooter",
+    "app/ui/src/components/errors/LaunchFix.tsx:@crate/ui/composites/ConfirmDialog:ConfirmDialog",
     1,
   ],
   [

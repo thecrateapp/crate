@@ -1,16 +1,9 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ConfirmDialog } from "@crate/ui/composites/ConfirmDialog";
 import { FormField } from "@crate/ui/primitives/FormField";
 import { Button } from "@crate/ui/shadcn/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@crate/ui/shadcn/dialog";
 import { Textarea } from "@crate/ui/shadcn/textarea";
 
 import { useTaskPoll } from "@/hooks/use-task-poll";
@@ -49,6 +42,7 @@ export function LaunchFix({
   const [pending, setPending] = useState(false);
   const blocked = !fix.supported || fix.available_at !== null;
 
+  /** Queues the dispatch; a refusal throws so the dialog stays open. */
   async function launch() {
     setSending(true);
     let taskId: string;
@@ -59,18 +53,9 @@ export function LaunchFix({
         "POST",
         body,
       ));
-    } catch (caught) {
+    } finally {
       setSending(false);
-      const code = apiErrorCode(caught);
-      toast.error(fixProblemText(code));
-      if (code === "ERROR_FIX_RECENTLY_REQUESTED") {
-        setOpen(false);
-        onChanged();
-      }
-      return;
     }
-    setSending(false);
-    setOpen(false);
     setNote("");
     setPending(true);
     pollTask(
@@ -88,6 +73,15 @@ export function LaunchFix({
         onChanged();
       },
     );
+  }
+
+  function refused(caught: unknown) {
+    const code = apiErrorCode(caught);
+    toast.error(fixProblemText(code));
+    if (code === "ERROR_FIX_RECENTLY_REQUESTED") {
+      setOpen(false);
+      onChanged();
+    }
   }
 
   return (
@@ -111,65 +105,40 @@ export function LaunchFix({
               : null}
       </p>
 
-      <Dialog
+      <ConfirmDialog
         open={open}
-        onOpenChange={(next) => {
-          if (!sending) setOpen(next);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Launch a fix for {issue.short_id}?</DialogTitle>
-            <DialogDescription>
-              Crate asks GitHub Actions to run {fix.workflow} in{" "}
-              {fix.repository}. An agent tries to reproduce the error with a
-              test and, if it can, opens a draft pull request for review.
-              Nothing is merged without a person.
-            </DialogDescription>
-          </DialogHeader>
-
-          <p
-            role="note"
-            className="border-l-2 border-state-warning pl-3 text-sm text-state-warning-text"
-          >
-            {fix.repository} is a public repository. The short id and your note
-            will be visible to anyone in the workflow run. Do not include
-            personal data, file paths or secrets.
-          </p>
-
-          <FormField
-            label="Note for the agent (optional)"
-            hint={`${note.length} of ${MAX_FIX_NOTE_LENGTH} characters. Public.`}
-          >
-            <Textarea
-              rows={4}
-              maxLength={MAX_FIX_NOTE_LENGTH}
-              disabled={sending}
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-            />
-          </FormField>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={sending}
-              onClick={() => setOpen(false)}
+        onOpenChange={setOpen}
+        onConfirm={launch}
+        onError={refused}
+        title={`Launch a fix for ${issue.short_id}?`}
+        description={`Crate asks GitHub Actions to run ${fix.workflow} in ${fix.repository}. An agent tries to reproduce the error with a test and, if it can, opens a draft pull request for review. Nothing is merged without a person.`}
+        body={
+          <div className="grid gap-4">
+            <p
+              role="note"
+              className="border-l-2 border-state-warning pl-3 text-sm text-state-warning-text"
             >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              disabled={sending}
-              aria-busy={sending || undefined}
-              onClick={() => void launch()}
+              {fix.repository} is a public repository. The short id and your
+              note will be visible to anyone in the workflow run. Do not include
+              personal data, file paths or secrets.
+            </p>
+            <FormField
+              label="Note for the agent (optional)"
+              hint={`${note.length} of ${MAX_FIX_NOTE_LENGTH} characters. Public.`}
             >
-              {sending ? "Launching…" : "Launch fix"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <Textarea
+                rows={4}
+                maxLength={MAX_FIX_NOTE_LENGTH}
+                disabled={sending}
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+              />
+            </FormField>
+          </div>
+        }
+        confirmLabel="Launch fix"
+        size="md"
+      />
     </div>
   );
 }
