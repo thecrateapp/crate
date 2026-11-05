@@ -5,7 +5,7 @@ section: operations
 audience: [developer, operator]
 status: canonical
 order: 95
-verified: 2026-10-19
+verified: 2026-11-05
 sources:
   - app/crate/ai/actions.py
   - app/crate/ai/capabilities.py
@@ -24,6 +24,11 @@ sources:
   - app/tests/test_ai_architecture.py
   - app/tests/test_actor_config.py
   - app/crate/music_paths_refinement.py
+  - app/crate/error_inbox/triage.py
+  - app/crate/llm/prompts/error_triage.py
+  - app/crate/llm/prompts/error_investigate.py
+  - app/crate/db/migrations/versions/145_ai_action_error_inbox.py
+  - app/ui/src/components/ai-models/FeatureModelSheet.tsx
   - app/crate/credentials.py
   - app/crate/api/ai_agents.py
   - app/crate/db/repositories/ai_configuration.py
@@ -40,7 +45,7 @@ sources:
 
 # AI agents configuration
 
-Crate routes its eleven registered language model actions through explicit provider
+Crate routes its thirteen registered language model actions through explicit provider
 connections and immutable model profile versions. Admin exposes the configuration
 at `/ai` (**AI models**), with Default model, Features, Providers, Advanced and
 Activity panels; `/ai-agents` redirects to it. Domain buttons check their own action
@@ -71,7 +76,7 @@ establish live readiness or a known version.
    Its first use computes every action's derived limits and activates the whole
    configuration in one reviewed transaction; an action whose derived limits are
    incompatible with that model keeps its existing binding, or its inherited legacy
-   snapshot, instead of blocking the other ten. An image feature that can keep
+   snapshot, instead of blocking the other twelve. An image feature that can keep
    neither is turned off, and the review lists it with the reason.
 4. On Features, give one feature its own model when it should diverge from the
    default. This creates or reuses a profile version scoped to that single feature
@@ -131,14 +136,14 @@ They share the global invocation idempotency namespace, with unknown usage and c
 Unsupported inherited state is visible but cannot be chosen as a new validated adapter.
 
 Activation compares the reviewed configuration fingerprint and revision, then
-atomically snapshots all eleven inherited actions into internal immutable profiles
+atomically snapshots all thirteen inherited actions into internal immutable profiles
 and bindings. It preserves native omitted options and each action's inherited
 behavior. It does not copy environment API keys into the database. Prepared bindings
 remain pending before activation. Activation is explicit and one-time; creating a
 connection or profile does not activate it.
 
 **Default model.** Choosing a default model (`POST /api/admin/ai/default-model`) is
-the normal way to reach activation. For each of the eleven actions, Crate derives a
+the normal way to reach activation. For each of the thirteen actions, Crate derives a
 profile from the chosen model and requested reasoning alone, with no read of prior
 configuration: an image action requires an image-capable model with a known
 per-image token bound (`AI_ACTION_NEEDS_IMAGE`, `AI_IMAGE_BOUND_UNKNOWN`); output and
@@ -168,7 +173,7 @@ rule to every binding it writes, so an enabled image binding whose model can no
 longer run it fails activation with that code.
 Only an action left with no such fallback, such as one without enough context on
 the chosen model, still fails the whole assignment closed with `AI_SETUP_BLOCKED`,
-and activation itself stays all-or-nothing across the eleven actions. After
+and activation itself stays all-or-nothing across the thirteen actions. After
 activation nothing is turned off: incompatible features keep their current binding
 (`kept_current`). Activating keeps each inherited on/off state: Music Paths
 refinement stays off when the Settings switch is off, or when it runs on Ollama
@@ -240,6 +245,8 @@ are readable only through their owned domain routes.
 | `playlists.description.generate` | text            |              45 |                  2048 |
 | `music_paths.refine`             | text            |               8 |                  4096 |
 | `i18n.listen.draft`              | text            |              90 |                 16000 |
+| `ops.error.triage`               | error summary   |              45 |                  2048 |
+| `ops.error.investigate`          | error summary   |              90 |                  4096 |
 
 Profiles may lower these maxima; they cannot raise them. Input profiles are bounded
 by the model context and 131072 tokens. Vision admission requires a conservative
@@ -257,7 +264,7 @@ UTC daily budgets reserve the full input plus output allowance before transmissi
 Known usage settles the reservation; missing usage keeps the conservative charge.
 Concurrency is released exactly once. Pruning activity or reconciling stale work does
 not refund daily usage. Synthetic tests share these connection budgets as a separate
-invocation kind with no domain action ID; they are not a twelfth action.
+invocation kind with no domain action ID; they are not a fourteenth action.
 
 Activity contains actor/job, provider/model/profile identity, status, duration, safe
 errors and input/output/thought/cache/total/reserved/charged tokens. Input includes
@@ -271,6 +278,61 @@ Music Paths caches retain profile/model/prompt/schema provenance with the route
 content. A configuration change invalidates reuse under another identity. Existing
 domain provenance, show source manifests and owned biography evidence remain private;
 raw provider reasoning is discarded and never enters public activity or logs.
+
+## Error inbox actions
+
+`ops.error.triage` classifies one error issue and `ops.error.investigate` proposes
+its cause and a next step. Both belong to the `ops` group, open at `/errors` and
+require `ops.errors.manage`. Migration 145 admits them in the action CHECKs of
+`ai_action_bindings`, `ai_invocations`, `ai_usage_daily` and
+`ai_legacy_invocation_receipts`. Its downgrade deletes their bindings and keeps
+their invocation history and usage: the restored CHECKs on those three tables are
+`NOT VALID`, so they apply to new rows only.
+
+**What leaves the server.** Each call sends the bound provider:
+
+- the sanitized digest of the issue's latest event: the exception chain, the app's
+  own frames with the code lines the error tracker stored, allowlisted tags and
+  short breadcrumbs. Frame variables, request data and user data never enter it, and
+  `/music` paths, query strings, e-mail and IP addresses are reduced first;
+- the issue's service, level, status, counts and first and last release;
+- at most ten duplicate candidates (same `group_key` or same main exception type),
+  each reduced to its short ID, status, main exception and innermost app frame;
+- for an investigation, the current triage of that digest.
+
+The issue title, culprit and permalink are not sent. Neither the prompt nor the
+raw response is stored. With Ollama the summary stays on the operator's own
+server; with Gemini or DeepSeek it leaves it. Giving one of these features a model
+(**Use a different model**) or applying a default model that would bind them shows
+a line such as «Error summaries leave this server for Gemini.» in the dialog,
+unless the provider is Ollama. With an active configuration and no binding they are
+unavailable (`AI_ACTION_DISABLED`) and the inbox works without AI; before setup
+they follow the server settings like every other feature.
+
+**Untrusted input.** Any of that data can carry text written by an attacker: file
+names, URLs, headers or messages. The prompt fences it between
+`<untrusted_error_data>` tags as JSON with `<`, `>` and `&` escaped, so the data
+cannot close the fence, and the system prompt tells the model to ignore any
+instruction inside it.
+
+**Validation.** The response schema is closed and narrowed for each call:
+`classification` and `severity` are enums, the summary, hypothesis and next step
+have length limits, `duplicate_of` must be the short ID of a listed candidate and
+`suspected_frames` holds at most five indexes into the digest's frames. An
+investigation must also return a hypothesis and a next step. Any other output
+fails the invocation with `AI_RESPONSE_INVALID` and nothing is saved. A valid
+result goes to `error_issue_triage` with its invocation ID.
+
+**One result per issue, kind and digest.** `triage_issue`
+(`crate.error_inbox.triage`) returns an existing result without calling the
+model. Its idempotency key, `issue_id:kind:digest_hash`, keeps a redelivered task
+from paying twice; a failed call also keeps the key, so that digest is not
+retried. A new digest gets a new triage.
+
+**Where it runs.** The caller passes the structured executor, so the `ai` task
+handler that calls `triage_issue` is the root of the model-calling chain that the
+static check below verifies. No task or route calls these actions yet; until one
+does, a binding sends nothing.
 
 ## Where model calls run
 
