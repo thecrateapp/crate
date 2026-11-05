@@ -279,7 +279,7 @@ def test_persists_beat_tracker(pg_db, tmp_path: Path) -> None:
     path.write_bytes(b"tracked-source")
     track_id, _track_uid = _create_track(path)
     plain = replace(_draft(), analyzer_version=ANALYZER_VERSION)
-    tracked = replace(plain, beat_tracker="beat-this-small0")
+    tracked = replace(plain, beat_tracker="beat-this-small0-dbn")
     assert store_smart_mix_profile_result(track_id, path, plain) is True
     before = get_track_mix_profile(track_id)
     assert before is not None
@@ -288,7 +288,7 @@ def test_persists_beat_tracker(pg_db, tmp_path: Path) -> None:
 
     profile = get_track_mix_profile(track_id, include_structure=True)
     assert profile is not None
-    assert profile.beat_tracker == "beat-this-small0"
+    assert profile.beat_tracker == "beat-this-small0-dbn"
     # The tracker is part of the revision: the same values from another tracker are
     # another profile.
     assert profile.profile_revision != before.profile_revision
@@ -300,20 +300,21 @@ def test_persists_beat_tracker(pg_db, tmp_path: Path) -> None:
             text("SELECT beat_tracker FROM track_mix_profiles WHERE track_id = :id"),
             {"id": track_id},
         ).scalar_one()
-    assert stored == "beat-this-small0"
+    assert stored == "beat-this-small0-dbn"
 
 
 def test_draft_with_tracker_replaces_same_version(pg_db, tmp_path: Path) -> None:
     # Beat This! ships inside the analyzer version (SM3-D14), like the voice: a draft
-    # that brings a tracker, or another one, replaces a profile of the same version
-    # and quality; a draft without one never strips it.
+    # that brings a tracker, or another one (the DBN over the first builds' peak
+    # picking), replaces a profile of the same version and quality; a draft without
+    # one never strips it.
     del pg_db
     path = tmp_path / "replace.flac"
     path.write_bytes(b"replace-source")
     track_id, _track_uid = _create_track(path)
     own = replace(_draft(), analyzer="crate-python", analyzer_version=ANALYZER_VERSION)
     small = replace(own, downbeat_anchor_ms=1_000, beat_tracker="beat-this-small0")
-    final = replace(small, beat_tracker="beat-this-final0")
+    dbn = replace(small, beat_tracker="beat-this-small0-dbn")
 
     assert store_smart_mix_profile_result(track_id, path, own) is True
     assert store_smart_mix_profile_result(track_id, path, small) is True
@@ -323,14 +324,14 @@ def test_draft_with_tracker_replaces_same_version(pg_db, tmp_path: Path) -> None
     rust_own = replace(own, analyzer="crate-rust")
     assert store_smart_mix_profile_result(track_id, path, rust_own) is False
     # A tracker never downgrades a full profile.
-    partial = replace(final, quality=MixProfileQuality.PARTIAL)
+    partial = replace(dbn, quality=MixProfileQuality.PARTIAL)
     assert store_smart_mix_profile_result(track_id, path, partial) is False
-    assert store_smart_mix_profile_result(track_id, path, final) is True
+    assert store_smart_mix_profile_result(track_id, path, dbn) is True
 
     profile = get_track_mix_profile(track_id, include_structure=True)
     assert profile is not None
     assert (profile.beat_tracker, profile.downbeat_anchor_ms) == (
-        "beat-this-final0",
+        "beat-this-small0-dbn",
         1_000,
     )
 

@@ -1383,7 +1383,7 @@ def test_profile_task_runs_the_beat_model_before_the_analysis(monkeypatch) -> No
     draft = _v7_draft()
     published = _profile_task_harness(monkeypatch, draft)
     beats = BeatTrack(
-        tracker="beat-this-small0", beats_ms=(500, 1_000), downbeats_ms=(500,)
+        tracker="beat-this-small0-dbn", beats_ms=(500, 1_000), downbeats_ms=(500,)
     )
     calls: list[tuple[str, object]] = []
     monkeypatch.setattr(

@@ -1,17 +1,21 @@
 """Beats and downbeats from Beat This! for Smart Mix profiles (SM3-D14).
 
 Beat This! (Foscarin, Schlüter and Widmer, ISMIR 2024; CPJKU, code and weights MIT) is
-run without its DBN post-processing. The profile task runs it before the analysis and
-hands the result to the analyzer, Rust or Python: both take these beats instead of their
-own tracker, keep fitting the constant grid, and take the bar phase from the model's
-downbeats (``crate.smart_mix.phrase_grid.downbeat_anchor_from_model``).
+run with its DBN post-processing: madmom's ``DBNDownBeatTrackingProcessor`` with 3 or 4
+beats per bar. Its plain peak picking leaves spurious beats 80-100 ms apart in about
+half the tracks, so a grid built on them slips the bar and many tracks lost their
+downbeat. The profile task runs it before the analysis and hands the result to the
+analyzer, Rust or Python: both take these beats instead of their own tracker, keep
+fitting the constant grid, and take the bar phase from the model's downbeats
+(``crate.smart_mix.phrase_grid.downbeat_anchor_from_model``).
 
-Only the analysis worker has torch, ``beat_this`` and the checkpoint, which the image
-bakes in; nothing is ever downloaded at run time. Without them, when the model fails or
-for tracks over ``BEAT_MODEL_MAX_SECONDS``, there are no model beats and the analysis
-keeps its own tracker. ``CRATE_BEAT_THIS_CHECKPOINT`` names the checkpoint (``small0``
-by default, ``final0`` if it proves clearly better) and the profile records it in
-``beat_tracker``.
+Only the analysis worker has torch, ``beat_this``, madmom and the checkpoint, which the
+image bakes in; nothing is ever downloaded at run time. Without them, when the model
+fails or for tracks over ``BEAT_MODEL_MAX_SECONDS``, there are no model beats and the
+analysis keeps its own tracker: without madmom the model is off, never run without its
+DBN. ``CRATE_BEAT_THIS_CHECKPOINT`` names the checkpoint (``small0`` by default,
+``final0`` if it proves clearly better) and the profile records it, with the
+post-processing, in ``beat_tracker`` (``beat-this-small0-dbn``).
 """
 
 from __future__ import annotations
@@ -38,11 +42,16 @@ CHECKPOINT_ENV = "CRATE_BEAT_THIS_CHECKPOINT"
 WEIGHTS_ENV = "CRATE_BEAT_THIS_WEIGHTS"
 DEFAULT_CHECKPOINT = "small0"
 MODELS_DIR = Path("/app/models")
-BEAT_TRACKER = f"beat-this-{DEFAULT_CHECKPOINT}"
 THREADS_ENV = "TORCH_NUM_THREADS"
-_CHECKPOINT_NAME = re.compile(r"[a-z0-9_-]{1,20}")
-# Besides torch, which only PANNS=off builds leave out.
-_MODEL_MODULES = ("beat_this",)
+_TRACKER_PREFIX = "beat-this-"
+# The post-processing is part of the tracker: beats from Beat This!'s plain peak
+# picking were named without it.
+_TRACKER_SUFFIX = "-dbn"
+BEAT_TRACKER = f"{_TRACKER_PREFIX}{DEFAULT_CHECKPOINT}{_TRACKER_SUFFIX}"
+# Short enough for the tracker name to fit the profile (MAX_BEAT_TRACKER, 32).
+_CHECKPOINT_NAME = re.compile(r"[a-z0-9_-]{1,18}")
+# Besides torch, which only PANNS=off builds leave out. madmom runs the DBN.
+_MODEL_MODULES = ("beat_this", "madmom")
 _READ_BLOCK_FRAMES = 65_536
 
 
@@ -72,13 +81,13 @@ class BeatModel(Protocol):
 
 
 class BeatThisModel:
-    """Beat This! on the CPU, without the DBN, from a local checkpoint."""
+    """Beat This! on the CPU, with madmom's DBN, from a local checkpoint."""
 
     def __init__(self, path: Path, tracker: str) -> None:
         from beat_this.inference import Audio2Beats
 
         self.tracker = tracker
-        self._model = Audio2Beats(checkpoint_path=str(path), device="cpu", dbn=False)
+        self._model = Audio2Beats(checkpoint_path=str(path), device="cpu", dbn=True)
 
     def __call__(self, signal: np.ndarray, sample_rate: int) -> tuple[Any, Any]:
         import torch
@@ -94,7 +103,7 @@ def checkpoint_name() -> str:
 
 
 def beat_tracker_name() -> str:
-    return f"beat-this-{checkpoint_name()}"
+    return f"{_TRACKER_PREFIX}{checkpoint_name()}{_TRACKER_SUFFIX}"
 
 
 def weights_path() -> Path:

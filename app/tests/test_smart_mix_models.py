@@ -424,11 +424,14 @@ def test_rust_payload_carries_the_beat_tracker() -> None:
     assert mix_profile_draft_from_payload(payload).beat_tracker is None
     assert (
         mix_profile_draft_from_payload(
-            {**payload, "beatTracker": "beat-this-small0"}
+            {**payload, "beatTracker": "beat-this-small0-dbn"}
         ).beat_tracker
-        == "beat-this-small0"
+        == "beat-this-small0-dbn"
     )
-    assert profile(beat_tracker="beat-this-small0").beat_tracker == "beat-this-small0"
+    assert (
+        profile(beat_tracker="beat-this-small0-dbn").beat_tracker
+        == "beat-this-small0-dbn"
+    )
 
 
 def test_voice_is_kept_with_its_detector() -> None:

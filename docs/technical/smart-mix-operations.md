@@ -161,8 +161,12 @@ Since SM3-D14 the beats and the bar come from a model, because the onset heurist
 downbeat on the wrong beat of the bar on more than half of the tracks checked at gate SG1.
 
 - **Model.** Beat This! (CPJKU, ISMIR 2024; code and weights MIT), checkpoint `small0`,
-  without its DBN. The analysis image fetches the checkpoint and the licence in its
-  `beat-this-weights` stage, checks their sha256 and bakes them in as
+  with its DBN post-processing: madmom's `DBNDownBeatTrackingProcessor` with 3 or 4 beats
+  per bar. Without it, Beat This! picks peaks and leaves spurious beats 80-100 ms apart in
+  about half the tracks; on 127 reference tracks the grid then slipped and 34 % of the
+  phrase-genre tracks got no downbeat, against 9 % with the DBN, which also put more of
+  them on the right beat (86 against 65). The analysis image fetches the checkpoint and
+  the licence in its `beat-this-weights` stage, checks their sha256 and bakes them in as
   `/app/models/beat_this-small0.ckpt` and `/app/models/beat_this.LICENSE`; `beat-this` is
   installed next to torch against the installed version (`requirements-beat-this.txt`).
   `CRATE_BEAT_THIS_CHECKPOINT` names the checkpoint (`final0` needs the build arguments
@@ -186,18 +190,21 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   `outroDownbeatMs`) take the same rule over the 32 beats around each cue. A `crate-cli`
   whose `analyze --help` does not list `--beats` is not given them: it tracks its own
   beats and its profile has no `beat_tracker`.
-- **Fallback.** Without torch, `beat_this` or the weights, when the model fails or finds no
-  beats, and for tracks over 600 s, the analysis keeps its own tracker and heuristic and
-  the worker logs it. Only an image without torch (`PANNS=off`) leaves the model out on
-  purpose and logs it at info; with torch, a missing `beat_this` or missing weights mean a
+- **Fallback.** Without torch, `beat_this`, madmom or the weights, when the model fails or
+  finds no beats, and for tracks over 600 s, the analysis keeps its own tracker and
+  heuristic and the worker logs it. Without madmom the model is off: it never runs
+  without its DBN. Only an image without torch (`PANNS=off`) leaves the model out on
+  purpose and logs it at info; with torch, a missing `beat_this`, madmom or weights mean a
   broken image and log a warning.
-- **Storage.** Migration 149 adds `beat_tracker` (`beat-this-small0`), null with the
-  analyzer's own tracker. It is part of the profile revision. Beat This! ships inside
-  `smart-mix-audio-v7`: a draft that brings a tracker the stored profile lacks replaces it
-  at the same quality, and a run without the model never replaces a profile whose beats
-  came from it.
-- **Cost.** About 15 s of CPU for a 240 s track with one thread (`TORCH_NUM_THREADS`);
-  `test_beat_model_overhead_within_budget` (run with `--benchmark`) fails above 25 s.
+- **Storage.** Migration 149 adds `beat_tracker` (`beat-this-small0-dbn`: the checkpoint
+  and the post-processing), null with the analyzer's own tracker. It is part of the
+  profile revision. Beat This! ships inside `smart-mix-audio-v7`: a draft that brings a
+  tracker the stored profile lacks, or another one (`beat-this-small0-dbn` over the
+  `beat-this-small0` of the first, peak-picking builds), replaces it at the same quality,
+  and a run without the model never replaces a profile whose beats came from it.
+- **Cost.** About 15 s of CPU for a 240 s track with one thread (`TORCH_NUM_THREADS`), plus
+  1-3 s for the DBN; `test_beat_model_overhead_within_budget` (run with `--benchmark`)
+  fails above 25 s.
 
 ### Voice per phrase
 

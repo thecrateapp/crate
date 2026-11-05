@@ -47,7 +47,7 @@ def test_run_analyze_returns_none_when_binary_lacks_analyze(monkeypatch):
 
 
 _BEATS = {
-    "tracker": "beat-this-small0",
+    "tracker": "beat-this-small0-dbn",
     "beats_ms": [500, 1_000, 1_500],
     "downbeats_ms": [500],
 }
