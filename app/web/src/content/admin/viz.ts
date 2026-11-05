@@ -629,6 +629,8 @@ export const QUEUE_ORDER = [
   "fast",
   "heavy",
   "playback",
+  "ai",
+  "ai_bulk",
 ] as const;
 
 export const QUEUE_PICKS: Record<(typeof QUEUE_ORDER)[number], string[]> = {
@@ -657,6 +659,14 @@ export const QUEUE_PICKS: Record<(typeof QUEUE_ORDER)[number], string[]> = {
   ],
   heavy: ["backfill_track_audio_fingerprints", "generate_cast_spectrum"],
   playback: ["prepare_stream_variant"],
+  ai: [
+    "propose_genre_eq",
+    "generate_playlist_description",
+    "refine_music_path",
+    "show_extract",
+    "research_artist_bio",
+  ],
+  ai_bulk: ["infer_genre_taxonomy", "rebuild_genre_taxonomy_proposals"],
 };
 
 export const IDENTITY_TAGS = [

@@ -10,6 +10,8 @@ const WORKERS: Record<string, string> = {
   fast: "worker · fast-worker",
   heavy: "analysis-worker",
   playback: "playback-worker",
+  ai: "worker",
+  ai_bulk: "worker",
 };
 const lanes = QUEUE_ORDER.map((queue) => ({
   queue,
@@ -19,9 +21,9 @@ const lanes = QUEUE_ORDER.map((queue) => ({
 }));
 ---
 
-<figure class="queues" data-viz="queues" data-reveal aria-label={`${scale.taskTypes} task types on five queues. Governed background work waits while the server is under load; user work keeps running.`}>
+<figure class="queues" data-viz="queues" data-reveal aria-label={`${scale.taskTypes} task types on seven queues. Governed background work waits while the server is under load; user work keeps running.`}>
   <header class="viz-bar" data-enter>
-    <p class="viz-label"><b>Operations</b> {scale.taskTypes} task types · five queues</p>
+    <p class="viz-label"><b>Operations</b> {scale.taskTypes} task types · seven queues</p>
     <p class="viz-label"><i class="key gov" aria-hidden="true"></i> governed by the resource governor</p>
   </header>
 

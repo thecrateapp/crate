@@ -10,6 +10,9 @@ const LANES: Record<string, { spawn: number; run: number; slots: number }> = {
   fast: { spawn: 0.9, run: 1.1, slots: 3 },
   heavy: { spawn: 3.6, run: 4.2, slots: 1 },
   playback: { spawn: 2.6, run: 1.4, slots: 1 },
+  // CRATE_AI_WORKER_THREADS and CRATE_AI_BULK_WORKER_THREADS default to 2 and 1.
+  ai: { spawn: 2.2, run: 3.2, slots: 2 },
+  ai_bulk: { spawn: 6.5, run: 7.5, slots: 1 },
 };
 const MAX_CHIPS = 7;
 const GAP = 6;
