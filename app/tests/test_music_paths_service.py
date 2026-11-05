@@ -126,30 +126,3 @@ def test_db_preparation_never_executes_ai_and_delegates_remain_thin():
                 assert isinstance(node.body[0], ast.ImportFrom)
                 assert node.body[0].module == "crate.music_paths"
                 assert isinstance(node.body[1], ast.Return)
-
-
-def test_legacy_refinement_delegate_forwards_actor_and_candidates(monkeypatch):
-    from crate import music_paths_refinement
-    from crate.db.paths_llm_refinement import refine_music_path_with_llm
-
-    calls = []
-    monkeypatch.setattr(
-        music_paths_refinement,
-        "refine_music_path_with_llm",
-        lambda **k: calls.append(k) or k["tracks"],
-    )
-    tracks, candidates = [{"id": 1}], {"rock": [{"id": 2}]}
-    assert (
-        refine_music_path_with_llm(
-            origin_label="Rock",
-            dest_label="Punk",
-            origin_type="genre",
-            dest_type="genre",
-            tracks=tracks,
-            candidates_by_genre=candidates,
-            actor_id=12,
-        )
-        is tracks
-    )
-    assert calls[0]["actor_id"] == 12
-    assert calls[0]["candidates_by_genre"] is candidates

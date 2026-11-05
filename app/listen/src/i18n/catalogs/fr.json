@@ -2140,5 +2140,6 @@
   "paths.warnings.quality": "Certaines transitions peuvent être moins fluides ou variées.",
   "paths.warnings.unavailable": "{count, plural, one {# titre enregistré est indisponible et sera ignoré.} other {# titres enregistrés sont indisponibles et seront ignorés.}}",
   "paths.warnings.trackUnavailable": "Indisponible",
-  "paths.warnings.noneAvailable": "Aucun des titres enregistrés n’est disponible à la lecture."
+  "paths.warnings.noneAvailable": "Aucun des titres enregistrés n’est disponible à la lecture.",
+  "paths.refinement.pending": "IA · Affinage"
 }

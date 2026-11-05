@@ -11,10 +11,18 @@ import type { ComponentProps } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { useApiMock, apiMock, llmStatusMock } = vi.hoisted(() => ({
-  useApiMock: vi.fn(),
-  apiMock: vi.fn(),
-  llmStatusMock: vi.fn(),
+const { useApiMock, apiMock, llmStatusMock, waitForTaskMock } = vi.hoisted(
+  () => ({
+    useApiMock: vi.fn(),
+    apiMock: vi.fn(),
+    llmStatusMock: vi.fn(),
+    waitForTaskMock: vi.fn(),
+  }),
+);
+
+// The proposal is built by a queued ai task (SMQ.PR2b).
+vi.mock("@/lib/tasks", () => ({
+  waitForTask: waitForTaskMock,
 }));
 
 vi.mock("@/hooks/use-api", () => ({
@@ -56,9 +64,11 @@ vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
     error: vi.fn(),
+    info: vi.fn(),
   },
 }));
 
+import { toast } from "sonner";
 import { GenreTaxonomyTree } from "./GenreTaxonomyTree";
 
 const taxonomyTree = {
@@ -111,6 +121,10 @@ const taxonomyTree = {
   top_level_slugs: ["hardcore", "punk"],
 };
 
+function resolveProposal(result: Record<string, unknown>) {
+  waitForTaskMock.mockResolvedValueOnce({ status: "completed", result });
+}
+
 function renderTree(
   props: Partial<ComponentProps<typeof GenreTaxonomyTree>> = {},
 ) {
@@ -124,6 +138,7 @@ function renderTree(
 describe("GenreTaxonomyTree", () => {
   beforeEach(() => {
     apiMock.mockReset();
+    waitForTaskMock.mockReset();
     apiMock.mockResolvedValue({});
     llmStatusMock.mockReset();
     llmStatusMock.mockReturnValue(null);
@@ -383,10 +398,153 @@ describe("GenreTaxonomyTree", () => {
     }
   });
 
-  it("stages description, relations and EQ from one enrichment call", async () => {
+  it("shows pending then the proposal staged in the EQ editor", async () => {
     llmStatusMock.mockReturnValue({ available: true });
     const eqGains = [1, 2, 1, 0, -1, 0, 1, 2, 1, 0];
     apiMock.mockResolvedValueOnce({
+      task_id: "proposal-1",
+      status: "queued",
+      deduplicated: false,
+    });
+    let finishTask: ((value: unknown) => void) | null = null;
+    waitForTaskMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishTask = resolve;
+        }),
+    );
+    renderTree({ canCurate: true });
+    fireEvent.click(screen.getByText("Hardcore"));
+    const enrichButton = screen.getByRole("button", { name: "Enrich with AI" });
+    fireEvent.click(enrichButton);
+
+    await waitFor(() =>
+      expect(waitForTaskMock).toHaveBeenCalledWith(
+        "proposal-1",
+        expect.any(Number),
+        expect.any(AbortSignal),
+      ),
+    );
+    expect(enrichButton).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByTestId("eq-editor")).toHaveAttribute(
+      "data-ai-gains",
+      "",
+    );
+    expect(
+      screen.queryByText("Enrichment proposal ready to review"),
+    ).not.toBeInTheDocument();
+
+    await act(async () => {
+      finishTask?.({
+        status: "completed",
+        result: {
+          description: "A forceful hardcore offshoot with metallic riffs.",
+          aliases: [],
+          relations: [],
+          eq_gains: eqGains,
+          eq_reasoning: "Shape the low mids and add presence.",
+          reasoning: "The local catalog points to punk lineage.",
+        },
+      });
+    });
+    expect(screen.getByTestId("eq-editor")).toHaveAttribute(
+      "data-ai-gains",
+      eqGains.join(","),
+    );
+    expect(enrichButton).not.toHaveAttribute("aria-busy");
+    expect(
+      screen.getByText("Enrichment proposal ready to review"),
+    ).toBeVisible();
+  });
+
+  it("keeps the curator's edits when the proposal arrives", async () => {
+    llmStatusMock.mockReturnValue({ available: true });
+    apiMock.mockResolvedValueOnce({ task_id: "proposal-5" });
+    let finishTask: ((value: unknown) => void) | null = null;
+    waitForTaskMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishTask = resolve;
+        }),
+    );
+    renderTree({ canCurate: true });
+    fireEvent.click(screen.getByText("Hardcore"));
+    fireEvent.click(screen.getByRole("button", { name: "Enrich with AI" }));
+    await waitFor(() => expect(waitForTaskMock).toHaveBeenCalled());
+    const description =
+      document.querySelector<HTMLTextAreaElement>("#genre-description")!;
+    fireEvent.change(description, { target: { value: "Curator copy" } });
+
+    await act(async () => {
+      finishTask?.({
+        status: "completed",
+        result: {
+          description: "AI copy",
+          aliases: [],
+          relations: [],
+          eq_gains: [1, 2, 1, 0, -1, 0, 1, 2, 1, 0],
+          eq_reasoning: "Presence.",
+          reasoning: "Lineage.",
+        },
+      });
+    });
+
+    expect(description.value).toBe("Curator copy");
+    // The paid proposal is still staged for review (EQ curve included).
+    expect(screen.getByTestId("eq-editor")).toHaveAttribute(
+      "data-ai-gains",
+      "1,2,1,0,-1,0,1,2,1,0",
+    );
+    expect(toast.info).toHaveBeenCalled();
+  });
+
+  it("abandons the proposal when another genre is selected", async () => {
+    llmStatusMock.mockReturnValue({ available: true });
+    apiMock.mockResolvedValueOnce({ task_id: "proposal-6" });
+    let signal: AbortSignal | undefined;
+    waitForTaskMock.mockImplementationOnce(
+      (_id: string, _timeout: number, taskSignal: AbortSignal) => {
+        signal = taskSignal;
+        return new Promise(() => {});
+      },
+    );
+    renderTree({ canCurate: true });
+    fireEvent.click(screen.getByText("Hardcore"));
+    fireEvent.click(screen.getByRole("button", { name: "Enrich with AI" }));
+    await waitFor(() => expect(signal).toBeDefined());
+
+    fireEvent.click(screen.getByText("Punk"));
+
+    expect(signal?.aborted).toBe(true);
+  });
+
+  it("reports a failed proposal task and stages nothing", async () => {
+    llmStatusMock.mockReturnValue({ available: true });
+    apiMock.mockResolvedValueOnce({ task_id: "proposal-2" });
+    waitForTaskMock.mockResolvedValueOnce({
+      status: "failed",
+      error: "Current actor is not authorized for this action",
+    });
+    renderTree({ canCurate: true });
+    fireEvent.click(screen.getByText("Hardcore"));
+    fireEvent.click(screen.getByRole("button", { name: "Enrich with AI" }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "Current actor is not authorized for this action",
+      ),
+    );
+    expect(screen.getByTestId("eq-editor")).toHaveAttribute(
+      "data-ai-gains",
+      "",
+    );
+  });
+
+  it("stages description, relations and EQ from one enrichment call", async () => {
+    llmStatusMock.mockReturnValue({ available: true });
+    const eqGains = [1, 2, 1, 0, -1, 0, 1, 2, 1, 0];
+    apiMock.mockResolvedValueOnce({ task_id: "proposal-3" });
+    resolveProposal({
       description: "A forceful hardcore offshoot with metallic riffs.",
       aliases: [],
       relations: [
@@ -446,7 +604,8 @@ describe("GenreTaxonomyTree", () => {
 
   async function stageHardcoreProposal() {
     llmStatusMock.mockReturnValue({ available: true });
-    apiMock.mockResolvedValueOnce({
+    apiMock.mockResolvedValueOnce({ task_id: "proposal-4" });
+    resolveProposal({
       description: "A forceful hardcore offshoot with metallic riffs.",
       aliases: ["hc"],
       relations: [

@@ -1,4 +1,10 @@
-"""Best-effort LLM reviewer for Music Paths."""
+"""Best-effort LLM reviewer for Music Paths.
+
+Requests never call the model (SM3-D8): ``refine_music_path_from_cache`` applies
+a cached review (a read) or reports that one is needed, and the
+``refine_music_path`` task on the ai lane runs ``refine_music_path_with_llm``
+with the accepted call and fills the 7-day cache.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +13,7 @@ import os
 import hashlib
 import json
 from collections.abc import Mapping
+from dataclasses import dataclass
 
 from crate.db.cache_settings import get_setting
 from crate.db.cache_store import get_cache, set_cache
@@ -28,6 +35,81 @@ _REFINEMENT_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
 _REFINEMENT_ENABLED_SETTING = "paths_llm_refinement_enabled"
 
 
+@dataclass(frozen=True)
+class RefinementOutcome:
+    """Tracks to store now and whether a model review still has to run."""
+
+    tracks: list[dict]
+    pending: bool = False
+    cached: bool = False
+
+
+def _cached_response(cache_key: str) -> MusicPathLlmRefinementResponse | None:
+    cached = get_cache(cache_key, max_age_seconds=_REFINEMENT_CACHE_TTL_SECONDS)
+    if isinstance(cached, dict):
+        try:
+            return MusicPathLlmRefinementResponse.model_validate(cached)
+        except ValueError:
+            log.debug("Ignoring invalid music path refinement cache entry")
+    return None
+
+
+def refine_music_path_from_cache(
+    *,
+    origin_label: str,
+    dest_label: str,
+    origin_type: str,
+    dest_type: str,
+    tracks: list[dict],
+    candidates_by_genre: Mapping[str, list[dict]],
+    actor_id: int | None = None,
+    recent_song_keys: set[tuple[str, str]] | None = None,
+    previous_song_keys: set[tuple[str, str]] | None = None,
+    previous_track_ids: set[int] | None = None,
+    validation_context: dict | None = None,
+) -> RefinementOutcome:
+    """Request path: apply a cached review inline or report one is needed.
+
+    Reading the cache is not a model call, so a hit is applied in the request.
+    A miss returns the deterministic tracks with ``pending=True``.
+    """
+    if len(tracks) < _MIN_TRACKS_FOR_REFINEMENT:
+        return RefinementOutcome(tracks)
+    alternatives = _select_alternatives(tracks, candidates_by_genre)
+    if not alternatives:
+        return RefinementOutcome(tracks)
+    try:
+        call = resolve_call("music_paths.refine", actor_id=actor_id)
+        context = call["context"]
+        if not _legacy_refinement_enabled(context):
+            return RefinementOutcome(tracks)
+        prompt = _build_refinement_prompt(
+            origin_label=origin_label,
+            dest_label=dest_label,
+            origin_type=origin_type,
+            dest_type=dest_type,
+            tracks=tracks,
+            alternatives=alternatives,
+        )
+        response = _cached_response(_cache_key(context, prompt))
+        if response is None:
+            return RefinementOutcome(tracks, pending=True)
+        _revalidate_refinement(call)
+        refined = _apply_replacements(
+            tracks,
+            alternatives,
+            response.replacements[:_MAX_REPLACEMENTS],
+            recent_song_keys=recent_song_keys,
+            previous_song_keys=previous_song_keys,
+            previous_track_ids=previous_track_ids,
+            validation_context=validation_context,
+        )
+        return RefinementOutcome(refined, cached=True)
+    except Exception:
+        log.debug("Music path refinement unavailable; retaining deterministic path")
+        return RefinementOutcome(tracks)
+
+
 def refine_music_path_with_llm(
     *,
     origin_label: str,
@@ -41,8 +123,13 @@ def refine_music_path_with_llm(
     previous_song_keys: set[tuple[str, str]] | None = None,
     previous_track_ids: set[int] | None = None,
     validation_context: dict | None = None,
+    ai_call: dict | None = None,
 ) -> list[dict]:
-    """Review outside DB scopes; any unavailable or stale review keeps the path."""
+    """Worker path: review once; any unavailable or stale review keeps the path.
+
+    ``ai_call`` is the call the refine_music_path task resumed from the request's
+    acceptance. Only AI-lane tasks may call this (tests/test_ai_architecture.py).
+    """
     if len(tracks) < _MIN_TRACKS_FOR_REFINEMENT:
         return tracks
     alternatives = _select_alternatives(tracks, candidates_by_genre)
@@ -50,7 +137,7 @@ def refine_music_path_with_llm(
         return tracks
 
     try:
-        call = resolve_call("music_paths.refine", actor_id=actor_id)
+        call = ai_call or resolve_call("music_paths.refine", actor_id=actor_id)
         context = call["context"]
         if not _legacy_refinement_enabled(context):
             return tracks
@@ -63,13 +150,7 @@ def refine_music_path_with_llm(
             alternatives=alternatives,
         )
         cache_key = _cache_key(context, prompt)
-        cached = get_cache(cache_key, max_age_seconds=_REFINEMENT_CACHE_TTL_SECONDS)
-        response = None
-        if isinstance(cached, dict):
-            try:
-                response = MusicPathLlmRefinementResponse.model_validate(cached)
-            except ValueError:
-                log.debug("Ignoring invalid music path refinement cache entry")
+        response = _cached_response(cache_key)
         if response is None:
             response = execute_structured(
                 "music_paths.refine",
@@ -234,5 +315,7 @@ def _text(value: object) -> str:
 __all__ = [
     "MusicPathLlmRefinementResponse",
     "MusicPathReplacement",
+    "RefinementOutcome",
+    "refine_music_path_from_cache",
     "refine_music_path_with_llm",
 ]

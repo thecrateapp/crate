@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel
 
-from crate.ai import configuration, transport
+from crate.ai import configuration, guard, requeue, transport
 from crate.ai.actions import get_action
 from crate.ai.contracts import AIConfigurationError, ProfileConfig
 from crate.ai.consumers import require_action_authority
@@ -79,7 +79,7 @@ def _parse(text):
     return json.loads(cleaned.strip())
 
 
-def execute_probe(context, *, api_key, prompt, response_schema):
+def execute_probe(context, *, api_key, prompt, response_schema, max_seconds=None):
     """One exact-profile synthetic call. Operations owns its reservation/finish."""
     config = ProfileConfig.model_validate(context["config"])
     if (
@@ -94,6 +94,7 @@ def execute_probe(context, *, api_key, prompt, response_schema):
         api_key=api_key,
         prompt=prompt,
         response_schema=response_schema,
+        **({} if max_seconds is None else {"max_seconds": max_seconds}),
     )
     try:
         data = _parse(result.text)
@@ -129,6 +130,7 @@ def execute_structured(
     server-owned context plus stable job/idempotency identity at execution. No raw
     result is saved in activity; repeat claims fail instead of paying twice.
     """
+    guard.require_ai_task("execute_structured", action_id)
     action = get_action(action_id)
     pinned = deepcopy(
         context
@@ -220,13 +222,19 @@ def execute_structured(
     admitted["schema_fingerprint"] = _hash(schema)
     admitted["config_fingerprint"] = context_fingerprint(admitted)
     key = idempotency_key or (f"job:{job_id}:{action_id}" if job_id else str(uuid4()))
-    invocation = usage.reserve_invocation(
-        admitted,
-        idempotency_key=f"action:{actor_id}:{key}",
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        actor_id=actor_id,
-        job_id=job_id,
+    # Inside an AI-lane task, never reserve a call the task cannot finish.
+    requeue.require_call_budget()
+    # A concurrency refusal transmits nothing; AI-lane tasks wait for capacity.
+    invocation = requeue.reserve_with_capacity_wait(
+        lambda: usage.reserve_invocation(
+            admitted,
+            idempotency_key=f"action:{actor_id}:{key}",
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            actor_id=actor_id,
+            job_id=job_id,
+            **requeue.reservation_options(),
+        )
     )
     if not invocation["claimed"]:
         raise AIConfigurationError(
@@ -238,6 +246,9 @@ def execute_structured(
         # Close the acceptance-to-network race; the loaded key remains pinned in memory.
         configuration.revalidate_context(pinned)
         require_action_authority(action_id, actor_id)
+        # The transport kills the call at this bound, so it ends before the task.
+        budget = requeue.require_call_budget()
+        bounded = {} if budget is None else {"max_seconds": budget}
         call = transport.generate_legacy if legacy else transport.generate
         result = call(
             pinned,
@@ -247,6 +258,7 @@ def execute_structured(
             response_schema=schema,
             image=image,
             media_type=media_type,
+            **bounded,
         )
         try:
             data = _parse(result.text)

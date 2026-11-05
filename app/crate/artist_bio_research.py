@@ -10,6 +10,7 @@ import os
 import re
 import socket
 import ssl
+import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from urllib.parse import quote, urljoin, urlparse, urlunsplit
@@ -604,14 +605,41 @@ def _collect_web_search(name: str) -> list[dict[str, object]]:
     return []
 
 
+# Total web collection budget (review M10): with one in-flight collector's own
+# request timeouts and the 90s model call, research fits its 300s task.
+COLLECTION_BUDGET_SECONDS = 100
+_MODEL_CALL_SECONDS = 90
+_FINISH_SECONDS = 15
+
+
+def collection_budget_seconds() -> float:
+    """Collection budget, shrunk to what the running AI task can still afford."""
+    from crate.ai.requeue import call_budget_seconds
+
+    remaining = call_budget_seconds()
+    if remaining is None:
+        return float(COLLECTION_BUDGET_SECONDS)
+    return max(
+        0.0,
+        min(
+            float(COLLECTION_BUDGET_SECONDS),
+            remaining - _MODEL_CALL_SECONDS - _FINISH_SECONDS,
+        ),
+    )
+
+
 def collect_artist_research_sources(
     artist: Mapping[str, object],
     *,
     progress: Callable[[str], None] | None = None,
+    budget_seconds: float | None = None,
 ) -> list[dict[str, object]]:
     name = str(artist.get("name") or "").strip()
     if not name:
         raise ValueError("Artist name is required")
+    deadline = time.monotonic() + (
+        collection_budget_seconds() if budget_seconds is None else budget_seconds
+    )
     sources: list[dict[str, object]] = []
     for label, collector in (
         (
@@ -622,6 +650,9 @@ def collect_artist_research_sources(
         ("Last.fm", lambda: _collect_lastfm(name)),
         ("Web search", lambda: _collect_web_search(name)),
     ):
+        if time.monotonic() >= deadline:
+            log.info("Artist research collection budget reached before %s", label)
+            break
         if progress:
             progress(f"Searching {label}")
         try:
@@ -632,6 +663,8 @@ def collect_artist_research_sources(
     urls = artist.get("urls_json")
     if isinstance(urls, dict):
         for index, (label, url) in enumerate(list(urls.items())[:3]):
+            if time.monotonic() >= deadline:
+                break
             safe_url = _safe_public_url(str(url))
             if not safe_url:
                 continue

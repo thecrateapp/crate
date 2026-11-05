@@ -235,8 +235,13 @@ export async function api<T>(
   const patch = (body ?? {}) as Partial<Playlist> & { track_ids?: number[] };
   return pending(() => {
     if (path.endsWith("/preview")) return structuredClone(fixture.preview) as T;
+    // SMQ.PR3: the route queues the draft in the ai lane and answers 202.
     if (path.endsWith("/ai-description"))
-      return structuredClone(fixture.description) as T;
+      return {
+        task_id: "sample-description",
+        status: "queued",
+        deduplicated: false,
+      } as T;
     if (path.endsWith("/refine")) return structuredClone(fixture.proposal) as T;
     if (path.endsWith("/duplicate"))
       return { ...surface.playlist, id: 99 } as T;
@@ -284,6 +289,14 @@ export async function api<T>(
       } as T;
     return structuredClone(surface.playlist) as T;
   }, fail);
+}
+export function waitForTask(taskId: string) {
+  if (taskId !== "sample-description")
+    throw new Error(`Unsupported editor sample task: ${taskId}`);
+  return Promise.resolve({
+    status: "completed",
+    result: { ...structuredClone(fixture.description), applied: false },
+  });
 }
 export function complete() {
   if (!state.pending) throw new Error("No pending editor sample");

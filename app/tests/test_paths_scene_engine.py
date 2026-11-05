@@ -710,8 +710,9 @@ def test_compute_scene_path_returns_music_path_entries(monkeypatch):
     assert tracks[-1]["progress"] == 1.0
 
 
-def test_compute_scene_path_applies_llm_refinement_before_entries(monkeypatch):
+def test_compute_scene_path_applies_cached_refinement_before_entries(monkeypatch):
     from crate import music_paths
+    from crate.music_paths_refinement import RefinementOutcome
     from crate.db import paths_scene
     from crate.db.queries import paths_scene_queries
 
@@ -754,8 +755,8 @@ def test_compute_scene_path_applies_llm_refinement_before_entries(monkeypatch):
     monkeypatch.setattr(paths_scene, "load_artist_radio_graphs", lambda: ({}, {}, {}))
     monkeypatch.setattr(
         music_paths,
-        "refine_music_path_with_llm",
-        lambda **kwargs: [punk_track, better_track],
+        "refine_music_path_from_cache",
+        lambda **kwargs: RefinementOutcome([punk_track, better_track], cached=True),
     )
 
     tracks = paths_scene.compute_scene_path(

@@ -167,6 +167,12 @@ export function scopesForUrl(url: string): string[] {
     const m = url.match(/^\/api\/playlists\/(\d+)/);
     if (m) scopes.push(`playlist:${m[1]}`);
   }
+  // Music Paths: a refined revision invalidates "path:{id}" (SMQ.PR4)
+  else if (url.startsWith("/api/paths")) {
+    scopes.push("paths");
+    const m = url.match(/^\/api\/paths\/(\d+)/);
+    if (m) scopes.push(`path:${m[1]}`);
+  }
   // Crate collection and detail queries share the broad invalidation scope.
   else if (url.startsWith("/api/crates")) scopes.push("crates");
   // Curation

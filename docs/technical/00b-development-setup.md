@@ -65,7 +65,10 @@ Runtime DSNs are injected by Compose. Browser DSNs are public identifiers and
 are embedded by the production image/mobile workflows. The
 `SENTRY_AUTH_TOKEN` Actions Secret is used only during trusted push builds to
 upload source maps, Android R8 mappings and Tauri native debug symbols; it is
-never stored in a runtime image. Android symbol upload runs only for signed tag
+never stored in a runtime image. The desktop workflow uploads only the shipped
+binary and its PDB or dSYM (`app/listen-desktop/scripts/debug-symbol-files.mjs`),
+and a Sentry failure there leaves a warning instead of keeping the packages out
+of the release. Android symbol upload runs only for signed tag
 releases. The current iOS workflow builds an unsigned simulator app, so there
 is no distributed iOS archive or production dSYM to upload yet.
 

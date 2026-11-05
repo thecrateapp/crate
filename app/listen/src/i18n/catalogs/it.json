@@ -2140,5 +2140,6 @@
   "paths.warnings.quality": "Alcune transizioni potrebbero essere meno fluide o varie.",
   "paths.warnings.unavailable": "{count, plural, one {# brano salvato non è disponibile e verrà saltato.} other {# brani salvati non sono disponibili e verranno saltati.}}",
   "paths.warnings.trackUnavailable": "Non disponibile",
-  "paths.warnings.noneAvailable": "Nessuno dei brani salvati è disponibile per la riproduzione."
+  "paths.warnings.noneAvailable": "Nessuno dei brani salvati è disponibile per la riproduzione.",
+  "paths.refinement.pending": "IA · Rifinitura"
 }

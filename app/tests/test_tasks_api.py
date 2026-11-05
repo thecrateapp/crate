@@ -206,6 +206,52 @@ class TestAdminTasksSnapshot:
         assert len(data["history"]) == 1
         assert data["history"][0]["id"] == "t99"
 
+    def test_keeps_ai_lanes_and_their_oldest_task(self, test_app):
+        lanes = {"fast": 0, "default": 0, "heavy": 0, "maintenance": 0, "playback": 0}
+        snapshot = {
+            "snapshot": {
+                "scope": "ops:tasks",
+                "subject_key": "surface:100",
+                "version": 2,
+                "stale": False,
+                "generation_ms": 8,
+            },
+            "live": {
+                "engine": "dramatiq",
+                "running_tasks": [],
+                "pending_tasks": [],
+                "recent_tasks": [],
+                "worker_slots": {"max": 3, "active": 0},
+                "queue_breakdown": {
+                    "running": {**lanes, "ai": 1, "ai_bulk": 0},
+                    "pending": {**lanes, "ai": 4, "ai_bulk": 2},
+                    "oldest_pending": {
+                        "ai": {
+                            "id": "t-ai",
+                            "type": "research_artist_bio",
+                            "created_at": "2026-11-04T10:00:00+00:00",
+                        }
+                    },
+                },
+                "db_heavy_gate": {"active": 0, "pending": 0, "blocking": False},
+                "systems": {"postgres": True, "watcher": True},
+            },
+            "history": [],
+        }
+        with patch("crate.api.tasks.get_cached_tasks_surface", return_value=snapshot):
+            resp = test_app.get("/api/admin/tasks-snapshot")
+
+        assert resp.status_code == 200
+        breakdown = resp.json()["live"]["queue_breakdown"]
+        assert breakdown["running"]["ai"] == 1
+        assert breakdown["pending"]["ai"] == 4
+        assert breakdown["pending"]["ai_bulk"] == 2
+        assert breakdown["oldest_pending"]["ai"] == {
+            "id": "t-ai",
+            "type": "research_artist_bio",
+            "created_at": "2026-11-04T10:00:00+00:00",
+        }
+
     def test_requires_admin(self, test_app):
         with patch(
             "crate.api.tasks.require_permission", side_effect=Exception("forbidden")

@@ -1288,3 +1288,119 @@ def test_grafana_target_tunnels_loopback_grafana_and_opens_it() -> None:
     assert "-L 3999:127.0.0.1:3001 crate@95.216.3.27" in output
     assert "ExitOnForwardFailure=yes" in output
     assert 'open "http://localhost:3999"' in output
+
+
+def _queue_contract(services: dict) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [
+            "python3",
+            "-I",
+            str(ROOT / "scripts/worker_queue_contract.py"),
+            "-",
+        ],
+        input=json.dumps({"services": services}),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _worker(queues: str) -> dict:
+    return {"command": ["worker", "--queues", queues, "--processes", "3"]}
+
+
+def test_preflight_requires_ai_consumers() -> None:
+    missing = _queue_contract(
+        {
+            "crate-worker": _worker("default,fast"),
+            "crate-maintenance-worker": _worker("maintenance"),
+            "crate-api": {"command": ["api"]},
+        }
+    )
+    assert missing.returncode == 1
+    assert "ai" in missing.stderr and "ai_bulk" in missing.stderr
+
+    partial = _queue_contract({"crate-worker": _worker("default,fast,ai")})
+    assert partial.returncode == 1
+    assert "ai_bulk" in partial.stderr
+
+    complete = _queue_contract({"crate-worker": _worker("default,fast,ai,ai_bulk")})
+    assert complete.returncode == 0, complete.stderr
+
+    unreadable = subprocess.run(
+        ["python3", "-I", str(ROOT / "scripts/worker_queue_contract.py"), "-"],
+        input="",
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert unreadable.returncode == 2
+    assert "Traceback" not in unreadable.stderr
+
+    local_script = (ROOT / "scripts/deploy.sh").read_text()
+    remote_script = (ROOT / "scripts/deploy-remote.sh").read_text()
+    local_body = local_script[
+        local_script.index("local_preflight() {") : local_script.index(
+            "sync_config() {"
+        )
+    ]
+    staging = local_script[
+        local_script.index("stage_remote_preflight_payload() {") : local_script.index(
+            "resolve_remote_release_settings() {"
+        )
+    ]
+    remote_body = remote_script[
+        remote_script.index("cmd_release_preflight() {") : remote_script.index(
+            "wait_for_container_running() {"
+        )
+    ]
+    assert "config --format json" in local_body
+    assert 'scripts/worker_queue_contract.py" -' in local_body
+    assert "scripts/worker_queue_contract.py" in staging
+    assert "config --format json" in remote_body
+    assert '"$DEPLOY_CANDIDATE_DIR/worker_queue_contract.py" -' in remote_body
+
+
+def test_production_compose_satisfies_the_worker_queue_contract() -> None:
+    services = yaml.safe_load((ROOT / "docker-compose.yaml").read_text())["services"]
+    result = _queue_contract(
+        {
+            name: {"command": service.get("command")}
+            for name, service in services.items()
+        }
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_worker_queue_contract_matches_the_ai_lanes() -> None:
+    from crate.ai.queues import AI_QUEUES
+
+    import runpy
+
+    contract = runpy.run_path(str(ROOT / "scripts/worker_queue_contract.py"))
+    assert contract["REQUIRED_QUEUES"] == AI_QUEUES
+
+
+@pytest.mark.parametrize(
+    "service,consumes",
+    [
+        ({"command": ["worker", "--queues=default,ai,ai_bulk"]}, True),
+        ({"command": "worker --queues=default,ai,ai_bulk --processes 2"}, True),
+        ({"command": ["worker", "--queues", "ai,ai_bulk"], "scale": 0}, False),
+        (
+            {
+                "command": ["worker", "--queues", "ai,ai_bulk"],
+                "deploy": {"replicas": 0},
+            },
+            False,
+        ),
+        (
+            {"command": ["worker", "--queues", "ai,ai_bulk"], "profiles": ["agent"]},
+            False,
+        ),
+    ],
+    ids=["equals-list", "equals-string", "scale-0", "replicas-0", "profile"],
+)
+def test_worker_queue_contract_reads_every_command_form(service, consumes) -> None:
+    result = _queue_contract({"crate-worker": service})
+    assert (result.returncode == 0) is consumes, result.stderr

@@ -17,6 +17,10 @@ export interface PathSummary {
   is_partial?: boolean;
   generated_step_count?: number;
   warnings?: { code: string; [key: string]: unknown }[];
+  /** Increments when a regeneration or an AI review replaces the tracks. */
+  revision?: number;
+  /** Present while an AI review is pending or after it ran (SMQ.PR4). */
+  refinement?: { status: string; [key: string]: unknown };
 }
 
 export interface PathTrack extends TrackMediaMetadata {

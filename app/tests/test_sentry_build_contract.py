@@ -169,3 +169,33 @@ def test_desktop_release_uploads_native_debug_symbols() -> None:
     assert step_names.index("Generate macOS dSYMs") < step_names.index(
         "Upload desktop native debug symbols"
     )
+
+
+def test_desktop_symbol_upload_sends_only_the_app_and_never_blocks_the_release() -> (
+    None
+):
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/build-desktop.yml").read_text()
+    )
+    steps = workflow["jobs"]["build-desktop"]["steps"]
+    step_names = [step.get("name") for step in steps]
+    symbol_step = steps[step_names.index("Upload desktop native debug symbols")]
+
+    # Only the shipped binary and its PDB/dSYM: the whole target folder carries
+    # build scripts and proc macros that Sentry rejects on Windows.
+    assert "app/listen-desktop/scripts/debug-symbol-files.mjs" in symbol_step["run"]
+    assert (
+        "--wait-for 120 app/listen-desktop/src-tauri/target" not in symbol_step["run"]
+    )
+
+    # A Sentry failure leaves a warning; packaging and the release upload go on.
+    assert "::warning" in symbol_step["run"]
+    assert "continue-on-error" not in symbol_step
+    assert step_names.index("Upload desktop native debug symbols") < step_names.index(
+        "Attach desktop artifacts to GitHub Release"
+    )
+
+    selection_test = steps[step_names.index("Test debug symbol selection")]
+    assert selection_test["run"] == (
+        "npm run --workspace=app/listen-desktop test:debug-symbols"
+    )

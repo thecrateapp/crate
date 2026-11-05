@@ -179,7 +179,7 @@ services:
       CRATE_OPERATOR_PRINCIPAL_IDS: ${CRATE_OPERATOR_PRINCIPAL_IDS:?Provision exact server-side operator principal IDs}
       CRATE_AGENT_INSTANCE_ID: ${CRATE_AGENT_INSTANCE_ID:?Provision instance identity}
       CRATE_READINESS_ROLE: worker
-      CRATE_READINESS_QUEUES: default,fast
+      CRATE_READINESS_QUEUES: default,fast,ai,ai_bulk
     volumes:
       - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/context/public:/run/crate-provenance:ro
       - ${CRATE_OPERATOR_ROOT:-${DATA_DIR}/crate-operator}/provenance:/run/crate-provenance-evidence:ro

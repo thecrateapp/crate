@@ -307,6 +307,9 @@ def discover_models(
     provider: str, *, api_key: str | None, endpoint: str | None = None
 ) -> list[dict]:
     """Discover normalized capability JSON; never execute inference or use env keys."""
+    from crate.ai.guard import require_ai_task
+
+    require_ai_task("discover_models")
     endpoint = validate_endpoint(provider, endpoint)
     if api_key is not None and (
         not isinstance(api_key, str)

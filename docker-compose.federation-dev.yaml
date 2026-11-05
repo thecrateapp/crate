@@ -229,6 +229,8 @@ services:
     cpus: "0.25"
 
   node-a-worker:
+    # The pools drain in-flight tasks on SIGTERM (crate.worker POOL_STOP_GRACE_SECONDS).
+    stop_grace_period: 2m
     build:
       context: ./app
       target: worker-core
@@ -249,6 +251,8 @@ services:
       - CRATE_WORKER_PROCESSES=1
       - FAST_WORKER_PROCESSES=1
       - MAINTENANCE_WORKER_PROCESSES=1
+      - CRATE_AI_WORKER_THREADS=${CRATE_AI_WORKER_THREADS:-2}
+      - CRATE_AI_BULK_WORKER_THREADS=${CRATE_AI_BULK_WORKER_THREADS:-1}
       - DOMAIN=node-a.federation.local
       - CRATE_FEDERATION_SUBJECT_SECRET=fed-dev-node-a-subject-secret-000000
       - CRATE_FEDERATION_DEV_ALLOW_HTTP=true
@@ -310,7 +314,7 @@ services:
       [
         "worker",
         "--queues",
-        "default,fast,maintenance",
+        "default,fast,maintenance,ai,ai_bulk",
         "--processes",
         "1",
         "--no-service-loop",
@@ -542,6 +546,8 @@ services:
     cpus: "0.25"
 
   node-b-worker:
+    # The pools drain in-flight tasks on SIGTERM (crate.worker POOL_STOP_GRACE_SECONDS).
+    stop_grace_period: 2m
     build:
       context: ./app
       target: worker-core
@@ -562,6 +568,8 @@ services:
       - CRATE_WORKER_PROCESSES=1
       - FAST_WORKER_PROCESSES=1
       - MAINTENANCE_WORKER_PROCESSES=1
+      - CRATE_AI_WORKER_THREADS=${CRATE_AI_WORKER_THREADS:-2}
+      - CRATE_AI_BULK_WORKER_THREADS=${CRATE_AI_BULK_WORKER_THREADS:-1}
       - DOMAIN=node-b.federation.local
       - CRATE_FEDERATION_SUBJECT_SECRET=fed-dev-node-b-subject-secret-000000
       - CRATE_FEDERATION_DEV_ALLOW_HTTP=true
@@ -623,7 +631,7 @@ services:
       [
         "worker",
         "--queues",
-        "default,fast,maintenance",
+        "default,fast,maintenance,ai,ai_bulk",
         "--processes",
         "1",
         "--no-service-loop",

@@ -94,6 +94,7 @@ export default defineConfig({
               "@/hooks/use-api",
               "@/hooks/use-llm",
               "@/hooks/use-snapshot-stream",
+              "@/lib/tasks",
             ].includes(source)
           )
             return fileURLToPath(

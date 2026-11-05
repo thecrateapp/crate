@@ -259,6 +259,9 @@ jobs:
       - name: Test stable artifact names
         run: npm run --workspace=app/listen-desktop test:stable-names
 
+      - name: Test debug symbol selection
+        run: npm run --workspace=app/listen-desktop test:debug-symbols
+
       - name: Test Linux glibc compatibility verifier
         if: runner.os == 'Linux'
         run: npm run --workspace=app/listen-desktop test:glibc
@@ -838,12 +841,21 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ninja-development
           SENTRY_PROJECT: crate-listen
-        run: >-
-          npx --no-install sentry-cli debug-files upload
-          --org "$SENTRY_ORG"
-          --project "$SENTRY_PROJECT"
-          --wait-for 120
-          app/listen-desktop/src-tauri/target
+        run: |
+          # Only the shipped binary and its PDB/dSYM: the rest of the target folder
+          # holds build scripts and proc macros that Sentry rejects on Windows. A
+          # missing binary fails the step; a Sentry failure only leaves a warning,
+          # so it never keeps the packages out of the release.
+          selected="$(node app/listen-desktop/scripts/debug-symbol-files.mjs app/listen-desktop/src-tauri/target)"
+          mapfile -t files <<<"$selected"
+          printf 'Uploading %s\n' "${files[@]}"
+          if ! npx --no-install sentry-cli debug-files upload \
+            --org "$SENTRY_ORG" \
+            --project "$SENTRY_PROJECT" \
+            --wait-for 120 \
+            "${files[@]}"; then
+            echo "::warning title=Desktop debug symbols::Sentry did not accept the ${{ matrix.name }} debug symbols. The packages are still published; native crashes from this build will not be symbolicated."
+          fi
 
       - name: Collect artifacts
         if: runner.os != 'macOS'

@@ -15,6 +15,14 @@ sources:
   - app/crate/ai/runtime.py
   - app/crate/ai/transport.py
   - app/crate/ai/operations.py
+  - app/crate/ai/queues.py
+  - app/crate/ai/guard.py
+  - app/crate/ai/requeue.py
+  - app/crate/actors.py
+  - app/crate/worker.py
+  - app/crate/api/ai_tasks.py
+  - app/tests/test_ai_architecture.py
+  - app/tests/test_actor_config.py
   - app/crate/music_paths_refinement.py
   - app/crate/credentials.py
   - app/crate/api/ai_agents.py
@@ -263,6 +271,125 @@ Music Paths caches retain profile/model/prompt/schema provenance with the route
 content. A configuration change invalidates reuse under another identity. Existing
 domain provenance, show source manifests and owned biography evidence remain private;
 raw provider reasoning is discarded and never enters public activity or logs.
+
+## Where model calls run
+
+Every provider call runs inside a Dramatiq task on one of two queues reserved for
+AI work (SM3-D8). Only `crate-worker` consumes them, each in its own pool (see
+[Smart Mix operations](smart-mix-operations.md#ai-worker-lanes-and-sizing) for
+sizing). Provider latency therefore never holds the general queues, and a long
+taxonomy batch never holds the interactive threads.
+
+| Lane      | Work                                                     | Time limit            | Task types (time limit in seconds)                                                                                                                                                                                                                                                                             |
+| --------- | -------------------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ai`      | One proposal, draft, extraction, analysis or admin probe | at most 300 s         | `ai_catalog_refresh` (180), `ai_profile_test` (180), `propose_genre_eq` (120), `generate_playlist_description` (120), `propose_genre_taxonomy_node` (180), `refine_music_path` (120), `analyze_artist_hero_candidate` (180), `show_extract` (180), `research_artist_bio` (300), `draft_i18n_translation` (300) |
+| `ai_bulk` | Long batches                                             | per task, no lane cap | `infer_genre_taxonomy` (3600), `rebuild_genre_taxonomy_proposals` (7200)                                                                                                                                                                                                                                       |
+
+Every AI task keeps `max_retries=0`: paid work is never retried.
+`enrich_genre_descriptions` reads Wikidata and Wikipedia only, calls no model
+and stays on `maintenance`.
+Task priority does not reorder a lane: Dramatiq applies an actor's priority only
+among the messages one pool process has already prefetched (twice its threads),
+so each lane runs close to first in, first out.
+
+### No model calls inside HTTP requests
+
+Routes never call a model. A route that needs one validates its input, pins the
+current configuration with `accept_action(action_id)` (action, fingerprint and
+profile identity only) and queues a task. The proposal routes below queue it
+through `crate.api.ai_tasks.queue_ai_task` and answer `202` with
+`{task_id, status, deduplicated}`; the client follows
+`/api/events/task/{task_id}` and reads the proposal from the task result. A
+duplicate request joins the active task. If that task finished between the
+dedup check and the lookup, the route returns the finished task with its
+status, so the client still reads the result it paid for; if no row is left, it
+queues a new task. An unavailable action answers `503` with the closed code in
+`X-Crate-Error` before anything is queued.
+
+| Request                                                  | Task                            | One active task per                        |
+| -------------------------------------------------------- | ------------------------------- | ------------------------------------------ |
+| `POST /api/genres/{slug}/generate-eq`                    | `propose_genre_eq`              | genre and apply mode                       |
+| `POST /api/genres/taxonomy/{slug}/proposal`              | `propose_genre_taxonomy_node`   | genre and a fingerprint of its inputs      |
+| `POST /api/admin/system-playlists/{id}/ai-description`   | `generate_playlist_description` | playlist, hash of its rules and apply mode |
+| `POST /api/artwork/artists/{id}/hero-candidates/analyze` | `analyze_artist_hero_candidate` | artist and image (origin and reference)    |
+| Music Path create or regenerate                          | `refine_music_path`             | path, revision and accepted configuration  |
+
+A Music Path request instead returns the deterministic path at once, applies a
+cached review inline (a read) and queues the review; the worker stores a changed
+path as the next revision. The other AI tasks are queued by their own routes
+and request flows. Handlers resume the accepted configuration with
+`resume_action`, which rechecks the actor's current permission before anything
+is sent; a handler that applies a proposal checks it once more first.
+
+Two checks keep it that way:
+
+- **Static.** `app/tests/test_ai_architecture.py` builds a call graph of
+  `app/crate` (`app/tests/ai_model_calls.py`). API modules may not import prompt
+  generators, `execute_structured`, the legacy provider, the transport, model
+  discovery, `run_probe`, `resolve_call` or `resume_action`, nor call anything
+  that reaches a provider, and every chain that reaches one must start in a
+  handler of an `ai` or `ai_bulk` task. Its exception list is empty; a new entry
+  needs an approved plan change.
+  `app/tests/test_actor_config.py` keeps every model-calling task on an AI lane,
+  every other task off them, `ai` at 300 s or less and AI retries at zero.
+- **Runtime.** `execute_structured`, `run_probe` and `discover_models` refuse with
+  `AI_OUTSIDE_AI_TASK` unless the actor opened an AI-lane window for the current
+  task (`crate.ai.guard`). This also covers dynamic dispatch that static analysis
+  cannot see. `CRATE_AI_LANE_GUARD=off` disables it; only the test session sets it.
+
+### Task deadlines
+
+No provider call outlives its task. The actor opens the AI window with a
+deadline: the moment the message started, plus the task's `time_limit_seconds`,
+minus 30 seconds (`AI_CALL_DEADLINE_MARGIN_SECONDS`) left for validation and
+persistence. Before reserving, and again right before transmitting, a call with
+less than one second left fails with `AI_TASK_DEADLINE`. Otherwise the remaining
+budget caps the transport, which kills its child at that point, also on the
+legacy Ollama and LiteLLM paths. Every AI task's limit leaves room for the
+longest action maximum (90 s) after the margin. Network work before the call
+has its own bound so it cannot eat that room: biography research stops starting
+collectors after 100 s, and a remote hero candidate download checks its 30 s
+budget after every socket read, so it stops within 42 s (each read waits at most
+12 s) even when the server trickles bytes.
+
+### Provider capacity: wait, do not fail
+
+`reserve_invocation` refuses with `AI_CONCURRENCY_LIMIT` when the connection
+already runs `max_concurrent` calls. Nothing has been sent at that point, so
+waiting and reserving again is not a transport retry and cannot pay twice.
+
+- **`ai`.** The runtime raises `AIConcurrencyDeferred`, which derives from
+  `BaseException` so that handlers cannot turn it into a failed result. The actor
+  moves the task from `running` back to `pending`, with the progress "Waiting for
+  AI provider capacity; retry n/10 in Ns", and sends it again after a jittered
+  5–30 s delay. After ten requeues the refusal surfaces as the closed error and
+  the task fails. A cancellation request wins over a requeue.
+- **Only before the first paid call.** A requeue runs the whole handler again, so
+  a task that has already reserved one call is never requeued: a later refusal
+  fails it with the closed error. Every `ai` handler makes exactly one model call
+  today. A handler that needs several calls must either accept that rule or run
+  on `ai_bulk`.
+- **`ai_bulk`.** A batch is never requeued, because it keeps its per-item results
+  in memory. Before each reservation it yields while `ai` has pending tasks, and
+  on a refusal it holds the item and reserves again, each wait a jittered 5–30 s
+  inside the task budget and at most ten per item. Once an item is still refused
+  after its ten waits, or the budget cannot fit another wait, the batch stops
+  waiting for every later item and ends with the results it already paid for.
+  On a connection with more than one slot, a bulk reservation leaves one slot
+  free for interactive work; a single-slot connection is shared.
+
+Bulk waits and `ai` requeues are counted in the `ai.capacity.wait` and
+`ai.capacity.requeue` metrics, per lane. The ops snapshot counts, per lane, the
+tasks whose progress says they are waiting for provider capacity. The Admin
+Tasks page shows `ai` and `ai_bulk` with their running and pending counts and
+the age of their oldest pending task, and draws a task waiting for capacity as
+deferred.
+
+A killed worker never finishes its reservation, which would keep the slot taken.
+Every 30 seconds the service loop fails zombie tasks and then reclaims
+reservations whose task is finished or gone, or that are older than 15 minutes.
+They finish as failed with `AI_INVOCATION_ABANDONED`; the slot comes back once
+and the charged tokens stay charged, so the daily budget is never refunded.
 
 ## Credential storage and rotation
 

@@ -2140,5 +2140,6 @@
   "paths.warnings.quality": "Some transitions may feel less smooth or varied.",
   "paths.warnings.unavailable": "{count, plural, one {# saved track is unavailable and will be skipped.} other {# saved tracks are unavailable and will be skipped.}}",
   "paths.warnings.trackUnavailable": "Unavailable",
-  "paths.warnings.noneAvailable": "None of the saved tracks are available to play."
+  "paths.warnings.noneAvailable": "None of the saved tracks are available to play.",
+  "paths.refinement.pending": "AI · Refining"
 }

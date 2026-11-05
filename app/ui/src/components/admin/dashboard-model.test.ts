@@ -97,7 +97,7 @@ describe("Dashboard interpretation of existing reports", () => {
       expect(model.daemons.length).toBe(kind === "unavailable" ? 0 : 2);
     },
   );
-  it("sums all five real queues without treating saturation or admission waits as incidents", () => {
+  it("sums all real queues without treating saturation or admission waits as incidents", () => {
     const input = data();
     input.live.queue_breakdown.running = {
       fast: 1,
@@ -105,6 +105,8 @@ describe("Dashboard interpretation of existing reports", () => {
       heavy: 3,
       maintenance: 4,
       playback: 5,
+      ai: 2,
+      ai_bulk: 1,
     };
     input.live.queue_breakdown.pending = {
       fast: 5,
@@ -112,12 +114,22 @@ describe("Dashboard interpretation of existing reports", () => {
       heavy: 3,
       maintenance: 2,
       playback: 1,
+      ai: 3,
+      ai_bulk: 0,
     };
     input.live.worker_slots = { active: 6, max: 6 };
     input.live.db_heavy_gate = { active: 1, pending: 3, blocking: true };
     const model = getDashboardModel(input, null, now);
-    expect(model.running).toBe(15);
-    expect(model.waiting).toBe(15);
+    expect(model.running).toBe(18);
+    expect(model.waiting).toBe(18);
+    expect(model.attention).toEqual([]);
+    // Snapshots written before the AI lanes existed still add up.
+    delete input.live.queue_breakdown.running.ai;
+    delete input.live.queue_breakdown.running.ai_bulk;
+    expect(getDashboardModel(input, null, now).running).toBe(15);
+    input.live.queue_breakdown.pending.ai = -1;
+    expect(getDashboardModel(input, null, now).waiting).toBeNull();
+    input.live.queue_breakdown.pending.ai = 3;
     expect(model.attention).toEqual([]);
     delete (
       input.live.queue_breakdown.pending as Partial<

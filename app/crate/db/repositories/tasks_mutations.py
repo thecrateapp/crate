@@ -18,6 +18,9 @@ from crate.db.repositories.tasks_updates import (
     fail_or_retry_task as _fail_or_retry_task,
 )
 from crate.db.repositories.tasks_updates import heartbeat_task as _heartbeat_task
+from crate.db.repositories.tasks_updates import (
+    requeue_running_task as _requeue_running_task,
+)
 from crate.db.repositories.tasks_updates import start_task as _start_task
 from crate.db.repositories.tasks_updates import update_task as _update_task
 
@@ -150,6 +153,10 @@ def heartbeat_task(task_id: str, *, session=None):
     _heartbeat_task(task_id, session=session)
 
 
+def requeue_running_task(task_id: str, *, progress: str, session=None) -> dict | None:
+    return _requeue_running_task(task_id, progress=progress, session=session)
+
+
 def save_scan_result(task_id: str, issues: list[dict], *, session=None):
     _save_scan_result(task_id, issues, session=session, dumps_fn=dumps)
 
@@ -161,6 +168,7 @@ __all__ = [
     "find_active_task_by_type_params",
     "heartbeat_task",
     "release_task_dedup_key",
+    "requeue_running_task",
     "save_scan_result",
     "start_task",
     "update_task",

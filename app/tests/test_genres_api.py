@@ -1,6 +1,7 @@
 """Contract tests for the Genre API endpoints."""
 
 from unittest.mock import ANY, patch
+import pytest
 from tests.ai_consumer_fakes import pin_actions
 
 
@@ -472,116 +473,116 @@ class TestGenreTaxonomyAPI:
         assert create_task.call_args.args[1]["type"] == "genre_cover"
         assert create_task.call_args.args[1]["slug"] == "post-hardcore"
 
-    def test_infer_taxonomy_node_proposal_returns_reviewable_diff(
-        self, test_app, monkeypatch, pg_db
+    @pytest.mark.parametrize("slug", ["post-hardcore", "instrumental"])
+    def test_infer_taxonomy_node_proposal_queues_the_ai_task(
+        self, test_app, monkeypatch, pg_db, slug
     ):
+        # SMQ.PR2b: the route accepts and queues; the worker builds the proposal.
         pin_actions(monkeypatch)
-        proposal = {
-            "ok": True,
-            "slug": "post-hardcore",
-            "name": "Post-Hardcore",
-            "description": "Angular post-punk pressure filtered through hardcore.",
-            "aliases": ["post hardcore"],
-            "relations": [
-                {
-                    "relation_type": "parent",
-                    "target_slugs": ["hardcore-punk"],
-                    "confidence": 0.88,
-                    "reasoning": "The genre emerged from hardcore.",
-                }
-            ],
-            "eq_gains": [0, 1, 2, 1, 0, -1, -2, -1, 0, 1],
-            "eq_reasoning": "A modest low-mid cut with a restrained presence lift.",
-            "reasoning": "Local artists and lineage match the node.",
-            "current_relations": {"parent": ["rock"]},
-        }
+        monkeypatch.setattr(
+            "crate.db.repositories.tasks_mutations.dispatch_task", lambda *_: None
+        )
         with (
-            patch("crate.api.genres.get_genre_taxonomy_node_id", return_value=1),
             patch(
-                "crate.api.genres.build_genre_taxonomy_node_proposal",
-                return_value=proposal,
-            ) as build_proposal,
+                "crate.api.genres.node_proposal_input_fingerprint",
+                return_value="f" * 64,
+            ) as fingerprint,
+            patch(
+                "crate.genre_taxonomy_proposals.build_genre_taxonomy_node_proposal",
+                side_effect=AssertionError("no model call in the request"),
+            ),
         ):
-            resp = test_app.post("/api/genres/taxonomy/post-hardcore/proposal")
+            resp = test_app.post(f"/api/genres/taxonomy/{slug}/proposal")
 
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["slug"] == "post-hardcore"
-        assert data["description"].startswith("Angular")
-        assert data["relations"][0]["relation_type"] == "parent"
-        assert data["eq_gains"] == [0, 1, 2, 1, 0, -1, -2, -1, 0, 1]
-        assert data["eq_reasoning"].startswith("A modest low-mid cut")
-        build_proposal.assert_called_once_with("post-hardcore", ai_call=ANY)
+        assert resp.status_code == 202, resp.text
+        assert resp.json()["task_id"]
+        fingerprint.assert_called_once_with(slug)
 
-    def test_infer_taxonomy_node_proposal_allows_raw_unmapped_genres(
-        self, test_app, monkeypatch, pg_db
+    @pytest.mark.parametrize(
+        "proposal",
+        [
+            {
+                "ok": True,
+                "slug": "post-hardcore",
+                "name": "Post-Hardcore",
+                "description": "Angular post-punk pressure filtered through hardcore.",
+                "aliases": ["post hardcore"],
+                "relations": [
+                    {
+                        "relation_type": "parent",
+                        "target_slugs": ["hardcore-punk"],
+                        "confidence": 0.88,
+                        "reasoning": "The genre emerged from hardcore.",
+                    }
+                ],
+                "eq_gains": [0, 1, 2, 1, 0, -1, -2, -1, 0, 1],
+                "eq_reasoning": "A modest low-mid cut with a restrained presence lift.",
+                "reasoning": "Local artists and lineage match the node.",
+                "current_relations": {"parent": ["rock"]},
+            },
+            {
+                "ok": True,
+                "slug": "instrumental",
+                "name": "Instrumental",
+                "source_kind": "raw_genre",
+                "recommended_action": "alias_existing",
+                "recommended_target_slug": "instrumental-rock",
+                "description": "Instrumental rock without vocals.",
+                "aliases": ["instrumental"],
+                "relations": [],
+                "reasoning": "Local evidence points to instrumental-rock.",
+                "current_relations": {},
+                "evidence": {"seed_artists": ["Mogwai"]},
+            },
+            {
+                "ok": True,
+                "slug": "instrumental",
+                "name": "Instrumental",
+                "source_kind": "raw_genre",
+                "recommended_action": "classify_facet",
+                "recommended_target_slug": None,
+                "facets": [
+                    {
+                        "dimension": "vocals",
+                        "slug": "instrumental",
+                        "name": "Instrumental",
+                    }
+                ],
+                "description": "",
+                "aliases": [],
+                "relations": [],
+                "eq_gains": [],
+                "reasoning": "This tag describes vocal presence rather than a genre.",
+                "current_relations": {},
+                "evidence": {"seed_artists": ["Mogwai"]},
+            },
+        ],
+        ids=["reviewable-diff", "raw-genre-alias", "raw-genre-facet"],
+    )
+    def test_taxonomy_proposal_task_returns_the_reviewable_proposal(
+        self, monkeypatch, pg_db, proposal
     ):
+        from crate.ai.consumers import accept_action
+        from crate.worker_handlers.ai_proposals import (
+            _handle_propose_genre_taxonomy_node,
+        )
+
         pin_actions(monkeypatch)
-        proposal = {
-            "ok": True,
-            "slug": "instrumental",
-            "name": "Instrumental",
-            "source_kind": "raw_genre",
-            "recommended_action": "alias_existing",
-            "recommended_target_slug": "instrumental-rock",
-            "description": "Instrumental rock without vocals.",
-            "aliases": ["instrumental"],
-            "relations": [],
-            "reasoning": "Local evidence points to instrumental-rock.",
-            "current_relations": {},
-            "evidence": {"seed_artists": ["Mogwai"]},
-        }
         with patch(
-            "crate.api.genres.build_genre_taxonomy_node_proposal",
+            "crate.genre_taxonomy_proposals.build_genre_taxonomy_node_proposal",
             return_value=proposal,
         ) as build_proposal:
-            resp = test_app.post("/api/genres/taxonomy/instrumental/proposal")
-
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["source_kind"] == "raw_genre"
-        assert data["recommended_action"] == "alias_existing"
-        assert data["recommended_target_slug"] == "instrumental-rock"
-        assert data["evidence"]["seed_artists"] == ["Mogwai"]
-        build_proposal.assert_called_once_with("instrumental", ai_call=ANY)
-
-    def test_infer_taxonomy_node_proposal_returns_raw_facet_recommendation(
-        self, test_app, monkeypatch, pg_db
-    ):
-        pin_actions(monkeypatch)
-        proposal = {
-            "ok": True,
-            "slug": "instrumental",
-            "name": "Instrumental",
-            "source_kind": "raw_genre",
-            "recommended_action": "classify_facet",
-            "recommended_target_slug": None,
-            "facets": [
+            result = _handle_propose_genre_taxonomy_node(
+                "job",
                 {
-                    "dimension": "vocals",
-                    "slug": "instrumental",
-                    "name": "Instrumental",
-                }
-            ],
-            "description": "",
-            "aliases": [],
-            "relations": [],
-            "eq_gains": [],
-            "reasoning": "This tag describes vocal presence rather than a genre.",
-            "current_relations": {},
-            "evidence": {"seed_artists": ["Mogwai"]},
-        }
-        with patch(
-            "crate.api.genres.build_genre_taxonomy_node_proposal",
-            return_value=proposal,
-        ):
-            resp = test_app.post("/api/genres/taxonomy/instrumental/proposal")
+                    "slug": proposal["slug"],
+                    "ai_acceptance": accept_action("genres.taxonomy.propose"),
+                },
+                {},
+            )
 
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["source_kind"] == "raw_genre"
-        assert data["recommended_action"] == "classify_facet"
-        assert data["facets"] == proposal["facets"]
+        assert result == proposal
+        build_proposal.assert_called_once_with(proposal["slug"], ai_call=ANY)
 
     def test_apply_taxonomy_proposal_maps_raw_genre_as_alias(self, test_app):
         with (

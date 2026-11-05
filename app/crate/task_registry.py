@@ -40,6 +40,17 @@ TASK_CATEGORIES: dict[str, str] = {
 TASK_TYPES: dict[str, TaskTypeInfo] = {
     "ai_catalog_refresh": TaskTypeInfo("AI Model Catalog Refresh", "enrichment"),
     "ai_profile_test": TaskTypeInfo("AI Synthetic Profile Test", "enrichment"),
+    "propose_genre_eq": TaskTypeInfo("Genre EQ Proposal", "enrichment"),
+    "propose_genre_taxonomy_node": TaskTypeInfo(
+        "Genre Taxonomy Proposal", "enrichment"
+    ),
+    "refine_music_path": TaskTypeInfo("Music Path Refinement", "enrichment"),
+    "analyze_artist_hero_candidate": TaskTypeInfo(
+        "Artist Hero Candidate Analysis", "artwork"
+    ),
+    "generate_playlist_description": TaskTypeInfo(
+        "Playlist Description Draft", "playlists"
+    ),
     "library_sync": TaskTypeInfo("Library Scan", "library"),
     "library_pipeline": TaskTypeInfo("Library Pipeline", "library"),
     "scan": TaskTypeInfo("Health Check", "library"),

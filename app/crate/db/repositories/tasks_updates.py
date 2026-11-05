@@ -130,6 +130,42 @@ def update_task(
             mark_quality_report_stale(session=s)
 
 
+def requeue_running_task(task_id: str, *, progress: str, session=None) -> dict | None:
+    """Return a running task to pending so its actor can send it again later.
+
+    Used when the task stopped before doing paid or destructive work (an AI
+    provider refused for concurrency). A cancellation request wins: the row is
+    left alone and the caller acknowledges the cancellation instead.
+    """
+    now = utc_now_iso()
+    with optional_scope(session) as s:
+        register_tasks_surface_signal(s)
+        row = (
+            s.execute(
+                text(
+                    """
+                UPDATE tasks
+                SET status = 'pending',
+                    updated_at = :now,
+                    heartbeat_at = NULL,
+                    worker_id = NULL,
+                    progress = :progress
+                WHERE id = :id
+                  AND status = 'running'
+                  AND cancellation_requested_at IS NULL
+                RETURNING *
+                """
+                ),
+                {"now": now, "progress": progress, "id": task_id},
+            )
+            .mappings()
+            .first()
+        )
+        if row is not None:
+            _register_task_transition_signal(s, dict(row))
+    return dict(row) if row else None
+
+
 def heartbeat_task(task_id: str, *, session=None):
     with optional_scope(session) as s:
         s.execute(
