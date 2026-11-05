@@ -23,6 +23,8 @@ sources:
   - app/crate/api/schemas/smart_mix_admin.py
   - app/crate/db/jobs/analysis_storage.py
   - app/crate/db/jobs/smart_mix_backfill.py
+  - app/crate/smart_mix/backfill_window.py
+  - app/ui/src/components/SmartMixBackfillSettings.tsx
   - app/crate/db/queries/smart_mix_admin_tracks.py
   - app/crate/db/queries/smart_mix_compatible.py
   - app/crate/db/repositories/smart_mix.py
@@ -52,6 +54,7 @@ sources:
   - app/tests/test_smart_mix_planner.py
   - app/tests/test_smart_mix_publication.py
   - app/tests/test_smart_mix_backfill.py
+  - app/tests/test_smart_mix_backfill_window.py
   - app/tests/test_smart_mix_admin.py
 ---
 
@@ -255,6 +258,59 @@ completes has exhausted the claimable work in that pass; it can still leave exha
 non-current profiles. Check coverage and `processing.exhausted` before treating the backlog as
 resolved. A coordinating task in `done` does not mean all of its children have finished either.
 
+### Night window
+
+Nobody listens at night, so the backfill keeps more analyses in flight inside a night window
+(SM3-D15). Admin edits it in the Smart Mix panel of Analysis, next to the batch size and the
+attempts, and the start and resume calls take it in the same body:
+
+| Setting            | Default                             | Accepted values                                               |
+| ------------------ | ----------------------------------- | ------------------------------------------------------------- |
+| `nightWindow`      | `01:00` to `08:00`, `Europe/Madrid` | `{start, end, timezone}`: `HH:MM`, different times, IANA name |
+| `nightConcurrency` | 8                                   | 1 to 32                                                       |
+| `dayConcurrency`   | 4                                   | 1 to 32                                                       |
+
+- The window uses the local clock of its timezone, so it follows DST changes. It can cross
+  midnight; the start belongs to the window and the end does not.
+- In flight means claims of this backfill: `smart_mix` rows in `analyzing` for the current
+  target, claimed in the last two hours, whether the child is queued or running. Imports claim
+  the `analysis` and `bliss` pipelines and **Reanalyze track** takes no claim, so neither counts.
+- A pass claims at most `batchSize` tracks and never more than the limit of the current window
+  minus what is in flight. When the limit is reached, the coordinator checks again every 3 s for
+  up to ten minutes and then queues the next pass. The window, not `batchSize`, bounds the work
+  in flight.
+- A change of window, or of the settings, applies to the next claim and cancels nothing. At
+  08:00 with eight analyses accepted, they finish and the coordinator claims again once fewer
+  than four are left.
+- The settings are stored in the campaign. A campaign saved before the window existed reads the
+  defaults. A start or resume that omits a setting keeps the stored one, even across a new
+  campaign after a cancel. **Apply settings**, shown while the backfill runs, sends them to the
+  running campaign through `POST /api/admin/smart-mix/backfill`, which answers
+  `already_running`.
+- `GET /api/admin/smart-mix/status` returns `backfillSettings` (those of the stored campaign, or
+  what a new one would use) and `backfillLimit` (`window` `night` or `day`, and `limit`). Admin
+  shows it next to the coverage as `Night window · 8 in flight` or `Day · 4 in flight`. The
+  coordinator's result has the same `window` and `limit`.
+
+The limit counts children; the analyses run in the processes of `crate-analysis-worker`, so
+`ANALYSIS_WORKER_PROCESSES` is the night maximum. Set it to the night limit: the window then needs
+no restart or outside scaling, which Crate could not do anyway without the Docker socket. With
+fewer processes the extra children wait in `heavy`. By day the processes the backfill leaves free
+serve other `heavy` work; a coordinator waiting for a free slot holds one of them.
+
+On the project server (i7-7700, 4 cores and 8 threads) set `ANALYSIS_WORKER_PROCESSES=8` in
+`.env` and recreate the service with `docker compose up -d crate-analysis-worker`.
+`docker-compose.project.yaml` gives it `cpus: "7.0"`, which leaves a logical CPU for Postgres and
+the API at night, and `mem_limit: 14g`, which covers the 1.5 GB at which each process recycles
+itself plus the parent with the import analysis daemons. Watch its memory during the first night
+with `docker stats crate-analysis-worker`. Eight analyses on four cores share them through
+Hyper-Threading, so the night gains less than double the day's throughput.
+
+The resource governor still applies on top of the window. With its default `max_load_ratio` of
+0.85, a child that starts while the one-minute load is above 6.8 on eight logical CPUs waits five
+minutes, so a night with eight analyses settles at six or seven. To run all eight, raise
+`max_load_ratio` in the runtime policy; the same threshold also applies by day.
+
 ## AI worker lanes and sizing
 
 No shipped Smart Mix task calls a model: profiles, plans and backfill keep the queues above.
@@ -385,7 +441,7 @@ Crate Agent; an MCP Bearer token is not an Admin session or a VirtualDJ PAT.
 | `POST /api/playback/continuation-token` and `/api/playback/continuation`     | Contract for continuing planning and the queue in the native runtime                                                    |
 | `GET /api/admin/smart-mix/status`                                            | Coverage, campaign and coordinating task; can enqueue `refresh_smart_mix_coverage` if it is missing or older than 600 s |
 | `GET /api/admin/smart-mix/tracks` and `/activity`                            | Paginated profiles and processing, and task activity                                                                    |
-| `POST /api/admin/smart-mix/backfill` and `/backfill/resume\|pause\|cancel`   | Change campaign control                                                                                                 |
+| `POST /api/admin/smart-mix/backfill` and `/backfill/resume\|pause\|cancel`   | Change campaign control and settings                                                                                    |
 | `POST /api/admin/smart-mix/tracks/{id}/reanalyze`                            | Enqueues analysis for one track, with deduplication                                                                     |
 
 Admin requires `library.analysis.manage`, even for its reads. The public profile and compatible
