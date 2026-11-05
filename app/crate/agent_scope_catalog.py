@@ -74,6 +74,7 @@ _LABELS: dict[str, str] = {
     "ops.schedules.write": "Update reviewed schedule intervals",
     "ops.runtime.read": "Read runtime policy and worker adoption",
     "ops.runtime.write": "Update reviewed runtime policy",
+    "ops.errors.read": "Read the error inbox",
     "curation.shows.read": "Read upcoming shows",
     "curation.shows.write": "Import reviewed shows",
     "editorial.read": "Read editorial playlists and selections",
@@ -121,6 +122,7 @@ _CRATE_AGENT_SCOPES: tuple[str, ...] = (
     "ops.audit.read",
     "ops.schedules.read",
     "ops.runtime.read",
+    "ops.errors.read",
 )
 
 _CRATE_OPERATOR_SCOPES: tuple[str, ...] = _CRATE_AGENT_SCOPES + (
@@ -197,7 +199,7 @@ SCOPE_PRESETS: tuple[ScopePreset, ...] = (
         label="Crate Agent (read only)",
         description=(
             "Exactly what Crate Agent uses: health, status, jobs, logs, audit, "
-            "schedules and runtime policy. Cannot change anything."
+            "schedules, runtime policy and the error inbox. Cannot change anything."
         ),
         scopes=_CRATE_AGENT_SCOPES,
     ),

@@ -26,6 +26,17 @@ def test_admin_and_owner_have_all_capabilities():
     assert get_user_capabilities({"role": "owner"}) == set(ALL_CAPABILITIES)
 
 
+def test_error_inbox_capabilities_follow_the_ops_role():
+    from crate.api.permissions import ALL_CAPABILITIES, has_capability
+
+    for capability in ("ops.errors.view", "ops.errors.manage"):
+        assert capability in ALL_CAPABILITIES
+        assert has_capability({"role": "ops"}, capability)
+        assert has_capability({"role": "admin"}, capability)
+        for role in ("librarian", "curator", "editor", "contributor", "user"):
+            assert not has_capability({"role": role}, capability)
+
+
 def test_roles_are_checked_through_casbin_policy():
     from crate.api.permissions import has_capability
 

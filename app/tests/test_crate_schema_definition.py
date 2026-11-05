@@ -134,8 +134,9 @@ def test_crate_migration_follows_the_current_main_head() -> None:
     assert scripts.get_revision("140").down_revision == "139"
     assert scripts.get_revision("141").down_revision == "140"
     assert scripts.get_revision("142").down_revision == "141"
-    assert scripts.get_heads() == ["143"]
     assert scripts.get_revision("143").down_revision == "142"
+    assert scripts.get_heads() == ["144"]
+    assert scripts.get_revision("144").down_revision == "143"
 
 
 def test_metric_minute_migration_uses_immutable_schema_definition(monkeypatch):
@@ -278,12 +279,47 @@ def test_error_inbox_migration_uses_immutable_schema_definition(monkeypatch):
     ]
 
 
+def test_error_inbox_grant_migration_uses_immutable_schema_definition(monkeypatch):
+    migration = import_module(
+        "crate.db.migrations.versions.144_error_inbox_agent_grant"
+    )
+    schema = import_module("crate.db.schema_sections.error_inbox_grant_v144")
+    migration_executor = RecordingExecutor()
+    schema_executor = RecordingExecutor()
+    monkeypatch.setattr(migration, "op", migration_executor)
+
+    migration.upgrade()
+    schema.create_error_inbox_grant_v144_schema(schema_executor)
+
+    assert migration_executor.statements == schema_executor.statements
+    added = migration_executor.statements[-1]
+    assert "ADD CONSTRAINT agent_principals_grants_check" in added
+    assert "'ops.errors.read'" in added
+    assert "'library.acquisition.write'" in added
+
+    downgrade = RecordingExecutor()
+    monkeypatch.setattr(migration, "op", downgrade)
+    migration.downgrade()
+    assert "'ops.errors.read'" not in downgrade.statements[-1]
+    assert "'library.acquisition.write'" in downgrade.statements[-1]
+
+
+def test_error_inbox_grant_check_matches_the_allowed_grants() -> None:
+    import re
+
+    from crate.agent_access import ALLOWED_GRANTS
+    from crate.db.schema_sections.error_inbox_grant_v144 import V144_GRANTS
+
+    assert set(re.findall(r"'([^']+)'", V144_GRANTS)) == set(ALLOWED_GRANTS)
+
+
 def test_error_inbox_tables_are_part_of_the_bootstrap_schema() -> None:
     source = (
         Path(__file__).resolve().parents[1] / "crate/db/schema_bootstrap.py"
     ).read_text()
 
     assert "create_error_inbox_v143_schema(cur)" in source
+    assert "create_error_inbox_grant_v144_schema(cur)" in source
 
 
 def test_crate_bootstrap_includes_presentation_settings() -> None:

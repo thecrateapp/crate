@@ -57,7 +57,7 @@ stack, with their own bot, model login, conversations, memory and MCP credential
 | Compose service / profile | `crate-agent` / `agent`           | `crate-operator` / `crate-operator`, overlay `deploy/operator/compose.operator.yaml` |
 | State directory           | `${DATA_DIR}/crate-agent`         | `CRATE_OPERATOR_ROOT`, default `${DATA_DIR}/crate-operator`                          |
 | MCP credential preset     | "Crate Agent (read only)"         | "Crate Operator"                                                                     |
-| Crate MCP tools           | 12, all read-only                 | 69, writes only through approved plans                                               |
+| Crate MCP tools           | 19, all read-only                 | 75, writes only through approved plans                                               |
 | Push alerts               | No                                | Through the supervisor, set up by `make agent-init`                                  |
 
 Never run both at the same time. `make agent-up` refuses to start one while the other

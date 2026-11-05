@@ -24,9 +24,9 @@ export interface FlowStep {
 export const MCP = {
   endpoint: "/mcp",
   discovery: "/.well-known/oauth-protected-resource/mcp",
-  tools: 74,
-  readOnly: 30,
-  scopes: 32,
+  tools: 77,
+  readOnly: 33,
+  scopes: 33,
   limits: {
     readsPerMinute: 60,
     concurrentPerClient: 2,

@@ -14,12 +14,18 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from crate.db.read_model_shared import coerce_json
+from crate.db.repositories.error_tracking_settings import ERROR_TRACKING_SETTINGS_KEY
 from crate.db.tx import read_scope
 from crate.error_inbox.priority import CRITICAL_SCORE, CRITICAL_TRIAGE_CONFIDENCE
+from crate.error_inbox.state import ACCESS_STATE_KEY, SYNC_STATE_KEY
 
 MAX_LIST_LIMIT = 200
 MAX_CURSOR_OFFSET = 100_000
 LIST_STATUSES = frozenset({"unresolved", "resolved", "ignored", "all"})
+_STORED_SETTINGS = "(SELECT value FROM settings WHERE key = :settings_key)"
+_STORED_SYNC = "(SELECT payload_json FROM ops_runtime_state WHERE key = :sync_key)"
+_STORED_ACCESS = "(SELECT payload_json FROM ops_runtime_state WHERE key = :access_key)"
 
 _CURRENT_TRIAGE = """
     LEFT JOIN LATERAL (
@@ -129,52 +135,47 @@ def list_issues(
         return _impl(current)
 
 
-def get_issue(
-    issue_id: str, *, session: Session | None = None
-) -> dict[str, Any] | None:
-    valid_id = _valid_uuid(issue_id)
-    if valid_id is None:
-        return None
-    sql = f"""
-        SELECT {_LIST_COLUMNS}, {_CRITICAL} AS critical,
-               i.provider, i.external_id, i.digest, i.digest_event_id, i.digest_hash,
-               i.fix_requested_by, i.closed_at, i.created_at,
-               COALESCE(
-                   (
-                       SELECT json_agg(
-                           json_build_object(
-                               'id', t.id::text,
-                               'kind', t.kind,
-                               'digest_hash', t.digest_hash,
-                               'invocation_id', t.invocation_id::text,
-                               'classification', t.classification,
-                               'severity', t.severity,
-                               'duplicate_of', t.duplicate_of::text,
-                               'summary', t.summary,
-                               'hypothesis', t.hypothesis,
-                               'suspected_frames', t.suspected_frames,
-                               'next_step', t.next_step,
-                               'confidence', t.confidence,
-                               'created_at', t.created_at
-                           )
-                           ORDER BY t.created_at DESC
+_DETAIL_SQL = f"""
+    SELECT {_LIST_COLUMNS}, {_CRITICAL} AS critical,
+           i.provider, i.external_id, i.digest, i.digest_event_id, i.digest_hash,
+           i.fix_requested_by, i.closed_at, i.created_at,
+           COALESCE(
+               (
+                   SELECT json_agg(
+                       json_build_object(
+                           'id', t.id::text,
+                           'kind', t.kind,
+                           'digest_hash', t.digest_hash,
+                           'invocation_id', t.invocation_id::text,
+                           'classification', t.classification,
+                           'severity', t.severity,
+                           'duplicate_of', t.duplicate_of::text,
+                           'summary', t.summary,
+                           'hypothesis', t.hypothesis,
+                           'suspected_frames', t.suspected_frames,
+                           'next_step', t.next_step,
+                           'confidence', t.confidence,
+                           'created_at', t.created_at
                        )
-                       FROM error_issue_triage t
-                       WHERE t.issue_id = i.id
-                   ),
-                   '[]'::json
-               ) AS triages
-        FROM error_issues i
-        {_CURRENT_TRIAGE}
-        WHERE i.id = CAST(:id AS uuid)
-    """
+                       ORDER BY t.created_at DESC
+                   )
+                   FROM error_issue_triage t
+                   WHERE t.issue_id = i.id
+               ),
+               '[]'::json
+           ) AS triages
+    FROM error_issues i
+    {_CURRENT_TRIAGE}
+"""
+
+
+def _detail(
+    where: str, params: dict[str, Any], session: Session | None
+) -> dict[str, Any] | None:
+    sql = f"{_DETAIL_SQL} WHERE {where} ORDER BY i.last_seen DESC NULLS LAST LIMIT 1"
 
     def _impl(current: Session) -> dict[str, Any] | None:
-        row = (
-            current.execute(text(sql), {**_thresholds(), "id": valid_id})
-            .mappings()
-            .first()
-        )
+        row = current.execute(text(sql), {**_thresholds(), **params}).mappings().first()
         return dict(row) if row else None
 
     if session is not None:
@@ -183,12 +184,30 @@ def get_issue(
         return _impl(current)
 
 
-def summary(
-    *, now: datetime | None = None, top: int = 3, session: Session | None = None
-) -> dict[str, Any]:
-    """Counts for the System Health tile and the MCP summary, in one query."""
-    since = (now or datetime.now(timezone.utc)) - timedelta(hours=24)
-    sql = f"""
+def get_issue(
+    issue_id: str, *, session: Session | None = None
+) -> dict[str, Any] | None:
+    valid_id = _valid_uuid(issue_id)
+    if valid_id is None:
+        return None
+    return _detail("i.id = CAST(:id AS uuid)", {"id": valid_id}, session)
+
+
+def get_issue_by_short_id(
+    short_id: str, *, provider: str = "sentry", session: Session | None = None
+) -> dict[str, Any] | None:
+    """Detail by Sentry short id (`CRATE-API-1F`), the id the summaries name."""
+    if not isinstance(short_id, str) or not 0 < len(short_id) <= 128:
+        return None
+    return _detail(
+        "i.provider = :provider AND upper(i.short_id) = upper(:short_id)",
+        {"provider": provider, "short_id": short_id},
+        session,
+    )
+
+
+def _summary_sql(extra_columns: str = "") -> str:
+    return f"""
         WITH open_issues AS (
             SELECT i.id, i.short_id, i.title, i.service, i.crate_score, i.first_seen,
                    i.last_seen, i.substatus, {_CRITICAL} AS critical
@@ -257,19 +276,92 @@ def summary(
                 ),
                 '[]'::json
             ) AS top_critical
+            {extra_columns}
     """
-    params = {**_thresholds(), "since": since, "top": max(0, int(top))}
+
+
+def _summary_params(now: datetime | None, top: int) -> dict[str, Any]:
+    since = (now or datetime.now(timezone.utc)) - timedelta(hours=24)
+    return {**_thresholds(), "since": since, "top": max(0, int(top))}
+
+
+def _summary_counts(row: Any) -> dict[str, Any]:
+    return {
+        "open": int(row["open"]),
+        "critical_open": int(row["critical_open"]),
+        "new_24h": int(row["new_24h"]),
+        "regressed_24h": int(row["regressed_24h"]),
+        "last_synced_at": row["last_synced_at"],
+        "services": list(row["services"]),
+        "top_critical": list(row["top_critical"]),
+    }
+
+
+def summary(
+    *, now: datetime | None = None, top: int = 3, session: Session | None = None
+) -> dict[str, Any]:
+    """Counts for the System Health tile and the MCP summary, in one query."""
+    sql = _summary_sql()
+    params = _summary_params(now, top)
+
+    def _impl(current: Session) -> dict[str, Any]:
+        return _summary_counts(current.execute(text(sql), params).mappings().one())
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
+def _state_params() -> dict[str, str]:
+    return {
+        "settings_key": ERROR_TRACKING_SETTINGS_KEY,
+        "sync_key": SYNC_STATE_KEY,
+        "access_key": ACCESS_STATE_KEY,
+    }
+
+
+def inbox_overview(
+    *, now: datetime | None = None, top: int = 3, session: Session | None = None
+) -> dict[str, Any]:
+    """`summary()` plus the stored settings value and the last sync state, in one query.
+
+    `settings` is the raw stored value (JSON text, parsed by the caller) and
+    `sync_state` the `error_inbox` runtime payload.
+    """
+    sql = _summary_sql(
+        f", {_STORED_SETTINGS} AS settings, {_STORED_SYNC} AS sync_state"
+    )
+    params = {**_summary_params(now, top), **_state_params()}
 
     def _impl(current: Session) -> dict[str, Any]:
         row = current.execute(text(sql), params).mappings().one()
         return {
-            "open": int(row["open"]),
-            "critical_open": int(row["critical_open"]),
-            "new_24h": int(row["new_24h"]),
-            "regressed_24h": int(row["regressed_24h"]),
-            "last_synced_at": row["last_synced_at"],
-            "services": list(row["services"]),
-            "top_critical": list(row["top_critical"]),
+            **_summary_counts(row),
+            "settings": row["settings"],
+            "sync_state": coerce_json(row["sync_state"]),
+        }
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
+def inbox_state(*, session: Session | None = None) -> dict[str, Any]:
+    """Stored settings value and both runtime states of the inbox, in one query."""
+    sql = f"""
+        SELECT {_STORED_SETTINGS} AS settings,
+               {_STORED_SYNC} AS sync_state,
+               {_STORED_ACCESS} AS access_state
+    """
+
+    def _impl(current: Session) -> dict[str, Any]:
+        row = current.execute(text(sql), _state_params()).mappings().one()
+        return {
+            "settings": row["settings"],
+            "sync_state": coerce_json(row["sync_state"]),
+            "access_state": coerce_json(row["access_state"]),
         }
 
     if session is not None:
@@ -391,6 +483,9 @@ __all__ = [
     "LIST_STATUSES",
     "MAX_LIST_LIMIT",
     "get_issue",
+    "get_issue_by_short_id",
+    "inbox_overview",
+    "inbox_state",
     "list_issues",
     "open_ids_not_in",
     "summary",

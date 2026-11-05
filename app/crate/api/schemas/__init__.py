@@ -9,6 +9,7 @@ from crate.api.schemas.metrics import (
 )
 
 from crate.api.schemas import ai_agents as ai_agents
+from crate.api.schemas import error_inbox as error_inbox
 from crate.api.schemas.sonic_insights import SonicNeighborsResponse, SonicReport
 from crate.api.schemas.agent_telegram import (
     NativeCallback,
@@ -467,6 +468,7 @@ __all__ = [
     "NativePoll",
     "TelegramBindingInput",
     "ai_agents",
+    "error_inbox",
     "ShowCandidate",
     "ShowConsolidationInput",
     "ShowExtractionInput",

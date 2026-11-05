@@ -6,6 +6,7 @@ listed in the fixture must stay present in both the built and cold payloads.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 
@@ -47,7 +48,10 @@ def test_built_dashboard_satisfies_the_contract(pg_db, window):
     )
     from crate.db.user_stats_dashboard_surface import build_user_stats_dashboard
 
-    seed_listening_history(events=300, days=60)
+    # The 30d window is measured from now, so the plays must end now too.
+    seed_listening_history(
+        events=300, days=60, end_at=datetime.now(timezone.utc).isoformat()
+    )
     recompute_user_listening_aggregates(1)
 
     payload = build_user_stats_dashboard(

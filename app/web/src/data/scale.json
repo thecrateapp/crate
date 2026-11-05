@@ -1,12 +1,12 @@
 {
   "tracks": "48,213",
   "albums": "4,400",
-  "pytest": 7701,
+  "pytest": 7736,
   "vitest": 6830,
   "goTests": 428,
   "rustTests": 318,
   "taskTypes": 147,
-  "migrations": 143,
+  "migrations": 144,
   "taskQueues": {
     "maintenance": [
       "ai_catalog_refresh",

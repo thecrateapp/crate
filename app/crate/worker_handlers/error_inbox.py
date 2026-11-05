@@ -6,7 +6,8 @@ scope between requests. The token is handed to the client and nothing else: it n
 reaches a log line, a task result or the runtime state, and neither do response
 bodies or event text.
 
-Runtime state (`ops_runtime_state`) the admin API reads:
+Runtime state (`ops_runtime_state`) the admin API and MCP read; the keys and the
+write-access check live in `crate.error_inbox.state`:
 
 - `error_inbox`, written by every sync pass (see `_SyncReport.state`): `status`
   (`ok`, `partial` or `failed`), `started_at`, `finished_at`, `last_success_at`,
@@ -28,7 +29,6 @@ decide, and a 403 comes back as `SENTRY_FORBIDDEN`.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import time
 from collections.abc import Callable, Mapping, Sequence
@@ -53,6 +53,13 @@ from crate.error_inbox.config import (
 )
 from crate.error_inbox.digest import build_digest, digest_hash, group_key
 from crate.error_inbox.priority import crate_score
+from crate.error_inbox.state import (
+    ACCESS_STATE_KEY,
+    STATE_VERSION,
+    SYNC_STATE_KEY,
+    known_write_access,
+    record_access,
+)
 from crate.error_inbox.sentry_client import (
     LIST_STATS_PERIOD,
     RECENT_STATS_PERIOD,
@@ -70,9 +77,6 @@ log = logging.getLogger(__name__)
 
 ClientFactory = Callable[[ErrorTrackingConfig, str], SentryClient]
 
-SYNC_STATE_KEY = "error_inbox"
-ACCESS_STATE_KEY = "error_inbox_access"
-STATE_VERSION = 1
 MAX_LIST_PAGES = 5
 MAX_EVENT_FETCHES = 25
 MAX_STATUS_REFRESHES = 50
@@ -95,47 +99,11 @@ def _failed(code: str, message: str, **extra: Any) -> dict[str, Any]:
 # -- access (EI-D4) -----------------------------------------------------------
 
 
-def _credential(config: ErrorTrackingConfig) -> str | None:
-    if not config.secret_ref:
-        return None
-    return hashlib.sha256(config.secret_ref.encode()).hexdigest()[:16]
-
-
 def _access_from_scopes(scopes: frozenset[str]) -> dict[str, bool | None]:
     # An empty answer means Sentry did not report scopes, not that there are none.
     if not scopes:
         return dict(_UNKNOWN_ACCESS)
     return dict(scope_access(scopes))
-
-
-def _record_access(
-    config: ErrorTrackingConfig,
-    *,
-    source: str,
-    access: Mapping[str, bool | None],
-    error_code: str | None = None,
-) -> None:
-    set_ops_runtime_state(
-        ACCESS_STATE_KEY,
-        {
-            "version": STATE_VERSION,
-            "read": access.get("read"),
-            "write": access.get("write"),
-            "credential": _credential(config),
-            "source": source,
-            "checked_at": _now().isoformat(),
-            "error_code": error_code,
-        },
-    )
-
-
-def known_write_access(config: ErrorTrackingConfig) -> bool | None:
-    """Recorded write access of the current token, or None when it is not known."""
-    state = get_ops_runtime_state(ACCESS_STATE_KEY)
-    if not state or state.get("credential") != _credential(config):
-        return None
-    write = state.get("write")
-    return write if isinstance(write, bool) else None
 
 
 # -- sync ---------------------------------------------------------------------
@@ -301,14 +269,14 @@ class _Pass:
         try:
             scopes = self.client.check_scopes()
         except SentryAuthError:
-            _record_access(
+            record_access(
                 self.config,
                 source="sync",
                 access={"read": False, "write": False},
                 error_code="SENTRY_AUTH",
             )
             raise
-        _record_access(self.config, source="sync", access=_access_from_scopes(scopes))
+        record_access(self.config, source="sync", access=_access_from_scopes(scopes))
 
         # Both listings come before any write: a failure keeps the previous rows.
         full = self.client.iter_unresolved(
@@ -568,12 +536,12 @@ def check_connection(*, client_factory: ClientFactory | None = None) -> dict[str
             if isinstance(error, SentryAuthError)
             else dict(_UNKNOWN_ACCESS)
         )
-        _record_access(
+        record_access(
             config, source="connection_test", access=access, error_code=error.code
         )
         return _failed(error.code, str(error), access=access)
     access = _access_from_scopes(scopes)
-    _record_access(config, source="connection_test", access=access)
+    record_access(config, source="connection_test", access=access)
     return {"status": "succeeded", "access": access}
 
 
