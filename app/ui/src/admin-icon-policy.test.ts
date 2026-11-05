@@ -81,6 +81,15 @@ const supportingScope = [
   "app/ui/src/components/admin/QueueLanes.tsx",
   "app/ui/src/components/admin/RelativeTime.tsx",
   "app/ui/src/pages/agents/Agents.tsx",
+  // Error Inbox (E1.PR4): text actions, one Solar refresh glyph.
+  "app/ui/src/pages/Errors.tsx",
+  "app/ui/src/pages/ErrorDetail.tsx",
+  "app/ui/src/components/errors/ConnectionPanel.tsx",
+  "app/ui/src/components/errors/ConnectionSheet.tsx",
+  "app/ui/src/components/errors/IssueStatusActions.tsx",
+  "app/ui/src/components/errors/IssueTable.tsx",
+  "app/ui/src/components/errors/StackFrames.tsx",
+  "app/ui/src/components/system-health/ErrorsTile.tsx",
 ];
 const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
   .map((name) => `app/ui/src/components/layout/${name}.tsx`)
@@ -122,6 +131,10 @@ const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
 // Reviewed shared Select contract: disclosure, option selection and search glyphs are UX.
 // The Admin wrapper itself is checked directly; no arbitrary wrapper or icon prop is exempt.
 const approvedControls = new Map([
+  [
+    "app/ui/src/pages/Errors.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 1 },
+  ],
   [
     "app/ui/src/pages/Insights.tsx:@/components/layout/PageHeader",
     { component: "PageHeaderAction", limit: 1 },
@@ -460,6 +473,46 @@ const approvedLibraryControls = new Map<string, number>([
     3,
   ],
   ["app/ui/src/pages/PlaylistEditor.tsx:@crate/ui/shadcn/button:Button", 7],
+  // Error Inbox (E1.PR4): text actions and shared states; each child is audited above.
+  ["app/ui/src/pages/Errors.tsx:@/components/ui/AdminSelect:AdminSelect", 3],
+  ["app/ui/src/pages/Errors.tsx:@crate/ui/primitives/ErrorState:ErrorState", 2],
+  [
+    "app/ui/src/pages/Errors.tsx:@/components/errors/ConnectionSheet:ConnectionSheet",
+    1,
+  ],
+  // The drawer keeps the shared close control (conventional UX glyph).
+  [
+    "app/ui/src/components/errors/ConnectionSheet.tsx:@crate/ui/shadcn/sheet:SheetContent",
+    1,
+  ],
+  [
+    "app/ui/src/components/errors/ConnectionSheet.tsx:./ConnectionPanel:ConnectionPanel",
+    1,
+  ],
+  [
+    "app/ui/src/pages/ErrorDetail.tsx:@crate/ui/domain/navigation/BackLink:BackLink",
+    1,
+  ],
+  [
+    "app/ui/src/pages/ErrorDetail.tsx:@crate/ui/primitives/ErrorState:ErrorState",
+    2,
+  ],
+  [
+    "app/ui/src/pages/ErrorDetail.tsx:@/components/errors/IssueStatusActions:IssueStatusActions",
+    1,
+  ],
+  [
+    "app/ui/src/pages/ErrorDetail.tsx:@/components/admin/TechnicalDetails:TechnicalDetails",
+    1,
+  ],
+  [
+    "app/ui/src/components/errors/ConnectionPanel.tsx:@crate/ui/primitives/ErrorState:ErrorState",
+    1,
+  ],
+  [
+    "app/ui/src/pages/SystemHealth.tsx:@/components/system-health/ErrorsTile:ErrorsTile",
+    1,
+  ],
   [
     "app/ui/src/pages/PlaylistEditor.tsx:@crate/ui/primitives/SearchInput:SearchInput",
     1,
@@ -1028,6 +1081,7 @@ const approvedLibraryControls = new Map<string, number>([
 ]);
 // Diego's 1W steering explicitly retains UX glyphs. Each concrete site remains bounded.
 const approvedUx = new Map([
+  ["Errors:header-refresh", ["@crate/ui/icons", "RefreshCw"]],
   ["ListPagination:pagination-previous", ["lucide-react", "ChevronLeft"]],
   ["ListPagination:pagination-next", ["lucide-react", "ChevronRight"]],
 

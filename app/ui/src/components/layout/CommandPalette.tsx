@@ -192,6 +192,11 @@ export function CommandPalette() {
       capabilities: ["ops.logs.view"],
     },
     {
+      label: "Errors",
+      path: "/errors",
+      capabilities: ["ops.errors.view"],
+    },
+    {
       label: "Stack",
       path: "/stack",
       capabilities: ["ops.runtime.manage"],

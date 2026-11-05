@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import storedDashboardFixture from "../../../../tests/admin-e2e/fixtures/metrics-dashboard.json";
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
+import { sampleSummary } from "@/test/error-inbox-fixtures";
 
 const { useApiMock, refetchMock, charts, motionMock } = vi.hoisted(() => ({
   useApiMock: vi.fn(),
@@ -555,5 +556,42 @@ describe("SystemHealth Resources instrument", () => {
     expect(
       screen.getByText(/Playback quality readings are unavailable/),
     ).toBeVisible();
+  });
+});
+
+describe("SystemHealth errors tile", () => {
+  it("shows the Error Inbox summary from the dashboard and links to it", () => {
+    useApiMock.mockReturnValue({
+      data: { ...dashboard, errors: sampleSummary() },
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+    renderWithAdminProviders(<SystemHealth />, { route: "/system" });
+
+    const panel = screen
+      .getByRole("heading", { name: "Errors" })
+      .closest<HTMLElement>("section")!;
+    expect(
+      within(panel).getByRole("link", { name: "Open errors" }),
+    ).toHaveAttribute("href", "/errors");
+    expect(
+      within(panel).getByRole("list", { name: "Top of the critical lane" }),
+    ).toBeVisible();
+  });
+
+  it("marks the summary unavailable when the dashboard lacks it", () => {
+    useApiMock.mockReturnValue({
+      data: dashboard,
+      loading: false,
+      error: null,
+      refetch: refetchMock,
+    });
+    renderWithAdminProviders(<SystemHealth />, { route: "/system" });
+
+    const panel = screen
+      .getByRole("heading", { name: "Errors" })
+      .closest<HTMLElement>("section")!;
+    expect(within(panel).getByText("Unavailable")).toBeVisible();
   });
 });

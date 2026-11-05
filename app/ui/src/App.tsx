@@ -129,6 +129,12 @@ const PlaybackDelivery = lazy(() =>
 const Logs = lazy(() =>
   import("@/pages/Logs").then((m) => ({ default: m.Logs })),
 );
+const Errors = lazy(() =>
+  import("@/pages/Errors").then((m) => ({ default: m.Errors })),
+);
+const ErrorDetail = lazy(() =>
+  import("@/pages/ErrorDetail").then((m) => ({ default: m.ErrorDetail })),
+);
 const PlaylistEditor = lazy(() =>
   import("@/pages/PlaylistEditor").then((m) => ({ default: m.PlaylistEditor })),
 );
@@ -190,6 +196,7 @@ const LIBRARY_REPAIR_RUN = ["library.repair.run"] as const;
 const LIBRARY_TRACK_REMOVE = ["library.track.remove"] as const;
 const OPS_HEALTH_VIEW = ["ops.health.view"] as const;
 const OPS_LOGS_VIEW = ["ops.logs.view"] as const;
+const OPS_ERRORS_VIEW = ["ops.errors.view"] as const;
 const OPS_TASKS_MANAGE = ["ops.tasks.manage"] as const;
 const OPS_RUNTIME_MANAGE = ["ops.runtime.manage"] as const;
 const SETTINGS_MANAGE = ["settings.manage"] as const;
@@ -399,6 +406,22 @@ export default function App() {
                   element={
                     <RequireCapabilities anyOf={OPS_LOGS_VIEW}>
                       <Logs />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="errors"
+                  element={
+                    <RequireCapabilities anyOf={OPS_ERRORS_VIEW}>
+                      <Errors />
+                    </RequireCapabilities>
+                  }
+                />
+                <Route
+                  path="errors/:id"
+                  element={
+                    <RequireCapabilities anyOf={OPS_ERRORS_VIEW}>
+                      <ErrorDetail />
                     </RequireCapabilities>
                   }
                 />
