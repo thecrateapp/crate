@@ -44,8 +44,8 @@ export function ConnectionSheet({
           target.focus();
         }}
       >
-        <SheetHeader className="pr-14">
-          <SheetTitle className="text-lg">Sentry connection</SheetTitle>
+        <SheetHeader>
+          <SheetTitle>Sentry connection</SheetTitle>
           <SheetDescription>
             Where Crate reads issues from. The token is stored encrypted and
             never shown again.

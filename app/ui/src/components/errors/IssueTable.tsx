@@ -141,13 +141,11 @@ function GroupRows({ group }: { group: IssueGroup }) {
             <span className="block text-sm text-text-primary wrap-anywhere group-hover:text-accent-action-hi">
               {lead.title}
             </span>
-            <MonoLabel
-              as="span"
-              tone="accent"
-              className="mt-1 inline-flex min-h-8 items-center"
-            >
-              {open ? "Hide" : "Show"} {group.members.length} similar issues
-            </MonoLabel>
+            <span className="mt-1 inline-flex min-h-8 items-center">
+              <MonoLabel as="span" tone="accent">
+                {open ? "Hide" : "Show"} {group.members.length} similar issues
+              </MonoLabel>
+            </span>
           </button>
           {lead.culprit ? (
             <p className="font-mono text-label text-text-subtle wrap-anywhere">
