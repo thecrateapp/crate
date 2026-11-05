@@ -846,8 +846,12 @@ jobs:
           # holds build scripts and proc macros that Sentry rejects on Windows. A
           # missing binary fails the step; a Sentry failure only leaves a warning,
           # so it never keeps the packages out of the release.
+          # A while-read loop: macOS runs this with bash 3.2 (no bash 4 builtins).
           selected="$(node app/listen-desktop/scripts/debug-symbol-files.mjs app/listen-desktop/src-tauri/target)"
-          mapfile -t files <<<"$selected"
+          files=()
+          while IFS= read -r file; do
+            files+=("$file")
+          done <<<"$selected"
           printf 'Uploading %s\n' "${files[@]}"
           if ! npx --no-install sentry-cli debug-files upload \
             --org "$SENTRY_ORG" \

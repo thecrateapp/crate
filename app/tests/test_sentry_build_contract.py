@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pytest
@@ -199,3 +200,21 @@ def test_desktop_symbol_upload_sends_only_the_app_and_never_blocks_the_release()
     assert selection_test["run"] == (
         "npm run --workspace=app/listen-desktop test:debug-symbols"
     )
+
+
+def test_desktop_workflow_scripts_run_on_the_macos_system_bash() -> None:
+    # macOS runners use /bin/bash 3.2: mapfile, readarray, associative arrays and
+    # case-changing expansions are bash 4+ and fail there with exit 127 or a
+    # syntax error (the v3.2.3 macOS build lost its packages to `mapfile`).
+    bash4_only = re.compile(
+        r"\b(mapfile|readarray)\b|declare -A|local -n|\$\{\w+(,,|\^\^)\}"
+    )
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/build-desktop.yml").read_text()
+    )
+    offenders = [
+        step["name"]
+        for step in workflow["jobs"]["build-desktop"]["steps"]
+        if bash4_only.search(step.get("run") or "")
+    ]
+    assert offenders == []
