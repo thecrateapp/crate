@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import logging
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 
 def test_run_scan_supports_scan_only_binary(monkeypatch):
@@ -143,80 +147,139 @@ def test_beats_support_reads_the_analyze_help(monkeypatch):
     crate_cli._analyze_help.cache_clear()
 
 
-def test_a_failed_beats_probe_is_asked_again(monkeypatch, caplog):
-    import logging
-    import subprocess
+class _Clock:
+    def __init__(self) -> None:
+        self.now = 1_000.0
 
+    def __call__(self) -> float:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        self.now += seconds
+
+
+@pytest.fixture
+def probe_clock(monkeypatch):
     from crate import crate_cli
 
+    clock = _Clock()
+    monkeypatch.setattr(crate_cli, "_clock", clock)
     monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
-    replies = [
-        subprocess.TimeoutExpired(["crate-cli", "analyze", "--help"], 5),
-        SimpleNamespace(returncode=0, stdout="      --beats <BEATS>\n", stderr=""),
-    ]
-    calls: list[list[str]] = []
+    crate_cli._help_text.cache_clear()
+    crate_cli._analyze_help.cache_clear()
+    yield clock
+    crate_cli._help_text.cache_clear()
+    crate_cli._analyze_help.cache_clear()
 
-    def fake_run(args, **kwargs):
-        calls.append(list(args))
-        reply = replies.pop(0)
+
+class _Binary:
+    """A crate-cli double that counts its calls and answers in turn."""
+
+    def __init__(self, *replies) -> None:
+        self.replies = list(replies)
+        self.calls: list[list[str]] = []
+
+    def __call__(self, args, **kwargs):
+        self.calls.append(list(args))
+        reply = self.replies[0] if len(self.replies) == 1 else self.replies.pop(0)
         if isinstance(reply, Exception):
             raise reply
-        return reply
-
-    monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
-    crate_cli._analyze_help.cache_clear()
-    try:
-        with caplog.at_level(logging.WARNING, logger=crate_cli.__name__):
-            # A loaded worker can miss the 5 s timeout: that must not turn the model
-            # beats off until the worker restarts.
-            assert crate_cli.supports_analyze_beats() is False
-        assert "analyze --help" in caplog.text
-        assert crate_cli.supports_analyze_beats() is True
-        assert crate_cli.supports_analyze_beats() is True
-        assert len(calls) == 2
-    finally:
-        crate_cli._analyze_help.cache_clear()
+        return SimpleNamespace(returncode=0, stdout=reply, stderr="")
 
 
-def test_a_failed_help_probe_is_asked_again(monkeypatch, caplog):
-    import logging
-    import subprocess
+def _broken(*args: str) -> subprocess.CalledProcessError:
+    return subprocess.CalledProcessError(2, ["crate-cli", *args], stderr="panic")
 
+
+# Both probes: the --help that lists the commands and the analyze --help that lists
+# --beats, each with a help that answers True.
+PROBES = [
+    pytest.param(
+        lambda cli: cli.supports_command("analyze"),
+        ["--help"],
+        "Commands:\n  scan\n  analyze\n",
+        id="help",
+    ),
+    pytest.param(
+        lambda cli: cli.supports_analyze_beats(),
+        ["analyze", "--help"],
+        "      --beats <BEATS>\n",
+        id="analyze-help",
+    ),
+]
+
+
+@pytest.mark.parametrize(("probe", "args", "_help"), PROBES)
+def test_failed_probe_is_not_repeated_within_retry_window(
+    monkeypatch, caplog, probe_clock, probe, args, _help
+):
     from crate import crate_cli
 
-    monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
-    replies = [
+    # A binary whose help always fails, as a broken install would.
+    binary = _Binary(_broken(*args))
+    monkeypatch.setattr(crate_cli.subprocess, "run", binary)
+
+    with caplog.at_level(logging.WARNING, logger=crate_cli.__name__):
+        assert probe(crate_cli) is False
+    assert len(caplog.records) == 1
+    assert " ".join(args) in caplog.text
+    caplog.clear()
+
+    probe_clock.advance(crate_cli.PROBE_RETRY_SECONDS - 1)
+    with caplog.at_level(logging.WARNING, logger=crate_cli.__name__):
+        assert probe(crate_cli) is False
+        assert probe(crate_cli) is False
+
+    # Every track asks; the binary ran once and the failure was logged once.
+    assert binary.calls == [["/usr/local/bin/crate-cli", *args]]
+    assert caplog.records == []
+
+
+@pytest.mark.parametrize(("probe", "args", "help_text"), PROBES)
+def test_failed_probe_is_repeated_after_retry_window(
+    monkeypatch, probe_clock, probe, args, help_text
+):
+    from crate import crate_cli
+
+    # A loaded worker can miss the 5 s timeout once: that must not turn the binary
+    # off until the worker restarts.
+    binary = _Binary(
+        subprocess.TimeoutExpired(["crate-cli", *args], 5), help_text, help_text
+    )
+    monkeypatch.setattr(crate_cli.subprocess, "run", binary)
+
+    assert probe(crate_cli) is False
+    probe_clock.advance(crate_cli.PROBE_RETRY_SECONDS)
+    assert probe(crate_cli) is True
+    probe_clock.advance(crate_cli.PROBE_RETRY_SECONDS)
+    assert probe(crate_cli) is True
+
+    # The help of a binary that replied is kept.
+    assert binary.calls == [["/usr/local/bin/crate-cli", *args]] * 2
+
+
+def test_a_failed_help_probe_is_asked_again(monkeypatch, caplog, probe_clock):
+    from crate import crate_cli
+
+    binary = _Binary(
         subprocess.TimeoutExpired(["crate-cli", "--help"], 5),
         OSError("Resource temporarily unavailable"),
-        SimpleNamespace(
-            returncode=0, stdout="Commands:\n  scan\n  analyze\n", stderr=""
-        ),
-    ]
-    calls: list[list[str]] = []
+        "Commands:\n  scan\n  analyze\n",
+    )
+    monkeypatch.setattr(crate_cli.subprocess, "run", binary)
 
-    def fake_run(args, **kwargs):
-        calls.append(list(args))
-        reply = replies.pop(0)
-        if isinstance(reply, Exception):
-            raise reply
-        return reply
-
-    monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
-    crate_cli._help_text.cache_clear()
-    try:
-        with caplog.at_level(logging.WARNING, logger=crate_cli.__name__):
-            # A loaded worker can miss the 5 s timeout: that must not turn crate-cli
-            # off until the worker restarts.
-            assert crate_cli.supports_command("analyze") is False
-            assert crate_cli.has_subcommands() is False
-        assert "--help" in caplog.text
-        assert crate_cli.supports_command("analyze") is True
-        assert crate_cli.has_subcommands() is True
-        assert crate_cli.supports_command("bliss") is False
-        # The help of a binary that replied is kept.
-        assert len(calls) == 3
-    finally:
-        crate_cli._help_text.cache_clear()
+    with caplog.at_level(logging.WARNING, logger=crate_cli.__name__):
+        assert crate_cli.supports_command("analyze") is False
+        # Every command shares the one --help.
+        assert crate_cli.has_subcommands() is False
+        probe_clock.advance(crate_cli.PROBE_RETRY_SECONDS)
+        assert crate_cli.has_subcommands() is False
+    assert "--help" in caplog.text
+    probe_clock.advance(crate_cli.PROBE_RETRY_SECONDS)
+    assert crate_cli.supports_command("analyze") is True
+    assert crate_cli.has_subcommands() is True
+    assert crate_cli.supports_command("bliss") is False
+    assert len(binary.calls) == 3
 
 
 def test_run_analyze_runs_at_background_priority(monkeypatch):

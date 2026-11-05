@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 from collections.abc import Mapping
 from contextlib import ExitStack
 from functools import lru_cache
@@ -16,6 +17,9 @@ log = logging.getLogger(__name__)
 
 BIN_NAMES = ["crate-cli"]
 BIN_PATHS = ["/app/bin/crate-cli", "/usr/local/bin/crate-cli"]
+# A help probe that failed is not run again for this long (it takes up to 5 s).
+PROBE_RETRY_SECONDS = 60
+_clock = time.monotonic
 
 
 @lru_cache(maxsize=1)
@@ -43,33 +47,13 @@ def supports_command(command: str) -> bool:
     """Whether ``crate-cli --help`` lists ``command``.
 
     The help of a binary that replied is kept for the process. A probe that fails,
-    such as a timeout on a loaded worker, answers False for this call only.
+    such as a timeout on a loaded worker, answers False for ``PROBE_RETRY_SECONDS``.
     """
     binary = find_binary()
     if not binary:
         return False
-    try:
-        help_text = _help_text(binary)
-    except Exception:
-        log.warning(
-            "crate-cli --help failed; this call goes on without crate-cli %s",
-            command,
-            exc_info=True,
-        )
-        return False
-    return command.lower() in help_text.lower()
-
-
-@lru_cache(maxsize=4)
-def _help_text(binary: str) -> str:
-    """``--help`` of ``binary``; a failed call raises, so it is never cached."""
-    return subprocess.run(
-        [binary, "--help"],
-        capture_output=True,
-        text=True,
-        timeout=5,
-        check=True,
-    ).stdout
+    help_text = _help_text(binary)
+    return help_text is not None and command.lower() in help_text.lower()
 
 
 def supports_analyze_beats() -> bool:
@@ -77,31 +61,62 @@ def supports_analyze_beats() -> bool:
     track the beats themselves.
 
     The answer of a binary that replied is kept for the process. A probe that fails,
-    such as a timeout on a loaded worker, answers False for this call only.
+    such as a timeout on a loaded worker, answers False for ``PROBE_RETRY_SECONDS``.
     """
     binary = find_binary()
     if not binary:
         return False
-    try:
-        return "--beats" in _analyze_help(binary)
-    except Exception:
-        log.warning(
-            "crate-cli analyze --help failed; this analysis does not hand it model beats",
-            exc_info=True,
-        )
-        return False
+    help_text = _analyze_help(binary)
+    return help_text is not None and "--beats" in help_text
 
 
-@lru_cache(maxsize=4)
-def _analyze_help(binary: str) -> str:
-    """``analyze --help`` of ``binary``; a failed call raises, so it is never cached."""
-    return subprocess.run(
-        [binary, "analyze", "--help"],
-        capture_output=True,
-        text=True,
-        timeout=5,
-        check=True,
-    ).stdout
+class _HelpProbe:
+    """The help a crate-cli call prints, or None when it fails.
+
+    A help is kept for the process once the binary replied. A failure is logged and
+    remembered: for ``PROBE_RETRY_SECONDS`` the probe answers None without running
+    the binary or logging again, since every track asks.
+    """
+
+    def __init__(self, *args: str) -> None:
+        self._args = args
+        self._replies: dict[str, str] = {}
+        self._failed_at: dict[str, float] = {}
+
+    def __call__(self, binary: str) -> str | None:
+        if binary in self._replies:
+            return self._replies[binary]
+        failed_at = self._failed_at.get(binary)
+        if failed_at is not None and _clock() - failed_at < PROBE_RETRY_SECONDS:
+            return None
+        try:
+            reply = subprocess.run(
+                [binary, *self._args],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=True,
+            ).stdout
+        except Exception:
+            self._failed_at[binary] = _clock()
+            log.warning(
+                "crate-cli %s failed; it is not asked again for %d s",
+                " ".join(self._args),
+                PROBE_RETRY_SECONDS,
+                exc_info=True,
+            )
+            return None
+        self._failed_at.pop(binary, None)
+        self._replies[binary] = reply
+        return reply
+
+    def cache_clear(self) -> None:
+        self._replies.clear()
+        self._failed_at.clear()
+
+
+_help_text = _HelpProbe("--help")
+_analyze_help = _HelpProbe("analyze", "--help")
 
 
 def _scan_timeout() -> int:
