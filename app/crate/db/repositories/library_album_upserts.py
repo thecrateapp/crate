@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timezone
 
-from sqlalchemy import false, func, or_, select, update
+from sqlalchemy import and_, false, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.engine import Row
 from sqlalchemy.orm import Session
 
 from crate.entity_ids import album_entity_uid
@@ -22,7 +24,78 @@ from crate.db.tx import optional_scope
 from crate.slugs import build_album_slug
 
 
-def upsert_album(data: dict, *, session: Session | None = None) -> int:
+class LibraryAlbumIdentityConflict(RuntimeError):
+    """A scanned album folder is a second live copy of an album indexed elsewhere."""
+
+    def __init__(self, *, path: str, existing_album_id: int, existing_path: str):
+        super().__init__(
+            f"Album at {path} is already indexed as album {existing_album_id} "
+            f"at {existing_path}"
+        )
+        self.path = path
+        self.existing_album_id = existing_album_id
+        self.existing_path = existing_path
+
+
+def _adopt_moved_album(
+    s: Session,
+    data: dict,
+    entity_uid,
+    columns: tuple,
+    indexed_path_is_live: Callable[[str], bool],
+) -> Row | None:
+    """Return the row a folder moved away from, or ``None`` for a new album.
+
+    ``library_albums`` keeps one row per artist and name and per entity UID. A
+    row holding either key at another path is the same album: when its folder
+    has gone the album moved, so the caller updates that row; when its folder
+    still holds audio this folder is a second copy, which is not indexed.
+    """
+    rows = s.execute(
+        select(*columns, LibraryAlbum.path, LibraryAlbum.quarantined_at)
+        .where(
+            LibraryAlbum.path != data["path"],
+            or_(
+                and_(
+                    LibraryAlbum.artist == data["artist"],
+                    LibraryAlbum.name == data["name"],
+                ),
+                LibraryAlbum.entity_uid == entity_uid,
+            ),
+        )
+        .order_by(LibraryAlbum.id)
+        .limit(2)
+    ).all()
+    if not rows:
+        return None
+    conflict = rows[0]
+    if (
+        len(rows) > 1
+        or conflict.quarantined_at is not None
+        or indexed_path_is_live(conflict.path)
+    ):
+        raise LibraryAlbumIdentityConflict(
+            path=data["path"],
+            existing_album_id=int(conflict.id),
+            existing_path=conflict.path,
+        )
+    return conflict
+
+
+def upsert_album(
+    data: dict,
+    *,
+    session: Session | None = None,
+    indexed_path_is_live: Callable[[str], bool] | None = None,
+) -> int:
+    """Insert or update the album indexed at ``data["path"]``; return its id.
+
+    A filesystem scan passes ``indexed_path_is_live`` to resolve a new path
+    whose artist and name, or entity UID, already belong to another row: that
+    row is moved here when its indexed folder no longer holds audio, and
+    ``LibraryAlbumIdentityConflict`` is raised while it still does. Without it
+    such an insert fails on the unique constraints.
+    """
     with optional_scope(session) as s:
         now = datetime.now(timezone.utc)
         requested_entity_uid = coerce_uuid_or_none(data.get("entity_uid"))
@@ -87,6 +160,28 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
                 )
                 .limit(1)
             ).first()
+        artist_entity_uid = s.execute(
+            select(LibraryArtist.entity_uid)
+            .where(LibraryArtist.name == data["artist"])
+            .limit(1)
+        ).scalar_one_or_none()
+        candidate_entity_uid = requested_entity_uid or album_entity_uid(
+            artist_name=data["artist"],
+            artist_uid=artist_entity_uid,
+            album_name=data["name"],
+            year=data.get("year"),
+            musicbrainz_albumid=data.get("musicbrainz_albumid"),
+            musicbrainz_releasegroupid=data.get("musicbrainz_releasegroupid"),
+            tag_album=data.get("tag_album"),
+        )
+        if existing is None and indexed_path_is_live is not None:
+            existing = _adopt_moved_album(
+                s,
+                data,
+                candidate_entity_uid,
+                existing_columns,
+                indexed_path_is_live,
+            )
         slug = (
             existing[1]
             if existing and existing[1]
@@ -95,26 +190,8 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
             )
         )
         requested_storage_id = coerce_uuid_or_none(data.get("storage_id"))
-        artist_entity_uid = s.execute(
-            select(LibraryArtist.entity_uid)
-            .where(LibraryArtist.name == data["artist"])
-            .limit(1)
-        ).scalar_one_or_none()
         requested_tag_album = data.get("tag_album")
-        entity_uid = (
-            existing[3]
-            if existing and existing[3]
-            else requested_entity_uid
-            or album_entity_uid(
-                artist_name=data["artist"],
-                artist_uid=artist_entity_uid,
-                album_name=data["name"],
-                year=data.get("year"),
-                musicbrainz_albumid=data.get("musicbrainz_albumid"),
-                musicbrainz_releasegroupid=data.get("musicbrainz_releasegroupid"),
-                tag_album=data.get("tag_album"),
-            )
-        )
+        entity_uid = existing[3] if existing and existing[3] else candidate_entity_uid
         storage_id = existing[2] if existing and existing[2] else requested_storage_id
         if existing:
             album_id = int(existing[0])
@@ -303,4 +380,4 @@ def upsert_album(data: dict, *, session: Session | None = None) -> int:
         return int(row)
 
 
-__all__ = ["upsert_album"]
+__all__ = ["LibraryAlbumIdentityConflict", "upsert_album"]

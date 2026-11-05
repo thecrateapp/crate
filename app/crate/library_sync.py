@@ -22,6 +22,7 @@ from crate.db.repositories.library import (
     get_library_artist,
     get_library_artists,
 )
+from crate.db.repositories.library_album_upserts import LibraryAlbumIdentityConflict
 from crate.db.repositories.library_writes import upsert_artist
 from crate.db.repositories.library_sync_writes import upsert_scanned_album
 from crate.entity_ids import artist_entity_uid as build_artist_entity_uid
@@ -401,6 +402,20 @@ class LibrarySync:
                     album_dirs.append(sub)
         return album_dirs
 
+    def _indexed_album_path_is_live(self, path: str) -> bool:
+        """Whether an album indexed at ``path`` still has audio on disk.
+
+        An unreadable folder counts as live so that its row is never taken over.
+        """
+        album_dir = Path(path)
+        try:
+            if not album_dir.is_dir():
+                return False
+            audio_files, _latest_mtime = self._scan_album_tree(album_dir)
+        except OSError:
+            return True
+        return bool(audio_files)
+
     def _iter_album_audio_files(self, album_dir: Path) -> list[Path]:
         all_audio, _latest_mtime = self._scan_album_tree(album_dir)
         return all_audio
@@ -517,6 +532,7 @@ class LibrarySync:
         total_tracks = 0
         synced_paths = set()
         sync_failures = 0
+        duplicate_albums = 0
 
         for album_dir in album_dirs:
             try:
@@ -566,6 +582,16 @@ class LibrarySync:
                 total_tracks += result["track_count"]
                 synced_paths.add(album_path)
 
+            except LibraryAlbumIdentityConflict as conflict:
+                # A second live copy of an indexed album: leave it unindexed
+                # until the copies are consolidated, without failing the pass.
+                duplicate_albums += 1
+                log.warning(
+                    "Skipping album folder %s: album %d is already indexed at %s",
+                    album_dir.name,
+                    conflict.existing_album_id,
+                    conflict.existing_path,
+                )
             except Exception:
                 sync_failures += 1
                 log.exception("Failed to sync album %s", album_dir.name)
@@ -576,6 +602,14 @@ class LibrarySync:
                 "Skipping deletion of existing albums for %s because %d album syncs failed",
                 artist_name,
                 sync_failures,
+            )
+        elif duplicate_albums:
+            # The indexed copy may live in a folder this pass did not scan.
+            log.warning(
+                "Skipping deletion of existing albums for %s because %d album "
+                "folders duplicate indexed albums",
+                artist_name,
+                duplicate_albums,
             )
         elif not album_dirs and existing_paths:
             log.warning(
@@ -956,6 +990,7 @@ class LibrarySync:
             artist_payload=artist_payload,
             album_payload=album_payload,
             track_payloads=track_data_list,
+            indexed_album_path_is_live=self._indexed_album_path_is_live,
         )
         if has_cover:
             queue_artwork_materialization(
@@ -964,7 +999,16 @@ class LibrarySync:
             )
 
         # Remove deleted tracks
-        for old_path in set(existing_tracks_by_path.keys()) - synced_paths:
+        stale_track_paths = set(existing_tracks_by_path.keys()) - synced_paths
+        if album_id != existing_album_id:
+            # The row was adopted from another path (a moved folder): drop the
+            # tracks it still indexes there whose files are gone.
+            stale_track_paths |= {
+                old_path
+                for old_path in set(get_tracks_by_album_id(album_id)) - synced_paths
+                if not Path(old_path).exists()
+            }
+        for old_path in stale_track_paths:
             delete_track_by_path(old_path)
 
         return {
