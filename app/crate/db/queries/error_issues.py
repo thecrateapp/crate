@@ -479,11 +479,142 @@ def untriaged_open(
         return _impl(current)
 
 
+MAX_DUPLICATE_CANDIDATES = 10
+
+_TRIAGE_INPUT_SQL = """
+    WITH target AS (
+        SELECT i.id, i.short_id, i.service, i.level, i.status, i.substatus,
+               i.issue_category, i.events_24h, i.users_24h, i.events_total,
+               i.users_total, i.first_seen, i.last_seen, i.first_release,
+               i.last_release, i.crate_score, i.group_key, i.digest, i.digest_hash,
+               i.digest -> 'exceptions' -> -1 ->> 'type' AS exception_type
+        FROM error_issues i
+        WHERE i.id = CAST(:id AS uuid)
+    ),
+    candidates AS (
+        SELECT c.id, c.short_id, c.service, c.level, c.status, c.substatus,
+               c.last_seen, c.events_24h,
+               COALESCE(c.group_key = t.group_key, FALSE) AS same_group,
+               c.digest -> 'exceptions' -> -1 AS exception,
+               c.digest -> 'frames' -> -1 AS top_frame,
+               c.digest ->> 'message' AS message,
+               row_number() OVER (
+                   ORDER BY COALESCE(c.group_key = t.group_key, FALSE) DESC,
+                            (c.status = 'unresolved') DESC,
+                            c.crate_score DESC,
+                            c.last_seen DESC NULLS LAST,
+                            c.id
+               ) AS rank
+        FROM error_issues c
+        CROSS JOIN target t
+        WHERE c.id <> t.id
+          AND c.digest IS NOT NULL
+          AND (
+              (t.group_key IS NOT NULL AND c.group_key = t.group_key)
+              OR (
+                  t.exception_type IS NOT NULL
+                  AND c.digest -> 'exceptions' -> -1 ->> 'type' = t.exception_type
+              )
+          )
+    )
+    SELECT t.id::text AS id, t.short_id, t.service, t.level, t.status, t.substatus,
+           t.issue_category, t.events_24h, t.users_24h, t.events_total,
+           t.users_total, t.first_seen, t.last_seen, t.first_release,
+           t.last_release, t.crate_score, t.group_key, t.digest, t.digest_hash,
+           COALESCE(
+               (
+                   SELECT json_agg(
+                       json_build_object(
+                           'id', c.id::text,
+                           'short_id', c.short_id,
+                           'service', c.service,
+                           'level', c.level,
+                           'status', c.status,
+                           'substatus', c.substatus,
+                           'last_seen', c.last_seen,
+                           'events_24h', c.events_24h,
+                           'same_group', c.same_group,
+                           'exception', c.exception,
+                           'top_frame', c.top_frame,
+                           'message', c.message
+                       )
+                       ORDER BY c.rank
+                   )
+                   FROM candidates c
+                   WHERE c.rank <= :candidate_limit
+               ),
+               '[]'::json
+           ) AS candidates,
+           (
+               SELECT json_build_object(
+                   'classification', tr.classification,
+                   'severity', tr.severity,
+                   'summary', tr.summary,
+                   'hypothesis', tr.hypothesis,
+                   'confidence', tr.confidence
+               )
+               FROM error_issue_triage tr
+               WHERE tr.issue_id = t.id
+                 AND tr.kind = 'triage'
+                 AND tr.digest_hash = t.digest_hash
+               ORDER BY tr.created_at DESC
+               LIMIT 1
+           ) AS current_triage,
+           COALESCE(
+               (
+                   SELECT array_agg(DISTINCT tr.kind ORDER BY tr.kind)
+                   FROM error_issue_triage tr
+                   WHERE tr.issue_id = t.id AND tr.digest_hash = t.digest_hash
+               ),
+               ARRAY[]::text[]
+           ) AS done_kinds
+    FROM target t
+"""
+
+
+def get_triage_input(
+    issue_id: str,
+    *,
+    candidate_limit: int = MAX_DUPLICATE_CANDIDATES,
+    session: Session | None = None,
+) -> dict[str, Any] | None:
+    """What a triage or investigation of an issue reads, in one query.
+
+    The issue's stats and digest; at most `candidate_limit` duplicate candidates
+    (same `group_key` or same main exception type, same group first, then open
+    issues by score), each reduced to its main exception and innermost app frame;
+    the current digest's latest triage; and the kinds already stored for it.
+    """
+    valid_id = _valid_uuid(issue_id)
+    if valid_id is None:
+        return None
+    limit = max(0, min(int(candidate_limit), MAX_DUPLICATE_CANDIDATES))
+    params = {"id": valid_id, "candidate_limit": limit}
+
+    def _impl(current: Session) -> dict[str, Any] | None:
+        row = current.execute(text(_TRIAGE_INPUT_SQL), params).mappings().first()
+        if row is None:
+            return None
+        data = dict(row)
+        data["digest"] = coerce_json(data["digest"])
+        data["candidates"] = list(coerce_json(data["candidates"]) or [])
+        data["current_triage"] = coerce_json(data["current_triage"])
+        data["done_kinds"] = list(data["done_kinds"] or [])
+        return data
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
 __all__ = [
     "LIST_STATUSES",
+    "MAX_DUPLICATE_CANDIDATES",
     "MAX_LIST_LIMIT",
     "get_issue",
     "get_issue_by_short_id",
+    "get_triage_input",
     "inbox_overview",
     "inbox_state",
     "list_issues",

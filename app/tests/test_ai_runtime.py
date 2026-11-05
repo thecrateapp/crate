@@ -334,6 +334,7 @@ def test_real_admission_probe_and_action_charge_and_replay(pg_db, monkeypatch):
         )
     assert error.value.code == "AI_EXECUTION_ALREADY_ACCEPTED" and len(calls) == 1
     row = runtime.usage.list_invocations({})["items"][0]
+    assert answer._ai_invocation_id == str(row["id"])
     assert row["charged_tokens"] == 32 and row["usage_known"]
     assert "synthetic" not in str(row) and "actual-model" == row["reported_model"]
     probe = runtime.configuration.resolve_profile(profile["id"], 1)
