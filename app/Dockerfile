@@ -148,11 +148,16 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # keeps local ARM builds light by installing them on x86_64 only; off skips them.
 # Beat This! installs against the torch just installed (pinned by constraint), with
 # torchaudio from the same CPU index, so it never moves torch.
+# torch is pinned because Beat This! needs torchaudio, which stopped at 2.11 while
+# torch moved on: torchaudio 2.11.1 (requirements-beat-this.txt) declares only
+# torch>=2.11, so an unpinned torch would pair itself with a torchaudio nobody ran on
+# it. Bump both together and check Beat This! on the new pair.
 ARG PANNS=auto
+ARG TORCH_VERSION=2.15.0
 COPY requirements-beat-this.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     if [ "$PANNS" = "on" ] || { [ "$PANNS" = "auto" ] && [ "$(uname -m)" = "x86_64" ]; }; then \
-        pip install torch --index-url https://download.pytorch.org/whl/cpu && \
+        pip install "torch==${TORCH_VERSION}" --index-url https://download.pytorch.org/whl/cpu && \
         pip install panns_inference && \
         pip freeze | grep -i '^torch==' > /tmp/torch-constraint.txt && \
         pip install --prefer-binary -c /tmp/torch-constraint.txt \
