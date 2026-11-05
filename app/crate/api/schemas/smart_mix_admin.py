@@ -3,11 +3,45 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from crate.smart_mix.backfill_window import (
+    DEFAULT_DAY_CONCURRENCY,
+    DEFAULT_NIGHT_CONCURRENCY,
+    MAX_CONCURRENCY,
+    MIN_CONCURRENCY,
+    is_valid_timezone,
+)
+
+
+_HHMM_PATTERN = r"^(?:[01]\d|2[0-3]):[0-5]\d$"
 
 
 class SmartMixAdminModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
+
+
+class SmartMixNightWindow(SmartMixAdminModel):
+    """Local time range, possibly across midnight, with more backfill capacity."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    start: str = Field(pattern=_HHMM_PATTERN)
+    end: str = Field(pattern=_HHMM_PATTERN)
+    timezone: str = Field(min_length=1, max_length=64)
+
+    @field_validator("timezone")
+    @classmethod
+    def known_timezone(cls, value: str) -> str:
+        if not is_valid_timezone(value):
+            raise ValueError("A valid IANA timezone is required")
+        return value
+
+    @model_validator(mode="after")
+    def distinct_bounds(self) -> SmartMixNightWindow:
+        if self.start == self.end:
+            raise ValueError("The night window needs different start and end times")
+        return self
 
 
 class SmartMixBackfillRequest(SmartMixAdminModel):
@@ -15,6 +49,20 @@ class SmartMixBackfillRequest(SmartMixAdminModel):
 
     batch_size: int = Field(default=25, alias="batchSize", ge=1, le=100)
     max_attempts: int = Field(default=3, alias="maxAttempts", ge=1, le=10)
+    # Omitted night window settings keep the stored ones.
+    night_window: SmartMixNightWindow | None = Field(default=None, alias="nightWindow")
+    night_concurrency: int | None = Field(
+        default=None,
+        alias="nightConcurrency",
+        ge=MIN_CONCURRENCY,
+        le=MAX_CONCURRENCY,
+    )
+    day_concurrency: int | None = Field(
+        default=None,
+        alias="dayConcurrency",
+        ge=MIN_CONCURRENCY,
+        le=MAX_CONCURRENCY,
+    )
 
 
 class SmartMixProfileQualityCounts(SmartMixAdminModel):
@@ -45,11 +93,32 @@ class SmartMixBackfillTask(SmartMixAdminModel):
     updated_at: datetime | str | None = Field(default=None, alias="updatedAt")
 
 
-class SmartMixBackfillCampaign(SmartMixAdminModel):
-    target: str
-    status: Literal["running", "paused", "cancelled", "completed"]
+class SmartMixBackfillSettings(SmartMixAdminModel):
     batch_size: int = Field(alias="batchSize", ge=1, le=100)
     max_attempts: int = Field(alias="maxAttempts", ge=1, le=10)
+    night_window: SmartMixNightWindow = Field(alias="nightWindow")
+    night_concurrency: int = Field(
+        default=DEFAULT_NIGHT_CONCURRENCY,
+        alias="nightConcurrency",
+        ge=MIN_CONCURRENCY,
+        le=MAX_CONCURRENCY,
+    )
+    day_concurrency: int = Field(
+        default=DEFAULT_DAY_CONCURRENCY,
+        alias="dayConcurrency",
+        ge=MIN_CONCURRENCY,
+        le=MAX_CONCURRENCY,
+    )
+
+
+class SmartMixBackfillLimit(SmartMixAdminModel):
+    window: Literal["night", "day"]
+    limit: int = Field(ge=MIN_CONCURRENCY, le=MAX_CONCURRENCY)
+
+
+class SmartMixBackfillCampaign(SmartMixBackfillSettings):
+    target: str
+    status: Literal["running", "paused", "cancelled", "completed"]
     batches: int = Field(default=0, ge=0)
     claimed: int = Field(default=0, ge=0)
     updated_at: datetime | str | None = Field(default=None, alias="updatedAt")
@@ -144,6 +213,8 @@ class SmartMixAdminStatusResponse(SmartMixAdminModel):
     refreshed_at: datetime | str | None = Field(default=None, alias="refreshedAt")
     control_state: Literal["idle", "running", "paused"] = Field(alias="controlState")
     campaign: SmartMixBackfillCampaign | None = None
+    backfill_settings: SmartMixBackfillSettings = Field(alias="backfillSettings")
+    backfill_limit: SmartMixBackfillLimit = Field(alias="backfillLimit")
     active_task: SmartMixBackfillTask | None = Field(
         default=None,
         alias="activeTask",

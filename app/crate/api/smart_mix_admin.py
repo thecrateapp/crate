@@ -28,6 +28,10 @@ from crate.db.queries.smart_mix_admin_activity import get_smart_mix_activity
 from crate.db.queries.smart_mix_admin_tracks import list_smart_mix_tracks
 from crate.db.queries.tasks import list_tasks
 from crate.db.repositories.tasks import create_task_dedup
+from crate.smart_mix.backfill_window import (
+    backfill_window_limit,
+    backfill_window_settings,
+)
 
 
 router = APIRouter(prefix="/api/admin/smart-mix", tags=["admin"])
@@ -37,6 +41,8 @@ COVERAGE_DEDUP_KEY = "smart-mix:coverage"
 COVERAGE_MAX_AGE_SECONDS = 600
 PROFILE_TASK_TYPE = "compute_smart_mix_profile"
 TRACK_PAGE_SIZE = 50
+DEFAULT_BATCH_SIZE = 25
+DEFAULT_MAX_ATTEMPTS = 3
 TrackStatusFilter = Literal[
     "all", "current", "outdated", "source_changed", "unavailable", "missing", "failed"
 ]
@@ -71,6 +77,20 @@ def _control_state(campaign: dict | None) -> Literal["idle", "running", "paused"
     return "idle"
 
 
+def _now() -> datetime:
+    return datetime.now(UTC)
+
+
+def _backfill_settings(campaign: dict | None) -> dict:
+    """Settings of the stored campaign, or the ones a new campaign would use."""
+    stored = campaign or {}
+    return {
+        "batch_size": stored.get("batch_size") or DEFAULT_BATCH_SIZE,
+        "max_attempts": stored.get("max_attempts") or DEFAULT_MAX_ATTEMPTS,
+        **backfill_window_settings(campaign),
+    }
+
+
 def _coverage_is_stale(refreshed_at: datetime | str | None) -> bool:
     if refreshed_at is None:
         return True
@@ -89,12 +109,16 @@ def smart_mix_status(request: Request) -> SmartMixAdminStatusResponse:
     coverage = get_smart_mix_admin_status()
     if _coverage_is_stale(coverage.get("refreshed_at")):
         create_task_dedup(COVERAGE_TASK_TYPE, {}, dedup_key=COVERAGE_DEDUP_KEY)
+    settings = _backfill_settings(campaign)
+    limit = backfill_window_limit(campaign, now=_now())
     return SmartMixAdminStatusResponse.model_validate(
         {
             **coverage,
             "controlState": _control_state(campaign),
-            "campaign": campaign,
+            "campaign": {**campaign, **settings} if campaign else None,
             "activeTask": _active_backfill_task(),
+            "backfillSettings": settings,
+            "backfillLimit": {"window": limit.window, "limit": limit.limit},
         }
     )
 
@@ -192,6 +216,9 @@ def _queue_backfill(
     start_smart_mix_campaign(
         batch_size=body.batch_size,
         max_attempts=body.max_attempts,
+        night_window=body.night_window.model_dump() if body.night_window else None,
+        night_concurrency=body.night_concurrency,
+        day_concurrency=body.day_concurrency,
     )
     if active is not None:
         return SmartMixBackfillResponse.model_validate(

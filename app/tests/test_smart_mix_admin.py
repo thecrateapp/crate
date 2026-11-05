@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from unittest.mock import patch
 import uuid
 
 from fastapi import HTTPException
+import pytest
 from sqlalchemy import text
 
 from crate.db.tx import transaction_scope
@@ -463,8 +465,173 @@ def test_backfill_starts_a_bounded_campaign(test_app, monkeypatch) -> None:
         "status": "queued",
         "deduplicated": False,
     }
-    assert started == [{"batch_size": 40, "max_attempts": 4}]
+    assert started == [
+        {
+            "batch_size": 40,
+            "max_attempts": 4,
+            "night_window": None,
+            "night_concurrency": None,
+            "day_concurrency": None,
+        }
+    ]
     assert oversized.status_code == 422
+
+
+def test_backfill_passes_the_night_window_settings(test_app, monkeypatch) -> None:
+    from crate.api import smart_mix_admin
+
+    started: list[dict] = []
+    monkeypatch.setattr(smart_mix_admin, "_active_backfill_task", lambda: None)
+    monkeypatch.setattr(
+        smart_mix_admin,
+        "start_smart_mix_campaign",
+        lambda **kwargs: started.append(kwargs) or _campaign(),
+    )
+    monkeypatch.setattr(
+        smart_mix_admin, "queue_next_smart_mix_batch", lambda: "task-new"
+    )
+
+    for path in (
+        "/api/admin/smart-mix/backfill",
+        "/api/admin/smart-mix/backfill/resume",
+    ):
+        response = test_app.post(
+            path,
+            json={
+                "batchSize": 25,
+                "maxAttempts": 3,
+                "nightWindow": {
+                    "start": "23:30",
+                    "end": "07:15",
+                    "timezone": "America/New_York",
+                },
+                "nightConcurrency": 12,
+                "dayConcurrency": 2,
+            },
+        )
+        assert response.status_code == 200
+
+    expected = {
+        "batch_size": 25,
+        "max_attempts": 3,
+        "night_window": {
+            "start": "23:30",
+            "end": "07:15",
+            "timezone": "America/New_York",
+        },
+        "night_concurrency": 12,
+        "day_concurrency": 2,
+    }
+    assert started == [expected, expected]
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"nightWindow": {"start": "1:00", "end": "08:00", "timezone": "UTC"}},
+        {"nightWindow": {"start": "24:00", "end": "08:00", "timezone": "UTC"}},
+        {"nightWindow": {"start": "01:00", "end": "08:61", "timezone": "UTC"}},
+        {"nightWindow": {"start": "01:00", "end": "01:00", "timezone": "UTC"}},
+        {"nightWindow": {"start": "01:00", "end": "08:00", "timezone": "Mars/Base"}},
+        {"nightWindow": {"start": "01:00", "end": "08:00", "timezone": "../etc"}},
+        {"nightWindow": {"start": "01:00", "end": "08:00", "timezone": ""}},
+        {"nightWindow": {"start": "01:00", "end": "08:00"}},
+        {
+            "nightWindow": {
+                "start": "01:00",
+                "end": "08:00",
+                "timezone": "UTC",
+                "days": "weekdays",
+            }
+        },
+        {"nightWindow": None, "nightConcurrency": 0},
+        {"nightConcurrency": 33},
+        {"dayConcurrency": 0},
+        {"dayConcurrency": "four"},
+        {"windowLimit": 4},
+    ],
+)
+def test_settings_validation_rejects_bad_window(
+    test_app, monkeypatch, changes: dict
+) -> None:
+    from crate.api import smart_mix_admin
+
+    monkeypatch.setattr(smart_mix_admin, "_active_backfill_task", lambda: None)
+    monkeypatch.setattr(
+        smart_mix_admin,
+        "start_smart_mix_campaign",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            AssertionError("invalid settings must not reach the campaign")
+        ),
+    )
+
+    for path in (
+        "/api/admin/smart-mix/backfill",
+        "/api/admin/smart-mix/backfill/resume",
+    ):
+        response = test_app.post(
+            path, json={"batchSize": 25, "maxAttempts": 3, **changes}
+        )
+        assert response.status_code == 422, (path, changes)
+
+
+def test_status_reports_the_active_window_and_limit(test_app, monkeypatch) -> None:
+    from crate.api import smart_mix_admin
+
+    campaigns = {
+        "configured": {
+            **_campaign(),
+            "night_window": {
+                "start": "22:00",
+                "end": "06:00",
+                "timezone": "Europe/Madrid",
+            },
+            "night_concurrency": 6,
+            "day_concurrency": 2,
+        },
+        "legacy": _campaign(),
+        "none": None,
+    }
+    current = {"campaign": None}
+    monkeypatch.setattr(smart_mix_admin, "get_smart_mix_admin_status", _coverage)
+    monkeypatch.setattr(
+        smart_mix_admin, "get_smart_mix_campaign_status", lambda: current["campaign"]
+    )
+    monkeypatch.setattr(smart_mix_admin, "_backfill_tasks", lambda: [])
+    # 23:30 in Madrid: inside 22:00-06:00, outside the default 01:00-08:00.
+    monkeypatch.setattr(
+        smart_mix_admin, "_now", lambda: datetime(2026, 1, 15, 22, 30, tzinfo=UTC)
+    )
+
+    payloads = {}
+    for name, campaign in campaigns.items():
+        current["campaign"] = campaign
+        response = test_app.get("/api/admin/smart-mix/status")
+        assert response.status_code == 200
+        payloads[name] = response.json()
+
+    assert payloads["configured"]["backfillLimit"] == {"window": "night", "limit": 6}
+    assert payloads["configured"]["backfillSettings"] == {
+        "batchSize": 25,
+        "maxAttempts": 3,
+        "nightWindow": {"start": "22:00", "end": "06:00", "timezone": "Europe/Madrid"},
+        "nightConcurrency": 6,
+        "dayConcurrency": 2,
+    }
+    assert payloads["configured"]["campaign"]["dayConcurrency"] == 2
+
+    defaults = {
+        "batchSize": 25,
+        "maxAttempts": 3,
+        "nightWindow": {"start": "01:00", "end": "08:00", "timezone": "Europe/Madrid"},
+        "nightConcurrency": 8,
+        "dayConcurrency": 4,
+    }
+    for name in ("legacy", "none"):
+        assert payloads[name]["backfillLimit"] == {"window": "day", "limit": 4}
+        assert payloads[name]["backfillSettings"] == defaults
+    assert payloads["legacy"]["campaign"]["nightWindow"] == defaults["nightWindow"]
+    assert payloads["none"]["campaign"] is None
 
 
 def test_backfill_with_an_active_batch_reuses_it(test_app, monkeypatch) -> None:
