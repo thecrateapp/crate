@@ -11,6 +11,7 @@ from crate.smart_mix.models import (
     Phrase,
     StructureDraft,
     TrackMixProfile,
+    TrackMixProfileDraft,
     TransitionContext,
     TransitionFallbackReason,
     TransitionMode,
@@ -396,6 +397,38 @@ def test_phrase_rejects_invalid_values(overrides) -> None:
 def test_structure_rejects_overlapping_or_oversized_values(structure) -> None:
     with pytest.raises((TypeError, ValueError)):
         profile(**structure)
+
+
+@pytest.mark.parametrize("tracker", ["", "b" * 33, 7])
+def test_beat_tracker_names_the_tracker_in_a_few_characters(tracker) -> None:
+    with pytest.raises((TypeError, ValueError)):
+        profile(beat_tracker=tracker)
+    with pytest.raises((TypeError, ValueError)):
+        TrackMixProfileDraft(
+            analyzer="crate-rust",
+            analyzer_version="smart-mix-audio-v7",
+            duration_ms=1_000,
+            quality="partial",
+            beat_tracker=tracker,
+        )
+
+
+def test_rust_payload_carries_the_beat_tracker() -> None:
+    payload = {
+        "analyzer": "crate-rust",
+        "analyzerVersion": "smart-mix-audio-v7",
+        "durationMs": 1_000,
+        "quality": "partial",
+    }
+
+    assert mix_profile_draft_from_payload(payload).beat_tracker is None
+    assert (
+        mix_profile_draft_from_payload(
+            {**payload, "beatTracker": "beat-this-small0"}
+        ).beat_tracker
+        == "beat-this-small0"
+    )
+    assert profile(beat_tracker="beat-this-small0").beat_tracker == "beat-this-small0"
 
 
 def test_voice_is_kept_with_its_detector() -> None:

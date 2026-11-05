@@ -1269,10 +1269,11 @@ def _handle_compute_smart_mix_profile(task_id: str, params: dict, config: dict) 
     path = str(track["path"])
     claim_token = params.get("claim_token")
     capture = capture_smart_mix_source(track_id, path, claim_token=claim_token)
+    beats = _smart_mix_beats(path)
     try:
         from crate.audio_analysis import analyze_mix_profile
 
-        draft = analyze_mix_profile(path)
+        draft = analyze_mix_profile(path, beats)
     except Exception as exc:
         record_smart_mix_failure(track_id, path, str(exc), claim_token=claim_token)
         log.warning("Smart Mix analysis failed for %s", path, exc_info=True)
@@ -1315,6 +1316,22 @@ def _handle_compute_smart_mix_profile(task_id: str, params: dict, config: dict) 
         "outcome": str(outcome),
         "quality": str(draft.quality),
     }
+
+
+def _smart_mix_beats(path: str):
+    """Beats and downbeats from Beat This! (SM3-D14), or None: without them the
+    analysis keeps its own beat tracker, so a model failure never fails the profile."""
+    from crate.smart_mix.beat_model import track_file_beats
+
+    try:
+        return track_file_beats(path)
+    except Exception:
+        log.warning(
+            "Beat This! failed for %s; the analysis keeps its own beat tracker",
+            path,
+            exc_info=True,
+        )
+        return None
 
 
 def _refresh_live_coverage() -> None:

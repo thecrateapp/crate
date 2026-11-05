@@ -1,0 +1,262 @@
+"""Beats and downbeats from Beat This! for Smart Mix profiles (SM3-D14).
+
+Beat This! (Foscarin, Schlüter and Widmer, ISMIR 2024; CPJKU, code and weights MIT) is
+run without its DBN post-processing. The profile task runs it before the analysis and
+hands the result to the analyzer, Rust or Python: both take these beats instead of their
+own tracker, keep fitting the constant grid, and take the bar phase from the model's
+downbeats (``crate.smart_mix.phrase_grid.downbeat_anchor_from_model``).
+
+Only the analysis worker has torch, ``beat_this`` and the checkpoint, which the image
+bakes in; nothing is ever downloaded at run time. Without them, when the model fails or
+for tracks over ``BEAT_MODEL_MAX_SECONDS``, there are no model beats and the analysis
+keeps its own tracker. ``CRATE_BEAT_THIS_CHECKPOINT`` names the checkpoint (``small0``
+by default, ``final0`` if it proves clearly better) and the profile records it in
+``beat_tracker``.
+"""
+
+from __future__ import annotations
+
+import logging
+import math
+import os
+import re
+from collections.abc import Sequence
+from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Protocol
+
+import numpy as np
+
+log = logging.getLogger(__name__)
+
+# A DJ set or a long live recording would cost minutes of CPU per track.
+BEAT_MODEL_MAX_SECONDS = 600
+MODEL_SAMPLE_RATE = 22_050
+CHECKPOINT_ENV = "CRATE_BEAT_THIS_CHECKPOINT"
+WEIGHTS_ENV = "CRATE_BEAT_THIS_WEIGHTS"
+DEFAULT_CHECKPOINT = "small0"
+MODELS_DIR = Path("/app/models")
+BEAT_TRACKER = f"beat-this-{DEFAULT_CHECKPOINT}"
+THREADS_ENV = "TORCH_NUM_THREADS"
+_CHECKPOINT_NAME = re.compile(r"[a-z0-9_-]{1,20}")
+_READ_BLOCK_FRAMES = 65_536
+
+
+@dataclass(frozen=True, slots=True)
+class BeatTrack:
+    """Model beats and downbeats in whole, positive, strictly increasing milliseconds."""
+
+    tracker: str
+    beats_ms: tuple[int, ...]
+    downbeats_ms: tuple[int, ...]
+
+    def to_payload(self) -> dict[str, Any]:
+        """The JSON that ``crate-cli analyze --beats`` reads."""
+        return {
+            "tracker": self.tracker,
+            "beats_ms": list(self.beats_ms),
+            "downbeats_ms": list(self.downbeats_ms),
+        }
+
+
+class BeatModel(Protocol):
+    tracker: str
+
+    def __call__(self, signal: np.ndarray, sample_rate: int) -> tuple[Any, Any]:
+        """Beat and downbeat times in seconds."""
+        ...
+
+
+class BeatThisModel:
+    """Beat This! on the CPU, without the DBN, from a local checkpoint."""
+
+    def __init__(self, path: Path, tracker: str) -> None:
+        from beat_this.inference import Audio2Beats
+
+        self.tracker = tracker
+        self._model = Audio2Beats(checkpoint_path=str(path), device="cpu", dbn=False)
+
+    def __call__(self, signal: np.ndarray, sample_rate: int) -> tuple[Any, Any]:
+        import torch
+
+        torch.set_num_threads(_torch_threads())
+        return self._model(signal, sample_rate)
+
+
+def checkpoint_name() -> str:
+    """The configured checkpoint: a short identifier, never a path or a URL."""
+    name = (os.environ.get(CHECKPOINT_ENV) or "").strip()
+    return name if _CHECKPOINT_NAME.fullmatch(name) else DEFAULT_CHECKPOINT
+
+
+def beat_tracker_name() -> str:
+    return f"beat-this-{checkpoint_name()}"
+
+
+def weights_path() -> Path:
+    explicit = (os.environ.get(WEIGHTS_ENV) or "").strip()
+    if explicit:
+        return Path(explicit)
+    return MODELS_DIR / f"beat_this-{checkpoint_name()}.ckpt"
+
+
+def _torch_threads() -> int:
+    try:
+        return max(1, int(os.environ.get(THREADS_ENV) or 1))
+    except ValueError:
+        return 1
+
+
+@lru_cache(maxsize=1)
+def load_beat_model() -> BeatModel | None:
+    """The process-wide model, or None without torch, ``beat_this`` or the weights.
+
+    ``beat_this`` downloads any checkpoint it cannot open as a file, so the file is
+    checked first: the weights only ever come from the image.
+    """
+    path = weights_path()
+    if not path.is_file():
+        log.info("No Beat This! weights at %s; Smart Mix keeps its own tracker", path)
+        return None
+    try:
+        return BeatThisModel(path, beat_tracker_name())
+    except ImportError:
+        log.info("Beat This! is not installed; Smart Mix keeps its own tracker")
+        return None
+    except Exception:
+        log.warning("Beat This! weights at %s could not be loaded", path, exc_info=True)
+        return None
+
+
+def track_beats(
+    audio: np.ndarray, sample_rate: int, *, model: BeatModel | None = None
+) -> BeatTrack | None:
+    """Beats and downbeats of mono audio, or None when the model gives none."""
+    samples = np.asarray(audio, dtype=np.float32)
+    if samples.ndim == 2:
+        samples = samples.mean(axis=1)
+    samples = samples.reshape(-1)
+    if sample_rate <= 0 or samples.size > BEAT_MODEL_MAX_SECONDS * sample_rate:
+        return None
+    beat_model = model if model is not None else load_beat_model()
+    if beat_model is None:
+        return None
+    try:
+        beats, downbeats = beat_model(samples, sample_rate)
+    except Exception:
+        log.warning(
+            "Beat This! failed; the analysis keeps its own beat tracker", exc_info=True
+        )
+        return None
+    beats_ms = _milliseconds(beats)
+    if not beats_ms:
+        log.info("Beat This! found no beats; the analysis keeps its own beat tracker")
+        return None
+    return BeatTrack(
+        tracker=beat_model.tracker,
+        beats_ms=beats_ms,
+        downbeats_ms=_milliseconds(downbeats),
+    )
+
+
+def track_file_beats(
+    path: str | Path, *, model: BeatModel | None = None
+) -> BeatTrack | None:
+    """``track_beats`` for an audio file, decoded only when the model can run."""
+    beat_model = model if model is not None else load_beat_model()
+    if beat_model is None:
+        return None
+    try:
+        duration = _duration_seconds(Path(path))
+        if duration > BEAT_MODEL_MAX_SECONDS:
+            log.info(
+                "Beat This! skips %s (%.0f s, limit %d s); the analysis keeps its own "
+                "beat tracker",
+                path,
+                duration,
+                BEAT_MODEL_MAX_SECONDS,
+            )
+            return None
+        signal, sample_rate = _load_signal(Path(path))
+    except Exception:
+        log.warning(
+            "Beat This! could not decode %s; the analysis keeps its own beat tracker",
+            path,
+            exc_info=True,
+        )
+        return None
+    return track_beats(signal, sample_rate, model=beat_model)
+
+
+def _milliseconds(seconds: Sequence[float] | np.ndarray) -> tuple[int, ...]:
+    values = np.asarray(seconds, dtype=np.float64).reshape(-1)
+    return tuple(
+        sorted(
+            {
+                max(1, round(float(value) * 1_000))
+                for value in values
+                if math.isfinite(value) and value >= 0
+            }
+        )
+    )
+
+
+def _duration_seconds(path: Path) -> float:
+    try:
+        import soundfile as sf
+
+        return float(sf.info(str(path)).duration)
+    except Exception:
+        import librosa
+
+        return float(librosa.get_duration(path=str(path)))
+
+
+def _load_signal(path: Path) -> tuple[np.ndarray, int]:
+    """Mono float32 audio at the model's rate (Beat This! would resample it anyway)."""
+    try:
+        import soundfile as sf
+
+        with sf.SoundFile(str(path)) as source:
+            mono, rate = _read_mono(source), int(source.samplerate)
+    except Exception:
+        import librosa
+
+        audio, rate = librosa.load(str(path), sr=None, mono=True)
+        mono, rate = np.asarray(audio, dtype=np.float32), int(rate)
+    if rate != MODEL_SAMPLE_RATE and mono.size:
+        import soxr
+
+        mono = soxr.resample(mono, rate, MODEL_SAMPLE_RATE)
+        rate = MODEL_SAMPLE_RATE
+    return np.ascontiguousarray(mono, dtype=np.float32), rate
+
+
+def _read_mono(source) -> np.ndarray:
+    blocks = []
+    while True:
+        block = source.read(_READ_BLOCK_FRAMES, dtype="float32", always_2d=True)
+        if block.size == 0:
+            break
+        blocks.append(block.mean(axis=1))
+    return np.concatenate(blocks) if blocks else np.zeros(0, dtype=np.float32)
+
+
+__all__ = [
+    "BEAT_MODEL_MAX_SECONDS",
+    "BEAT_TRACKER",
+    "CHECKPOINT_ENV",
+    "DEFAULT_CHECKPOINT",
+    "MODEL_SAMPLE_RATE",
+    "WEIGHTS_ENV",
+    "BeatModel",
+    "BeatThisModel",
+    "BeatTrack",
+    "beat_tracker_name",
+    "checkpoint_name",
+    "load_beat_model",
+    "track_beats",
+    "track_file_beats",
+    "weights_path",
+]

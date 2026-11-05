@@ -312,6 +312,115 @@ def test_short_tracks_are_still_scanned_in_full(monkeypatch, tmp_path: Path) -> 
     assert max(profile.beat_grid_ms) > 10_000
 
 
+def _model_beats(phase: int, *, first_ms: int = 1_000, last_ms: int = 19_500):
+    from crate.smart_mix.beat_model import BeatTrack
+
+    beats = tuple(range(first_ms, last_ms + 1, 500))
+    return BeatTrack(
+        tracker="beat-this-test",
+        beats_ms=beats,
+        downbeats_ms=beats[phase::4],
+    )
+
+
+def test_external_beats_replace_tracker_and_pick_downbeat(
+    monkeypatch, tmp_path: Path
+) -> None:
+    import librosa
+
+    from crate.smart_mix.analyzer import analyze_mix_profile
+
+    # The clicks accent every fourth beat from 1 s, which the onset heuristic takes
+    # as the bar; the model hears the bar two beats later and decides it.
+    track = tmp_path / "accented.wav"
+    _write_click_track(
+        track, bpm=120.0, duration_seconds=20.0, leading_silence_seconds=1.0
+    )
+    heuristic = analyze_mix_profile(track)
+
+    def no_tracker(*_args, **_kwargs):
+        raise AssertionError("model beats replace librosa's beat tracker")
+
+    monkeypatch.setattr(librosa.beat, "beat_track", no_tracker)
+
+    profile = analyze_mix_profile(track, beats=_model_beats(2))
+
+    # librosa's grid lags the clicks by a frame or two; its bar starts on the accent.
+    assert abs(heuristic.downbeat_anchor_ms - 1_000) <= 40
+    assert profile.beat_tracker == "beat-this-test"
+    assert profile.bpm == 120.0
+    assert profile.beat_grid_ms[:3] == (1_000, 1_500, 2_000)
+    assert profile.downbeat_anchor_ms == 2_000
+    assert profile.time_signature == 4
+    assert profile.quality == "full"
+    assert heuristic.beat_tracker is None
+
+
+def test_model_downbeats_without_a_clear_bar_leave_no_downbeat(
+    monkeypatch, tmp_path: Path
+) -> None:
+    from crate.smart_mix.analyzer import analyze_mix_profile
+    from crate.smart_mix.beat_model import BeatTrack
+
+    track = tmp_path / "unclear.wav"
+    _write_click_track(
+        track, bpm=120.0, duration_seconds=20.0, leading_silence_seconds=1.0
+    )
+    beats = _model_beats(0).beats_ms
+    # Bars on two phases half and half: no phase reaches the share.
+    split = BeatTrack(
+        tracker="beat-this-test",
+        beats_ms=beats,
+        downbeats_ms=tuple(sorted(beats[0:16:4] + beats[18::4])),
+    )
+
+    profile = analyze_mix_profile(track, beats=split)
+
+    # The onset heuristic would anchor this track; the model's word is final.
+    assert profile.downbeat_anchor_ms is None
+    assert profile.time_signature is None
+    assert profile.phrases == ()
+    assert profile.quality == "partial"
+    assert profile.beat_tracker == "beat-this-test"
+
+
+def test_external_beats_stop_at_the_analysed_head(monkeypatch, tmp_path: Path) -> None:
+    from crate.smart_mix import analyzer
+
+    monkeypatch.setattr(analyzer, "FULL_SCAN_HEAD_SECONDS", 10)
+    monkeypatch.setattr(analyzer, "FULL_SCAN_TAIL_SECONDS", 10)
+    track = tmp_path / "long.wav"
+    _write_click_track(
+        track, bpm=120.0, duration_seconds=40.0, leading_silence_seconds=1.0
+    )
+
+    profile = analyzer.analyze_mix_profile(track, beats=_model_beats(0, last_ms=39_000))
+
+    assert profile.beat_grid_ms[0] == 1_000
+    assert max(profile.beat_grid_ms) <= 10_000
+    assert profile.quality == "partial"
+
+
+def test_profile_analysis_passes_model_beats_to_the_python_analyzer(
+    monkeypatch, tmp_path: Path
+) -> None:
+    import crate.audio_analysis as audio_analysis
+    from crate.smart_mix import analyzer
+
+    beats = _model_beats(0)
+    received: list[object] = []
+    monkeypatch.setattr(audio_analysis, "_analyze_rust", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        analyzer,
+        "analyze_mix_profile",
+        lambda _path, beats=None: received.append(beats) or "draft",
+    )
+
+    assert audio_analysis.analyze_mix_profile(tmp_path / "t.flac", beats) == "draft"
+    assert audio_analysis.analyze_mix_profile(tmp_path / "t.flac") == "draft"
+    assert received == [beats, None]
+
+
 def _bar_features(bar_starts, kick_beats, beats, spacing=20):
     frames = beats * spacing + spacing
     onsets = np.full(frames, 0.2)

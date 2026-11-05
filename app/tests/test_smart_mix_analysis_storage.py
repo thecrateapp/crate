@@ -17,6 +17,7 @@ from crate.db.repositories.library_processing_state import (
 from crate.db.repositories.smart_mix import get_track_mix_profile
 from crate.db.tx import read_scope, transaction_scope
 from crate.smart_mix.models import MixProfileQuality, Phrase, TrackMixProfileDraft
+from crate.smart_mix.versions import ANALYZER_VERSION
 
 
 def test_smart_mix_storage_upserts_without_mutating_legacy_analysis(
@@ -270,6 +271,68 @@ def test_persists_structure_fields(pg_db, tmp_path: Path) -> None:
         )
     assert stored["phrases"] == [phrase.to_dict() for phrase in STRUCTURE_PHRASES]
     assert bytes(stored["energy_curve"]) == STRUCTURE_CURVE
+
+
+def test_persists_beat_tracker(pg_db, tmp_path: Path) -> None:
+    del pg_db
+    path = tmp_path / "tracked.flac"
+    path.write_bytes(b"tracked-source")
+    track_id, _track_uid = _create_track(path)
+    plain = replace(_draft(), analyzer_version=ANALYZER_VERSION)
+    tracked = replace(plain, beat_tracker="beat-this-small0")
+    assert store_smart_mix_profile_result(track_id, path, plain) is True
+    before = get_track_mix_profile(track_id)
+    assert before is not None
+
+    assert store_smart_mix_profile_result(track_id, path, tracked) is True
+
+    profile = get_track_mix_profile(track_id, include_structure=True)
+    assert profile is not None
+    assert profile.beat_tracker == "beat-this-small0"
+    # The tracker is part of the revision: the same values from another tracker are
+    # another profile.
+    assert profile.profile_revision != before.profile_revision
+    # Like the voice detector, it is read with the structure, never by plan reads.
+    summary = get_track_mix_profile(track_id)
+    assert summary is not None and summary.beat_tracker is None
+    with read_scope() as session:
+        stored = session.execute(
+            text("SELECT beat_tracker FROM track_mix_profiles WHERE track_id = :id"),
+            {"id": track_id},
+        ).scalar_one()
+    assert stored == "beat-this-small0"
+
+
+def test_draft_with_tracker_replaces_same_version(pg_db, tmp_path: Path) -> None:
+    # Beat This! ships inside the analyzer version (SM3-D14), like the voice: a draft
+    # that brings a tracker, or another one, replaces a profile of the same version
+    # and quality; a draft without one never strips it.
+    del pg_db
+    path = tmp_path / "replace.flac"
+    path.write_bytes(b"replace-source")
+    track_id, _track_uid = _create_track(path)
+    own = replace(_draft(), analyzer="crate-python", analyzer_version=ANALYZER_VERSION)
+    small = replace(own, downbeat_anchor_ms=1_000, beat_tracker="beat-this-small0")
+    final = replace(small, beat_tracker="beat-this-final0")
+
+    assert store_smart_mix_profile_result(track_id, path, own) is True
+    assert store_smart_mix_profile_result(track_id, path, small) is True
+    assert store_smart_mix_profile_result(track_id, path, small) is False
+    assert store_smart_mix_profile_result(track_id, path, own) is False
+    # Not even a Rust draft, which otherwise promotes a Python profile.
+    rust_own = replace(own, analyzer="crate-rust")
+    assert store_smart_mix_profile_result(track_id, path, rust_own) is False
+    # A tracker never downgrades a full profile.
+    partial = replace(final, quality=MixProfileQuality.PARTIAL)
+    assert store_smart_mix_profile_result(track_id, path, partial) is False
+    assert store_smart_mix_profile_result(track_id, path, final) is True
+
+    profile = get_track_mix_profile(track_id, include_structure=True)
+    assert profile is not None
+    assert (profile.beat_tracker, profile.downbeat_anchor_ms) == (
+        "beat-this-final0",
+        1_000,
+    )
 
 
 def test_unsegmented_structure_stays_distinct_from_no_structure(

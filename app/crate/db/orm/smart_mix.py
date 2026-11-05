@@ -85,6 +85,7 @@ class TrackMixProfileRow(Base):
     energy_curve: Mapped[bytes | None] = mapped_column(LargeBinary)
     vocal_presence: Mapped[bytes | None] = mapped_column(LargeBinary)
     vocal_detector: Mapped[str | None] = mapped_column(Text)
+    beat_tracker: Mapped[str | None] = mapped_column(Text)
     structure_confidence: Mapped[float | None] = mapped_column(REAL)
     source_stale_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     analyzed_at: Mapped[datetime] = mapped_column(

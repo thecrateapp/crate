@@ -313,3 +313,53 @@ def _vocal_detector_column(connection) -> tuple[str, str] | None:
         )
     ).first()
     return None if row is None else (row.data_type, row.is_nullable)
+
+
+def test_beat_tracker_migration_up_down(pg_db, monkeypatch) -> None:
+    del pg_db
+    from crate.db.engine import get_engine
+
+    migration = import_module("crate.db.migrations.versions.149_smart_mix_beat_tracker")
+    assert (migration.revision, migration.down_revision) == ("149", "148")
+    with get_engine().connect() as connection:
+        assert (
+            connection.execute(text("SELECT current_database()"))
+            .scalar_one()
+            .startswith("crate_test_case_")
+        )
+        context = MigrationContext.configure(connection)
+        monkeypatch.setattr(migration, "op", Operations(context))
+
+        with context.begin_transaction():
+            migration.downgrade()
+            migration.downgrade()
+        assert _profile_column(connection, "beat_tracker") is None
+
+        with context.begin_transaction():
+            migration.upgrade()
+            migration.upgrade()
+        assert _profile_column(connection, "beat_tracker") == ("text", "YES")
+
+
+def test_bootstrap_schema_creates_the_beat_tracker_column() -> None:
+    source = (
+        ROOT / "app" / "crate" / "db" / "schema_sections" / "library_catalog.py"
+    ).read_text()
+
+    assert "create_smart_mix_beat_tracker_v149_schema(cur)" in source
+
+
+def _profile_column(connection, column: str) -> tuple[str, str] | None:
+    row = connection.execute(
+        text(
+            """
+            SELECT data_type, is_nullable
+            FROM information_schema.columns
+            WHERE table_schema = current_schema()
+              AND table_name = 'track_mix_profiles'
+              AND column_name = :column
+            """
+        ),
+        {"column": column},
+    ).first()
+    return None if row is None else (row.data_type, row.is_nullable)

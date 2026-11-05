@@ -155,6 +155,36 @@ profiles of any other schema. Readers accept every schema up to the current one
 (`READABLE_PROFILE_VERSIONS`), and the backfill, coverage and campaign target the analyzer
 and the schema together, so a later schema bump needs no other server change.
 
+### Beats and downbeats
+
+Since SM3-D14 the beats and the bar come from a model, because the onset heuristic put the
+downbeat on the wrong beat of the bar on more than half of the tracks checked at gate SG1.
+
+- **Model.** Beat This! (CPJKU, ISMIR 2024; code and weights MIT), checkpoint `small0`,
+  without its DBN. The analysis image fetches the checkpoint and the licence in its
+  `beat-this-weights` stage, checks their sha256 and bakes them in as
+  `/app/models/beat_this-small0.ckpt` and `/app/models/beat_this.LICENSE`; `beat-this` is
+  installed next to torch against the installed version (`requirements-beat-this.txt`).
+  `CRATE_BEAT_THIS_CHECKPOINT` names the checkpoint (`final0` needs the build arguments
+  documented in the Dockerfile) and `CRATE_BEAT_THIS_WEIGHTS` overrides the path. Nothing is
+  downloaded at run time.
+- **Where it runs.** `compute_smart_mix_profile` runs it before the analysis
+  (`crate/smart_mix/beat_model.py`) and passes the beats to the Python analyzer, which uses
+  them instead of librosa's tracker, still fits the constant grid, and anchors the bar on
+  the grid phase (beat index mod 4) that collects the most model downbeats within 70 ms,
+  if that phase holds at least 60 % of the model downbeats inside the grid. Otherwise the
+  track has no downbeat and no phrases.
+- **Fallback.** Without torch, `beat_this` or the weights (`PANNS=off`), when the model fails
+  or finds no beats, and for tracks over 600 s, the analysis keeps its own tracker and
+  heuristic and the worker logs it.
+- **Storage.** Migration 149 adds `beat_tracker` (`beat-this-small0`), null with the
+  analyzer's own tracker. It is part of the profile revision. Beat This! ships inside
+  `smart-mix-audio-v7`: a draft that brings a tracker the stored profile lacks replaces it
+  at the same quality, and a run without the model never replaces a profile whose beats
+  came from it.
+- **Cost.** About 15 s of CPU for a 240 s track with one thread (`TORCH_NUM_THREADS`);
+  `test_beat_model_overhead_within_budget` (run with `--benchmark`) fails above 25 s.
+
 ### Voice per phrase
 
 Since SM3-D13 a profile with phrases also says how much of each phrase has an audible sung or

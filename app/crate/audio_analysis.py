@@ -57,8 +57,12 @@ SIGNAL_DURATION = 120  # seconds — for BPM/key accuracy
 FRAME_STEP = 4  # analyze every Nth frame for spectral features
 
 
-def analyze_mix_profile(filepath: str | Path):
-    """Analyze full-track signals used by the versioned Smart Mix profile."""
+def analyze_mix_profile(filepath: str | Path, beats=None):
+    """Analyze full-track signals used by the versioned Smart Mix profile.
+
+    ``beats`` (a ``crate.smart_mix.beat_model.BeatTrack``) replaces the analyzer's own
+    beat tracker and downbeat heuristic (SM3-D14).
+    """
     from crate.smart_mix.analyzer import analyze_mix_profile as analyze
     from crate.smart_mix.models import mix_profile_draft_from_payload
 
@@ -66,7 +70,7 @@ def analyze_mix_profile(filepath: str | Path):
     payload = rust_result.get("mix_profile") if rust_result else None
     if isinstance(payload, dict):
         return mix_profile_draft_from_payload(payload)
-    return analyze(filepath)
+    return analyze(filepath, beats)
 
 
 # ── PANNs CNN14 (lazy singleton) ──────────────────────────────────

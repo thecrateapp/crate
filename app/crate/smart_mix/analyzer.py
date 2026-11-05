@@ -5,6 +5,7 @@ import math
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -28,7 +29,11 @@ from crate.smart_mix.tempo_grid import (
     fit_tempo,
     half_beat_slides,
 )
+from crate.smart_mix.phrase_grid import downbeat_anchor_from_model
 from crate.smart_mix.versions import ANALYZER_VERSION, PYTHON_ANALYZER
+
+if TYPE_CHECKING:
+    from crate.smart_mix.beat_model import BeatTrack
 
 
 log = logging.getLogger(__name__)
@@ -48,15 +53,25 @@ _DOWNBEAT_MARGIN = 0.3
 # profile, which the bass must not contest; without a constant grid, the tracked beats
 # must never slide half a beat and the bass must not contest their phase.
 _FULL_PROFILE_MIN_PHASE_SUPPORT = 0.7
+# Model beats sit on the attack, while the onset envelope peaks a frame or two later:
+# the onset frame of a model beat is the envelope's peak within this distance, as the
+# tracker's beats are, so beat strength and confidence read the same envelope values.
+_MODEL_BEAT_ONSET_WINDOW_MS = 35.0
 WINDOW_SECONDS = 5.0
 FULL_SCAN_HEAD_SECONDS = 240
 FULL_SCAN_TAIL_SECONDS = 120
 _READ_BLOCK_FRAMES = 65_536
 
 
-def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
-    import librosa
+def analyze_mix_profile(
+    filepath: str | Path, beats: BeatTrack | None = None
+) -> TrackMixProfileDraft:
+    """The track's mix profile.
 
+    With ``beats`` (Beat This!, SM3-D14) the model's beats replace librosa's tracker
+    and its downbeats pick the bar phase of the grid; without them the analyzer tracks
+    the beats itself and takes the bar from bass onsets and chord changes.
+    """
     loaded = _load_audio(Path(filepath))
     audio, sample_rate = loaded.head, loaded.sample_rate
     duration_ms = loaded.duration_ms
@@ -69,34 +84,18 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
         )
 
     onset_envelope, low_onsets, chroma, bands = _frame_features(audio, sample_rate)
-    tempo = librosa.feature.tempo(
-        onset_envelope=onset_envelope,
-        sr=sample_rate,
-        hop_length=HOP_LENGTH,
-        std_bpm=TEMPO_PRIOR_OCTAVES,
-    )
-    _, beat_frames = librosa.beat.beat_track(
-        onset_envelope=onset_envelope,
-        sr=sample_rate,
-        hop_length=HOP_LENGTH,
-        bpm=float(np.atleast_1d(tempo)[0]),
-        sparse=True,
-    )
-    beat_frames = np.asarray(beat_frames, dtype=int).reshape(-1)
-    tracked_ms = tuple(
-        sorted(
-            {
-                max(1, round(float(frame) * HOP_LENGTH * 1_000 / sample_rate))
-                for frame in beat_frames
-            }
+    frame_ms = HOP_LENGTH * 1_000 / sample_rate
+    if beats is None:
+        tracked_ms, beat_frames = _tracked_beats(onset_envelope, sample_rate)
+    else:
+        tracked_ms, beat_frames = _model_beats(
+            beats.beats_ms, audio.size * 1_000 / sample_rate, onset_envelope, frame_ms
         )
-    )
     bpm, bpm_confidence, tempo_stability = _tempo_features(
         tracked_ms,
         onset_envelope,
         beat_frames,
     )
-    frame_ms = HOP_LENGTH * 1_000 / sample_rate
     tempo_fit = fit_tempo(tracked_ms, onset_envelope, low_onsets, frame_ms=frame_ms)
     constant_grid = tempo_fit.grid if tempo_fit is not None else None
     if constant_grid is not None:
@@ -119,17 +118,25 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
         ) == 0 and not bass_contests_tracked_beats(
             tracked_ms, onset_envelope, low_onsets, frame_ms=frame_ms
         )
-    downbeat_anchor_ms, time_signature = _downbeat_features(
-        beat_grid_ms,
-        grid_frames,
-        bpm_confidence,
-        onsets=onset_envelope,
-        low_onsets=low_onsets,
-        chroma=chroma,
-        window_frames=max(
-            1, round(_DOWNBEAT_WINDOW_SECONDS * sample_rate / HOP_LENGTH)
-        ),
-    )
+    if beats is None:
+        downbeat_anchor_ms, time_signature = _downbeat_features(
+            beat_grid_ms,
+            grid_frames,
+            bpm_confidence,
+            onsets=onset_envelope,
+            low_onsets=low_onsets,
+            chroma=chroma,
+            window_frames=max(
+                1, round(_DOWNBEAT_WINDOW_SECONDS * sample_rate / HOP_LENGTH)
+            ),
+        )
+    else:
+        # The model's downbeats decide the bar alone: a track whose downbeats hold no
+        # clear phase of the grid gets no downbeat, and no phrases.
+        downbeat_anchor_ms = downbeat_anchor_from_model(
+            beat_grid_ms, beats.downbeats_ms
+        )
+        time_signature = None if downbeat_anchor_ms is None else 4
     key, scale, camelot, key_confidence = _key_features(audio, sample_rate)
     rms = frame_rms(audio, sample_rate)
     cues = detect_mix_cues(audio, sample_rate, beat_grid_ms, rms=rms)
@@ -215,7 +222,60 @@ def analyze_mix_profile(filepath: str | Path) -> TrackMixProfileDraft:
         energy_curve=structure.energy_curve,
         vocal_presence=None,
         structure_confidence=structure.structure_confidence,
+        beat_tracker=None if beats is None else beats.tracker,
     )
+
+
+def _tracked_beats(
+    onset_envelope: np.ndarray, sample_rate: int
+) -> tuple[tuple[int, ...], np.ndarray]:
+    """librosa's beats (ms) and their onset frames."""
+    import librosa
+
+    tempo = librosa.feature.tempo(
+        onset_envelope=onset_envelope,
+        sr=sample_rate,
+        hop_length=HOP_LENGTH,
+        std_bpm=TEMPO_PRIOR_OCTAVES,
+    )
+    _, beat_frames = librosa.beat.beat_track(
+        onset_envelope=onset_envelope,
+        sr=sample_rate,
+        hop_length=HOP_LENGTH,
+        bpm=float(np.atleast_1d(tempo)[0]),
+        sparse=True,
+    )
+    beat_frames = np.asarray(beat_frames, dtype=int).reshape(-1)
+    tracked_ms = tuple(
+        sorted(
+            {
+                max(1, round(float(frame) * HOP_LENGTH * 1_000 / sample_rate))
+                for frame in beat_frames
+            }
+        )
+    )
+    return tracked_ms, beat_frames
+
+
+def _model_beats(
+    beats_ms: tuple[int, ...],
+    analysed_ms: float,
+    onset_envelope: np.ndarray,
+    frame_ms: float,
+) -> tuple[tuple[int, ...], np.ndarray]:
+    """The model's beats over the analysed audio (the head of a long track) and their
+    onset frames: each beat's envelope peak within ``_MODEL_BEAT_ONSET_WINDOW_MS``."""
+    tracked_ms = tuple(beat for beat in beats_ms if 0 < beat <= analysed_ms)
+    window = max(1, round(_MODEL_BEAT_ONSET_WINDOW_MS / frame_ms))
+    frames = []
+    for beat in tracked_ms:
+        centre = round(beat / frame_ms)
+        start = max(0, centre - window)
+        end = min(onset_envelope.size, centre + window + 1)
+        frames.append(
+            start + int(np.argmax(onset_envelope[start:end])) if start < end else centre
+        )
+    return tracked_ms, np.array(frames, dtype=int)
 
 
 @dataclass(frozen=True, slots=True)

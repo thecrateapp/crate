@@ -208,6 +208,7 @@ def test_profile_reads_load_the_structure_only_when_asked(pg_db) -> None:
         "energy_curve",
         "vocal_presence",
         "vocal_detector",
+        "beat_tracker",
         "structure_confidence",
     ):
         assert column not in plain_sql[0]

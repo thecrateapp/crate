@@ -306,7 +306,10 @@ def test_compute_profile_handler_resolves_track_inside_worker(monkeypatch) -> No
         },
         raising=False,
     )
-    monkeypatch.setattr("crate.audio_analysis.analyze_mix_profile", lambda _path: draft)
+    _without_beat_model(monkeypatch)
+    monkeypatch.setattr(
+        "crate.audio_analysis.analyze_mix_profile", lambda _path, _beats=None: draft
+    )
     captured: list[tuple[int, str, str | None]] = []
     monkeypatch.setattr(
         analysis,
@@ -354,9 +357,10 @@ def test_failed_profiles_also_refresh_the_live_coverage(monkeypatch) -> None:
         analysis, "capture_smart_mix_source", lambda *_args, **_kwargs: "capture"
     )
 
-    def broken(_path):
+    def broken(_path, _beats=None):
         raise RuntimeError("decoder exploded")
 
+    _without_beat_model(monkeypatch)
     monkeypatch.setattr("crate.audio_analysis.analyze_mix_profile", broken)
     monkeypatch.setattr(analysis, "record_smart_mix_failure", lambda *_a, **_k: None)
     refreshes: list[bool] = []
@@ -383,9 +387,10 @@ def test_a_profile_that_cannot_be_stored_is_recorded_as_failed(monkeypatch) -> N
     monkeypatch.setattr(
         analysis, "capture_smart_mix_source", lambda *_args, **_kwargs: "capture"
     )
+    _without_beat_model(monkeypatch)
     monkeypatch.setattr(
         "crate.audio_analysis.analyze_mix_profile",
-        lambda _path: TrackMixProfileDraft(
+        lambda _path, _beats=None: TrackMixProfileDraft(
             analyzer="crate-rust",
             analyzer_version=ANALYZER_VERSION,
             duration_ms=10_000,
@@ -1305,7 +1310,10 @@ def test_profile_task_publishes_the_draft_with_its_phrase_voice(monkeypatch) -> 
         lambda **_kwargs: {"id": 7, "path": "/music/artist/album/track.flac"},
         raising=False,
     )
-    monkeypatch.setattr("crate.audio_analysis.analyze_mix_profile", lambda _path: draft)
+    _without_beat_model(monkeypatch)
+    monkeypatch.setattr(
+        "crate.audio_analysis.analyze_mix_profile", lambda _path, _beats=None: draft
+    )
     voice_calls: list[tuple[TrackMixProfileDraft, str]] = []
     monkeypatch.setattr(
         "crate.smart_mix.vocals.add_vocal_presence",
@@ -1329,3 +1337,99 @@ def test_profile_task_publishes_the_draft_with_its_phrase_voice(monkeypatch) -> 
 
     assert voice_calls == [(draft, "/music/artist/album/track.flac")]
     assert published == [voiced]
+
+
+def _without_beat_model(monkeypatch) -> None:
+    # Handler tests never load Beat This!; its own tests cover it.
+    monkeypatch.setattr(
+        "crate.smart_mix.beat_model.track_file_beats", lambda _path: None
+    )
+
+
+def _profile_task_harness(monkeypatch, draft: TrackMixProfileDraft) -> list:
+    from crate.worker_handlers import analysis
+
+    monkeypatch.setattr(
+        analysis,
+        "resolve_smart_mix_track",
+        lambda **_kwargs: {"id": 7, "path": "/music/artist/album/track.flac"},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "crate.smart_mix.vocals.add_vocal_presence", lambda value, _path: value
+    )
+    monkeypatch.setattr(
+        analysis, "capture_smart_mix_source", lambda *_args, **_kwargs: "capture"
+    )
+    published: list[TrackMixProfileDraft] = []
+    monkeypatch.setattr(
+        analysis,
+        "publish_smart_mix_profile",
+        lambda _capture, value: (
+            published.append(value) or analysis.SmartMixPublication.PUBLISHED
+        ),
+    )
+    monkeypatch.setattr(analysis, "emit_task_event", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(analysis, "refresh_live_smart_mix_coverage", lambda: None)
+    return published
+
+
+def test_profile_task_runs_the_beat_model_before_the_analysis(monkeypatch) -> None:
+    # Beat This! gives the beats and downbeats to the analysis, Rust or Python
+    # (SM3-D14).
+    from crate.smart_mix.beat_model import BeatTrack
+    from crate.worker_handlers import analysis
+
+    draft = _v7_draft()
+    published = _profile_task_harness(monkeypatch, draft)
+    beats = BeatTrack(
+        tracker="beat-this-small0", beats_ms=(500, 1_000), downbeats_ms=(500,)
+    )
+    calls: list[tuple[str, object]] = []
+    monkeypatch.setattr(
+        "crate.smart_mix.beat_model.track_file_beats",
+        lambda path: calls.append(("beats", str(path))) or beats,
+    )
+    monkeypatch.setattr(
+        "crate.audio_analysis.analyze_mix_profile",
+        lambda path, beats=None: calls.append(("analysis", beats)) or draft,
+    )
+
+    result = analysis._handle_compute_smart_mix_profile("task-1", {"track_id": 7}, {})
+
+    assert calls == [
+        ("beats", "/music/artist/album/track.flac"),
+        ("analysis", beats),
+    ]
+    assert result["stored"] is True
+    assert published == [draft]
+
+
+def test_profile_falls_back_when_beat_model_fails(monkeypatch, caplog) -> None:
+    import logging
+
+    from crate.worker_handlers import analysis
+
+    draft = _v7_draft()
+    published = _profile_task_harness(monkeypatch, draft)
+
+    def broken(_path):
+        raise RuntimeError("torch exploded")
+
+    monkeypatch.setattr("crate.smart_mix.beat_model.track_file_beats", broken)
+    analysed: list[object] = []
+    monkeypatch.setattr(
+        "crate.audio_analysis.analyze_mix_profile",
+        lambda _path, beats=None: analysed.append(beats) or draft,
+    )
+
+    with caplog.at_level(logging.WARNING):
+        result = analysis._handle_compute_smart_mix_profile(
+            "task-1", {"track_id": 7}, {}
+        )
+
+    # The analysis runs as before, with its own beat tracker, and the profile ships.
+    assert analysed == [None]
+    assert result["stored"] is True
+    assert published == [draft]
+    assert "Beat This!" in caplog.text

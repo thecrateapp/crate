@@ -1,0 +1,7 @@
+# Beat This! for the Smart Mix beats and downbeats (SM3-D14), installed in the analysis
+# image next to torch (Dockerfile, PANNS=on/auto). The Dockerfile pins torch to the
+# version it just installed; torchaudio comes from the PyTorch CPU index.
+beat-this==1.1.0
+einops==0.8.2
+rotary-embedding-torch==0.9.1
+torchaudio==2.11.1

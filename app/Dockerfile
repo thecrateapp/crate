@@ -1,3 +1,8 @@
+# Beat This! checkpoint for the Smart Mix beats (SM3-D14). final0 swaps in the larger
+# model: BEAT_THIS_CHECKPOINT=final0 and
+# BEAT_THIS_SHA256=8c328b45f59d8dd3dff219253ff6a8d6482be57d0133a29140e2febbf8eb8331.
+ARG BEAT_THIS_CHECKPOINT=small0
+
 FROM python:3.13-slim AS base
 
 ENV HOME=/app
@@ -108,6 +113,25 @@ COPY scripts/convert_yamnet_weights.py ./
 RUN python convert_yamnet_weights.py yamnet.h5 yamnet_class_map.csv yamnet.npz
 
 
+# Beat This! (CPJKU, ISMIR 2024; code and weights MIT) for the Smart Mix beats and
+# downbeats (SM3-D14). The checkpoint is fetched and checked here, so the worker never
+# downloads it: beat_this would fetch any checkpoint it cannot open from disk.
+FROM python:3.13-slim AS beat-this-weights
+
+ARG BEAT_THIS_CHECKPOINT
+ARG BEAT_THIS_SHA256=6074be2c4d490c5f6101fcc374a1ec72ae93456e23bb6019783b849f5dc7d47b
+ARG BEAT_THIS_LICENSE_SHA256=909ab6549794a18e9bb243aacfadda4a5f308436fc2846f350755c53c4f06ae1
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /beat-this
+RUN curl -fsSL --retry 5 -o "beat_this-${BEAT_THIS_CHECKPOINT}.ckpt" \
+        "https://cloud.cp.jku.at/public.php/dav/files/7ik4RrBKTS273gp/${BEAT_THIS_CHECKPOINT}.ckpt" && \
+    curl -fsSL --retry 5 -o beat_this.LICENSE \
+        https://raw.githubusercontent.com/CPJKU/beat_this/v1.1.0/LICENSE && \
+    echo "$BEAT_THIS_SHA256  beat_this-${BEAT_THIS_CHECKPOINT}.ckpt" | sha256sum -c - && \
+    echo "$BEAT_THIS_LICENSE_SHA256  beat_this.LICENSE" | sha256sum -c -
+
+
 FROM worker-core-deps AS worker-analysis-deps
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -119,14 +143,23 @@ COPY requirements-worker-analysis.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --prefer-binary -r requirements-worker-analysis.txt
 
-# PyTorch CPU-only + PANNs for audio classification. PANNS=on installs them on
-# every architecture (release images); auto keeps local ARM builds light by
-# installing them on x86_64 only; off skips them.
+# PyTorch CPU-only + PANNs for audio classification, and Beat This! for the Smart
+# Mix beats. PANNS=on installs them on every architecture (release images); auto
+# keeps local ARM builds light by installing them on x86_64 only; off skips them.
+# Beat This! installs against the torch just installed (pinned by constraint), with
+# torchaudio from the same CPU index, so it never moves torch.
 ARG PANNS=auto
+COPY requirements-beat-this.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     if [ "$PANNS" = "on" ] || { [ "$PANNS" = "auto" ] && [ "$(uname -m)" = "x86_64" ]; }; then \
         pip install torch --index-url https://download.pytorch.org/whl/cpu && \
-        pip install panns_inference; \
+        pip install panns_inference && \
+        pip freeze | grep -i '^torch==' > /tmp/torch-constraint.txt && \
+        pip install --prefer-binary -c /tmp/torch-constraint.txt \
+            --extra-index-url https://download.pytorch.org/whl/cpu \
+            -r requirements-beat-this.txt && \
+        pip freeze | grep -i '^torch==' | cmp -s - /tmp/torch-constraint.txt && \
+        rm /tmp/torch-constraint.txt; \
     fi
 
 # Download PANNs CNN14 checkpoint before mutable source COPY so Docker layer
@@ -143,6 +176,12 @@ RUN if [ "$PANNS" = "on" ] || { [ "$PANNS" = "auto" ] && [ "$(uname -m)" = "x86_
 # no voice.
 COPY --from=yamnet-weights /yamnet/yamnet.npz /app/models/yamnet.npz
 COPY --from=yamnet-weights /yamnet/LICENSE /app/models/yamnet.LICENSE
+
+# Smart Mix beats (SM3-D14): without torch or beat_this the analyzers keep their own
+# beat tracker.
+ARG BEAT_THIS_CHECKPOINT
+ENV CRATE_BEAT_THIS_CHECKPOINT=${BEAT_THIS_CHECKPOINT}
+COPY --from=beat-this-weights /beat-this/ /app/models/
 
 
 FROM worker-analysis-deps AS worker-analysis

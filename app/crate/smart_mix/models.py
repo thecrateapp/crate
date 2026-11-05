@@ -39,6 +39,7 @@ PHRASE_BAR_LENGTHS = (8, 16, 32)
 MAX_PHRASES = 120
 MAX_ENERGY_CURVE_BARS = 2048
 MAX_VOCAL_DETECTOR = 32
+MAX_BEAT_TRACKER = 32
 # Scale of the per-phrase voice byte (crate.smart_mix.vocals): the geometric mean of the
 # phrase's YAMNet voice scores on a log scale, LOG_FLOOR or less is 0 and 1 is 255. Kept
 # here, without numpy, so the API can read it.
@@ -166,12 +167,16 @@ class TrackMixProfileDraft:
     vocal_presence: bytes | None = None
     vocal_detector: str | None = None
     structure_confidence: float | None = None
+    # The model that gave the beats and downbeats (SM3-D14); null with the
+    # analyzer's own tracker.
+    beat_tracker: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "quality", MixProfileQuality(self.quality))
         _require_non_negative_ms("duration_ms", self.duration_ms)
         _validate_measurements(self)
         _validate_structure(self)
+        _validate_beat_tracker(self.beat_tracker)
         for field_name in (
             "beat_anchor_ms",
             "downbeat_anchor_ms",
@@ -273,6 +278,9 @@ class TrackMixProfile:
     vocal_presence: bytes | None = None
     vocal_detector: str | None = None
     structure_confidence: float | None = None
+    # The model that gave the beats and downbeats (SM3-D14); null with the
+    # analyzer's own tracker.
+    beat_tracker: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "quality", MixProfileQuality(self.quality))
@@ -280,6 +288,7 @@ class TrackMixProfile:
         _require_non_negative_ms("duration_ms", self.duration_ms)
         _validate_measurements(self)
         _validate_structure(self)
+        _validate_beat_tracker(self.beat_tracker)
         if self.duration_source not in {"decoder", "library"}:
             raise ValueError("duration_source must be decoder or library")
         for field_name in (
@@ -556,6 +565,7 @@ def mix_profile_draft_from_payload(payload: Mapping[str, Any]) -> TrackMixProfil
         vocal_presence=_bytes_from_payload(value("vocal_presence", "vocalPresence")),
         vocal_detector=value("vocal_detector", "vocalDetector"),
         structure_confidence=value("structure_confidence", "structureConfidence"),
+        beat_tracker=value("beat_tracker", "beatTracker"),
     )
 
 
@@ -636,6 +646,15 @@ def _validate_structure(profile: Any) -> None:
     if confidence is not None:
         object.__setattr__(
             profile, "structure_confidence", _clamp_confidence(confidence)
+        )
+
+
+def _validate_beat_tracker(tracker: str | None) -> None:
+    if tracker is not None and (
+        not isinstance(tracker, str) or not 0 < len(tracker) <= MAX_BEAT_TRACKER
+    ):
+        raise ValueError(
+            f"beat_tracker must name the tracker in 1-{MAX_BEAT_TRACKER} characters"
         )
 
 

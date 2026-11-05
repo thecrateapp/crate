@@ -627,6 +627,7 @@ def _publish_smart_mix_profile(
             TrackMixProfileRow.analyzer_version,
             TrackMixProfileRow.quality,
             TrackMixProfileRow.vocal_detector,
+            TrackMixProfileRow.beat_tracker,
         )
         .where(TrackMixProfileRow.track_id == capture.track_id)
         .with_for_update()
@@ -675,6 +676,11 @@ def _replaces_current_profile(
     draft_rank = _QUALITY_RANK[MixProfileQuality(draft.quality)]
     if draft_rank != current_rank:
         return draft_rank > current_rank
+    # Beat This! ships inside the analyzer version (SM3-D14): a draft that brings a
+    # tracker, or another one, replaces the profile; one from the analyzer's own
+    # tracker never replaces a profile whose beats came from the model.
+    if draft.beat_tracker != current.beat_tracker:
+        return draft.beat_tracker is not None
     # Voice ships inside the analyzer version (SM3-D13): a draft that brings it, or
     # another detector, replaces the profile; a draft without it never strips it.
     if (

@@ -211,6 +211,7 @@ def upsert_track_mix_profile_draft(
             energy_curve=stored.energy_curve,
             vocal_presence=stored.vocal_presence,
             vocal_detector=stored.vocal_detector,
+            beat_tracker=stored.beat_tracker,
             structure_confidence=stored.structure_confidence,
             analyzed_at=datetime.now(UTC),
         )
