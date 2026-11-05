@@ -132,7 +132,7 @@ RUN curl -fsSL --retry 5 -o "beat_this-${BEAT_THIS_CHECKPOINT}.ckpt" \
     echo "$BEAT_THIS_LICENSE_SHA256  beat_this.LICENSE" | sha256sum -c -
 
 
-FROM worker-core-deps AS worker-analysis-deps
+FROM worker-core-deps AS worker-analysis-python
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
@@ -143,11 +143,40 @@ COPY requirements-worker-analysis.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --prefer-binary -r requirements-worker-analysis.txt
 
+
+# madmom (CPJKU) for the DBN that post-processes the Beat This! beats and downbeats
+# (SM3-D14). Its PyPI release, 0.16.1, does not build on Python 3.13, so its wheel is
+# built here from a pinned commit, against the numpy of the analysis image, and only
+# the wheel reaches the image, without the compilers. madmom's code is BSD; its package
+# also ships model files under CC BY-NC-SA 4.0 that Crate does not use (the DBN needs
+# none), which is acceptable for Crate as free and open-source software. The licence
+# goes to /app/models/madmom.LICENSE.
+FROM worker-analysis-python AS madmom-wheel
+
+ARG MADMOM_COMMIT=27f032e8947204902c675e5e341a3faf5dc86dae
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential git \
+    && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip freeze | grep -i '^numpy==' > /tmp/numpy-constraint.txt && \
+    pip install -c /tmp/numpy-constraint.txt \
+        cython==3.3.1 setuptools==84.2.1 wheel==0.48.0
+WORKDIR /madmom
+RUN git init -q . && \
+    git fetch -q --depth 1 https://github.com/CPJKU/madmom.git "$MADMOM_COMMIT" && \
+    git checkout -q FETCH_HEAD && \
+    git submodule update -q --init --depth 1 && \
+    pip wheel --no-build-isolation --no-deps --wheel-dir /wheels .
+
+
+FROM worker-analysis-python AS worker-analysis-deps
+
 # PyTorch CPU-only + PANNs for audio classification, and Beat This! for the Smart
 # Mix beats. PANNS=on installs them on every architecture (release images); auto
 # keeps local ARM builds light by installing them on x86_64 only; off skips them.
 # Beat This! installs against the torch just installed (pinned by constraint), with
-# torchaudio from the same CPU index, so it never moves torch.
+# torchaudio from the same CPU index, so it never moves torch, and with the madmom
+# wheel built above for its DBN. numpy is held from the start, so it stays the one
+# madmom was built against. The imports at the end catch a broken set at build time.
 # torch is pinned because Beat This! needs torchaudio, which stopped at 2.11 while
 # torch moved on: torchaudio 2.11.1 (requirements-beat-this.txt) declares only
 # torch>=2.11, so an unpinned torch would pair itself with a torchaudio nobody ran on
@@ -156,15 +185,20 @@ ARG PANNS=auto
 ARG TORCH_VERSION=2.15.0
 COPY requirements-beat-this.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=bind,from=madmom-wheel,source=/wheels,target=/tmp/madmom-wheels \
     if [ "$PANNS" = "on" ] || { [ "$PANNS" = "auto" ] && [ "$(uname -m)" = "x86_64" ]; }; then \
-        pip install "torch==${TORCH_VERSION}" --index-url https://download.pytorch.org/whl/cpu && \
-        pip install panns_inference && \
-        pip freeze | grep -i '^torch==' > /tmp/torch-constraint.txt && \
-        pip install --prefer-binary -c /tmp/torch-constraint.txt \
+        pip freeze | grep -i '^numpy==' > /tmp/analysis-constraint.txt && \
+        pip install -c /tmp/analysis-constraint.txt "torch==${TORCH_VERSION}" \
+            --index-url https://download.pytorch.org/whl/cpu && \
+        pip install -c /tmp/analysis-constraint.txt panns_inference && \
+        pip freeze | grep -i '^torch==' >> /tmp/analysis-constraint.txt && \
+        pip install --prefer-binary -c /tmp/analysis-constraint.txt \
             --extra-index-url https://download.pytorch.org/whl/cpu \
-            -r requirements-beat-this.txt && \
-        pip freeze | grep -i '^torch==' | cmp -s - /tmp/torch-constraint.txt && \
-        rm /tmp/torch-constraint.txt; \
+            -r requirements-beat-this.txt /tmp/madmom-wheels/madmom-*.whl && \
+        pip freeze | grep -iE '^(numpy|torch)==' | sort > /tmp/analysis-installed.txt && \
+        sort /tmp/analysis-constraint.txt | cmp -s - /tmp/analysis-installed.txt && \
+        python -c "import torchaudio, beat_this.inference, madmom.features.downbeats" && \
+        rm /tmp/analysis-constraint.txt /tmp/analysis-installed.txt; \
     fi
 
 # Download PANNs CNN14 checkpoint before mutable source COPY so Docker layer
@@ -182,11 +216,12 @@ RUN if [ "$PANNS" = "on" ] || { [ "$PANNS" = "auto" ] && [ "$(uname -m)" = "x86_
 COPY --from=yamnet-weights /yamnet/yamnet.npz /app/models/yamnet.npz
 COPY --from=yamnet-weights /yamnet/LICENSE /app/models/yamnet.LICENSE
 
-# Smart Mix beats (SM3-D14): without torch or beat_this the analyzers keep their own
-# beat tracker.
+# Smart Mix beats (SM3-D14): without torch, beat_this or madmom the analyzers keep
+# their own beat tracker.
 ARG BEAT_THIS_CHECKPOINT
 ENV CRATE_BEAT_THIS_CHECKPOINT=${BEAT_THIS_CHECKPOINT}
 COPY --from=beat-this-weights /beat-this/ /app/models/
+COPY --from=madmom-wheel /madmom/LICENSE /app/models/madmom.LICENSE
 
 
 FROM worker-analysis-deps AS worker-analysis

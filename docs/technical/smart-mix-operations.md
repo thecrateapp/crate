@@ -168,6 +168,13 @@ downbeat on the wrong beat of the bar on more than half of the tracks checked at
   `CRATE_BEAT_THIS_CHECKPOINT` names the checkpoint (`final0` needs the build arguments
   documented in the Dockerfile) and `CRATE_BEAT_THIS_WEIGHTS` overrides the path. Nothing is
   downloaded at run time.
+- **madmom.** Its PyPI release (0.16.1) does not build on Python 3.13, so the `madmom-wheel`
+  stage builds a wheel from a pinned commit of `CPJKU/madmom` against the analysis
+  image's numpy, and the image installs only the wheel, under the same constraint that
+  keeps torch and numpy where they were; there are no compilers in the image. madmom's code
+  is BSD (`/app/models/madmom.LICENSE`); its package also ships model files under CC
+  BY-NC-SA 4.0 that Crate does not use (the DBN needs none), which is acceptable for Crate
+  as free and open-source software.
 - **Where it runs.** `compute_smart_mix_profile` runs it before the analysis
   (`crate/smart_mix/beat_model.py`) and passes the beats to the Rust analyzer
   (`crate-cli analyze --file <track> --beats <json>`, a temporary file with `tracker`,
