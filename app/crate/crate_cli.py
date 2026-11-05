@@ -34,37 +34,42 @@ def is_available() -> bool:
     return find_binary() is not None
 
 
-def _has_subcommands() -> bool:
-    """Check if the binary supports clap-style subcommands."""
-    binary = find_binary()
-    if not binary:
-        return False
-    try:
-        result = subprocess.run(
-            [binary, "--help"], capture_output=True, text=True, timeout=5
-        )
-        return "scan" in result.stdout.lower()
-    except Exception:
-        return False
-
-
-@lru_cache(maxsize=1)
 def has_subcommands() -> bool:
-    return _has_subcommands()
+    """Whether the binary takes clap-style subcommands (its help lists ``scan``)."""
+    return supports_command("scan")
 
 
-@lru_cache(maxsize=16)
 def supports_command(command: str) -> bool:
+    """Whether ``crate-cli --help`` lists ``command``.
+
+    The help of a binary that replied is kept for the process. A probe that fails,
+    such as a timeout on a loaded worker, answers False for this call only.
+    """
     binary = find_binary()
     if not binary:
         return False
     try:
-        result = subprocess.run(
-            [binary, "--help"], capture_output=True, text=True, timeout=5
-        )
+        help_text = _help_text(binary)
     except Exception:
+        log.warning(
+            "crate-cli --help failed; this call goes on without crate-cli %s",
+            command,
+            exc_info=True,
+        )
         return False
-    return command.lower() in result.stdout.lower()
+    return command.lower() in help_text.lower()
+
+
+@lru_cache(maxsize=4)
+def _help_text(binary: str) -> str:
+    """``--help`` of ``binary``; a failed call raises, so it is never cached."""
+    return subprocess.run(
+        [binary, "--help"],
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=True,
+    ).stdout
 
 
 def supports_analyze_beats() -> bool:

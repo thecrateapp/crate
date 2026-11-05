@@ -7,8 +7,7 @@ from types import SimpleNamespace
 def test_run_scan_supports_scan_only_binary(monkeypatch):
     from crate import crate_cli
 
-    crate_cli.supports_command.cache_clear()
-    crate_cli.has_subcommands.cache_clear()
+    crate_cli._help_text.cache_clear()
     monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
 
     calls: list[list[str]] = []
@@ -30,8 +29,7 @@ def test_run_scan_supports_scan_only_binary(monkeypatch):
 def test_run_analyze_returns_none_when_binary_lacks_analyze(monkeypatch):
     from crate import crate_cli
 
-    crate_cli.supports_command.cache_clear()
-    crate_cli.has_subcommands.cache_clear()
+    crate_cli._help_text.cache_clear()
     monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
 
     calls: list[list[str]] = []
@@ -180,6 +178,47 @@ def test_a_failed_beats_probe_is_asked_again(monkeypatch, caplog):
         crate_cli._analyze_help.cache_clear()
 
 
+def test_a_failed_help_probe_is_asked_again(monkeypatch, caplog):
+    import logging
+    import subprocess
+
+    from crate import crate_cli
+
+    monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
+    replies = [
+        subprocess.TimeoutExpired(["crate-cli", "--help"], 5),
+        OSError("Resource temporarily unavailable"),
+        SimpleNamespace(
+            returncode=0, stdout="Commands:\n  scan\n  analyze\n", stderr=""
+        ),
+    ]
+    calls: list[list[str]] = []
+
+    def fake_run(args, **kwargs):
+        calls.append(list(args))
+        reply = replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+    monkeypatch.setattr(crate_cli.subprocess, "run", fake_run)
+    crate_cli._help_text.cache_clear()
+    try:
+        with caplog.at_level(logging.WARNING, logger=crate_cli.__name__):
+            # A loaded worker can miss the 5 s timeout: that must not turn crate-cli
+            # off until the worker restarts.
+            assert crate_cli.supports_command("analyze") is False
+            assert crate_cli.has_subcommands() is False
+        assert "--help" in caplog.text
+        assert crate_cli.supports_command("analyze") is True
+        assert crate_cli.has_subcommands() is True
+        assert crate_cli.supports_command("bliss") is False
+        # The help of a binary that replied is kept.
+        assert len(calls) == 3
+    finally:
+        crate_cli._help_text.cache_clear()
+
+
 def test_run_analyze_runs_at_background_priority(monkeypatch):
     from crate import crate_cli, resource_governor
 
@@ -216,8 +255,7 @@ def test_run_analyze_runs_at_background_priority(monkeypatch):
 def test_run_quality_uses_quality_subcommand(monkeypatch):
     from crate import crate_cli
 
-    crate_cli.supports_command.cache_clear()
-    crate_cli.has_subcommands.cache_clear()
+    crate_cli._help_text.cache_clear()
     monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
 
     calls: list[list[str]] = []
@@ -244,8 +282,7 @@ def test_run_quality_uses_quality_subcommand(monkeypatch):
 def test_run_diff_uses_diff_subcommand(monkeypatch):
     from crate import crate_cli
 
-    crate_cli.supports_command.cache_clear()
-    crate_cli.has_subcommands.cache_clear()
+    crate_cli._help_text.cache_clear()
     monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
 
     calls: list[list[str]] = []
@@ -276,8 +313,7 @@ def test_run_diff_uses_diff_subcommand(monkeypatch):
 def test_run_tags_inspect_uses_tags_subcommand(monkeypatch):
     from crate import crate_cli
 
-    crate_cli.supports_command.cache_clear()
-    crate_cli.has_subcommands.cache_clear()
+    crate_cli._help_text.cache_clear()
     monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
 
     calls: list[list[str]] = []
@@ -305,8 +341,7 @@ def test_run_tags_inspect_uses_tags_subcommand(monkeypatch):
 def test_run_tags_write_identity_uses_tags_subcommand(monkeypatch):
     from crate import crate_cli
 
-    crate_cli.supports_command.cache_clear()
-    crate_cli.has_subcommands.cache_clear()
+    crate_cli._help_text.cache_clear()
     monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
 
     calls: list[list[str]] = []
@@ -357,8 +392,7 @@ def test_run_tags_write_identity_uses_tags_subcommand(monkeypatch):
 def test_run_fingerprint_uses_fingerprint_subcommand(monkeypatch):
     from crate import crate_cli
 
-    crate_cli.supports_command.cache_clear()
-    crate_cli.has_subcommands.cache_clear()
+    crate_cli._help_text.cache_clear()
     monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
 
     calls: list[list[str]] = []
@@ -389,8 +423,7 @@ def test_run_fingerprint_uses_fingerprint_subcommand(monkeypatch):
 def test_run_bliss_does_not_treat_scan_only_crate_cli_as_legacy_binary(monkeypatch):
     from crate import crate_cli
 
-    crate_cli.supports_command.cache_clear()
-    crate_cli.has_subcommands.cache_clear()
+    crate_cli._help_text.cache_clear()
     monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
 
     calls: list[list[str]] = []
