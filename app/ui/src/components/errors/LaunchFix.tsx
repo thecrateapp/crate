@@ -119,9 +119,7 @@ export function LaunchFix({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="font-display">
-              Launch a fix for {issue.short_id}?
-            </DialogTitle>
+            <DialogTitle>Launch a fix for {issue.short_id}?</DialogTitle>
             <DialogDescription>
               Crate asks GitHub Actions to run {fix.workflow} in{" "}
               {fix.repository}. An agent tries to reproduce the error with a
