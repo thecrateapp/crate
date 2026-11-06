@@ -341,7 +341,10 @@ required queue is consumed or that a particular handler is progressing.
 Before claiming a task, the actor evaluates the resource governor, DB-heavy coordination,
 download windows/listener limits and transfer slots where applicable. Deferral requeues
 the same task with a delay and progress/reason evidence; it is not completion or a new
-user operation. Runtime policy revision/hash are rechecked at the pending-to-running claim;
+user operation. A running handler can do the same through `run_again_later`: the task goes
+back to `pending` with its progress and runs again after the delay, so waiting for capacity
+does not hold a worker process. Its queue wait is recorded once, up to its first start.
+Runtime policy revision/hash are rechecked at the pending-to-running claim;
 a concurrent policy change causes requeue without handler execution. Atomic claim prevents
 duplicate broker messages from running the same task concurrently. Inspect persisted
 status, progress, heartbeat, queue and reason before diagnosing a pending job as stuck.

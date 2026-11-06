@@ -31,6 +31,7 @@ from crate.ai.requeue import (
     requeue_delay_ms,
 )
 from crate.db.repositories.tasks_shared import DB_HEAVY_TASKS
+from crate.worker_handlers import RUN_AGAIN_AFTER_KEY
 
 log = logging.getLogger(__name__)
 
@@ -950,6 +951,18 @@ def _execute_task(task_type: str, task_id: str, ai_requeues: int = 0):
                 task_type,
                 result.get("chunks", 0),
             )
+        elif isinstance(result, dict) and result.get(RUN_AGAIN_AFTER_KEY):
+            # The handler waits for capacity without holding this process.
+            delay_ms = max(1, round(float(result[RUN_AGAIN_AFTER_KEY]) * 1000))
+            if _requeue_later(
+                task_type,
+                task_id,
+                delay_ms=delay_ms,
+                progress=str(result.get("progress") or "Waiting to run again"),
+            ):
+                log.debug(
+                    "Task %s (%s) runs again in %dms", task_id, task_type, delay_ms
+                )
         elif isinstance(result, dict) and (
             result.get("error") or result.get("status") in {"failed", "conflict"}
         ):

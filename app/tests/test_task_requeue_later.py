@@ -111,3 +111,32 @@ def test_queue_wait_is_recorded_only_up_to_the_first_start(harness) -> None:
 
     [wait] = _queue_waits(harness)
     assert 89 <= wait < 120
+
+
+def test_a_handler_can_send_its_task_back_to_run_later(harness) -> None:
+    from crate import actors
+    from crate.worker_handlers import run_again_later
+
+    harness.result = run_again_later(3, progress="Waiting for a free analysis slot")
+
+    actors._execute_task(TASK_TYPE, "task-1")
+
+    assert harness.requeued == [("task-1", "Waiting for a free analysis slot")]
+    assert harness.sends == [{"args": ("task-1",), "delay": 3000}]
+    # Neither completed nor failed, and nobody was told it finished.
+    assert not any(update.get("status") for update in harness.updates)
+    assert harness.published == []
+
+
+def test_a_task_cancelled_while_it_ran_is_not_sent_back(harness) -> None:
+    from crate import actors
+    from crate.worker_handlers import run_again_later
+
+    harness.result = run_again_later(3, progress="Waiting for a free analysis slot")
+    harness.cancelled = True
+
+    actors._execute_task(TASK_TYPE, "task-1")
+
+    assert harness.sends == []
+    assert harness.requeued == []
+    assert harness.acknowledged == ["task-1"]
