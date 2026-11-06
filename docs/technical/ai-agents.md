@@ -298,7 +298,10 @@ their invocation history and usage: the restored CHECKs on those three tables ar
 - the issue's service, level, status, counts and first and last release;
 - at most ten duplicate candidates (same `group_key` or same main exception type),
   each reduced to its short ID, status, main exception and innermost app frame;
-- for an investigation, the current triage of that digest.
+- for an investigation, the current triage of that digest and, when Sentry answers,
+  how the issue's events spread over releases (`events_by_release`) and over the
+  values of the allowlisted tags the digest carries (`tag_distribution`), top
+  values only and scrubbed like the digest.
 
 The issue title, culprit and permalink are not sent. Neither the prompt nor the
 raw response is stored. With Ollama the summary stays on the operator's own
@@ -325,14 +328,41 @@ result goes to `error_issue_triage` with its invocation ID.
 
 **One result per issue, kind and digest.** `triage_issue`
 (`crate.error_inbox.triage`) returns an existing result without calling the
-model. Its idempotency key, `issue_id:kind:digest_hash`, keeps a redelivered task
-from paying twice; a failed call also keeps the key, so that digest is not
-retried. A new digest gets a new triage.
+model; only a saved result counts as done. The idempotency key keeps a redelivered
+task from paying twice:
 
-**Where it runs.** The caller passes the structured executor, so the `ai` task
-handler that calls `triage_issue` is the root of the model-calling chain that the
-static check below verifies. No task or route calls these actions yet; until one
-does, a binding sends nothing.
+- automatic triage uses `issue_id:kind:digest_hash`, so it sends a digest once:
+  after a failed call (invalid output, timeout, provider error) it never retries
+  that digest, and the sync never queues it again;
+- a person's request (Investigate, Triage backlog) adds its task id,
+  `issue_id:kind:digest_hash:task_id`, so pressing again after a failure is a new
+  attempt, while a redelivery of the same task is still refused.
+
+A digest larger than the profile's input allowance fails with
+`AI_INPUT_TOO_LARGE` before anything is reserved. The digest is never trimmed to
+fit: the task result names the input the call needed and the profile's limit
+(«This issue needs about 30,512 input tokens; the AI profile bound to Investigate
+error issue allows 16,384…»), and the admin shows it where the button was pressed.
+A hand-made profile starts at 16,384 input tokens, below what a full 24 KB digest
+needs; raise it in AI models for these two actions.
+
+**Where it runs.** Two `ai`-lane tasks call these actions, and their handlers pass
+`execute_structured` themselves, so each is the root of the model-calling chain
+the static check below verifies:
+
+- `triage_error_issue` (priority 1, 120 s): queued by the sync when automatic
+  triage is on, or by **Triage backlog**;
+- `investigate_error_issue` (priority 0, 180 s): queued by **Investigate**. It
+  first reads the Sentry evidence (one documented Retrieve Tag Details call per
+  key, `release` first, at most 20 s and 5 s per call; without Sentry it goes on
+  with the digest alone).
+
+Both resume the configuration the route or the sync accepted (`accept_action`) and
+fail closed (`AI_CONTEXT_STALE`) when it changed. A connection with no free slot
+returns the task to `pending` and requeues it like every `ai` task. Failures are
+typed task results the worker does not report to Sentry; the admin shows them as
+they are. [Observability](observability.md#ai-triage-and-investigation) covers
+when automatic triage queues work and the daily limit.
 
 ## Where model calls run
 
@@ -342,10 +372,10 @@ AI work (SM3-D8). Only `crate-worker` consumes them, each in its own pool (see
 sizing). Provider latency therefore never holds the general queues, and a long
 taxonomy batch never holds the interactive threads.
 
-| Lane      | Work                                                     | Time limit            | Task types (time limit in seconds)                                                                                                                                                                                                                                                                             |
-| --------- | -------------------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ai`      | One proposal, draft, extraction, analysis or admin probe | at most 300 s         | `ai_catalog_refresh` (180), `ai_profile_test` (180), `propose_genre_eq` (120), `generate_playlist_description` (120), `propose_genre_taxonomy_node` (180), `refine_music_path` (120), `analyze_artist_hero_candidate` (180), `show_extract` (180), `research_artist_bio` (300), `draft_i18n_translation` (300) |
-| `ai_bulk` | Long batches                                             | per task, no lane cap | `infer_genre_taxonomy` (3600), `rebuild_genre_taxonomy_proposals` (7200)                                                                                                                                                                                                                                       |
+| Lane      | Work                                                     | Time limit            | Task types (time limit in seconds)                                                                                                                                                                                                                                                                                                                                          |
+| --------- | -------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ai`      | One proposal, draft, extraction, analysis or admin probe | at most 300 s         | `ai_catalog_refresh` (180), `ai_profile_test` (180), `propose_genre_eq` (120), `generate_playlist_description` (120), `propose_genre_taxonomy_node` (180), `refine_music_path` (120), `analyze_artist_hero_candidate` (180), `show_extract` (180), `research_artist_bio` (300), `draft_i18n_translation` (300), `triage_error_issue` (120), `investigate_error_issue` (180) |
+| `ai_bulk` | Long batches                                             | per task, no lane cap | `infer_genre_taxonomy` (3600), `rebuild_genre_taxonomy_proposals` (7200)                                                                                                                                                                                                                                                                                                    |
 
 Every AI task keeps `max_retries=0`: paid work is never retried.
 `enrich_genre_descriptions` reads Wikidata and Wikipedia only, calls no model
