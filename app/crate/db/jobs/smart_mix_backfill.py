@@ -333,9 +333,13 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                                 AND profile.quality <> 'unavailable'
                                 AND profile.source_stale_at IS NOT NULL
                                 AS is_source_changed,
-                            jsonb_typeof(profile.phrases) = 'array'
-                                AND jsonb_array_length(profile.phrases) > 0
-                                AS has_phrases,
+                            -- CASE: AND does not guarantee the order, and
+                            -- jsonb_array_length fails on anything but an array.
+                            CASE
+                                WHEN jsonb_typeof(profile.phrases) = 'array'
+                                THEN jsonb_array_length(profile.phrases) > 0
+                                ELSE false
+                            END AS has_phrases,
                             processing.state,
                             processing.attempts,
                             processing.target_generation = :target_generation
