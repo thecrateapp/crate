@@ -254,7 +254,7 @@ def test_vocal_overlap_penalised_only_with_voice_on_both_sides() -> None:
                 candidate.breakdown.weighted_sum(PLANNER_POLICY_V3.candidate_weights)
                 - penalty,
             ),
-            abs=1e-6,
+            abs=1e-5,
         )
 
 

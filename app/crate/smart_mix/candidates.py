@@ -344,12 +344,22 @@ def _phrase_options(
         if used_outgoing >= policy.outgoing_phrase_choices:
             break
         found = False
+        outgoing_cue = round(outgoing_phrases.starts[outgoing_index])
         for incoming_index in incoming_choices:
+            incoming_cue = round(incoming_phrases.starts[incoming_index])
+            offset = (
+                _snapped_phase_offset(
+                    edge, outgoing_cue, incoming_cue, edge.tempo_ratio
+                )
+                if edge.beatmatch
+                else 0
+            )
             for length_bars in _lengths(edge):
                 geometry = _phrase_geometry(
                     edge,
-                    outgoing_phrases,
-                    incoming_phrases,
+                    outgoing_cue,
+                    incoming_cue,
+                    offset,
                     outgoing_index,
                     incoming_index,
                     length_bars,
@@ -375,15 +385,14 @@ def _lengths(edge: _Edge) -> tuple[int | None, ...]:
 
 def _phrase_geometry(
     edge: _Edge,
-    outgoing_phrases: _Timeline,
-    incoming_phrases: _Timeline,
+    outgoing_cue: int,
+    incoming_cue: int,
+    offset: int,
     outgoing_index: int,
     incoming_index: int,
     length_bars: int | None,
 ) -> _Geometry | None:
     outgoing, policy = edge.outgoing, edge.policy
-    outgoing_cue = round(outgoing_phrases.starts[outgoing_index])
-    incoming_cue = round(incoming_phrases.starts[incoming_index])
     ratio = edge.tempo_ratio if edge.beatmatch else 1.0
     if length_bars is None:
         duration = _fitted_duration(edge, outgoing_cue, incoming_cue, ratio)
@@ -411,11 +420,7 @@ def _phrase_geometry(
         outgoing_cue_ms=outgoing_cue,
         incoming_cue_ms=incoming_cue,
         ratio=ratio,
-        beat_phase_offset_ms=(
-            _snapped_phase_offset(edge, outgoing_cue, incoming_cue, ratio)
-            if edge.beatmatch
-            else 0
-        ),
+        beat_phase_offset_ms=offset,
         outgoing_phrase=outgoing_index,
         incoming_phrase=incoming_index,
         length_bars=length_bars,
@@ -768,7 +773,7 @@ def _curve_options(
 
 
 def _component(value: float) -> float:
-    return round(max(0.0, min(1.0, value)), _DIGITS)
+    return max(0.0, min(1.0, value))
 
 
 def _step(outgoing: float | None, incoming: float | None) -> float | None:
