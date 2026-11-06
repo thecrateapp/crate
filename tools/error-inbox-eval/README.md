@@ -79,19 +79,20 @@ Options shared by the commands:
 | `--output PATH`                    | Markdown report (`run`, `report`); the JSON goes next to it. Default: `docs/technical/evidence/observability/error-triage-eval-<date>.md`. |
 | `--date`, `--replace`              | Report date (default today, UTC); drop earlier runs kept in the JSON.                                                                      |
 | `--confirm-calls N`                | `run` only: confirm without a prompt; must equal the planned number of calls.                                                              |
-| `--poll-seconds`, `--wait-seconds` | `run` only: how often and how long to wait for the task (default 15 s and 7,800 s).                                                        |
+| `--poll-seconds`, `--wait-seconds` | `run` only: how often and how long to wait for the task (default 15 s and 11,400 s).                                                       |
 
 ## Cost and duration
 
 Each call sends one digest (at most 24 KB), the issue's counts and up to ten reduced candidates,
-and the answer is capped by the profile's output limit (at most 2,048 tokens for this action). The
+and the answer is capped by the profile's output limit (at most 8,192 tokens for this action,
+reasoning included). The
 plan prints Crate's input bound, one token per byte, which is well above the real token count; the
 report has the real counts. The connection's daily budget reserves each call's full profile
 allowance before sending and settles it with the real usage, so it needs room for one or two
 reservations at a time, not for the whole run.
 
-Calls run one after another on the `ai_bulk` lane (time limit 7,200 s), yielding to interactive AI
-work; each takes at most the profile's timeout (45 s for this action).
+Calls run one after another on the `ai_bulk` lane (time limit 10,800 s), yielding to interactive AI
+work; each takes at most the profile's timeout (90 s for this action).
 
 ## The report
 

@@ -48,7 +48,7 @@ CLASSIFICATIONS = (
 SEVERITIES = ("critical", "high", "medium", "low")
 STATUSES = ("ok", "invalid_output", "failed", "skipped", "not_run")
 EG2_CLASSIFICATION = 0.8
-ACTION_MAX_OUTPUT_TOKENS = 2048
+ACTION_MAX_OUTPUT_TOKENS = 8192
 SHORT_ID = re.compile(r"[A-Z0-9][A-Z0-9_-]{0,62}-[A-Z0-9]+")
 CODE = re.compile(r"[A-Z][A-Z0-9_]{0,79}")
 MODEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}")
@@ -1164,7 +1164,7 @@ def parser() -> argparse.ArgumentParser:
         help="confirm the number of calls without a prompt (must match the plan)",
     )
     run.add_argument("--poll-seconds", type=float, default=15)
-    run.add_argument("--wait-seconds", type=float, default=7800)
+    run.add_argument("--wait-seconds", type=float, default=11400)
     report = commands.add_parser(
         "report", parents=[common, written], help="collect finished tasks"
     )

@@ -157,6 +157,10 @@ ACTIONS: dict[str, AIAction] = {
             16000,
             "Draft translations while preserving keys and placeholders for review.",
         ),
+        # Reasoning models count their thinking against the output limit (Gemini's
+        # maxOutputTokens, DeepSeek's max_tokens): a triage answer is about 200
+        # tokens, but its reasoning can take thousands. The timeouts leave room to
+        # produce that many tokens.
         _action(
             "ops.error.triage",
             "Triage error issue",
@@ -164,8 +168,8 @@ ACTIONS: dict[str, AIAction] = {
             "text",
             "ops.errors.manage",
             "/errors",
-            45,
-            2048,
+            90,
+            8192,
             "Classify an error issue from its sanitized digest and pick duplicates "
             "only from the listed candidates.",
         ),
@@ -177,7 +181,7 @@ ACTIONS: dict[str, AIAction] = {
             "ops.errors.manage",
             "/errors",
             90,
-            4096,
+            16000,
             "Propose a cause and a concrete next step for one error issue from its "
             "sanitized digest.",
         ),

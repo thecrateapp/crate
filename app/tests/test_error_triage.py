@@ -609,7 +609,7 @@ def test_handlers_name_the_executor_and_run_on_the_ai_lane():
     from crate.worker import TASK_HANDLERS
     from crate.worker_handlers import error_inbox
 
-    assert TASK_POOL_CONFIG["triage_error_issue"] == ("ai", 1, 120, 0)
+    assert TASK_POOL_CONFIG["triage_error_issue"] == ("ai", 1, 150, 0)
     assert TASK_POOL_CONFIG["investigate_error_issue"] == ("ai", 0, 180, 0)
     assert TASK_HANDLERS["triage_error_issue"] is (
         error_inbox._handle_triage_error_issue

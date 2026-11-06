@@ -248,10 +248,16 @@ are readable only through their owned domain routes.
 | `playlists.description.generate` | text            |              45 |                  2048 |
 | `music_paths.refine`             | text            |               8 |                  4096 |
 | `i18n.listen.draft`              | text            |              90 |                 16000 |
-| `ops.error.triage`               | error summary   |              45 |                  2048 |
-| `ops.error.investigate`          | error summary   |              90 |                  4096 |
+| `ops.error.triage`               | error summary   |              90 |                  8192 |
+| `ops.error.investigate`          | error summary   |              90 |                 16000 |
 
-Profiles may lower these maxima; they cannot raise them. Input profiles are bounded
+Profiles may lower these maxima; they cannot raise them. Reasoning models count
+their thinking against the output limit (Gemini's `maxOutputTokens`, DeepSeek's
+`max_tokens`, Ollama's `num_predict`), so the error inbox actions leave room for
+thousands of reasoning tokens around an answer of a few hundred. A profile keeps the
+limits it was created with: after a maximum is raised, use the model again for that
+feature (**Use a different model**, same model and reasoning) to append a profile
+version with the new limits. Input profiles are bounded
 by the model context and 131072 tokens. Vision admission requires a conservative
 image bound or a sufficient complete model-context reservation; unknown image bounds
 fail closed. Binding an enabled image action to such a profile is rejected up front
@@ -353,7 +359,7 @@ needs; raise it in AI models for these two actions.
 `execute_structured` themselves, so each is the root of the model-calling chain
 the static check below verifies:
 
-- `triage_error_issue` (priority 1, 120 s): queued by the sync when automatic
+- `triage_error_issue` (priority 1, 150 s): queued by the sync when automatic
   triage is on, or by **Triage backlog**;
 - `investigate_error_issue` (priority 0, 180 s): queued by **Investigate**. It
   first reads the Sentry evidence (one documented Retrieve Tag Details call per
@@ -414,8 +420,8 @@ taxonomy batch never holds the interactive threads.
 
 | Lane      | Work                                                     | Time limit            | Task types (time limit in seconds)                                                                                                                                                                                                                                                                                                                                          |
 | --------- | -------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ai`      | One proposal, draft, extraction, analysis or admin probe | at most 300 s         | `ai_catalog_refresh` (180), `ai_profile_test` (180), `propose_genre_eq` (120), `generate_playlist_description` (120), `propose_genre_taxonomy_node` (180), `refine_music_path` (120), `analyze_artist_hero_candidate` (180), `show_extract` (180), `research_artist_bio` (300), `draft_i18n_translation` (300), `triage_error_issue` (120), `investigate_error_issue` (180) |
-| `ai_bulk` | Long batches                                             | per task, no lane cap | `infer_genre_taxonomy` (3600), `rebuild_genre_taxonomy_proposals` (7200), `evaluate_error_triage` (7200)                                                                                                                                                                                                                                                                    |
+| `ai`      | One proposal, draft, extraction, analysis or admin probe | at most 300 s         | `ai_catalog_refresh` (180), `ai_profile_test` (180), `propose_genre_eq` (120), `generate_playlist_description` (120), `propose_genre_taxonomy_node` (180), `refine_music_path` (120), `analyze_artist_hero_candidate` (180), `show_extract` (180), `research_artist_bio` (300), `draft_i18n_translation` (300), `triage_error_issue` (150), `investigate_error_issue` (180) |
+| `ai_bulk` | Long batches                                             | per task, no lane cap | `infer_genre_taxonomy` (3600), `rebuild_genre_taxonomy_proposals` (7200), `evaluate_error_triage` (10800)                                                                                                                                                                                                                                                                   |
 
 Every AI task keeps `max_retries=0`: paid work is never retried.
 `enrich_genre_descriptions` reads Wikidata and Wikipedia only, calls no model

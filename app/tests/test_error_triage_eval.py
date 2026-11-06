@@ -439,7 +439,7 @@ def test_handler_names_the_executor_on_the_bulk_lane(monkeypatch):
     from crate.worker import TASK_HANDLERS
     from crate.worker_handlers import error_inbox
 
-    assert TASK_POOL_CONFIG[EVAL_TASK] == ("ai_bulk", 3, 7200, 0)
+    assert TASK_POOL_CONFIG[EVAL_TASK] == ("ai_bulk", 3, 10800, 0)
     assert TASK_HANDLERS[EVAL_TASK] is error_inbox._handle_evaluate_error_triage
     seen: dict[str, Any] = {}
     progress: list[tuple[int, int, str]] = []

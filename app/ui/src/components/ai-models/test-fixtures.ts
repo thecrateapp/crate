@@ -104,8 +104,8 @@ export function errorTriageAction(): Action {
     description:
       "Classify an error issue from its sanitized digest and pick duplicates only from the listed candidates.",
     maxima: {
-      timeout_seconds: 45,
-      max_output_tokens: 2048,
+      timeout_seconds: 90,
+      max_output_tokens: 8192,
       max_input_tokens: 131072,
       max_image_pixels: null,
       max_proposals: null,
