@@ -145,6 +145,51 @@ def test_a_task_cancelled_while_it_ran_is_not_sent_back(harness) -> None:
     assert harness.acknowledged == ["task-1"]
 
 
+def test_a_cancellation_that_lands_during_the_requeue_wins(
+    harness, monkeypatch
+) -> None:
+    from crate import actors
+    from crate.worker_handlers import run_again_later
+
+    # Not cancelled when the handler returns; cancelled by the time the row is
+    # returned to pending, so the requeue refuses and acknowledges it instead.
+    answers = iter([False, True])
+    monkeypatch.setattr(
+        "crate.worker._is_cancelled", lambda task_id: next(answers, True)
+    )
+    monkeypatch.setattr(
+        "crate.db.repositories.tasks.requeue_running_task",
+        lambda task_id, *, progress: None,
+    )
+    harness.result = run_again_later(3, progress="Waiting for a free analysis slot")
+
+    actors._execute_task(TASK_TYPE, "task-1")
+
+    assert harness.sends == []
+    assert harness.acknowledged == ["task-1"]
+    assert [event[1] for event in harness.published] == ["task_done"]
+    assert harness.published[0][2]["status"] == "cancelled"
+
+
+def test_a_requeued_child_does_not_fan_in_its_parent(harness, monkeypatch) -> None:
+    from crate import actors
+    from crate.worker_handlers import run_again_later
+
+    fanned_in: list[str] = []
+    monkeypatch.setattr(
+        actors,
+        "_try_fan_in_parent",
+        lambda task, task_type, task_id: fanned_in.append(task_id),
+    )
+    harness.task["parent_task_id"] = "parent-1"
+    harness.result = run_again_later(3, progress="Waiting for a free analysis slot")
+
+    actors._execute_task(TASK_TYPE, "task-1")
+
+    assert harness.requeued == [("task-1", "Waiting for a free analysis slot")]
+    assert fanned_in == []
+
+
 def test_a_task_whose_message_cannot_be_sent_stays_pending(harness) -> None:
     from crate import actors
     from crate.worker_handlers import run_again_later
@@ -160,3 +205,59 @@ def test_a_task_whose_message_cannot_be_sent_stays_pending(harness) -> None:
     assert harness.requeued == [("task-1", "Waiting for a free analysis slot")]
     assert not any(update.get("status") for update in harness.updates)
     assert harness.published == []
+
+
+def test_requeue_returns_a_running_task_to_pending_for_any_worker(pg_db) -> None:
+    from crate.db.queries.tasks import get_task
+    from crate.db.repositories.task_control import request_cancellation
+    from crate.db.repositories.tasks import (
+        create_task,
+        requeue_running_task,
+        start_task,
+    )
+
+    task_id = create_task(TASK_TYPE, dispatch=False)
+    first = start_task(task_id, worker_id="host:1:1")
+    assert first is not None
+    assert first["heartbeat_at"] is not None
+
+    assert requeue_running_task(task_id, progress="Waiting for a free slot")
+    task = get_task(task_id)
+    assert (task["status"], task["worker_id"], task["heartbeat_at"]) == (
+        "pending",
+        None,
+        None,
+    )
+    assert task["progress"] == "Waiting for a free slot"
+    # The first start stays, so its queue wait is recorded only once.
+    assert task["started_at"] == first["started_at"]
+    # Only a running task goes back.
+    assert requeue_running_task(task_id, progress="again") is None
+
+    assert start_task(task_id, worker_id="host:1:2") is not None
+    request_cancellation(task_id)
+    assert requeue_running_task(task_id, progress="again") is None
+    assert get_task(task_id)["status"] == "running"
+
+
+def test_a_requeued_child_keeps_its_parent_waiting(pg_db) -> None:
+    from crate.db.queries.tasks import get_task
+    from crate.db.repositories.tasks import (
+        check_siblings_complete,
+        create_task,
+        requeue_running_task,
+        start_task,
+        update_task,
+    )
+
+    parent = create_task("compute_popularity", dispatch=False)
+    update_task(parent, status="delegated")
+    child = create_task("popularity_chunk", parent_task_id=parent, dispatch=False)
+    assert start_task(child, worker_id="host:1:1") is not None
+
+    assert requeue_running_task(child, progress="Waiting to run again")
+
+    task = get_task(child)
+    assert (task["status"], task["parent_task_id"]) == ("pending", parent)
+    assert check_siblings_complete(parent)["all_done"] is False
+    assert get_task(parent)["status"] == "delegated"
