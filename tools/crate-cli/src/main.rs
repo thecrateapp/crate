@@ -85,7 +85,8 @@ enum Command {
         mode: String,
     },
     /// Analyze audio features (BPM, key, loudness, energy, mood, danceability; Smart Mix
-    /// phrases from level, band balance, harmony and timbre novelty)
+    /// phrases from level, band balance, harmony and timbre novelty, with an MFCC
+    /// deviation floor under the timbre)
     #[cfg(feature = "analysis")]
     Analyze {
         #[arg(short, long)]

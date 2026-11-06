@@ -49,6 +49,9 @@ pub const SPECTRAL_WEIGHT: f64 = 0.5;
 pub const HARMONY_WEIGHT: f64 = 2.0;
 pub const TIMBRE_WEIGHT: f64 = 8.0;
 pub const MFCC_COEFFICIENTS: usize = 13;
+/// Least deviation an MFCC coefficient is divided by, in MFCC units (librosa's mfcc of
+/// the dB mel levels), so the bar-to-bar noise of a near-static loop stays small.
+pub const MFCC_STD_FLOOR: f64 = 1.0;
 /// The first music bar keeps the grid unless another start beats its confidence by this.
 pub const OFFSET_ZERO_PREFERENCE: f64 = 0.05;
 pub const BOUNDARY_COST_DB: f64 = 4.0;
@@ -489,7 +492,8 @@ fn novelty_windows(boundary: usize, gaps: &[bool]) -> Option<(Vec<usize>, Vec<us
 /// Harmony and timbre at each bar boundary `0..=gaps.len()`, unweighted (SM3-D17):
 /// the cosine distance between the mean chroma of the windows (0 when either is silent)
 /// and the distance between their mean MFCC over `sqrt(MFCC_COEFFICIENTS)`, each
-/// coefficient standardised over the bars. Boundaries without windows get 0.
+/// coefficient standardised over the bars (dividing by at least `MFCC_STD_FLOOR`).
+/// Boundaries without windows get 0.
 fn harmony_timbre(
     chroma: &[[f64; 12]],
     mfcc: &[[f64; MFCC_COEFFICIENTS]],
@@ -513,7 +517,8 @@ fn harmony_timbre(
     (harmony, timbre)
 }
 
-/// Each column minus its mean, over its standard deviation (1 when within `EPSILON`).
+/// Each column minus its mean, over its standard deviation or `MFCC_STD_FLOOR`, the
+/// larger of the two, so a column that barely moves keeps its differences small.
 fn standardized_columns<const N: usize>(rows: &[[f64; N]]) -> Vec<[f64; N]> {
     let mut standard = rows.to_vec();
     if rows.is_empty() {
@@ -527,7 +532,11 @@ fn standardized_columns<const N: usize>(rows: &[[f64; N]]) -> Vec<[f64; N]> {
             .map(|row| (row[column] - mean) * (row[column] - mean)))
             / count)
             .sqrt();
-        let scale = if deviation > EPSILON { deviation } else { 1.0 };
+        let scale = if deviation > MFCC_STD_FLOOR {
+            deviation
+        } else {
+            MFCC_STD_FLOOR
+        };
         for (target, row) in standard.iter_mut().zip(rows) {
             target[column] = (row[column] - mean) / scale;
         }

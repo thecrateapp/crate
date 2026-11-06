@@ -22,10 +22,12 @@ Harmony is ``HARMONY_WEIGHT`` times the cosine distance between the mean chroma 
 two windows (0 when either is silent). Timbre is ``TIMBRE_WEIGHT`` times the distance
 between their mean MFCC divided by the square root of ``MFCC_COEFFICIENTS``, each
 coefficient standardised over the bars from the first to the last music bar (gaps
-included; a constant one divides by 1), so loudness (the first coefficient) and colour
-weigh alike. A bar's chroma and MFCC are the means of the band frames centred inside
-it, the frames that exist in all three arrays; without chroma or MFCC frames both terms
-are 0 and the novelty is v7's. Boundaries closer than four bars to either end of the
+included), so loudness (the first coefficient) and colour weigh alike. A coefficient
+divides by its standard deviation or ``MFCC_STD_FLOOR``, whichever is larger: a
+near-static loop's bar-to-bar noise stays noise instead of growing to unit variance.
+A bar's chroma and MFCC are the means of the band frames centred inside it, the frames
+that exist in all three arrays; without chroma or MFCC frames both terms are 0 and the
+novelty is v7's. Boundaries closer than four bars to either end of the
 music get none: a truncated window cannot tell a pickup or a fade-in from a section
 change. Its peaks are the local maxima of at least 1 dB, skipping gap bars; a run of
 equal values is one peak, so a long fade or ramp makes one wide peak. Phrases are 8, 16
@@ -101,6 +103,9 @@ SPECTRAL_WEIGHT = 0.5
 HARMONY_WEIGHT = 2.0
 TIMBRE_WEIGHT = 8.0
 MFCC_COEFFICIENTS = 13
+# Least deviation an MFCC coefficient is divided by, in MFCC units (librosa's mfcc of
+# the dB mel levels), so the bar-to-bar noise of a near-static loop stays small.
+MFCC_STD_FLOOR = 1.0
 OFFSET_ZERO_PREFERENCE = 0.05
 BOUNDARY_COST_DB = 4.0
 HYPERBAR_16_BONUS_DB = 0.25
@@ -436,7 +441,10 @@ def _harmony_timbre(
 
 
 def _standardized_columns(rows: list[list[float]]) -> list[list[float]]:
-    """Each column minus its mean, over its standard deviation (1 when within EPSILON)."""
+    """Each column minus its mean, over its standard deviation or ``MFCC_STD_FLOOR``.
+
+    The larger of the two, so a column that barely moves keeps its differences small.
+    """
     if not rows:
         return []
     columns = []
@@ -445,7 +453,7 @@ def _standardized_columns(rows: list[list[float]]) -> list[list[float]]:
         deviation = math.sqrt(
             _mean([(value - mean) * (value - mean) for value in column])
         )
-        scale = deviation if deviation > EPSILON else 1.0
+        scale = deviation if deviation > MFCC_STD_FLOOR else MFCC_STD_FLOOR
         columns.append([(value - mean) / scale for value in column])
     return [list(row) for row in zip(*columns, strict=True)]
 

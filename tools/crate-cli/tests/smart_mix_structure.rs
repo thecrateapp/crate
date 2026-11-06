@@ -879,6 +879,35 @@ fn harmony_change_is_a_boundary() {
 }
 
 #[test]
+fn static_loop_has_no_timbre_boundaries() {
+    // 48 identical bars whose MFCC wobble by 0.05 from bar to bar. Scaled up to unit
+    // variance, that noise put a timbre boundary every 8 bars; under the deviation
+    // floor only the 32-bar phrase cap splits the loop. Same case as the Python test.
+    let mut seed = 0x2545_f491_u32;
+    let mut uniform = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        (f64::from(seed) + 1.0) / (f64::from(u32::MAX) + 2.0)
+    };
+    let mfcc: Vec<[f64; MFCC_COEFFICIENTS]> = (0..48)
+        .map(|_| {
+            std::array::from_fn(|coefficient| {
+                // Box-Muller: a normal draw, here with a standard deviation of 0.05.
+                let normal =
+                    (-2.0 * uniform().ln()).sqrt() * (std::f64::consts::TAU * uniform()).cos();
+                -20.0 + 25.0 * coefficient as f64 / 12.0 + 0.05 * normal
+            })
+        })
+        .collect();
+
+    assert_eq!(
+        phrase_start_bars(&[[0.0; 3]; 48], &[one_hot(0); 48], &mfcc),
+        [0, 32]
+    );
+}
+
+#[test]
 fn mfcc_matches_orthonormal_dct() {
     let reference = feature_fixture().mfcc_reference;
 

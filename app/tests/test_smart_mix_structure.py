@@ -621,6 +621,19 @@ def test_timbre_change_at_same_level_is_a_boundary() -> None:
     assert 16 not in _phrase_start_bars(levels, chroma=chroma, mfcc=[[0.0] * 13] * 32)
 
 
+def test_static_loop_has_no_timbre_boundaries() -> None:
+    # 48 identical bars whose MFCC wobble by 0.05 from bar to bar. Scaled up to unit
+    # variance, that noise put a timbre boundary every 8 bars; under the deviation
+    # floor only the 32-bar phrase cap splits the loop.
+    rng = np.random.default_rng(7)
+    count = 48
+    mfcc = np.linspace(-20.0, 5.0, 13) + rng.normal(0.0, 0.05, (count, 13))
+
+    assert _phrase_start_bars(
+        [-12.0] * count, chroma=[_one_hot(PITCH_C)] * count, mfcc=mfcc
+    ) == [0, 32]
+
+
 def test_mfcc_scale_does_not_change_novelty() -> None:
     from crate.smart_mix.structure import _harmony_timbre
 
@@ -680,7 +693,7 @@ def test_zero_chroma_and_flat_mfcc_give_no_nan() -> None:
 
     assert harmony == [0.0] * (count + 1)
     assert all(math.isfinite(value) for value in timbre)
-    # A constant coefficient divides by 1: rounding noise in its mean stays noise.
+    # A constant coefficient divides by MFCC_STD_FLOOR: rounding noise stays noise.
     assert max(flat_timbre) < 1e-9
 
 

@@ -186,13 +186,15 @@ def test_rust_structure_constants_match_python() -> None:
 
 def test_novelty_constants_match_between_python_and_rust() -> None:
     # SM3-D17: both analyzers weigh harmony and timbre alike, over the same windows,
-    # and charge the same cost per phrase boundary.
+    # with the same floor under each MFCC deviation, and charge the same cost per
+    # phrase boundary.
     from crate.smart_mix import structure
 
     expected = {
         "HARMONY_WEIGHT": 2.0,
         "TIMBRE_WEIGHT": 8.0,
         "MFCC_COEFFICIENTS": 13,
+        "MFCC_STD_FLOOR": 1.0,
         "BOUNDARY_COST_DB": 4.0,
         "NOVELTY_WINDOW_BARS": 4,
     }
