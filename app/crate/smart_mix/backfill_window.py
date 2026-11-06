@@ -51,7 +51,7 @@ def is_valid_timezone(value: object) -> bool:
     return True
 
 
-def validate_night_window(value: Mapping[str, Any]) -> dict[str, str]:
+def validate_night_window(value: object) -> dict[str, str]:
     """Return a clean copy of a night window or raise ``ValueError``."""
     if not isinstance(value, Mapping) or set(value) != set(_WINDOW_KEYS):
         raise ValueError("The night window needs start, end and timezone")
