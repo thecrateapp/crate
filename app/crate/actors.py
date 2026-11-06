@@ -642,6 +642,10 @@ def _requeue_later(
 
     A cancellation request wins: the row is left alone and the cancellation is
     acknowledged instead. Returns whether the task was requeued.
+
+    Once the row is pending a failed send must not fail the task: the caller's
+    error path would mark a task that never ran again as failed. The stale
+    pending redispatch of the service loop sends it again instead.
     """
     from crate.db.repositories.tasks import requeue_running_task
     from crate.worker import _is_cancelled
@@ -666,7 +670,16 @@ def _requeue_later(
                 )
         log.info("Task %s (%s) not requeued: no longer running", task_id, task_type)
         return False
-    _send_later(task_type, task_id, delay_ms, ai_requeues=ai_requeues)
+    try:
+        _send_later(task_type, task_id, delay_ms, ai_requeues=ai_requeues)
+    except Exception:
+        log.warning(
+            "Task %s (%s) is pending but its message could not be sent; "
+            "the stale pending redispatch will send it",
+            task_id,
+            task_type,
+            exc_info=True,
+        )
     return True
 
 

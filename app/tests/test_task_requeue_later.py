@@ -38,10 +38,13 @@ def harness(monkeypatch):
         metrics=[],
         cancelled=False,
         acknowledged=[],
+        send_error=None,
     )
 
     class Actor:
         def send_with_options(self, **options):
+            if state.send_error is not None:
+                raise state.send_error
             state.sends.append(options)
 
     def requeue_running_task(task_id, *, progress):
@@ -140,3 +143,20 @@ def test_a_task_cancelled_while_it_ran_is_not_sent_back(harness) -> None:
     assert harness.sends == []
     assert harness.requeued == []
     assert harness.acknowledged == ["task-1"]
+
+
+def test_a_task_whose_message_cannot_be_sent_stays_pending(harness) -> None:
+    from crate import actors
+    from crate.worker_handlers import run_again_later
+
+    # The row is already pending when the broker refuses the delayed message;
+    # failing the task now would leave the backfill without a coordinator. The
+    # stale-pending redispatch sends it again within minutes.
+    harness.result = run_again_later(3, progress="Waiting for a free analysis slot")
+    harness.send_error = ConnectionError("Redis is restarting")
+
+    actors._execute_task(TASK_TYPE, "task-1")
+
+    assert harness.requeued == [("task-1", "Waiting for a free analysis slot")]
+    assert not any(update.get("status") for update in harness.updates)
+    assert harness.published == []
