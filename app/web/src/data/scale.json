@@ -1,12 +1,12 @@
 {
   "tracks": "48,213",
   "albums": "4,400",
-  "pytest": 7995,
-  "vitest": 6981,
+  "pytest": 8415,
+  "vitest": 7045,
   "goTests": 435,
-  "rustTests": 318,
-  "taskTypes": 156,
-  "migrations": 146,
+  "rustTests": 361,
+  "taskTypes": 158,
+  "migrations": 153,
   "taskQueues": {
     "ai": [
       "ai_catalog_refresh",
@@ -18,6 +18,7 @@
       "analyze_artist_hero_candidate",
       "triage_error_issue",
       "investigate_error_issue",
+      "smart_mix_refine_transition",
       "show_extract",
       "research_artist_bio",
       "draft_i18n_translation"
@@ -138,6 +139,7 @@
       "rematch_album_mbids",
       "compute_popularity",
       "refresh_smart_mix_coverage",
+      "cleanup_smart_mix_refinements",
       "index_genres",
       "enrich_genre_descriptions",
       "sync_musicbrainz_genre_graph",
