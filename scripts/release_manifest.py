@@ -369,6 +369,42 @@ SENTRY_RELEASE_ENVIRONMENTS = {
 }
 
 
+# Sentry project of every image that reports to Sentry. Each image reports the release of
+# the commit it was built at (its source_sha): `crate-<sha>`, or `cast-receiver-<sha>` for
+# the Cast receiver. The site and the agent images do not report a release.
+SENTRY_PROJECTS = {
+    "api": "crate-api",
+    "readplane": "crate-readplane",
+    "worker": "crate-workers",
+    "analysis-worker": "crate-workers",
+    "playback-worker": "crate-workers",
+    "media-worker": "crate-media-worker",
+    "ui": "crate-admin",
+    "listen": "crate-listen",
+    "cast-receiver": "crate-cast-receiver",
+    "docs": "crate-docs",
+}
+SENTRY_RELEASE_PREFIXES = {"cast-receiver": "cast-receiver-"}
+
+
+def sentry_releases(
+    manifest: dict, source_sha: str | None = None
+) -> dict[str, list[str]]:
+    """Sentry releases running in a manifest, each with its projects.
+
+    With ``source_sha``, only the releases of the images built at that commit.
+    """
+    validate_manifest(manifest)
+    releases: dict[str, set[str]] = {}
+    for name, project in SENTRY_PROJECTS.items():
+        sha = manifest["images"][name]["source_sha"]
+        if source_sha is not None and sha != source_sha:
+            continue
+        release = SENTRY_RELEASE_PREFIXES.get(name, "crate-") + sha
+        releases.setdefault(release, set()).add(project)
+    return {release: sorted(projects) for release, projects in sorted(releases.items())}
+
+
 def render_release_env(manifest: dict) -> str:
     validate_manifest(manifest)
     lines = [f"CRATE_RELEASE_SHA={manifest['release_sha']}"]
@@ -457,6 +493,10 @@ def _build_parser() -> argparse.ArgumentParser:
     refs_parser = subparsers.add_parser("refs")
     refs_parser.add_argument("--manifest", required=True)
 
+    sentry_parser = subparsers.add_parser("sentry-releases")
+    sentry_parser.add_argument("--manifest", required=True)
+    sentry_parser.add_argument("--source-sha")
+
     base_parser = subparsers.add_parser("base-sha")
     base_parser.add_argument("--manifest", required=True)
     return parser
@@ -500,6 +540,12 @@ def main() -> int:
             registry=args.registry,
             owner=args.owner,
         )
+        return 0
+    if args.command == "sentry-releases":
+        manifest = _load_manifest(args.manifest)
+        assert manifest is not None
+        for release, projects in sentry_releases(manifest, args.source_sha).items():
+            print(f"{release}\t{','.join(projects)}")
         return 0
     if args.command == "baseline-sha":
         manifest = _load_manifest(args.manifest)

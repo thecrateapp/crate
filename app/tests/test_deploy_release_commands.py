@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -1404,3 +1406,120 @@ def test_worker_queue_contract_matches_the_ai_lanes() -> None:
 def test_worker_queue_contract_reads_every_command_form(service, consumes) -> None:
     result = _queue_contract({"crate-worker": service})
     assert (result.returncode == 0) is consumes, result.stderr
+
+
+def _deploy_function(name: str) -> str:
+    script = (ROOT / "scripts/deploy.sh").read_text()
+    start = script.index(f"{name}() {{")
+    return script[start : script.index("\n}\n", start) + 3]
+
+
+def _deployed_manifest(tmp_path: Path) -> tuple[str, str]:
+    spec = importlib.util.spec_from_file_location(
+        "crate_release_manifest_for_deploy", ROOT / "scripts/release_manifest.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    old, new = "a" * 40, "b" * 40
+    previous = module.assemble_manifest(
+        release_sha=old,
+        registry="ghcr.io",
+        owner="thecrateapp",
+        previous=None,
+        changed_digests={
+            name: f"sha256:{index:064x}"
+            for index, name in enumerate(module.ALL_IMAGE_SPECS, start=1)
+        },
+    )
+    manifest = module.assemble_manifest(
+        release_sha=new,
+        registry="ghcr.io",
+        owner="thecrateapp",
+        previous=previous,
+        changed_digests={"api": f"sha256:{999:064x}"},
+    )
+    (tmp_path / "release-manifest.json").write_text(json.dumps(manifest))
+    return old, new
+
+
+def _record_sentry_deploys(
+    tmp_path: Path, *, token: str | None, cli_exit: int = 0
+) -> tuple[subprocess.CompletedProcess, list[str]]:
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    cli = fake_bin / "sentry-cli"
+    cli.write_text(
+        "#!/usr/bin/env bash\n"
+        'printf \'%s\\n\' "$*" >> "$FAKE_SENTRY_LOG"\n'
+        'exit "$FAKE_SENTRY_EXIT"\n'
+    )
+    cli.chmod(0o755)
+    calls = tmp_path / "sentry-cli.log"
+    env = {
+        "PATH": f"{fake_bin}:{os.environ['PATH']}",
+        "HOME": str(tmp_path),
+        "FAKE_SENTRY_LOG": str(calls),
+        "FAKE_SENTRY_EXIT": str(cli_exit),
+    }
+    if token is not None:
+        env["SENTRY_AUTH_TOKEN"] = token
+    script = (
+        f'ROOT_DIR="{ROOT}"\nTMP_DIR="{tmp_path}"\nDEPLOY_ID=20261106-101500\n'
+        + _deploy_function("log")
+        + _deploy_function("record_sentry_deploys")
+        + "\nrecord_sentry_deploys\n"
+    )
+    result = subprocess.run(
+        ["bash", "-Eeuo", "pipefail", "-c", script],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    lines = calls.read_text().splitlines() if calls.exists() else []
+    return result, lines
+
+
+def test_deploy_marks_every_deployed_sentry_release_in_production(
+    tmp_path: Path,
+) -> None:
+    old, new = _deployed_manifest(tmp_path)
+
+    result, calls = _record_sentry_deploys(tmp_path, token="test-token")
+
+    assert result.returncode == 0, result.stderr
+    assert calls == [
+        f"deploys --org ninja-development new --release {release}"
+        " --env production --name 20261106-101500"
+        for release in (f"cast-receiver-{old}", f"crate-{old}", f"crate-{new}")
+    ]
+
+
+def test_deploy_skips_sentry_markers_without_a_token(tmp_path: Path) -> None:
+    _deployed_manifest(tmp_path)
+
+    result, calls = _record_sentry_deploys(tmp_path, token=None)
+
+    assert result.returncode == 0, result.stderr
+    assert calls == []
+    assert "Skipping Sentry deploy markers" in result.stdout
+
+
+def test_a_sentry_failure_never_fails_a_finished_deploy(tmp_path: Path) -> None:
+    _deployed_manifest(tmp_path)
+
+    result, calls = _record_sentry_deploys(tmp_path, token="test-token", cli_exit=1)
+
+    assert result.returncode == 0, result.stderr
+    assert len(calls) == 3
+    assert "could not record the Sentry deploy" in result.stdout
+
+
+def test_deploy_records_sentry_markers_after_verifying_and_before_cleanup() -> None:
+    run_deploy = _deploy_function("run_deploy")
+
+    verify = run_deploy.index("remote_deploy verify")
+    record = run_deploy.index("record_sentry_deploys")
+    cleanup = run_deploy.index("\n  cleanup\n")
+    assert verify < record < cleanup

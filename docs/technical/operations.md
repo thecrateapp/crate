@@ -212,6 +212,29 @@ The standalone Home Compose currently does not wire Sentry runtime variables;
 this metadata change does not enable telemetry there. Frontend source releases
 remain embedded in their immutable image builds.
 
+### Commits and deploys
+
+`scripts/release_manifest.py sentry-releases --manifest <file>` lists the Sentry
+releases a manifest runs and their projects: the API, readplane, workers, media
+worker, Admin, Listen and docs images report `crate-<source_sha>`, and the Cast
+receiver reports `cast-receiver-<source_sha>`. The site and the agent images report
+no release. `--source-sha <sha>` keeps only the images built at that commit.
+
+- **Commits.** After promoting a release manifest, the image workflow creates the
+  releases of the images it built in their Sentry projects (when no upload did yet)
+  and associates their commits with `sentry-cli releases set-commits --auto`. Sentry
+  reads the commits through its GitHub integration for `thecrateapp/crate`; the
+  workflow uses the `SENTRY_AUTH_TOKEN` Actions secret. A Sentry failure leaves a
+  warning in the run and never blocks the release.
+- **Deploys.** At the end of a successful `make deploy`, `scripts/deploy.sh` records
+  a Sentry deploy to `production`, named after the deploy id, for every release the
+  manifest runs. It needs `sentry-cli` (`npm install` provides it) and a Sentry auth
+  token in the shell that runs the deploy: `SENTRY_AUTH_TOKEN`, or a token in
+  `~/.sentryclirc`. An organization token (`org:ci` scope) is enough.
+  `SENTRY_DEPLOY_ORG` and `SENTRY_DEPLOY_ENVIRONMENT` override `ninja-development`
+  and `production`. Without a token or `sentry-cli` the step is skipped with a
+  message; a failed Sentry call is logged and never fails the deploy.
+
 ## Launch fix token
 
 [Launch fix](observability.md#launch-fix) dispatches the error autofix workflow
@@ -234,6 +257,24 @@ The token only starts runs. What the run can do is decided by the workflow's own
 permissions and secrets (`SENTRY_AUTOFIX_TOKEN`, the agent token and the GitHub
 App that publishes the draft pull request), which live in the repository and are
 reviewed separately.
+
+### Autofix workflow secrets
+
+`.github/workflows/error-autofix.yml` runs with these repository settings, all
+outside Crate:
+
+| Setting                   | Kind     | What it is                                                                                                  |
+| ------------------------- | -------- | ----------------------------------------------------------------------------------------------------------- |
+| `AUTOFIX_ENABLED`         | Variable | `true` lets runs do work; anything else ends them at once                                                   |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Secret   | The agent's Claude subscription token (`claude setup-token`)                                                |
+| `SENTRY_AUTOFIX_TOKEN`    | Secret   | Token of a Sentry internal integration with only _Issue & Event: Read_, separate from the inbox one         |
+| `AUTOFIX_APP_CLIENT_ID`   | Variable | Client id of the GitHub App `crate-error-autofix`                                                           |
+| `AUTOFIX_APP_PRIVATE_KEY` | Secret   | Private key of that App, which pushes the fix branch and opens the draft pull request so that CI runs on it |
+
+The App is installed only on `thecrateapp/crate`, with _Contents_ and _Pull
+requests_ write. The workflow also needs the `autofix` label in the repository.
+Each command the agent runs is sandboxed with bubblewrap and socat, which the job
+installs before the agent starts.
 
 ### Turning Launch fix off
 
