@@ -175,7 +175,16 @@ function LimitsForm({
         />
       </FormField>
       {isOllama ? (
-        <FormField label="Endpoint" className="min-w-0">
+        <FormField
+          label="Endpoint"
+          // The API revokes a saved key when the endpoint moves.
+          hint={
+            connection.has_key
+              ? "Changing the endpoint removes the saved key."
+              : undefined
+          }
+          className="min-w-0"
+        >
           <Input
             type="url"
             required

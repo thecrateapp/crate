@@ -45,6 +45,7 @@ sources:
   - docker-compose.dev.yaml
   - docker-compose.home.yaml
   - app/tests/test_ai_ollama_endpoint_key.py
+  - app/ui/src/components/ai-models/ProviderCard.tsx
 ---
 
 # AI agents configuration
@@ -578,7 +579,8 @@ endpoint; until then discovery and inference send no `Authorization` header, as
 for any Ollama connection without a key. No single API request changes both: move
 the endpoint, then write the key with the new revision. Saving the same endpoint
 again, in any spelling that normalises to it (letter case, a trailing dot or
-slash), keeps the key.
+slash), keeps the key. Admin warns under the endpoint field when a key would be
+removed.
 
 ## Validation evidence and remaining limits
 
