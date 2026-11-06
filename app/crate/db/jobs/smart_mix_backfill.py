@@ -377,6 +377,27 @@ def count_smart_mix_in_flight(*, session=None) -> int:
         )
 
 
+def seconds_since_smart_mix_change(*, session=None) -> float | None:
+    """Seconds since a Smart Mix processing row last changed, or None if none.
+
+    Claims, finished and failed analyses and released claims all touch
+    ``updated_at``, so this is how long the backfill's slots have stayed as
+    they are. An index range on ``(pipeline, updated_at DESC)`` answers it.
+    """
+    with optional_scope(session) as active_session:
+        seconds = active_session.execute(
+            text(
+                """
+                SELECT EXTRACT(EPOCH FROM NOW() - MAX(updated_at))
+                FROM track_processing_state
+                WHERE pipeline = :pipeline
+                """
+            ),
+            {"pipeline": SMART_MIX_PIPELINE},
+        ).scalar_one_or_none()
+    return None if seconds is None else float(seconds)
+
+
 def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> dict:
     with read_scope() as session:
         row = (
@@ -692,6 +713,7 @@ __all__ = [
     "release_smart_mix_claims",
     "smart_mix_profile_dedup_key",
     "save_smart_mix_campaign",
+    "seconds_since_smart_mix_change",
     "set_smart_mix_campaign_status",
     "start_smart_mix_campaign",
 ]

@@ -289,11 +289,15 @@ attempts, and the start and resume calls take it in the same body:
   minus what is in flight. The claim counts again inside its transaction, under a lock that every
   coordinator takes, so two coordinators can never exceed the limit together. The window, not
   `batchSize`, bounds the work in flight.
-- When the limit is reached, the coordinator's task goes back to `pending` and runs again 3 s
-  later, with the progress `Waiting for a free slot: 4 of 4 in flight (day)`. It holds no worker
+- When the limit is reached, the coordinator's task goes back to `pending` with the progress
+  `Waiting for a free slot: 4 of 4 in flight (day)` and runs again later. It holds no worker
   process while it waits. It does the same when nothing is left to claim while analyses are
   still running (`Waiting for the 2 analyses in flight to finish`), and completes the campaign
   once nothing is in flight.
+- The wait follows how long the slots have stayed as they are, measured from the last change to
+  a `smart_mix` processing row (a claim, a finished or failed analysis): 3 s right after one,
+  then about double each time while nothing changes, up to 30 s. A freed slot is therefore
+  refilled within 30 s at worst and within a few seconds while analyses finish often.
 - A change of window, or of the settings, applies to the next claim and cancels nothing. At
   08:00 with eight analyses accepted, they finish and the coordinator claims again once fewer
   than four are left.

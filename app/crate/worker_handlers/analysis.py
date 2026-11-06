@@ -35,6 +35,7 @@ from crate.db.jobs.smart_mix_backfill import (
     refresh_live_smart_mix_coverage,
     refresh_smart_mix_coverage,
     release_smart_mix_claims,
+    seconds_since_smart_mix_change,
     smart_mix_profile_dedup_key,
 )
 from crate.db.repositories.library import (
@@ -73,8 +74,10 @@ _POPULARITY_CHUNK_SLEEP_SECONDS = 0.25
 _WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS = 300
 # The night-window limit keeps only a few analyses in flight, so a slot freed by
 # a finished analysis should be refilled within seconds rather than a poll later.
-# The coordinator waits as a pending task, not in a worker process.
+# The coordinator waits as a pending task, not in a worker process, and checks
+# less often the longer its slots stay as they are.
 _SMART_MIX_BACKFILL_POLL_SECONDS = 3
+_SMART_MIX_BACKFILL_MAX_POLL_SECONDS = 30
 
 
 def _now() -> datetime:
@@ -1357,7 +1360,7 @@ def _handle_backfill_smart_mix_profiles(
     in_flight = count_smart_mix_in_flight()
     if in_flight >= window.limit:
         return run_again_later(
-            _SMART_MIX_BACKFILL_POLL_SECONDS,
+            _smart_mix_backfill_poll_seconds(),
             progress=(
                 f"Waiting for a free slot: {in_flight} of {window.limit} "
                 f"in flight ({window.window})"
@@ -1416,7 +1419,7 @@ def _handle_backfill_smart_mix_profiles(
             complete_smart_mix_campaign()
             return {"claimed": 0, "queued": 0, "completed": True}
         return run_again_later(
-            _SMART_MIX_BACKFILL_POLL_SECONDS,
+            _smart_mix_backfill_poll_seconds(),
             progress=f"Waiting for the {in_flight} analyses in flight to finish",
         )
     refresh_smart_mix_coverage(max_attempts=max_attempts)
@@ -1428,6 +1431,25 @@ def _handle_backfill_smart_mix_profiles(
         "limit": window.limit,
         "next_task_id": queue_next_smart_mix_batch(batches=1, claimed=len(claimed)),
     }
+
+
+def _smart_mix_backfill_poll_seconds() -> int:
+    """How long a waiting coordinator stays in the queue before it checks again.
+
+    As long as the slots have stayed as they are: 3 s right after a claim or a
+    finished analysis, then about double each time while nothing changes, up to
+    30 s. Each check is a whole actor cycle, so a long analysis or a child the
+    governor defers no longer costs one every 3 s.
+    """
+    since_change = seconds_since_smart_mix_change()
+    if since_change is None:
+        return _SMART_MIX_BACKFILL_MAX_POLL_SECONDS
+    return round(
+        min(
+            _SMART_MIX_BACKFILL_MAX_POLL_SECONDS,
+            max(_SMART_MIX_BACKFILL_POLL_SECONDS, since_change),
+        )
+    )
 
 
 def _smart_mix_campaign_running(campaign: dict | None) -> TypeGuard[dict]:

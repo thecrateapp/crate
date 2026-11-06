@@ -808,6 +808,43 @@ def test_in_flight_counts_only_fresh_claims_of_the_current_target(
     assert count_smart_mix_in_flight() == 1
 
 
+def test_the_last_backfill_change_is_its_newest_processing_row(
+    pg_db, tmp_path: Path
+) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import seconds_since_smart_mix_change
+
+    assert seconds_since_smart_mix_change() is None
+    [claimed, imported] = _create_tracks(tmp_path, count=2)
+    claim_smart_mix_backfill_batch(limit=1, claimed_by="task:coordinator")
+    assert seconds_since_smart_mix_change() < 5
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE track_processing_state
+                SET updated_at = NOW() - INTERVAL '100 seconds'
+                WHERE pipeline = 'smart_mix'
+                """
+            )
+        )
+        # Other pipelines change all the time; they say nothing about slots.
+        session.execute(
+            text(
+                """
+                INSERT INTO track_processing_state (
+                    track_id, pipeline, state, attempts, updated_at
+                )
+                VALUES (:track_id, 'analysis', 'done', 1, NOW())
+                """
+            ),
+            {"track_id": imported},
+        )
+
+    assert 99 <= seconds_since_smart_mix_change() < 110
+
+
 def _queue_child(track_id: int, claim_token: str) -> str:
     from crate.db.repositories.tasks import create_task_dedup
 
@@ -1104,6 +1141,8 @@ def _handler_harness(monkeypatch, *, campaigns, in_flight, claimed=(), now=DAY):
         lambda **kwargs: calls["next"].append(kwargs) or "task-next",
     )
     monkeypatch.setattr("time.sleep", lambda seconds: calls["sleeps"].append(seconds))
+    # A slot changed a moment ago: the coordinator checks again soon.
+    monkeypatch.setattr(analysis, "seconds_since_smart_mix_change", lambda: 0.0)
     return analysis, calls
 
 
@@ -1225,7 +1264,7 @@ def test_backfill_handler_completes_the_campaign_when_nothing_is_left(
 def _runs_again_later(result: dict) -> bool:
     from crate.worker_handlers import RUN_AGAIN_AFTER_KEY
 
-    return result.get(RUN_AGAIN_AFTER_KEY) == 3
+    return bool(result.get(RUN_AGAIN_AFTER_KEY))
 
 
 def test_saturated_backfill_runs_again_later_without_holding_a_process(
@@ -1243,6 +1282,37 @@ def test_saturated_backfill_runs_again_later_without_holding_a_process(
     assert calls["sleeps"] == []
     assert calls["claims"] == []
     assert calls["next"] == []
+
+
+@pytest.mark.parametrize(
+    ("since_change", "expected_wait"),
+    [
+        # Right after a claim or a finished analysis: check again in 3 s.
+        (0.4, 3),
+        # Nothing has changed for 12 s: wait as long again, so the checks
+        # about double while the slots stay full.
+        (12.2, 12),
+        # Never more than 30 s, so a freed slot waits at most that long.
+        (300, 30),
+        (None, 30),
+    ],
+)
+@pytest.mark.parametrize("in_flight", [4, 2], ids=["saturated", "last-analyses"])
+def test_a_waiting_coordinator_backs_off_while_nothing_changes(
+    monkeypatch, since_change, expected_wait, in_flight
+) -> None:
+    from crate.worker_handlers import RUN_AGAIN_AFTER_KEY
+
+    analysis, calls = _handler_harness(
+        monkeypatch, campaigns=[_running_campaign()], in_flight=[in_flight]
+    )
+    monkeypatch.setattr(
+        analysis, "seconds_since_smart_mix_change", lambda: since_change
+    )
+
+    result = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+
+    assert result[RUN_AGAIN_AFTER_KEY] == expected_wait
 
 
 def test_a_pause_stops_a_waiting_coordinator_before_claiming(monkeypatch) -> None:
