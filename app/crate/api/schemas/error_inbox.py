@@ -12,6 +12,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
 from crate.error_inbox.autofix import MAX_NOTE_LENGTH
+from crate.error_inbox.config import MAX_DAILY_TRIAGE
 from crate.error_inbox.sentry_client import SUBSTATUSES
 
 IssueStatus = Literal["unresolved", "resolved", "ignored"]
@@ -109,6 +110,8 @@ class ErrorTriage(BaseModel):
     suspected_frames: list[int] = Field(default_factory=list)
     next_step: str | None = None
     confidence: float
+    # The model that answered, while its invocation record is kept (90 days).
+    model: str | None = None
     created_at: datetime
 
 
@@ -135,6 +138,8 @@ class ErrorIssueDetail(ErrorIssueSummary):
     closed_at: datetime | None = None
     created_at: datetime
     triages: list[ErrorTriage] = Field(default_factory=list)
+    # When automatic triage queued the current digest; null if it never did.
+    auto_triage_queued_at: datetime | None = None
     write_access: bool | None = None
     fix: ErrorIssueFix | None = None
 
@@ -142,6 +147,21 @@ class ErrorIssueDetail(ErrorIssueSummary):
 class ErrorSyncTruncation(BaseModel):
     full: bool = False
     recent: bool = False
+
+
+class ErrorSyncTriage(BaseModel):
+    """What the pass queued for automatic triage.
+
+    `status`: `off`, `idle` (nothing to queue), `queued`, `cap_reached` (the daily
+    limit is used up), `unavailable` (no usable model; `error_code` says why) or
+    `failed`.
+    """
+
+    status: Literal["off", "idle", "queued", "cap_reached", "unavailable", "failed"]
+    queued: int = 0
+    queued_24h: int | None = None
+    daily_max: int | None = None
+    error_code: str | None = None
 
 
 class ErrorSyncState(BaseModel):
@@ -152,6 +172,7 @@ class ErrorSyncState(BaseModel):
     error_code: str | None = None
     counts: dict[str, int] = Field(default_factory=dict)
     truncated: ErrorSyncTruncation = Field(default_factory=ErrorSyncTruncation)
+    triage: ErrorSyncTriage | None = None
 
 
 class ErrorServiceCounts(BaseModel):
@@ -177,6 +198,8 @@ class ErrorSummary(BaseModel):
     critical_open: int
     new_24h: int
     regressed_24h: int
+    # Open issues with an event summary and no triage of it: the triage backlog.
+    untriaged: int = 0
     last_synced_at: datetime | None = None
     services: list[ErrorServiceCounts] = Field(default_factory=list)
     top_critical: list[ErrorTopCritical] = Field(default_factory=list)
@@ -201,6 +224,13 @@ class ErrorFixConnection(BaseModel):
     actions_url: str
 
 
+class ErrorTriageSettings(BaseModel):
+    """Automatic AI triage after each sync; off until the triage quality is approved."""
+
+    automatic: bool = False
+    daily_max: int = Field(default=30, ge=0, le=MAX_DAILY_TRIAGE)
+
+
 class ErrorTrackingConnection(BaseModel):
     configured: bool
     provider: Literal["sentry"] = "sentry"
@@ -212,6 +242,7 @@ class ErrorTrackingConnection(BaseModel):
     access: ErrorTrackingAccess | None = None
     sync: ErrorSyncState | None = None
     fix: ErrorFixConnection | None = None
+    triage: ErrorTriageSettings = Field(default_factory=ErrorTriageSettings)
 
 
 def _new_secret(value: SecretStr | None) -> str | None:
@@ -244,7 +275,7 @@ class ErrorTrackingConnectionUpdate(BaseModel):
     """Connection settings. `token` is write-only; omitted, null or blank keeps it.
 
     `fix` omitted keeps the Launch fix settings; `null` turns Launch fix off and
-    revokes its GitHub token.
+    revokes its GitHub token. `triage` omitted keeps the triage settings.
     """
 
     base_url: str | None = Field(default=None, max_length=2048)
@@ -253,6 +284,7 @@ class ErrorTrackingConnectionUpdate(BaseModel):
     environments: list[str] | None = Field(default=None, max_length=50)
     token: SecretStr | None = Field(default=None, json_schema_extra={"writeOnly": True})
     fix: ErrorFixSettingsUpdate | None = None
+    triage: ErrorTriageSettings | None = None
 
     def settings(self) -> dict[str, object]:
         return {
@@ -268,6 +300,16 @@ class ErrorTrackingConnectionUpdate(BaseModel):
     @property
     def updates_fix(self) -> bool:
         return "fix" in self.model_fields_set
+
+
+class ErrorTriageBacklogResponse(BaseModel):
+    """`Triage backlog`: one triage task per open issue without one, up to `limit`."""
+
+    queued: int
+    # Issues whose triage was already queued or running.
+    deduplicated: int
+    limit: int
+    task_ids: list[str] = Field(default_factory=list)
 
 
 class ErrorFixRequest(BaseModel):
@@ -310,4 +352,6 @@ __all__ = [
     "ErrorTrackingConnection",
     "ErrorTrackingConnectionUpdate",
     "ErrorTriage",
+    "ErrorTriageBacklogResponse",
+    "ErrorTriageSettings",
 ]

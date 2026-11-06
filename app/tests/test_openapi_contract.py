@@ -1841,6 +1841,14 @@ def test_openapi_types_error_inbox_routes_and_marks_them_authenticated(test_app)
         ("/api/admin/errors/connection", "get"): ("200", "ErrorTrackingConnection"),
         ("/api/admin/errors/connection", "put"): ("200", "ErrorTrackingConnection"),
         ("/api/admin/errors/connection/test", "post"): ("202", "TaskEnqueueResponse"),
+        ("/api/admin/errors/{issue_id}/investigate", "post"): (
+            "202",
+            "TaskEnqueueResponse",
+        ),
+        ("/api/admin/errors/triage-backlog", "post"): (
+            "202",
+            "ErrorTriageBacklogResponse",
+        ),
     }
     for (path, method), (status, model) in expected.items():
         operation = schema["paths"][path][method]

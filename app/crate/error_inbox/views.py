@@ -106,6 +106,10 @@ def connection_view(stored: StoredConnection | None = None) -> dict[str, Any]:
         "access": access_view(stored.access_state),
         "sync": sync_view(stored.sync_state),
         "fix": _fix_connection(config.fix if config else None),
+        "triage": {
+            "automatic": config.triage.automatic if config else False,
+            "daily_max": config.triage.daily_max if config else 30,
+        },
     }
 
 
@@ -122,6 +126,7 @@ def inbox_summary(*, now: datetime | None = None, top: int = 3) -> dict[str, Any
         "critical_open": overview["critical_open"],
         "new_24h": overview["new_24h"],
         "regressed_24h": overview["regressed_24h"],
+        "untriaged": overview["untriaged"],
         "last_synced_at": _iso(overview["last_synced_at"]),
         "services": overview["services"],
         "top_critical": overview["top_critical"],

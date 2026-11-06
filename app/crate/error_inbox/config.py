@@ -394,6 +394,7 @@ def load_github_token(config: ErrorTrackingConfig, *, session=None) -> str:
 __all__ = [
     "DEFAULT_BASE_URL",
     "GITHUB_TOKEN_PREFIX",
+    "MAX_DAILY_TRIAGE",
     "SENTRY_CLOUD_HOSTS",
     "ErrorTrackingConfig",
     "ErrorTrackingConfigError",
