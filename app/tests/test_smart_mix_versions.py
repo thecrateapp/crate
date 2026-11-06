@@ -140,6 +140,8 @@ def test_rust_beat_grid_format_matches_python() -> None:
         "PLANNER_IDENTIFIER",
         "PLANNER_POLICY_VERSION",
         "PLANNER_POLICY.rules_revision",
+        "PLANNER_POLICY_V3.identifier",
+        "PLANNER_POLICY_V3.rules_revision",
     ],
 )
 def test_operator_reference_versions_match_implemented_contract(identifier):
@@ -150,9 +152,14 @@ def test_operator_reference_versions_match_implemented_contract(identifier):
             cells = [cell.strip().strip("`") for cell in line.split("|")[1:-1]]
             if len(cells) >= 2:
                 rows[cells[0]] = cells[1]
+    policies = {
+        "PLANNER_POLICY": PLANNER_POLICY,
+        "PLANNER_POLICY_V3": PLANNER_POLICY_V3,
+    }
+    owner, _dot, attribute = identifier.partition(".")
     expected = (
-        PLANNER_POLICY.rules_revision
-        if identifier == "PLANNER_POLICY.rules_revision"
+        getattr(policies[owner], attribute)
+        if owner in policies
         else getattr(versions, identifier)
     )
     assert rows[identifier] == str(expected)

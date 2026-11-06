@@ -18,6 +18,7 @@ sources:
   - app/crate/smart_mix/beat_model.py
   - app/crate/smart_mix/vocals.py
   - app/crate/smart_mix/planner.py
+  - app/crate/smart_mix/candidates.py
   - app/crate/smart_mix/evaluation.py
   - tools/smart-mix-eval/README.md
   - tools/smart-mix-eval/structure/README.md
@@ -100,19 +101,25 @@ Backfill campaign -> batch claims -> heavy tasks per track
 These values come from the reviewed code; they were not discovered from a live instance.
 `test_smart_mix_versions.py` checks that this table follows the implemented identifiers.
 
-| Identifier                      | Value                | Meaning                                               |
-| ------------------------------- | -------------------- | ----------------------------------------------------- |
-| `API_CONTRACT_VERSION`          | `2026-08`            | Advertised integration and capabilities contract      |
-| `PROFILE_SCHEMA_VERSION`        | `1`                  | Schema of the persisted and serialized profile        |
-| `ANALYZER_VERSION`              | `smart-mix-audio-v7` | Target generation of profile analysis                 |
-| `MEASUREMENT_VERSION`           | `bs1770-v1`          | Loudness and true peak provenance used by the planner |
-| `BEAT_GRID_FORMAT`              | `delta-ms-v1`        | Beat grid format                                      |
-| `PLANNER_IDENTIFIER`            | `smart-mix-v2`       | Identifier for plan batches and capabilities          |
-| `PLANNER_POLICY_VERSION`        | `2`                  | Numeric version of each individual plan               |
-| `PLANNER_POLICY.rules_revision` | `7`                  | Internal rules revision included in the cache key     |
+| Identifier                         | Value                | Meaning                                               |
+| ---------------------------------- | -------------------- | ----------------------------------------------------- |
+| `API_CONTRACT_VERSION`             | `2026-08`            | Advertised integration and capabilities contract      |
+| `PROFILE_SCHEMA_VERSION`           | `1`                  | Schema of the persisted and serialized profile        |
+| `ANALYZER_VERSION`                 | `smart-mix-audio-v7` | Target generation of profile analysis                 |
+| `MEASUREMENT_VERSION`              | `bs1770-v1`          | Loudness and true peak provenance used by the planner |
+| `BEAT_GRID_FORMAT`                 | `delta-ms-v1`        | Beat grid format                                      |
+| `PLANNER_IDENTIFIER`               | `smart-mix-v2`       | Identifier for plan batches and capabilities          |
+| `PLANNER_POLICY_VERSION`           | `2`                  | Numeric version of each individual plan               |
+| `PLANNER_POLICY.rules_revision`    | `7`                  | Internal rules revision included in the cache key     |
+| `PLANNER_POLICY_V3.identifier`     | `smart-mix-v3`       | Planner on the stored phrases (SM3-D3)                |
+| `PLANNER_POLICY_V3.rules_revision` | `1`                  | Rules revision of v3, in its cache key                |
 
 Changing the rules does not necessarily change the public planner identifier: the cache key
-includes both.
+includes both. `PLANNER_IDENTIFIER` is the default: plan batches without `plannerVersion`,
+`smart_mix.planner_version` and the VirtualDJ contract. `smart_mix.planner_versions` lists every
+planner the plan batch accepts. v3 plans keep plan version 2: they have v2's fields and meaning.
+`API_CONTRACT_VERSION` stays `2026-08` although v3 extends the plan batch, because VirtualDJ
+plugin 1.0.0 refuses any other contract and the extension is additive.
 
 Each profile keeps `profileRevision`, `sourceRevision`, `analyzer`, `analyzerVersion`,
 `profileVersion` and `analyzedAt`. `sourceRevision` is a hash of size, mtime in nanoseconds
@@ -715,9 +722,43 @@ changing the existing fields. A high score does not mean the player will beatmat
 federated coverage exists.
 
 Plan batches load profiles and cache in bulk. The key includes the UIDs of both tracks, their
-`profileRevision`, the context, the planner identifier and the rules revision. A change of
-profile or rules leads to a different cache identity; do not recommend flushing Redis as a
-routine repair. A planning POST can write to the cache even though it does not modify music.
+`profileRevision`, the context, the requested planner's identifier and its rules revision. A
+change of profile or rules leads to a different cache identity; do not recommend flushing Redis
+as a routine repair. A planning POST can write to the cache even though it does not modify music.
+`context.setHistory` (the last three transitions as mode, bars and energy step) is validated but
+left out of the key: no deterministic planner reads it; the AI refinement will.
+
+### Planner smart-mix-v3
+
+`plannerVersion: "smart-mix-v3"` plans on the analyzer v7 structure (SM3-D3,
+`smart_mix/candidates.py`). For each edge it builds a menu of up to eight valid plans, best
+first, and serves the first; the AI refinement (SM4) will pick from the same menu by index.
+
+- **With phrases on both tracks**, a candidate mixes from the start of one of the last four
+  outgoing phrases that admit a mix into the start of one of the first three incoming phrases,
+  for 8, 16 or 32 outgoing bars or the context's preferred duration, with the bass handoff on
+  and off and with both curves when either is allowed. Phrase lengths over the preferred
+  duration need a long blend, as in v2. Pairs v2 would crossfade keep the preferred duration.
+  v2's own plan joins the menu, scored the same way: it reaches the tail after the last phrase
+  and the incoming lead-in.
+- **Score**: phrase alignment of the four mix boundaries (0.25), energy step at the handoff
+  (0.20), harmony (0.15: longer blends with compatible keys, less full-level overlap with
+  incompatible ones), tempo stability (0.10), bass handoff (0.15) and music left out (0.15,
+  outros and intros cut for free), minus 6 × the voice-over-voice time at full level over 48 s
+  when both profiles carry the voice per phrase (SM3-D13, cut `VOCAL_THRESHOLD`). The weights
+  are `PLANNER_POLICY_V3.candidate_weights`; changing them bumps the rules revision.
+- **Without phrases on both tracks** (v5 and v6 profiles, unsegmented tracks, 3/4) the menu is
+  v2's bar heuristic with v2's plan first, so v3 plans exactly as v2. Album, manual and missing
+  profile transitions keep v2's single plan.
+- **Safety**: every candidate goes through `TransitionPlan` and the planner policy
+  (`evaluation.policy_violations`); v3 copies v2's limits on tempo, gain, true peak and
+  durations.
+- **Response**: each v3 plan adds `structureUsed`, whether the menu came from the phrases. The
+  batch reads profiles without structure to build the cache keys and reads the structure only
+  for the edges it has to plan.
+- **Capability**: `smart_mix.structure` is true when at least half the library's tracks have a
+  current profile with phrases, read from the coverage snapshot (`structure_percent`, counted by
+  `refresh_smart_mix_coverage`). It is never computed in the request.
 
 ## HTTP, permissions and consumers
 
@@ -816,6 +857,11 @@ the blind listening test.
   Diego's authorization.
 - Profiles without phrases (analyzer v5 and v6) get phrase alignment from an 8-bar grid and no
   vocal metric. Compare planners on the same profile generation.
+- `--planner smart-mix-v3` plans as the API does. On edges without phrases it equals v2, so
+  measure it on an edge set with v7 profiles: `build_pool_dataset.py` pairs a pool of tracks
+  (the development library's spike tracks) with itself.
+- `music_left_out` reports the outgoing music after the mix and the incoming music before it,
+  without a target: v3 often ends the mix at a phrase boundary before the outgoing music ends.
 
 The analyzer's structure is measured apart, on audio files rather than plans:
 `tools/smart-mix-eval/structure/` scores beats, downbeats and phrases against All-In-One
