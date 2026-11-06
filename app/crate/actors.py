@@ -629,20 +629,23 @@ def _send_later(task_type: str, task_id: str, delay_ms: int, ai_requeues: int = 
     actor.send_with_options(**options)
 
 
-def _requeue_for_ai_capacity(task_type: str, task_id: str, attempt: int) -> None:
-    """Put an AI task refused for connection concurrency back in its queue."""
+def _requeue_later(
+    task_type: str,
+    task_id: str,
+    *,
+    delay_ms: int,
+    progress: str,
+    ai_requeues: int = 0,
+) -> bool:
+    """Return a running task to pending and send its message again later.
+
+    A cancellation request wins: the row is left alone and the cancellation is
+    acknowledged instead. Returns whether the task was requeued.
+    """
     from crate.db.repositories.tasks import requeue_running_task
     from crate.worker import _is_cancelled
 
-    delay_ms = requeue_delay_ms()
-    requeued = requeue_running_task(
-        task_id,
-        progress=(
-            "Waiting for AI provider capacity; "
-            f"retry {attempt}/{AI_CONCURRENCY_REQUEUE_LIMIT} in {delay_ms // 1000}s"
-        ),
-    )
-    if requeued is None:
+    if requeue_running_task(task_id, progress=progress) is None:
         if _is_cancelled(task_id):
             from crate.db.repositories.task_control import acknowledge_cancellation
 
@@ -661,8 +664,25 @@ def _requeue_for_ai_capacity(task_type: str, task_id: str, attempt: int) -> None
                     "",
                 )
         log.info("Task %s (%s) not requeued: no longer running", task_id, task_type)
+        return False
+    _send_later(task_type, task_id, delay_ms, ai_requeues=ai_requeues)
+    return True
+
+
+def _requeue_for_ai_capacity(task_type: str, task_id: str, attempt: int) -> None:
+    """Put an AI task refused for connection concurrency back in its queue."""
+    delay_ms = requeue_delay_ms()
+    if not _requeue_later(
+        task_type,
+        task_id,
+        delay_ms=delay_ms,
+        progress=(
+            "Waiting for AI provider capacity; "
+            f"retry {attempt}/{AI_CONCURRENCY_REQUEUE_LIMIT} in {delay_ms // 1000}s"
+        ),
+        ai_requeues=attempt,
+    ):
         return
-    _send_later(task_type, task_id, delay_ms, ai_requeues=attempt)
     log.info(
         "Task %s (%s) waiting for AI provider capacity; requeue %d/%d in %dms",
         task_id,
