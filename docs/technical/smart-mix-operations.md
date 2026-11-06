@@ -242,8 +242,11 @@ structure; check `refreshedAt` before reading zeros as a library with nothing pe
 | `compute_smart_mix_profile`   | `heavy`       | Analysis and publication per track        |
 | `refresh_smart_mix_coverage`  | `maintenance` | Aggregates coverage outside the request   |
 
-The backfill applies resource pressure and limits the work in flight. Its Admin settings
-accept `batchSize` from 1 to 100 (25 by default) and `maxAttempts` from 1 to 10 (3 by default).
+The backfill applies resource pressure and limits the work in flight to the limit of the
+[night window](#night-window): 8 at night and 4 by day by default. Its Admin settings accept
+`batchSize` from 1 to 100 (25 by default) and `maxAttempts` from 1 to 10 (3 by default).
+`batchSize` caps how many tracks one pass claims, `min(batchSize, limit - in flight)`; it no
+longer bounds the work in flight, which it did, at 25, before the night window.
 Claims use `SKIP LOCKED`, a token, `target_generation` and attempts; a new analyzer version
 makes attempts from the previous generation eligible again. It prioritizes the play queue,
 supplied offline IDs, favorites and collections, and listening history before everything else.
@@ -312,6 +315,13 @@ it runs for a moment every few seconds and waits in the queue, so with eight pro
 limit of eight, eight analyses run. By day the processes the backfill leaves free serve other
 `heavy` work.
 
+The cap on the work in flight used to be `batchSize`, 25 by default, so a deploy ran as many
+backfill analyses as `crate-analysis-worker` had processes. Now the window caps it, so by day the
+backfill runs at most four however many processes there are, and on a deploy with more than four
+it runs fewer analyses by day than before. That is intended (SM3-D15): the day keeps capacity for
+imports, reanalyses and listeners, and the night makes up for it. To run more by day, raise
+`dayConcurrency` in Admin; adding processes does not.
+
 On the project server (i7-7700, 4 cores and 8 threads) set `ANALYSIS_WORKER_PROCESSES=8` in
 `.env` and recreate the service with `docker compose up -d crate-analysis-worker`.
 `docker-compose.project.yaml` gives it `cpus: "7.0"`, which leaves a logical CPU for Postgres and
@@ -322,8 +332,12 @@ Hyper-Threading, so the night gains less than double the day's throughput.
 
 The resource governor still applies on top of the window. With its default `max_load_ratio` of
 0.85, a child that starts while the one-minute load is above 6.8 on eight logical CPUs waits five
-minutes, so a night with eight analyses settles at six or seven. To run all eight, raise
-`max_load_ratio` in the runtime policy; the same threshold also applies by day.
+minutes, so a night with eight analyses settles at six or seven. A deferred child stays `pending`
+and keeps its claim, so it still counts as in flight and the coordinator does not claim another
+track in its place: its slot stays empty until it runs. The real concurrency at night is
+therefore often below the night limit, and by day listeners can hold it below the day limit for
+as long as they listen. To run all eight at night, raise `max_load_ratio` in the runtime policy;
+the same threshold also applies by day.
 
 ## AI worker lanes and sizing
 
