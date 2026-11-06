@@ -139,3 +139,8 @@ def create_schema(cur):
     )
 
     create_error_inbox_auto_triage_v146_schema(cur)
+    from crate.db.schema_sections.ai_openai_compatible_v147 import (
+        create_ai_openai_compatible_v147_schema,
+    )
+
+    create_ai_openai_compatible_v147_schema(cur)
