@@ -392,6 +392,208 @@ def test_batch_rejects_empty_oversized_or_unknown_plan_requests(test_app) -> Non
     )
 
 
+def _memory_cache(monkeypatch, smart_mix) -> dict[str, dict]:
+    cached: dict[str, dict] = {}
+    monkeypatch.setattr(
+        smart_mix,
+        "get_smart_mix_plan_caches",
+        lambda keys: {key: cached[key] for key in keys if key in cached},
+    )
+    monkeypatch.setattr(
+        smart_mix, "set_smart_mix_plan_caches", lambda plans: cached.update(plans)
+    )
+    return cached
+
+
+def test_v2_default_unchanged(test_app, monkeypatch) -> None:
+    from crate.api import smart_mix
+
+    reads: list[dict] = []
+
+    def fake_profiles(entity_uids, **kwargs):
+        reads.append(kwargs)
+        return [_structured_profile(uid) for uid in entity_uids]
+
+    monkeypatch.setattr(
+        smart_mix, "get_track_mix_profiles_by_entity_uids", fake_profiles
+    )
+    monkeypatch.setattr(smart_mix, "get_smart_mix_plan_caches", lambda _keys: {})
+    monkeypatch.setattr(smart_mix, "set_smart_mix_plan_caches", lambda _plans: None)
+    edge = _edge(str(uuid.uuid4()), str(uuid.uuid4()))
+
+    default = test_app.post("/api/playback/transition-plans", json={"edges": [edge]})
+    explicit = test_app.post(
+        "/api/playback/transition-plans",
+        json={"plannerVersion": "smart-mix-v2", "edges": [edge]},
+    )
+
+    assert default.status_code == 200
+    assert default.json() == explicit.json()
+    assert default.json()["plannerVersion"] == "smart-mix-v2"
+    [plan] = default.json()["plans"]
+    assert plan["plannerVersion"] == 2
+    assert "structureUsed" not in plan
+    assert reads == [{"include_structure": False}, {"include_structure": False}]
+
+
+def test_v3_returns_structure_used(test_app, monkeypatch) -> None:
+    from crate.api import smart_mix
+
+    structured = {str(uuid.uuid4()), str(uuid.uuid4())}
+    reads: list[dict] = []
+
+    def fake_profiles(entity_uids, **kwargs):
+        reads.append(kwargs)
+        return [
+            _structured_profile(uid) if uid in structured else _profile(uid)
+            for uid in entity_uids
+        ]
+
+    monkeypatch.setattr(
+        smart_mix, "get_track_mix_profiles_by_entity_uids", fake_profiles
+    )
+    _memory_cache(monkeypatch, smart_mix)
+    outgoing, incoming = sorted(structured)
+    edges = [_edge(outgoing, incoming), _edge(str(uuid.uuid4()), str(uuid.uuid4()))]
+
+    response = test_app.post(
+        "/api/playback/transition-plans",
+        json={"plannerVersion": "smart-mix-v3", "edges": edges},
+    )
+    cached = test_app.post(
+        "/api/playback/transition-plans",
+        json={"plannerVersion": "smart-mix-v3", "edges": edges},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["plannerVersion"] == "smart-mix-v3"
+    with_structure, without_structure = response.json()["plans"]
+    assert with_structure["structureUsed"] is True
+    assert with_structure["plannerVersion"] == 2
+    assert without_structure["structureUsed"] is False
+    assert cached.json() == response.json()
+    assert reads[:2] == [{"include_structure": False}, {"include_structure": True}]
+
+
+def test_v3_reads_the_structure_only_for_cache_misses(test_app, monkeypatch) -> None:
+    from crate.api import smart_mix
+
+    uids = [str(uuid.uuid4()) for _ in range(3)]
+    reads: list[tuple[list[str], bool]] = []
+
+    def fake_profiles(entity_uids, **kwargs):
+        structure = kwargs.get("include_structure", False)
+        reads.append((list(entity_uids), structure))
+        return [
+            _structured_profile(uid) if structure else _profile(uid)
+            for uid in entity_uids
+        ]
+
+    monkeypatch.setattr(
+        smart_mix, "get_track_mix_profiles_by_entity_uids", fake_profiles
+    )
+    cached = _memory_cache(monkeypatch, smart_mix)
+    first = _edge(uids[0], uids[1])
+    second = _edge(uids[1], uids[2])
+
+    warm = test_app.post(
+        "/api/playback/transition-plans",
+        json={"plannerVersion": "smart-mix-v3", "edges": [first]},
+    )
+    reads.clear()
+    batch = test_app.post(
+        "/api/playback/transition-plans",
+        json={"plannerVersion": "smart-mix-v3", "edges": [first, second]},
+    )
+    reads_with_a_miss = list(reads)
+    reads.clear()
+    hot = test_app.post(
+        "/api/playback/transition-plans",
+        json={"plannerVersion": "smart-mix-v3", "edges": [first, second]},
+    )
+
+    assert warm.status_code == batch.status_code == hot.status_code == 200
+    # Revisions for the cache keys first; the structure only for the missed edge.
+    assert reads_with_a_miss == [(uids, False), ([uids[1], uids[2]], True)]
+    assert reads == [(uids, False)]
+    assert batch.json()["plans"][0] == warm.json()["plans"][0]
+    assert all(plan["structureUsed"] for plan in batch.json()["plans"])
+    assert hot.json() == batch.json()
+    assert len(cached) == 2
+
+
+def test_v3_cache_key_differs_from_v2(test_app, monkeypatch) -> None:
+    from crate.api import smart_mix
+    from crate.api.schemas.smart_mix import TransitionEdgeRequest
+    from crate.smart_mix.policy import PLANNER_POLICY, PLANNER_POLICY_V3
+
+    monkeypatch.setattr(
+        smart_mix,
+        "get_track_mix_profiles_by_entity_uids",
+        lambda entity_uids, **_kwargs: [_profile(uid) for uid in entity_uids],
+    )
+    cached = _memory_cache(monkeypatch, smart_mix)
+    edge = _edge(str(uuid.uuid4()), str(uuid.uuid4()))
+    request = TransitionEdgeRequest.model_validate(edge)
+
+    for planner in ("smart-mix-v2", "smart-mix-v3", "smart-mix-v2"):
+        assert (
+            test_app.post(
+                "/api/playback/transition-plans",
+                json={"plannerVersion": planner, "edges": [edge]},
+            ).status_code
+            == 200
+        )
+
+    v2_key = smart_mix._plan_cache_key(request, None, None, PLANNER_POLICY)
+    v3_key = smart_mix._plan_cache_key(request, None, None, PLANNER_POLICY_V3)
+    assert v2_key != v3_key
+    assert v2_key == smart_mix._plan_cache_key(request, None, None)
+    assert len(cached) == 2
+
+
+def test_set_history_validated(test_app, monkeypatch) -> None:
+    from crate.api import smart_mix
+    from crate.api.schemas.smart_mix import TransitionEdgeRequest
+
+    monkeypatch.setattr(
+        smart_mix,
+        "get_track_mix_profiles_by_entity_uids",
+        lambda entity_uids, **_kwargs: [_profile(uid) for uid in entity_uids],
+    )
+    _memory_cache(monkeypatch, smart_mix)
+    path = "/api/playback/transition-plans"
+    edge = _edge(str(uuid.uuid4()), str(uuid.uuid4()))
+    entry = {"mode": "beatmatch", "durationBars": 16, "deltaEnergy": -0.12}
+
+    def with_history(history) -> dict:
+        return {**edge, "context": {**edge["context"], "setHistory": history}}
+
+    def post(history) -> int:
+        return test_app.post(
+            path,
+            json={"plannerVersion": "smart-mix-v3", "edges": [with_history(history)]},
+        ).status_code
+
+    assert post([entry, {**entry, "mode": "adaptive", "durationBars": 0}]) == 200
+    assert post([]) == 200
+    assert post([entry] * 4) == 422
+    assert post([{**entry, "mode": "scratch"}]) == 422
+    assert post([{**entry, "deltaEnergy": 1.5}]) == 422
+    assert post([{**entry, "durationBars": -1}]) == 422
+    assert post([{**entry, "durationBars": 129}]) == 422
+    assert post([{**entry, "title": "Song"}]) == 422
+    assert post([{"mode": "beatmatch"}]) == 422
+    # The deterministic planners do not read the set history, so it does not split
+    # the plan cache.
+    plain = TransitionEdgeRequest.model_validate(edge)
+    historied = TransitionEdgeRequest.model_validate(with_history([entry]))
+    assert smart_mix._plan_cache_key(plain, None, None) == smart_mix._plan_cache_key(
+        historied, None, None
+    )
+    assert smart_mix._cache_context(plain.context) == edge["context"]
+
+
 def _edge(outgoing_uid: str, incoming_uid: str) -> dict:
     return {
         "outgoingTrackEntityUid": outgoing_uid,
@@ -446,3 +648,9 @@ def _profile(
         valence=0.5,
         analyzed_at=datetime(2026, 7, 28, tzinfo=UTC),
     )
+
+
+def _structured_profile(track_uid: str) -> TrackMixProfile:
+    from tests.smart_mix_candidate_cases import INCOMING_LAYOUT, profile
+
+    return profile(track_uid, layout=INCOMING_LAYOUT, analyzer_version="smart-mix-v2")

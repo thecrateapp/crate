@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from crate.smart_mix.beat_grid import FORMAT_NAME as BEAT_GRID_FORMAT
-from crate.smart_mix.policy import PLANNER_POLICY
+from crate.smart_mix.policy import PLANNER_POLICY, PLANNER_POLICY_V3
 
 API_CONTRACT_VERSION = "2026-08"
 PROFILE_SCHEMA_VERSION = 1
@@ -23,12 +23,16 @@ READABLE_ANALYZER_VERSIONS = (
 READABLE_PROFILE_VERSIONS = tuple(range(PROFILE_SCHEMA_VERSION, 0, -1))
 PYTHON_ANALYZER = "crate-python"
 MEASUREMENT_VERSION = "bs1770-v1"
+# The default planner: plans requested without a version, capabilities and the
+# VirtualDJ contract.
 PLANNER_IDENTIFIER = PLANNER_POLICY.identifier
 PLANNER_POLICY_VERSION = PLANNER_POLICY.version
+# Every planner the plan API serves (SM3-D3), default first.
+PLANNER_IDENTIFIERS = (PLANNER_IDENTIFIER, PLANNER_POLICY_V3.identifier)
 # Planners whose plans read phrases and the energy curve (SM3-D3). Profile reads for
 # any other planner leave the structure columns out, so v2 planning reads what it did
 # before the structure was persisted.
-STRUCTURE_PLANNER_IDENTIFIERS = frozenset({"smart-mix-v3"})
+STRUCTURE_PLANNER_IDENTIFIERS = frozenset({PLANNER_POLICY_V3.identifier})
 
 
 def planner_reads_structure(planner_identifier: str) -> bool:
@@ -41,6 +45,7 @@ __all__ = [
     "BEAT_GRID_FORMAT",
     "MEASUREMENT_VERSION",
     "PLANNER_IDENTIFIER",
+    "PLANNER_IDENTIFIERS",
     "PLANNER_POLICY_VERSION",
     "PROFILE_SCHEMA_VERSION",
     "PYTHON_ANALYZER",

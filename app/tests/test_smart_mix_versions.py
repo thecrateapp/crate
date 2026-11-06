@@ -10,7 +10,7 @@ from crate.api.schemas.smart_mix import (
     TransitionPlanResponse,
 )
 from crate.smart_mix import versions
-from crate.smart_mix.policy import PLANNER_POLICY
+from crate.smart_mix.policy import PLANNER_POLICY, PLANNER_POLICY_V3
 
 APP_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = APP_ROOT.parent
@@ -27,11 +27,21 @@ def _literal_values(model, field_name: str) -> tuple:
 
 
 def test_planner_wire_literals_match_the_planner_identity() -> None:
-    assert _literal_values(TransitionPlanBatchRequest, "planner_version") == (
+    assert versions.PLANNER_IDENTIFIERS == (
         versions.PLANNER_IDENTIFIER,
+        PLANNER_POLICY_V3.identifier,
     )
-    assert _literal_values(TransitionPlanBatchResponse, "planner_version") == (
-        versions.PLANNER_IDENTIFIER,
+    assert (
+        _literal_values(TransitionPlanBatchRequest, "planner_version")
+        == versions.PLANNER_IDENTIFIERS
+    )
+    assert (
+        TransitionPlanBatchRequest.model_fields["planner_version"].default
+        == versions.PLANNER_IDENTIFIER
+    )
+    assert (
+        _literal_values(TransitionPlanBatchResponse, "planner_version")
+        == versions.PLANNER_IDENTIFIERS
     )
     assert _literal_values(CompatibleTracksResponse, "planner_version") == (
         versions.PLANNER_IDENTIFIER,
@@ -130,6 +140,8 @@ def test_rust_beat_grid_format_matches_python() -> None:
         "PLANNER_IDENTIFIER",
         "PLANNER_POLICY_VERSION",
         "PLANNER_POLICY.rules_revision",
+        "PLANNER_POLICY_V3.identifier",
+        "PLANNER_POLICY_V3.rules_revision",
     ],
 )
 def test_operator_reference_versions_match_implemented_contract(identifier):
@@ -140,9 +152,14 @@ def test_operator_reference_versions_match_implemented_contract(identifier):
             cells = [cell.strip().strip("`") for cell in line.split("|")[1:-1]]
             if len(cells) >= 2:
                 rows[cells[0]] = cells[1]
+    policies = {
+        "PLANNER_POLICY": PLANNER_POLICY,
+        "PLANNER_POLICY_V3": PLANNER_POLICY_V3,
+    }
+    owner, _dot, attribute = identifier.partition(".")
     expected = (
-        PLANNER_POLICY.rules_revision
-        if identifier == "PLANNER_POLICY.rules_revision"
+        getattr(policies[owner], attribute)
+        if owner in policies
         else getattr(versions, identifier)
     )
     assert rows[identifier] == str(expected)
@@ -245,6 +262,9 @@ def test_only_phrase_planners_read_the_profile_structure() -> None:
     assert versions.planner_reads_structure(versions.PLANNER_IDENTIFIER) is False
     assert versions.planner_reads_structure("smart-mix-v2") is False
     assert versions.planner_reads_structure("smart-mix-v3") is True
+    assert versions.STRUCTURE_PLANNER_IDENTIFIERS == frozenset(
+        {PLANNER_POLICY_V3.identifier}
+    )
 
 
 def test_readers_accept_every_profile_schema_up_to_the_current_one() -> None:

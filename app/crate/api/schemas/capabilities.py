@@ -15,6 +15,19 @@ DecksFeature = Literal[
 class SmartMixCapabilities(BaseModel):
     available: bool
     planner_version: str | None
+    planner_versions: list[str] = Field(
+        description=(
+            "Planners POST /api/playback/transition-plans accepts as plannerVersion; "
+            "planner_version is the default. Empty while Smart Mix is off."
+        )
+    )
+    structure: bool = Field(
+        description=(
+            "Whether most of the library has analyzed phrases, so smart-mix-v3 "
+            "plans on them; read from the coverage snapshot, never computed per "
+            "request."
+        )
+    )
     android_native_crossfade: bool
     android_beatmatch: bool
     android_bass_handoff: bool

@@ -105,7 +105,8 @@ def test_evaluate_dataset_plans_every_edge_with_the_chosen_planner() -> None:
     assert records[2]["plan"]["fallbackReason"] == "missing_profile"
     assert records[0]["metrics"]["harmonicRelationship"] == "incompatible"
     assert records[0]["metrics"]["policyViolations"] == []
-    assert set(PLANNERS) == {"smart-mix-v2"}
+    assert set(PLANNERS) == {"smart-mix-v2", "smart-mix-v3"}
+    assert "structureUsed" not in records[0]
     json.dumps(records)
 
 
@@ -223,3 +224,74 @@ def test_load_profiles_reads_the_stored_structure(monkeypatch) -> None:
 
     assert run_eval.load_profiles([OUT, IN]) == {OUT: None, IN: None}
     assert reads == [{"include_beat_grid": True, "include_structure": True}]
+
+
+def _structured_pair() -> dict:
+    from tests.smart_mix_candidate_cases import (
+        INCOMING_LAYOUT,
+        OUTGOING_LAYOUT,
+        profile,
+    )
+
+    return {
+        OUT: profile(OUT, layout=OUTGOING_LAYOUT, outro_cue_ms=215_520),
+        IN: profile(IN, layout=INCOMING_LAYOUT),
+        OTHER: _profile(OTHER),
+    }
+
+
+def test_v3_plans_the_edge_set_as_the_api_does() -> None:
+    from crate.smart_mix.planner import plan_transition_v3
+
+    from run_eval import PLANNER_RULES
+
+    profiles = _structured_pair()
+    rows = [
+        _row("e0001", OUT, IN, "electronic/0-2"),
+        _row("e0002", IN, OTHER, "electronic/0-2"),
+    ]
+
+    records = evaluate_dataset(
+        rows, profiles, planner="smart-mix-v3", context=CONTEXTS["dj"]
+    )
+    v2 = evaluate_dataset(
+        rows, profiles, planner="smart-mix-v2", context=CONTEXTS["dj"]
+    )
+    summary = summarize(records)
+
+    expected = plan_transition_v3(
+        profiles[OUT],
+        profiles[IN],
+        CONTEXTS["dj"],
+        outgoing_track_entity_uid=OUT,
+        incoming_track_entity_uid=IN,
+    )
+    assert records[0]["plan"] == expected.plan.to_dict()
+    assert records[0]["structureUsed"] is True
+    assert records[0]["candidates"] == len(expected.candidates)
+    # Without phrases on both tracks v3 plans as v2.
+    assert records[1]["structureUsed"] is False
+    assert records[1]["plan"] == v2[1]["plan"]
+    assert summary["structureUsed"] == {"edges": 1, "rate": 0.5}
+    assert PLANNER_RULES["smart-mix-v3"] == 1
+    json.dumps(records)
+
+
+def test_reports_summarize_the_music_a_mix_leaves_out() -> None:
+    records = _records()
+
+    summary = summarize(records)
+    group = build_report(records, meta={"planner": "smart-mix-v2"})["overall"]
+    markdown = render_markdown(
+        build_report(records, meta={"planner": "smart-mix-v2", "dataset": {}})
+    )
+
+    unplayed = [
+        record["metrics"]["musicLeftOut"]["outgoingUnplayedMs"]
+        for record in records
+        if record["metrics"]["musicLeftOut"]
+    ]
+    assert summary["musicLeftOutMs"]["outgoingUnplayed"]["n"] == len(unplayed)
+    assert group["unplayedMsMean"] == pytest.approx(sum(unplayed) / len(unplayed))
+    assert "Outgoing music after the mix (ms)" in markdown
+    assert "Unplayed ms" in markdown

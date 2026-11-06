@@ -22,12 +22,14 @@ from crate.smart_mix.evaluation import (
     evaluate_transition,
     harmonic_clash_ms,
     incoming_start_ms,
+    music_left_out,
     phrase_alignment,
     policy_violations,
     staging_gains,
     vocal_clash_ms,
 )
 from crate.smart_mix.models import (
+    VOCAL_THRESHOLD,
     TrackMixProfile,
     TransitionContext,
     TransitionPlan,
@@ -305,6 +307,69 @@ def test_vocal_clash_counts_overlapping_vocal_phrases() -> None:
     # vocal phrase ends at 8 s.
     assert clash == pytest.approx(8_000 - 16_000 / 3, abs=20)
     assert vocal_clash_ms(_plan(), outgoing, instrumental_in) == 0
+
+
+def test_vocal_clash_reads_voice_with_the_sg1b_cut() -> None:
+    # Gate SG1b: a phrase has voice from byte VOCAL_THRESHOLD (90), the cut the
+    # server applies, not from half of the byte scale.
+    outgoing = _Structured(
+        _profile(OUTGOING_UID),
+        phrases=_phrases(0, 160_000, 168_000),
+        vocal_presence=bytes([0, VOCAL_THRESHOLD, 0]),
+    )
+    just_voiced_in = _Structured(
+        _profile(INCOMING_UID),
+        phrases=_phrases(0, 32_000),
+        vocal_presence=bytes([0, VOCAL_THRESHOLD]),
+    )
+    just_below_in = _Structured(
+        _profile(INCOMING_UID),
+        phrases=_phrases(0, 32_000),
+        vocal_presence=bytes([0, VOCAL_THRESHOLD - 1]),
+    )
+
+    assert vocal_clash_ms(_plan(), outgoing, just_voiced_in) == pytest.approx(
+        8_000 - 16_000 / 3, abs=20
+    )
+    assert vocal_clash_ms(_plan(), outgoing, just_below_in) == 0
+
+
+def test_music_left_out_counts_unplayed_outgoing_and_skipped_incoming() -> None:
+    outgoing = _profile(OUTGOING_UID, active_end_ms=290_000)
+    incoming = _profile(INCOMING_UID, active_start_ms=1_000)
+
+    left_out = music_left_out(
+        _plan(beat_phase_offset_ms=200, incoming_tempo_ratio=1.02),
+        outgoing,
+        incoming,
+    )
+    gapless = music_left_out(
+        _plan(
+            mode="gapless",
+            duration_ms=0,
+            outgoing_cue_ms=300_000,
+            incoming_cue_ms=0,
+        ),
+        outgoing,
+        _profile(INCOMING_UID),
+    )
+
+    assert left_out is not None and gapless is not None
+    # The mix ends at 176 s of a track whose music ends at 290 s; the incoming
+    # starts at 32 s plus the phase offset at its tempo, its music at 1 s.
+    assert left_out.outgoing_unplayed_ms == 290_000 - 176_000
+    assert left_out.incoming_skipped_ms == 32_000 + 204 - 1_000
+    assert left_out.to_dict() == {
+        "outgoingUnplayedMs": 114_000,
+        "incomingSkippedMs": 31_204,
+    }
+    assert (gapless.outgoing_unplayed_ms, gapless.incoming_skipped_ms) == (0, 0)
+    assert music_left_out(_plan(), None, incoming) is None
+    evaluation = evaluate_transition(_plan(), outgoing, incoming)
+    assert evaluation.to_dict()["musicLeftOut"] == {
+        "outgoingUnplayedMs": 114_000,
+        "incomingSkippedMs": 31_000,
+    }
 
 
 def test_policy_violations_detects_out_of_range_plan() -> None:

@@ -1,3 +1,4 @@
+import logging
 import os
 
 from fastapi import APIRouter, Request
@@ -18,13 +19,23 @@ from crate.config import (
     vdj_automation_enabled,
     vdj_enabled,
 )
+from crate.db.queries.smart_mix_admin import get_smart_mix_structure_percent
 from crate.smart_mix.versions import (
     API_CONTRACT_VERSION,
     PLANNER_IDENTIFIER,
+    PLANNER_IDENTIFIERS,
     PROFILE_SCHEMA_VERSION,
 )
 
+log = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api", tags=["system"])
+
+# smart_mix.structure: share of the library's tracks whose current profile has
+# phrases, from the coverage snapshot (refresh_smart_mix_coverage). After the v7
+# backfill about four in five tracks get phrases; the rest are crossfade genres,
+# 3/4 meters and tracks the analyzer could not segment.
+SMART_MIX_STRUCTURE_MIN_PERCENT = 50.0
 
 AUTOMATION_SCOPE = "vdj.automation.execute"
 
@@ -51,6 +62,8 @@ def get_capabilities(request: Request) -> CapabilitiesResponse:
         smart_mix=SmartMixCapabilities(
             available=available,
             planner_version=PLANNER_IDENTIFIER if available else None,
+            planner_versions=list(PLANNER_IDENTIFIERS) if available else [],
+            structure=available and _structure_available(),
             android_native_crossfade=native_crossfade,
             android_beatmatch=beatmatch,
             android_bass_handoff=bass_handoff,
@@ -76,6 +89,17 @@ def get_capabilities(request: Request) -> CapabilitiesResponse:
         ),
         access_token=_access_token_capabilities(request, vdj_automation),
     )
+
+
+def _structure_available() -> bool:
+    try:
+        percent = get_smart_mix_structure_percent()
+    except Exception:
+        # Capabilities bootstrap every client: an unreadable snapshot only hides
+        # the structure flag.
+        log.warning("Smart Mix coverage snapshot unreadable", exc_info=True)
+        return False
+    return percent is not None and percent >= SMART_MIX_STRUCTURE_MIN_PERCENT
 
 
 def _decks_features() -> list[DecksFeature]:
