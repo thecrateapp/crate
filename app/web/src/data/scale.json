@@ -1,12 +1,12 @@
 {
   "tracks": "48,213",
   "albums": "4,400",
-  "pytest": 7921,
-  "vitest": 6963,
+  "pytest": 7950,
+  "vitest": 6981,
   "goTests": 435,
   "rustTests": 318,
-  "taskTypes": 153,
-  "migrations": 145,
+  "taskTypes": 155,
+  "migrations": 146,
   "taskQueues": {
     "ai": [
       "ai_catalog_refresh",
@@ -16,6 +16,8 @@
       "propose_genre_taxonomy_node",
       "refine_music_path",
       "analyze_artist_hero_candidate",
+      "triage_error_issue",
+      "investigate_error_issue",
       "show_extract",
       "research_artist_bio",
       "draft_i18n_translation"
