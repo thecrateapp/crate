@@ -354,23 +354,32 @@ def _plan_transition_edges(
     policy = _planner_policy(planner_version)
     unique_edges = _deduplicate_edges(edges)
     entity_uids = _ordered_entity_uids(unique_edges)
+    # The cache key needs only the profile revisions; the structure (v3) is read
+    # below for the edges the cache misses.
     profiles = get_track_mix_profiles_by_entity_uids(
-        entity_uids, include_structure=planner_reads_structure(planner_version)
+        entity_uids, include_structure=False
     )
-    profiles_by_uid = dict(zip(entity_uids, profiles, strict=True))
-    edge_profiles = [
-        (
-            edge,
-            profiles_by_uid.get(str(edge.outgoing_track_entity_uid)),
-            profiles_by_uid.get(str(edge.incoming_track_entity_uid)),
-        )
-        for edge in unique_edges
-    ]
+    edge_profiles = _edge_profiles(unique_edges, entity_uids, profiles)
     cache_keys = [
         _plan_cache_key(edge, outgoing, incoming, policy)
         for edge, outgoing, incoming in edge_profiles
     ]
     cached = get_smart_mix_plan_caches(cache_keys)
+    missed = [
+        index for index, cache_key in enumerate(cache_keys) if cache_key not in cached
+    ]
+    if missed and planner_reads_structure(policy.identifier):
+        missed_edges = [unique_edges[index] for index in missed]
+        missed_uids = _ordered_entity_uids(missed_edges)
+        structured = _edge_profiles(
+            missed_edges,
+            missed_uids,
+            get_track_mix_profiles_by_entity_uids(missed_uids, include_structure=True),
+        )
+        for index, (edge, outgoing, incoming) in zip(missed, structured, strict=True):
+            edge_profiles[index] = (edge, outgoing, incoming)
+            # A profile republished between the two reads keys its new plan.
+            cache_keys[index] = _plan_cache_key(edge, outgoing, incoming, policy)
     computed: dict[str, dict] = {}
     plans = []
     for cache_key, (edge, outgoing, incoming) in zip(
@@ -385,6 +394,22 @@ def _plan_transition_edges(
         plans.append(TransitionPlanResponse.model_validate(serialized))
     set_smart_mix_plan_caches(computed)
     return plans
+
+
+def _edge_profiles(
+    edges: list[TransitionEdgeRequest],
+    entity_uids: list[str],
+    profiles: list[TrackMixProfile | None],
+) -> list[tuple[TransitionEdgeRequest, TrackMixProfile | None, TrackMixProfile | None]]:
+    by_uid = dict(zip(entity_uids, profiles, strict=True))
+    return [
+        (
+            edge,
+            by_uid.get(str(edge.outgoing_track_entity_uid)),
+            by_uid.get(str(edge.incoming_track_entity_uid)),
+        )
+        for edge in edges
+    ]
 
 
 def _deduplicate_edges(

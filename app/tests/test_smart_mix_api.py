@@ -472,7 +472,54 @@ def test_v3_returns_structure_used(test_app, monkeypatch) -> None:
     assert with_structure["plannerVersion"] == 2
     assert without_structure["structureUsed"] is False
     assert cached.json() == response.json()
-    assert reads[0] == {"include_structure": True}
+    assert reads[:2] == [{"include_structure": False}, {"include_structure": True}]
+
+
+def test_v3_reads_the_structure_only_for_cache_misses(test_app, monkeypatch) -> None:
+    from crate.api import smart_mix
+
+    uids = [str(uuid.uuid4()) for _ in range(3)]
+    reads: list[tuple[list[str], bool]] = []
+
+    def fake_profiles(entity_uids, **kwargs):
+        structure = kwargs.get("include_structure", False)
+        reads.append((list(entity_uids), structure))
+        return [
+            _structured_profile(uid) if structure else _profile(uid)
+            for uid in entity_uids
+        ]
+
+    monkeypatch.setattr(
+        smart_mix, "get_track_mix_profiles_by_entity_uids", fake_profiles
+    )
+    cached = _memory_cache(monkeypatch, smart_mix)
+    first = _edge(uids[0], uids[1])
+    second = _edge(uids[1], uids[2])
+
+    warm = test_app.post(
+        "/api/playback/transition-plans",
+        json={"plannerVersion": "smart-mix-v3", "edges": [first]},
+    )
+    reads.clear()
+    batch = test_app.post(
+        "/api/playback/transition-plans",
+        json={"plannerVersion": "smart-mix-v3", "edges": [first, second]},
+    )
+    reads_with_a_miss = list(reads)
+    reads.clear()
+    hot = test_app.post(
+        "/api/playback/transition-plans",
+        json={"plannerVersion": "smart-mix-v3", "edges": [first, second]},
+    )
+
+    assert warm.status_code == batch.status_code == hot.status_code == 200
+    # Revisions for the cache keys first; the structure only for the missed edge.
+    assert reads_with_a_miss == [(uids, False), ([uids[1], uids[2]], True)]
+    assert reads == [(uids, False)]
+    assert batch.json()["plans"][0] == warm.json()["plans"][0]
+    assert all(plan["structureUsed"] for plan in batch.json()["plans"])
+    assert hot.json() == batch.json()
+    assert len(cached) == 2
 
 
 def test_v3_cache_key_differs_from_v2(test_app, monkeypatch) -> None:
