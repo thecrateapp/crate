@@ -117,6 +117,21 @@ class EnergyStep:
 
 
 @dataclass(frozen=True, slots=True)
+class MusicLeftOut:
+    """Music a plan does not play: after the mix on the outgoing track, before the
+    mix on the incoming one. Informative: cutting an outro or an intro is mixing."""
+
+    outgoing_unplayed_ms: int
+    incoming_skipped_ms: int
+
+    def to_dict(self) -> dict[str, int]:
+        return {
+            "outgoingUnplayedMs": self.outgoing_unplayed_ms,
+            "incomingSkippedMs": self.incoming_skipped_ms,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class TransitionEvaluation:
     mode: str
     duration_ms: int
@@ -130,6 +145,7 @@ class TransitionEvaluation:
     harmonic_clash_ms: int | None
     energy_step: EnergyStep | None
     vocal_clash_ms: int | None
+    music_left_out: MusicLeftOut | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -147,6 +163,9 @@ class TransitionEvaluation:
             "harmonicClashMs": self.harmonic_clash_ms,
             "energyStep": self.energy_step.to_dict() if self.energy_step else None,
             "vocalClashMs": self.vocal_clash_ms,
+            "musicLeftOut": (
+                self.music_left_out.to_dict() if self.music_left_out else None
+            ),
         }
 
 
@@ -178,6 +197,7 @@ def evaluate_transition(
         harmonic_clash_ms=harmonic_clash_ms(plan, outgoing, incoming),
         energy_step=energy_step(plan, outgoing, incoming),
         vocal_clash_ms=vocal_clash_ms(plan, outgoing, incoming),
+        music_left_out=music_left_out(plan, outgoing, incoming),
     )
 
 
@@ -345,6 +365,26 @@ def vocal_clash_ms(
         incoming,
         _both_full_level,
         position_filter=both_vocals,
+    )
+
+
+def music_left_out(
+    plan: TransitionPlan,
+    outgoing: TrackMixProfile | None,
+    incoming: TrackMixProfile | None,
+) -> MusicLeftOut | None:
+    """Milliseconds of music the plan leaves out on each track.
+
+    Outgoing: from the end of the mix to the end of the music (``activeEndMs``).
+    Incoming: from the start of the music (``activeStartMs``) to where the deck
+    starts (``incoming_start_ms``). ``None`` without both profiles.
+    """
+    if outgoing is None or incoming is None:
+        return None
+    unplayed = _playable_end_ms(outgoing) - (plan.outgoing_cue_ms + plan.duration_ms)
+    skipped = incoming_start_ms(plan) - (incoming.active_start_ms or 0)
+    return MusicLeftOut(
+        outgoing_unplayed_ms=max(0, unplayed), incoming_skipped_ms=max(0, skipped)
     )
 
 
@@ -948,6 +988,7 @@ __all__ = [
     "DJ_BLEND_EXIT",
     "EnergyStep",
     "GRID_PHRASE_BARS",
+    "MusicLeftOut",
     "OVERLAP_FLOOR_DB",
     "OVERLAP_FLOOR_GAIN",
     "POLICY_VIOLATION_CODES",
@@ -964,6 +1005,7 @@ __all__ = [
     "harmonic_clash_ms",
     "incoming_start_ms",
     "incoming_tempo",
+    "music_left_out",
     "phrase_alignment",
     "policy_violations",
     "staging_gains",
