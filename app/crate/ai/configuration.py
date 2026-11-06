@@ -1121,6 +1121,26 @@ def _context(version, connection, *, action_id=None, binding=None):
         m for m in connection["model_catalog"] if m["model_id"] == version["model_id"]
     )
     capabilities = ModelCapabilities.model_validate(model)
+    wire = {}
+    if connection["provider"] == "openai_compatible":
+        # The manifest, not the model name, decides the request body; a manifest
+        # change therefore makes an accepted context stale.
+        entry = next(
+            (
+                e
+                for e in connection["model_manifest"]
+                if e["model_id"] == version["model_id"]
+            ),
+            None,
+        )
+        if entry is None:
+            _fail("AI_MODEL_UNVALIDATED", "Model is absent from the manifest")
+        wire = {
+            "template": connection["template"],
+            "path_prefix": connection["path_prefix"],
+            "structured_output": entry["structured_output"],
+            "reasoning_control": entry["reasoning"],
+        }
     reservation_bounds = None
     if isinstance(config, LegacyProfileConfig):
         reservation_bounds = {
@@ -1148,6 +1168,7 @@ def _context(version, connection, *, action_id=None, binding=None):
         "credential_source": source,
         "credential_ref": connection.get("secret_ref"),
         "credential_version": _hash(key),
+        **wire,
     }
 
 
