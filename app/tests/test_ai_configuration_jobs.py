@@ -325,3 +325,72 @@ def test_persisted_retry_actor_cannot_borrow_original_ai_permissions(
         assert result == {"status": "failed", "error_code": "AI_TASK_PROVENANCE"}
     assert calls == []
     assert usage.list_invocations({})["items"] == []
+
+
+def test_refresh_reads_the_openai_compatible_manifest(pg_db, monkeypatch):
+    from cryptography.fernet import Fernet
+
+    from crate.ai import configuration as service, discovery, operations
+    from crate.ai.capabilities import manifest_capabilities
+    from crate.db.repositories import ai_configuration as store
+    from crate.worker_handlers import ai_configuration as worker
+
+    monkeypatch.setenv("CRATE_CREDENTIAL_KEY", Fernet.generate_key().decode())
+    entry = {
+        "model_id": "kimi-k3.1-pro",
+        "context_window": 262144,
+        "max_output_tokens": 32768,
+        "structured_output": "json_object",
+    }
+    conn = service.create_connection(
+        {
+            "label": "Kimi",
+            "provider": "openai_compatible",
+            "template": "moonshot",
+            "model_manifest": [entry],
+        },
+        None,
+    )
+    conn = service.set_credential(conn["id"], "moonshot-key", conn["revision"], None)
+    monkeypatch.setattr(worker, "get_user_by_id", lambda uid: {"role": "admin"})
+    monkeypatch.setattr(
+        worker,
+        "get_task",
+        lambda task_id: {"type": "ai_catalog_refresh", "actor_user_id": 1},
+    )
+    queued = []
+    monkeypatch.setattr(
+        operations,
+        "create_task_dedup",
+        lambda kind, params, **kw: queued.append(params) or "job",
+    )
+    operations.queue_refresh(conn["id"], conn["revision"], 1)
+    calls = []
+
+    def discover(provider, **kwargs):
+        calls.append((provider, kwargs))
+        return [manifest_capabilities(entry, listed=True).model_dump(mode="json")]
+
+    monkeypatch.setattr(discovery, "discover_models", discover)
+    assert worker.handle_refresh("job", queued[0], {}) == {
+        "status": "succeeded",
+        "model_count": 1,
+    }
+    assert calls == [
+        (
+            "openai_compatible",
+            {
+                "api_key": "moonshot-key",
+                "endpoint": "https://api.moonshot.ai",
+                "template": "moonshot",
+                "path_prefix": "/v1",
+                "manifest": service._connection(conn["id"])["model_manifest"],
+            },
+        )
+    ]
+    row = store.get_connection(conn["id"])
+    assert [m["model_id"] for m in row["model_catalog"]] == ["kimi-k3.1-pro"]
+    assert row["model_catalog"][0]["validated"] is True
+    assert (
+        operations.activity({"provider": "openai_compatible"}, 50, None)["items"] == []
+    )

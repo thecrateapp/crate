@@ -5,6 +5,11 @@ addresses are allowed, but metadata/link-local addresses are not. DNS is resolve
 once per request; the socket connects to the checked IP while Host and TLS SNI
 retain the configured hostname. Proxies, redirects and transport retries are off.
 A killed/reaped subprocess bounds DNS, connect, headers, body and parsing together.
+
+An openai_compatible connection uses its template's fixed origin and path prefix,
+or a confirmed custom origin that is pinned like Ollama's and must resolve only to
+private addresses when it uses plain HTTP. Its catalog is the admin's manifest:
+/models only confirms which declared IDs the provider still lists.
 """
 
 from __future__ import annotations
@@ -22,7 +27,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
-from crate.ai.capabilities import model_capabilities
+from crate.ai.capabilities import manifest_capabilities, model_capabilities
 from crate.ai.contracts import (
     OPENAI_COMPATIBLE_PATH_PREFIXES,
     OPENAI_COMPATIBLE_TEMPLATES,
@@ -34,6 +39,8 @@ MAX_ENTRY_BYTES = 64 * 1024
 MAX_MODELS = 500
 MAX_PAGES = 10
 MAX_OLLAMA_SHOW = 100
+# /models of an OpenAI-compatible router lists every routed model; only IDs are read.
+MAX_LISTED_MODELS = 5000
 REQUEST_SECONDS = 5.0
 DISCOVERY_SECONDS = 30.0
 _BASES = {
@@ -130,12 +137,13 @@ def validate_endpoint(provider: str, endpoint: str | None) -> str | None:
         raise _error("AI_ENDPOINT_INVALID", "Invalid or disallowed endpoint") from None
 
 
-def pin_origin(origin: str) -> tuple[str, str, str]:
+def pin_origin(origin: str, *, private_only: bool = False) -> tuple[str, str, str]:
     """Resolve an admin-chosen origin once and connect to a checked address.
 
-    Every DNS answer must pass `_check_address`; the request then goes to the
-    first one, so a later lookup cannot move it. Returns the address-based base
-    URL, the Host header and the TLS server name, both kept as configured.
+    Every DNS answer must pass `_check_address` (and be private when
+    `private_only`); the request then goes to the first one, so a later lookup
+    cannot move it. Returns the address-based base URL, the Host header and the
+    TLS server name, both kept as configured.
     """
     parsed = urlsplit(origin)
     hostname = parsed.hostname or ""
@@ -146,6 +154,8 @@ def pin_origin(origin: str) -> tuple[str, str, str]:
     )
     if not addresses:
         raise _error("AI_ENDPOINT_INVALID", "Endpoint has no permitted address")
+    if private_only and not all(_is_private(address) for address in addresses):
+        raise _error("AI_ENDPOINT_INVALID", "A public origin requires HTTPS")
     address = addresses[0]
     host = f"[{address}]" if ":" in address else address
     base = urlunsplit((parsed.scheme, f"{host}:{port}", "", "", ""))
@@ -197,6 +207,32 @@ def validate_openai_compatible(
     return origin, path_prefix
 
 
+def request_target(
+    provider: str,
+    endpoint: str | None,
+    path: str,
+    *,
+    template: str | None = None,
+    path_prefix: str | None = None,
+) -> tuple[str, str, bool, bool]:
+    """Validate a destination: (origin, path, pin it, private addresses only).
+
+    Only openai_compatible has a template and a path prefix; every other
+    provider rejects them, so its requests keep their fixed native paths.
+    """
+    if provider != "openai_compatible":
+        if template is not None or path_prefix is not None:
+            raise _error(
+                "AI_ENDPOINT_INVALID", "Only OpenAI-compatible origins have a prefix"
+            )
+        endpoint = validate_endpoint(provider, endpoint)
+        base = endpoint or _BASES[provider]
+        return base, path, provider == "ollama", False
+    origin, prefix = validate_openai_compatible(template, endpoint, path_prefix)
+    custom = OPENAI_COMPATIBLE_TEMPLATES[template or ""].origin is None
+    return origin, prefix + path, custom, custom and origin.startswith("http://")
+
+
 def _http_json(
     provider: str,
     endpoint: str | None,
@@ -205,18 +241,23 @@ def _http_json(
     api_key: str | None,
     params: dict | None = None,
     body: dict | None = None,
+    template: str | None = None,
+    path_prefix: str | None = None,
 ) -> dict:
     """One request inside the deadline subprocess (also exercised with fake HTTP)."""
-    endpoint = validate_endpoint(provider, endpoint)
-    base = endpoint or _BASES[provider]
+    base, path, pinned, private_only = request_target(
+        provider, endpoint, path, template=template, path_prefix=path_prefix
+    )
     headers = {"Accept": "application/json"}
     if provider == "gemini":
         headers["x-goog-api-key"] = api_key or ""
     elif provider == "deepseek" or api_key:
         headers["Authorization"] = f"Bearer {api_key or ''}"
     extensions: dict[str, Any] = {}
-    if provider == "ollama":
-        base, headers["Host"], extensions["sni_hostname"] = pin_origin(base)
+    if pinned:
+        base, headers["Host"], extensions["sni_hostname"] = pin_origin(
+            base, private_only=private_only
+        )
     try:
         with httpx.Client(
             timeout=REQUEST_SECONDS, follow_redirects=False, trust_env=False
@@ -265,6 +306,8 @@ def _request_json(
     deadline: float,
     params: dict | None = None,
     body: dict | None = None,
+    template: str | None = None,
+    path_prefix: str | None = None,
 ) -> dict:
     started = time.monotonic()
     request_deadline = min(deadline, started + REQUEST_SECONDS)
@@ -278,6 +321,8 @@ def _request_json(
             "api_key": api_key,
             "params": params,
             "body": body,
+            "template": template,
+            "path_prefix": path_prefix,
         }
     ).encode()
     if len(packet) > 16384:
@@ -364,21 +409,56 @@ def _entries(payload: dict, field: str) -> list[dict]:
     return bounded
 
 
+def _listed_ids(payload: dict) -> set[str]:
+    entries = payload.get("data")
+    if not isinstance(entries, list) or len(entries) > MAX_LISTED_MODELS:
+        raise _error("AI_CATALOG_INVALID", "Provider catalog is malformed")
+    if any(
+        not isinstance(entry, dict) or not isinstance(entry.get("id"), str)
+        for entry in entries
+    ):
+        raise _error("AI_CATALOG_INVALID", "Provider model identifier is malformed")
+    return {entry["id"] for entry in entries}
+
+
 def discover_models(
-    provider: str, *, api_key: str | None, endpoint: str | None = None
+    provider: str,
+    *,
+    api_key: str | None,
+    endpoint: str | None = None,
+    template: str | None = None,
+    path_prefix: str | None = None,
+    manifest: list[dict] | None = None,
 ) -> list[dict]:
     """Discover normalized capability JSON; never execute inference or use env keys."""
     from crate.ai.guard import require_ai_task
 
     require_ai_task("discover_models")
-    endpoint = validate_endpoint(provider, endpoint)
+    if provider == "openai_compatible":
+        endpoint, path_prefix = validate_openai_compatible(
+            template, endpoint, path_prefix
+        )
+        if not manifest:
+            raise _error("AI_CATALOG_INVALID", "Declare the provider's models")
+    elif template is not None or path_prefix is not None or manifest is not None:
+        raise _error(
+            "AI_ENDPOINT_INVALID", "Only OpenAI-compatible origins have a manifest"
+        )
+    else:
+        endpoint = validate_endpoint(provider, endpoint)
     if api_key is not None and (
         not isinstance(api_key, str)
         or not 1 <= len(api_key) <= 4096
         or any(ord(char) < 33 or ord(char) > 126 for char in api_key)
     ):
         raise _error("AI_CREDENTIAL_INVALID", "Invalid provider credential")
-    if provider in _BASES and not api_key:
+    if not api_key and (
+        provider in _BASES
+        or (
+            provider == "openai_compatible"
+            and OPENAI_COMPATIBLE_TEMPLATES[template or ""].requires_key
+        )
+    ):
         raise _error("AI_CREDENTIAL_REQUIRED", "Provider credential is required")
     deadline = time.monotonic() + DISCOVERY_SECONDS
     result: dict[str, dict] = {}
@@ -391,6 +471,17 @@ def discover_models(
             provider, endpoint, path, api_key=api_key, deadline=deadline, **kwargs
         )
 
+    if provider == "openai_compatible":
+        assert manifest is not None
+        listed = _listed_ids(
+            request("/models", template=template, path_prefix=path_prefix)
+        )
+        return [
+            manifest_capabilities(entry, listed=entry["model_id"] in listed).model_dump(
+                mode="json"
+            )
+            for entry in manifest
+        ]
     if provider == "gemini":
         token = None
         for _page in range(MAX_PAGES):

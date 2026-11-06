@@ -424,7 +424,12 @@ def list_invocations(filters, limit=50, cursor=None, *, session=None) -> dict:
             clauses.append(f"{key}=:{key}")
             params[key] = filters[key]
     if filters.get("provider") is not None:
-        if filters["provider"] not in {"gemini", "deepseek", "ollama"}:
+        if filters["provider"] not in {
+            "gemini",
+            "deepseek",
+            "ollama",
+            "openai_compatible",
+        }:
             _error("AI_USAGE_INVALID", "Unknown provider")
         clauses.append(
             "connection_id IN (SELECT id FROM ai_provider_connections WHERE provider=:provider)"
