@@ -362,3 +362,34 @@ def test_secret_stored_encrypted(pg_db, monkeypatch, caplog):
     custom = create(**CUSTOM, confirm_custom_origin=True)
     assert configuration._has_credential(store.get_connection(custom["id"])) is True
     assert configuration._has_credential(store.get_connection(create()["id"])) is False
+
+
+def test_moving_a_custom_origin_drops_its_key(pg_db, monkeypatch):
+    # ai.config.manage can move an origin; only ai.credentials.manage may decide
+    # which server receives a stored key, so a new destination starts keyless.
+    monkeypatch.setenv("CRATE_CREDENTIAL_KEY", Fernet.generate_key().decode())
+    row = create(**CUSTOM, confirm_custom_origin=True)
+    row = configuration.set_credential(row["id"], "local-key", row["revision"], None)
+    old_ref = store.get_connection(row["id"], private=True)["secret_ref"]
+
+    kept = patch(row, path_prefix="/api/v1", label="Same server")
+    assert kept["has_key"] is True
+    assert load_secret(old_ref, scope="ai") == {"api_key": "local-key"}
+
+    moved = patch(
+        kept, endpoint="https://other.example.test", confirm_custom_origin=True
+    )
+    assert (moved["has_key"], moved["source"]) == (False, "none")
+    private = store.get_connection(row["id"], private=True)
+    assert private["secret_ref"] is None and private["secret_source"] == "none"
+    with pytest.raises(Exception):
+        load_secret(old_ref, scope="ai")
+    # An unconfirmed move changes nothing, key included.
+    again = configuration.set_credential(
+        row["id"], "other-key", moved["revision"], None
+    )
+    assert (
+        code(patch, again, endpoint="https://third.example.test")
+        == "AI_ORIGIN_UNCONFIRMED"
+    )
+    assert store.get_connection(row["id"])["has_secret"] is True

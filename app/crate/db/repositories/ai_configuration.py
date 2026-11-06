@@ -595,6 +595,34 @@ def swap_connection_credential(
             return result
 
 
+def move_connection_origin(id, data, expected_revision, actor_id, *, session=None):
+    """Update a connection's destination and revoke its stored key atomically.
+
+    A key is bound to the server it was entered for: a new origin starts keyless,
+    so changing where requests go can never send an existing key elsewhere.
+    """
+    from crate.credentials import revoke_secret
+
+    with optional_scope(session) as s:
+        with s.begin_nested():
+            previous = s.execute(
+                text(
+                    "SELECT secret_ref FROM ai_provider_connections WHERE id=:id FOR UPDATE"
+                ),
+                {"id": id},
+            ).scalar_one_or_none()
+            result = update_connection(
+                id,
+                {**data, "secret_ref": None, "secret_source": "none"},
+                expected_revision,
+                actor_id,
+                session=s,
+            )
+            if previous:
+                revoke_secret(previous, session=s)
+            return result
+
+
 def ensure_environment_connection(
     provider, endpoint, *, expected_revision=None, session=None
 ):

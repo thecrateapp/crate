@@ -448,17 +448,24 @@ def patch_connection(id, data, expected_revision, actor_id):
         _fail("AI_CONFIGURATION_INVALID", "No connection changes supplied")
     if row["provider"] == "openai_compatible":
         template = row["template"]
+        moved = False
         if "endpoint" in values or "path_prefix" in values:
             endpoint, prefix = validate_openai_compatible(
                 template,
                 values.get("endpoint", row["endpoint"]),
                 values.get("path_prefix", row["path_prefix"]),
             )
-            if endpoint != row["endpoint"]:
+            moved = endpoint != row["endpoint"]
+            if moved:
                 _require_confirmed_origin(template, confirmed)
             values |= {"endpoint": endpoint, "path_prefix": prefix}
         if "model_manifest" in values:
             values["model_manifest"] = _manifest(template, values["model_manifest"])
+        if moved:
+            # Only ai.credentials.manage decides which server receives a key.
+            return _public_connection(
+                store.move_connection_origin(id, values, expected_revision, actor_id)
+            )
     elif "endpoint" in values:
         values["endpoint"] = validate_endpoint(row["provider"], values["endpoint"])
     return _public_connection(

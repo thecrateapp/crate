@@ -146,7 +146,9 @@ it has no environment connection and its key is always stored encrypted.
 - A predefined template fixes its origin and prefix; the API and a database CHECK
   reject any other. A custom origin follows the Ollama rules, needs HTTPS unless
   every resolved address is private, and needs the admin's confirmation each time
-  it is set or moved. The AWS IPv6 metadata address is blocked as well.
+  it is set or moved. Moving it revokes the stored key, so changing a destination
+  (`ai.config.manage`) never sends a key entered by `ai.credentials.manage` to a
+  new server. The AWS IPv6 metadata address is blocked as well.
 - Requests are `GET <prefix>/models` (catalog refresh) and
   `POST <prefix>/chat/completions` (inference) only, with the same 2 MB response
   cap, killable child process and no redirects, retries or fallback.
