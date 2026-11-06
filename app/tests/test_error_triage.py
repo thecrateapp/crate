@@ -430,6 +430,41 @@ def test_triage_input_caps_and_ranks_candidates(pg_db):
     assert data["done_kinds"] == [] and data["current_triage"] is None
 
 
+def test_candidates_of_a_digest_without_a_row_match_the_triage_input(pg_db):
+    from crate.db.queries.error_issues import (
+        duplicate_candidates,
+        get_triage_input,
+    )
+
+    target = _issue(100, _event(), crate_score=200)
+    for external_id in range(101, 113):
+        _issue(external_id, _event(value=f"'{external_id}'"), crate_score=external_id)
+    _issue(114, _event(functions=("other",)), crate_score=999)
+    _issue(115, _event(exception="TimeoutError"), crate_score=999)
+    data = get_triage_input(target)
+    assert data is not None
+    digest = build_digest(_event())
+    key = {"group_key": group_key(digest), "exception_type": "KeyError"}
+
+    as_row, elsewhere, unmatched = duplicate_candidates(
+        [
+            {"external_id": "100", **key},
+            {"external_id": None, **key},
+            {"external_id": None, "group_key": "none", "exception_type": None},
+        ]
+    )
+
+    # The same candidates, order and shape as the triage input of the row.
+    assert as_row == data["candidates"]
+    assert {"crate_score", "same_group", "exception", "top_frame"} <= set(as_row[0])
+    assert "CRATE-API-100" not in {c["short_id"] for c in as_row}
+    # A digest that is not this row also gets the row itself as a candidate.
+    assert [c["short_id"] for c in elsewhere][:2] == ["CRATE-API-100", "CRATE-API-112"]
+    assert len(elsewhere) == 10
+    assert unmatched == []
+    assert duplicate_candidates([]) == []
+
+
 def test_missing_issue_or_digest_makes_no_call(pg_db, monkeypatch):
     _configure(monkeypatch)
     calls = _model(monkeypatch, _output())

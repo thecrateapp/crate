@@ -27,6 +27,7 @@ MAX_CONTEXT_LINE = 200
 MAX_BREADCRUMBS = 10
 MAX_BREADCRUMB_MESSAGE = 160
 MAX_NAME = 300
+MAX_SERVICE_LENGTH = 100
 TAG_ALLOWLIST = (
     "service",
     "environment",
@@ -282,6 +283,15 @@ def digest_hash(digest: Mapping[str, Any]) -> str:
     return hashlib.sha256(encoded.encode()).hexdigest()
 
 
+def service_tag(digest: Mapping[str, Any]) -> str | None:
+    """The `service` tag of the digest's event: the inbox's service when present."""
+    tags = digest.get("tags")
+    value = tags.get("service") if isinstance(tags, Mapping) else None
+    if not isinstance(value, str):
+        return None
+    return value.strip()[:MAX_SERVICE_LENGTH] or None
+
+
 def group_key(digest: Mapping[str, Any]) -> str:
     """Exception type plus the innermost app frame: candidates for duplicates."""
     exceptions = digest.get("exceptions") or []
@@ -302,4 +312,5 @@ __all__ = [
     "digest_hash",
     "group_key",
     "sanitize_text",
+    "service_tag",
 ]

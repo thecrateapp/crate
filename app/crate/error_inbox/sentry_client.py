@@ -19,7 +19,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 import httpx
 
@@ -66,6 +66,7 @@ _STATUS_MAP = {
 }
 _PRIORITIES = frozenset({"high", "medium", "low"})
 _ISSUE_ID = re.compile(r"^\d{1,20}$")
+_SHORT_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,62}-[A-Za-z0-9]+$")
 _TAG_KEY = re.compile(r"^[a-z][a-z0-9_.]{0,31}$")
 MAX_TAG_VALUES = 10
 MAX_TAG_VALUE_LENGTH = 200
@@ -470,6 +471,31 @@ class SentryClient:
         except (ValueError, AttributeError):
             raise SentryUnavailableError(
                 "SENTRY_INVALID_RESPONSE", "Unexpected issue"
+            ) from None
+
+    def resolve_short_id(self, short_id: str) -> dict[str, Any]:
+        """The issue a short id names (Resolve a Short ID), normalized like a listed one.
+
+        `GET /organizations/{org}/shortids/{short_id}/` answers with the issue as
+        `group`. A merged issue's short id resolves to the issue it was merged
+        into, so the caller compares `short_id`. Unknown or deleted: 404.
+        """
+        if (
+            not isinstance(short_id, str)
+            or len(short_id) > 64
+            or not _SHORT_ID.match(short_id)
+        ):
+            raise ValueError("Invalid Sentry short id")
+        path = self._organization_path(f"shortids/{quote(short_id, safe='')}/")
+        data, _ = self._request("GET", path)
+        group = data.get("group") if isinstance(data, Mapping) else None
+        try:
+            if not isinstance(group, Mapping):
+                raise ValueError("No issue in the answer")
+            return normalize_issue(group)
+        except (ValueError, AttributeError, TypeError):
+            raise SentryUnavailableError(
+                "SENTRY_INVALID_RESPONSE", "Unexpected short id answer"
             ) from None
 
     def latest_event(self, issue_id: str) -> dict[str, Any]:

@@ -266,6 +266,61 @@ def test_get_issue_and_latest_event_paths():
     assert event["eventID"] == "e" * 32
 
 
+def test_resolve_short_id_reads_the_org_scoped_endpoint():
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "organizationSlug": "ninja-development",
+                "projectSlug": "crate-api",
+                "groupId": "42",
+                "shortId": "CRATE-API-42",
+                "group": _issue(42),
+            },
+        )
+
+    issue = _client(handler).resolve_short_id("CRATE-API-42")
+
+    [request] = seen
+    # The regional host serves organization endpoints; only the API root is not.
+    assert str(request.url) == (
+        "https://us.sentry.io/api/0/organizations/ninja-development/shortids/"
+        "CRATE-API-42/"
+    )
+    assert request.headers["Authorization"] == f"Bearer {TOKEN}"
+    assert (issue["external_id"], issue["short_id"]) == ("42", "CRATE-API-42")
+    assert issue["first_release"] == "crate-8ba478ac"
+
+
+@pytest.mark.parametrize(
+    "short_id", ["", "-API-1", "../issues/1", "CRATE API-1", "X" * 65 + "-1"]
+)
+def test_resolve_short_id_rejects_odd_ids_before_sending(short_id):
+    client = _client(lambda request: pytest.fail("sent"))
+
+    with pytest.raises(ValueError):
+        client.resolve_short_id(short_id)
+
+
+@pytest.mark.parametrize(
+    "status,body,error",
+    [
+        (404, {"detail": "not found"}, SentryNotFoundError),
+        (200, {"groupId": "42"}, SentryUnavailableError),
+        (200, {"group": {"id": "42"}}, SentryUnavailableError),
+        (200, ["CRATE-API-42"], SentryUnavailableError),
+    ],
+)
+def test_resolve_short_id_errors_are_typed(status, body, error):
+    client = _client(lambda request: httpx.Response(status, json=body))
+
+    with pytest.raises(error):
+        client.resolve_short_id("CRATE-API-42")
+
+
 def test_tag_values_reads_the_documented_endpoint_on_the_configured_host():
     seen: list[httpx.Request] = []
 
