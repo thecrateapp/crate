@@ -44,12 +44,17 @@ from crate.smart_mix.models import (  # noqa: E402
     TransitionContext,
     TransitionPlan,
 )
-from crate.smart_mix.planner import plan_transition  # noqa: E402
-from crate.smart_mix.policy import PLANNER_POLICY  # noqa: E402
+from crate.smart_mix.planner import (  # noqa: E402
+    PlannedTransition,
+    plan_transition,
+    plan_transition_v3,
+)
+from crate.smart_mix.policy import PLANNER_POLICY, PLANNER_POLICY_V3  # noqa: E402
 
+# A planner returns a plan, or a v3 PlannedTransition (its plan plus the menu).
 Planner = Callable[
     [TrackMixProfile | None, TrackMixProfile | None, TransitionContext, str, str],
-    TransitionPlan,
+    TransitionPlan | PlannedTransition,
 ]
 
 
@@ -71,8 +76,33 @@ def _plan_smart_mix_v2(
     )
 
 
-PLANNERS: dict[str, Planner] = {"smart-mix-v2": _plan_smart_mix_v2}
-PLANNER_RULES = {"smart-mix-v2": PLANNER_POLICY.rules_revision}
+def _plan_smart_mix_v3(
+    outgoing: TrackMixProfile | None,
+    incoming: TrackMixProfile | None,
+    context: TransitionContext,
+    outgoing_uid: str,
+    incoming_uid: str,
+) -> PlannedTransition:
+    # The API's v3 path: candidates on the stored phrases, v2's bar heuristic
+    # without them. It reads no beat grid, as the API does not load it.
+    return plan_transition_v3(
+        outgoing,
+        incoming,
+        context,
+        outgoing_track_entity_uid=outgoing_uid,
+        incoming_track_entity_uid=incoming_uid,
+        policy=PLANNER_POLICY_V3,
+    )
+
+
+PLANNERS: dict[str, Planner] = {
+    "smart-mix-v2": _plan_smart_mix_v2,
+    "smart-mix-v3": _plan_smart_mix_v3,
+}
+PLANNER_RULES = {
+    "smart-mix-v2": PLANNER_POLICY.rules_revision,
+    "smart-mix-v3": PLANNER_POLICY_V3.rules_revision,
+}
 
 CONTEXTS = {
     # What a DJ client allows: beatmatch with tempo adjustment, the longest
@@ -112,6 +142,8 @@ GROUP_FIELDS = (
     ("harmonicClashMsMean", "Key clash ms"),
     ("energyStepMean", "Energy step"),
     ("durationMsMean", "Duration ms"),
+    ("unplayedMsMean", "Unplayed ms"),
+    ("skippedMsMean", "Skipped ms"),
 )
 _RATE_FIELDS = {
     "beatmatchRate",
@@ -148,8 +180,17 @@ def evaluate_dataset(
         incoming_uid = str(row["incomingTrackEntityUid"])
         outgoing = profiles.get(outgoing_uid)
         incoming = profiles.get(incoming_uid)
-        plan = plan_edge(outgoing, incoming, context, outgoing_uid, incoming_uid)
+        planned = plan_edge(outgoing, incoming, context, outgoing_uid, incoming_uid)
+        plan = planned.plan if isinstance(planned, PlannedTransition) else planned
         evaluation = evaluate_transition(plan, outgoing, incoming, context=context)
+        menu = (
+            {
+                "structureUsed": planned.structure_used,
+                "candidates": len(planned.candidates),
+            }
+            if isinstance(planned, PlannedTransition)
+            else {}
+        )
         records.append(
             {
                 "edgeId": row["edgeId"],
@@ -169,6 +210,7 @@ def evaluate_dataset(
                     for profile in (outgoing, incoming)
                 ],
                 "plan": plan.to_dict(),
+                **menu,
                 "metrics": evaluation.to_dict(),
             }
         )
@@ -197,6 +239,10 @@ def summarize(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         item["vocalClashMs"] for item in metrics if item["vocalClashMs"] is not None
     ]
     violating = [item for item in metrics if item["policyViolations"]]
+    left_out = [item["musicLeftOut"] for item in metrics if item.get("musicLeftOut")]
+    structured = [
+        record["structureUsed"] for record in records if "structureUsed" in record
+    ]
     return {
         "edges": len(records),
         "modes": _counts(item["mode"] for item in metrics),
@@ -260,6 +306,18 @@ def summarize(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             **_stats(vocals),
             "unavailable": len(metrics) - len(vocals),
         },
+        "musicLeftOutMs": {
+            "outgoingUnplayed": _stats(item["outgoingUnplayedMs"] for item in left_out),
+            "incomingSkipped": _stats(item["incomingSkippedMs"] for item in left_out),
+        },
+        "structureUsed": (
+            {
+                "edges": sum(1 for used in structured if used),
+                "rate": _rate(sum(1 for used in structured if used), len(structured)),
+            }
+            if structured
+            else None
+        ),
     }
 
 
@@ -274,6 +332,7 @@ def summarize_group(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         if item["harmonicClashMs"] is not None
     ]
     energies = [item["energyStep"]["value"] for item in metrics if item["energyStep"]]
+    left_out = [item["musicLeftOut"] for item in metrics if item.get("musicLeftOut")]
     return {
         "n": len(metrics),
         "beatmatchRate": _rate(
@@ -294,6 +353,8 @@ def summarize_group(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "harmonicClashMsMean": _mean(clashes),
         "energyStepMean": _mean(energies),
         "durationMsMean": _mean(item["durationMs"] for item in metrics),
+        "unplayedMsMean": _mean(item["outgoingUnplayedMs"] for item in left_out),
+        "skippedMsMean": _mean(item["incomingSkippedMs"] for item in left_out),
     }
 
 
@@ -373,6 +434,12 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         f" curves: {_format_counts(summary['curves'])};"
         f" bass handoffs: {summary['bassHandoffs']}",
     ]
+    if summary.get("structureUsed"):
+        structure = summary["structureUsed"]
+        lines.append(
+            f"- Planned on stored phrases: {structure['edges']} of {summary['edges']}"
+            f" edges ({_percent(structure['rate'])}); the rest used v2's bar heuristic"
+        )
     if meta.get("createdAt") or meta.get("gitCommit"):
         lines.append(
             f"- Run {meta.get('createdAt', '?')} at commit"
@@ -604,6 +671,18 @@ def _overall_table(summary: Mapping[str, Any]) -> list[str]:
             f" {vocal['unavailable']} edges | | |"
         )
     rows.append(_stats_row("Transition duration (ms)", summary["durationMs"]))
+    left_out = summary.get("musicLeftOutMs")
+    if left_out:
+        rows.append(
+            _stats_row(
+                "Outgoing music after the mix (ms)", left_out["outgoingUnplayed"]
+            )
+        )
+        rows.append(
+            _stats_row(
+                "Incoming music before the mix (ms)", left_out["incomingSkipped"]
+            )
+        )
     return rows
 
 

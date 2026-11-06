@@ -15,6 +15,7 @@ Store results by `entity_uid`, edge id or index, never by title or artist. The o
 | Path                                           | What it is                                                                 |
 | ---------------------------------------------- | -------------------------------------------------------------------------- |
 | `build_dataset.py`                             | Builds the edge set (`dataset.jsonl`) from the compatible-tracks service   |
+| `build_pool_dataset.py`                        | Builds an edge set inside a fixed pool of tracks (the spike tracks)        |
 | `run_eval.py`                                  | Plans the edge set with a planner and writes `report.json` and `report.md` |
 | `app/crate/smart_mix/evaluation.py`            | The metrics: pure functions over a plan and two profiles                   |
 | `app/crate/db/queries/smart_mix_evaluation.py` | Read-only session guard and seed sampling used by the tools                |
@@ -141,11 +142,22 @@ development library on 2026-11-04 (all profiles `smart-mix-audio-v5`), its
 context. Later phases plan this same file: rebuilding the set after a reanalysis would give
 different edges, because the compatible-tracks ranking reads the profiles.
 
+## Pool edge sets
+
+The SM0 set has no phrases (v5 profiles), so it cannot tell `smart-mix-v3` from v2: without
+phrases on both tracks v3 plans as v2. `build_pool_dataset.py --uids <file>` pairs a pool of
+tracks with itself: each seed keeps its best partner in each tempo band, ranked by the
+planner's pure `score_compatibility`, and by default both tracks need phrases. Use it for the
+tracks with audio and analyzer v7 profiles (the spike tracks), whose edges can also be rendered
+for listening. Rows keep the `dataset.jsonl` format with the root genre `pool`.
+
 ## Planners and contexts
 
-`--planner` picks an entry of `PLANNERS` in `run_eval.py`; today only `smart-mix-v2`. A new
-planner registers a function `(outgoing, incoming, context, outgoing_uid, incoming_uid) ->
-TransitionPlan`. `--context` picks the transition context:
+`--planner` picks an entry of `PLANNERS` in `run_eval.py`: `smart-mix-v2` or `smart-mix-v3`
+(SM2). A new planner registers a function `(outgoing, incoming, context, outgoing_uid,
+incoming_uid) -> TransitionPlan`, or a `PlannedTransition` like v3's; each v3 edge in
+`report.json` also says whether it was planned on the stored phrases (`structureUsed`) and how
+many candidates its menu had. `--context` picks the transition context:
 
 - `dj` (default): playlist, automatic, 12 s preferred, beatmatch with tempo adjustment, long
   beatmatch and bass handoff allowed. What Crate Decks asks for, and what exercises all of v2.
@@ -175,6 +187,7 @@ overlap. The timeline is sampled every 10 ms.
 | `harmonic_clash_ms` | ms with both decks at full level when Camelot calls the keys incompatible; 0 for same, relative and adjacent keys                                                                                                     | Same; `None` when a key is unknown                                                                                |
 | `energy_step`       | Absolute energy change (0–1 profile scale) between the phrase each track plays at the handoff; `signed` is incoming minus outgoing                                                                                    | Outgoing outro energy against incoming intro energy; `basis: "intro_outro"`                                       |
 | `vocal_clash_ms`    | ms with both decks at full level while both play phrases with voice: a presence byte of at least 90, the cut of gate SG1b (`VOCAL_THRESHOLD`)                                                                         | `None` (needs phrases and the optional vocal detector on both profiles)                                           |
+| `music_left_out`    | Informative: ms of outgoing music after the mix (to `activeEndMs`) and of incoming music before it starts (from `activeStartMs`). Cutting an outro or an intro is part of mixing, so it has no target                 | Same                                                                                                              |
 
 Policy details worth knowing:
 
