@@ -1103,7 +1103,8 @@ def test_model_that_runs_no_target_feature_is_rejected_without_writes(
     gemini_environment(monkeypatch)
     activate_legacy()
     text_only = ollama_text()
-    tiny = ollama_text(context=6000)
+    # Below 4096 input tokens after the smallest output allowance (1024).
+    tiny = ollama_text(context=5000)
     before = write_counts()
 
     with pytest.raises(AIConfigurationError) as image_only:

@@ -10,6 +10,7 @@ from typing import Any, Sequence
 
 from sqlalchemy import text
 
+from crate.db.repositories.smart_mix_refinements import refinement_latency_p50_ms
 from crate.db.ops_runtime import get_ops_runtime_state, set_ops_runtime_state
 from crate.db.tx import optional_scope, read_scope
 from crate.smart_mix.versions import (
@@ -474,6 +475,8 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
             for version in version_rows
         ],
     }
+    # Capabilities announce it as smart_mix.ai_assisted.typical_latency_ms (SM3-D9).
+    snapshot["refinement_latency_p50_ms"] = refinement_latency_p50_ms()
     set_ops_runtime_state(COVERAGE_STATE_KEY, snapshot)
     return snapshot
 

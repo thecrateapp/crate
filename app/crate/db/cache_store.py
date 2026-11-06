@@ -25,6 +25,21 @@ from crate.db.tx import read_scope, transaction_scope
 SMART_MIX_PLAN_CACHE_PREFIX = "smart-mix:transition-plan:v1:"
 SMART_MIX_PLAN_CACHE_TTL_SECONDS = 6 * 60 * 60
 _SMART_MIX_PLAN_L1_TTL_SECONDS = 5 * 60
+# Smart Mix refinements (SM3-D5): read in the same mget as the plans. Finished
+# entries (ready, rejected, failed) live a day in Redis, with the table behind
+# them; markers (pending, unavailable) are short and never kept in memory, so a
+# finished refinement shows on the next poll.
+SMART_MIX_REFINED_PLAN_CACHE_PREFIX = "smart-mix:refined-plan:v1:"
+SMART_MIX_REFINED_PLAN_CACHE_TTL_SECONDS = 24 * 60 * 60
+SMART_MIX_REFINEMENT_PENDING_TTL_SECONDS = 150
+SMART_MIX_REFINEMENT_FINISHED = frozenset({"ready", "rejected", "failed"})
+SMART_MIX_REFINEMENT_GATE_KEY = "smart-mix:refinement-gate:v1"
+SMART_MIX_REFINEMENT_GATE_TTL_SECONDS = 30
+_SMART_MIX_REFINEMENT_GATE_L1_TTL_SECONDS = 10
+_SMART_MIX_REFINEMENT_BUDGET_PREFIX = "cache:smart-mix:refinement-budget:v1:"
+_SMART_MIX_REFINEMENT_READS_KEY = "cache:smart-mix:refined-plan:reads"
+_SMART_MIX_REFINEMENT_READS_TTL_SECONDS = 3 * 24 * 60 * 60
+_SMART_MIX_REFINEMENT_QUOTA_PREFIX = "crate:smart-mix-refinement:user:"
 
 
 def get_cache(key: str, max_age_seconds: int | None = None) -> Any | None:
@@ -292,6 +307,251 @@ def set_smart_mix_plan_caches(plans: Mapping[str, dict[str, Any]]) -> None:
         pass
 
 
+def _finished_refinement(value: Any) -> bool:
+    return (
+        isinstance(value, dict) and value.get("status") in SMART_MIX_REFINEMENT_FINISHED
+    )
+
+
+def get_smart_mix_plan_and_refinement_caches(
+    plan_keys: Sequence[str], refinement_keys: Sequence[str]
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    """Plans and refinements of a batch in one Redis round trip, never PostgreSQL."""
+    plans: dict[str, dict[str, Any]] = {}
+    refinements: dict[str, dict[str, Any]] = {}
+    missing_plans: list[str] = []
+    for plan_key in plan_keys:
+        value = _mem_get(
+            f"{SMART_MIX_PLAN_CACHE_PREFIX}{plan_key}",
+            max_age_seconds=SMART_MIX_PLAN_CACHE_TTL_SECONDS,
+        )
+        if isinstance(value, dict):
+            plans[plan_key] = value
+        else:
+            missing_plans.append(plan_key)
+    missing_refinements: list[str] = []
+    for refinement_key in dict.fromkeys(refinement_keys):
+        value = _mem_get(f"{SMART_MIX_REFINED_PLAN_CACHE_PREFIX}{refinement_key}")
+        if isinstance(value, dict) and _finished_refinement(value):
+            refinements[refinement_key] = value
+        else:
+            missing_refinements.append(refinement_key)
+    redis_client = get_redis()
+    if not redis_client or not (missing_plans or missing_refinements):
+        return plans, refinements
+    try:
+        raw_values = redis_client.mget(
+            [f"cache:{SMART_MIX_PLAN_CACHE_PREFIX}{key}" for key in missing_plans]
+            + [
+                f"cache:{SMART_MIX_REFINED_PLAN_CACHE_PREFIX}{key}"
+                for key in missing_refinements
+            ]
+        )
+        for plan_key, raw in zip(missing_plans, raw_values, strict=False):
+            value = json.loads(raw) if raw is not None else None
+            if isinstance(value, dict):
+                plans[plan_key] = value
+                _mem_set(
+                    f"{SMART_MIX_PLAN_CACHE_PREFIX}{plan_key}",
+                    value,
+                    _SMART_MIX_PLAN_L1_TTL_SECONDS,
+                )
+        for refinement_key, raw in zip(
+            missing_refinements, raw_values[len(missing_plans) :], strict=True
+        ):
+            value = json.loads(raw) if raw is not None else None
+            if not isinstance(value, dict):
+                continue
+            refinements[refinement_key] = value
+            if _finished_refinement(value):
+                _mem_set(
+                    f"{SMART_MIX_REFINED_PLAN_CACHE_PREFIX}{refinement_key}",
+                    value,
+                    _SMART_MIX_PLAN_L1_TTL_SECONDS,
+                )
+    except Exception:
+        pass
+    return plans, refinements
+
+
+def set_smart_mix_refined_plan_caches(
+    entries: Mapping[str, dict[str, Any]],
+    *,
+    ttl_seconds: int = SMART_MIX_REFINED_PLAN_CACHE_TTL_SECONDS,
+) -> None:
+    for refinement_key, value in entries.items():
+        if _finished_refinement(value):
+            _mem_set(
+                f"{SMART_MIX_REFINED_PLAN_CACHE_PREFIX}{refinement_key}",
+                value,
+                _SMART_MIX_PLAN_L1_TTL_SECONDS,
+            )
+    redis_client = get_redis()
+    if not redis_client or not entries:
+        return
+    try:
+        pipeline = redis_client.pipeline(transaction=False)
+        for refinement_key, value in entries.items():
+            pipeline.setex(
+                f"cache:{SMART_MIX_REFINED_PLAN_CACHE_PREFIX}{refinement_key}",
+                ttl_seconds,
+                json.dumps(value, default=str),
+            )
+        pipeline.execute()
+    except Exception:
+        pass
+
+
+def delete_smart_mix_refined_plan_caches(refinement_keys: Sequence[str]) -> None:
+    for refinement_key in refinement_keys:
+        _mem_delete(f"{SMART_MIX_REFINED_PLAN_CACHE_PREFIX}{refinement_key}")
+    redis_client = get_redis()
+    if not redis_client or not refinement_keys:
+        return
+    try:
+        redis_client.delete(
+            *(
+                f"cache:{SMART_MIX_REFINED_PLAN_CACHE_PREFIX}{key}"
+                for key in refinement_keys
+            )
+        )
+    except Exception:
+        pass
+
+
+def get_smart_mix_refinement_gate() -> dict[str, Any] | None:
+    """The cached server switches of AI refinement (never PostgreSQL)."""
+    value = _mem_get(
+        SMART_MIX_REFINEMENT_GATE_KEY,
+        max_age_seconds=_SMART_MIX_REFINEMENT_GATE_L1_TTL_SECONDS,
+    )
+    if isinstance(value, dict):
+        return value
+    redis_client = get_redis()
+    if not redis_client:
+        return None
+    try:
+        raw = redis_client.get(f"cache:{SMART_MIX_REFINEMENT_GATE_KEY}")
+        value = json.loads(raw) if raw is not None else None
+    except Exception:
+        return None
+    if not isinstance(value, dict):
+        return None
+    _mem_set(
+        SMART_MIX_REFINEMENT_GATE_KEY, value, _SMART_MIX_REFINEMENT_GATE_L1_TTL_SECONDS
+    )
+    return value
+
+
+def set_smart_mix_refinement_gate(gate: Mapping[str, Any]) -> None:
+    _mem_set(
+        SMART_MIX_REFINEMENT_GATE_KEY,
+        dict(gate),
+        _SMART_MIX_REFINEMENT_GATE_L1_TTL_SECONDS,
+    )
+    redis_client = get_redis()
+    if not redis_client:
+        return
+    try:
+        redis_client.setex(
+            f"cache:{SMART_MIX_REFINEMENT_GATE_KEY}",
+            SMART_MIX_REFINEMENT_GATE_TTL_SECONDS,
+            json.dumps(dict(gate), default=str),
+        )
+    except Exception:
+        pass
+
+
+def delete_smart_mix_refinement_gate() -> None:
+    _mem_delete(SMART_MIX_REFINEMENT_GATE_KEY)
+    redis_client = get_redis()
+    if not redis_client:
+        return
+    try:
+        redis_client.delete(f"cache:{SMART_MIX_REFINEMENT_GATE_KEY}")
+    except Exception:
+        pass
+
+
+def set_smart_mix_refinement_budget_marker(fingerprint: str, ttl_seconds: int) -> None:
+    """A provider refused the daily budget of this configuration until it resets."""
+    redis_client = get_redis()
+    if not redis_client:
+        return
+    try:
+        redis_client.setex(
+            f"{_SMART_MIX_REFINEMENT_BUDGET_PREFIX}{fingerprint}",
+            max(1, int(ttl_seconds)),
+            "1",
+        )
+    except Exception:
+        pass
+
+
+def smart_mix_refinement_budget_exhausted(fingerprint: str) -> bool:
+    redis_client = get_redis()
+    if not redis_client:
+        return False
+    try:
+        return (
+            redis_client.get(f"{_SMART_MIX_REFINEMENT_BUDGET_PREFIX}{fingerprint}")
+            is not None
+        )
+    except Exception:
+        return False
+
+
+def record_smart_mix_refinement_reads(refinement_keys: Sequence[str]) -> None:
+    """Remember served refinements; the daily cleanup touches them in one batch."""
+    redis_client = get_redis()
+    if not redis_client or not refinement_keys:
+        return
+    try:
+        pipeline = redis_client.pipeline(transaction=False)
+        pipeline.sadd(_SMART_MIX_REFINEMENT_READS_KEY, *refinement_keys)
+        pipeline.expire(
+            _SMART_MIX_REFINEMENT_READS_KEY, _SMART_MIX_REFINEMENT_READS_TTL_SECONDS
+        )
+        pipeline.execute()
+    except Exception:
+        pass
+
+
+def pop_smart_mix_refinement_reads(count: int) -> list[str]:
+    redis_client = get_redis()
+    if not redis_client:
+        return []
+    try:
+        popped = redis_client.spop(_SMART_MIX_REFINEMENT_READS_KEY, count) or []
+    except Exception:
+        return []
+    return [item.decode() if isinstance(item, bytes) else str(item) for item in popped]
+
+
+def consume_smart_mix_refinement_quota(
+    user_id: int, count: int, *, limit: int, window_seconds: int
+) -> int:
+    """How many of ``count`` refinements a user may queue in the current window.
+
+    Without Redis the quota cannot be counted and every request passes; the
+    connection's daily call and token budgets still bound the spend.
+    """
+    if count <= 0:
+        return 0
+    redis_client = get_redis()
+    if not redis_client:
+        return count
+    key = f"{_SMART_MIX_REFINEMENT_QUOTA_PREFIX}{user_id}"
+    try:
+        pipeline = redis_client.pipeline(transaction=False)
+        pipeline.incrby(key, count)
+        pipeline.expire(key, window_seconds, nx=True)
+        total = int(pipeline.execute()[0] or 0)
+    except Exception:
+        return count
+    return max(0, min(count, limit - (total - count)))
+
+
 def delete_cache(key: str) -> None:
     _mem_delete(key)
 
@@ -386,7 +646,18 @@ __all__ = [
     "get_cache",
     "get_caches",
     "get_cache_stats",
+    "consume_smart_mix_refinement_quota",
+    "delete_smart_mix_refined_plan_caches",
+    "delete_smart_mix_refinement_gate",
+    "get_smart_mix_plan_and_refinement_caches",
     "get_smart_mix_plan_caches",
+    "get_smart_mix_refinement_gate",
+    "pop_smart_mix_refinement_reads",
+    "record_smart_mix_refinement_reads",
+    "set_smart_mix_refined_plan_caches",
+    "set_smart_mix_refinement_budget_marker",
+    "set_smart_mix_refinement_gate",
+    "smart_mix_refinement_budget_exhausted",
     "get_volatile_cache",
     "set_cache",
     "set_smart_mix_plan_caches",

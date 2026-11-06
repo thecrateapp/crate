@@ -72,3 +72,25 @@ def test_capabilities_openapi_lists_planners_and_structure(test_app, spec: str) 
     assert smart_mix["properties"]["planner_versions"]["type"] == "array"
     assert smart_mix["properties"]["structure"]["type"] == "boolean"
     assert {"planner_versions", "structure"} <= set(smart_mix["required"])
+
+
+@pytest.mark.parametrize("spec", ["/openapi.json", "/openapi-crate.json"])
+def test_smart_mix_openapi_offers_ai_refinement(test_app, spec: str) -> None:
+    components = test_app.get(spec).json()["components"]["schemas"]
+
+    context = components["TransitionContextRequest"]["properties"]
+    assert context["aiRefinement"]["default"] is False
+    assert "aiRefinement" not in components["TransitionContextRequest"].get(
+        "required", []
+    )
+    plan = components["TransitionPlanResponse"]["properties"]
+    assert "refinement" in plan
+    refinement = components["TransitionRefinementResponse"]["properties"]
+    assert refinement["status"]["enum"] == ["ready", "pending", "unavailable"]
+    reason_codes = refinement["reasonCode"]["anyOf"][0]["enum"]
+    assert {"disabled", "no_model", "budget", "scope_missing", "rate_limited"} <= set(
+        reason_codes
+    )
+    # The refined plan has the plan fields, without a nested refinement.
+    refined = components["RefinedTransitionPlanResponse"]["properties"]
+    assert "durationMs" in refined and "refinement" not in refined

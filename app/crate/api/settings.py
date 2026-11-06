@@ -21,8 +21,14 @@ from crate.api.schemas.settings import (
     ScheduleIntervalsRequest,
     SettingsResponse,
     SettingsUpdateResponse,
+    SmartMixSettingsUpdateRequest,
     SoulseekSettingsUpdateRequest,
     WorkerSettingsRequest,
+)
+from crate.smart_mix_ai import (
+    ENABLED_SETTING,
+    SEND_GENRE_SETTING,
+    invalidate_refinement_gate,
 )
 from crate.db.audit import get_db_table_stats
 from crate.db.cache_settings import get_setting, set_setting
@@ -107,6 +113,7 @@ def get_settings(request: Request):
             == "true",
             "llm_refinement_cache_ttl_hours": 168,
         },
+        "smart_mix": _get_smart_mix_settings(),
         "shows": _get_shows_settings(),
         "soulseek": {
             "url": get_setting(
@@ -120,6 +127,13 @@ def get_settings(request: Request):
             "shares_music": get_setting("slskd_shares_music", "true") == "true",
         },
         "about": _get_about_info(),
+    }
+
+
+def _get_smart_mix_settings() -> dict:
+    return {
+        "ai_enabled": get_setting(ENABLED_SETTING, "false") == "true",
+        "ai_send_genre": get_setting(SEND_GENRE_SETTING, "true") == "true",
     }
 
 
@@ -345,6 +359,23 @@ def update_paths_settings(request: Request, body: PathsSettingsUpdateRequest):
             "paths_llm_refinement_enabled",
             "true" if body.llm_refinement_enabled else "false",
         )
+    return {"ok": True}
+
+
+@router.put(
+    "/smart-mix",
+    response_model=SettingsUpdateResponse,
+    responses=_SETTINGS_RESPONSES,
+    summary="Update Smart Mix AI settings",
+)
+def update_smart_mix_settings(request: Request, body: SmartMixSettingsUpdateRequest):
+    _require_settings_manager(request)
+    if body.ai_enabled is not None:
+        set_setting(ENABLED_SETTING, "true" if body.ai_enabled else "false")
+    if body.ai_send_genre is not None:
+        set_setting(SEND_GENRE_SETTING, "true" if body.ai_send_genre else "false")
+    # Clients see the change on their next request, not after the gate expires.
+    invalidate_refinement_gate()
     return {"ok": True}
 
 

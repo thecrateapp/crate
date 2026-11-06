@@ -22,6 +22,7 @@ export const FEATURE_AREAS = [
   "genres",
   "discovery",
   "translation",
+  "smart_mix",
   "ops",
 ] as const;
 
@@ -32,6 +33,7 @@ const FEATURE_AREA_LABELS: Record<string, string> = {
   genres: "Genres",
   discovery: "Discovery",
   translation: "Translations",
+  smart_mix: "Smart Mix",
   ops: "Operations",
 };
 
@@ -56,6 +58,8 @@ const FEATURE_SENDS: Record<string, string> = {
     "Sends: the scrubbed error summary and up to 10 similar issues",
   "ops.error.investigate":
     "Sends: the scrubbed error summary, its counts and releases, and similar issues",
+  "smart_mix.transition.refine":
+    "Sends: tempo, key, energy and phrase numbers of two tracks, their genres if allowed, and the candidate transitions",
 };
 
 export function featureSends(action: Action): string {

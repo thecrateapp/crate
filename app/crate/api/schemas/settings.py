@@ -52,6 +52,13 @@ class PathsSettingsUpdateRequest(BaseModel):
     llm_refinement_enabled: bool | None = None
 
 
+class SmartMixSettingsUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ai_enabled: bool | None = None
+    ai_send_genre: bool | None = None
+
+
 class SoulseekSettingsUpdateRequest(BaseModel):
     url: str | None = None
     quality: str | None = None
@@ -82,6 +89,13 @@ class ProcessingSettingsResponse(BaseModel):
 class PathsSettingsResponse(BaseModel):
     llm_refinement_enabled: bool
     llm_refinement_cache_ttl_hours: int
+
+
+class SmartMixSettingsResponse(BaseModel):
+    # AI Assisted Mixing (SM3-D10): off by default; the genre slug goes to the
+    # model only while ai_send_genre is on (SM3-D6).
+    ai_enabled: bool
+    ai_send_genre: bool
 
 
 class ShowsActiveCityResponse(BaseModel):
@@ -124,6 +138,7 @@ class SettingsResponse(BaseModel):
     library: LibrarySettingsResponse
     processing: ProcessingSettingsResponse
     paths: PathsSettingsResponse
+    smart_mix: SmartMixSettingsResponse
     shows: ShowsSettingsResponse
     soulseek: SoulseekSettingsResponse
     about: AboutInfoResponse

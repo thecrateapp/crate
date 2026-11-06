@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable, Mapping, TypeGuard
 
+from crate.db.repositories.smart_mix_refinements import invalidate_for_tracks
 from crate.audio_fingerprint import compute_audio_fingerprint_with_source
 from crate.db.cache_store import set_cache
 from crate.db.events import emit_task_event
@@ -1264,6 +1265,18 @@ def _handle_backfill_track_audio_fingerprints(
     }
 
 
+def _invalidate_refinements(track_entity_uid: str) -> None:
+    """Drop the AI refinements of the track's previous profile revision (SM4).
+
+    Their keys already miss with the new revision; this frees the rows. A
+    failure here must not fail the profile, which is stored.
+    """
+    try:
+        invalidate_for_tracks([track_entity_uid])
+    except Exception:
+        log.warning("Smart Mix refinement invalidation failed", exc_info=True)
+
+
 def _handle_compute_smart_mix_profile(task_id: str, params: dict, config: dict) -> dict:
     del config
     track = resolve_smart_mix_track(
@@ -1324,6 +1337,8 @@ def _handle_compute_smart_mix_profile(task_id: str, params: dict, config: dict) 
             "track_id": track_id,
         }
     stored = outcome is SmartMixPublication.PUBLISHED
+    if stored and track.get("entity_uid"):
+        _invalidate_refinements(str(track["entity_uid"]))
     _refresh_live_coverage()
     if stored:
         emit_task_event(

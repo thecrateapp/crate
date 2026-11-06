@@ -139,3 +139,13 @@ def create_schema(cur):
     )
 
     create_error_inbox_auto_triage_v146_schema(cur)
+    from crate.db.schema_sections.ai_action_smart_mix_refine_v151 import (
+        create_ai_action_smart_mix_refine_v151_schema,
+    )
+
+    create_ai_action_smart_mix_refine_v151_schema(cur)
+    from crate.db.schema_sections.smart_mix_refined_plans_v152 import (
+        create_smart_mix_refined_plans_v152_schema,
+    )
+
+    create_smart_mix_refined_plans_v152_schema(cur)

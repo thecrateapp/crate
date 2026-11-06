@@ -34,6 +34,7 @@ IDS = {
     "i18n.listen.draft",
     "ops.error.triage",
     "ops.error.investigate",
+    "smart_mix.transition.refine",
 }
 
 

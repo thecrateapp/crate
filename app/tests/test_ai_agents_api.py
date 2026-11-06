@@ -581,7 +581,8 @@ def test_effective_ollama_endpoint_refresh_and_activation_pinning(pg_db, monkeyp
             "label": "Bounded",
             "connection_id": conn["id"],
             "model_id": "model",
-            "config": {"timeout_seconds": 8},
+            # Within every action's maxima (Smart Mix refinement: 1024 output).
+            "config": {"timeout_seconds": 8, "max_output_tokens": 1024},
         },
         None,
     )
