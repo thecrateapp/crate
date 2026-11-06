@@ -23,7 +23,11 @@ from urllib.parse import urlsplit, urlunsplit
 import httpx
 
 from crate.ai.capabilities import model_capabilities
-from crate.ai.contracts import AIConfigurationError
+from crate.ai.contracts import (
+    OPENAI_COMPATIBLE_PATH_PREFIXES,
+    OPENAI_COMPATIBLE_TEMPLATES,
+    AIConfigurationError,
+)
 
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 MAX_ENTRY_BYTES = 64 * 1024
@@ -121,6 +125,51 @@ def validate_endpoint(provider: str, endpoint: str | None) -> str | None:
         return f"{parsed.scheme}://{host}" + (f":{port}" if port is not None else "")
     except (ValueError, UnicodeError):
         raise _error("AI_ENDPOINT_INVALID", "Invalid or disallowed endpoint") from None
+
+
+def _is_private(raw: str) -> bool:
+    address = ipaddress.ip_address(raw)
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped:
+        address = address.ipv4_mapped
+    return address.is_private or address.is_loopback
+
+
+def validate_openai_compatible(
+    template: str | None, endpoint: str | None, path_prefix: str | None
+) -> tuple[str, str]:
+    """Return the (origin, path prefix) an openai_compatible connection may use.
+
+    A predefined template fixes both; restating them is accepted, anything else
+    is not. A custom origin follows the Ollama address rules (no credentials,
+    query, fragment or path; metadata and link-local addresses blocked), uses
+    one of the predefined prefixes, and needs HTTPS unless its address is
+    private. A host name is resolved and checked again at request time.
+    """
+    spec = OPENAI_COMPATIBLE_TEMPLATES.get(template) if template else None
+    if spec is None:
+        raise _error("AI_ENDPOINT_INVALID", "Unknown origin template")
+    if spec.origin is not None and spec.path_prefix is not None:
+        if (
+            endpoint is not None
+            and (not isinstance(endpoint, str) or endpoint.rstrip("/") != spec.origin)
+        ) or (path_prefix is not None and path_prefix != spec.path_prefix):
+            raise _error("AI_ENDPOINT_INVALID", "This template's origin is fixed")
+        return spec.origin, spec.path_prefix
+    if path_prefix not in OPENAI_COMPATIBLE_PATH_PREFIXES:
+        raise _error("AI_ENDPOINT_INVALID", "Unsupported path prefix")
+    if endpoint is None:
+        raise _error("AI_ENDPOINT_INVALID", "A custom origin is required")
+    origin = validate_endpoint("ollama", endpoint)
+    assert origin is not None
+    if origin.startswith("http://"):
+        hostname = urlsplit(origin).hostname or ""
+        try:
+            private = _is_private(hostname)
+        except ValueError:
+            private = True  # A name: its resolved addresses are checked per request.
+        if not private:
+            raise _error("AI_ENDPOINT_INVALID", "A public origin requires HTTPS")
+    return origin, path_prefix
 
 
 def _http_json(
