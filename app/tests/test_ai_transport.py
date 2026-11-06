@@ -2,7 +2,7 @@
 
 import pytest
 
-from crate.ai import transport
+from crate.ai import discovery, transport
 from crate.ai.contracts import AIConfigurationError, ProfileConfig
 
 
@@ -170,7 +170,7 @@ def test_http_pins_dns_host_sni_and_keys_are_request_local(monkeypatch):
 
     monkeypatch.setattr(transport.httpx, "Client", client)
     monkeypatch.setattr(
-        transport.socket,
+        discovery.socket,
         "getaddrinfo",
         lambda *args, **kwargs: [(2, 1, 6, "", ("10.0.0.5", 11434))],
     )

@@ -10,19 +10,18 @@ from __future__ import annotations
 import base64
 import json
 import resource
-import socket
 import subprocess
 import sys
 import tempfile
 import time
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import quote, urlsplit, urlunsplit
+from urllib.parse import quote, urlsplit
 
 import httpx
 
 from crate.ai.contracts import AIConfigurationError, ProfileConfig
-from crate.ai.discovery import _check_address, validate_endpoint
+from crate.ai.discovery import pin_origin, validate_endpoint
 
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 MAX_REQUEST_BYTES = 32 * 1024 * 1024
@@ -60,20 +59,10 @@ def _http_json(provider, endpoint, path, *, api_key, body, timeout_seconds):
         headers["Authorization"] = f"Bearer {api_key}"
     extensions: dict[str, Any] = {}
     if provider == "ollama":
-        parsed = urlsplit(base)
-        hostname = parsed.hostname or ""
-        port = parsed.port or (443 if parsed.scheme == "https" else 80)
-        answers = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
-        addresses = list(
-            dict.fromkeys(_check_address(str(answer[4][0])) for answer in answers)
-        )
-        if not addresses:
-            raise _fail("AI_ENDPOINT_INVALID")
-        address = addresses[0]
-        host = f"[{address}]" if ":" in address else address
-        headers["Host"] = parsed.netloc
-        extensions["sni_hostname"] = hostname
-        base = urlunsplit((parsed.scheme, f"{host}:{port}", "", "", ""))
+        try:
+            base, headers["Host"], extensions["sni_hostname"] = pin_origin(base)
+        except AIConfigurationError as error:
+            raise _fail(error.code) from None
     try:
         with httpx.Client(
             timeout=timeout_seconds, follow_redirects=False, trust_env=False

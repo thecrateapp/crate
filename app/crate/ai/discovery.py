@@ -127,6 +127,28 @@ def validate_endpoint(provider: str, endpoint: str | None) -> str | None:
         raise _error("AI_ENDPOINT_INVALID", "Invalid or disallowed endpoint") from None
 
 
+def pin_origin(origin: str) -> tuple[str, str, str]:
+    """Resolve an admin-chosen origin once and connect to a checked address.
+
+    Every DNS answer must pass `_check_address`; the request then goes to the
+    first one, so a later lookup cannot move it. Returns the address-based base
+    URL, the Host header and the TLS server name, both kept as configured.
+    """
+    parsed = urlsplit(origin)
+    hostname = parsed.hostname or ""
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    answers = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
+    addresses = list(
+        dict.fromkeys(_check_address(str(answer[4][0])) for answer in answers)
+    )
+    if not addresses:
+        raise _error("AI_ENDPOINT_INVALID", "Endpoint has no permitted address")
+    address = addresses[0]
+    host = f"[{address}]" if ":" in address else address
+    base = urlunsplit((parsed.scheme, f"{host}:{port}", "", "", ""))
+    return base, parsed.netloc, hostname
+
+
 def _is_private(raw: str) -> bool:
     address = ipaddress.ip_address(raw)
     if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped:
@@ -191,20 +213,7 @@ def _http_json(
         headers["Authorization"] = f"Bearer {api_key or ''}"
     extensions: dict[str, Any] = {}
     if provider == "ollama":
-        parsed = urlsplit(base)
-        hostname = parsed.hostname or ""
-        port = parsed.port or (443 if parsed.scheme == "https" else 80)
-        answers = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
-        addresses = list(
-            dict.fromkeys(_check_address(str(answer[4][0])) for answer in answers)
-        )
-        if not addresses:
-            raise _error("AI_ENDPOINT_INVALID", "Endpoint has no permitted address")
-        address = addresses[0]
-        host = f"[{address}]" if ":" in address else address
-        headers["Host"] = parsed.netloc
-        extensions["sni_hostname"] = hostname
-        base = urlunsplit((parsed.scheme, f"{host}:{port}", "", "", ""))
+        base, headers["Host"], extensions["sni_hostname"] = pin_origin(base)
     try:
         with httpx.Client(
             timeout=REQUEST_SECONDS, follow_redirects=False, trust_env=False
