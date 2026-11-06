@@ -1334,21 +1334,25 @@ def _handle_backfill_smart_mix_profiles(
     task_id: str, params: dict, config: dict
 ) -> dict:
     del config
-    from crate.resource_governor import wait_while_pressured
+    from crate.resource_governor import record_decision, should_defer_task
 
     campaign = get_smart_mix_campaign()
     if not _smart_mix_campaign_running(campaign):
         return {"claimed": 0, "queued": 0, "control": _campaign_control(campaign)}
-    if not wait_while_pressured(
-        label="Smart Mix profile backfill",
-        task_type="backfill_smart_mix_profiles",
-        is_cancelled_fn=is_cancelled,
-        task_id=task_id,
-        params=params,
-        emit_event_fn=emit_task_event,
-        max_sleep_seconds=_WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS,
-    ):
-        return {"claimed": 0, "queued": 0, "paused": True}
+    # The actor asked the governor just before; if it has changed its mind
+    # since, wait in the queue like the actor would rather than in this process.
+    decision = should_defer_task("backfill_smart_mix_profiles", params)
+    if not decision.allowed:
+        record_decision(
+            decision, task_type="backfill_smart_mix_profiles", source="task_loop"
+        )
+        return run_again_later(
+            min(
+                max(1, decision.defer_seconds),
+                _WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS,
+            ),
+            progress=f"Deferred by resource governor: {decision.reason}",
+        )
 
     # Only the claims of this backfill count as in flight; imports and manual
     # reanalyses never take a backfill claim. The night window sets how many may

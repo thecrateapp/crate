@@ -292,32 +292,48 @@ def test_a_claim_takes_only_the_free_slots(pg_db, tmp_path: Path) -> None:
     assert {row["id"] for row in claimed} <= set(free)
 
 
-def test_backfill_handler_pauses_before_claiming_when_governor_denies(
+def _allow_by_governor(monkeypatch) -> list:
+    from crate.resource_governor import ResourceDecision
+
+    decisions: list = []
+    monkeypatch.setattr(
+        "crate.resource_governor.should_defer_task",
+        lambda task_type, params=None: ResourceDecision(allowed=True),
+    )
+    monkeypatch.setattr(
+        "crate.resource_governor.record_decision",
+        lambda decision, **kwargs: decisions.append((decision, kwargs)),
+    )
+    return decisions
+
+
+def test_governor_pressure_sends_the_coordinator_back_without_sleeping(
     monkeypatch,
 ) -> None:
-    from crate.worker_handlers import analysis
+    from crate.resource_governor import ResourceDecision
+    from crate.worker_handlers import RUN_AGAIN_AFTER_KEY
 
-    monkeypatch.setattr(
-        analysis, "get_smart_mix_campaign", lambda: {"status": "running"}
+    # The actor admitted the coordinator, but the governor denies by the time
+    # the handler checks: waiting in the handler would hold a heavy process.
+    analysis, calls = _handler_harness(
+        monkeypatch, campaigns=[_running_campaign()], in_flight=[0]
+    )
+    decisions = _allow_by_governor(monkeypatch)
+    denied = ResourceDecision(
+        allowed=False, reason="load 7.2 above 6.8", defer_seconds=600
     )
     monkeypatch.setattr(
-        "crate.resource_governor.wait_while_pressured",
-        lambda **_kwargs: False,
-    )
-    monkeypatch.setattr(
-        analysis,
-        "claim_smart_mix_backfill_batch",
-        lambda **_kwargs: (_ for _ in ()).throw(
-            AssertionError("must not claim while resource pressured")
-        ),
-        raising=False,
-    )
-
-    result = analysis._handle_backfill_smart_mix_profiles(
-        "task-1", {"batch_size": 20}, {}
+        "crate.resource_governor.should_defer_task",
+        lambda task_type, params=None: denied,
     )
 
-    assert result == {"claimed": 0, "queued": 0, "paused": True}
+    result = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+
+    assert result[RUN_AGAIN_AFTER_KEY] == 300
+    assert result["progress"] == "Deferred by resource governor: load 7.2 above 6.8"
+    assert calls["sleeps"] == []
+    assert calls["claims"] == []
+    assert [decision for decision, _kwargs in decisions] == [denied]
 
 
 def test_compute_profile_handler_resolves_track_inside_worker(monkeypatch) -> None:
@@ -1107,9 +1123,7 @@ def _handler_harness(monkeypatch, *, campaigns, in_flight, claimed=(), now=DAY):
 
     monkeypatch.setattr(analysis, "get_smart_mix_campaign", next_campaign)
     monkeypatch.setattr(analysis, "count_smart_mix_in_flight", next_in_flight)
-    monkeypatch.setattr(
-        "crate.resource_governor.wait_while_pressured", lambda **_kwargs: True
-    )
+    _allow_by_governor(monkeypatch)
     monkeypatch.setattr(
         analysis,
         "claim_smart_mix_backfill_batch",
@@ -1526,9 +1540,7 @@ def test_non_backfill_analysis_not_counted(pg_db, tmp_path: Path, monkeypatch) -
     save_smart_mix_campaign(_running_campaign(batch_size=25))
     claims: list[dict] = []
     monkeypatch.setattr(analysis, "_now", lambda: DAY)
-    monkeypatch.setattr(
-        "crate.resource_governor.wait_while_pressured", lambda **_kwargs: True
-    )
+    _allow_by_governor(monkeypatch)
     monkeypatch.setattr(
         analysis,
         "claim_smart_mix_backfill_batch",

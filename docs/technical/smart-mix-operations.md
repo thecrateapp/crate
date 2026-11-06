@@ -298,6 +298,9 @@ attempts, and the start and resume calls take it in the same body:
   a `smart_mix` processing row (a claim, a finished or failed analysis): 3 s right after one,
   then about double each time while nothing changes, up to 30 s. A freed slot is therefore
   refilled within 30 s at worst and within a few seconds while analyses finish often.
+- If the resource governor denies the coordinator after the actor admitted it, the coordinator
+  goes back to the queue the same way, for the governor's delay and at most five minutes, with
+  the progress `Deferred by resource governor: <reason>`. It never sleeps in a worker process.
 - A change of window, or of the settings, applies to the next claim and cancels nothing. At
   08:00 with eight analyses accepted, they finish and the coordinator claims again once fewer
   than four are left.
