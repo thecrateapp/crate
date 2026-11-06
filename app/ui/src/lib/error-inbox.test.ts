@@ -1,10 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { sampleIssue, sampleIssues } from "@/test/error-inbox-fixtures";
+import {
+  sampleDetail,
+  sampleIssue,
+  sampleIssues,
+  sampleTriage,
+} from "@/test/error-inbox-fixtures";
 
 import {
   DEFAULT_FILTERS,
+  aiProblemText,
   apiErrorCode,
+  currentAssessments,
+  investigateUrl,
+  previousAssessment,
+  triagePassText,
   clockText,
   filtersFromParams,
   fixProblemText,
@@ -156,5 +166,74 @@ describe("Launch fix", () => {
       /CRATE-API-1F/,
     );
     expect(fixProblemText(null)).toBe("Could not launch the fix. Try again.");
+  });
+});
+
+describe("AI assessments", () => {
+  const investigation = sampleTriage({
+    id: "investigation",
+    kind: "investigation",
+  });
+  const triage = sampleTriage({ id: "triage" });
+  const older = sampleTriage({ id: "older", digest_hash: "earlier-event" });
+
+  it("picks the current event's triage and investigation", () => {
+    const issue = sampleDetail({ triages: [investigation, older, triage] });
+
+    expect(currentAssessments(issue)).toEqual({ triage, investigation });
+    expect(previousAssessment(issue)).toBe(older);
+    expect(currentAssessments(sampleDetail({ triages: [older] }))).toEqual({
+      triage: null,
+      investigation: null,
+    });
+    expect(previousAssessment(sampleDetail({ triages: [triage] }))).toBeNull();
+  });
+
+  it("builds the investigate URL and words its refusals", () => {
+    expect(investigateUrl("a b")).toBe("/api/admin/errors/a%20b/investigate");
+    expect(aiProblemText("AI_ACTION_DISABLED", "investigation")).toBe(
+      "No usable model is bound to Investigate error issue. Bind one in AI models.",
+    );
+    expect(aiProblemText("AI_PROFILE_UNKNOWN", "triage")).toMatch(
+      /Triage error issue/,
+    );
+    expect(
+      aiProblemText("ERROR_ISSUE_ALREADY_INVESTIGATED", "investigation"),
+    ).toBe("The latest event of this issue has already been investigated.");
+    expect(aiProblemText("ERROR_ISSUE_NO_DIGEST", "investigation")).toMatch(
+      /next sync/,
+    );
+    expect(aiProblemText(null, "triage")).toBe(
+      "Could not queue the triage. Try again.",
+    );
+  });
+});
+
+describe("triagePassText", () => {
+  const pass = {
+    queued: 3,
+    queued_24h: 12,
+    daily_max: 30,
+    error_code: null,
+  };
+
+  it("words each automatic triage outcome", () => {
+    expect(triagePassText({ ...pass, status: "queued" })).toBe(
+      "The last sync queued 3 issues for triage. 12 of 30 in the last 24 hours.",
+    );
+    expect(triagePassText({ ...pass, status: "queued", queued: 1 })).toMatch(
+      /queued 1 issue for triage/,
+    );
+    expect(triagePassText({ ...pass, status: "cap_reached" })).toMatch(
+      /daily limit is used up/,
+    );
+    expect(triagePassText({ ...pass, status: "idle" })).toMatch(
+      /nothing new to triage/,
+    );
+    expect(triagePassText({ ...pass, status: "failed" })).toMatch(
+      /could not queue triage/,
+    );
+    expect(triagePassText({ ...pass, status: "off" })).toBeNull();
+    expect(triagePassText(null)).toBeNull();
   });
 });

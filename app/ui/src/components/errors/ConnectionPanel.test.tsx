@@ -24,6 +24,7 @@ import {
   NOT_CONFIGURED_CONNECTION,
   sampleConnection,
   sampleFixConnection,
+  sampleSync,
 } from "@/test/error-inbox-fixtures";
 
 import { ConnectionPanel, connectionTestOutcome } from "./ConnectionPanel";
@@ -44,6 +45,8 @@ const form = () =>
 const field = (name: string) => within(form()).getByLabelText(name);
 const fixForm = () => screen.getByRole("form", { name: "Launch fix settings" });
 const fixField = (name: string) => within(fixForm()).getByLabelText(name);
+const triageForm = () =>
+  screen.getByRole("form", { name: "AI triage settings" });
 
 describe("ConnectionPanel", () => {
   beforeEach(() => {
@@ -359,6 +362,104 @@ describe("ConnectionPanel", () => {
     );
     expect(toastMock.success).not.toHaveBeenCalled();
     expect(fixField("GitHub token")).toHaveValue("ghp_classic");
+  });
+
+  it("turns automatic triage on with a daily limit", async () => {
+    apiMock.mockResolvedValue(sampleConnection());
+    const onChanged = renderPanel(sampleConnection());
+
+    const section = screen.getByRole("region", { name: "AI triage" });
+    expect(within(section).getByText("Manual")).toBeInTheDocument();
+    const toggle = within(triageForm()).getByRole("switch", {
+      name: "Triage new issues automatically",
+    });
+    expect(toggle).not.toBeChecked();
+    const limit = within(triageForm()).getByLabelText("Daily limit");
+    expect(limit).toHaveValue(30);
+
+    await userEvent.click(toggle);
+    await userEvent.clear(limit);
+    await userEvent.type(limit, "12");
+    await userEvent.click(
+      within(triageForm()).getByRole("button", { name: "Save triage" }),
+    );
+
+    // The stored Sentry settings go along unchanged; only `triage` is new.
+    expect(apiMock).toHaveBeenLastCalledWith(
+      "/api/admin/errors/connection",
+      "PUT",
+      {
+        base_url: "https://sentry.io",
+        organization: "example-org",
+        projects: [
+          "crate-api",
+          "crate-workers",
+          "crate-readplane",
+          "crate-listen",
+        ],
+        environments: ["production"],
+        triage: { automatic: true, daily_max: 12 },
+      },
+    );
+    expect(apiMock.mock.lastCall![2]).not.toHaveProperty("token");
+    expect(apiMock.mock.lastCall![2]).not.toHaveProperty("fix");
+    expect(toastMock.success).toHaveBeenCalledWith("Automatic triage is on");
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it("refuses a daily limit out of range before sending", async () => {
+    renderPanel(
+      sampleConnection({ triage: { automatic: true, daily_max: 30 } }),
+    );
+
+    expect(
+      within(screen.getByRole("region", { name: "AI triage" })).getByText(
+        "Automatic",
+      ),
+    ).toBeInTheDocument();
+    const limit = within(triageForm()).getByLabelText("Daily limit");
+    await userEvent.clear(limit);
+    await userEvent.type(limit, "501");
+    // Native validation would block the submit; the form checks it too.
+    (triageForm() as HTMLFormElement).noValidate = true;
+    await userEvent.click(
+      within(triageForm()).getByRole("button", { name: "Save triage" }),
+    );
+
+    expect(within(triageForm()).getByRole("alert")).toHaveTextContent(
+      "The daily limit must be a whole number from 0 to 500.",
+    );
+    expect(apiMock).not.toHaveBeenCalled();
+  });
+
+  it("says what the last sync queued for automatic triage", () => {
+    renderPanel(
+      sampleConnection({
+        triage: { automatic: true, daily_max: 30 },
+        sync: sampleSync({
+          triage: {
+            status: "unavailable",
+            queued: 0,
+            queued_24h: 4,
+            daily_max: 30,
+            error_code: "AI_ACTION_DISABLED",
+          },
+        }),
+      }),
+    );
+
+    expect(within(triageForm()).getByRole("status")).toHaveTextContent(
+      "The last sync queued nothing: no usable model is bound to Triage error issue. Bind one in AI models.",
+    );
+  });
+
+  it("asks for the Sentry settings before AI triage", () => {
+    renderPanel(NOT_CONFIGURED_CONNECTION);
+
+    const section = screen.getByRole("region", { name: "AI triage" });
+    expect(
+      within(section).getByText(/Save the Sentry settings first/),
+    ).toBeInTheDocument();
   });
 });
 

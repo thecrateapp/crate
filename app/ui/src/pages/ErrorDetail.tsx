@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useParams } from "react-router";
 
 import { EmptyState } from "@crate/ui/domain/lists/EmptyState";
@@ -18,9 +18,11 @@ import { RelativeTime } from "@/components/admin/RelativeTime";
 import { SeverityMeter } from "@/components/admin/status-indicators";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { TechnicalDetails } from "@/components/admin/TechnicalDetails";
+import { InvestigateAction } from "@/components/errors/InvestigateAction";
 import { IssueStatusActions } from "@/components/errors/IssueStatusActions";
 import { FixRequestState, LaunchFix } from "@/components/errors/LaunchFix";
 import { StackFrames } from "@/components/errors/StackFrames";
+import { TriagePanel, suspectedFrames } from "@/components/errors/TriagePanel";
 import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
 import {
@@ -33,7 +35,6 @@ import {
   substatusTone,
   type Digest,
   type ErrorIssueDetail,
-  type ErrorTriage,
 } from "@/lib/error-inbox";
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
@@ -133,44 +134,6 @@ function Breadcrumbs({ crumbs }: { crumbs: Digest["breadcrumbs"] }) {
   );
 }
 
-function Triage({ triages }: { triages: ErrorTriage[] }) {
-  const latest = triages[0];
-  if (!latest)
-    return (
-      <EmptyState
-        title="Not triaged yet"
-        description="Nobody has classified this issue yet. The Crate score above orders it in the meantime."
-      />
-    );
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
-        {latest.classification ? (
-          <InfoBadge>{CLASSIFICATION_LABEL[latest.classification]}</InfoBadge>
-        ) : null}
-        {latest.severity ? (
-          <InfoBadge
-            tone={latest.severity === "critical" ? "warning" : "neutral"}
-          >
-            {latest.severity}
-          </InfoBadge>
-        ) : null}
-        <InfoBadge>{Math.round(latest.confidence * 100)}% confidence</InfoBadge>
-        <InfoBadge>
-          <RelativeTime value={latest.created_at} />
-        </InfoBadge>
-      </div>
-      <p className="text-sm text-text-secondary">{latest.summary}</p>
-      {latest.hypothesis ? (
-        <p className="text-sm text-text-muted">{latest.hypothesis}</p>
-      ) : null}
-      {latest.next_step ? (
-        <p className="text-sm text-text-muted">Next: {latest.next_step}</p>
-      ) : null}
-    </div>
-  );
-}
-
 function IssueView({
   issue,
   onChanged,
@@ -180,8 +143,10 @@ function IssueView({
 }) {
   const { hasCapability } = useAuth();
   const canManage = hasCapability(ERRORS_MANAGE);
+  const [investigating, setInvestigating] = useState(false);
   const substatus = substatusLabel(issue.substatus);
   const digest = issue.digest;
+  const suspected = suspectedFrames(issue);
   return (
     <div className="min-w-0 space-y-6 pb-8">
       <BackLink to="/errors" label="Back to errors" />
@@ -215,6 +180,13 @@ function IssueView({
       </AdminPageHeader>
 
       <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+        {canManage ? (
+          <InvestigateAction
+            issue={issue}
+            onChanged={onChanged}
+            onPendingChange={setInvestigating}
+          />
+        ) : null}
         {canManage && issue.write_access !== false ? (
           <IssueStatusActions issue={issue} onChanged={onChanged} />
         ) : null}
@@ -286,10 +258,14 @@ function IssueView({
           </OpsPanel>
           <OpsPanel
             title="Stack trace"
-            description="In-app frames, innermost first. Source lines are the ones Sentry stored for the release that failed."
+            description={
+              suspected.length > 0
+                ? "In-app frames, innermost first. Source lines are the ones Sentry stored for the release that failed. Suspected frames come from the AI assessment below."
+                : "In-app frames, innermost first. Source lines are the ones Sentry stored for the release that failed."
+            }
           >
             {digest.frames.length > 0 ? (
-              <StackFrames frames={digest.frames} />
+              <StackFrames frames={digest.frames} suspected={suspected} />
             ) : (
               <p className="text-sm text-text-muted">
                 No frames from Crate code in this event.
@@ -318,8 +294,11 @@ function IssueView({
         </OpsPanel>
       )}
 
-      <OpsPanel title="Triage">
-        <Triage triages={issue.triages} />
+      <OpsPanel
+        title="Triage and investigation"
+        description="Opinions from the AI model bound to each action, based only on the sanitized event summary. They never change the issue in Sentry."
+      >
+        <TriagePanel issue={issue} investigating={investigating} />
       </OpsPanel>
 
       <TechnicalDetails

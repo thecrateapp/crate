@@ -409,6 +409,7 @@ def test_summary_of_an_empty_inbox(pg_db):
         "critical_open": 0,
         "new_24h": 0,
         "regressed_24h": 0,
+        "untriaged": 0,
         "last_synced_at": None,
         "services": [],
         "top_critical": [],

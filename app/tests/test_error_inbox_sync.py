@@ -10,7 +10,14 @@ import httpx
 import pytest
 from sqlalchemy import text
 
-from tests.error_inbox_fakes import TOKEN, FakeSentry, configure, raw_event, raw_issue
+from tests.error_inbox_fakes import (
+    TOKEN,
+    FakeSentry,
+    configure,
+    configure_ai,
+    raw_event,
+    raw_issue,
+)
 
 
 def _scope():
@@ -499,3 +506,258 @@ def test_missing_token_is_a_typed_failure(pg_db):
     assert result["status"] == "failed"
     assert result["error_code"] == "ERROR_TRACKING_TOKEN_MISSING"
     assert _state()["error_code"] == "ERROR_TRACKING_TOKEN_MISSING"
+
+
+# -- automatic triage (E2.PR2, design §7.1) -----------------------------------------
+
+
+def _queued_triages() -> dict[str, dict]:
+    """Queued triage tasks by the external id of their issue."""
+    with _scope() as session:
+        rows = session.execute(
+            text(
+                """
+                SELECT i.external_id, t.params_json, t.origin, t.actor_user_id,
+                       t.status
+                FROM tasks t
+                JOIN error_issues i ON i.id = CAST(t.params_json ->> 'issue_id' AS uuid)
+                WHERE t.type = 'triage_error_issue'
+                """
+            )
+        ).mappings()
+        found = {}
+        for row in rows:
+            task = dict(row)
+            if isinstance(task["params_json"], str):
+                task["params_json"] = json.loads(task["params_json"])
+            found[row["external_id"]] = task
+        return found
+
+
+def _age_automatic_triage(hours: int = 25) -> None:
+    with _scope() as session:
+        session.execute(
+            text(
+                "UPDATE error_issues SET auto_triage_at = auto_triage_at - "
+                "make_interval(hours => :hours) WHERE auto_triage_at IS NOT NULL"
+            ),
+            {"hours": hours},
+        )
+
+
+def _automatic(monkeypatch, daily_max: int = 30) -> None:
+    configure(triage={"automatic": True, "daily_max": daily_max})
+    configure_ai(monkeypatch, ("ops.error.triage",))
+
+
+def test_enqueues_triage_for_new_regressed_escalating(pg_db, monkeypatch):
+    _automatic(monkeypatch)
+    fake = _fake_with(
+        raw_issue(1, substatus="new"),
+        raw_issue(2, substatus="regressed"),
+        raw_issue(3, substatus="escalating"),
+        # Never triaged and steady: left to Triage backlog.
+        raw_issue(4, substatus="ongoing"),
+    )
+
+    result = _sync(fake)
+
+    assert result["status"] == "ok"
+    assert result["triage"] == {
+        "status": "queued",
+        "queued": 3,
+        "queued_24h": 3,
+        "daily_max": 30,
+        "deduplicated": 0,
+    }
+    assert _state()["triage"] == result["triage"]
+    queued = _queued_triages()
+    assert set(queued) == {"1", "2", "3"}
+    rows = _rows()
+    for external_id, task in queued.items():
+        params = task["params_json"]
+        assert params["issue_id"] == rows[external_id]["id"]
+        assert params["digest_hash"] == rows[external_id]["digest_hash"]
+        assert params["origin"] == "automatic"
+        assert params["actor_user_id"] is None
+        assert params["ai_acceptance"]["action_id"] == "ops.error.triage"
+        assert (task["origin"], task["actor_user_id"]) == ("worker", None)
+    with _scope() as session:
+        marked = dict(
+            session.execute(
+                text("SELECT external_id, auto_triage_hash FROM error_issues")
+            ).all()
+        )
+    assert marked == {
+        "1": rows["1"]["digest_hash"],
+        "2": rows["2"]["digest_hash"],
+        "3": rows["3"]["digest_hash"],
+        "4": None,
+    }
+
+    # The next pass finds nothing new to queue.
+    again = _sync(fake)
+    assert again["triage"]["status"] == "idle"
+    assert again["triage"]["queued"] == 0
+    assert len(_queued_triages()) == 3
+
+
+def test_respects_daily_cap_by_score(pg_db, monkeypatch):
+    _automatic(monkeypatch, daily_max=2)
+    fake = _fake_with(
+        raw_issue(1, substatus="new", level="warning"),
+        raw_issue(2, substatus="new", level="fatal"),
+        raw_issue(3, substatus="new", level="error"),
+        raw_issue(4, substatus="new", level="info"),
+    )
+
+    first = _sync(fake)
+
+    assert set(_queued_triages()) == {"2", "3"}
+    assert (first["triage"]["queued"], first["triage"]["queued_24h"]) == (2, 2)
+
+    capped = _sync(fake)
+    assert capped["triage"] == {
+        "status": "cap_reached",
+        "queued": 0,
+        "queued_24h": 2,
+        "daily_max": 2,
+    }
+    assert set(_queued_triages()) == {"2", "3"}
+
+    # A day later the cap has room again for the next ones by score.
+    _age_automatic_triage()
+    later = _sync(fake)
+    assert later["triage"]["queued"] == 2
+    assert set(_queued_triages()) == {"1", "2", "3", "4"}
+
+
+def test_no_triage_when_automatic_off(pg_db, monkeypatch):
+    configure()
+    configure_ai(monkeypatch, ("ops.error.triage",))
+    fake = _fake_with(raw_issue(1, substatus="new"))
+
+    result = _sync(fake)
+
+    assert result["triage"] == {"status": "off", "queued": 0}
+    assert _queued_triages() == {}
+
+
+def test_no_triage_without_a_model_until_one_is_bound(pg_db, monkeypatch):
+    configure(triage={"automatic": True})
+    configure_ai(monkeypatch, actions=())
+    fake = _fake_with(raw_issue(1, substatus="new"))
+
+    result = _sync(fake)
+
+    assert result["status"] == "ok"
+    assert result["triage"]["status"] == "unavailable"
+    assert result["triage"]["error_code"] == "AI_ACTION_DISABLED"
+    assert _queued_triages() == {}
+    # Nothing was marked: the issue is queued once a model is bound.
+    assert _rows()["1"]["digest_hash"]
+    with _scope() as session:
+        assert (
+            session.execute(text("SELECT auto_triage_hash FROM error_issues")).scalar()
+            is None
+        )
+
+
+def test_failed_automatic_triage_is_not_requeued(pg_db, monkeypatch):
+    _automatic(monkeypatch)
+    fake = _fake_with(raw_issue(1, substatus="new"))
+    _sync(fake)
+    with _scope() as session:
+        session.execute(
+            text("UPDATE tasks SET status = 'failed' WHERE type = 'triage_error_issue'")
+        )
+
+    # Neither the next pass nor the next day sends the same digest again.
+    assert _sync(fake)["triage"]["queued"] == 0
+    _age_automatic_triage()
+    assert _sync(fake)["triage"]["queued"] == 0
+    assert len(_queued_triages()) == 1
+
+
+def test_digest_change_retriages(pg_db, monkeypatch):
+    from crate.db.repositories.error_issues import save_triage
+
+    _automatic(monkeypatch)
+    fake = _fake_with(
+        # Steady, triaged by hand before automatic triage was on.
+        raw_issue(1, substatus="ongoing"),
+        # New: queued at once.
+        raw_issue(2, substatus="new"),
+    )
+    _sync(fake)
+    first = _rows()
+    assert set(_queued_triages()) == {"2"}
+    save_triage(
+        first["1"]["id"],
+        kind="triage",
+        digest_hash=first["1"]["digest_hash"],
+        classification="bug",
+        severity="medium",
+        summary="Duplicate key in the library pipeline.",
+        confidence=0.7,
+    )
+
+    # Both issues raise something else now: a new digest.
+    fake.full = [
+        raw_issue(1, substatus="ongoing", lastSeen="2026-11-05T08:00:00Z"),
+        raw_issue(2, substatus="ongoing", lastSeen="2026-11-05T08:00:00Z"),
+    ]
+    fake.events = {
+        "1": raw_event(1, exception="KeyError", function="load"),
+        "2": raw_event(2, exception="KeyError", function="load"),
+    }
+    changed = _sync(fake)
+    rows = _rows()
+
+    assert rows["1"]["digest_hash"] != first["1"]["digest_hash"]
+    # Issue 1 was triaged for its old digest: the new one is triaged at once.
+    queued = _queued_triages()
+    assert set(queued) == {"1", "2"}
+    assert queued["1"]["params_json"]["digest_hash"] == rows["1"]["digest_hash"]
+    assert changed["triage"]["queued"] == 1
+    # Issue 2 was queued less than a day ago: its new digest waits for the window.
+    assert queued["2"]["params_json"]["digest_hash"] == first["2"]["digest_hash"]
+
+    _age_automatic_triage()
+    _sync(fake)
+    with _scope() as session:
+        hashes = {
+            row.digest_hash
+            for row in session.execute(
+                text(
+                    """
+                    SELECT i.external_id, t.params_json ->> 'digest_hash' AS digest_hash
+                    FROM tasks t
+                    JOIN error_issues i
+                      ON i.id = CAST(t.params_json ->> 'issue_id' AS uuid)
+                    WHERE t.type = 'triage_error_issue' AND i.external_id = '2'
+                    """
+                )
+            )
+        }
+    assert hashes == {first["2"]["digest_hash"], rows["2"]["digest_hash"]}
+
+
+def test_a_triage_queue_failure_does_not_fail_the_sync(pg_db, monkeypatch, caplog):
+    _automatic(monkeypatch)
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("synthetic queue failure")
+
+    monkeypatch.setattr("crate.worker_handlers.error_inbox.queue_triages", broken)
+
+    with caplog.at_level(logging.ERROR, logger="crate.worker_handlers.error_inbox"):
+        result = _sync(_fake_with(raw_issue(1, substatus="new")))
+
+    assert result["status"] == "ok"
+    assert result["triage"] == {
+        "status": "failed",
+        "queued": 0,
+        "error_code": "ERROR_TRIAGE_FAILED",
+    }
+    assert "Could not queue automatic error triage" in caplog.text

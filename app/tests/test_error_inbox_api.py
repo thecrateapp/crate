@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy import text
 
-from tests.error_inbox_fakes import ORGANIZATION, TOKEN, configure
+from tests.error_inbox_fakes import ORGANIZATION, TOKEN, configure, configure_ai
 
 NOW = datetime.now(timezone.utc).replace(microsecond=0)
 VIEW = "ops.errors.view"
@@ -137,10 +137,13 @@ def set_digest(issue_id: str, digest_hash: str = "current") -> None:
     )
 
 
-def insert_triage(issue_id: str, digest_hash: str = "current", **values) -> None:
+def insert_triage(
+    issue_id: str, digest_hash: str = "current", kind: str = "triage", **values
+) -> None:
     params = {
         "issue_id": issue_id,
         "digest_hash": digest_hash,
+        "kind": kind,
         "classification": "infrastructure",
         "severity": "critical",
         "confidence": 0.9,
@@ -154,7 +157,7 @@ def insert_triage(issue_id: str, digest_hash: str = "current", **values) -> None
                 INSERT INTO error_issue_triage
                     (issue_id, kind, digest_hash, classification, severity, summary,
                      suspected_frames, confidence)
-                VALUES (CAST(:issue_id AS uuid), 'triage', :digest_hash,
+                VALUES (CAST(:issue_id AS uuid), :kind, :digest_hash,
                         :classification, :severity, :summary, '[0]'::jsonb, :confidence)
                 """
             ),
@@ -443,6 +446,9 @@ def test_detail_has_digest_triage_and_404s(api):
         "Database restarted during the sync"
     ]
     assert body["triages"][0]["suspected_frames"] == [0]
+    # No invocation record behind this triage: the model is unknown.
+    assert body["triages"][0]["model"] is None
+    assert body["auto_triage_queued_at"] is None
     assert body["write_access"] is None
 
     for missing in ("00000000-0000-0000-0000-000000000000", "CRATE-API-1"):
@@ -521,6 +527,7 @@ def test_connection_defaults_when_unset(api):
         "access": None,
         "sync": None,
         "fix": None,
+        "triage": {"automatic": False, "daily_max": 30},
     }
 
 
@@ -744,6 +751,7 @@ def test_no_outbound_http_in_handlers(api, monkeypatch):
     monkeypatch.setattr("crate.error_inbox.sentry_client.SentryClient.__init__", refuse)
     monkeypatch.setattr("crate.error_inbox.github_client.GitHubClient.__init__", refuse)
 
+    configure_ai(monkeypatch)
     issue_id = seed_issues(_row(1))["1"]
     set_digest(issue_id)
     responses = [
@@ -767,6 +775,8 @@ def test_no_outbound_http_in_handlers(api, monkeypatch):
         api.get(f"{BASE}/{issue_id}"),
         api.post(f"{BASE}/{issue_id}/status", json={"status": "resolved"}),
         api.post(f"{BASE}/{issue_id}/fix", json={"note": "No network here."}),
+        api.post(f"{BASE}/{issue_id}/investigate"),
+        api.post(f"{BASE}/triage-backlog"),
     ]
 
     assert [response.status_code for response in responses] == [
@@ -778,5 +788,206 @@ def test_no_outbound_http_in_handlers(api, monkeypatch):
         200,
         202,
         202,
+        202,
+        202,
     ]
     assert calls == []
+
+
+# -- AI triage and investigation (E2.PR2) -----------------------------------------
+
+
+def _tasks_of(task_type: str) -> list[dict]:
+    with _scope() as session:
+        rows = session.execute(
+            text(
+                "SELECT params_json, origin, actor_user_id FROM tasks WHERE type = :type"
+            ),
+            {"type": task_type},
+        ).mappings()
+        tasks = []
+        for row in rows:
+            params = row["params_json"]
+            tasks.append(
+                {
+                    "params": json.loads(params) if isinstance(params, str) else params,
+                    "origin": row["origin"],
+                    "actor_user_id": row["actor_user_id"],
+                }
+            )
+        return tasks
+
+
+def test_investigate_requires_manage(api, monkeypatch):
+    configure_ai(monkeypatch)
+    issue_id = seed_issues(_row(1))["1"]
+    set_digest(issue_id)
+
+    _as(api, VIEW)
+    refused = api.post(f"{BASE}/{issue_id}/investigate")
+    assert refused.status_code == 403
+    assert _task_count() == 0
+
+    _as(api, VIEW, MANAGE)
+    first = api.post(f"{BASE}/{issue_id}/investigate")
+    second = api.post(f"{BASE}/{issue_id}/investigate")
+
+    assert first.status_code == 202, first.text
+    # One investigation per issue and event while it is queued or running.
+    assert second.json() == first.json()
+    task = _task(first.json()["task_id"])
+    assert task["type"] == "investigate_error_issue"
+    assert task["actor_user_id"] == _user_id()
+    params = task["params"]
+    assert params["issue_id"] == issue_id
+    assert params["digest_hash"] == "current"
+    assert params["actor_user_id"] == _user_id()
+    assert params["ai_acceptance"]["action_id"] == "ops.error.investigate"
+    assert set(params["ai_acceptance"]) <= {
+        "action_id",
+        "fingerprint",
+        "profile_id",
+        "profile_version",
+    }
+
+
+def test_investigate_needs_an_event_a_new_digest_and_a_model(api, monkeypatch):
+    configure_ai(monkeypatch, ("ops.error.triage",))
+    ids = seed_issues(_row(1), _row(2), _row(3))
+    set_digest(ids["2"])
+    insert_triage(ids["2"], kind="investigation")
+    set_digest(ids["3"])
+
+    missing = api.post(f"{BASE}/00000000-0000-4000-8000-000000000000/investigate")
+    no_digest = api.post(f"{BASE}/{ids['1']}/investigate")
+    done = api.post(f"{BASE}/{ids['2']}/investigate")
+    unbound = api.post(f"{BASE}/{ids['3']}/investigate")
+
+    assert (missing.status_code, _code(missing)) == (404, "ERROR_ISSUE_NOT_FOUND")
+    assert (no_digest.status_code, _code(no_digest)) == (409, "ERROR_ISSUE_NO_DIGEST")
+    assert (done.status_code, _code(done)) == (409, "ERROR_ISSUE_ALREADY_INVESTIGATED")
+    assert (unbound.status_code, _code(unbound)) == (503, "AI_ACTION_DISABLED")
+    assert _task_count() == 0
+
+    # A new event can be investigated again.
+    set_digest(ids["2"], "changed")
+    assert api.post(f"{BASE}/{ids['2']}/investigate").status_code == 503
+
+
+def test_backlog_caps_at_100(api, monkeypatch):
+    configure_ai(monkeypatch)
+    rows = [_row(n, crate_score=n) for n in range(1, 106)]
+    ids = seed_issues(
+        *rows,
+        _row(200, crate_score=999),  # triaged for its current event
+        _row(201, crate_score=998),  # no event summary yet
+        _row(202, crate_score=997, status="resolved"),
+    )
+    for external_id, issue_id in ids.items():
+        if external_id != "201":
+            set_digest(issue_id)
+    insert_triage(ids["200"])
+
+    _as(api, VIEW)
+    assert api.post(f"{BASE}/triage-backlog").status_code == 403
+    assert api.get(f"{BASE}/summary").json()["untriaged"] == 105
+
+    _as(api, VIEW, MANAGE)
+    first = api.post(f"{BASE}/triage-backlog")
+
+    assert first.status_code == 202, first.text
+    body = first.json()
+    assert (body["queued"], body["deduplicated"], body["limit"]) == (100, 0, 100)
+    assert len(body["task_ids"]) == 100
+    tasks = _tasks_of("triage_error_issue")
+    # Highest score first: the five lowest wait for the next press.
+    assert {task["params"]["issue_id"] for task in tasks} == {
+        ids[str(n)] for n in range(6, 106)
+    }
+    for task in tasks:
+        assert task["params"]["origin"] == "backlog"
+        assert task["params"]["actor_user_id"] == _user_id()
+        assert task["params"]["ai_acceptance"]["action_id"] == "ops.error.triage"
+        assert (task["origin"], task["actor_user_id"]) == ("admin", _user_id())
+
+    again = api.post(f"{BASE}/triage-backlog").json()
+    assert (again["queued"], again["deduplicated"]) == (0, 100)
+    assert len(_tasks_of("triage_error_issue")) == 100
+
+
+def test_backlog_needs_a_model(api, monkeypatch):
+    configure_ai(monkeypatch, ("ops.error.investigate",))
+    set_digest(seed_issues(_row(1))["1"])
+
+    response = api.post(f"{BASE}/triage-backlog")
+
+    assert (response.status_code, _code(response)) == (503, "AI_ACTION_DISABLED")
+    assert _task_count() == 0
+
+
+def test_put_connection_saves_triage_settings(api):
+    from crate.error_inbox.config import load_config
+
+    configure()
+    saved = api.put(
+        f"{BASE}/connection",
+        json={
+            "organization": ORGANIZATION,
+            "triage": {"automatic": True, "daily_max": 12},
+        },
+    )
+
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["triage"] == {"automatic": True, "daily_max": 12}
+    config = load_config()
+    assert config is not None
+    assert (config.triage.automatic, config.triage.daily_max) == (True, 12)
+
+    # Omitted: kept.
+    kept = api.put(f"{BASE}/connection", json={"organization": ORGANIZATION})
+    assert kept.json()["triage"] == {"automatic": True, "daily_max": 12}
+
+    for triage in (
+        {"automatic": True, "daily_max": 501},
+        {"automatic": True, "daily_max": -1},
+        {"automatic": True, "daily_max": "many"},
+    ):
+        refused = api.put(
+            f"{BASE}/connection",
+            json={"organization": ORGANIZATION, "triage": triage},
+        )
+        assert refused.status_code == 422
+        assert _code(refused) == "ERROR_TRACKING_INVALID"
+    assert api.get(f"{BASE}/connection").json()["triage"] == {
+        "automatic": True,
+        "daily_max": 12,
+    }
+
+
+def test_connection_reports_the_last_automatic_triage_pass(api):
+    configure(triage={"automatic": True, "daily_max": 30})
+    record_sync(
+        triage={
+            "status": "unavailable",
+            "queued": 0,
+            "queued_24h": 4,
+            "daily_max": 30,
+            "error_code": "AI_ACTION_DISABLED",
+            "unexpected": "dropped",
+        }
+    )
+
+    body = api.get(f"{BASE}/connection").json()
+
+    assert body["triage"] == {"automatic": True, "daily_max": 30}
+    assert body["sync"]["triage"] == {
+        "status": "unavailable",
+        "queued": 0,
+        "queued_24h": 4,
+        "daily_max": 30,
+        "error_code": "AI_ACTION_DISABLED",
+    }
+
+    # A pass from before automatic triage, or an unknown shape, reads as none.
+    record_sync(triage={"status": "exploded"})
+    assert api.get(f"{BASE}/connection").json()["sync"]["triage"] is None

@@ -229,7 +229,13 @@ request calls Sentry, so a slow or unavailable Sentry never slows the page down.
 - **Actions.** _Resolve in next release_, _Ignore until escalating_ and _Reopen_
   change the issue in Sentry first and then in Crate. Each runs as a worker task;
   the buttons wait until it finishes. _Open in Sentry_ links to the issue.
-  _Launch fix_ asks GitHub Actions to try a fix ([Launch fix](#launch-fix)).
+  _Investigate_ asks the AI model for a cause and a next step
+  ([AI triage and investigation](#ai-triage-and-investigation)). _Launch fix_ asks
+  GitHub Actions to try a fix ([Launch fix](#launch-fix)).
+- **Triage and investigation.** The detail shows the AI triage and investigation of
+  the latest event: classification, severity, confidence, summary, hypothesis,
+  next step, the suspected frames (also marked in the stack trace) and the model
+  and time. They are opinions; nothing in them changes the issue.
 - **System Health** shows a tile with open, critical, new and regressed issues in
   the last 24 hours and the top three of the critical lane. It comes in the
   existing dashboard response; when the summary cannot be built the tile says it
@@ -270,8 +276,8 @@ breadcrumbs go first, then source lines.
 | Capability           | Grants                                                               |
 | -------------------- | -------------------------------------------------------------------- |
 | `ops.errors.view`    | The Errors page, the issue detail and the Errors entry in navigation |
-| `ops.errors.manage`  | Resolve, Ignore, Reopen and Launch fix                               |
-| `ops.runtime.manage` | The connection drawer: Sentry and Launch fix settings and tokens     |
+| `ops.errors.manage`  | Resolve, Ignore, Reopen, Investigate, Triage backlog and Launch fix  |
+| `ops.runtime.manage` | The connection drawer: Sentry, AI triage and Launch fix settings     |
 
 System Health stays open to `ops.health.view`; its tile links to the inbox only
 for people who can open it.
@@ -299,6 +305,51 @@ for:
 _Test connection_ enqueues a worker task that checks the token's scopes and
 records whether Crate can read and write; the panel shows the result and when it
 was checked.
+
+### AI triage and investigation
+
+Two governed AI actions read the sanitized digest, never the raw event, the title,
+the culprit or the Sentry link: `ops.error.triage` classifies an issue (bug,
+infrastructure, external dependency, client environment or noise), rates its
+severity and may name a duplicate among similar issues; `ops.error.investigate`
+also proposes a cause and one concrete next step. Each needs a model bound in AI
+models; without one the buttons say so and the inbox works as before.
+[AI actions](ai-agents.md#error-inbox-actions) covers what leaves the server and
+how the output is validated. Results go to `error_issue_triage`, one per issue,
+kind and digest. A triage with severity `critical` and confidence of at least 0.6
+puts the issue in the critical lane.
+
+Triage is queued three ways, always as `triage_error_issue` tasks on the `ai`
+lane, never inside an Admin request:
+
+- **Automatically**, at the end of each sync, when the connection drawer's **AI
+  triage** switch is on. It is off by default and should stay off until the
+  triage quality has been checked against the reference set. A pass queues the
+  open issues whose latest event has no triage and that are new, regressed or
+  escalating, or whose event changed since an earlier triage or automatic attempt;
+  highest Crate score first.
+  - **Daily limit** (`triage.daily_max`, 30 by default, 0 to 500): at most that
+    many issues queued in 24 hours. The sync records what it queued in its state
+    (`triage`: `queued`, `queued_24h`, `cap_reached`, `unavailable` when the action
+    has no usable model, `off`).
+  - Each digest is queued once (`error_issues.auto_triage_hash`, migration 146),
+    and an issue at most once a day, so a failed triage or an event that keeps
+    changing never loops. A failure is retried only by a person.
+- **Triage backlog**, a button on the Errors page that names how many issues it
+  will queue: every open issue whose latest event has no triage, highest score
+  first, at most 100 per press. It answers at once with the number queued; results
+  appear in the list as each task finishes.
+- **Investigate**, in the issue detail: one `investigate_error_issue` task for the
+  latest event. It reads how the issue's events spread over releases and over the
+  allowlisted tags from Sentry (documented Retrieve Tag Details calls, at most
+  20 s), then calls the model. The button waits for the task and shows the result
+  or the reason it failed. An event already investigated is not investigated
+  again; a new event can be.
+
+A person's press after a failure is a new attempt; automatic triage never resends
+a digest. When the bound profile's input limit is too small for the digest, the
+task fails before anything is sent and says how many input tokens the call needed
+and what the profile allows. The digest is never trimmed to fit.
 
 ### Launch fix
 

@@ -66,6 +66,9 @@ _STATUS_MAP = {
 }
 _PRIORITIES = frozenset({"high", "medium", "low"})
 _ISSUE_ID = re.compile(r"^\d{1,20}$")
+_TAG_KEY = re.compile(r"^[a-z][a-z0-9_.]{0,31}$")
+MAX_TAG_VALUES = 10
+MAX_TAG_VALUE_LENGTH = 200
 _STATS_PERIOD = re.compile(r"^[1-9]\d{0,2}[hd]$")
 _LINK = re.compile(r"<[^>]*>((?:\s*;\s*[A-Za-z]+=\"[^\"]*\")*)")
 _LINK_ATTRIBUTE = re.compile(r"([A-Za-z]+)=\"([^\"]*)\"")
@@ -475,6 +478,48 @@ class SentryClient:
         if not isinstance(data, dict):
             raise SentryUnavailableError("SENTRY_INVALID_RESPONSE", "Unexpected event")
         return data
+
+    def tag_values(self, issue_id: str, key: str) -> dict[str, Any]:
+        """Event counts of one tag's top values for an issue (Retrieve Tag Details).
+
+        Filtered to the configured environments. Values are capped in number and
+        length here; the caller still sanitises them before they go anywhere.
+        """
+        if not isinstance(key, str) or not _TAG_KEY.match(key):
+            raise ValueError("Unsupported tag key")
+        path = self._organization_path(f"issues/{_issue_id(issue_id)}/tags/{key}/")
+        params = [
+            ("environment", environment) for environment in self._config.environments
+        ]
+        data, _ = self._request("GET", path, params=params)
+        if not isinstance(data, Mapping):
+            raise SentryUnavailableError(
+                "SENTRY_INVALID_RESPONSE", "Unexpected tag details"
+            )
+        top: list[dict[str, Any]] = []
+        for item in data.get("topValues") or []:
+            if not isinstance(item, Mapping):
+                continue
+            value = item.get("value")
+            count = _to_int(item.get("count"))
+            if value is None or count is None:
+                continue
+            top.append(
+                {
+                    "value": str(value)[:MAX_TAG_VALUE_LENGTH],
+                    "count": count,
+                    "first_seen": _to_datetime(item.get("firstSeen")),
+                    "last_seen": _to_datetime(item.get("lastSeen")),
+                }
+            )
+            if len(top) == MAX_TAG_VALUES:
+                break
+        return {
+            "key": key,
+            "total": _to_int(data.get("totalValues")),
+            "unique": _to_int(data.get("uniqueValues")),
+            "top": top,
+        }
 
     def update_status(
         self, issue_id: str, status: str, *, substatus: str | None = None

@@ -26,6 +26,7 @@ ORGANIZATION = "ninja-development"
 ISSUES_PATH = f"/api/0/organizations/{ORGANIZATION}/issues/"
 _ISSUE = re.compile(rf"^{re.escape(ISSUES_PATH)}(\d+)/$")
 _LATEST = re.compile(rf"^{re.escape(ISSUES_PATH)}(\d+)/events/latest/$")
+_TAG = re.compile(rf"^{re.escape(ISSUES_PATH)}(\d+)/tags/([a-z0-9_.]+)/$")
 FULL_SCOPES = ("org:read", "project:read", "event:read", "event:write")
 
 
@@ -109,6 +110,8 @@ class FakeSentry:
         self.recent: list[dict[str, Any]] = []
         self.issues: dict[str, dict[str, Any]] = {}
         self.events: dict[str, dict[str, Any]] = {}
+        # Retrieve Tag Details answers by issue id, then tag key.
+        self.tags: dict[str, dict[str, dict[str, Any]]] = {}
         self.scopes: list[str] | None = list(FULL_SCOPES)
         self.page_size = 100
         self.requests: list[httpx.Request] = []
@@ -129,6 +132,13 @@ class FakeSentry:
             match.group(1)
             for path in self.paths("GET")
             if (match := _LATEST.match(path)) is not None
+        ]
+
+    def tag_keys(self) -> list[str]:
+        return [
+            match.group(2)
+            for path in self.paths("GET")
+            if (match := _TAG.match(path)) is not None
         ]
 
     def issue_ids(self, method: str = "GET") -> list[str]:
@@ -163,6 +173,11 @@ class FakeSentry:
             return httpx.Response(200, json={"version": "0", "auth": auth})
         if path == ISSUES_PATH and request.method == "GET":
             return self._listing(request)
+        if match := _TAG.match(path):
+            detail = self.tags.get(match.group(1), {}).get(match.group(2))
+            if detail is None:
+                return httpx.Response(404, json={"detail": "not found"})
+            return httpx.Response(200, json=detail)
         if match := _LATEST.match(path):
             event = self.events.get(match.group(1))
             if event is None:
@@ -236,3 +251,80 @@ class FakeGitHub:
             headers=self.headers,
             json=None if self.status == 204 else {"message": "synthetic body"},
         )
+
+
+def tag_detail(key: str, *values: tuple[str, int]) -> dict[str, Any]:
+    """A Retrieve Tag Details answer with the given (value, count) pairs."""
+    return {
+        "key": key,
+        "name": key.title(),
+        "uniqueValues": len(values),
+        "totalValues": sum(count for _, count in values),
+        "topValues": [
+            {
+                "key": value,
+                "name": value,
+                "value": value,
+                "count": count,
+                "firstSeen": "2026-11-01T10:00:00Z",
+                "lastSeen": "2026-11-04T08:00:00Z",
+            }
+            for value, count in values
+        ],
+    }
+
+
+TRIAGE_ACTION = "ops.error.triage"
+INVESTIGATE_ACTION = "ops.error.investigate"
+
+
+def configure_ai(
+    monkeypatch,
+    actions=(TRIAGE_ACTION, INVESTIGATE_ACTION),
+    *,
+    max_input_tokens: int = 65536,
+) -> None:
+    """An active AI configuration with `actions` bound to one Gemini profile.
+
+    Only the provider transport is faked by the tests that call the model.
+    """
+    from sqlalchemy import text
+
+    from crate.ai import configuration
+    from crate.ai.capabilities import model_capabilities
+    from crate.db.repositories import ai_configuration as store
+    from crate.db.tx import transaction_scope
+
+    monkeypatch.setenv("GEMINI_API_KEY", "synthetic-key")
+    connection = configuration.ensure_environment_connection("gemini")
+    store.save_model_catalog(
+        connection["id"],
+        [model_capabilities("gemini", "gemini-2.5-flash").model_dump(mode="json")],
+        "ready",
+        1,
+    )
+    profile = configuration.create_profile(
+        {
+            "label": "Errors",
+            "connection_id": connection["id"],
+            "model_id": "gemini-2.5-flash",
+            "config": {"max_input_tokens": max_input_tokens},
+        },
+        None,
+    )
+    if actions:
+        configuration.apply_bindings(
+            [
+                {
+                    "action_id": action_id,
+                    "profile_id": profile["id"],
+                    "profile_version": 1,
+                    "enabled": True,
+                    "expected_revision": 0,
+                }
+                for action_id in actions
+            ],
+            None,
+        )
+    with transaction_scope() as session:
+        session.execute(text("UPDATE ai_configuration_state SET active = TRUE"))

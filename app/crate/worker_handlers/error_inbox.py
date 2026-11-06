@@ -31,6 +31,17 @@ decide, and a 403 comes back as `SENTRY_FORBIDDEN`.
 for one issue with only its short id and the person's note. It claims the issue
 first (`fix_requested_at`, at most once every 24 hours), dispatches once without
 retries, and audits the request; a failed dispatch gives the claim back.
+
+AI triage (E2): with `triage.automatic` on, each sync pass ends by queuing
+`triage_error_issue` for the open issues that need it (`queue_automatic_triage`,
+design §7.1), at most `triage.daily_max` a day, highest score first, never the same
+digest twice. `triage_error_issue` and `investigate_error_issue` run on the `ai`
+lane inside the actor's capacity window: each resumes the configuration accepted
+when it was queued and makes one model call through `crate.error_inbox.triage`.
+The investigation first reads events per release and the tag distribution from
+Sentry (`crate.error_inbox.evidence`). Failures come back as typed results the
+admin shows as they are; they are expected (configuration or model answers), so
+the worker does not report them to Sentry.
 """
 
 from __future__ import annotations
@@ -42,12 +53,22 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+from crate.ai.consumers import accept_action, resume_action
+from crate.ai.contracts import AIConfigurationError
+from crate.ai.runtime import execute_structured
 from crate.db.ops_runtime import get_ops_runtime_state, set_ops_runtime_state
-from crate.db.queries.error_issues import get_issue, open_ids_not_in, sync_state
+from crate.db.queries.error_issues import (
+    auto_triage_plan,
+    get_issue,
+    open_ids_not_in,
+    sync_state,
+)
 from crate.db.repositories.error_issues import (
+    TRIAGE_ORIGINS,
     audit_fix_request,
     mark_status,
     purge_closed,
+    queue_triages,
     record_fix_request,
     record_status_change,
     release_fix_request,
@@ -68,6 +89,7 @@ from crate.error_inbox.config import (
     load_sentry_token,
 )
 from crate.error_inbox.digest import build_digest, digest_hash, group_key
+from crate.error_inbox.evidence import fetch_evidence
 from crate.error_inbox.github_client import GitHubAPIError, GitHubClient
 from crate.error_inbox.priority import crate_score
 from crate.error_inbox.state import (
@@ -76,6 +98,13 @@ from crate.error_inbox.state import (
     SYNC_STATE_KEY,
     known_write_access,
     record_access,
+)
+from crate.error_inbox.triage import (
+    ACTION_BY_KIND,
+    INPUT_TOO_LARGE_CODE,
+    StructuredExecutor,
+    TriageOutcome,
+    triage_issue,
 )
 from crate.error_inbox.sentry_client import (
     LIST_STATS_PERIOD,
@@ -191,6 +220,8 @@ class _SyncReport:
     )
     budget_exhausted: bool = False
     cancelled: bool = False
+    # What the pass queued for automatic triage (`queue_automatic_triage`).
+    triage: dict[str, Any] | None = None
 
     def fail(self, code: str) -> None:
         self.status = "failed"
@@ -219,6 +250,7 @@ class _SyncReport:
             "truncated": dict(self.truncated),
             "budget_exhausted": self.budget_exhausted,
             "cancelled": self.cancelled,
+            "triage": self.triage,
         }
 
     def result(self) -> dict[str, Any]:
@@ -228,6 +260,7 @@ class _SyncReport:
             "counts": dict(self.counts),
             "truncated": dict(self.truncated),
             "budget_exhausted": self.budget_exhausted,
+            "triage": self.triage,
         }
         if self.status == "failed":
             result["error"] = f"Error inbox sync failed ({self.error_code})"
@@ -472,8 +505,69 @@ def sync_issues(
         except Exception:
             log.warning("Could not record the error inbox sync state", exc_info=True)
         raise
+    if report.status != "failed" and not report.cancelled:
+        report.triage = _automatic_triage(config)
     _record_sync_state(report)
     return report.result()
+
+
+# -- automatic triage (E2, design §7.1) ------------------------------------------
+
+TRIAGE_ACTION = ACTION_BY_KIND["triage"]
+
+
+def queue_automatic_triage(
+    config: ErrorTrackingConfig,
+    *,
+    now: datetime | None = None,
+    accept: Callable[[str], dict] = accept_action,
+) -> dict[str, Any]:
+    """Queue triage for the open issues that need it, within the daily cap.
+
+    Candidates are open issues whose current digest has no triage and that are new,
+    regressed or escalating, or whose digest changed since an earlier triage or
+    automatic attempt. Highest score first, at most `triage.daily_max` issues in 24
+    hours, each issue at most once a day and each digest only once. The accepted
+    configuration travels with the tasks; nothing is queued when the action has no
+    usable model.
+    """
+    settings = config.triage
+    if not settings.automatic:
+        return {"status": "off", "queued": 0}
+    plan = auto_triage_plan(daily_max=settings.daily_max, now=now)
+    report: dict[str, Any] = {
+        "status": "idle",
+        "queued": 0,
+        "queued_24h": plan["queued_24h"],
+        "daily_max": settings.daily_max,
+    }
+    if not plan["candidates"]:
+        if plan["room"] == 0:
+            report["status"] = "cap_reached"
+        return report
+    try:
+        acceptance = accept(TRIAGE_ACTION)
+    except AIConfigurationError as error:
+        return {**report, "status": "unavailable", "error_code": error.code}
+    queued = queue_triages(
+        plan["candidates"], origin="automatic", acceptance=acceptance, at=now
+    )
+    return {
+        **report,
+        "status": "queued",
+        "queued": len(queued["task_ids"]),
+        "queued_24h": plan["queued_24h"] + len(queued["task_ids"]),
+        "deduplicated": queued["deduplicated"],
+    }
+
+
+def _automatic_triage(config: ErrorTrackingConfig) -> dict[str, Any]:
+    # The sync itself succeeded: a failure to queue triage is reported, not raised.
+    try:
+        return queue_automatic_triage(config)
+    except Exception:
+        log.exception("Could not queue automatic error triage")
+        return {"status": "failed", "queued": 0, "error_code": "ERROR_TRIAGE_FAILED"}
 
 
 # -- status changes -------------------------------------------------------------
@@ -717,6 +811,179 @@ def dispatch_fix(
     }
 
 
+# -- AI triage and investigation tasks (E2) ---------------------------------------
+
+ACTION_LABEL = {
+    "triage": "Triage error issue",
+    "investigation": "Investigate error issue",
+}
+_UNAVAILABLE_CODES = frozenset(
+    {
+        "AI_ACTION_DISABLED",
+        "AI_ACTION_UNKNOWN",
+        "AI_CONNECTION_UNAVAILABLE",
+        "AI_CREDENTIAL_REQUIRED",
+        "AI_CREDENTIAL_UNAVAILABLE",
+        "AI_PROFILE_INCOMPATIBLE",
+        "AI_PROFILE_UNKNOWN",
+        "AI_RUNTIME_UNAVAILABLE",
+    }
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _TriageRequest:
+    issue_id: str
+    origin: str
+    actor_id: int | None
+    acceptance: Mapping[str, Any] | None
+
+
+def _triage_request(params: Mapping[str, Any], kind: str) -> _TriageRequest:
+    issue_id = params.get("issue_id")
+    origin = params.get("origin", "investigate" if kind == "investigation" else None)
+    actor_id = params.get("actor_user_id")
+    acceptance = params.get("ai_acceptance")
+    allowed = {"investigate"} if kind == "investigation" else TRIAGE_ORIGINS
+    if (
+        not isinstance(issue_id, str)
+        or origin not in allowed
+        or isinstance(actor_id, bool)
+        or (actor_id is not None and not isinstance(actor_id, int))
+        # A person's request carries the person; automatic triage carries nobody.
+        or (origin == "automatic") != (actor_id is None)
+        or (acceptance is not None and not isinstance(acceptance, Mapping))
+    ):
+        raise ValueError("Invalid triage request")
+    return _TriageRequest(issue_id, str(origin), actor_id, acceptance)
+
+
+def ai_problem_text(
+    kind: str, code: str | None, outcome: TriageOutcome | None = None
+) -> str:
+    """A plain account of a failed triage or investigation, for the task result."""
+    label = ACTION_LABEL.get(kind, "this action")
+    if code == INPUT_TOO_LARGE_CODE:
+        if outcome is not None and outcome.input_tokens and outcome.input_limit:
+            return (
+                f"This issue needs about {outcome.input_tokens:,} input tokens; the "
+                f"AI profile bound to {label} allows {outcome.input_limit:,}. Raise "
+                "its input limit in AI models and try again."
+            )
+        return (
+            f"This issue is larger than the AI profile bound to {label} accepts. "
+            "Raise its input limit in AI models and try again."
+        )
+    if code == "AI_RESPONSE_INVALID":
+        return (
+            "The model's answer did not match the expected format, so nothing was "
+            "saved. Try again or bind another model."
+        )
+    if code in _UNAVAILABLE_CODES:
+        return f"No usable model is bound to {label}. Bind one in AI models."
+    if code == "AI_CONTEXT_STALE":
+        return "The AI configuration changed after this was queued. Start it again."
+    if code == "AI_AUTHORITY_REVOKED":
+        return "The person who asked for this can no longer manage errors."
+    if code == "AI_EXECUTION_ALREADY_ACCEPTED":
+        return (
+            "This event was already sent to the model by an earlier attempt that "
+            "saved nothing. Use Investigate or Triage backlog to try again."
+        )
+    if code in {"AI_PROVIDER_TIMEOUT", "AI_TASK_DEADLINE"}:
+        return "The model did not answer in time. Try again."
+    if code in {"AI_DAILY_CALL_LIMIT", "AI_DAILY_TOKEN_LIMIT"}:
+        return "The AI connection reached its daily limit. Try again tomorrow."
+    if code == "AI_CONCURRENCY_LIMIT":
+        return "The AI connection stayed busy. Try again in a few minutes."
+    return f"The AI call failed ({code or 'unknown error'})."
+
+
+def _ai_failed(
+    kind: str,
+    code: str | None,
+    outcome: TriageOutcome | None = None,
+    **extra: Any,
+) -> dict[str, Any]:
+    return {
+        **extra,
+        "status": "failed",
+        "kind": kind,
+        "error_code": code,
+        "error": ai_problem_text(kind, code, outcome),
+        # Configuration and model answers, shown in the admin and in AI activity.
+        "expected": True,
+    }
+
+
+def run_triage_task(
+    task_id: str,
+    params: Mapping[str, Any],
+    *,
+    kind: str,
+    execute: StructuredExecutor,
+    sentry_factory: ClientFactory | None = None,
+) -> dict[str, Any]:
+    """One triage or investigation task. The handler names the executor."""
+    try:
+        request = _triage_request(params, kind)
+    except ValueError:
+        return _failed("ERROR_TRIAGE_INVALID_REQUEST", "Invalid triage request")
+    try:
+        call = resume_action(
+            ACTION_BY_KIND[kind],
+            dict(request.acceptance) if request.acceptance else None,
+            actor_id=request.actor_id,
+            job_id=task_id,
+        )
+    except AIConfigurationError as error:
+        return _ai_failed(kind, error.code, issue_id=request.issue_id)
+
+    evidence: dict[str, Any] = {}
+
+    def read_evidence(data: Mapping[str, Any]) -> dict[str, Any]:
+        found = fetch_evidence(
+            str(data.get("external_id") or ""),
+            data["digest"],
+            client_factory=sentry_factory,
+        )
+        evidence.update(found.summary())
+        return found.data
+
+    outcome = triage_issue(
+        request.issue_id,
+        "investigation" if kind == "investigation" else "triage",
+        request.actor_id,
+        execute=execute,
+        context=call["context"],
+        job_id=task_id,
+        # Automatic triage sends a digest once; a person's request is its own attempt.
+        attempt=None if request.origin == "automatic" else task_id,
+        evidence=read_evidence if kind == "investigation" else None,
+    )
+    base: dict[str, Any] = {
+        "kind": kind,
+        "issue_id": request.issue_id,
+        "digest_hash": outcome.digest_hash,
+    }
+    if evidence:
+        base["evidence"] = evidence
+    if outcome.status in {"saved", "existing"}:
+        return {"status": outcome.status, "triage_id": outcome.triage_id, **base}
+    if outcome.status in {"not_found", "no_digest"}:
+        return {"status": "skipped", "reason": outcome.status, **base}
+    return _ai_failed(
+        kind,
+        outcome.error_code,
+        outcome,
+        issue_id=request.issue_id,
+        digest_hash=outcome.digest_hash,
+        input_tokens=outcome.input_tokens,
+        input_limit=outcome.input_limit,
+        **({"evidence": evidence} if evidence else {}),
+    )
+
+
 # -- task handlers --------------------------------------------------------------
 
 
@@ -738,11 +1005,25 @@ def _handle_dispatch_error_fix(task_id: str, params: dict, config: dict) -> dict
     return dispatch_fix(task_id, params)
 
 
+# The AI-lane handlers name the structured executor themselves: that makes them the
+# roots of the model-calling chain tests/test_ai_architecture.py checks.
+def _handle_triage_error_issue(task_id: str, params: dict, config: dict) -> dict:
+    return run_triage_task(task_id, params, kind="triage", execute=execute_structured)
+
+
+def _handle_investigate_error_issue(task_id: str, params: dict, config: dict) -> dict:
+    return run_triage_task(
+        task_id, params, kind="investigation", execute=execute_structured
+    )
+
+
 ERROR_INBOX_TASK_HANDLERS: dict[str, TaskHandler] = {
     "sync_error_issues": _handle_sync_error_issues,
     "update_error_issue_status": _handle_update_error_issue_status,
     "test_error_tracking_connection": _handle_test_error_tracking_connection,
     "dispatch_error_fix": _handle_dispatch_error_fix,
+    "triage_error_issue": _handle_triage_error_issue,
+    "investigate_error_issue": _handle_investigate_error_issue,
 }
 
 __all__ = [
@@ -752,9 +1033,12 @@ __all__ = [
     "MAX_LIST_PAGES",
     "MAX_STATUS_REFRESHES",
     "SYNC_STATE_KEY",
+    "ai_problem_text",
     "check_connection",
     "dispatch_fix",
     "known_write_access",
+    "queue_automatic_triage",
+    "run_triage_task",
     "sync_issues",
     "update_issue_status",
 ]

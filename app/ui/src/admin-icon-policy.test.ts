@@ -92,6 +92,11 @@ const supportingScope = [
   // Launch fix (E3.PR2): text actions and the shared dialog close control.
   "app/ui/src/components/errors/LaunchFix.tsx",
   "app/ui/src/components/errors/FixSettingsForm.tsx",
+  // AI triage (E2.PR2): text actions only.
+  "app/ui/src/components/errors/InvestigateAction.tsx",
+  "app/ui/src/components/errors/TriageBacklog.tsx",
+  "app/ui/src/components/errors/TriagePanel.tsx",
+  "app/ui/src/components/errors/TriageSettingsForm.tsx",
   "app/ui/src/components/system-health/ErrorsTile.tsx",
 ];
 const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
@@ -524,6 +529,19 @@ const approvedLibraryControls = new Map<string, number>([
   // The shared confirmation: close control and busy glyph are its own.
   [
     "app/ui/src/components/errors/LaunchFix.tsx:@crate/ui/composites/ConfirmDialog:ConfirmDialog",
+    1,
+  ],
+  // AI triage (E2.PR2): text buttons; children audited in the scope above.
+  [
+    "app/ui/src/pages/ErrorDetail.tsx:@/components/errors/InvestigateAction:InvestigateAction",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Errors.tsx:@/components/errors/TriageBacklog:TriageBacklog",
+    1,
+  ],
+  [
+    "app/ui/src/components/errors/ConnectionPanel.tsx:./TriageSettingsForm:TriageSettingsForm",
     1,
   ],
   [

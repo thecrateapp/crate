@@ -109,6 +109,31 @@ def known_write_access(config: ErrorTrackingConfig) -> bool | None:
     return write_access(config, get_ops_runtime_state(ACCESS_STATE_KEY))
 
 
+TRIAGE_PASS_STATUSES = frozenset(
+    {"off", "idle", "queued", "cap_reached", "unavailable", "failed"}
+)
+
+
+def _count(value: Any) -> int | None:
+    return value if type(value) is int and value >= 0 else None
+
+
+def triage_view(value: Any) -> dict[str, Any] | None:
+    """What the pass queued for automatic triage, as the sync recorded it."""
+    if (
+        not isinstance(value, Mapping)
+        or value.get("status") not in TRIAGE_PASS_STATUSES
+    ):
+        return None
+    return {
+        "status": value["status"],
+        "queued": _count(value.get("queued")) or 0,
+        "queued_24h": _count(value.get("queued_24h")),
+        "daily_max": _count(value.get("daily_max")),
+        "error_code": _text(value.get("error_code"), _MAX_CODE_LENGTH),
+    }
+
+
 def sync_view(state: Mapping[str, Any] | None) -> dict[str, Any] | None:
     """The last sync pass as the admin and MCP show it; None before the first pass."""
     if not isinstance(state, Mapping) or state.get("status") not in SYNC_STATUSES:
@@ -131,6 +156,7 @@ def sync_view(state: Mapping[str, Any] | None) -> dict[str, Any] | None:
             "full": truncated.get("full") is True,
             "recent": truncated.get("recent") is True,
         },
+        "triage": triage_view(state.get("triage")),
     }
 
 
@@ -139,11 +165,13 @@ __all__ = [
     "STATE_VERSION",
     "SYNC_STATE_KEY",
     "SYNC_STATUSES",
+    "TRIAGE_PASS_STATUSES",
     "access_for",
     "access_view",
     "credential_fingerprint",
     "known_write_access",
     "record_access",
     "sync_view",
+    "triage_view",
     "write_access",
 ]

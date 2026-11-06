@@ -98,6 +98,8 @@ export interface ErrorTriage {
   suspected_frames: number[];
   next_step: string | null;
   confidence: number;
+  /** The model that answered; null once its invocation record is pruned. */
+  model: string | null;
   created_at: string;
 }
 
@@ -123,11 +125,22 @@ export interface ErrorIssueDetail extends ErrorIssueSummary {
   fix_requested_by_name: string | null;
   closed_at: string | null;
   created_at: string;
-  /** Newest first; empty until automatic triage exists. */
+  /** Triages and investigations of every digest, newest first. */
   triages: ErrorTriage[];
+  /** When automatic triage queued the current digest; null if it never did. */
+  auto_triage_queued_at: string | null;
   /** The token's Sentry write scope: false means status actions are unavailable. */
   write_access: boolean | null;
   fix: ErrorIssueFix | null;
+}
+
+/** What a sync pass queued for automatic triage. */
+export interface SyncTriage {
+  status: "off" | "idle" | "queued" | "cap_reached" | "unavailable" | "failed";
+  queued: number;
+  queued_24h: number | null;
+  daily_max: number | null;
+  error_code: string | null;
 }
 
 export interface SyncState {
@@ -138,6 +151,8 @@ export interface SyncState {
   error_code: string | null;
   counts: Record<string, number>;
   truncated: { full: boolean; recent: boolean };
+  /** Absent before automatic triage existed or when it never ran. */
+  triage?: SyncTriage | null;
 }
 
 export interface ErrorSummary {
@@ -146,6 +161,8 @@ export interface ErrorSummary {
   critical_open: number;
   new_24h: number;
   regressed_24h: number;
+  /** Open issues with an event summary and no triage of it. */
+  untriaged: number;
   last_synced_at: string | null;
   services: Array<{
     service: string;
@@ -182,6 +199,15 @@ export interface FixConnection {
   actions_url: string;
 }
 
+export interface TriageSettings {
+  /** Triage new, regressed and escalating issues after each sync. */
+  automatic: boolean;
+  /** At most this many automatic triages in 24 hours (0–500). */
+  daily_max: number;
+}
+
+export const MAX_DAILY_TRIAGE = 500;
+
 export interface ErrorTrackingConnection {
   configured: boolean;
   provider: "sentry";
@@ -195,6 +221,7 @@ export interface ErrorTrackingConnection {
   sync: SyncState | null;
   /** Launch fix settings; null when it is off. */
   fix: FixConnection | null;
+  triage: TriageSettings;
 }
 
 export interface ErrorIssuePage {
@@ -219,6 +246,8 @@ export interface ConnectionUpdate {
   token?: string;
   /** Omitted keeps the Launch fix settings; null turns Launch fix off. */
   fix?: FixSettingsUpdate | null;
+  /** Omitted keeps the triage settings. */
+  triage?: TriageSettings;
 }
 
 /** The workflow refuses longer notes (`error-autofix.yml`). */
@@ -237,6 +266,21 @@ export interface StatusChange {
 export interface EnqueuedTask {
   task_id: string;
 }
+
+export interface TriageBacklogResult {
+  queued: number;
+  /** Issues whose triage was already queued or running. */
+  deduplicated: number;
+  /** One press queues at most this many issues. */
+  limit: number;
+  task_ids: string[];
+}
+
+export const TRIAGE_ACTION = "ops.error.triage";
+export const INVESTIGATE_ACTION = "ops.error.investigate";
+export const TRIAGE_BACKLOG_URL = `${ERRORS_API}/triage-backlog`;
+/** Design §7.1: one Triage backlog press queues at most this many issues. */
+export const TRIAGE_BACKLOG_LIMIT = 100;
 
 // -- filters ------------------------------------------------------------------
 
@@ -319,6 +363,10 @@ export function issueUrl(id: string): string {
 
 export function fixUrl(id: string): string {
   return `${issueUrl(id)}/fix`;
+}
+
+export function investigateUrl(id: string): string {
+  return `${issueUrl(id)}/investigate`;
 }
 
 export function issuePath(id: string): string {
@@ -529,6 +577,93 @@ export function fixProblemText(code: string | null | undefined): string {
       return "This issue is no longer in the inbox.";
     default:
       return "Could not launch the fix. Try again.";
+  }
+}
+
+/** The latest triage and investigation of the issue's current digest. */
+export function currentAssessments(issue: ErrorIssueDetail): {
+  triage: ErrorTriage | null;
+  investigation: ErrorTriage | null;
+} {
+  const current = issue.triages.filter(
+    (entry) => entry.digest_hash === issue.digest_hash,
+  );
+  return {
+    triage: current.find((entry) => entry.kind === "triage") ?? null,
+    investigation:
+      current.find((entry) => entry.kind === "investigation") ?? null,
+  };
+}
+
+/** The newest assessment of an earlier digest, when the current one has none. */
+export function previousAssessment(
+  issue: ErrorIssueDetail,
+): ErrorTriage | null {
+  return (
+    issue.triages.find((entry) => entry.digest_hash !== issue.digest_hash) ??
+    null
+  );
+}
+
+/**
+ * Why the API refused to queue an AI action, or why its task failed. Task
+ * failures already arrive in plain words from the worker; these cover the
+ * codes the API answers with.
+ */
+export function aiProblemText(
+  code: string | null | undefined,
+  action: "triage" | "investigation",
+): string {
+  const label =
+    action === "investigation"
+      ? "Investigate error issue"
+      : "Triage error issue";
+  switch (code) {
+    case "ERROR_ISSUE_NOT_FOUND":
+      return "This issue is no longer in the inbox.";
+    case "ERROR_ISSUE_NO_DIGEST":
+      return "This issue has no event summary yet. The next sync downloads it.";
+    case "ERROR_ISSUE_ALREADY_INVESTIGATED":
+      return "The latest event of this issue has already been investigated.";
+    case "AI_CONTEXT_STALE":
+      return "The AI configuration is changing. Try again in a moment.";
+    case "AI_ACTION_DISABLED":
+    case "AI_ACTION_UNKNOWN":
+    case "AI_PROFILE_UNKNOWN":
+    case "AI_PROFILE_INCOMPATIBLE":
+    case "AI_CONNECTION_UNAVAILABLE":
+    case "AI_CREDENTIAL_REQUIRED":
+    case "AI_CREDENTIAL_UNAVAILABLE":
+      return `No usable model is bound to ${label}. Bind one in AI models.`;
+    default:
+      return action === "investigation"
+        ? "Could not start the investigation. Try again."
+        : "Could not queue the triage. Try again.";
+  }
+}
+
+/** The last sync pass's automatic triage, in a sentence; null when off. */
+export function triagePassText(
+  triage: SyncTriage | null | undefined,
+): string | null {
+  if (!triage || triage.status === "off") return null;
+  const window =
+    triage.queued_24h != null && triage.daily_max != null
+      ? ` ${formatCount(triage.queued_24h)} of ${formatCount(triage.daily_max)} in the last 24 hours.`
+      : "";
+  switch (triage.status) {
+    case "queued":
+      return `The last sync queued ${formatCount(triage.queued)} ${triage.queued === 1 ? "issue" : "issues"} for triage.${window}`;
+    case "idle":
+      return `The last sync found nothing new to triage.${window}`;
+    case "cap_reached":
+      return `The daily limit is used up; triage resumes as the 24-hour window moves.${window}`;
+    case "unavailable":
+      return "The last sync queued nothing: no usable model is bound to Triage error issue. Bind one in AI models.";
+    case "failed":
+      return "The last sync could not queue triage. It tries again on the next pass.";
+    default:
+      return null;
   }
 }
 

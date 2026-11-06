@@ -19,6 +19,7 @@ import { RelativeTime } from "@/components/admin/RelativeTime";
 import { useCursorList } from "@/components/agents/connections/use-cursor-list";
 import { ConnectionSheet } from "@/components/errors/ConnectionSheet";
 import { IssueTable } from "@/components/errors/IssueTable";
+import { TriageBacklog } from "@/components/errors/TriageBacklog";
 import {
   PageHeaderAction,
   PageHeaderActions,
@@ -412,6 +413,7 @@ export function Errors() {
         {list.items.length > 0 ? (
           <SyncNotice summary={data} onOpenConnection={openConnection} />
         ) : null}
+        <TriageBacklog untriaged={data.untriaged ?? 0} onQueued={refresh} />
         <OpsPanel title="Filters">
           <Filters
             filters={filters}

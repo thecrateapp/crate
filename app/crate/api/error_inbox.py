@@ -1,8 +1,10 @@
 """Error inbox admin API: Sentry issues synced into Crate.
 
 Reads come from PostgreSQL and `ops_runtime_state`; writes enqueue worker tasks. No
-handler calls Sentry, GitHub or a model (EI-D3). Errors carry their code in the
-`X-Crate-Error` header and the message in `detail`, like the other admin routers.
+handler calls Sentry, GitHub or a model (EI-D3): Investigate and Triage backlog only
+accept the AI configuration and queue tasks on the `ai` lane. Errors carry their
+code in the `X-Crate-Error` header and the message in `detail`, like the other
+admin routers.
 
 The Sentry and GitHub tokens are accepted only by `PUT /connection`. They are never
 returned, never logged and never echoed in a validation error.
@@ -34,10 +36,23 @@ from crate.api.schemas.error_inbox import (
     ErrorSummary,
     ErrorTrackingConnection,
     ErrorTrackingConnectionUpdate,
+    ErrorTriageBacklogResponse,
     IssueLane,
     IssueStatusFilter,
 )
-from crate.db.queries.error_issues import MAX_LIST_LIMIT, get_issue, list_issues
+from crate.ai.consumers import accept_action
+from crate.ai.contracts import AIConfigurationError
+from crate.db.queries.error_issues import (
+    MAX_LIST_LIMIT,
+    get_issue,
+    list_issues,
+    untriaged_open,
+)
+from crate.db.repositories.error_issues import (
+    INVESTIGATE_TASK,
+    investigation_dedup_key,
+    queue_triages,
+)
 from crate.db.repositories.tasks import (
     create_task,
     create_task_dedup,
@@ -55,6 +70,10 @@ STATUS_TASK = "update_error_issue_status"
 CONNECTION_TEST_TASK = "test_error_tracking_connection"
 CONNECTION_TEST_DEDUP_KEY = "error-tracking:connection-test"
 FIX_TASK = "dispatch_error_fix"
+TRIAGE_ACTION = "ops.error.triage"
+INVESTIGATE_ACTION = "ops.error.investigate"
+# Design §7.1: one Triage backlog press queues at most this many issues.
+BACKLOG_LIMIT = 100
 
 
 def _fail(status: int, code: str, message: str) -> NoReturn:
@@ -118,6 +137,27 @@ _FIX_CONFLICT: OpenApiResponses = {
         "last request."
     )
 }
+
+
+_AI_UNAVAILABLE: OpenApiResponses = {
+    503: error_response(
+        "No usable model for the AI action (AI_ACTION_DISABLED, AI_CONTEXT_STALE, ...)."
+    )
+}
+_INVESTIGATE_CONFLICT: OpenApiResponses = {
+    409: error_response(
+        "ERROR_ISSUE_NO_DIGEST before the first event summary; "
+        "ERROR_ISSUE_ALREADY_INVESTIGATED when the current event has an investigation."
+    )
+}
+
+
+def _accept(action_id: str) -> dict:
+    """Accept the action's current configuration; the task resumes exactly it."""
+    try:
+        return accept_action(action_id)
+    except AIConfigurationError as error:
+        _fail(503, error.code, error.message)
 
 
 def _enqueue(task_type: str, params: dict, *, dedup_key: str, actor_id: int) -> str:
@@ -203,13 +243,15 @@ def get_connection(request: Request):
 def put_connection(request: Request, body: ErrorTrackingConnectionUpdate):
     require_permission(request, CONNECTION)
     current = views.stored_connection().config
-    # Triage settings are not edited here (E2): keep the stored ones. Launch fix
-    # settings are kept unless the body carries `fix` (null turns it off).
+    # Triage and Launch fix settings are kept unless the body carries them
+    # (`fix: null` turns Launch fix off).
     preserved = (
         {key: current.to_settings()[key] for key in ("triage", "fix")}
         if current
         else {}
     )
+    if body.triage is not None:
+        preserved["triage"] = body.triage.model_dump()
     github_token = None
     if body.updates_fix:
         preserved["fix"] = body.fix.settings() if body.fix else None
@@ -248,6 +290,31 @@ def test_connection(request: Request):
         actor_id=int(actor["id"]),
     )
     return {"task_id": task_id}
+
+
+@router.post(
+    "/triage-backlog",
+    status_code=202,
+    response_model=ErrorTriageBacklogResponse,
+    responses=merge_responses(AUTH_ERROR_RESPONSES, _AI_UNAVAILABLE),
+    summary="Queue AI triage of the open issues that have none, highest score first",
+)
+def triage_backlog(request: Request):
+    actor = require_permission(request, MANAGE)
+    acceptance = _accept(TRIAGE_ACTION)
+    actor_id = int(actor["id"])
+    queued = queue_triages(
+        untriaged_open(limit=BACKLOG_LIMIT),
+        origin="backlog",
+        acceptance=acceptance,
+        actor_id=actor_id,
+    )
+    return {
+        "queued": len(queued["task_ids"]),
+        "deduplicated": queued["deduplicated"],
+        "limit": BACKLOG_LIMIT,
+        "task_ids": queued["task_ids"],
+    }
 
 
 @router.get(
@@ -350,6 +417,55 @@ def launch_fix(request: Request, issue_id: str, body: ErrorFixRequest):
     # One pending dispatch per issue; the task enforces the 24-hour window.
     task_id = _enqueue(
         FIX_TASK, params, dedup_key=f"error-fix:{issue['id']}", actor_id=actor_id
+    )
+    return {"task_id": task_id}
+
+
+@router.post(
+    "/{issue_id}/investigate",
+    status_code=202,
+    response_model=TaskEnqueueResponse,
+    response_model_exclude_none=True,
+    responses=merge_responses(
+        AUTH_ERROR_RESPONSES, _NOT_FOUND, _INVESTIGATE_CONFLICT, _AI_UNAVAILABLE
+    ),
+    summary="Queue an AI investigation of the issue's latest event",
+)
+def investigate(request: Request, issue_id: str):
+    actor = require_permission(request, MANAGE)
+    issue = get_issue(issue_id)
+    if issue is None:
+        _fail(404, "ERROR_ISSUE_NOT_FOUND", "Error issue not found")
+    digest_hash = issue.get("digest_hash")
+    if not digest_hash or not issue.get("digest"):
+        _fail(
+            409,
+            "ERROR_ISSUE_NO_DIGEST",
+            "This issue has no event summary yet; the next sync downloads it",
+        )
+    if any(
+        triage.get("kind") == "investigation"
+        and triage.get("digest_hash") == digest_hash
+        for triage in issue.get("triages") or []
+    ):
+        _fail(
+            409,
+            "ERROR_ISSUE_ALREADY_INVESTIGATED",
+            "The latest event of this issue has already been investigated",
+        )
+    acceptance = _accept(INVESTIGATE_ACTION)
+    actor_id = int(actor["id"])
+    params = {
+        "issue_id": issue["id"],
+        "digest_hash": digest_hash,
+        "ai_acceptance": acceptance,
+        "actor_user_id": actor_id,
+    }
+    task_id = _enqueue(
+        INVESTIGATE_TASK,
+        params,
+        dedup_key=investigation_dedup_key(issue["id"], digest_hash),
+        actor_id=actor_id,
     )
     return {"task_id": task_id}
 
