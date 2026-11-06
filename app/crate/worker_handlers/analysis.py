@@ -1385,6 +1385,7 @@ def _handle_backfill_smart_mix_profiles(
 
     claimed = claim_smart_mix_backfill_batch(
         limit=min(batch_size, window.limit - in_flight),
+        max_in_flight=window.limit,
         offline_track_ids=offline_ids,
         max_attempts=max_attempts,
         claimed_by=f"task:{task_id}",
@@ -1413,7 +1414,9 @@ def _handle_backfill_smart_mix_profiles(
         release_smart_mix_claims(released)
     refresh_smart_mix_coverage(max_attempts=max_attempts)
 
-    if not claimed and in_flight == 0:
+    # The claim counts again under its lock, so an empty claim can also mean
+    # another coordinator took the free slots; only nothing in flight ends it.
+    if not claimed and count_smart_mix_in_flight() == 0:
         complete_smart_mix_campaign()
         return {"claimed": 0, "queued": 0, "completed": True}
     return {

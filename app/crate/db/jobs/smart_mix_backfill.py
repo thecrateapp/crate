@@ -35,6 +35,9 @@ LIVE_COVERAGE_MAX_AGE_SECONDS = 10
 UNQUEUED_CLAIM_GRACE_SECONDS = 300
 DEAD_CLAIM_ERROR = "The analysis task ended without settling its claim"
 _PROFILE_DEDUP_PREFIX = "smart-mix-profile:"
+# Serializes counting and claiming between coordinators, so two of them can
+# never both see the same free slots.
+_CLAIM_LOCK_KEY = "smart_mix:backfill_claim"
 
 # A backfill claim is alive while its child task is pending or running, however
 # long the resource governor defers it or its retries take; the task row is the
@@ -82,12 +85,19 @@ def smart_mix_profile_dedup_key(track_id: int) -> str:
 def claim_smart_mix_backfill_batch(
     *,
     limit: int,
+    max_in_flight: int | None = None,
     offline_track_ids: Sequence[int] = (),
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
     claimed_by: str | None = None,
     promote_python_profiles: bool = False,
     session=None,
 ) -> list[dict[str, Any]]:
+    """Claim up to ``limit`` tracks for the backfill.
+
+    With ``max_in_flight`` the claim counts what is in flight and takes only the
+    free slots, under a transaction lock, so concurrent coordinators cannot
+    exceed the limit between the count and the claim.
+    """
     batch_size = max(1, min(int(limit), MAX_BACKFILL_BATCH_SIZE))
     retry_limit = max(1, min(int(max_attempts), 10))
     offline_ids = sorted({int(track_id) for track_id in offline_track_ids})
@@ -95,7 +105,19 @@ def claim_smart_mix_backfill_batch(
         f"{os.environ.get('CRATE_RUNTIME', 'runtime')}:{socket.gethostname()}"
     )
     with optional_scope(session) as active_session:
+        if max_in_flight is not None:
+            active_session.execute(
+                text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
+                {"key": _CLAIM_LOCK_KEY},
+            )
         release_dead_smart_mix_claims(session=active_session)
+        if max_in_flight is not None:
+            free = int(max_in_flight) - count_smart_mix_in_flight(
+                session=active_session
+            )
+            if free <= 0:
+                return []
+            batch_size = min(batch_size, free)
         rows = (
             active_session.execute(
                 text(

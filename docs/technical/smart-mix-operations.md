@@ -283,9 +283,10 @@ attempts, and the start and resume calls take it in the same body:
   ended without settling its claim". The attempt still counts, so a track that keeps killing its
   worker ends up exhausted instead of being retried forever.
 - A pass claims at most `batchSize` tracks and never more than the limit of the current window
-  minus what is in flight. When the limit is reached, the coordinator checks again every 3 s for
-  up to ten minutes and then queues the next pass. The window, not `batchSize`, bounds the work
-  in flight.
+  minus what is in flight. The claim counts again inside its transaction, under a lock that every
+  coordinator takes, so two coordinators can never exceed the limit together. When the limit is
+  reached, the coordinator checks again every 3 s for up to ten minutes and then queues the next
+  pass. The window, not `batchSize`, bounds the work in flight.
 - A change of window, or of the settings, applies to the next claim and cancels nothing. At
   08:00 with eight analyses accepted, they finish and the coordinator claims again once fewer
   than four are left.

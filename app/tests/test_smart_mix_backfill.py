@@ -245,6 +245,53 @@ def test_concurrent_backfill_claims_skip_locked_tracks(pg_db, tmp_path: Path) ->
     assert [first[0]["id"], second[0]["id"]] == track_ids
 
 
+def test_concurrent_claims_never_exceed_the_in_flight_limit(
+    pg_db, tmp_path: Path
+) -> None:
+    del pg_db
+    import threading
+
+    from crate.db.jobs.smart_mix_backfill import count_smart_mix_in_flight
+
+    _create_tracks(tmp_path, count=6)
+    claims: dict[str, list[dict]] = {}
+
+    def second_coordinator() -> None:
+        claims["second"] = claim_smart_mix_backfill_batch(
+            limit=25, max_in_flight=4, claimed_by="task:second"
+        )
+
+    with transaction_scope() as first_session:
+        claims["first"] = claim_smart_mix_backfill_batch(
+            limit=25, max_in_flight=4, claimed_by="task:first", session=first_session
+        )
+        # The second coordinator counts and claims before the first commits.
+        second = threading.Thread(target=second_coordinator)
+        second.start()
+        second.join(timeout=1)
+    second.join(timeout=10)
+
+    assert not second.is_alive()
+    assert len(claims["first"]) == 4
+    assert claims["second"] == []
+    assert count_smart_mix_in_flight() == 4
+
+
+def test_a_claim_takes_only_the_free_slots(pg_db, tmp_path: Path) -> None:
+    del pg_db
+    in_flight, *free = _create_tracks(tmp_path, count=4)
+    _insert_processing(
+        in_flight, state="analyzing", attempts=1, target_generation=ANALYZER_VERSION
+    )
+
+    claimed = claim_smart_mix_backfill_batch(
+        limit=25, max_in_flight=3, claimed_by="task:coordinator"
+    )
+
+    assert len(claimed) == 2
+    assert {row["id"] for row in claimed} <= set(free)
+
+
 def test_backfill_handler_pauses_before_claiming_when_governor_denies(
     monkeypatch,
 ) -> None:
@@ -1014,10 +1061,14 @@ def _handler_harness(monkeypatch, *, campaigns, in_flight, claimed=(), now=DAY):
         return current["value"]
 
     in_flight_values = iter(in_flight)
+    counted = {"value": 0}
+
+    def next_in_flight():
+        counted["value"] = next(in_flight_values, counted["value"])
+        return counted["value"]
+
     monkeypatch.setattr(analysis, "get_smart_mix_campaign", next_campaign)
-    monkeypatch.setattr(
-        analysis, "count_smart_mix_in_flight", lambda: next(in_flight_values)
-    )
+    monkeypatch.setattr(analysis, "count_smart_mix_in_flight", next_in_flight)
     monkeypatch.setattr(
         "crate.resource_governor.wait_while_pressured", lambda **_kwargs: True
     )
@@ -1101,6 +1152,38 @@ def test_backfill_handler_claims_free_capacity_and_chains_the_next_batch(
     assert result["claimed"] == 2
     assert result["next_task_id"] == "task-next"
     assert calls["next"] == [{"batches": 1, "claimed": 2}]
+
+
+def test_the_claim_enforces_the_window_limit(monkeypatch) -> None:
+    analysis, calls = _handler_harness(
+        monkeypatch,
+        campaigns=[_running_campaign(batch_size=25)],
+        in_flight=[1],
+        claimed=[{"id": 5, "entity_uid": "uid-5", "claim_token": "token-5"}],
+        now=NIGHT,
+    )
+
+    analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+
+    assert (calls["claims"][0]["limit"], calls["claims"][0]["max_in_flight"]) == (
+        7,
+        8,
+    )
+
+
+def test_a_coordinator_that_loses_the_slots_does_not_complete_the_campaign(
+    monkeypatch,
+) -> None:
+    # Nothing was in flight when it counted, but another coordinator filled the
+    # slots before its claim, which therefore took nothing.
+    analysis, calls = _handler_harness(
+        monkeypatch, campaigns=[_running_campaign()], in_flight=[0, 4]
+    )
+
+    result = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+
+    assert result.get("completed") is not True
+    assert calls["completed"] == []
 
 
 def test_backfill_handler_promotes_python_profiles_only_with_crate_cli(
