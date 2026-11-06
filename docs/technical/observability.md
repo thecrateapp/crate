@@ -398,6 +398,23 @@ the settings:
 
 The button only appears when the settings and a token are stored.
 
+### From fix to release
+
+A fix closes the loop in Sentry without anyone resolving the issue by hand:
+
+1. The pull request that fixes an issue carries `Fixes <SHORT-ID>` in a commit
+   message. The autofix workflow writes it; add it yourself to manual fixes.
+2. When that commit lands on `main`, Sentry's GitHub integration resolves the issue.
+3. Every image build on `main` associates its commits with the Sentry releases of
+   the images it built (`crate-<sha>`, or `cast-receiver-<sha>`, in the projects of
+   those images; [operations](operations.md#commits-and-deploys)). Sentry then knows
+   which release contains the fix.
+4. `make deploy` records a deploy to `production` for every release the deployed
+   manifest runs, so Sentry knows when each one went live.
+5. If the error comes back in a release that already contains the fix, Sentry
+   marks the issue as regressed, and the next sync shows it in the inbox as a
+   regression.
+
 ## Prometheus and Grafana
 
 The monitoring stack, `crate-observability`, runs Prometheus, Grafana and

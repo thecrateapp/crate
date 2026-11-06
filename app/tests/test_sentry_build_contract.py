@@ -1,3 +1,4 @@
+import json
 import re
 from pathlib import Path
 
@@ -218,3 +219,30 @@ def test_desktop_workflow_scripts_run_on_the_macos_system_bash() -> None:
         if bash4_only.search(step.get("run") or "")
     ]
     assert offenders == []
+
+
+def test_main_builds_associate_commits_with_their_sentry_releases() -> None:
+    # Without commits on a release, Sentry cannot tell which release fixed an issue
+    # or brought it back. Each build creates the releases of the images it built.
+    workflow = yaml.safe_load((ROOT / ".github/workflows/build-images.yml").read_text())
+    steps = workflow["jobs"]["promote-release"]["steps"]
+    names = [step.get("name") for step in steps]
+    step = steps[names.index("Associate commits with the Sentry releases")]
+    assert names.index("Assemble complete release manifest") < names.index(
+        "Associate commits with the Sentry releases"
+    )
+
+    run = step["run"]
+    assert "release_manifest.py sentry-releases" in run
+    assert '--source-sha "$GITHUB_SHA"' in run
+    assert "releases --org" in run and " new " in run
+    assert "set-commits" in run and "--auto" in run and "--ignore-missing" in run
+    # A Sentry failure leaves a warning and never blocks the release manifest.
+    assert "::warning" in run
+    assert "continue-on-error" not in step
+    assert step["env"]["SENTRY_AUTH_TOKEN"] == "${{ secrets.SENTRY_AUTH_TOKEN }}"
+    assert step["env"]["SENTRY_ORG"] == "ninja-development"
+
+    lock = json.loads((ROOT / "package-lock.json").read_text())
+    pinned = lock["packages"]["node_modules/@sentry/cli"]["version"]
+    assert step["env"]["SENTRY_CLI_VERSION"] == pinned

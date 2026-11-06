@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import subprocess
 import sys
 from copy import deepcopy
 from pathlib import Path
@@ -219,6 +221,78 @@ def test_release_environment_uses_immutable_digest_references() -> None:
         in rendered
     )
     assert ":latest" not in rendered
+
+
+def _manifest_with_changed(*names: str) -> dict:
+    return assemble_manifest(
+        release_sha=RELEASE_SHA,
+        registry="ghcr.io",
+        owner="thecrateapp",
+        previous=_previous_manifest(),
+        changed_digests={
+            name: f"sha256:{900 + i:064x}" for i, name in enumerate(names)
+        },
+    )
+
+
+def test_sentry_releases_name_each_image_release_with_its_projects() -> None:
+    manifest = _manifest_with_changed("api", "worker", "cast-receiver")
+
+    releases = release_manifest.sentry_releases(manifest)
+
+    # Each image reports the release of the commit it was built at.
+    assert releases == {
+        f"cast-receiver-{RELEASE_SHA}": ["crate-cast-receiver"],
+        f"crate-{PREVIOUS_SHA}": [
+            "crate-admin",
+            "crate-docs",
+            "crate-listen",
+            "crate-media-worker",
+            "crate-readplane",
+            "crate-workers",
+        ],
+        f"crate-{RELEASE_SHA}": ["crate-api", "crate-workers"],
+    }
+
+
+def test_sentry_releases_keep_only_the_images_built_at_a_commit() -> None:
+    manifest = _manifest_with_changed("ui", "listen")
+
+    assert release_manifest.sentry_releases(manifest, source_sha=RELEASE_SHA) == {
+        f"crate-{RELEASE_SHA}": ["crate-admin", "crate-listen"],
+    }
+    assert release_manifest.sentry_releases(manifest, source_sha="c" * 40) == {}
+
+
+def test_sentry_releases_skip_images_without_sentry() -> None:
+    releases = release_manifest.sentry_releases(_manifest_with_changed("site"))
+
+    assert all(
+        "site" not in project for projects in releases.values() for project in projects
+    )
+    assert f"crate-{RELEASE_SHA}" not in releases
+
+
+def test_sentry_releases_command_prints_release_and_projects(tmp_path: Path) -> None:
+    path = tmp_path / "release-manifest.json"
+    path.write_text(json.dumps(_manifest_with_changed("api", "readplane")))
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/release_manifest.py"),
+            "sentry-releases",
+            "--manifest",
+            str(path),
+            "--source-sha",
+            RELEASE_SHA,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.stdout == f"crate-{RELEASE_SHA}\tcrate-api,crate-readplane\n"
 
 
 AGENT_DIGEST = f"sha256:{777:064x}"

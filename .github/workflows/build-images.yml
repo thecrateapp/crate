@@ -676,3 +676,37 @@ jobs:
           docker buildx imagetools create \
             --tag "${MANIFEST_REPOSITORY}:stable" \
             "${MANIFEST_REPOSITORY}@${{ steps.manifest.outputs.digest }}"
+
+      # Sentry can only tell which release fixed an issue, or brought it back, when the
+      # release has its commits. The images built here report `crate-<sha>` (Cast receiver:
+      # `cast-receiver-<sha>`); create those releases in their projects if no upload did yet,
+      # and associate the commits through Sentry's GitHub integration. A Sentry failure
+      # leaves a warning and never blocks the release.
+      - name: Associate commits with the Sentry releases
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ninja-development
+          SENTRY_CLI_VERSION: 2.58.6
+        run: |
+          if [[ -z "$SENTRY_AUTH_TOKEN" ]]; then
+            echo "::warning title=Sentry releases::SENTRY_AUTH_TOKEN is not set; no commits were associated."
+            exit 0
+          fi
+          python scripts/release_manifest.py sentry-releases \
+            --manifest /tmp/release-manifest.json \
+            --source-sha "$GITHUB_SHA" > "$RUNNER_TEMP/sentry-releases.tsv"
+          sentry_cli() { npx --yes "@sentry/cli@${SENTRY_CLI_VERSION}" "$@"; }
+          while IFS=$'\t' read -r release projects; do
+            [[ -n "$release" ]] || continue
+            project_args=()
+            IFS=',' read -r -a project_list <<<"$projects"
+            for project in "${project_list[@]}"; do
+              project_args+=(--project "$project")
+            done
+            if sentry_cli releases --org "$SENTRY_ORG" new "$release" "${project_args[@]}" \
+              && sentry_cli releases --org "$SENTRY_ORG" set-commits "$release" --auto --ignore-missing; then
+              echo "Associated commits with $release ($projects)"
+            else
+              echo "::warning title=Sentry releases::Could not associate commits with $release."
+            fi
+          done < "$RUNNER_TEMP/sentry-releases.tsv"
