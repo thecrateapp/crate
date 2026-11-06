@@ -224,7 +224,9 @@ def list_domain_events(
 
     ``unprocessed_only=True`` uses a consumer group. It first retries
     this consumer's pending messages (`id="0"`) so projector crashes do
-    not strand events forever, then falls back to new messages (`id=">"`).
+    not strand events forever. Batches of at least two reserve capacity for
+    new messages (`id=">"`), even while older acquisitions remain deferred.
+    A one-message batch retains pending-first replay semantics.
     """
 
     r = _get_redis()
@@ -244,26 +246,33 @@ def list_domain_events(
             _GROUP_NAME,
             consumer_name,
             {_STREAM_KEY: "0"},
-            count=count,
+            count=max(1, count // 2),
         )
-        if not entries:
-            entries = r.xreadgroup(
+        messages = [
+            message
+            for _stream_name, stream_messages in entries or []
+            for message in stream_messages
+        ]
+        remaining = count - len(messages)
+        if remaining:
+            read_kwargs = {"count": remaining}
+            if not messages and block_ms > 0:
+                read_kwargs["block"] = int(block_ms)
+            new_entries = r.xreadgroup(
                 _GROUP_NAME,
                 consumer_name,
                 {_STREAM_KEY: ">"},
-                count=count,
-                block=max(0, int(block_ms)),
+                **read_kwargs,
+            )
+            messages.extend(
+                message
+                for _stream_name, stream_messages in new_entries or []
+                for message in stream_messages
             )
     except Exception:
         log.debug("Failed to read domain events from stream", exc_info=True)
         return []
 
-    if not entries:
-        return []
-
-    messages: list[tuple[str, dict[str, Any]]] = []
-    for _stream_name, stream_messages in entries:
-        messages.extend(stream_messages)
     return _decode_stream_messages(messages)
 
 
