@@ -35,6 +35,7 @@ from crate.db.jobs.smart_mix_backfill import (
     refresh_live_smart_mix_coverage,
     refresh_smart_mix_coverage,
     release_smart_mix_claims,
+    smart_mix_profile_dedup_key,
 )
 from crate.db.repositories.library import (
     get_library_album,
@@ -1402,7 +1403,7 @@ def _handle_backfill_smart_mix_profiles(
                 "track_entity_uid": track.get("entity_uid"),
                 "claim_token": track.get("claim_token"),
             },
-            dedup_key=f"smart-mix-profile:{track_id}",
+            dedup_key=smart_mix_profile_dedup_key(track_id),
         )
         if child_id:
             queued += 1

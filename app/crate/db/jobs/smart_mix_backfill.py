@@ -25,9 +25,58 @@ SMART_MIX_ANALYZER_VERSION = ANALYZER_VERSION
 MAX_BACKFILL_BATCH_SIZE = 100
 DEFAULT_MAX_ATTEMPTS = 3
 BACKFILL_TASK_TYPE = "backfill_smart_mix_profiles"
+PROFILE_TASK_TYPE = "compute_smart_mix_profile"
 CAMPAIGN_STATE_KEY = "smart_mix:backfill_campaign"
 COVERAGE_STATE_KEY = "smart_mix:coverage"
 LIVE_COVERAGE_MAX_AGE_SECONDS = 10
+# The coordinator claims a batch and then queues one child task per claim, so a
+# claim has no child for a moment. Past this grace a claim without a child is
+# dead: the coordinator stopped between the two steps.
+UNQUEUED_CLAIM_GRACE_SECONDS = 300
+DEAD_CLAIM_ERROR = "The analysis task ended without settling its claim"
+_PROFILE_DEDUP_PREFIX = "smart-mix-profile:"
+
+# A backfill claim is alive while its child task is pending or running, however
+# long the resource governor defers it or its retries take; the task row is the
+# source of truth. A child that failed for good, was cancelled or was lost with
+# its worker (zombie cleanup marks it failed) ends its claim at once. A claim
+# that never had a child counts only during the grace.
+_CHILD_OF_CLAIM_SQL = (
+    "child.type = :profile_task_type"
+    " AND child.dedup_key"
+    " = CAST(:profile_dedup_prefix AS text) || {claim}.track_id::text"
+    " AND child.params_json->>'claim_token' = {claim}.claimed_by"
+)
+_LIVE_CLAIM_SQL = f"""
+    (
+        EXISTS (
+            SELECT 1
+            FROM tasks child
+            WHERE {_CHILD_OF_CLAIM_SQL}
+              AND child.status IN ('pending', 'running')
+        )
+        OR (
+            {{claim}}.claimed_at
+                >= NOW() - make_interval(secs => :unqueued_claim_grace)
+            AND NOT EXISTS (
+                SELECT 1
+                FROM tasks child
+                WHERE child.created_at >= {{claim}}.claimed_at - INTERVAL '1 minute'
+                  AND {_CHILD_OF_CLAIM_SQL}
+            )
+        )
+    )
+"""
+_LIVE_CLAIM_PARAMS = {
+    "profile_task_type": PROFILE_TASK_TYPE,
+    "profile_dedup_prefix": _PROFILE_DEDUP_PREFIX,
+    "unqueued_claim_grace": UNQUEUED_CLAIM_GRACE_SECONDS,
+}
+
+
+def smart_mix_profile_dedup_key(track_id: int) -> str:
+    """Dedup key of a track's profile task; claims find their child through it."""
+    return f"{_PROFILE_DEDUP_PREFIX}{int(track_id)}"
 
 
 def claim_smart_mix_backfill_batch(
@@ -46,6 +95,7 @@ def claim_smart_mix_backfill_batch(
         f"{os.environ.get('CRATE_RUNTIME', 'runtime')}:{socket.gethostname()}"
     )
     with optional_scope(session) as active_session:
+        release_dead_smart_mix_claims(session=active_session)
         rows = (
             active_session.execute(
                 text(
@@ -136,11 +186,7 @@ def claim_smart_mix_backfill_batch(
                       AND (
                           processing.track_id IS NULL
                           OR (
-                              (
-                                  processing.state <> 'analyzing'
-                                  OR processing.claimed_at
-                                      < NOW() - INTERVAL '2 hours'
-                              )
+                              processing.state <> 'analyzing'
                               AND (
                                   processing.target_generation
                                       IS DISTINCT FROM :analyzer_version
@@ -243,23 +289,67 @@ def release_smart_mix_claims(track_ids: Sequence[int], *, session=None) -> int:
         return int(getattr(result, "rowcount", 0) or 0)
 
 
+def release_dead_smart_mix_claims(*, session=None) -> int:
+    """Settle claims whose child task is gone as failed attempts.
+
+    The attempt was counted when the track was claimed, so a track whose
+    analysis keeps killing its worker still runs out of attempts. The service
+    loop calls this after its zombie cleanup, and every claim starts with it.
+    Rows another transaction holds are skipped: two sweeps at once would
+    otherwise wait on each other, and the claim of a coordinator would fail on
+    the lock timeout. The other sweep settles them.
+    """
+    with optional_scope(session) as active_session:
+        result = active_session.execute(
+            text(
+                f"""
+                WITH dead AS (
+                    SELECT claim.track_id, claim.pipeline
+                    FROM track_processing_state claim
+                    WHERE claim.pipeline = :pipeline
+                      AND claim.state = 'analyzing'
+                      AND NOT {_LIVE_CLAIM_SQL.format(claim="claim")}
+                    FOR UPDATE OF claim SKIP LOCKED
+                )
+                UPDATE track_processing_state settled
+                SET state = 'failed',
+                    claimed_by = NULL,
+                    claimed_at = NULL,
+                    last_error = :reason,
+                    updated_at = NOW()
+                FROM dead
+                WHERE settled.track_id = dead.track_id
+                  AND settled.pipeline = dead.pipeline
+                """
+            ),
+            {
+                "pipeline": SMART_MIX_PIPELINE,
+                "reason": DEAD_CLAIM_ERROR,
+                **_LIVE_CLAIM_PARAMS,
+            },
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
+
+
 def count_smart_mix_in_flight(*, session=None) -> int:
+    """Count the live claims of this backfill for the current target."""
     with optional_scope(session) as active_session:
         return int(
             active_session.execute(
                 text(
-                    """
+                    f"""
                     SELECT COUNT(*)
-                    FROM track_processing_state
-                    WHERE pipeline = :pipeline
-                      AND state = 'analyzing'
-                      AND target_generation = :analyzer_version
-                      AND claimed_at >= NOW() - INTERVAL '2 hours'
+                    FROM track_processing_state claim
+                    WHERE claim.pipeline = :pipeline
+                      AND claim.state = 'analyzing'
+                      AND claim.target_generation = :analyzer_version
+                      AND {_LIVE_CLAIM_SQL.format(claim="claim")}
                     """
                 ),
                 {
                     "pipeline": SMART_MIX_PIPELINE,
                     "analyzer_version": SMART_MIX_ANALYZER_VERSION,
+                    **_LIVE_CLAIM_PARAMS,
                 },
             ).scalar_one()
         )
@@ -576,7 +666,9 @@ __all__ = [
     "get_smart_mix_campaign",
     "queue_next_smart_mix_batch",
     "refresh_smart_mix_coverage",
+    "release_dead_smart_mix_claims",
     "release_smart_mix_claims",
+    "smart_mix_profile_dedup_key",
     "save_smart_mix_campaign",
     "set_smart_mix_campaign_status",
     "start_smart_mix_campaign",

@@ -273,8 +273,15 @@ attempts, and the start and resume calls take it in the same body:
 - The window uses the local clock of its timezone, so it follows DST changes. It can cross
   midnight; the start belongs to the window and the end does not.
 - In flight means claims of this backfill: `smart_mix` rows in `analyzing` for the current
-  target, claimed in the last two hours, whether the child is queued or running. Imports claim
-  the `analysis` and `bliss` pipelines and **Reanalyze track** takes no claim, so neither counts.
+  target whose child task (`compute_smart_mix_profile` with that claim token) is `pending` or
+  `running`, however long it has waited. A claim whose child has not been queued yet counts for
+  five minutes, the time the coordinator takes between claiming and queuing. Imports claim the
+  `analysis` and `bliss` pipelines and **Reanalyze track** takes no claim, so neither counts.
+- A child that ends without settling its claim (retries exhausted, cancelled, or failed by the
+  zombie cleanup after its worker died) stops counting at once. The next claim, and the service
+  loop after each zombie cleanup, mark such claims `failed` with the error "The analysis task
+  ended without settling its claim". The attempt still counts, so a track that keeps killing its
+  worker ends up exhausted instead of being retried forever.
 - A pass claims at most `batchSize` tracks and never more than the limit of the current window
   minus what is in flight. When the limit is reached, the coordinator checks again every 3 s for
   up to ten minutes and then queues the next pass. The window, not `batchSize`, bounds the work

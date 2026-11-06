@@ -18,6 +18,7 @@ from crate.db.jobs.analysis_storage import resolve_smart_mix_track
 from crate.db.jobs.smart_mix_backfill import (
     queue_next_smart_mix_batch,
     set_smart_mix_campaign_status,
+    smart_mix_profile_dedup_key,
     start_smart_mix_campaign,
 )
 from crate.db.queries.smart_mix_admin import (
@@ -170,7 +171,7 @@ def reanalyze_smart_mix_track(
     task_id = create_task_dedup(
         PROFILE_TASK_TYPE,
         {"track_id": int(track["id"]), "track_entity_uid": track["entity_uid"]},
-        dedup_key=f"smart-mix-profile:{int(track['id'])}",
+        dedup_key=smart_mix_profile_dedup_key(int(track["id"])),
     )
     return SmartMixReanalyzeResponse(
         taskId=task_id, status="queued" if task_id else "already_queued"

@@ -638,6 +638,7 @@ def _insert_processing(
     attempts: int,
     target_generation: str,
     claimed_hours_ago: int = 0,
+    claimed_minutes_ago: int = 0,
 ) -> None:
     with transaction_scope() as session:
         session.execute(
@@ -651,7 +652,7 @@ def _insert_processing(
                     :track_id, 'smart_mix', :state,
                     CASE WHEN :state = 'analyzing' THEN 'other-worker' END,
                     CASE WHEN :state = 'analyzing'
-                        THEN NOW() - make_interval(hours => :hours)
+                        THEN NOW() - make_interval(hours => :hours, mins => :minutes)
                     END,
                     :attempts, 5, :target
                 )
@@ -663,6 +664,7 @@ def _insert_processing(
                 "attempts": attempts,
                 "target": target_generation,
                 "hours": claimed_hours_ago,
+                "minutes": claimed_minutes_ago,
             },
         )
 
@@ -757,6 +759,228 @@ def test_in_flight_counts_only_fresh_claims_of_the_current_target(
     )
 
     assert count_smart_mix_in_flight() == 1
+
+
+def _queue_child(track_id: int, claim_token: str) -> str:
+    from crate.db.repositories.tasks import create_task_dedup
+
+    task_id = create_task_dedup(
+        "compute_smart_mix_profile",
+        {"track_id": track_id, "claim_token": claim_token},
+        dedup_key=f"smart-mix-profile:{track_id}",
+        dispatch=False,
+    )
+    assert task_id is not None
+    return task_id
+
+
+def _set_task(task_id: str, **columns) -> None:
+    assignments = ", ".join(f"{column} = :{column}" for column in columns)
+    with transaction_scope() as session:
+        session.execute(
+            text(f"UPDATE tasks SET {assignments} WHERE id = :id"),
+            {"id": task_id, **columns},
+        )
+
+
+def _age_claim(track_id: int, *, hours: int) -> None:
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE track_processing_state
+                SET claimed_at = NOW() - make_interval(hours => :hours)
+                WHERE track_id = :track_id AND pipeline = 'smart_mix'
+                """
+            ),
+            {"track_id": track_id, "hours": hours},
+        )
+
+
+def test_a_child_that_fails_for_good_frees_its_slot(pg_db, tmp_path: Path) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        count_smart_mix_in_flight,
+        release_dead_smart_mix_claims,
+    )
+    from crate.db.repositories.tasks import fail_or_retry_task
+
+    [track_id] = _create_tracks(tmp_path, count=1)
+    [claim] = claim_smart_mix_backfill_batch(limit=1, claimed_by="task:coordinator")
+    child = _queue_child(track_id, claim["claim_token"])
+
+    # A retry puts the same task, with the same claim token, back in the queue.
+    assert fail_or_retry_task(child, "decoder crashed") == "retrying"
+    assert fail_or_retry_task(child, "decoder crashed") == "retrying"
+    assert count_smart_mix_in_flight() == 1
+
+    assert fail_or_retry_task(child, "decoder crashed") == "failed"
+    assert count_smart_mix_in_flight() == 0
+    assert release_dead_smart_mix_claims() == 1
+    row = _processing_row(track_id)
+    assert (row["state"], row["attempts"]) == ("failed", 1)
+
+
+def test_a_child_lost_with_its_worker_frees_its_slot(pg_db, tmp_path: Path) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import count_smart_mix_in_flight
+    from crate.db.repositories.tasks import cleanup_zombie_tasks
+
+    [track_id] = _create_tracks(tmp_path, count=1)
+    [claim] = claim_smart_mix_backfill_batch(limit=1, claimed_by="task:coordinator")
+    child = _queue_child(track_id, claim["claim_token"])
+    # The process died mid-analysis on its last retry: no heartbeat for ten minutes.
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE tasks
+                SET status = 'running',
+                    retry_count = max_retries,
+                    heartbeat_at = NOW() - INTERVAL '10 minutes'
+                WHERE id = :id
+                """
+            ),
+            {"id": child},
+        )
+    assert count_smart_mix_in_flight() == 1
+
+    assert cleanup_zombie_tasks(heartbeat_timeout_min=5) == 1
+    assert count_smart_mix_in_flight() == 0
+
+
+def test_a_child_whose_analysis_fails_frees_its_slot(pg_db, tmp_path: Path) -> None:
+    del pg_db
+    from crate.db.jobs.analysis_storage import record_smart_mix_failure
+    from crate.db.jobs.smart_mix_backfill import count_smart_mix_in_flight
+
+    [track_id] = _create_tracks(tmp_path, count=1)
+    [claim] = claim_smart_mix_backfill_batch(limit=1, claimed_by="task:coordinator")
+    child = _queue_child(track_id, claim["claim_token"])
+    _set_task(child, status="running")
+
+    record_smart_mix_failure(
+        track_id, claim["path"], "decoder crashed", claim_token=claim["claim_token"]
+    )
+
+    assert count_smart_mix_in_flight() == 0
+    assert _processing_row(track_id)["state"] == "failed"
+
+
+def test_four_stuck_claims_do_not_block_the_backfill(pg_db, tmp_path: Path) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import count_smart_mix_in_flight
+
+    # Four claims whose children were never queued: the coordinator died between
+    # claiming and queuing them. They used to count for two hours, which is the
+    # whole day limit.
+    stuck = _create_tracks(tmp_path, count=4)
+    for track_id in stuck:
+        _insert_processing(
+            track_id,
+            state="analyzing",
+            attempts=1,
+            target_generation=ANALYZER_VERSION,
+            claimed_minutes_ago=10,
+        )
+
+    assert count_smart_mix_in_flight() == 0
+    claimed = claim_smart_mix_backfill_batch(limit=4, claimed_by="task:next")
+    assert sorted(row["id"] for row in claimed) == sorted(stuck)
+    assert {_processing_row(track_id)["attempts"] for track_id in stuck} == {2}
+
+
+def test_releasing_dead_claims_skips_one_another_sweep_holds(
+    pg_db, tmp_path: Path
+) -> None:
+    del pg_db
+    import threading
+
+    from crate.db.jobs.smart_mix_backfill import release_dead_smart_mix_claims
+
+    # The service loop and a coordinator can sweep at once; waiting on each
+    # other's rows could deadlock and fail the coordinator.
+    held, free = _create_tracks(tmp_path, count=2)
+    for track_id in (held, free):
+        _insert_processing(
+            track_id,
+            state="analyzing",
+            attempts=1,
+            target_generation=ANALYZER_VERSION,
+            claimed_minutes_ago=10,
+        )
+    released: list[int] = []
+
+    def other_sweep() -> None:
+        released.append(release_dead_smart_mix_claims())
+
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                SELECT 1 FROM track_processing_state
+                WHERE track_id = :track_id AND pipeline = 'smart_mix'
+                FOR UPDATE
+                """
+            ),
+            {"track_id": held},
+        )
+        sweep = threading.Thread(target=other_sweep)
+        sweep.start()
+        sweep.join(timeout=5)
+        finished_while_held = not sweep.is_alive()
+    sweep.join(timeout=10)
+
+    assert finished_while_held
+    assert released == [1]
+    assert _processing_row(free)["state"] == "failed"
+
+
+@pytest.mark.parametrize("child_status", ["pending", "running"])
+def test_a_deferred_or_slow_child_keeps_its_claim(
+    pg_db, tmp_path: Path, child_status: str
+) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        count_smart_mix_in_flight,
+        release_dead_smart_mix_claims,
+    )
+
+    # A child the resource governor has deferred for three hours stays pending;
+    # it still holds its slot and its claim.
+    [track_id] = _create_tracks(tmp_path, count=1)
+    [claim] = claim_smart_mix_backfill_batch(limit=1, claimed_by="task:coordinator")
+    child = _queue_child(track_id, claim["claim_token"])
+    _set_task(child, status=child_status)
+    _age_claim(track_id, hours=3)
+
+    assert count_smart_mix_in_flight() == 1
+    assert release_dead_smart_mix_claims() == 0
+    assert claim_smart_mix_backfill_batch(limit=1, claimed_by="task:next") == []
+    assert _processing_row(track_id)["state"] == "analyzing"
+
+
+def test_stale_work_recovery_releases_dead_claims_after_the_zombie_cleanup(
+    monkeypatch,
+) -> None:
+    from crate import worker
+
+    steps: list[str] = []
+    monkeypatch.setattr(
+        worker, "cleanup_zombie_tasks", lambda **_k: steps.append("zombies") or 0
+    )
+    monkeypatch.setattr(
+        "crate.db.repositories.ai_usage.reclaim_abandoned_invocations",
+        lambda **_k: steps.append("ai") or 0,
+    )
+    monkeypatch.setattr(
+        "crate.db.jobs.smart_mix_backfill.release_dead_smart_mix_claims",
+        lambda **_k: steps.append("smart_mix") or 0,
+    )
+
+    worker._recover_stale_work()
+
+    assert steps.index("zombies") < steps.index("smart_mix")
 
 
 # 13:00 and 03:00 in Madrid (CET): outside and inside the default night window.
