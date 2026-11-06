@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
+from crate.smart_mix.policy import CandidateWeights
 from crate.smart_mix.versions import ANALYZER_VERSION
 
 
@@ -511,6 +512,179 @@ class TransitionPlan:
                 if self.fallback_reason is not None
                 else None
             ),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class CandidateScore:
+    """The components of a v3 candidate score, each in [0, 1] (SM3-D3).
+
+    ``vocal`` is the share of a reference overlap with voice on both decks, the base
+    of a penalty, and is null unless both profiles carry the voice per phrase.
+    """
+
+    alignment: float
+    energy: float
+    harmonic: float
+    stability: float
+    bass: float
+    position: float
+    vocal: float | None = None
+
+    def __post_init__(self) -> None:
+        for name in (
+            "alignment",
+            "energy",
+            "harmonic",
+            "stability",
+            "bass",
+            "position",
+        ):
+            object.__setattr__(
+                self, name, round(_clamp_confidence(getattr(self, name)), 6)
+            )
+        if self.vocal is not None:
+            object.__setattr__(self, "vocal", round(_clamp_confidence(self.vocal), 6))
+
+    def weighted_sum(self, weights: CandidateWeights) -> float:
+        """The weighted components, without the vocal penalty."""
+        return sum(
+            getattr(self, name) * weight for name, weight in weights.components()
+        )
+
+    def to_dict(self) -> dict[str, float | None]:
+        return {
+            "alignment": self.alignment,
+            "energy": self.energy,
+            "harmonic": self.harmonic,
+            "stability": self.stability,
+            "bass": self.bass,
+            "position": self.position,
+            "vocal": self.vocal,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class TransitionCandidate:
+    """One entry of the v3 candidate menu (SM3-D3): a complete, valid plan and why.
+
+    ``index`` is the rank in the menu (0 is the planner's choice). The phrases index
+    the profiles' ``phrases`` and ``length_bars`` is the mix length in outgoing bars;
+    all three are null for a candidate of the bar heuristic, and ``length_bars`` for
+    a mix of the context's preferred duration. ``structure_used`` says whether the
+    candidate was placed on the stored phrases.
+    """
+
+    index: int
+    outgoing_phrase: int | None
+    incoming_phrase: int | None
+    length_bars: int | None
+    structure_used: bool
+    score: float
+    breakdown: CandidateScore
+    planner_version: int
+    outgoing_track_entity_uid: str
+    incoming_track_entity_uid: str
+    mode: TransitionMode | str
+    duration_ms: int
+    outgoing_cue_ms: int
+    incoming_cue_ms: int
+    incoming_tempo_ratio: float
+    beat_phase_offset_ms: int
+    handoff_progress: float
+    outgoing_gain_db: float
+    incoming_gain_db: float
+    curve: str
+    bass_handoff: str
+    confidence: float
+    fallback_reason: TransitionFallbackReason | str | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "mode", TransitionMode(self.mode))
+        if self.fallback_reason is not None:
+            object.__setattr__(
+                self, "fallback_reason", TransitionFallbackReason(self.fallback_reason)
+            )
+        if (
+            isinstance(self.index, bool)
+            or not isinstance(self.index, int)
+            or self.index < 0
+        ):
+            raise ValueError("candidate index must be a non-negative integer")
+        if self.length_bars is not None and self.length_bars not in PHRASE_BAR_LENGTHS:
+            raise ValueError("candidate length_bars must be 8, 16 or 32")
+        object.__setattr__(self, "score", round(_clamp_confidence(self.score), 6))
+
+    @classmethod
+    def from_plan(
+        cls,
+        plan: TransitionPlan,
+        *,
+        index: int,
+        score: float,
+        breakdown: CandidateScore,
+        structure_used: bool,
+        outgoing_phrase: int | None = None,
+        incoming_phrase: int | None = None,
+        length_bars: int | None = None,
+    ) -> TransitionCandidate:
+        return cls(
+            index=index,
+            outgoing_phrase=outgoing_phrase,
+            incoming_phrase=incoming_phrase,
+            length_bars=length_bars,
+            structure_used=structure_used,
+            score=score,
+            breakdown=breakdown,
+            planner_version=plan.planner_version,
+            outgoing_track_entity_uid=plan.outgoing_track_entity_uid,
+            incoming_track_entity_uid=plan.incoming_track_entity_uid,
+            mode=plan.mode,
+            duration_ms=plan.duration_ms,
+            outgoing_cue_ms=plan.outgoing_cue_ms,
+            incoming_cue_ms=plan.incoming_cue_ms,
+            incoming_tempo_ratio=plan.incoming_tempo_ratio,
+            beat_phase_offset_ms=plan.beat_phase_offset_ms,
+            handoff_progress=plan.handoff_progress,
+            outgoing_gain_db=plan.outgoing_gain_db,
+            incoming_gain_db=plan.incoming_gain_db,
+            curve=plan.curve,
+            bass_handoff=plan.bass_handoff,
+            confidence=plan.confidence,
+            fallback_reason=plan.fallback_reason,
+        )
+
+    def to_plan(self) -> TransitionPlan:
+        """The candidate as a plan, validated again by ``TransitionPlan``."""
+        return TransitionPlan(
+            planner_version=self.planner_version,
+            outgoing_track_entity_uid=self.outgoing_track_entity_uid,
+            incoming_track_entity_uid=self.incoming_track_entity_uid,
+            mode=self.mode,
+            duration_ms=self.duration_ms,
+            outgoing_cue_ms=self.outgoing_cue_ms,
+            incoming_cue_ms=self.incoming_cue_ms,
+            incoming_tempo_ratio=self.incoming_tempo_ratio,
+            beat_phase_offset_ms=self.beat_phase_offset_ms,
+            handoff_progress=self.handoff_progress,
+            outgoing_gain_db=self.outgoing_gain_db,
+            incoming_gain_db=self.incoming_gain_db,
+            curve=self.curve,
+            bass_handoff=self.bass_handoff,
+            confidence=self.confidence,
+            fallback_reason=self.fallback_reason,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "index": self.index,
+            "outgoingPhrase": self.outgoing_phrase,
+            "incomingPhrase": self.incoming_phrase,
+            "lengthBars": self.length_bars,
+            "structureUsed": self.structure_used,
+            "score": self.score,
+            "breakdown": self.breakdown.to_dict(),
+            "plan": self.to_plan().to_dict(),
         }
 
 
