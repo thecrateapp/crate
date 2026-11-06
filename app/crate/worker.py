@@ -740,7 +740,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "crate.worker_handlers.smart_mix_refinement",
         "SMART_MIX_REFINEMENT_TASK_HANDLERS",
-        ("smart_mix_refine_transition",),
+        ("smart_mix_refine_transition", "cleanup_smart_mix_refinements"),
     ),
     (
         "crate.worker_handlers.ai_proposals",

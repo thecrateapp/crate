@@ -290,6 +290,7 @@ def test_compute_profile_handler_resolves_track_inside_worker(monkeypatch) -> No
     from crate.worker_handlers import analysis
     from crate.smart_mix.models import MixProfileQuality, TrackMixProfileDraft
 
+    track_uid = str(uuid.uuid4())
     draft = TrackMixProfileDraft(
         analyzer="crate-python",
         analyzer_version="smart-mix-v1",
@@ -301,7 +302,7 @@ def test_compute_profile_handler_resolves_track_inside_worker(monkeypatch) -> No
         "resolve_smart_mix_track",
         lambda **_kwargs: {
             "id": 7,
-            "entity_uid": str(uuid.uuid4()),
+            "entity_uid": track_uid,
             "path": "/music/artist/album/track.flac",
         },
         raising=False,
@@ -328,6 +329,12 @@ def test_compute_profile_handler_resolves_track_inside_worker(monkeypatch) -> No
     monkeypatch.setattr(
         analysis, "refresh_live_smart_mix_coverage", lambda: refreshes.append(True)
     )
+    invalidated: list[list[str]] = []
+    monkeypatch.setattr(
+        analysis,
+        "invalidate_for_tracks",
+        lambda uids: invalidated.append(list(uids)) or 1,
+    )
 
     result = analysis._handle_compute_smart_mix_profile(
         "task-1",
@@ -343,6 +350,8 @@ def test_compute_profile_handler_resolves_track_inside_worker(monkeypatch) -> No
     }
     assert captured == [(7, "/music/artist/album/track.flac", "worker:claim")]
     assert refreshes == [True]
+    # A published profile drops the AI refinements of its old revision (SM4).
+    assert invalidated == [[track_uid]]
 
 
 def test_failed_profiles_also_refresh_the_live_coverage(monkeypatch) -> None:

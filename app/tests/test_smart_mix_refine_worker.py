@@ -304,3 +304,34 @@ def test_never_logs_prompt_or_response(env, caplog):
     ):
         assert secret not in logged
         assert all(secret not in str(result) for result in results)
+
+
+def test_cleanup_touches_reads_then_deletes_unread(monkeypatch):
+    reads = [["a", "b"], ["c"], []]
+    touched, deleted = [], [5000, 12]
+    monkeypatch.setattr(
+        worker, "pop_smart_mix_refinement_reads", lambda count: reads.pop(0)
+    )
+    monkeypatch.setattr(worker, "touch", lambda keys: touched.append(keys) or len(keys))
+    monkeypatch.setattr(
+        worker,
+        "cleanup_unread_refinements",
+        lambda *, older_than_days, limit: deleted.pop(0),
+    )
+    monkeypatch.setattr(worker, "is_cancelled", lambda task_id: False)
+
+    result = worker._handle_cleanup_smart_mix_refinements("task-9", {}, {})
+
+    # Reads are recorded first, so nothing read since the last run is deleted.
+    assert touched == [["a", "b"], ["c"]]
+    assert result == {"touched": 3, "deleted": 5012}
+
+
+def test_cleanup_is_scheduled_daily_on_maintenance():
+    from crate.actors import TASK_POOL_CONFIG
+    from crate.scheduler import DEFAULT_SCHEDULES
+
+    config = TASK_POOL_CONFIG["cleanup_smart_mix_refinements"]
+    assert (config.queue, config.priority, config.max_retries) == ("maintenance", 3, 0)
+    assert config.time_limit_seconds == 600
+    assert DEFAULT_SCHEDULES["cleanup_smart_mix_refinements"] == 86400

@@ -229,6 +229,9 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "compute_smart_mix_profile": TaskPoolConfig("heavy", 2, 900, 2),
     "backfill_smart_mix_profiles": TaskPoolConfig("heavy", 3, 1800, 0),
     "refresh_smart_mix_coverage": TaskPoolConfig("maintenance", 3, 300, 0),
+    # Daily retention of AI refinements (SM3-D5): records queued reads, then
+    # deletes rows unread for 180 days. No model call.
+    "cleanup_smart_mix_refinements": TaskPoolConfig("maintenance", 3, 600, 0),
     "backfill_track_audio_fingerprints": TaskPoolConfig("heavy", 3, 14400, 0),
     "index_genres": TaskPoolConfig("maintenance", 3, 600, 0),
     "infer_genre_taxonomy": TaskPoolConfig("ai_bulk", 3, 3600, 0),

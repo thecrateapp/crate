@@ -28,11 +28,17 @@ from crate.ai.contracts import AIConfigurationError
 from crate.ai.runtime import execute_structured
 from crate.db.cache_store import (
     delete_smart_mix_refined_plan_caches,
+    pop_smart_mix_refinement_reads,
     set_smart_mix_refined_plan_caches,
 )
 from crate.db.queries.smart_mix_refinement import get_track_genre_slugs
 from crate.db.repositories.smart_mix import get_track_mix_profiles_by_entity_uids
-from crate.db.repositories.smart_mix_refinements import get_many, save
+from crate.db.repositories.smart_mix_refinements import (
+    cleanup_unread_refinements,
+    get_many,
+    save,
+    touch,
+)
 from crate.genre_taxonomy import resolve_genre_slug
 from crate.llm.prompts.smart_mix_transition import (
     PROMPT_VERSION,
@@ -49,6 +55,7 @@ from crate.smart_mix.refinement import (
     context_from_payload,
     deterministic_plan_hash,
 )
+from crate.worker_handlers import is_cancelled
 from crate.smart_mix_ai import (
     REFINE_ACTION,
     edge_refinement_key,
@@ -259,8 +266,36 @@ def _elapsed_ms(started: float) -> int:
     return max(0, round((time.monotonic() - started) * 1000))
 
 
+# Retention (SM3-D5): refinements unread for this long are deleted.
+RETENTION_DAYS = 180
+_READS_BATCH = 1000
+_CLEANUP_BATCH = 5000
+
+
+def _handle_cleanup_smart_mix_refinements(
+    task_id: str, params: dict, config: dict
+) -> dict:
+    """Record the reads the plan API queued, then delete unread refinements."""
+    del params, config
+    touched = 0
+    while keys := pop_smart_mix_refinement_reads(_READS_BATCH):
+        touched += touch(keys)
+        if is_cancelled(task_id):
+            return {"touched": touched, "deleted": 0, "cancelled": True}
+    deleted = 0
+    while True:
+        batch = cleanup_unread_refinements(
+            older_than_days=RETENTION_DAYS, limit=_CLEANUP_BATCH
+        )
+        deleted += batch
+        if batch < _CLEANUP_BATCH or is_cancelled(task_id):
+            break
+    return {"touched": touched, "deleted": deleted}
+
+
 SMART_MIX_REFINEMENT_TASK_HANDLERS = {
     "smart_mix_refine_transition": _handle_smart_mix_refine_transition,
+    "cleanup_smart_mix_refinements": _handle_cleanup_smart_mix_refinements,
 }
 
 __all__ = ["SMART_MIX_REFINEMENT_TASK_HANDLERS"]
