@@ -41,6 +41,16 @@ def get_smart_mix_structure_percent() -> float | None:
     return None if value is None else float(value)
 
 
+def get_smart_mix_refinement_latency_ms() -> int | None:
+    """Median AI refinement latency of the last 24 h, from the coverage snapshot.
+
+    ``refresh_smart_mix_coverage`` computes it; capabilities read it here.
+    """
+    snapshot = get_ops_runtime_state(COVERAGE_STATE_KEY)
+    value = (snapshot or {}).get("refinement_latency_p50_ms")
+    return None if value is None else int(value)
+
+
 def get_smart_mix_campaign_status() -> dict | None:
     return get_ops_runtime_state(CAMPAIGN_STATE_KEY)
 
@@ -77,5 +87,6 @@ __all__ = [
     "SMART_MIX_PROFILE_VERSION",
     "get_smart_mix_admin_status",
     "get_smart_mix_campaign_status",
+    "get_smart_mix_refinement_latency_ms",
     "get_smart_mix_structure_percent",
 ]

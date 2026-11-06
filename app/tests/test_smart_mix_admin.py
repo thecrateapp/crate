@@ -76,6 +76,8 @@ def test_status_counts_profile_versions_quality_and_checkpoint_state(pg_db) -> N
         "coverage_percent": 25.0,
         "structure_profiles": 0,
         "structure_percent": 0.0,
+        # No refinements yet (SM4): capabilities read null.
+        "refinement_latency_p50_ms": None,
         "quality": {
             "full": 1,
             "partial": 1,

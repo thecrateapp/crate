@@ -12,6 +12,26 @@ DecksFeature = Literal[
 ]
 
 
+class SmartMixAiAssistedCapabilities(BaseModel):
+    """AI Assisted Mixing (SM3-D9): whether clients may ask for refinements."""
+
+    available: bool
+    provider_kind: Literal["local", "cloud"] | None = Field(
+        description="local: the model runs on the operator's own server (Ollama)."
+    )
+    model_label: str | None = Field(description="Display text only.")
+    prompt_version: str
+    typical_latency_ms: int | None = Field(
+        description=(
+            "Median model latency of the refinements of the last 24 h, from the "
+            "coverage snapshot; null without data."
+        )
+    )
+    reason: (
+        Literal["smart_mix_unavailable", "disabled", "no_model", "budget"] | None
+    ) = None
+
+
 class SmartMixCapabilities(BaseModel):
     available: bool
     planner_version: str | None
@@ -32,6 +52,7 @@ class SmartMixCapabilities(BaseModel):
     android_beatmatch: bool
     android_bass_handoff: bool
     android_long_beatmatch: bool
+    ai_assisted: SmartMixAiAssistedCapabilities
 
 
 class VDJCapabilities(BaseModel):
