@@ -117,20 +117,17 @@ export function AddProviderDialog({
       <DialogContent
         aria-describedby={undefined}
         size={provider === "openai_compatible" ? "xl" : "md"}
-        className="flex max-h-[min(92dvh,960px)] flex-col overflow-hidden"
       >
         <DialogHeader>
           <DialogTitle className="font-display">Add provider</DialogTitle>
         </DialogHeader>
-        <form
-          onSubmit={(event) => void submit(event)}
-          className="flex min-h-0 flex-1 flex-col gap-4"
-        >
+        <form onSubmit={(event) => void submit(event)} className="space-y-4">
           {/* A manifest can outgrow the viewport: only the fields scroll, so
-              the title and the submit button stay reachable. */}
+              the title and the submit button stay reachable. 14rem leaves room
+              for the panel padding, the title and the footer. */}
           <div
             data-testid="add-provider-body"
-            className="-m-1 min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-1"
+            className="-mx-1 -mt-1 max-h-[calc(100dvh-14rem)] space-y-4 overflow-y-auto overscroll-contain p-1"
           >
             <SegmentedControl
               as="radio"

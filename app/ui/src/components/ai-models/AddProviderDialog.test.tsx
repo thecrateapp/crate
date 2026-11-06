@@ -237,10 +237,11 @@ describe("AddProviderDialog", () => {
 
     // jsdom has no layout: check the structure that keeps the title and the
     // submit button on screen when the manifest outgrows a phone viewport.
-    expect(dialog).toHaveClass("flex", "flex-col", "overflow-hidden");
-    expect(dialog.className).toMatch(/max-h-/);
+    // The body caps its own height; the shared panel keeps its sizing.
+    expect(dialog.className).not.toMatch(/(^|\s)(max-h|min-h|h)-/);
     const body = within(dialog).getByTestId("add-provider-body");
-    expect(body).toHaveClass("min-h-0", "flex-1", "overflow-y-auto");
+    expect(body).toHaveClass("overflow-y-auto");
+    expect(body.className).toMatch(/max-h-\[calc\(100dvh-/);
     expect(
       within(body).getByRole("combobox", { name: "Origin" }),
     ).toBeInTheDocument();
