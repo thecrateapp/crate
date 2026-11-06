@@ -14,6 +14,8 @@ from crate.api.auth import (
     _require_transition_plan_access,
     _require_vdj_scope,
 )
+from crate import smart_mix_ai
+from crate.api.permissions import has_capability
 from crate.api.radio import continuation_radio_tracks
 from crate.config import android_bass_handoff_enabled
 from crate.api.openapi_responses import COMMON_ERROR_RESPONSES
@@ -34,6 +36,7 @@ from crate.api.schemas.smart_mix import (
     TransitionPlanResponse,
 )
 from crate.db.cache_store import (
+    get_smart_mix_plan_and_refinement_caches,
     get_smart_mix_plan_caches,
     set_smart_mix_plan_caches,
 )
@@ -335,12 +338,12 @@ def transition_plans(
     request: Request,
     payload: TransitionPlanBatchRequest = Body(...),
 ) -> TransitionPlanBatchResponse:
-    _require_transition_plan_access(request)
+    user = _require_transition_plan_access(request)
     return TransitionPlanBatchResponse.model_validate(
         {
             "plannerVersion": payload.planner_version,
             "plans": _plan_transition_edges(
-                payload.edges, planner_version=payload.planner_version
+                payload.edges, planner_version=payload.planner_version, user=user
             ),
         }
     )
@@ -350,6 +353,7 @@ def _plan_transition_edges(
     edges: list[TransitionEdgeRequest],
     *,
     planner_version: str = PLANNER_IDENTIFIER,
+    user: dict | None = None,
 ) -> list[TransitionPlanResponse]:
     policy = _planner_policy(planner_version)
     unique_edges = _deduplicate_edges(edges)
@@ -364,7 +368,18 @@ def _plan_transition_edges(
         _plan_cache_key(edge, outgoing, incoming, policy)
         for edge, outgoing, incoming in edge_profiles
     ]
-    cached = get_smart_mix_plan_caches(cache_keys)
+    refinements = (
+        _refinement_batch(edge_profiles, user)
+        if user is not None and planner_reads_structure(policy.identifier)
+        else None
+    )
+    if refinements is None:
+        cached, cached_refinements = get_smart_mix_plan_caches(cache_keys), {}
+    else:
+        # One Redis round trip for the plans and their refinements (SM3-D5).
+        cached, cached_refinements = get_smart_mix_plan_and_refinement_caches(
+            cache_keys, list(refinements.keys.values())
+        )
     missed = [
         index for index, cache_key in enumerate(cache_keys) if cache_key not in cached
     ]
@@ -382,8 +397,9 @@ def _plan_transition_edges(
             cache_keys[index] = _plan_cache_key(edge, outgoing, incoming, policy)
     computed: dict[str, dict] = {}
     plans = []
-    for cache_key, (edge, outgoing, incoming) in zip(
-        cache_keys, edge_profiles, strict=True
+    statuses = refinements.resolve(cached_refinements) if refinements else {}
+    for index, (cache_key, (edge, outgoing, incoming)) in enumerate(
+        zip(cache_keys, edge_profiles, strict=True)
     ):
         serialized = cached.get(cache_key)
         if serialized is None:
@@ -391,9 +407,69 @@ def _plan_transition_edges(
                 edge, outgoing=outgoing, incoming=incoming, policy=policy
             )
             computed[cache_key] = serialized
+        if index in statuses:
+            serialized = {**serialized, "refinement": statuses[index]}
         plans.append(TransitionPlanResponse.model_validate(serialized))
     set_smart_mix_plan_caches(computed)
     return plans
+
+
+def _refinement_batch(
+    edge_profiles: list[
+        tuple[TransitionEdgeRequest, TrackMixProfile | None, TrackMixProfile | None]
+    ],
+    user: dict,
+) -> smart_mix_ai.RefinementBatch | None:
+    """The refinements a v3 request asked for, or None when no edge did."""
+    requests = [
+        smart_mix_ai.RefinementRequest(
+            position=index,
+            outgoing_track_entity_uid=str(edge.outgoing_track_entity_uid),
+            incoming_track_entity_uid=str(edge.incoming_track_entity_uid),
+            outgoing_profile_revision=(
+                outgoing.profile_revision if outgoing is not None else None
+            ),
+            incoming_profile_revision=(
+                incoming.profile_revision if incoming is not None else None
+            ),
+            context=_refinement_context(edge.context),
+            single_candidate=(
+                not edge.context.automatic or edge.context.source == "album"
+            ),
+        )
+        for index, (edge, outgoing, incoming) in enumerate(edge_profiles)
+        if edge.context.ai_refinement
+    ]
+    if not requests:
+        return None
+    return smart_mix_ai.RefinementBatch(
+        requests,
+        actor_id=user.get("id"),
+        access_reason=_refinement_access_reason(user),
+    )
+
+
+def _refinement_access_reason(user: dict) -> str | None:
+    """Sessions need `smart_mix.ai`; access tokens the `vdj.smart_mix.ai` scope.
+
+    A missing grant is a reason in the response, never a 403, so clients that
+    ask for refinements keep their deterministic plans.
+    """
+    if user.get("auth_type") == "access_token":
+        scopes = set(user.get("scopes") or [])
+        return None if smart_mix_ai.REFINE_SCOPE in scopes else "scope_missing"
+    return None if has_capability(user, "smart_mix.ai") else "permission_denied"
+
+
+def _refinement_context(payload: TransitionContextRequest) -> dict:
+    """The plan cache context plus the set history, which the prompt reads."""
+    context = _cache_context(payload)
+    if payload.set_history:
+        context["setHistory"] = [
+            entry.model_dump(mode="json", by_alias=True)
+            for entry in payload.set_history
+        ]
+    return context
 
 
 def _edge_profiles(
@@ -515,8 +591,10 @@ def _cache_context(payload: TransitionContextRequest) -> dict:
         context.pop("allowBassHandoff", None)
     if not payload.allow_long_beatmatch:
         context.pop("allowLongBeatmatch", None)
-    # No deterministic planner reads the set history: it must not split the cache.
+    # No deterministic planner reads the set history or the AI flag: they must
+    # not split the cache.
     context.pop("setHistory", None)
+    context.pop("aiRefinement", None)
     return context
 
 
