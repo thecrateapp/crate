@@ -266,6 +266,66 @@ def test_get_issue_and_latest_event_paths():
     assert event["eventID"] == "e" * 32
 
 
+def test_tag_values_reads_the_documented_endpoint_on_the_configured_host():
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(
+            200,
+            json={
+                "key": "release",
+                "name": "Release",
+                "uniqueValues": 13,
+                "totalValues": 40,
+                "topValues": [
+                    {
+                        "key": "crate-b",
+                        "name": "crate-b",
+                        "value": "crate-b",
+                        "count": 30,
+                        "firstSeen": "2026-11-01T10:00:00Z",
+                        "lastSeen": "2026-11-04T08:00:00Z",
+                    },
+                    {"value": "x" * 300, "count": "7"},
+                    {"value": None, "count": 1},
+                    "not an object",
+                    *({"value": f"crate-{n}", "count": 1} for n in range(20)),
+                ],
+            },
+        )
+
+    detail = _client(handler).tag_values("42", "release")
+
+    [request] = seen
+    # Regional host, organization-scoped path, configured environments only.
+    assert request.url.host == "us.sentry.io"
+    assert request.url.path == (
+        "/api/0/organizations/ninja-development/issues/42/tags/release/"
+    )
+    assert request.url.params.get_list("environment") == ["production"]
+    assert (detail["key"], detail["total"], detail["unique"]) == ("release", 40, 13)
+    assert len(detail["top"]) == 10
+    assert detail["top"][0] == {
+        "value": "crate-b",
+        "count": 30,
+        "first_seen": datetime(2026, 11, 1, 10, tzinfo=timezone.utc),
+        "last_seen": datetime(2026, 11, 4, 8, tzinfo=timezone.utc),
+    }
+    assert detail["top"][1]["value"] == "x" * 200 and detail["top"][1]["count"] == 7
+
+
+@pytest.mark.parametrize("key", ["", "Release", "../events", "user.email/x", "a" * 33])
+def test_tag_values_rejects_odd_keys_before_sending(key):
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("no request expected")
+
+    with pytest.raises(ValueError):
+        _client(handler).tag_values("42", key)
+    with pytest.raises(ValueError):
+        _client(handler).tag_values("../42", "release")
+
+
 def test_update_status_payload():
     seen: list[httpx.Request] = []
 
