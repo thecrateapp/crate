@@ -102,6 +102,9 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     # A person's Investigate: Sentry evidence reads (≤ 20s), then one
     # ops.error.investigate call (≤ 90s).
     "investigate_error_issue": TaskPoolConfig("ai", 0, 180, 0),
+    # Error triage evaluation (gate EG2): one ops.error.triage call (<= 45s) for each
+    # of at most 100 listed issues, nothing saved; queued by tools/error-inbox-eval.
+    "evaluate_error_triage": TaskPoolConfig("ai_bulk", 3, 7200, 0),
     # User-initiated (priority 0) — these should run ASAP
     "tidal_download": TaskPoolConfig(
         "default", 0, 14400, 0

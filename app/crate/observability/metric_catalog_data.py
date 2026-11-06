@@ -233,6 +233,7 @@ LABEL_VALUES = {
         "enrich_artists",
         "enrich_genre_descriptions",
         "enrich_mbids",
+        "evaluate_error_triage",
         "export_rich_metadata",
         "federation_directory_refresh",
         "federation_health_poll",

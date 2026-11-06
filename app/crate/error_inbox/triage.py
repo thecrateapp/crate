@@ -123,13 +123,19 @@ def _input_limit(context: Mapping[str, Any] | None) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
-def _request(
+def build_request(
     kind: str,
     data: Mapping[str, Any],
     candidates: list[str],
     frame_count: int,
     evidence: Mapping[str, Any] | None = None,
 ) -> tuple[str, type[ErrorTriageResponse] | type[ErrorInvestigationResponse], str]:
+    """The system prompt, the narrowed response model and the prompt of one call.
+
+    `data` is what `get_triage_input` returns. The evaluation tool
+    (`crate.error_inbox.evaluation`) sends exactly this request, so what it measures
+    is what triage sends.
+    """
     digest = data["digest"]
     if kind == "investigation":
         prompt = build_investigation_prompt(
@@ -200,7 +206,7 @@ def triage_issue(
     candidates = candidate_ids(data["candidates"])
     frame_count = len(digest.get("frames") or [])
     extra = evidence(data) if evidence is not None and kind == "investigation" else None
-    system, response_model, prompt = _request(
+    system, response_model, prompt = build_request(
         kind, data, candidates, frame_count, extra
     )
     try:
@@ -274,6 +280,7 @@ __all__ = [
     "TriageKind",
     "TriageOutcome",
     "TriageStatus",
+    "build_request",
     "idempotency_key",
     "triage_issue",
 ]
