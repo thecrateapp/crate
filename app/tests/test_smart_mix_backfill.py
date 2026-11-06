@@ -7,8 +7,6 @@ import uuid
 import pytest
 from sqlalchemy import text
 
-import pytest
-
 from crate.db.jobs import smart_mix_backfill
 from crate.db.jobs.smart_mix_backfill import claim_smart_mix_backfill_batch
 from crate.db.tx import read_scope, transaction_scope
@@ -1858,12 +1856,6 @@ def test_fresh_campaign_after_the_cancelled_v6_one_claims_old_rows_once(
     from crate.db.jobs.smart_mix_backfill import (
         get_smart_mix_campaign,
         refresh_smart_mix_coverage,
-
-
-def test_campaign_stores_the_night_window_and_keeps_it_when_omitted(pg_db) -> None:
-    del pg_db
-    from crate.db.jobs.smart_mix_backfill import (
-        get_smart_mix_campaign,
         save_smart_mix_campaign,
         start_smart_mix_campaign,
     )
@@ -2151,6 +2143,14 @@ def test_profile_falls_back_when_beat_model_fails(monkeypatch, caplog) -> None:
     assert published == [draft]
     assert "Beat This!" in caplog.text
 
+
+def test_campaign_stores_the_night_window_and_keeps_it_when_omitted(pg_db) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        get_smart_mix_campaign,
+        save_smart_mix_campaign,
+        start_smart_mix_campaign,
+    )
 
     # A campaign saved before the night window existed reads the defaults.
     save_smart_mix_campaign(_running_campaign(status="paused"))
