@@ -23,6 +23,11 @@ from crate.ai.contracts import (
 
 MIN_INPUT_TOKENS = 4096
 PREFERRED_IMAGE_DETAIL: dict[str, ImageDetail] = {"shows.extract.vision": "ultra_high"}
+# A feature's own reasoning when the request leaves it to the provider: Smart Mix
+# refinement answers while a transition approaches, so it starts low (SM4.PR1).
+PREFERRED_REASONING: dict[str, ReasoningConfig] = {
+    "smart_mix.transition.refine": ReasoningConfig(mode="level", level="low"),
+}
 
 
 @dataclass(frozen=True)
@@ -79,6 +84,20 @@ def _image_detail(
         (detail for detail in candidates if detail in model.image_details), None
     )
     return chosen, chosen is not None and chosen != candidates[0]
+
+
+def _preferred_reasoning(
+    reasoning: ReasoningConfig, model: ModelCapabilities, action_id: str
+) -> ReasoningConfig:
+    """The feature's own reasoning for a provider-default request, when native."""
+    preferred = PREFERRED_REASONING.get(action_id)
+    if (
+        preferred is None
+        or reasoning.mode != "provider_default"
+        or preferred.level not in model.reasoning_levels
+    ):
+        return reasoning
+    return preferred
 
 
 def _resolve_reasoning(
@@ -143,7 +162,7 @@ def _derive_limits(
     if image_detail is None:
         return DerivedConfig(action_id, None, "AI_PROFILE_INCOMPATIBLE")
     resolved_reasoning, reasoning_adjusted = _resolve_reasoning(
-        reasoning, model, output
+        _preferred_reasoning(reasoning, model, action_id), model, output
     )
 
     adjustments: list[Literal["reasoning", "image_detail"]] = []

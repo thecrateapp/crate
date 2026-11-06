@@ -89,6 +89,7 @@ describe("FEATURE_AREAS / featureAreaLabel", () => {
       "genres",
       "discovery",
       "translation",
+      "smart_mix",
       "ops",
     ]);
   });
@@ -100,6 +101,7 @@ describe("FEATURE_AREAS / featureAreaLabel", () => {
     expect(featureAreaLabel("genres")).toBe("Genres");
     expect(featureAreaLabel("discovery")).toBe("Discovery");
     expect(featureAreaLabel("translation")).toBe("Translations");
+    expect(featureAreaLabel("smart_mix")).toBe("Smart Mix");
     expect(featureAreaLabel("ops")).toBe("Operations");
   });
 
@@ -146,6 +148,10 @@ describe("featureSends", () => {
     [
       "ops.error.investigate",
       "Sends: the scrubbed error summary, its counts and releases, and similar issues",
+    ],
+    [
+      "smart_mix.transition.refine",
+      "Sends: tempo, key, energy and phrase numbers of two tracks, their genres if allowed, and the candidate transitions",
     ],
   ];
 
