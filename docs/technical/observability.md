@@ -351,7 +351,10 @@ lane, never inside an Admin request:
 A person's press after a failure is a new attempt; automatic triage never resends
 a digest. When the bound profile's input limit is too small for the digest, the
 task fails before anything is sent and says how many input tokens the call needed
-and what the profile allows. The digest is never trimmed to fit.
+and what the profile allows. The digest is never trimmed to fit. When the model's
+answer is cut off at the profile's output limit (reasoning models spend part of it
+thinking), the task fails with `AI_OUTPUT_LIMIT`, names that limit and saves
+nothing.
 
 #### Evaluating the triage before turning it on
 

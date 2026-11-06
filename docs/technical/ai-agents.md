@@ -335,6 +335,18 @@ investigation must also return a hypothesis and a next step. Any other output
 fails the invocation with `AI_RESPONSE_INVALID` and nothing is saved. A valid
 result goes to `error_issue_triage` with its invocation ID.
 
+**Output limit.** When the provider stops because the answer reached the profile's
+output limit (Gemini `finishReason: MAX_TOKENS`, DeepSeek `finish_reason: length`,
+Ollama `done_reason: length`) and what it returned is not a valid answer, the
+runtime fails the invocation with `AI_OUTPUT_LIMIT` instead of
+`AI_RESPONSE_INVALID`, for every action. Reasoning counts against that limit, so a
+model can spend it all thinking and return little or nothing. The invocation keeps
+its token usage, AI activity shows «The answer was cut off at the profile's output
+limit, reasoning included», and a triage or investigation task says which limit it
+reached («The answer was cut off at the AI profile's 2,048-token output limit, so
+nothing was saved…»). An answer that is complete and valid when the limit stops it
+is kept.
+
 **One result per issue, kind and digest.** `triage_issue`
 (`crate.error_inbox.triage`) returns an existing result without calling the
 model; only a saved result counts as done. The idempotency key keeps a redelivered

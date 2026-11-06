@@ -30,11 +30,14 @@ _BASES = {
     "gemini": "https://generativelanguage.googleapis.com",
     "deepseek": "https://api.deepseek.com",
 }
+# The answer stopped at the profile's max_output_tokens before it was complete.
+OUTPUT_LIMIT_CODE = "AI_OUTPUT_LIMIT"
 _CODES = {
     "AI_ENDPOINT_INVALID",
     "AI_PROVIDER_TIMEOUT",
     "AI_PROVIDER_FAILED",
     "AI_RESPONSE_INVALID",
+    OUTPUT_LIMIT_CODE,
 }
 
 
@@ -44,6 +47,25 @@ class NativeResponse:
     usage: dict | None
     reported_model: str | None
     duration_ms: int
+    # The provider stopped because the answer reached the output limit.
+    truncated: bool = False
+
+
+def hit_output_limit(provider: str, data: Any) -> bool:
+    """Whether a native response stopped at the output limit, not at its end.
+
+    Gemini reports `finishReason: MAX_TOKENS`, DeepSeek `finish_reason: length` and
+    Ollama `done_reason: length`. Reasoning tokens count against that limit, so a
+    model that thinks long can stop before, or in the middle of, its answer.
+    """
+    try:
+        if provider == "gemini":
+            return data["candidates"][0].get("finishReason") == "MAX_TOKENS"
+        if provider == "deepseek":
+            return data["choices"][0].get("finish_reason") == "length"
+        return data.get("done_reason") == "length"
+    except (KeyError, IndexError, TypeError, AttributeError):
+        return False
 
 
 def _fail(code="AI_PROVIDER_FAILED"):
@@ -333,16 +355,26 @@ def generate(
             body=body,
             deadline=deadline,
         )
+        truncated = hit_output_limit(provider, data)
         if provider == "gemini":
+            candidate = data["candidates"][0]
+            # Thinking can spend the whole allowance and leave no answer part.
+            parts = (
+                (candidate.get("content") or {}).get("parts") or []
+                if truncated
+                else candidate["content"]["parts"]
+            )
             text = "".join(
                 part["text"]
-                for part in data["candidates"][0]["content"]["parts"]
+                for part in parts
                 if "text" in part and not part.get("thought")
             )
         elif provider == "deepseek":
             text = data["choices"][0]["message"]["content"]
         else:
             text = data["message"]["content"]
+        if text is None and truncated:
+            text = ""
         if not isinstance(text, str):
             raise _fail("AI_RESPONSE_INVALID")
         model = data.get("modelVersion" if provider == "gemini" else "model")
@@ -353,6 +385,7 @@ def generate(
             _usage(provider, data),
             model,
             int((time.monotonic() - started) * 1000),
+            truncated,
         )
     except AIConfigurationError:
         raise
@@ -407,6 +440,7 @@ def generate_legacy(
         data.get("usage"),
         data.get("reported_model"),
         int((time.monotonic() - started) * 1000),
+        data.get("truncated") is True,
     )
 
 
@@ -471,17 +505,25 @@ def _legacy_response(packet):
         "private_response": True,
         "_injected": injected,
     }
-    if body.get("image") is not None:
-        result = provider.ask_image_structured(
-            Response,
-            body["prompt"],
-            image=base64.b64decode(body["image"]),
-            media_type=body["media_type"],
-            image_detail=options["image_detail"],
-            **kwargs,
-        )
-    else:
-        result = provider.ask_structured(Response, body["prompt"], **kwargs)
+    try:
+        if body.get("image") is not None:
+            result = provider.ask_image_structured(
+                Response,
+                body["prompt"],
+                image=base64.b64decode(body["image"]),
+                media_type=body["media_type"],
+                image_detail=options["image_detail"],
+                **kwargs,
+            )
+        else:
+            result = provider.ask_structured(Response, body["prompt"], **kwargs)
+    except Exception:
+        # The old client cannot parse an answer cut off at the output limit.
+        if captured and hit_output_limit(context["provider"], captured[0]):
+            raise AIConfigurationError(
+                OUTPUT_LIMIT_CODE, "The answer reached the output limit"
+            ) from None
+        raise
     data = captured[0] if captured else {}
     model = data.get("modelVersion" if context["provider"] == "gemini" else "model")
     if not isinstance(model, str) or not 1 <= len(model) <= 200:
@@ -490,6 +532,7 @@ def _legacy_response(packet):
         "text": result.model_dump_json(),
         "usage": _usage(context["provider"], data) if captured else None,
         "reported_model": model,
+        "truncated": bool(captured) and hit_output_limit(context["provider"], data),
     }
 
 

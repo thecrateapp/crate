@@ -5,7 +5,9 @@
 validated result in `error_issue_triage`. Nothing else is stored: not the prompt and
 not the raw response. Output outside the closed schema, a `duplicate_of` outside
 the candidates or a frame index outside the digest fail the call as
-`AI_RESPONSE_INVALID`, and nothing is saved.
+`AI_RESPONSE_INVALID`, and nothing is saved. An answer the provider stopped at the
+profile's output limit (reasoning models spend part of it thinking) fails as
+`AI_OUTPUT_LIMIT` instead; the outcome then carries that limit.
 
 One result per issue, kind and digest: an existing result is returned without a
 call. The call's idempotency key keeps a redelivered task from paying twice:
@@ -69,6 +71,7 @@ ACTION_BY_KIND: dict[str, str] = {
 }
 INVALID_OUTPUT_CODE = "AI_RESPONSE_INVALID"
 INPUT_TOO_LARGE_CODE = "AI_INPUT_TOO_LARGE"
+OUTPUT_LIMIT_CODE = "AI_OUTPUT_LIMIT"
 
 # Reads extra evidence for an investigation from the triage input (Sentry counts).
 EvidenceReader = Callable[[Mapping[str, Any]], Mapping[str, Any] | None]
@@ -105,6 +108,8 @@ class TriageOutcome:
     # AI_INPUT_TOO_LARGE: the tokens the call needed and the profile's limit.
     input_tokens: int | None = None
     input_limit: int | None = None
+    # AI_OUTPUT_LIMIT: the profile's output limit the answer reached.
+    output_limit: int | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -117,9 +122,9 @@ def idempotency_key(
     return f"{key}:{attempt}" if attempt else key
 
 
-def _input_limit(context: Mapping[str, Any] | None) -> int | None:
+def _profile_limit(context: Mapping[str, Any] | None, key: str) -> int | None:
     config = (context or {}).get("config")
-    value = config.get("max_input_tokens") if isinstance(config, Mapping) else None
+    value = config.get(key) if isinstance(config, Mapping) else None
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
@@ -230,7 +235,14 @@ def triage_issue(
                 input_tokens=estimated_input_tokens(
                     prompt, system, response_model.model_json_schema()
                 ),
-                input_limit=_input_limit(context),
+                input_limit=_profile_limit(context, "max_input_tokens"),
+            )
+        if error.code == OUTPUT_LIMIT_CODE:
+            return outcome(
+                "failed",
+                digest_hash=digest_hash,
+                error_code=error.code,
+                output_limit=_profile_limit(context, "max_output_tokens"),
             )
         status: TriageStatus = (
             "invalid_output" if error.code == INVALID_OUTPUT_CODE else "failed"
@@ -275,6 +287,7 @@ __all__ = [
     "ACTION_BY_KIND",
     "INPUT_TOO_LARGE_CODE",
     "INVALID_OUTPUT_CODE",
+    "OUTPUT_LIMIT_CODE",
     "EvidenceReader",
     "StructuredExecutor",
     "TriageKind",

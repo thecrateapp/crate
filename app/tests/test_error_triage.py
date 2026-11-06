@@ -770,6 +770,47 @@ def test_input_too_large_says_which_limit_to_raise(pg_db, monkeypatch):
     assert calls == [] and _invocations() == [] and _triages(target) == []
 
 
+def test_an_answer_cut_off_at_the_output_limit_says_which_limit(issues, monkeypatch):
+    calls: list[dict[str, Any]] = []
+
+    def generate(context, **kwargs):
+        # Production, 2026-11-06: thought plus output tokens equal the limit.
+        calls.append(context["config"])
+        return NativeResponse(
+            '{"classification": "bug", "sev',
+            {"input_tokens": 3000, "output_tokens": 80, "thought_tokens": 1968},
+            "fake-model",
+            1,
+            truncated=True,
+        )
+
+    monkeypatch.setattr(runtime.transport, "generate", generate)
+    target = issues["target"]
+
+    result = _run("triage", target, origin="automatic")
+
+    assert (result["status"], result["error_code"]) == ("failed", "AI_OUTPUT_LIMIT")
+    assert result["output_limit"] == calls[0]["max_output_tokens"] == 2048
+    assert "2,048-token output limit" in result["error"]
+    assert "Triage error issue" in result["error"]
+    assert len(result["error"]) <= 200
+    assert [row["error_code"] for row in _invocations()] == ["AI_OUTPUT_LIMIT"]
+    assert _triages(target) == []
+
+    investigated = _run("investigation", target, actor_id=_operator())
+    assert investigated["error_code"] == "AI_OUTPUT_LIMIT"
+    assert "Investigate error issue" in investigated["error"]
+
+
+def test_output_limit_text_without_a_known_limit():
+    from crate.worker_handlers.error_inbox import ai_problem_text
+
+    text = ai_problem_text("triage", "AI_OUTPUT_LIMIT")
+
+    assert text.startswith("The answer was cut off at the AI profile's output limit")
+    assert "did not match the expected format" not in text
+
+
 def test_input_estimate_is_the_runtime_bound():
     schema = {"type": "object"}
 

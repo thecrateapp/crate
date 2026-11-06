@@ -108,6 +108,7 @@ from crate.error_inbox.state import (
 from crate.error_inbox.triage import (
     ACTION_BY_KIND,
     INPUT_TOO_LARGE_CODE,
+    OUTPUT_LIMIT_CODE,
     StructuredExecutor,
     TriageOutcome,
     triage_issue,
@@ -881,6 +882,17 @@ def ai_problem_text(
             f"This issue is larger than the AI profile bound to {label} accepts. "
             "Raise its input limit in AI models and try again."
         )
+    if code == OUTPUT_LIMIT_CODE:
+        limit = (
+            f"{outcome.output_limit:,}-token "
+            if outcome is not None and outcome.output_limit
+            else ""
+        )
+        return (
+            f"The answer was cut off at the AI profile's {limit}output limit, so "
+            f"nothing was saved. Raise it for {label} in AI models, or use a model "
+            "that reasons less."
+        )
     if code == "AI_RESPONSE_INVALID":
         return (
             "The model's answer did not match the expected format, so nothing was "
@@ -987,6 +999,7 @@ def run_triage_task(
         digest_hash=outcome.digest_hash,
         input_tokens=outcome.input_tokens,
         input_limit=outcome.input_limit,
+        output_limit=outcome.output_limit,
         **({"evidence": evidence} if evidence else {}),
     )
 
