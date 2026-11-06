@@ -34,6 +34,8 @@ sources:
   - app/crate/db/jobs/analysis_storage.py
   - app/crate/db/jobs/smart_mix_backfill.py
   - app/crate/db/migrations/versions/147_smart_mix_structure.py
+  - app/crate/smart_mix/backfill_window.py
+  - app/ui/src/components/SmartMixBackfillSettings.tsx
   - app/crate/db/queries/smart_mix_admin_tracks.py
   - app/crate/db/queries/smart_mix_compatible.py
   - app/crate/db/repositories/smart_mix.py
@@ -64,6 +66,7 @@ sources:
   - app/tests/test_smart_mix_planner.py
   - app/tests/test_smart_mix_publication.py
   - app/tests/test_smart_mix_backfill.py
+  - app/tests/test_smart_mix_backfill_window.py
   - app/tests/test_smart_mix_admin.py
 ---
 
@@ -551,8 +554,11 @@ structure; check `refreshedAt` before reading zeros as a library with nothing pe
 | `compute_smart_mix_profile`   | `heavy`       | Analysis and publication per track        |
 | `refresh_smart_mix_coverage`  | `maintenance` | Aggregates coverage outside the request   |
 
-The backfill applies resource pressure and limits the work in flight. Its Admin settings
-accept `batchSize` from 1 to 100 (25 by default) and `maxAttempts` from 1 to 10 (3 by default).
+The backfill applies resource pressure and limits the work in flight to the limit of the
+[night window](#night-window): 8 at night and 4 by day by default. Its Admin settings accept
+`batchSize` from 1 to 100 (25 by default) and `maxAttempts` from 1 to 10 (3 by default).
+`batchSize` caps how many tracks one pass claims, `min(batchSize, limit - in flight)`; it no
+longer bounds the work in flight, which it did, at 25, before the night window.
 Claims use `SKIP LOCKED`, a token, `target_generation` and attempts. A track is claimable
 unless its profile is at the target analyzer and profile schema, current and usable; a
 profile the backfill just wrote is never claimed again. `target_generation` is the analyzer
@@ -575,10 +581,95 @@ completes has exhausted the claimable work in that pass; it can still leave exha
 non-current profiles. Check coverage and `processing.exhausted` before treating the backlog as
 resolved. A coordinating task in `done` does not mean all of its children have finished either.
 
+### Night window
+
+Nobody listens at night, so the backfill keeps more analyses in flight inside a night window
+(SM3-D15). Admin edits it in the Smart Mix panel of Analysis, next to the batch size and the
+attempts, and the start and resume calls take it in the same body:
+
+| Setting            | Default                             | Accepted values                                               |
+| ------------------ | ----------------------------------- | ------------------------------------------------------------- |
+| `nightWindow`      | `01:00` to `08:00`, `Europe/Madrid` | `{start, end, timezone}`: `HH:MM`, different times, IANA name |
+| `nightConcurrency` | 8                                   | 1 to 32                                                       |
+| `dayConcurrency`   | 4                                   | 1 to 32                                                       |
+
+- The window uses the local clock of its timezone, so it follows DST changes. It can cross
+  midnight; the start belongs to the window and the end does not.
+- In flight means claims of this backfill: `smart_mix` rows in `analyzing` for the current
+  target whose child task (`compute_smart_mix_profile` with that claim token) is `pending` or
+  `running`, however long it has waited. A claim whose child has not been queued yet counts for
+  five minutes, the time the coordinator takes between claiming and queuing. Imports claim the
+  `analysis` and `bliss` pipelines and **Reanalyze track** takes no claim, so neither counts.
+- A child that ends without settling its claim (retries exhausted, cancelled, or failed by the
+  zombie cleanup after its worker died) stops counting at once. The next claim, and the service
+  loop after each zombie cleanup, mark such claims `failed` with the error "The analysis task
+  ended without settling its claim". The attempt still counts, so a track that keeps killing its
+  worker ends up exhausted instead of being retried forever.
+- A pass claims at most `batchSize` tracks and never more than the limit of the current window
+  minus what is in flight. The claim counts again inside its transaction, under a lock that every
+  coordinator takes, so two coordinators can never exceed the limit together. The window, not
+  `batchSize`, bounds the work in flight.
+- When the limit is reached, the coordinator's task goes back to `pending` with the progress
+  `Waiting for a free slot: 4 of 4 in flight (day)` and runs again later. It holds no worker
+  process while it waits. It does the same when nothing is left to claim while analyses are
+  still running (`Waiting for the 2 analyses in flight to finish`), and completes the campaign
+  once nothing is in flight.
+- The wait follows how long the slots have stayed as they are, measured from the last change to
+  a `smart_mix` processing row (a claim, a finished or failed analysis): 3 s right after one,
+  then about double each time while nothing changes, up to 30 s. A freed slot is therefore
+  refilled within 30 s at worst and within a few seconds while analyses finish often.
+- If the resource governor denies the coordinator after the actor admitted it, the coordinator
+  goes back to the queue the same way, for the governor's delay and at most five minutes, with
+  the progress `Deferred by resource governor: <reason>`. It never sleeps in a worker process.
+- A change of window, or of the settings, applies to the next claim and cancels nothing. At
+  08:00 with eight analyses accepted, they finish and the coordinator claims again once fewer
+  than four are left.
+- The settings are stored in the campaign. A campaign saved before the window existed reads the
+  defaults. A start or resume that omits a setting keeps the stored one, even across a new
+  campaign after a cancel. **Apply settings**, shown while the backfill runs, sends them to the
+  running campaign through `POST /api/admin/smart-mix/backfill`, which answers
+  `already_running`.
+- `GET /api/admin/smart-mix/status` returns `backfillSettings` (those of the stored campaign, or
+  what a new one would use) and `backfillLimit` (`window` `night` or `day`, and `limit`). Admin
+  shows it next to the coverage as `Night window · 8 in flight` or `Day · 4 in flight`. A pass
+  that claims returns the same `window` and `limit`.
+
+The limit counts children; the analyses run in the processes of `crate-analysis-worker`, so
+`ANALYSIS_WORKER_PROCESSES` is the night maximum. Set it to the night limit: the window then needs
+no restart or outside scaling, which Crate could not do anyway without the Docker socket. With
+fewer processes the extra children wait in `heavy`. The coordinator needs no process of its own:
+it runs for a moment every few seconds and waits in the queue, so with eight processes and a night
+limit of eight, eight analyses run. By day the processes the backfill leaves free serve other
+`heavy` work.
+
+The cap on the work in flight used to be `batchSize`, 25 by default, so a deploy ran as many
+backfill analyses as `crate-analysis-worker` had processes. Now the window caps it, so by day the
+backfill runs at most four however many processes there are, and on a deploy with more than four
+it runs fewer analyses by day than before. That is intended (SM3-D15): the day keeps capacity for
+imports, reanalyses and listeners, and the night makes up for it. To run more by day, raise
+`dayConcurrency` in Admin; adding processes does not.
+
+On the project server (i7-7700, 4 cores and 8 threads) set `ANALYSIS_WORKER_PROCESSES=8` in
+`.env` and recreate the service with `docker compose up -d crate-analysis-worker`.
+`docker-compose.project.yaml` gives it `cpus: "7.0"`, which leaves a logical CPU for Postgres and
+the API at night, and `mem_limit: 14g`, which covers the 1.5 GB at which each process recycles
+itself plus the parent with the import analysis daemons. Watch its memory during the first night
+with `docker stats crate-analysis-worker`. Eight analyses on four cores share them through
+Hyper-Threading, so the night gains less than double the day's throughput.
+
+The resource governor still applies on top of the window. With its default `max_load_ratio` of
+0.85, a child that starts while the one-minute load is above 6.8 on eight logical CPUs waits five
+minutes, so a night with eight analyses settles at six or seven. A deferred child stays `pending`
+and keeps its claim, so it still counts as in flight and the coordinator does not claim another
+track in its place: its slot stays empty until it runs. The real concurrency at night is
+therefore often below the night limit, and by day listeners can hold it below the day limit for
+as long as they listen. To run all eight at night, raise `max_load_ratio` in the runtime policy;
+the same threshold also applies by day.
+
 ### Running the v7 backfill (Smart Mix 3)
 
 Production holds a `cancelled` campaign with `target` `smart-mix-audio-v6`. After the release
-with v7 and migrations 147 to 150 is deployed through the normal process, recompute the library
+with v7 and migrations 147 to 153 is deployed through the normal process, recompute the library
 like this. The queues do not change: the coordinator and each analysis run on `heavy`.
 
 1. **Check the starting point.** Open Admin, Analysis, Smart Mix, or call
@@ -589,26 +680,29 @@ like this. The queues do not change: the coordinator and each analysis run on `h
    coverage refresh: read it again a minute later. Coverage starts close to 0 % and `versions`
    lists the v6 and v5 profiles still being served. If `activeTask` is not null, wait for it
    to finish (it exits at once for a cancelled campaign) or cancel it from Tasks.
-2. **Start the campaign.** Press **Start backfill** (batch size 25, 3 attempts), or call
+2. **Set the night limit.** On the project server set `ANALYSIS_WORKER_PROCESSES=8` in `.env`
+   and recreate `crate-analysis-worker` (see [Night window](#night-window)).
+3. **Start the campaign.** Press **Start backfill** (batch size 25, 3 attempts), or call
    `POST /api/admin/smart-mix/backfill` with `{"batchSize": 25, "maxAttempts": 3}`. The answer
    is `{"status": "queued", "taskId": "…"}` and the campaign becomes `target`
    `smart-mix-audio-v7`, `profile_version` `1`, `status` `running`, `batches` and `claimed`
    `0`. Raise `batchSize` (up to 100) only if the heavy worker keeps up.
-3. **Watch it.** `controlState` `running`; `campaign.batches` and `campaign.claimed` grow;
+4. **Watch it.** `controlState` `running`; `campaign.batches` and `campaign.claimed` grow;
    `currentProfiles` and `coveragePercent` rise; `processing.active`, `failed` and `exhausted`
    show the work and its errors; `GET /api/admin/smart-mix/activity` gives
    `tracksPerMinute`. The campaign claims every profile that is not v7: the v6 profiles the
    cancelled campaign rewrote, v5 profiles, tracks without a profile, `unavailable` and
-   source-changed profiles. Claims the v6 campaign left in `analyzing` become claimable two
-   hours after they were taken. Each rewritten track is claimed once.
-4. **Pause, resume or cancel.** **Pause backfill** or `POST /api/admin/smart-mix/backfill/pause`
+   source-changed profiles. Claims the v6 campaign left in `analyzing` have no live child
+   task, so the first pass marks them `failed` and, being of another generation, claims them
+   again at once. Each rewritten track is claimed once.
+5. **Pause, resume or cancel.** **Pause backfill** or `POST /api/admin/smart-mix/backfill/pause`
    (only from `running`, 409 otherwise); **Resume backfill** or
    `POST /api/admin/smart-mix/backfill/resume` with the same body as the start, which keeps
    the counters; **Cancel backfill** or `POST /api/admin/smart-mix/backfill/cancel` (from
    `running` or `paused`). None of them interrupts analyses already handed to the heavy queue.
    Starting again after a cancel opens a new v7 campaign that only claims what is still not
    v7.
-5. **Close it.** The campaign turns `completed` when a pass claims nothing and nothing is in
+6. **Close it.** The campaign turns `completed` when a pass claims nothing and nothing is in
    flight. Then check `processing.exhausted` and the track list filters `outdated` and
    `failed`, and use **Reanalyze track** for the ones worth retrying. Once the backfill has
    finished, a later release can drop v6 and v5 from `READABLE_ANALYZER_VERSIONS`.
@@ -834,7 +928,7 @@ Crate Agent; an MCP Bearer token is not an Admin session or a VirtualDJ PAT.
 | `POST /api/playback/continuation-token` and `/api/playback/continuation`     | Contract for continuing planning and the queue in the native runtime                                                    |
 | `GET /api/admin/smart-mix/status`                                            | Coverage, campaign and coordinating task; can enqueue `refresh_smart_mix_coverage` if it is missing or older than 600 s |
 | `GET /api/admin/smart-mix/tracks` and `/activity`                            | Paginated profiles and processing, and task activity                                                                    |
-| `POST /api/admin/smart-mix/backfill` and `/backfill/resume\|pause\|cancel`   | Change campaign control                                                                                                 |
+| `POST /api/admin/smart-mix/backfill` and `/backfill/resume\|pause\|cancel`   | Change campaign control and settings                                                                                    |
 | `POST /api/admin/smart-mix/tracks/{id}/reanalyze`                            | Enqueues analysis for one track, with deduplication                                                                     |
 | `GET /api/admin/smart-mix/tracks/{id}/structure`                             | Stored phrases (with end and voice byte), energy curve and bar starts of one profile, for review in Admin               |
 

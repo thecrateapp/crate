@@ -44,9 +44,12 @@ is legacy (`worker --legacy` only); do not extend it or `claim_next_task`.
    `worker_handlers/__init__.py`). Heartbeat thread updates `heartbeat_at` every 15s.
 5. Result: dict with `error` or `status in {"failed","conflict"}` -> `failed` (no retry);
    `{"_delegated": True, "chunks": n}` -> `delegated`, children fan in via `parent_task_id`;
-   anything else -> `completed` (so `{"status": "skipped", ...}` is a success). Raised exception
-   or `TimeLimitExceeded` -> `fail_or_retry_task` (DB `retry_count < max_retries` -> back to
-   `pending`). A `task_done` event is published in every case.
+   `run_again_later(seconds, progress=...)` (`worker_handlers/__init__.py`) -> back to
+   `pending` and sent again after `seconds`, without holding a process while it waits;
+   anything else -> `completed` (so `{"status": "skipped", ...}` is a success). Raised
+   exception or `TimeLimitExceeded` -> `fail_or_retry_task` (DB `retry_count < max_retries`
+   -> back to `pending`). A `task_done` event is published in every case except
+   `run_again_later`.
 6. After each message `_check_memory()` SIGTERMs the process above 1500 MB RSS; Dramatiq respawns it.
 
 Healing: service loop marks zombies (no heartbeat 5 min) and redispatches `pending` rows older
@@ -90,6 +93,8 @@ than 300s. The `tasks` row is the source of truth; Redis messages can be lost or
   (see `enrich_artists`, `analysis._try_complete_parent`) instead of raising the limit.
 - Cooperative cancellation: poll `is_cancelled(task_id)` (`worker_handlers/__init__.py`) between
   items in any loop longer than a few seconds and return early.
+- Never sleep in a handler to wait for capacity: the task holds a worker process meanwhile.
+  Return `run_again_later(...)` instead.
 - No DB transport outside `crate/db/` (`tests/test_db_access_boundaries.py`) and no new imports
   from the `crate.db` facade (`tests/test_runtime_boundaries.py`).
 - Do not enqueue per-item tasks inside large loops; batch, or let daemons claim work.

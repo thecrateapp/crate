@@ -37,6 +37,8 @@ from crate.db.jobs.smart_mix_backfill import (
     refresh_live_smart_mix_coverage,
     refresh_smart_mix_coverage,
     release_smart_mix_claims,
+    seconds_since_smart_mix_change,
+    smart_mix_profile_dedup_key,
 )
 from crate.db.repositories.library import (
     get_library_album,
@@ -54,8 +56,9 @@ from crate.db.repositories.smart_mix_signals import (
 )
 from crate.db.repositories.tasks import create_task
 from crate.smart_mix.source import smart_mix_source_revision
+from crate.smart_mix.backfill_window import backfill_window_limit
 from crate.task_progress import TaskProgress, emit_progress, entity_label
-from crate.worker_handlers import TaskHandler, is_cancelled
+from crate.worker_handlers import TaskHandler, is_cancelled, run_again_later
 
 log = logging.getLogger(__name__)
 
@@ -78,9 +81,17 @@ _MAX_BACKFILL_FINGERPRINT_LIMIT = 50_000
 # Concurrency / backpressure constants
 _POPULARITY_CHUNK_SLEEP_SECONDS = 0.25
 _WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS = 300
-_SMART_MIX_BACKFILL_POLL_SECONDS = 15
-_SMART_MIX_BACKFILL_MAX_WAIT_SECONDS = 600
-_sleep = time.sleep
+# The night-window limit keeps only a few analyses in flight, so a slot freed by
+# a finished analysis should be refilled within seconds rather than a poll later.
+# The coordinator waits as a pending task, not in a worker process, and checks
+# less often the longer its slots stay as they are.
+_SMART_MIX_BACKFILL_POLL_SECONDS = 3
+_SMART_MIX_BACKFILL_MAX_POLL_SECONDS = 30
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)
+
 
 # Registry of post-processing functions for fan-out coordinators.
 # Keyed by the child task_type. Called once by the last chunk to complete.
@@ -1485,40 +1496,45 @@ def _handle_backfill_smart_mix_profiles(
     task_id: str, params: dict, config: dict
 ) -> dict:
     del config
-    from crate.resource_governor import wait_while_pressured
+    from crate.resource_governor import record_decision, should_defer_task
 
     campaign = get_smart_mix_campaign()
     if not _smart_mix_campaign_running(campaign):
         return {"claimed": 0, "queued": 0, "control": _campaign_control(campaign)}
-    if not wait_while_pressured(
-        label="Smart Mix profile backfill",
-        task_type="backfill_smart_mix_profiles",
-        is_cancelled_fn=is_cancelled,
-        task_id=task_id,
-        params=params,
-        emit_event_fn=emit_task_event,
-        max_sleep_seconds=_WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS,
-    ):
-        return {"claimed": 0, "queued": 0, "paused": True}
+    # The actor asked the governor just before; if it has changed its mind
+    # since, wait in the queue like the actor would rather than in this process.
+    decision = should_defer_task("backfill_smart_mix_profiles", params)
+    if not decision.allowed:
+        record_decision(
+            decision, task_type="backfill_smart_mix_profiles", source="task_loop"
+        )
+        return run_again_later(
+            min(
+                max(1, decision.defer_seconds),
+                _WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS,
+            ),
+            progress=f"Deferred by resource governor: {decision.reason}",
+        )
+
+    # Only the claims of this backfill count as in flight; imports and manual
+    # reanalyses never take a backfill claim. The night window sets how many may
+    # be in flight. A change of window, or of the settings, applies to the next
+    # claim; analyses already accepted keep running. While the limit is reached
+    # the coordinator goes back to the queue, so it never holds a worker process
+    # that a child could use.
+    window = backfill_window_limit(campaign, now=_now())
+    in_flight = count_smart_mix_in_flight()
+    if in_flight >= window.limit:
+        return run_again_later(
+            _smart_mix_backfill_poll_seconds(),
+            progress=(
+                f"Waiting for a free slot: {in_flight} of {window.limit} "
+                f"in flight ({window.window})"
+            ),
+        )
 
     batch_size = max(1, min(int(campaign.get("batch_size") or 25), 100))
     max_attempts = int(campaign.get("max_attempts") or 3)
-    in_flight = count_smart_mix_in_flight()
-    waited = 0
-    while in_flight >= batch_size and waited < _SMART_MIX_BACKFILL_MAX_WAIT_SECONDS:
-        _sleep(_SMART_MIX_BACKFILL_POLL_SECONDS)
-        waited += _SMART_MIX_BACKFILL_POLL_SECONDS
-        campaign = get_smart_mix_campaign()
-        if not _smart_mix_campaign_running(campaign):
-            return {"claimed": 0, "queued": 0, "control": _campaign_control(campaign)}
-        in_flight = count_smart_mix_in_flight()
-    if in_flight >= batch_size:
-        return {
-            "claimed": 0,
-            "queued": 0,
-            "deferred": True,
-            "next_task_id": queue_next_smart_mix_batch(),
-        }
 
     offline_ids = [
         int(track_id)
@@ -1528,7 +1544,8 @@ def _handle_backfill_smart_mix_profiles(
     from crate.crate_cli import has_subcommands, is_available
 
     claimed = claim_smart_mix_backfill_batch(
-        limit=batch_size - in_flight,
+        limit=min(batch_size, window.limit - in_flight),
+        max_in_flight=window.limit,
         offline_track_ids=offline_ids,
         max_attempts=max_attempts,
         claimed_by=f"task:{task_id}",
@@ -1547,7 +1564,7 @@ def _handle_backfill_smart_mix_profiles(
                 "track_entity_uid": track.get("entity_uid"),
                 "claim_token": track.get("claim_token"),
             },
-            dedup_key=f"smart-mix-profile:{track_id}",
+            dedup_key=smart_mix_profile_dedup_key(track_id),
         )
         if child_id:
             queued += 1
@@ -1555,19 +1572,50 @@ def _handle_backfill_smart_mix_profiles(
             released.append(track_id)
     if released:
         release_smart_mix_claims(released)
-    refresh_smart_mix_coverage(max_attempts=max_attempts)
 
-    if not claimed and in_flight == 0:
-        complete_smart_mix_campaign()
-        return {"claimed": 0, "queued": 0, "completed": True}
+    # The claim counts again under its lock, so an empty claim can also mean
+    # another coordinator took the free slots; only nothing in flight ends it.
+    # With analyses still running, the coordinator waits for them rather than
+    # chaining passes, and coverage refreshes that would change nothing, until
+    # they finish.
+    if not claimed:
+        in_flight = count_smart_mix_in_flight()
+        if in_flight == 0:
+            refresh_smart_mix_coverage(max_attempts=max_attempts)
+            complete_smart_mix_campaign()
+            return {"claimed": 0, "queued": 0, "completed": True}
+        return run_again_later(
+            _smart_mix_backfill_poll_seconds(),
+            progress=f"Waiting for the {in_flight} analyses in flight to finish",
+        )
+    refresh_smart_mix_coverage(max_attempts=max_attempts)
     return {
         "claimed": len(claimed),
         "queued": queued,
         "released": len(released),
-        "next_task_id": queue_next_smart_mix_batch(
-            batches=1 if claimed else 0, claimed=len(claimed)
-        ),
+        "window": window.window,
+        "limit": window.limit,
+        "next_task_id": queue_next_smart_mix_batch(batches=1, claimed=len(claimed)),
     }
+
+
+def _smart_mix_backfill_poll_seconds() -> int:
+    """How long a waiting coordinator stays in the queue before it checks again.
+
+    As long as the slots have stayed as they are: 3 s right after a claim or a
+    finished analysis, then about double each time while nothing changes, up to
+    30 s. Each check is a whole actor cycle, so a long analysis or a child the
+    governor defers no longer costs one every 3 s.
+    """
+    since_change = seconds_since_smart_mix_change()
+    if since_change is None:
+        return _SMART_MIX_BACKFILL_MAX_POLL_SECONDS
+    return round(
+        min(
+            _SMART_MIX_BACKFILL_MAX_POLL_SECONDS,
+            max(_SMART_MIX_BACKFILL_POLL_SECONDS, since_change),
+        )
+    )
 
 
 def _smart_mix_campaign_running(campaign: dict | None) -> TypeGuard[dict]:

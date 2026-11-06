@@ -120,10 +120,14 @@ def test_stale_work_recovery_reclaims_after_zombie_cleanup(monkeypatch):
         "crate.db.repositories.ai_usage.reclaim_abandoned_invocations",
         lambda **k: steps.append("reclaim") or 0,
     )
+    monkeypatch.setattr(
+        "crate.db.jobs.smart_mix_backfill.release_dead_smart_mix_claims",
+        lambda **k: steps.append("smart_mix") or 0,
+    )
 
     worker._recover_stale_work()
 
-    assert steps == ["zombies", "reclaim"]
+    assert steps == ["zombies", "reclaim", "smart_mix"]
 
 
 def test_bulk_batch_stops_waiting_after_one_item_exhausts(monkeypatch):

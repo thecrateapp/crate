@@ -12,6 +12,13 @@ import { useApi } from "@/hooks/use-api";
 import { api } from "@/lib/api";
 import { SmartMixActivity } from "@/components/SmartMixActivity";
 import {
+  SmartMixBackfillSettings,
+  backfillWindowLabel,
+  invalidBackfillFields,
+  type SmartMixBackfillLimit,
+  type SmartMixBackfillSettingsValue,
+} from "@/components/SmartMixBackfillSettings";
+import {
   SmartMixTracks,
   type SmartMixVersionCount,
 } from "@/components/SmartMixTracks";
@@ -55,9 +62,20 @@ interface SmartMixAdminStatus {
     createdAt?: string | null;
     updatedAt?: string | null;
   } | null;
+  // Missing only from an API older than the night window.
+  backfillSettings?: SmartMixBackfillSettingsValue;
+  backfillLimit?: SmartMixBackfillLimit;
 }
 
-type BackfillAction = "start" | "pause" | "cancel" | "resume";
+type BackfillAction = "start" | "pause" | "cancel" | "resume" | "apply";
+
+const ACTION_SUCCESS: Record<BackfillAction, string> = {
+  start: "Smart Mix backfill queued",
+  resume: "Smart Mix backfill queued",
+  pause: "Smart Mix backfill paused",
+  cancel: "Smart Mix backfill cancelled",
+  apply: "Smart Mix backfill settings applied",
+};
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (
@@ -75,28 +93,41 @@ export function SmartMixCoverage() {
     "/api/admin/smart-mix/status",
   );
   const [activeAction, setActiveAction] = useState<BackfillAction | null>(null);
+  const saved = data?.backfillSettings ?? null;
+  const savedKey = saved ? JSON.stringify(saved) : "";
+  const [draft, setDraft] = useState(saved);
+  const [draftKey, setDraftKey] = useState(savedKey);
+  const [showInvalid, setShowInvalid] = useState(false);
+  // A change of the saved settings (ours or another admin's) restarts the
+  // form from them, so a later action never sends stale values back.
+  if (savedKey !== draftKey) {
+    setDraftKey(savedKey);
+    setDraft(saved);
+    setShowInvalid(false);
+  }
 
   async function runAction(action: BackfillAction) {
+    const sendsSettings =
+      action === "start" || action === "resume" || action === "apply";
+    if (sendsSettings && draft && invalidBackfillFields(draft).size > 0) {
+      setShowInvalid(true);
+      toast.error("Check the Smart Mix backfill settings");
+      return;
+    }
     setActiveAction(action);
     try {
-      if (action === "start" || action === "resume") {
+      if (sendsSettings) {
         await api(
           `/api/admin/smart-mix/backfill${
             action === "resume" ? "/resume" : ""
           }`,
           "POST",
-          { batchSize: 25, maxAttempts: 3 },
+          draft ?? {},
         );
       } else {
         await api(`/api/admin/smart-mix/backfill/${action}`, "POST");
       }
-      toast.success(
-        action === "pause"
-          ? "Smart Mix backfill paused"
-          : action === "cancel"
-            ? "Smart Mix backfill cancelled"
-            : "Smart Mix backfill queued",
-      );
+      toast.success(ACTION_SUCCESS[action]);
       await refetch();
     } catch {
       toast.error("The Smart Mix backfill action failed");
@@ -131,6 +162,9 @@ export function SmartMixCoverage() {
             <InfoBadge>{percent}% coverage</InfoBadge>
             <InfoBadge>{data.analyzerVersion}</InfoBadge>
             <InfoBadge>profile v{data.profileVersion}</InfoBadge>
+            {data.backfillLimit ? (
+              <InfoBadge>{backfillWindowLabel(data.backfillLimit)}</InfoBadge>
+            ) : null}
           </div>
           <div className="text-xs text-text-muted">
             {data.currentProfiles.toLocaleString()} current profiles across{" "}
@@ -230,6 +264,35 @@ export function SmartMixCoverage() {
         <Metric label="Failed" value={data.processing.failed} />
         <Metric label="Exhausted" value={data.processing.exhausted} />
       </div>
+
+      {draft && data.backfillSettings ? (
+        <SmartMixBackfillSettings
+          saved={data.backfillSettings}
+          draft={draft}
+          showErrors={showInvalid}
+          disabled={activeAction !== null}
+          onChange={setDraft}
+          action={
+            data.controlState === "running" ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                disabled={activeAction !== null}
+                onClick={() => void runAction("apply")}
+              >
+                {activeAction === "apply" ? (
+                  <Loader2
+                    data-admin-ux="mix-apply-loading"
+                    className="animate-spin"
+                  />
+                ) : null}
+                Apply settings
+              </Button>
+            ) : null
+          }
+        />
+      ) : null}
 
       <SmartMixActivity
         live={data.controlState === "running"}
