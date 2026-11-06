@@ -395,11 +395,29 @@ automatic triage on. `tools/error-inbox-eval/run_eval.py` produces that report
 
 - It never calls a model itself. Through `python -m crate.error_inbox.evaluation_cli`
   inside the worker container it plans (which reference issues have a stored digest,
-  the bound model, the number of calls and their token bound), queues one
-  `evaluate_error_triage` task and reads its result. `plan` is a dry run; `run`
-  sends calls only with `--execute` and a confirmation of the exact number of calls.
-- Only short ids reach the server; the labels stay with the tool. Issues without a
-  stored digest are reported as skipped. Nothing is fetched from Sentry.
+  which ones the task will read from Sentry, the bound model, the number of calls
+  and their token bound), queues one `evaluate_error_triage` task and reads its
+  result. `plan` is a dry run that makes no Sentry request; `run` sends calls only
+  with `--execute` and a confirmation of the exact number of calls. The plan warns
+  when the bound profile's output limit or timeout is below the action's.
+- Only short ids reach the server; the labels stay with the tool. Issues with a row
+  but no stored digest are reported as skipped.
+- Most reference issues have been resolved or filtered out of the inbox since E0.
+  The task reads each one the inbox does not hold with the stored Sentry connection
+  (`crate.error_inbox.references`): Resolve a Short ID
+  (`/organizations/{org}/shortids/{short_id}/`), the issue and its latest event,
+  three organization-scoped requests on the configured host, at most four a second,
+  a 429 waited out once (Retry-After, at most 60 s), all within 600 s. It builds the
+  triage input in memory exactly as the sync would store it (`build_digest`, the
+  same service and score) and never writes it to the inbox, a file, a log line or
+  the result. An issue Sentry no longer has is skipped as `not_found`, one merged
+  into another as `merged`, one whose events are gone as `no_event`, a failed read
+  as `fetch_failed` (with its Sentry code; a rejected token skips the rest without
+  asking again) and the end of the budget as `fetch_budget`; the run goes on.
+  Without a Sentry connection these issues are skipped as `not_in_inbox`.
+- Duplicate candidates come from the inbox and from the issues read from Sentry
+  together, with the triage's rule (same group key or same main exception) and
+  order, at most ten, so duplicate agreement is measured on the whole reference set.
 - `queue` accepts the binding the plan showed and refuses with `AI_CONTEXT_STALE`
   if it changed since. One evaluation runs at a time.
 - The task runs on `ai_bulk` and its handler names `execute_structured`, so the
@@ -413,9 +431,10 @@ automatic triage on. `tools/error-inbox-eval/run_eval.py` produces that report
   with a JSON file next to it, shows per model the agreement on classification and
   severity, critical (and, because the reference has no critical label,
   high-severity) issues taken for noise, confident critical answers on non-critical
-  issues, duplicate agreement, invalid outputs, failed calls and tokens, with the
-  cost at a price passed on the command line. It holds labels, short ids, counts and
-  token figures only.
+  issues, duplicate agreement, invalid outputs, answers cut off at the output limit
+  (`AI_OUTPUT_LIMIT`), failed calls, how many issues were read from Sentry and why
+  others were skipped, and tokens, with the cost at a price passed on the command
+  line. It holds labels, short ids, counts, codes and token figures only.
 
 Running it against production spends the connection's budget and sends the
 reference issues' digests to the bound provider, so it needs the maintainer's
