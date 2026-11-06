@@ -19,6 +19,9 @@ sources:
   - app/crate/smart_mix/vocals.py
   - app/crate/smart_mix/planner.py
   - app/crate/smart_mix/candidates.py
+  - app/crate/smart_mix/refinement.py
+  - app/crate/smart_mix_ai.py
+  - app/crate/worker_handlers/smart_mix_refinement.py
   - app/crate/smart_mix/evaluation.py
   - tools/smart-mix-eval/README.md
   - tools/smart-mix-eval/structure/README.md
@@ -732,7 +735,7 @@ left out of the key: no deterministic planner reads it; the AI refinement will.
 
 `plannerVersion: "smart-mix-v3"` plans on the analyzer v7 structure (SM3-D3,
 `smart_mix/candidates.py`). For each edge it builds a menu of up to eight valid plans, best
-first, and serves the first; the AI refinement (SM4) will pick from the same menu by index.
+first, and serves the first; the AI refinement (below) picks from the same menu by index.
 
 - **With phrases on both tracks**, a candidate mixes from the start of one of the last four
   outgoing phrases that admit a mix into the start of one of the first three incoming phrases,
@@ -759,6 +762,63 @@ first, and serves the first; the AI refinement (SM4) will pick from the same men
 - **Capability**: `smart_mix.structure` is true when at least half the library's tracks have a
   current profile with phrases, read from the coverage snapshot (`structure_percent`, counted by
   `refresh_smart_mix_coverage`). It is never computed in the request.
+
+### AI refinement (SM4)
+
+A model may choose another plan from the v3 menu (SM3-D1). It never writes times, ratios or
+gains: it answers a candidate index, a shift of the outgoing or incoming phrase (-1, 0, 1), a
+step to the previous or next phrase length, the bass handoff, a reason, a confidence and up to
+four notes. `smart_mix/refinement.py::apply_refinement` rebuilds the plan with the generator's
+own code and validates it again with `TransitionPlan` and the planner policy; anything else is
+a closed rejection code (`unknown_candidate`, `low_confidence` below 0.55,
+`shift_out_of_range`, `length_not_allowed`, `bass_handoff_not_allowed`, `plan_invalid`,
+`policy_violation`, `response_invalid`, `single_candidate`) and the client keeps the
+deterministic plan.
+
+- **Activation, three levels (SM3-D10).** The Settings switch `smart_mix_ai_enabled` (off by
+  default; `PUT /api/settings/smart-mix`) and a model bound to `smart_mix.transition.refine`
+  in AI models; the client's option; and `context.aiRefinement: true` on a v3 edge. Sessions
+  need `smart_mix.ai` (every role with `library.view`); access tokens also need the scope
+  `vdj.smart_mix.ai`. A missing grant is `unavailable` with `permission_denied` or
+  `scope_missing`, never a 403.
+- **What leaves the server (SM3-D6).** `llm/prompts/smart_mix_transition.py`
+  (`sm3-refine-1`) sends tempo, Camelot key, energy, danceability, valence, loudness, the last
+  outgoing and first incoming phrases with their energy per bar and voice, the set history,
+  the context rules and the candidates. The genre slug goes only while
+  `smart_mix_ai_send_genre` is on (default). Never titles, artists, paths, track or profile
+  IDs, the user or an address. The prompt and the answer are neither stored nor logged.
+- **Response.** v3 plans of flagged edges add `refinement`: `ready` with the refined `plan`,
+  `source: "ai"`, `modelLabel`, `reason`, `confidence`, `promptVersion` and `candidateIndex`;
+  `pending`; or `unavailable` with `reasonCode` (`disabled`, `no_model`, `budget`,
+  `missing_profile`, `single_candidate`, `permission_denied`, `scope_missing`,
+  `rate_limited`, `rejected`, `failed`). Clients poll the same edge at most every 5 s.
+  smart-mix-v2 ignores the flag, and the flag does not change the deterministic plan or its
+  cache key.
+- **Keys and storage (SM3-D5).** The refinement key hashes the planner and rules revision,
+  both tracks and profile revisions, the normalized context with the set history, the prompt
+  version and schema, the accepted AI configuration and the genre switch.
+  `smart_mix_refined_plans` (migration 152) is the source of truth: `ready`, `rejected` or
+  `failed` with `outcome_code`, the choice, reason, confidence, latency and tokens.
+  `cache:smart-mix:refined-plan:v1:<key>` is read in the same `mget` as the plans; a Redis
+  miss reads the table once with `ANY(:keys)`. A cached refinement costs no PostgreSQL query
+  beyond the plan's own profile read; a Redis miss costs one.
+- **Queueing.** Missing keys are accepted with `accept_action` and queued with
+  `create_task_dedup` (one task per key; priority 0 for the first two edges of the batch, 1
+  for the rest), at most 64 per user and minute (`rate_limited` above). A `pending` marker
+  (150 s) keeps polls from queueing again.
+- **Task.** `smart_mix_refine_transition` (`ai`, priority 0, 120 s, no retries) rebuilds the
+  menu from the same profile revisions (`stale` otherwise), resumes the accepted
+  configuration, makes one call and stores the outcome. A menu with one candidate is not sent.
+  A refusal before anything is sent stores nothing; a daily budget refusal sets a budget
+  marker until UTC midnight and the API answers `budget` without queueing.
+- **Retention.** A published profile deletes the refinements of its old revision.
+  `cleanup_smart_mix_refinements` (maintenance, daily) records the reads the API queued in
+  Redis, then deletes refinements unread for 180 days.
+- **Capability (SM3-D9).** `smart_mix.ai_assisted` reports `available`, `provider_kind`
+  (`local` for Ollama, otherwise `cloud`), `model_label`, `prompt_version`,
+  `typical_latency_ms` (median of the last 24 h, from the coverage snapshot) and `reason`
+  (`smart_mix_unavailable`, `disabled`, `no_model`, `budget`). It reads the cached gate,
+  never the configuration tables or an aggregate per request.
 
 ## HTTP, permissions and consumers
 

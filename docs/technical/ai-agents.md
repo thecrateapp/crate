@@ -5,7 +5,7 @@ section: operations
 audience: [developer, operator]
 status: canonical
 order: 95
-verified: 2026-11-05
+verified: 2026-11-06
 sources:
   - app/crate/ai/actions.py
   - app/crate/ai/capabilities.py
@@ -24,6 +24,9 @@ sources:
   - app/tests/test_ai_architecture.py
   - app/tests/test_actor_config.py
   - app/crate/music_paths_refinement.py
+  - app/crate/smart_mix_ai.py
+  - app/crate/worker_handlers/smart_mix_refinement.py
+  - app/crate/llm/prompts/smart_mix_transition.py
   - app/crate/error_inbox/triage.py
   - app/crate/llm/prompts/error_triage.py
   - app/crate/llm/prompts/error_investigate.py
@@ -381,10 +384,10 @@ AI work (SM3-D8). Only `crate-worker` consumes them, each in its own pool (see
 sizing). Provider latency therefore never holds the general queues, and a long
 taxonomy batch never holds the interactive threads.
 
-| Lane      | Work                                                     | Time limit            | Task types (time limit in seconds)                                                                                                                                                                                                                                                                                                                                          |
-| --------- | -------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ai`      | One proposal, draft, extraction, analysis or admin probe | at most 300 s         | `ai_catalog_refresh` (180), `ai_profile_test` (180), `propose_genre_eq` (120), `generate_playlist_description` (120), `propose_genre_taxonomy_node` (180), `refine_music_path` (120), `analyze_artist_hero_candidate` (180), `show_extract` (180), `research_artist_bio` (300), `draft_i18n_translation` (300), `triage_error_issue` (120), `investigate_error_issue` (180) |
-| `ai_bulk` | Long batches                                             | per task, no lane cap | `infer_genre_taxonomy` (3600), `rebuild_genre_taxonomy_proposals` (7200)                                                                                                                                                                                                                                                                                                    |
+| Lane      | Work                                                     | Time limit            | Task types (time limit in seconds)                                                                                                                                                                                                                                                                                                                                                                               |
+| --------- | -------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ai`      | One proposal, draft, extraction, analysis or admin probe | at most 300 s         | `ai_catalog_refresh` (180), `ai_profile_test` (180), `propose_genre_eq` (120), `generate_playlist_description` (120), `propose_genre_taxonomy_node` (180), `refine_music_path` (120), `analyze_artist_hero_candidate` (180), `show_extract` (180), `research_artist_bio` (300), `draft_i18n_translation` (300), `triage_error_issue` (120), `investigate_error_issue` (180), `smart_mix_refine_transition` (120) |
+| `ai_bulk` | Long batches                                             | per task, no lane cap | `infer_genre_taxonomy` (3600), `rebuild_genre_taxonomy_proposals` (7200)                                                                                                                                                                                                                                                                                                                                         |
 
 Every AI task keeps `max_retries=0`: paid work is never retried.
 `enrich_genre_descriptions` reads Wikidata and Wikipedia only, calls no model
@@ -407,17 +410,20 @@ status, so the client still reads the result it paid for; if no row is left, it
 queues a new task. An unavailable action answers `503` with the closed code in
 `X-Crate-Error` before anything is queued.
 
-| Request                                                  | Task                            | One active task per                        |
-| -------------------------------------------------------- | ------------------------------- | ------------------------------------------ |
-| `POST /api/genres/{slug}/generate-eq`                    | `propose_genre_eq`              | genre and apply mode                       |
-| `POST /api/genres/taxonomy/{slug}/proposal`              | `propose_genre_taxonomy_node`   | genre and a fingerprint of its inputs      |
-| `POST /api/admin/system-playlists/{id}/ai-description`   | `generate_playlist_description` | playlist, hash of its rules and apply mode |
-| `POST /api/artwork/artists/{id}/hero-candidates/analyze` | `analyze_artist_hero_candidate` | artist and image (origin and reference)    |
-| Music Path create or regenerate                          | `refine_music_path`             | path, revision and accepted configuration  |
+| Request                                                   | Task                            | One active task per                        |
+| --------------------------------------------------------- | ------------------------------- | ------------------------------------------ |
+| `POST /api/genres/{slug}/generate-eq`                     | `propose_genre_eq`              | genre and apply mode                       |
+| `POST /api/genres/taxonomy/{slug}/proposal`               | `propose_genre_taxonomy_node`   | genre and a fingerprint of its inputs      |
+| `POST /api/admin/system-playlists/{id}/ai-description`    | `generate_playlist_description` | playlist, hash of its rules and apply mode |
+| `POST /api/artwork/artists/{id}/hero-candidates/analyze`  | `analyze_artist_hero_candidate` | artist and image (origin and reference)    |
+| Music Path create or regenerate                           | `refine_music_path`             | path, revision and accepted configuration  |
+| `POST /api/playback/transition-plans` with `aiRefinement` | `smart_mix_refine_transition`   | refinement key (SM3-D5)                    |
 
 A Music Path request instead returns the deterministic path at once, applies a
 cached review inline (a read) and queues the review; the worker stores a changed
-path as the next revision. The other AI tasks are queued by their own routes
+path as the next revision. A transition plan request likewise returns the deterministic
+plan at once and reports the refinement as `pending`; the client asks again and
+reads the stored refinement from the cache ([Smart Mix operations](smart-mix-operations.md#ai-refinement-sm4)). The other AI tasks are queued by their own routes
 and request flows. Handlers resume the accepted configuration with
 `resume_action`, which rechecks the actor's current permission before anything
 is sent; a handler that applies a proposal checks it once more first.
