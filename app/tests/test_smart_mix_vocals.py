@@ -157,6 +157,54 @@ def test_a_failing_model_keeps_the_profile_without_voice(monkeypatch, caplog) ->
     assert "voice" in caplog.text
 
 
+def test_audio_loads_with_essentia_at_the_model_rate(monkeypatch) -> None:
+    calls = []
+
+    def mono_loader(**kwargs):
+        calls.append(kwargs)
+        return lambda: [0.0, 0.5]
+
+    def import_module(name):
+        assert name == "essentia.standard"
+        return SimpleNamespace(MonoLoader=mono_loader)
+
+    monkeypatch.setattr(vocals.importlib, "import_module", import_module)
+
+    audio = vocals.load_audio(Path("/music/track.flac"))
+
+    assert calls == [
+        {"filename": "/music/track.flac", "sampleRate": 16_000, "resampleQuality": 4}
+    ]
+    assert audio.dtype == np.float32 and audio.tolist() == [0.0, 0.5]
+
+
+def test_audio_falls_back_to_librosa_without_essentia(monkeypatch) -> None:
+    import importlib
+
+    import librosa
+
+    real_import = importlib.import_module
+
+    def import_module(name, *args):
+        if name == "essentia.standard":
+            raise ImportError(name)
+        return real_import(name, *args)
+
+    loaded = []
+
+    def load(path, sr, mono):
+        loaded.append((path, sr, mono))
+        return np.zeros(4, dtype=np.float64), sr
+
+    monkeypatch.setattr(vocals.importlib, "import_module", import_module)
+    monkeypatch.setattr(librosa, "load", load)
+
+    audio = vocals.load_audio("/music/track.flac")
+
+    assert loaded == [("/music/track.flac", 16_000, True)]
+    assert audio.dtype == np.float32 and len(audio) == 4
+
+
 def test_phrase_spans_end_at_the_next_phrase_or_after_the_last_bars() -> None:
     beat_grid = tuple(500 + 500 * beat for beat in range(80))
     phrases = (

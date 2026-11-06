@@ -19,11 +19,12 @@ the voice classes low probabilities over dense music, so the scale reaches down 
 
 from __future__ import annotations
 
+import importlib
 import logging
 from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 import numpy as np
 
@@ -74,13 +75,17 @@ def phrase_vocal_presence(
 def load_audio(path: str | Path) -> np.ndarray:
     """Mono audio at YAMNet's 16 kHz, with Essentia when present, else librosa."""
     try:
-        from essentia.standard import MonoLoader
+        # essentia.standard builds its algorithms at import time, so a type checker
+        # cannot see them; read them through Any, as audio_analysis does.
+        standard: Any = importlib.import_module("essentia.standard")
     except ImportError:
         import librosa
 
         audio, _rate = librosa.load(str(path), sr=SAMPLE_RATE, mono=True)
         return np.asarray(audio, dtype=np.float32)
-    loader = MonoLoader(filename=str(path), sampleRate=SAMPLE_RATE, resampleQuality=4)
+    loader = standard.MonoLoader(
+        filename=str(path), sampleRate=SAMPLE_RATE, resampleQuality=4
+    )
     return np.asarray(loader(), dtype=np.float32)
 
 
