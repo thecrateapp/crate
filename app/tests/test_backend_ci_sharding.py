@@ -2,6 +2,8 @@ import heapq
 import json
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github/workflows/test-backend.yml"
@@ -21,6 +23,26 @@ def test_backend_ci_runs_eight_balanced_database_shards() -> None:
         "--durations-path=${{ github.workspace }}/app/tests/.test_durations" in workflow
     )
     assert "timeout-minutes: 20" in workflow
+
+
+def test_backend_ci_installs_media_packages_from_a_cache_with_a_short_timeout() -> None:
+    # The 88 ffmpeg/tesseract packages (76 MB) sometimes crawl from the runner's
+    # apt mirror and used up the shard's 20 minutes before any test ran.
+    steps = yaml.safe_load(WORKFLOW.read_text())["jobs"]["tests"]["steps"]
+    names = [step.get("name") for step in steps]
+    install = steps[names.index("Install media and OCR test dependencies")]
+    cache = steps[names.index("Restore the media and OCR package cache")]
+
+    assert names.index("Restore the media and OCR package cache") < names.index(
+        "Install media and OCR test dependencies"
+    )
+    assert cache["uses"].startswith("actions/cache@")
+    archives = cache["with"]["path"].replace("~", "$HOME", 1)
+    assert f'"{archives}"' in install["run"]
+    assert "Dir::Cache::Archives" in install["run"]
+    # Root-owned debs and apt's lock file must be readable when the cache is saved.
+    assert "chown" in install["run"]
+    assert 0 < install["timeout-minutes"] <= 10
 
 
 def test_backend_ci_combines_raw_coverage_before_enforcing_threshold() -> None:
