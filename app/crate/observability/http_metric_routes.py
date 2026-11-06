@@ -715,6 +715,7 @@ HTTP_ROUTES = frozenset(
         "/api/settings/paths",
         "/api/settings/processing",
         "/api/settings/schedules",
+        "/api/settings/smart-mix",
         "/api/settings/soulseek",
         "/api/settings/worker",
         "/api/show-imports/availability",
