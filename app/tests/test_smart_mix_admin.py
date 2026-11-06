@@ -74,6 +74,8 @@ def test_status_counts_profile_versions_quality_and_checkpoint_state(pg_db) -> N
         "source_changed_profiles": 0,
         "missing_profiles": 3,
         "coverage_percent": 25.0,
+        "structure_profiles": 0,
+        "structure_percent": 0.0,
         "quality": {
             "full": 1,
             "partial": 1,

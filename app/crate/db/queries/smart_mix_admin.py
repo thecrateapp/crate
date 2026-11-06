@@ -24,6 +24,23 @@ def get_smart_mix_admin_status() -> dict:
     return {**snapshot, "refreshed_at": refreshed_at}
 
 
+def get_smart_mix_structure_percent() -> float | None:
+    """Share of the library with phrases in the coverage snapshot, or None.
+
+    Only a snapshot of the current analyzer and schema counts; the snapshot is
+    computed by ``refresh_smart_mix_coverage``, never here.
+    """
+    snapshot = get_ops_runtime_state(COVERAGE_STATE_KEY)
+    if (
+        not snapshot
+        or snapshot.get("analyzer_version") != SMART_MIX_ANALYZER_VERSION
+        or snapshot.get("profile_version") != SMART_MIX_PROFILE_VERSION
+    ):
+        return None
+    value = snapshot.get("structure_percent")
+    return None if value is None else float(value)
+
+
 def get_smart_mix_campaign_status() -> dict | None:
     return get_ops_runtime_state(CAMPAIGN_STATE_KEY)
 
@@ -39,6 +56,8 @@ def _empty_status() -> dict:
         "source_changed_profiles": 0,
         "missing_profiles": 0,
         "coverage_percent": 0.0,
+        "structure_profiles": 0,
+        "structure_percent": 0.0,
         "quality": {"full": 0, "partial": 0, "legacy": 0, "unavailable": 0},
         "current_quality": {"full": 0, "partial": 0, "legacy": 0},
         "processing": {
@@ -58,4 +77,5 @@ __all__ = [
     "SMART_MIX_PROFILE_VERSION",
     "get_smart_mix_admin_status",
     "get_smart_mix_campaign_status",
+    "get_smart_mix_structure_percent",
 ]

@@ -52,8 +52,8 @@ from crate.smart_mix.models import (
     TrackMixProfile,
     TransitionContext,
 )
-from crate.smart_mix.planner import plan_transition
-from crate.smart_mix.policy import PLANNER_POLICY
+from crate.smart_mix.planner import plan_transition, plan_transition_v3
+from crate.smart_mix.policy import PLANNER_POLICY, PLANNER_POLICY_V3, PlannerPolicy
 from crate.smart_mix.versions import PLANNER_IDENTIFIER, planner_reads_structure
 
 
@@ -351,6 +351,7 @@ def _plan_transition_edges(
     *,
     planner_version: str = PLANNER_IDENTIFIER,
 ) -> list[TransitionPlanResponse]:
+    policy = _planner_policy(planner_version)
     unique_edges = _deduplicate_edges(edges)
     entity_uids = _ordered_entity_uids(unique_edges)
     profiles = get_track_mix_profiles_by_entity_uids(
@@ -366,7 +367,7 @@ def _plan_transition_edges(
         for edge in unique_edges
     ]
     cache_keys = [
-        _plan_cache_key(edge, outgoing, incoming)
+        _plan_cache_key(edge, outgoing, incoming, policy)
         for edge, outgoing, incoming in edge_profiles
     ]
     cached = get_smart_mix_plan_caches(cache_keys)
@@ -377,7 +378,9 @@ def _plan_transition_edges(
     ):
         serialized = cached.get(cache_key)
         if serialized is None:
-            serialized = _plan_edge(edge, outgoing=outgoing, incoming=incoming)
+            serialized = _plan_edge(
+                edge, outgoing=outgoing, incoming=incoming, policy=policy
+            )
             computed[cache_key] = serialized
         plans.append(TransitionPlanResponse.model_validate(serialized))
     set_smart_mix_plan_caches(computed)
@@ -421,18 +424,43 @@ def _ordered_entity_uids(edges: list[TransitionEdgeRequest]) -> list[str]:
     return result
 
 
+def _planner_policy(planner_version: str) -> PlannerPolicy:
+    """The policy of a requested planner; read at call time so tests can swap it."""
+    if planner_version == PLANNER_POLICY_V3.identifier:
+        return PLANNER_POLICY_V3
+    if planner_version == PLANNER_POLICY.identifier:
+        return PLANNER_POLICY
+    raise ValueError(f"Unsupported planner version: {planner_version!r}")
+
+
 def _plan_edge(
     edge: TransitionEdgeRequest,
     *,
     outgoing: TrackMixProfile | None,
     incoming: TrackMixProfile | None,
+    policy: PlannerPolicy | None = None,
 ) -> dict:
+    policy = policy or PLANNER_POLICY
+    context = _transition_context(edge.context)
+    outgoing_uid = str(edge.outgoing_track_entity_uid)
+    incoming_uid = str(edge.incoming_track_entity_uid)
+    if planner_reads_structure(policy.identifier):
+        planned = plan_transition_v3(
+            outgoing,
+            incoming,
+            context,
+            outgoing_track_entity_uid=outgoing_uid,
+            incoming_track_entity_uid=incoming_uid,
+            policy=policy,
+        )
+        return {**planned.plan.to_dict(), "structureUsed": planned.structure_used}
     return plan_transition(
         outgoing,
         incoming,
-        _transition_context(edge.context),
-        outgoing_track_entity_uid=str(edge.outgoing_track_entity_uid),
-        incoming_track_entity_uid=str(edge.incoming_track_entity_uid),
+        context,
+        outgoing_track_entity_uid=outgoing_uid,
+        incoming_track_entity_uid=incoming_uid,
+        policy=policy,
     ).to_dict()
 
 
@@ -462,6 +490,8 @@ def _cache_context(payload: TransitionContextRequest) -> dict:
         context.pop("allowBassHandoff", None)
     if not payload.allow_long_beatmatch:
         context.pop("allowLongBeatmatch", None)
+    # No deterministic planner reads the set history: it must not split the cache.
+    context.pop("setHistory", None)
     return context
 
 
@@ -469,10 +499,12 @@ def _plan_cache_key(
     edge: TransitionEdgeRequest,
     outgoing: TrackMixProfile | None,
     incoming: TrackMixProfile | None,
+    policy: PlannerPolicy | None = None,
 ) -> str:
+    policy = policy or PLANNER_POLICY
     cache_identity = {
-        "plannerVersion": PLANNER_IDENTIFIER,
-        "plannerRules": PLANNER_POLICY.rules_revision,
+        "plannerVersion": policy.identifier,
+        "plannerRules": policy.rules_revision,
         "outgoingTrackEntityUid": str(edge.outgoing_track_entity_uid),
         "outgoingProfileRevision": (
             outgoing.profile_revision if outgoing is not None else "missing"

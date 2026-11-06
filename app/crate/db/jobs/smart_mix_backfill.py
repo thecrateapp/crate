@@ -333,6 +333,9 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                                 AND profile.quality <> 'unavailable'
                                 AND profile.source_stale_at IS NOT NULL
                                 AS is_source_changed,
+                            jsonb_typeof(profile.phrases) = 'array'
+                                AND jsonb_array_length(profile.phrases) > 0
+                                AS has_phrases,
                             processing.state,
                             processing.attempts,
                             processing.target_generation = :target_generation
@@ -352,6 +355,9 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                         COUNT(*) FILTER (
                             WHERE is_source_changed
                         )::int AS source_changed_profiles,
+                        COUNT(*) FILTER (
+                            WHERE is_current AND has_phrases
+                        )::int AS structure_profiles,
                         COUNT(*) FILTER (WHERE quality = 'full')::int AS full_profiles,
                         COUNT(*) FILTER (
                             WHERE is_current AND quality = 'full'
@@ -418,6 +424,7 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
         )
     total_tracks = int(row["total_tracks"])
     current_profiles = int(row["current_profiles"])
+    structure_profiles = int(row["structure_profiles"])
     snapshot = {
         "profile_version": PROFILE_SCHEMA_VERSION,
         "analyzer_version": SMART_MIX_ANALYZER_VERSION,
@@ -429,6 +436,12 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
         "missing_profiles": max(total_tracks - current_profiles, 0),
         "coverage_percent": (
             round(current_profiles / total_tracks * 100, 1) if total_tracks else 0.0
+        ),
+        # Current profiles with at least one phrase (planner v3 plans on them),
+        # over every track: smart_mix.structure in capabilities reads it.
+        "structure_profiles": structure_profiles,
+        "structure_percent": (
+            round(structure_profiles / total_tracks * 100, 1) if total_tracks else 0.0
         ),
         "quality": {
             "full": int(row["full_profiles"]),

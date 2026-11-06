@@ -737,6 +737,48 @@ def test_coverage_snapshot_separates_current_stale_failed_and_exhausted(
     assert missing not in {current, stale}
 
 
+def test_coverage_snapshot_counts_profiles_with_structure(
+    pg_db, tmp_path: Path
+) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import refresh_smart_mix_coverage
+    from crate.db.queries.smart_mix_admin import get_smart_mix_structure_percent
+
+    phrased, empty, unsegmented, old, missing = _create_tracks(tmp_path, count=5)
+    for track_id in (phrased, empty, unsegmented):
+        _insert_profile(track_id, analyzer_version=ANALYZER_VERSION)
+    _insert_profile(old, analyzer_version="smart-mix-audio-v6")
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE track_mix_profiles
+                SET phrases = CASE track_id
+                        WHEN :phrased THEN CAST(:one AS jsonb)
+                        WHEN :old THEN CAST(:one AS jsonb)
+                        ELSE CAST('[]' AS jsonb)
+                    END
+                WHERE track_id IN (:phrased, :empty, :old)
+                """
+            ),
+            {
+                "phrased": phrased,
+                "empty": empty,
+                "old": old,
+                "one": '[{"start_beat": 0, "start_ms": 0, "bars": 8, '
+                '"energy": 0.5, "delta_energy": null, "kind": "body"}]',
+            },
+        )
+
+    snapshot = refresh_smart_mix_coverage(max_attempts=3)
+
+    # Only current profiles with at least one phrase count, over every track.
+    assert snapshot["structure_profiles"] == 1
+    assert snapshot["structure_percent"] == 20.0
+    assert get_smart_mix_structure_percent() == 20.0
+    assert missing not in {phrased, empty, unsegmented, old}
+
+
 def test_status_without_a_snapshot_reports_no_counts(pg_db) -> None:
     del pg_db
     from crate.db.queries.smart_mix_admin import get_smart_mix_admin_status

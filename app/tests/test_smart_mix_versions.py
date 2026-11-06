@@ -10,7 +10,7 @@ from crate.api.schemas.smart_mix import (
     TransitionPlanResponse,
 )
 from crate.smart_mix import versions
-from crate.smart_mix.policy import PLANNER_POLICY
+from crate.smart_mix.policy import PLANNER_POLICY, PLANNER_POLICY_V3
 
 APP_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = APP_ROOT.parent
@@ -27,11 +27,21 @@ def _literal_values(model, field_name: str) -> tuple:
 
 
 def test_planner_wire_literals_match_the_planner_identity() -> None:
-    assert _literal_values(TransitionPlanBatchRequest, "planner_version") == (
+    assert versions.PLANNER_IDENTIFIERS == (
         versions.PLANNER_IDENTIFIER,
+        PLANNER_POLICY_V3.identifier,
     )
-    assert _literal_values(TransitionPlanBatchResponse, "planner_version") == (
-        versions.PLANNER_IDENTIFIER,
+    assert (
+        _literal_values(TransitionPlanBatchRequest, "planner_version")
+        == versions.PLANNER_IDENTIFIERS
+    )
+    assert (
+        TransitionPlanBatchRequest.model_fields["planner_version"].default
+        == versions.PLANNER_IDENTIFIER
+    )
+    assert (
+        _literal_values(TransitionPlanBatchResponse, "planner_version")
+        == versions.PLANNER_IDENTIFIERS
     )
     assert _literal_values(CompatibleTracksResponse, "planner_version") == (
         versions.PLANNER_IDENTIFIER,
@@ -245,6 +255,9 @@ def test_only_phrase_planners_read_the_profile_structure() -> None:
     assert versions.planner_reads_structure(versions.PLANNER_IDENTIFIER) is False
     assert versions.planner_reads_structure("smart-mix-v2") is False
     assert versions.planner_reads_structure("smart-mix-v3") is True
+    assert versions.STRUCTURE_PLANNER_IDENTIFIERS == frozenset(
+        {PLANNER_POLICY_V3.identifier}
+    )
 
 
 def test_readers_accept_every_profile_schema_up_to_the_current_one() -> None:
