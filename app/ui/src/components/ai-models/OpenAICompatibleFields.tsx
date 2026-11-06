@@ -252,6 +252,7 @@ function ModelFields({
             ariaLabel="Structured output"
             placeholder="Choose"
             allowClear={false}
+            triggerClassName="w-full max-w-none"
             value={draft.structuredOutput}
             options={STRUCTURED_OUTPUT_OPTIONS}
             disabled={disabled}
@@ -267,6 +268,7 @@ function ModelFields({
             ariaLabel="Reasoning"
             placeholder="Reasoning"
             allowClear={false}
+            triggerClassName="w-full max-w-none"
             value={draft.reasoning}
             options={controls.map((control) => ({
               value: control,
@@ -340,6 +342,7 @@ export function OpenAICompatibleFields({
           ariaLabel="Origin"
           placeholder="Choose a provider"
           allowClear={false}
+          triggerClassName="w-full max-w-none"
           value={draft.template}
           options={TEMPLATE_OPTIONS}
           disabled={disabled}
@@ -360,7 +363,7 @@ export function OpenAICompatibleFields({
 
       {template && template.origin === null ? (
         <div className="space-y-3">
-          <div className="grid min-w-0 gap-3 sm:grid-cols-[1fr_auto]">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_14rem]">
             <FormField
               label="Address"
               hint="Use HTTPS unless the server is on your private network."
@@ -382,6 +385,7 @@ export function OpenAICompatibleFields({
                 ariaLabel="Path prefix"
                 placeholder="Choose"
                 allowClear={false}
+                triggerClassName="w-full max-w-none"
                 value={draft.pathPrefix}
                 options={OPENAI_COMPATIBLE_PATH_PREFIXES.map((prefix) => ({
                   value: prefix,

@@ -229,6 +229,30 @@ describe("AddProviderDialog", () => {
     );
   });
 
+  it("scrolls a long form between a fixed title and submit button", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    const dialog = await openCompatible(user);
+    await user.click(within(dialog).getByRole("button", { name: "Add model" }));
+
+    // jsdom has no layout: check the structure that keeps the title and the
+    // submit button on screen when the manifest outgrows a phone viewport.
+    expect(dialog).toHaveClass("flex", "flex-col", "overflow-hidden");
+    expect(dialog.className).toMatch(/max-h-/);
+    const body = within(dialog).getByTestId("add-provider-body");
+    expect(body).toHaveClass("min-h-0", "flex-1", "overflow-y-auto");
+    expect(
+      within(body).getByRole("combobox", { name: "Origin" }),
+    ).toBeInTheDocument();
+    expect(
+      within(body).getByRole("group", { name: "Model 2" }),
+    ).toBeInTheDocument();
+    expect(body).not.toContainElement(
+      within(dialog).getByRole("heading", { name: "Add provider" }),
+    );
+    expect(body).not.toContainElement(submitButton(dialog));
+  });
+
   it("keeps the confirmation for the address it was given", async () => {
     const user = userEvent.setup();
     renderDialog();
