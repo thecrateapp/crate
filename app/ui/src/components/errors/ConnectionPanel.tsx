@@ -15,6 +15,7 @@ import { useTaskPoll } from "@/hooks/use-task-poll";
 import { api } from "@/lib/api";
 import { apiErrorText } from "@/lib/agent-plan-presentation";
 import { FixSettingsForm, fixState } from "./FixSettingsForm";
+import { TriageSettingsForm, triageState } from "./TriageSettingsForm";
 import {
   ERRORS_API,
   accessText,
@@ -361,9 +362,13 @@ function savedFixKey(connection: ErrorTrackingConnection): string {
   return JSON.stringify([connection.organization, connection.fix]);
 }
 
+function savedTriageKey(connection: ErrorTrackingConnection): string {
+  return JSON.stringify([connection.organization, connection.triage]);
+}
+
 /**
  * Sentry connection status and settings, the body of the connection drawer
- * (ops.runtime.manage only), plus the Launch fix settings. Saving stores the
+ * (ops.runtime.manage only), plus the AI triage and Launch fix settings. Saving stores the
  * settings (and a typed token); "Test connection" enqueues a worker task and
  * waits for it: the page itself never calls Sentry or GitHub.
  */
@@ -430,6 +435,20 @@ export function ConnectionPanel({ onChanged }: { onChanged?: () => void }) {
       <Section title="Settings">
         <ConnectionForm
           key={savedKey(data)}
+          connection={data}
+          onSaved={refresh}
+        />
+      </Section>
+      <Section
+        title="AI triage"
+        action={
+          <StatusBadge tone={triageState(data).tone}>
+            {triageState(data).label}
+          </StatusBadge>
+        }
+      >
+        <TriageSettingsForm
+          key={savedTriageKey(data)}
           connection={data}
           onSaved={refresh}
         />

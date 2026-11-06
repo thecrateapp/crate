@@ -56,17 +56,38 @@ export function SourceContext({ frame }: { frame: DigestFrame }) {
   );
 }
 
-/** In-app frames, innermost first; the innermost one starts open. */
-export function StackFrames({ frames }: { frames: DigestFrame[] }) {
+/**
+ * In-app frames, innermost first; the innermost one starts open. `suspected`
+ * holds digest frame indexes an AI triage or investigation pointed at: they are
+ * marked with an accent rule and a label, and start open too.
+ */
+export function StackFrames({
+  frames,
+  suspected = [],
+}: {
+  frames: DigestFrame[];
+  suspected?: number[];
+}) {
   const ordered = frames.map((frame, index) => ({ frame, index })).reverse();
+  const flagged = new Set(suspected);
   return (
     <ol
       aria-label="In-app frames, innermost first"
       className="list-none border-t border-border-quiet p-0"
     >
       {ordered.map(({ frame, index }, position) => (
-        <li key={index} className="border-b border-border-quiet py-2">
-          <details open={position === 0} className="group">
+        <li
+          key={index}
+          data-suspected={flagged.has(index) || undefined}
+          className={cn(
+            "border-b border-border-quiet py-2",
+            flagged.has(index) && "border-l-2 border-l-accent-action-hi pl-3",
+          )}
+        >
+          <details
+            open={position === 0 || flagged.has(index)}
+            className="group"
+          >
             <summary className="flex min-h-11 cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 [&::-webkit-details-marker]:hidden">
               <span
                 aria-hidden="true"
@@ -83,6 +104,11 @@ export function StackFrames({ frames }: { frames: DigestFrame[] }) {
               {position === 0 ? (
                 <span className="font-mono text-label uppercase tracking-caps text-accent-action-hi">
                   Innermost
+                </span>
+              ) : null}
+              {flagged.has(index) ? (
+                <span className="font-mono text-label uppercase tracking-caps text-accent-action-hi">
+                  Suspected
                 </span>
               ) : null}
             </summary>

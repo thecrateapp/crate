@@ -10,6 +10,7 @@ import type {
   ErrorIssueSummary,
   ErrorSummary,
   ErrorTrackingConnection,
+  ErrorTriage,
   FixConnection,
   SyncState,
 } from "@/lib/error-inbox";
@@ -278,6 +279,7 @@ export function sampleSummary(
     new_24h: open.filter((issue) => issue.substatus === "new").length,
     regressed_24h: open.filter((issue) => issue.substatus === "regressed")
       .length,
+    untriaged: open.filter((issue) => !issue.classification).length,
     last_synced_at: minutesAgo(3),
     services: [...services.values()].sort((a, b) =>
       a.service.localeCompare(b.service),
@@ -300,6 +302,7 @@ export const NOT_CONFIGURED_SUMMARY: ErrorSummary = {
   critical_open: 0,
   new_24h: 0,
   regressed_24h: 0,
+  untriaged: 0,
   last_synced_at: null,
   services: [],
   top_critical: [],
@@ -435,8 +438,35 @@ export function sampleDetail(
     closed_at: null,
     created_at: minutesAgo(60 * 24 * 19),
     triages: [],
+    auto_triage_queued_at: null,
     write_access: true,
     fix: null,
+    ...overrides,
+  };
+}
+
+/** A validated triage of the sample digest, as the detail lists it. */
+export function sampleTriage(
+  overrides: Partial<ErrorTriage> = {},
+): ErrorTriage {
+  return {
+    id: "a1b2c3d4-0000-4000-8000-00000000aa01",
+    kind: "triage",
+    digest_hash: "4f9a1c7e2b3d5a60",
+    invocation_id: "a1b2c3d4-0000-4000-8000-00000000bb01",
+    classification: "bug",
+    severity: "high",
+    duplicate_of: null,
+    summary:
+      "Persisting an album fails when the scanner reports the same file twice.",
+    hypothesis:
+      "persist_album upserts by id, so a moved file arrives with a new id and the same path.",
+    suspected_frames: [1, 2],
+    next_step:
+      "Upsert library_tracks on path in upsert_tracks and add a test with a moved file.",
+    confidence: 0.82,
+    model: "gemini-2.5-flash",
+    created_at: minutesAgo(20),
     ...overrides,
   };
 }
@@ -492,6 +522,7 @@ export function sampleConnection(
     },
     sync: sampleSync(),
     fix: null,
+    triage: { automatic: false, daily_max: 30 },
     ...overrides,
   };
 }
@@ -507,4 +538,5 @@ export const NOT_CONFIGURED_CONNECTION: ErrorTrackingConnection = {
   access: null,
   sync: null,
   fix: null,
+  triage: { automatic: false, daily_max: 30 },
 };

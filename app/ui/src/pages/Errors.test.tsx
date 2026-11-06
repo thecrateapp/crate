@@ -3,12 +3,15 @@ import userEvent from "@testing-library/user-event";
 import { useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { apiMock, useApiMock, pollTaskMock, refetchMock } = vi.hoisted(() => ({
-  apiMock: vi.fn(),
-  useApiMock: vi.fn(),
-  pollTaskMock: vi.fn(),
-  refetchMock: vi.fn(),
-}));
+const { apiMock, useApiMock, pollTaskMock, refetchMock, llm } = vi.hoisted(
+  () => ({
+    apiMock: vi.fn(),
+    useApiMock: vi.fn(),
+    pollTaskMock: vi.fn(),
+    refetchMock: vi.fn(),
+    llm: { status: { available: true } as { available: boolean } | null },
+  }),
+);
 
 vi.mock("@/hooks/use-api", () => ({ useApi: useApiMock }));
 vi.mock("@/lib/api", () => ({ api: apiMock }));
@@ -18,6 +21,9 @@ vi.mock("@/hooks/use-task-poll", () => ({
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
+vi.mock("@/hooks/use-llm", () => ({ useActionLLMStatus: () => llm.status }));
+
+import { toast } from "sonner";
 
 import type {
   ErrorIssueSummary,
@@ -98,6 +104,9 @@ describe("Errors", () => {
     useApiMock.mockReset();
     pollTaskMock.mockReset();
     refetchMock.mockReset();
+    vi.mocked(toast.success).mockReset();
+    vi.mocked(toast.error).mockReset();
+    llm.status = { available: true };
   });
 
   it("renders critical lane first", async () => {
@@ -481,5 +490,89 @@ describe("Errors", () => {
     expect(
       await screen.findByRole("heading", { name: "No open issues" }),
     ).toBeInTheDocument();
+  });
+
+  const backlogButton = () =>
+    screen.queryByRole("button", { name: /^Triage backlog/ });
+
+  it("queues the triage backlog and says how many it queued", async () => {
+    serve({ summary: sampleSummary({ untriaged: 42 }) });
+    renderWithAdminProviders(<Errors />, { route: "/errors" });
+    await issueTable();
+    const list = apiMock.getMockImplementation()!;
+    apiMock.mockImplementation(async (url: string, method = "GET") =>
+      url === "/api/admin/errors/triage-backlog"
+        ? { queued: 40, deduplicated: 2, limit: 100, task_ids: [] }
+        : list(url, method),
+    );
+
+    expect(backlogButton()).toHaveTextContent("Triage backlog (42)");
+    expect(
+      screen.getByText("42 open issues have no AI triage of the latest event."),
+    ).toBeInTheDocument();
+    await userEvent.click(backlogButton()!);
+
+    expect(apiMock).toHaveBeenCalledWith(
+      "/api/admin/errors/triage-backlog",
+      "POST",
+    );
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith(
+        "Queued 40 issues for AI triage. Results appear in the list as each one finishes. 2 were already queued.",
+      ),
+    );
+    expect(refetchMock).toHaveBeenCalled();
+  });
+
+  it("names the 100 a backlog press queues when more are waiting", async () => {
+    serve({ summary: sampleSummary({ untriaged: 230 }) });
+    renderWithAdminProviders(<Errors />, { route: "/errors" });
+    await issueTable();
+
+    expect(backlogButton()).toHaveTextContent("Triage backlog (100)");
+    expect(
+      screen.getByText(/230 open issues have no AI triage/),
+    ).toHaveTextContent("Each press queues the 100 with the highest score.");
+  });
+
+  it("explains a refused backlog and an unbound model", async () => {
+    serve({ summary: sampleSummary({ untriaged: 3 }) });
+    renderWithAdminProviders(<Errors />, { route: "/errors" });
+    await issueTable();
+    apiMock.mockRejectedValueOnce(
+      Object.assign(new Error('{"detail":"Configuration changed"}'), {
+        status: 503,
+        code: "AI_CONTEXT_STALE",
+      }),
+    );
+
+    await userEvent.click(backlogButton()!);
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "The AI configuration is changing. Try again in a moment.",
+      ),
+    );
+  });
+
+  it("disables the backlog without a model and hides it without manage", async () => {
+    llm.status = { available: false };
+    serve({ summary: sampleSummary({ untriaged: 3 }) });
+    const { unmount } = renderWithAdminProviders(<Errors />, {
+      route: "/errors",
+    });
+    await issueTable();
+    expect(backlogButton()).toBeDisabled();
+    expect(
+      screen.getByText(/No usable model is bound to Triage error issue/),
+    ).toBeInTheDocument();
+    unmount();
+
+    llm.status = { available: true };
+    renderWithAdminProviders(<Errors />, {
+      route: "/errors",
+      auth: only("ops.errors.view"),
+    });
+    await issueTable();
+    expect(backlogButton()).not.toBeInTheDocument();
   });
 });
