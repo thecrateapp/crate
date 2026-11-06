@@ -47,6 +47,8 @@ sources:
   - docker-compose.yaml
   - docker-compose.dev.yaml
   - docker-compose.home.yaml
+  - app/tests/test_ai_ollama_endpoint_key.py
+  - app/ui/src/components/ai-models/ProviderCard.tsx
 ---
 
 # AI agents configuration
@@ -125,8 +127,10 @@ models likewise remain pending until trusted compatibility evidence exists.
 
 Gemini and DeepSeek use fixed cloud origins. Ollama requires an explicit HTTP(S)
 origin; private networks are allowed, credentials in URLs are rejected, and metadata,
-link-local and unsafe resolved addresses are blocked. Discovery and inference pin a
-validated address with the original Host/TLS name. Ambient proxies, redirects,
+link-local and unsafe resolved addresses are blocked. A stored Ollama key belongs to
+the origin it was saved for: a new scheme, host or port revokes it (see [Credential
+storage and rotation](#credential-storage-and-rotation)). Discovery and inference
+pin a validated address with the original Host/TLS name. Ambient proxies, redirects,
 transport retries and provider fallback are disabled. Discovery has a 30 second total
 budget, at most 500 catalog rows and 100 Ollama inspections; an uninspected model
 remains pending. Failed refreshes keep the last good catalog and expose a safe error.
@@ -580,6 +584,18 @@ To replace or revoke a **provider API key**, use the connection's credential wri
 with its expected revision. Replacement revokes the old vault reference atomically;
 revocation makes pending contexts stale. It does not rewrite historical invocation
 rows. Keep encryption keys recoverable separately from the database backup.
+
+A stored key is only ever sent to the origin it was saved for. Changing an Ollama
+connection's endpoint to another scheme, host or port revokes its stored key in the
+same transaction, audited as one connection update. Moving a connection needs
+`ai.config.manage`, while only `ai.credentials.manage` decides which server
+receives a key. The connection stays keyless until a key is saved for the new
+endpoint; until then discovery and inference send no `Authorization` header, as
+for any Ollama connection without a key. No single API request changes both: move
+the endpoint, then write the key with the new revision. Saving the same endpoint
+again, in any spelling that normalises to it (letter case, a trailing dot or
+slash), keeps the key. Admin warns under the endpoint field when a key would be
+removed.
 
 ## Validation evidence and remaining limits
 

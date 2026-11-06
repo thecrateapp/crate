@@ -532,6 +532,37 @@ describe("ProvidersPanel", () => {
     );
   });
 
+  it("warns that a new Ollama endpoint removes the saved key", async () => {
+    const user = userEvent.setup();
+    const ollama = {
+      provider: "ollama" as const,
+      endpoint: "http://localhost:11434",
+    };
+    const snapshot = aiSnapshot();
+    snapshot.connections = [
+      storedConnection({ ...ollama, id: "keyed", label: "Keyed" }),
+      storedConnection({
+        ...ollama,
+        id: "keyless",
+        label: "Keyless",
+        source: "none",
+        has_key: false,
+      }),
+    ];
+    renderPanel(snapshot);
+
+    const keyed = await openSettings(user, "Keyed");
+    expect(
+      within(keyed).getByLabelText("Endpoint"),
+    ).toHaveAccessibleDescription(
+      "Changing the endpoint removes the saved key.",
+    );
+    const keyless = await openSettings(user, "Keyless");
+    expect(
+      within(keyless).getByLabelText("Endpoint"),
+    ).not.toHaveAccessibleDescription();
+  });
+
   it("shows a cleared limit as empty and does not save it", async () => {
     const user = userEvent.setup();
     renderPanel(aiSnapshot());

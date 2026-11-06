@@ -378,6 +378,13 @@ def patch_connection(id, data, expected_revision, actor_id):
         _fail("AI_CONFIGURATION_INVALID", "No connection changes supplied")
     if "endpoint" in values:
         values["endpoint"] = validate_endpoint(row["provider"], values["endpoint"])
+        # Stored endpoints are already normalised, so re-saving the same origin
+        # in another spelling is not a move. Only ai.credentials.manage decides
+        # which server receives a key.
+        if values["endpoint"] != row["endpoint"]:
+            return _public_connection(
+                store.move_connection_origin(id, values, expected_revision, actor_id)
+            )
     return _public_connection(
         store.update_connection(id, values, expected_revision, actor_id)
     )
