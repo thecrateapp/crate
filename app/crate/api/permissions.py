@@ -37,6 +37,8 @@ ALL_CAPABILITIES: tuple[str, ...] = (
     "roles.assign",
     "roles.manage",
     "library.view",
+    # Smart Mix AI refinement (SM3-D10): granted with library.view by default.
+    "smart_mix.ai",
     "library.metadata.write",
     "library.analysis.manage",
     "library.maintenance.manage",
@@ -80,6 +82,7 @@ ROLE_CAPABILITIES: dict[str, tuple[str, ...]] = {
     ),
     "librarian": (
         "library.view",
+        "smart_mix.ai",
         "library.metadata.write",
         "library.analysis.manage",
         "library.track.remove",
@@ -98,6 +101,7 @@ ROLE_CAPABILITIES: dict[str, tuple[str, ...]] = {
     ),
     "curator": (
         "library.view",
+        "smart_mix.ai",
         "curation.playlists.write",
         "curation.genres.write",
         "curation.shows.write",
@@ -107,18 +111,21 @@ ROLE_CAPABILITIES: dict[str, tuple[str, ...]] = {
     ),
     "editor": (
         "library.view",
+        "smart_mix.ai",
         "library.metadata.write",
         "federation.catalog.search",
         "federation.stream.play",
     ),
     "contributor": (
         "library.view",
+        "smart_mix.ai",
         "contributions.own.manage",
         "federation.catalog.search",
         "federation.stream.play",
     ),
     "user": (
         "library.view",
+        "smart_mix.ai",
         "federation.catalog.search",
         "federation.stream.play",
     ),

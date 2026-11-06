@@ -7,10 +7,37 @@ from typing import Any
 from sqlalchemy import text
 
 from crate.release_dates import normalize_release_date
+from crate.release_track_matching import match_release_track
 from crate.db.repositories.global_catalog_dirty_sources import (
     enqueue_local_dirty_source,
 )
-from crate.db.tx import transaction_scope
+from crate.db.tx import read_scope, transaction_scope
+
+
+_RELEASE_IDENTITY_CONFLICT_JOIN = """
+    LEFT JOIN (
+        SELECT DISTINCT ON (LOWER(release.artist_name), LOWER(release.album_title))
+               LOWER(release.artist_name) AS artist_key,
+               LOWER(release.album_title) AS album_key,
+               release.mb_release_group_id AS expected_release_group_id,
+               jsonb_array_length(CASE
+                 WHEN jsonb_typeof(release.tracklist_json) = 'array'
+                 THEN release.tracklist_json ELSE '[]'::jsonb
+               END) AS expected_tracks
+        FROM new_releases release
+        WHERE LOWER(release.release_type) = 'album'
+          AND release.status <> 'dismissed'
+          AND release.release_date <= CURRENT_DATE
+          AND NULLIF(release.mb_release_group_id, '') IS NOT NULL
+        ORDER BY LOWER(release.artist_name), LOWER(release.album_title),
+                 release.release_date DESC, release.id DESC
+    ) expected_release
+      ON LOWER(COALESCE(album.release_group_primary_type, '')) IN ('single', 'ep')
+     AND expected_release.artist_key = LOWER(album.artist)
+     AND expected_release.album_key = LOWER(album.name)
+     AND expected_release.expected_release_group_id <> COALESCE(album.musicbrainz_releasegroupid, '')
+     AND expected_release.expected_tracks BETWEEN 2 AND album.track_count
+"""
 
 
 def get_albums_without_mbid() -> list[dict]:
@@ -28,21 +55,25 @@ def get_albums_without_mbid() -> list[dict]:
 
 
 def get_albums_needing_release_metadata() -> list[dict]:
-    with transaction_scope() as session:
+    with read_scope() as session:
         rows = (
             session.execute(
                 text(
-                    """
-                    SELECT album.*, artist.mbid AS artist_mbid
+                    f"""
+                    SELECT album.*, artist.mbid AS artist_mbid,
+                           expected_release.expected_release_group_id
                     FROM library_albums album
                     LEFT JOIN library_artists artist
                       ON LOWER(artist.name) = LOWER(album.artist)
-                    WHERE album.musicbrainz_albumid IS NULL
+                    {_RELEASE_IDENTITY_CONFLICT_JOIN}
+                    WHERE album.quarantined_at IS NULL
+                      AND (album.musicbrainz_albumid IS NULL
                        OR album.musicbrainz_albumid = ''
                        OR album.release_group_primary_type IS NULL
                        OR album.release_group_primary_type = ''
                        OR album.release_date IS NULL
                        OR album.release_date = ''
+                       OR expected_release.expected_release_group_id IS NOT NULL)
                     ORDER BY album.artist, album.year NULLS LAST, album.name
                     """
                 )
@@ -54,13 +85,14 @@ def get_albums_needing_release_metadata() -> list[dict]:
 
 
 def get_albums_missing_release_group() -> list[dict]:
-    with transaction_scope() as session:
+    with read_scope() as session:
         rows = (
             session.execute(
                 text(
-                    """
+                    f"""
                     SELECT
                         album.*,
+                        expected_release.expected_release_group_id,
                         (
                             SELECT artist.mbid
                             FROM library_artists artist
@@ -69,7 +101,9 @@ def get_albums_missing_release_group() -> list[dict]:
                             LIMIT 1
                         ) AS artist_mbid
                     FROM library_albums album
-                    WHERE COALESCE(album.release_group_primary_type, '') = ''
+                    {_RELEASE_IDENTITY_CONFLICT_JOIN}
+                    WHERE (COALESCE(album.release_group_primary_type, '') = ''
+                           OR expected_release.expected_release_group_id IS NOT NULL)
                       AND album.quarantined_at IS NULL
                     ORDER BY album.id DESC
                     """
@@ -169,22 +203,27 @@ def persist_album_release_mbids(
             enqueue_local_dirty_source(
                 "album", str(entity_uid), "upsert", session=session
             )
-        for index, db_track in enumerate(tracks_db):
-            if index >= len(mb_tracks):
-                break
-            track_mbid = mb_tracks[index].get("mbid", "")
+        for db_track in tracks_db:
+            matched_track = match_release_track(db_track, mb_tracks)
+            if matched_track is None:
+                continue
+            track_mbid = matched_track.get("mbid", "")
             if track_mbid:
-                session.execute(
+                track_entity_uid = session.execute(
                     text(
                         "UPDATE library_tracks SET musicbrainz_albumid = :album_mbid, musicbrainz_trackid = :track_mbid "
-                        "WHERE id = :id"
+                        "WHERE id = :id RETURNING entity_uid::text"
                     ),
                     {
                         "album_mbid": release_mbid,
                         "track_mbid": track_mbid,
                         "id": db_track["id"],
                     },
-                )
+                ).scalar_one_or_none()
+                if track_entity_uid:
+                    enqueue_local_dirty_source(
+                        "track", str(track_entity_uid), "upsert", session=session
+                    )
 
 
 def persist_album_release_group_types(updates: list[dict]) -> int:

@@ -70,9 +70,10 @@ async function captureSurface(
 async function expectQuietHairline(
   surface: Locator,
   sides: readonly string[] = ["Top", "Right", "Bottom", "Left"],
+  token = "--border-quiet",
 ) {
   await expect(surface).toBeVisible();
-  const appearance = await surface.evaluate((element) => {
+  const appearance = await surface.evaluate((element, token) => {
     const canvas = document.createElement("canvas");
     canvas.width = 1;
     canvas.height = 1;
@@ -87,15 +88,14 @@ async function expectQuietHairline(
     };
 
     const probe = document.createElement("span");
-    probe.style.cssText =
-      "position:absolute;visibility:hidden;border:1px solid var(--border-quiet)";
+    probe.style.cssText = `position:absolute;visibility:hidden;border:1px solid var(${token})`;
     element.append(probe);
     const quietColor = getComputedStyle(probe).borderTopColor;
     probe.remove();
 
     const style = getComputedStyle(element);
     return {
-      token: style.getPropertyValue("--border-quiet").trim(),
+      token: style.getPropertyValue(token).trim(),
       quietColor: normalizeColor(quietColor),
       borders: ["Top", "Right", "Bottom", "Left"].map((side) => ({
         side,
@@ -106,9 +106,9 @@ async function expectQuietHairline(
         ),
       })),
     };
-  });
+  }, token);
 
-  expect(appearance.token, "The quiet border token is available").not.toBe("");
+  expect(appearance.token, `The ${token} token is available`).not.toBe("");
   expect(
     appearance.quietColor[3],
     "The quiet border is not transparent",
@@ -123,6 +123,14 @@ async function expectQuietHairline(
       color: appearance.quietColor,
     })),
   );
+  return appearance.quietColor;
+}
+
+async function borderBottom(surface: Locator) {
+  return surface.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return `${style.borderBottomWidth} ${style.borderBottomStyle}`;
+  });
 }
 
 test.beforeEach(async ({ page }) => {
@@ -136,6 +144,14 @@ test("rules the album audio analysis readings with a quiet hairline", async ({
 }, info) => {
   adminApi.respondTo("/api/artists/23/analysis-data", analysisData);
   await openAdminPage(albumPath);
+  // The album page groups its sections in tabs; the audio analysis has its own.
+  const analysisTab = page.getByRole("tab", {
+    name: "Audio analysis",
+    exact: true,
+  });
+  await analysisTab.click();
+  await expect(analysisTab).toHaveAttribute("aria-selected", "true");
+  await expect(page).toHaveURL(/[?&]tab=analysis(&|$)/);
   const profile = page.getByRole("region", {
     name: "Audio analysis",
     exact: true,
@@ -143,26 +159,57 @@ test("rules the album audio analysis readings with a quiet hairline", async ({
   await expect(
     profile.getByText("3 / 3 tracks with audio features", { exact: true }),
   ).toBeVisible();
-  const labels = [
-    "Mean tempo",
-    "Most frequent key",
-    "Mean loudness",
-    "Mean dynamic range",
-  ];
-  const readings = profile
-    .getByRole("term")
-    .filter({ hasText: labels[0] })
-    .locator("xpath=ancestor::dl[1]");
-  for (const label of labels) {
-    await expect(
-      readings.getByRole("term").filter({ hasText: label }),
-    ).toBeVisible();
+
+  // Each reading is a row of the list: its term, its value and, under them, its strip
+  // with a mark per track, or for the key the keys counted.
+  const readings = profile.locator('dl[data-slot="album-readings"]');
+  const rows = readings.locator(':scope > [data-slot="album-reading"]');
+  const expected = [
+    ["Mean tempo", "120 BPM"],
+    ["Mean loudness", "-9.0 dB"],
+    ["Mean dynamic range", "10.0 dB"],
+    ["Most frequent key", "D minor"],
+  ] as const;
+  await expect(rows).toHaveCount(expected.length);
+  for (const [index, [label, value]] of expected.entries()) {
+    const row = rows.nth(index);
+    await expect(row.getByRole("term")).toHaveText(label);
+    const definitions = row.getByRole("definition");
+    await expect(definitions).toHaveCount(2);
+    await expect(definitions.first()).toHaveText(value);
   }
-  await expect(readings.getByRole("definition")).toHaveCount(labels.length);
+  for (const index of [0, 1, 2]) {
+    const strip = rows.nth(index).getByRole("img");
+    await expect(strip).toHaveAttribute("data-slot", "album-reading-strip");
+    await expect(strip.locator('[data-slot="album-reading-tick"]')).toHaveCount(
+      3,
+    );
+  }
+  await expect(
+    rows
+      .nth(3)
+      .getByRole("list", { name: "Keys", exact: true })
+      .getByRole("listitem"),
+  ).toHaveText(["D minor ×2", "A minor ×1"]);
 
   await captureSurface(page, readings, info, "admin-audio-profile-kpis");
 
-  await expectQuietHairline(profile, ["Top"]);
+  // The card is ruled by the quiet section hairline, and the readings are separated by
+  // the quieter row divider of the admin policy, never by a stronger rule. The last
+  // reading closes the list without one.
+  const sectionRule = await expectQuietHairline(profile, ["Top"]);
+  for (const index of [0, 1, 2]) {
+    const rowRule = await expectQuietHairline(
+      rows.nth(index),
+      ["Bottom"],
+      "--border-quiet-subtle",
+    );
+    expect(
+      rowRule[3],
+      "The row divider is quieter than the section rule",
+    ).toBeLessThan(sectionRule[3]);
+  }
+  expect(await borderBottom(rows.nth(3))).toMatch(/^0px /);
 });
 
 test("separates the crop modal with a quiet hairline without uploading", async ({

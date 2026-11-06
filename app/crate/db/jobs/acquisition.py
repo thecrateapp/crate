@@ -32,9 +32,14 @@ def mark_artist_new_releases_checked(
         )
 
 
-def get_due_prereleases(today: date, *, lookback_days: int) -> list[dict]:
-    """Releases detected before their release date that are now out but not
-    yet downloaded, newest first."""
+def get_due_prereleases(
+    today: date, *, lookback_days: int, after_release_id: int = 0
+) -> list[dict]:
+    """Released prereleases, including incomplete short-form imports.
+
+    Rotate a bounded batch after the last checked ID so unavailable sources
+    do not prevent later releases from being promoted.
+    """
     with read_scope() as session:
         rows = (
             session.execute(
@@ -47,19 +52,37 @@ def get_due_prereleases(today: date, *, lookback_days: int) -> list[dict]:
                     nr.tidal_url,
                     nr.cover_url,
                     nr.tracks,
+                    nr.release_type,
+                    nr.mb_release_group_id,
+                    nr.tracklist_json,
                     COALESCE(MAX(alb.track_count), 0) AS library_track_count
                 FROM new_releases nr
                 LEFT JOIN library_albums alb
                   ON LOWER(alb.artist) = LOWER(nr.artist_name)
                  AND LOWER(alb.name) = LOWER(nr.album_title)
-                WHERE nr.status = 'detected'
+                WHERE nr.status IN ('detected', 'downloaded')
                   AND nr.release_date <= :today
                   AND nr.release_date >= :since
                   AND nr.detected_at::date < nr.release_date
                 GROUP BY nr.id
-                ORDER BY nr.release_date DESC, nr.id
+                HAVING nr.status = 'detected' OR (
+                    LOWER(nr.release_type) = 'album'
+                    AND BOOL_OR(LOWER(alb.release_group_primary_type) IN ('single', 'ep'))
+                    AND COALESCE(MAX(alb.track_count), 0) > 0
+                    AND COALESCE(MAX(alb.track_count), 0) < GREATEST(
+                        COALESCE(nr.tracks, 0),
+                        CASE WHEN jsonb_typeof(nr.tracklist_json) = 'array'
+                             THEN jsonb_array_length(nr.tracklist_json) ELSE 0 END
+                    )
+                )
+                ORDER BY (nr.id <= :after_release_id), nr.id
+                LIMIT 100
                 """),
-                {"today": today, "since": today - timedelta(days=lookback_days)},
+                {
+                    "today": today,
+                    "since": today - timedelta(days=lookback_days),
+                    "after_release_id": max(0, after_release_id),
+                },
             )
             .mappings()
             .all()

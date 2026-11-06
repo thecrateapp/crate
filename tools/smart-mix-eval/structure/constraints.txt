@@ -1,0 +1,3 @@
+torch==2.0.1+cpu
+torchaudio==2.0.2+cpu
+numpy<1.24

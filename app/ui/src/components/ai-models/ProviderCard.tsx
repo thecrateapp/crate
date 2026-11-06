@@ -28,6 +28,11 @@ function keyLine(connection: Connection): string {
   return "No key";
 }
 
+function endpointLine(connection: Connection): string {
+  if (!connection.endpoint) return "Endpoint: provider default";
+  return `Endpoint: ${connection.endpoint}${connection.path_prefix ?? ""}`;
+}
+
 function ModelsLine({ connection }: { connection: Connection }) {
   if (connection.model_count === 0) return <p>Models not loaded</p>;
   const count = `${formatCount(connection.model_count)} models`;
@@ -175,7 +180,16 @@ function LimitsForm({
         />
       </FormField>
       {isOllama ? (
-        <FormField label="Endpoint" className="min-w-0">
+        <FormField
+          label="Endpoint"
+          // The API revokes a saved key when the endpoint moves.
+          hint={
+            connection.has_key
+              ? "Changing the endpoint removes the saved key."
+              : undefined
+          }
+          className="min-w-0"
+        >
           <Input
             type="url"
             required
@@ -311,10 +325,20 @@ function SettingsSection({
             connection={connection}
             refresh={refresh}
           />
-          <ManualModelForm connection={connection} refresh={refresh} />
-          <p className="text-xs text-text-muted">
-            Added models stay pending until Crate can confirm what they support.
-          </p>
+          {connection.provider === "openai_compatible" ? (
+            <p className="text-xs text-text-muted">
+              Models come from this connection&apos;s manifest and load on
+              refresh.
+            </p>
+          ) : (
+            <>
+              <ManualModelForm connection={connection} refresh={refresh} />
+              <p className="text-xs text-text-muted">
+                Added models stay pending until Crate can confirm what they
+                support.
+              </p>
+            </>
+          )}
         </div>
       ) : null}
     </div>
@@ -382,7 +406,7 @@ export function ProviderCard({
 
       <div className="space-y-1 text-sm text-text-secondary">
         <p>{keyLine(connection)}</p>
-        <p>Endpoint: {connection.endpoint ?? "provider default"}</p>
+        <p>{endpointLine(connection)}</p>
         <ModelsLine connection={connection} />
         {connection.catalog_status === "error" ? (
           <p>Couldn&apos;t load models. The last list is kept.</p>

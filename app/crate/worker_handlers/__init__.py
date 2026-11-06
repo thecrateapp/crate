@@ -15,6 +15,10 @@ log = logging.getLogger(__name__)
 # Type alias for task handler functions
 TaskHandler = Callable[[str, dict, dict], dict]
 
+# Result key read by the actor: send the task back to pending and run it again
+# after this many seconds.
+RUN_AGAIN_AFTER_KEY = "_run_again_after_seconds"
+
 # Audio file extensions recognized across all handlers
 DEFAULT_AUDIO_EXTENSIONS = {
     ".flac",
@@ -45,6 +49,16 @@ def is_cancelled(task_id: str) -> bool:
     from crate.db.repositories.agent_task_control import check_task_authority
 
     return check_task_authority(task_id)
+
+
+def run_again_later(seconds: float, *, progress: str) -> dict:
+    """Result that sends the task back to pending to run again after ``seconds``.
+
+    The worker process is free in the meantime, so a handler that waits for
+    capacity returns this instead of sleeping. The task keeps its row, and its
+    progress says why it waits. A cancellation requested meanwhile wins.
+    """
+    return {RUN_AGAIN_AFTER_KEY: float(seconds), "progress": progress}
 
 
 def compute_dir_hash(directory: Path, extensions: set[str] | None = None) -> str:

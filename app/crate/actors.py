@@ -31,6 +31,7 @@ from crate.ai.requeue import (
     requeue_delay_ms,
 )
 from crate.db.repositories.tasks_shared import DB_HEAVY_TASKS
+from crate.worker_handlers import RUN_AGAIN_AFTER_KEY
 
 log = logging.getLogger(__name__)
 
@@ -105,6 +106,10 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     # Error triage evaluation (gate EG2): one ops.error.triage call (<= 45s) for each
     # of at most 100 listed issues, nothing saved; queued by tools/error-inbox-eval.
     "evaluate_error_triage": TaskPoolConfig("ai_bulk", 3, 7200, 0),
+    # One smart_mix.transition.refine call (≤ 45 s) for a transition about to
+    # play: top priority. 120 s leaves the longest action maximum (90 s) after
+    # the call margin, like the other ai tasks.
+    "smart_mix_refine_transition": TaskPoolConfig("ai", 0, 120, 0),
     # User-initiated (priority 0) — these should run ASAP
     "tidal_download": TaskPoolConfig(
         "default", 0, 14400, 0
@@ -228,6 +233,9 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "compute_smart_mix_profile": TaskPoolConfig("heavy", 2, 900, 2),
     "backfill_smart_mix_profiles": TaskPoolConfig("heavy", 3, 1800, 0),
     "refresh_smart_mix_coverage": TaskPoolConfig("maintenance", 3, 300, 0),
+    # Daily retention of AI refinements (SM3-D5): records queued reads, then
+    # deletes rows unread for 180 days. No model call.
+    "cleanup_smart_mix_refinements": TaskPoolConfig("maintenance", 3, 600, 0),
     "backfill_track_audio_fingerprints": TaskPoolConfig("heavy", 3, 14400, 0),
     "index_genres": TaskPoolConfig("maintenance", 3, 600, 0),
     "infer_genre_taxonomy": TaskPoolConfig("ai_bulk", 3, 3600, 0),
@@ -632,20 +640,27 @@ def _send_later(task_type: str, task_id: str, delay_ms: int, ai_requeues: int = 
     actor.send_with_options(**options)
 
 
-def _requeue_for_ai_capacity(task_type: str, task_id: str, attempt: int) -> None:
-    """Put an AI task refused for connection concurrency back in its queue."""
+def _requeue_later(
+    task_type: str,
+    task_id: str,
+    *,
+    delay_ms: int,
+    progress: str,
+    ai_requeues: int = 0,
+) -> bool:
+    """Return a running task to pending and send its message again later.
+
+    A cancellation request wins: the row is left alone and the cancellation is
+    acknowledged instead. Returns whether the task was requeued.
+
+    Once the row is pending a failed send must not fail the task: the caller's
+    error path would mark a task that never ran again as failed. The stale
+    pending redispatch of the service loop sends it again instead.
+    """
     from crate.db.repositories.tasks import requeue_running_task
     from crate.worker import _is_cancelled
 
-    delay_ms = requeue_delay_ms()
-    requeued = requeue_running_task(
-        task_id,
-        progress=(
-            "Waiting for AI provider capacity; "
-            f"retry {attempt}/{AI_CONCURRENCY_REQUEUE_LIMIT} in {delay_ms // 1000}s"
-        ),
-    )
-    if requeued is None:
+    if requeue_running_task(task_id, progress=progress) is None:
         if _is_cancelled(task_id):
             from crate.db.repositories.task_control import acknowledge_cancellation
 
@@ -664,8 +679,34 @@ def _requeue_for_ai_capacity(task_type: str, task_id: str, attempt: int) -> None
                     "",
                 )
         log.info("Task %s (%s) not requeued: no longer running", task_id, task_type)
+        return False
+    try:
+        _send_later(task_type, task_id, delay_ms, ai_requeues=ai_requeues)
+    except Exception:
+        log.warning(
+            "Task %s (%s) is pending but its message could not be sent; "
+            "the stale pending redispatch will send it",
+            task_id,
+            task_type,
+            exc_info=True,
+        )
+    return True
+
+
+def _requeue_for_ai_capacity(task_type: str, task_id: str, attempt: int) -> None:
+    """Put an AI task refused for connection concurrency back in its queue."""
+    delay_ms = requeue_delay_ms()
+    if not _requeue_later(
+        task_type,
+        task_id,
+        delay_ms=delay_ms,
+        progress=(
+            "Waiting for AI provider capacity; "
+            f"retry {attempt}/{AI_CONCURRENCY_REQUEUE_LIMIT} in {delay_ms // 1000}s"
+        ),
+        ai_requeues=attempt,
+    ):
         return
-    _send_later(task_type, task_id, delay_ms, ai_requeues=attempt)
     log.info(
         "Task %s (%s) waiting for AI provider capacity; requeue %d/%d in %dms",
         task_id,
@@ -841,12 +882,14 @@ def _execute_task(task_type: str, task_id: str, ai_requeues: int = 0):
     )
     hb_thread.start()
 
-    # Record queue wait time (created → running)
+    # Record queue wait time (created → first running). A retried or requeued
+    # task already started once; counting from creation again would report its
+    # earlier runs and delays as queue wait.
     try:
         from crate.metrics import record
 
         created = task.get("created_at")
-        if created and hasattr(created, "timestamp"):
+        if created and hasattr(created, "timestamp") and not task.get("started_at"):
             wait_sec = _time.time() - created.timestamp()
             record("worker.queue.wait", wait_sec, {"type": task_type})
     except Exception:
@@ -931,6 +974,18 @@ def _execute_task(task_type: str, task_id: str, ai_requeues: int = 0):
                 task_type,
                 result.get("chunks", 0),
             )
+        elif isinstance(result, dict) and result.get(RUN_AGAIN_AFTER_KEY):
+            # The handler waits for capacity without holding this process.
+            delay_ms = max(1, round(float(result[RUN_AGAIN_AFTER_KEY]) * 1000))
+            if _requeue_later(
+                task_type,
+                task_id,
+                delay_ms=delay_ms,
+                progress=str(result.get("progress") or "Waiting to run again"),
+            ):
+                log.debug(
+                    "Task %s (%s) runs again in %dms", task_id, task_type, delay_ms
+                )
         elif isinstance(result, dict) and (
             result.get("error") or result.get("status") in {"failed", "conflict"}
         ):

@@ -5,13 +5,21 @@ import logging
 import os
 import shutil
 import subprocess
+import tempfile
+import time
+from collections.abc import Mapping
+from contextlib import ExitStack
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 log = logging.getLogger(__name__)
 
 BIN_NAMES = ["crate-cli"]
 BIN_PATHS = ["/app/bin/crate-cli", "/usr/local/bin/crate-cli"]
+# A help probe that failed is not run again for this long (it takes up to 5 s).
+PROBE_RETRY_SECONDS = 60
+_clock = time.monotonic
 
 
 @lru_cache(maxsize=1)
@@ -30,37 +38,96 @@ def is_available() -> bool:
     return find_binary() is not None
 
 
-def _has_subcommands() -> bool:
-    """Check if the binary supports clap-style subcommands."""
-    binary = find_binary()
-    if not binary:
-        return False
-    try:
-        result = subprocess.run(
-            [binary, "--help"], capture_output=True, text=True, timeout=5
-        )
-        return "scan" in result.stdout.lower()
-    except Exception:
-        return False
-
-
-@lru_cache(maxsize=1)
 def has_subcommands() -> bool:
-    return _has_subcommands()
+    """Whether the binary takes clap-style subcommands (its help lists ``scan``)."""
+    return supports_command("scan")
 
 
-@lru_cache(maxsize=16)
 def supports_command(command: str) -> bool:
+    """Whether ``crate-cli --help`` lists ``command``.
+
+    The help of a binary that replied is kept for the process. A probe that fails,
+    such as a timeout on a loaded worker, answers False for ``PROBE_RETRY_SECONDS``.
+    """
     binary = find_binary()
     if not binary:
         return False
-    try:
-        result = subprocess.run(
-            [binary, "--help"], capture_output=True, text=True, timeout=5
-        )
-    except Exception:
+    help_text = _help_text(binary)
+    return help_text is not None and command.lower() in help_text.lower()
+
+
+def supports_analyze_beats() -> bool:
+    """Whether ``analyze`` takes model beats (``--beats``, SM3-D14); older binaries
+    track the beats themselves.
+
+    The answer of a binary that replied is kept for the process. A probe that fails,
+    such as a timeout on a loaded worker, answers False for ``PROBE_RETRY_SECONDS``.
+    """
+    binary = find_binary()
+    if not binary:
         return False
-    return command.lower() in result.stdout.lower()
+    help_text = _analyze_help(binary)
+    return help_text is not None and "--beats" in help_text
+
+
+def analyze_beats_probe_backing_off() -> bool:
+    """Whether ``analyze --help`` failed less than ``PROBE_RETRY_SECONDS`` ago, so
+    ``supports_analyze_beats`` answers False without having asked the binary."""
+    binary = find_binary()
+    return binary is not None and _analyze_help.backing_off(binary)
+
+
+class _HelpProbe:
+    """The help a crate-cli call prints, or None when it fails.
+
+    A help is kept for the process once the binary replied. A failure is logged and
+    remembered: for ``PROBE_RETRY_SECONDS`` the probe answers None without running
+    the binary or logging again, since every track asks.
+    """
+
+    def __init__(self, *args: str) -> None:
+        self._args = args
+        self._replies: dict[str, str] = {}
+        self._failed_at: dict[str, float] = {}
+
+    def __call__(self, binary: str) -> str | None:
+        if binary in self._replies:
+            return self._replies[binary]
+        if self.backing_off(binary):
+            return None
+        try:
+            reply = subprocess.run(
+                [binary, *self._args],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=True,
+            ).stdout
+        except Exception:
+            self._failed_at[binary] = _clock()
+            log.warning(
+                "crate-cli %s failed; it is not asked again for %d s",
+                " ".join(self._args),
+                PROBE_RETRY_SECONDS,
+                exc_info=True,
+            )
+            return None
+        self._failed_at.pop(binary, None)
+        self._replies[binary] = reply
+        return reply
+
+    def backing_off(self, binary: str) -> bool:
+        """Whether a failure of ``binary`` is less than ``PROBE_RETRY_SECONDS`` old."""
+        failed_at = self._failed_at.get(binary)
+        return failed_at is not None and _clock() - failed_at < PROBE_RETRY_SECONDS
+
+    def cache_clear(self) -> None:
+        self._replies.clear()
+        self._failed_at.clear()
+
+
+_help_text = _HelpProbe("--help")
+_analyze_help = _HelpProbe("analyze", "--help")
 
 
 def _scan_timeout() -> int:
@@ -290,9 +357,17 @@ def _find_panns_model() -> str | None:
 
 
 def run_analyze(
-    directory: str = "", file: str = "", extensions: str = "flac,mp3,m4a,ogg,opus"
+    directory: str = "",
+    file: str = "",
+    extensions: str = "flac,mp3,m4a,ogg,opus",
+    *,
+    beats: Mapping[str, Any] | None = None,
 ) -> dict | None:
-    """Run audio analysis with Rust CLI. Returns AnalysisResult(s) or None."""
+    """Run audio analysis with Rust CLI. Returns AnalysisResult(s) or None.
+
+    ``beats`` (``BeatTrack.to_payload()``) replaces the tracker of a single file's
+    analysis when the binary supports it; it goes through a temporary JSON file.
+    """
     binary = find_binary()
     if not binary or not supports_command("analyze"):
         return None
@@ -308,17 +383,33 @@ def run_analyze(
         return None
     from crate.resource_governor import low_priority_command
 
-    try:
-        result = subprocess.run(
-            low_priority_command(args), capture_output=True, text=True, timeout=3600
-        )
-        if result.returncode != 0:
-            log.warning("crate-cli analyze failed: %s", result.stderr[:200])
+    with ExitStack() as cleanup:
+        if beats is not None and file and supports_analyze_beats():
+            scratch = cleanup.enter_context(
+                tempfile.TemporaryDirectory(prefix="crate-cli-beats-")
+            )
+            beats_path = Path(scratch) / "beats.json"
+            beats_path.write_text(json.dumps(dict(beats)))
+            args.extend(["--beats", str(beats_path)])
+        elif beats is not None:
+            log.warning(
+                "crate-cli analyze takes model beats (--beats) only for one file and "
+                "from a binary that lists it; this run tracks its own beats"
+            )
+        try:
+            result = subprocess.run(
+                low_priority_command(args),
+                capture_output=True,
+                text=True,
+                timeout=3600,
+            )
+            if result.returncode != 0:
+                log.warning("crate-cli analyze failed: %s", result.stderr[:200])
+                return None
+            return json.loads(result.stdout)
+        except Exception:
+            log.warning("crate-cli analyze subprocess failed", exc_info=True)
             return None
-        return json.loads(result.stdout)
-    except Exception:
-        log.warning("crate-cli analyze subprocess failed", exc_info=True)
-        return None
 
 
 def run_bliss(

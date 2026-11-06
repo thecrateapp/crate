@@ -1,5 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
-import { beforeEach, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AudioProfileCard } from "./AudioProfileCard";
 import type { AudioAnalysisTrack } from "./audio-analysis";
 vi.mock("@nivo/radar", () => ({ ResponsiveRadar: () => null }));
@@ -94,7 +95,7 @@ it("provides an explicit empty state when no analysis was returned", () => {
   ).toBeInTheDocument();
 });
 
-it("groups track dialog cues separately from profile provenance and retains the measured values", () => {
+it("groups track dialog cues separately from profile provenance and retains the measured values", async () => {
   render(
     <AudioProfileCard
       totalTracks={1}
@@ -135,6 +136,7 @@ it("groups track dialog cues separately from profile provenance and retains the 
   );
   const sound = screen.getByRole("region", { name: "Sound profile" });
   expect(within(sound).getByText("Energy")).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("tab", { name: "Smart Mix" }));
   const mix = screen
     .getByRole("heading", { name: "Smart Mix" })
     .closest("section")!;
@@ -163,6 +165,7 @@ it("groups track dialog cues separately from profile provenance and retains the 
     screen.getByRole("region", { name: "Audio analysis" }),
   ).not.toHaveClass("border-t");
   expect(within(mix).queryByText("Profile revision")).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("tab", { name: "Provenance" }));
   const provenance = screen.getByRole("region", {
     name: "Analysis provenance",
   });
@@ -202,5 +205,243 @@ it("retains the existing album loudness summary and provenance by default", () =
   expect(screen.getByText("Intro / outro cue")).toBeInTheDocument();
   expect(
     screen.queryByRole("region", { name: "Analysis provenance" }),
+  ).not.toBeInTheDocument();
+});
+
+const dialogTrack = {
+  track: {
+    ...empty,
+    tempo: 120,
+    energy: 0.7,
+    smart_mix: { quality: "full", analyzer_version: "test-analyzer" },
+  },
+};
+
+function renderDialog(structure = true) {
+  return render(
+    <AudioProfileCard
+      totalTracks={1}
+      presentation="track-dialog"
+      analysisData={dialogTrack}
+      smartMixStructure={
+        structure ? <div data-testid="phrase-structure" /> : undefined
+      }
+    />,
+  );
+}
+
+describe("track dialog tabs", () => {
+  beforeEach(() => window.sessionStorage.clear());
+
+  it("opens on Sound with the track's readings", () => {
+    renderDialog();
+
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Sound",
+      "Smart Mix",
+      "Phrases",
+      "Provenance",
+    ]);
+    expect(screen.getByRole("tab", { name: "Sound" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByText("Tempo")).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Sound profile" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("phrase-structure")).not.toBeInTheDocument();
+  });
+
+  it("shows the phrase structure in its own tab at full width", async () => {
+    renderDialog();
+
+    await userEvent.click(screen.getByRole("tab", { name: "Phrases" }));
+
+    const structure = screen.getByTestId("phrase-structure");
+    expect(screen.getByRole("tabpanel")).toContainElement(structure);
+    expect(
+      screen.queryByRole("heading", { name: "Smart Mix" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("leaves Phrases out without a structure", () => {
+    renderDialog(false);
+
+    expect(
+      screen.queryByRole("tab", { name: "Phrases" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens on the last tab chosen in this session", async () => {
+    const first = renderDialog();
+    await userEvent.click(screen.getByRole("tab", { name: "Phrases" }));
+    first.unmount();
+
+    renderDialog();
+
+    expect(screen.getByRole("tab", { name: "Phrases" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("falls back to Sound when the remembered tab is not offered", async () => {
+    const first = renderDialog();
+    await userEvent.click(screen.getByRole("tab", { name: "Phrases" }));
+    first.unmount();
+
+    renderDialog(false);
+
+    expect(screen.getByRole("tab", { name: "Sound" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+});
+
+it("lays out the album's readings beside the sound spectrum", () => {
+  render(
+    <AudioProfileCard
+      totalTracks={3}
+      analysisData={{
+        "0": {
+          ...empty,
+          tempo: 80,
+          key: "F",
+          scale: "major",
+          loudness: -14,
+          dynamic_range: 20,
+          energy: 0.6,
+          smart_mix: { bpm: 81 },
+        },
+        "1": {
+          ...empty,
+          tempo: 112,
+          key: "F",
+          scale: "major",
+          loudness: -16,
+          dynamic_range: 30,
+          energy: 0.7,
+        },
+        "2": { ...empty, tempo: 65, key: "D", scale: "minor", energy: 0.5 },
+      }}
+      trackLabels={{
+        "0": "World In My Eyes",
+        "1": "Halo",
+        "2": "Personal Jesus",
+      }}
+    />,
+  );
+
+  const layout = document.querySelector('[data-audio-profile-layout="album"]')!;
+  const [readings, sound] = [
+    ...layout.querySelectorAll('[data-slot="audio-profile-column"]'),
+  ];
+  // Smart Mix's tempo wins over the library's when both exist, as before.
+  expect(
+    within(readings as HTMLElement).getByRole("img", {
+      name: "Mean tempo: 86 BPM, from 65 BPM (Personal Jesus) to 112 BPM (Halo)",
+    }),
+  ).toBeInTheDocument();
+  expect(
+    within(readings as HTMLElement).getByRole("img", {
+      name: "Mean loudness: -15.0 dB, from -16.0 dB (Halo) to -14.0 dB (World In My Eyes)",
+    }),
+  ).toBeInTheDocument();
+  expect(
+    within(readings as HTMLElement).getByRole("img", {
+      name: "Mean dynamic range: 25.0 dB, from 20.0 dB (World In My Eyes) to 30.0 dB (Halo)",
+    }),
+  ).toBeInTheDocument();
+  expect(
+    within(within(readings as HTMLElement).getByRole("list", { name: "Keys" }))
+      .getAllByRole("listitem")
+      .map((chip) => chip.textContent),
+  ).toEqual(["F major ×2", "D minor ×1"]);
+  expect(
+    within(sound as HTMLElement).getByRole("list", { name: "Sound features" }),
+  ).toBeInTheDocument();
+});
+
+it("draws the album's moods as a rose beside the spectrum", () => {
+  render(
+    <AudioProfileCard
+      totalTracks={2}
+      analysisData={{
+        "0": { ...empty, energy: 0.6, mood: { sad: 0.6, happy: 0.4 } },
+        "1": { ...empty, energy: 0.7, mood: { sad: 0.4, happy: 0.2 } },
+      }}
+      trackLabels={{ "0": "Halo", "1": "Clean" }}
+    />,
+  );
+
+  const columns = document.querySelectorAll(
+    '[data-audio-profile-layout="album"] [data-slot="audio-profile-column"]',
+  );
+  expect(columns).toHaveLength(3);
+  expect(
+    within(columns[2] as HTMLElement).getByRole("img", {
+      name: "Mood: sad 50%, happy 30%",
+    }),
+  ).toBeInTheDocument();
+  // The rose replaces the album's mood badges.
+  expect(screen.queryByText("sad 50%")).not.toBeInTheDocument();
+});
+
+it("shows a single track's readings, spectrum and moods in the dialog's Sound tab", () => {
+  render(
+    <AudioProfileCard
+      totalTracks={1}
+      presentation="track-dialog"
+      analysisData={{
+        track: {
+          ...empty,
+          tempo: 119.5,
+          key: "F",
+          scale: "major",
+          energy: 0.7,
+          mood: { sad: 0.6 },
+        },
+      }}
+    />,
+  );
+
+  const sound = screen.getByRole("region", { name: "Sound profile" });
+  expect(
+    within(sound).getByRole("img", { name: "Tempo: 119.5 BPM" }),
+  ).toBeInTheDocument();
+  expect(
+    within(sound).getByRole("list", { name: "Sound features" }),
+  ).toBeInTheDocument();
+  expect(
+    within(sound).getByRole("img", { name: "Mood: sad 60%" }),
+  ).toBeInTheDocument();
+  // One key on one track needs no count.
+  expect(within(sound).queryByRole("list", { name: "Keys" })).toBeNull();
+});
+
+it("draws the sound features as a spectrum that names the album's extremes", () => {
+  render(
+    <AudioProfileCard
+      totalTracks={2}
+      analysisData={{
+        "0": { ...empty, energy: 0.4, danceability: 0.5 },
+        "1": { ...empty, energy: 0.8, danceability: 0.7 },
+      }}
+      trackLabels={{ "0": "Halo", "1": "Clean" }}
+    />,
+  );
+
+  expect(
+    screen.getByRole("list", { name: "Sound features" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("img", {
+      name: "Energy: mean 60%, from 40% (Halo) to 80% (Clean)",
+    }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("img", { name: "Measured audio features radar" }),
   ).not.toBeInTheDocument();
 });

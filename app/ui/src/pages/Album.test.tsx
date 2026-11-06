@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Route, Routes } from "react-router";
+import { Route, Routes, useLocation } from "react-router";
 
 import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 
@@ -408,4 +408,104 @@ it("keeps deletion pending and leaves the confirmation open after failure", asyn
     expect(screen.getByRole("button", { name: "Delete Album" })).toBeEnabled(),
   );
   expect(screen.getByRole("alertdialog")).toBeVisible();
+});
+
+const tabbedAlbum = {
+  id: 1,
+  artist: "Artist",
+  name: "Album",
+  track_count: 1,
+  total_size_mb: 0,
+  total_length_sec: 0,
+  has_cover: false,
+  tracks: [
+    {
+      id: 4,
+      filename: "song.flac",
+      format: "flac",
+      length_sec: 60,
+      size_mb: 2,
+      bitrate: 320,
+      tags: { title: "Song" },
+    },
+  ],
+  album_tags: {},
+};
+
+function LocationProbe() {
+  return <output data-testid="location">{useLocation().search}</output>;
+}
+
+function renderAlbumAt(route: string) {
+  mockUseApi.mockReturnValue({
+    data: tabbedAlbum,
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  });
+  renderWithAdminProviders(
+    <Routes>
+      <Route
+        path="/artists/:artistSlug/:albumSlug"
+        element={
+          <>
+            <Album />
+            <LocationProbe />
+          </>
+        }
+      />
+    </Routes>,
+    { route },
+  );
+}
+
+describe("Album page tabs", () => {
+  it("opens on Tracks below the header", () => {
+    renderAlbumAt("/artists/artist/album");
+
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Tracks",
+      "Audio analysis",
+      "Related",
+    ]);
+    expect(screen.getByRole("tab", { name: "Tracks" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByText("Song")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Audio analysis" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the chosen tab in the URL", async () => {
+    renderAlbumAt("/artists/artist/album");
+
+    await userEvent.click(screen.getByRole("tab", { name: "Audio analysis" }));
+
+    expect(
+      screen.getByRole("region", { name: "Audio analysis" }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("?tab=analysis");
+    await userEvent.click(screen.getByRole("tab", { name: "Tracks" }));
+    expect(screen.getByTestId("location")).toBeEmptyDOMElement();
+  });
+
+  it("opens on the tab named in the URL", () => {
+    renderAlbumAt("/artists/artist/album?tab=related");
+
+    expect(screen.getByRole("tab", { name: "Related" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("falls back to Tracks for an unknown tab", () => {
+    renderAlbumAt("/artists/artist/album?tab=nonsense");
+
+    expect(screen.getByRole("tab", { name: "Tracks" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
 });

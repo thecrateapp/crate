@@ -7,6 +7,7 @@ class _FakeRedisStream:
         self.delivered_ids: set[str] = set()
         self.dead_letters: list[tuple[str, dict]] = []
         self.hashes: dict[str, dict[str, int]] = {}
+        self.read_calls: list[dict] = []
 
     def xadd(
         self,
@@ -47,13 +48,13 @@ class _FakeRedisStream:
         count: int,
         block: int | None = None,
     ):
-        del block
+        self.read_calls.append({"streams": streams, "count": count, "block": block})
         request_id = next(iter(streams.values()))
         pending = self.pending_by_consumer.setdefault(consumer_name, [])
 
         if request_id == "0":
             messages = pending[:count]
-            return [("crate:domain_events", messages)] if messages else []
+            return [("crate:domain_events", messages)]
 
         if request_id != ">":
             raise AssertionError(f"Unexpected read id: {request_id}")
@@ -161,6 +162,62 @@ def test_list_domain_events_replays_pending_before_consuming_new(monkeypatch):
 
     second = domain_events.list_domain_events(limit=1, consumer_name="worker")
     assert [event["event_type"] for event in second] == ["second.event"]
+
+
+def test_list_domain_events_does_not_starve_new_events_behind_pending(monkeypatch):
+    domain_events, fake_redis = _patch_fake_redis(monkeypatch)
+    for event_type in ("first.event", "second.event"):
+        domain_events._publish_domain_event(event_type)
+
+    first_batch = domain_events.list_domain_events(limit=2)
+    assert len(first_batch) == 2
+    domain_events._publish_domain_event("new.event")
+
+    mixed_batch = domain_events.list_domain_events(limit=2)
+
+    assert [event["event_type"] for event in mixed_batch] == [
+        "first.event",
+        "new.event",
+    ]
+    assert len(fake_redis.pending_by_consumer["worker"]) == 3
+
+
+def test_list_domain_events_returns_pending_without_blocking_for_new(monkeypatch):
+    domain_events, fake_redis = _patch_fake_redis(monkeypatch)
+    domain_events._publish_domain_event("pending.event")
+    first_batch = domain_events.list_domain_events(limit=4)
+
+    replayed = domain_events.list_domain_events(limit=4, block_ms=1000)
+
+    assert [event["id"] for event in replayed] == [first_batch[0]["id"]]
+    assert fake_redis.read_calls[-1]["streams"] == {"crate:domain_events": ">"}
+    assert fake_redis.read_calls[-1]["block"] is None
+
+
+def test_list_domain_events_zero_block_is_a_nonblocking_read(monkeypatch):
+    domain_events, fake_redis = _patch_fake_redis(monkeypatch)
+
+    assert domain_events.list_domain_events(block_ms=0) == []
+    assert fake_redis.read_calls[-1]["streams"] == {"crate:domain_events": ">"}
+    assert fake_redis.read_calls[-1]["block"] is None
+
+
+def test_list_domain_events_retains_batch_cap_during_backlog_replay(monkeypatch):
+    domain_events, fake_redis = _patch_fake_redis(monkeypatch)
+    for index in range(8):
+        domain_events._publish_domain_event("pending.event", {"index": index})
+    pending = domain_events.list_domain_events(limit=8)
+    for index in range(6):
+        domain_events._publish_domain_event("new.event", {"index": index})
+
+    mixed = domain_events.list_domain_events(limit=5)
+
+    assert len(mixed) == 5
+    assert [event["id"] for event in mixed[:2]] == [
+        event["id"] for event in pending[:2]
+    ]
+    assert [event["event_type"] for event in mixed[2:]] == ["new.event"] * 3
+    assert len(fake_redis.pending_by_consumer["worker"]) == 11
 
 
 def test_failed_domain_event_retries_then_moves_to_dead_letter(monkeypatch):

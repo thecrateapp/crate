@@ -1,3 +1,4 @@
+import logging
 import os
 
 from fastapi import APIRouter, Request
@@ -7,6 +8,7 @@ from crate.api.schemas.capabilities import (
     CapabilitiesResponse,
     DecksCapabilities,
     DecksFeature,
+    SmartMixAiAssistedCapabilities,
     SmartMixCapabilities,
     VDJCapabilities,
 )
@@ -18,13 +20,28 @@ from crate.config import (
     vdj_automation_enabled,
     vdj_enabled,
 )
+from crate.db.queries.smart_mix_admin import (
+    get_smart_mix_refinement_latency_ms,
+    get_smart_mix_structure_percent,
+)
+from crate.llm.prompts.smart_mix_transition import PROMPT_VERSION
+from crate.smart_mix_ai import gate_reason, provider_kind, refinement_gate
 from crate.smart_mix.versions import (
     API_CONTRACT_VERSION,
     PLANNER_IDENTIFIER,
+    PLANNER_IDENTIFIERS,
     PROFILE_SCHEMA_VERSION,
 )
 
+log = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api", tags=["system"])
+
+# smart_mix.structure: share of the library's tracks whose current profile has
+# phrases, from the coverage snapshot (refresh_smart_mix_coverage). After the v7
+# backfill about four in five tracks get phrases; the rest are crossfade genres,
+# 3/4 meters and tracks the analyzer could not segment.
+SMART_MIX_STRUCTURE_MIN_PERCENT = 50.0
 
 AUTOMATION_SCOPE = "vdj.automation.execute"
 
@@ -51,10 +68,13 @@ def get_capabilities(request: Request) -> CapabilitiesResponse:
         smart_mix=SmartMixCapabilities(
             available=available,
             planner_version=PLANNER_IDENTIFIER if available else None,
+            planner_versions=list(PLANNER_IDENTIFIERS) if available else [],
+            structure=available and _structure_available(),
             android_native_crossfade=native_crossfade,
             android_beatmatch=beatmatch,
             android_bass_handoff=bass_handoff,
             android_long_beatmatch=beatmatch,
+            ai_assisted=_ai_assisted(available),
         ),
         vdj=VDJCapabilities(
             available=vdj_available,
@@ -75,6 +95,48 @@ def get_capabilities(request: Request) -> CapabilitiesResponse:
             features=_decks_features(),
         ),
         access_token=_access_token_capabilities(request, vdj_automation),
+    )
+
+
+def _structure_available() -> bool:
+    try:
+        percent = get_smart_mix_structure_percent()
+    except Exception:
+        # Capabilities bootstrap every client: an unreadable snapshot only hides
+        # the structure flag.
+        log.warning("Smart Mix coverage snapshot unreadable", exc_info=True)
+        return False
+    return percent is not None and percent >= SMART_MIX_STRUCTURE_MIN_PERCENT
+
+
+def _ai_assisted(smart_mix_available: bool) -> SmartMixAiAssistedCapabilities:
+    """From the cached refinement gate and the coverage snapshot (SM3-D9)."""
+    unavailable = SmartMixAiAssistedCapabilities(
+        available=False,
+        provider_kind=None,
+        model_label=None,
+        prompt_version=PROMPT_VERSION,
+        typical_latency_ms=None,
+        reason="smart_mix_unavailable",
+    )
+    if not smart_mix_available:
+        return unavailable
+    try:
+        gate = refinement_gate()
+        latency = get_smart_mix_refinement_latency_ms()
+    except Exception:
+        # Capabilities bootstrap every client: an unreadable gate hides the option.
+        log.warning("Smart Mix AI gate unreadable", exc_info=True)
+        return unavailable.model_copy(update={"reason": "no_model"})
+    reason = gate_reason(gate)
+    configured = gate.get("enabled") and gate.get("available")
+    return SmartMixAiAssistedCapabilities(
+        available=reason is None,
+        provider_kind=provider_kind(gate.get("provider")) if configured else None,
+        model_label=gate.get("model_id") if configured else None,
+        prompt_version=PROMPT_VERSION,
+        typical_latency_ms=latency,
+        reason=reason,
     )
 
 

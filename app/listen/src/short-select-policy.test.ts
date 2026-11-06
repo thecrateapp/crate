@@ -32,6 +32,12 @@ const DYNAMIC_SELECTS: Record<string, string> = {
     "Reasoning form presets depend on the selected model capabilities and include stored custom budgets.",
   'app/ui/src/components/ai-models/ProfileForm.tsx:AdminSelect:model ? limits.image_detail : ""':
     "Image detail is a categorical profile field supplied by the selected model's capability metadata.",
+  "app/ui/src/components/ai-models/OpenAICompatibleFields.tsx:AdminSelect:draft.template":
+    "Origin templates come from the OPENAI_COMPATIBLE_TEMPLATES catalogue, which mirrors the API's closed template list; categorical form field.",
+  "app/ui/src/components/ai-models/OpenAICompatibleFields.tsx:AdminSelect:draft.pathPrefix":
+    "Path prefixes are those of the predefined origins (OPENAI_COMPATIBLE_PATH_PREFIXES), the closed list the API accepts; categorical form field.",
+  "app/ui/src/components/ai-models/OpenAICompatibleFields.tsx:AdminSelect:draft.reasoning":
+    "Reasoning controls depend on the chosen origin template's API.",
   "app/ui/src/pages/Browse.tsx:AdminSelect:genre":
     "The catalog supplies available genres; their cardinality is not a UI constant.",
   "app/ui/src/pages/Browse.tsx:AdminSelect:country":
@@ -110,6 +116,13 @@ const FORM_SELECTS: Record<string, FormSelect> = {
       sites: 1,
       reason:
         "Categorical artist Type edit field follows1AQ/1AR; five declared values plus the existing clear option.",
+    },
+  "app/ui/src/components/ai-models/OpenAICompatibleFields.tsx:AdminSelect:draft.structuredOutput":
+    {
+      choices: 2,
+      sites: 1,
+      reason:
+        "Categorical manifest field: each model declares JSON schema or JSON object, which the API validates; form Select under1AQ/1AR, not a filter.",
     },
   'app/ui/src/components/shows/ShowCandidateFields.tsx:AdminSelect:candidate.status ?? "scheduled"':
     {

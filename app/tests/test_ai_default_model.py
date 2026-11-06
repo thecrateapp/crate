@@ -73,6 +73,28 @@ def test_features_take_their_action_maxima_within_model_bounds():
         assert d.adjustments == ()
 
 
+def test_smart_mix_refinement_defaults_to_low_reasoning():
+    def refine(model, reasoning):
+        return _derived(model, reasoning, "smart_mix.transition.refine")
+
+    preferred = refine(GEMINI_38, PROVIDER_DEFAULT)
+    assert preferred.config is not None
+    assert preferred.config.reasoning == ReasoningConfig(mode="level", level="low")
+    assert (preferred.config.timeout_seconds, preferred.config.max_output_tokens) == (
+        45,
+        1024,
+    )
+    assert preferred.adjustments == ()
+    # An explicit choice wins, and other features keep the provider default.
+    assert refine(GEMINI_38, HIGH).config.reasoning == HIGH
+    assert (
+        _derived(GEMINI_38, PROVIDER_DEFAULT, "genres.eq.propose").config.reasoning
+        == PROVIDER_DEFAULT
+    )
+    # A model without a native low level keeps the requested reasoning.
+    assert refine(OLLAMA_TEXT, PROVIDER_DEFAULT).config.reasoning == PROVIDER_DEFAULT
+
+
 def test_model_output_and_context_bound_the_derived_limits():
     results = {d.action_id: d for d in derive_all(DEEPSEEK_VISION, PROVIDER_DEFAULT)}
 

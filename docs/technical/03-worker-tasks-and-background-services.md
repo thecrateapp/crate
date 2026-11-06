@@ -294,11 +294,56 @@ task row.
 It:
 
 - reads Redis Stream events through a consumer group
-- retries its own pending messages first after a crash/restart
+- retries its own pending messages first after a crash/restart, reserving space
+  for new messages so deferred work cannot stall the whole consumer
 - decides whether ops or home snapshots need refreshing
 - marks processed messages only after warming completes
 
 This is the bridge between write-side mutations and snapshot-driven UI surfaces.
+
+### Recovering a stalled consumer
+
+An outbox row marked `delivered` means the relay published it to Redis, not that
+the projector processed it. Check the consumer group's `last-delivered-id`,
+`pending` and `lag` together; a live projector heartbeat alone does not prove
+that the stream is advancing. Redis returns an empty pending read as a stream
+envelope containing no messages. The consumer must still read new entries.
+
+When deploying a fix after a sustained stall, start the projector with a small
+batch, for example `projector --limit 5 --interval 10`, and increase it only as
+the task queues drain. The equivalent injected settings are
+`CRATE_PROJECTOR_BATCH_LIMIT` and `CRATE_PROJECTOR_INTERVAL_SECONDS`. Catch-up can
+enqueue post-acquisition processing for historical downloads, even if the files
+have long been present. Task deduplication prevents concurrent processing of the
+same artist; it does not eliminate all historical work.
+
+Record the stream's first and last entries before recovery. The stream retains
+approximately 50,000 entries, and delivered outbox rows normally expire after
+seven days. Reported lag is not a count of events guaranteed to remain
+recoverable. Reconcile any gap with retained outbox events and targeted repair
+jobs; do not reset the consumer cursor or blindly replay all deliveries.
+
+### Pre-release singles becoming complete albums
+
+An advance single and the full album can have the same title but different
+MusicBrainz release groups and provider URLs. The number of tracks currently
+downloaded from a single is not the expected size of the full release. Promotion
+uses the complete known tracklist when checking availability and validates a
+matching artist, title and source before downloading the complete release.
+
+Release matching checks track coverage in both directions and rejects an
+incompatible short-form candidate. Scheduled metadata repair also considers
+published albums whose known full release conflicts with a persisted single or
+EP identity. Legitimate EPs are not reclassified solely by their track count.
+
+For a managed album growing from an advance release, imports can reuse an
+existing track identity when a uniquely named track changes position and its
+FLAC audio checksum, sample rate, bit depth, channels and sample count match
+exactly. The replacement keeps the original file stem and quarantines the old
+copy. Different recordings, missing checksums and intentionally repeated titles
+remain separate. Existing historical duplicates require a reviewed repair that
+preserves playlist, history and entity references; this import safeguard does
+not delete them retrospectively.
 
 ## Media worker bridge
 
@@ -341,7 +386,10 @@ required queue is consumed or that a particular handler is progressing.
 Before claiming a task, the actor evaluates the resource governor, DB-heavy coordination,
 download windows/listener limits and transfer slots where applicable. Deferral requeues
 the same task with a delay and progress/reason evidence; it is not completion or a new
-user operation. Runtime policy revision/hash are rechecked at the pending-to-running claim;
+user operation. A running handler can do the same through `run_again_later`: the task goes
+back to `pending` with its progress and runs again after the delay, so waiting for capacity
+does not hold a worker process. Its queue wait is recorded once, up to its first start.
+Runtime policy revision/hash are rechecked at the pending-to-running claim;
 a concurrent policy change causes requeue without handler execution. Atomic claim prevents
 duplicate broker messages from running the same task concurrently. Inspect persisted
 status, progress, heartbeat, queue and reason before diagnosing a pending job as stuck.

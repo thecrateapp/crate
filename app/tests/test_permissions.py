@@ -37,6 +37,20 @@ def test_error_inbox_capabilities_follow_the_ops_role():
             assert not has_capability({"role": role}, capability)
 
 
+def test_smart_mix_ai_is_granted_with_library_view():
+    from crate.api.permissions import (
+        ALL_CAPABILITIES,
+        ROLE_CAPABILITIES,
+        has_capability,
+    )
+
+    assert "smart_mix.ai" in ALL_CAPABILITIES
+    for role, capabilities in ROLE_CAPABILITIES.items():
+        assert has_capability({"role": role}, "smart_mix.ai") == (
+            role in {"owner", "admin"} or "library.view" in capabilities
+        ), role
+
+
 def test_roles_are_checked_through_casbin_policy():
     from crate.api.permissions import has_capability
 
