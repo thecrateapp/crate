@@ -136,8 +136,9 @@ def test_crate_migration_follows_the_current_main_head() -> None:
     assert scripts.get_revision("142").down_revision == "141"
     assert scripts.get_revision("143").down_revision == "142"
     assert scripts.get_revision("144").down_revision == "143"
-    assert scripts.get_heads() == ["145"]
     assert scripts.get_revision("145").down_revision == "144"
+    assert scripts.get_heads() == ["146"]
+    assert scripts.get_revision("146").down_revision == "145"
 
 
 def test_metric_minute_migration_uses_immutable_schema_definition(monkeypatch):
@@ -321,6 +322,35 @@ def test_error_inbox_tables_are_part_of_the_bootstrap_schema() -> None:
 
     assert "create_error_inbox_v143_schema(cur)" in source
     assert "create_error_inbox_grant_v144_schema(cur)" in source
+    assert "create_error_inbox_auto_triage_v146_schema(cur)" in source
+
+
+def test_error_inbox_auto_triage_migration_uses_immutable_schema_definition(
+    monkeypatch,
+):
+    migration = import_module(
+        "crate.db.migrations.versions.146_error_inbox_auto_triage"
+    )
+    schema = import_module("crate.db.schema_sections.error_inbox_auto_triage_v146")
+    migration_executor = RecordingExecutor()
+    schema_executor = RecordingExecutor()
+    monkeypatch.setattr(migration, "op", migration_executor)
+
+    migration.upgrade()
+    schema.create_error_inbox_auto_triage_v146_schema(schema_executor)
+
+    assert migration_executor.statements == schema_executor.statements
+    statements = "\n".join(migration_executor.statements)
+    assert "ADD COLUMN IF NOT EXISTS auto_triage_hash TEXT" in statements
+    assert "ADD COLUMN IF NOT EXISTS auto_triage_at TIMESTAMPTZ" in statements
+
+    downgrade = RecordingExecutor()
+    monkeypatch.setattr(migration, "op", downgrade)
+    migration.downgrade()
+    assert downgrade.statements == [
+        "ALTER TABLE error_issues DROP COLUMN IF EXISTS auto_triage_at",
+        "ALTER TABLE error_issues DROP COLUMN IF EXISTS auto_triage_hash",
+    ]
 
 
 def test_crate_bootstrap_includes_presentation_settings() -> None:
