@@ -40,6 +40,9 @@ _BASES = {
     "gemini": "https://generativelanguage.googleapis.com",
     "deepseek": "https://api.deepseek.com",
 }
+# Cloud metadata services outside the link-local ranges: Alibaba, Oracle and
+# the AWS IPv6 endpoint (a unique local address, so `is_private` admits it).
+_METADATA_ADDRESSES = {"100.100.100.200", "192.0.0.192", "fd00:ec2::254"}
 _METADATA_HOSTS = {
     "metadata.google.internal",
     "metadata.goog",
@@ -64,7 +67,7 @@ def _check_address(raw: str) -> str:
         or address.is_multicast
         or address.is_unspecified
         or (address.is_reserved and not address.is_loopback)
-        or str(address) in {"100.100.100.200", "192.0.0.192"}
+        or str(address) in _METADATA_ADDRESSES
     ):
         raise _error("AI_ENDPOINT_INVALID", "Endpoint address is not allowed")
     return str(address)
