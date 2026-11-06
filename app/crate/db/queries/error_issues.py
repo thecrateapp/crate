@@ -215,6 +215,41 @@ def get_issue_by_short_id(
     )
 
 
+def issue_ids_by_short_id(
+    short_ids: Sequence[str],
+    *,
+    provider: str = "sentry",
+    session: Session | None = None,
+) -> dict[str, str]:
+    """Issue ids keyed by upper-case short id, for the given short ids, in one query.
+
+    Short ids that match no issue are absent. Every status counts: a resolved issue
+    keeps its row (and digest) until it is purged 30 days after it closed.
+    """
+    wanted = sorted(
+        {value.upper() for value in short_ids if isinstance(value, str) and value}
+    )
+    if not wanted:
+        return {}
+    sql = """
+        SELECT DISTINCT ON (upper(i.short_id)) upper(i.short_id) AS short_id,
+               i.id::text AS id
+        FROM error_issues i
+        WHERE i.provider = :provider AND upper(i.short_id) = ANY(:short_ids)
+        ORDER BY upper(i.short_id), i.last_seen DESC NULLS LAST, i.id
+    """
+    params = {"provider": provider, "short_ids": wanted}
+
+    def _impl(current: Session) -> dict[str, str]:
+        rows = current.execute(text(sql), params).mappings().all()
+        return {str(row["short_id"]): str(row["id"]) for row in rows}
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
 def _summary_sql(extra_columns: str = "") -> str:
     return f"""
         WITH open_issues AS (
@@ -703,6 +738,7 @@ __all__ = [
     "get_triage_input",
     "inbox_overview",
     "inbox_state",
+    "issue_ids_by_short_id",
     "list_issues",
     "open_ids_not_in",
     "summary",

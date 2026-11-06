@@ -405,7 +405,7 @@ def reclaim_abandoned_invocations(
 
 
 def list_invocations(filters, limit=50, cursor=None, *, session=None) -> dict:
-    """Keyset page: {items, next_cursor}; filters connection_id/action_id/invocation_kind/status/actor_id.
+    """Keyset page: {items, next_cursor}; filters connection_id/action_id/invocation_kind/status/actor_id/model_id/job_id.
 
     Cursor is opaque JSON [created_at,id] emitted by this repository. Claim tokens
     are omitted. Activity older than 90 days is excluded even before bounded prune.
@@ -419,6 +419,7 @@ def list_invocations(filters, limit=50, cursor=None, *, session=None) -> dict:
         "status",
         "actor_id",
         "model_id",
+        "job_id",
     ):
         if filters.get(key) is not None:
             clauses.append(f"{key}=:{key}")

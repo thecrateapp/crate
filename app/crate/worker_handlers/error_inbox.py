@@ -42,6 +42,11 @@ The investigation first reads events per release and the tag distribution from
 Sentry (`crate.error_inbox.evidence`). Failures come back as typed results the
 admin shows as they are; they are expected (configuration or model answers), so
 the worker does not report them to Sentry.
+
+`evaluate_error_triage` (gate EG2) runs on the `ai_bulk` lane: one triage call per
+issue a maintainer listed, validated like a real triage and never saved
+(`crate.error_inbox.evaluation`). The maintainer queues it with
+`tools/error-inbox-eval/run_eval.py`; no route or schedule does.
 """
 
 from __future__ import annotations
@@ -89,6 +94,7 @@ from crate.error_inbox.config import (
     load_sentry_token,
 )
 from crate.error_inbox.digest import build_digest, digest_hash, group_key
+from crate.error_inbox.evaluation import run_evaluation
 from crate.error_inbox.evidence import fetch_evidence
 from crate.error_inbox.github_client import GitHubAPIError, GitHubClient
 from crate.error_inbox.priority import crate_score
@@ -117,6 +123,7 @@ from crate.error_inbox.sentry_client import (
     merge_recent_window,
     scope_access,
 )
+from crate.task_progress import TaskProgress, emit_progress
 from crate.worker_handlers import TaskHandler, is_cancelled
 
 log = logging.getLogger(__name__)
@@ -1017,6 +1024,22 @@ def _handle_investigate_error_issue(task_id: str, params: dict, config: dict) ->
     )
 
 
+def _handle_evaluate_error_triage(task_id: str, params: dict, config: dict) -> dict:
+    progress = TaskProgress(phase="evaluate_triage", phase_count=1)
+
+    def report(done: int, total: int, short_id: str) -> None:
+        progress.done, progress.total, progress.item = done, total, short_id
+        emit_progress(task_id, progress, force=done == total)
+
+    return run_evaluation(
+        task_id,
+        params,
+        execute=execute_structured,
+        cancelled=lambda: is_cancelled(task_id),
+        progress=report,
+    )
+
+
 ERROR_INBOX_TASK_HANDLERS: dict[str, TaskHandler] = {
     "sync_error_issues": _handle_sync_error_issues,
     "update_error_issue_status": _handle_update_error_issue_status,
@@ -1024,6 +1047,7 @@ ERROR_INBOX_TASK_HANDLERS: dict[str, TaskHandler] = {
     "dispatch_error_fix": _handle_dispatch_error_fix,
     "triage_error_issue": _handle_triage_error_issue,
     "investigate_error_issue": _handle_investigate_error_issue,
+    "evaluate_error_triage": _handle_evaluate_error_triage,
 }
 
 __all__ = [

@@ -5,7 +5,7 @@ section: operations
 audience: [operator, developer]
 status: canonical
 order: 125
-verified: 2026-10-21
+verified: 2026-11-06
 sources:
   [
     deploy/operator/state.py,
@@ -14,9 +14,11 @@ sources:
     deploy/operator/server.py,
     deploy/operator/watchdog.py,
     deploy/operator/config.example.json,
+    deploy/operator/config.operator.example.json,
     deploy/operator/watchdog.example.json,
     app/tests/test_operator_state.py,
     app/tests/test_operator_supervisor.py,
+    app/tests/test_operator_alert_rules.py,
     app/tests/test_operator_delivery.py,
     app/tests/test_operator_server.py,
     app/tests/test_operator_watchdog.py,
@@ -93,7 +95,8 @@ required for hangs, disk failure and process loss.
 Rules use an exact tool, fixed arguments, a source-envelope path, and an exact
 field path inside that source's `data`. Allowed observations are
 `get_instance_inventory`, `get_observability_summary`, `get_pipeline_status`
-(with one closed pipeline name), and no-argument `get_smart_mix_status`.
+(with one closed pipeline name), and the no-argument `get_smart_mix_status`,
+`get_stack_status`, `get_playback_quality` and `get_error_summary`.
 `get_job` is reserved for exact watched task IDs. These are persisted reads;
 there is no refresh, repair, arbitrary HTTP, shell, Docker or SQL operation.
 
@@ -157,6 +160,46 @@ Telegram bot was removed. The example config ships three alert rules over
 
 Per-task completion messages and playback notifications are intentionally not
 recreated.
+
+### Critical errors (`errors-critical`)
+
+`deploy/operator/config.operator.example.json` also ships
+`error-inbox/errors-critical`, with `"enabled": false`. It reads the Error
+Inbox summary that `get_error_summary` serves (counts, by service and the top three
+of the critical lane as short id, service and score; no titles or event text):
+
+- `kind: high` on `critical_open`, the open issues in the critical lane (a Crate
+  score of at least 70, or a triage of the current event with severity `critical`
+  and confidence of at least 0.6). `threshold: 1` and `clear_threshold: 0`: one
+  critical issue is enough, and the incident resolves when none is left.
+- The default two consecutive samples count only distinct syncs, so with the
+  5-minute sync an issue that stays critical alerts within about 10 minutes, and
+  the incident resolves after two syncs without one.
+- `fresh_seconds: 900`: a summary older than three syncs, an unconfigured inbox or
+  one that never synced is unavailable and never opens or resolves the incident.
+- `cooldown_seconds: 3600`: a reopen within an hour of the previous message waits
+  until the hour is over.
+- `detail_field: ["top_critical"]`: the message lists those issues as
+  `CRATE-API-1F (api, score 88)`, for example
+  `Crate WARNING · Error inbox: errors critical 1 (limit 1)`.
+
+It stays disabled until gate EG4 of the Error Inbox: 7 to 14 days of shadow, in
+which the critical lane of the Errors page and the System Health tile are compared
+with what the rule would have sent, after the AI triage was evaluated (EG2,
+[AI agents](ai-agents.md#error-inbox-actions)) because a triage can put an issue in
+the critical lane. To enable it after EG4:
+
+1. Give the supervisor's MCP credential `ops.errors.read`, which the setup does not
+   grant today: issue a new credential with
+   `docker exec -i crate-api python -m crate.agent_credentials_cli create --name "Crate Operator supervisor (read only)" --expires-in-days 365 --grant library.health.read --grant ops.jobs.read --grant ops.status.read --grant ops.errors.read`,
+   write its token to `secrets/supervisor/operator_mcp_read` and revoke the previous
+   one (`... revoke <credential id>`).
+2. Set `"enabled": true` on the rule in the installed `supervisor-config.json`,
+   check it with `python -m deploy.operator.server --config <path> --check` and
+   restart the supervisor.
+
+Without the grant the observation fails, the rule's coverage shows it as invalid
+and nothing is sent.
 
 ## Incidents, read API and job watches
 

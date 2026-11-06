@@ -730,6 +730,7 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "dispatch_error_fix",
             "triage_error_issue",
             "investigate_error_issue",
+            "evaluate_error_triage",
         ),
     ),
     (

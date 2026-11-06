@@ -5,7 +5,7 @@ section: operations
 audience: [developer, operator]
 status: canonical
 order: 95
-verified: 2026-11-05
+verified: 2026-11-06
 sources:
   - app/crate/ai/actions.py
   - app/crate/ai/capabilities.py
@@ -25,6 +25,9 @@ sources:
   - app/tests/test_actor_config.py
   - app/crate/music_paths_refinement.py
   - app/crate/error_inbox/triage.py
+  - app/crate/error_inbox/evaluation.py
+  - app/crate/error_inbox/evaluation_cli.py
+  - tools/error-inbox-eval/run_eval.py
   - app/crate/llm/prompts/error_triage.py
   - app/crate/llm/prompts/error_investigate.py
   - app/crate/db/migrations/versions/145_ai_action_error_inbox.py
@@ -364,6 +367,43 @@ typed task results the worker does not report to Sentry; the admin shows them as
 they are. [Observability](observability.md#ai-triage-and-investigation) covers
 when automatic triage queues work and the daily limit.
 
+**Evaluation before automatic triage (gate EG2).** Automatic triage stays off
+until the triage has been measured against the 79 issues labelled by hand in
+phase E0 (`app/tests/fixtures/error_inbox/reference_labels.json`). The gate asks
+for at least 80% agreement on classification and no critical issue taken for
+noise; with the report the maintainer picks the model and decides whether to turn
+automatic triage on. `tools/error-inbox-eval/run_eval.py` produces that report
+([README](https://github.com/thecrateapp/crate/tree/main/tools/error-inbox-eval)):
+
+- It never calls a model itself. Through `python -m crate.error_inbox.evaluation_cli`
+  inside the worker container it plans (which reference issues have a stored digest,
+  the bound model, the number of calls and their token bound), queues one
+  `evaluate_error_triage` task and reads its result. `plan` is a dry run; `run`
+  sends calls only with `--execute` and a confirmation of the exact number of calls.
+- Only short ids reach the server; the labels stay with the tool. Issues without a
+  stored digest are reported as skipped. Nothing is fetched from Sentry.
+- `queue` accepts the binding the plan showed and refuses with `AI_CONTEXT_STALE`
+  if it changed since. One evaluation runs at a time.
+- The task runs on `ai_bulk` and its handler names `execute_structured`, so the
+  calls happen inside the AI-lane window like any other model call and the static
+  check below needs no exception. Each call is the request `triage_issue` builds,
+  validated the same way, with the idempotency key `eval:<task id>:<short id>`. It
+  stores nothing in `error_issue_triage`, ignores triages already stored, and keeps
+  only classification, severity, `duplicate_of` and confidence: the summary,
+  hypothesis and next step are dropped because they can echo event text.
+- The report, `docs/technical/evidence/observability/error-triage-eval-<date>.md`
+  with a JSON file next to it, shows per model the agreement on classification and
+  severity, critical (and, because the reference has no critical label,
+  high-severity) issues taken for noise, confident critical answers on non-critical
+  issues, duplicate agreement, invalid outputs, failed calls and tokens, with the
+  cost at a price passed on the command line. It holds labels, short ids, counts and
+  token figures only.
+
+Running it against production spends the connection's budget and sends the
+reference issues' digests to the bound provider, so it needs the maintainer's
+explicit authorization. To compare models, bind another one to **Triage error
+issue** and run again.
+
 ## Where model calls run
 
 Every provider call runs inside a Dramatiq task on one of two queues reserved for
@@ -375,7 +415,7 @@ taxonomy batch never holds the interactive threads.
 | Lane      | Work                                                     | Time limit            | Task types (time limit in seconds)                                                                                                                                                                                                                                                                                                                                          |
 | --------- | -------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ai`      | One proposal, draft, extraction, analysis or admin probe | at most 300 s         | `ai_catalog_refresh` (180), `ai_profile_test` (180), `propose_genre_eq` (120), `generate_playlist_description` (120), `propose_genre_taxonomy_node` (180), `refine_music_path` (120), `analyze_artist_hero_candidate` (180), `show_extract` (180), `research_artist_bio` (300), `draft_i18n_translation` (300), `triage_error_issue` (120), `investigate_error_issue` (180) |
-| `ai_bulk` | Long batches                                             | per task, no lane cap | `infer_genre_taxonomy` (3600), `rebuild_genre_taxonomy_proposals` (7200)                                                                                                                                                                                                                                                                                                    |
+| `ai_bulk` | Long batches                                             | per task, no lane cap | `infer_genre_taxonomy` (3600), `rebuild_genre_taxonomy_proposals` (7200), `evaluate_error_triage` (7200)                                                                                                                                                                                                                                                                    |
 
 Every AI task keeps `max_retries=0`: paid work is never retried.
 `enrich_genre_descriptions` reads Wikidata and Wikipedia only, calls no model

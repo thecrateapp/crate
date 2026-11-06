@@ -1,11 +1,11 @@
 {
   "tracks": "48,213",
   "albums": "4,400",
-  "pytest": 7950,
+  "pytest": 7995,
   "vitest": 6981,
   "goTests": 435,
   "rustTests": 318,
-  "taskTypes": 155,
+  "taskTypes": 156,
   "migrations": 146,
   "taskQueues": {
     "ai": [
@@ -21,6 +21,11 @@
       "show_extract",
       "research_artist_bio",
       "draft_i18n_translation"
+    ],
+    "ai_bulk": [
+      "evaluate_error_triage",
+      "infer_genre_taxonomy",
+      "rebuild_genre_taxonomy_proposals"
     ],
     "default": [
       "tidal_download",
@@ -170,7 +175,6 @@
       "backfill_smart_mix_profiles",
       "backfill_track_audio_fingerprints"
     ],
-    "ai_bulk": ["infer_genre_taxonomy", "rebuild_genre_taxonomy_proposals"],
     "playback": ["prepare_stream_variant"]
   }
 }

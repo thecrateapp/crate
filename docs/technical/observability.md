@@ -5,7 +5,7 @@ section: operations
 audience: [operator, developer]
 status: canonical
 order: 121
-verified: 2026-11-05
+verified: 2026-11-06
 sources:
   [
     app/crate/metrics.py,
@@ -30,6 +30,8 @@ sources:
     app/crate/error_inbox/autofix.py,
     app/crate/error_inbox/github_client.py,
     app/crate/worker_handlers/error_inbox.py,
+    app/crate/error_inbox/evaluation.py,
+    tools/error-inbox-eval/run_eval.py,
     app/ui/src/pages/Errors.tsx,
     app/ui/src/pages/ErrorDetail.tsx,
     app/ui/src/components/errors/ConnectionPanel.tsx,
@@ -351,6 +353,32 @@ a digest. When the bound profile's input limit is too small for the digest, the
 task fails before anything is sent and says how many input tokens the call needed
 and what the profile allows. The digest is never trimmed to fit.
 
+#### Evaluating the triage before turning it on
+
+The **AI triage** switch stays off until the triage has been measured against the
+79 issues labelled by hand when the Sentry backlog was first triaged
+(`docs/technical/evidence/observability/sentry-triage-2026-11.md`). The
+maintainer runs `tools/error-inbox-eval/run_eval.py` with the model bound to
+**Triage error issue**:
+
+1. `plan`, a dry run: which reference issues still have a stored digest in the
+   inbox, how many calls the evaluation makes and their token bound. Issues that
+   were purged or whose latest event was never downloaded are listed as skipped.
+2. `run --execute`, after typing the number of calls: one `evaluate_error_triage`
+   task on the `ai_bulk` lane triages each issue's stored digest exactly as the
+   inbox would, but saves nothing, so the Errors page does not change.
+3. The report, `docs/technical/evidence/observability/error-triage-eval-<date>.md`,
+   gives per model
+   the agreement on classification and severity, the critical and high-severity
+   issues taken for noise, the confident critical answers on issues that are not
+   critical (each would raise the critical lane and the alert below), duplicate
+   agreement, invalid outputs and tokens.
+
+With at least 80% agreement on classification and no critical issue taken for
+noise, the maintainer chooses the model and decides whether to turn automatic
+triage on (gate EG2). [AI agents](ai-agents.md#error-inbox-actions) describes what
+the evaluation sends and how it stays inside the AI lanes.
+
 ### Launch fix
 
 _Launch fix_ hands one issue to the autofix workflow of the Crate repository,
@@ -447,6 +475,13 @@ Rules cover monitoring health, queues and the projector, availability and
 playback. They ship disabled. Monitoring first runs a shadow period of 7 to 14
 days without alerts; after it, each rule is enabled on its own once its noise and
 threshold have been reviewed.
+
+`errors-critical` alerts when at least one open issue is in the Errors critical
+lane, reading the counts `get_error_summary` serves (short ids, services and
+scores, never event text). It also ships disabled and is enabled only after its
+own shadow period, once the AI triage that can put issues in that lane has been
+evaluated; [Crate Operator](crate-operator.md#critical-errors-errors-critical)
+lists its thresholds and how to enable it.
 
 ## Agents
 
