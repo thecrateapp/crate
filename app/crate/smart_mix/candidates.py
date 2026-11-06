@@ -269,6 +269,73 @@ def plan_transition_candidates(
     return _menu(edge, [first, *_ranked(_heuristic_options(edge, baseline), policy)])
 
 
+def recompose_candidate(
+    outgoing: TrackMixProfile,
+    incoming: TrackMixProfile,
+    context: TransitionContext,
+    policy: PlannerPolicy = PLANNER_POLICY_V3,
+    *,
+    outgoing_phrase: int,
+    incoming_phrase: int,
+    length_bars: int | None,
+    bass_handoff: str,
+    curve: str,
+    outgoing_track_entity_uid: str | None = None,
+    incoming_track_entity_uid: str | None = None,
+) -> TransitionPlan | None:
+    """A plan placed on two phrases the way the menu places its candidates, or None.
+
+    SM4 rebuilds a model's adjusted choice (another phrase, the next or previous
+    length, the bass handoff) with this, so the plan comes from the same geometry,
+    variants and policy check as every candidate (SM3-D1). ``curve`` is kept when
+    the geometry allows it; otherwise the geometry's own curve is used (a long blend
+    is always a DJ blend, a crossfade equal power). None when the phrases, the
+    length or the bass handoff do not give a valid plan.
+    """
+    baseline = plan_transition(
+        outgoing,
+        incoming,
+        context,
+        outgoing_track_entity_uid=outgoing_track_entity_uid,
+        incoming_track_entity_uid=incoming_track_entity_uid,
+        policy=policy,
+    )
+    edge = _edge(outgoing, incoming, context, policy, baseline)
+    outgoing_phrases = _timeline(outgoing, policy)
+    incoming_phrases = _timeline(incoming, policy)
+    if (
+        outgoing_phrases is None
+        or incoming_phrases is None
+        or not 0 <= outgoing_phrase < len(outgoing_phrases.starts)
+        or not 0 <= incoming_phrase < len(incoming_phrases.starts)
+        or length_bars not in _lengths(edge)
+    ):
+        return None
+    outgoing_cue = round(outgoing_phrases.starts[outgoing_phrase])
+    incoming_cue = round(incoming_phrases.starts[incoming_phrase])
+    offset = (
+        _snapped_phase_offset(edge, outgoing_cue, incoming_cue, edge.tempo_ratio)
+        if edge.beatmatch
+        else 0
+    )
+    geometry = _phrase_geometry(
+        edge,
+        outgoing_cue,
+        incoming_cue,
+        offset,
+        outgoing_phrase,
+        incoming_phrase,
+        length_bars,
+    )
+    if geometry is None:
+        return None
+    bass_handoffs, curves = _variants(edge, geometry)
+    if bass_handoff not in bass_handoffs:
+        return None
+    plan = _plan(edge, geometry, bass_handoff, curve if curve in curves else curves[0])
+    return None if _violates_policy(edge, plan) else plan
+
+
 # --- phrases ---------------------------------------------------------------
 
 
@@ -1087,4 +1154,4 @@ def _is_short_cut(plan: TransitionPlan, policy: PlannerPolicy) -> bool:
     )
 
 
-__all__ = ["plan_transition_candidates"]
+__all__ = ["plan_transition_candidates", "recompose_candidate"]
