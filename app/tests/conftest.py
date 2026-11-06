@@ -367,7 +367,28 @@ def test_app(monkeypatch):
         yield client
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--benchmark",
+        action="store_true",
+        default=False,
+        help="run tests marked benchmark (timing budgets, skipped by default)",
+    )
+
+
 def pytest_configure(config):
     config.addinivalue_line(
         "markers", "slow: marks tests as slow (deselect with -m 'not slow')"
     )
+    config.addinivalue_line(
+        "markers", "benchmark: timing budget, runs only with --benchmark"
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--benchmark"):
+        return
+    skip_benchmark = pytest.mark.skip(reason="timing benchmark: run with --benchmark")
+    for item in items:
+        if item.get_closest_marker("benchmark") is not None:
+            item.add_marker(skip_benchmark)

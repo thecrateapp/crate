@@ -34,6 +34,93 @@ class TransitionFallbackReason(StrEnum):
     INSUFFICIENT_WINDOW = "insufficient_window"
 
 
+PHRASE_KINDS = ("intro", "build", "peak", "break", "outro", "body")
+PHRASE_BAR_LENGTHS = (8, 16, 32)
+MAX_PHRASES = 120
+MAX_ENERGY_CURVE_BARS = 2048
+MAX_VOCAL_DETECTOR = 32
+MAX_BEAT_TRACKER = 32
+# Scale of the per-phrase voice byte (crate.smart_mix.vocals): the geometric mean of the
+# phrase's YAMNet voice scores on a log scale, LOG_FLOOR or less is 0 and 1 is 255. Kept
+# here, without numpy, so the API can read it.
+VOCAL_LOG_FLOOR = 1e-4
+# Gate SG1b (2026-11-05): a phrase has voice from this byte, a geometric mean voice score
+# of about 0.0026. Against synced lyrics: precision 0.88, recall 0.78, specificity 0.66.
+VOCAL_THRESHOLD = 90
+
+
+@dataclass(frozen=True, slots=True)
+class Phrase:
+    """A phrase of ``bars`` bars that starts on the downbeat ``start_beat``.
+
+    ``start_beat`` indexes the profile beat grid and ``start_ms`` is that beat.
+    ``energy`` is the mean bar energy on the scale of the other profile energies (RMS,
+    0 at -60 dBFS and 1 at 0 dBFS); ``delta_energy`` is the change from the previous
+    phrase and is null on the first one.
+    """
+
+    start_beat: int
+    start_ms: int
+    bars: int
+    energy: float
+    delta_energy: float | None
+    kind: str
+
+    def __post_init__(self) -> None:
+        _require_non_negative_ms("start_beat", self.start_beat)
+        _require_non_negative_ms("start_ms", self.start_ms)
+        if self.bars not in PHRASE_BAR_LENGTHS:
+            raise ValueError("phrase bars must be 8, 16 or 32")
+        if self.kind not in PHRASE_KINDS:
+            raise ValueError(f"Unsupported phrase kind: {self.kind!r}")
+        object.__setattr__(self, "energy", _clamp_confidence(self.energy))
+        if self.delta_energy is not None:
+            delta = float(self.delta_energy)
+            if not math.isfinite(delta) or abs(delta) > 1.0:
+                raise ValueError("phrase delta_energy must be between -1 and 1")
+            object.__setattr__(self, "delta_energy", delta)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "start_beat": self.start_beat,
+            "start_ms": self.start_ms,
+            "bars": self.bars,
+            "energy": self.energy,
+            "delta_energy": self.delta_energy,
+            "kind": self.kind,
+        }
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, Any]) -> Phrase:
+        def value(snake_case: str, camel_case: str) -> Any:
+            return payload.get(snake_case, payload.get(camel_case))
+
+        return cls(
+            start_beat=value("start_beat", "startBeat"),
+            start_ms=value("start_ms", "startMs"),
+            bars=value("bars", "bars"),
+            energy=value("energy", "energy"),
+            delta_energy=value("delta_energy", "deltaEnergy"),
+            kind=value("kind", "kind"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class StructureDraft:
+    """Phrases, one energy byte per bar from the first downbeat, and their confidence.
+
+    ``energy_curve`` is null when the track has no downbeat to count bars from; an
+    empty ``phrases`` with confidence 0 means the structure could not be segmented.
+    """
+
+    phrases: tuple[Phrase, ...]
+    energy_curve: bytes | None
+    structure_confidence: float
+
+    def __post_init__(self) -> None:
+        _validate_structure(self)
+
+
 @dataclass(frozen=True, slots=True)
 class TrackMixProfileDraft:
     analyzer: str
@@ -75,11 +162,21 @@ class TrackMixProfileDraft:
     active_end_ms: int | None = None
     integrated_lufs: float | None = None
     measurement_version: str | None = None
+    phrases: tuple[Phrase, ...] | None = None
+    energy_curve: bytes | None = None
+    vocal_presence: bytes | None = None
+    vocal_detector: str | None = None
+    structure_confidence: float | None = None
+    # The model that gave the beats and downbeats (SM3-D14); null with the
+    # analyzer's own tracker.
+    beat_tracker: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "quality", MixProfileQuality(self.quality))
         _require_non_negative_ms("duration_ms", self.duration_ms)
         _validate_measurements(self)
+        _validate_structure(self)
+        _validate_beat_tracker(self.beat_tracker)
         for field_name in (
             "beat_anchor_ms",
             "downbeat_anchor_ms",
@@ -176,12 +273,22 @@ class TrackMixProfile:
     integrated_lufs: float | None = None
     measurement_version: str | None = None
     duration_source: str = "decoder"
+    phrases: tuple[Phrase, ...] | None = None
+    energy_curve: bytes | None = None
+    vocal_presence: bytes | None = None
+    vocal_detector: str | None = None
+    structure_confidence: float | None = None
+    # The model that gave the beats and downbeats (SM3-D14); null with the
+    # analyzer's own tracker.
+    beat_tracker: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "quality", MixProfileQuality(self.quality))
         _require_positive_int("profile_version", self.profile_version)
         _require_non_negative_ms("duration_ms", self.duration_ms)
         _validate_measurements(self)
+        _validate_structure(self)
+        _validate_beat_tracker(self.beat_tracker)
         if self.duration_source not in {"decoder", "library"}:
             raise ValueError("duration_source must be decoder or library")
         for field_name in (
@@ -453,7 +560,26 @@ def mix_profile_draft_from_payload(payload: Mapping[str, Any]) -> TrackMixProfil
         active_end_ms=value("active_end_ms", "activeEndMs"),
         integrated_lufs=value("integrated_lufs", "integratedLufs"),
         measurement_version=value("measurement_version", "measurementVersion"),
+        phrases=_phrases_from_payload(value("phrases", "phrases")),
+        energy_curve=_bytes_from_payload(value("energy_curve", "energyCurve")),
+        vocal_presence=_bytes_from_payload(value("vocal_presence", "vocalPresence")),
+        vocal_detector=value("vocal_detector", "vocalDetector"),
+        structure_confidence=value("structure_confidence", "structureConfidence"),
+        beat_tracker=value("beat_tracker", "beatTracker"),
     )
+
+
+def _phrases_from_payload(payload: Any) -> tuple[Phrase, ...] | None:
+    if payload is None:
+        return None
+    return tuple(
+        phrase if isinstance(phrase, Phrase) else Phrase.from_payload(phrase)
+        for phrase in payload
+    )
+
+
+def _bytes_from_payload(payload: Any) -> bytes | None:
+    return None if payload is None else bytes(payload)
 
 
 def _validate_measurements(profile: Any) -> None:
@@ -478,6 +604,58 @@ def _validate_measurements(profile: Any) -> None:
         raise ValueError("active_start_ms must be before active_end_ms")
     if end_ms is not None and end_ms > profile.duration_ms:
         raise ValueError("active_end_ms must not exceed duration_ms")
+
+
+def _validate_structure(profile: Any) -> None:
+    phrases = profile.phrases
+    if phrases is not None:
+        phrases = tuple(phrases)
+        if len(phrases) > MAX_PHRASES:
+            raise ValueError(f"a profile holds at most {MAX_PHRASES} phrases")
+        if any(not isinstance(phrase, Phrase) for phrase in phrases):
+            raise TypeError("phrases must be Phrase values")
+        for current, following in zip(phrases, phrases[1:], strict=False):
+            if (
+                following.start_beat < current.start_beat + 4 * current.bars
+                or following.start_ms <= current.start_ms
+            ):
+                raise ValueError("phrases must be ordered and must not overlap")
+        object.__setattr__(profile, "phrases", phrases)
+    curve = profile.energy_curve
+    if curve is not None:
+        curve = bytes(curve)
+        if len(curve) > MAX_ENERGY_CURVE_BARS:
+            raise ValueError(f"energy_curve holds at most {MAX_ENERGY_CURVE_BARS} bars")
+        object.__setattr__(profile, "energy_curve", curve)
+    vocals = getattr(profile, "vocal_presence", None)
+    if vocals is not None:
+        vocals = bytes(vocals)
+        if phrases is None or len(vocals) != len(phrases):
+            raise ValueError("vocal_presence needs one byte per phrase")
+        object.__setattr__(profile, "vocal_presence", vocals)
+    detector = getattr(profile, "vocal_detector", None)
+    if (detector is None) != (vocals is None):
+        raise ValueError("vocal_presence and vocal_detector go together")
+    if detector is not None and (
+        not isinstance(detector, str) or not 0 < len(detector) <= MAX_VOCAL_DETECTOR
+    ):
+        raise ValueError(
+            f"vocal_detector must name the detector in 1-{MAX_VOCAL_DETECTOR} characters"
+        )
+    confidence = profile.structure_confidence
+    if confidence is not None:
+        object.__setattr__(
+            profile, "structure_confidence", _clamp_confidence(confidence)
+        )
+
+
+def _validate_beat_tracker(tracker: str | None) -> None:
+    if tracker is not None and (
+        not isinstance(tracker, str) or not 0 < len(tracker) <= MAX_BEAT_TRACKER
+    ):
+        raise ValueError(
+            f"beat_tracker must name the tracker in 1-{MAX_BEAT_TRACKER} characters"
+        )
 
 
 def _require_positive_int(name: str, value: int) -> None:

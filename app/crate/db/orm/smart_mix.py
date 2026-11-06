@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import (
+    ARRAY,
     BIGINT,
     CheckConstraint,
     DateTime,
@@ -10,10 +11,12 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     LargeBinary,
+    REAL,
     SmallInteger,
     Text,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from crate.db.engine import Base
@@ -79,10 +82,49 @@ class TrackMixProfileRow(Base):
     active_end_ms: Mapped[int | None] = mapped_column(BIGINT)
     integrated_lufs: Mapped[float | None] = mapped_column(Float)
     measurement_version: Mapped[str | None] = mapped_column(Text)
+    phrases: Mapped[list | None] = mapped_column(JSONB)
+    energy_curve: Mapped[bytes | None] = mapped_column(LargeBinary)
+    vocal_presence: Mapped[bytes | None] = mapped_column(LargeBinary)
+    vocal_detector: Mapped[str | None] = mapped_column(Text)
+    beat_tracker: Mapped[str | None] = mapped_column(Text)
+    structure_confidence: Mapped[float | None] = mapped_column(REAL)
     source_stale_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     analyzed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("NOW()"),
+    )
+
+
+class TrackMixSignalsRow(Base):
+    """The model outputs a track's profile was built from (SM3-D16)."""
+
+    __tablename__ = "track_mix_signals"
+    __table_args__ = (
+        CheckConstraint("beats_per_bar IS NULL OR beats_per_bar > 0"),
+        CheckConstraint("voice_hop_ms IS NULL OR voice_hop_ms > 0"),
+        CheckConstraint("(beat_tracker IS NULL) = (beats_ms IS NULL)"),
+        CheckConstraint("(beats_ms IS NULL) = (downbeats_ms IS NULL)"),
+        CheckConstraint("(vocal_detector IS NULL) = (voice_scores IS NULL)"),
+        CheckConstraint("(voice_scores IS NULL) = (voice_hop_ms IS NULL)"),
+    )
+
+    track_id: Mapped[int] = mapped_column(
+        BIGINT,
+        ForeignKey("library_tracks.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    source_revision: Mapped[str] = mapped_column(Text, nullable=False)
+    beat_tracker: Mapped[str | None] = mapped_column(Text)
+    beats_ms: Mapped[list[int] | None] = mapped_column(ARRAY(Integer))
+    downbeats_ms: Mapped[list[int] | None] = mapped_column(ARRAY(Integer))
+    beats_per_bar: Mapped[int | None] = mapped_column(SmallInteger)
+    vocal_detector: Mapped[str | None] = mapped_column(Text)
+    voice_hop_ms: Mapped[int | None] = mapped_column(SmallInteger)
+    voice_scores: Mapped[bytes | None] = mapped_column(LargeBinary)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

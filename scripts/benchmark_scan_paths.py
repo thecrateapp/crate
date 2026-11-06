@@ -86,8 +86,7 @@ def _configure_crate_cli_path(crate_cli: Path | None) -> None:
 
     crate_cli_module.BIN_PATHS.insert(0, str(crate_cli))
     crate_cli_module.find_binary.cache_clear()
-    crate_cli_module.has_subcommands.cache_clear()
-    crate_cli_module.supports_command.cache_clear()
+    crate_cli_module._help_text.cache_clear()
 
 
 def run_library_sync_payload(root: Path, extensions: str, crate_cli: Path | None) -> dict[str, Any]:

@@ -54,7 +54,7 @@ from crate.smart_mix.models import (
 )
 from crate.smart_mix.planner import plan_transition
 from crate.smart_mix.policy import PLANNER_POLICY
-from crate.smart_mix.versions import PLANNER_IDENTIFIER
+from crate.smart_mix.versions import PLANNER_IDENTIFIER, planner_reads_structure
 
 
 router = APIRouter(prefix="/api", tags=["smart-mix"])
@@ -339,17 +339,23 @@ def transition_plans(
     return TransitionPlanBatchResponse.model_validate(
         {
             "plannerVersion": payload.planner_version,
-            "plans": _plan_transition_edges(payload.edges),
+            "plans": _plan_transition_edges(
+                payload.edges, planner_version=payload.planner_version
+            ),
         }
     )
 
 
 def _plan_transition_edges(
     edges: list[TransitionEdgeRequest],
+    *,
+    planner_version: str = PLANNER_IDENTIFIER,
 ) -> list[TransitionPlanResponse]:
     unique_edges = _deduplicate_edges(edges)
     entity_uids = _ordered_entity_uids(unique_edges)
-    profiles = get_track_mix_profiles_by_entity_uids(entity_uids)
+    profiles = get_track_mix_profiles_by_entity_uids(
+        entity_uids, include_structure=planner_reads_structure(planner_version)
+    )
     profiles_by_uid = dict(zip(entity_uids, profiles, strict=True))
     edge_profiles = [
         (

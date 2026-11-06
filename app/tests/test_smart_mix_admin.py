@@ -108,7 +108,9 @@ def test_admin_routes_require_analysis_management_permission(test_app) -> None:
         tracks = test_app.get("/api/admin/smart-mix/tracks")
         reanalyze = test_app.post("/api/admin/smart-mix/tracks/1/reanalyze")
         activity = test_app.get("/api/admin/smart-mix/activity")
+        structure = test_app.get("/api/admin/smart-mix/tracks/1/structure")
 
+    assert structure.status_code == 403
     assert status.status_code == 403
     assert backfill.status_code == 403
     assert tracks.status_code == 403
@@ -634,3 +636,263 @@ def _insert_profile(
                 "stale": source_stale,
             },
         )
+
+
+def test_operator_restarts_the_backfill_from_the_cancelled_v6_campaign(
+    pg_db, test_app
+) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        get_smart_mix_campaign,
+        save_smart_mix_campaign,
+    )
+    from crate.smart_mix.versions import PROFILE_SCHEMA_VERSION
+
+    save_smart_mix_campaign(
+        {
+            "target": "smart-mix-audio-v6",
+            "status": "cancelled",
+            "batch_size": 25,
+            "max_attempts": 3,
+            "batches": 1_555,
+            "claimed": 38_865,
+            "sequence": 1_600,
+        }
+    )
+    assert test_app.get("/api/admin/smart-mix/status").json()["controlState"] == (
+        "idle"
+    )
+
+    started = test_app.post(
+        "/api/admin/smart-mix/backfill", json={"batchSize": 50, "maxAttempts": 3}
+    )
+
+    assert started.status_code == 200
+    assert started.json()["status"] == "queued"
+    campaign = get_smart_mix_campaign()
+    assert {
+        key: campaign[key]
+        for key in ("target", "profile_version", "status", "batches", "claimed")
+    } == {
+        "target": ANALYZER_VERSION,
+        "profile_version": PROFILE_SCHEMA_VERSION,
+        "status": "running",
+        "batches": 0,
+        "claimed": 0,
+    }
+    assert _task_dedup_key(started.json()["taskId"]) == (
+        f"smart-mix:backfill:{ANALYZER_VERSION}:1601"
+    )
+    status = test_app.get("/api/admin/smart-mix/status").json()
+    assert status["controlState"] == "running"
+    assert status["campaign"]["target"] == ANALYZER_VERSION
+
+    assert test_app.post("/api/admin/smart-mix/backfill/pause").json()["status"] == (
+        "paused"
+    )
+    assert test_app.get("/api/admin/smart-mix/status").json()["controlState"] == (
+        "paused"
+    )
+    # The worker picks up the queued batch, sees the pause and stops.
+    _finish_task(started.json()["taskId"])
+    resumed = test_app.post(
+        "/api/admin/smart-mix/backfill/resume",
+        json={"batchSize": 50, "maxAttempts": 3},
+    )
+    assert resumed.json()["status"] == "resumed"
+    assert _task_dedup_key(resumed.json()["taskId"]) == (
+        f"smart-mix:backfill:{ANALYZER_VERSION}:1602"
+    )
+    assert get_smart_mix_campaign()["status"] == "running"
+
+    assert test_app.post("/api/admin/smart-mix/backfill/cancel").json()["status"] == (
+        "cancelled"
+    )
+    assert test_app.post("/api/admin/smart-mix/backfill/pause").status_code == 409
+
+
+def test_status_reports_a_running_campaign_of_another_target_as_idle(
+    test_app, monkeypatch
+) -> None:
+    from crate.api import smart_mix_admin
+
+    monkeypatch.setattr(smart_mix_admin, "get_smart_mix_admin_status", _coverage)
+    monkeypatch.setattr(
+        smart_mix_admin,
+        "get_smart_mix_campaign_status",
+        lambda: {**_campaign(), "target": "smart-mix-audio-v6"},
+    )
+    monkeypatch.setattr(smart_mix_admin, "_backfill_tasks", lambda: [])
+    monkeypatch.setattr(
+        smart_mix_admin, "create_task_dedup", lambda *_args, **_kwargs: None
+    )
+
+    status = test_app.get("/api/admin/smart-mix/status").json()
+
+    # Nothing claims for v6 any more: the operator starts a campaign for the target.
+    assert status["controlState"] == "idle"
+    assert status["campaign"]["target"] == "smart-mix-audio-v6"
+
+
+def _task_dedup_key(task_id: str) -> str:
+    with transaction_scope() as session:
+        return session.execute(
+            text("SELECT dedup_key FROM tasks WHERE id = :id"), {"id": task_id}
+        ).scalar_one()
+
+
+def _finish_task(task_id: str) -> None:
+    with transaction_scope() as session:
+        session.execute(
+            text("UPDATE tasks SET status = 'completed' WHERE id = :id"),
+            {"id": task_id},
+        )
+
+
+def _structured_profile(track_id: int, **overrides) -> None:
+    from datetime import UTC, datetime
+
+    from crate.db.repositories.smart_mix import upsert_track_mix_profile
+    from crate.smart_mix.models import MixProfileQuality, Phrase, TrackMixProfile
+    from crate.smart_mix.versions import PROFILE_SCHEMA_VERSION
+
+    with transaction_scope() as session:
+        track_uid = session.execute(
+            text("SELECT entity_uid::text FROM library_tracks WHERE id = :id"),
+            {"id": track_id},
+        ).scalar_one()
+    # 120 BPM from 0.5 s: bar n starts at 0.5 + 2n s, the downbeat on the first beat.
+    profile = TrackMixProfile(
+        track_entity_uid=track_uid,
+        profile_version=PROFILE_SCHEMA_VERSION,
+        profile_revision=f"structure-{track_id}",
+        analyzer="crate-rust",
+        analyzer_version=ANALYZER_VERSION,
+        source_revision="source",
+        duration_ms=60_000,
+        quality=MixProfileQuality.FULL,
+        bpm=120.0,
+        beat_anchor_ms=500,
+        downbeat_anchor_ms=500,
+        time_signature=4,
+        beat_grid_format="delta-ms-v1",
+        beat_grid_ms=tuple(500 + 500 * beat for beat in range(100)),
+        phrases=(
+            Phrase(
+                start_beat=0,
+                start_ms=500,
+                bars=8,
+                energy=0.4,
+                delta_energy=None,
+                kind="intro",
+            ),
+            Phrase(
+                start_beat=32,
+                start_ms=16_500,
+                bars=16,
+                energy=0.8,
+                delta_energy=0.4,
+                kind="peak",
+            ),
+        ),
+        energy_curve=bytes(range(0, 250, 10)),
+        vocal_presence=bytes((0, 200)),
+        vocal_detector="yamnet-1",
+        structure_confidence=0.75,
+        analyzed_at=datetime(2026, 11, 4, tzinfo=UTC),
+    )
+    from dataclasses import replace
+
+    assert upsert_track_mix_profile(track_id, replace(profile, **overrides))
+
+
+def test_track_structure_serves_phrases_energy_and_bars(pg_db, test_app) -> None:
+    del pg_db
+    [track_id] = _create_tracks(1)
+    _structured_profile(track_id)
+
+    response = test_app.get(f"/api/admin/smart-mix/tracks/{track_id}/structure")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["trackId"] == track_id
+    assert body["analyzerVersion"] == ANALYZER_VERSION
+    assert body["durationMs"] == 60_000
+    assert body["structureConfidence"] == 0.75
+    assert body["vocalDetector"] == "yamnet-1"
+    assert body["phrases"] == [
+        {
+            "startBeat": 0,
+            "startMs": 500,
+            "endMs": 16_500,
+            "bars": 8,
+            "energy": 0.4,
+            "deltaEnergy": None,
+            "kind": "intro",
+            "vocalPresence": 0,
+            "voiced": False,
+        },
+        {
+            "startBeat": 32,
+            "startMs": 16_500,
+            "endMs": 48_500,
+            "bars": 16,
+            "energy": 0.8,
+            "deltaEnergy": 0.4,
+            "kind": "peak",
+            "vocalPresence": 200,
+            # The API applies the calibrated cut so the admin never repeats it.
+            "voiced": True,
+        },
+    ]
+    assert body["energyCurve"] == list(range(0, 250, 10))
+    assert body["barStartsMs"] == [500 + 2_000 * bar for bar in range(25)]
+
+
+def test_track_structure_tells_unanalyzed_from_unsegmented(pg_db, test_app) -> None:
+    del pg_db
+    unanalyzed, unsegmented = _create_tracks(2)
+    _structured_profile(
+        unanalyzed,
+        phrases=None,
+        energy_curve=None,
+        vocal_presence=None,
+        vocal_detector=None,
+        structure_confidence=None,
+        analyzer_version="smart-mix-audio-v6",
+    )
+    _structured_profile(
+        unsegmented,
+        phrases=(),
+        vocal_presence=None,
+        vocal_detector=None,
+        structure_confidence=0.0,
+    )
+
+    before = test_app.get(f"/api/admin/smart-mix/tracks/{unanalyzed}/structure").json()
+    after = test_app.get(f"/api/admin/smart-mix/tracks/{unsegmented}/structure").json()
+
+    assert (
+        before["phrases"],
+        before["energyCurve"],
+        before["structureConfidence"],
+    ) == (
+        None,
+        None,
+        None,
+    )
+    assert before["analyzerVersion"] == "smart-mix-audio-v6"
+    assert after["phrases"] == []
+    assert after["structureConfidence"] == 0.0
+    assert (before["vocalDetector"], after["vocalDetector"]) == (None, None)
+    assert len(after["energyCurve"]) == len(after["barStartsMs"]) == 25
+
+
+def test_track_structure_without_a_profile_is_not_found(pg_db, test_app) -> None:
+    del pg_db
+    [track_id] = _create_tracks(1)
+
+    assert (
+        test_app.get(f"/api/admin/smart-mix/tracks/{track_id}/structure").status_code
+        == 404
+    )

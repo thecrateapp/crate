@@ -14,7 +14,11 @@ CAMPAIGN_STATE_KEY = "smart_mix:backfill_campaign"
 
 def get_smart_mix_admin_status() -> dict:
     snapshot = get_ops_runtime_state(COVERAGE_STATE_KEY)
-    if not snapshot or snapshot.get("analyzer_version") != SMART_MIX_ANALYZER_VERSION:
+    if (
+        not snapshot
+        or snapshot.get("analyzer_version") != SMART_MIX_ANALYZER_VERSION
+        or snapshot.get("profile_version") != SMART_MIX_PROFILE_VERSION
+    ):
         return _empty_status()
     refreshed_at = snapshot.pop("updated_at", None)
     return {**snapshot, "refreshed_at": refreshed_at}

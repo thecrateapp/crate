@@ -14,10 +14,12 @@ use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 
-use crate::beat_tracking;
+use crate::beat_tracking::{self, ExternalBeats};
 use crate::key_detection::detect_key;
 use crate::loudness::{LoudnessMeter, LoudnessSummary, MEASUREMENT_VERSION};
 use crate::mix_profile::{to_camelot, SmartMixProfileResult, ANALYZER_VERSION};
+pub use crate::structure::rms_frame_geometry;
+use crate::structure::{self, EnergyFrames, Structure, ACTIVE_RANGE_DB, MIN_ACTIVE_DBFS};
 use crate::tempo_grid::{self, ConstantGrid};
 use crate::{collect_audio_files, parse_extensions};
 
@@ -700,7 +702,32 @@ fn cue_downbeat_ms(
     let count = CUE_DOWNBEAT_BEATS.min(beat_frames.len());
     let start = window_start(beat_frames.len(), nearest, count);
     let phase = beat_tracking::window_downbeat_phase(features, &beat_frames[start..start + count])?;
-    let first = start + phase;
+    bar_downbeat_near(beat_grid_ms, start + phase, nearest)
+}
+
+/// The bar downbeat nearest a cue from the model downbeats around it: the window of
+/// `cue_downbeat_ms` and the phase rule of the anchor (SM3-D14).
+fn model_cue_downbeat_ms(
+    beat_grid_ms: &[u64],
+    downbeats_ms: &[u64],
+    cue_ms: Option<u64>,
+) -> Option<u64> {
+    let cue_ms = cue_ms?;
+    if beat_grid_ms.is_empty() {
+        return None;
+    }
+    let nearest = nearest_beat(beat_grid_ms, cue_ms);
+    let count = CUE_DOWNBEAT_BEATS.min(beat_grid_ms.len());
+    let start = window_start(beat_grid_ms.len(), nearest, count);
+    let phase = beat_tracking::downbeat_phase_from_model(
+        &beat_grid_ms[start..start + count],
+        downbeats_ms,
+    )?;
+    bar_downbeat_near(beat_grid_ms, start + phase, nearest)
+}
+
+/// The downbeat nearest beat `nearest` of the bars that start on beat `first`.
+fn bar_downbeat_near(beat_grid_ms: &[u64], first: usize, nearest: usize) -> Option<u64> {
     let bars = ((nearest as f64 - first as f64) / 4.0).round().max(0.0) as usize;
     let mut index = first + bars * 4;
     while index >= beat_grid_ms.len() && index >= 4 {
@@ -843,8 +870,7 @@ fn tempo_features(beat_frames: &[usize], onsets: &[f32], sample_rate: u32) -> Te
 }
 
 fn frame_rms(samples: &[f32], sample_rate: u32) -> (Vec<f32>, usize, usize) {
-    let frame_length = ((sample_rate as f32 * 0.05).round() as usize).max(256);
-    let hop_length = (frame_length / 2).max(128);
+    let (frame_length, hop_length) = rms_frame_geometry(sample_rate);
     if samples.is_empty() {
         return (Vec::new(), frame_length, hop_length);
     }
@@ -872,6 +898,25 @@ fn detect_mix_cues(
     beat_grid_ms: &[u64],
 ) -> (Option<u64>, Option<u64>, Option<u64>, Option<u64>) {
     let (rms_values, frame_length, hop_length) = frame_rms(samples, sample_rate);
+    cues_from_rms(
+        samples.len(),
+        sample_rate,
+        beat_grid_ms,
+        &rms_values,
+        frame_length,
+        hop_length,
+    )
+}
+
+/// `detect_mix_cues` over RMS frames the caller already computed with `frame_rms`.
+fn cues_from_rms(
+    sample_count: usize,
+    sample_rate: u32,
+    beat_grid_ms: &[u64],
+    rms_values: &[f32],
+    frame_length: usize,
+    hop_length: usize,
+) -> (Option<u64>, Option<u64>, Option<u64>, Option<u64>) {
     if rms_values.is_empty() {
         return (None, None, None, None);
     }
@@ -880,7 +925,7 @@ fn detect_mix_cues(
         .map(|rms| compute_loudness_db(*rms))
         .collect();
     let peak = dbfs.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-    let threshold = (-55.0_f32).max(peak - 35.0);
+    let threshold = (MIN_ACTIVE_DBFS as f32).max(peak - ACTIVE_RANGE_DB as f32);
     let active_frames: Vec<usize> = dbfs
         .iter()
         .enumerate()
@@ -889,7 +934,7 @@ fn detect_mix_cues(
     let (Some(first), Some(last)) = (active_frames.first(), active_frames.last()) else {
         return (None, None, None, None);
     };
-    let duration_ms = samples.len() as u64 * 1_000 / u64::from(sample_rate);
+    let duration_ms = sample_count as u64 * 1_000 / u64::from(sample_rate);
     let active_start_ms = *first as u64 * hop_length as u64 * 1_000 / u64::from(sample_rate);
     let active_end_ms = duration_ms.min(
         (*last as u64 * hop_length as u64 + frame_length as u64) * 1_000 / u64::from(sample_rate),
@@ -994,6 +1039,26 @@ pub fn analyze_smart_mix_segments(
     total_duration_ms: Option<u64>,
     loudness: Option<&LoudnessSummary>,
 ) -> SmartMixProfileResult {
+    analyze_smart_mix_segments_with_beats(
+        samples,
+        tail,
+        sample_rate,
+        total_duration_ms,
+        loudness,
+        None,
+    )
+}
+
+/// The mix profile; with `beats` (Beat This!, SM3-D14) the model's beats replace the
+/// tracker and its downbeats pick the bar phase of the grid, as in the Python analyzer.
+pub fn analyze_smart_mix_segments_with_beats(
+    samples: &[f32],
+    tail: Option<AudioTail<'_>>,
+    sample_rate: u32,
+    total_duration_ms: Option<u64>,
+    loudness: Option<&LoudnessSummary>,
+    beats: Option<&ExternalBeats>,
+) -> SmartMixProfileResult {
     let duration_ms = total_duration_ms.unwrap_or(if sample_rate == 0 {
         0
     } else {
@@ -1005,8 +1070,27 @@ pub fn analyze_smart_mix_segments(
 
     let features = beat_tracking::frame_features(samples, sample_rate);
     let onsets = &features.onsets;
-    let beat_frames = beat_tracking::track_beats(onsets, sample_rate);
-    let tracked_ms = beat_tracking::refine_beat_times_ms(samples, sample_rate, &beat_frames);
+    let (beat_frames, tracked_ms) = match beats {
+        Some(external) => {
+            // The model's beats over the analysed audio (the head of a long track).
+            let analysed_ms = samples.len() as u64 * 1_000 / u64::from(sample_rate);
+            let tracked: Vec<u64> = external
+                .beats_ms
+                .iter()
+                .copied()
+                .filter(|beat| *beat > 0 && *beat <= analysed_ms)
+                .collect();
+            (
+                beat_tracking::model_beat_frames(&tracked, onsets, sample_rate),
+                tracked,
+            )
+        }
+        None => {
+            let frames = beat_tracking::track_beats(onsets, sample_rate);
+            let refined = beat_tracking::refine_beat_times_ms(samples, sample_rate, &frames);
+            (frames, refined)
+        }
+    };
     let tempo = tempo_features(&beat_frames, onsets, sample_rate);
     let tempo_stability = tempo.stability;
     let tempo_fit = tempo_grid::fit_tempo(&tracked_ms, &features, sample_rate);
@@ -1025,8 +1109,15 @@ pub fn analyze_smart_mix_segments(
     .or(tempo.frame_bpm);
     let (key, scale, key_confidence) = detect_key(samples, sample_rate);
     let camelot = to_camelot(&key, &scale).map(str::to_owned);
-    let (active_start_ms, intro_cue_ms, mut outro_cue_ms, mut active_end_ms) =
-        detect_mix_cues(samples, sample_rate, &beat_grid_ms);
+    let (rms, rms_frame_length, rms_hop) = frame_rms(samples, sample_rate);
+    let (active_start_ms, intro_cue_ms, mut outro_cue_ms, mut active_end_ms) = cues_from_rms(
+        samples.len(),
+        sample_rate,
+        &beat_grid_ms,
+        &rms,
+        rms_frame_length,
+        rms_hop,
+    );
     let intro = signal_features(
         window_samples(samples, sample_rate, intro_cue_ms, false),
         sample_rate,
@@ -1068,21 +1159,43 @@ pub fn analyze_smart_mix_segments(
         .zip(outro_local)
         .map(|(intro, outro)| 0.5 * (intro.stability + outro.stability));
     let bpm_confidence = tempo.confidence(cue_stability.unwrap_or(tempo_stability));
-    let downbeat_detectable = tempo.confidence(tempo_stability) >= DOWNBEAT_MIN_CONFIDENCE;
-    let intro_downbeat_ms = downbeat_detectable
-        .then(|| cue_downbeat_ms(&features, &grid_frames, &beat_grid_ms, intro_cue_ms))
-        .flatten();
-    let outro_downbeat_ms = (downbeat_detectable && tail.is_none())
-        .then(|| cue_downbeat_ms(&features, &grid_frames, &beat_grid_ms, outro_cue_ms))
-        .flatten();
-    let downbeat_anchor_ms = downbeat_detectable
-        .then(|| {
-            beat_tracking::downbeat_phase(&features, &grid_frames)
-                .and_then(|phase| beat_grid_ms.get(phase).copied())
-        })
-        .flatten()
-        .or(intro_downbeat_ms);
-    let time_signature = downbeat_anchor_ms.map(|_| 4);
+    let other_meter = beats.and_then(ExternalBeats::other_meter);
+    let (intro_downbeat_ms, outro_downbeat_ms, downbeat_anchor_ms) = match beats {
+        // Phrases and the planner count bars of four beats: a track the DBN hears in
+        // another meter (3/4) says so and gets no downbeat and no phrases (SM3-D16).
+        Some(_) if other_meter.is_some() => (None, None, None),
+        // The model's downbeats decide the bar alone: a track whose downbeats hold no
+        // clear phase of the grid gets no downbeat, and no phrases.
+        Some(external) => {
+            let downbeats = &external.downbeats_ms;
+            (
+                model_cue_downbeat_ms(&beat_grid_ms, downbeats, intro_cue_ms),
+                tail.is_none()
+                    .then(|| model_cue_downbeat_ms(&beat_grid_ms, downbeats, outro_cue_ms))
+                    .flatten(),
+                beat_tracking::downbeat_phase_from_model(&beat_grid_ms, downbeats)
+                    .and_then(|phase| beat_grid_ms.get(phase).copied()),
+            )
+        }
+        None => {
+            let downbeat_detectable = tempo.confidence(tempo_stability) >= DOWNBEAT_MIN_CONFIDENCE;
+            let intro_downbeat_ms = downbeat_detectable
+                .then(|| cue_downbeat_ms(&features, &grid_frames, &beat_grid_ms, intro_cue_ms))
+                .flatten();
+            let outro_downbeat_ms = (downbeat_detectable && tail.is_none())
+                .then(|| cue_downbeat_ms(&features, &grid_frames, &beat_grid_ms, outro_cue_ms))
+                .flatten();
+            let downbeat_anchor_ms = downbeat_detectable
+                .then(|| {
+                    beat_tracking::downbeat_phase(&features, &grid_frames)
+                        .and_then(|phase| beat_grid_ms.get(phase).copied())
+                })
+                .flatten()
+                .or(intro_downbeat_ms);
+            (intro_downbeat_ms, outro_downbeat_ms, downbeat_anchor_ms)
+        }
+    };
+    let time_signature = other_meter.or(downbeat_anchor_ms.map(|_| 4));
     let global = signal_features(samples, sample_rate);
     let intro_lufs = loudness.zip(intro_cue_ms).and_then(|(summary, start_ms)| {
         summary.window_lufs(start_ms, start_ms + MEASUREMENT_WINDOW_MS)
@@ -1102,6 +1215,34 @@ pub fn analyze_smart_mix_segments(
             tempo_grid::half_beat_slides(&tracked_ms) == 0
                 && !tempo_grid::bass_contests_tracked_beats(&tracked_ms, &features, sample_rate)
         }
+    };
+    // The planner takes outgoing phrases from the end of the track, which a head-and-tail
+    // scan never segments: no structure beats a truncated one.
+    let downbeats = structure::downbeats_from_anchor(&beat_grid_ms, downbeat_anchor_ms);
+    let grid_trusted = clear_phase
+        && constant_grid
+            .as_ref()
+            .is_none_or(|grid| !grid.tempo_deviates);
+    let structure = if tail.is_some() || downbeats.is_empty() {
+        Structure::none()
+    } else {
+        structure::guarded(|| {
+            structure::segment_phrases(
+                &beat_grid_ms,
+                &downbeats,
+                &EnergyFrames {
+                    rms: &rms,
+                    rms_frame_length,
+                    rms_hop,
+                    bands_db: &features.bands,
+                    band_hop: beat_tracking::HOP_SIZE,
+                    chroma: &features.chroma,
+                    mfcc: &features.mfcc,
+                },
+                sample_rate,
+                grid_trusted,
+            )
+        })
     };
     let quality = if tail.is_none()
         && beat_grid_ms.len() >= 12
@@ -1158,13 +1299,22 @@ pub fn analyze_smart_mix_segments(
         intro_spectral_density: intro.2,
         outro_spectral_density: outro.2,
         global_energy: global.1,
+        phrases: Some(structure.phrases),
+        energy_curve: structure.energy_curve,
+        vocal_presence: None,
+        structure_confidence: Some(structure.structure_confidence),
+        beat_tracker: beats.and_then(|external| external.tracker.clone()),
     }
 }
 
 /// Analyze a single track. If `panns` is provided, also compute ML features.
 #[cfg(feature = "ml")]
-pub fn analyze_track_with_ml(path: &Path, panns: Option<&crate::ml::PannsModel>) -> AnalysisResult {
-    let mut result = analyze_track(path);
+pub fn analyze_track_with_ml(
+    path: &Path,
+    panns: Option<&crate::ml::PannsModel>,
+    beats: Option<&ExternalBeats>,
+) -> AnalysisResult {
+    let mut result = analyze_track_with_beats(path, beats);
     if result.error.is_some() {
         return result;
     }
@@ -1206,6 +1356,11 @@ pub fn analyze_track_with_ml(path: &Path, panns: Option<&crate::ml::PannsModel>)
 }
 
 pub fn analyze_track(path: &Path) -> AnalysisResult {
+    analyze_track_with_beats(path, None)
+}
+
+/// `analyze_track` with model beats for the mix profile (`analyze --beats`).
+pub fn analyze_track_with_beats(path: &Path, beats: Option<&ExternalBeats>) -> AnalysisResult {
     let decoded = match decode_audio(path) {
         Ok(r) => r,
         Err(e) => {
@@ -1262,7 +1417,7 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
     let energy = compute_energy(rms);
     let dynamic_range = compute_dynamic_range(&samples);
     let bpm = estimate_bpm(&samples, sample_rate);
-    let mix_profile = analyze_smart_mix_segments(
+    let mix_profile = analyze_smart_mix_segments_with_beats(
         &samples,
         tail.as_ref().map(|(samples, start_ms)| AudioTail {
             samples,
@@ -1271,6 +1426,7 @@ pub fn analyze_track(path: &Path) -> AnalysisResult {
         sample_rate,
         Some(duration_ms),
         measured_loudness.as_ref(),
+        beats,
     );
     let (key, scale) = (mix_profile.key.clone(), mix_profile.scale.clone());
 
@@ -1316,8 +1472,23 @@ pub fn run_analyze(
     dir: Option<PathBuf>,
     extensions: String,
     model_path: Option<PathBuf>,
+    beats_path: Option<PathBuf>,
 ) {
     let exts = parse_extensions(&extensions);
+    // A beats file that cannot be read fails the run, so the worker falls back to the
+    // Python analyzer with the same beats instead of silently tracking its own.
+    let beats = match beats_path.as_deref().map(ExternalBeats::load) {
+        Some(Ok(beats)) => Some(beats),
+        Some(Err(error)) => {
+            eprintln!("{error}");
+            std::process::exit(1);
+        }
+        None => None,
+    };
+    if beats.is_some() && file.is_none() {
+        eprintln!("--beats describes one track: use it with --file");
+        std::process::exit(1);
+    }
 
     // Load PANNs model if path provided and feature enabled
     #[cfg(feature = "ml")]
@@ -1343,9 +1514,13 @@ pub fn run_analyze(
 
     if let Some(file_path) = file {
         #[cfg(feature = "ml")]
-        let result = analyze_track_with_ml(&file_path, panns.as_ref().map(|m| m.as_ref()));
+        let result = analyze_track_with_ml(
+            &file_path,
+            panns.as_ref().map(|m| m.as_ref()),
+            beats.as_ref(),
+        );
         #[cfg(not(feature = "ml"))]
-        let result = analyze_track(&file_path);
+        let result = analyze_track_with_beats(&file_path, beats.as_ref());
 
         println!("{}", serde_json::to_string(&result).unwrap_or_default());
         return;
@@ -1361,7 +1536,7 @@ pub fn run_analyze(
             // Sequential when using ML model (ONNX session requires &mut)
             files
                 .iter()
-                .map(|f| analyze_track_with_ml(f, Some(model.as_ref())))
+                .map(|f| analyze_track_with_ml(f, Some(model.as_ref()), None))
                 .collect()
         } else {
             files.par_iter().map(|f| analyze_track(f)).collect()

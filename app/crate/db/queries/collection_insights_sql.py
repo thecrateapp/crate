@@ -13,11 +13,12 @@ WITH eligible AS MATERIALIZED (
            a.name AS title, a.artist, a.year, a.has_cover <> 0 AS has_cover,
            ar.id AS artist_id, ar.entity_uid::text AS artist_uid,
            ar.slug AS artist_slug, ar.has_photo <> 0 AS has_photo,
-           COALESCE(p.quality = 'full' AND p.profile_version = :profile_version
+           COALESCE(p.quality = 'full' AND p.profile_version = ANY(:profile_versions)
                AND p.analyzer_version = ANY(:analyzer_versions)
                AND p.source_stale_at IS NULL, false) AS full_current,
            COALESCE(cardinality(t.bliss_vector), 0) > 0 AS has_bliss,
-           COALESCE(p.quality IN ('full', 'partial') AND p.profile_version = :profile_version
+           COALESCE(p.quality IN ('full', 'partial')
+               AND p.profile_version = ANY(:profile_versions)
                AND p.analyzer_version = ANY(:analyzer_versions)
                AND p.source_stale_at IS NULL, false) AS profile_current,
            p.bpm AS mix_bpm, p.bpm_confidence AS mix_bpm_confidence,

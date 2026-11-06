@@ -1,0 +1,20 @@
+# Throwaway image for the structure reference: All-In-One (MIT) and madmom (code BSD,
+# models CC BY-NC-SA 4.0). Offline evaluation only; never a base for a Crate image.
+#   docker build -f Dockerfile.allin1 -t sg1-allin1:local .
+FROM python:3.10-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg git build-essential \
+    && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir torch==2.0.1+cpu torchaudio==2.0.2+cpu \
+        --extra-index-url https://download.pytorch.org/whl/cpu
+# All-In-One's neighbourhood attention, built against the CPU torch above.
+RUN pip install --no-cache-dir cmake ninja wheel \
+    && MAX_JOBS=16 NATTEN_N_WORKERS=16 pip install --no-cache-dir --no-build-isolation natten==0.14.6
+# madmom at the commit the analysis worker image builds (its PyPI release is older).
+ARG MADMOM_COMMIT=27f032e8947204902c675e5e341a3faf5dc86dae
+RUN pip install --no-cache-dir "numpy<1.24" cython \
+    && pip install --no-cache-dir --no-build-isolation \
+        "git+https://github.com/CPJKU/madmom@${MADMOM_COMMIT}"
+COPY constraints.txt /constraints.txt
+RUN pip install --no-cache-dir allin1==1.1.0 -c /constraints.txt \
+    --extra-index-url https://download.pytorch.org/whl/cpu

@@ -19,8 +19,22 @@ from crate.db.repositories.library_processing_state import (
 )
 from crate.db.repositories.smart_mix import get_track_mix_profile
 from crate.db.tx import read_scope, transaction_scope
-from crate.smart_mix.models import MixProfileQuality, TrackMixProfileDraft
+from crate.smart_mix.models import MixProfileQuality, Phrase, TrackMixProfileDraft
 from crate.smart_mix.versions import ANALYZER_VERSION
+
+_PHRASES = (
+    Phrase(
+        start_beat=0, start_ms=500, bars=8, energy=0.5, delta_energy=None, kind="intro"
+    ),
+    Phrase(
+        start_beat=32,
+        start_ms=16_500,
+        bars=8,
+        energy=0.7,
+        delta_energy=0.2,
+        kind="body",
+    ),
+)
 
 
 def test_full_rust_profile_promotes_partial_python_profile(
@@ -43,6 +57,41 @@ def test_full_rust_profile_promotes_partial_python_profile(
     assert stored is not None
     assert stored.analyzer == "crate-rust"
     assert stored.quality is MixProfileQuality.FULL
+
+
+def test_a_new_voice_detector_replaces_a_profile_of_the_same_analyzer(
+    pg_db, tmp_path: Path
+) -> None:
+    # Voice ships inside the same analyzer version (SM3-D13), so a draft that adds it,
+    # or brings another detector, must not be kept out as "unchanged".
+    del pg_db
+    path, track_id = _track(tmp_path, "voice")
+    plain = replace(
+        _draft(),
+        phrases=_PHRASES,
+        energy_curve=bytes(16),
+        structure_confidence=0.6,
+    )
+    voiced = replace(plain, vocal_presence=bytes((200, 10)), vocal_detector="yamnet-1")
+    assert (
+        publish_smart_mix_profile(capture_smart_mix_source(track_id, path), plain)
+        is SmartMixPublication.PUBLISHED
+    )
+
+    first = publish_smart_mix_profile(capture_smart_mix_source(track_id, path), voiced)
+    again = publish_smart_mix_profile(capture_smart_mix_source(track_id, path), voiced)
+    without = publish_smart_mix_profile(capture_smart_mix_source(track_id, path), plain)
+
+    assert first is SmartMixPublication.PUBLISHED
+    assert again is SmartMixPublication.UNCHANGED
+    # A run without the model never strips the voice another run stored.
+    assert without is SmartMixPublication.UNCHANGED
+    stored = get_track_mix_profile(track_id, include_structure=True)
+    assert stored is not None
+    assert (stored.vocal_presence, stored.vocal_detector) == (
+        bytes((200, 10)),
+        "yamnet-1",
+    )
 
 
 def test_partial_result_never_replaces_a_full_profile_of_the_same_source(

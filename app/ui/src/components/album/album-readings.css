@@ -1,0 +1,130 @@
+/* Album readings (audio analysis, beside the sound spectrum): each mean over a strip on
+   the library's usual scale, with a mark per track and the mean glowing, in the
+   spectrum's language (approved mockup B). The strip keeps a fixed height so its marks
+   weigh the same at any column width. Beside the spectrum the rows share its height;
+   stacked, there is no extra room and they keep their own. */
+.album-readings {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  margin: 0;
+}
+
+.album-reading {
+  display: grid;
+  flex: 1 1 auto;
+  align-content: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 1rem;
+  padding: 0.625rem 0;
+  border-bottom: 1px solid var(--border-quiet-subtle);
+}
+
+.album-reading:last-child {
+  border-bottom: 0;
+}
+
+.album-reading-value {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.album-reading-detail {
+  grid-column: 1 / -1;
+  margin: 0.375rem 0 0;
+}
+
+.album-reading-graphic {
+  border-radius: 0.25rem;
+  outline-offset: 2px;
+}
+
+.album-reading-svg {
+  display: block;
+  overflow: visible;
+}
+
+.album-reading-axis {
+  stroke: var(--text-primary);
+  stroke-opacity: 0.08;
+}
+
+.album-reading-range {
+  fill: var(--accent-action);
+  fill-opacity: 0.14;
+}
+
+.album-reading-tick {
+  stroke: var(--accent-action-hi);
+  stroke-opacity: 0.6;
+  stroke-width: 2;
+}
+
+.album-reading-mean {
+  fill: var(--accent-action-hi);
+  filter: drop-shadow(0 0 4px var(--accent-action-hi));
+}
+
+.album-reading-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.album-reading-key {
+  padding: 0.1875rem 0.5625rem;
+  border: 1px solid var(--border-quiet);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.album-reading-key[data-dominant="true"] {
+  border-color: var(--accent-action-hi);
+  color: var(--text-primary);
+}
+
+/* Entrance, as in the spectrum: the range grows, then the marks appear, row by row. The
+   mean only fades, so its centring transform stays untouched. */
+.album-readings[data-animated="true"] .album-reading-range {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: album-reading-grow 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--row, 0) * 70ms);
+}
+
+.album-readings[data-animated="true"] .album-reading-tick,
+.album-readings[data-animated="true"] .album-reading-mean {
+  animation: album-reading-fade 400ms ease-out both;
+  animation-delay: calc(var(--row, 0) * 70ms + 350ms);
+}
+
+@keyframes album-reading-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes album-reading-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .album-readings * {
+    animation: none !important;
+  }
+}

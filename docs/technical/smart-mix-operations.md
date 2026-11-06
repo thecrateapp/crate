@@ -14,7 +14,13 @@ sources:
   - app/crate/smart_mix/key_detection.py
   - app/crate/smart_mix/tempo_grid.py
   - app/crate/smart_mix/cue_detection.py
+  - app/crate/smart_mix/structure.py
+  - app/crate/smart_mix/beat_model.py
+  - app/crate/smart_mix/vocals.py
   - app/crate/smart_mix/planner.py
+  - app/crate/smart_mix/evaluation.py
+  - tools/smart-mix-eval/README.md
+  - tools/smart-mix-eval/structure/README.md
   - app/crate/smart_mix/policy.py
   - app/crate/smart_mix/source.py
   - app/crate/api/smart_mix.py
@@ -23,9 +29,11 @@ sources:
   - app/crate/api/schemas/smart_mix_admin.py
   - app/crate/db/jobs/analysis_storage.py
   - app/crate/db/jobs/smart_mix_backfill.py
+  - app/crate/db/migrations/versions/147_smart_mix_structure.py
   - app/crate/db/queries/smart_mix_admin_tracks.py
   - app/crate/db/queries/smart_mix_compatible.py
   - app/crate/db/repositories/smart_mix.py
+  - app/crate/db/repositories/smart_mix_signals.py
   - app/crate/worker_handlers/analysis.py
   - app/crate/actors.py
   - app/crate/ai/queues.py
@@ -96,7 +104,7 @@ These values come from the reviewed code; they were not discovered from a live i
 | ------------------------------- | -------------------- | ----------------------------------------------------- |
 | `API_CONTRACT_VERSION`          | `2026-08`            | Advertised integration and capabilities contract      |
 | `PROFILE_SCHEMA_VERSION`        | `1`                  | Schema of the persisted and serialized profile        |
-| `ANALYZER_VERSION`              | `smart-mix-audio-v6` | Target generation of profile analysis                 |
+| `ANALYZER_VERSION`              | `smart-mix-audio-v7` | Target generation of profile analysis                 |
 | `MEASUREMENT_VERSION`           | `bs1770-v1`          | Loudness and true peak provenance used by the planner |
 | `BEAT_GRID_FORMAT`              | `delta-ms-v1`        | Beat grid format                                      |
 | `PLANNER_IDENTIFIER`            | `smart-mix-v2`       | Identifier for plan batches and capabilities          |
@@ -124,6 +132,302 @@ profile into a deck (Android, Crate Decks) must follow these definitions.
 | `activeEndMs`              | Musical end, by the same rule (for long tracks, over the last 120 s). A fade or reverb tail continues after it, so it falls 1-6 s before a -60 dB end of sound such as Mixxx's. It is not a silence threshold                                                                                                                           |
 | `introCueMs`, `outroCueMs` | Suggested mix points: the first beat at or after `activeStartMs` and the last beat 4 s before `activeEndMs`                                                                                                                                                                                                                             |
 | `beatPhaseOffsetMs`        | Plan field, beatmatch only. In output time and below one outgoing beat: the incoming track starts this much after `incomingCueMs` when the outgoing reaches `outgoingCueMs`. In incoming track time, start at `incomingCueMs + beatPhaseOffsetMs * incomingTempoRatio` (`NativeTransitionPlan.startIncomingCueMs()`); never subtract it |
+
+### Analyzer v7
+
+`smart-mix-audio-v7` keeps every v6 measurement and adds the structure of Smart Mix 3
+(SM3-D2): phrases of 8, 16 or 32 bars with a heuristic kind, one energy byte per bar
+and `structureConfidence`. Readers accept v7, v6 and v5 profiles
+(`READABLE_ANALYZER_VERSIONS`); writers, the backfill and Admin coverage target v7.
+
+Phrases follow a novelty curve at bar boundaries (`structure.py`, mirrored by
+`structure.rs`). Each bar gets its mean RMS level from the cue-detection RMS frames that lie
+wholly inside it, and the balance of three mel bands, its mean chroma and the mean of 13
+MFCC from the spectrogram frames centred inside it; both leave out 50 ms at each end of the
+bar. In both analyzers the chroma frames lag the band frames by 1,024 samples (about 46 ms),
+the onset envelope's alignment, which the downbeat features need. The novelty of a boundary
+compares the four bars before it with the four after it, gap bars left out:
+
+- level change plus half the balance change, less 0.5 dB and never below 0 (the v7 measure);
+- plus harmony (SM3-D17): 2 dB (`HARMONY_WEIGHT`) per unit of cosine distance between the
+  two mean chromas;
+- plus timbre: 8 dB (`TIMBRE_WEIGHT`) per unit of distance between the two mean MFCC over
+  √13, each coefficient standardised over the bars from the first to the last music bar:
+  minus its mean, over its standard deviation or 1.0 (`MFCC_STD_FLOOR`, in the MFCC units
+  of librosa's `mfcc` of the dB mel levels), whichever is larger. Without the floor, the
+  bar-to-bar noise of a near-static loop grew to unit variance and split the loop every 8
+  bars.
+
+A dynamic programme keeps the 8-bar grid boundaries whose novelty pays 4 dB each
+(`BOUNDARY_COST_DB`; boundaries on 16- and 32-bar multiples get 0.25 and 0.5 dB of bonus).
+Harmony alone never pays that cost: it decides a boundary together with level, balance or
+timbre. Chroma and MFCC are recomputed from the audio and not stored; the harmony and timbre
+terms (SM3-D17) add about 6 ms per track in Python and 4 ms in Rust. The Rust chroma is not
+librosa's, so Python–Rust parity on real audio keeps its tolerance; the shared fixtures
+`structure_v1.json` (frames) and `structure_v2.json` (per-bar features with chroma and MFCC)
+pin the algorithm. How the phrases compare with an automatic reference is in
+[Measurement of the structure](#measurement-of-the-structure).
+
+Migration 147 stores the structure in nullable `track_mix_profiles` columns: `phrases`
+(JSON list of `start_beat`, `start_ms`, `bars`, `energy`, `delta_energy`, `kind`),
+`energy_curve` (one byte per bar), `vocal_presence` (one byte per phrase, see "Voice per
+phrase" below) and `structure_confidence` (REAL, four decimals). Profiles written
+before v7 keep null structure. An empty phrase list with confidence 0 means the track could
+not be segmented, which is different from null.
+
+Profile reads leave the structure out unless the planner segments by phrase
+(`planner_reads_structure`, only `smart-mix-v3`), so planning with `smart-mix-v2` reads the
+same columns as before. The public profile endpoint and the plan responses do not include the
+structure yet; Admin reads it through `GET /api/admin/smart-mix/tracks/{id}/structure` and,
+for accounts with `library.analysis.manage`, draws it in a track's audio profile (album track
+list, **Show audio profile**): a 1 px rule at each phrase boundary, the kind and length of each
+phrase, a 1 px voice lane and the energy curve as a 1 px lane, on the track's time axis.
+
+`PROFILE_SCHEMA_VERSION` stays `1`: the VirtualDJ plugin 1.0.0 refuses capabilities and
+profiles of any other schema. Readers accept every schema up to the current one
+(`READABLE_PROFILE_VERSIONS`), and the backfill, coverage and campaign target the analyzer
+and the schema together, so a later schema bump needs no other server change.
+
+### Models, licences and cost
+
+The v7 profile task runs two models next to the analyzer's own signal processing. Both
+outputs carry the name of what produced them, so a reader or a later analyzer knows where
+a stored beat or voice byte came from, and both are kept per track (see "Stored model
+signals" below).
+
+| Model                                                     | Licence                                            | Output and provenance                                                       | CPU per track, one thread                                                  |
+| --------------------------------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Beat This! `small0` with madmom's DBN (SM3-D14)           | Beat This! MIT (code and weights); madmom code BSD | Beats, downbeats and beats per bar; `beat_tracker` = `beat-this-small0-dbn` | 12.8 s on a 237 s track, 21.1 s on a 367 s one, plus 0.8-1.0 s for the DBN |
+| YAMNet, Google's weights in a PyTorch port (SM3-D13)      | Apache-2.0                                         | Voice per 0.48 s patch and per phrase; `vocal_detector` = `yamnet-2`        | About 0.7 s per minute of audio                                            |
+| None: harmony and timbre novelty of the phrases (SM3-D17) | —                                                  | Phrase boundaries, under `analyzerVersion` `smart-mix-audio-v7`             | About 6 ms (Python) and 4 ms (Rust)                                        |
+
+Two more models serve only the offline measurement and never run in the worker: All-In-One
+(MIT), the reference for sections and downbeats, and madmom's downbeat networks (CC
+BY-NC-SA 4.0), the arbiter. madmom's package in the analysis image ships those network
+files too, unused: the DBN needs none.
+
+### Beats and downbeats
+
+Since SM3-D14 the beats and the bar come from a model, because the onset heuristic put the
+downbeat on the wrong beat of the bar on more than half of the tracks checked at gate SG1.
+
+- **Model.** Beat This! (CPJKU, ISMIR 2024; code and weights MIT), checkpoint `small0`,
+  with its DBN post-processing: madmom's `DBNDownBeatTrackingProcessor` with 3 or 4 beats
+  per bar. Without it, Beat This! picks peaks and leaves spurious beats 80-100 ms apart in
+  about half the tracks; on 127 reference tracks the grid then slipped and 34 % of the
+  phrase-genre tracks got no downbeat, against 9 % with the DBN, which also put more of
+  them on the right beat (86 against 65). The analysis image fetches the checkpoint and
+  the licence in its `beat-this-weights` stage, checks their sha256 and bakes them in as
+  `/app/models/beat_this-small0.ckpt` and `/app/models/beat_this.LICENSE`; `beat-this` is
+  installed next to torch against the installed version (`requirements-beat-this.txt`).
+  `CRATE_BEAT_THIS_CHECKPOINT` names the checkpoint (`final0` needs the build arguments
+  documented in the Dockerfile) and `CRATE_BEAT_THIS_WEIGHTS` overrides the path. Nothing is
+  downloaded at run time. `small0` stays: its raw downbeats agree with All-In-One as often
+  as the larger `final0`'s (see [Measurement of the structure](#measurement-of-the-structure)).
+- **madmom.** Its PyPI release (0.16.1) does not build on Python 3.13, so the
+  `madmom-build` stage builds a wheel from a pinned commit of `CPJKU/madmom` against the
+  analysis image's numpy, and the image installs only the wheel, under the same constraint
+  that keeps torch and numpy where they were; there are no compilers in the image. The
+  build reaches that stage through the `madmom-wheel` alias only when the image installs
+  torch; without torch the alias points at the empty `madmom-skip` stage and the image
+  gets neither madmom nor its licence. madmom's code is BSD (`/app/models/madmom.LICENSE`);
+  its package also ships model files under CC BY-NC-SA 4.0 that Crate does not use (the
+  DBN needs none), which is acceptable for Crate as free and open-source software.
+- **Where it runs.** `compute_smart_mix_profile` runs it before the analysis
+  (`crate/smart_mix/beat_model.py`), unless the beats of this file are stored (see "Stored
+  model signals" below), and passes the beats to the Rust analyzer
+  (`crate-cli analyze --file <track> --beats <json>`, a temporary file with `tracker`,
+  `beats_ms`, `downbeats_ms` and `beats_per_bar`) or, without `crate-cli`, to the Python
+  fallback. Both use
+  them instead of their own tracker, still fit the constant grid, and anchor the bar on the
+  grid phase (beat index mod 4) that collects the most model downbeats within 70 ms, if
+  that phase holds at least 60 % of the model downbeats inside the grid. Otherwise the
+  track has no downbeat and no phrases. The Rust cue downbeats (`introDownbeatMs`,
+  `outroDownbeatMs`) take the same rule over the 32 beats around each cue. A `crate-cli`
+  whose `analyze --help` does not list `--beats` would track its own beats after the model
+  ran, so the worker logs a warning and the Python analyzer takes the beats instead. When
+  that probe fails (a timeout on a loaded worker, for example), it logs a warning once and
+  is not run again for 60 s (`PROBE_RETRY_SECONDS`); meanwhile each track logs at info that
+  the probe is backing off and goes to the Python analyzer as well.
+- **Meter.** The DBN keeps one bar length per track, 3 or 4 beats, and `beats_per_bar` is
+  read from its downbeats: the beats from each downbeat to the next, when every bar has as
+  many (otherwise null). Phrases, the planner and Crate Decks count bars of four, so with
+  any other length (SM3-D16) both analyzers give the profile that `time_signature` and no
+  downbeat, cue downbeats or phrases, and the track goes to crossfade. With 4, or without a
+  constant bar, the bar is anchored as above and `time_signature` is 4 when the track has a
+  downbeat. Before, a 3/4 track only lost its downbeat when its downbeats missed the 60 %
+  share, and its profile never said it was in three. The DBN chose 3 beats for 5 of the
+  145 tracks of the SMB.PR3 measurement; All-In-One hears three beats on 3 of them and on
+  no other track.
+- **Fallback.** Without torch, `beat_this`, madmom or the weights, when the model fails or
+  finds no beats, and for tracks over 600 s, the analysis keeps its own tracker and
+  heuristic and the worker logs it. Without madmom the model is off: it never runs
+  without its DBN. Only an image without torch (`PANNS=off`) leaves the model out on
+  purpose and logs it at info; with torch, a missing `beat_this`, madmom or weights mean a
+  broken image and log a warning.
+- **Storage.** Migration 149 adds `beat_tracker` (`beat-this-small0-dbn`: the checkpoint
+  and the post-processing), null with the analyzer's own tracker. It is part of the
+  profile revision. Beat This! ships inside `smart-mix-audio-v7`: a draft that brings a
+  tracker the stored profile lacks, or another one (`beat-this-small0-dbn` over the
+  `beat-this-small0` of the first, peak-picking builds), replaces it at the same quality,
+  and a run without the model never replaces a profile whose beats came from it.
+- **Cost.** With one thread (`TORCH_NUM_THREADS`) on the development machine, `small0`
+  takes 12.8 s of CPU on a 237 s track and 21.1 s on a 367 s one, and the DBN 0.8-1.0 s;
+  with decoding and resampling, the whole step takes 14.7 s and 25.4 s.
+  `test_beat_model_overhead_within_budget` (run with `--benchmark`) fails above 25 s for a
+  240 s track. Stored beats skip the step on later analyses (see "Stored model signals").
+
+### Voice per phrase
+
+Since SM3-D13 a profile with phrases also says how much of each phrase has an audible sung or
+spoken voice, so a transition can avoid laying one voice over another.
+
+- **Model.** YAMNet (Google, AudioSet, Apache-2.0), ported to PyTorch in
+  `crate/smart_mix/voice_model.py` with Google's original weights. The analysis image builds
+  them in its `yamnet-weights` stage: it downloads `yamnet.h5`, the class map and the licence,
+  checks their sha256 and converts the weights with `scripts/convert_yamnet_weights.py` to
+  `/app/models/yamnet.npz` (licence at `/app/models/yamnet.LICENSE`). Essentia's packaged
+  YAMNet graph is not used: its models are licensed for non-commercial use only. The port
+  matches Google's TensorFlow reference within 5e-6 (`test_smart_mix_voice_model.py`).
+- **Byte.** YAMNet scores 0.975 s patches every 0.48 s; a patch's voice score is its highest
+  AudioSet voice class (speech, narration, singing, choir, chant, rapping). A phrase's byte
+  is the geometric mean of its patch scores on a log scale, from `LOG_FLOOR` (10^-4) or less
+  (0) to 1 (255), and the phrase counts as voiced from `VOCAL_THRESHOLD`
+  (`crate/smart_mix/vocals.py`). The byte stores no threshold, so the voiced cut can move
+  without analysing the library again. Since SM3-D16 the patch scores are stored as one byte
+  each on the same scale, and a phrase byte is the mean of its patch bytes (see "Stored
+  model signals" below), within one of the geometric mean of the float scores.
+- **Calibration (gate SG1b, 2026-11-05).** Measured against synced lyrics instead of hand
+  labels: 358 production tracks with LRCLIB synced lyrics from 20 genres, analysed with v7
+  outside the database; a phrase is voiced when lyric lines cover a quarter of it and
+  unvoiced when none touches it. 2,721 phrases of 275 tracks qualified (76 % voiced). The
+  share of voiced patches, the arithmetic mean and the geometric mean separate equally well
+  (AUC 0.79-0.80); the geometric mean was kept because it stores no threshold. At
+  `VOCAL_THRESHOLD = 90` (a mean score of about 0.0026): precision 0.88, recall 0.78,
+  specificity 0.66, which meets the design's precision 0.8 and recall 0.7. Lyrics miss
+  backing vocals and ad-libs, so these figures are a lower bound. YAMNet is strong on
+  alternative rock, post-punk, new wave, pop and hip-hop (AUC 0.86-1.0) and weak on black
+  and death metal, industrial metal, post-hardcore, synthpop and trip-hop (0.64-0.67).
+  v7 found no phrases on 66 of the 358 tracks, mostly extreme and industrial metal.
+- **Where it runs.** `compute_smart_mix_profile` adds the voice after the analysis, from the
+  Rust analyzer or the Python fallback, so both analyzers stay identical. Without torch or the
+  weights (`PANNS=off`, or `CRATE_YAMNET_WEIGHTS` pointing nowhere), or when decoding or the
+  model fails, the profile is published without voice and the worker logs a warning.
+- **Cost.** About 0.7 s of CPU per minute of audio with the analysis worker's single native
+  thread (`OMP_NUM_THREADS=1`); `test_voice_overhead_within_budget` (run with `--benchmark`)
+  fails above 1.5 s.
+- **Storage.** Migration 148 adds `vocal_detector` (`yamnet-2`; `yamnet-1` stored the share
+  of patches above a fixed score and only ever existed in development), set together with
+  `vocal_presence` or not at all. Voice ships inside `smart-mix-audio-v7`, so a draft that
+  brings a detector the stored profile lacks replaces it at the same quality, and a run
+  without the model never strips stored voice. Reanalyzing a v7 track from Admin therefore
+  adds its voice; changing the detector name recomputes every profile through the backfill
+  without a new analyzer version.
+
+### Stored model signals
+
+Since SM3-D16 the outputs of both models are kept per track, apart from the profile, so a
+later analyzer version that only changes the Rust step (the grid, the downbeat rule, the
+phrases) does not run them again. Beat This! is about three quarters of a profile's cost:
+with its beats stored, a backfill of the library takes about 3 days instead of 12-13.
+
+- **What.** Migration 150 adds `track_mix_signals`, one row per track that goes with it
+  (`ON DELETE CASCADE`), written by `crate/db/repositories/smart_mix_signals.py`:
+  `source_revision`; Beat This!'s `beat_tracker`, `beats_ms` and `downbeats_ms` after the
+  DBN, and `beats_per_bar`; YAMNet's `vocal_detector`, `voice_hop_ms` (480) and
+  `voice_scores`, one byte per 0.48 s patch on the scale of the phrase bytes. The model
+  logits are not kept (about 13 GB for the library): they would only matter to change the
+  post-processing itself.
+- **When they are reused.** `compute_smart_mix_profile` reads the row once, for the source
+  revision it captured (`smart_mix_source_revision`: size, mtime and inode, so a rename
+  keeps it, and a retag or a replaced file does not). Stored beats are reused when
+  `beat_tracker` is the current tracker name, without loading Beat This!; stored voice
+  when `vocal_detector` is the current detector. Otherwise the model runs and its output
+  is stored. Beats and voice of the same file share the row; either of a new revision
+  replaces the row whole, since the other half described the old file. The voice is still
+  computed only for a draft with phrases, so storing it adds no cost, and a track the model
+  gives no beats stores none.
+- **A file replaced during the task.** The models read the file after the task captured its
+  revision, so the task reads the revision again before each store: if the file changed in
+  between, it stores nothing and logs `the file changed during the task` (publication
+  drops that draft too, as `source_changed`). Each row's `updated_at` is when its task read
+  the file (with a time zone; the stores refuse one without), and signals of another
+  revision replace the row only when they were read later, so a slow task that read the
+  old file never overwrites the new file's signals. Such a store writes nothing and logs at
+  info which signal of which revision it kept out.
+- **A file rewritten in place.** The revision sees size, mtime and inode, not the audio: a
+  file rewritten with the same size, mtime and inode (a tool that restores the mtime, for
+  example) keeps its stored signals and its profile. Reanalysing the track does not
+  change that: the task reuses the signals of that revision and publication finds nothing
+  to replace (`unchanged`). To force a recompute, change the file's mtime (`touch` it on
+  the host) and reanalyse the track: the new revision runs both models, replaces the row
+  and publishes a new profile.
+- **How a later version uses them.** A new analyzer version that keeps
+  `beat-this-small0-dbn` and `yamnet-2` reanalyses the library through the backfill as
+  usual, and every profile task finds the signals of its track: only decoding, the Rust
+  analysis and the phrase voice from the stored bytes run. Changing the checkpoint, the
+  post-processing or the detector changes the name, and each track runs that model again
+  on its next profile.
+- **Phrase voice.** A phrase byte is the mean of its patch bytes whether YAMNet ran or not,
+  so a profile built from stored windows is the one the model would give. Each patch byte
+  is rounded on its own, so the phrase byte can miss the geometric mean of the float scores
+  that SG1b calibrated by one: 1,369 of 1,400 synthetic phrases and 14 of 15 phrases of a
+  real track match it exactly (`test_phrase_bytes_from_window_bytes_match_float_scores`).
+  On the SG1b calibration set at `VOCAL_THRESHOLD = 90`, the byte path gives precision
+  0.8824 and recall 0.7832 against 0.8825 and 0.7837 from the float scores, so the
+  calibration holds and the phrase byte is computed the same way in both cases.
+- **Failures.** A failed read only means running the models again, and a failed write
+  only means not keeping their output: the worker logs a warning and the profile goes on.
+- **Size.** 3.4 KB for a 4:21 track and 4.8 KB for a 6:02 one (`pg_column_size` of the
+  row; integer arrays are stored uncompressed), so about 0.5 GB for 140,000 tracks.
+
+### Measurement of the structure
+
+SMB.PR3 measured the v7 bar and phrase structure offline with
+`tools/smart-mix-eval/structure/` (its README has the scripts, images and commands) on 145
+tracks from the SG1b calibration set and the Crate Decks spike set, analysed outside the
+database. 144 are in genres mixed by phrase; the one extreme-metal track is mixed by crossfade
+and left out of the table. The analysis ran the branch's final `crate-cli` on Beat This!
+beats with the DBN, as the worker does.
+
+- **Reference.** All-In-One (MIT): its sections, edge silence left out, and its downbeats.
+- **Arbiter.** madmom's RNN and DBN downbeats (CC BY-NC-SA 4.0 networks, offline only). A
+  track has an arbiter when All-In-One and madmom share at least 90 % of their downbeats
+  within 70 ms: 96 of the 144.
+- **Downbeat right.** The grid's bars hit at least 90 % of All-In-One's downbeats inside the
+  grid within 70 ms, counted among the tracks that got a downbeat: the analyzer may
+  abstain, but must not anchor the wrong beat.
+- **Phrase boundaries on downbeats.** At least 90 % of a track's phrase boundaries lie
+  within 120 ms of an All-In-One downbeat.
+- **Sections.** `mir_eval.segment.detection` between the phrase boundaries and All-In-One's
+  section boundaries (one-to-one matching, first and last boundary trimmed) at ±0.5 s, ±3
+  s and ±1 bar; precision, recall and F1 averaged per track. Phrases (8, 16 and 32 bars)
+  are finer than sections, which keeps precision low by construction.
+
+| Phrase-mixed genres (144 tracks)                  | Old v7 heuristic   | v7 with Beat This! and its DBN (SMB.PR2c)                  | Plus the SM3-D17 novelty |
+| ------------------------------------------------- | ------------------ | ---------------------------------------------------------- | ------------------------ |
+| Tracks with phrases                               | 119                | 131                                                        | 131                      |
+| Downbeat right among the anchored tracks          | —                  | 97 of 131 against All-In-One; 84 of 92 with arbiter (91 %) | Same                     |
+| Phrase boundaries on All-In-One downbeats (≥90 %) | 32 of 119          | 61 of 131                                                  | 66 of 131                |
+| Sections ±0.5 s: precision / recall / F1          | 0.28 / 0.23 / 0.25 | 0.36 / 0.32 / 0.33                                         | 0.38 / 0.38 / 0.36       |
+| Sections ±3 s: precision / recall / F1            | 0.51 / 0.43 / 0.45 | 0.54 / 0.49 / 0.49                                         | 0.55 / 0.55 / 0.53       |
+| Sections ±1 bar: precision / recall / F1          | 0.42 / 0.35 / 0.38 | 0.47 / 0.43 / 0.43                                         | 0.49 / 0.48 / 0.47       |
+
+- **Arbiter subset.** Section F1 at ±3 s goes 0.43, 0.50 and 0.54 in the same three
+  columns.
+- **SM3-D17 acceptance.** F1 at ±3 s of at least 0.52 with precision not below SMB.PR2c's
+  and at most 0.5 s more per track: 0.53, precision 0.55 against 0.54, and milliseconds.
+- **MFCC deviation floor.** Rerun on the same beats with the `crate-cli` that adds the
+  floor, the 145 profiles are identical, so the table stands.
+- **Meter.** The DBN reads 3 beats per bar on 5 of the 145 tracks; All-In-One agrees on 3
+  of them and hears three beats nowhere else. Those tracks get no phrases (SM3-D16).
+- **Checkpoint.** `small0` against `final0`: their raw downbeats agree with All-In-One on 38
+  and 37 of 56 tracks, and on 31 and 30 of the arbiter tracks.
+- **Cost.** See "Models, licences and cost" above; the novelty stays far under the 0.5 s
+  that SM3-D17 allowed.
+- **Caveats.** All-In-One is an automatic reference: the numbers measure agreement with it,
+  not correctness, and the arbiter subset is selected by agreement, so it is the easier
+  part of the set.
 
 ### Analyzer v6
 
@@ -171,11 +475,9 @@ profile into a deck (Android, Crate Decks) must follow these definitions.
   track table shows v5 ones as `outdated`: they measure backfill progress, not what
   readers can use.
 - **Recomputing is a backfill campaign.** Deploying does not start one. Started from Admin,
-  it claims every v5 profile (and missing ones) with target generation v6. A campaign
-  left `running` at deploy keeps going: the coordinator checks only its status and every
-  claim uses the deployed target, so it starts recomputing the whole library with v6
-  while its stored `target` still reads v5 (agent observability reports that mismatch).
-  Pause it before deploying if the recompute should wait.
+  it claims every v5 profile (and missing ones) with target generation v6. Until v7, a
+  campaign left `running` at deploy kept going under the new target; since v7 a campaign of
+  another target stops claiming (see [Campaign, queues and backfill](#campaign-queues-and-backfill)).
 - When the backfill has finished, remove v5 from `READABLE_ANALYZER_VERSIONS`.
 
 ## Producing and publishing profiles
@@ -241,19 +543,65 @@ structure; check `refreshedAt` before reading zeros as a library with nothing pe
 
 The backfill applies resource pressure and limits the work in flight. Its Admin settings
 accept `batchSize` from 1 to 100 (25 by default) and `maxAttempts` from 1 to 10 (3 by default).
-Claims use `SKIP LOCKED`, a token, `target_generation` and attempts; a new analyzer version
+Claims use `SKIP LOCKED`, a token, `target_generation` and attempts. A track is claimable
+unless its profile is at the target analyzer and profile schema, current and usable; a
+profile the backfill just wrote is never claimed again. `target_generation` is the analyzer
+version (with `+schemaN` appended for schemas above 1), so a new analyzer version or schema
 makes attempts from the previous generation eligible again. It prioritizes the play queue,
 supplied offline IDs, favorites and collections, and listening history before everything else.
-It can promote Python profiles when the Rust CLI is available.
+It can promote Python profiles when the Rust CLI is available, within `maxAttempts`.
 
 The campaign is persisted under `smart_mix:backfill_campaign`, with the states `running`,
 `paused`, `cancelled` and `completed`. `controlState=idle` also covers a missing campaign and
 terminal campaigns; on its own it does not mean full coverage. Pausing or cancelling stops the
 campaign from continuing; it does not forcibly interrupt child analyses that were already
-accepted. Resuming reuses a running or paused campaign of the same generation. A campaign that
+accepted. A campaign records its target: `target` (analyzer version) and `profile_version`
+(missing on campaigns saved before v7, which count as schema 1). Resuming reuses a running or
+paused campaign of the same target with its counters. A campaign of another target never
+claims for the deployed one: the coordinator stops it with `control: superseded`, Admin
+reports `controlState=idle` while still showing the old campaign, and starting (or resuming)
+creates a new campaign for the deployed target with zeroed counters. A campaign that
 completes has exhausted the claimable work in that pass; it can still leave exhausted errors or
 non-current profiles. Check coverage and `processing.exhausted` before treating the backlog as
 resolved. A coordinating task in `done` does not mean all of its children have finished either.
+
+### Running the v7 backfill (Smart Mix 3)
+
+Production holds a `cancelled` campaign with `target` `smart-mix-audio-v6`. After the release
+with v7 and migrations 147 to 150 is deployed through the normal process, recompute the library
+like this. The queues do not change: the coordinator and each analysis run on `heavy`.
+
+1. **Check the starting point.** Open Admin, Analysis, Smart Mix, or call
+   `GET /api/admin/smart-mix/status` with an account that has `library.analysis.manage`.
+   Expect `analyzerVersion` `smart-mix-audio-v7`, `profileVersion` `1`, `controlState`
+   `idle`, `campaign.target` `smart-mix-audio-v6` with `campaign.status` `cancelled`, and
+   `activeTask` null. If `refreshedAt` is null or older than ten minutes, the call queues a
+   coverage refresh: read it again a minute later. Coverage starts close to 0 % and `versions`
+   lists the v6 and v5 profiles still being served. If `activeTask` is not null, wait for it
+   to finish (it exits at once for a cancelled campaign) or cancel it from Tasks.
+2. **Start the campaign.** Press **Start backfill** (batch size 25, 3 attempts), or call
+   `POST /api/admin/smart-mix/backfill` with `{"batchSize": 25, "maxAttempts": 3}`. The answer
+   is `{"status": "queued", "taskId": "…"}` and the campaign becomes `target`
+   `smart-mix-audio-v7`, `profile_version` `1`, `status` `running`, `batches` and `claimed`
+   `0`. Raise `batchSize` (up to 100) only if the heavy worker keeps up.
+3. **Watch it.** `controlState` `running`; `campaign.batches` and `campaign.claimed` grow;
+   `currentProfiles` and `coveragePercent` rise; `processing.active`, `failed` and `exhausted`
+   show the work and its errors; `GET /api/admin/smart-mix/activity` gives
+   `tracksPerMinute`. The campaign claims every profile that is not v7: the v6 profiles the
+   cancelled campaign rewrote, v5 profiles, tracks without a profile, `unavailable` and
+   source-changed profiles. Claims the v6 campaign left in `analyzing` become claimable two
+   hours after they were taken. Each rewritten track is claimed once.
+4. **Pause, resume or cancel.** **Pause backfill** or `POST /api/admin/smart-mix/backfill/pause`
+   (only from `running`, 409 otherwise); **Resume backfill** or
+   `POST /api/admin/smart-mix/backfill/resume` with the same body as the start, which keeps
+   the counters; **Cancel backfill** or `POST /api/admin/smart-mix/backfill/cancel` (from
+   `running` or `paused`). None of them interrupts analyses already handed to the heavy queue.
+   Starting again after a cancel opens a new v7 campaign that only claims what is still not
+   v7.
+5. **Close it.** The campaign turns `completed` when a pass claims nothing and nothing is in
+   flight. Then check `processing.exhausted` and the track list filters `outdated` and
+   `failed`, and use **Reanalyze track** for the ones worth retrying. Once the backfill has
+   finished, a later release can drop v6 and v5 from `READABLE_ANALYZER_VERSIONS`.
 
 ## AI worker lanes and sizing
 
@@ -387,6 +735,7 @@ Crate Agent; an MCP Bearer token is not an Admin session or a VirtualDJ PAT.
 | `GET /api/admin/smart-mix/tracks` and `/activity`                            | Paginated profiles and processing, and task activity                                                                    |
 | `POST /api/admin/smart-mix/backfill` and `/backfill/resume\|pause\|cancel`   | Change campaign control                                                                                                 |
 | `POST /api/admin/smart-mix/tracks/{id}/reanalyze`                            | Enqueues analysis for one track, with deduplication                                                                     |
+| `GET /api/admin/smart-mix/tracks/{id}/structure`                             | Stored phrases (with end and voice byte), energy curve and bar starts of one profile, for review in Admin               |
 
 Admin requires `library.analysis.manage`, even for its reads. The public profile and compatible
 endpoints use session authorization or the PAT scope `vdj.smart_mix.read`, depending on the
@@ -451,6 +800,27 @@ audio. Those signals remain unavailable. An enqueue does not prove completion; a
 stored versions compatible with the API code, and the age declared in its envelope still
 applies. The release context and its `source_sha` stay in the context MCP; they are not derived
 from an image tag or from `get_smart_mix_status`.
+
+## Offline plan evaluation
+
+Smart Mix 3 measures every planner change offline before it reaches a client (see
+`tools/smart-mix-eval/README.md`). `build_dataset.py` builds a fixed set
+of real edges from the compatible-tracks service, stratified by root genre and tempo band;
+`run_eval.py` plans it with a planner and scores each plan with the pure metrics of
+`crate.smart_mix.evaluation`: policy violations, phrase alignment, bass overlap, harmonic
+clash, energy step and vocal clash; `render_pair.py` and `blind_session.py` render pairs and run
+the blind listening test.
+
+- The tools read a development library through read-only PostgreSQL sessions and the pure
+  planner; they write no rows and no plan cache. They are never run against production without
+  Diego's authorization.
+- Profiles without phrases (analyzer v5 and v6) get phrase alignment from an 8-bar grid and no
+  vocal metric. Compare planners on the same profile generation.
+
+The analyzer's structure is measured apart, on audio files rather than plans:
+`tools/smart-mix-eval/structure/` scores beats, downbeats and phrases against All-In-One
+with madmom as arbiter (see [Measurement of the structure](#measurement-of-the-structure)).
+It reads no database.
 
 ## Regression evidence and acceptance questions
 

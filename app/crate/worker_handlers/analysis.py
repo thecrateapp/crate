@@ -1,5 +1,6 @@
 import logging
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable, Mapping, TypeGuard
 
@@ -26,6 +27,7 @@ from crate.db.jobs.analysis_storage import (
     resolve_smart_mix_track,
 )
 from crate.db.jobs.smart_mix_backfill import (
+    campaign_targets_current,
     claim_smart_mix_backfill_batch,
     complete_smart_mix_campaign,
     count_smart_mix_in_flight,
@@ -43,7 +45,14 @@ from crate.db.repositories.library import (
     get_library_tracks,
     update_track_analysis,
 )
+from crate.db.repositories.smart_mix_signals import (
+    TrackMixSignals,
+    get_track_mix_signals,
+    store_track_mix_beats,
+    store_track_mix_voice,
+)
 from crate.db.repositories.tasks import create_task
+from crate.smart_mix.source import smart_mix_source_revision
 from crate.task_progress import TaskProgress, emit_progress, entity_label
 from crate.worker_handlers import TaskHandler, is_cancelled
 
@@ -1267,11 +1276,16 @@ def _handle_compute_smart_mix_profile(task_id: str, params: dict, config: dict) 
     track_id = int(track["id"])
     path = str(track["path"])
     claim_token = params.get("claim_token")
+    # The model signals are stamped with when the file was read (SM3-D16).
+    read_at = datetime.now(UTC)
     capture = capture_smart_mix_source(track_id, path, claim_token=claim_token)
+    source_revision = capture.source_revision
+    signals = _stored_signals(track_id, source_revision)
+    beats = _smart_mix_beats(path, track_id, source_revision, signals, read_at)
     try:
         from crate.audio_analysis import analyze_mix_profile
 
-        draft = analyze_mix_profile(path)
+        draft = analyze_mix_profile(path, beats)
     except Exception as exc:
         record_smart_mix_failure(track_id, path, str(exc), claim_token=claim_token)
         log.warning("Smart Mix analysis failed for %s", path, exc_info=True)
@@ -1280,6 +1294,24 @@ def _handle_compute_smart_mix_profile(task_id: str, params: dict, config: dict) 
             "error": f"Smart Mix analysis failed: {exc}",
             "track_id": track_id,
         }
+
+    # Voice per phrase (SM3-D13); a voice failure leaves the draft as it was.
+    from crate.smart_mix.vocals import VoiceWindowBytes, add_vocal_presence
+
+    def keep_voice(windows: VoiceWindowBytes) -> None:
+        if _source_unchanged(path, source_revision, "voice windows"):
+            store_track_mix_voice(
+                track_id,
+                source_revision,
+                detector=windows.detector,
+                hop_ms=windows.hop_ms,
+                scores=windows.scores,
+                updated_at=read_at,
+            )
+
+    draft = add_vocal_presence(
+        draft, path, stored=_stored_voice(signals), keep=keep_voice
+    )
 
     try:
         outcome = publish_smart_mix_profile(capture, draft)
@@ -1309,6 +1341,122 @@ def _handle_compute_smart_mix_profile(task_id: str, params: dict, config: dict) 
         "outcome": str(outcome),
         "quality": str(draft.quality),
     }
+
+
+def _stored_signals(track_id: int, source_revision: str) -> TrackMixSignals | None:
+    """The model outputs stored for this file (SM3-D16), or None.
+
+    Signals of another source revision describe another audio and are never reused.
+    A failed lookup only costs running the models again.
+    """
+    try:
+        signals = get_track_mix_signals(track_id)
+    except Exception:
+        log.warning(
+            "Smart Mix could not read the stored signals of track %s; the models run "
+            "again",
+            track_id,
+            exc_info=True,
+        )
+        return None
+    if signals is None or signals.source_revision != source_revision:
+        return None
+    return signals
+
+
+def _source_unchanged(path: str, source_revision: str, signals: str) -> bool:
+    """Whether the file is still the one the task captured.
+
+    The models read the file after the capture; if it was replaced since, their
+    outputs may describe the new audio, so they are stored under neither revision.
+    """
+    if smart_mix_source_revision(path) == source_revision:
+        return True
+    log.warning(
+        "Smart Mix did not store the %s of %s: the file changed during the task",
+        signals,
+        path,
+    )
+    return False
+
+
+def _smart_mix_beats(
+    path: str,
+    track_id: int,
+    source_revision: str,
+    signals: TrackMixSignals | None,
+    read_at: datetime,
+):
+    """Beats and downbeats from Beat This! (SM3-D14), or None: without them the
+    analysis keeps its own beat tracker, so a model failure never fails the profile.
+
+    Beats stored for this file by the current tracker are reused without running the
+    model (SM3-D16); the model's beats are stored, stamped with ``read_at``, while the
+    file is still the captured one, and a failure to store them only logs. A track
+    the model gives no beats stores nothing.
+    """
+    from crate.smart_mix.beat_model import (
+        BeatTrack,
+        beat_tracker_name,
+        track_file_beats,
+    )
+
+    tracker = beat_tracker_name()
+    if signals is not None and signals.beat_tracker == tracker and signals.beats_ms:
+        return BeatTrack(
+            tracker=tracker,
+            beats_ms=signals.beats_ms,
+            downbeats_ms=signals.downbeats_ms or (),
+            beats_per_bar=signals.beats_per_bar,
+        )
+    try:
+        beats = track_file_beats(path)
+    except Exception:
+        log.warning(
+            "Beat This! failed for %s; the analysis keeps its own beat tracker",
+            path,
+            exc_info=True,
+        )
+        return None
+    if beats is None:
+        return None
+    if not _source_unchanged(path, source_revision, "Beat This! beats"):
+        return beats
+    try:
+        store_track_mix_beats(
+            track_id,
+            source_revision,
+            tracker=beats.tracker,
+            beats_ms=beats.beats_ms,
+            downbeats_ms=beats.downbeats_ms,
+            beats_per_bar=beats.beats_per_bar,
+            updated_at=read_at,
+        )
+    except Exception:
+        log.warning(
+            "Smart Mix could not store the Beat This! beats of %s; the profile goes on",
+            path,
+            exc_info=True,
+        )
+    return beats
+
+
+def _stored_voice(signals: TrackMixSignals | None):
+    """The voice windows stored for this file, whatever their detector, or None."""
+    from crate.smart_mix.vocals import VoiceWindowBytes
+
+    if (
+        signals is None
+        or signals.vocal_detector is None
+        or signals.voice_hop_ms is None
+        or signals.voice_scores is None
+    ):
+        return None
+    return VoiceWindowBytes(
+        detector=signals.vocal_detector,
+        hop_ms=signals.voice_hop_ms,
+        scores=signals.voice_scores,
+    )
 
 
 def _refresh_live_coverage() -> None:
@@ -1408,11 +1556,21 @@ def _handle_backfill_smart_mix_profiles(
 
 
 def _smart_mix_campaign_running(campaign: dict | None) -> TypeGuard[dict]:
-    return campaign is not None and campaign.get("status") == "running"
+    # A campaign of another analyzer or schema (left running across a deploy) never
+    # claims for this one; an operator starts a campaign for the current target.
+    return (
+        campaign is not None
+        and campaign.get("status") == "running"
+        and campaign_targets_current(campaign)
+    )
 
 
 def _campaign_control(campaign: dict | None) -> str:
-    return str(campaign.get("status")) if campaign else "idle"
+    if not campaign:
+        return "idle"
+    if not campaign_targets_current(campaign):
+        return "superseded"
+    return str(campaign.get("status"))
 
 
 def _handle_refresh_smart_mix_coverage(
