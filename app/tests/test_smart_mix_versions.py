@@ -103,6 +103,16 @@ def test_worker_binary_segments_with_harmony_and_timbre() -> None:
     )
 
 
+def test_worker_binary_floors_the_mfcc_deviation() -> None:
+    # The MFCC deviation floor kept the analyzer version too, so a binary built before
+    # it would keep splitting near-static loops on noise; its analyze help names it.
+    binary = (APP_ROOT / "bin/crate-cli-linux-amd64").read_bytes()
+
+    assert b"MFCC deviation floor" in binary, (
+        "rebuild app/bin/crate-cli-linux-amd64 with `make crate-cli-linux`"
+    )
+
+
 def test_rust_beat_grid_format_matches_python() -> None:
     source = (REPO_ROOT / "tools/crate-cli/src/mix_profile.rs").read_text()
 
