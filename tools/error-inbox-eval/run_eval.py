@@ -5,8 +5,10 @@ Standard library only; it never imports `crate` and never calls a model. It driv
 `python -m crate.error_inbox.evaluation_cli` inside the worker container through a
 command prefix (`--crate`, by default `docker exec -i crate-worker python`):
 
-    plan    dry run: the bound model, which reference issues have a stored digest,
-            how many calls an evaluation makes and their token bound. Sends nothing.
+    plan    dry run: the bound model, which reference issues have a stored digest
+            and which the task will read from Sentry because the inbox no longer
+            holds them, how many calls an evaluation makes and their token bound.
+            Sends nothing to the provider and makes no Sentry request.
     run     plan, then, only with --execute and a typed confirmation of the number of
             calls, queue one `evaluate_error_triage` task (ai_bulk lane), wait for it
             and write the report.
@@ -53,12 +55,19 @@ SHORT_ID = re.compile(r"[A-Z0-9][A-Z0-9_-]{0,62}-[A-Z0-9]+")
 CODE = re.compile(r"[A-Z][A-Z0-9_]{0,79}")
 MODEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}")
 SKIP_TEXT = {
-    "not_in_inbox": "not in the inbox",
+    "not_in_inbox": "not in the inbox and not read from Sentry",
     "no_digest": "no stored digest",
     "over_input_limit": "over the profile's input limit",
+    "not_found": "not found in Sentry (deleted)",
+    "merged": "merged into another Sentry issue",
+    "no_event": "no event left in Sentry",
+    "fetch_failed": "Sentry could not be read",
+    "fetch_budget": "Sentry read time budget used up",
     "not_queued": "not queued",
     "cancelled": "cancelled",
 }
+SOURCES = ("inbox", "sentry")
+OUTPUT_LIMIT_CODE = "AI_OUTPUT_LIMIT"
 
 Runner = Callable[[list[str], str], "subprocess.CompletedProcess[str]"]
 
@@ -182,12 +191,17 @@ def describe_plan(
     """What `run --execute` would send, as text. Nothing here has been sent."""
     items = plan.get("items") or []
     ready = [item for item in items if item.get("status") == "ready"]
+    fetched = [item for item in ready if item.get("source") == "sentry"]
     reasons = Counter(
         str(item.get("reason")) for item in items if item.get("status") == "skipped"
     )
     limits = plan.get("limits") or {}
     output_limit = limits.get("max_output_tokens") or ACTION_MAX_OUTPUT_TOKENS
-    input_bound = sum(int(item.get("estimated_input_tokens") or 0) for item in ready)
+    input_bound = plan.get("input_bound")
+    if not isinstance(input_bound, int):
+        input_bound = sum(
+            int(item.get("estimated_input_tokens") or 0) for item in ready
+        )
     profile = (
         f" (profile {plan.get('profile_id')} v{plan.get('profile_version')})"
         if plan.get("profile_id")
@@ -211,12 +225,31 @@ def describe_plan(
             f"{_tokens(limits.get('max_output_tokens'))}, timeout "
             f"{limits.get('timeout_seconds') or 'unknown'} s"
         )
+    lines += _limit_warnings(limits, plan.get("action_limits") or {})
+    sentry = plan.get("sentry") or {}
     lines += [
         f"Reference issues: {len(items)}",
         f"  ready, one call each: {len(ready)}",
+        f"    from the inbox: {len(ready) - len(fetched)}",
+        f"    read from Sentry by the task, kept in memory: {len(fetched)}",
     ]
     for reason, count in sorted(reasons.items()):
         lines.append(f"  skipped, {SKIP_TEXT.get(reason, reason)}: {count}")
+    if fetched:
+        requests = sentry.get("requests")
+        requests = requests if isinstance(requests, int) else len(fetched) * 3
+        lines.append(
+            f"Sentry: {requests} requests at most (resolve the short id, read "
+            "the issue and its latest event), paced and within "
+            f"{_seconds(sentry.get('budget_seconds'))}. An issue Sentry no longer "
+            "has, or whose events are gone, is skipped and costs nothing."
+        )
+    elif reasons.get("not_in_inbox"):
+        lines.append(
+            "Sentry is not connected "
+            f"({sentry.get('error_code') or 'unknown'}), so issues outside the inbox "
+            "are skipped."
+        )
     over = [item for item in items if item.get("reason") == "over_input_limit"]
     if over:
         needed = max(int(item.get("estimated_input_tokens") or 0) for item in over)
@@ -231,11 +264,21 @@ def describe_plan(
         "short breadcrumbs), its service, level, status, counts and releases, and up "
         "to ten duplicate candidates reduced to short id, status, main exception and "
         "innermost frame. Titles, culprits, links and the reference labels are not "
-        "sent. Nothing is saved to the inbox.",
+        "sent. Digests read from Sentry are built in the task's memory like the "
+        "sync's and never stored. Nothing is saved to the inbox.",
         "",
-        f"Calls: {len(ready)}. Input bound: {input_bound:,} tokens (Crate's "
-        "one-token-per-byte estimate; real counts are lower). Output: at most "
-        f"{len(ready) * output_limit:,} tokens.",
+        f"Calls: {len(ready)}"
+        + (" at most" if fetched else "")
+        + f". Input bound: {input_bound:,} tokens (Crate's one-token-per-byte "
+        "estimate; real counts are lower"
+        + (
+            "; an issue read from Sentry counts as the largest request, a 24 KB "
+            "digest and ten candidates"
+            if fetched
+            else ""
+        )
+        + "). Output: at most "
+        f"{len(ready) * output_limit:,} tokens, reasoning included.",
     ]
     model, rates = _price(prices, plan.get("model_id"))
     if rates is not None:
@@ -249,6 +292,45 @@ def describe_plan(
 
 def _tokens(value: Any) -> str:
     return f"{value:,} tokens" if isinstance(value, int) else "unknown"
+
+
+def _sentence(text: str) -> str:
+    """Upper-case the first letter only: `capitalize` would lower "Sentry"."""
+    return text[:1].upper() + text[1:]
+
+
+def _seconds(value: Any) -> str:
+    return f"{value:,.0f} s" if isinstance(value, (int, float)) else "a time budget"
+
+
+def _limit_warnings(limits: Mapping[str, Any], action: Mapping[str, Any]) -> list[str]:
+    """A bound profile made before the action's limits were raised keeps the old ones."""
+    lower = [
+        f"{name} {_unit(limits.get(key), key)} (the action allows "
+        f"{_unit(action.get(key), key)})"
+        for key, name in (
+            ("max_output_tokens", "output"),
+            ("timeout_seconds", "timeout"),
+        )
+        if isinstance(limits.get(key), int)
+        and isinstance(action.get(key), int)
+        and limits[key] < action[key]
+    ]
+    if not lower:
+        return []
+    return [
+        "Warning: the bound profile's limits are below the action's: "
+        + ", ".join(lower)
+        + ". Answers that reason longer are cut off (AI_OUTPUT_LIMIT). Use the same "
+        "model again for Triage error issue in AI models to raise them, then plan "
+        "again."
+    ]
+
+
+def _unit(value: Any, key: str) -> str:
+    if not isinstance(value, int):
+        return "unknown"
+    return f"{value} s" if key == "timeout_seconds" else f"{value:,} tokens"
 
 
 def confirm(
@@ -339,10 +421,12 @@ def _rows(labels: Mapping[str, Mapping], result: Mapping[str, Any]) -> list[dict
         prediction = _prediction(item) if item and status == "ok" else None
         if status == "ok" and prediction is None:
             status = "invalid_output"
+        source = (item or {}).get("source")
         rows.append(
             {
                 "short_id": short_id,
                 "group": label.get("group"),
+                "source": source if source in SOURCES else None,
                 "reference": {
                     "classification": label["classification"],
                     "severity": label["severity"],
@@ -545,6 +629,7 @@ def score_run(
     failures = Counter(
         row["error_code"] or "unknown" for row in rows if row["status"] == "failed"
     )
+    cut_off = [r["short_id"] for r in rows if r["error_code"] == OUTPUT_LIMIT_CODE]
     return {
         "task_id": record.get("task_id"),
         "task_status": record.get("status"),
@@ -559,8 +644,19 @@ def score_run(
         }
         | {"limits": model.get("limits") or {}},
         "counts": {"reference": len(rows), **{s: statuses.get(s, 0) for s in STATUSES}},
+        "sources": {
+            source: sum(
+                r["source"] == source and r["status"] not in {"skipped", "not_run"}
+                for r in rows
+            )
+            for source in SOURCES
+        },
         "skipped": [
-            {"short_id": r["short_id"], "reason": r["reason"]}
+            {
+                "short_id": r["short_id"],
+                "reason": r["reason"],
+                **({"error_code": r["error_code"]} if r["error_code"] else {}),
+            }
             for r in rows
             if r["status"] in {"skipped", "not_run"}
         ],
@@ -585,6 +681,8 @@ def score_run(
             "by_code": dict(sorted(failures.items())),
             "short_ids": [r["short_id"] for r in rows if r["status"] == "failed"],
         },
+        # Answers the profile's output limit cut off, reasoning included.
+        "output_limit": {"count": len(cut_off), "short_ids": cut_off},
         "usage": _usage(list(record.get("invocations") or []), model, prices or {}),
         "eg2": {
             "classification_threshold": EG2_CLASSIFICATION,
@@ -680,6 +778,7 @@ def _summary_row(run: Mapping[str, Any]) -> list[Any]:
         run["high_as_noise"]["count"],
         run["false_critical"]["count"],
         run["invalid_outputs"]["count"],
+        (run.get("output_limit") or {}).get("count", 0),
         f"{duplicates['agreed']}/{duplicates['labelled']}",
         f"{tokens_in:,} / {tokens_out:,}",
         _cost_text(usage),
@@ -727,15 +826,23 @@ def _run_section(run: Mapping[str, Any]) -> list[str]:
             ]
         ],
     )
+    sources = run.get("sources") or {}
+    if sources.get("sentry"):
+        lines += [
+            "",
+            f"Sent from the inbox: {sources.get('inbox', 0)}; read from Sentry and "
+            f"built in memory: {sources['sentry']}.",
+        ]
     if run["skipped"]:
         by_reason: dict[str, list[str]] = defaultdict(list)
         for item in run["skipped"]:
-            by_reason[item["reason"]].append(item["short_id"])
+            code = item.get("error_code")
+            by_reason[item["reason"]].append(
+                item["short_id"] + (f" ({code})" if code else "")
+            )
         lines.append("")
         for reason, ids in sorted(by_reason.items()):
-            lines.append(
-                f"- {SKIP_TEXT.get(reason, reason).capitalize()}: {_ids(ids)}."
-            )
+            lines.append(f"- {_sentence(SKIP_TEXT.get(reason, reason))}: {_ids(ids)}.")
     lines.append("")
     lines += _confusion("Classification", run["classification"], CLASSIFICATIONS)
     lines += _confusion("Severity", run["severity"], SEVERITIES)
@@ -778,11 +885,20 @@ def _run_section(run: Mapping[str, Any]) -> list[str]:
         "",
     ]
     failures = run["failures"]
+    cut_off = run.get("output_limit") or {"count": 0, "short_ids": []}
     lines += [
         "### Invalid outputs and failures",
         "",
         f"- Invalid outputs: {run['invalid_outputs']['count']} "
         f"({_ids(run['invalid_outputs']['short_ids'])}).",
+        f"- Answers cut off at the profile's output limit (`{OUTPUT_LIMIT_CODE}`, "
+        f"reasoning included): {cut_off['count']} ({_ids(cut_off['short_ids'])})."
+        + (
+            f" The profile allows {_tokens(limits.get('max_output_tokens'))}; raise "
+            "it before comparing models."
+            if cut_off["count"]
+            else ""
+        ),
         f"- Failed calls: {failures['count']}"
         + (
             " ("
@@ -886,9 +1002,11 @@ def render_report(document: Mapping[str, Any]) -> str:
     lines = [
         f"# AI error triage evaluation: {document['date']}",
         "",
-        "Error Inbox gate EG2. Each reference issue's stored digest was triaged with "
-        "`ops.error.triage` by the model below, through `evaluate_error_triage` on the "
-        "`ai_bulk` lane; nothing was saved to the inbox. Reference: "
+        "Error Inbox gate EG2. Each reference issue's digest, stored in the inbox or, "
+        "when the inbox no longer holds it, built in memory from its latest Sentry "
+        "event, was triaged with `ops.error.triage` by the model below, through "
+        "`evaluate_error_triage` on the `ai_bulk` lane; nothing was saved to the "
+        "inbox. Reference: "
         f"{reference['labels']} labelled issues from phase E0 "
         f"(`{reference['path']}`, version {reference['version']}). This report holds "
         "labels, short ids, counts and token figures only: no event text, file names "
@@ -908,6 +1026,7 @@ def render_report(document: Mapping[str, Any]) -> str:
             "High as noise",
             "False critical",
             "Invalid outputs",
+            "Cut off",
             "Duplicates",
             "Tokens in / out",
             "Cost",
@@ -1025,7 +1144,15 @@ def _progress_text(record: Mapping[str, Any]) -> str:
         # A plain note, such as the AI lane's "Waiting for AI provider capacity".
         return f"{record.get('status')}: {str(raw)[:120]}"
     if isinstance(progress, dict) and progress.get("total"):
-        return f"{record.get('status')}: {progress.get('done')}/{progress.get('total')}"
+        phase = (
+            "reading from Sentry "
+            if progress.get("phase") == "fetch_references"
+            else ""
+        )
+        return (
+            f"{record.get('status')}: {phase}"
+            f"{progress.get('done')}/{progress.get('total')}"
+        )
     return f"{record.get('status')}"
 
 
@@ -1049,7 +1176,7 @@ def command_run(
         )
     ready = [item["short_id"] for item in plan["items"] if item["status"] == "ready"]
     if not ready:
-        raise EvalError("No reference issue has a stored digest; nothing to evaluate")
+        raise EvalError("No reference issue can be evaluated; nothing to evaluate")
     if not args.execute:
         raise EvalError(
             f"Dry run only. Add --execute to send these {len(ready)} calls."
@@ -1115,7 +1242,8 @@ def _write(args, reference, records, echo) -> int:
             f"{_model_name(run)}: classification {_pct(run['classification']['rate'])}, "
             f"severity {_pct(run['severity']['rate'])}, critical as noise "
             f"{run['critical_as_noise']['count']}, invalid outputs "
-            f"{run['invalid_outputs']['count']}"
+            f"{run['invalid_outputs']['count']}, cut off at the output limit "
+            f"{run['output_limit']['count']}"
         )
     echo(f"Wrote {md} and {js}")
     return 0
