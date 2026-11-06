@@ -418,6 +418,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 scope="local",
                 limit=20,
                 planner_version=PLANNER_IDENTIFIER,
+                # Called directly, not through FastAPI: every Query default must
+                # be passed, or the handler receives the Query object itself.
+                # TEST_GAP: run() needs a seeded database; running the benchmark
+                # exercises this call.
+                context="auto",
             ),
             warmup=args.warmup,
             iterations=args.iterations,
