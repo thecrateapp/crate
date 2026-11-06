@@ -174,7 +174,8 @@ def _upsert(
         where=or_(same_source, read_later),
     )
     with optional_scope(session) as current:
-        stored = current.execute(statement).rowcount
+        result = current.execute(statement)
+        stored = int(getattr(result, "rowcount", 0) or 0)
     if not stored:
         log.info(
             "Track %s: not storing the %s of source revision %s; the stored signals "
