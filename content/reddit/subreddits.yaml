@@ -1,0 +1,114 @@
+# Target subreddits and their rules.
+#
+# Rules are copied BY HAND by Diego from each subreddit's sidebar and wiki, with the date of the review. Reddit's
+# public API stopped accepting new apps on 2026-10-31 and RSS stops on 2026-11-13, so nothing here is fetched
+# automatically, and agents must not invent rules.
+#
+# status: pending_review  -> no rules recorded yet; the pipeline never drafts posts for this subreddit.
+# status: reviewed        -> rules[] and reviewed_on are required; re-review every quarter.
+#
+# self_promotion.allowed: yes | no | conditional | unknown
+# piracy_discussion: allowed | forbidden | unknown
+# links_to_blog: yes | no | conditional | unknown
+
+subreddits:
+  - name: r/cratemusic
+    audiences: [all]
+    status: pending_review
+    reviewed_on: null
+    rules: []
+    self_promotion:
+      { allowed: yes, conditions: "Our own subreddit, created in M0.3." }
+    piracy_discussion: unknown
+    links_to_blog: yes
+    notes: "Release posts, changelogs and support. Diego writes the rules."
+  - name: r/selfhosted
+    audiences: [self-hosters]
+    status: pending_review
+    reviewed_on: null
+    rules: []
+    self_promotion: { allowed: unknown, conditions: "" }
+    piracy_discussion: unknown
+    links_to_blog: unknown
+    notes: "Main audience. Check the current self-promotion and new-project rules before any post."
+  - name: r/homelab
+    audiences: [self-hosters]
+    status: pending_review
+    reviewed_on: null
+    rules: []
+    self_promotion: { allowed: unknown, conditions: "" }
+    piracy_discussion: unknown
+    links_to_blog: unknown
+    notes: "Stack map and resource use fit here better than music features."
+  - name: r/musichoarder
+    audiences: [collectors]
+    status: pending_review
+    reviewed_on: null
+    rules: []
+    self_promotion: { allowed: unknown, conditions: "" }
+    piracy_discussion: unknown
+    links_to_blog: unknown
+    notes: "Library health, enrichment and tagging."
+  - name: r/DataHoarder
+    audiences: [collectors]
+    status: pending_review
+    reviewed_on: null
+    rules: []
+    self_promotion: { allowed: unknown, conditions: "" }
+    piracy_discussion: unknown
+    links_to_blog: unknown
+    notes: "Large libraries, lossless, storage."
+  - name: r/Beatmatch
+    audiences: [DJs]
+    status: pending_review
+    reviewed_on: null
+    rules: []
+    self_promotion: { allowed: unknown, conditions: "" }
+    piracy_discussion: unknown
+    links_to_blog: unknown
+    notes: "Teach-first posts about how Smart Mix decides transitions."
+  - name: r/DJs
+    audiences: [DJs]
+    status: pending_review
+    reviewed_on: null
+    rules: []
+    self_promotion: { allowed: unknown, conditions: "" }
+    piracy_discussion: unknown
+    links_to_blog: unknown
+    notes: "Crate Decks once it has a release."
+  - name: r/Mixxx
+    audiences: [DJs]
+    status: pending_review
+    reviewed_on: null
+    rules: []
+    self_promotion: { allowed: unknown, conditions: "" }
+    piracy_discussion: unknown
+    links_to_blog: unknown
+    notes: "Crate Decks is based on Mixxx: credit the project, never position it as a replacement."
+  - name: r/opensource
+    audiences: [engineers]
+    status: pending_review
+    reviewed_on: null
+    rules: []
+    self_promotion: { allowed: unknown, conditions: "" }
+    piracy_discussion: unknown
+    links_to_blog: unknown
+    notes: "AGPL project announcements."
+  - name: r/rust
+    audiences: [engineers]
+    status: pending_review
+    reviewed_on: null
+    rules: []
+    self_promotion: { allowed: unknown, conditions: "" }
+    piracy_discussion: unknown
+    links_to_blog: unknown
+    notes: "Only Rust-specific engineering posts (crate-cli, media worker)."
+  - name: r/golang
+    audiences: [engineers]
+    status: pending_review
+    reviewed_on: null
+    rules: []
+    self_promotion: { allowed: unknown, conditions: "" }
+    piracy_discussion: unknown
+    links_to_blog: unknown
+    notes: "Only Go-specific engineering posts (read plane)."
