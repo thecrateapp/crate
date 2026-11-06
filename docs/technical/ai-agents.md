@@ -5,7 +5,7 @@ section: operations
 audience: [developer, operator]
 status: canonical
 order: 95
-verified: 2026-11-05
+verified: 2026-11-06
 sources:
   - app/crate/ai/actions.py
   - app/crate/ai/capabilities.py
@@ -28,6 +28,9 @@ sources:
   - app/crate/llm/prompts/error_triage.py
   - app/crate/llm/prompts/error_investigate.py
   - app/crate/db/migrations/versions/145_ai_action_error_inbox.py
+  - app/crate/db/migrations/versions/147_ai_openai_compatible.py
+  - app/crate/ai/contracts.py
+  - app/ui/src/components/ai-models/OpenAICompatibleFields.tsx
   - app/ui/src/components/ai-models/FeatureModelSheet.tsx
   - app/crate/credentials.py
   - app/crate/api/ai_agents.py
@@ -104,11 +107,12 @@ on the Actions view cover the recent metadata page, rather than the whole histor
 
 ## Providers and native controls
 
-| Provider | Model validation                                                                                                                    | Reasoning and image controls                                                                                                                                                                                                         |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Gemini   | Explicit catalog plus a reviewed finite manifest: `gemini-3.8-flash`, `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-2.5-flash-lite` | 3.8 Flash: `low`, `medium`, `high`; no `minimal`. Gemini 2.5 uses native thinking budgets within each model's range. Disable is offered only where supported. Image detail is model specific; `ultra_high` is exposed for 3.8 Flash. |
-| DeepSeek | Provider metadata must establish text input/output, structured output and token/context limits; bare model IDs remain pending       | Native `thinking` enabled/disabled and `reasoning_effort` levels only when established by catalog metadata. No guessed aliases or image support.                                                                                     |
-| Ollama   | `/api/tags` followed by bounded `/api/show` inspection establishes completion/vision and context metadata                           | Exact `/api/show` `thinking.values` establishes boolean controls or named levels. A generic thinking capability or model name cannot establish them.                                                                                 |
+| Provider          | Model validation                                                                                                                                                                     | Reasoning and image controls                                                                                                                                                                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gemini            | Explicit catalog plus a reviewed finite manifest: `gemini-3.8-flash`, `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-2.5-flash-lite`                                                  | 3.8 Flash: `low`, `medium`, `high`; no `minimal`. Gemini 2.5 uses native thinking budgets within each model's range. Disable is offered only where supported. Image detail is model specific; `ultra_high` is exposed for 3.8 Flash.                                   |
+| DeepSeek          | Provider metadata must establish text input/output, structured output and token/context limits; bare model IDs remain pending                                                        | Native `thinking` enabled/disabled and `reasoning_effort` levels only when established by catalog metadata. No guessed aliases or image support.                                                                                                                       |
+| Ollama            | `/api/tags` followed by bounded `/api/show` inspection establishes completion/vision and context metadata                                                                            | Exact `/api/show` `thinking.values` establishes boolean controls or named levels. A generic thinking capability or model name cannot establish them.                                                                                                                   |
+| OpenAI-compatible | The admin's model manifest declares context, maximum output, `json_schema` or `json_object` output and the native reasoning control; `/models` only confirms each ID is still listed | The one control the manifest declares, if its origin template accepts it: `thinking` or `reasoning_effort` (Moonshot), `enable_thinking` (DashScope), `reasoning` (OpenRouter), and `thinking`, `enable_thinking` or `reasoning_effort` on a custom server. Text only. |
 
 `provider_default`, `enabled`, `disabled`, `level` and `budget` are distinct modes.
 Only advertised modes are accepted. Changing models requires a new review of native
@@ -125,6 +129,35 @@ transport retries and provider fallback are disabled. Discovery has a 30 second 
 budget, at most 500 catalog rows and 100 Ollama inspections; an uninspected model
 remains pending. Failed refreshes keep the last good catalog and expose a safe error.
 Catalog compatibility is distinct from live connectivity or available credit.
+
+### OpenAI-compatible connections
+
+An `openai_compatible` connection serves Kimi, Qwen in the cloud, OpenRouter and
+self-hosted vLLM or LM Studio servers (SM3-D7). It is configured in Admin only:
+it has no environment connection and its key is always stored encrypted.
+
+| Origin template  | Requests go to                                                    | Key      |
+| ---------------- | ----------------------------------------------------------------- | -------- |
+| `moonshot`       | `https://api.moonshot.ai/v1`                                      | Required |
+| `dashscope_intl` | `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`          | Required |
+| `openrouter`     | `https://openrouter.ai/api/v1`                                    | Required |
+| `custom`         | The admin's origin plus `/v1`, `/compatible-mode/v1` or `/api/v1` | Optional |
+
+- A predefined template fixes its origin and prefix; the API and a database CHECK
+  reject any other. A custom origin follows the Ollama rules, needs HTTPS unless
+  every resolved address is private, and needs the admin's confirmation each time
+  it is set or moved. The AWS IPv6 metadata address is blocked as well.
+- Requests are `GET <prefix>/models` (catalog refresh) and
+  `POST <prefix>/chat/completions` (inference) only, with the same 2 MB response
+  cap, killable child process and no redirects, retries or fallback.
+- The manifest holds at most 50 models. A model is validated while `/models` still
+  lists its ID; a retired ID turns pending at the next refresh. A new manifest or
+  origin drops the cached catalog and makes accepted contexts stale. Models cannot
+  be added one by one.
+- Inference sends `max_tokens` and the declared `response_format`: `json_schema`
+  with the schema, or `json_object` with the schema in the system prompt. Usage
+  splits reasoning tokens from output and reads cached input from
+  `prompt_tokens_details` or Moonshot's top-level `cached_tokens`.
 
 ## Migration and execution identity
 
@@ -490,6 +523,7 @@ An empty or malformed value blocks storage instead of falling back to JWT-derive
 encryption. Keys are write-only in Admin, stored in the existing scoped vault, and
 never returned in snapshots, catalog responses, jobs or audit metadata. Environment
 connections expose metadata separately and do not make their keys editable in Admin.
+OpenAI-compatible keys are only ever stored this way; no environment variable feeds them.
 
 Generate a key with the installed backend environment, store it in your secret
 manager, and provide the same value to API and all inference workers:
