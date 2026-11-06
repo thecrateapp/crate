@@ -332,7 +332,7 @@ def get_smart_mix_plan_and_refinement_caches(
     missing_refinements: list[str] = []
     for refinement_key in dict.fromkeys(refinement_keys):
         value = _mem_get(f"{SMART_MIX_REFINED_PLAN_CACHE_PREFIX}{refinement_key}")
-        if _finished_refinement(value):
+        if isinstance(value, dict) and _finished_refinement(value):
             refinements[refinement_key] = value
         else:
             missing_refinements.append(refinement_key)

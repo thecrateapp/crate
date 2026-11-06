@@ -21,7 +21,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 from crate.ai.consumers import accept_action
 from crate.ai.contracts import AIConfigurationError
@@ -59,6 +59,8 @@ SEND_GENRE_SETTING = "smart_mix_ai_send_genre"
 LOCAL_PROVIDERS = frozenset({"ollama"})
 _MIN_BUDGET_MARKER_SECONDS = 60
 
+GateReason = Literal["disabled", "no_model", "budget"]
+
 
 def refinement_gate() -> dict[str, Any]:
     """The server switches of AI refinement, from the cache when it has them."""
@@ -92,7 +94,7 @@ def read_refinement_gate() -> dict[str, Any]:
     }
 
 
-def gate_reason(gate: Mapping[str, Any]) -> str | None:
+def gate_reason(gate: Mapping[str, Any]) -> GateReason | None:
     """Why the gate refuses refinements, as a closed reason code, or None."""
     if not gate.get("enabled"):
         return "disabled"
@@ -118,7 +120,7 @@ def mark_budget_exhausted(fingerprint: str, *, now: datetime | None = None) -> N
     invalidate_refinement_gate()
 
 
-def provider_kind(provider: str | None) -> str:
+def provider_kind(provider: str | None) -> Literal["local", "cloud"]:
     return "local" if provider in LOCAL_PROVIDERS else "cloud"
 
 

@@ -59,13 +59,20 @@ REJECTION_CODES: frozenset[str] = frozenset(RejectionCode.__args__)  # type: ign
 class RefinementChoice(Protocol):
     """The fields of a model answer the validation reads (see the prompt module)."""
 
-    candidate_index: int
-    outgoing_phrase_shift: int
-    incoming_phrase_shift: int
-    length_step: int
-    bass_handoff: str
-    reason: str
-    confidence: float
+    @property
+    def candidate_index(self) -> int: ...
+    @property
+    def outgoing_phrase_shift(self) -> int: ...
+    @property
+    def incoming_phrase_shift(self) -> int: ...
+    @property
+    def length_step(self) -> int: ...
+    @property
+    def bass_handoff(self) -> str: ...
+    @property
+    def reason(self) -> str: ...
+    @property
+    def confidence(self) -> float: ...
 
 
 @dataclass(frozen=True, slots=True)

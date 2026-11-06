@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import text
+from sqlalchemy.engine import CursorResult
 
 from crate.db.tx import optional_scope, read_scope
 
@@ -164,7 +165,7 @@ def touch(keys: Sequence[str], *, session=None) -> int:
             ),
             {"keys": unique},
         )
-        return int(result.rowcount or 0)
+        return int(cast(CursorResult, result).rowcount or 0)
 
 
 def invalidate_for_tracks(entity_uids: Sequence[str], *, session=None) -> int:
@@ -212,7 +213,7 @@ def invalidate_for_tracks(entity_uids: Sequence[str], *, session=None) -> int:
             ),
             {"uids": uids},
         )
-        return int(result.rowcount or 0)
+        return int(cast(CursorResult, result).rowcount or 0)
 
 
 def cleanup_unread_refinements(
@@ -234,7 +235,7 @@ def cleanup_unread_refinements(
             ),
             {"days": int(older_than_days), "limit": int(limit)},
         )
-        return int(result.rowcount or 0)
+        return int(cast(CursorResult, result).rowcount or 0)
 
 
 def refinement_latency_p50_ms(*, hours: int = 24, session=None) -> int | None:
