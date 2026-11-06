@@ -568,8 +568,8 @@ resolved. A coordinating task in `done` does not mean all of its children have f
 ### Running the v7 backfill (Smart Mix 3)
 
 Production holds a `cancelled` campaign with `target` `smart-mix-audio-v6`. After the release
-with v7 and migration 147 is deployed through the normal process, recompute the library like
-this. The queues do not change: the coordinator and each analysis run on `heavy`.
+with v7 and migrations 147 to 150 is deployed through the normal process, recompute the library
+like this. The queues do not change: the coordinator and each analysis run on `heavy`.
 
 1. **Check the starting point.** Open Admin, Analysis, Smart Mix, or call
    `GET /api/admin/smart-mix/status` with an account that has `library.analysis.manage`.
