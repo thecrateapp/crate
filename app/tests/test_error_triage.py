@@ -10,6 +10,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import httpx
 import pytest
 from sqlalchemy import text
 
@@ -22,6 +23,7 @@ from crate.llm.prompts.error_triage import (
     UNTRUSTED_DATA_CLAUSE,
     UNTRUSTED_OPEN,
 )
+from tests.error_inbox_fakes import FakeSentry, configure, configure_ai, tag_detail
 
 NOW = datetime(2026, 11, 4, 12, 0, tzinfo=timezone.utc)
 TRIAGE = "ops.error.triage"
@@ -34,45 +36,9 @@ def _scope():
     return transaction_scope()
 
 
-def _configure(monkeypatch, actions=(TRIAGE, INVESTIGATE)) -> None:
+def _configure(monkeypatch, actions=(TRIAGE, INVESTIGATE), **options) -> None:
     """An active configuration with the given actions bound to one Gemini profile."""
-    from crate.ai import configuration
-    from crate.ai.capabilities import model_capabilities
-    from crate.db.repositories import ai_configuration as store
-
-    monkeypatch.setenv("GEMINI_API_KEY", "synthetic-key")
-    connection = configuration.ensure_environment_connection("gemini")
-    store.save_model_catalog(
-        connection["id"],
-        [model_capabilities("gemini", "gemini-2.5-flash").model_dump(mode="json")],
-        "ready",
-        1,
-    )
-    profile = configuration.create_profile(
-        {
-            "label": "Errors",
-            "connection_id": connection["id"],
-            "model_id": "gemini-2.5-flash",
-            "config": {"max_input_tokens": 65536},
-        },
-        None,
-    )
-    if actions:
-        configuration.apply_bindings(
-            [
-                {
-                    "action_id": action_id,
-                    "profile_id": profile["id"],
-                    "profile_version": 1,
-                    "enabled": True,
-                    "expected_revision": 0,
-                }
-                for action_id in actions
-            ],
-            None,
-        )
-    with _scope() as session:
-        session.execute(text("UPDATE ai_configuration_state SET active = TRUE"))
+    configure_ai(monkeypatch, actions, **options)
 
 
 def _model(monkeypatch, *outputs: Any) -> list[dict[str, Any]]:
@@ -588,3 +554,277 @@ def test_candidates_are_reduced_before_they_reach_the_prompt():
     assert candidate_ids([candidate, {**candidate}, {"short_id": None}]) == [
         "CRATE-API-2"
     ]
+
+
+# -- tasks: triage_error_issue and investigate_error_issue (E2.PR2) -------------
+
+
+def _operator() -> int:
+    from crate.db.repositories.auth_user_accounts import create_user
+
+    return int(create_user("errors-operator@example.test", role="ops")["id"])
+
+
+ACCEPT = object()
+
+
+def _run(
+    kind: str,
+    issue_id: str,
+    *,
+    task_id: str = "task-1",
+    origin: str | None = None,
+    actor_id: int | None = None,
+    acceptance: Any = ACCEPT,
+    sentry: FakeSentry | None = None,
+) -> dict[str, Any]:
+    """Run the task body the handler runs, with the real structured executor."""
+    from crate.ai.consumers import accept_action
+    from crate.worker_handlers.error_inbox import run_triage_task
+
+    action = INVESTIGATE if kind == "investigation" else TRIAGE
+    params: dict[str, Any] = {
+        "issue_id": issue_id,
+        "ai_acceptance": accept_action(action) if acceptance is ACCEPT else acceptance,
+        "actor_user_id": actor_id,
+    }
+    if origin is not None:
+        params["origin"] = origin
+    return run_triage_task(
+        task_id,
+        params,
+        kind=kind,
+        execute=runtime.execute_structured,
+        sentry_factory=sentry.factory if sentry is not None else None,
+    )
+
+
+def _fenced(prompt: str) -> dict[str, Any]:
+    opened = prompt.index(UNTRUSTED_OPEN) + len(UNTRUSTED_OPEN)
+    return json.loads(prompt[opened : prompt.index(UNTRUSTED_CLOSE)])
+
+
+def test_handlers_name_the_executor_and_run_on_the_ai_lane():
+    from crate.actors import TASK_POOL_CONFIG
+    from crate.worker import TASK_HANDLERS
+    from crate.worker_handlers import error_inbox
+
+    assert TASK_POOL_CONFIG["triage_error_issue"] == ("ai", 1, 120, 0)
+    assert TASK_POOL_CONFIG["investigate_error_issue"] == ("ai", 0, 180, 0)
+    assert TASK_HANDLERS["triage_error_issue"] is (
+        error_inbox._handle_triage_error_issue
+    )
+    assert TASK_HANDLERS["investigate_error_issue"] is (
+        error_inbox._handle_investigate_error_issue
+    )
+
+
+def test_triage_task_saves_once_per_digest(issues, monkeypatch):
+    calls = _model(monkeypatch, _output())
+    target = issues["target"]
+
+    saved = _run("triage", target, origin="automatic")
+    again = _run("triage", target, task_id="task-2", origin="automatic")
+
+    assert saved["status"] == "saved" and saved["triage_id"]
+    assert (saved["kind"], saved["issue_id"]) == ("triage", target)
+    assert again["status"] == "existing"
+    assert len(calls) == 1
+    [invocation] = _invocations()
+    assert invocation["idempotency_key"] == (
+        f"action:None:{target}:triage:{saved['digest_hash']}"
+    )
+
+
+def test_failed_automatic_triage_is_retried_only_by_a_person(issues, monkeypatch):
+    calls = _model(monkeypatch, _output(classification="catastrophic"), _output())
+    target = issues["target"]
+
+    failed = _run("triage", target, origin="automatic")
+    replay = _run("triage", target, task_id="task-2", origin="automatic")
+
+    assert failed["status"] == "failed"
+    assert failed["error_code"] == "AI_RESPONSE_INVALID"
+    assert failed["expected"] is True
+    assert "nothing was saved" in failed["error"]
+    # Automatic triage sends a digest once: the replay pays nothing.
+    assert replay["error_code"] == "AI_EXECUTION_ALREADY_ACCEPTED"
+    assert len(calls) == 1
+
+    # A person's Triage backlog (or Investigate) is a new attempt of its own.
+    operator = _operator()
+    retried = _run(
+        "triage", target, task_id="task-3", origin="backlog", actor_id=operator
+    )
+
+    assert retried["status"] == "saved"
+    assert len(calls) == 2
+    digest = failed["digest_hash"]
+    assert [row["idempotency_key"] for row in _invocations()] == [
+        f"action:None:{target}:triage:{digest}",
+        f"action:{operator}:{target}:triage:{digest}:task-3",
+    ]
+    # Saved now: another press finds it without a call.
+    assert (
+        _run("triage", target, task_id="task-4", origin="backlog", actor_id=operator)[
+            "status"
+        ]
+        == "existing"
+    )
+    assert len(calls) == 2
+
+
+def test_investigation_reads_events_per_release_and_tags_from_sentry(
+    issues, monkeypatch
+):
+    configure()
+    fake = FakeSentry()
+    fake.tags["1"] = {
+        "release": tag_detail("release", ("crate-b", 30), ("crate-a", 2)),
+        "service": tag_detail("service", ("api", 32)),
+    }
+    calls = _model(monkeypatch, _output())
+    operator = _operator()
+
+    result = _run("investigation", issues["target"], actor_id=operator, sentry=fake)
+
+    assert result["status"] == "saved"
+    assert result["evidence"] == {
+        "status": "complete",
+        "error_code": None,
+        "keys": ["release", "service"],
+    }
+    # Documented, organization-scoped reads, filtered to the configured environment.
+    assert fake.paths() == [
+        "/api/0/organizations/ninja-development/issues/1/tags/release/",
+        "/api/0/organizations/ninja-development/issues/1/tags/service/",
+    ]
+    assert all(
+        request.url.params.get_list("environment") == ["production"]
+        for request in fake.requests
+    )
+    [call] = calls
+    assert call["action_id"] == INVESTIGATE
+    data = _fenced(call["prompt"])
+    assert [row["release"] for row in data["events_by_release"]] == [
+        "crate-b",
+        "crate-a",
+    ]
+    assert data["tag_distribution"]["service"]["top"] == [
+        {"value": "api", "events": 32}
+    ]
+    for private in ("Title-only text", "culprit-only text", "sentry.io/issues"):
+        assert private not in call["prompt"] + call["system"]
+    [row] = [
+        row for row in _triages(issues["target"]) if row["kind"] == "investigation"
+    ]
+    assert row["hypothesis"] and row["next_step"]
+
+
+def test_investigation_runs_on_the_digest_when_sentry_cannot_answer(
+    issues, monkeypatch
+):
+    calls = _model(monkeypatch, _output(), _output())
+    operator = _operator()
+
+    alone = _run("investigation", issues["target"], actor_id=operator)
+
+    assert alone["status"] == "saved"
+    assert alone["evidence"] == {
+        "status": "skipped",
+        "error_code": "ERROR_TRACKING_NOT_CONFIGURED",
+        "keys": [],
+    }
+    data = _fenced(calls[0]["prompt"])
+    assert data["events_by_release"] is None and data["tag_distribution"] is None
+
+    configure()
+    down = FakeSentry()
+    down.fail = lambda request: httpx.Response(502)
+    degraded = _run("investigation", issues["group"], actor_id=operator, sentry=down)
+
+    assert degraded["status"] == "saved"
+    assert (degraded["evidence"]["status"], degraded["evidence"]["error_code"]) == (
+        "unavailable",
+        "SENTRY_SERVER",
+    )
+
+
+def test_input_too_large_says_which_limit_to_raise(pg_db, monkeypatch):
+    _configure(monkeypatch, max_input_tokens=4096)
+    target = _issue(1, _event())
+    calls = _model(monkeypatch, _output())
+
+    result = _run("triage", target, origin="automatic")
+
+    assert result["status"] == "failed"
+    assert result["error_code"] == "AI_INPUT_TOO_LARGE"
+    assert result["input_limit"] == 4096
+    assert result["input_tokens"] > 4096
+    assert f"{result['input_tokens']:,}" in result["error"]
+    assert "4,096" in result["error"]
+    assert "Raise its input limit in AI models" in result["error"]
+    # The task event carries the first 200 characters of the message.
+    assert len(result["error"]) <= 200
+    # Refused before anything was reserved or sent: the digest's key is not spent.
+    assert calls == [] and _invocations() == [] and _triages(target) == []
+
+
+def test_input_estimate_is_the_runtime_bound():
+    schema = {"type": "object"}
+
+    assert runtime.estimated_input_tokens("prompt é", "system", schema) == (
+        len("prompt é".encode()) + len("system") + len('{"type": "object"}') + 1024
+    )
+
+
+def test_missing_or_stale_acceptance_fails_closed(issues, monkeypatch):
+    from crate.worker_handlers.error_inbox import run_triage_task
+
+    calls = _model(monkeypatch, _output())
+    target = issues["target"]
+
+    stale = _run("triage", target, origin="automatic", acceptance=None)
+    assert (stale["status"], stale["error_code"]) == ("failed", "AI_CONTEXT_STALE")
+    assert "configuration changed" in stale["error"]
+
+    # A person's request names the person; automatic triage names nobody.
+    for params in (
+        {"issue_id": target, "origin": "backlog", "actor_user_id": None},
+        {"issue_id": target, "origin": "automatic", "actor_user_id": 1},
+        {"issue_id": target, "origin": "elsewhere", "actor_user_id": None},
+        {"issue_id": 7, "origin": "automatic", "actor_user_id": None},
+    ):
+        invalid = run_triage_task(
+            "task-x", params, kind="triage", execute=runtime.execute_structured
+        )
+        assert invalid["error_code"] == "ERROR_TRIAGE_INVALID_REQUEST"
+    assert calls == [] and _invocations() == []
+
+
+def test_purged_issue_is_skipped(pg_db, monkeypatch):
+    _configure(monkeypatch)
+    calls = _model(monkeypatch, _output())
+
+    result = _run("triage", "00000000-0000-4000-8000-000000000000", origin="automatic")
+
+    assert (result["status"], result["reason"]) == ("skipped", "not_found")
+    assert calls == []
+
+
+def test_capacity_deferral_reaches_the_actor(monkeypatch):
+    from crate.ai.requeue import AIConcurrencyDeferred
+    from crate.worker_handlers import error_inbox
+
+    def busy(*args, **kwargs):
+        raise AIConcurrencyDeferred(1)
+
+    monkeypatch.setattr(error_inbox, "resume_action", lambda *a, **k: {"context": {}})
+    monkeypatch.setattr(error_inbox, "triage_issue", busy)
+
+    with pytest.raises(AIConcurrencyDeferred):
+        error_inbox._handle_triage_error_issue(
+            "task-1",
+            {"issue_id": "x", "origin": "automatic", "actor_user_id": None},
+            {},
+        )

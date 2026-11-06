@@ -185,6 +185,8 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
         "Error Tracking Connection Test", "analysis"
     ),
     "dispatch_error_fix": TaskTypeInfo("Error Fix Launch", "analysis"),
+    "triage_error_issue": TaskTypeInfo("Error Issue AI Triage", "analysis"),
+    "investigate_error_issue": TaskTypeInfo("Error Issue AI Investigation", "analysis"),
     "refresh_user_listening_stats": TaskTypeInfo("Listening Stats Refresh", "analysis"),
     "refresh_dirty_listening_stats": TaskTypeInfo(
         "Pending Listening Stats Sweep", "analysis"

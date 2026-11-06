@@ -97,6 +97,11 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     # Loads one candidate (a fanart download stops within 30s + one 12s read), then one
     # artwork.hero.analyze call (≤ 90s).
     "analyze_artist_hero_candidate": TaskPoolConfig("ai", 0, 180, 0),
+    # Error inbox: one ops.error.triage call (≤ 45s); queued by the sync or a backlog.
+    "triage_error_issue": TaskPoolConfig("ai", 1, 120, 0),
+    # A person's Investigate: Sentry evidence reads (≤ 20s), then one
+    # ops.error.investigate call (≤ 90s).
+    "investigate_error_issue": TaskPoolConfig("ai", 0, 180, 0),
     # User-initiated (priority 0) — these should run ASAP
     "tidal_download": TaskPoolConfig(
         "default", 0, 14400, 0

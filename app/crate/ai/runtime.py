@@ -110,6 +110,13 @@ def execute_probe(context, *, api_key, prompt, response_schema, max_seconds=None
     }
 
 
+def estimated_input_tokens(prompt: str, system: str, schema: dict) -> int:
+    """Upper bound of a text call's input: one token per byte plus 1,024 for the
+    provider's framing. Above the profile's `max_input_tokens` the call is refused
+    with AI_INPUT_TOO_LARGE before anything is reserved or sent."""
+    return len((prompt + system + json.dumps(schema)).encode()) + 1024
+
+
 def execute_structured(
     action_id: str,
     response_model: type[T],
@@ -173,7 +180,7 @@ def execute_structured(
                 "AI_PROFILE_INCOMPATIBLE", "Profile exceeds action bounds"
             )
         input_tokens, output_tokens = config.max_input_tokens, config.max_output_tokens
-        estimated_input = len((prompt + system + json.dumps(schema)).encode()) + 1024
+        estimated_input = estimated_input_tokens(prompt, system, schema)
         if action.input == "image":
             from io import BytesIO
             from PIL import Image

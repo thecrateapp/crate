@@ -158,15 +158,20 @@ _DETAIL_SQL = f"""
                            'suspected_frames', t.suspected_frames,
                            'next_step', t.next_step,
                            'confidence', t.confidence,
+                           'model', COALESCE(inv.reported_model, inv.model_id),
                            'created_at', t.created_at
                        )
                        ORDER BY t.created_at DESC
                    )
                    FROM error_issue_triage t
+                   -- The model is known while the invocation record is kept (90 days).
+                   LEFT JOIN ai_invocations inv ON inv.id = t.invocation_id
                    WHERE t.issue_id = i.id
                ),
                '[]'::json
-           ) AS triages
+           ) AS triages,
+           CASE WHEN i.auto_triage_hash = i.digest_hash THEN i.auto_triage_at END
+               AS auto_triage_queued_at
     FROM error_issues i
     LEFT JOIN users requester ON requester.id = i.fix_requested_by
     {_CURRENT_TRIAGE}
@@ -214,7 +219,9 @@ def _summary_sql(extra_columns: str = "") -> str:
     return f"""
         WITH open_issues AS (
             SELECT i.id, i.short_id, i.title, i.service, i.crate_score, i.first_seen,
-                   i.last_seen, i.substatus, {_CRITICAL} AS critical
+                   i.last_seen, i.substatus, {_CRITICAL} AS critical,
+                   (i.digest_hash IS NOT NULL AND triage.classification IS NULL)
+                       AS untriaged
             FROM error_issues i
             {_CURRENT_TRIAGE}
             WHERE i.status = 'unresolved'
@@ -247,6 +254,7 @@ def _summary_sql(extra_columns: str = "") -> str:
                 )
                 FROM open_issues
             ) AS regressed_24h,
+            (SELECT count(*) FILTER (WHERE untriaged) FROM open_issues) AS untriaged,
             (SELECT max(synced_at) FROM error_issues) AS last_synced_at,
             COALESCE(
                 (
@@ -295,6 +303,7 @@ def _summary_counts(row: Any) -> dict[str, Any]:
         "critical_open": int(row["critical_open"]),
         "new_24h": int(row["new_24h"]),
         "regressed_24h": int(row["regressed_24h"]),
+        "untriaged": int(row["untriaged"]),
         "last_synced_at": row["last_synced_at"],
         "services": list(row["services"]),
         "top_critical": list(row["top_critical"]),
@@ -483,11 +492,80 @@ def untriaged_open(
         return _impl(current)
 
 
+AUTO_TRIAGE_SUBSTATUSES = ("new", "regressed", "escalating")
+AUTO_TRIAGE_WINDOW = timedelta(hours=24)
+
+_AUTO_TRIAGE_QUEUED_SQL = """
+    SELECT count(*) FROM error_issues WHERE auto_triage_at >= :since
+"""
+# Open issues whose current digest has no triage, that are new, regressed or
+# escalating or whose digest changed since an earlier triage or automatic attempt.
+# A digest automatic triage already queued is never queued again, and an issue is
+# queued at most once per window, so a failure or a flapping digest cannot loop.
+_AUTO_TRIAGE_CANDIDATES_SQL = """
+    SELECT i.id::text AS id, i.digest_hash, i.crate_score
+    FROM error_issues i
+    WHERE i.status = 'unresolved'
+      AND i.digest_hash IS NOT NULL
+      AND i.auto_triage_hash IS DISTINCT FROM i.digest_hash
+      AND (i.auto_triage_at IS NULL OR i.auto_triage_at < :since)
+      AND NOT EXISTS (
+          SELECT 1
+          FROM error_issue_triage t
+          WHERE t.issue_id = i.id AND t.kind = 'triage' AND t.digest_hash = i.digest_hash
+      )
+      AND (
+          i.substatus = ANY(CAST(:substatuses AS text[]))
+          OR i.auto_triage_hash IS NOT NULL
+          OR EXISTS (SELECT 1 FROM error_issue_triage t WHERE t.issue_id = i.id)
+      )
+    ORDER BY i.crate_score DESC, i.last_seen DESC NULLS LAST, i.id
+    LIMIT :limit
+"""
+
+
+def auto_triage_plan(
+    *,
+    daily_max: int,
+    now: datetime | None = None,
+    session: Session | None = None,
+) -> dict[str, Any]:
+    """What automatic triage may queue now: the issues queued in the last 24 hours
+    and, highest score first, the candidates that still fit under `daily_max`."""
+    since = (now or datetime.now(timezone.utc)) - AUTO_TRIAGE_WINDOW
+
+    def _impl(current: Session) -> dict[str, Any]:
+        queued = int(
+            current.execute(
+                text(_AUTO_TRIAGE_QUEUED_SQL), {"since": since}
+            ).scalar_one()
+        )
+        room = max(0, int(daily_max) - queued)
+        candidates: list[dict[str, Any]] = []
+        if room:
+            rows = current.execute(
+                text(_AUTO_TRIAGE_CANDIDATES_SQL),
+                {
+                    "since": since,
+                    "substatuses": list(AUTO_TRIAGE_SUBSTATUSES),
+                    "limit": room,
+                },
+            ).mappings()
+            candidates = [dict(row) for row in rows]
+        return {"queued_24h": queued, "room": room, "candidates": candidates}
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
 MAX_DUPLICATE_CANDIDATES = 10
 
 _TRIAGE_INPUT_SQL = """
     WITH target AS (
-        SELECT i.id, i.short_id, i.service, i.level, i.status, i.substatus,
+        SELECT i.id, i.external_id, i.short_id, i.service, i.level, i.status,
+               i.substatus,
                i.issue_category, i.events_24h, i.users_24h, i.events_total,
                i.users_total, i.first_seen, i.last_seen, i.first_release,
                i.last_release, i.crate_score, i.group_key, i.digest, i.digest_hash,
@@ -521,7 +599,8 @@ _TRIAGE_INPUT_SQL = """
               )
           )
     )
-    SELECT t.id::text AS id, t.short_id, t.service, t.level, t.status, t.substatus,
+    SELECT t.id::text AS id, t.external_id, t.short_id, t.service, t.level, t.status,
+           t.substatus,
            t.issue_category, t.events_24h, t.users_24h, t.events_total,
            t.users_total, t.first_seen, t.last_seen, t.first_release,
            t.last_release, t.crate_score, t.group_key, t.digest, t.digest_hash,
@@ -613,9 +692,12 @@ def get_triage_input(
 
 
 __all__ = [
+    "AUTO_TRIAGE_SUBSTATUSES",
+    "AUTO_TRIAGE_WINDOW",
     "LIST_STATUSES",
     "MAX_DUPLICATE_CANDIDATES",
     "MAX_LIST_LIMIT",
+    "auto_triage_plan",
     "get_issue",
     "get_issue_by_short_id",
     "get_triage_input",

@@ -467,18 +467,107 @@ def save_triage(
         ).scalar_one_or_none()
 
 
+TRIAGE_TASK = "triage_error_issue"
+INVESTIGATE_TASK = "investigate_error_issue"
+TRIAGE_ORIGINS = frozenset({"automatic", "backlog"})
+
+
+def triage_dedup_key(issue_id: str, digest_hash: str) -> str:
+    """One queued triage per issue and digest, whoever asked for it."""
+    return f"error-triage:{issue_id}:{digest_hash}"
+
+
+def investigation_dedup_key(issue_id: str, digest_hash: str) -> str:
+    return f"error-investigate:{issue_id}:{digest_hash}"
+
+
+def queue_triages(
+    items: Sequence[Mapping[str, Any]],
+    *,
+    origin: str,
+    acceptance: Mapping[str, Any],
+    actor_id: int | None = None,
+    at: datetime | None = None,
+    session: Session | None = None,
+) -> dict[str, Any]:
+    """Queue `triage_error_issue` for each `{"id", "digest_hash"}`, in order.
+
+    A digest whose triage is already queued or running is skipped (task dedup).
+    Automatic triage also records the digest it queued on the issue, in the same
+    transaction, so the sync never queues that digest again and the daily cap can
+    count it. Tasks are dispatched after the commit.
+    """
+    from crate.db.repositories.tasks import create_task_dedup
+
+    if origin not in TRIAGE_ORIGINS:
+        raise ValueError(f"Unsupported triage origin: {origin!r}")
+    automatic = origin == "automatic"
+    stamp = at or _now()
+    queued: list[str] = []
+    marked: list[tuple[str, str]] = []
+    deduplicated = 0
+    with optional_scope(session) as current:
+        for item in items:
+            issue_id = _uuid(item["id"])
+            digest_hash = str(item["digest_hash"])
+            task_id = create_task_dedup(
+                TRIAGE_TASK,
+                {
+                    "issue_id": issue_id,
+                    "digest_hash": digest_hash,
+                    "origin": origin,
+                    "ai_acceptance": dict(acceptance),
+                    "actor_user_id": actor_id,
+                },
+                dedup_key=triage_dedup_key(issue_id, digest_hash),
+                session=current,
+                origin="worker" if automatic else "admin",
+                actor_user_id=actor_id,
+            )
+            if task_id is None:
+                deduplicated += 1
+                continue
+            queued.append(task_id)
+            marked.append((issue_id, digest_hash))
+        if automatic and marked:
+            current.execute(
+                text(
+                    """
+                    UPDATE error_issues i
+                    SET auto_triage_hash = queued.digest_hash,
+                        auto_triage_at = :at
+                    FROM unnest(CAST(:ids AS uuid[]), CAST(:hashes AS text[]))
+                        AS queued(id, digest_hash)
+                    WHERE i.id = queued.id
+                    """
+                ),
+                {
+                    "at": stamp,
+                    "ids": [issue_id for issue_id, _ in marked],
+                    "hashes": [digest_hash for _, digest_hash in marked],
+                },
+            )
+    return {"task_ids": queued, "deduplicated": deduplicated}
+
+
 __all__ = [
     "FIX_AUDIT_ACTION",
+    "INVESTIGATE_TASK",
     "ISSUE_STATUSES",
     "STATUS_AUDIT_ACTION",
     "TRIAGE_KINDS",
+    "TRIAGE_ORIGINS",
+    "TRIAGE_TASK",
     "audit_fix_request",
+    "investigation_dedup_key",
     "mark_status",
     "purge_closed",
+    "queue_triages",
     "record_fix_request",
     "record_status_change",
     "release_fix_request",
     "save_triage",
     "set_digest",
+    "triage_dedup_key",
     "upsert_issues",
 ]
