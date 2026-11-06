@@ -994,3 +994,31 @@ def test_a_broken_sentry_connection_still_evaluates_the_inbox(sentry, monkeypatc
     assert result["items"][1]["error_code"] == "EVAL_FETCH_FAILED"
     assert len(calls) == 1
     assert SENTINEL not in json.dumps(result)
+
+
+def test_candidate_times_rank_to_the_microsecond():
+    from crate.error_inbox.references import with_references
+
+    digest = {"exceptions": [{"type": "KeyError"}], "frames": []}
+    target = {"short_id": "CRATE-API-1", "group_key": "g", "digest": digest}
+    later = {
+        "id": "00000000-0000-4000-8000-000000000009",
+        "short_id": "CRATE-API-9",
+        "same_group": True,
+        "status": "resolved",
+        "crate_score": 5,
+        "last_seen": "2026-11-05T10:00:00.000001+00:00",
+    }
+    earlier = {
+        "short_id": "CRATE-API-21",
+        "group_key": "g",
+        "status": "resolved",
+        "crate_score": 5,
+        "last_seen": datetime(2026, 11, 5, 10, tzinfo=timezone.utc),
+        "digest": digest,
+    }
+
+    merged = with_references(target, [later], {"CRATE-API-21": earlier})
+
+    # One microsecond later still ranks first, whatever the ids.
+    assert [c["short_id"] for c in merged] == ["CRATE-API-9", "CRATE-API-21"]

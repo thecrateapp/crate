@@ -22,7 +22,7 @@ import logging
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from crate.db.queries.error_issues import (
@@ -360,15 +360,20 @@ def _as_candidate(
     }
 
 
-def _moment(value: Any) -> datetime | None:
-    if isinstance(value, datetime):
-        return value
+_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
+def _microseconds(value: Any) -> int | None:
+    """A timestamp in whole microseconds, as PostgreSQL orders them; None if absent."""
     if isinstance(value, str):
         try:
-            return datetime.fromisoformat(value)
+            value = datetime.fromisoformat(value)
         except ValueError:
             return None
-    return None
+    if not isinstance(value, datetime):
+        return None
+    aware = value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+    return (aware - _EPOCH) // timedelta(microseconds=1)
 
 
 def _rank(candidate: Mapping[str, Any]) -> tuple:
@@ -376,14 +381,14 @@ def _rank(candidate: Mapping[str, Any]) -> tuple:
 
     Inbox rows come before in-memory issues on a complete tie.
     """
-    seen = _moment(candidate.get("last_seen"))
+    seen = _microseconds(candidate.get("last_seen"))
     score = candidate.get("crate_score")
     return (
         not candidate.get("same_group"),
         candidate.get("status") != "unresolved",
         -(score if isinstance(score, int) else 0),
         seen is None,
-        -seen.timestamp() if seen is not None else 0.0,
+        -seen if seen is not None else 0,
         candidate.get("id") is None,
         str(candidate.get("id") or candidate.get("short_id") or ""),
     )
