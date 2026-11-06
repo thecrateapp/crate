@@ -48,7 +48,7 @@ from crate.db.repositories.library import (
 from crate.db.repositories.tasks import create_task
 from crate.smart_mix.backfill_window import backfill_window_limit
 from crate.task_progress import TaskProgress, emit_progress, entity_label
-from crate.worker_handlers import TaskHandler, is_cancelled
+from crate.worker_handlers import TaskHandler, is_cancelled, run_again_later
 
 log = logging.getLogger(__name__)
 
@@ -73,9 +73,8 @@ _POPULARITY_CHUNK_SLEEP_SECONDS = 0.25
 _WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS = 300
 # The night-window limit keeps only a few analyses in flight, so a slot freed by
 # a finished analysis should be refilled within seconds rather than a poll later.
+# The coordinator waits as a pending task, not in a worker process.
 _SMART_MIX_BACKFILL_POLL_SECONDS = 3
-_SMART_MIX_BACKFILL_MAX_WAIT_SECONDS = 600
-_sleep = time.sleep
 
 
 def _now() -> datetime:
@@ -1351,27 +1350,19 @@ def _handle_backfill_smart_mix_profiles(
     # Only the claims of this backfill count as in flight; imports and manual
     # reanalyses never take a backfill claim. The night window sets how many may
     # be in flight. A change of window, or of the settings, applies to the next
-    # claim; analyses already accepted keep running.
+    # claim; analyses already accepted keep running. While the limit is reached
+    # the coordinator goes back to the queue, so it never holds a worker process
+    # that a child could use.
     window = backfill_window_limit(campaign, now=_now())
     in_flight = count_smart_mix_in_flight()
-    waited = 0
-    while in_flight >= window.limit and waited < _SMART_MIX_BACKFILL_MAX_WAIT_SECONDS:
-        _sleep(_SMART_MIX_BACKFILL_POLL_SECONDS)
-        waited += _SMART_MIX_BACKFILL_POLL_SECONDS
-        campaign = get_smart_mix_campaign()
-        if not _smart_mix_campaign_running(campaign):
-            return {"claimed": 0, "queued": 0, "control": _campaign_control(campaign)}
-        window = backfill_window_limit(campaign, now=_now())
-        in_flight = count_smart_mix_in_flight()
     if in_flight >= window.limit:
-        return {
-            "claimed": 0,
-            "queued": 0,
-            "deferred": True,
-            "window": window.window,
-            "limit": window.limit,
-            "next_task_id": queue_next_smart_mix_batch(),
-        }
+        return run_again_later(
+            _SMART_MIX_BACKFILL_POLL_SECONDS,
+            progress=(
+                f"Waiting for a free slot: {in_flight} of {window.limit} "
+                f"in flight ({window.window})"
+            ),
+        )
 
     batch_size = max(1, min(int(campaign.get("batch_size") or 25), 100))
     max_attempts = int(campaign.get("max_attempts") or 3)
@@ -1412,22 +1403,30 @@ def _handle_backfill_smart_mix_profiles(
             released.append(track_id)
     if released:
         release_smart_mix_claims(released)
-    refresh_smart_mix_coverage(max_attempts=max_attempts)
 
     # The claim counts again under its lock, so an empty claim can also mean
     # another coordinator took the free slots; only nothing in flight ends it.
-    if not claimed and count_smart_mix_in_flight() == 0:
-        complete_smart_mix_campaign()
-        return {"claimed": 0, "queued": 0, "completed": True}
+    # With analyses still running, the coordinator waits for them rather than
+    # chaining passes, and coverage refreshes that would change nothing, until
+    # they finish.
+    if not claimed:
+        in_flight = count_smart_mix_in_flight()
+        if in_flight == 0:
+            refresh_smart_mix_coverage(max_attempts=max_attempts)
+            complete_smart_mix_campaign()
+            return {"claimed": 0, "queued": 0, "completed": True}
+        return run_again_later(
+            _SMART_MIX_BACKFILL_POLL_SECONDS,
+            progress=f"Waiting for the {in_flight} analyses in flight to finish",
+        )
+    refresh_smart_mix_coverage(max_attempts=max_attempts)
     return {
         "claimed": len(claimed),
         "queued": queued,
         "released": len(released),
         "window": window.window,
         "limit": window.limit,
-        "next_task_id": queue_next_smart_mix_batch(
-            batches=1 if claimed else 0, claimed=len(claimed)
-        ),
+        "next_task_id": queue_next_smart_mix_batch(batches=1, claimed=len(claimed)),
     }
 
 

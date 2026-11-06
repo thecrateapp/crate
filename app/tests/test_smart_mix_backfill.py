@@ -1044,6 +1044,7 @@ def _handler_harness(monkeypatch, *, campaigns, in_flight, claimed=(), now=DAY):
         "completed": [],
         "next": [],
         "released": [],
+        "sleeps": [],
     }
     instants = iter(now if isinstance(now, list) else [now])
     clock = {"value": None}
@@ -1102,7 +1103,7 @@ def _handler_harness(monkeypatch, *, campaigns, in_flight, claimed=(), now=DAY):
         "queue_next_smart_mix_batch",
         lambda **kwargs: calls["next"].append(kwargs) or "task-next",
     )
-    monkeypatch.setattr(analysis, "_sleep", lambda _seconds: None)
+    monkeypatch.setattr("time.sleep", lambda seconds: calls["sleeps"].append(seconds))
     return analysis, calls
 
 
@@ -1221,32 +1222,57 @@ def test_backfill_handler_completes_the_campaign_when_nothing_is_left(
     assert calls["next"] == []
 
 
-def test_saturated_backfill_waits_then_defers_without_claiming(monkeypatch) -> None:
+def _runs_again_later(result: dict) -> bool:
+    from crate.worker_handlers import RUN_AGAIN_AFTER_KEY
+
+    return result.get(RUN_AGAIN_AFTER_KEY) == 3
+
+
+def test_saturated_backfill_runs_again_later_without_holding_a_process(
+    monkeypatch,
+) -> None:
     analysis, calls = _handler_harness(
-        monkeypatch,
-        campaigns=[_running_campaign()] * 100,
-        in_flight=[10] * 100,
+        monkeypatch, campaigns=[_running_campaign()], in_flight=[10]
     )
-    monkeypatch.setattr(analysis, "_SMART_MIX_BACKFILL_MAX_WAIT_SECONDS", 30)
 
     result = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
 
-    assert result["deferred"] is True
+    # The task goes back to pending; the worker process is free meanwhile.
+    assert _runs_again_later(result)
+    assert result["progress"] == "Waiting for a free slot: 10 of 4 in flight (day)"
+    assert calls["sleeps"] == []
     assert calls["claims"] == []
-    assert len(calls["next"]) == 1
+    assert calls["next"] == []
 
 
-def test_pausing_during_the_wait_stops_before_claiming(monkeypatch) -> None:
+def test_a_pause_stops_a_waiting_coordinator_before_claiming(monkeypatch) -> None:
     analysis, calls = _handler_harness(
         monkeypatch,
         campaigns=[_running_campaign(), _running_campaign(status="paused")],
-        in_flight=[10, 10],
+        in_flight=[10],
+    )
+
+    waiting = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+    paused = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+
+    assert _runs_again_later(waiting)
+    assert paused == {"claimed": 0, "queued": 0, "control": "paused"}
+    assert calls["claims"] == []
+    assert calls["next"] == []
+
+
+def test_nothing_to_claim_while_analyses_run_waits_for_them(monkeypatch) -> None:
+    # The last tracks are in flight: chaining a pass at once would repeat the
+    # claim and the coverage refresh until they finish.
+    analysis, calls = _handler_harness(
+        monkeypatch, campaigns=[_running_campaign()], in_flight=[2]
     )
 
     result = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
 
-    assert result == {"claimed": 0, "queued": 0, "control": "paused"}
-    assert calls["claims"] == []
+    assert _runs_again_later(result)
+    assert result["progress"] == "Waiting for the 2 analyses in flight to finish"
+    assert calls["completed"] == []
     assert calls["next"] == []
 
 
@@ -1307,7 +1333,8 @@ def test_window_concurrency_comes_from_the_campaign_and_batch_size_caps_a_pass(
             _running_campaign(batch_size=3, night_concurrency=12),
             _running_campaign(batch_size=25, day_concurrency=2),
         ],
-        in_flight=[0, 1],
+        # Each pass counts, claims nothing and counts again.
+        in_flight=[0, 0, 1, 1],
         now=[NIGHT, DAY],
     )
 
@@ -1320,16 +1347,15 @@ def test_window_concurrency_comes_from_the_campaign_and_batch_size_caps_a_pass(
 def test_day_limit_keeps_a_saturated_backfill_from_claiming(monkeypatch) -> None:
     analysis, calls = _handler_harness(
         monkeypatch,
-        campaigns=[_running_campaign(batch_size=25)] * 100,
-        in_flight=[4] * 100,
+        campaigns=[_running_campaign(batch_size=25)],
+        in_flight=[4],
         now=DAY,
     )
-    monkeypatch.setattr(analysis, "_SMART_MIX_BACKFILL_MAX_WAIT_SECONDS", 30)
 
     result = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
 
-    assert result["deferred"] is True
-    assert (result["window"], result["limit"]) == ("day", 4)
+    assert _runs_again_later(result)
+    assert result["progress"] == "Waiting for a free slot: 4 of 4 in flight (day)"
     assert calls["claims"] == []
 
 
@@ -1341,37 +1367,41 @@ def test_window_change_applies_on_the_next_batch_without_cancelling(
     first_day_minute = datetime(2026, 1, 16, 7, 0, tzinfo=UTC)
     analysis, calls = _handler_harness(
         monkeypatch,
-        campaigns=[_running_campaign(batch_size=25)] * 100,
-        in_flight=[8, 8, 5, 5, 3],
-        now=[last_night_minute] + [first_day_minute] * 100,
+        campaigns=[_running_campaign(batch_size=25)],
+        in_flight=[8, 8, 5, 3],
+        claimed=[{"id": 5, "entity_uid": "uid-5", "claim_token": "token-5"}],
+        now=[last_night_minute, first_day_minute],
     )
-    monkeypatch.setattr(analysis, "_SMART_MIX_BACKFILL_POLL_SECONDS", 5)
-    monkeypatch.setattr(analysis, "_SMART_MIX_BACKFILL_MAX_WAIT_SECONDS", 15)
 
-    morning = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
-    later = analysis._handle_backfill_smart_mix_profiles("task-2", {}, {})
+    runs = [
+        analysis._handle_backfill_smart_mix_profiles("task-1", {}, {}) for _ in range(4)
+    ]
 
-    assert morning["deferred"] is True
-    assert (morning["window"], morning["limit"]) == ("day", 4)
+    assert [_runs_again_later(run) for run in runs[:3]] == [True, True, True]
+    assert runs[0]["progress"].endswith("8 of 8 in flight (night)")
+    assert runs[1]["progress"].endswith("8 of 4 in flight (day)")
     assert calls["released"] == []
     assert [claim["limit"] for claim in calls["claims"]] == [1]
-    assert (later["window"], later["limit"]) == ("day", 4)
+    assert (runs[3]["window"], runs[3]["limit"]) == ("day", 4)
 
 
 def test_night_start_lets_a_waiting_coordinator_claim_more(monkeypatch) -> None:
     # 00:59 and 01:00 in Madrid.
     analysis, calls = _handler_harness(
         monkeypatch,
-        campaigns=[_running_campaign(batch_size=25)] * 10,
+        campaigns=[_running_campaign(batch_size=25)],
         in_flight=[4, 4],
+        claimed=[{"id": 5, "entity_uid": "uid-5", "claim_token": "token-5"}],
         now=[
             datetime(2026, 1, 15, 23, 59, tzinfo=UTC),
             datetime(2026, 1, 16, 0, 0, tzinfo=UTC),
         ],
     )
 
+    waiting = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
     result = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
 
+    assert _runs_again_later(waiting)
     assert [claim["limit"] for claim in calls["claims"]] == [4]
     assert (result["window"], result["limit"]) == ("night", 8)
 

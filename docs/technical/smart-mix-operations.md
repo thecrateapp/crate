@@ -284,9 +284,13 @@ attempts, and the start and resume calls take it in the same body:
   worker ends up exhausted instead of being retried forever.
 - A pass claims at most `batchSize` tracks and never more than the limit of the current window
   minus what is in flight. The claim counts again inside its transaction, under a lock that every
-  coordinator takes, so two coordinators can never exceed the limit together. When the limit is
-  reached, the coordinator checks again every 3 s for up to ten minutes and then queues the next
-  pass. The window, not `batchSize`, bounds the work in flight.
+  coordinator takes, so two coordinators can never exceed the limit together. The window, not
+  `batchSize`, bounds the work in flight.
+- When the limit is reached, the coordinator's task goes back to `pending` and runs again 3 s
+  later, with the progress `Waiting for a free slot: 4 of 4 in flight (day)`. It holds no worker
+  process while it waits. It does the same when nothing is left to claim while analyses are
+  still running (`Waiting for the 2 analyses in flight to finish`), and completes the campaign
+  once nothing is in flight.
 - A change of window, or of the settings, applies to the next claim and cancels nothing. At
   08:00 with eight analyses accepted, they finish and the coordinator claims again once fewer
   than four are left.
@@ -297,14 +301,16 @@ attempts, and the start and resume calls take it in the same body:
   `already_running`.
 - `GET /api/admin/smart-mix/status` returns `backfillSettings` (those of the stored campaign, or
   what a new one would use) and `backfillLimit` (`window` `night` or `day`, and `limit`). Admin
-  shows it next to the coverage as `Night window · 8 in flight` or `Day · 4 in flight`. The
-  coordinator's result has the same `window` and `limit`.
+  shows it next to the coverage as `Night window · 8 in flight` or `Day · 4 in flight`. A pass
+  that claims returns the same `window` and `limit`.
 
 The limit counts children; the analyses run in the processes of `crate-analysis-worker`, so
 `ANALYSIS_WORKER_PROCESSES` is the night maximum. Set it to the night limit: the window then needs
 no restart or outside scaling, which Crate could not do anyway without the Docker socket. With
-fewer processes the extra children wait in `heavy`. By day the processes the backfill leaves free
-serve other `heavy` work; a coordinator waiting for a free slot holds one of them.
+fewer processes the extra children wait in `heavy`. The coordinator needs no process of its own:
+it runs for a moment every few seconds and waits in the queue, so with eight processes and a night
+limit of eight, eight analyses run. By day the processes the backfill leaves free serve other
+`heavy` work.
 
 On the project server (i7-7700, 4 cores and 8 threads) set `ANALYSIS_WORKER_PROCESSES=8` in
 `.env` and recreate the service with `docker compose up -d crate-analysis-worker`.
