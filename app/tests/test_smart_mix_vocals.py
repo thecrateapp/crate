@@ -95,7 +95,9 @@ def test_scores_under_the_floor_count_as_the_floor() -> None:
 
 def test_the_calibrated_threshold_is_a_mean_voice_score_of_about_0_26_percent() -> None:
     # SG1b: calibrated on 2,721 phrases of 275 production tracks against synced lyrics.
-    at_threshold = 10 ** (np.log10(vocals.LOG_FLOOR) * (1 - vocals.VOCAL_THRESHOLD / 255))
+    at_threshold = 10 ** (
+        np.log10(vocals.LOG_FLOOR) * (1 - vocals.VOCAL_THRESHOLD / 255)
+    )
 
     assert at_threshold == pytest.approx(0.0026, rel=0.01)
 
