@@ -19,9 +19,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Literal, Protocol
+from typing import Any, Literal, Protocol
 
 from crate.smart_mix.candidates import recompose_candidate
 from crate.smart_mix.evaluation import policy_violations
@@ -80,6 +80,56 @@ class RefinementOutcome:
     reason: str | None
     confidence: float | None
     deterministic_plan_hash: str
+
+
+def refinement_key(
+    *,
+    planner_identifier: str,
+    rules_revision: int,
+    outgoing_track_entity_uid: str,
+    incoming_track_entity_uid: str,
+    outgoing_profile_revision: str,
+    incoming_profile_revision: str,
+    context: Mapping[str, Any],
+    prompt_version: str,
+    schema_fingerprint: str,
+    config_fingerprint: str,
+    send_genre: bool,
+) -> str:
+    """The identity a refinement is paid for once (SM3-D5).
+
+    ``context`` is the request context as the plan cache normalizes it, plus the
+    set history the prompt reads. ``config_fingerprint`` changes with the model or
+    profile; ``send_genre`` changes the prompt.
+    """
+    identity = {
+        "planner": planner_identifier,
+        "rules": rules_revision,
+        "outgoing": [str(outgoing_track_entity_uid), outgoing_profile_revision],
+        "incoming": [str(incoming_track_entity_uid), incoming_profile_revision],
+        "context": dict(context),
+        "prompt": prompt_version,
+        "schema": schema_fingerprint,
+        "config": config_fingerprint,
+        "genre": bool(send_genre),
+    }
+    canonical = json.dumps(identity, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def context_from_payload(payload: Mapping[str, Any]) -> TransitionContext:
+    """The planner context of a normalized request context (camelCase keys)."""
+    return TransitionContext(
+        source=str(payload["source"]),
+        automatic=bool(payload["automatic"]),
+        offline=bool(payload["offline"]),
+        preferred_duration_ms=int(payload["preferredDurationMs"]),
+        user_cue_profile=str(payload["userCueProfile"]),
+        allow_beatmatch=bool(payload["allowBeatmatch"]),
+        allow_tempo_adjustment=bool(payload["allowTempoAdjustment"]),
+        allow_bass_handoff=bool(payload.get("allowBassHandoff", False)),
+        allow_long_beatmatch=bool(payload.get("allowLongBeatmatch", False)),
+    )
 
 
 def phrase_windows(
@@ -225,6 +275,8 @@ __all__ = [
     "RefinementChoice",
     "RefinementOutcome",
     "apply_refinement",
+    "context_from_payload",
     "deterministic_plan_hash",
     "phrase_windows",
+    "refinement_key",
 ]

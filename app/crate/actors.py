@@ -102,6 +102,10 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     # A person's Investigate: Sentry evidence reads (≤ 20s), then one
     # ops.error.investigate call (≤ 90s).
     "investigate_error_issue": TaskPoolConfig("ai", 0, 180, 0),
+    # One smart_mix.transition.refine call (≤ 45 s) for a transition about to
+    # play: top priority. 120 s leaves the longest action maximum (90 s) after
+    # the call margin, like the other ai tasks.
+    "smart_mix_refine_transition": TaskPoolConfig("ai", 0, 120, 0),
     # User-initiated (priority 0) — these should run ASAP
     "tidal_download": TaskPoolConfig(
         "default", 0, 14400, 0

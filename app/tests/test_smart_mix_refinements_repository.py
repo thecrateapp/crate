@@ -236,3 +236,40 @@ def test_latency_p50_reads_the_last_day(pg_db):
         )
 
     assert refinement_latency_p50_ms() == 2000
+
+
+def test_track_genre_slugs_take_the_heaviest_album_genre(pg_db):
+    from crate.db.queries.smart_mix_refinement import get_track_genre_slugs
+
+    del pg_db
+    tagged_id, tagged = _create_track("tagged")
+    _untagged_id, untagged = _create_track("untagged")
+    with transaction_scope() as session:
+        album_id = session.execute(
+            text("SELECT album_id FROM library_tracks WHERE id = :id"),
+            {"id": tagged_id},
+        ).scalar_one()
+        for name, slug, weight in (
+            ("Techno", "techno", 0.4),
+            ("Minimal Techno", "minimal-techno", 0.9),
+        ):
+            genre_id = session.execute(
+                text(
+                    "INSERT INTO genres (name, slug) VALUES (:name, :slug) RETURNING id"
+                ),
+                {"name": name, "slug": slug},
+            ).scalar_one()
+            session.execute(
+                text(
+                    "INSERT INTO album_genres (album_id, genre_id, weight) "
+                    "VALUES (:album, :genre, :weight)"
+                ),
+                {"album": album_id, "genre": genre_id, "weight": weight},
+            )
+
+    with recorded_statements() as statements:
+        slugs = get_track_genre_slugs([tagged, untagged, tagged])
+
+    assert slugs == {tagged: "minimal-techno", untagged: None}
+    assert len(statements) == 1
+    assert get_track_genre_slugs([]) == {}
