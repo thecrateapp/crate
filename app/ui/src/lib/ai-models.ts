@@ -8,8 +8,10 @@ import type {
   LegacyConfig,
   Model,
   ModelChoice,
+  OpenAICompatibleTemplate,
   Profile,
   ReasoningConfig,
+  ReasoningControl,
   Snapshot,
   Usage,
   Version,
@@ -82,7 +84,76 @@ const PROVIDER_LABELS: Record<string, string> = {
   gemini: "Gemini",
   deepseek: "DeepSeek",
   ollama: "Ollama",
+  openai_compatible: "OpenAI-compatible",
 };
+
+export interface OpenAICompatibleTemplateView {
+  label: string;
+  /** Fixed origin and path prefix; null for a custom address. */
+  origin: string | null;
+  pathPrefix: string | null;
+  /** The native reasoning controls this provider's API accepts. */
+  reasoning: readonly ReasoningControl[];
+}
+
+// Mirrors crate.ai.contracts.OPENAI_COMPATIBLE_TEMPLATES; the API enforces it.
+export const OPENAI_COMPATIBLE_TEMPLATES: Record<
+  OpenAICompatibleTemplate,
+  OpenAICompatibleTemplateView
+> = {
+  moonshot: {
+    label: "Moonshot (Kimi)",
+    origin: "https://api.moonshot.ai",
+    pathPrefix: "/v1",
+    reasoning: ["none", "thinking", "reasoning_effort"],
+  },
+  dashscope_intl: {
+    label: "DashScope international (Qwen)",
+    origin: "https://dashscope-intl.aliyuncs.com",
+    pathPrefix: "/compatible-mode/v1",
+    reasoning: ["none", "enable_thinking"],
+  },
+  openrouter: {
+    label: "OpenRouter",
+    origin: "https://openrouter.ai",
+    pathPrefix: "/api/v1",
+    reasoning: ["none", "reasoning"],
+  },
+  custom: {
+    label: "Custom address",
+    origin: null,
+    pathPrefix: null,
+    reasoning: ["none", "thinking", "enable_thinking", "reasoning_effort"],
+  },
+};
+
+/** The path prefixes a custom address may use: those of the predefined origins. */
+export const OPENAI_COMPATIBLE_PATH_PREFIXES = [
+  "/v1",
+  "/compatible-mode/v1",
+  "/api/v1",
+] as const;
+
+const REASONING_CONTROL_LABELS: Record<ReasoningControl, string> = {
+  none: "Provider default",
+  thinking: "thinking on/off",
+  enable_thinking: "enable_thinking on/off",
+  reasoning_effort: "reasoning_effort levels",
+  reasoning: "reasoning effort or on/off",
+};
+
+export function reasoningControlLabel(control: ReasoningControl): string {
+  return REASONING_CONTROL_LABELS[control];
+}
+
+/** Ollama and a custom OpenAI-compatible address may run without a key. */
+export function needsKey(connection: Connection): boolean {
+  if (connection.provider === "ollama") return false;
+  if (connection.provider === "openai_compatible") {
+    return connection.template !== "custom";
+  }
+  return true;
+}
 
 export function providerLabel(provider: string): string {
   return PROVIDER_LABELS[provider] ?? humanizeKey(provider);
@@ -102,7 +173,7 @@ export interface ToneView {
 
 export function providerStatus(connection: Connection): ToneView {
   if (!connection.enabled) return { label: "Turned off", tone: "neutral" };
-  if (connection.provider !== "ollama" && !connection.has_key) {
+  if (needsKey(connection) && !connection.has_key) {
     return { label: "Needs key", tone: "warning" };
   }
   if (connection.catalog_status === "error") {
@@ -119,7 +190,7 @@ export function isUsableConnection(connection: Connection): boolean {
     connection.enabled &&
     connection.persistent_id !== null &&
     connection.model_count > 0 &&
-    (connection.provider === "ollama" || connection.has_key)
+    (!needsKey(connection) || connection.has_key)
   );
 }
 
@@ -468,6 +539,10 @@ const AI_ERROR_TEXT: Record<string, string> = {
   AI_IMAGE_BOUND_UNKNOWN:
     "This model's image limits are unknown, so it can't run image features.",
   AI_ACTION_NEEDS_IMAGE: "This feature needs a model that reads images.",
+  AI_ORIGIN_UNCONFIRMED:
+    "Confirm that this address may receive prompts and the key.",
+  AI_MANIFEST_INVALID:
+    "Check the models: declare each one once, with controls this provider has.",
 };
 
 const DEFAULT_AI_ERROR_TEXT =

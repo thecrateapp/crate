@@ -240,6 +240,29 @@ describe("providerStatus", () => {
     ).toEqual({ label: "Ready", tone: "success" });
   });
 
+  it("requires a key only for predefined OpenAI-compatible origins", () => {
+    const compatible = {
+      ...base,
+      provider: "openai_compatible",
+      has_key: false,
+      catalog_status: "ready",
+    };
+    expect(providerStatus({ ...compatible, template: "custom" })).toEqual({
+      label: "Ready",
+      tone: "success",
+    });
+    expect(isUsableConnection({ ...compatible, template: "custom" })).toBe(
+      true,
+    );
+    expect(providerStatus({ ...compatible, template: "moonshot" })).toEqual({
+      label: "Needs key",
+      tone: "warning",
+    });
+    expect(isUsableConnection({ ...compatible, template: "moonshot" })).toBe(
+      false,
+    );
+  });
+
   it("reports a catalog error", () => {
     expect(providerStatus({ ...base, catalog_status: "error" })).toEqual({
       label: "Error",

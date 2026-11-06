@@ -612,6 +612,34 @@ describe("ProvidersPanel", () => {
     );
   });
 
+  it("shows an OpenAI-compatible origin and keeps its models in the manifest", async () => {
+    const user = userEvent.setup();
+    renderPanel(
+      withConnection(aiSnapshot(), STUDIO_ID, {
+        provider: "openai_compatible",
+        template: "custom",
+        endpoint: "http://10.0.0.5:8000",
+        path_prefix: "/v1",
+        has_key: false,
+      }),
+    );
+    const card = await openSettings(user, "Studio");
+
+    expect(within(card).getByText("OpenAI-compatible")).toBeVisible();
+    expect(
+      within(card).getByText("Endpoint: http://10.0.0.5:8000/v1"),
+    ).toBeVisible();
+    expect(within(card).queryByText("Needs key")).not.toBeInTheDocument();
+    expect(
+      within(card).queryByRole("button", { name: "Add model" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(card).getByText(
+        "Models come from this connection's manifest and load on refresh.",
+      ),
+    ).toBeVisible();
+  });
+
   it("adds hosted and Ollama providers with exactly the fields the API accepts", async () => {
     apiMock.mockReset().mockResolvedValue({});
     const user = userEvent.setup();
