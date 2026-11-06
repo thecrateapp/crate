@@ -149,3 +149,8 @@ def create_schema(cur):
     )
 
     create_smart_mix_refined_plans_v152_schema(cur)
+    from crate.db.schema_sections.ai_openai_compatible_v153 import (
+        create_ai_openai_compatible_v153_schema,
+    )
+
+    create_ai_openai_compatible_v153_schema(cur)

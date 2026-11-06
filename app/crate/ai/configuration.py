@@ -18,6 +18,7 @@ from crate.ai.capabilities import (
     validate_profile,
 )
 from crate.ai.contracts import (
+    OPENAI_COMPATIBLE_TEMPLATES,
     AIConfigurationError,
     LegacyProfileConfig,
     ModelCapabilities,
@@ -26,19 +27,26 @@ from crate.ai.contracts import (
     ReasoningConfig,
 )
 from crate.ai.default_model import derive_all, require_supported_reasoning
-from crate.ai.discovery import validate_endpoint
+from crate.ai.discovery import validate_endpoint, validate_openai_compatible
 from crate.credentials import CredentialSecretError, load_secret
 from crate.db.repositories import ai_configuration as store
 
 if TYPE_CHECKING:
     from typing_extensions import TypeForm
 
-_PROVIDERS = ("gemini", "deepseek", "ollama")
+_PROVIDERS = ("gemini", "deepseek", "ollama", "openai_compatible")
+# Providers that can come from the server environment: they have a symbolic
+# `env:<provider>` connection and can be the provider of an inherited legacy setup.
+_ENVIRONMENT_PROVIDERS = ("gemini", "deepseek", "ollama")
 _KEYS = {
     "gemini": ("GEMINI_API_KEY", "AUDIOMUSE_GEMINI_API_KEY"),
     "deepseek": ("DEEPSEEK_API_KEY",),
     "ollama": (),
+    # Configured in Admin only: its key is always stored encrypted, never read
+    # from the environment.
+    "openai_compatible": (),
 }
+_OPENAI_COMPATIBLE_FIELDS = ("template", "path_prefix", "model_manifest")
 
 
 def _fail(code, message) -> NoReturn:
@@ -67,7 +75,7 @@ def _env_id(provider):
 
 
 def ensure_environment_connection(provider, *, expected_revision=None):
-    if provider not in _PROVIDERS:
+    if provider not in _ENVIRONMENT_PROVIDERS:
         _fail("AI_PROVIDER_UNSUPPORTED", "Provider is not supported")
     from crate.llm.provider import get_config
 
@@ -85,7 +93,7 @@ def _connection(id, *, persist=False, expected_revision=None) -> dict:
     symbolic_environment = id.startswith("env:")
     if id.startswith("env:"):
         provider = id[4:]
-        if provider not in _PROVIDERS:
+        if provider not in _ENVIRONMENT_PROVIDERS:
             _fail("AI_PROVIDER_UNSUPPORTED", "Provider is not supported")
         id = (
             ensure_environment_connection(
@@ -153,6 +161,8 @@ def _public_connection(row, *, include_models=True):
     } | {
         "id": _public_connection_id(row),
         "persistent_id": row["id"],
+        "template": row.get("template"),
+        "path_prefix": row.get("path_prefix"),
         "model_count": row.get("model_count", len(row.get("model_catalog", []))),
         "source": row["secret_source"],
         "has_key": bool(key)
@@ -164,11 +174,22 @@ def _public_connection(row, *, include_models=True):
 
     if include_models:
         result["model_catalog"] = row["model_catalog"]
+        result["model_manifest"] = row.get("model_manifest") or []
     return result
 
 
-def _has_credential(connection):
+def _requires_key(connection):
+    """Ollama and a custom openai_compatible origin may run without a key."""
     if connection["provider"] == "ollama":
+        return False
+    if connection["provider"] == "openai_compatible":
+        spec = OPENAI_COMPATIBLE_TEMPLATES.get(connection.get("template") or "")
+        return spec is None or spec.requires_key
+    return True
+
+
+def _has_credential(connection):
+    if not _requires_key(connection):
         return True
     if connection["secret_source"] == "environment":
         return bool(_environment_key(connection["provider"]))
@@ -274,7 +295,7 @@ def snapshot():
     connections = [
         _public_connection(c, include_models=False) for c in data["connections"]
     ]
-    for provider in _PROVIDERS:
+    for provider in _ENVIRONMENT_PROVIDERS:
         if f"env:{provider}" in {c["id"] for c in connections}:
             continue
         key = _environment_key(provider)
@@ -288,6 +309,8 @@ def snapshot():
                 "endpoint": legacy_config["ollama_url"]
                 if provider == "ollama"
                 else None,
+                "template": None,
+                "path_prefix": None,
                 "enabled": True,
                 "model_count": 0,
                 "catalog_status": "pending",
@@ -327,7 +350,7 @@ def snapshot():
                 )
             }
             | {
-                "supported": context["provider"] in _PROVIDERS,
+                "supported": context["provider"] in _ENVIRONMENT_PROVIDERS,
                 "legacy_enabled": _legacy_enabled(
                     context["action_id"], context["provider"]
                 ),
@@ -356,11 +379,55 @@ def snapshot():
     }
 
 
+def _manifest(template, entries):
+    """A validated manifest: declared once each, with controls the template takes."""
+    if not entries:
+        _fail("AI_MANIFEST_INVALID", "Declare at least one model")
+    if len({entry["model_id"] for entry in entries}) != len(entries):
+        _fail("AI_MANIFEST_INVALID", "Declare each model once")
+    controls = OPENAI_COMPATIBLE_TEMPLATES[template].reasoning
+    if any(entry["reasoning"] not in controls for entry in entries):
+        _fail("AI_MANIFEST_INVALID", "This provider has no such reasoning control")
+    return entries
+
+
+def _require_confirmed_origin(template, confirmed):
+    if OPENAI_COMPATIBLE_TEMPLATES[template].origin is None and not confirmed:
+        _fail(
+            "AI_ORIGIN_UNCONFIRMED",
+            "Confirm that this origin may receive prompts and the key",
+        )
+
+
+def _reject_openai_compatible_fields(values, confirmed):
+    if confirmed or any(
+        values.get(field) is not None for field in _OPENAI_COMPATIBLE_FIELDS
+    ):
+        _fail(
+            "AI_CONFIGURATION_INVALID",
+            "Only OpenAI-compatible connections have a template or model manifest",
+        )
+
+
 def create_connection(data, actor_id):
     from crate.api.schemas.ai_agents import ConnectionCreate
 
     values = ConnectionCreate.model_validate(data).model_dump()
-    values["endpoint"] = validate_endpoint(values["provider"], values["endpoint"])
+    confirmed = values.pop("confirm_custom_origin")
+    if values["provider"] != "openai_compatible":
+        _reject_openai_compatible_fields(values, confirmed)
+        for field in _OPENAI_COMPATIBLE_FIELDS:
+            values.pop(field)
+        values["endpoint"] = validate_endpoint(values["provider"], values["endpoint"])
+        return _public_connection(store.create_connection(values, actor_id))
+    template = values["template"]
+    if template is None:
+        _fail("AI_CONFIGURATION_INVALID", "Choose an origin template")
+    values["endpoint"], values["path_prefix"] = validate_openai_compatible(
+        template, values["endpoint"], values["path_prefix"]
+    )
+    _require_confirmed_origin(template, confirmed)
+    values["model_manifest"] = _manifest(template, values["model_manifest"])
     return _public_connection(store.create_connection(values, actor_id))
 
 
@@ -371,12 +438,35 @@ def patch_connection(id, data, expected_revision, actor_id):
         {**data, "expected_revision": expected_revision}
     ).model_dump(exclude_unset=True)
     values.pop("expected_revision")
+    confirmed = values.pop("confirm_custom_origin", None)
     row = _connection(id)
     if row["secret_source"] == "environment":
         _fail("AI_ENVIRONMENT_READ_ONLY", "Environment connections are read only")
+    if row["provider"] != "openai_compatible":
+        _reject_openai_compatible_fields(values, confirmed)
     if not values:
         _fail("AI_CONFIGURATION_INVALID", "No connection changes supplied")
-    if "endpoint" in values:
+    if row["provider"] == "openai_compatible":
+        template = row["template"]
+        moved = False
+        if "endpoint" in values or "path_prefix" in values:
+            endpoint, prefix = validate_openai_compatible(
+                template,
+                values.get("endpoint", row["endpoint"]),
+                values.get("path_prefix", row["path_prefix"]),
+            )
+            moved = endpoint != row["endpoint"]
+            if moved:
+                _require_confirmed_origin(template, confirmed)
+            values |= {"endpoint": endpoint, "path_prefix": prefix}
+        if "model_manifest" in values:
+            values["model_manifest"] = _manifest(template, values["model_manifest"])
+        if moved:
+            # Only ai.credentials.manage decides which server receives a key.
+            return _public_connection(
+                store.move_connection_origin(id, values, expected_revision, actor_id)
+            )
+    elif "endpoint" in values:
         values["endpoint"] = validate_endpoint(row["provider"], values["endpoint"])
         # Stored endpoints are already normalised, so re-saving the same origin
         # in another spelling is not a move. Only ai.credentials.manage decides
@@ -408,7 +498,7 @@ def set_credential(id, api_key, expected_revision, actor_id):
 
 
 def connection_models(id):
-    if id.startswith("env:") and id[4:] not in _PROVIDERS:
+    if id.startswith("env:") and id[4:] not in _ENVIRONMENT_PROVIDERS:
         _fail("AI_PROVIDER_UNSUPPORTED", "Provider is not supported")
     row = (
         _connection(id)
@@ -428,6 +518,11 @@ def connection_models(id):
 
 def register_manual_model(id, model_id, expected_revision):
     row = _connection(id, persist=True)
+    if row["provider"] == "openai_compatible":
+        _fail(
+            "AI_CONFIGURATION_INVALID",
+            "Declare this provider's models in its manifest",
+        )
     pending = model_capabilities(row["provider"], model_id).model_dump(mode="json")
     # A friendly model name or manifest alone is not compatibility evidence.
     pending.update(validated=False, source="pending")
@@ -625,7 +720,7 @@ def _assignment_connection(public_id, connections):
     """Resolve a public connection id inside one read snapshot; never persists."""
     if public_id.startswith("env:"):
         provider = public_id[4:]
-        if provider not in _PROVIDERS:
+        if provider not in _ENVIRONMENT_PROVIDERS:
             _fail("AI_PROVIDER_UNSUPPORTED", "Provider is not supported")
         row = connections.get(_env_id(provider))
         if row is None:
@@ -788,7 +883,7 @@ def _plan_assignment(derived, data, contexts, connection, model_id):
                 }
             else:
                 context = contexts[action_id]
-                if context["provider"] not in _PROVIDERS:
+                if context["provider"] not in _ENVIRONMENT_PROVIDERS:
                     _fail("AI_PROVIDER_UNSUPPORTED", "Provider is not supported")
                 row = connections.get(_env_id(context["provider"]))
                 if row is None:
@@ -919,7 +1014,7 @@ def _validate_legacy_or_normal(connection, version, action_id):
         None,
     )
     if (
-        connection["provider"] not in _PROVIDERS
+        connection["provider"] not in _ENVIRONMENT_PROVIDERS
         or not connection["enabled"]
         or model is None
     ):
@@ -995,7 +1090,7 @@ def _legacy(action_id, config=None):
     )
     key = (
         _environment_key(provider)
-        if provider in _PROVIDERS
+        if provider in _ENVIRONMENT_PROVIDERS
         else get_provider_api_key(provider)
     )
     return {
@@ -1034,12 +1129,32 @@ def _context(version, connection, *, action_id=None, binding=None):
             _fail("AI_CREDENTIAL_UNAVAILABLE", "Credential is unavailable")
     else:
         key = None
-    if connection["provider"] != "ollama" and not key:
+    if _requires_key(connection) and not key:
         _fail("AI_CREDENTIAL_REQUIRED", "Provider credential is required")
     model = next(
         m for m in connection["model_catalog"] if m["model_id"] == version["model_id"]
     )
     capabilities = ModelCapabilities.model_validate(model)
+    wire = {}
+    if connection["provider"] == "openai_compatible":
+        # The manifest, not the model name, decides the request body; a manifest
+        # change therefore makes an accepted context stale.
+        entry = next(
+            (
+                e
+                for e in connection["model_manifest"]
+                if e["model_id"] == version["model_id"]
+            ),
+            None,
+        )
+        if entry is None:
+            _fail("AI_MODEL_UNVALIDATED", "Model is absent from the manifest")
+        wire = {
+            "template": connection["template"],
+            "path_prefix": connection["path_prefix"],
+            "structured_output": entry["structured_output"],
+            "reasoning_control": entry["reasoning"],
+        }
     reservation_bounds = None
     if isinstance(config, LegacyProfileConfig):
         reservation_bounds = {
@@ -1067,6 +1182,7 @@ def _context(version, connection, *, action_id=None, binding=None):
         "credential_source": source,
         "credential_ref": connection.get("secret_ref"),
         "credential_version": _hash(key),
+        **wire,
     }
 
 
@@ -1114,7 +1230,7 @@ def resolve_action(action_id, expected_fingerprint=None):
     if expected_fingerprint and expected_fingerprint != context["config_fingerprint"]:
         _fail("AI_CONTEXT_STALE", "Configuration changed; review before submitting")
     # Execution acceptance may materialize environment metadata, never the key.
-    if context["mode"] == "legacy" and context["provider"] in _PROVIDERS:
+    if context["mode"] == "legacy" and context["provider"] in _ENVIRONMENT_PROVIDERS:
         ensure_environment_connection(context["provider"])
     return context
 
@@ -1140,7 +1256,10 @@ def load_context_key(context):
             key = load_secret(context["credential_ref"], scope="ai")["api_key"]
         except (CredentialSecretError, KeyError):
             _fail("AI_CREDENTIAL_UNAVAILABLE", "Credential is unavailable")
-    elif context["mode"] == "legacy" and context["provider"] not in _PROVIDERS:
+    elif (
+        context["mode"] == "legacy"
+        and context["provider"] not in _ENVIRONMENT_PROVIDERS
+    ):
         from crate.llm.provider import get_provider_api_key
 
         key = get_provider_api_key(context["provider"])

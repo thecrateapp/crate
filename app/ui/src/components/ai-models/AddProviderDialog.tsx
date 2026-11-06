@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 
+import { FormField } from "@crate/ui/primitives/FormField";
 import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 import { Button } from "@crate/ui/shadcn/button";
 import {
@@ -14,14 +15,21 @@ import { Input } from "@crate/ui/shadcn/input";
 import { providerLabel, splitConnections } from "@/lib/ai-models";
 
 import { reportFailure, writeAI } from "./api";
+import {
+  compatibleRequest,
+  emptyCompatibleDraft,
+  OpenAICompatibleFields,
+  type CompatibleDraft,
+} from "./OpenAICompatibleFields";
 import type { Connection, Snapshot } from "./types";
 
-type AddableProvider = "gemini" | "deepseek" | "ollama";
+type AddableProvider = "gemini" | "deepseek" | "ollama" | "openai_compatible";
 
 const PROVIDER_ITEMS = [
   { value: "gemini" as const, label: "Gemini" },
   { value: "deepseek" as const, label: "DeepSeek" },
   { value: "ollama" as const, label: "Ollama" },
+  { value: "openai_compatible" as const, label: "OpenAI-compatible" },
 ];
 
 const PROVIDER_ENV_VAR: Record<string, string> = {
@@ -53,26 +61,40 @@ export function AddProviderDialog({
   const [provider, setProvider] = useState<AddableProvider>("gemini");
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
+  const [compatible, setCompatible] =
+    useState<CompatibleDraft>(emptyCompatibleDraft);
   const [busy, setBusy] = useState(false);
 
   const { hidden } = splitConnections(snapshot);
+  const compatibleFields =
+    provider === "openai_compatible" ? compatibleRequest(compatible) : null;
+  const ready =
+    Boolean(name) &&
+    (provider !== "openai_compatible" || compatibleFields !== null);
 
   function close() {
     setProvider("gemini");
     setName("");
     setAddress("");
+    setCompatible(emptyCompatibleDraft());
     onOpenChange(false);
   }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (!ready) return;
     setBusy(true);
     try {
-      await writeAI("/connections", {
-        label: name,
-        provider,
-        endpoint: provider === "ollama" ? address : null,
-      });
+      await writeAI(
+        "/connections",
+        compatibleFields
+          ? { label: name, provider, ...compatibleFields }
+          : {
+              label: name,
+              provider,
+              endpoint: provider === "ollama" ? address : null,
+            },
+      );
       close();
       refresh();
     } catch (error) {
@@ -92,56 +114,74 @@ export function AddProviderDialog({
         else close();
       }}
     >
-      <DialogContent aria-describedby={undefined}>
+      <DialogContent
+        aria-describedby={undefined}
+        size={provider === "openai_compatible" ? "xl" : "md"}
+      >
         <DialogHeader>
           <DialogTitle className="font-display">Add provider</DialogTitle>
         </DialogHeader>
         <form onSubmit={(event) => void submit(event)} className="space-y-4">
-          <SegmentedControl
-            as="radio"
-            label="Provider"
-            value={provider}
-            onValueChange={setProvider}
-            items={PROVIDER_ITEMS}
-          />
-          <label className="block space-y-1 text-sm text-white/70">
-            Name
-            <Input
-              required
-              maxLength={200}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
+          {/* A manifest can outgrow the viewport: only the fields scroll, so
+              the title and the submit button stay reachable. 14rem leaves room
+              for the panel padding, the title and the footer. */}
+          <div
+            data-testid="add-provider-body"
+            className="-mx-1 -mt-1 max-h-[calc(100dvh-14rem)] space-y-4 overflow-y-auto overscroll-contain p-1"
+          >
+            <SegmentedControl
+              as="radio"
+              label="Provider"
+              value={provider}
+              onValueChange={setProvider}
+              items={PROVIDER_ITEMS}
             />
-          </label>
-          {provider === "ollama" ? (
-            <label className="block space-y-1 text-sm text-white/70">
-              Address
+            <FormField label="Name">
               <Input
-                type="url"
                 required
-                value={address}
-                onChange={(event) => setAddress(event.target.value)}
+                maxLength={200}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
               />
-            </label>
-          ) : null}
+            </FormField>
+            {provider === "ollama" ? (
+              <FormField label="Address">
+                <Input
+                  type="url"
+                  required
+                  value={address}
+                  onChange={(event) => setAddress(event.target.value)}
+                />
+              </FormField>
+            ) : null}
+            {provider === "openai_compatible" ? (
+              <OpenAICompatibleFields
+                draft={compatible}
+                disabled={busy}
+                onChange={setCompatible}
+              />
+            ) : null}
+            {hidden.length > 0 ? (
+              <section className="space-y-1 border-t border-border-quiet pt-4 text-sm text-text-muted">
+                <h3 className="font-semibold text-text-secondary font-display">
+                  From the server environment
+                </h3>
+                <ul className="space-y-1">
+                  {hidden.map((connection) => (
+                    <li key={connection.id}>
+                      {hiddenProviderLine(connection)}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+          </div>
           <DialogFooter>
-            <Button type="submit" disabled={busy || !name}>
+            <Button type="submit" disabled={busy || !ready}>
               Add provider
             </Button>
           </DialogFooter>
         </form>
-        {hidden.length > 0 ? (
-          <section className="space-y-1 border-t border-white/10 pt-4 text-sm text-white/60">
-            <h3 className="font-semibold text-white/80 font-display">
-              From the server environment
-            </h3>
-            <ul className="space-y-1">
-              {hidden.map((connection) => (
-                <li key={connection.id}>{hiddenProviderLine(connection)}</li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
       </DialogContent>
     </Dialog>
   );
