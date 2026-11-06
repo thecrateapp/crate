@@ -26,6 +26,7 @@ from typing import Any, Literal
 
 from crate.smart_mix.camelot import CamelotRelationship, camelot_relationship
 from crate.smart_mix.models import (
+    VOCAL_THRESHOLD,
     TrackMixProfile,
     TransitionContext,
     TransitionFallbackReason,
@@ -54,7 +55,9 @@ DJ_BLEND_EXIT = 0.7
 GRID_PHRASE_BARS = 8
 PHRASE_TOLERANCE_BEATS = 0.125
 DEFAULT_PHRASE_TOLERANCE_MS = 60
-VOCAL_PRESENCE_THRESHOLD = 0.5
+# A phrase has voice from the cut gate SG1b calibrated on the stored byte
+# (``VOCAL_THRESHOLD``, 90 of 255), the one the server applies.
+VOCAL_PRESENCE_THRESHOLD = VOCAL_THRESHOLD / 255.0
 TIMELINE_STEP_MS = 10
 
 PhraseBasis = Literal["phrases", "grid", "mixed"]
@@ -310,7 +313,8 @@ def vocal_clash_ms(
 
     Needs phrases and per-phrase vocal presence (schema 2 with the optional
     detector) on both profiles; ``None`` otherwise. A phrase has vocals when
-    its presence is at least ``VOCAL_PRESENCE_THRESHOLD``.
+    its presence byte is at least ``VOCAL_THRESHOLD`` (SG1b), which is
+    ``VOCAL_PRESENCE_THRESHOLD`` on the 0-1 scale.
     """
     if outgoing is None or incoming is None:
         return None

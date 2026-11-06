@@ -28,6 +28,7 @@ from crate.smart_mix.evaluation import (
     vocal_clash_ms,
 )
 from crate.smart_mix.models import (
+    VOCAL_THRESHOLD,
     TrackMixProfile,
     TransitionContext,
     TransitionPlan,
@@ -305,6 +306,31 @@ def test_vocal_clash_counts_overlapping_vocal_phrases() -> None:
     # vocal phrase ends at 8 s.
     assert clash == pytest.approx(8_000 - 16_000 / 3, abs=20)
     assert vocal_clash_ms(_plan(), outgoing, instrumental_in) == 0
+
+
+def test_vocal_clash_reads_voice_with_the_sg1b_cut() -> None:
+    # Gate SG1b: a phrase has voice from byte VOCAL_THRESHOLD (90), the cut the
+    # server applies, not from half of the byte scale.
+    outgoing = _Structured(
+        _profile(OUTGOING_UID),
+        phrases=_phrases(0, 160_000, 168_000),
+        vocal_presence=bytes([0, VOCAL_THRESHOLD, 0]),
+    )
+    just_voiced_in = _Structured(
+        _profile(INCOMING_UID),
+        phrases=_phrases(0, 32_000),
+        vocal_presence=bytes([0, VOCAL_THRESHOLD]),
+    )
+    just_below_in = _Structured(
+        _profile(INCOMING_UID),
+        phrases=_phrases(0, 32_000),
+        vocal_presence=bytes([0, VOCAL_THRESHOLD - 1]),
+    )
+
+    assert vocal_clash_ms(_plan(), outgoing, just_voiced_in) == pytest.approx(
+        8_000 - 16_000 / 3, abs=20
+    )
+    assert vocal_clash_ms(_plan(), outgoing, just_below_in) == 0
 
 
 def test_policy_violations_detects_out_of_range_plan() -> None:
