@@ -116,7 +116,14 @@ class Crate:
 
     def __call__(self, command: str, payload: Mapping[str, Any]) -> dict[str, Any]:
         argv = [*self.prefix, "-m", CLI_MODULE, command]
-        process = self.runner(argv, json.dumps(payload))
+        try:
+            process = self.runner(argv, json.dumps(payload))
+        except subprocess.TimeoutExpired:
+            raise EvalError(f"`{command}` did not answer within 600 s") from None
+        except OSError as error:
+            raise EvalError(
+                f"Could not run {self.prefix[0]!r}: {error.strerror}"
+            ) from None
         lines = (process.stdout or "").strip().splitlines()
         try:
             answer = json.loads(lines[-1]) if lines else None

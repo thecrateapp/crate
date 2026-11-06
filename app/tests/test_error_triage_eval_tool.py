@@ -664,6 +664,29 @@ def test_server_refusals_and_garbage_become_errors():
         run_eval.Crate("", broken)
 
 
+@pytest.mark.parametrize(
+    "error,message",
+    [
+        (FileNotFoundError(2, "No such file or directory"), "Could not run 'ssh'"),
+        (subprocess.TimeoutExpired(["ssh"], 600), "did not answer within 600 s"),
+    ],
+)
+def test_a_missing_command_or_a_hung_call_is_a_clean_refusal(
+    labels_file, error, message
+):
+    def runner(argv, stdin):
+        raise error
+
+    lines: list[str] = []
+    status = run_eval.main(
+        ["plan", "--labels", str(labels_file), "--crate", "ssh host python"],
+        runner=runner,
+        echo=lines.append,
+    )
+
+    assert status == 2 and message in lines[-1]
+
+
 @pytest.mark.parametrize("value", ["model", "model=1", "=1/2", "model=a/b", "m=-1/2"])
 def test_prices_are_parsed_strictly(value):
     with pytest.raises(Exception):
