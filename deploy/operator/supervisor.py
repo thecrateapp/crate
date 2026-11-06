@@ -13,6 +13,7 @@ from .prometheus import TOOL as PROMETHEUS_TOOL
 from .state import LIMITS, CapacityError, enqueue, event, prune
 
 TOOLS = {
+    "get_error_summary",
     "get_instance_inventory",
     "get_observability_summary",
     "get_pipeline_status",
@@ -350,6 +351,17 @@ def _condition(rule, evidence, severity, resolved):
     return str(value)[:128]
 
 
+def _issue_text(item):
+    """An error issue as `CRATE-API-1F (api, score 85)`; only identifier-like text."""
+    extra = []
+    if isinstance(item.get("service"), str) and IDENTIFIER.fullmatch(item["service"]):
+        extra.append(item["service"][:40])
+    score = item.get("crate_score")
+    if type(score) in {int, float} and math.isfinite(score):
+        extra.append(f"score {_number(score)}")
+    return item["short_id"] + (f" ({', '.join(extra)})" if extra else "")
+
+
 def _detail_text(detail):
     if isinstance(detail, list) and all(
         isinstance(item, dict) and "name" in item for item in detail
@@ -360,6 +372,13 @@ def _detail_text(detail):
             suffix = f" {_number(value)}" if type(value) in {int, float} else ""
             parts.append(f"{item['name']}{suffix}")
         return ", ".join(parts)
+    if isinstance(detail, list) and all(
+        isinstance(item, dict)
+        and isinstance(item.get("short_id"), str)
+        and IDENTIFIER.fullmatch(item["short_id"])
+        for item in detail
+    ):
+        return ", ".join(_issue_text(item) for item in detail[:5])
     return json.dumps(detail, sort_keys=True)[:300]
 
 

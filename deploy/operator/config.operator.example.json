@@ -330,6 +330,20 @@
       "fresh_seconds": 900,
       "cooldown_seconds": 1800,
       "enabled": false
+    },
+    {
+      "id": "errors-critical",
+      "subsystem": "error-inbox",
+      "tool": "get_error_summary",
+      "source_path": ["data", "sources", "inbox"],
+      "field": ["critical_open"],
+      "detail_field": ["top_critical"],
+      "kind": "high",
+      "threshold": 1,
+      "clear_threshold": 0,
+      "fresh_seconds": 900,
+      "cooldown_seconds": 3600,
+      "enabled": false
     }
   ],
   "human_callback_secret_file": "/run/secrets/operator_human",
