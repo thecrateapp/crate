@@ -858,12 +858,14 @@ def _execute_task(task_type: str, task_id: str, ai_requeues: int = 0):
     )
     hb_thread.start()
 
-    # Record queue wait time (created → running)
+    # Record queue wait time (created → first running). A retried or requeued
+    # task already started once; counting from creation again would report its
+    # earlier runs and delays as queue wait.
     try:
         from crate.metrics import record
 
         created = task.get("created_at")
-        if created and hasattr(created, "timestamp"):
+        if created and hasattr(created, "timestamp") and not task.get("started_at"):
             wait_sec = _time.time() - created.timestamp()
             record("worker.queue.wait", wait_sec, {"type": task_type})
     except Exception:
