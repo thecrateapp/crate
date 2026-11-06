@@ -272,3 +272,134 @@ def test_lossless_formats_outrank_lossy_ones():
 
     assert {audio_format_rank(fmt) for fmt in ("flac", ".ape", "wv", "dsf")} == {100}
     assert audio_format_rank("mp3") < audio_format_rank("m4a") < 100
+
+
+def _write_flac(path, *, title, position, checksum, date="2026-11-06"):
+    from mutagen.flac import FLAC
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    stream_info = (
+        (4096).to_bytes(2, "big") * 2
+        + bytes(6)
+        + ((44100 << 44) | (1 << 41) | (15 << 36) | (44100 * 158)).to_bytes(8, "big")
+        + checksum.to_bytes(16, "big")
+    )
+    path.write_bytes(b"fLaC\x80\x00\x00\x22" + stream_info)
+    audio = FLAC(path)
+    audio["title"] = title
+    audio["tracknumber"] = str(position)
+    audio["album"] = "Chosen Hell"
+    audio["artist"] = "Comeback Kid"
+    audio["date"] = date
+    audio.save()
+
+
+def test_album_import_reuses_identical_single_identity_at_its_album_position(tmp_path):
+    from mutagen.flac import FLAC
+
+    library, target = _managed_album(tmp_path)
+    existing = target / "single-identity.flac"
+    _write_flac(
+        existing, title="Chosen Hell", position=1, checksum=42, date="2026-08-27"
+    )
+    staged = tmp_path / "staging"
+    _write_flac(staged / "01.flac", title="Target On My Back", position=1, checksum=1)
+    _write_flac(staged / "02.flac", title="Vindication", position=2, checksum=2)
+    _write_flac(staged / "06.flac", title="Chosen Hell", position=6, checksum=42)
+
+    moved = storage_import.move_album_tree(
+        staged,
+        target,
+        managed_track_names=True,
+        artist_name="Comeback Kid",
+        album_name="Chosen Hell",
+        library_root=library,
+    )
+
+    assert moved == 3
+    assert len(list(target.glob("*.flac"))) == 3
+    assert FLAC(existing)["tracknumber"] == ["6"]
+    assert FLAC(existing)["date"] == ["2026-11-06"]
+    old_copy = library / ".crate-trash/tracks/artist-uid/album-uid/single-identity.flac"
+    assert FLAC(old_copy)["tracknumber"] == ["1"]
+
+
+def test_album_import_does_not_merge_a_different_recording_with_the_same_title(
+    tmp_path,
+):
+    library, target = _managed_album(tmp_path)
+    existing = target / "single-identity.flac"
+    _write_flac(existing, title="Chosen Hell", position=1, checksum=42)
+    staged = tmp_path / "staging"
+    _write_flac(staged / "01.flac", title="Target On My Back", position=1, checksum=1)
+    _write_flac(staged / "02.flac", title="Vindication", position=2, checksum=2)
+    _write_flac(staged / "06.flac", title="Chosen Hell", position=6, checksum=43)
+
+    storage_import.move_album_tree(
+        staged,
+        target,
+        managed_track_names=True,
+        artist_name="Comeback Kid",
+        album_name="Chosen Hell",
+        library_root=library,
+    )
+
+    assert len(list(target.glob("*.flac"))) == 4
+    assert existing.exists()
+    assert not (library / ".crate-trash").exists()
+
+
+def test_album_import_preserves_intentionally_repeated_identical_tracks(tmp_path):
+    library, target = _managed_album(tmp_path)
+    existing = target / "single-identity.flac"
+    _write_flac(existing, title="Chosen Hell", position=1, checksum=42)
+    staged = tmp_path / "staging"
+    _write_flac(staged / "01.flac", title="Opening", position=1, checksum=1)
+    _write_flac(staged / "02.flac", title="Chosen Hell", position=2, checksum=42)
+    _write_flac(staged / "06.flac", title="Chosen Hell", position=6, checksum=42)
+
+    storage_import.move_album_tree(
+        staged,
+        target,
+        managed_track_names=True,
+        artist_name="Comeback Kid",
+        album_name="Chosen Hell",
+        library_root=library,
+    )
+
+    assert len(list(target.glob("*.flac"))) == 4
+    assert existing.exists()
+
+
+def test_unreadable_flac_has_no_recording_identity(tmp_path):
+    path = tmp_path / "corrupt.flac"
+    path.write_bytes(b"not a valid FLAC")
+    stat = path.stat()
+
+    assert (
+        storage_import._flac_audio_identity(str(path), stat.st_mtime_ns, stat.st_size)
+        is None
+    )
+
+
+def test_missing_flac_checksum_does_not_merge_an_advance_single(tmp_path):
+    library, target = _managed_album(tmp_path)
+    existing = target / "single-identity.flac"
+    _write_flac(existing, title="Chosen Hell", position=1, checksum=0)
+    staged = tmp_path / "staging"
+    _write_flac(staged / "01.flac", title="Target On My Back", position=1, checksum=1)
+    _write_flac(staged / "02.flac", title="Vindication", position=2, checksum=2)
+    _write_flac(staged / "06.flac", title="Chosen Hell", position=6, checksum=0)
+
+    storage_import.move_album_tree(
+        staged,
+        target,
+        managed_track_names=True,
+        artist_name="Comeback Kid",
+        album_name="Chosen Hell",
+        library_root=library,
+    )
+
+    assert len(list(target.glob("*.flac"))) == 4
+    assert existing.exists()
+    assert not (library / ".crate-trash").exists()

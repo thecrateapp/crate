@@ -130,6 +130,7 @@ def upsert_new_release(
     """Insert or update a detected new release. Returns release ID."""
     clean_tracklist = dedupe_release_tracklist(tracklist)
     clean_preview_tracks = dedupe_release_preview_tracks(preview_tracks)
+    tracks = max(tracks, len(clean_tracklist))
     if session is None:
         with transaction_scope() as s:
             return upsert_new_release(
@@ -161,8 +162,14 @@ def upsert_new_release(
                 cover_source, tracklist_json, preview_tracks_json)
             VALUES (:artist_name, :album_title, :tidal_id, :tidal_url, :cover_url, :year, :tracks, :quality, 'detected', :detected_at, :release_date, :release_type, :mb_release_group_id, :source_name, :source_url, :cover_source, CAST(:tracklist_json AS jsonb), CAST(:preview_tracks_json AS jsonb))
             ON CONFLICT (artist_name, album_title) DO UPDATE SET
-                tidal_id = COALESCE(NULLIF(EXCLUDED.tidal_id, ''), new_releases.tidal_id),
-                tidal_url = COALESCE(NULLIF(EXCLUDED.tidal_url, ''), new_releases.tidal_url),
+                tidal_id = CASE
+                    WHEN EXCLUDED.tidal_url = '' AND EXCLUDED.tracks > COALESCE(new_releases.tracks, 0)
+                    THEN '' ELSE COALESCE(NULLIF(EXCLUDED.tidal_id, ''), new_releases.tidal_id)
+                END,
+                tidal_url = CASE
+                    WHEN EXCLUDED.tidal_url = '' AND EXCLUDED.tracks > COALESCE(new_releases.tracks, 0)
+                    THEN '' ELSE COALESCE(NULLIF(EXCLUDED.tidal_url, ''), new_releases.tidal_url)
+                END,
                 cover_url = CASE
                     WHEN new_releases.cover_source = 'manual'
                      AND NULLIF(new_releases.cover_url, '') IS NOT NULL
@@ -175,8 +182,16 @@ def upsert_new_release(
                 release_date = COALESCE(EXCLUDED.release_date, new_releases.release_date),
                 release_type = COALESCE(NULLIF(EXCLUDED.release_type, ''), new_releases.release_type),
                 mb_release_group_id = COALESCE(NULLIF(EXCLUDED.mb_release_group_id, ''), new_releases.mb_release_group_id),
-                source_name = COALESCE(NULLIF(EXCLUDED.source_name, ''), new_releases.source_name),
-                source_url = COALESCE(NULLIF(EXCLUDED.source_url, ''), new_releases.source_url),
+                source_name = CASE
+                    WHEN new_releases.source_name = 'tidal'
+                     AND COALESCE(EXCLUDED.source_url, '') = '' AND EXCLUDED.tracks > COALESCE(new_releases.tracks, 0)
+                    THEN NULL ELSE COALESCE(NULLIF(EXCLUDED.source_name, ''), new_releases.source_name)
+                END,
+                source_url = CASE
+                    WHEN new_releases.source_name = 'tidal'
+                     AND COALESCE(EXCLUDED.source_url, '') = '' AND EXCLUDED.tracks > COALESCE(new_releases.tracks, 0)
+                    THEN NULL ELSE COALESCE(NULLIF(EXCLUDED.source_url, ''), new_releases.source_url)
+                END,
                 cover_source = CASE
                     WHEN new_releases.cover_source = 'manual'
                      AND NULLIF(new_releases.cover_url, '') IS NOT NULL

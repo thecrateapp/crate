@@ -92,7 +92,7 @@ def test_register_new_release_uses_tidal_tracklist_when_mb_is_empty(monkeypatch)
 
     monkeypatch.setattr(
         "crate.worker_handlers.acquisition._find_tidal_release_match",
-        lambda _artist, _title: {
+        lambda _artist, _title, **_kwargs: {
             "tidal_url": "https://tidal.com/album/515000",
             "tidal_id": "515000",
             "cover_url": "https://img.example/cover.jpg",
@@ -181,7 +181,7 @@ def test_register_new_release_downloads_on_release_day(monkeypatch):
 
     monkeypatch.setattr(
         "crate.worker_handlers.acquisition._find_tidal_release_match",
-        lambda _artist, _title: {
+        lambda _artist, _title, **_kwargs: {
             "tidal_url": "https://tidal.com/album/777",
             "tidal_id": "777",
             "cover_url": "https://img.example/release.jpg",
@@ -271,7 +271,7 @@ def test_register_new_release_queues_each_preview_source(monkeypatch):
 
     monkeypatch.setattr(
         "crate.worker_handlers.acquisition._find_tidal_release_match",
-        lambda _artist, _title: {
+        lambda _artist, _title, **_kwargs: {
             "tidal_url": "",
             "tidal_id": "",
             "cover_url": "",
@@ -1242,8 +1242,12 @@ def _patch_promotion(monkeypatch, releases, *, tidal_matches=None):
     from crate.worker_handlers import acquisition
 
     calls = {"downloaded": [], "downloading": [], "sources": [], "tasks": []}
+    monkeypatch.setattr(acquisition, "get_cache", lambda _key: None)
+    monkeypatch.setattr(acquisition, "set_cache", lambda *args, **kwargs: None)
     monkeypatch.setattr(
-        acquisition, "get_due_prereleases", lambda today, lookback_days: releases
+        acquisition,
+        "get_due_prereleases",
+        lambda today, lookback_days, **kwargs: releases,
     )
     monkeypatch.setattr(acquisition, "get_setting", lambda key, default: "max")
     monkeypatch.setattr(acquisition, "emit_progress", lambda *a, **k: None)
@@ -1263,8 +1267,20 @@ def _patch_promotion(monkeypatch, releases, *, tidal_matches=None):
     monkeypatch.setattr(
         acquisition,
         "_find_tidal_release_match",
-        lambda artist, title: (tidal_matches or {}).get(
-            title, {"tidal_url": "", "tidal_id": ""}
+        lambda artist, title, **metadata: (tidal_matches or {}).get(
+            title,
+            {
+                "tidal_url": next(
+                    (
+                        row.get("tidal_url", "")
+                        for row in releases
+                        if row["album_title"] == title
+                    ),
+                    "",
+                ),
+                "tidal_id": "",
+                "tracks": metadata.get("expected_tracks", 0),
+            },
         ),
     )
     monkeypatch.setattr(
@@ -1323,6 +1339,7 @@ def test_promote_due_releases_downloads_released_prereleases(monkeypatch):
             "Distance in Static": {
                 "tidal_url": "https://tidal.com/album/532092074",
                 "tidal_id": "532092074",
+                "tracks": 12,
             }
         },
     )
@@ -1396,7 +1413,7 @@ def test_promote_due_releases_caps_tidal_lookups_per_run(monkeypatch):
     monkeypatch.setattr(
         acquisition,
         "_find_tidal_release_match",
-        lambda artist, title: (
+        lambda artist, title, **_metadata: (
             searched.append(title) or {"tidal_url": "", "tidal_id": ""}
         ),
     )
@@ -1453,7 +1470,13 @@ def test_find_tidal_release_match_ignores_untitled_or_urlless_results(monkeypatc
             "albums": [
                 {"id": 1, "title": "", "url": "https://tidal.com/album/1"},
                 {"id": 2, "title": "Siete", "url": ""},
-                {"id": 3, "title": "Siete", "url": "https://tidal.com/album/3"},
+                {
+                    "id": 3,
+                    "title": "Siete",
+                    "artist": "Toundra",
+                    "tracks": 7,
+                    "url": "https://tidal.com/album/3",
+                },
             ]
         },
     )

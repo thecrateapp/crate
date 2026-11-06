@@ -94,6 +94,7 @@ NEW_RELEASE_SCAN_TTL = timedelta(hours=12)
 PRERELEASE_PROMOTION_LOOKBACK_DAYS = 60
 PRERELEASE_PROMOTION_MAX_DOWNLOADS = 10
 PRERELEASE_PROMOTION_MAX_LOOKUPS = 10
+PRERELEASE_PROMOTION_CURSOR_KEY = "new_releases:promotion_cursor"
 
 
 def _emit_acquisition_domain_event(
@@ -1169,29 +1170,7 @@ def _update_new_releases_progress(
     emit_progress(task_id, p)
 
 
-def _find_tidal_release_match(artist_name: str, title: str) -> dict:
-    from crate import tidal as tidal_mod
-
-    try:
-        tidal_results = tidal_mod.search(
-            f"{artist_name} {title}", content_type="albums", limit=3
-        )
-        wanted = title.strip().lower()
-        for tidal_album in tidal_results.get("albums", []):
-            title_match = str(tidal_album.get("title") or "").strip().lower()
-            if not wanted or not title_match or not tidal_album.get("url"):
-                continue
-            if wanted in title_match or title_match in wanted:
-                return {
-                    "tidal_url": _normalize_tidal_url(tidal_album.get("url", "")),
-                    "tidal_id": str(tidal_album.get("id", "")),
-                    "cover_url": tidal_album.get("cover", ""),
-                    "tracks": tidal_album.get("tracks", 0),
-                    "quality": tidal_album.get("quality", ""),
-                }
-    except Exception:
-        log.debug("Tidal search failed for %s - %s", artist_name, title, exc_info=True)
-
+def _empty_tidal_release_match() -> dict:
     return {
         "tidal_url": "",
         "tidal_id": "",
@@ -1199,6 +1178,78 @@ def _find_tidal_release_match(artist_name: str, title: str) -> dict:
         "tracks": 0,
         "quality": "",
     }
+
+
+def _release_track_count(value: object) -> int:
+    try:
+        return max(0, int(str(value or 0)))
+    except (ValueError, TypeError):
+        return 0
+
+
+def _release_search_key(value: object) -> str:
+    raw = str(value or "").casefold()
+    return " ".join(re.findall(r"[^\W_]+", raw)) or " ".join(raw.split())
+
+
+def _find_tidal_release_match(
+    artist_name: str,
+    title: str,
+    *,
+    expected_tracks: int = 0,
+    release_type: str = "",
+) -> dict:
+    from crate import tidal as tidal_mod
+
+    try:
+        tidal_results = tidal_mod.search(
+            f"{artist_name} {title}", content_type="albums", limit=10
+        )
+        wanted = _release_search_key(title)
+        wanted_artist = _release_search_key(artist_name)
+        matches = []
+        for tidal_album in tidal_results.get("albums", []):
+            title_match = _release_search_key(tidal_album.get("title"))
+            if (
+                not wanted
+                or title_match != wanted
+                or not wanted_artist
+                or _release_search_key(tidal_album.get("artist")) != wanted_artist
+                or not tidal_album.get("url")
+            ):
+                continue
+            tracks = _release_track_count(tidal_album.get("tracks"))
+            if not tracks:
+                continue
+            if expected_tracks and tracks < expected_tracks:
+                continue
+            source_type = str(tidal_album.get("type") or "").casefold()
+            if release_type.casefold() == "album" and source_type in {"single", "ep"}:
+                continue
+            if (
+                not expected_tracks
+                and release_type.casefold() == "album"
+                and source_type != "album"
+                and tracks <= 3
+            ):
+                continue
+            matches.append(
+                {
+                    "tidal_url": _normalize_tidal_url(tidal_album.get("url", "")),
+                    "tidal_id": str(tidal_album.get("id", "")),
+                    "cover_url": tidal_album.get("cover", ""),
+                    "tracks": tracks,
+                    "quality": tidal_album.get("quality", ""),
+                }
+            )
+        if matches:
+            return min(
+                matches, key=lambda match: abs(match["tracks"] - expected_tracks)
+            )
+    except Exception:
+        log.debug("Tidal search failed for %s - %s", artist_name, title, exc_info=True)
+
+    return _empty_tidal_release_match()
 
 
 def _get_tidal_release_tracklist(album_id: str) -> list[dict]:
@@ -1475,7 +1526,6 @@ def _register_new_release(
         return 0, False
 
     release_group_id = str(release.get("mbid", ""))
-    tidal_data = _find_tidal_release_match(artist_name, title)
     try:
         from crate.musicbrainz_ext import get_release_group_tracklist
 
@@ -1483,6 +1533,14 @@ def _register_new_release(
     except Exception:
         log.debug("Failed to load MB tracklist for %s", release_group_id, exc_info=True)
         tracklist = []
+    tidal_data = _find_tidal_release_match(
+        artist_name,
+        title,
+        expected_tracks=len(tracklist),
+        release_type=str(release.get("type") or ""),
+    )
+    if tracklist and _release_track_count(tidal_data["tracks"]) < len(tracklist):
+        tidal_data = _empty_tidal_release_match()
     tidal_tracklist = _get_tidal_release_tracklist(tidal_data["tidal_id"])
     if tidal_tracklist and len(tidal_tracklist) > len(tracklist):
         tracklist = tidal_tracklist
@@ -1506,7 +1564,7 @@ def _register_new_release(
         tidal_url=tidal_data["tidal_url"],
         cover_url=cover_url,
         year=year,
-        tracks=tidal_data["tracks"] or len(tracklist),
+        tracks=max(_release_track_count(tidal_data["tracks"]), len(tracklist)),
         quality=_quality_label(tidal_data["quality"] or preview_data["quality"]),
         release_date=release_date,
         release_type=release.get("type", "Album"),
@@ -1696,14 +1754,18 @@ def _handle_check_new_releases(task_id: str, params: dict, config: dict) -> dict
 
 def _handle_promote_due_releases(task_id: str, params: dict, config: dict) -> dict:
     today = datetime.now(timezone.utc).date()
+    cursor = _release_track_count(get_cache(PRERELEASE_PROMOTION_CURSOR_KEY))
     releases = get_due_prereleases(
-        today, lookback_days=PRERELEASE_PROMOTION_LOOKBACK_DAYS
+        today,
+        lookback_days=PRERELEASE_PROMOTION_LOOKBACK_DAYS,
+        after_release_id=cursor,
     )
     quality = get_setting("tidal_quality", "max")
     queued = 0
     lookups = 0
     already_in_library = 0
     waiting_for_source = 0
+    last_lookup_id = None
     p = TaskProgress(phase="promoting", phase_count=1, total=len(releases))
 
     for index, release in enumerate(releases, start=1):
@@ -1716,24 +1778,36 @@ def _handle_promote_due_releases(task_id: str, params: dict, config: dict) -> di
         p.item = entity_label(artist=artist_name, album=album_title)
         emit_progress(task_id, p)
 
-        expected_tracks = int(release.get("tracks") or 0)
+        tracklist = release.get("tracklist_json") or []
+        expected_tracks = max(
+            _release_track_count(release.get("tracks")),
+            len(tracklist) if isinstance(tracklist, list) else 0,
+        )
         library_tracks = int(release.get("library_track_count") or 0)
         if expected_tracks and library_tracks >= expected_tracks:
             mark_release_downloaded(release_id)
             already_in_library += 1
             continue
 
-        tidal_url = _normalize_tidal_url(str(release.get("tidal_url") or ""))
-        if not tidal_url:
-            if lookups >= PRERELEASE_PROMOTION_MAX_LOOKUPS:
-                waiting_for_source += 1
-                continue
-            lookups += 1
-            match = _find_tidal_release_match(artist_name, album_title)
-            tidal_url = match["tidal_url"]
-            if not tidal_url:
-                waiting_for_source += 1
-                continue
+        if lookups >= PRERELEASE_PROMOTION_MAX_LOOKUPS:
+            waiting_for_source += 1
+            continue
+        lookups += 1
+        last_lookup_id = release_id
+        match = _find_tidal_release_match(
+            artist_name,
+            album_title,
+            expected_tracks=expected_tracks,
+            release_type=str(release.get("release_type") or ""),
+        )
+        tidal_url = match["tidal_url"]
+        if not tidal_url or (
+            expected_tracks
+            and _release_track_count(match.get("tracks")) < expected_tracks
+        ):
+            waiting_for_source += 1
+            continue
+        if tidal_url != _normalize_tidal_url(str(release.get("tidal_url") or "")):
             set_new_release_tidal_source(
                 release_id, tidal_id=match["tidal_id"], tidal_url=tidal_url
             )
@@ -1763,6 +1837,9 @@ def _handle_promote_due_releases(task_id: str, params: dict, config: dict) -> di
                 "release_date": release.get("release_date"),
             },
         )
+
+    if last_lookup_id is not None:
+        set_cache(PRERELEASE_PROMOTION_CURSOR_KEY, last_lookup_id, ttl=86400 * 7)
 
     return {
         "due": len(releases),

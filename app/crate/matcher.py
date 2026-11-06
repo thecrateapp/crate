@@ -194,8 +194,8 @@ def _search_musicbrainz(artist: str, album: str, track_count: int) -> list[dict]
     candidates: list[dict] = []
 
     queries = [
-        {"artist": artist, "release": album, "limit": 10},
         {"artist": artist, "release": album, "tracks": track_count, "limit": 10},
+        {"artist": artist, "release": album, "limit": 10},
     ]
 
     for kwargs in queries:
@@ -206,6 +206,13 @@ def _search_musicbrainz(artist: str, album: str, track_count: int) -> list[dict]
                 if mbid in seen_mbids:
                     continue
                 seen_mbids.add(mbid)
+                try:
+                    candidate_track_count = sum(
+                        int(medium.get("track-count") or 0)
+                        for medium in r.get("medium-list", [])
+                    ) or kwargs.get("tracks")
+                except (TypeError, ValueError):
+                    candidate_track_count = None
                 candidates.append(
                     {
                         "mbid": mbid,
@@ -213,11 +220,21 @@ def _search_musicbrainz(artist: str, album: str, track_count: int) -> list[dict]
                         "artist": r.get("artist-credit-phrase", ""),
                         "date": r.get("date", ""),
                         "score": int(r.get("ext:score", 0)),
+                        "track_count": candidate_track_count,
                     }
                 )
         except Exception as e:
             log.error("MB search failed: %s", e)
 
+    if track_count:
+        candidates.sort(
+            key=lambda candidate: (
+                abs(candidate["track_count"] - track_count)
+                / max(candidate["track_count"], track_count)
+                if candidate.get("track_count")
+                else 1
+            )
+        )
     return candidates
 
 
@@ -285,11 +302,8 @@ def _best_title_match(title: str, candidates: list[dict]) -> tuple[int, dict | N
 def _score_match(local: dict, release: dict) -> int:
     """Score how well a MB release matches local files. 0-100.
 
-    Uses best-match pairing (not positional) so bonus tracks or
-    different track order don't tank the score.  Deluxe/expanded
-    editions are handled gracefully: only matched tracks count toward
-    the title-similarity average, and track-count differences are
-    scored relative to the smaller side.
+    Uses best-match pairing (not positional), allowing incomplete albums
+    and bonus tracks while penalizing local recordings absent from a release.
     """
     from thefuzz import fuzz
 
@@ -307,7 +321,6 @@ def _score_match(local: dict, release: dict) -> int:
 
     # Best-match title + duration pairing (0-50)
     matched_title_scores = []
-    unmatched_count = 0
     duration_diffs = []
     remaining_mb = list(mb_tracks)
 
@@ -317,26 +330,25 @@ def _score_match(local: dict, release: dict) -> int:
             matched_title_scores.append(t_score)
             duration_diffs.append(abs(lt["length_sec"] - best.get("length_sec", 0)))
             remaining_mb.remove(best)
-        else:
-            unmatched_count += 1
 
     # Coverage: what fraction of MB tracks did we match?
     matched_count = len(matched_title_scores)
     coverage = matched_count / mb_count if mb_count else 0
+    local_coverage = matched_count / local_count if local_count else 0
 
     if matched_title_scores:
         avg_title = sum(matched_title_scores) / len(matched_title_scores)
         # Scale by coverage so a partial match (deluxe) still scores well
-        score += int(avg_title * 0.35 * max(coverage, 0.6))  # 0-35
+        score += int(avg_title * 0.35 * max(coverage, 0.6) * local_coverage)
 
     if duration_diffs:
         avg_diff = sum(duration_diffs) / len(duration_diffs)
         if avg_diff <= 2:
-            score += 15
+            score += int(15 * local_coverage)
         elif avg_diff <= 5:
-            score += 10
+            score += int(10 * local_coverage)
         elif avg_diff <= 10:
-            score += 5
+            score += int(5 * local_coverage)
 
     # Album name match (0-25)
     # Use token_set_ratio so "Album (Deluxe Edition)" matches "Album"
