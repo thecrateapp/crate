@@ -142,6 +142,11 @@ development library on 2026-11-04 (all profiles `smart-mix-audio-v5`), its
 context. Later phases plan this same file: rebuilding the set after a reanalysis would give
 different edges, because the compatible-tracks ranking reads the profiles.
 
+`baselines/dev-2026-11-06-sm2/` keeps the SM2 evaluation of `smart-mix-v3`: `sm0/` plans the
+SM0 set with v2 and v3 (identical plans: its v5 profiles have no phrases) and `spike/` holds the
+spike track UIDs, the 184-edge pool set built from the 64 with phrases and the v2 and v3 reports
+for the `dj` and `listen` contexts.
+
 ## Pool edge sets
 
 The SM0 set has no phrases (v5 profiles), so it cannot tell `smart-mix-v3` from v2: without
