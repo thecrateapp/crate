@@ -161,6 +161,8 @@ $RUN -e HOME=/tmp --entrypoint sh crate-analysis-worker:eval -c \
 `evaluate` splits the tracks into `tune` (even positions in stem order) and `held` (odd),
 and prints the variants whose tuning precision at ±3 s is not below the base's, best F1
 first. SM3-D17 kept variant A with weights 2 (harmony) and 8 (timbre) and a 4 dB cost.
+Both variants standardise each MFCC coefficient as the analyzer does, dividing by its
+standard deviation or `MFCC_STD_FLOOR` (1.0), whichever is larger.
 
 `diagnose_downbeats.py` takes the same `--allin1`, `--madmom`, `--baseline` and `--tracks`,
 plus `--beat-this` for Beat This! records and `--analysis` to diagnose analyzer records

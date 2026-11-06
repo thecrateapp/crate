@@ -20,7 +20,8 @@ Variants: ``base`` is the v7 novelty alone; ``A`` adds the production terms
 (``structure._harmony_timbre``: distance between the four-bar mean chroma and MFCC
 before and after a boundary), which SM3-D17 kept with weights 2 and 8 and a 4 dB
 cost; ``B`` adds a Foote checkerboard kernel of 4 + 4 bars over the bar
-self-similarity of chroma and MFCC, which it rejected.
+self-similarity of chroma and MFCC, which it rejected. Both standardise each MFCC
+coefficient over the music bars, dividing by at least ``structure.MFCC_STD_FLOOR``.
 """
 
 from __future__ import annotations
@@ -96,8 +97,15 @@ def _cosine_similarity(matrix: np.ndarray) -> np.ndarray:
 
 
 def _standardized(mfcc: np.ndarray) -> np.ndarray:
+    """Each coefficient minus its mean, over its deviation or ``MFCC_STD_FLOOR``.
+
+    The larger of the two, as the production timbre term divides (variant A), so the
+    bar-to-bar noise of a near-static loop stays noise.
+    """
+    from crate.smart_mix import structure
+
     deviation = mfcc.std(axis=0)
-    return (mfcc - mfcc.mean(axis=0)) / np.where(deviation > 1e-8, deviation, 1.0)
+    return (mfcc - mfcc.mean(axis=0)) / np.maximum(deviation, structure.MFCC_STD_FLOOR)
 
 
 def foote_terms(

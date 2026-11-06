@@ -352,6 +352,18 @@ def test_foote_terms_are_zero_where_the_production_novelty_is() -> None:
     assert all(math.isfinite(value) and value == 0.0 for value in silent)
 
 
+def test_foote_timbre_keeps_a_static_loop_flat() -> None:
+    # Variant B standardises the MFCC under the production MFCC_STD_FLOOR, so the
+    # bar-to-bar noise of a static loop does not grow into timbre novelty.
+    rng = np.random.default_rng(7)
+    bars = 16
+    mfcc = np.linspace(-20.0, 5.0, 13) + rng.normal(0.0, 0.05, (bars, 13))
+
+    _, timbre = novelty_prototype.foote_terms(np.ones((bars, 12)), mfcc, [False] * bars)
+
+    assert max(timbre) < 0.01
+
+
 def test_variant_a_is_the_production_novelty() -> None:
     from crate.smart_mix import structure
 
