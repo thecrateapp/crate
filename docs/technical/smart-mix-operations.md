@@ -152,7 +152,11 @@ compares the four bars before it with the four after it, gap bars left out:
 - plus harmony (SM3-D17): 2 dB (`HARMONY_WEIGHT`) per unit of cosine distance between the
   two mean chromas;
 - plus timbre: 8 dB (`TIMBRE_WEIGHT`) per unit of distance between the two mean MFCC over
-  √13, each coefficient standardised over the bars from the first to the last music bar.
+  √13, each coefficient standardised over the bars from the first to the last music bar:
+  minus its mean, over its standard deviation or 1.0 (`MFCC_STD_FLOOR`, in the MFCC units
+  of librosa's `mfcc` of the dB mel levels), whichever is larger. Without the floor, the
+  bar-to-bar noise of a near-static loop grew to unit variance and split the loop every 8
+  bars.
 
 A dynamic programme keeps the 8-bar grid boundaries whose novelty pays 4 dB each
 (`BOUNDARY_COST_DB`; boundaries on 16- and 32-bar multiples get 0.25 and 0.5 dB of bonus).
@@ -413,6 +417,8 @@ beats with the DBN, as the worker does.
   columns.
 - **SM3-D17 acceptance.** F1 at ±3 s of at least 0.52 with precision not below SMB.PR2c's
   and at most 0.5 s more per track: 0.53, precision 0.55 against 0.54, and milliseconds.
+- **MFCC deviation floor.** Rerun on the same beats with the `crate-cli` that adds the
+  floor, the 145 profiles are identical, so the table stands.
 - **Meter.** The DBN reads 3 beats per bar on 5 of the 145 tracks; All-In-One agrees on 3
   of them and hears three beats nowhere else. Those tracks get no phrases (SM3-D16).
 - **Checkpoint.** `small0` against `final0`: their raw downbeats agree with All-In-One on 38
