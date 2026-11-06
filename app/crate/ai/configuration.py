@@ -34,6 +34,9 @@ if TYPE_CHECKING:
     from typing_extensions import TypeForm
 
 _PROVIDERS = ("gemini", "deepseek", "ollama")
+# Providers that can come from the server environment: they have a symbolic
+# `env:<provider>` connection and can be the provider of an inherited legacy setup.
+_ENVIRONMENT_PROVIDERS = _PROVIDERS
 _KEYS = {
     "gemini": ("GEMINI_API_KEY", "AUDIOMUSE_GEMINI_API_KEY"),
     "deepseek": ("DEEPSEEK_API_KEY",),
@@ -67,7 +70,7 @@ def _env_id(provider):
 
 
 def ensure_environment_connection(provider, *, expected_revision=None):
-    if provider not in _PROVIDERS:
+    if provider not in _ENVIRONMENT_PROVIDERS:
         _fail("AI_PROVIDER_UNSUPPORTED", "Provider is not supported")
     from crate.llm.provider import get_config
 
@@ -85,7 +88,7 @@ def _connection(id, *, persist=False, expected_revision=None) -> dict:
     symbolic_environment = id.startswith("env:")
     if id.startswith("env:"):
         provider = id[4:]
-        if provider not in _PROVIDERS:
+        if provider not in _ENVIRONMENT_PROVIDERS:
             _fail("AI_PROVIDER_UNSUPPORTED", "Provider is not supported")
         id = (
             ensure_environment_connection(
@@ -274,7 +277,7 @@ def snapshot():
     connections = [
         _public_connection(c, include_models=False) for c in data["connections"]
     ]
-    for provider in _PROVIDERS:
+    for provider in _ENVIRONMENT_PROVIDERS:
         if f"env:{provider}" in {c["id"] for c in connections}:
             continue
         key = _environment_key(provider)
@@ -327,7 +330,7 @@ def snapshot():
                 )
             }
             | {
-                "supported": context["provider"] in _PROVIDERS,
+                "supported": context["provider"] in _ENVIRONMENT_PROVIDERS,
                 "legacy_enabled": _legacy_enabled(
                     context["action_id"], context["provider"]
                 ),
@@ -401,7 +404,7 @@ def set_credential(id, api_key, expected_revision, actor_id):
 
 
 def connection_models(id):
-    if id.startswith("env:") and id[4:] not in _PROVIDERS:
+    if id.startswith("env:") and id[4:] not in _ENVIRONMENT_PROVIDERS:
         _fail("AI_PROVIDER_UNSUPPORTED", "Provider is not supported")
     row = (
         _connection(id)
@@ -618,7 +621,7 @@ def _assignment_connection(public_id, connections):
     """Resolve a public connection id inside one read snapshot; never persists."""
     if public_id.startswith("env:"):
         provider = public_id[4:]
-        if provider not in _PROVIDERS:
+        if provider not in _ENVIRONMENT_PROVIDERS:
             _fail("AI_PROVIDER_UNSUPPORTED", "Provider is not supported")
         row = connections.get(_env_id(provider))
         if row is None:
@@ -781,7 +784,7 @@ def _plan_assignment(derived, data, contexts, connection, model_id):
                 }
             else:
                 context = contexts[action_id]
-                if context["provider"] not in _PROVIDERS:
+                if context["provider"] not in _ENVIRONMENT_PROVIDERS:
                     _fail("AI_PROVIDER_UNSUPPORTED", "Provider is not supported")
                 row = connections.get(_env_id(context["provider"]))
                 if row is None:
@@ -912,7 +915,7 @@ def _validate_legacy_or_normal(connection, version, action_id):
         None,
     )
     if (
-        connection["provider"] not in _PROVIDERS
+        connection["provider"] not in _ENVIRONMENT_PROVIDERS
         or not connection["enabled"]
         or model is None
     ):
@@ -988,7 +991,7 @@ def _legacy(action_id, config=None):
     )
     key = (
         _environment_key(provider)
-        if provider in _PROVIDERS
+        if provider in _ENVIRONMENT_PROVIDERS
         else get_provider_api_key(provider)
     )
     return {
@@ -1107,7 +1110,7 @@ def resolve_action(action_id, expected_fingerprint=None):
     if expected_fingerprint and expected_fingerprint != context["config_fingerprint"]:
         _fail("AI_CONTEXT_STALE", "Configuration changed; review before submitting")
     # Execution acceptance may materialize environment metadata, never the key.
-    if context["mode"] == "legacy" and context["provider"] in _PROVIDERS:
+    if context["mode"] == "legacy" and context["provider"] in _ENVIRONMENT_PROVIDERS:
         ensure_environment_connection(context["provider"])
     return context
 
@@ -1133,7 +1136,10 @@ def load_context_key(context):
             key = load_secret(context["credential_ref"], scope="ai")["api_key"]
         except (CredentialSecretError, KeyError):
             _fail("AI_CREDENTIAL_UNAVAILABLE", "Credential is unavailable")
-    elif context["mode"] == "legacy" and context["provider"] not in _PROVIDERS:
+    elif (
+        context["mode"] == "legacy"
+        and context["provider"] not in _ENVIRONMENT_PROVIDERS
+    ):
         from crate.llm.provider import get_provider_api_key
 
         key = get_provider_api_key(context["provider"])
