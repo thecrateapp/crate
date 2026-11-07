@@ -12,6 +12,15 @@ usage:
         --dataset tools/smart-mix-eval/out/dev/dataset.jsonl \
         --planner smart-mix-v2 --output tools/smart-mix-eval/out/dev/smart-mix-v2 \
         [--context dj] [--compare <other report.json>]
+
+    run_eval.py ... --planner smart-mix-v3 --refine gemini/gemini-3.8-flash \
+        --refine-connection <ai_provider_connections.id> [--max-usd 5]
+
+``--refine`` sends every v3 edge's candidate menu to a real model with the SM4
+prompt, schema and validation (``refine.py``); the report then serves the
+refined plan where the model's choice was accepted, keeps the deterministic plan
+and its metrics next to it, and adds the refinement statistics, the paired
+differences and the SG3 criteria of the design (§10).
 """
 
 from __future__ import annotations
@@ -24,7 +33,7 @@ from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from common import (
     display_path,
@@ -50,6 +59,17 @@ from crate.smart_mix.planner import (  # noqa: E402
     plan_transition_v3,
 )
 from crate.smart_mix.policy import PLANNER_POLICY, PLANNER_POLICY_V3  # noqa: E402
+from build_dataset import GenreRoots  # noqa: E402
+from refine import (  # noqa: E402
+    Budget,
+    EdgeJob,
+    EdgeRefinement,
+    RateLimiter,
+    Refiner,
+    environment_api_key,
+    parse_reasoning,
+    resolve_target,
+)
 
 # A planner returns a plan, or a v3 PlannedTransition (its plan plus the menu).
 Planner = Callable[
@@ -141,6 +161,7 @@ GROUP_FIELDS = (
     ("harmonicClashRate", "Key clash"),
     ("harmonicClashMsMean", "Key clash ms"),
     ("energyStepMean", "Energy step"),
+    ("vocalClashMsMean", "Vocal clash ms"),
     ("durationMsMean", "Duration ms"),
     ("unplayedMsMean", "Unplayed ms"),
     ("skippedMsMean", "Skipped ms"),
@@ -166,15 +187,38 @@ def percentile(values: Sequence[float], quantile: float) -> float | None:
     return ordered[lower] + (ordered[upper] - ordered[lower]) * fraction
 
 
+class EdgeRefiner(Protocol):
+    def refine_many(
+        self, jobs: Sequence[EdgeJob], *, concurrency: int = 1
+    ) -> list[EdgeRefinement]: ...
+
+
+# Pool edge sets carry no genre: their edges are grouped by the genre the prompt
+# carried instead.
+POOL_GENRE = "pool"
+
+
 def evaluate_dataset(
     rows: Iterable[Mapping[str, Any]],
     profiles: Mapping[str, TrackMixProfile | None],
     *,
     planner: str,
     context: TransitionContext,
+    refiner: EdgeRefiner | None = None,
+    genres: Mapping[str, str | None] | None = None,
+    genre_root: Callable[[str | None], str] | None = None,
+    concurrency: int = 1,
 ) -> list[dict[str, Any]]:
+    """Plan and score every edge; with ``refiner``, refine the v3 menus too.
+
+    A refined record serves the model's plan when it was accepted (``plan`` and
+    ``metrics`` are what the client plays) and keeps the planner's own plan and
+    metrics under ``deterministic``. ``genres`` maps a track to the genre slug the
+    prompt sends; ``genre_root`` resolves it to a root genre for pool edges.
+    """
     plan_edge = PLANNERS[planner]
     records = []
+    jobs: list[EdgeJob] = []
     for row in rows:
         outgoing_uid = str(row["outgoingTrackEntityUid"])
         incoming_uid = str(row["incomingTrackEntityUid"])
@@ -191,30 +235,92 @@ def evaluate_dataset(
             if isinstance(planned, PlannedTransition)
             else {}
         )
-        records.append(
-            {
-                "edgeId": row["edgeId"],
-                "stratum": row["stratum"],
-                "rootGenre": row["rootGenre"],
-                "tempoBand": row["tempoBand"],
-                "profiles": {
-                    "outgoing": _profile_state(
-                        outgoing, row.get("outgoingProfileRevision")
-                    ),
-                    "incoming": _profile_state(
-                        incoming, row.get("incomingProfileRevision")
-                    ),
-                },
-                "analyzerVersions": [
-                    profile.analyzer_version if profile else None
-                    for profile in (outgoing, incoming)
-                ],
-                "plan": plan.to_dict(),
-                **menu,
-                "metrics": evaluation.to_dict(),
+        record: dict[str, Any] = {
+            "edgeId": row["edgeId"],
+            "stratum": row["stratum"],
+            "rootGenre": row["rootGenre"],
+            "tempoBand": row["tempoBand"],
+            "profiles": {
+                "outgoing": _profile_state(
+                    outgoing, row.get("outgoingProfileRevision")
+                ),
+                "incoming": _profile_state(
+                    incoming, row.get("incomingProfileRevision")
+                ),
+            },
+            "analyzerVersions": [
+                profile.analyzer_version if profile else None
+                for profile in (outgoing, incoming)
+            ],
+            "plan": plan.to_dict(),
+            **menu,
+            "metrics": evaluation.to_dict(),
+        }
+        if refiner is not None and isinstance(planned, PlannedTransition):
+            prompt_genres = (
+                (genres or {}).get(outgoing_uid),
+                (genres or {}).get(incoming_uid),
+            )
+            record["genreRoot"] = _genre_root(row, prompt_genres[0], genre_root)
+            record["deterministic"] = {
+                "plan": record["plan"],
+                "metrics": record["metrics"],
             }
-        )
+            record["refinement"] = {
+                "status": "unavailable",
+                "code": "missing_profile",
+                "candidates": len(planned.candidates),
+                "changed": False,
+                "genres": list(prompt_genres),
+            }
+            if outgoing is not None and incoming is not None:
+                jobs.append(
+                    EdgeJob(
+                        edge_id=str(row["edgeId"]),
+                        outgoing=outgoing,
+                        incoming=incoming,
+                        candidates=planned.candidates,
+                        context=context,
+                        genres=prompt_genres,
+                    )
+                )
+        records.append(record)
+    if refiner is not None and jobs:
+        by_edge = {str(record["edgeId"]): record for record in records}
+        outcomes = refiner.refine_many(jobs, concurrency=concurrency)
+        for job, outcome in zip(jobs, outcomes, strict=True):
+            _serve_refinement(by_edge[job.edge_id], job, outcome, context)
     return records
+
+
+def _serve_refinement(
+    record: dict[str, Any],
+    job: EdgeJob,
+    outcome: EdgeRefinement,
+    context: TransitionContext,
+) -> None:
+    refinement = record["refinement"]
+    refinement.update(outcome.to_dict())
+    if outcome.status == "ready" and outcome.plan is not None:
+        served = outcome.plan.to_dict()
+        refinement["changed"] = served != record["deterministic"]["plan"]
+        record["plan"] = served
+        record["metrics"] = evaluate_transition(
+            outcome.plan, job.outgoing, job.incoming, context=context
+        ).to_dict()
+    else:
+        refinement["changed"] = False
+
+
+def _genre_root(
+    row: Mapping[str, Any],
+    outgoing_genre: str | None,
+    genre_root: Callable[[str | None], str] | None,
+) -> str:
+    dataset_root = str(row["rootGenre"])
+    if dataset_root != POOL_GENRE or genre_root is None:
+        return dataset_root
+    return genre_root(outgoing_genre)
 
 
 def summarize(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -352,6 +458,9 @@ def summarize_group(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         ),
         "harmonicClashMsMean": _mean(clashes),
         "energyStepMean": _mean(energies),
+        "vocalClashMsMean": _mean(
+            item["vocalClashMs"] for item in metrics if item["vocalClashMs"] is not None
+        ),
         "durationMsMean": _mean(item["durationMs"] for item in metrics),
         "unplayedMsMean": _mean(item["outgoingUnplayedMs"] for item in left_out),
         "skippedMsMean": _mean(item["incomingSkippedMs"] for item in left_out),
@@ -376,7 +485,254 @@ def build_report(
     }
     if baseline is not None:
         report["comparison"] = compare_reports(report, baseline)
+    if any("refinement" in record for record in records):
+        refinement = refinement_summary(records)
+        provider_kind = (meta.get("refine") or {}).get("providerKind", "cloud")
+        refinement["criteria"] = sg3_criteria(
+            refinement["deterministic"],
+            refinement["refined"],
+            refinement,
+            provider_kind=provider_kind,
+        )
+        report["refinement"] = refinement
     return report
+
+
+# Design §10: latency p95 targets per provider kind.
+LATENCY_P95_TARGET_MS = {"cloud": 30_000, "local": 20_000}
+REJECTION_RATE_TARGET = 0.10
+_SAME = 1e-9
+
+
+def refinement_summary(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """What the model did, what it cost, and served minus deterministic metrics.
+
+    The rejection rate counts the answers the validation rejected over all answers
+    (ready or rejected); menus with a single candidate never reach the model. The
+    failure rate counts transport failures over calls.
+    """
+    refined = [record for record in records if "refinement" in record]
+    items = [record["refinement"] for record in refined]
+    called = [item for item in items if item.get("called")]
+    answered = [item for item in called if item["status"] in ("ready", "rejected")]
+    rejected = [item for item in answered if item["status"] == "rejected"]
+    failed = [item for item in called if item["status"] == "failed"]
+    ready = [item for item in items if item["status"] == "ready"]
+    latencies = [
+        item["latencyMs"] for item in called if item.get("latencyMs") is not None
+    ]
+    usages = [item["usage"] for item in called if item.get("usage")]
+    costs = [item["costUsd"] for item in called if item.get("costUsd") is not None]
+    deterministic = [_deterministic(record) for record in refined]
+    changed = [record for record in refined if record["refinement"]["changed"]]
+    changed_deterministic = [_deterministic(record) for record in changed]
+    total_cost = sum(costs)
+    return {
+        "edges": len(refined),
+        "statuses": _counts(item["status"] for item in items),
+        "codes": _counts(item["code"] for item in items if item.get("code")),
+        "calls": len(called),
+        "cachedCalls": sum(1 for item in called if item.get("cached")),
+        "answers": len(answered),
+        "rejectionRate": _rate(len(rejected), len(answered)),
+        "failureRate": _rate(len(failed), len(called)),
+        "changed": len(changed),
+        "changedRate": _rate(len(changed), len(refined)),
+        "keptPlannerPlan": sum(1 for item in ready if not item["changed"]),
+        "candidateIndex": _counts(str(item["candidateIndex"]) for item in ready),
+        "adjustments": _counts(
+            name
+            for item in ready
+            for name, value in (item.get("adjustments") or {}).items()
+            if value not in (0, "keep")
+        ),
+        "confidence": _stats(
+            item["confidence"]
+            for item in answered
+            if item.get("confidence") is not None
+        ),
+        "readyViolations": sum(
+            1
+            for record in refined
+            if record["refinement"]["status"] == "ready"
+            and record["metrics"]["policyViolations"]
+        ),
+        "latencyMs": {
+            **_stats(latencies),
+            "max": max(latencies) if latencies else None,
+        },
+        "tokens": {
+            "input": _stats(_tokens(usage, "input_tokens") for usage in usages),
+            "output": _stats(
+                _tokens(usage, "output_tokens") + _tokens(usage, "thought_tokens")
+                for usage in usages
+            ),
+            "thought": _stats(_tokens(usage, "thought_tokens") for usage in usages),
+            "total": _stats(
+                _tokens(usage, "input_tokens")
+                + _tokens(usage, "output_tokens")
+                + _tokens(usage, "thought_tokens")
+                for usage in usages
+            ),
+        },
+        "cost": {
+            "totalUsd": round(total_cost, 6),
+            "perTransitionUsd": round(total_cost / len(costs), 6) if costs else None,
+            "per1000TransitionsUsd": round(1000 * total_cost / len(costs), 4)
+            if costs
+            else None,
+            "estimatedCalls": sum(1 for item in called if item.get("costEstimated")),
+        },
+        "deterministic": summarize_group(deterministic),
+        "refined": summarize_group(refined),
+        "delta": {
+            "overall": _paired_delta(
+                summarize_group(refined), summarize_group(deterministic)
+            ),
+            "changed": _paired_delta(
+                summarize_group(changed), summarize_group(changed_deterministic)
+            ),
+            **{
+                group: _paired_group_deltas(refined, deterministic, key)
+                for group, key in (
+                    ("byTempoBand", "tempoBand"),
+                    ("byGenreRoot", "genreRoot"),
+                    ("byStratum", "stratum"),
+                )
+            },
+        },
+    }
+
+
+def sg3_criteria(
+    deterministic: Mapping[str, Any],
+    refined: Mapping[str, Any],
+    stats: Mapping[str, Any],
+    *,
+    provider_kind: str,
+) -> list[dict[str, Any]]:
+    """The objective criteria of design §10, served plans against deterministic ones.
+
+    ``pass`` is None when a side has no value (no vocal data, no calls).
+    """
+
+    def not_worse(key: str, *, higher_is_better: bool = False) -> dict[str, Any]:
+        before, after = deterministic.get(key), refined.get(key)
+        if before is None or after is None:
+            verdict = None
+        elif higher_is_better:
+            verdict = after >= before - _SAME
+        else:
+            verdict = after <= before + _SAME
+        return {"deterministic": before, "refined": after, "pass": verdict}
+
+    alignment = [
+        not_worse("phraseFullyAlignedRate", higher_is_better=True),
+        not_worse("phraseAlignedFraction", higher_is_better=True),
+    ]
+    alignment_pass = (
+        None
+        if any(item["pass"] is None for item in alignment)
+        else all(item["pass"] for item in alignment)
+    )
+    latency_target = LATENCY_P95_TARGET_MS.get(
+        provider_kind, LATENCY_P95_TARGET_MS["cloud"]
+    )
+    p95 = (stats.get("latencyMs") or {}).get("p95")
+    rejection = stats.get("rejectionRate")
+    violations = stats.get("readyViolations")
+    return [
+        {
+            "id": "policy_violations",
+            "label": "Policy violations in served refined plans",
+            "target": "0",
+            "deterministic": 0,
+            "refined": violations,
+            "pass": None if violations is None else violations == 0,
+        },
+        {
+            "id": "phrase_alignment",
+            "label": "Phrase alignment (start and end on a boundary; boundaries aligned)",
+            "target": ">= deterministic",
+            "deterministic": [item["deterministic"] for item in alignment],
+            "refined": [item["refined"] for item in alignment],
+            "pass": alignment_pass,
+        },
+        {
+            "id": "bass_overlap",
+            "label": "Bass overlap, mean ms",
+            "target": "<= deterministic",
+            **not_worse("bassOverlapMsMean"),
+        },
+        {
+            "id": "harmonic_clash",
+            "label": "Harmonic clash, mean ms",
+            "target": "<= deterministic",
+            **not_worse("harmonicClashMsMean"),
+        },
+        {
+            "id": "energy_continuity",
+            "label": "Energy step, mean (0-1)",
+            "target": "<= deterministic",
+            **not_worse("energyStepMean"),
+        },
+        {
+            "id": "vocal_clash",
+            "label": "Vocal clash, mean ms (profiles with voice)",
+            "target": "<= deterministic",
+            **not_worse("vocalClashMsMean"),
+        },
+        {
+            "id": "rejection_rate",
+            "label": "Rejection rate (validation, over answers)",
+            "target": f"<= {REJECTION_RATE_TARGET:.0%}",
+            "deterministic": None,
+            "refined": rejection,
+            "pass": None if rejection is None else rejection <= REJECTION_RATE_TARGET,
+        },
+        {
+            "id": "latency",
+            "label": f"Latency p95 ({provider_kind})",
+            "target": f"<= {latency_target / 1000:.0f} s",
+            "deterministic": None,
+            "refined": p95,
+            "pass": None if p95 is None else p95 <= latency_target,
+        },
+        {
+            "id": "cost",
+            "label": "Cost per transition, USD",
+            "target": "informative",
+            "deterministic": None,
+            "refined": (stats.get("cost") or {}).get("perTransitionUsd"),
+            "pass": None,
+        },
+    ]
+
+
+def _deterministic(record: Mapping[str, Any]) -> dict[str, Any]:
+    return {**record, "metrics": record["deterministic"]["metrics"]}
+
+
+def _paired_group_deltas(
+    refined: Sequence[Mapping[str, Any]],
+    deterministic: Sequence[Mapping[str, Any]],
+    key: str,
+) -> dict[str, dict[str, Any]]:
+    served = _grouped(refined, key)
+    planned = _grouped(deterministic, key)
+    return {name: _paired_delta(served[name], planned[name]) for name in served}
+
+
+def _paired_delta(
+    served: Mapping[str, Any], planned: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Served minus deterministic on the same edges; ``n`` stays the edge count."""
+    return {**_delta(served, planned), "n": served["n"]}
+
+
+def _tokens(usage: Mapping[str, Any], key: str) -> int:
+    value = usage.get(key)
+    return int(value) if isinstance(value, int) else 0
 
 
 def compare_reports(
@@ -474,7 +830,140 @@ def render_markdown(report: Mapping[str, Any]) -> str:
         ]
     else:
         lines += ["## Comparison", "", "None: this report is a baseline.", ""]
+    if report.get("refinement"):
+        lines += _refinement_markdown(meta.get("refine") or {}, report["refinement"])
     return "\n".join(lines)
+
+
+def _refinement_markdown(
+    target: Mapping[str, Any], refinement: Mapping[str, Any]
+) -> list[str]:
+    config = target.get("config") or {}
+    reasoning = config.get("reasoning") or {}
+    price = target.get("price")
+    latency = refinement["latencyMs"]
+    tokens = refinement["tokens"]
+    cost = refinement["cost"]
+    lines = [
+        f"## AI refinement: {target.get('model', '?')}",
+        "",
+        f"- Connection: {target.get('connectionLabel') or 'none'}"
+        f" ({target.get('providerKind', '?')}); prompt `{target.get('promptVersion', '?')}`,"
+        f" genre {'sent' if target.get('sendGenre', True) else 'not sent'}",
+        f"- Profile: reasoning {_reasoning_label(reasoning)},"
+        f" timeout {config.get('timeout_seconds', '?')} s,"
+        f" {config.get('max_output_tokens', '?')} output tokens;"
+        f" validated for the action: {'yes' if target.get('profileValidated') else 'no'}",
+    ]
+    if price:
+        lines.append(
+            f"- Price: {price.get('inputPerMillion', '?')} USD per million input"
+            f" tokens, {price.get('outputPerMillion', '?')} per million output tokens"
+            f" (thinking included), {price.get('cachedInputPerMillion', '?')} cached;"
+            f" {price.get('source', '?')}, read {price.get('date', '?')}"
+        )
+    lines += [
+        f"- Edges: {refinement['edges']}; statuses:"
+        f" {_format_counts(refinement['statuses'])}; codes:"
+        f" {_format_counts(refinement['codes'])}",
+        f"- Calls: {refinement['calls']} ({refinement['cachedCalls']} from the cache),"
+        f" {refinement['answers']} answers",
+        "",
+        "| Measure | Value |",
+        "| --- | ---: |",
+        f"| Rejection rate (validation, over answers) |"
+        f" {_percent(refinement['rejectionRate'])} |",
+        f"| Failure rate (transport, over calls) | {_percent(refinement['failureRate'])} |",
+        f"| Plans the model changed | {refinement['changed']}"
+        f" ({_percent(refinement['changedRate'])}) |",
+        f"| Accepted, same plan as the planner | {refinement['keptPlannerPlan']} |",
+        f"| Candidate chosen (accepted) | {_format_counts(refinement['candidateIndex'])} |",
+        f"| Adjustments (accepted) | {_format_counts(refinement['adjustments'])} |",
+        f"| Confidence, mean / p50 / p95 | {_triple(refinement['confidence'], 2)} |",
+        f"| Latency p50 / p95 / max (ms) | {_cell(latency['p50'])} /"
+        f" {_cell(latency['p95'])} / {_cell(latency['max'])} |",
+        f"| Tokens per transition, input (mean / p50 / p95) |"
+        f" {_triple(tokens['input'])} |",
+        f"| Tokens per transition, output with thinking | {_triple(tokens['output'])} |",
+        f"| Tokens per transition, thinking | {_triple(tokens['thought'])} |",
+        f"| Tokens per transition, total | {_triple(tokens['total'])} |",
+        f"| Cost, total (USD) | {cost['totalUsd']:.4f} |",
+        f"| Cost per transition (USD) | {_cell(cost['perTransitionUsd'], 5)} |",
+        f"| Cost per 1,000 transitions (USD) | {_cell(cost['per1000TransitionsUsd'], 2)} |",
+        f"| Calls costed at their worst case (no usage) | {cost['estimatedCalls']} |",
+        "",
+        "## SG3 criteria",
+        "",
+        "Design §10, served plans (the model's where accepted, the planner's"
+        " otherwise) against the deterministic v3 plans of the same edges.",
+        "",
+        "| Criterion | Target | Deterministic | Served | Pass |",
+        "| --- | --- | ---: | ---: | --- |",
+    ]
+    for item in refinement["criteria"]:
+        verdict = {True: "yes", False: "no", None: "n/a"}[item["pass"]]
+        lines.append(
+            f"| {item['label']} | {item['target']} |"
+            f" {_criterion_value(item['deterministic'])} |"
+            f" {_criterion_value(item['refined'])} | {verdict} |"
+        )
+    delta = refinement["delta"]
+    lines += [
+        "",
+        "## Served minus deterministic",
+        "",
+        "All edges, then only the edges whose plan the model changed.",
+        "",
+        *_group_table(
+            {"all edges": delta["overall"], "changed edges": delta["changed"]},
+            signed=True,
+        ),
+        "",
+        "### By tempo band",
+        "",
+        *_group_table(delta["byTempoBand"], signed=True),
+        "",
+        "### By genre",
+        "",
+        "Root genre of the outgoing track; pool edges use the genre the prompt sent.",
+        "",
+        *_group_table(delta["byGenreRoot"], signed=True),
+        "",
+        "### By stratum",
+        "",
+        *_group_table(delta["byStratum"], signed=True),
+        "",
+    ]
+    return lines
+
+
+def _reasoning_label(reasoning: Mapping[str, Any]) -> str:
+    mode = reasoning.get("mode", "provider_default")
+    if mode == "level":
+        return str(reasoning.get("level"))
+    if mode == "budget":
+        return f"budget {reasoning.get('budget_tokens')}"
+    return str(mode)
+
+
+def _cell(value: float | None, digits: int = 0) -> str:
+    if value is None:
+        return "n/a"
+    return f"{value:,.{digits}f}"
+
+
+def _triple(values: Mapping[str, Any], digits: int = 0) -> str:
+    return " / ".join(_cell(values.get(key), digits) for key in ("mean", "p50", "p95"))
+
+
+def _criterion_value(value: Any) -> str:
+    if value is None:
+        return "n/a"
+    if isinstance(value, list):
+        return " / ".join(_criterion_value(item) for item in value)
+    if isinstance(value, float):
+        return f"{value:,.4g}"
+    return str(value)
 
 
 def load_profiles(uids: Sequence[str]) -> dict[str, TrackMixProfile | None]:
@@ -499,10 +988,51 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--compare", type=Path, help="baseline report.json")
     parser.add_argument("--allow-remote-database", action="store_true")
+    parser.add_argument("--limit", type=int, help="evaluate only the first N edges")
+    refine = parser.add_argument_group("AI refinement (SM5, needs smart-mix-v3)")
+    refine.add_argument("--refine", metavar="PROVIDER/MODEL")
+    refine.add_argument(
+        "--refine-connection",
+        metavar="UUID",
+        help="ai_provider_connections row whose catalog and endpoint to use",
+    )
+    refine.add_argument(
+        "--refine-reasoning",
+        help="low, medium, high, minimal, off, on, default or budget:N;"
+        " by default the action's own profile",
+    )
+    refine.add_argument(
+        "--refine-cache",
+        type=Path,
+        default=Path(__file__).parent / "out" / "refine-cache",
+    )
+    refine.add_argument(
+        "--ledger",
+        type=Path,
+        help="spend ledger shared by runs (default: ledger.jsonl in --refine-cache)",
+    )
+    refine.add_argument(
+        "--max-usd",
+        type=float,
+        default=5.0,
+        help="stop before the ledger of every run would pass this spend",
+    )
+    refine.add_argument("--concurrency", type=int, default=1)
+    refine.add_argument(
+        "--min-interval", type=float, default=1.0, help="seconds between call starts"
+    )
+    refine.add_argument(
+        "--retry-failed", action="store_true", help="call again for cached failures"
+    )
+    refine.add_argument("--no-send-genre", action="store_true")
     args = parser.parse_args(argv)
     args.dsn = resolve_dsn(args.dsn)
     if not args.dsn:
         parser.error("--dsn or SMART_MIX_EVAL_DSN is required")
+    if args.refine and args.planner != "smart-mix-v3":
+        parser.error("--refine needs --planner smart-mix-v3")
+    if args.ledger is None:
+        args.ledger = args.refine_cache / "ledger.jsonl"
     return args
 
 
@@ -514,6 +1044,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.dsn, allow_remote=args.allow_remote_database
     )
     rows = read_jsonl(args.dataset)
+    if args.limit is not None:
+        rows = rows[: args.limit]
     uids = sorted(
         {
             str(row[key])
@@ -523,7 +1055,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     profiles = load_profiles(uids)
     context = CONTEXTS[args.context]
-    records = evaluate_dataset(rows, profiles, planner=args.planner, context=context)
+    refiner = None
+    refine_meta: dict[str, Any] | None = None
+    options: dict[str, Any] = {}
+    if args.refine:
+        refiner, refine_meta = _refiner(args)
+        roots = GenreRoots.from_taxonomy()
+        options = {
+            "refiner": refiner,
+            "genres": load_prompt_genres(uids),
+            "genre_root": roots.root,
+            "concurrency": args.concurrency,
+        }
+    records = evaluate_dataset(
+        rows, profiles, planner=args.planner, context=context, **options
+    )
     baseline = json.loads(args.compare.read_text()) if args.compare else None
     report = build_report(
         records,
@@ -541,6 +1087,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "readOnly": True,
             "createdAt": datetime.now(UTC).isoformat(),
             "gitCommit": git_commit(),
+            **({"refine": refine_meta} if refine_meta else {}),
         },
         baseline=baseline,
     )
@@ -548,7 +1095,65 @@ def main(argv: Sequence[str] | None = None) -> int:
     write_json(args.output / "report.json", report)
     (args.output / "report.md").write_text(render_markdown(report))
     print(f"{len(records)} edges -> {args.output}", file=sys.stderr)
+    if refiner is not None:
+        spent = refiner.budget.spent_usd
+        print(f"AI spend in the ledger: {spent:.4f} USD", file=sys.stderr)
+        if refiner.budget_exhausted:
+            print(
+                f"Stopped at the --max-usd limit ({args.max_usd:.2f} USD): edges"
+                " after it are unavailable (budget) in the report",
+                file=sys.stderr,
+            )
+            return 3
     return 0
+
+
+def _refiner(args: argparse.Namespace) -> tuple[Refiner, dict[str, Any]]:
+    """The refiner of ``--refine`` and its report metadata (no secret)."""
+    from crate.db.repositories.ai_configuration import get_connection
+    from crate.smart_mix_ai import provider_kind
+
+    connection = None
+    if args.refine_connection:
+        connection = get_connection(args.refine_connection)
+        if connection is None:
+            raise SystemExit(f"No AI connection {args.refine_connection}")
+    target = resolve_target(
+        args.refine,
+        connection=connection,
+        reasoning=parse_reasoning(args.refine_reasoning)
+        if args.refine_reasoning
+        else None,
+    )
+    refiner = Refiner(
+        target,
+        api_key=environment_api_key(target.provider),
+        cache_dir=args.refine_cache,
+        budget=Budget(args.ledger, args.max_usd),
+        limiter=RateLimiter(args.min_interval),
+        send_genre=not args.no_send_genre,
+        retry_failed=args.retry_failed,
+    )
+    return refiner, {
+        **target.to_meta(),
+        "providerKind": provider_kind(target.provider),
+        "sendGenre": not args.no_send_genre,
+        "maxUsd": args.max_usd,
+        "concurrency": args.concurrency,
+        "minIntervalSeconds": args.min_interval,
+    }
+
+
+def load_prompt_genres(uids: Sequence[str]) -> dict[str, str | None]:
+    """Each track's genre slug as the refinement task sends it (its ``_genres``)."""
+    from crate.db.queries.smart_mix_refinement import get_track_genre_slugs
+    from crate.genre_taxonomy import resolve_genre_slug
+
+    slugs = get_track_genre_slugs(list(uids))
+    return {
+        uid: (resolve_genre_slug(slug) or slug) if (slug := slugs.get(uid)) else None
+        for uid in uids
+    }
 
 
 def _profile_state(profile: TrackMixProfile | None, revision: Any) -> str:
