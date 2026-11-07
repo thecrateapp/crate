@@ -16,6 +16,7 @@ Store results by `entity_uid`, edge id or index, never by title or artist. The o
 | ---------------------------------------------- | -------------------------------------------------------------------------- |
 | `build_dataset.py`                             | Builds the edge set (`dataset.jsonl`) from the compatible-tracks service   |
 | `build_pool_dataset.py`                        | Builds an edge set inside a fixed pool of tracks (the spike tracks)        |
+| `analyze_pool.py`                              | Computes v7 profiles for a list of tracks with the worker's own handler    |
 | `run_eval.py`                                  | Plans the edge set with a planner and writes `report.json` and `report.md` |
 | `refine.py`                                    | AI refinement of each v3 edge with a real model, cached and budgeted (SM5) |
 | `app/crate/smart_mix/evaluation.py`            | The metrics: pure functions over a plan and two profiles                   |
@@ -157,6 +158,40 @@ tracks with itself: each seed keeps its best partner in each tempo band, ranked 
 planner's pure `score_compatibility`, and by default both tracks need phrases. Use it for the
 tracks with audio and analyzer v7 profiles (the spike tracks), whose edges can also be rendered
 for listening. Rows keep the `dataset.jsonl` format with the root genre `pool`.
+
+### A new edge set from audio files
+
+How SM5 built its electronic set (120 tracks in four genre buckets, 112 edges). The tracks
+need `library_tracks` rows whose `path` the container can read; a copy of the development
+database migrated to head already has the library's rows.
+
+1. **Database.** Build or refresh a local copy at the branch's head (see "AI refinement");
+   never write to the shared development database. `analyze_pool.py` refuses it.
+2. **Audio.** Put the files where the rows' paths point once mounted, for example
+   `out/<set>/audio/<path without /music/>` mounted read-only at `/music`. Keep audio in `out/`
+   (ignored by git) and never commit audio or profiles.
+3. **Profiles.** A TSV with the track ID in the first column and the group (genre bucket) in
+   the second, then, in the analysis worker image with the audio mounted:
+
+   ```bash
+   python tools/smart-mix-eval/analyze_pool.py --tracks out/<set>/picks.tsv \
+     --output out/<set>/pool --jobs 6
+   ```
+
+   It runs `compute_smart_mix_profile` on each track that is not ready (Beat This!, YAMNet,
+   `crate-cli`), with Redis pointed at a local instance, and writes `pool_uids.txt`,
+   `groups.tsv` and `analysis.json`. Rerun it to retry failures; ready tracks are skipped.
+
+4. **Edges.** Pair the pool like a DJ: each seed's best partner inside its group with a tempo
+   band, the best per group, and a few across groups (`cross`):
+
+   ```bash
+   python tools/smart-mix-eval/build_pool_dataset.py --uids out/<set>/pool/pool_uids.txt \
+     --groups out/<set>/pool/groups.tsv --per-group 25 --cross-group 12 \
+     --output out/<set>/dataset
+   ```
+
+5. **Evaluate** with `run_eval.py` (v2, v3, `--refine`) and `listen_metrics.py` as for any set.
 
 ## Planners and contexts
 
