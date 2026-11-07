@@ -17,6 +17,8 @@ test.describe("without JavaScript", () => {
     "/architecture",
     "/developers",
     "/install",
+    "/blog",
+    "/blog/reads-from-snapshots",
   ]) {
     test(`${path} shows its copy without waiting for motion`, async ({
       page,
