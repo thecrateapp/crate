@@ -9,6 +9,7 @@ from crate.smart_mix.versions import (
     ANALYZER_VERSION,
     PROFILE_SCHEMA_VERSION,
     READABLE_ANALYZER_VERSIONS,
+    READABLE_PROFILE_VERSIONS,
 )
 from sqlalchemy import text
 
@@ -479,7 +480,7 @@ def test_report_streams_one_small_row_per_track_without_internal_columns(library
                 "start": date(2026, 9, 25),
                 "previous_start": date(2026, 8, 26),
                 "previous_end": date(2026, 9, 24),
-                "profile_version": PROFILE_SCHEMA_VERSION,
+                "profile_versions": list(READABLE_PROFILE_VERSIONS),
                 "analyzer_versions": list(READABLE_ANALYZER_VERSIONS),
             },
         ).all()

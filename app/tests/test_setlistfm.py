@@ -387,3 +387,36 @@ def test_setlist_shows_sync_artist_limit_is_bounded(monkeypatch):
 
     monkeypatch.setenv("SETLISTFM_SHOWS_SYNC_MAX_ARTISTS", "invalid")
     assert shows_sync_max_artists() == 100
+
+
+def test_setlist_rate_limit_is_an_expected_provider_rate_limit(monkeypatch):
+    import pytest
+
+    from crate.provider_rate_limits import ProviderRateLimited
+    from crate.setlistfm import (
+        SetlistProviderRateLimited,
+        SetlistProviderUnavailable,
+        search_artist,
+    )
+
+    class RateLimitedResponse:
+        status_code = 429
+        headers = {"Retry-After": "120"}
+
+    monkeypatch.setenv("SETLISTFM_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "crate.provider_rate_limits.wait_for_provider_slot", lambda *_args: 0.0
+    )
+    monkeypatch.setattr(
+        "crate.setlistfm.requests.get", lambda *_args, **_kwargs: RateLimitedResponse()
+    )
+
+    with pytest.raises(SetlistProviderRateLimited) as raised:
+        search_artist("The Example")
+
+    error = raised.value
+    assert isinstance(error, ProviderRateLimited)
+    assert isinstance(error, SetlistProviderUnavailable)
+    assert error.provider == "setlistfm"
+    assert error.retry_after_seconds == 120.0
+    assert str(error) == "Setlist.fm rate limit exceeded"

@@ -8,6 +8,8 @@ order: 60
 verified: 2026-10-21
 sources:
   - app/crate/api
+  - app/crate/api/error_inbox.py
+  - app/crate/error_inbox/views.py
   - app/crate/db
   - app/crate/projector.py
   - app/crate/db/user_stats_dashboard_surface.py
@@ -349,6 +351,33 @@ schedule a coverage refresh, so HTTP method alone does not establish a pure read
 See [Smart Mix operation](smart-mix-operations.md) for current state semantics, provenance,
 HTTP boundaries and evidence available to Hermes.
 
+## Error inbox HTTP boundaries
+
+`app/crate/api/error_inbox.py` serves `/api/admin/errors` under the OpenAPI tag `errors`.
+Every route reads PostgreSQL (`error_issues`, `error_issue_triage`, `settings` and the
+`error_inbox` and `error_inbox_access` rows of `ops_runtime_state`) or enqueues a worker
+task. None calls Sentry, GitHub or a model: Investigate and Triage backlog only pin the
+action's configuration (`accept_action`) and queue `ai`-lane tasks.
+
+| Route                                     | Capability           | Behaviour                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/admin/errors`                   | `ops.errors.view`    | Issues with the critical lane first. Filters `status`, `lane`, `service`, `classification` and `release` (first or last release); `limit` 1–200 and an opaque `cursor`. A bad filter is `400 ERROR_INBOX_INVALID_FILTER`.                                                                                                                                                                                                      |
+| `GET /api/admin/errors/summary`           | `ops.errors.view`    | Open, critical, new and regressed counts, by service, the top three critical issues, `untriaged` (open issues whose latest event has no triage) and the last sync.                                                                                                                                                                                                                                                             |
+| `GET /api/admin/errors/{id}`              | `ops.errors.view`    | Detail with the digest, triage results (with the model while its invocation record is kept), when automatic triage queued the current digest and the token's known `write_access`; `404 ERROR_ISSUE_NOT_FOUND`.                                                                                                                                                                                                                |
+| `POST /api/admin/errors/{id}/investigate` | `ops.errors.manage`  | Queues `investigate_error_issue` for the latest event and returns `202 {task_id}`, one per issue and event while it is pending. `409 ERROR_ISSUE_NO_DIGEST` or `ERROR_ISSUE_ALREADY_INVESTIGATED`; `503` with the AI code (`AI_ACTION_DISABLED`, ...) when the action has no usable model.                                                                                                                                     |
+| `POST /api/admin/errors/triage-backlog`   | `ops.errors.manage`  | Queues `triage_error_issue` for the open issues whose latest event has no triage, highest score first, at most 100, and returns `202 {queued, deduplicated, limit, task_ids}`. `503` when the action has no usable model.                                                                                                                                                                                                      |
+| `POST /api/admin/errors/{id}/status`      | `ops.errors.manage`  | Queues `update_error_issue_status` and returns `202 {task_id}`. `409 ERROR_TRACKING_NOT_CONFIGURED`, or `409 ERROR_TRACKING_WRITE_SCOPE_MISSING` when the token is known to lack `event:write`.                                                                                                                                                                                                                                |
+| `POST /api/admin/errors/{id}/fix`         | `ops.errors.manage`  | Launch fix: queues `dispatch_error_fix` with the issue and an optional `note` (at most 500 characters) and returns `202 {task_id}`. `409 ERROR_FIX_NOT_CONFIGURED`, `ERROR_FIX_UNSUPPORTED_ISSUE` or `ERROR_FIX_RECENTLY_REQUESTED`.                                                                                                                                                                                           |
+| `GET`/`PUT /api/admin/errors/connection`  | `ops.runtime.manage` | Settings, `has_token`, the last access check (reset when a new token is saved) and the last sync. `PUT` validates (`422 ERROR_TRACKING_INVALID`) and stores the token in `credential_secrets`; it is never returned. `fix` carries the Launch fix settings and their write-only GitHub token: omitted keeps them, `null` turns Launch fix off. `triage` (`automatic`, `daily_max` 0–500) omitted keeps the AI triage settings. |
+| `POST /api/admin/errors/connection/test`  | `ops.runtime.manage` | Queues `test_error_tracking_connection`, one pending at a time.                                                                                                                                                                                                                                                                                                                                                                |
+
+Errors carry their code in the `X-Crate-Error` header and the message in `detail`. A request
+that fails validation is answered with a fixed message, so a body carrying the token is
+never echoed. The `ops` role holds both error capabilities; `owner` and `admin` hold all.
+The System Health dashboard (`GET /api/admin/metrics/dashboard`) adds `errors`, the same
+summary built with one query inside its 10-second cache; it is `null` when the summary
+cannot be built. Without `ops.errors.view` the top critical issues come without titles,
+which are event text.
 
 ## Precalculated listening statistics and snapshot fallback
 

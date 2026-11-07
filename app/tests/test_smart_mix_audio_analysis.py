@@ -152,7 +152,7 @@ def test_python_fallback_never_publishes_unmeasured_loudness(tmp_path: Path) -> 
 
     profile = analyze_mix_profile(track)
 
-    assert profile.analyzer_version == ANALYZER_VERSION == "smart-mix-audio-v6"
+    assert profile.analyzer_version == ANALYZER_VERSION == "smart-mix-audio-v7"
     assert profile.intro_lufs is None
     assert profile.outro_lufs is None
     assert profile.integrated_lufs is None
@@ -224,7 +224,7 @@ def test_backfill_analysis_prefers_the_rust_profile(
     monkeypatch.setattr(
         audio_analysis,
         "_analyze_rust",
-        lambda _path: {
+        lambda _path, _beats=None: {
             "mix_profile": {
                 "analyzer": "crate-rust",
                 "analyzerVersion": "smart-mix-audio-v2",
@@ -256,7 +256,9 @@ def test_backfill_analysis_falls_back_to_python_without_crate_cli(
         leading_silence_seconds=0.0,
         trailing_silence_seconds=0.0,
     )
-    monkeypatch.setattr(audio_analysis, "_analyze_rust", lambda _path: None)
+    monkeypatch.setattr(
+        audio_analysis, "_analyze_rust", lambda _path, _beats=None: None
+    )
 
     draft = audio_analysis.analyze_mix_profile(track)
 
@@ -312,6 +314,278 @@ def test_short_tracks_are_still_scanned_in_full(monkeypatch, tmp_path: Path) -> 
     assert max(profile.beat_grid_ms) > 10_000
 
 
+def _model_beats(phase: int, *, first_ms: int = 1_000, last_ms: int = 19_500):
+    from crate.smart_mix.beat_model import BeatTrack
+
+    beats = tuple(range(first_ms, last_ms + 1, 500))
+    return BeatTrack(
+        tracker="beat-this-test",
+        beats_ms=beats,
+        downbeats_ms=beats[phase::4],
+    )
+
+
+def test_external_beats_replace_tracker_and_pick_downbeat(
+    monkeypatch, tmp_path: Path
+) -> None:
+    import librosa
+
+    from crate.smart_mix.analyzer import analyze_mix_profile
+
+    # The clicks accent every fourth beat from 1 s, which the onset heuristic takes
+    # as the bar; the model hears the bar two beats later and decides it.
+    track = tmp_path / "accented.wav"
+    _write_click_track(
+        track, bpm=120.0, duration_seconds=20.0, leading_silence_seconds=1.0
+    )
+    heuristic = analyze_mix_profile(track)
+
+    def no_tracker(*_args, **_kwargs):
+        raise AssertionError("model beats replace librosa's beat tracker")
+
+    monkeypatch.setattr(librosa.beat, "beat_track", no_tracker)
+
+    profile = analyze_mix_profile(track, beats=_model_beats(2))
+
+    # librosa's grid lags the clicks by a frame or two; its bar starts on the accent.
+    assert abs(heuristic.downbeat_anchor_ms - 1_000) <= 40
+    assert profile.beat_tracker == "beat-this-test"
+    assert profile.bpm == 120.0
+    assert profile.beat_grid_ms[:3] == (1_000, 1_500, 2_000)
+    assert profile.downbeat_anchor_ms == 2_000
+    assert profile.time_signature == 4
+    assert profile.quality == "full"
+    assert heuristic.beat_tracker is None
+
+
+def test_model_downbeats_without_a_clear_bar_leave_no_downbeat(
+    monkeypatch, tmp_path: Path
+) -> None:
+    from crate.smart_mix.analyzer import analyze_mix_profile
+    from crate.smart_mix.beat_model import BeatTrack
+
+    track = tmp_path / "unclear.wav"
+    _write_click_track(
+        track, bpm=120.0, duration_seconds=20.0, leading_silence_seconds=1.0
+    )
+    beats = _model_beats(0).beats_ms
+    # Bars on two phases half and half: no phase reaches the share.
+    split = BeatTrack(
+        tracker="beat-this-test",
+        beats_ms=beats,
+        downbeats_ms=tuple(sorted(beats[0:16:4] + beats[18::4])),
+    )
+
+    profile = analyze_mix_profile(track, beats=split)
+
+    # The onset heuristic would anchor this track; the model's word is final.
+    assert profile.downbeat_anchor_ms is None
+    assert profile.time_signature is None
+    assert profile.phrases == ()
+    assert profile.quality == "partial"
+    assert profile.beat_tracker == "beat-this-test"
+
+
+def test_three_four_meter_gets_no_phrases(tmp_path: Path) -> None:
+    # Phrases and their consumers count bars of four beats: a track the DBN hears in
+    # 3/4 says so and gets no downbeat and no phrases, so it goes to crossfade
+    # (SM3-D16).
+    from crate.smart_mix.analyzer import analyze_mix_profile
+    from crate.smart_mix.beat_model import BeatTrack
+    from tests.smart_mix_structure_audio import (
+        BEAT_MS,
+        DJ_SECTIONS,
+        LEAD_SECONDS,
+        write_structured_track,
+    )
+
+    track = tmp_path / "structured.wav"
+    write_structured_track(track, DJ_SECTIONS)
+    first_ms = round(LEAD_SECONDS * 1_000)
+    beats = tuple(
+        range(
+            first_ms,
+            first_ms + 4 * sum(section.bars for section in DJ_SECTIONS) * BEAT_MS,
+            BEAT_MS,
+        )
+    )
+    four = BeatTrack("beat-this-test", beats, beats[::4], beats_per_bar=4)
+    three = BeatTrack("beat-this-test", beats, beats[::3], beats_per_bar=3)
+
+    in_four = analyze_mix_profile(track, beats=four)
+    in_three = analyze_mix_profile(track, beats=three)
+
+    assert (in_four.time_signature, in_four.downbeat_anchor_ms) == (4, first_ms)
+    assert in_four.phrases
+    assert in_three.time_signature == 3
+    assert in_three.downbeat_anchor_ms is None
+    assert in_three.phrases == ()
+    assert in_three.energy_curve is None
+    assert in_three.beat_tracker == "beat-this-test"
+    assert in_three.beat_grid_ms == in_four.beat_grid_ms
+
+
+def test_external_beats_stop_at_the_analysed_head(monkeypatch, tmp_path: Path) -> None:
+    from crate.smart_mix import analyzer
+
+    monkeypatch.setattr(analyzer, "FULL_SCAN_HEAD_SECONDS", 10)
+    monkeypatch.setattr(analyzer, "FULL_SCAN_TAIL_SECONDS", 10)
+    track = tmp_path / "long.wav"
+    _write_click_track(
+        track, bpm=120.0, duration_seconds=40.0, leading_silence_seconds=1.0
+    )
+
+    profile = analyzer.analyze_mix_profile(track, beats=_model_beats(0, last_ms=39_000))
+
+    assert profile.beat_grid_ms[0] == 1_000
+    assert max(profile.beat_grid_ms) <= 10_000
+    assert profile.quality == "partial"
+
+
+def test_profile_analysis_passes_model_beats_to_rust(
+    monkeypatch, tmp_path: Path
+) -> None:
+    import crate.audio_analysis as audio_analysis
+    from crate import crate_cli
+
+    beats = _model_beats(2)
+    calls: list[dict] = []
+    monkeypatch.setattr(crate_cli, "is_available", lambda: True)
+    monkeypatch.setattr(crate_cli, "has_subcommands", lambda: True)
+    monkeypatch.setattr(crate_cli, "supports_analyze_beats", lambda: True)
+
+    def run_analyze(**kwargs):
+        calls.append(kwargs)
+        return {
+            "mixProfile": {
+                "analyzer": "crate-rust",
+                "analyzerVersion": "smart-mix-audio-v7",
+                "durationMs": 20_000,
+                "quality": "partial",
+                "beatTracker": "beat-this-test",
+            }
+        }
+
+    monkeypatch.setattr(crate_cli, "run_analyze", run_analyze)
+
+    draft = audio_analysis.analyze_mix_profile(tmp_path / "track.flac", beats)
+    plain = audio_analysis.analyze_mix_profile(tmp_path / "track.flac")
+
+    assert calls == [
+        {"file": str(tmp_path / "track.flac"), "beats": beats.to_payload()},
+        {"file": str(tmp_path / "track.flac"), "beats": None},
+    ]
+    assert (draft.analyzer, draft.beat_tracker) == ("crate-rust", "beat-this-test")
+    assert plain.analyzer == "crate-rust"
+
+
+def test_profile_analysis_passes_model_beats_to_the_python_analyzer(
+    monkeypatch, tmp_path: Path
+) -> None:
+    import crate.audio_analysis as audio_analysis
+    from crate.smart_mix import analyzer
+
+    beats = _model_beats(0)
+    received: list[object] = []
+    monkeypatch.setattr(audio_analysis, "_analyze_rust", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        analyzer,
+        "analyze_mix_profile",
+        lambda _path, beats=None: received.append(beats) or "draft",
+    )
+
+    assert audio_analysis.analyze_mix_profile(tmp_path / "t.flac", beats) == "draft"
+    assert audio_analysis.analyze_mix_profile(tmp_path / "t.flac") == "draft"
+    assert received == [beats, None]
+
+
+def test_model_beats_go_to_python_when_crate_cli_cannot_take_them(
+    monkeypatch, tmp_path: Path, caplog
+) -> None:
+    import logging
+
+    import crate.audio_analysis as audio_analysis
+    from crate import crate_cli
+    from crate.smart_mix import analyzer
+
+    beats = _model_beats(0)
+    received: list[object] = []
+    rust_runs: list[dict] = []
+    monkeypatch.setattr(crate_cli, "is_available", lambda: True)
+    monkeypatch.setattr(crate_cli, "has_subcommands", lambda: True)
+    monkeypatch.setattr(crate_cli, "supports_analyze_beats", lambda: False)
+    monkeypatch.setattr(
+        crate_cli, "run_analyze", lambda **kwargs: rust_runs.append(kwargs)
+    )
+    monkeypatch.setattr(
+        analyzer,
+        "analyze_mix_profile",
+        lambda _path, beats=None: received.append(beats) or "python draft",
+    )
+
+    with caplog.at_level(logging.WARNING, logger=audio_analysis.__name__):
+        draft = audio_analysis.analyze_mix_profile(tmp_path / "t.flac", beats)
+
+    # An older crate-cli would track its own beats after the model ran: the Python
+    # analyzer takes them instead, and the worker says why.
+    assert draft == "python draft"
+    assert received == [beats]
+    assert rust_runs == []
+    assert "--beats" in caplog.text
+
+    # Without model beats that crate-cli still runs.
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger=audio_analysis.__name__):
+        audio_analysis.analyze_mix_profile(tmp_path / "t.flac")
+    assert rust_runs == [{"file": str(tmp_path / "t.flac"), "beats": None}]
+    assert received == [beats, None]
+    assert "--beats" not in caplog.text
+
+
+def test_model_beats_go_to_python_while_the_beats_probe_backs_off(
+    monkeypatch, tmp_path: Path, caplog
+) -> None:
+    import logging
+    import subprocess
+
+    import crate.audio_analysis as audio_analysis
+    from crate import crate_cli
+    from crate.smart_mix import analyzer
+
+    beats = _model_beats(0)
+    probes: list[list[str]] = []
+
+    def broken_probe(args, **_kwargs):
+        probes.append(list(args))
+        raise subprocess.TimeoutExpired(args, 5)
+
+    monkeypatch.setattr(crate_cli, "find_binary", lambda: "/usr/local/bin/crate-cli")
+    monkeypatch.setattr(crate_cli, "is_available", lambda: True)
+    monkeypatch.setattr(crate_cli, "has_subcommands", lambda: True)
+    monkeypatch.setattr(crate_cli, "_clock", lambda: 1_000.0)
+    monkeypatch.setattr(crate_cli.subprocess, "run", broken_probe)
+    monkeypatch.setattr(
+        analyzer, "analyze_mix_profile", lambda _path, beats=None: "python draft"
+    )
+    crate_cli._analyze_help.cache_clear()
+    try:
+        with caplog.at_level(logging.INFO, logger=audio_analysis.__name__):
+            for name in ("a.flac", "b.flac"):
+                draft = audio_analysis.analyze_mix_profile(tmp_path / name, beats)
+                assert draft == "python draft"
+    finally:
+        crate_cli._analyze_help.cache_clear()
+
+    # The binary may well take --beats: its analyze --help timed out once and is not
+    # asked again for a minute, so the worker says that rather than blaming the binary.
+    assert probes == [["/usr/local/bin/crate-cli", "analyze", "--help"]]
+    records = [r for r in caplog.records if r.name == audio_analysis.__name__]
+    assert "does not take model beats" not in caplog.text
+    assert len(records) == 2
+    assert all("backing off" in record.getMessage() for record in records)
+    assert all(record.levelno == logging.INFO for record in records)
+
+
 def _bar_features(bar_starts, kick_beats, beats, spacing=20):
     frames = beats * spacing + spacing
     onsets = np.full(frames, 0.2)
@@ -354,3 +628,32 @@ def test_downbeat_phase_needs_a_consistent_bar(bars, kicks, beats, expected) -> 
     beat_frames, features = _bar_features(set(bars), set(kicks), beats)
 
     assert _downbeat_phase(beat_frames, window_frames=2, **features) == expected
+
+
+def test_frame_features_return_aligned_mfcc() -> None:
+    from crate.smart_mix.analyzer import _frame_features
+
+    rng = np.random.default_rng(5)
+    audio = (0.1 * rng.standard_normal(3 * SAMPLE_RATE)).astype(np.float32)
+
+    _, _, chroma, bands, mfcc = _frame_features(audio, SAMPLE_RATE)
+
+    assert mfcc.shape == (bands.shape[0], 13)
+    assert chroma.shape[0] == bands.shape[0]
+    assert np.isfinite(mfcc).all()
+
+
+def test_mfcc_is_the_orthonormal_dct_of_the_mel_levels() -> None:
+    # The reference frame the Rust analyzer's MFCC is checked against
+    # (tools/crate-cli/tests/smart_mix_structure.rs, mfcc_matches_orthonormal_dct).
+    import json
+
+    import librosa
+
+    fixture = Path(__file__).parent / "fixtures/smart_mix/structure_v2.json"
+    reference = json.loads(fixture.read_text())["mfccReference"]
+    mel_db = np.asarray(reference["melDb"], dtype=np.float32)[:, None]
+
+    mfcc = librosa.feature.mfcc(S=mel_db, n_mfcc=13)[:, 0]
+
+    assert mfcc.tolist() == pytest.approx(reference["mfcc"], abs=1e-3)

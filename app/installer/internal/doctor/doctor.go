@@ -17,6 +17,7 @@ import (
 	"github.com/thecrateapp/crate/app/installer/internal/envfile"
 	"github.com/thecrateapp/crate/app/installer/internal/install"
 	"github.com/thecrateapp/crate/app/installer/internal/manifest"
+	"github.com/thecrateapp/crate/app/installer/internal/monitoring"
 	"github.com/thecrateapp/crate/app/installer/internal/stack"
 	"github.com/thecrateapp/crate/app/installer/internal/system"
 	"github.com/thecrateapp/crate/app/installer/internal/ui"
@@ -41,8 +42,23 @@ type Item struct {
 }
 
 type Report struct {
-	Healthy bool   `json:"healthy"`
-	Items   []Item `json:"items"`
+	Healthy    bool        `json:"healthy"`
+	Items      []Item      `json:"items"`
+	Monitoring *Monitoring `json:"monitoring,omitempty"`
+}
+
+// Monitoring is the optional crate-observability project. Its problems are
+// warnings: Crate runs without it.
+type Monitoring struct {
+	Available       bool     `json:"available"`
+	Reason          string   `json:"reason,omitempty"`
+	Configured      bool     `json:"configured"`
+	Connected       bool     `json:"connected"`
+	MissingOverlays []string `json:"missing_overlays,omitempty"`
+	Running         int      `json:"running"`
+	Services        int      `json:"services"`
+	GrafanaURL      string   `json:"grafana_url,omitempty"`
+	GrafanaHealthy  bool     `json:"grafana_healthy"`
 }
 
 type Deps struct {
@@ -61,7 +77,10 @@ func DefaultDeps() Deps {
 	}
 }
 
-type report struct{ items []Item }
+type report struct {
+	items      []Item
+	monitoring *Monitoring
+}
 
 func (r *report) add(section, name string, status Status, detail, fix string) {
 	r.items = append(r.items, Item{section, name, status, detail, fix})
@@ -95,19 +114,71 @@ func Run(ctx context.Context, dir string, deps Deps) (Report, error) {
 
 	docker, state := deps.DetectDocker(ctx, deps.Run, host)
 	r.items = append(r.items, fromCheck("Docker", system.DockerCheck(state, docker, host)))
-	s := stack.Stack{Run: deps.Run, Compose: docker.Compose, Dir: dir, Files: install.ComposeFiles(values)}
+	s := stack.Stack{Run: deps.Run, Compose: docker.Compose, Dir: dir, Files: install.ComposeFiles(values), Env: values}
 	if state == system.DockerReady {
 		checkServices(ctx, r, s)
 	}
 	checkAPI(ctx, r, deps.HTTP, cfg.LocalURLs().API)
 	checkIntegrations(ctx, r, m, values, deps.Validate)
 	checkAgent(ctx, r, values, agent.Setup{Stack: s, Docker: docker.Docker}, state == system.DockerReady)
+	if state == system.DockerReady {
+		m := monitoring.New(dir, "", deps.Run, docker, host, io.Discard)
+		m.HTTP = deps.HTTP
+		r.monitoring = checkMonitoring(ctx, r, m)
+	}
 	return r.finish(), nil
 }
 
 func (r *report) finish() Report {
 	healthy := !slices.ContainsFunc(r.items, func(i Item) bool { return i.Status == Fail })
-	return Report{Healthy: healthy, Items: r.items}
+	return Report{Healthy: healthy, Items: r.items, Monitoring: r.monitoring}
+}
+
+func checkMonitoring(ctx context.Context, r *report, m monitoring.Monitor) *Monitoring {
+	const section = "Monitoring"
+	inspected, err := m.Inspect(ctx)
+	if err != nil {
+		return nil
+	}
+	result := &Monitoring{
+		Available: inspected.Availability.Available, Reason: inspected.Availability.Reason,
+		Configured: inspected.Configured, MissingOverlays: inspected.MissingOverlays,
+		Connected: inspected.Active && len(inspected.MissingOverlays) == 0,
+		Services:  len(monitoring.Services), GrafanaURL: inspected.GrafanaURL, GrafanaHealthy: inspected.GrafanaHealthy,
+	}
+	for _, service := range inspected.Services {
+		if service.State == "running" {
+			result.Running++
+		}
+	}
+	enable := "Run `crate observability enable --dir " + m.Dir + "`."
+	switch {
+	case !inspected.Configured && !inspected.Active && !inspected.Availability.Available:
+		r.add(section, "Monitoring", Skip, "not available", inspected.Availability.Reason)
+		return result
+	case !inspected.Configured && !inspected.Active:
+		r.add(section, "Monitoring", Skip, "not set up", "Optional. Turn it on with `crate observability enable --dir "+m.Dir+"`.")
+		return result
+	case !inspected.Active:
+		r.add(section, "Monitoring", Skip, "off; its data is kept", "Turn it back on with `crate observability enable --dir "+m.Dir+"`.")
+		return result
+	}
+	if result.Running == result.Services {
+		r.add(section, "Services", OK, fmt.Sprintf("%d of %d running", result.Running, result.Services), "")
+	} else {
+		r.add(section, "Services", Warn, fmt.Sprintf("%d of %d running", result.Running, result.Services), enable)
+	}
+	if len(inspected.MissingOverlays) > 0 {
+		r.add(section, "Crate", Warn, "a monitoring network is missing; Crate starts without "+strings.Join(inspected.MissingOverlays, ", "), enable)
+	} else {
+		r.add(section, "Crate", OK, "connected", "")
+	}
+	if inspected.GrafanaHealthy {
+		r.add(section, "Grafana", OK, inspected.GrafanaURL, "")
+	} else {
+		r.add(section, "Grafana", Warn, "not answering at "+inspected.GrafanaURL, enable)
+	}
+	return result
 }
 
 func checkSettings(r *report, m *manifest.Manifest, dir string, values *envfile.Values) {

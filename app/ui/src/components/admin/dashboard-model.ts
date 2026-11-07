@@ -7,6 +7,8 @@ const queueNames = [
   "maintenance",
   "playback",
 ] as const;
+// AI lanes (SM3-D8); snapshots written before them omit the keys.
+const optionalQueueNames = ["ai", "ai_bulk"] as const;
 function count(value: unknown): number | null {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
     ? value
@@ -19,9 +21,13 @@ function date(value: unknown): number | null {
 }
 function queueTotal(queue: unknown): number | null {
   if (!queue || typeof queue !== "object") return null;
-  const values = queueNames.map((name) =>
-    count((queue as Record<string, unknown>)[name]),
-  );
+  const record = queue as Record<string, unknown>;
+  const values = [
+    ...queueNames.map((name) => count(record[name])),
+    ...optionalQueueNames.map((name) =>
+      record[name] === undefined ? 0 : count(record[name]),
+    ),
+  ];
   if (values.some((value) => value === null)) return null;
   const total = values.reduce<number>((sum, value) => sum + value!, 0);
   return Number.isSafeInteger(total) ? total : null;
@@ -39,7 +45,7 @@ function taskName(value: unknown) {
     compute_bliss: "Bliss analysis",
     analyze_all: "Audio analysis",
   };
-  return name ? names[name] ?? name.replace(/_/g, " ") : "Unknown task";
+  return name ? (names[name] ?? name.replace(/_/g, " ")) : "Unknown task";
 }
 function progress(value: unknown) {
   const empty = {

@@ -195,6 +195,7 @@ const catalogReviewFixture = {
                   "@/hooks/use-api",
                   "@/hooks/use-llm",
                   "@/hooks/use-snapshot-stream",
+                  "@/lib/tasks",
                 ]
               : isPlaylistEditorAIButton
                 ? ["@/hooks/use-llm"]

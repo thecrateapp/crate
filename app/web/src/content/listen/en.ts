@@ -41,12 +41,25 @@ export interface SmartMixDetail {
   controls: SmartMixSection & { items: SmartMixControl[]; note: string };
 }
 
+export interface PluginStep {
+  body: string;
+  code?: string;
+}
+
+export interface PluginInstall {
+  eyebrow: string;
+  requirement: string;
+  untested: string;
+  steps: PluginStep[];
+}
+
 export interface ListenChapter {
   title: string;
   id?: string;
   lede: string[];
   status?: "in-development";
   features?: Feature[];
+  plugin?: PluginInstall;
   dive?: { name: "radio" | "paths"; steps: Step[] };
   smartMix?: SmartMixDetail;
 }
@@ -211,8 +224,13 @@ export const listen: ListenPage = {
             },
             {
               name: "VirtualDJ",
+              status: "available",
+              body: "Compatible tracks with Camelot keys and energy from Smart Mix analysis. VirtualDJ mixes them itself.",
+            },
+            {
+              name: "Crate Decks",
               status: "in-development",
-              body: "The Decks plugin: Crate as an online source.",
+              body: "Crate's transition plans, played by a Mixxx-based DJ app for Linux.",
             },
           ],
           note: "Off by default. Server operators opt in with environment variables: CRATE_SMART_MIX_ENABLED, plus one each for Android crossfade, Beatmatch and Bass swap.",
@@ -448,16 +466,46 @@ export const listen: ListenPage = {
       ],
     },
     {
-      title: "Decks",
-      status: "in-development",
-      lede: ["Crate as an online source in VirtualDJ."],
+      title: "For DJs",
+      lede: [
+        "Your library inside DJ software: a plugin for VirtualDJ today, and Crate Decks for Linux on the way.",
+      ],
       features: [
         {
           title: "VirtualDJ plugin",
-          body: "In development.",
+          status: "available",
+          body: "Crate as an online source in VirtualDJ Pro: search, folders and load to deck, plus a Compatibles folder ranked by tempo, harmony, energy and sound, with Camelot keys and energy in the browser. Tracks open in Listen, and plays count in your stats.",
+        },
+        {
+          title: "Queue from Crate",
+          status: "available",
+          body: "While VirtualDJ mixes on its own, Crate keeps its queue two tracks ahead with compatible picks and no repeated artist or album nearby. It needs the automation permission on the token and CRATE_VDJ_AUTOMATION_ENABLED on the server.",
+        },
+        {
+          title: "Crate Decks",
+          status: "in-development",
+          body: "A DJ app for Linux built on Mixxx. It uses your Crate server as its library, with the original audio, track analysis and transition plans from Crate's planner.",
           link: { href: "/developers#working-on", label: t("working.link") },
         },
       ],
+      plugin: {
+        eyebrow: "Install the VirtualDJ plugin",
+        requirement:
+          "Needs VirtualDJ Pro, CRATE_VDJ_ENABLED on the server and an access token created in Listen, under Settings, Access tokens.",
+        untested: "Experimental: not yet tested in VirtualDJ",
+        steps: [
+          {
+            body: "Close VirtualDJ and unzip the package into the OnlineSources folder of its plugins: PluginsMacArm on Apple silicon, Plugins64 on Intel Macs and Windows.",
+          },
+          {
+            body: "On macOS the plugin is not notarized yet, so clear the quarantine flag once:",
+            code: "xattr -dr com.apple.quarantine Crate.bundle",
+          },
+          {
+            body: "Open VirtualDJ, turn on Crate under Online Sources and connect with your server address and the token.",
+          },
+        ],
+      },
     },
   ],
 };

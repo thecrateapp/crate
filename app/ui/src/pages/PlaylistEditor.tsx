@@ -60,6 +60,7 @@ import { Textarea } from "@crate/ui/shadcn/textarea";
 import { useApi } from "@/hooks/use-api";
 import { useActionLLMStatus } from "@/hooks/use-llm";
 import { ApiError, api, apiSseUrl } from "@/lib/api";
+import { waitForTask } from "@/lib/tasks";
 import { timeAgo } from "@/lib/utils";
 
 interface Playlist {
@@ -191,6 +192,9 @@ interface FilterOptions {
   keys: string[];
   artists: string[];
 }
+
+// Covers queueing behind other AI work plus capacity requeues (5-30s each).
+const DESCRIPTION_TASK_TIMEOUT_MS = 10 * 60 * 1000;
 
 function apiErrorDetail(error: unknown, fallback: string): string {
   if (!(error instanceof ApiError)) return fallback;
@@ -555,6 +559,10 @@ export function PlaylistEditor() {
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [previewKey, setPreviewKey] = useState<string | null>(null);
   const previewRequest = useRef(0);
+  const describeTask = useRef<AbortController | null>(null);
+  // "Duplicate" reuses this component for another playlist: a pending draft
+  // belongs to the playlist it was requested for.
+  useEffect(() => () => describeTask.current?.abort(), [id]);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [removingCover, setRemovingCover] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -752,14 +760,22 @@ export function PlaylistEditor() {
     }
   };
 
+  const descriptionRef = useRef(description);
+  descriptionRef.current = description;
+
   const handleGenerateDescription = useCallback(async () => {
     if (!llmAvailable) {
       toast.error(llmUnavailableReason);
       return;
     }
+    describeTask.current?.abort();
+    const controller = new AbortController();
+    describeTask.current = controller;
+    const requestedDescription = descriptionRef.current;
     setDescribing(true);
     try {
-      const result = await api<{ description: string }>(
+      // The model runs in the ai queue; the request only returns the task.
+      const queued = await api<{ task_id: string }>(
         `/api/admin/system-playlists/${id}/ai-description`,
         "POST",
         {
@@ -767,12 +783,36 @@ export function PlaylistEditor() {
           smart_rules: isSmart ? currentSmartRules : null,
         },
       );
-      setField("description", result.description);
+      const task = await waitForTask(
+        queued.task_id,
+        DESCRIPTION_TASK_TIMEOUT_MS,
+        controller.signal,
+      );
+      const description = task.result?.description;
+      if (task.status !== "completed" || typeof description !== "string") {
+        throw new Error(task.error || "Failed to generate description");
+      }
+      if (controller.signal.aborted) return;
+      if (descriptionRef.current !== requestedDescription) {
+        toast.info(
+          "AI description ready, but you edited the description meanwhile; it was not replaced.",
+        );
+        return;
+      }
+      setField("description", description);
       toast.success("AI description generated");
     } catch (error) {
-      toast.error(apiErrorDetail(error, "Failed to generate description"));
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      toast.error(
+        error instanceof ApiError || !(error instanceof Error) || !error.message
+          ? apiErrorDetail(error, "Failed to generate description")
+          : error.message,
+      );
     } finally {
-      setDescribing(false);
+      if (describeTask.current === controller) {
+        describeTask.current = null;
+        setDescribing(false);
+      }
     }
   }, [
     currentSmartRules,

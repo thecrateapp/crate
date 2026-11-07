@@ -203,6 +203,18 @@ export const test = base.extend<AdminFixtures>({
             controlState: "idle",
             campaign: null,
             activeTask: null,
+            backfillSettings: {
+              batchSize: 25,
+              maxAttempts: 3,
+              nightWindow: {
+                start: "01:00",
+                end: "08:00",
+                timezone: "Europe/Madrid",
+              },
+              nightConcurrency: 8,
+              dayConcurrency: 4,
+            },
+            backfillLimit: { window: "day", limit: 4 },
           },
         });
         return;

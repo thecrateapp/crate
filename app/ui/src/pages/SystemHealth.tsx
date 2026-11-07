@@ -8,6 +8,7 @@ import {
 import { Loader2, RefreshCw as HeaderRefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { ErrorsTile } from "@/components/system-health/ErrorsTile";
 import { MetricChart } from "@/components/system-health/MetricChart";
 import {
   PlaybackHealth,
@@ -32,6 +33,7 @@ import { SegmentedControl } from "@crate/ui/primitives/SegmentedControl";
 
 import { InstrumentPanel } from "@crate/ui/primitives/InstrumentPanel";
 import { useApi } from "@/hooks/use-api";
+import type { ErrorSummary } from "@/lib/error-inbox";
 import { taskLabel, useTaskCatalog } from "@/lib/task-catalog";
 import { ErrorState } from "@crate/ui/primitives/ErrorState";
 import { Link } from "react-router";
@@ -123,6 +125,8 @@ interface SystemHealthDashboardResponse {
   timeseries: Record<string, TimeseriesPoint[]>;
   timeseries_status?: Record<string, MetricReadStatus>;
   route_latency_status?: MetricReadStatus;
+  /** Error Inbox summary; null when it could not be built. */
+  errors?: ErrorSummary | null;
 }
 
 interface ActiveTask {
@@ -727,7 +731,7 @@ export function SystemHealth() {
   const runningTasks = tasks.length;
   const queueDepth =
     verified && !error && currentMetric(rawSummary?.worker_queue_depth, now)
-      ? rawSummary!.worker_queue_depth.latest ?? null
+      ? (rawSummary!.worker_queue_depth.latest ?? null)
       : null;
 
   if (loading && !dashboard) {
@@ -938,6 +942,8 @@ export function SystemHealth() {
           }
         />
       </div>
+
+      <ErrorsTile errors={error ? undefined : dashboard?.errors} />
 
       <RouteLatencyOverview routes={routeLatency} status={routeStatus} />
 

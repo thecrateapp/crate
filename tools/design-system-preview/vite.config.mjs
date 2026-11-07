@@ -94,6 +94,7 @@ export default defineConfig({
               "@/hooks/use-api",
               "@/hooks/use-llm",
               "@/hooks/use-snapshot-stream",
+              "@/lib/tasks",
             ].includes(source)
           )
             return fileURLToPath(
@@ -139,6 +140,22 @@ export default defineConfig({
             new URL("admin-upcoming-fixtures.ts", import.meta.url),
           );
         if (!importer?.includes("/app/ui/") || !source.startsWith("@/")) return;
+        // Error Inbox preview: the pages, their components and the cursor pager
+        // they share read fake endpoints and a fake task poller.
+        if (
+          (importer.endsWith("/app/ui/src/pages/Errors.tsx") ||
+            importer.endsWith("/app/ui/src/pages/ErrorDetail.tsx") ||
+            importer.includes("/app/ui/src/components/errors/") ||
+            importer.endsWith(
+              "/app/ui/src/components/agents/connections/use-cursor-list.ts",
+            )) &&
+          ["@/lib/api", "@/hooks/use-api", "@/hooks/use-task-poll"].includes(
+            source,
+          )
+        )
+          return fileURLToPath(
+            new URL("admin-errors-fixtures.ts", import.meta.url),
+          );
         if (importer.endsWith("/app/ui/src/pages/I18nReview.tsx")) {
           if (source === "@/lib/api")
             return fileURLToPath(
@@ -460,6 +477,9 @@ export default defineConfig({
         ),
         adminSystemHealth: fileURLToPath(
           new URL("admin-system-health-demo.html", import.meta.url),
+        ),
+        adminErrors: fileURLToPath(
+          new URL("admin-errors-demo.html", import.meta.url),
         ),
         adminHealth: fileURLToPath(
           new URL("admin-health-demo.html", import.meta.url),

@@ -1,3 +1,5 @@
+import json
+import re
 from pathlib import Path
 
 import pytest
@@ -169,3 +171,78 @@ def test_desktop_release_uploads_native_debug_symbols() -> None:
     assert step_names.index("Generate macOS dSYMs") < step_names.index(
         "Upload desktop native debug symbols"
     )
+
+
+def test_desktop_symbol_upload_sends_only_the_app_and_never_blocks_the_release() -> (
+    None
+):
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/build-desktop.yml").read_text()
+    )
+    steps = workflow["jobs"]["build-desktop"]["steps"]
+    step_names = [step.get("name") for step in steps]
+    symbol_step = steps[step_names.index("Upload desktop native debug symbols")]
+
+    # Only the shipped binary and its PDB/dSYM: the whole target folder carries
+    # build scripts and proc macros that Sentry rejects on Windows.
+    assert "app/listen-desktop/scripts/debug-symbol-files.mjs" in symbol_step["run"]
+    assert (
+        "--wait-for 120 app/listen-desktop/src-tauri/target" not in symbol_step["run"]
+    )
+
+    # A Sentry failure leaves a warning; packaging and the release upload go on.
+    assert "::warning" in symbol_step["run"]
+    assert "continue-on-error" not in symbol_step
+    assert step_names.index("Upload desktop native debug symbols") < step_names.index(
+        "Attach desktop artifacts to GitHub Release"
+    )
+
+    selection_test = steps[step_names.index("Test debug symbol selection")]
+    assert selection_test["run"] == (
+        "npm run --workspace=app/listen-desktop test:debug-symbols"
+    )
+
+
+def test_desktop_workflow_scripts_run_on_the_macos_system_bash() -> None:
+    # macOS runners use /bin/bash 3.2: mapfile, readarray, associative arrays and
+    # case-changing expansions are bash 4+ and fail there with exit 127 or a
+    # syntax error (the v3.2.3 macOS build lost its packages to `mapfile`).
+    bash4_only = re.compile(
+        r"\b(mapfile|readarray)\b|declare -A|local -n|\$\{\w+(,,|\^\^)\}"
+    )
+    workflow = yaml.safe_load(
+        (ROOT / ".github/workflows/build-desktop.yml").read_text()
+    )
+    offenders = [
+        step["name"]
+        for step in workflow["jobs"]["build-desktop"]["steps"]
+        if bash4_only.search(step.get("run") or "")
+    ]
+    assert offenders == []
+
+
+def test_main_builds_associate_commits_with_their_sentry_releases() -> None:
+    # Without commits on a release, Sentry cannot tell which release fixed an issue
+    # or brought it back. Each build creates the releases of the images it built.
+    workflow = yaml.safe_load((ROOT / ".github/workflows/build-images.yml").read_text())
+    steps = workflow["jobs"]["promote-release"]["steps"]
+    names = [step.get("name") for step in steps]
+    step = steps[names.index("Associate commits with the Sentry releases")]
+    assert names.index("Assemble complete release manifest") < names.index(
+        "Associate commits with the Sentry releases"
+    )
+
+    run = step["run"]
+    assert "release_manifest.py sentry-releases" in run
+    assert '--source-sha "$GITHUB_SHA"' in run
+    assert "releases --org" in run and " new " in run
+    assert "set-commits" in run and "--auto" in run and "--ignore-missing" in run
+    # A Sentry failure leaves a warning and never blocks the release manifest.
+    assert "::warning" in run
+    assert "continue-on-error" not in step
+    assert step["env"]["SENTRY_AUTH_TOKEN"] == "${{ secrets.SENTRY_AUTH_TOKEN }}"
+    assert step["env"]["SENTRY_ORG"] == "ninja-development"
+
+    lock = json.loads((ROOT / "package-lock.json").read_text())
+    pinned = lock["packages"]["node_modules/@sentry/cli"]["version"]
+    assert step["env"]["SENTRY_CLI_VERSION"] == pinned

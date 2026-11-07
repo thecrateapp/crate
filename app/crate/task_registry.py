@@ -40,6 +40,20 @@ TASK_CATEGORIES: dict[str, str] = {
 TASK_TYPES: dict[str, TaskTypeInfo] = {
     "ai_catalog_refresh": TaskTypeInfo("AI Model Catalog Refresh", "enrichment"),
     "ai_profile_test": TaskTypeInfo("AI Synthetic Profile Test", "enrichment"),
+    "propose_genre_eq": TaskTypeInfo("Genre EQ Proposal", "enrichment"),
+    "propose_genre_taxonomy_node": TaskTypeInfo(
+        "Genre Taxonomy Proposal", "enrichment"
+    ),
+    "refine_music_path": TaskTypeInfo("Music Path Refinement", "enrichment"),
+    "smart_mix_refine_transition": TaskTypeInfo(
+        "Smart Mix Transition Refinement", "analysis"
+    ),
+    "analyze_artist_hero_candidate": TaskTypeInfo(
+        "Artist Hero Candidate Analysis", "artwork"
+    ),
+    "generate_playlist_description": TaskTypeInfo(
+        "Playlist Description Draft", "playlists"
+    ),
     "library_sync": TaskTypeInfo("Library Scan", "library"),
     "library_pipeline": TaskTypeInfo("Library Pipeline", "library"),
     "scan": TaskTypeInfo("Health Check", "library"),
@@ -168,6 +182,15 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
     "compute_product_kpis": TaskTypeInfo("Product KPIs", "analysis"),
     "compute_observability_summary": TaskTypeInfo("Observability Summary", "analysis"),
     "compute_recommendation_skips": TaskTypeInfo("Recommendation skips", "analysis"),
+    "sync_error_issues": TaskTypeInfo("Error Inbox Sync", "analysis"),
+    "update_error_issue_status": TaskTypeInfo("Error Issue Status Change", "analysis"),
+    "test_error_tracking_connection": TaskTypeInfo(
+        "Error Tracking Connection Test", "analysis"
+    ),
+    "dispatch_error_fix": TaskTypeInfo("Error Fix Launch", "analysis"),
+    "triage_error_issue": TaskTypeInfo("Error Issue AI Triage", "analysis"),
+    "investigate_error_issue": TaskTypeInfo("Error Issue AI Investigation", "analysis"),
+    "evaluate_error_triage": TaskTypeInfo("Error Triage Evaluation", "analysis"),
     "refresh_user_listening_stats": TaskTypeInfo("Listening Stats Refresh", "analysis"),
     "refresh_dirty_listening_stats": TaskTypeInfo(
         "Pending Listening Stats Sweep", "analysis"
@@ -203,6 +226,9 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
         "Smart Mix Profile Backfill", "analysis"
     ),
     "refresh_smart_mix_coverage": TaskTypeInfo("Smart Mix Coverage", "analysis"),
+    "cleanup_smart_mix_refinements": TaskTypeInfo(
+        "Smart Mix Refinement Cleanup", "analysis"
+    ),
     "materialize_artwork_variants": TaskTypeInfo("Artwork Variants", "artwork"),
     "backfill_artwork_variants": TaskTypeInfo("Artwork Variant Backfill", "artwork"),
     "cleanup_artwork_variants": TaskTypeInfo("Artwork Variant Cleanup", "artwork"),

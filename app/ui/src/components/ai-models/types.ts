@@ -62,6 +62,20 @@ export interface Profile {
   created_at: string;
   versions: Version[];
 }
+export type OpenAICompatibleTemplate =
+  "moonshot" | "dashscope_intl" | "openrouter" | "custom";
+export type ReasoningControl =
+  "none" | "thinking" | "enable_thinking" | "reasoning_effort" | "reasoning";
+/** One model an admin declares for an OpenAI-compatible connection. */
+export interface ManifestEntry {
+  model_id: string;
+  label?: string | null;
+  context_window: number;
+  max_output_tokens: number;
+  structured_output: "json_object" | "json_schema";
+  reasoning: ReasoningControl;
+  reasoning_levels: string[];
+}
 export interface Connection {
   id: string;
   persistent_id: string | null;
@@ -69,6 +83,9 @@ export interface Connection {
   provider: string;
   revision: number;
   endpoint: string | null;
+  /** OpenAI-compatible connections only. */
+  template?: OpenAICompatibleTemplate | null;
+  path_prefix?: string | null;
   enabled: boolean;
   model_count: number;
   catalog_status: string;

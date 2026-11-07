@@ -54,7 +54,7 @@ jobs:
       matrix:
         storage: [overlay2, overlayfs]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6

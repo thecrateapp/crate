@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, cast
 
-from sqlalchemy import and_, false, func, or_, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
@@ -34,18 +34,38 @@ def upsert_track(
     with optional_scope(session) as s:
         now = datetime.now(timezone.utc)
         requested_entity_uid = coerce_uuid_or_none(data.get("entity_uid"))
-        path_match = LibraryTrack.path == data["path"]
-        entity_match = (
-            and_(
-                LibraryTrack.entity_uid == requested_entity_uid,
-                LibraryTrack.album_id == data.get("album_id"),
-                LibraryTrack.disc_number == int(data.get("disc_number") or 1),
-                LibraryTrack.track_number.is_not_distinct_from(
-                    data.get("track_number")
-                ),
+        if strict_identity and requested_entity_uid is None:
+            raise ValueError("Strict track upserts require an approved entity UID")
+        album_entity_uid = None
+        album_id = data.get("album_id")
+        if album_id is not None:
+            album_entity_uid = s.execute(
+                select(LibraryAlbum.entity_uid)
+                .where(LibraryAlbum.id == album_id)
+                .limit(1)
+            ).scalar_one_or_none()
+        if requested_entity_uid is None:
+            # A file without a UID stem (legacy layout) takes its derived UID.
+            # It is resolved like a requested one below, because the derived
+            # UID of a tagged recording is the same on every release that
+            # carries it and for a file renamed inside its album.
+            requested_entity_uid = track_entity_uid(
+                album_uid=album_entity_uid,
+                artist_name=data["artist"],
+                album_name=data["album"],
+                title=data.get("title"),
+                filename=data.get("filename"),
+                disc_number=data.get("disc_number"),
+                track_number=data.get("track_number"),
+                musicbrainz_trackid=data.get("musicbrainz_trackid"),
+                musicbrainz_albumid=data.get("musicbrainz_albumid"),
             )
-            if requested_entity_uid is not None
-            else false()
+        path_match = LibraryTrack.path == data["path"]
+        entity_match = and_(
+            LibraryTrack.entity_uid == requested_entity_uid,
+            LibraryTrack.album_id == album_id,
+            LibraryTrack.disc_number == int(data.get("disc_number") or 1),
+            LibraryTrack.track_number.is_not_distinct_from(data.get("track_number")),
         )
         requested_track_mbid = (data.get("musicbrainz_trackid") or "").strip()
         existing_columns = (
@@ -62,11 +82,12 @@ def upsert_track(
             LibraryTrack.path,
         )
         existing_query = (
-            select(*existing_columns).where(or_(path_match, entity_match)).limit(1)
+            select(*existing_columns)
+            .where(or_(path_match, entity_match))
+            .order_by(path_match.desc())
+            .limit(1)
         )
         if strict_identity:
-            if requested_entity_uid is None:
-                raise ValueError("Strict track upserts require an approved entity UID")
             existing_query = existing_query.with_for_update()
         existing = s.execute(existing_query).first()
         if (
@@ -79,15 +100,7 @@ def upsert_track(
             )
         ):
             raise ValueError("Strict track identity conflicts with an indexed path")
-        album_entity_uid = None
-        album_id = data.get("album_id")
-        if album_id is not None:
-            album_entity_uid = s.execute(
-                select(LibraryAlbum.entity_uid)
-                .where(LibraryAlbum.id == album_id)
-                .limit(1)
-            ).scalar_one_or_none()
-        if requested_entity_uid is not None and existing is None:
+        if existing is None:
             entity_uid_is_occupied = s.execute(
                 select(LibraryTrack.id)
                 .where(LibraryTrack.entity_uid == requested_entity_uid)
@@ -124,22 +137,7 @@ def upsert_track(
                 ),
             )
         )
-        entity_uid = (
-            existing[3]
-            if existing and existing[3]
-            else requested_entity_uid
-            or track_entity_uid(
-                album_uid=album_entity_uid,
-                artist_name=data["artist"],
-                album_name=data["album"],
-                title=data.get("title"),
-                filename=data.get("filename"),
-                disc_number=data.get("disc_number"),
-                track_number=data.get("track_number"),
-                musicbrainz_trackid=data.get("musicbrainz_trackid"),
-                musicbrainz_albumid=data.get("musicbrainz_albumid"),
-            )
-        )
+        entity_uid = existing[3] if existing and existing[3] else requested_entity_uid
         requested_storage_id = coerce_uuid_or_none(data.get("storage_id"))
         storage_id = existing[2] if existing and existing[2] else requested_storage_id
         requested_album_mbid = (data.get("musicbrainz_albumid") or "").strip()

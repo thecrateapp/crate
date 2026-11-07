@@ -8,7 +8,7 @@ interface Props {
 }
 
 const { locale = "en" } = Astro.props;
-const items = (["jams", "vdj"] as const).map((key) => ({
+const items = (["jams", "decks"] as const).map((key) => ({
   title: t(`working.${key}.title` as MessageKey, locale),
   body: t(`working.${key}.body` as MessageKey, locale),
   facts: t(`working.${key}.facts` as MessageKey, locale).split(" · "),

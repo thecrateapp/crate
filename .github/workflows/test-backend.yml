@@ -8,6 +8,8 @@ on:
       - "app/crate/**"
       - "app/tests/**"
       - "app/requirements*.txt"
+      - ".github/autofix/**"
+      - ".github/workflows/error-autofix.yml"
       - ".github/workflows/test-backend.yml"
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
@@ -15,6 +17,8 @@ on:
       - "app/crate/**"
       - "app/tests/**"
       - "app/requirements*.txt"
+      - ".github/autofix/**"
+      - ".github/workflows/error-autofix.yml"
       - ".github/workflows/test-backend.yml"
 
 concurrency:
@@ -144,10 +148,36 @@ jobs:
         run: pip install -r requirements-test.txt
         working-directory: app
 
-      - name: Install media and OCR test dependencies
+      # ffmpeg and tesseract pull 88 packages (76 MB). The runner's apt mirror sometimes
+      # serves them at a crawl and used up the shard's 20 minutes before any test ran, so
+      # the downloaded .deb files are cached per runner image. A new image restores the
+      # previous image's files and downloads only the packages that changed.
+      - name: Locate the media and OCR package cache
+        id: apt-cache
         run: |
+          prefix="apt-media-ocr-${ImageOS:-ubuntu}-"
+          echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
+          echo "key=${prefix}${ImageVersion:-$(date -u +%G-%V)}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the media and OCR package cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/apt-archives
+          key: ${{ steps.apt-cache.outputs.key }}
+          restore-keys: ${{ steps.apt-cache.outputs.prefix }}
+
+      - name: Install media and OCR test dependencies
+        timeout-minutes: 10
+        run: |
+          archives="$HOME/.cache/apt-archives"
+          mkdir -p "$archives/partial"
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ffmpeg tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa
+          sudo apt-get install -y --no-install-recommends \
+            -o Dir::Cache::Archives="$archives" \
+            -o Acquire::Retries=3 \
+            ffmpeg tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa
+          # apt leaves root-owned files and a 0640 lock behind; the cache save runs as the runner.
+          sudo chown -R "$(id -u):$(id -g)" "$archives"
           ffmpeg -version
 
       - name: Run test shard with coverage

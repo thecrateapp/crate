@@ -1,0 +1,392 @@
+{
+  "uid": "crate-app-workers",
+  "title": "Crate application \u00b7 Workers and projector",
+  "schemaVersion": 40,
+  "version": 1,
+  "editable": false,
+  "tags": ["crate", "application", "shadow", "workers"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "annotations": {
+    "list": []
+  },
+  "links": [],
+  "panels": [
+    {
+      "title": "Queue depth",
+      "type": "timeseries",
+      "description": "Messages waiting per queue, as last reported. Expires two minutes after the last scrape.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:worker_queue_depth:last2m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{queue}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 1
+    },
+    {
+      "title": "Running tasks",
+      "type": "timeseries",
+      "description": "Tasks running per queue, as last reported. Expires two minutes after the last scrape.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:worker_queue_running:last2m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{queue}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 2
+    },
+    {
+      "title": "Task p95 duration",
+      "type": "timeseries",
+      "description": "95th percentile task duration over 15 minutes by queue. Empty without tasks.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:worker_task_duration_seconds:p95_15m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{queue}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 3
+    },
+    {
+      "title": "Queue wait p95",
+      "type": "timeseries",
+      "description": "95th percentile wait before a task starts, over 15 minutes. Empty without tasks.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:worker_queue_wait_seconds:p95_15m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{queue}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 4
+    },
+    {
+      "title": "Task failure ratio",
+      "type": "timeseries",
+      "description": "Tasks that did not complete over all tasks in 15 minutes. Zero only when tasks ran and none failed.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:worker_task_failures:ratio15m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{queue}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 5
+    },
+    {
+      "title": "Tasks by outcome",
+      "type": "timeseries",
+      "description": "Tasks finished in 15 minutes by queue and outcome. Sample size for the same window. A ratio over a small sample is not a trend.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:worker_tasks:increase15m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{queue}} {{outcome}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 6
+    },
+    {
+      "title": "Resource deferrals",
+      "type": "timeseries",
+      "description": "Tasks deferred by the resource governor in 15 minutes, by queue and reason.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:worker_resource_deferred:increase15m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{queue}} {{reason}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 7
+    },
+    {
+      "title": "Projector and workers collection",
+      "type": "timeseries",
+      "description": "Scrape state of the projector and worker containers. 0 is a failed scrape; no data is an undiscovered service.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:scrape_up:by_service{service=~\"crate-projector|crate-.*worker\"}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 8
+    },
+    {
+      "title": "Media packages",
+      "type": "timeseries",
+      "description": "ZIP packages completed and failed in 15 minutes, by kind.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "crate-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "crate:media_worker_packages:increase15m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "completed {{kind}}"
+        },
+        {
+          "refId": "B",
+          "expr": "crate:media_worker_package_failures:increase15m",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "crate-prometheus"
+          },
+          "legendFormat": "failed {{kind}}"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "id": 9
+    }
+  ],
+  "templating": {
+    "list": []
+  }
+}

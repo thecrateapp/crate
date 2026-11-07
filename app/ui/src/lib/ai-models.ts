@@ -8,8 +8,10 @@ import type {
   LegacyConfig,
   Model,
   ModelChoice,
+  OpenAICompatibleTemplate,
   Profile,
   ReasoningConfig,
+  ReasoningControl,
   Snapshot,
   Usage,
   Version,
@@ -22,6 +24,8 @@ export const FEATURE_AREAS = [
   "genres",
   "discovery",
   "translation",
+  "smart_mix",
+  "ops",
 ] as const;
 
 const FEATURE_AREA_LABELS: Record<string, string> = {
@@ -31,6 +35,8 @@ const FEATURE_AREA_LABELS: Record<string, string> = {
   genres: "Genres",
   discovery: "Discovery",
   translation: "Translations",
+  smart_mix: "Smart Mix",
+  ops: "Operations",
 };
 
 export function featureAreaLabel(group: string): string {
@@ -50,17 +56,108 @@ const FEATURE_SENDS: Record<string, string> = {
   "playlists.description.generate": "Sends: playlist rules and up to 60 tracks",
   "music_paths.refine": "Sends: the computed path and the allowed alternatives",
   "i18n.listen.draft": "Sends: interface text with its keys and placeholders",
+  "ops.error.triage":
+    "Sends: the scrubbed error summary and up to 10 similar issues",
+  "ops.error.investigate":
+    "Sends: the scrubbed error summary, its counts and releases, and similar issues",
+  "smart_mix.transition.refine":
+    "Sends: tempo, key, energy and phrase numbers of two tracks, their genres if allowed, and the candidate transitions",
 };
 
 export function featureSends(action: Action): string {
   return FEATURE_SENDS[action.id] ?? action.description;
 }
 
+/** Features whose input is the error summary of an issue from the error tracker. */
+export function sendsErrorSummaries(actionId: string): boolean {
+  return actionId.startsWith("ops.error.");
+}
+
+/**
+ * The data-egress line for error features bound to `provider`. Ollama runs on
+ * the operator's own server, so nothing leaves; an unknown provider warns.
+ */
+export function errorSummaryEgress(provider: string | null): string | null {
+  if (provider === "ollama") return null;
+  return provider
+    ? `Error summaries leave this server for ${providerLabel(provider)}.`
+    : "Error summaries leave this server for the chosen provider.";
+}
+
 const PROVIDER_LABELS: Record<string, string> = {
   gemini: "Gemini",
   deepseek: "DeepSeek",
   ollama: "Ollama",
+  openai_compatible: "OpenAI-compatible",
 };
+
+export interface OpenAICompatibleTemplateView {
+  label: string;
+  /** Fixed origin and path prefix; null for a custom address. */
+  origin: string | null;
+  pathPrefix: string | null;
+  /** The native reasoning controls this provider's API accepts. */
+  reasoning: readonly ReasoningControl[];
+}
+
+// Mirrors crate.ai.contracts.OPENAI_COMPATIBLE_TEMPLATES; the API enforces it.
+export const OPENAI_COMPATIBLE_TEMPLATES: Record<
+  OpenAICompatibleTemplate,
+  OpenAICompatibleTemplateView
+> = {
+  moonshot: {
+    label: "Moonshot (Kimi)",
+    origin: "https://api.moonshot.ai",
+    pathPrefix: "/v1",
+    reasoning: ["none", "thinking", "reasoning_effort"],
+  },
+  dashscope_intl: {
+    label: "DashScope international (Qwen)",
+    origin: "https://dashscope-intl.aliyuncs.com",
+    pathPrefix: "/compatible-mode/v1",
+    reasoning: ["none", "enable_thinking"],
+  },
+  openrouter: {
+    label: "OpenRouter",
+    origin: "https://openrouter.ai",
+    pathPrefix: "/api/v1",
+    reasoning: ["none", "reasoning"],
+  },
+  custom: {
+    label: "Custom address",
+    origin: null,
+    pathPrefix: null,
+    reasoning: ["none", "thinking", "enable_thinking", "reasoning_effort"],
+  },
+};
+
+/** The path prefixes a custom address may use: those of the predefined origins. */
+export const OPENAI_COMPATIBLE_PATH_PREFIXES = [
+  "/v1",
+  "/compatible-mode/v1",
+  "/api/v1",
+] as const;
+
+const REASONING_CONTROL_LABELS: Record<ReasoningControl, string> = {
+  none: "Provider default",
+  thinking: "thinking on/off",
+  enable_thinking: "enable_thinking on/off",
+  reasoning_effort: "reasoning_effort levels",
+  reasoning: "reasoning effort or on/off",
+};
+
+export function reasoningControlLabel(control: ReasoningControl): string {
+  return REASONING_CONTROL_LABELS[control];
+}
+
+/** Ollama and a custom OpenAI-compatible address may run without a key. */
+export function needsKey(connection: Connection): boolean {
+  if (connection.provider === "ollama") return false;
+  if (connection.provider === "openai_compatible") {
+    return connection.template !== "custom";
+  }
+  return true;
+}
 
 export function providerLabel(provider: string): string {
   return PROVIDER_LABELS[provider] ?? humanizeKey(provider);
@@ -80,7 +177,7 @@ export interface ToneView {
 
 export function providerStatus(connection: Connection): ToneView {
   if (!connection.enabled) return { label: "Turned off", tone: "neutral" };
-  if (connection.provider !== "ollama" && !connection.has_key) {
+  if (needsKey(connection) && !connection.has_key) {
     return { label: "Needs key", tone: "warning" };
   }
   if (connection.catalog_status === "error") {
@@ -97,7 +194,7 @@ export function isUsableConnection(connection: Connection): boolean {
     connection.enabled &&
     connection.persistent_id !== null &&
     connection.model_count > 0 &&
-    (connection.provider === "ollama" || connection.has_key)
+    (!needsKey(connection) || connection.has_key)
   );
 }
 
@@ -446,6 +543,10 @@ const AI_ERROR_TEXT: Record<string, string> = {
   AI_IMAGE_BOUND_UNKNOWN:
     "This model's image limits are unknown, so it can't run image features.",
   AI_ACTION_NEEDS_IMAGE: "This feature needs a model that reads images.",
+  AI_ORIGIN_UNCONFIRMED:
+    "Confirm that this address may receive prompts and the key.",
+  AI_MANIFEST_INVALID:
+    "Check the models: declare each one once, with controls this provider has.",
 };
 
 const DEFAULT_AI_ERROR_TEXT =
@@ -493,6 +594,8 @@ const INVOCATION_ERROR_TEXT: Record<string, string> = {
   AI_PROVIDER_TIMEOUT: "The provider didn't answer in time",
   AI_PROVIDER_FAILED: "The provider couldn't complete the request",
   AI_RESPONSE_INVALID: "The model's answer didn't match the expected format",
+  AI_OUTPUT_LIMIT:
+    "The answer was cut off at the profile's output limit, reasoning included",
   AI_INPUT_TOO_LARGE: "The input was larger than the profile allows",
   AI_PROBE_FAILED: "The test request failed",
 };

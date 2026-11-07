@@ -153,3 +153,116 @@ fn test_analyze_bpm_detection() {
         );
     }
 }
+
+#[test]
+fn analyze_cli_takes_external_beats_from_a_json_file() {
+    let dir = TempDir::new().unwrap();
+    let path = create_test_wav(&dir, "tone.wav", 220.0, 20.0);
+    let beats_ms: Vec<u64> = (0..38).map(|beat| 1_000 + 500 * beat).collect();
+    let downbeats_ms: Vec<u64> = beats_ms.iter().skip(1).step_by(4).copied().collect();
+    let beats_path = dir.path().join("beats.json");
+    std::fs::write(
+        &beats_path,
+        serde_json::json!({
+            "tracker": "beat-this-small0",
+            "beats_ms": beats_ms,
+            "downbeats_ms": downbeats_ms,
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let binary = env!("CARGO_BIN_EXE_crate-cli");
+
+    let help = std::process::Command::new(binary)
+        .args(["analyze", "--help"])
+        .output()
+        .unwrap();
+    let output = std::process::Command::new(binary)
+        .arg("analyze")
+        .arg("--file")
+        .arg(&path)
+        .arg("--beats")
+        .arg(&beats_path)
+        .output()
+        .unwrap();
+
+    // crate_cli.py passes --beats only to a binary whose help lists it.
+    assert!(String::from_utf8_lossy(&help.stdout).contains("--beats"));
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let profile = &result["mixProfile"];
+    assert_eq!(profile["beatTracker"], "beat-this-small0");
+    assert_eq!(profile["beatGridMs"][0], 1_000);
+    assert_eq!(profile["downbeatAnchorMs"], 1_500);
+}
+
+#[test]
+fn analyze_cli_takes_the_model_bar_length() {
+    let dir = TempDir::new().unwrap();
+    let path = create_test_wav(&dir, "tone.wav", 220.0, 20.0);
+    let beats_ms: Vec<u64> = (0..38).map(|beat| 1_000 + 500 * beat).collect();
+    let downbeats_ms: Vec<u64> = beats_ms.iter().step_by(3).copied().collect();
+    let beats_path = dir.path().join("beats.json");
+    std::fs::write(
+        &beats_path,
+        serde_json::json!({
+            "tracker": "beat-this-small0-dbn",
+            "beats_ms": beats_ms,
+            "downbeats_ms": downbeats_ms,
+            "beats_per_bar": 3,
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let binary = env!("CARGO_BIN_EXE_crate-cli");
+
+    let help = std::process::Command::new(binary)
+        .args(["analyze", "--help"])
+        .output()
+        .unwrap();
+    let output = std::process::Command::new(binary)
+        .arg("analyze")
+        .arg("--file")
+        .arg(&path)
+        .arg("--beats")
+        .arg(&beats_path)
+        .output()
+        .unwrap();
+
+    assert!(String::from_utf8_lossy(&help.stdout).contains("beats_per_bar"));
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let profile = &result["mixProfile"];
+    assert_eq!(profile["beatTracker"], "beat-this-small0-dbn");
+    assert_eq!(profile["timeSignature"], 3);
+    assert_eq!(profile["downbeatAnchorMs"], serde_json::Value::Null);
+    assert_eq!(profile["phrases"], serde_json::json!([]));
+}
+
+#[test]
+fn analyze_cli_rejects_an_unreadable_beats_file() {
+    let dir = TempDir::new().unwrap();
+    let path = create_test_wav(&dir, "tone.wav", 220.0, 3.0);
+    let beats_path = dir.path().join("beats.json");
+    std::fs::write(&beats_path, "not json").unwrap();
+
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_crate-cli"))
+        .arg("analyze")
+        .arg("--file")
+        .arg(&path)
+        .arg("--beats")
+        .arg(&beats_path)
+        .output()
+        .unwrap();
+
+    // A failure, so the worker falls back to the Python analyzer with the same beats.
+    assert!(!output.status.success());
+}

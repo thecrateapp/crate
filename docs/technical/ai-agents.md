@@ -5,7 +5,7 @@ section: operations
 audience: [developer, operator]
 status: canonical
 order: 95
-verified: 2026-10-19
+verified: 2026-11-06
 sources:
   - app/crate/ai/actions.py
   - app/crate/ai/capabilities.py
@@ -15,7 +15,29 @@ sources:
   - app/crate/ai/runtime.py
   - app/crate/ai/transport.py
   - app/crate/ai/operations.py
+  - app/crate/ai/queues.py
+  - app/crate/ai/guard.py
+  - app/crate/ai/requeue.py
+  - app/crate/actors.py
+  - app/crate/worker.py
+  - app/crate/api/ai_tasks.py
+  - app/tests/test_ai_architecture.py
+  - app/tests/test_actor_config.py
   - app/crate/music_paths_refinement.py
+  - app/crate/smart_mix_ai.py
+  - app/crate/worker_handlers/smart_mix_refinement.py
+  - app/crate/llm/prompts/smart_mix_transition.py
+  - app/crate/error_inbox/triage.py
+  - app/crate/error_inbox/evaluation.py
+  - app/crate/error_inbox/evaluation_cli.py
+  - tools/error-inbox-eval/run_eval.py
+  - app/crate/llm/prompts/error_triage.py
+  - app/crate/llm/prompts/error_investigate.py
+  - app/crate/db/migrations/versions/145_ai_action_error_inbox.py
+  - app/crate/db/migrations/versions/153_ai_openai_compatible.py
+  - app/crate/ai/contracts.py
+  - app/ui/src/components/ai-models/OpenAICompatibleFields.tsx
+  - app/ui/src/components/ai-models/FeatureModelSheet.tsx
   - app/crate/credentials.py
   - app/crate/api/ai_agents.py
   - app/crate/db/repositories/ai_configuration.py
@@ -28,11 +50,13 @@ sources:
   - docker-compose.yaml
   - docker-compose.dev.yaml
   - docker-compose.home.yaml
+  - app/tests/test_ai_ollama_endpoint_key.py
+  - app/ui/src/components/ai-models/ProviderCard.tsx
 ---
 
 # AI agents configuration
 
-Crate routes its eleven registered language model actions through explicit provider
+Crate routes its fourteen registered language model actions through explicit provider
 connections and immutable model profile versions. Admin exposes the configuration
 at `/ai` (**AI models**), with Default model, Features, Providers, Advanced and
 Activity panels; `/ai-agents` redirects to it. Domain buttons check their own action
@@ -63,7 +87,7 @@ establish live readiness or a known version.
    Its first use computes every action's derived limits and activates the whole
    configuration in one reviewed transaction; an action whose derived limits are
    incompatible with that model keeps its existing binding, or its inherited legacy
-   snapshot, instead of blocking the other ten. An image feature that can keep
+   snapshot, instead of blocking the other thirteen. An image feature that can keep
    neither is turned off, and the review lists it with the reason.
 4. On Features, give one feature its own model when it should diverge from the
    default. This creates or reuses a profile version scoped to that single feature
@@ -91,11 +115,12 @@ on the Actions view cover the recent metadata page, rather than the whole histor
 
 ## Providers and native controls
 
-| Provider | Model validation                                                                                                                    | Reasoning and image controls                                                                                                                                                                                                         |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Gemini   | Explicit catalog plus a reviewed finite manifest: `gemini-3.8-flash`, `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-2.5-flash-lite` | 3.8 Flash: `low`, `medium`, `high`; no `minimal`. Gemini 2.5 uses native thinking budgets within each model's range. Disable is offered only where supported. Image detail is model specific; `ultra_high` is exposed for 3.8 Flash. |
-| DeepSeek | Provider metadata must establish text input/output, structured output and token/context limits; bare model IDs remain pending       | Native `thinking` enabled/disabled and `reasoning_effort` levels only when established by catalog metadata. No guessed aliases or image support.                                                                                     |
-| Ollama   | `/api/tags` followed by bounded `/api/show` inspection establishes completion/vision and context metadata                           | Exact `/api/show` `thinking.values` establishes boolean controls or named levels. A generic thinking capability or model name cannot establish them.                                                                                 |
+| Provider          | Model validation                                                                                                                                                                     | Reasoning and image controls                                                                                                                                                                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gemini            | Explicit catalog plus a reviewed finite manifest: `gemini-3.8-flash`, `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-2.5-flash-lite`                                                  | 3.8 Flash: `low`, `medium`, `high`; no `minimal`. Gemini 2.5 uses native thinking budgets within each model's range. Disable is offered only where supported. Image detail is model specific; `ultra_high` is exposed for 3.8 Flash.                                   |
+| DeepSeek          | Provider metadata must establish text input/output, structured output and token/context limits; bare model IDs remain pending                                                        | Native `thinking` enabled/disabled and `reasoning_effort` levels only when established by catalog metadata. No guessed aliases or image support.                                                                                                                       |
+| Ollama            | `/api/tags` followed by bounded `/api/show` inspection establishes completion/vision and context metadata                                                                            | Exact `/api/show` `thinking.values` establishes boolean controls or named levels. A generic thinking capability or model name cannot establish them.                                                                                                                   |
+| OpenAI-compatible | The admin's model manifest declares context, maximum output, `json_schema` or `json_object` output and the native reasoning control; `/models` only confirms each ID is still listed | The one control the manifest declares, if its origin template accepts it: `thinking` or `reasoning_effort` (Moonshot), `enable_thinking` (DashScope), `reasoning` (OpenRouter), and `thinking`, `enable_thinking` or `reasoning_effort` on a custom server. Text only. |
 
 `provider_default`, `enabled`, `disabled`, `level` and `budget` are distinct modes.
 Only advertised modes are accepted. Changing models requires a new review of native
@@ -106,12 +131,45 @@ models likewise remain pending until trusted compatibility evidence exists.
 
 Gemini and DeepSeek use fixed cloud origins. Ollama requires an explicit HTTP(S)
 origin; private networks are allowed, credentials in URLs are rejected, and metadata,
-link-local and unsafe resolved addresses are blocked. Discovery and inference pin a
-validated address with the original Host/TLS name. Ambient proxies, redirects,
+link-local and unsafe resolved addresses are blocked. A stored Ollama key belongs to
+the origin it was saved for: a new scheme, host or port revokes it (see [Credential
+storage and rotation](#credential-storage-and-rotation)). Discovery and inference
+pin a validated address with the original Host/TLS name. Ambient proxies, redirects,
 transport retries and provider fallback are disabled. Discovery has a 30 second total
 budget, at most 500 catalog rows and 100 Ollama inspections; an uninspected model
 remains pending. Failed refreshes keep the last good catalog and expose a safe error.
 Catalog compatibility is distinct from live connectivity or available credit.
+
+### OpenAI-compatible connections
+
+An `openai_compatible` connection serves Kimi, Qwen in the cloud, OpenRouter and
+self-hosted vLLM or LM Studio servers (SM3-D7). It is configured in Admin only:
+it has no environment connection and its key is always stored encrypted.
+
+| Origin template  | Requests go to                                                    | Key      |
+| ---------------- | ----------------------------------------------------------------- | -------- |
+| `moonshot`       | `https://api.moonshot.ai/v1`                                      | Required |
+| `dashscope_intl` | `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`          | Required |
+| `openrouter`     | `https://openrouter.ai/api/v1`                                    | Required |
+| `custom`         | The admin's origin plus `/v1`, `/compatible-mode/v1` or `/api/v1` | Optional |
+
+- A predefined template fixes its origin and prefix; the API and a database CHECK
+  reject any other. A custom origin follows the Ollama rules, needs HTTPS unless
+  every resolved address is private, and needs the admin's confirmation each time
+  it is set or moved. Moving it revokes the stored key, so changing a destination
+  (`ai.config.manage`) never sends a key entered by `ai.credentials.manage` to a
+  new server. The AWS IPv6 metadata address is blocked as well.
+- Requests are `GET <prefix>/models` (catalog refresh) and
+  `POST <prefix>/chat/completions` (inference) only, with the same 2 MB response
+  cap, killable child process and no redirects, retries or fallback.
+- The manifest holds at most 50 models. A model is validated while `/models` still
+  lists its ID; a retired ID turns pending at the next refresh. A new manifest or
+  origin drops the cached catalog and makes accepted contexts stale. Models cannot
+  be added one by one.
+- Inference sends `max_tokens` and the declared `response_format`: `json_schema`
+  with the schema, or `json_object` with the schema in the system prompt. Usage
+  splits reasoning tokens from output and reads cached input from
+  `prompt_tokens_details` or Moonshot's top-level `cached_tokens`.
 
 ## Migration and execution identity
 
@@ -123,14 +181,14 @@ They share the global invocation idempotency namespace, with unknown usage and c
 Unsupported inherited state is visible but cannot be chosen as a new validated adapter.
 
 Activation compares the reviewed configuration fingerprint and revision, then
-atomically snapshots all eleven inherited actions into internal immutable profiles
+atomically snapshots all fourteen inherited actions into internal immutable profiles
 and bindings. It preserves native omitted options and each action's inherited
 behavior. It does not copy environment API keys into the database. Prepared bindings
 remain pending before activation. Activation is explicit and one-time; creating a
 connection or profile does not activate it.
 
 **Default model.** Choosing a default model (`POST /api/admin/ai/default-model`) is
-the normal way to reach activation. For each of the eleven actions, Crate derives a
+the normal way to reach activation. For each of the fourteen actions, Crate derives a
 profile from the chosen model and requested reasoning alone, with no read of prior
 configuration: an image action requires an image-capable model with a known
 per-image token bound (`AI_ACTION_NEEDS_IMAGE`, `AI_IMAGE_BOUND_UNKNOWN`); output and
@@ -160,7 +218,7 @@ rule to every binding it writes, so an enabled image binding whose model can no
 longer run it fails activation with that code.
 Only an action left with no such fallback, such as one without enough context on
 the chosen model, still fails the whole assignment closed with `AI_SETUP_BLOCKED`,
-and activation itself stays all-or-nothing across the eleven actions. After
+and activation itself stays all-or-nothing across the fourteen actions. After
 activation nothing is turned off: incompatible features keep their current binding
 (`kept_current`). Activating keeps each inherited on/off state: Music Paths
 refinement stays off when the Settings switch is off, or when it runs on Ollama
@@ -232,8 +290,25 @@ are readable only through their owned domain routes.
 | `playlists.description.generate` | text            |              45 |                  2048 |
 | `music_paths.refine`             | text            |               8 |                  4096 |
 | `i18n.listen.draft`              | text            |              90 |                 16000 |
+| `ops.error.triage`               | error summary   |              90 |                  8192 |
+| `ops.error.investigate`          | error summary   |              90 |                 16000 |
+| `smart_mix.transition.refine`    | numbers only    |              45 |                  1024 |
 
-Profiles may lower these maxima; they cannot raise them. Input profiles are bounded
+`smart_mix.transition.refine` (permission `smart_mix.ai`, which every role with
+`library.view` holds) sends only the tempo, key, energy and phrase numbers of two
+tracks, their genre slugs when Settings allow it, and the planner's candidate
+transitions: never titles, artists, paths, track IDs or the user. When a default
+model is applied with the provider's own reasoning, this feature takes the model's
+native `low` level if it has one, because its answer is needed before the
+transition plays.
+
+Profiles may lower these maxima; they cannot raise them. Reasoning models count
+their thinking against the output limit (Gemini's `maxOutputTokens`, DeepSeek's and
+OpenAI-compatible `max_tokens`, Ollama's `num_predict`), so the error inbox actions
+leave room for thousands of reasoning tokens around an answer of a few hundred. A
+profile keeps the limits it was created with: after a maximum is raised, use the
+model again for that feature (**Use a different model**, same model and reasoning)
+to append a profile version with the new limits. Input profiles are bounded
 by the model context and 131072 tokens. Vision admission requires a conservative
 image bound or a sufficient complete model-context reservation; unknown image bounds
 fail closed. Binding an enabled image action to such a profile is rejected up front
@@ -249,7 +324,7 @@ UTC daily budgets reserve the full input plus output allowance before transmissi
 Known usage settles the reservation; missing usage keeps the conservative charge.
 Concurrency is released exactly once. Pruning activity or reconciling stale work does
 not refund daily usage. Synthetic tests share these connection budgets as a separate
-invocation kind with no domain action ID; they are not a twelfth action.
+invocation kind with no domain action ID; they are not a fifteenth action.
 
 Activity contains actor/job, provider/model/profile identity, status, duration, safe
 errors and input/output/thought/cache/total/reserved/charged tokens. Input includes
@@ -264,6 +339,281 @@ content. A configuration change invalidates reuse under another identity. Existi
 domain provenance, show source manifests and owned biography evidence remain private;
 raw provider reasoning is discarded and never enters public activity or logs.
 
+## Error inbox actions
+
+`ops.error.triage` classifies one error issue and `ops.error.investigate` proposes
+its cause and a next step. Both belong to the `ops` group, open at `/errors` and
+require `ops.errors.manage`. Migration 145 admits them in the action CHECKs of
+`ai_action_bindings`, `ai_invocations`, `ai_usage_daily` and
+`ai_legacy_invocation_receipts`. Its downgrade deletes their bindings and keeps
+their invocation history and usage: the restored CHECKs on those three tables are
+`NOT VALID`, so they apply to new rows only.
+
+**What leaves the server.** Each call sends the bound provider:
+
+- the sanitized digest of the issue's latest event: the exception chain, the app's
+  own frames with the code lines the error tracker stored, allowlisted tags and
+  short breadcrumbs. Frame variables, request data and user data never enter it, and
+  `/music` paths, query strings, e-mail and IP addresses are reduced first;
+- the issue's service, level, status, counts and first and last release;
+- at most ten duplicate candidates (same `group_key` or same main exception type),
+  each reduced to its short ID, status, main exception and innermost app frame;
+- for an investigation, the current triage of that digest and, when Sentry answers,
+  how the issue's events spread over releases (`events_by_release`) and over the
+  values of the allowlisted tags the digest carries (`tag_distribution`), top
+  values only and scrubbed like the digest.
+
+The issue title, culprit and permalink are not sent. Neither the prompt nor the
+raw response is stored. With Ollama the summary stays on the operator's own
+server; with Gemini or DeepSeek it leaves it. Giving one of these features a model
+(**Use a different model**) or applying a default model that would bind them shows
+a line such as «Error summaries leave this server for Gemini.» in the dialog,
+unless the provider is Ollama. With an active configuration and no binding they are
+unavailable (`AI_ACTION_DISABLED`) and the inbox works without AI; before setup
+they follow the server settings like every other feature.
+
+**Untrusted input.** Any of that data can carry text written by an attacker: file
+names, URLs, headers or messages. The prompt fences it between
+`<untrusted_error_data>` tags as JSON with `<`, `>` and `&` escaped, so the data
+cannot close the fence, and the system prompt tells the model to ignore any
+instruction inside it.
+
+**Validation.** The response schema is closed and narrowed for each call:
+`classification` and `severity` are enums, the summary, hypothesis and next step
+have length limits, `duplicate_of` must be the short ID of a listed candidate and
+`suspected_frames` holds at most five indexes into the digest's frames. An
+investigation must also return a hypothesis and a next step. Any other output
+fails the invocation with `AI_RESPONSE_INVALID` and nothing is saved. A valid
+result goes to `error_issue_triage` with its invocation ID.
+
+**Output limit.** When the provider stops because the answer reached the profile's
+output limit (Gemini `finishReason: MAX_TOKENS`, DeepSeek `finish_reason: length`,
+Ollama `done_reason: length`) and what it returned is not a valid answer, the
+runtime fails the invocation with `AI_OUTPUT_LIMIT` instead of
+`AI_RESPONSE_INVALID`, for every action. Reasoning counts against that limit, so a
+model can spend it all thinking and return little or nothing. The invocation keeps
+its token usage, AI activity shows «The answer was cut off at the profile's output
+limit, reasoning included», and a triage or investigation task says which limit it
+reached («The answer was cut off at the AI profile's 2,048-token output limit, so
+nothing was saved…»). An answer that is complete and valid when the limit stops it
+is kept.
+
+**One result per issue, kind and digest.** `triage_issue`
+(`crate.error_inbox.triage`) returns an existing result without calling the
+model; only a saved result counts as done. The idempotency key keeps a redelivered
+task from paying twice:
+
+- automatic triage uses `issue_id:kind:digest_hash`, so it sends a digest once:
+  after a failed call (invalid output, timeout, provider error) it never retries
+  that digest, and the sync never queues it again;
+- a person's request (Investigate, Triage backlog) adds its task id,
+  `issue_id:kind:digest_hash:task_id`, so pressing again after a failure is a new
+  attempt, while a redelivery of the same task is still refused.
+
+A digest larger than the profile's input allowance fails with
+`AI_INPUT_TOO_LARGE` before anything is reserved. The digest is never trimmed to
+fit: the task result names the input the call needed and the profile's limit
+(«This issue needs about 30,512 input tokens; the AI profile bound to Investigate
+error issue allows 16,384…»), and the admin shows it where the button was pressed.
+A hand-made profile starts at 16,384 input tokens, below what a full 24 KB digest
+needs; raise it in AI models for these two actions.
+
+**Where it runs.** Two `ai`-lane tasks call these actions, and their handlers pass
+`execute_structured` themselves, so each is the root of the model-calling chain
+the static check below verifies:
+
+- `triage_error_issue` (priority 1, 150 s): queued by the sync when automatic
+  triage is on, or by **Triage backlog**;
+- `investigate_error_issue` (priority 0, 180 s): queued by **Investigate**. It
+  first reads the Sentry evidence (one documented Retrieve Tag Details call per
+  key, `release` first, at most 20 s and 5 s per call; without Sentry it goes on
+  with the digest alone).
+
+Both resume the configuration the route or the sync accepted (`accept_action`) and
+fail closed (`AI_CONTEXT_STALE`) when it changed. A connection with no free slot
+returns the task to `pending` and requeues it like every `ai` task. Failures are
+typed task results the worker does not report to Sentry; the admin shows them as
+they are. [Observability](observability.md#ai-triage-and-investigation) covers
+when automatic triage queues work and the daily limit.
+
+**Evaluation before automatic triage (gate EG2).** Automatic triage stays off
+until the triage has been measured against the 79 issues labelled by hand in
+phase E0 (`app/tests/fixtures/error_inbox/reference_labels.json`). The gate asks
+for at least 80% agreement on classification and no critical issue taken for
+noise; with the report the maintainer picks the model and decides whether to turn
+automatic triage on. `tools/error-inbox-eval/run_eval.py` produces that report
+([README](https://github.com/thecrateapp/crate/tree/main/tools/error-inbox-eval)):
+
+- It never calls a model itself. Through `python -m crate.error_inbox.evaluation_cli`
+  inside the worker container it plans (which reference issues have a stored digest,
+  which ones the task will read from Sentry, the bound model, the number of calls
+  and their token bound), queues one `evaluate_error_triage` task and reads its
+  result. `plan` is a dry run that makes no Sentry request; `run` sends calls only
+  with `--execute` and a confirmation of the exact number of calls. The plan warns
+  when the bound profile's output limit or timeout is below the action's.
+- Only short ids reach the server; the labels stay with the tool. Issues with a row
+  but no stored digest are reported as skipped.
+- Most reference issues have been resolved or filtered out of the inbox since E0.
+  The task reads each one the inbox does not hold with the stored Sentry connection
+  (`crate.error_inbox.references`): Resolve a Short ID
+  (`/organizations/{org}/shortids/{short_id}/`), the issue and its latest event,
+  three organization-scoped requests on the configured host, at most four a second,
+  a 429 waited out once (Retry-After, at most 60 s), all within 600 s. It builds the
+  triage input in memory exactly as the sync would store it (`build_digest`, the
+  same service and score) and never writes it to the inbox, a file, a log line or
+  the result. An issue Sentry no longer has is skipped as `not_found`, one merged
+  into another as `merged`, one whose events are gone as `no_event`, a failed read
+  as `fetch_failed` (with its Sentry code; a rejected token skips the rest without
+  asking again) and the end of the budget as `fetch_budget`; the run goes on.
+  Without a Sentry connection these issues are skipped as `not_in_inbox`.
+- Duplicate candidates come from the inbox and from the issues read from Sentry
+  together, with the triage's rule (same group key or same main exception) and
+  order, at most ten, so duplicate agreement is measured on the whole reference set.
+- `queue` accepts the binding the plan showed and refuses with `AI_CONTEXT_STALE`
+  if it changed since. One evaluation runs at a time.
+- The task runs on `ai_bulk` and its handler names `execute_structured`, so the
+  calls happen inside the AI-lane window like any other model call and the static
+  check below needs no exception. Each call is the request `triage_issue` builds,
+  validated the same way, with the idempotency key `eval:<task id>:<short id>`. It
+  stores nothing in `error_issue_triage`, ignores triages already stored, and keeps
+  only classification, severity, `duplicate_of` and confidence: the summary,
+  hypothesis and next step are dropped because they can echo event text.
+- The report, `docs/technical/evidence/observability/error-triage-eval-<date>.md`
+  with a JSON file next to it, shows per model the agreement on classification and
+  severity, critical (and, because the reference has no critical label,
+  high-severity) issues taken for noise, confident critical answers on non-critical
+  issues, duplicate agreement, invalid outputs, answers cut off at the output limit
+  (`AI_OUTPUT_LIMIT`), failed calls, how many issues were read from Sentry and why
+  others were skipped, and tokens, with the cost at a price passed on the command
+  line. It holds labels, short ids, counts, codes and token figures only.
+
+Running it against production spends the connection's budget and sends the
+reference issues' digests to the bound provider, so it needs the maintainer's
+explicit authorization. To compare models, bind another one to **Triage error
+issue** and run again.
+
+## Where model calls run
+
+Every provider call runs inside a Dramatiq task on one of two queues reserved for
+AI work (SM3-D8). Only `crate-worker` consumes them, each in its own pool (see
+[Smart Mix operations](smart-mix-operations.md#ai-worker-lanes-and-sizing) for
+sizing). Provider latency therefore never holds the general queues, and a long
+taxonomy batch never holds the interactive threads.
+
+| Lane      | Work                                                     | Time limit            | Task types (time limit in seconds)                                                                                                                                                                                                                                                                                                                                                                               |
+| --------- | -------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ai`      | One proposal, draft, extraction, analysis or admin probe | at most 300 s         | `ai_catalog_refresh` (180), `ai_profile_test` (180), `propose_genre_eq` (120), `generate_playlist_description` (120), `propose_genre_taxonomy_node` (180), `refine_music_path` (120), `analyze_artist_hero_candidate` (180), `show_extract` (180), `research_artist_bio` (300), `draft_i18n_translation` (300), `triage_error_issue` (150), `investigate_error_issue` (180), `smart_mix_refine_transition` (120) |
+| `ai_bulk` | Long batches                                             | per task, no lane cap | `infer_genre_taxonomy` (3600), `rebuild_genre_taxonomy_proposals` (7200), `evaluate_error_triage` (10800)                                                                                                                                                                                                                                                                                                        |
+
+Every AI task keeps `max_retries=0`: paid work is never retried.
+`enrich_genre_descriptions` reads Wikidata and Wikipedia only, calls no model
+and stays on `maintenance`.
+Task priority does not reorder a lane: Dramatiq applies an actor's priority only
+among the messages one pool process has already prefetched (twice its threads),
+so each lane runs close to first in, first out.
+
+### No model calls inside HTTP requests
+
+Routes never call a model. A route that needs one validates its input, pins the
+current configuration with `accept_action(action_id)` (action, fingerprint and
+profile identity only) and queues a task. The proposal routes below queue it
+through `crate.api.ai_tasks.queue_ai_task` and answer `202` with
+`{task_id, status, deduplicated}`; the client follows
+`/api/events/task/{task_id}` and reads the proposal from the task result. A
+duplicate request joins the active task. If that task finished between the
+dedup check and the lookup, the route returns the finished task with its
+status, so the client still reads the result it paid for; if no row is left, it
+queues a new task. An unavailable action answers `503` with the closed code in
+`X-Crate-Error` before anything is queued.
+
+| Request                                                   | Task                            | One active task per                        |
+| --------------------------------------------------------- | ------------------------------- | ------------------------------------------ |
+| `POST /api/genres/{slug}/generate-eq`                     | `propose_genre_eq`              | genre and apply mode                       |
+| `POST /api/genres/taxonomy/{slug}/proposal`               | `propose_genre_taxonomy_node`   | genre and a fingerprint of its inputs      |
+| `POST /api/admin/system-playlists/{id}/ai-description`    | `generate_playlist_description` | playlist, hash of its rules and apply mode |
+| `POST /api/artwork/artists/{id}/hero-candidates/analyze`  | `analyze_artist_hero_candidate` | artist and image (origin and reference)    |
+| Music Path create or regenerate                           | `refine_music_path`             | path, revision and accepted configuration  |
+| `POST /api/playback/transition-plans` with `aiRefinement` | `smart_mix_refine_transition`   | refinement key (SM3-D5)                    |
+
+A Music Path request instead returns the deterministic path at once, applies a
+cached review inline (a read) and queues the review; the worker stores a changed
+path as the next revision. A transition plan request likewise returns the deterministic
+plan at once and reports the refinement as `pending`; the client asks again and
+reads the stored refinement from the cache ([Smart Mix operations](smart-mix-operations.md#ai-refinement-sm4)). The other AI tasks are queued by their own routes
+and request flows. Handlers resume the accepted configuration with
+`resume_action`, which rechecks the actor's current permission before anything
+is sent; a handler that applies a proposal checks it once more first.
+
+Two checks keep it that way:
+
+- **Static.** `app/tests/test_ai_architecture.py` builds a call graph of
+  `app/crate` (`app/tests/ai_model_calls.py`). API modules may not import prompt
+  generators, `execute_structured`, the legacy provider, the transport, model
+  discovery, `run_probe`, `resolve_call` or `resume_action`, nor call anything
+  that reaches a provider, and every chain that reaches one must start in a
+  handler of an `ai` or `ai_bulk` task. Its exception list is empty; a new entry
+  needs an approved plan change.
+  `app/tests/test_actor_config.py` keeps every model-calling task on an AI lane,
+  every other task off them, `ai` at 300 s or less and AI retries at zero.
+- **Runtime.** `execute_structured`, `run_probe` and `discover_models` refuse with
+  `AI_OUTSIDE_AI_TASK` unless the actor opened an AI-lane window for the current
+  task (`crate.ai.guard`). This also covers dynamic dispatch that static analysis
+  cannot see. `CRATE_AI_LANE_GUARD=off` disables it; only the test session sets it.
+
+### Task deadlines
+
+No provider call outlives its task. The actor opens the AI window with a
+deadline: the moment the message started, plus the task's `time_limit_seconds`,
+minus 30 seconds (`AI_CALL_DEADLINE_MARGIN_SECONDS`) left for validation and
+persistence. Before reserving, and again right before transmitting, a call with
+less than one second left fails with `AI_TASK_DEADLINE`. Otherwise the remaining
+budget caps the transport, which kills its child at that point, also on the
+legacy Ollama and LiteLLM paths. Every AI task's limit leaves room for the
+longest action maximum (90 s) after the margin. Network work before the call
+has its own bound so it cannot eat that room: biography research stops starting
+collectors after 100 s, and a remote hero candidate download checks its 30 s
+budget after every socket read, so it stops within 42 s (each read waits at most
+12 s) even when the server trickles bytes.
+
+### Provider capacity: wait, do not fail
+
+`reserve_invocation` refuses with `AI_CONCURRENCY_LIMIT` when the connection
+already runs `max_concurrent` calls. Nothing has been sent at that point, so
+waiting and reserving again is not a transport retry and cannot pay twice.
+
+- **`ai`.** The runtime raises `AIConcurrencyDeferred`, which derives from
+  `BaseException` so that handlers cannot turn it into a failed result. The actor
+  moves the task from `running` back to `pending`, with the progress "Waiting for
+  AI provider capacity; retry n/10 in Ns", and sends it again after a jittered
+  5–30 s delay. After ten requeues the refusal surfaces as the closed error and
+  the task fails. A cancellation request wins over a requeue.
+- **Only before the first paid call.** A requeue runs the whole handler again, so
+  a task that has already reserved one call is never requeued: a later refusal
+  fails it with the closed error. Every `ai` handler makes exactly one model call
+  today. A handler that needs several calls must either accept that rule or run
+  on `ai_bulk`.
+- **`ai_bulk`.** A batch is never requeued, because it keeps its per-item results
+  in memory. Before each reservation it yields while `ai` has pending tasks, and
+  on a refusal it holds the item and reserves again, each wait a jittered 5–30 s
+  inside the task budget and at most ten per item. Once an item is still refused
+  after its ten waits, or the budget cannot fit another wait, the batch stops
+  waiting for every later item and ends with the results it already paid for.
+  On a connection with more than one slot, a bulk reservation leaves one slot
+  free for interactive work; a single-slot connection is shared.
+
+Bulk waits and `ai` requeues are counted in the `ai.capacity.wait` and
+`ai.capacity.requeue` metrics, per lane. The ops snapshot counts, per lane, the
+tasks whose progress says they are waiting for provider capacity. The Admin
+Tasks page shows `ai` and `ai_bulk` with their running and pending counts and
+the age of their oldest pending task, and draws a task waiting for capacity as
+deferred.
+
+A killed worker never finishes its reservation, which would keep the slot taken.
+Every 30 seconds the service loop fails zombie tasks and then reclaims
+reservations whose task is finished or gone, or that are older than 15 minutes.
+They finish as failed with `AI_INVOCATION_ABANDONED`; the slot comes back once
+and the charged tokens stay charged, so the daily budget is never refunded.
+
 ## Credential storage and rotation
 
 New stored AI secrets require an explicit valid Fernet `CRATE_CREDENTIAL_KEY`.
@@ -271,6 +621,7 @@ An empty or malformed value blocks storage instead of falling back to JWT-derive
 encryption. Keys are write-only in Admin, stored in the existing scoped vault, and
 never returned in snapshots, catalog responses, jobs or audit metadata. Environment
 connections expose metadata separately and do not make their keys editable in Admin.
+OpenAI-compatible keys are only ever stored this way; no environment variable feeds them.
 
 Generate a key with the installed backend environment, store it in your secret
 manager, and provide the same value to API and all inference workers:
@@ -306,6 +657,18 @@ To replace or revoke a **provider API key**, use the connection's credential wri
 with its expected revision. Replacement revokes the old vault reference atomically;
 revocation makes pending contexts stale. It does not rewrite historical invocation
 rows. Keep encryption keys recoverable separately from the database backup.
+
+A stored key is only ever sent to the origin it was saved for. Changing an Ollama
+connection's endpoint to another scheme, host or port revokes its stored key in the
+same transaction, audited as one connection update. Moving a connection needs
+`ai.config.manage`, while only `ai.credentials.manage` decides which server
+receives a key. The connection stays keyless until a key is saved for the new
+endpoint; until then discovery and inference send no `Authorization` header, as
+for any Ollama connection without a key. No single API request changes both: move
+the endpoint, then write the key with the new revision. Saving the same endpoint
+again, in any spelling that normalises to it (letter case, a trailing dot or
+slash), keeps the key. Admin warns under the endpoint field when a key would be
+removed.
 
 ## Validation evidence and remaining limits
 

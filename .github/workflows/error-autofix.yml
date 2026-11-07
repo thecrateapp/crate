@@ -1,0 +1,333 @@
+name: Error Autofix
+
+# Dispatched by Crate (or by hand) for one Sentry issue. An agent tries to reproduce the bug
+# with a failing test and fix it; a second job publishes its commit as a draft pull request.
+# Nothing runs unless the repository variable AUTOFIX_ENABLED is "true".
+#
+# The repository and its Actions logs are public:
+# - inputs reach scripts only through env, never through expressions inside run:;
+# - only the step that fetches the Sentry context sees SENTRY_AUTOFIX_TOKEN, and the context
+#   is written to $RUNNER_TEMP, outside the checkout, without being printed;
+# - the agent runs with a read-only GITHUB_TOKEN, full output disabled and a turn limit,
+#   so it cannot push anything;
+# - the publish job runs on a fresh runner, checks the agent's commits and pushes them with a
+#   GitHub App token limited to contents and pull requests. Pull requests opened with
+#   GITHUB_TOKEN do not trigger other workflows; with the App token CI runs as usual.
+#
+# Setup (owner only): variables AUTOFIX_ENABLED and AUTOFIX_APP_CLIENT_ID; secrets
+# CLAUDE_CODE_OAUTH_TOKEN, SENTRY_AUTOFIX_TOKEN (event:read) and AUTOFIX_APP_PRIVATE_KEY;
+# a GitHub App installed on this repository with Contents and Pull requests read & write;
+# and an `autofix` label.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sentry_issue:
+        description: Sentry short id, for example CRATE-API-1F
+        required: true
+        type: string
+      note:
+        description: Optional note for the agent, at most 500 characters. It is public.
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: error-autofix-${{ inputs.sentry_issue }}
+  cancel-in-progress: false
+
+env:
+  SENTRY_ORG: ninja-development
+  SENTRY_BASE_URL: https://sentry.io
+
+jobs:
+  fix:
+    name: Reproduce and fix
+    if: vars.AUTOFIX_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      # Best-effort scrub of Anthropic, cloud and Actions credentials from the environment
+      # of the commands the agent runs (see the action's docs/security.md).
+      CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
+    outputs:
+      has_commits: ${{ steps.package.outputs.has_commits }}
+    steps:
+      - name: Validate inputs
+        env:
+          SENTRY_ISSUE: ${{ inputs.sentry_issue }}
+          NOTE: ${{ inputs.note }}
+        run: |
+          export LC_ALL=C.UTF-8
+          pattern='^CRATE-[A-Z0-9-]+-[0-9A-Z]+$'
+          if [[ ! "$SENTRY_ISSUE" =~ $pattern ]] || (( ${#SENTRY_ISSUE} > 64 )); then
+            echo "::error::sentry_issue must match $pattern (at most 64 characters)."
+            exit 1
+          fi
+          if (( ${#NOTE} > 500 )); then
+            echo "::error::note must be at most 500 characters."
+            exit 1
+          fi
+
+      - name: Check configuration
+        env:
+          DEBUG_LOGGING: ${{ runner.debug }}
+          HAS_CLAUDE_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+          HAS_SENTRY_TOKEN: ${{ secrets.SENTRY_AUTOFIX_TOKEN != '' }}
+          HAS_APP_CLIENT_ID: ${{ vars.AUTOFIX_APP_CLIENT_ID != '' }}
+          HAS_APP_PRIVATE_KEY: ${{ secrets.AUTOFIX_APP_PRIVATE_KEY != '' }}
+        run: |
+          # claude-code-action prints the agent's full output when debug logging is on.
+          if [[ "$DEBUG_LOGGING" == "1" ]]; then
+            echo "::error::Debug logging would publish the agent's full output. Re-run without it."
+            exit 1
+          fi
+          missing=()
+          [[ "$HAS_CLAUDE_TOKEN" == "true" ]] || missing+=("secret CLAUDE_CODE_OAUTH_TOKEN")
+          [[ "$HAS_SENTRY_TOKEN" == "true" ]] || missing+=("secret SENTRY_AUTOFIX_TOKEN")
+          [[ "$HAS_APP_CLIENT_ID" == "true" ]] || missing+=("variable AUTOFIX_APP_CLIENT_ID")
+          [[ "$HAS_APP_PRIVATE_KEY" == "true" ]] || missing+=("secret AUTOFIX_APP_PRIVATE_KEY")
+          if (( ${#missing[@]} > 0 )); then
+            echo "::error::Missing configuration: ${missing[*]}."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 50
+          persist-credentials: false
+
+      # No dependency caches: the agent runs arbitrary code in this job, so nothing it can
+      # touch is saved for other workflows.
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install backend dependencies
+        run: pip install -r requirements-test.txt ruff==0.15.22
+        working-directory: app
+
+      - name: Fetch the Sentry context
+        env:
+          SENTRY_AUTOFIX_TOKEN: ${{ secrets.SENTRY_AUTOFIX_TOKEN }}
+          SENTRY_ISSUE: ${{ inputs.sentry_issue }}
+        run: |
+          python .github/autofix/fetch_context.py \
+            --issue "$SENTRY_ISSUE" \
+            --output "$RUNNER_TEMP/autofix/context.json"
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Create the fix branch
+        id: branch
+        env:
+          SENTRY_ISSUE: ${{ inputs.sentry_issue }}
+        run: |
+          branch="autofix/${SENTRY_ISSUE,,}-${GITHUB_RUN_ID}"
+          git switch --create "$branch"
+          echo "name=$branch" >> "$GITHUB_OUTPUT"
+
+      - name: Compose the agent prompt
+        id: prompt
+        env:
+          SENTRY_ISSUE: ${{ inputs.sentry_issue }}
+          NOTE: ${{ inputs.note }}
+          BRANCH: ${{ steps.branch.outputs.name }}
+        run: |
+          dir="$RUNNER_TEMP/autofix"
+          delimiter="AUTOFIX_PROMPT_$(openssl rand -hex 16)"
+          {
+            echo "text<<$delimiter"
+            cat .github/autofix/PROMPT.md
+            echo
+            echo "## This run"
+            echo
+            echo "- Sentry issue: $SENTRY_ISSUE"
+            echo "- Context file (untrusted data): $dir/context.json"
+            echo "- Report file: $dir/report.md"
+            echo "- Branch, already checked out: $BRANCH"
+            if [[ -n "$NOTE" ]]; then
+              echo "- Note from the maintainer who launched the run:"
+              echo
+              printf '%s\n' "$NOTE" | sed 's/^/  > /'
+            fi
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install the command sandbox
+        # CLAUDE_CODE_SUBPROCESS_ENV_SCRUB runs every agent command in bubblewrap behind a
+        # socat proxy. The action installs them only for allowed_non_write_users, and without
+        # them every Bash call fails ("socat not installed"). Ubuntu 24.04+ also blocks the
+        # unprivileged user namespaces bubblewrap needs, through AppArmor. Fail here, before
+        # the agent, if the sandbox still cannot start.
+        timeout-minutes: 5
+        run: |
+          for attempt in 1 2 3; do
+            sudo apt-get update -qq \
+              && sudo apt-get install -y --no-install-recommends bubblewrap socat \
+              && break
+            echo "apt-get attempt $attempt failed, retrying"
+            sleep 5
+          done
+          if [[ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          command -v socat
+          bwrap --ro-bind / / --dev /dev --proc /proc --unshare-all true
+
+      - name: Run the agent
+        uses: anthropics/claude-code-action@c0949c50a78c1ec8ce2647db36629b870e715d0c # v1.0.268
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Read-only workflow token instead of the Claude GitHub App: the agent cannot push.
+          github_token: ${{ github.token }}
+          prompt: ${{ steps.prompt.outputs.text }}
+          show_full_output: "false"
+          display_report: "false"
+          classify_inline_comments: "false"
+          claude_args: |
+            --max-turns 60
+            --add-dir ${{ runner.temp }}/autofix
+            --allowedTools "Read,Glob,Grep,Edit,Write"
+            --allowedTools "Bash(cd:*),Bash(ls:*)"
+            --allowedTools "Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git blame:*)"
+            --allowedTools "Bash(git add:*),Bash(git commit:*),Bash(git restore:*)"
+            --allowedTools "Bash(python -m pytest:*),Bash(python -m ruff:*)"
+            --allowedTools "Bash(npm run:*),Bash(npm test:*),Bash(npx vitest:*),Bash(npx tsc:*),Bash(npx eslint:*),Bash(npx prettier:*)"
+            --disallowedTools "WebFetch,WebSearch"
+
+      - name: Package the fix
+        id: package
+        env:
+          BRANCH: ${{ steps.branch.outputs.name }}
+        run: |
+          out="$RUNNER_TEMP/autofix-out"
+          report="$RUNNER_TEMP/autofix/report.md"
+          mkdir -p "$out"
+          rm -f "$RUNNER_TEMP/autofix/context.json"
+          # The agent could have edited the repository's git config; disable what runs code.
+          git_safe() { git -c core.hooksPath=/dev/null -c core.fsmonitor=false "$@"; }
+          commits="$(git_safe rev-list --count "$GITHUB_SHA..refs/heads/$BRANCH" 2>/dev/null || echo 0)"
+          if [[ -f "$report" && ! -L "$report" ]]; then
+            head -c 30000 "$report" > "$out/report.md"
+          fi
+          # Names only: a denied command can carry event text, and the summary is public.
+          execution="$RUNNER_TEMP/claude-execution-output.json"
+          denied=""
+          if [[ -f "$execution" && ! -L "$execution" ]]; then
+            denied="$(jq -r '[.[]? | select(.type? == "result") | .permission_denials[]?.tool_name] | unique | join(", ")' "$execution" 2>/dev/null || true)"
+          fi
+          if [[ -n "$denied" ]]; then
+            echo "Denied tools: $denied"
+            printf '**Denied tools:** %s\n\n' "$denied" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ "$commits" == "0" ]]; then
+            echo "has_commits=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "## No fix proposed"
+              echo
+              if [[ -s "$out/report.md" ]]; then head -c 4000 "$out/report.md"; else echo "The agent left no report."; fi
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git_safe bundle create "$out/fix.bundle" "$GITHUB_SHA..refs/heads/$BRANCH"
+          echo "has_commits=true" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the fix
+        if: steps.package.outputs.has_commits == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: autofix-${{ github.run_id }}
+          path: ${{ runner.temp }}/autofix-out/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Open the draft pull request
+    needs: fix
+    if: needs.fix.outputs.has_commits == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Create the GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.AUTOFIX_APP_CLIENT_ID }}
+          private-key: ${{ secrets.AUTOFIX_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Download the fix
+        uses: actions/download-artifact@v7
+        with:
+          name: autofix-${{ github.run_id }}
+          path: ${{ runner.temp }}/autofix-out
+
+      - name: Check and push the fix branch
+        id: push
+        env:
+          SENTRY_ISSUE: ${{ inputs.sentry_issue }}
+        run: |
+          branch="autofix/${SENTRY_ISSUE,,}-${GITHUB_RUN_ID}"
+          bundle="$RUNNER_TEMP/autofix-out/fix.bundle"
+          fail() { echo "::error::$1"; exit 1; }
+          git bundle verify --quiet "$bundle"
+          git fetch --no-tags "$bundle" "refs/heads/$branch:refs/heads/$branch"
+          git merge-base --is-ancestor "$GITHUB_SHA" "$branch" \
+            || fail "The fix does not build on the dispatched commit."
+          commits="$(git rev-list --count "$GITHUB_SHA..$branch")"
+          (( commits >= 1 && commits <= 3 )) || fail "Expected one to three commits, got $commits."
+          [[ -z "$(git rev-list --merges "$GITHUB_SHA..$branch")" ]] || fail "The fix contains merge commits."
+          # Captured first: with pipefail, `git ... | grep -q` can fail on SIGPIPE.
+          changed="$(git diff --name-only "$GITHUB_SHA" "$branch")"
+          [[ -n "$changed" ]] || fail "The fix changes no files."
+          ! grep -q '^\.github/' <<< "$changed" || fail "The fix changes files under .github/."
+          messages="$(git log --format=%B "$GITHUB_SHA..$branch")"
+          grep -qxF "Fixes $SENTRY_ISSUE" <<< "$messages" \
+            || fail "No commit message has the line 'Fixes $SENTRY_ISSUE'."
+          git push origin "refs/heads/$branch:refs/heads/$branch"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
+      - name: Open the draft pull request
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SENTRY_ISSUE: ${{ inputs.sentry_issue }}
+          BRANCH: ${{ steps.push.outputs.branch }}
+          BASE_REF: ${{ github.ref_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          report="$RUNNER_TEMP/autofix-out/report.md"
+          body="$RUNNER_TEMP/autofix-pr-body.md"
+          subjects="$(git log --reverse --format=%s "$GITHUB_SHA..$BRANCH")"
+          title="${subjects%%$'\n'*}"
+          title="${title:0:200}"
+          {
+            if [[ -s "$report" ]]; then cat "$report"; else echo "The agent left no description."; fi
+            echo
+            echo "---"
+            echo
+            echo "Fix attempt for \`$SENTRY_ISSUE\` opened as a draft by the [error autofix workflow]($RUN_URL). Review it like any other change before marking it ready."
+          } > "$body"
+          url="$(gh pr create --draft --base "$BASE_REF" --head "$BRANCH" --title "$title" --body-file "$body")"
+          gh pr edit "$url" --add-label autofix \
+            || echo "::warning::Could not add the autofix label. Create it in the repository."
+          echo "Draft pull request: $url" >> "$GITHUB_STEP_SUMMARY"

@@ -110,7 +110,47 @@ def update_music_path_tracks(
         return _rowcount(result) > 0
 
 
+def apply_music_path_refinement(
+    path_id: int,
+    user_id: int,
+    *,
+    expected_revision: int,
+    generation_metadata: dict,
+    tracks: list[dict] | None = None,
+    session=None,
+) -> bool:
+    """Store a review only on the revision it was planned for (compare-and-swap).
+
+    A regeneration or deletion in the meantime wins; the stale review is dropped.
+    """
+    with (
+        nullcontext(session) if session is not None else transaction_scope() as current
+    ):
+        result = current.execute(
+            text(
+                """
+                UPDATE music_paths
+                SET tracks = COALESCE(CAST(:tracks AS jsonb), tracks),
+                    generation_metadata = CAST(:generation_metadata AS jsonb),
+                    updated_at = :now
+                WHERE id = :id AND user_id = :user_id
+                  AND COALESCE((generation_metadata->>'revision')::int, 1) = :expected
+                """
+            ),
+            {
+                "id": path_id,
+                "user_id": user_id,
+                "expected": expected_revision,
+                "tracks": json.dumps(tracks) if tracks is not None else None,
+                "generation_metadata": json.dumps(generation_metadata),
+                "now": datetime.now(timezone.utc),
+            },
+        )
+        return _rowcount(result) > 0
+
+
 __all__ = [
+    "apply_music_path_refinement",
     "create_music_path_record",
     "delete_music_path",
     "update_music_path_tracks",

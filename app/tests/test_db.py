@@ -2476,38 +2476,59 @@ class TestHomeCaching:
 
     def test_get_task_activity_snapshot(self, pg_db):
         from crate.db.queries.tasks import get_task_activity_snapshot
+        from crate.db.tx import transaction_scope
 
         running_id = pg_db.create_task("scan", pool="fast")
         delegated_id = pg_db.create_task("library_sync", pool="heavy")
         pending_id = pg_db.create_task("repair", pool="default")
         heavy_pending_id = pg_db.create_task("migrate_storage_v2", pool="heavy")
         completed_id = pg_db.create_task("enrich", pool="default")
+        ai_running_id = pg_db.create_task("show_extract", pool="ai")
+        ai_oldest_id = pg_db.create_task("research_artist_bio", pool="ai")
+        ai_newer_id = pg_db.create_task("draft_i18n_translation", pool="ai")
+        bulk_pending_id = pg_db.create_task("infer_genre_taxonomy", pool="ai_bulk")
 
         pg_db.update_task(running_id, status="running")
         pg_db.update_task(delegated_id, status="delegated")
         pg_db.update_task(completed_id, status="completed")
+        pg_db.update_task(ai_running_id, status="running")
+        with transaction_scope() as session:
+            session.execute(
+                text(
+                    "UPDATE tasks SET created_at = created_at - INTERVAL '10 minutes' "
+                    "WHERE id = :id"
+                ),
+                {"id": ai_oldest_id},
+            )
 
         snapshot = get_task_activity_snapshot(
             running_limit=10, pending_limit=10, recent_limit=10
         )
 
-        assert snapshot["running_count"] == 2
-        assert snapshot["pending_count"] == 2
+        assert snapshot["running_count"] == 3
+        assert snapshot["pending_count"] == 5
         assert {task["id"] for task in snapshot["running_tasks"]} == {
             running_id,
             delegated_id,
+            ai_running_id,
         }
         assert {task["id"] for task in snapshot["pending_tasks"]} == {
             pending_id,
             heavy_pending_id,
+            ai_oldest_id,
+            ai_newer_id,
+            bulk_pending_id,
         }
-        assert snapshot["queue_breakdown"] == {
+        breakdown = snapshot["queue_breakdown"]
+        assert {key: breakdown[key] for key in ("running", "pending")} == {
             "running": {
                 "fast": 1,
                 "default": 0,
                 "heavy": 1,
                 "maintenance": 0,
                 "playback": 0,
+                "ai": 1,
+                "ai_bulk": 0,
             },
             "pending": {
                 "fast": 0,
@@ -2515,8 +2536,16 @@ class TestHomeCaching:
                 "heavy": 1,
                 "maintenance": 0,
                 "playback": 0,
+                "ai": 2,
+                "ai_bulk": 1,
             },
         }
+        oldest = breakdown["oldest_pending"]
+        assert set(oldest) == {"default", "heavy", "ai", "ai_bulk"}
+        assert oldest["ai"]["id"] == ai_oldest_id
+        assert oldest["ai"]["type"] == "research_artist_bio"
+        assert oldest["ai"]["created_at"]
+        assert oldest["ai_bulk"]["id"] == bulk_pending_id
         assert snapshot["db_heavy_gate"] == {
             "active": 0,
             "pending": 2,

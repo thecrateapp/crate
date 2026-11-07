@@ -31,6 +31,8 @@ DEFAULT_SCHEDULES = {
     "compute_product_kpis": 3600,  # 1h — recompute today's and yesterday's KPIs
     "compute_observability_summary": 0,  # opt-in — summary for Admin, MCP and Agent
     "compute_recommendation_skips": 3600,  # 1h — early skips over the last 24h
+    "sync_error_issues": 300,  # 5min — Sentry issues into the error inbox
+    "cleanup_smart_mix_refinements": 86400,  # 24h — AI refinements unread for 180 days
 }
 
 SCHEDULED_TASKS = [
@@ -49,6 +51,10 @@ GLOBAL_CATALOG_SCHEDULED_TASKS = {
     "global_catalog_reconcile_incremental",
     "global_catalog_reconcile_full",
 }
+
+# Only scheduled once `error_tracking` is configured: an install without Sentry
+# creates no tasks.
+ERROR_TRACKING_SCHEDULED_TASKS = {"sync_error_issues"}
 
 
 def get_schedules() -> dict[str, int]:
@@ -117,6 +123,9 @@ def _scheduled_task_enabled(task_type: str) -> bool:
     if task_type in GLOBAL_CATALOG_SCHEDULED_TASKS:
         return True
 
+    if task_type in ERROR_TRACKING_SCHEDULED_TASKS:
+        return _has_error_tracking_config()
+
     return True
 
 
@@ -130,6 +139,18 @@ def _has_due_federation_directories() -> bool:
     except Exception:
         log.debug("Unable to inspect federation directories", exc_info=True)
         return False
+
+
+def _has_error_tracking_config() -> bool:
+    """Settings stored and a token to use; invalid settings never schedule."""
+    try:
+        from crate.error_inbox.config import load_config
+
+        config = load_config()
+    except Exception:
+        log.debug("Unable to read the error tracking settings", exc_info=True)
+        return False
+    return config is not None and bool(config.secret_ref)
 
 
 def _has_approved_federation_peers() -> bool:

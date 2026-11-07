@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import sys
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -485,3 +486,200 @@ def test_sustained_availability_gap_notifies_once_with_readable_text(state):
         message.endswith("\nref " + item_id)
         for message, item_id in zip(raw, state.snapshot()["outbox"])
     )
+
+
+def error_summary(now, critical_open, *, top=(), observed=None):
+    """A `get_error_summary` observation as the Crate MCP returns it."""
+    return {
+        "data": {
+            "sources": {
+                "inbox": {
+                    "source": "error_inbox",
+                    "availability": "available",
+                    "observed_at": iso(now if observed is None else observed),
+                    "coverage": "partial",
+                    "freshness": {"fresh_seconds": 900},
+                    "data": {
+                        "open": 4,
+                        "critical_open": critical_open,
+                        "new_24h": 1,
+                        "regressed_24h": 0,
+                        "top_critical": list(top),
+                    },
+                }
+            }
+        }
+    }
+
+
+CRITICAL_ISSUE = {"short_id": "CRATE-API-1F", "service": "api", "crate_score": 88}
+
+
+def errors_critical():
+    return replace(example_rules()["errors-critical"], enabled=True)
+
+
+def test_errors_critical_ships_disabled_with_the_design_thresholds():
+    rule = example_rules()["errors-critical"]
+
+    assert rule.enabled is False
+    assert (rule.subsystem, rule.tool, rule.kind) == (
+        "error-inbox",
+        "get_error_summary",
+        "high",
+    )
+    assert list(rule.source_path) == ["data", "sources", "inbox"]
+    assert list(rule.field) == ["critical_open"]
+    assert list(rule.detail_field) == ["top_critical"]
+    # One critical issue is enough to alert; none clears it.
+    assert (rule.threshold, rule.clear_threshold, rule.critical) == (1, 0, None)
+    assert (rule.fresh_seconds, rule.cooldown_seconds) == (900, 3600)
+    assert rule.request_key == "get_error_summary:{}"
+
+
+def test_errors_critical_alerts_on_one_critical_issue_and_resolves(state):
+    rule = errors_critical()
+    supervisor = Supervisor(state, "lab", [rule])
+    # One sample per 5-minute sync; the rule needs two in a row either way.
+    for step, count in enumerate((0, 1, 1, 0, 0)):
+        now = BASE + step * 300
+        top = [CRITICAL_ISSUE] if count else []
+        supervisor.observe({rule.request_key: error_summary(now, count, top=top)}, now)
+
+    sent = messages(state)
+    assert [message.split("\n")[0] for message in sent] == [
+        "Crate WARNING · Error inbox: errors critical 1 (limit 1)",
+        "Crate RESOLVED · Error inbox: errors critical back to 0",
+    ]
+    assert sent[0].split("\n")[1:] == [
+        "Since 08:10 UTC",
+        "CRATE-API-1F (api, score 88)",
+        "lab/error-inbox/errors-critical · rev 1",
+    ]
+    assert sent[1].split("\n")[1] == "Lasted 10 min"
+    assert "{" not in "".join(sent)
+
+
+def test_errors_critical_reopen_waits_for_the_hour_cooldown(state):
+    rule = errors_critical()
+    supervisor = Supervisor(state, "lab", [rule])
+    now = BASE
+    for count in (1, 1, 0, 0, 1, 1):
+        supervisor.observe({rule.request_key: error_summary(now, count)}, now)
+        now += 300
+    assert len(messages(state)) == 2
+    incident = state.snapshot()["incidents"]["lab/error-inbox/errors-critical"]
+    assert incident["state"] == "open" and incident["deferred"] == "opened"
+
+    # The cooldown counts from the last message, the recovery at BASE + 900.
+    resolved_at = BASE + 900
+    almost = resolved_at + 3599
+    supervisor.observe({rule.request_key: error_summary(almost, 1)}, almost)
+    assert len(messages(state)) == 2
+    due = resolved_at + 3600
+    supervisor.observe({rule.request_key: error_summary(due, 1)}, due)
+    sent = messages(state)
+    assert len(sent) == 3
+    assert sent[-1].startswith("Crate WARNING · Error inbox: errors critical 1")
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        # Older than the 900 s the rule accepts.
+        lambda now: error_summary(now, 3, observed=now - 901),
+        # Error tracking unconfigured or never synced: the source is unavailable.
+        lambda now: {
+            "data": {
+                "sources": {
+                    "inbox": {"source": "error_inbox", "availability": "unavailable"}
+                }
+            }
+        },
+        # The observation failed (no grant, Crate down).
+        lambda now: {},
+    ],
+)
+def test_errors_critical_never_alerts_without_fresh_evidence(state, response):
+    rule = errors_critical()
+    supervisor = Supervisor(state, "lab", [rule])
+    for step in range(5):
+        now = BASE + step * 300
+        supervisor.observe({rule.request_key: response(now)}, now)
+
+    assert not messages(state)
+    coverage = supervisor.status(BASE + 1200)["coverage"]
+    assert coverage["lab/error-inbox/errors-critical"]["valid"] is False
+
+
+def test_errors_critical_reads_the_real_error_summary(state, monkeypatch):
+    from crate import agent_error_inbox
+
+    clock = {"now": datetime(2027, 1, 15, 8, tzinfo=UTC)}
+    for target in (
+        "crate.agent_diagnostics._now",
+        "crate.agent_observability._now",
+        "crate.agent_error_inbox._now",
+    ):
+        monkeypatch.setattr(target, lambda: clock["now"])
+
+    def summary():
+        synced = clock["now"].isoformat()
+        return {
+            "configured": True,
+            "open": 4,
+            "critical_open": 1,
+            "new_24h": 1,
+            "regressed_24h": 0,
+            "last_synced_at": synced,
+            "services": [{"service": "api", "open": 4, "critical": 1}],
+            "top_critical": [
+                {**CRITICAL_ISSUE, "id": "x", "title": "ValueError: event text"}
+            ],
+            "sync": {
+                "status": "ok",
+                "finished_at": synced,
+                "last_success_at": synced,
+                "error_code": None,
+            },
+        }
+
+    monkeypatch.setattr(agent_error_inbox, "inbox_summary", summary)
+    rule = errors_critical()
+    supervisor = Supervisor(state, "lab", [rule])
+    for _ in range(2):
+        supervisor.observe(
+            {rule.request_key: agent_error_inbox.get_error_summary()},
+            clock["now"].timestamp(),
+        )
+        clock["now"] += timedelta(minutes=5)
+
+    [sent] = messages(state)
+    assert sent.split("\n")[0] == (
+        "Crate WARNING · Error inbox: errors critical 1 (limit 1)"
+    )
+    assert "CRATE-API-1F (api, score 88)" in sent
+    assert "event text" not in sent
+
+
+def test_example_config_loads_with_errors_critical_enabled(tmp_path):
+    from deploy.operator.server import load_config
+
+    config = json.loads(
+        (ROOT / "deploy/operator/config.operator.example.json").read_text()
+    )
+    config.pop("prometheus_url")
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps(config))
+    assert "errors-critical" not in [
+        rule.id for rule in load_config(path)["parsed_rules"]
+    ]
+
+    for rule in config["rules"]:
+        if rule["id"] == "errors-critical":
+            rule["enabled"] = True
+    path.write_text(json.dumps(config))
+    enabled = load_config(path)["parsed_rules"]
+    assert "errors-critical" in [rule.id for rule in enabled]
+    # Still within the eight distinct MCP observations a cycle may make.
+    assert len({rule.request_key for rule in enabled}) <= 8

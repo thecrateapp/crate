@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
 
 const INFO_ACTION_GAP_PX = 20;
 
@@ -17,6 +17,11 @@ export function useAlbumHeroMeasurement({
     value: number | ((current: number) => number),
   ) => void;
 }) {
+  // Read the offset through a ref: depending on it re-ran the measurement on
+  // every change and could loop forever when the layout ignored the offset.
+  const offsetRef = useRef(mobileHeroInfoOffset);
+  offsetRef.current = mobileHeroInfoOffset;
+
   useLayoutEffect(() => {
     if (isDesktop) {
       setMobileHeroInfoOffset((current) => (current === 0 ? current : 0));
@@ -40,7 +45,7 @@ export function useAlbumHeroMeasurement({
 
       const currentGap = actionsRect.top - infoRect.bottom;
       const nextOffset = Math.round(
-        mobileHeroInfoOffset + currentGap - INFO_ACTION_GAP_PX,
+        offsetRef.current + currentGap - INFO_ACTION_GAP_PX,
       );
 
       setMobileHeroInfoOffset((current) =>
@@ -71,7 +76,6 @@ export function useAlbumHeroMeasurement({
     albumHeroInfoRef,
     albumPrimaryActionsRef,
     isDesktop,
-    mobileHeroInfoOffset,
     setMobileHeroInfoOffset,
   ]);
 }

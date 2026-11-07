@@ -53,7 +53,11 @@ def _stored_album_mtimes(artist_dir: Path) -> dict[str, float]:
 
 
 def _fake_upsert_scanned_album(
-    *, artist_payload: dict, album_payload: dict, track_payloads: list[dict]
+    *,
+    artist_payload: dict,
+    album_payload: dict,
+    track_payloads: list[dict],
+    indexed_album_path_is_live=None,
 ):
     return (
         artist_payload["name"],

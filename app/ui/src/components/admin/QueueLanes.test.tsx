@@ -9,17 +9,21 @@ const emptyCounts = {
   heavy: 0,
   maintenance: 0,
   playback: 0,
+  ai: 0,
+  ai_bulk: 0,
 };
 
 function breakdown(
   overrides: {
     running?: Partial<QueueLaneBreakdown["running"]>;
     pending?: Partial<QueueLaneBreakdown["pending"]>;
+    oldest_pending?: QueueLaneBreakdown["oldest_pending"];
   } = {},
 ): QueueLaneBreakdown {
   return {
     running: { ...emptyCounts, ...(overrides.running ?? {}) },
     pending: { ...emptyCounts, ...(overrides.pending ?? {}) },
+    oldest_pending: overrides.oldest_pending,
   };
 }
 
@@ -82,7 +86,7 @@ describe("QueueLanes", () => {
 
     for (const testId of ["queue-total-count", "queue-total-count-mobile"]) {
       const readouts = screen.getAllByTestId(testId);
-      expect(readouts).toHaveLength(5);
+      expect(readouts).toHaveLength(7);
       for (const readout of readouts) {
         expect(readout).toHaveClass("font-mono", "tabular-nums");
         expect(readout).not.toHaveClass("font-display");
@@ -90,7 +94,7 @@ describe("QueueLanes", () => {
     }
   });
 
-  it("renders the five original site lanes with live tasks in their status zones", () => {
+  it("renders the site lanes with live tasks in their status zones", () => {
     render(
       <QueueLanes
         breakdown={breakdown({
@@ -120,9 +124,9 @@ describe("QueueLanes", () => {
 
     const queues = screen.getByRole("region", { name: "Worker queue lanes" });
     expect(queues).toHaveTextContent("Operations");
-    expect(queues).toHaveTextContent("125 task types · five queues");
+    expect(queues).toHaveTextContent("125 task types · seven queues");
     expect(queues).toHaveTextContent("governed by the resource governor");
-    expect(screen.getAllByTestId(/^queue-lane-/)).toHaveLength(5);
+    expect(screen.getAllByTestId(/^queue-lane-/)).toHaveLength(7);
 
     const maintenance = screen.getByRole("listitem", {
       name: "maintenance queue",
@@ -144,6 +148,54 @@ describe("QueueLanes", () => {
     expect(maintenance).toHaveTextContent("+1");
   });
 
+  it("shows the ai and ai_bulk lanes with their length and oldest task", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-04T10:12:00Z"));
+    render(
+      <QueueLanes
+        breakdown={breakdown({
+          running: { ai: 2 },
+          pending: { ai: 3, ai_bulk: 1 },
+          oldest_pending: {
+            ai: {
+              id: "ai-old",
+              type: "research_artist_bio",
+              created_at: "2026-11-04T10:00:00Z",
+            },
+            ai_bulk: {
+              id: "bulk-old",
+              type: "infer_genre_taxonomy",
+              created_at: "2026-11-04T08:12:00Z",
+            },
+          },
+        })}
+        runningTasks={[{ id: "r1", type: "show_extract", pool: "ai" }]}
+        pendingTasks={[
+          {
+            id: "ai-old",
+            type: "research_artist_bio",
+            pool: "ai",
+            status: "pending",
+            progress: "Waiting for AI provider capacity; retry 2/10 in 12s",
+          },
+        ]}
+      />,
+    );
+
+    const ai = screen.getByRole("listitem", { name: "ai queue" });
+    expect(ai).toHaveTextContent("5");
+    expect(ai).toHaveTextContent("2 running · 3 queued · oldest 12m ago");
+    expect(ai).toHaveTextContent("worker · ai pool");
+    expect(
+      within(ai).getByText("Waiting for AI provider capacity"),
+    ).toHaveClass("sr-only");
+    const bulk = screen.getByRole("listitem", { name: "ai_bulk queue" });
+    expect(bulk).toHaveTextContent("0 running · 1 queued · oldest 2h ago");
+    expect(bulk).toHaveTextContent("worker · ai_bulk pool");
+    const fast = screen.getByRole("listitem", { name: "fast queue" });
+    expect(fast).not.toHaveTextContent("oldest");
+  });
+
   it("keeps empty queue zones legible and reports work beyond the task sample", () => {
     render(
       <QueueLanes
@@ -154,7 +206,7 @@ describe("QueueLanes", () => {
     );
 
     const queues = screen.getByRole("region", { name: "Worker queue lanes" });
-    expect(screen.getAllByTestId(/^queue-lane-/)).toHaveLength(5);
+    expect(screen.getAllByTestId(/^queue-lane-/)).toHaveLength(7);
     expect(
       within(queues).getByRole("listitem", { name: "playback queue" }),
     ).toHaveTextContent("playback-worker");

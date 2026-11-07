@@ -31,7 +31,10 @@ func tone(status system.Status) ui.Tone {
 
 func (w *wizard) checks(ctx context.Context) error {
 	ui.Step(w.out, 1, totalSteps, "Checking this machine", "Crate runs as a set of Docker containers. Let's make sure this machine can host them.")
-	w.host = system.DetectHost(ctx, w.run)
+	if w.detectHost == nil {
+		w.detectHost = system.DetectHost
+	}
+	w.host = w.detectHost(ctx, w.run)
 	osName := map[string]string{"linux": "Linux (" + w.host.Distro + ")", "darwin": "macOS"}[w.host.OS]
 	if osName == "" {
 		ui.StatusRow(w.out, ui.ToneFail, "System", w.host.OS, "Crate installs on Linux and macOS.")
@@ -314,7 +317,7 @@ func (w *wizard) askPorts() error {
 }
 
 func (w *wizard) admin(context.Context) error {
-	ui.Step(w.out, 5, totalSteps, "Your admin account", "You sign in to Admin and Listen with this account. Invite other people from Admin later.")
+	ui.Step(w.out, 6, totalSteps, "Your admin account", "You sign in to Admin and Listen with this account. Invite other people from Admin later.")
 	if w.existing != nil {
 		ui.Success(w.out, "The admin account already exists. Change its password from Admin > Users.")
 		w.cfg.AdminPassword = ""

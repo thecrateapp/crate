@@ -40,7 +40,8 @@ make tauri-collect-artifacts
 `make dev-test-rust` also runs the desktop cargo tests. CI:
 `.github/workflows/build-desktop.yml` (cargo test --locked, version/glibc tests,
 3-OS bundles, artifact version check, WebKitGTK 2.40 symbol check, Windows install
-smoke), `test-frontend.yml` (typecheck + vitest) and `test-native-tools.yml`
+smoke, Sentry debug symbols of the shipped binary only, never blocking the release),
+`test-frontend.yml` (typecheck + vitest) and `test-native-tools.yml`
 (`cargo fmt --check` with Rust 1.88). Clippy is not gated in CI because the vendored
 Wry warns; validation docs record `cargo clippy --locked --all-targets ... -D warnings`
 as the local bar for first-party code.

@@ -1,0 +1,39 @@
+name: VirtualDJ SDK
+description: Unpack the private VirtualDJ SDK headers from a secret outside the checkout and verify them
+inputs:
+  sdk-zip-base64:
+    description: Base64 of a zip holding vdjPlugin8.h and vdjOnlineSource.h
+    required: true
+outputs:
+  root:
+    description: Folder with the SDK headers
+    value: ${{ steps.unpack.outputs.root }}
+runs:
+  using: composite
+  steps:
+    - id: unpack
+      shell: bash
+      env:
+        SDK_ZIP_BASE64: ${{ inputs.sdk-zip-base64 }}
+      run: |
+        if [ -z "$SDK_ZIP_BASE64" ]; then
+          echo "::error::The VIRTUALDJ_SDK_ZIP_B64 secret is not available to this run"
+          exit 1
+        fi
+        root="$RUNNER_TEMP/virtualdj-sdk"
+        if command -v cygpath >/dev/null; then
+          root="$(cygpath -m "$root")"
+        fi
+        mkdir -p "$root"
+        printf '%s' "$SDK_ZIP_BASE64" | base64 --decode > "$root/sdk.zip"
+        (cd "$root" && cmake -E tar xf sdk.zip && rm sdk.zip)
+        check() {
+          actual="$(cmake -E sha256sum "$root/$1" | cut -d' ' -f1)"
+          if [ "$actual" != "$2" ]; then
+            echo "::error::$1 does not match the pinned VirtualDJ SDK 20211003 header"
+            exit 1
+          fi
+        }
+        check vdjPlugin8.h 06cc9b63df2b8e3584e3f77c8fe12abbc58d04ee38afe9038e078055a9690297
+        check vdjOnlineSource.h 79dbc45d9658579d846dc2448bc0c38ef356247f1b1dd2d5513355967c4875a3
+        echo "root=$root" >> "$GITHUB_OUTPUT"

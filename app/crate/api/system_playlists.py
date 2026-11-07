@@ -1,4 +1,6 @@
 import asyncio
+import hashlib
+import json
 from typing import AsyncIterator
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -12,7 +14,7 @@ from crate.api.openapi_responses import (
 )
 from crate.api.permissions import require_permission
 from crate.api.playlist_utils import apply_playlist_cover_payload
-from crate.api.schemas.common import OkResponse
+from crate.api.schemas.common import OkResponse, TaskEnqueueResponse
 from crate.api.schemas.curation import (
     AddSystemPlaylistTracksRequest,
     ApplyPlaylistRefinementRequest,
@@ -20,7 +22,6 @@ from crate.api.schemas.curation import (
     CreateSystemPlaylistFromBlueprintRequest,
     CreateSystemPlaylistRequest,
     GeneratePlaylistDescriptionRequest,
-    GeneratePlaylistDescriptionResponse,
     PreviewSystemPlaylistRequest,
     RefineSystemPlaylistResponse,
     ReorderSystemPlaylistTracksRequest,
@@ -60,6 +61,7 @@ from crate.db.repositories.playlists_generation_state import (
 )
 from crate.playlist_blueprints import blueprint_curation_key, find_playlist_blueprint
 from crate.playlist_rule_contract import validate_smart_rules
+from crate.api.ai_tasks import queue_ai_task
 from crate.db.repositories.tasks import create_task
 
 router = APIRouter(prefix="/api/admin/system-playlists", tags=["admin"])
@@ -759,15 +761,25 @@ def admin_preview_system_playlist(
 
 @router.post(
     "/{playlist_id}/ai-description",
-    response_model=GeneratePlaylistDescriptionResponse,
-    responses=_SYSTEM_PLAYLIST_RESPONSES,
-    summary="Generate an editorial playlist description with the configured LLM",
+    status_code=202,
+    response_model=TaskEnqueueResponse,
+    responses=merge_responses(
+        _SYSTEM_PLAYLIST_RESPONSES,
+        {503: error_response("The AI playlist description action is unavailable.")},
+    ),
+    summary="Queue an editorial playlist description from the configured model",
 )
 def admin_generate_playlist_description(
     request: Request,
     playlist_id: int,
     body: GeneratePlaylistDescriptionRequest | None = None,
 ):
+    """Queue the description on the ai queue; the task result holds the draft.
+
+    The model is never called inside the request (SM3-D8). Follow the returned
+    task with /api/events/task/{task_id}; its result is
+    {playlist_id, description, applied}.
+    """
     actor = _require_playlist_curator(request)
     playlist = _require_system_playlist(playlist_id)
     rules = (
@@ -775,34 +787,35 @@ def admin_generate_playlist_description(
         if body and body.smart_rules is not None
         else playlist.get("smart_rules")
     )
+    apply = bool(body and body.apply)
+
+    from crate.ai.consumers import accept_action
+    from crate.ai.contracts import AIConfigurationError
+
     try:
-        from crate.llm.prompts.playlist_description import (
-            generate_playlist_description,
-        )
-
-        from crate.ai.consumers import resolve_call, revalidate_call
-
-        ai_call = resolve_call(
-            "playlists.description.generate", actor_id=actor.get("id")
-        )
-        response = generate_playlist_description(
-            name=playlist.get("name") or "Untitled playlist",
-            category=playlist.get("category"),
-            smart_rules=rules,
-            tracks=get_playlist_tracks(playlist_id)[:60],
-            ai_call=ai_call,
-        )
-    except Exception as exc:
+        acceptance = accept_action("playlists.description.generate")
+    except AIConfigurationError as error:
         raise HTTPException(
             status_code=503,
-            detail=f"LLM description generation failed: {exc}",
-        ) from exc
+            detail=error.message,
+            headers={"X-Crate-Error": error.code},
+        ) from None
 
-    applied = bool(body and body.apply)
-    if applied:
-        revalidate_call(ai_call)
-        update_playlist(playlist_id, description=response.description)
-    return {"description": response.description, "applied": applied}
+    rules_key = hashlib.sha256(
+        json.dumps(rules, sort_keys=True, default=str).encode()
+    ).hexdigest()[:16]
+    dedup_key = (
+        f"playlist-description:{playlist_id}:{rules_key}:"
+        f"{'apply' if apply else 'draft'}"
+    )
+    params = {
+        "playlist_id": playlist_id,
+        "smart_rules": rules,
+        "apply": apply,
+        "actor_user_id": actor.get("id"),
+        "ai_acceptance": acceptance,
+    }
+    return queue_ai_task("generate_playlist_description", params, dedup_key=dedup_key)
 
 
 @router.post(

@@ -1,0 +1,138 @@
+/* Sound spectrum (audio analysis): the approved mockup's instrument, drawn per row in a
+   600 x 50 box that scales uniformly. Like GenreWheel and StackMap it sits straight on
+   the page and takes the card's width, so it keeps its presence; a panel in the page
+   colour would only vanish. */
+.sound-spectrum {
+  width: 100%;
+  max-width: 56rem;
+  padding: 0.25rem 0 0.5rem;
+}
+
+.sound-spectrum-axis,
+.sound-spectrum-graphic svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.sound-spectrum-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sound-spectrum-graphic {
+  border-radius: 0.25rem;
+  outline-offset: -2px;
+}
+
+.sound-spectrum-grid {
+  stroke: var(--text-primary);
+  stroke-opacity: 0.08;
+}
+
+.sound-spectrum-axis-label {
+  fill: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.sound-spectrum-label {
+  fill: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sound-spectrum-value {
+  fill: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.sound-spectrum-fill-from {
+  stop-color: var(--accent-action);
+  stop-opacity: 0;
+}
+
+.sound-spectrum-fill-to {
+  stop-color: var(--accent-action-hi);
+  stop-opacity: 0.55;
+}
+
+.sound-spectrum-ridge-from {
+  stop-color: var(--accent-action-hi);
+  stop-opacity: 0.45;
+}
+
+.sound-spectrum-ridge-to {
+  stop-color: var(--accent-action);
+  stop-opacity: 0.02;
+}
+
+.sound-spectrum-ridge-line {
+  fill: none;
+  stroke: var(--accent-action-hi);
+  stroke-opacity: 0.8;
+  stroke-width: 1.2;
+}
+
+.sound-spectrum-tick {
+  stroke: var(--accent-action-hi);
+  stroke-opacity: 0.55;
+  stroke-width: 1.5;
+}
+
+.sound-spectrum-mean {
+  fill: var(--accent-action-hi);
+}
+
+/* Entrance: the fill grows from 0, the ridge rises, then the marks appear, row by row. */
+.sound-spectrum[data-animated="true"] .sound-spectrum-fill {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: sound-spectrum-grow 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--row, 0) * 70ms);
+}
+
+.sound-spectrum[data-animated="true"] .sound-spectrum-ridge {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: sound-spectrum-rise 650ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--row, 0) * 70ms + 150ms);
+}
+
+.sound-spectrum[data-animated="true"] .sound-spectrum-tick,
+.sound-spectrum[data-animated="true"] .sound-spectrum-mean {
+  animation: sound-spectrum-fade 400ms ease-out both;
+  animation-delay: calc(var(--row, 0) * 70ms + 350ms);
+}
+
+@keyframes sound-spectrum-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes sound-spectrum-rise {
+  from {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+}
+
+@keyframes sound-spectrum-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sound-spectrum * {
+    animation: none !important;
+  }
+}

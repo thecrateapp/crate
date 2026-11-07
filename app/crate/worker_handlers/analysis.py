@@ -1,8 +1,10 @@
 import logging
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable, Mapping, TypeGuard
 
+from crate.db.repositories.smart_mix_refinements import invalidate_for_tracks
 from crate.audio_fingerprint import compute_audio_fingerprint_with_source
 from crate.db.cache_store import set_cache
 from crate.db.events import emit_task_event
@@ -26,6 +28,7 @@ from crate.db.jobs.analysis_storage import (
     resolve_smart_mix_track,
 )
 from crate.db.jobs.smart_mix_backfill import (
+    campaign_targets_current,
     claim_smart_mix_backfill_batch,
     complete_smart_mix_campaign,
     count_smart_mix_in_flight,
@@ -34,6 +37,8 @@ from crate.db.jobs.smart_mix_backfill import (
     refresh_live_smart_mix_coverage,
     refresh_smart_mix_coverage,
     release_smart_mix_claims,
+    seconds_since_smart_mix_change,
+    smart_mix_profile_dedup_key,
 )
 from crate.db.repositories.library import (
     get_library_album,
@@ -43,9 +48,17 @@ from crate.db.repositories.library import (
     get_library_tracks,
     update_track_analysis,
 )
+from crate.db.repositories.smart_mix_signals import (
+    TrackMixSignals,
+    get_track_mix_signals,
+    store_track_mix_beats,
+    store_track_mix_voice,
+)
 from crate.db.repositories.tasks import create_task
+from crate.smart_mix.source import smart_mix_source_revision
+from crate.smart_mix.backfill_window import backfill_window_limit
 from crate.task_progress import TaskProgress, emit_progress, entity_label
-from crate.worker_handlers import TaskHandler, is_cancelled
+from crate.worker_handlers import TaskHandler, is_cancelled, run_again_later
 
 log = logging.getLogger(__name__)
 
@@ -68,9 +81,17 @@ _MAX_BACKFILL_FINGERPRINT_LIMIT = 50_000
 # Concurrency / backpressure constants
 _POPULARITY_CHUNK_SLEEP_SECONDS = 0.25
 _WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS = 300
-_SMART_MIX_BACKFILL_POLL_SECONDS = 15
-_SMART_MIX_BACKFILL_MAX_WAIT_SECONDS = 600
-_sleep = time.sleep
+# The night-window limit keeps only a few analyses in flight, so a slot freed by
+# a finished analysis should be refilled within seconds rather than a poll later.
+# The coordinator waits as a pending task, not in a worker process, and checks
+# less often the longer its slots stay as they are.
+_SMART_MIX_BACKFILL_POLL_SECONDS = 3
+_SMART_MIX_BACKFILL_MAX_POLL_SECONDS = 30
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)
+
 
 # Registry of post-processing functions for fan-out coordinators.
 # Keyed by the child task_type. Called once by the last chunk to complete.
@@ -1255,6 +1276,18 @@ def _handle_backfill_track_audio_fingerprints(
     }
 
 
+def _invalidate_refinements(track_entity_uid: str) -> None:
+    """Drop the AI refinements of the track's previous profile revision (SM4).
+
+    Their keys already miss with the new revision; this frees the rows. A
+    failure here must not fail the profile, which is stored.
+    """
+    try:
+        invalidate_for_tracks([track_entity_uid])
+    except Exception:
+        log.warning("Smart Mix refinement invalidation failed", exc_info=True)
+
+
 def _handle_compute_smart_mix_profile(task_id: str, params: dict, config: dict) -> dict:
     del config
     track = resolve_smart_mix_track(
@@ -1267,11 +1300,16 @@ def _handle_compute_smart_mix_profile(task_id: str, params: dict, config: dict) 
     track_id = int(track["id"])
     path = str(track["path"])
     claim_token = params.get("claim_token")
+    # The model signals are stamped with when the file was read (SM3-D16).
+    read_at = datetime.now(UTC)
     capture = capture_smart_mix_source(track_id, path, claim_token=claim_token)
+    source_revision = capture.source_revision
+    signals = _stored_signals(track_id, source_revision)
+    beats = _smart_mix_beats(path, track_id, source_revision, signals, read_at)
     try:
         from crate.audio_analysis import analyze_mix_profile
 
-        draft = analyze_mix_profile(path)
+        draft = analyze_mix_profile(path, beats)
     except Exception as exc:
         record_smart_mix_failure(track_id, path, str(exc), claim_token=claim_token)
         log.warning("Smart Mix analysis failed for %s", path, exc_info=True)
@@ -1280,6 +1318,24 @@ def _handle_compute_smart_mix_profile(task_id: str, params: dict, config: dict) 
             "error": f"Smart Mix analysis failed: {exc}",
             "track_id": track_id,
         }
+
+    # Voice per phrase (SM3-D13); a voice failure leaves the draft as it was.
+    from crate.smart_mix.vocals import VoiceWindowBytes, add_vocal_presence
+
+    def keep_voice(windows: VoiceWindowBytes) -> None:
+        if _source_unchanged(path, source_revision, "voice windows"):
+            store_track_mix_voice(
+                track_id,
+                source_revision,
+                detector=windows.detector,
+                hop_ms=windows.hop_ms,
+                scores=windows.scores,
+                updated_at=read_at,
+            )
+
+    draft = add_vocal_presence(
+        draft, path, stored=_stored_voice(signals), keep=keep_voice
+    )
 
     try:
         outcome = publish_smart_mix_profile(capture, draft)
@@ -1292,6 +1348,8 @@ def _handle_compute_smart_mix_profile(task_id: str, params: dict, config: dict) 
             "track_id": track_id,
         }
     stored = outcome is SmartMixPublication.PUBLISHED
+    if stored and track.get("entity_uid"):
+        _invalidate_refinements(str(track["entity_uid"]))
     _refresh_live_coverage()
     if stored:
         emit_task_event(
@@ -1311,6 +1369,122 @@ def _handle_compute_smart_mix_profile(task_id: str, params: dict, config: dict) 
     }
 
 
+def _stored_signals(track_id: int, source_revision: str) -> TrackMixSignals | None:
+    """The model outputs stored for this file (SM3-D16), or None.
+
+    Signals of another source revision describe another audio and are never reused.
+    A failed lookup only costs running the models again.
+    """
+    try:
+        signals = get_track_mix_signals(track_id)
+    except Exception:
+        log.warning(
+            "Smart Mix could not read the stored signals of track %s; the models run "
+            "again",
+            track_id,
+            exc_info=True,
+        )
+        return None
+    if signals is None or signals.source_revision != source_revision:
+        return None
+    return signals
+
+
+def _source_unchanged(path: str, source_revision: str, signals: str) -> bool:
+    """Whether the file is still the one the task captured.
+
+    The models read the file after the capture; if it was replaced since, their
+    outputs may describe the new audio, so they are stored under neither revision.
+    """
+    if smart_mix_source_revision(path) == source_revision:
+        return True
+    log.warning(
+        "Smart Mix did not store the %s of %s: the file changed during the task",
+        signals,
+        path,
+    )
+    return False
+
+
+def _smart_mix_beats(
+    path: str,
+    track_id: int,
+    source_revision: str,
+    signals: TrackMixSignals | None,
+    read_at: datetime,
+):
+    """Beats and downbeats from Beat This! (SM3-D14), or None: without them the
+    analysis keeps its own beat tracker, so a model failure never fails the profile.
+
+    Beats stored for this file by the current tracker are reused without running the
+    model (SM3-D16); the model's beats are stored, stamped with ``read_at``, while the
+    file is still the captured one, and a failure to store them only logs. A track
+    the model gives no beats stores nothing.
+    """
+    from crate.smart_mix.beat_model import (
+        BeatTrack,
+        beat_tracker_name,
+        track_file_beats,
+    )
+
+    tracker = beat_tracker_name()
+    if signals is not None and signals.beat_tracker == tracker and signals.beats_ms:
+        return BeatTrack(
+            tracker=tracker,
+            beats_ms=signals.beats_ms,
+            downbeats_ms=signals.downbeats_ms or (),
+            beats_per_bar=signals.beats_per_bar,
+        )
+    try:
+        beats = track_file_beats(path)
+    except Exception:
+        log.warning(
+            "Beat This! failed for %s; the analysis keeps its own beat tracker",
+            path,
+            exc_info=True,
+        )
+        return None
+    if beats is None:
+        return None
+    if not _source_unchanged(path, source_revision, "Beat This! beats"):
+        return beats
+    try:
+        store_track_mix_beats(
+            track_id,
+            source_revision,
+            tracker=beats.tracker,
+            beats_ms=beats.beats_ms,
+            downbeats_ms=beats.downbeats_ms,
+            beats_per_bar=beats.beats_per_bar,
+            updated_at=read_at,
+        )
+    except Exception:
+        log.warning(
+            "Smart Mix could not store the Beat This! beats of %s; the profile goes on",
+            path,
+            exc_info=True,
+        )
+    return beats
+
+
+def _stored_voice(signals: TrackMixSignals | None):
+    """The voice windows stored for this file, whatever their detector, or None."""
+    from crate.smart_mix.vocals import VoiceWindowBytes
+
+    if (
+        signals is None
+        or signals.vocal_detector is None
+        or signals.voice_hop_ms is None
+        or signals.voice_scores is None
+    ):
+        return None
+    return VoiceWindowBytes(
+        detector=signals.vocal_detector,
+        hop_ms=signals.voice_hop_ms,
+        scores=signals.voice_scores,
+    )
+
+
 def _refresh_live_coverage() -> None:
     try:
         refresh_live_smart_mix_coverage()
@@ -1322,40 +1496,45 @@ def _handle_backfill_smart_mix_profiles(
     task_id: str, params: dict, config: dict
 ) -> dict:
     del config
-    from crate.resource_governor import wait_while_pressured
+    from crate.resource_governor import record_decision, should_defer_task
 
     campaign = get_smart_mix_campaign()
     if not _smart_mix_campaign_running(campaign):
         return {"claimed": 0, "queued": 0, "control": _campaign_control(campaign)}
-    if not wait_while_pressured(
-        label="Smart Mix profile backfill",
-        task_type="backfill_smart_mix_profiles",
-        is_cancelled_fn=is_cancelled,
-        task_id=task_id,
-        params=params,
-        emit_event_fn=emit_task_event,
-        max_sleep_seconds=_WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS,
-    ):
-        return {"claimed": 0, "queued": 0, "paused": True}
+    # The actor asked the governor just before; if it has changed its mind
+    # since, wait in the queue like the actor would rather than in this process.
+    decision = should_defer_task("backfill_smart_mix_profiles", params)
+    if not decision.allowed:
+        record_decision(
+            decision, task_type="backfill_smart_mix_profiles", source="task_loop"
+        )
+        return run_again_later(
+            min(
+                max(1, decision.defer_seconds),
+                _WAIT_WHILE_PRESSURED_MAX_SLEEP_SECONDS,
+            ),
+            progress=f"Deferred by resource governor: {decision.reason}",
+        )
+
+    # Only the claims of this backfill count as in flight; imports and manual
+    # reanalyses never take a backfill claim. The night window sets how many may
+    # be in flight. A change of window, or of the settings, applies to the next
+    # claim; analyses already accepted keep running. While the limit is reached
+    # the coordinator goes back to the queue, so it never holds a worker process
+    # that a child could use.
+    window = backfill_window_limit(campaign, now=_now())
+    in_flight = count_smart_mix_in_flight()
+    if in_flight >= window.limit:
+        return run_again_later(
+            _smart_mix_backfill_poll_seconds(),
+            progress=(
+                f"Waiting for a free slot: {in_flight} of {window.limit} "
+                f"in flight ({window.window})"
+            ),
+        )
 
     batch_size = max(1, min(int(campaign.get("batch_size") or 25), 100))
     max_attempts = int(campaign.get("max_attempts") or 3)
-    in_flight = count_smart_mix_in_flight()
-    waited = 0
-    while in_flight >= batch_size and waited < _SMART_MIX_BACKFILL_MAX_WAIT_SECONDS:
-        _sleep(_SMART_MIX_BACKFILL_POLL_SECONDS)
-        waited += _SMART_MIX_BACKFILL_POLL_SECONDS
-        campaign = get_smart_mix_campaign()
-        if not _smart_mix_campaign_running(campaign):
-            return {"claimed": 0, "queued": 0, "control": _campaign_control(campaign)}
-        in_flight = count_smart_mix_in_flight()
-    if in_flight >= batch_size:
-        return {
-            "claimed": 0,
-            "queued": 0,
-            "deferred": True,
-            "next_task_id": queue_next_smart_mix_batch(),
-        }
 
     offline_ids = [
         int(track_id)
@@ -1365,7 +1544,8 @@ def _handle_backfill_smart_mix_profiles(
     from crate.crate_cli import has_subcommands, is_available
 
     claimed = claim_smart_mix_backfill_batch(
-        limit=batch_size - in_flight,
+        limit=min(batch_size, window.limit - in_flight),
+        max_in_flight=window.limit,
         offline_track_ids=offline_ids,
         max_attempts=max_attempts,
         claimed_by=f"task:{task_id}",
@@ -1384,7 +1564,7 @@ def _handle_backfill_smart_mix_profiles(
                 "track_entity_uid": track.get("entity_uid"),
                 "claim_token": track.get("claim_token"),
             },
-            dedup_key=f"smart-mix-profile:{track_id}",
+            dedup_key=smart_mix_profile_dedup_key(track_id),
         )
         if child_id:
             queued += 1
@@ -1392,27 +1572,68 @@ def _handle_backfill_smart_mix_profiles(
             released.append(track_id)
     if released:
         release_smart_mix_claims(released)
-    refresh_smart_mix_coverage(max_attempts=max_attempts)
 
-    if not claimed and in_flight == 0:
-        complete_smart_mix_campaign()
-        return {"claimed": 0, "queued": 0, "completed": True}
+    # The claim counts again under its lock, so an empty claim can also mean
+    # another coordinator took the free slots; only nothing in flight ends it.
+    # With analyses still running, the coordinator waits for them rather than
+    # chaining passes, and coverage refreshes that would change nothing, until
+    # they finish.
+    if not claimed:
+        in_flight = count_smart_mix_in_flight()
+        if in_flight == 0:
+            refresh_smart_mix_coverage(max_attempts=max_attempts)
+            complete_smart_mix_campaign()
+            return {"claimed": 0, "queued": 0, "completed": True}
+        return run_again_later(
+            _smart_mix_backfill_poll_seconds(),
+            progress=f"Waiting for the {in_flight} analyses in flight to finish",
+        )
+    refresh_smart_mix_coverage(max_attempts=max_attempts)
     return {
         "claimed": len(claimed),
         "queued": queued,
         "released": len(released),
-        "next_task_id": queue_next_smart_mix_batch(
-            batches=1 if claimed else 0, claimed=len(claimed)
-        ),
+        "window": window.window,
+        "limit": window.limit,
+        "next_task_id": queue_next_smart_mix_batch(batches=1, claimed=len(claimed)),
     }
 
 
+def _smart_mix_backfill_poll_seconds() -> int:
+    """How long a waiting coordinator stays in the queue before it checks again.
+
+    As long as the slots have stayed as they are: 3 s right after a claim or a
+    finished analysis, then about double each time while nothing changes, up to
+    30 s. Each check is a whole actor cycle, so a long analysis or a child the
+    governor defers no longer costs one every 3 s.
+    """
+    since_change = seconds_since_smart_mix_change()
+    if since_change is None:
+        return _SMART_MIX_BACKFILL_MAX_POLL_SECONDS
+    return round(
+        min(
+            _SMART_MIX_BACKFILL_MAX_POLL_SECONDS,
+            max(_SMART_MIX_BACKFILL_POLL_SECONDS, since_change),
+        )
+    )
+
+
 def _smart_mix_campaign_running(campaign: dict | None) -> TypeGuard[dict]:
-    return campaign is not None and campaign.get("status") == "running"
+    # A campaign of another analyzer or schema (left running across a deploy) never
+    # claims for this one; an operator starts a campaign for the current target.
+    return (
+        campaign is not None
+        and campaign.get("status") == "running"
+        and campaign_targets_current(campaign)
+    )
 
 
 def _campaign_control(campaign: dict | None) -> str:
-    return str(campaign.get("status")) if campaign else "idle"
+    if not campaign:
+        return "idle"
+    if not campaign_targets_current(campaign):
+        return "superseded"
+    return str(campaign.get("status"))
 
 
 def _handle_refresh_smart_mix_coverage(

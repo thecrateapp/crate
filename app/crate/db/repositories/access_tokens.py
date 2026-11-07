@@ -24,6 +24,8 @@ SUPPORTED_ACCESS_TOKEN_SCOPES = frozenset(
         "vdj.catalog.read",
         "vdj.media.read",
         "vdj.smart_mix.read",
+        # AI refinement of Smart Mix plans (SM4): it can spend provider budget.
+        "vdj.smart_mix.ai",
         "vdj.play_events.write",
         "vdj.automation",
         "vdj.automation.execute",

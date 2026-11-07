@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 import path from "path";
+import { createSentrySourcePathRewriter } from "../shared/web/sentry-source-paths";
 import { createApiProxyOptions } from "./dev-proxy";
 
 const sentryUploadEnabled = Boolean(
@@ -29,7 +30,13 @@ export default defineConfig({
             project: process.env.SENTRY_PROJECT,
             authToken: process.env.SENTRY_AUTH_TOKEN,
             release: { name: sentryRelease },
-            sourcemaps: { filesToDeleteAfterUpload: "**/*.map" },
+            sourcemaps: {
+              filesToDeleteAfterUpload: "**/*.map",
+              rewriteSources: createSentrySourcePathRewriter({
+                repoRoot: path.resolve(__dirname, "../.."),
+                distDir: path.resolve(__dirname, "dist"),
+              }),
+            },
           }),
         ]
       : []),

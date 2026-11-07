@@ -3,6 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
+from crate.ai.actions import ACTIONS
 from crate.ai.contracts import AIConfigurationError
 from crate.db.repositories import ai_configuration as store
 
@@ -55,7 +56,7 @@ def test_snapshot_is_read_only_and_batched(pg_db, monkeypatch):
     )
     monkeypatch.setenv("GEMINI_API_KEY", "private-key-value")
     result = service.snapshot()
-    assert len(result["actions"]) == 11
+    assert len(result["actions"]) == len(ACTIONS)
     assert not result["migrated"]
     assert store.list_connections() == []
     assert "private-key-value" not in str(result)
@@ -126,7 +127,7 @@ def test_exact_legacy_activation_and_cross_action_rejected(pg_db, monkeypatch):
     assert biography["effective_timeout_seconds"] == 60
     result = service.activate(before["revision"], None, before["review_fingerprint"])
     assert result["active"] is True
-    assert len(store.list_bindings()) == 11
+    assert len(store.list_bindings()) == len(ACTIONS)
     context = service.resolve_action("artists.bio.research")
     assert context["config"]["kind"] == "legacy_snapshot"
     assert context["config"]["legacy_options"]["timeout_seconds"] is None
@@ -580,7 +581,8 @@ def test_effective_ollama_endpoint_refresh_and_activation_pinning(pg_db, monkeyp
             "label": "Bounded",
             "connection_id": conn["id"],
             "model_id": "model",
-            "config": {"timeout_seconds": 8},
+            # Within every action's maxima (Smart Mix refinement: 1024 output).
+            "config": {"timeout_seconds": 8, "max_output_tokens": 1024},
         },
         None,
     )
@@ -724,14 +726,14 @@ def test_default_model_http_dry_run_apply_and_stale_replay(
     assert preview.status_code == 200, preview.text
     assert preview.json()["dry_run"] is True
     assert preview.json()["activation"] is True
-    assert len(preview.json()["outcomes"]) == 11
+    assert len(preview.json()["outcomes"]) == len(ACTIONS)
     assert preview.headers["cache-control"] == "no-store"
     assert store.list_bindings() == []
 
     applied = test_app.post("/api/admin/ai/default-model", json=body)
     assert applied.status_code == 200, applied.text
     assert applied.json()["activation"] is True
-    assert len(store.list_bindings()) == 11
+    assert len(store.list_bindings()) == len(ACTIONS)
 
     replay = test_app.post("/api/admin/ai/default-model", json=body)
     assert replay.status_code == 409

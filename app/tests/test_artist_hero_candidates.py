@@ -45,8 +45,8 @@ def test_candidate_tokens_are_signed_and_tamper_evident(monkeypatch):
     assert decode_candidate_token(token, expected_artist_id=8) is None
 
 
-def test_remote_candidate_stops_streaming_after_size_limit(monkeypatch):
-    from crate.artist_hero_candidates import _MAX_BYTES, _download_remote_candidate
+def _streaming_response(raw):
+    """A requests response over ``raw``, a stub of urllib3's stream."""
 
     class Response:
         headers = {"content-type": "image/jpeg"}
@@ -61,15 +61,62 @@ def test_remote_candidate_stops_streaming_after_size_limit(monkeypatch):
             return None
 
         def iter_content(self, *, chunk_size):
-            assert chunk_size == 1024 * 1024
-            yield b"x" * (_MAX_BYTES // 2)
-            yield b"x" * (_MAX_BYTES // 2 + 1)
+            # Like urllib3, a chunk only comes back once chunk_size bytes arrived.
+            while True:
+                received = 0
+                while received < chunk_size:
+                    piece = raw.read1(chunk_size - received)
+                    if not piece:
+                        break
+                    received += len(piece)
+                if not received:
+                    return
+                yield b"x" * received
+
+    response = Response()
+    response.raw = raw
+    return response
+
+
+def test_remote_candidate_stops_streaming_after_size_limit(monkeypatch):
+    from crate import artist_hero_candidates as hero
+
+    class Raw:
+        left = hero._MAX_BYTES + 1
+
+        def read1(self, amt=None, decode_content=None):
+            size = min(amt or self.left, self.left, 1024 * 1024)
+            self.left -= size
+            return b"x" * size
 
     monkeypatch.setattr(
-        "crate.artist_hero_candidates.requests.get", lambda *args, **kwargs: Response()
+        hero.requests, "get", lambda *args, **kwargs: _streaming_response(Raw())
     )
 
-    assert _download_remote_candidate("https://example.test/large.jpg") is None
+    assert hero._download_remote_candidate("https://example.test/large.jpg") is None
+
+
+def test_remote_candidate_stops_streaming_after_its_time_budget(monkeypatch):
+    # A server that sends a byte every 11 s never trips the read timeout, so only
+    # a deadline checked after every socket read keeps the ai task's time for the
+    # model call.
+    from crate import artist_hero_candidates as hero
+
+    clock = {"now": 100.0}
+
+    class Raw:
+        def read1(self, amt=None, decode_content=None):
+            clock["now"] += hero._READ_TIMEOUT_SECONDS - 1
+            return b"x"
+
+    monkeypatch.setattr(hero.time, "monotonic", lambda: clock["now"])
+    monkeypatch.setattr(
+        hero.requests, "get", lambda *args, **kwargs: _streaming_response(Raw())
+    )
+
+    assert hero._download_remote_candidate("https://example.test/slow.jpg") is None
+    elapsed = clock["now"] - 100.0
+    assert elapsed <= hero._DOWNLOAD_BUDGET_SECONDS + hero._READ_TIMEOUT_SECONDS
 
 
 def test_discovery_returns_all_valid_sources_with_same_origin_previews(
@@ -116,18 +163,37 @@ def test_discovery_returns_all_valid_sources_with_same_origin_previews(
     assert candidates[0].desktop.score >= candidates[-1].desktop.score
 
 
-def test_visual_analysis_falls_back_without_a_vision_capable_model(monkeypatch):
-    from tests.ai_consumer_fakes import pin_actions
+def test_visual_analysis_keeps_the_closed_error_code(monkeypatch):
+    # The analysis runs in an ai task, which reports the code; no silent None.
+    import pytest
 
-    pin_actions(monkeypatch)
+    from crate.ai.contracts import AIConfigurationError
     from crate.artist_hero_candidates import analyze_candidate_image
 
-    monkeypatch.setattr(
-        "crate.artist_hero_candidates.ask_image_structured",
-        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("unsupported")),
-    )
+    def refuse(*args, **kwargs):
+        raise AIConfigurationError(
+            "AI_ACTION_NEEDS_IMAGE", "Action requires image input"
+        )
 
-    assert analyze_candidate_image(_image_bytes((2400, 1000))) is None
+    monkeypatch.setattr("crate.artist_hero_candidates.ask_image_structured", refuse)
+
+    with pytest.raises(AIConfigurationError) as error:
+        analyze_candidate_image(
+            _image_bytes((2400, 1000)),
+            ai_call={"context": {}, "actor_id": 1, "job_id": "job"},
+        )
+    assert error.value.code == "AI_ACTION_NEEDS_IMAGE"
+
+
+def test_candidate_fingerprint_ignores_the_token_expiry():
+    from crate.artist_hero_candidates import candidate_fingerprint
+
+    photo = {"origin": "local-photo", "reference": "artist.jpg", "expires_at": 1}
+    later = {**photo, "expires_at": 2}
+    background = {**photo, "origin": "local-background"}
+
+    assert candidate_fingerprint(photo) == candidate_fingerprint(later)
+    assert candidate_fingerprint(photo) != candidate_fingerprint(background)
 
 
 def test_candidate_catalog_endpoint_returns_ranked_candidates(test_app, tmp_path):

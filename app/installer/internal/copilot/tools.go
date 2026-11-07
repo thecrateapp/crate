@@ -14,6 +14,7 @@ import (
 	"github.com/thecrateapp/crate/app/installer/internal/doctor"
 	"github.com/thecrateapp/crate/app/installer/internal/install"
 	"github.com/thecrateapp/crate/app/installer/internal/manifest"
+	"github.com/thecrateapp/crate/app/installer/internal/monitoring"
 	"github.com/thecrateapp/crate/app/installer/internal/secrets"
 	"github.com/thecrateapp/crate/app/installer/internal/stack"
 	"github.com/thecrateapp/crate/app/installer/internal/system"
@@ -513,6 +514,7 @@ func (s *Session) toolApply(ctx context.Context, _ *mcp.CallToolRequest, _ struc
 		s.cfg.AdminPassword, s.cfg.AdminPasswordGenerated = password, true
 	}
 	s.cfg.DockerGID = system.SocketGroup(ctx, s.deps.Run, s.host)
+	s.cfg.KeepMonitoringFiles = monitoring.KeepFiles(s.dir, s.version)
 	if err := install.Apply(s.manifest, s.cfg, s.existing); err != nil {
 		return nil, ApplyOut{}, err
 	}
@@ -560,7 +562,7 @@ func (s *Session) toolStart(ctx context.Context, _ *mcp.CallToolRequest, _ struc
 	if err != nil {
 		return nil, jobState{}, err
 	}
-	st := stack.Stack{Run: s.deps.Run, Compose: docker.Compose, Dir: s.dir, Files: install.ComposeFiles(values)}
+	st := stack.Stack{Run: s.deps.Run, Compose: docker.Compose, Dir: s.dir, Files: install.ComposeFiles(values), Env: values}
 	s.job = startJob(st, s.deps.HTTP, s.cfg.LocalURLs().API, startTimeout, s.agentStep(st, docker, values))
 	return nil, s.job.state(), nil
 }

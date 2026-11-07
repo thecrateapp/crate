@@ -11,6 +11,7 @@ import requests
 from requests import RequestException
 
 from crate.db.cache_store import delete_cache, get_cache, get_caches, set_cache
+from crate.provider_rate_limits import ProviderRateLimited
 
 log = logging.getLogger(__name__)
 
@@ -45,7 +46,9 @@ class SetlistProviderUnavailable(RuntimeError):
     pass
 
 
-class SetlistProviderRateLimited(SetlistProviderUnavailable):
+class SetlistProviderRateLimited(SetlistProviderUnavailable, ProviderRateLimited):
+    provider = "setlistfm"
+
     def __init__(self, retry_after_seconds: float = 60.0) -> None:
         super().__init__("Setlist.fm rate limit exceeded")
         self.retry_after_seconds = max(1.0, retry_after_seconds)

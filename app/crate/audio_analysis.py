@@ -57,16 +57,20 @@ SIGNAL_DURATION = 120  # seconds — for BPM/key accuracy
 FRAME_STEP = 4  # analyze every Nth frame for spectral features
 
 
-def analyze_mix_profile(filepath: str | Path):
-    """Analyze full-track signals used by the versioned Smart Mix profile."""
+def analyze_mix_profile(filepath: str | Path, beats=None):
+    """Analyze full-track signals used by the versioned Smart Mix profile.
+
+    ``beats`` (a ``crate.smart_mix.beat_model.BeatTrack``) replaces the analyzer's own
+    beat tracker and downbeat heuristic (SM3-D14).
+    """
     from crate.smart_mix.analyzer import analyze_mix_profile as analyze
     from crate.smart_mix.models import mix_profile_draft_from_payload
 
-    rust_result = _analyze_rust(str(filepath))
+    rust_result = _analyze_rust(str(filepath), beats)
     payload = rust_result.get("mix_profile") if rust_result else None
     if isinstance(payload, dict):
         return mix_profile_draft_from_payload(payload)
-    return analyze(filepath)
+    return analyze(filepath, beats)
 
 
 # ── PANNs CNN14 (lazy singleton) ──────────────────────────────────
@@ -367,14 +371,44 @@ def analyze_batch(filepaths: list) -> list:
     return [analyze_track(fp) for fp in filepaths]
 
 
-def _analyze_rust(filepath: str) -> dict | None:
-    """Try analyzing with crate-cli. Returns result dict or None to fall back."""
+def _analyze_rust(filepath: str, beats=None) -> dict | None:
+    """Try analyzing with crate-cli. Returns result dict or None to fall back.
+
+    ``beats`` (a ``BeatTrack``) reach a crate-cli that takes ``--beats``. An older one
+    would track its own beats after the model ran, so it is skipped and the Python
+    analyzer takes the beats.
+    """
     try:
-        from crate.crate_cli import run_analyze, is_available, has_subcommands
+        from crate.crate_cli import (
+            analyze_beats_probe_backing_off,
+            has_subcommands,
+            is_available,
+            run_analyze,
+            supports_analyze_beats,
+        )
 
         if not is_available() or not has_subcommands():
             return None
-        data = run_analyze(file=filepath)
+        if beats is not None and not supports_analyze_beats():
+            if analyze_beats_probe_backing_off():
+                # The probe failure was logged once; the binary may take --beats.
+                log.info(
+                    "crate-cli analyze --help failed recently and is backing off; the "
+                    "Python analyzer analyses %s with the %s beats",
+                    filepath,
+                    beats.tracker,
+                )
+            else:
+                log.warning(
+                    "crate-cli does not take model beats (--beats); the Python "
+                    "analyzer analyses %s with the %s beats",
+                    filepath,
+                    beats.tracker,
+                )
+            return None
+        data = run_analyze(
+            file=filepath, beats=None if beats is None else beats.to_payload()
+        )
         if not data or data.get("error"):
             return None
         return {

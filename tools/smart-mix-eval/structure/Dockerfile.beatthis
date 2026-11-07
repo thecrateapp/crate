@@ -1,0 +1,5 @@
+# Beat This! (MIT) on top of the All-In-One image, for beat_this_beats.py. Offline only.
+#   docker build -f Dockerfile.beatthis -t sg1-beatthis:local .
+FROM sg1-allin1:local
+COPY constraints.txt /tmp/constraints.txt
+RUN pip install --no-cache-dir -c /tmp/constraints.txt beat-this==1.1.0

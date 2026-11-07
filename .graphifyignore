@@ -1,0 +1,11 @@
+# Third-party code kept in the repo: excluded from the graphify knowledge graph.
+# Gitignore syntax; .gitignore is applied as well.
+
+# Vendored Tauri crates (wry, tauri-plugin-http)
+app/listen-desktop/src-tauri/vendor/
+
+# Agent skills installed from vercel-labs/agent-skills (see .claude/skills/skills-lock.json)
+.agents/skills/composition-patterns/
+.agents/skills/react-best-practices/
+.agents/skills/react-view-transitions/
+.agents/skills/web-design-guidelines/

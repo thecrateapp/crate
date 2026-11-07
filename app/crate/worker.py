@@ -1,11 +1,17 @@
 import logging
 import os
+import signal
+import subprocess
+import sys
 import threading
-from collections.abc import Iterator, MutableMapping
+import time
+from collections.abc import Iterator, MutableMapping, Sequence
 from importlib import import_module
 
+from crate.ai.queues import AI_QUEUES, lane_threads
 from crate.db.cache_store import set_cache
 from crate.db.init_db import init_db
+from crate.db.ops_runtime_views import DEFAULT_QUEUE_BREAKDOWN
 from crate.db.queries.tasks import get_task_activity_snapshot
 from crate.db.repositories.tasks import (
     cleanup_zombie_tasks,
@@ -24,7 +30,153 @@ def _normalise_queues(value) -> list[str]:
     else:
         parts = []
     queues = [str(part).strip() for part in parts if str(part).strip()]
-    return queues or ["fast", "heavy", "default", "maintenance"]
+    return queues or ["fast", "heavy", "default", "maintenance", *AI_QUEUES]
+
+
+# Dramatiq --worker-shutdown-timeout for every pool: on SIGTERM each pool stops
+# consuming and gives in-flight tasks this long (an AI call is at most 90s).
+POOL_SHUTDOWN_TIMEOUT_SECONDS = 90
+# How long the siblings of a pool that died on its own get to drain before they
+# are killed; a little more than their own shutdown timeout. The compose
+# stop_grace_period of crate-worker covers it as well.
+POOL_STOP_GRACE_SECONDS = POOL_SHUTDOWN_TIMEOUT_SECONDS + 15
+
+
+def _dramatiq_commands(queues: Sequence[str], processes: int) -> list[list[str]]:
+    """One Dramatiq pool for the general queues and one per AI lane.
+
+    AI lanes wait on provider latency, so each gets a single process with its own
+    thread count instead of sharing the general single-threaded processes.
+    """
+    base = [
+        sys.executable,
+        "-m",
+        "dramatiq",
+        "crate.actors",
+        "--worker-shutdown-timeout",
+        str(POOL_SHUTDOWN_TIMEOUT_SECONDS * 1000),
+    ]
+    general = [queue for queue in queues if queue not in AI_QUEUES]
+    commands = []
+    if general:
+        commands.append(
+            [
+                *base,
+                "--processes",
+                str(processes),
+                "--threads",
+                "1",
+                "--queues",
+                *general,
+            ]
+        )
+    for lane in AI_QUEUES:
+        if lane in queues:
+            commands.append(
+                [
+                    *base,
+                    "--processes",
+                    "1",
+                    "--threads",
+                    str(lane_threads(lane)),
+                    "--queues",
+                    lane,
+                ]
+            )
+    return commands
+
+
+def _pool_environment(command: Sequence[str]) -> dict[str, str] | None:
+    """Environment for an AI pool process; None keeps the inherited one.
+
+    Every running task holds a handler session and a heartbeat session, so an
+    AI pool with T threads needs at least 2T pooled connections.
+    """
+    queues = list(command[command.index("--queues") + 1 :])
+    if not queues or any(queue not in AI_QUEUES for queue in queues):
+        return None
+    threads = int(command[command.index("--threads") + 1])
+    configured = _env_int("CRATE_SQLALCHEMY_POOL_SIZE", 2) or 2
+    return {
+        **os.environ,
+        "CRATE_SQLALCHEMY_POOL_SIZE": str(max(configured, 2 * threads)),
+    }
+
+
+def _request_pool_stop(
+    processes: Sequence, stopping: threading.Event, signum: int
+) -> None:
+    """A requested stop: flag it first, then exactly one signal per pool.
+
+    A Dramatiq parent drains on the first SIGTERM and kills its workers on the
+    second, which would cut AI calls short and leak their provider slots.
+    """
+    stopping.set()
+    for process in processes:
+        if process.poll() is None:
+            process.send_signal(signum)
+
+
+def _supervise_pools(
+    processes: Sequence,
+    *,
+    stopping: threading.Event | None = None,
+    grace_seconds: float = POOL_STOP_GRACE_SECONDS,
+    poll_seconds: float = 1.0,
+) -> int:
+    """Run until the pools stop; return the exit code the container should use.
+
+    On a requested stop every pool already has its one SIGTERM, so the
+    supervisor only waits for all of them to drain. When a pool exits on its own
+    (OOM, memory recycling, crash) its siblings get one SIGTERM and
+    ``grace_seconds`` to drain before they are killed, so the restart policy
+    brings every lane back together instead of leaving a queue unconsumed.
+    """
+    stopping = stopping if stopping is not None else threading.Event()
+    while not stopping.is_set():
+        exited = next((p for p in processes if p.poll() is not None), None)
+        if exited is not None and not stopping.is_set():
+            return _stop_siblings(processes, exited, grace_seconds, poll_seconds)
+        time.sleep(poll_seconds)
+    while any(process.poll() is None for process in processes):
+        time.sleep(poll_seconds)
+    return next((p.returncode for p in processes if p.returncode), 0)
+
+
+def _stop_siblings(
+    processes: Sequence, exited, grace_seconds: float, poll_seconds: float
+) -> int:
+    siblings = [p for p in processes if p is not exited and p.poll() is None]
+    for process in siblings:
+        process.send_signal(signal.SIGTERM)
+    deadline = time.monotonic() + grace_seconds
+    while time.monotonic() < deadline and any(p.poll() is None for p in siblings):
+        time.sleep(poll_seconds)
+    for process in siblings:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+    return exited.returncode
+
+
+def _recover_stale_work() -> None:
+    """Fail zombie tasks, then give back what they held.
+
+    A killed task never reaches finish_invocation, so its provider slot would
+    stay taken; reclaiming keeps the charged tokens (no daily refund). A Smart
+    Mix profile task that failed for good leaves its backfill claim behind;
+    releasing it frees the slot even while the backfill is paused.
+    """
+    cleanup_zombie_tasks(heartbeat_timeout_min=5, no_heartbeat_timeout_min=3)
+    from crate.db.jobs.smart_mix_backfill import release_dead_smart_mix_claims
+    from crate.db.repositories.ai_usage import reclaim_abandoned_invocations
+
+    reclaimed = reclaim_abandoned_invocations()
+    if reclaimed:
+        log.warning("Reclaimed %d abandoned AI provider reservation(s)", reclaimed)
+    released = release_dead_smart_mix_claims()
+    if released:
+        log.warning("Released %d dead Smart Mix backfill claim(s)", released)
 
 
 def _env_int(name: str, default: int = 0) -> int:
@@ -57,10 +209,6 @@ def _is_cancelled(task_id: str) -> bool:
 
 def run_worker(config: dict):
     """Start Dramatiq workers + scheduler/watcher service loop."""
-    import subprocess
-    import signal
-    import sys
-    import threading
 
     logging.basicConfig(
         level=logging.INFO,
@@ -146,31 +294,27 @@ def run_worker(config: dict):
     else:
         log.info("Projector daemon disabled for queues: %s", ",".join(queues))
 
-    # Start Dramatiq workers via CLI (this manages its own process pool)
-    dramatiq_cmd = [
-        sys.executable,
-        "-m",
-        "dramatiq",
-        "crate.actors",
-        "--processes",
-        str(config.get("worker_processes", 6)),
-        "--threads",
-        "1",
-        "--queues",
-        *queues,
-    ]
-    log.info("Starting Dramatiq: %s", " ".join(dramatiq_cmd))
-    proc = subprocess.Popen(dramatiq_cmd)
+    # Start Dramatiq workers via CLI (each command manages its own process pool)
+    procs = []
+    for dramatiq_cmd in _dramatiq_commands(
+        queues, int(config.get("worker_processes", 6))
+    ):
+        log.info("Starting Dramatiq: %s", " ".join(dramatiq_cmd))
+        procs.append(
+            subprocess.Popen(dramatiq_cmd, env=_pool_environment(dramatiq_cmd))
+        )
+
+    stopping = threading.Event()
 
     def handle_signal(signum, frame):
         log.info("Received signal %d, shutting down...", signum)
         service_stop.set()
-        proc.send_signal(signum)
+        _request_pool_stop(procs, stopping, signum)
 
     signal.signal(signal.SIGTERM, handle_signal)
     signal.signal(signal.SIGINT, handle_signal)
 
-    exit_code = proc.wait()
+    exit_code = _supervise_pools(procs, stopping=stopping)
     service_stop.set()
     log.info("Dramatiq exited with code %d", exit_code)
     sys.exit(exit_code)
@@ -343,13 +487,11 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
             except Exception:
                 pass
 
-        # Zombie task cleanup every 30s (heartbeat-based)
+        # Zombie task cleanup and AI slot reclamation every 30s
         if now - last_zombie_check > 30:
             last_zombie_check = now
             try:
-                cleanup_zombie_tasks(
-                    heartbeat_timeout_min=5, no_heartbeat_timeout_min=3
-                )
+                _recover_stale_work()
             except Exception:
                 log.debug("Zombie cleanup failed", exc_info=True)
 
@@ -423,22 +565,7 @@ def _run_service_loop(config: dict, stop_event: threading.Event):
                         "active": int(activity["running_count"]),
                     },
                     "queue_breakdown": activity.get("queue_breakdown")
-                    or {
-                        "running": {
-                            "fast": 0,
-                            "default": 0,
-                            "heavy": 0,
-                            "maintenance": 0,
-                            "playback": 0,
-                        },
-                        "pending": {
-                            "fast": 0,
-                            "default": 0,
-                            "heavy": 0,
-                            "maintenance": 0,
-                            "playback": 0,
-                        },
-                    },
+                    or DEFAULT_QUEUE_BREAKDOWN,
                     "db_heavy_gate": activity.get("db_heavy_gate")
                     or {
                         "active": 0,
@@ -600,9 +727,38 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ("compute_recommendation_skips",),
     ),
     (
+        "crate.worker_handlers.error_inbox",
+        "ERROR_INBOX_TASK_HANDLERS",
+        (
+            "sync_error_issues",
+            "update_error_issue_status",
+            "test_error_tracking_connection",
+            "dispatch_error_fix",
+            "triage_error_issue",
+            "investigate_error_issue",
+            "evaluate_error_triage",
+        ),
+    ),
+    (
         "crate.worker_handlers.ai_configuration",
         "AI_CONFIGURATION_TASK_HANDLERS",
         ("ai_catalog_refresh", "ai_profile_test"),
+    ),
+    (
+        "crate.worker_handlers.smart_mix_refinement",
+        "SMART_MIX_REFINEMENT_TASK_HANDLERS",
+        ("smart_mix_refine_transition", "cleanup_smart_mix_refinements"),
+    ),
+    (
+        "crate.worker_handlers.ai_proposals",
+        "AI_PROPOSAL_TASK_HANDLERS",
+        (
+            "propose_genre_eq",
+            "generate_playlist_description",
+            "propose_genre_taxonomy_node",
+            "refine_music_path",
+            "analyze_artist_hero_candidate",
+        ),
     ),
     (
         "crate.worker_handlers.acquisition",

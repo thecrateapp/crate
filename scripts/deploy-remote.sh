@@ -382,6 +382,36 @@ current_schema_revision() {
     "SELECT version_num FROM alembic_version ORDER BY version_num DESC LIMIT 1"
 }
 
+# docker compose on the staged release candidate with the production environment.
+candidate_compose() {
+  local release_env="$DEPLOY_CANDIDATE_DIR/release.env"
+  CRATE_RELEASE_SHA="$(env_file_value "$release_env" CRATE_RELEASE_SHA)" \
+  CRATE_API_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_API_SENTRY_RELEASE)" \
+  CRATE_READPLANE_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_READPLANE_SENTRY_RELEASE)" \
+  CRATE_WORKER_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_WORKER_SENTRY_RELEASE)" \
+  CRATE_ANALYSIS_WORKER_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_ANALYSIS_WORKER_SENTRY_RELEASE)" \
+  CRATE_PLAYBACK_WORKER_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_PLAYBACK_WORKER_SENTRY_RELEASE)" \
+  CRATE_MEDIA_WORKER_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_MEDIA_WORKER_SENTRY_RELEASE)" \
+  CRATE_API_IMAGE="$(env_file_value "$release_env" CRATE_API_IMAGE)" \
+  CRATE_READPLANE_IMAGE="$(env_file_value "$release_env" CRATE_READPLANE_IMAGE)" \
+  CRATE_WORKER_IMAGE="$(env_file_value "$release_env" CRATE_WORKER_IMAGE)" \
+  CRATE_ANALYSIS_WORKER_IMAGE="$(env_file_value "$release_env" CRATE_ANALYSIS_WORKER_IMAGE)" \
+  CRATE_PLAYBACK_WORKER_IMAGE="$(env_file_value "$release_env" CRATE_PLAYBACK_WORKER_IMAGE)" \
+  CRATE_MEDIA_WORKER_IMAGE="$(env_file_value "$release_env" CRATE_MEDIA_WORKER_IMAGE)" \
+  CRATE_UI_IMAGE="$(env_file_value "$release_env" CRATE_UI_IMAGE)" \
+  CRATE_LISTEN_IMAGE="$(env_file_value "$release_env" CRATE_LISTEN_IMAGE)" \
+  CRATE_SITE_IMAGE="$(env_file_value "$release_env" CRATE_SITE_IMAGE)" \
+  CRATE_DOCS_IMAGE="$(env_file_value "$release_env" CRATE_DOCS_IMAGE)" \
+  CRATE_IMAGE_TAG="$DEPLOY_IMAGE_TAG" \
+  CRATE_IMAGE_OWNER="$DEPLOY_IMAGE_OWNER" \
+  CRATE_IMAGE_REGISTRY="$DEPLOY_IMAGE_REGISTRY" \
+  docker compose \
+    --env-file "$SERVER_PATH/.env" \
+    -f "$DEPLOY_CANDIDATE_DIR/docker-compose.yaml" \
+    -f "$DEPLOY_CANDIDATE_DIR/docker-compose.project.yaml" \
+    "$@"
+}
+
 cmd_release_preflight() {
   local available_kib
   local backup_running
@@ -442,31 +472,11 @@ cmd_release_preflight() {
   fi
 
   log "Validating candidate compose with the production environment"
-  CRATE_RELEASE_SHA="$release_sha" \
-  CRATE_API_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_API_SENTRY_RELEASE)" \
-  CRATE_READPLANE_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_READPLANE_SENTRY_RELEASE)" \
-  CRATE_WORKER_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_WORKER_SENTRY_RELEASE)" \
-  CRATE_ANALYSIS_WORKER_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_ANALYSIS_WORKER_SENTRY_RELEASE)" \
-  CRATE_PLAYBACK_WORKER_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_PLAYBACK_WORKER_SENTRY_RELEASE)" \
-  CRATE_MEDIA_WORKER_SENTRY_RELEASE="$(env_file_value "$release_env" CRATE_MEDIA_WORKER_SENTRY_RELEASE)" \
-  CRATE_API_IMAGE="$(env_file_value "$release_env" CRATE_API_IMAGE)" \
-  CRATE_READPLANE_IMAGE="$(env_file_value "$release_env" CRATE_READPLANE_IMAGE)" \
-  CRATE_WORKER_IMAGE="$(env_file_value "$release_env" CRATE_WORKER_IMAGE)" \
-  CRATE_ANALYSIS_WORKER_IMAGE="$(env_file_value "$release_env" CRATE_ANALYSIS_WORKER_IMAGE)" \
-  CRATE_PLAYBACK_WORKER_IMAGE="$(env_file_value "$release_env" CRATE_PLAYBACK_WORKER_IMAGE)" \
-  CRATE_MEDIA_WORKER_IMAGE="$(env_file_value "$release_env" CRATE_MEDIA_WORKER_IMAGE)" \
-  CRATE_UI_IMAGE="$(env_file_value "$release_env" CRATE_UI_IMAGE)" \
-  CRATE_LISTEN_IMAGE="$(env_file_value "$release_env" CRATE_LISTEN_IMAGE)" \
-  CRATE_SITE_IMAGE="$(env_file_value "$release_env" CRATE_SITE_IMAGE)" \
-  CRATE_DOCS_IMAGE="$(env_file_value "$release_env" CRATE_DOCS_IMAGE)" \
-  CRATE_IMAGE_TAG="$DEPLOY_IMAGE_TAG" \
-  CRATE_IMAGE_OWNER="$DEPLOY_IMAGE_OWNER" \
-  CRATE_IMAGE_REGISTRY="$DEPLOY_IMAGE_REGISTRY" \
-  docker compose \
-    --env-file "$SERVER_PATH/.env" \
-    -f "$DEPLOY_CANDIDATE_DIR/docker-compose.yaml" \
-    -f "$DEPLOY_CANDIDATE_DIR/docker-compose.project.yaml" \
-    config -q
+  candidate_compose config -q
+  log "Checking that every required worker queue has a consumer"
+  test -f "$DEPLOY_CANDIDATE_DIR/worker_queue_contract.py"
+  candidate_compose config --format json \
+    | python3 -I "$DEPLOY_CANDIDATE_DIR/worker_queue_contract.py" -
 
   available_kib="$(df -Pk "$SERVER_PATH" | awk 'NR == 2 {print $4}')"
   if [[ -z "$available_kib" || "$available_kib" -lt "${CRATE_DEPLOY_MIN_FREE_KIB:-10485760}" ]]; then

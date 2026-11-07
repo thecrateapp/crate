@@ -115,3 +115,7 @@ jobs:
         run: |
           pip install pytest
           python -m pytest tests -q
+
+      - name: Packaging tests
+        working-directory: tools/vdj-plugin/packaging
+        run: python -m pytest tests -q

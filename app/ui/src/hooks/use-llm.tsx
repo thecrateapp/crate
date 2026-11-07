@@ -31,6 +31,9 @@ const permissions: Record<string, string> = {
   "playlists.description.generate": "curation.playlists.write",
   "music_paths.refine": "library.view",
   "i18n.listen.draft": "settings.manage",
+  "ops.error.triage": "ops.errors.manage",
+  "ops.error.investigate": "ops.errors.manage",
+  "smart_mix.transition.refine": "smart_mix.ai",
 };
 interface StatusContext {
   statuses: Record<string, ActionLLMStatus | null>;

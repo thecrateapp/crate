@@ -4,6 +4,7 @@ import logging
 import re
 import shutil
 import uuid
+from collections import Counter
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -239,6 +240,57 @@ def _find_existing_copy(
     return None
 
 
+@lru_cache(maxsize=8192)
+def _flac_audio_identity(
+    path: str, _mtime_ns: int, _size: int
+) -> tuple[int, int, int, int, int] | None:
+    from mutagen.flac import FLAC, error as FLACError
+
+    if Path(path).suffix.lower() != ".flac":
+        return None
+    try:
+        info = FLAC(path).info
+        if not info.md5_signature:
+            return None
+        return (
+            info.md5_signature,
+            info.sample_rate,
+            info.bits_per_sample,
+            info.channels,
+            info.total_samples,
+        )
+    except (OSError, ValueError, FLACError):
+        return None
+
+
+def _resequence_candidates(staged: list[Path], target: Path) -> frozenset[Path]:
+    if not target.is_dir():
+        return frozenset()
+    existing = [
+        path
+        for path in target.iterdir()
+        if path.is_file() and path.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
+    ]
+    if not existing or len(staged) <= 2 * len(existing):
+        return frozenset()
+    incoming_titles = Counter(
+        identity[2]
+        for path in staged
+        if (identity := _track_identity(read_tags(path))) is not None
+    )
+    existing_identities = {path: _track_identity(read_tags(path)) for path in existing}
+    existing_titles = Counter(
+        identity[2] for identity in existing_identities.values() if identity
+    )
+    return frozenset(
+        path
+        for path, identity in existing_identities.items()
+        if identity
+        and incoming_titles[identity[2]] == 1
+        and existing_titles[identity[2]] == 1
+    )
+
+
 def _audio_quality_key(path: Path, quality: dict) -> tuple[int, int, int, int]:
     return (
         audio_format_rank(path.suffix),
@@ -276,6 +328,7 @@ def resolve_managed_track_destination(
     album_name: str,
     album_entity_uid: str,
     replace_existing_audio: bool = False,
+    resequence_candidates: frozenset[Path] = frozenset(),
 ) -> ManagedTrackPlacement | None:
     """Decide where ``src`` lands in a managed album without touching the disk.
 
@@ -302,6 +355,27 @@ def resolve_managed_track_destination(
         if identity
         else None
     )
+    if existing is None and identity and resequence_candidates:
+        stat = src.stat()
+        audio_identity = _flac_audio_identity(str(src), stat.st_mtime_ns, stat.st_size)
+        if audio_identity:
+            for candidate in sorted(resequence_candidates):
+                if not candidate.is_file():
+                    continue
+                stat = candidate.stat()
+                old_identity = _cached_track_identity(
+                    str(candidate), stat.st_mtime_ns, stat.st_size
+                )
+                if (
+                    old_identity
+                    and old_identity[2] == identity[2]
+                    and old_identity != identity
+                    and _flac_audio_identity(
+                        str(candidate), stat.st_mtime_ns, stat.st_size
+                    )
+                    == audio_identity
+                ):
+                    return ManagedTrackPlacement(dest=candidate, replaces=candidate)
     if existing is not None:
         new_quality = read_audio_quality(src)
         existing_quality = read_audio_quality(existing)
@@ -389,7 +463,16 @@ def move_album_tree(
         root = Path(library_root) if library_root else target_album_dir.parent.parent
         apply(lambda: target_album_dir.mkdir(parents=True, exist_ok=True))
         album_entity_uid = target_album_dir.name
-        for src in sorted(staged_album_dir.rglob("*")):
+        staged_files = sorted(staged_album_dir.rglob("*"))
+        resequence_candidates = _resequence_candidates(
+            [
+                path
+                for path in staged_files
+                if path.is_file() and path.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
+            ],
+            target_album_dir,
+        )
+        for src in staged_files:
             if not src.is_file():
                 continue
             is_audio = src.suffix.lower() in DEFAULT_AUDIO_EXTENSIONS
@@ -401,6 +484,7 @@ def move_album_tree(
                     album_name=album_name,
                     album_entity_uid=album_entity_uid,
                     replace_existing_audio=replace_existing_audio,
+                    resequence_candidates=resequence_candidates,
                 )
                 if is_audio
                 else None

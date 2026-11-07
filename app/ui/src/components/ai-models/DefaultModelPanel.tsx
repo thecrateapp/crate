@@ -38,6 +38,7 @@ interface AssignmentBody {
 interface Review {
   body: AssignmentBody;
   result: ModelAssignmentResult;
+  provider: string;
   connections: Connection[];
   actions: Action[];
 }
@@ -160,6 +161,7 @@ export function DefaultModelPanel({
           setReview({
             body,
             result,
+            provider: connection.provider,
             connections: limitedConnections(
               snapshot,
               connection,
@@ -236,6 +238,7 @@ export function DefaultModelPanel({
         <AssignmentDialog
           open={dialogOpen}
           modelId={review.body.model_id}
+          provider={review.provider}
           connections={review.connections}
           result={review.result}
           actions={review.actions}

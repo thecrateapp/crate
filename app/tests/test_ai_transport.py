@@ -2,7 +2,7 @@
 
 import pytest
 
-from crate.ai import transport
+from crate.ai import discovery, transport
 from crate.ai.contracts import AIConfigurationError, ProfileConfig
 
 
@@ -122,6 +122,136 @@ def test_native_thinking_and_no_reasoning_text(provider, monkeypatch):
         assert body["options"]["num_predict"] == 2048
 
 
+# What each provider answers when the output limit stops it, reasoning included.
+TRUNCATED = {
+    "gemini": {
+        "candidates": [
+            {
+                "finishReason": "MAX_TOKENS",
+                "content": {"parts": [{"text": '{"classification": "bu'}]},
+            }
+        ],
+        "usageMetadata": {
+            "promptTokenCount": 3000,
+            "candidatesTokenCount": 80,
+            "thoughtsTokenCount": 1968,
+            "totalTokenCount": 5048,
+        },
+    },
+    "deepseek": {
+        "choices": [
+            {
+                "finish_reason": "length",
+                "message": {"content": '{"classification": "bu'},
+            }
+        ],
+        "usage": {"prompt_tokens": 3000, "completion_tokens": 2048},
+    },
+    "ollama": {
+        "message": {"content": '{"classification": "bu'},
+        "done_reason": "length",
+        "prompt_eval_count": 3000,
+        "eval_count": 2048,
+    },
+}
+
+
+@pytest.mark.parametrize("provider", ["gemini", "deepseek", "ollama"])
+def test_a_stop_at_the_output_limit_is_reported(provider, monkeypatch):
+    monkeypatch.setattr(
+        transport, "_request_json", lambda **kwargs: TRUNCATED[provider]
+    )
+
+    result = transport.generate(
+        context(provider), api_key="key", prompt="synthetic", response_schema={}
+    )
+
+    assert result.truncated is True
+    assert result.text == '{"classification": "bu'
+    # The usage of the cut-off call is still recorded.
+    assert result.usage is not None and result.usage["input_tokens"] == 3000
+
+
+@pytest.mark.parametrize(
+    "provider,reason",
+    [
+        ("gemini", {"finishReason": "STOP"}),
+        ("deepseek", {"finish_reason": "stop"}),
+        ("ollama", {"done_reason": "stop"}),
+    ],
+)
+def test_a_complete_answer_is_not_truncated(provider, reason, monkeypatch):
+    if provider == "gemini":
+        data = {"candidates": [{"content": {"parts": [{"text": "{}"}]}, **reason}]}
+    elif provider == "deepseek":
+        data = {"choices": [{"message": {"content": "{}"}, **reason}]}
+    else:
+        data = {"message": {"content": "{}"}, **reason}
+    monkeypatch.setattr(transport, "_request_json", lambda **kwargs: data)
+
+    result = transport.generate(
+        context(provider), api_key="key", prompt="synthetic", response_schema={}
+    )
+
+    assert (result.text, result.truncated) == ("{}", False)
+
+
+@pytest.mark.parametrize(
+    "provider,data,expected",
+    [
+        ("gemini", {"candidates": [{"finishReason": "MAX_TOKENS"}]}, True),
+        ("deepseek", {"choices": [{"finish_reason": "length"}]}, True),
+        # OpenAI-compatible endpoints answer like DeepSeek, not like Ollama.
+        ("openai_compatible", {"choices": [{"finish_reason": "length"}]}, True),
+        ("openai_compatible", {"choices": [{"finish_reason": "stop"}]}, False),
+        ("ollama", {"done_reason": "length"}, True),
+        ("ollama", {"done_reason": "stop"}, False),
+    ],
+)
+def test_output_limit_stop_is_read_in_each_provider_format(provider, data, expected):
+    assert transport.hit_output_limit(provider, data) is expected
+
+
+def test_reasoning_can_spend_the_whole_output_limit(monkeypatch):
+    def request(**kwargs):
+        return {
+            "candidates": [
+                {"finishReason": "MAX_TOKENS", "content": {"role": "model"}}
+            ],
+            "usageMetadata": {
+                "promptTokenCount": 3000,
+                "thoughtsTokenCount": 2048,
+                "candidatesTokenCount": 0,
+            },
+        }
+
+    monkeypatch.setattr(transport, "_request_json", request)
+    result = transport.generate(
+        context(), api_key="key", prompt="synthetic", response_schema={}
+    )
+
+    assert (result.text, result.truncated) == ("", True)
+    assert result.usage["thought_tokens"] == 2048
+
+    deepseek = {"choices": [{"finish_reason": "length", "message": {"content": None}}]}
+    monkeypatch.setattr(transport, "_request_json", lambda **kwargs: deepseek)
+    result = transport.generate(
+        context("deepseek"), api_key="key", prompt="synthetic", response_schema={}
+    )
+    assert (result.text, result.truncated) == ("", True)
+
+
+def test_a_missing_answer_without_a_limit_stop_still_fails(monkeypatch):
+    data = {"candidates": [{"finishReason": "SAFETY", "content": {"role": "model"}}]}
+    monkeypatch.setattr(transport, "_request_json", lambda **kwargs: data)
+
+    with pytest.raises(AIConfigurationError) as error:
+        transport.generate(
+            context(), api_key="key", prompt="synthetic", response_schema={}
+        )
+    assert error.value.code == "AI_PROVIDER_FAILED"
+
+
 def test_invalid_native_budget_never_calls(monkeypatch):
     monkeypatch.setattr(
         transport, "_request_json", lambda **kwargs: pytest.fail("request")
@@ -170,7 +300,7 @@ def test_http_pins_dns_host_sni_and_keys_are_request_local(monkeypatch):
 
     monkeypatch.setattr(transport.httpx, "Client", client)
     monkeypatch.setattr(
-        transport.socket,
+        discovery.socket,
         "getaddrinfo",
         lambda *args, **kwargs: [(2, 1, 6, "", ("10.0.0.5", 11434))],
     )
@@ -494,3 +624,67 @@ def test_unsupported_legacy_uses_explicit_key_and_no_retries(monkeypatch):
     )
     assert calls[0]["num_retries"] == 0
     assert "timeout" not in calls[0] and "max_tokens" not in calls[0]
+
+
+def _legacy_packet(provider="gemini"):
+    return {
+        "api_key": "pinned-key",
+        "timeout_seconds": 300,
+        "body": {
+            "context": {
+                "mode": "legacy",
+                "provider": provider,
+                "legacy_model": provider + "/pinned-model",
+                "model_id": "pinned-model",
+                "endpoint": None,
+                "legacy_options": {
+                    "timeout_seconds": None,
+                    "max_tokens": 2048,
+                    "image_detail": "default",
+                },
+            },
+            "prompt": "synthetic",
+            "system": "",
+            "schema": {"type": "object"},
+            "image": None,
+            "media_type": None,
+        },
+    }
+
+
+def test_legacy_answer_cut_off_at_the_limit_is_named(monkeypatch):
+    from crate.llm import provider as old
+
+    monkeypatch.setattr(old, "_get_model", lambda: pytest.fail("global model"))
+    monkeypatch.setattr(
+        transport, "_http_json", lambda *args, **kwargs: TRUNCATED["gemini"]
+    )
+
+    with pytest.raises(AIConfigurationError) as error:
+        transport._legacy_response(_legacy_packet())
+    assert error.value.code == transport.OUTPUT_LIMIT_CODE
+    # The child process passes the code to the parent instead of a generic failure.
+    assert transport.OUTPUT_LIMIT_CODE in transport._CODES
+
+
+def test_legacy_response_carries_the_truncation_flag(monkeypatch):
+    stopped = {
+        "candidates": [
+            {"finishReason": "MAX_TOKENS", "content": {"parts": [{"text": "{}"}]}}
+        ]
+    }
+    monkeypatch.setattr(transport, "_http_json", lambda *args, **kwargs: stopped)
+    assert transport._legacy_response(_legacy_packet())["truncated"] is True
+
+    monkeypatch.setattr(
+        transport,
+        "_request_json",
+        lambda **kwargs: {"text": "{}", "usage": None, "truncated": True},
+    )
+    result = transport.generate_legacy(
+        {"mode": "legacy", "provider": "gemini", "legacy_deadline_seconds": 30.0},
+        api_key="key",
+        prompt="synthetic",
+        response_schema={},
+    )
+    assert result.truncated is True

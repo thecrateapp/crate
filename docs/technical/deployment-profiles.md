@@ -14,6 +14,8 @@ sources:
     docker-compose.yaml,
     docker-compose.project.yaml,
     scripts/deploy.sh,
+    scripts/deploy-remote.sh,
+    scripts/worker_queue_contract.py,
   ]
 ---
 
@@ -89,10 +91,43 @@ Before any non-development deployment:
 
 1. Back up PostgreSQL and the deployment `.env`.
 2. Check `docker compose config -q` with the exact compose/profile files.
-3. Confirm music mount ownership, free disk, required secrets and release digests.
-4. Record the previous release manifest and migration state.
+3. Check that the AI queues have a consumer (below).
+4. Confirm music mount ownership, free disk, required secrets and release digests.
+5. Record the previous release manifest and migration state.
 
 After startup, check container health, API status, readplane readiness,
 projector progress, worker queues and an authenticated Admin/Listen request.
+
+### AI queue consumers
+
+Every call to an AI provider runs as a task on the `ai` or `ai_bulk` queue (see
+[Where model calls run](ai-agents.md#where-model-calls-run)). A task sent to a
+queue that no worker consumes stays pending for good, which would silently stop
+every proposal, draft and extraction. Only `crate-worker` consumes these queues:
+its command is `worker --queues default,fast,ai,ai_bulk` in
+`docker-compose.yaml` (`default,ai,ai_bulk` in the home profile), and it starts
+one Dramatiq pool for the general queues and one per AI lane. An overlay that
+replaces that command must keep both lanes.
+
+`make deploy-preflight VERSION=<sha>` and `make deploy` check this twice. The
+local preflight renders the candidate Compose files
+(`docker compose config --format json`) and pipes the result into
+`scripts/worker_queue_contract.py`; `DEPLOY_SKIP_LOCAL_COMPOSE_CHECK=1` skips
+this local step together with the local `config -q`. The remote release
+preflight renders the candidate with the production environment and runs the
+same script, staged next to the candidate files. The script reads
+`--queues X` and `--queues=X` in list or string commands, ignores services that
+start no container by default (`scale: 0`, `deploy.replicas: 0` or an opt-in
+profile), and exits non-zero when `ai` or `ai_bulk` has no consumer. On success
+it prints the consumer of each lane, for example
+`Queue ai consumed by crate-worker`.
+
+After the deploy, the Admin Tasks page lists `ai` and `ai_bulk` with their
+running and pending tasks and the age of their oldest pending task. The
+operator overlay's worker readiness requires the same queues
+(`CRATE_READINESS_QUEUES=default,fast,ai,ai_bulk`). `crate-worker` has
+`stop_grace_period: 2m`, so recreating it during a deploy waits up to two
+minutes for in-flight AI calls to finish. Thread counts and memory are sized in
+[Smart Mix operations](smart-mix-operations.md#ai-worker-lanes-and-sizing).
 For federation-enabled changes also run the relevant harness acceptance gate;
 see [Federation production acceptance](federation-production-acceptance.md).

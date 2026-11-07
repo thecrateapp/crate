@@ -12,6 +12,7 @@ import (
 
 	"github.com/thecrateapp/crate/app/installer/internal/assets"
 	"github.com/thecrateapp/crate/app/installer/internal/envfile"
+	"github.com/thecrateapp/crate/app/installer/internal/observability"
 )
 
 type Mode string
@@ -104,8 +105,15 @@ func Active(values *envfile.Values) Mode {
 }
 
 // Activate points the settings at mode: its compose profile and, for Crate
-// Operator, its overlay.
+// Operator, its overlay. Active monitoring overlays stay after it, with the
+// supervisor one only while Crate Operator runs.
 func Activate(values *envfile.Values, mode Mode) {
+	monitoring := observability.Active(values)
+	defer func() {
+		if monitoring {
+			observability.Activate(values)
+		}
+	}()
 	list := slices.DeleteFunc(profileList(values), func(p string) bool {
 		return p == profiles[Agent].Compose || p == profiles[Operator].Compose
 	})

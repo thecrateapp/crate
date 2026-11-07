@@ -133,8 +133,19 @@ def test_crate_migration_follows_the_current_main_head() -> None:
     assert scripts.get_revision("139").down_revision == "138"
     assert scripts.get_revision("140").down_revision == "139"
     assert scripts.get_revision("141").down_revision == "140"
-    assert scripts.get_heads() == ["142"]
     assert scripts.get_revision("142").down_revision == "141"
+    assert scripts.get_revision("143").down_revision == "142"
+    assert scripts.get_revision("144").down_revision == "143"
+    assert scripts.get_revision("145").down_revision == "144"
+    assert scripts.get_revision("146").down_revision == "145"
+    assert scripts.get_revision("147").down_revision == "146"
+    assert scripts.get_revision("148").down_revision == "147"
+    assert scripts.get_revision("149").down_revision == "148"
+    assert scripts.get_revision("150").down_revision == "149"
+    assert scripts.get_revision("151").down_revision == "150"
+    assert scripts.get_revision("152").down_revision == "151"
+    assert scripts.get_revision("153").down_revision == "152"
+    assert scripts.get_heads() == ["153"]
 
 
 def test_metric_minute_migration_uses_immutable_schema_definition(monkeypatch):
@@ -240,6 +251,113 @@ def test_deployed_revisions_keep_their_numbers_ahead_of_branch_revisions() -> No
 
     for revision, stem in expected.items():
         assert Path(scripts.get_revision(revision).path).stem == stem
+
+
+def test_error_inbox_migration_uses_immutable_schema_definition(monkeypatch):
+    migration = import_module("crate.db.migrations.versions.143_error_inbox")
+    schema = import_module("crate.db.schema_sections.error_inbox_v143")
+    migration_executor = RecordingExecutor()
+    schema_executor = RecordingExecutor()
+    monkeypatch.setattr(migration, "op", migration_executor)
+
+    migration.upgrade()
+    schema.create_error_inbox_v143_schema(schema_executor)
+
+    assert migration_executor.statements == schema_executor.statements
+    statements = "\n".join(migration_executor.statements)
+    assert "CREATE TABLE IF NOT EXISTS error_issues" in statements
+    assert "UNIQUE (provider, external_id)" in statements
+    assert "CREATE TABLE IF NOT EXISTS error_issue_triage" in statements
+    assert "REFERENCES error_issues(id) ON DELETE CASCADE" in statements
+    assert "UNIQUE (issue_id, kind, digest_hash)" in statements
+    # Soft link: migration 130 owns ai_invocations and must stay reversible on its own.
+    assert "REFERENCES ai_invocations" not in statements
+    for index in (
+        "idx_error_issues_status_score",
+        "idx_error_issues_group_key",
+        "idx_error_issues_last_seen",
+    ):
+        assert f"CREATE INDEX IF NOT EXISTS {index}" in statements
+
+    downgrade = RecordingExecutor()
+    monkeypatch.setattr(migration, "op", downgrade)
+    migration.downgrade()
+    assert downgrade.statements == [
+        "DROP TABLE IF EXISTS error_issue_triage",
+        "DROP TABLE IF EXISTS error_issues",
+    ]
+
+
+def test_error_inbox_grant_migration_uses_immutable_schema_definition(monkeypatch):
+    migration = import_module(
+        "crate.db.migrations.versions.144_error_inbox_agent_grant"
+    )
+    schema = import_module("crate.db.schema_sections.error_inbox_grant_v144")
+    migration_executor = RecordingExecutor()
+    schema_executor = RecordingExecutor()
+    monkeypatch.setattr(migration, "op", migration_executor)
+
+    migration.upgrade()
+    schema.create_error_inbox_grant_v144_schema(schema_executor)
+
+    assert migration_executor.statements == schema_executor.statements
+    added = migration_executor.statements[-1]
+    assert "ADD CONSTRAINT agent_principals_grants_check" in added
+    assert "'ops.errors.read'" in added
+    assert "'library.acquisition.write'" in added
+
+    downgrade = RecordingExecutor()
+    monkeypatch.setattr(migration, "op", downgrade)
+    migration.downgrade()
+    assert "'ops.errors.read'" not in downgrade.statements[-1]
+    assert "'library.acquisition.write'" in downgrade.statements[-1]
+
+
+def test_error_inbox_grant_check_matches_the_allowed_grants() -> None:
+    import re
+
+    from crate.agent_access import ALLOWED_GRANTS
+    from crate.db.schema_sections.error_inbox_grant_v144 import V144_GRANTS
+
+    assert set(re.findall(r"'([^']+)'", V144_GRANTS)) == set(ALLOWED_GRANTS)
+
+
+def test_error_inbox_tables_are_part_of_the_bootstrap_schema() -> None:
+    source = (
+        Path(__file__).resolve().parents[1] / "crate/db/schema_bootstrap.py"
+    ).read_text()
+
+    assert "create_error_inbox_v143_schema(cur)" in source
+    assert "create_error_inbox_grant_v144_schema(cur)" in source
+    assert "create_error_inbox_auto_triage_v146_schema(cur)" in source
+
+
+def test_error_inbox_auto_triage_migration_uses_immutable_schema_definition(
+    monkeypatch,
+):
+    migration = import_module(
+        "crate.db.migrations.versions.146_error_inbox_auto_triage"
+    )
+    schema = import_module("crate.db.schema_sections.error_inbox_auto_triage_v146")
+    migration_executor = RecordingExecutor()
+    schema_executor = RecordingExecutor()
+    monkeypatch.setattr(migration, "op", migration_executor)
+
+    migration.upgrade()
+    schema.create_error_inbox_auto_triage_v146_schema(schema_executor)
+
+    assert migration_executor.statements == schema_executor.statements
+    statements = "\n".join(migration_executor.statements)
+    assert "ADD COLUMN IF NOT EXISTS auto_triage_hash TEXT" in statements
+    assert "ADD COLUMN IF NOT EXISTS auto_triage_at TIMESTAMPTZ" in statements
+
+    downgrade = RecordingExecutor()
+    monkeypatch.setattr(migration, "op", downgrade)
+    migration.downgrade()
+    assert downgrade.statements == [
+        "ALTER TABLE error_issues DROP COLUMN IF EXISTS auto_triage_at",
+        "ALTER TABLE error_issues DROP COLUMN IF EXISTS auto_triage_hash",
+    ]
 
 
 def test_crate_bootstrap_includes_presentation_settings() -> None:

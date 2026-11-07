@@ -21,7 +21,11 @@ func main() {
 		if err != nil {
 			fail(err)
 		}
-		if err := os.WriteFile(filepath.Join(target, name), data, 0o644); err != nil {
+		path := filepath.Join(target, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			fail(err)
+		}
+		if err := os.WriteFile(path, data, 0o644); err != nil {
 			fail(err)
 		}
 	}

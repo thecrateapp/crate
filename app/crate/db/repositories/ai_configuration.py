@@ -115,8 +115,14 @@ _CONNECTION_FIELDS = frozenset(
         "max_concurrent",
         "daily_calls",
         "daily_tokens",
+        "template",
+        "path_prefix",
+        "model_manifest",
     }
 )
+_JSON_FIELDS = frozenset({"model_manifest"})
+# Changing where requests go or which models exist invalidates the cached catalog.
+_CATALOG_FIELDS = frozenset({"endpoint", "path_prefix", "model_manifest"})
 
 
 def _connection_data(data):
@@ -124,7 +130,14 @@ def _connection_data(data):
         raise AIConfigurationError(
             "AI_CONFIGURATION_INVALID", "Invalid connection fields"
         )
-    return dict(data)
+    return {
+        key: json.dumps(value) if key in _JSON_FIELDS else value
+        for key, value in data.items()
+    }
+
+
+def _placeholder(key):
+    return f"CAST(:{key} AS jsonb)" if key in _JSON_FIELDS else f":{key}"
 
 
 def create_connection(data, actor_id, *, session=None) -> dict:
@@ -135,7 +148,7 @@ def create_connection(data, actor_id, *, session=None) -> dict:
         row = (
             s.execute(
                 text(
-                    f"INSERT INTO ai_provider_connections({','.join(fields)}) VALUES({','.join(':' + k for k in fields)}) RETURNING *"
+                    f"INSERT INTO ai_provider_connections({','.join(fields)}) VALUES({','.join(_placeholder(k) for k in fields)}) RETURNING *"
                 ),
                 values,
             )
@@ -148,8 +161,8 @@ def create_connection(data, actor_id, *, session=None) -> dict:
 
 def update_connection(id, data, expected_revision, actor_id, *, session=None) -> dict:
     values = _connection_data(data)
-    assignments = ",".join(f"{key}=:{key}" for key in sorted(values))
-    if "endpoint" in values:
+    assignments = ",".join(f"{key}={_placeholder(key)}" for key in sorted(values))
+    if _CATALOG_FIELDS & set(values):
         assignments += ",model_catalog='[]'::jsonb,catalog_status='pending',catalog_error_code=NULL,catalog_updated_at=NULL"
     with optional_scope(session) as s:
         row = (
@@ -513,7 +526,7 @@ def configuration_snapshot(*, bounded=False, session=None) -> dict:
                 _json(r)
                 for r in s.execute(
                     text(
-                        "SELECT id,label,provider,revision,secret_source,endpoint,enabled,catalog_status,catalog_error_code,catalog_updated_at,max_concurrent,daily_calls,daily_tokens,(secret_ref IS NOT NULL) AS has_secret,jsonb_array_length(model_catalog) AS model_count FROM ai_provider_connections ORDER BY created_at,id LIMIT 1001"
+                        "SELECT id,label,provider,revision,secret_source,endpoint,template,path_prefix,enabled,catalog_status,catalog_error_code,catalog_updated_at,max_concurrent,daily_calls,daily_tokens,(secret_ref IS NOT NULL) AS has_secret,jsonb_array_length(model_catalog) AS model_count FROM ai_provider_connections ORDER BY created_at,id LIMIT 1001"
                     )
                 ).mappings()
             ],
@@ -579,6 +592,34 @@ def swap_connection_credential(
             )
             if row["secret_ref"]:
                 revoke_secret(row["secret_ref"], session=s)
+            return result
+
+
+def move_connection_origin(id, data, expected_revision, actor_id, *, session=None):
+    """Update a connection's destination and revoke its stored key atomically.
+
+    A key is bound to the server it was entered for: a new origin starts keyless,
+    so changing where requests go can never send an existing key elsewhere.
+    """
+    from crate.credentials import revoke_secret
+
+    with optional_scope(session) as s:
+        with s.begin_nested():
+            previous = s.execute(
+                text(
+                    "SELECT secret_ref FROM ai_provider_connections WHERE id=:id FOR UPDATE"
+                ),
+                {"id": id},
+            ).scalar_one_or_none()
+            result = update_connection(
+                id,
+                {**data, "secret_ref": None, "secret_source": "none"},
+                expected_revision,
+                actor_id,
+                session=s,
+            )
+            if previous:
+                revoke_secret(previous, session=s)
             return result
 
 

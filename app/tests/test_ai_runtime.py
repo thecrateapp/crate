@@ -147,6 +147,38 @@ def test_invalid_response_is_private_and_finalizes_unknown(
     assert admitted[-1][0][2] == "failed"
 
 
+def test_an_answer_cut_off_at_the_output_limit_is_named(monkeypatch, admitted):
+    usage = {"input_tokens": 3000, "output_tokens": 80, "thought_tokens": 1968}
+    monkeypatch.setattr(
+        runtime.transport,
+        "generate",
+        lambda *args, **kwargs: NativeResponse('{"ok": tr', usage, "m", 2, True),
+    )
+
+    with pytest.raises(AIConfigurationError) as error:
+        runtime.execute_structured(
+            "genres.eq.propose", Answer, "prompt", context=context()
+        )
+
+    assert error.value.code == "AI_OUTPUT_LIMIT"
+    (invocation, recorded, status), options = admitted[-1]
+    assert (invocation, recorded, status) == ("invocation", usage, "failed")
+    assert options["error_code"] == "AI_OUTPUT_LIMIT"
+
+
+def test_a_complete_answer_at_the_output_limit_is_kept(monkeypatch, admitted):
+    monkeypatch.setattr(
+        runtime.transport,
+        "generate",
+        lambda *args, **kwargs: NativeResponse('{"ok":true}', None, "m", 2, True),
+    )
+
+    assert runtime.execute_structured(
+        "genres.eq.propose", Answer, "prompt", context=context()
+    ).ok
+    assert admitted[-1][0][2] == "succeeded"
+
+
 def test_probe_exact_profile_one_call_without_admission(monkeypatch):
     calls = []
     monkeypatch.setattr(
@@ -334,6 +366,7 @@ def test_real_admission_probe_and_action_charge_and_replay(pg_db, monkeypatch):
         )
     assert error.value.code == "AI_EXECUTION_ALREADY_ACCEPTED" and len(calls) == 1
     row = runtime.usage.list_invocations({})["items"][0]
+    assert answer._ai_invocation_id == str(row["id"])
     assert row["charged_tokens"] == 32 and row["usage_known"]
     assert "synthetic" not in str(row) and "actual-model" == row["reported_model"]
     probe = runtime.configuration.resolve_profile(profile["id"], 1)

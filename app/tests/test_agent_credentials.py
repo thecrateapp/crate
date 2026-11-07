@@ -134,6 +134,7 @@ def test_action_grants_are_explicit_and_do_not_expand_existing_diagnostic_grants
         "ops.jobs.manage_instance",
         "ops.schedules.read",
         "ops.runtime.read",
+        "ops.errors.read",
         "editorial.read",
         "editorial.write",
         "editorial.publish",

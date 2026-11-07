@@ -37,7 +37,8 @@ services:
     cpus: "0.5"
 
   crate-worker:
-    mem_limit: 2g
+    # Measured: the ai/ai_bulk pools add ~0.7 GB at peak (docs: smart-mix-operations).
+    mem_limit: 2816m
     mem_reservation: 768m
     cpus: "1.5"
 
@@ -46,10 +47,16 @@ services:
     mem_reservation: 512m
     cpus: "1.0"
 
+  # Runs ANALYSIS_WORKER_PROCESSES=8 for the Smart Mix backfill night window
+  # (8 analyses at night, 4 by day). Seven CPUs leave one logical CPU for
+  # Postgres and the API at night; by day the window keeps the backfill at
+  # four and the resource governor protects listeners. 14g gives each process
+  # the 1.5 GB at which it recycles itself, plus the parent with the import
+  # analysis daemons.
   crate-analysis-worker:
-    mem_limit: 4g
-    mem_reservation: 1g
-    cpus: "4.0"
+    mem_limit: 14g
+    mem_reservation: 2g
+    cpus: "7.0"
 
   crate-playback-worker:
     mem_limit: 2g

@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel
 
-from crate.ai import configuration, transport
+from crate.ai import configuration, guard, requeue, transport
 from crate.ai.actions import get_action
 from crate.ai.contracts import AIConfigurationError, ProfileConfig
 from crate.ai.consumers import require_action_authority
@@ -79,7 +79,7 @@ def _parse(text):
     return json.loads(cleaned.strip())
 
 
-def execute_probe(context, *, api_key, prompt, response_schema):
+def execute_probe(context, *, api_key, prompt, response_schema, max_seconds=None):
     """One exact-profile synthetic call. Operations owns its reservation/finish."""
     config = ProfileConfig.model_validate(context["config"])
     if (
@@ -94,6 +94,7 @@ def execute_probe(context, *, api_key, prompt, response_schema):
         api_key=api_key,
         prompt=prompt,
         response_schema=response_schema,
+        **({} if max_seconds is None else {"max_seconds": max_seconds}),
     )
     try:
         data = _parse(result.text)
@@ -107,6 +108,13 @@ def execute_probe(context, *, api_key, prompt, response_schema):
         "usage": result.usage,
         "reported_model": result.reported_model,
     }
+
+
+def estimated_input_tokens(prompt: str, system: str, schema: dict) -> int:
+    """Upper bound of a text call's input: one token per byte plus 1,024 for the
+    provider's framing. Above the profile's `max_input_tokens` the call is refused
+    with AI_INPUT_TOO_LARGE before anything is reserved or sent."""
+    return len((prompt + system + json.dumps(schema)).encode()) + 1024
 
 
 def execute_structured(
@@ -129,6 +137,7 @@ def execute_structured(
     server-owned context plus stable job/idempotency identity at execution. No raw
     result is saved in activity; repeat claims fail instead of paying twice.
     """
+    guard.require_ai_task("execute_structured", action_id)
     action = get_action(action_id)
     pinned = deepcopy(
         context
@@ -171,7 +180,7 @@ def execute_structured(
                 "AI_PROFILE_INCOMPATIBLE", "Profile exceeds action bounds"
             )
         input_tokens, output_tokens = config.max_input_tokens, config.max_output_tokens
-        estimated_input = len((prompt + system + json.dumps(schema)).encode()) + 1024
+        estimated_input = estimated_input_tokens(prompt, system, schema)
         if action.input == "image":
             from io import BytesIO
             from PIL import Image
@@ -220,13 +229,19 @@ def execute_structured(
     admitted["schema_fingerprint"] = _hash(schema)
     admitted["config_fingerprint"] = context_fingerprint(admitted)
     key = idempotency_key or (f"job:{job_id}:{action_id}" if job_id else str(uuid4()))
-    invocation = usage.reserve_invocation(
-        admitted,
-        idempotency_key=f"action:{actor_id}:{key}",
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        actor_id=actor_id,
-        job_id=job_id,
+    # Inside an AI-lane task, never reserve a call the task cannot finish.
+    requeue.require_call_budget()
+    # A concurrency refusal transmits nothing; AI-lane tasks wait for capacity.
+    invocation = requeue.reserve_with_capacity_wait(
+        lambda: usage.reserve_invocation(
+            admitted,
+            idempotency_key=f"action:{actor_id}:{key}",
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            actor_id=actor_id,
+            job_id=job_id,
+            **requeue.reservation_options(),
+        )
     )
     if not invocation["claimed"]:
         raise AIConfigurationError(
@@ -238,6 +253,9 @@ def execute_structured(
         # Close the acceptance-to-network race; the loaded key remains pinned in memory.
         configuration.revalidate_context(pinned)
         require_action_authority(action_id, actor_id)
+        # The transport kills the call at this bound, so it ends before the task.
+        budget = requeue.require_call_budget()
+        bounded = {} if budget is None else {"max_seconds": budget}
         call = transport.generate_legacy if legacy else transport.generate
         result = call(
             pinned,
@@ -247,6 +265,7 @@ def execute_structured(
             response_schema=schema,
             image=image,
             media_type=media_type,
+            **bounded,
         )
         try:
             data = _parse(result.text)
@@ -268,14 +287,22 @@ def execute_structured(
                         flat[key] = next(iter(item.values()))
                 value = response_model.model_validate(flat)
         except Exception:
+            if result.truncated:
+                # Not a malformed answer: the profile's output limit cut it off.
+                raise AIConfigurationError(
+                    transport.OUTPUT_LIMIT_CODE,
+                    "The answer reached the profile's output limit before it ended",
+                ) from None
             raise AIConfigurationError(
                 "AI_RESPONSE_INVALID", "Provider returned invalid structured data"
             ) from None
         require_action_authority(action_id, actor_id)
-        # Domain services can stamp the actual model without rereading global config.
+        # Domain services can stamp the actual model without rereading global config,
+        # and link a stored result to its invocation record.
         object.__setattr__(
             value, "_ai_model_id", result.reported_model or pinned["model_id"]
         )
+        object.__setattr__(value, "_ai_invocation_id", str(invocation["id"]))
         status, code = "succeeded", None
         return value
     except AIConfigurationError as error:

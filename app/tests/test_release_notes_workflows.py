@@ -9,6 +9,7 @@ RELEASE_STEPS = {
     "build-android.yml": "Attach signed Android artifacts to GitHub Release",
     "build-desktop.yml": "Attach desktop artifacts to GitHub Release",
     "build-installer.yml": "Attach the installer to the GitHub Release",
+    "vdj-plugin-release.yml": "Publish the VirtualDJ plugin release",
 }
 BODY_PATH = "docs/releases/${{ github.ref_name }}.md"
 

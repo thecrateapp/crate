@@ -359,7 +359,7 @@ describe("Tasks operational controls", () => {
     await user.hover(restartWorker);
     expect(
       await screen.findByRole("tooltip", {
-        name: "Restarts crate-worker: default and fast queues plus its service loop.",
+        name: "Restarts crate-worker: default and fast queues, the ai and ai_bulk pools and its service loop.",
       }),
     ).toBeVisible();
     expect(apiMock).not.toHaveBeenCalledWith(

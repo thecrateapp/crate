@@ -30,7 +30,15 @@ def test_task_handler_registry_imports_modules_lazily():
     assert "crate.worker_handlers.analysis" not in sys.modules
 
 
-def test_actor_treats_handler_error_result_as_failed(monkeypatch):
+@pytest.mark.parametrize(
+    "result, reported",
+    [
+        ({"error": "boom"}, True),
+        # A failure the handler marks expected stays failed but is not reported.
+        ({"status": "failed", "error": "boom", "expected": True}, False),
+    ],
+)
+def test_actor_treats_handler_error_result_as_failed(monkeypatch, result, reported):
     from crate import actors
     from crate.worker import TASK_HANDLERS
 
@@ -84,7 +92,7 @@ def test_actor_treats_handler_error_result_as_failed(monkeypatch):
         raising=False,
     )
     monkeypatch.setitem(
-        TASK_HANDLERS, "scan", lambda task_id, params, config: {"error": "boom"}
+        TASK_HANDLERS, "scan", lambda task_id, params, config: dict(result)
     )
 
     actors._execute_task("scan", "child-task")
@@ -94,7 +102,7 @@ def test_actor_treats_handler_error_result_as_failed(monkeypatch):
         for update in updates
     )
     assert fan_in == [("parent-task", "scan", "child-task")]
-    assert captured == [
+    expected_capture = [
         {
             "task_type": "scan",
             "task_id": "child-task",
@@ -104,6 +112,7 @@ def test_actor_treats_handler_error_result_as_failed(monkeypatch):
             "max_retries": 0,
         }
     ]
+    assert captured == (expected_capture if reported else [])
 
 
 def test_actor_treats_conflict_result_as_failed(monkeypatch):
@@ -363,3 +372,23 @@ def test_actor_reports_timeout_before_dramatiq_retry(monkeypatch):
             "max_retries": 2,
         }
     ]
+
+
+def test_error_inbox_tasks_have_handler_pool_and_registry():
+    from crate.actors import TASK_POOL_CONFIG, TaskPoolConfig
+    from crate.task_registry import TASK_TYPES
+    from crate.worker import TASK_HANDLERS
+
+    expected = {
+        # Scheduled, deferrable; Sentry calls with external effects never retry.
+        "sync_error_issues": TaskPoolConfig("maintenance", 1, 120, 0),
+        # A person waits for these.
+        "update_error_issue_status": TaskPoolConfig("fast", 0, 30, 0),
+        "test_error_tracking_connection": TaskPoolConfig("fast", 0, 30, 0),
+        # One GitHub workflow_dispatch; never retried, or a run could start twice.
+        "dispatch_error_fix": TaskPoolConfig("fast", 0, 30, 0),
+    }
+    for task_type, pool in expected.items():
+        assert TASK_POOL_CONFIG[task_type] == pool
+        assert callable(TASK_HANDLERS[task_type])
+        assert task_type in TASK_TYPES

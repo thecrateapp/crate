@@ -100,17 +100,18 @@ def test_bio_provenance_uses_result_model_without_rereading_global(monkeypatch):
 
 def test_hero_routes_its_action_and_keeps_default_image_detail(monkeypatch):
     from crate import artist_hero_candidates as hero
-    from tests.ai_consumer_fakes import pin_actions
 
-    pin_actions(monkeypatch)
     calls = []
     monkeypatch.setattr(
         hero,
         "ask_image_structured",
         lambda *a, **k: calls.append(k) or SimpleNamespace(),
     )
-    assert hero.analyze_candidate_image(b"image") is not None
+    call = {"context": {"private": "pinned"}, "actor_id": 7, "job_id": "job"}
+    assert hero.analyze_candidate_image(b"image", ai_call=call) is not None
     assert calls[0]["action_id"] == "artwork.hero.analyze"
+    assert calls[0]["context"] is call["context"]
+    assert calls[0]["job_id"] == "job"
     assert calls[0].get("image_detail", "default") == "default"
     assert calls[0]["private_response"] is True
 
@@ -317,12 +318,17 @@ def test_configuration_revoked_after_generation_blocks_application(
         return result
 
     if operation == "eq":
-        from crate.api import genres as api
+        # SMQ.PR2: the proposal and its apply run in the worker.
+        from crate.ai.consumers import accept_action
+        from crate.db.repositories.genres_taxonomy_nodes import (
+            upsert_genre_taxonomy_node,
+        )
+        from crate.worker_handlers import ai_proposals
 
-        monkeypatch.setattr(api, "_require_genre_curator", lambda _: domain_actor)
-        monkeypatch.setattr(api, "get_genre_taxonomy_node_id", lambda _: 1)
-        monkeypatch.setattr(api, "get_genre_detail", lambda _: {})
-        monkeypatch.setattr(api, "set_genre_eq_gains", lambda *a, **k: writes.append(k))
+        upsert_genre_taxonomy_node("rock", name="Rock")
+        monkeypatch.setattr(
+            ai_proposals, "set_genre_eq_gains", lambda *a, **k: writes.append(k)
+        )
         monkeypatch.setattr(
             "crate.llm.prompts.eq_preset.generate_eq_preset",
             lambda **k: generated(
@@ -330,16 +336,26 @@ def test_configuration_revoked_after_generation_blocks_application(
                 SimpleNamespace(gains=[0.0] * 10, reasoning="Review"),
             ),
         )
+        params = {
+            "slug": "rock",
+            "apply": True,
+            "actor_user_id": domain_actor["id"],
+            "ai_acceptance": accept_action("genres.eq.propose"),
+        }
 
         def invoke():
-            return api.generate_genre_eq(None, "rock", apply=True)
+            result = ai_proposals._handle_propose_genre_eq("eq-job", params, {})
+            raise AIConfigurationError(result["error_code"], result["error"])
     else:
-        from crate.api import system_playlists as api
+        # SMQ.PR3: the description and its apply run in the worker.
+        import crate.db.repositories.playlists as playlists
+        from crate.ai.consumers import accept_action
+        from crate.worker_handlers import ai_proposals
 
-        monkeypatch.setattr(api, "_require_playlist_curator", lambda _: domain_actor)
-        monkeypatch.setattr(api, "_require_system_playlist", lambda _: {"name": "Mix"})
-        monkeypatch.setattr(api, "get_playlist_tracks", lambda _: [])
-        monkeypatch.setattr(api, "update_playlist", lambda *a, **k: writes.append(k))
+        playlist_id = playlists.create_playlist("Mix", scope="system")
+        monkeypatch.setattr(
+            playlists, "update_playlist", lambda *a, **k: writes.append(k)
+        )
         monkeypatch.setattr(
             "crate.llm.prompts.playlist_description.generate_playlist_description",
             lambda **k: generated(
@@ -347,11 +363,18 @@ def test_configuration_revoked_after_generation_blocks_application(
                 SimpleNamespace(description="Private draft"),
             ),
         )
+        params = {
+            "playlist_id": playlist_id,
+            "apply": True,
+            "actor_user_id": domain_actor["id"],
+            "ai_acceptance": accept_action("playlists.description.generate"),
+        }
 
         def invoke():
-            return api.admin_generate_playlist_description(
-                None, 1, api.GeneratePlaylistDescriptionRequest(apply=True)
+            result = ai_proposals._handle_generate_playlist_description(
+                "playlist-job", params, {}
             )
+            raise AIConfigurationError(result["error_code"], result["error"])
 
     with pytest.raises(AIConfigurationError, match="changed"):
         invoke()

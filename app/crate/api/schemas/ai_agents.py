@@ -1,16 +1,20 @@
 """Closed, bounded admin AI contracts. Credentials are write-only."""
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, get_args
 
 from pydantic import Field, model_validator
 
+from crate.ai.actions import ACTIONS
 from crate.ai.contracts import (
     AIAction,
+    MAX_MANIFEST_ENTRIES,
     LegacyProfileConfig,
     LegacyOptions,
     ClosedModel,
     ModelCapabilities,
     ModelID,
+    ModelManifestEntry,
+    OpenAICompatibleTemplate,
     ProfileConfig,
     Provider,
     ReasoningConfig,
@@ -28,6 +32,10 @@ Revision = Annotated[int, Field(ge=0, le=2147483647)]
 Stamp = Annotated[str, Field(max_length=100)]
 Code = Annotated[str, Field(max_length=80, pattern=r"^[A-Z0-9_]+$")]
 Fingerprint = Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+# Lists with one entry per registered action are bounded by the registry.
+MAX_ACTIONS = len(ACTIONS)
+PathPrefix = Annotated[str, Field(max_length=100)]
+Manifest = Annotated[list[ModelManifestEntry], Field(max_length=MAX_MANIFEST_ENTRIES)]
 
 
 class ConnectionCreate(ClosedModel):
@@ -38,6 +46,12 @@ class ConnectionCreate(ClosedModel):
     max_concurrent: int = Field(default=2, ge=1, le=8)
     daily_calls: int = Field(default=1000, ge=1, le=100000)
     daily_tokens: int = Field(default=1000000, ge=1, le=1000000000)
+    # openai_compatible only (SM3-D7).
+    template: OpenAICompatibleTemplate | None = None
+    path_prefix: PathPrefix | None = None
+    model_manifest: Manifest | None = None
+    # The admin's acknowledgement that a custom origin receives prompts and the key.
+    confirm_custom_origin: bool = False
 
 
 class ConnectionPatch(ClosedModel):
@@ -45,6 +59,9 @@ class ConnectionPatch(ClosedModel):
     label: ShortText | None = None
     endpoint: Annotated[str, Field(max_length=2048)] | None = None
     enabled: bool | None = None
+    path_prefix: PathPrefix | None = None
+    model_manifest: Manifest | None = None
+    confirm_custom_origin: bool | None = None
     max_concurrent: Annotated[int, Field(ge=1, le=8)] | None = None
     daily_calls: Annotated[int, Field(ge=1, le=100000)] | None = None
     daily_tokens: Annotated[int, Field(ge=1, le=1000000000)] | None = None
@@ -97,7 +114,7 @@ class BindingChange(ClosedModel):
 
 
 class BindingBatch(ClosedModel):
-    changes: list[BindingChange] = Field(min_length=1, max_length=11)
+    changes: list[BindingChange] = Field(min_length=1, max_length=MAX_ACTIONS)
 
 
 class Activation(ClosedModel):
@@ -120,6 +137,8 @@ class ConnectionMetadata(ClosedModel):
     provider: Provider
     revision: Revision
     endpoint: Annotated[str, Field(max_length=2048)] | None
+    template: OpenAICompatibleTemplate | None = None
+    path_prefix: PathPrefix | None = None
     enabled: bool
     model_count: int = Field(ge=0, le=500)
     catalog_status: Literal["pending", "ready", "error"]
@@ -136,6 +155,7 @@ class ConnectionMetadata(ClosedModel):
 
 class Connection(ConnectionMetadata):
     model_catalog: list[ModelCapabilities] = Field(max_length=500)
+    model_manifest: Manifest = Field(default_factory=list)
 
 
 class CatalogModel(ModelCapabilities):
@@ -181,7 +201,7 @@ class Binding(ClosedModel):
 
 
 class BindingsResponse(ClosedModel):
-    bindings: list[Binding] = Field(max_length=11)
+    bindings: list[Binding] = Field(max_length=MAX_ACTIONS)
 
 
 class Engine(ClosedModel):
@@ -213,7 +233,7 @@ class DefaultModelState(ClosedModel):
     reasoning: ReasoningConfig
     available: bool
     error_code: Code | None
-    features: list[DefaultModelFeature] = Field(max_length=11)
+    features: list[DefaultModelFeature] = Field(max_length=MAX_ACTIONS)
 
 
 class Snapshot(ClosedModel):
@@ -221,12 +241,12 @@ class Snapshot(ClosedModel):
     revision: Revision
     migrated: bool
     review_fingerprint: Fingerprint
-    legacy_actions: list[LegacyActionPreview] = Field(max_length=11)
-    actions: list[AIAction] = Field(max_length=11)
-    engines: list[Engine] = Field(max_length=3)
+    legacy_actions: list[LegacyActionPreview] = Field(max_length=MAX_ACTIONS)
+    actions: list[AIAction] = Field(max_length=MAX_ACTIONS)
+    engines: list[Engine] = Field(max_length=len(get_args(Provider)))
     connections: list[ConnectionMetadata] = Field(max_length=1003)
     profiles: list[ProfileWithVersions] = Field(max_length=1000)
-    bindings: list[Binding] = Field(max_length=11)
+    bindings: list[Binding] = Field(max_length=MAX_ACTIONS)
     default_model: DefaultModelState | None = None
 
 
@@ -262,7 +282,7 @@ class ModelAssignmentResult(ClosedModel):
     activation: bool  # dry run: applying would activate; apply: it activated
     revision: Revision
     review_fingerprint: Fingerprint
-    outcomes: list[AssignmentOutcome] = Field(max_length=11)
+    outcomes: list[AssignmentOutcome] = Field(max_length=MAX_ACTIONS)
 
 
 class ActivationResponse(ClosedModel):

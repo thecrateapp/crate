@@ -2140,5 +2140,6 @@
   "paths.warnings.quality": "Trantsizio batzuk ez dira hain leunak edo askotarikoak izango.",
   "paths.warnings.unavailable": "{count, plural, one {Gordetako abesti # ez dago erabilgarri eta saltatu egingo da.} other {Gordetako # abesti ez daude erabilgarri eta saltatu egingo dira.}}",
   "paths.warnings.trackUnavailable": "Ez dago erabilgarri",
-  "paths.warnings.noneAvailable": "Gordetako abestietako bat ere ez dago erreproduzitzeko erabilgarri."
+  "paths.warnings.noneAvailable": "Gordetako abestietako bat ere ez dago erreproduzitzeko erabilgarri.",
+  "paths.refinement.pending": "AA · Fintzen"
 }

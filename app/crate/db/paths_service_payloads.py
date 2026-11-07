@@ -35,6 +35,9 @@ def serialize_music_path_row(row: dict, *, include_tracks: bool) -> dict:
     else:
         payload["track_count"] = row["track_count"]
     metadata = row.get("generation_metadata") or {}
+    payload["revision"] = int(metadata.get("revision") or 1)
+    if isinstance(metadata.get("refinement"), dict):
+        payload["refinement"] = metadata["refinement"]
     if metadata:
         payload.update(
             {

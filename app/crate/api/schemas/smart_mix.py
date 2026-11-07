@@ -7,6 +7,10 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+# Planner identifiers the plan batch accepts (SM3-D3); smart-mix-v2 is the default.
+PlannerIdentifier = Literal["smart-mix-v2", "smart-mix-v3"]
+
+
 class SmartMixApiModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -155,6 +159,14 @@ class MixProfileResponse(SmartMixApiModel):
     )
 
 
+class SetHistoryEntryRequest(SmartMixRequestModel):
+    """One of the last transitions a client played, as numbers only (SM3-D6)."""
+
+    mode: Literal["gapless", "adaptive", "beatmatch"]
+    duration_bars: int = Field(alias="durationBars", ge=0, le=128)
+    delta_energy: float = Field(alias="deltaEnergy", ge=-1.0, le=1.0)
+
+
 class TransitionContextRequest(SmartMixRequestModel):
     source: Literal[
         "album",
@@ -180,6 +192,26 @@ class TransitionContextRequest(SmartMixRequestModel):
     allow_tempo_adjustment: bool = Field(alias="allowTempoAdjustment")
     allow_bass_handoff: bool = Field(default=False, alias="allowBassHandoff")
     allow_long_beatmatch: bool = Field(default=False, alias="allowLongBeatmatch")
+    set_history: list[SetHistoryEntryRequest] | None = Field(
+        default=None,
+        alias="setHistory",
+        max_length=3,
+        description=(
+            "Up to the last three transitions the client played, oldest first, for "
+            "the energy arc of the set. The deterministic planners do not read it, "
+            "so it does not change the plan or its cache."
+        ),
+    )
+    ai_refinement: bool = Field(
+        default=False,
+        alias="aiRefinement",
+        description=(
+            "smart-mix-v3 only: also return `refinement`, the plan an AI model "
+            "chose from the planner's candidates (SM3-D4). The deterministic plan "
+            "is always returned and does not depend on this flag. smart-mix-v2 "
+            "ignores it."
+        ),
+    )
 
 
 class TransitionEdgeRequest(SmartMixRequestModel):
@@ -189,11 +221,20 @@ class TransitionEdgeRequest(SmartMixRequestModel):
 
 
 class TransitionPlanBatchRequest(SmartMixRequestModel):
-    planner_version: Literal["smart-mix-v2"] = Field(alias="plannerVersion")
+    planner_version: PlannerIdentifier = Field(
+        default="smart-mix-v2",
+        alias="plannerVersion",
+        description=(
+            "smart-mix-v3 places the mix on the analyzed phrases when both "
+            "profiles have them and falls back to smart-mix-v2's bar heuristic "
+            "otherwise. Each plan keeps plannerVersion 2: the plan format is the "
+            "same."
+        ),
+    )
     edges: list[TransitionEdgeRequest] = Field(min_length=1, max_length=32)
 
 
-class TransitionPlanResponse(SmartMixApiModel):
+class _TransitionPlanFields(SmartMixApiModel):
     planner_version: Literal[2] = Field(alias="plannerVersion")
     outgoing_track_entity_uid: UUID = Field(alias="outgoingTrackEntityUid")
     incoming_track_entity_uid: UUID = Field(alias="incomingTrackEntityUid")
@@ -241,8 +282,64 @@ class TransitionPlanResponse(SmartMixApiModel):
     ) = Field(default=None, alias="fallbackReason")
 
 
+class RefinedTransitionPlanResponse(_TransitionPlanFields):
+    """A plan rebuilt from the candidate an AI model chose and validated again."""
+
+
+RefinementReasonCode = Literal[
+    "disabled",
+    "no_model",
+    "budget",
+    "missing_profile",
+    "single_candidate",
+    "permission_denied",
+    "scope_missing",
+    "rate_limited",
+    "rejected",
+    "failed",
+]
+
+
+class TransitionRefinementResponse(SmartMixApiModel):
+    status: Literal["ready", "pending", "unavailable"] = Field(
+        description=(
+            "ready: `plan` is the refined plan. pending: queued; request the same "
+            "edge again, at most every 5 s. unavailable: keep the deterministic "
+            "plan; `reasonCode` says why."
+        )
+    )
+    reason_code: RefinementReasonCode | None = Field(default=None, alias="reasonCode")
+    plan: RefinedTransitionPlanResponse | None = None
+    source: Literal["ai"] | None = None
+    model_label: str | None = Field(default=None, alias="modelLabel", max_length=200)
+    reason: str | None = Field(default=None, max_length=240)
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    prompt_version: str | None = Field(default=None, alias="promptVersion")
+    candidate_index: int | None = Field(default=None, alias="candidateIndex", ge=0)
+
+
+class TransitionPlanResponse(_TransitionPlanFields):
+    structure_used: bool | None = Field(
+        default=None,
+        alias="structureUsed",
+        description=(
+            "smart-mix-v3 only: whether the plan was chosen on the stored phrases of "
+            "both tracks. False when either track has none and the bar heuristic "
+            "planned the edge. Absent from smart-mix-v2 plans."
+        ),
+    )
+
+    refinement: TransitionRefinementResponse | None = Field(
+        default=None,
+        description=(
+            "Only when the edge asked for `aiRefinement` with smart-mix-v3 "
+            "(SM3-D4). Absent otherwise."
+        ),
+    )
+
+
 class TransitionPlanBatchResponse(SmartMixApiModel):
-    planner_version: Literal["smart-mix-v2"] = Field(alias="plannerVersion")
+    planner_version: PlannerIdentifier = Field(alias="plannerVersion")
     plans: list[TransitionPlanResponse]
 
 
@@ -396,6 +493,8 @@ __all__ = [
     "CompatibleTrackResponse",
     "CompatibleTracksResponse",
     "MixProfileResponse",
+    "PlannerIdentifier",
+    "SetHistoryEntryRequest",
     "TransitionContextRequest",
     "TransitionEdgeRequest",
     "TransitionPlanBatchRequest",

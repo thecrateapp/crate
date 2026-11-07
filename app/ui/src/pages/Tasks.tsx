@@ -742,7 +742,7 @@ function WorkerControlPanel({
             label={
               restarting ? "Restarting crate-worker" : "Restart crate-worker"
             }
-            tooltip="Restarts crate-worker: default and fast queues plus its service loop."
+            tooltip="Restarts crate-worker: default and fast queues, the ai and ai_bulk pools and its service loop."
             onClick={restartWorker}
             loading={restarting}
           >
@@ -1551,6 +1551,8 @@ export function Tasks() {
                 heavy: 0,
                 maintenance: 0,
                 playback: 0,
+                ai: 0,
+                ai_bulk: 0,
               },
               pending: {
                 fast: 0,
@@ -1558,6 +1560,8 @@ export function Tasks() {
                 heavy: 0,
                 maintenance: 0,
                 playback: 0,
+                ai: 0,
+                ai_bulk: 0,
               },
             }
           }

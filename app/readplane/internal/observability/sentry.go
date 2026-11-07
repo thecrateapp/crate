@@ -14,6 +14,18 @@ import (
 
 const defaultTraceSampleRate = 0.1
 
+// readplaneModule is this service's Go module path. Stack frames from it are
+// application code; the standard library and dependencies are not.
+const readplaneModule = "github.com/thecrateapp/crate/app/readplane"
+
+// observabilityPackage is this package's import path. Its capture helpers must
+// not become the top frame (and so the culprit) of the events they report.
+const observabilityPackage = readplaneModule + "/internal/observability"
+
+// captureHelperFunction is the frame trimmed, with everything above it, from
+// the stack traces recorded by CaptureOperationError.
+const captureHelperFunction = "CaptureOperationError"
+
 var sensitiveQueryKeys = map[string]struct{}{
 	"access_token":  {},
 	"api_key":       {},
@@ -95,7 +107,7 @@ func InitSentry(service string) (bool, func(), error) {
 		TracesSampleRate:      settings.TracesSampleRate,
 		SampleRate:            1,
 		SendDefaultPII:        false,
-		BeforeSend:            ScrubEvent,
+		BeforeSend:            beforeSend,
 		BeforeSendTransaction: ScrubEvent,
 		MaxBreadcrumbs:        50,
 	}
@@ -118,6 +130,8 @@ func WrapHTTP(handler http.Handler) http.Handler {
 }
 
 // CaptureOperationError reports a handled runtime failure with stable grouping.
+// The reported stack trace ends at the caller, so the Sentry culprit is the
+// code that hit the failure rather than this helper.
 func CaptureOperationError(err error, operation string, tags map[string]string) *sentry.EventID {
 	if err == nil {
 		return nil
@@ -135,9 +149,82 @@ func CaptureOperationError(err error, operation string, tags map[string]string) 
 		for key, value := range tags {
 			scope.SetTag(key, value)
 		}
+		scope.AddEventProcessor(trimCaptureHelperFrames)
 		eventID = sentry.CaptureException(err)
 	})
 	return eventID
+}
+
+// trimCaptureHelperFrames drops CaptureOperationError and its WithScope closure
+// from the stack trace the SDK records at capture time. Without this the top
+// frame of every operation event is the closure, and Sentry names it culprit.
+func trimCaptureHelperFrames(event *sentry.Event, _ *sentry.EventHint) *sentry.Event {
+	if event == nil {
+		return nil
+	}
+	for index := range event.Exception {
+		trimHelperFrames(event.Exception[index].Stacktrace)
+	}
+	return event
+}
+
+// trimHelperFrames cuts the stack at the innermost CaptureOperationError frame.
+// Stacks carried by the error itself (pkg/errors and similar) never contain it
+// and are left alone; a stack with no frame below the helper is kept as is.
+func trimHelperFrames(stacktrace *sentry.Stacktrace) {
+	if stacktrace == nil {
+		return
+	}
+	for index := len(stacktrace.Frames) - 1; index > 0; index-- {
+		frame := stacktrace.Frames[index]
+		if frame.Module == observabilityPackage && frame.Function == captureHelperFunction {
+			stacktrace.Frames = stacktrace.Frames[:index]
+			return
+		}
+	}
+}
+
+// beforeSend scrubs an error event, then marks which frames are application code.
+func beforeSend(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+	event = ScrubEvent(event, hint)
+	if event != nil {
+		markApplicationFrames(event)
+	}
+	return event
+}
+
+// markApplicationFrames sets InApp from each frame's package. The SDK decides
+// InApp by comparing file paths with GOROOT, which is empty in the -trimpath
+// binary on the distroless image, so it marks every frame as library code and
+// Sentry falls back to the topmost frame for the culprit and grouping display.
+func markApplicationFrames(event *sentry.Event) {
+	for index := range event.Exception {
+		markStacktraceFrames(event.Exception[index].Stacktrace)
+	}
+	for index := range event.Threads {
+		markStacktraceFrames(event.Threads[index].Stacktrace)
+	}
+}
+
+func markStacktraceFrames(stacktrace *sentry.Stacktrace) {
+	if stacktrace == nil {
+		return
+	}
+	for index := range stacktrace.Frames {
+		stacktrace.Frames[index].InApp = isApplicationFrame(stacktrace.Frames[index])
+	}
+}
+
+// isApplicationFrame reports whether a frame comes from this module. Dependency
+// sources sit under a versioned module path ("module@version/..."), both in
+// -trimpath file names and in the module cache; the path check runs first
+// because closures inlined from a dependency into package main (the sentryhttp
+// handler, for one) carry the "main" package name.
+func isApplicationFrame(frame sentry.Frame) bool {
+	if strings.Contains(frame.Filename, "@") || strings.Contains(frame.AbsPath, "@") {
+		return false
+	}
+	return frame.Module == "main" || strings.HasPrefix(frame.Module, readplaneModule+"/")
 }
 
 // ScrubEvent removes credentials and user-identifying data before sending.

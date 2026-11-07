@@ -66,6 +66,8 @@ export interface OpsLiveActivity {
       heavy: number;
       maintenance: number;
       playback: number;
+      ai?: number;
+      ai_bulk?: number;
     };
     pending: {
       fast: number;
@@ -73,6 +75,8 @@ export interface OpsLiveActivity {
       heavy: number;
       maintenance: number;
       playback: number;
+      ai?: number;
+      ai_bulk?: number;
     };
   };
   db_heavy_gate: {

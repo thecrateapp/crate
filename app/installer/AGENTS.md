@@ -19,9 +19,27 @@ for linux/darwin × amd64/arm64.
   (the Crate Agent bot token, allowlist, model key and approver) are handed to a setup step
   and never written to `.env`; `install.BuildEnv` skips them.
 - The binary embeds the compose file, `app/config.yaml`, the Traefik read-plane routes, the
-  manifest, `scripts/agent_setup.py`, the agent runtime it imports and the operator overlay
+  manifest, `scripts/agent_setup.py`, the agent runtime it imports, the operator overlay and the
+  monitoring bundle with its application overlays from `deploy/observability`
   (`internal/assets`). After changing any of them run `go generate ./...` here; CI fails when
   the embedded copies are stale.
+- Monitoring is opt-in and Linux only in v1; see
+  `docs/plans/2026-11-03-installer-observability-design.md`. Its settings live under
+  `monitoring:` in the manifest: `env` for the separate `monitoring.env`, `app` for the
+  application `.env` variables the overlays read.
+  Storage, secrets and the `crate_observer` role come from `scripts/observability_setup.py`
+  (`prepare`, `role`, `status`), run like the agent setup in a throwaway `crate-api` container
+  as root; it prints names and booleans only and never rotates a secret.
+  `crate observability enable|disable|status` (`internal/monitoring`) starts monitoring before it
+  adds the application overlays to `COMPOSE_FILE`; `agent.Activate` keeps them after the operator
+  overlay. `stack.Stack` leaves out an overlay whose network is missing, so a lost monitoring
+  network never stops Crate.
+  The wizard's optional Monitoring step (unchecked by default; `--observability=on|off|keep` with
+  `--yes`) enables, disables or upgrades monitoring after Crate answers; upgrades back up
+  Grafana before an image change and restart services whose mounted file changed
+  (`observability.MountedFiles`, kept equal to `MOUNTED_FILES` in
+  `scripts/observability_release.py`). `crate doctor --json` reports it in a separate
+  `monitoring` object; its items are warnings at most.
 - Reconfiguring must never rotate a generated secret or drop a line the user added to `.env`.
   `install.BuildEnv` keeps existing values; keep it that way.
 - `CRATE_IMAGE_TAG` follows `install.UpgradeImageTag`: a release installer (`vX.Y.Z`, the git
@@ -71,4 +89,13 @@ go generate ./...                          # refresh embedded files
 go vet ./... && go test ./...
 go run ./cmd/crate install --dry-run       # walk the wizard without writing anything
 go run ./cmd/crate doctor --dir ~/crate    # check an installation
+make -C ../.. installer-observability-e2e # monitoring end to end in Docker-in-Docker (~10 min, ~8 GB)
 ```
+
+`installer-observability-e2e` builds the installer for Linux, starts a privileged
+`docker:28-dind` container and runs `scripts/installer-observability-e2e-scenarios.sh`
+in it against the published images of `CRATE_E2E_VERSION` (default `v3.1.3`): a default
+install without monitoring, `--observability=on`, status and doctor, disable, enable
+keeping Prometheus history and Grafana state, a reinstall that restarts Prometheus after a
+changed file, and a removed monitoring network. `KEEP=1` leaves the container for
+debugging. CI runs it only by hand or weekly (`installer-observability-e2e.yml`).

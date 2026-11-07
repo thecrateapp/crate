@@ -25,6 +25,8 @@ Usage:
   crate install [flags]                  install Crate, or change an existing installation
   crate configure [integration] [flags]  set up or change integrations (Last.fm, Soulseek, Crate Agent…)
   crate doctor [flags]                   check the installation, its services and its keys
+  crate observability <enable|disable|status> [flags]
+                                         optional monitoring with Prometheus and Grafana (Linux)
   crate mcp                              let an AI agent install Crate with you (MCP over stdio)
   crate version                          print the installer version
 
@@ -47,6 +49,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runConfigure(args[1:], stderr)
 	case "doctor":
 		return runDoctor(args[1:], stdout, stderr)
+	case "observability":
+		return runObservability(args[1:], stdout, stderr)
 	case "mcp":
 		return runMCP(stderr)
 	case "version", "--version":
@@ -83,8 +87,23 @@ func parseInstallFlags(args []string, stderr io.Writer) (wizard.Options, error) 
 	flags.BoolVar(&opts.DryRun, "dry-run", envFlag("CRATE_DRY_RUN"), "show what would happen without writing anything (CRATE_DRY_RUN=1)")
 	flags.BoolVar(&opts.SkipStart, "skip-start", envFlag("CRATE_SKIP_START"), "write the files but do not start Crate (CRATE_SKIP_START=1)")
 	flags.BoolVar(&opts.Accessible, "accessible", envFlag("ACCESSIBLE"), "plain prompts that work with screen readers")
-	err := flags.Parse(args)
-	return opts, err
+	flags.StringVar(&opts.Observability, "observability", observabilityDefault(), "with --yes: optional monitoring on, off or keep (CRATE_OBSERVABILITY); Linux only")
+	if err := flags.Parse(args); err != nil {
+		return opts, err
+	}
+	switch opts.Observability {
+	case wizard.ObservabilityOn, wizard.ObservabilityOff, wizard.ObservabilityKeep:
+		return opts, nil
+	}
+	fmt.Fprintf(stderr, "--observability must be on, off or keep, not %q\n", opts.Observability)
+	return opts, errors.New("invalid --observability")
+}
+
+func observabilityDefault() string {
+	if mode := os.Getenv("CRATE_OBSERVABILITY"); mode != "" {
+		return mode
+	}
+	return wizard.ObservabilityKeep
 }
 
 func runInstall(args []string, stderr io.Writer) int {

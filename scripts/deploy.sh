@@ -180,6 +180,7 @@ stage_remote_preflight_payload() {
     "$TMP_DIR/docker-compose.project.yaml" \
     "$TMP_DIR/release-manifest.json" \
     "$TMP_DIR/release.env" \
+    "$ROOT_DIR/scripts/worker_queue_contract.py" \
     "$REMOTE:$DEPLOY_CANDIDATE_DIR/"
 }
 
@@ -336,6 +337,13 @@ local_preflight() {
       -f "$TMP_DIR/docker-compose.yaml" \
       -f "$TMP_DIR/docker-compose.project.yaml" \
       config -q
+    log "Checking that every required worker queue has a consumer"
+    docker compose \
+      --env-file "$TMP_DIR/.env" \
+      -f "$TMP_DIR/docker-compose.yaml" \
+      -f "$TMP_DIR/docker-compose.project.yaml" \
+      config --format json \
+      | python3 -I "$ROOT_DIR/scripts/worker_queue_contract.py" -
   fi
 
   check_image_manifests
@@ -417,6 +425,37 @@ activate_agent_context() {
   remote_deploy agent-context
 }
 
+# Mark every Sentry release this manifest runs as deployed, so Sentry knows when each one
+# reached production. Optional: it needs SENTRY_AUTH_TOKEN (or ~/.sentryclirc) and
+# sentry-cli, and a Sentry failure never fails a deploy that already finished.
+record_sentry_deploys() {
+  local org="${SENTRY_DEPLOY_ORG:-ninja-development}"
+  local environment="${SENTRY_DEPLOY_ENVIRONMENT:-production}"
+  local cli=() release projects
+  if [[ -z "${SENTRY_AUTH_TOKEN:-}" && ! -f "${HOME:-}/.sentryclirc" ]]; then
+    log "Skipping Sentry deploy markers: SENTRY_AUTH_TOKEN is not set"
+    return 0
+  fi
+  if command -v sentry-cli >/dev/null 2>&1; then
+    cli=(sentry-cli)
+  elif [[ -x "$ROOT_DIR/node_modules/.bin/sentry-cli" ]]; then
+    cli=("$ROOT_DIR/node_modules/.bin/sentry-cli")
+  else
+    log "Skipping Sentry deploy markers: sentry-cli is not installed (run npm install)"
+    return 0
+  fi
+  log "Recording Sentry deploys in ${environment}"
+  while IFS=$'\t' read -r release projects; do
+    [[ -n "$release" ]] || continue
+    if ! "${cli[@]}" deploys --org "$org" new --release "$release" \
+      --env "$environment" --name "$DEPLOY_ID" >/dev/null 2>&1; then
+      log "Warning: could not record the Sentry deploy of ${release} (${projects})"
+    fi
+  done < <("$ROOT_DIR/scripts/release_manifest.py" sentry-releases \
+    --manifest "$TMP_DIR/release-manifest.json" 2>/dev/null || true)
+  return 0
+}
+
 run_deploy() {
   DEPLOY_ID="${DEPLOY_ID:-$(date -u +%Y%m%d-%H%M%S)}"
   require_deploy_id
@@ -440,6 +479,7 @@ run_deploy() {
   remote_deploy verify
   activate_agent_context
   remote_deploy cleanup
+  record_sentry_deploys
 
   trap - EXIT
   cleanup

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 from typing import AsyncIterator, Literal
@@ -13,7 +14,11 @@ from starlette.responses import StreamingResponse
 
 from crate.api._deps import json_dumps
 from crate.api.openapi_responses import AUTH_ERROR_RESPONSES
-from crate.api.permissions import require_any_permission, require_permission
+from crate.api.permissions import (
+    has_capability,
+    require_any_permission,
+    require_permission,
+)
 from crate.api.redis_sse import close_pubsub, open_pubsub
 from crate.api.schemas.metrics import (
     MetricsSummaryResponse,
@@ -38,6 +43,8 @@ from crate.db.queries.product_kpis import (
     MINIMUM_SEGMENT_SAMPLE,
     get_product_kpi_rows,
 )
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin", tags=["admin-metrics"])
 
@@ -319,6 +326,17 @@ def _build_playback_delivery() -> dict:
         }
 
 
+def _build_error_summary() -> dict | None:
+    """Error inbox counts for the System Health tile; None when unavailable."""
+    try:
+        from crate.error_inbox.views import inbox_summary
+
+        return inbox_summary()
+    except Exception:
+        log.warning("Error inbox summary unavailable for the dashboard", exc_info=True)
+        return None
+
+
 def _build_metrics_dashboard(period: str, minutes: int) -> dict:
     from crate.db.cache_store import get_cache, set_cache
     from crate.metrics import query_timeseries_snapshot, query_route_latency_snapshot
@@ -356,6 +374,7 @@ def _build_metrics_dashboard(period: str, minutes: int) -> dict:
         },
         "timeseries": timeseries,
         "timeseries_status": timeseries_status,
+        "errors": _build_error_summary(),
     }
     set_cache(cache_key, payload, ttl=10)
     return {**payload, "summary": _attach_local_collector(payload["summary"])}
@@ -511,9 +530,24 @@ def metrics_dashboard(
     period: str = Query("minute", description="Granularity: minute or hour"),
     minutes: int = Query(60, ge=1, le=2880, description="Minutes of recent data"),
 ):
-    _require_ops_health(request)
+    user = _require_ops_health(request)
     safe_period = period if period in {"minute", "hour", "day"} else "minute"
-    return _build_metrics_dashboard(safe_period, minutes)
+    payload = _build_metrics_dashboard(safe_period, minutes)
+    errors = payload.get("errors")
+    if isinstance(errors, dict) and not has_capability(user, "ops.errors.view"):
+        # The cached payload is shared; issue titles are event text and stay
+        # behind their capability. The counts remain for `ops.health.view`.
+        payload = {
+            **payload,
+            "errors": {
+                **errors,
+                "top_critical": [
+                    {key: value for key, value in item.items() if key != "title"}
+                    for item in errors.get("top_critical") or []
+                ],
+            },
+        }
+    return payload
 
 
 @router.get(

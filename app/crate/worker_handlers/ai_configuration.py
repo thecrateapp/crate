@@ -57,9 +57,19 @@ def handle_refresh(task_id, params, config):
             if conn["secret_source"] == "stored"
             else None
         )
+        # An openai_compatible catalog is its manifest, checked against /models.
+        declared = (
+            {
+                "template": conn["template"],
+                "path_prefix": conn["path_prefix"],
+                "manifest": conn["model_manifest"],
+            }
+            if conn["provider"] == "openai_compatible"
+            else {}
+        )
         try:
             models = discovery.discover_models(
-                conn["provider"], api_key=key, endpoint=conn["endpoint"]
+                conn["provider"], api_key=key, endpoint=conn["endpoint"], **declared
             )
         except AIConfigurationError as error:
             store.save_model_catalog(

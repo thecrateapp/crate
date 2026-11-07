@@ -113,6 +113,24 @@ VIRTUALDJ_APP ?= /Applications/VirtualDJ.app
 VDJ_BUILD_DIR ?= build/vdj-macos
 VDJ_ONLINE_SOURCES := $(HOME)/Library/Application Support/VirtualDJ/PluginsMacArm/OnlineSources
 
+VDJ_TESTED_VERSION ?= 8.5.9307
+VDJ_DIST_DIR ?= dist/vdj
+VDJ_ARCH ?= arm64
+VDJ_MACOS_MINIMUM ?= 12.0
+VDJ_PACKAGE_DIR ?= build/vdj-package-$(VDJ_ARCH)
+
+.PHONY: vdj-package
+vdj-package: ## Build and package the VirtualDJ plugin for macOS (VIRTUALDJ_SDK_ROOT=, VDJ_ARCH=arm64|x86_64)
+	@test -n "$(VIRTUALDJ_SDK_ROOT)" || { echo "$(RED)Set VIRTUALDJ_SDK_ROOT to the folder with vdjPlugin8.h and vdjOnlineSource.h$(NC)"; exit 1; }
+	@cmake -S tools/vdj-plugin -B $(VDJ_PACKAGE_DIR) -DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_OSX_ARCHITECTURES=$(VDJ_ARCH) -DCMAKE_OSX_DEPLOYMENT_TARGET=$(VDJ_MACOS_MINIMUM) \
+		-DCRATE_VDJ_BUILD_REAL_PLUGIN=ON -DVirtualDJSDK_ROOT="$(VIRTUALDJ_SDK_ROOT)" >/dev/null
+	@cmake --build $(VDJ_PACKAGE_DIR) --target crate_vdj_online_source_plugin --parallel
+	@python3 tools/vdj-plugin/packaging/package_macos.py $(VDJ_PACKAGE_DIR)/Crate.bundle $(VDJ_DIST_DIR) \
+		--arch $(VDJ_ARCH) \
+		--contract-header tools/vdj-plugin/include/crate_vdj/contract_negotiator.hpp \
+		$(if $(VDJ_TESTED_VERSION),--tested-virtualdj $(VDJ_TESTED_VERSION))
+
 .PHONY: vdj-dev
 vdj-dev: ## Build the VirtualDJ plugin, install it and open VirtualDJ against the dev stack (VIRTUALDJ_SDK_ROOT=, VIRTUALDJ_APP=)
 	@test -n "$(VIRTUALDJ_SDK_ROOT)" || { echo "$(RED)Set VIRTUALDJ_SDK_ROOT to the folder with vdjPlugin8.h and vdjOnlineSource.h$(NC)"; exit 1; }
@@ -1292,18 +1310,7 @@ observability-start-preflight: observability-config ## Check explicit monitoring
 	@$(OBS_PYTHON) scripts/observability_preflight.py --env-file "$$OBS_ENV_FILE" --project-dir "$$OBS_PROJECT_DIR" $(if $(filter 1,$(OBS_INITIALIZE_EMPTY)),--initialize-empty) -- $(OBS_DC)
 
 observability-up: observability-start-preflight ## Explicitly start only monitoring (provision secrets first)
-	@case "$$(docker info --format '{{.Driver}}'):$(OBS_CONTAINERD)" in overlay2:0|overlayfs:1) ;; *) echo "Monitoring requires overlay2 (OBS_CONTAINERD=0) or overlayfs (OBS_CONTAINERD=1); no services started."; exit 1 ;; esac
-	@for service in crate-prometheus crate-grafana; do \
-		projects="$$(docker ps --filter "label=com.docker.compose.service=$$service" --format '{{with .Label "com.docker.compose.project"}}{{.}}{{else}}unmanaged{{end}}')" || { echo "Cannot check existing monitoring writers; no services started." >&2; exit 1; }; \
-		if [ -n "$$(printf '%s\n' "$$projects" | sed '/^crate-observability$$/d; /^$$/d')" ]; then \
-			echo "Monitoring writers from another project are running. Migrate the old monitoring project before standalone startup." >&2; exit 1; \
-		fi; \
-	done
-ifeq ($(OBS_CONTAINERD),1)
-	@socket_path=$$(readlink -f "$${OBS_CONTAINERD_SOCKET:-/run/containerd/containerd.sock}") && case "$$socket_path" in /run/*) ;; *) echo "Containerd socket must resolve under masked /run; no services started."; exit 1 ;; esac || { echo "Unable to validate containerd socket; no services started."; exit 1; }
-	@$(OBS_DC) up -d --no-deps --wait --wait-timeout 45 crate-observability-docker-proxy
-endif
-	@$(OBS_DC) up -d --no-deps $(OBS_SERVICES)
+	@OBS_CONTAINERD=$(OBS_CONTAINERD) scripts/observability-up.sh
 
 observability-stop: observability-scope ## Stop only standalone monitoring; preserve all data
 	@$(OBS_DC) stop $(OBS_SERVICES)
@@ -1334,6 +1341,10 @@ observability-deploy-rollback: ## Return monitoring to the previous release (req
 
 observability-deploy-status: ## Show the deployed monitoring release, live drift and services
 	@$(OBS_DEPLOY_ENV) scripts/observability-deploy.sh status
+
+.PHONY: installer-observability-e2e
+installer-observability-e2e: ## End-to-end installer monitoring test in a disposable Docker-in-Docker container (KEEP=1 keeps it)
+	@scripts/installer-observability-e2e.sh
 
 GRAFANA_LOCAL_PORT  ?= 3001
 GRAFANA_REMOTE_PORT ?= 3001

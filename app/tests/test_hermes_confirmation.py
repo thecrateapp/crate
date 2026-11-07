@@ -317,7 +317,12 @@ def test_native_transport_reads_only_dedicated_files_rejects_redirects_and_proxi
 def test_write_profile_is_explicit_and_native_approval_is_not_a_model_tool():
     pilot = json.loads((ROOT / "deploy/hermes/config.json").read_text())
     operator = json.loads((ROOT / "deploy/hermes/config.operator.json").read_text())
-    assert len(pilot["mcp_servers"]["crate"]["tools"]["include"]) == 16
+    pilot_include = pilot["mcp_servers"]["crate"]["tools"]["include"]
+    assert len(pilot_include) == 19
+    # Error Inbox reads (ops.errors.read) are the only additions to the pilot.
+    assert {"get_error_summary", "list_error_issues", "get_error_issue"} <= set(
+        pilot_include
+    )
     assert "trust" not in pilot["mcp_servers"]["crate"]
     include = operator["mcp_servers"]["crate"]["tools"]["include"]
     assert "request_plan_confirmation" in include

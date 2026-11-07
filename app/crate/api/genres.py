@@ -29,7 +29,6 @@ from crate.api.schemas.genres import (
     GenreTaxonomyRawTagClassificationUpdateResponse,
     GenreTaxonomyNodeProposalApplyRequest,
     GenreTaxonomyNodeProposalApplyResponse,
-    GenreTaxonomyNodeProposalResponse,
     GenreTaxonomyNodeUpdateRequest,
     GenreTaxonomyNodeUpdateResponse,
     GenreTaxonomyRebuildProposalRequest,
@@ -55,6 +54,7 @@ from crate.db.queries.genres_library_detail import get_genre_upcoming_shows
 from crate.db.cache_store import get_volatile_cache, set_volatile_cache
 from crate.db.queries.tasks import list_tasks
 from crate.db.repositories.auth import get_user_by_id
+from crate.api.ai_tasks import queue_ai_task
 from crate.db.repositories.tasks import create_task
 from crate.db.queries.sound_intelligence import get_sound_intelligence_health
 from crate.db.repositories.genres_taxonomy_edges import (
@@ -85,7 +85,7 @@ from crate.genre_taxonomy import (
     invalidate_runtime_taxonomy_cache,
     resolve_genre_eq_preset,
 )
-from crate.genre_taxonomy_proposals import build_genre_taxonomy_node_proposal
+from crate.genre_taxonomy_proposals import node_proposal_input_fingerprint
 
 router = APIRouter(prefix="/api/genres", tags=["genres"])
 
@@ -629,27 +629,54 @@ def delete_taxonomy_node(request: Request, slug: str):
 
 @router.post(
     "/taxonomy/{slug}/proposal",
-    response_model=GenreTaxonomyNodeProposalResponse,
-    responses=_GENRE_ADMIN_RESPONSES,
-    summary="Generate a reviewable AI proposal for one taxonomy node",
+    status_code=202,
+    response_model=TaskEnqueueResponse,
+    responses=merge_responses(
+        _GENRE_ADMIN_RESPONSES,
+        {
+            404: error_response("Genre not found."),
+            503: error_response("The AI taxonomy proposal action is unavailable."),
+        },
+    ),
+    summary="Queue a reviewable AI proposal for one taxonomy node",
 )
 def infer_taxonomy_node_proposal(
     request: Request,
     slug: str,
 ):
+    """Queue the proposal on the ai queue; the task result holds it.
+
+    The model is never called inside the request (SM3-D8). Follow the returned
+    task with /api/events/task/{task_id}; its result has the shape of
+    GenreTaxonomyNodeProposalResponse.
+    """
     actor = _require_genre_curator(request)
     canonical_slug = (slug or "").strip().lower()
     if not canonical_slug:
         raise HTTPException(status_code=400, detail="Slug is required")
-    from crate.ai.consumers import resolve_call
-
-    proposal = build_genre_taxonomy_node_proposal(
-        canonical_slug,
-        ai_call=resolve_call("genres.taxonomy.propose", actor_id=actor.get("id")),
-    )
-    if not proposal.get("ok"):
+    fingerprint = node_proposal_input_fingerprint(canonical_slug)
+    if fingerprint is None:
         raise HTTPException(status_code=404, detail="Genre not found")
-    return proposal
+
+    from crate.ai.consumers import accept_action
+    from crate.ai.contracts import AIConfigurationError
+
+    try:
+        acceptance = accept_action("genres.taxonomy.propose")
+    except AIConfigurationError as error:
+        raise HTTPException(
+            status_code=503,
+            detail=error.message,
+            headers={"X-Crate-Error": error.code},
+        ) from None
+
+    dedup_key = f"genre-taxonomy-proposal:{canonical_slug}:{fingerprint[:16]}"
+    params = {
+        "slug": canonical_slug,
+        "actor_user_id": actor.get("id"),
+        "ai_acceptance": acceptance,
+    }
+    return queue_ai_task("propose_genre_taxonomy_node", params, dedup_key=dedup_key)
 
 
 @router.post(
@@ -1095,15 +1122,25 @@ def update_genre_eq_preset(request: Request, slug: str, body: EqPresetBody):
 
 @router.post(
     "/{slug}/generate-eq",
-    responses=_GENRE_RESPONSES,
-    summary="Generate an EQ preset for a genre using AI",
+    status_code=202,
+    response_model=TaskEnqueueResponse,
+    responses=merge_responses(
+        _GENRE_RESPONSES,
+        {503: error_response("The AI EQ proposal action is unavailable.")},
+    ),
+    summary="Queue an AI EQ preset proposal for a genre",
 )
 def generate_genre_eq(
     request: Request,
     slug: str,
     apply: bool = Query(False, description="Auto-apply the generated preset"),
 ):
-    """Use the configured LLM to generate a 10-band EQ preset for a genre."""
+    """Queue a 10-band EQ proposal on the ai queue; the task result holds it.
+
+    The model is never called inside the request (SM3-D8). Follow the returned
+    task with /api/events/task/{task_id}; its result is
+    {slug, gains, reasoning, applied}.
+    """
     actor = _require_genre_curator(request)
 
     canonical_slug = (slug or "").strip().lower()
@@ -1114,37 +1151,23 @@ def generate_genre_eq(
     if not node_id:
         raise HTTPException(status_code=404, detail="Genre not found in taxonomy")
 
-    # Get genre detail for context
-    detail = get_genre_detail(canonical_slug)
-    description = detail.get("description") if detail else None
-    parent_slugs = detail.get("parent_slugs", []) if detail else []
+    from crate.ai.consumers import accept_action
+    from crate.ai.contracts import AIConfigurationError
 
     try:
-        from crate.llm.prompts.eq_preset import generate_eq_preset
+        acceptance = accept_action("genres.eq.propose")
+    except AIConfigurationError as error:
+        raise HTTPException(
+            status_code=503,
+            detail=error.message,
+            headers={"X-Crate-Error": error.code},
+        ) from None
 
-        from crate.ai.consumers import resolve_call, revalidate_call
-
-        ai_call = resolve_call("genres.eq.propose", actor_id=actor.get("id"))
-        result = generate_eq_preset(
-            genre_name=canonical_slug.replace("-", " ").title(),
-            description=description,
-            parent_genres=[s.replace("-", " ").title() for s in parent_slugs[:3]],
-            ai_call=ai_call,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e))
-
-    gains = [max(-12.0, min(12.0, round(g, 1))) for g in result.gains]
-
-    if apply:
-        revalidate_call(ai_call)
-        set_genre_eq_gains(canonical_slug, gains, reasoning=result.reasoning)
-        invalidate_runtime_taxonomy_cache(broadcast=True)
-        _broadcast_genre_taxonomy_changed(f"genre:{canonical_slug}")
-
-    return {
+    dedup_key = f"genre-eq:{canonical_slug}:{'apply' if apply else 'propose'}"
+    params = {
         "slug": canonical_slug,
-        "gains": gains,
-        "reasoning": result.reasoning,
-        "applied": apply,
+        "apply": apply,
+        "actor_user_id": actor.get("id"),
+        "ai_acceptance": acceptance,
     }
+    return queue_ai_task("propose_genre_eq", params, dedup_key=dedup_key)

@@ -32,6 +32,9 @@ IDS = {
     "playlists.description.generate",
     "music_paths.refine",
     "i18n.listen.draft",
+    "ops.error.triage",
+    "ops.error.investigate",
+    "smart_mix.transition.refine",
 }
 
 
@@ -244,6 +247,8 @@ def test_catalog_rejects_malformed_and_stops_at_deadline(monkeypatch):
         "http://169.254.169.254",
         "http://[fe80::1]",
         "http://[::ffff:169.254.169.254]",
+        "http://[fd00:ec2::254]",
+        "http://100.100.100.200",
         "http://metadata.google.internal",
         "http://user:pass@localhost",
         "http://localhost?x=1",
@@ -508,6 +513,8 @@ def test_action_locations_point_to_existing_admin_surfaces():
     assert get_action("artists.bio.research").location == "/browse"
     assert get_action("i18n.listen.draft").location == "/i18n"
     assert get_action("music_paths.refine").location == "/settings"
+    assert get_action("ops.error.triage").location == "/errors"
+    assert get_action("ops.error.investigate").location == "/errors"
 
 
 def test_discovery_process_start_failure_is_closed(monkeypatch):

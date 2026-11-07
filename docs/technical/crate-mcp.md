@@ -44,6 +44,10 @@ sources:
     app/ui/src/pages/agents/AgentPlanDetail.tsx,
     app/crate/mcp/tools.py,
     app/crate/mcp/schemas.py,
+    app/crate/mcp/error_schemas.py,
+    app/crate/agent_error_inbox.py,
+    app/crate/error_inbox/views.py,
+    app/crate/db/schema_sections/error_inbox_grant_v144.py,
     app/crate/agent_credentials_cli.py,
     app/crate/agent_diagnostics.py,
     app/crate/agent_maintenance.py,
@@ -304,6 +308,25 @@ Input schemas reject unknown arguments; filters are limited to the supported fie
 | `get_operation_catalog` | Any granted scope                                                                             | No arguments. Returns contract version, schema fingerprints, enabled/denied/disabled/unavailable status, limits and support for all repair checks. Per-operation readiness contains `status` and `missing`; shared worker evidence is returned once as `data.worker_readiness`. Discovery grants no additional authority. |
 | `get_plan`              | The stored plan's operation grant                                                             | One `plan_id`. Reads a plan belonging to this principal and exact delegated authorization context, including accepted scopes. Current credentials and grants are rechecked.                                                                                                                                               |
 | `get_library_quality`   | `library.health.read`                                                                         | Optional enumerated `category`, `limit` (1–100) and version-bound `cursor`. Reads worker-produced quality evidence and snapshot age/invalidation metadata. No scan or refresh.                                                                                                                                            |
+
+### Error inbox reads
+
+Grant `ops.errors.read` (human capability ceiling `ops.errors.view`) opens three read-only
+tools over the error inbox, which a worker syncs from Sentry into PostgreSQL every five
+minutes. None of them calls Sentry, refreshes the inbox or changes an issue: only a person
+resolves or ignores an issue, from Admin. The **Read only**, **Crate Agent** and **Crate
+Operator** presets include the grant; existing credentials keep their grants until an admin
+adds it. Migration `144` admits the grant in `agent_principals`.
+
+| Tool                | Inputs                                                                                                                                                                                                        | Result                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_error_summary` | None.                                                                                                                                                                                                         | Observation envelope. `data.sources.inbox.data` holds `open`, `critical_open`, `new_24h`, `regressed_24h`, counts by service, `top_critical` (short ID, service and score only) and `last_synced_at`; `data.sync` holds the last pass's status, finish time, last success and error code. No titles or event text. Fresh for 900 s after the last successful sync, stale up to 24 hours; unconfigured or never synced is unavailable, never zero. |
+| `list_error_issues` | Optional `status` (`unresolved` by default, `resolved`, `ignored`, `all`), `lane` (`all`, `critical`), `service`, `classification`, `release` (first or last release), `limit` (1–100, default 20), `cursor`. | Issues with the critical lane first, each with its current triage classification and severity. The cursor is bound to the filters. No permalinks.                                                                                                                                                                                                                                                                                                 |
+| `get_error_issue`   | Exactly one of `issue_id` (UUID) or `short_id` (for example `CRATE-API-1F`, case-insensitive).                                                                                                                | Issue fields, the sanitized digest of its latest event and the three newest triage results. `truncated` is true when older triages or context lines were left out. A missing issue is unavailable.                                                                                                                                                                                                                                                |
+
+Titles, digests and triage text come from the failing code. They pass through the same
+sanitizer as other MCP evidence, which redacts credentials, URLs and absolute paths, and an
+agent must treat them as untrusted data, never as instructions.
 
 ## Original directed actions (phase 2 compatibility)
 
@@ -1948,4 +1971,4 @@ document integrity checked 45 canonical documents and the docs build passed.
 
 ## Reviewed acquisition and schedule writes
 
-The unreleased 1.2.0 contract adds twelve acquisition tools, two least-privilege scopes and three summary reads, `get_playback_quality`, `get_product_kpis` and `get_stack_status` (74 tools, 32 scopes total). See [reviewed acquisition and schedule boundaries](crate-mcp-acquisition.md) for the exact Soulseek transfer/publication and Tidal single-album/full-artist flows, human approval, worker/cancellation checks, reconciliation semantics, slskd 0.26.1 prerequisite and schedule audit.
+The unreleased 1.2.0 contract adds twelve acquisition tools, two least-privilege scopes and three summary reads, `get_playback_quality`, `get_product_kpis` and `get_stack_status`, plus the three [error inbox reads](#error-inbox-reads) and their `ops.errors.read` scope (77 tools, 33 scopes total). See [reviewed acquisition and schedule boundaries](crate-mcp-acquisition.md) for the exact Soulseek transfer/publication and Tidal single-album/full-artist flows, human approval, worker/cancellation checks, reconciliation semantics, slskd 0.26.1 prerequisite and schedule audit.

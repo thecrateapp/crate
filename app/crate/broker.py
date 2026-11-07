@@ -67,7 +67,9 @@ def get_broker() -> RedisBroker:
     return broker
 
 
-# Module-level broker — set on import so actors can register
-init_sentry(resolve_service_name("workers"))
+# Module-level broker — set on import so actors can register.
+# `dramatiq crate.actors` has no other Sentry init; in the API, worker launcher and
+# projector the process entry point owns the `service` tag, so do not overwrite it.
+init_sentry(resolve_service_name("workers"), entry_point=False)
 broker = get_broker()
 dramatiq.set_broker(broker)

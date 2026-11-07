@@ -78,7 +78,9 @@ def main():
     )
     worker_cmd.add_argument(
         "--queues",
-        default=os.environ.get("CRATE_WORKER_QUEUES", "fast,heavy,default,maintenance"),
+        default=os.environ.get(
+            "CRATE_WORKER_QUEUES", "fast,heavy,default,maintenance,ai,ai_bulk"
+        ),
         help="Comma-separated Dramatiq queues to consume",
     )
     worker_cmd.add_argument(

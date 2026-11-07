@@ -2,9 +2,15 @@
 //!
 //! Ports the librosa pipeline used by the Python analyzer (`onset_strength`,
 //! `feature.tempo` and `beat.beat_track`, after Ellis 2007) so both analyzers
-//! place beats with the same method.
+//! place beats with the same method. Beats and downbeats from a model (Beat This!,
+//! SM3-D14) replace the tracker and the downbeat heuristic when the worker passes them.
+
+use std::path::Path;
 
 use realfft::RealFftPlanner;
+use serde::Deserialize;
+
+use crate::structure::{BAND_COUNT, BEATS_PER_BAR, LOW_BAND_HZ, MFCC_COEFFICIENTS, MID_BAND_HZ};
 
 pub const FFT_SIZE: usize = 2048;
 pub const HOP_SIZE: usize = 512;
@@ -16,7 +22,6 @@ const START_BPM: f32 = 120.0;
 const PRIOR_OCTAVES: f32 = 1.5;
 const MAX_TEMPO: f32 = 320.0;
 const TIGHTNESS: f32 = 100.0;
-const LOW_BAND_HZ: f32 = 200.0;
 const CHROMA_MIN_HZ: f32 = 55.0;
 const CHROMA_MAX_HZ: f32 = 5_000.0;
 const DOWNBEAT_WINDOW_FRAMES: usize = 2;
@@ -27,6 +32,58 @@ const REFINE_LOOKAHEAD_MS: f64 = 12.0;
 const REFINE_WINDOW_MS: f64 = 2.0;
 const REFINE_RISE_MS: usize = 3;
 const REFINE_MIN_RISE: f64 = 0.5;
+/// Beat This! downbeats (SM3-D14): a model downbeat votes for the bar phase of the grid
+/// beat within this distance, and the winning phase must hold this share of the model
+/// downbeats that fall within the grid. Same constants as the Python analyzer
+/// (`crate.smart_mix.phrase_grid`).
+pub const MODEL_DOWNBEAT_TOLERANCE_MS: u64 = 70;
+pub const MODEL_DOWNBEAT_MIN_SHARE: f64 = 0.6;
+/// Model beats sit on the attack while the onset envelope peaks a frame later: the onset
+/// frame of a model beat is the envelope's peak within this distance, where the tracker's
+/// beats sit, so beat strength and stability read the same envelope values.
+const MODEL_BEAT_ONSET_WINDOW_MS: f64 = 35.0;
+
+/// Beats and downbeats from a model, as the worker writes them for `analyze --beats`:
+/// `{"tracker": "beat-this-small0-dbn", "beats_ms": [...], "downbeats_ms": [...],
+/// "beats_per_bar": 4}`. `beats_per_bar` is the bar length the model's DBN chose (3 or
+/// 4), absent or null when its bars are not all the same length.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct ExternalBeats {
+    #[serde(default)]
+    pub tracker: Option<String>,
+    pub beats_ms: Vec<u64>,
+    #[serde(default)]
+    pub downbeats_ms: Vec<u64>,
+    #[serde(default)]
+    pub beats_per_bar: Option<u8>,
+}
+
+impl ExternalBeats {
+    pub fn load(path: &Path) -> Result<Self, String> {
+        let text = std::fs::read_to_string(path).map_err(|error| format!("beats: {error}"))?;
+        let beats: Self = serde_json::from_str(&text).map_err(|error| format!("beats: {error}"))?;
+        Ok(beats.normalized())
+    }
+
+    /// Positive, strictly increasing positions, and a positive bar length or none.
+    pub fn normalized(mut self) -> Self {
+        for positions in [&mut self.beats_ms, &mut self.downbeats_ms] {
+            positions.retain(|position| *position > 0);
+            positions.sort_unstable();
+            positions.dedup();
+        }
+        self.beats_per_bar = self.beats_per_bar.filter(|beats| *beats > 0);
+        self
+    }
+
+    /// The model's bar length when it is not four beats (3/4 from the DBN). Phrases and
+    /// their consumers count bars of four, so such a track gets that time signature and
+    /// no downbeat and no phrases (SM3-D16), as in the Python analyzer.
+    pub fn other_meter(&self) -> Option<u8> {
+        self.beats_per_bar
+            .filter(|beats| *beats > 0 && usize::from(*beats) != BEATS_PER_BAR)
+    }
+}
 
 fn hz_to_mel(hz: f32) -> f32 {
     let f_sp = 200.0 / 3.0;
@@ -77,20 +134,74 @@ fn mel_filterbank(sample_rate: u32) -> Vec<Vec<(usize, f32)>> {
 }
 
 /// Per-hop signals shared by beat and downbeat tracking, aligned on the onset envelope.
+/// `bands` and `mfcc` are not shifted: frame `i` is the STFT frame centred on
+/// `i * HOP_SIZE`, holding the mean mel level (dB) below 200 Hz, below 2 kHz and above,
+/// and the first `MFCC_COEFFICIENTS` MFCC of its mel levels.
 pub struct FrameFeatures {
     pub onsets: Vec<f32>,
     pub low_onsets: Vec<f32>,
     pub chroma: Vec<[f32; 12]>,
+    pub bands: Vec<[f32; BAND_COUNT]>,
+    pub mfcc: Vec<[f32; MFCC_COEFFICIENTS]>,
+}
+
+fn band_count_below(sample_rate: u32, hz: f32) -> usize {
+    let max_mel = hz_to_mel(sample_rate as f32 / 2.0);
+    (0..MEL_BANDS)
+        .take_while(|band| mel_to_hz(max_mel * (*band + 1) as f32 / (MEL_BANDS + 1) as f32) < hz)
+        .count()
 }
 
 fn low_band_count(sample_rate: u32) -> usize {
-    let max_mel = hz_to_mel(sample_rate as f32 / 2.0);
-    (0..MEL_BANDS)
-        .take_while(|band| {
-            mel_to_hz(max_mel * (*band + 1) as f32 / (MEL_BANDS + 1) as f32) < LOW_BAND_HZ
+    band_count_below(sample_rate, LOW_BAND_HZ).max(1)
+}
+
+fn band_levels(mel_db: &[f32], low_bands: usize, mid_bands: usize) -> [f32; BAND_COUNT] {
+    let mean = |values: &[f32]| {
+        values.iter().map(|value| f64::from(*value)).sum::<f64>() / values.len() as f64
+    };
+    [
+        mean(&mel_db[..low_bands]) as f32,
+        mean(&mel_db[low_bands..mid_bands]) as f32,
+        mean(&mel_db[mid_bands..]) as f32,
+    ]
+}
+
+/// Rows of the orthonormal DCT-II over `bands` values, one per kept coefficient: the MFCC
+/// of librosa (`feature.mfcc` on a dB mel spectrogram) and `scipy.fft.dct(norm="ortho")`.
+fn dct_basis(bands: usize) -> Vec<Vec<f64>> {
+    let size = bands as f64;
+    (0..MFCC_COEFFICIENTS)
+        .map(|coefficient| {
+            let scale = if coefficient == 0 {
+                (1.0 / size).sqrt()
+            } else {
+                (2.0 / size).sqrt()
+            };
+            (0..bands)
+                .map(|band| {
+                    let angle = std::f64::consts::PI * coefficient as f64 * (2 * band + 1) as f64
+                        / (2.0 * size);
+                    scale * angle.cos()
+                })
+                .collect()
         })
-        .count()
-        .max(1)
+        .collect()
+}
+
+fn mfcc_with(basis: &[Vec<f64>], mel_db: &[f32]) -> [f32; MFCC_COEFFICIENTS] {
+    std::array::from_fn(|coefficient| {
+        basis[coefficient]
+            .iter()
+            .zip(mel_db)
+            .map(|(weight, level)| weight * f64::from(*level))
+            .sum::<f64>() as f32
+    })
+}
+
+/// The first `MFCC_COEFFICIENTS` MFCC of one frame of mel levels (dB).
+pub fn mfcc(mel_db: &[f32]) -> [f32; MFCC_COEFFICIENTS] {
+    mfcc_with(&dct_basis(mel_db.len()), mel_db)
 }
 
 fn pitch_classes(sample_rate: u32) -> Vec<Option<usize>> {
@@ -121,6 +232,8 @@ pub fn frame_features(samples: &[f32], sample_rate: u32) -> FrameFeatures {
             onsets: Vec::new(),
             low_onsets: Vec::new(),
             chroma: Vec::new(),
+            bands: Vec::new(),
+            mfcc: Vec::new(),
         };
     }
     let filters = mel_filterbank(sample_rate);
@@ -176,6 +289,16 @@ pub fn frame_features(samples: &[f32], sample_rate: u32) -> FrameFeatures {
     for value in mel_db.iter_mut() {
         *value = value.max(floor);
     }
+    let mid_bands = band_count_below(sample_rate, MID_BAND_HZ).max(low_bands + 1);
+    let bands = mel_db
+        .chunks_exact(MEL_BANDS)
+        .map(|frame| band_levels(frame, low_bands, mid_bands))
+        .collect();
+    let basis = dct_basis(MEL_BANDS);
+    let mfcc = mel_db
+        .chunks_exact(MEL_BANDS)
+        .map(|frame| mfcc_with(&basis, frame))
+        .collect();
 
     let lead = 1 + FFT_SIZE / (2 * HOP_SIZE);
     let mut onsets = vec![0.0_f32; frames];
@@ -196,6 +319,8 @@ pub fn frame_features(samples: &[f32], sample_rate: u32) -> FrameFeatures {
         onsets,
         low_onsets,
         chroma,
+        bands,
+        mfcc,
     }
 }
 
@@ -333,6 +458,83 @@ pub fn window_downbeat_phase(features: &FrameFeatures, beats: &[usize]) -> Optio
     let scores = downbeat_scores(features, beats)?;
     let (phase, margin) = best_phase(&scores, 0..beats.len())?;
     (margin >= DOWNBEAT_MARGIN).then_some(phase)
+}
+
+fn nearest_beat_index(beat_grid_ms: &[u64], position: u64) -> usize {
+    let after = beat_grid_ms.partition_point(|beat| *beat < position);
+    if after == 0 {
+        return 0;
+    }
+    if after == beat_grid_ms.len() {
+        return after - 1;
+    }
+    let before = after - 1;
+    if position - beat_grid_ms[before] <= beat_grid_ms[after] - position {
+        before
+    } else {
+        after
+    }
+}
+
+/// Index of the first downbeat in `beat_grid_ms`: the bar phase (index mod 4) that
+/// collects the most model downbeats, each voting for its nearest grid beat within
+/// `MODEL_DOWNBEAT_TOLERANCE_MS`, if it holds `MODEL_DOWNBEAT_MIN_SHARE` of the model
+/// downbeats between the first and the last beat (within the tolerance).
+pub fn downbeat_phase_from_model(beat_grid_ms: &[u64], downbeats_ms: &[u64]) -> Option<usize> {
+    let (first, last) = (*beat_grid_ms.first()?, *beat_grid_ms.last()?);
+    let mut votes = [0_usize; BEATS_PER_BAR];
+    let mut counted = 0_usize;
+    for &downbeat in downbeats_ms {
+        if downbeat + MODEL_DOWNBEAT_TOLERANCE_MS < first
+            || downbeat > last + MODEL_DOWNBEAT_TOLERANCE_MS
+        {
+            continue;
+        }
+        counted += 1;
+        let index = nearest_beat_index(beat_grid_ms, downbeat);
+        if beat_grid_ms[index].abs_diff(downbeat) <= MODEL_DOWNBEAT_TOLERANCE_MS {
+            votes[index % BEATS_PER_BAR] += 1;
+        }
+    }
+    if counted == 0 {
+        return None;
+    }
+    // On a tie the earlier phase wins; a tie never reaches a share above one half.
+    let phase = (0..BEATS_PER_BAR)
+        .max_by(|left, right| votes[*left].cmp(&votes[*right]).then(right.cmp(left)))?;
+    (votes[phase] as f64 >= MODEL_DOWNBEAT_MIN_SHARE * counted as f64).then_some(phase)
+}
+
+/// Onset frame of each model beat: the onset envelope's peak within
+/// `MODEL_BEAT_ONSET_WINDOW_MS`, never before the previous beat's frame.
+pub fn model_beat_frames(beats_ms: &[u64], onsets: &[f32], sample_rate: u32) -> Vec<usize> {
+    if sample_rate == 0 {
+        return Vec::new();
+    }
+    let frame_ms = HOP_SIZE as f64 * 1_000.0 / f64::from(sample_rate);
+    let window = ((MODEL_BEAT_ONSET_WINDOW_MS / frame_ms).round() as usize).max(1);
+    let mut previous = 0_usize;
+    beats_ms
+        .iter()
+        .map(|beat| {
+            let centre = (*beat as f64 / frame_ms).round() as usize;
+            let start = centre.saturating_sub(window).max(previous);
+            let end = (centre + window + 1).min(onsets.len());
+            let frame = if start < end {
+                (start..end).fold(start, |best, frame| {
+                    if onsets[frame] > onsets[best] {
+                        frame
+                    } else {
+                        best
+                    }
+                })
+            } else {
+                centre.max(previous)
+            };
+            previous = frame;
+            frame
+        })
+        .collect()
 }
 
 fn frames_per_second(sample_rate: u32) -> f32 {
@@ -724,6 +926,8 @@ mod tests {
             onsets: vec![0.2; frames],
             low_onsets: vec![0.1; frames],
             chroma: vec![[0.0; 12]; frames],
+            bands: Vec::new(),
+            mfcc: Vec::new(),
         };
         let mut chord = 0;
         for beat in 0..beats {
@@ -787,11 +991,178 @@ mod tests {
         assert_eq!(downbeat_phase(&features, &beat_frames(beats)), None);
     }
 
+    fn model_grid(beats: u64) -> Vec<u64> {
+        (0..beats).map(|beat| 1_000 + 500 * beat).collect()
+    }
+
+    fn on_phase(grid: &[u64], phase: usize, beats: std::ops::Range<usize>) -> Vec<u64> {
+        beats
+            .filter(|beat| beat % 4 == phase)
+            .map(|beat| grid[beat])
+            .collect()
+    }
+
+    #[test]
+    fn model_downbeat_constants_match_the_python_analyzer() {
+        assert_eq!(MODEL_DOWNBEAT_TOLERANCE_MS, 70);
+        assert_eq!(MODEL_DOWNBEAT_MIN_SHARE, 0.6);
+    }
+
+    #[test]
+    fn downbeat_phase_from_model_downbeats() {
+        let grid = model_grid(64);
+        // A pickup: the bar starts on the third beat, with two stray downbeats.
+        let mut downbeats = on_phase(&grid, 2, 0..64);
+        downbeats.extend([grid[4], grid[40]]);
+        downbeats.sort_unstable();
+        assert_eq!(downbeat_phase_from_model(&grid, &downbeats), Some(2));
+
+        // Jitter within the tolerance still votes.
+        let jittered: Vec<u64> = on_phase(&grid, 3, 0..64)
+            .iter()
+            .enumerate()
+            .map(|(index, beat)| if index % 2 == 0 { beat - 60 } else { beat + 60 })
+            .collect();
+        assert_eq!(downbeat_phase_from_model(&grid, &jittered), Some(3));
+
+        // Downbeats outside the grid neither vote nor dilute the share.
+        let mut outside = vec![10, 200, grid[63] + 2_000, grid[63] + 4_000];
+        outside.extend(on_phase(&grid, 1, 0..64));
+        outside.sort_unstable();
+        assert_eq!(downbeat_phase_from_model(&grid, &outside), Some(1));
+
+        // Six of ten on one phase is exactly the share.
+        let mut exact = on_phase(&grid, 0, 0..24);
+        exact.extend([grid[1], grid[5], grid[9], grid[13]]);
+        exact.sort_unstable();
+        assert_eq!(exact.len(), 10);
+        assert_eq!(downbeat_phase_from_model(&grid, &exact), Some(0));
+
+        // A drifting tracked grid: each downbeat votes for its nearest beat.
+        let drifting: Vec<u64> = (0..40_u64)
+            .map(|beat| 1_000 + 480 * beat + 2 * beat * beat)
+            .collect();
+        let late: Vec<u64> = (1..40).step_by(4).map(|beat| drifting[beat] + 20).collect();
+        assert_eq!(downbeat_phase_from_model(&drifting, &late), Some(1));
+    }
+
+    #[test]
+    fn no_downbeat_below_min_share() {
+        let grid = model_grid(64);
+        let mut split = on_phase(&grid, 0, 0..32);
+        split.extend(on_phase(&grid, 2, 32..64));
+        let waltz: Vec<u64> = (0..64).step_by(3).map(|beat| grid[beat]).collect();
+        let off_by_more: Vec<u64> = on_phase(&grid, 3, 0..64)
+            .iter()
+            .map(|beat| beat + MODEL_DOWNBEAT_TOLERANCE_MS + 30)
+            .collect();
+        let mut below = on_phase(&grid, 0, 0..20);
+        below.extend([grid[1], grid[5], grid[9], grid[13]]);
+
+        assert_eq!(downbeat_phase_from_model(&grid, &split), None);
+        assert_eq!(downbeat_phase_from_model(&grid, &waltz), None);
+        assert_eq!(downbeat_phase_from_model(&grid, &off_by_more), None);
+        assert_eq!(downbeat_phase_from_model(&grid, &below), None);
+        assert_eq!(downbeat_phase_from_model(&grid, &[]), None);
+        assert_eq!(
+            downbeat_phase_from_model(&[], &on_phase(&grid, 0, 0..64)),
+            None
+        );
+    }
+
+    #[test]
+    fn external_beats_read_the_python_payload() {
+        let beats: ExternalBeats = serde_json::from_str(
+            r#"{"tracker": "beat-this-small0", "beats_ms": [1500, 0, 500, 1000, 1000],
+                "downbeats_ms": [1500, 500], "beats_per_bar": 3}"#,
+        )
+        .unwrap();
+        let beats = beats.normalized();
+
+        assert_eq!(beats.tracker.as_deref(), Some("beat-this-small0"));
+        assert_eq!(beats.beats_ms, vec![500, 1_000, 1_500]);
+        assert_eq!(beats.downbeats_ms, vec![500, 1_500]);
+        assert_eq!(beats.beats_per_bar, Some(3));
+        assert_eq!(beats.other_meter(), Some(3));
+    }
+
+    #[test]
+    fn only_a_bar_other_than_four_is_another_meter() {
+        for (payload, beats_per_bar) in [
+            (r#"{"beats_ms": [500], "beats_per_bar": 4}"#, Some(4)),
+            (r#"{"beats_ms": [500], "beats_per_bar": null}"#, None),
+            (r#"{"beats_ms": [500]}"#, None),
+            (r#"{"beats_ms": [500], "beats_per_bar": 0}"#, None),
+        ] {
+            let beats = serde_json::from_str::<ExternalBeats>(payload)
+                .unwrap()
+                .normalized();
+
+            assert_eq!(beats.beats_per_bar, beats_per_bar, "{payload}");
+            assert_eq!(beats.other_meter(), None, "{payload}");
+        }
+    }
+
+    #[test]
+    fn model_beats_take_the_onset_peak_as_their_frame() {
+        let samples = clicks(120.0, 10.0);
+        let onsets = onset_strength(&samples, SAMPLE_RATE);
+        // The clicks start at 0 s, every 500 ms; the model hears the attacks.
+        let beats_ms: Vec<u64> = (1..19).map(|beat| 500 * beat).collect();
+
+        let frames = model_beat_frames(&beats_ms, &onsets, SAMPLE_RATE);
+
+        assert_eq!(frames.len(), beats_ms.len());
+        for (frame, beat) in frames.iter().zip(&beats_ms) {
+            let window = &onsets[frame.saturating_sub(2)..(frame + 3).min(onsets.len())];
+            assert_eq!(
+                onsets[*frame],
+                window.iter().copied().fold(0.0_f32, f32::max)
+            );
+            let ms = *frame as f64 * HOP_SIZE as f64 * 1_000.0 / f64::from(SAMPLE_RATE);
+            assert!(
+                (ms - *beat as f64).abs() <= 50.0,
+                "beat {beat} on frame {ms} ms"
+            );
+        }
+        assert!(frames.windows(2).all(|pair| pair[0] <= pair[1]));
+    }
+
+    #[test]
+    fn close_model_beats_keep_their_frames_in_order() {
+        let onsets: Vec<f32> = (0..40)
+            .map(|frame| if frame % 7 == 0 { 1.0 } else { 0.1 })
+            .collect();
+        // Beats closer than the snapping window may not swap frames.
+        let beats_ms: Vec<u64> = vec![100, 140, 180, 600];
+
+        let frames = model_beat_frames(&beats_ms, &onsets, SAMPLE_RATE);
+
+        assert!(
+            frames.windows(2).all(|pair| pair[0] <= pair[1]),
+            "{frames:?}"
+        );
+    }
+
     #[test]
     fn silence_has_no_tempo_or_beats() {
         let onsets = onset_strength(&vec![0.0; SAMPLE_RATE as usize * 10], SAMPLE_RATE);
 
         assert_eq!(estimate_tempo(&onsets, SAMPLE_RATE), None);
         assert!(track_beats(&onsets, SAMPLE_RATE).is_empty());
+    }
+
+    #[test]
+    fn frame_features_return_mfcc_on_the_band_frames() {
+        let samples = clicks(120.0, 3.0);
+
+        let features = frame_features(&samples, SAMPLE_RATE);
+
+        assert_eq!(features.mfcc.len(), features.bands.len());
+        assert!(features.mfcc.len() > 100);
+        assert!(features
+            .mfcc
+            .iter()
+            .all(|frame| frame.iter().all(|value| value.is_finite())));
     }
 }

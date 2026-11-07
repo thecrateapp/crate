@@ -21,10 +21,20 @@ def test_smart_mix_capabilities_default_to_disabled(test_app, monkeypatch):
         "smart_mix": {
             "available": False,
             "planner_version": None,
+            "planner_versions": [],
+            "structure": False,
             "android_native_crossfade": False,
             "android_beatmatch": False,
             "android_bass_handoff": False,
             "android_long_beatmatch": False,
+            "ai_assisted": {
+                "available": False,
+                "provider_kind": None,
+                "model_label": None,
+                "prompt_version": "sm3-refine-1",
+                "typical_latency_ms": None,
+                "reason": "smart_mix_unavailable",
+            },
         },
         "vdj": {
             "available": False,
@@ -44,6 +54,17 @@ def test_smart_mix_capabilities_default_to_disabled(test_app, monkeypatch):
 def test_smart_mix_capabilities_support_local_environment_overrides(
     test_app, monkeypatch
 ):
+    monkeypatch.setattr(
+        "crate.api.capabilities.get_smart_mix_structure_percent", lambda: None
+    )
+    # AI Assisted Mixing stays off by default (smart_mix_ai_enabled).
+    monkeypatch.setattr(
+        "crate.api.capabilities.refinement_gate",
+        lambda: {"enabled": False, "available": False, "fingerprint": None},
+    )
+    monkeypatch.setattr(
+        "crate.api.capabilities.get_smart_mix_refinement_latency_ms", lambda: None
+    )
     monkeypatch.setenv("CRATE_SMART_MIX_ENABLED", "true")
     monkeypatch.setenv("CRATE_ANDROID_NATIVE_CROSSFADE_ENABLED", "true")
     monkeypatch.setenv("CRATE_ANDROID_BEATMATCH_ENABLED", "true")
@@ -56,10 +77,20 @@ def test_smart_mix_capabilities_support_local_environment_overrides(
         "smart_mix": {
             "available": True,
             "planner_version": "smart-mix-v2",
+            "planner_versions": ["smart-mix-v2", "smart-mix-v3"],
+            "structure": False,
             "android_native_crossfade": True,
             "android_beatmatch": True,
             "android_bass_handoff": True,
             "android_long_beatmatch": True,
+            "ai_assisted": {
+                "available": False,
+                "provider_kind": None,
+                "model_label": None,
+                "prompt_version": "sm3-refine-1",
+                "typical_latency_ms": None,
+                "reason": "disabled",
+            },
         },
         "vdj": {
             "available": False,

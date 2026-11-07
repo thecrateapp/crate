@@ -1,4 +1,4 @@
-"""The eleven registered operations, independent of provider and persistence."""
+"""The fourteen registered operations, independent of provider and persistence."""
 
 from crate.ai.contracts import AIAction, AIConfigurationError, ActionMaxima
 
@@ -156,6 +156,46 @@ ACTIONS: dict[str, AIAction] = {
             90,
             16000,
             "Draft translations while preserving keys and placeholders for review.",
+        ),
+        # Reasoning models count their thinking against the output limit (Gemini's
+        # maxOutputTokens, DeepSeek's max_tokens): a triage answer is about 200
+        # tokens, but its reasoning can take thousands. The timeouts leave room to
+        # produce that many tokens.
+        _action(
+            "ops.error.triage",
+            "Triage error issue",
+            "ops",
+            "text",
+            "ops.errors.manage",
+            "/errors",
+            90,
+            8192,
+            "Classify an error issue from its sanitized digest and pick duplicates "
+            "only from the listed candidates.",
+        ),
+        _action(
+            "ops.error.investigate",
+            "Investigate error issue",
+            "ops",
+            "text",
+            "ops.errors.manage",
+            "/errors",
+            90,
+            16000,
+            "Propose a cause and a concrete next step for one error issue from its "
+            "sanitized digest.",
+        ),
+        _action(
+            "smart_mix.transition.refine",
+            "Refine Smart Mix transition",
+            "smart_mix",
+            "text",
+            "smart_mix.ai",
+            "/settings",
+            45,
+            1024,
+            "Pick and adjust one transition from the planner's valid candidates, "
+            "using only tempo, key, energy and phrase numbers.",
         ),
     )
 }

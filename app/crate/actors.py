@@ -22,7 +22,16 @@ import dramatiq
 
 # Broker must be imported before actor registration
 import crate.broker  # noqa: F401
+from crate.ai.queues import AI_QUEUES
+from crate.ai.requeue import (
+    AI_CALL_DEADLINE_MARGIN_SECONDS,
+    AI_CONCURRENCY_REQUEUE_LIMIT,
+    AIConcurrencyDeferred,
+    concurrency_window,
+    requeue_delay_ms,
+)
 from crate.db.repositories.tasks_shared import DB_HEAVY_TASKS
+from crate.worker_handlers import RUN_AGAIN_AFTER_KEY
 
 log = logging.getLogger(__name__)
 
@@ -58,6 +67,13 @@ DOWNLOAD_SEM_MAX = _env_int("CRATE_DOWNLOAD_SEM_MAX", 2)
 #   default — mixed: sync, pipeline, downloads, management
 #   maintenance — deferrable repair/sync/export work
 #   playback — interactive playback delivery and stream variant preparation
+#   ai      — every interactive AI-provider call (≤ 300s; crate.ai.queues)
+#   ai_bulk — long AI-provider batches such as the genre taxonomy runs
+#
+# A task that calls a model (directly or through a domain helper) belongs in
+# ai or ai_bulk and nowhere else; tests/test_actor_config.py enforces it. Paid
+# AI work keeps max_retries=0: the runtime reserves before transmitting and a
+# connection-concurrency refusal is requeued by the actor, not retried.
 
 
 class TaskPoolConfig(NamedTuple):
@@ -68,8 +84,34 @@ class TaskPoolConfig(NamedTuple):
 
 
 TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
-    "ai_catalog_refresh": TaskPoolConfig("maintenance", 0, 180, 0),
-    "ai_profile_test": TaskPoolConfig("maintenance", 0, 180, 0),
+    # Admin-triggered and short (30s discovery budget): interactive lane.
+    "ai_catalog_refresh": TaskPoolConfig("ai", 0, 180, 0),
+    "ai_profile_test": TaskPoolConfig("ai", 0, 180, 0),
+    # One genres.eq.propose call (≤ 45s) plus the optional apply.
+    "propose_genre_eq": TaskPoolConfig("ai", 0, 120, 0),
+    # One playlists.description.generate call (≤ 45s) plus the optional apply.
+    "generate_playlist_description": TaskPoolConfig("ai", 0, 120, 0),
+    # One genres.taxonomy.propose call (≤ 90s) after catalog and evidence reads.
+    "propose_genre_taxonomy_node": TaskPoolConfig("ai", 0, 180, 0),
+    # Replays the deterministic scene plan, then one music_paths.refine call (≤ 8s).
+    "refine_music_path": TaskPoolConfig("ai", 0, 120, 0),
+    # Loads one candidate (a fanart download stops within 30s + one 12s read), then one
+    # artwork.hero.analyze call (≤ 90s).
+    "analyze_artist_hero_candidate": TaskPoolConfig("ai", 0, 180, 0),
+    # Error inbox: one ops.error.triage call (≤ 90s) plus the 30s call margin; queued
+    # by the sync or a backlog.
+    "triage_error_issue": TaskPoolConfig("ai", 1, 150, 0),
+    # A person's Investigate: Sentry evidence reads (≤ 20s), then one
+    # ops.error.investigate call (≤ 90s).
+    "investigate_error_issue": TaskPoolConfig("ai", 0, 180, 0),
+    # Error triage evaluation (gate EG2): Sentry reads for listed issues the inbox no
+    # longer holds (≤ 600s), then one ops.error.triage call (≤ 90s) for each of at
+    # most 100 issues, nothing saved; queued by tools/error-inbox-eval.
+    "evaluate_error_triage": TaskPoolConfig("ai_bulk", 3, 10800, 0),
+    # One smart_mix.transition.refine call (≤ 45 s) for a transition about to
+    # play: top priority. 120 s leaves the longest action maximum (90 s) after
+    # the call margin, like the other ai tasks.
+    "smart_mix_refine_transition": TaskPoolConfig("ai", 0, 120, 0),
     # User-initiated (priority 0) — these should run ASAP
     "tidal_download": TaskPoolConfig(
         "default", 0, 14400, 0
@@ -146,7 +188,7 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "library_pipeline": TaskPoolConfig("maintenance", 2, 7200, 0),
     "health_check": TaskPoolConfig("maintenance", 2, 1500, 0),
     "quality_check": TaskPoolConfig("maintenance", 2, 1800, 0),
-    "show_extract": TaskPoolConfig("maintenance", 2, 180, 0),
+    "show_extract": TaskPoolConfig("ai", 2, 180, 0),
     "agent_maintenance": TaskPoolConfig("maintenance", 2, 1800, 0),
     "agent_tidal_download": TaskPoolConfig("default", 0, 14400, 0),
     "agent_control": TaskPoolConfig("fast", 0, 60, 0),
@@ -157,6 +199,12 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "compute_product_kpis": TaskPoolConfig("maintenance", 2, 900, 0),
     "compute_observability_summary": TaskPoolConfig("maintenance", 2, 120, 0),
     "compute_recommendation_skips": TaskPoolConfig("maintenance", 2, 300, 0),
+    # Error inbox: Sentry calls with external effects never retry.
+    "sync_error_issues": TaskPoolConfig("maintenance", 1, 120, 0),
+    "update_error_issue_status": TaskPoolConfig("fast", 0, 30, 0),
+    "test_error_tracking_connection": TaskPoolConfig("fast", 0, 30, 0),
+    # Launch fix: one workflow_dispatch to GitHub, never retried.
+    "dispatch_error_fix": TaskPoolConfig("fast", 0, 30, 0),
     "check_new_releases": TaskPoolConfig("maintenance", 2, 7200, 1),
     "promote_due_releases": TaskPoolConfig("maintenance", 2, 900, 0),
     "scan": TaskPoolConfig("maintenance", 2, 1800, 0),
@@ -187,10 +235,13 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "compute_smart_mix_profile": TaskPoolConfig("heavy", 2, 900, 2),
     "backfill_smart_mix_profiles": TaskPoolConfig("heavy", 3, 1800, 0),
     "refresh_smart_mix_coverage": TaskPoolConfig("maintenance", 3, 300, 0),
+    # Daily retention of AI refinements (SM3-D5): records queued reads, then
+    # deletes rows unread for 180 days. No model call.
+    "cleanup_smart_mix_refinements": TaskPoolConfig("maintenance", 3, 600, 0),
     "backfill_track_audio_fingerprints": TaskPoolConfig("heavy", 3, 14400, 0),
     "index_genres": TaskPoolConfig("maintenance", 3, 600, 0),
-    "infer_genre_taxonomy": TaskPoolConfig("maintenance", 3, 3600, 0),
-    "rebuild_genre_taxonomy_proposals": TaskPoolConfig("maintenance", 3, 7200, 0),
+    "infer_genre_taxonomy": TaskPoolConfig("ai_bulk", 3, 3600, 0),
+    "rebuild_genre_taxonomy_proposals": TaskPoolConfig("ai_bulk", 3, 7200, 0),
     "enrich_genre_descriptions": TaskPoolConfig("maintenance", 3, 3600, 0),
     "sync_musicbrainz_genre_graph": TaskPoolConfig("maintenance", 3, 5400, 0),
     "cleanup_invalid_genre_taxonomy": TaskPoolConfig("maintenance", 3, 900, 0),
@@ -207,7 +258,8 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "repair_artwork_variants": TaskPoolConfig("maintenance", 3, 3600, 1),
     "backfill_similarities": TaskPoolConfig("maintenance", 3, 3600, 0),
     "normalize_artist_bios": TaskPoolConfig("maintenance", 2, 3600, 0),
-    "research_artist_bio": TaskPoolConfig("default", 1, 900, 1),
+    # Web collection (bounded request timeouts) plus one model call of ≤ 90s.
+    "research_artist_bio": TaskPoolConfig("ai", 1, 300, 0),
     "sync_shows": TaskPoolConfig("maintenance", 3, 3600, 1),
     "bandcamp_connect_credentials": TaskPoolConfig("maintenance", 1, 900, 0),
     "bandcamp_sync_collection": TaskPoolConfig("maintenance", 2, 7200, 1),
@@ -237,8 +289,8 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     "refresh_system_smart_playlists": TaskPoolConfig("maintenance", 3, 1800, 0),
     "persist_playlist_cover": TaskPoolConfig("fast", 0, 120, 1),
     "crate_download": TaskPoolConfig("default", 0, 7200, 0),
-    # Listen i18n
-    "draft_i18n_translation": TaskPoolConfig("maintenance", 3, 900, 0),
+    # Listen i18n: one draft call (i18n.listen.draft allows ≤ 90s).
+    "draft_i18n_translation": TaskPoolConfig("ai", 3, 300, 0),
 }
 
 # DB-heavy tasks — only one at a time via Redis mutex
@@ -579,8 +631,98 @@ def clear_download_slots():
 # ── Generic task executor ─────────────────────────────────────────
 
 
-def _execute_task(task_type: str, task_id: str):
+def _send_later(task_type: str, task_id: str, delay_ms: int, ai_requeues: int = 0):
+    """Send the task's message again, keeping its AI capacity attempt count."""
+    actor = _actors.get(task_type)
+    if not actor:
+        return
+    options: dict[str, Any] = {"args": (task_id,), "delay": delay_ms}
+    if ai_requeues:
+        options["kwargs"] = {"ai_requeues": ai_requeues}
+    actor.send_with_options(**options)
+
+
+def _requeue_later(
+    task_type: str,
+    task_id: str,
+    *,
+    delay_ms: int,
+    progress: str,
+    ai_requeues: int = 0,
+) -> bool:
+    """Return a running task to pending and send its message again later.
+
+    A cancellation request wins: the row is left alone and the cancellation is
+    acknowledged instead. Returns whether the task was requeued.
+
+    Once the row is pending a failed send must not fail the task: the caller's
+    error path would mark a task that never ran again as failed. The stale
+    pending redispatch of the service loop sends it again instead.
+    """
+    from crate.db.repositories.tasks import requeue_running_task
+    from crate.worker import _is_cancelled
+
+    if requeue_running_task(task_id, progress=progress) is None:
+        if _is_cancelled(task_id):
+            from crate.db.repositories.task_control import acknowledge_cancellation
+
+            acknowledged = acknowledge_cancellation(task_id)
+            if acknowledged:
+                from crate.db.events import _publish_to_redis
+
+                _publish_to_redis(
+                    task_id,
+                    "task_done",
+                    {
+                        "type": "task_done",
+                        "status": acknowledged["status"],
+                        "task_type": task_type,
+                    },
+                    "",
+                )
+        log.info("Task %s (%s) not requeued: no longer running", task_id, task_type)
+        return False
+    try:
+        _send_later(task_type, task_id, delay_ms, ai_requeues=ai_requeues)
+    except Exception:
+        log.warning(
+            "Task %s (%s) is pending but its message could not be sent; "
+            "the stale pending redispatch will send it",
+            task_id,
+            task_type,
+            exc_info=True,
+        )
+    return True
+
+
+def _requeue_for_ai_capacity(task_type: str, task_id: str, attempt: int) -> None:
+    """Put an AI task refused for connection concurrency back in its queue."""
+    delay_ms = requeue_delay_ms()
+    if not _requeue_later(
+        task_type,
+        task_id,
+        delay_ms=delay_ms,
+        progress=(
+            "Waiting for AI provider capacity; "
+            f"retry {attempt}/{AI_CONCURRENCY_REQUEUE_LIMIT} in {delay_ms // 1000}s"
+        ),
+        ai_requeues=attempt,
+    ):
+        return
+    log.info(
+        "Task %s (%s) waiting for AI provider capacity; requeue %d/%d in %dms",
+        task_id,
+        task_type,
+        attempt,
+        AI_CONCURRENCY_REQUEUE_LIMIT,
+        delay_ms,
+    )
+
+
+def _execute_task(task_type: str, task_id: str, ai_requeues: int = 0):
     """Generic wrapper: read PG task → run handler → update PG → check memory."""
+    # Dramatiq's time limit runs from here; AI calls must end before it.
+    message_started = time.monotonic()
     from crate.config import load_config
     from crate.db.queries.tasks import get_task
     from crate.db.repositories.task_control import acknowledge_cancellation
@@ -621,12 +763,12 @@ def _execute_task(task_type: str, task_id: str):
             task_id,
             progress=f"Deferred by resource governor: {resource_decision.reason}",
         )
-        actor = _actors.get(task_type)
-        if actor:
-            actor.send_with_options(
-                args=(task_id,),
-                delay=max(1, resource_decision.defer_seconds) * 1000,
-            )
+        _send_later(
+            task_type,
+            task_id,
+            max(1, resource_decision.defer_seconds) * 1000,
+            ai_requeues,
+        )
         return
 
     # DB-heavy mutex — check BEFORE marking as running
@@ -722,9 +864,8 @@ def _execute_task(task_type: str, task_id: str):
                 fresh.get("status"),
             )
         else:
-            actor = _actors.get(task_type)
-            if fresh and fresh.get("status") == "pending" and actor:
-                actor.send_with_options(args=(task_id,), delay=TASK_REQUEUE_DELAY_MS)
+            if fresh and fresh.get("status") == "pending":
+                _send_later(task_type, task_id, TASK_REQUEUE_DELAY_MS, ai_requeues)
             log.info("Task %s (%s) waiting for runtime admission", task_id, task_type)
         if is_db_heavy:
             _release_db_heavy_lock(task_id)
@@ -743,12 +884,14 @@ def _execute_task(task_type: str, task_id: str):
     )
     hb_thread.start()
 
-    # Record queue wait time (created → running)
+    # Record queue wait time (created → first running). A retried or requeued
+    # task already started once; counting from creation again would report its
+    # earlier runs and delays as queue wait.
     try:
         from crate.metrics import record
 
         created = task.get("created_at")
-        if created and hasattr(created, "timestamp"):
+        if created and hasattr(created, "timestamp") and not task.get("started_at"):
             wait_sec = _time.time() - created.timestamp()
             record("worker.queue.wait", wait_sec, {"type": task_type})
     except Exception:
@@ -777,7 +920,19 @@ def _execute_task(task_type: str, task_id: str):
                 authority_failed = True
         if not authority_failed:
             config = load_config()
-            result = handler(task_id, task.get("params", {}), config)
+            queue = get_queue_for_task(task_type)
+            if queue in AI_QUEUES:
+                deadline = (
+                    message_started
+                    + TASK_POOL_CONFIG[task_type].time_limit_seconds
+                    - AI_CALL_DEADLINE_MARGIN_SECONDS
+                )
+                with concurrency_window(
+                    queue, ai_requeues, deadline=deadline, task_id=task_id
+                ):
+                    result = handler(task_id, task.get("params", {}), config)
+            else:
+                result = handler(task_id, task.get("params", {}), config)
 
         if not authority_failed and _is_cancelled(task_id):
             if isinstance(result, dict) and result.get("_delegated"):
@@ -821,6 +976,18 @@ def _execute_task(task_type: str, task_id: str):
                 task_type,
                 result.get("chunks", 0),
             )
+        elif isinstance(result, dict) and result.get(RUN_AGAIN_AFTER_KEY):
+            # The handler waits for capacity without holding this process.
+            delay_ms = max(1, round(float(result[RUN_AGAIN_AFTER_KEY]) * 1000))
+            if _requeue_later(
+                task_type,
+                task_id,
+                delay_ms=delay_ms,
+                progress=str(result.get("progress") or "Waiting to run again"),
+            ):
+                log.debug(
+                    "Task %s (%s) runs again in %dms", task_id, task_type, delay_ms
+                )
         elif isinstance(result, dict) and (
             result.get("error") or result.get("status") in {"failed", "conflict"}
         ):
@@ -831,16 +998,19 @@ def _execute_task(task_type: str, task_id: str):
             )[:500]
             update_task(task_id, status="failed", result=result, error=error)
             log.warning("Task %s (%s) failed: %s", task_id, task_type, error)
-            from crate.observability.sentry import capture_task_failure
+            # An expected failure (an external service misconfigured or down, which
+            # the page already explains) stays failed but is not a Sentry error.
+            if not result.get("expected"):
+                from crate.observability.sentry import capture_task_failure
 
-            capture_task_failure(
-                task_type=task_type,
-                task_id=task_id,
-                queue=get_queue_for_task(task_type),
-                error=error,
-                retry_count=int(task.get("retry_count") or 0),
-                max_retries=int(task.get("max_retries") or 0),
-            )
+                capture_task_failure(
+                    task_type=task_type,
+                    task_id=task_id,
+                    queue=get_queue_for_task(task_type),
+                    error=error,
+                    retry_count=int(task.get("retry_count") or 0),
+                    max_retries=int(task.get("max_retries") or 0),
+                )
             _try_fan_in_parent(task, task_type, task_id)
             try:
                 from crate.metrics import record as _record
@@ -946,6 +1116,10 @@ def _execute_task(task_type: str, task_id: str):
             log.debug("Task event publish failed", exc_info=True)
         raise  # let dramatiq handle retry logic
 
+    except AIConcurrencyDeferred as deferred:
+        # Nothing was transmitted: the provider connection had no free slot.
+        _requeue_for_ai_capacity(task_type, task_id, deferred.attempt)
+
     except BaseException as e:
         if e.__class__.__name__ != "TimeLimitExceeded":
             raise
@@ -1034,11 +1208,11 @@ _actors: dict[str, dramatiq.Actor] = {}
 def _make_actor_fn(task_type: str):
     """Create a closure that calls _execute_task for a specific task type."""
 
-    def actor_fn(task_id: str):
+    def actor_fn(task_id: str, ai_requeues: int = 0):
         from crate.observability.sentry import task_scope
 
         with task_scope(task_type, task_id, get_queue_for_task(task_type)):
-            _execute_task(task_type, task_id)
+            _execute_task(task_type, task_id, ai_requeues=ai_requeues)
 
     actor_fn.__name__ = task_type
     actor_fn.__qualname__ = task_type

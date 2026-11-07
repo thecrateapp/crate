@@ -168,42 +168,7 @@ def _artist_key(track: Mapping | None) -> str:
     return str(track.get("artist") or "").strip().casefold()
 
 
-def refine_music_path_with_llm(
-    *,
-    origin_label: str,
-    dest_label: str,
-    origin_type: str,
-    dest_type: str,
-    tracks: list[dict],
-    candidates_by_genre: Mapping[str, list[dict]],
-    actor_id: int | None = None,
-    recent_song_keys: set[tuple[str, str]] | None = None,
-    previous_song_keys: set[tuple[str, str]] | None = None,
-    previous_track_ids: set[int] | None = None,
-    validation_context: dict | None = None,
-) -> list[dict]:
-    """Compatibility entry point; the service owns AI execution and caching."""
-    from crate.music_paths_refinement import (
-        refine_music_path_with_llm as implementation,
-    )
-
-    return implementation(
-        origin_label=origin_label,
-        dest_label=dest_label,
-        origin_type=origin_type,
-        dest_type=dest_type,
-        tracks=tracks,
-        candidates_by_genre=candidates_by_genre,
-        actor_id=actor_id,
-        recent_song_keys=recent_song_keys,
-        previous_song_keys=previous_song_keys,
-        previous_track_ids=previous_track_ids,
-        validation_context=validation_context,
-    )
-
-
 __all__ = [
     "MusicPathLlmRefinementResponse",
     "MusicPathReplacement",
-    "refine_music_path_with_llm",
 ]

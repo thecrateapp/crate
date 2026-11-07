@@ -393,6 +393,7 @@ def create_app() -> FastAPI:
                 "admin",
                 "agents",
                 "admin-auth",
+                "errors",
             },
             title="Crate Admin & System API",
             summary="Setup, administration, health, task orchestration, and system control.",
@@ -610,6 +611,9 @@ def create_app() -> FastAPI:
     app.include_router(admin_federation_router)
     app.include_router(admin_global_catalog_router)
     app.include_router(admin_metrics_router)
+    from crate.api.error_inbox import router as error_inbox_router
+
+    app.include_router(error_inbox_router)
     from crate.api.agent_integrations import router as agent_integrations_router
     from crate.api.agent_plans import router as agent_plans_router
     from crate.api.show_imports import router as show_imports_router

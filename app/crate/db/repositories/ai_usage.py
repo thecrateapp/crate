@@ -44,9 +44,13 @@ def reserve_invocation(
     output_tokens: int,
     actor_id: int | None = None,
     job_id: str | None = None,
+    leave_free: int = 0,
     session=None,
 ) -> dict:
     """Return invocation row plus claimed:boolean and owner-only claim_token.
+
+    ``leave_free`` keeps that many slots of a multi-call connection unused (bulk
+    work leaves room for interactive calls); a single-call connection is shared.
 
     context keys: connection_id, model_id (required), action_id for actions; profile_id,
     profile_version, config_fingerprint (optional). Raw input/output is never stored.
@@ -158,7 +162,10 @@ def reserve_invocation(
             or conn["provider"] != context["provider"]
         ):
             _error("AI_CONTEXT_STALE", "Legacy connection does not match")
-        if not tracking and conn["active_invocations"] >= conn["max_concurrent"]:
+        slots = conn["max_concurrent"]
+        if leave_free > 0 and slots > leave_free:
+            slots -= leave_free
+        if not tracking and conn["active_invocations"] >= slots:
             _error("AI_CONCURRENCY_LIMIT", "Connection concurrency limit reached")
         if not tracking and totals["calls"] >= conn["daily_calls"]:
             _error("AI_DAILY_CALL_LIMIT", "Daily call limit reached")
@@ -348,8 +355,57 @@ def finish_invocation(
         return _row(result)
 
 
+ABANDONED_INVOCATION_SECONDS = 15 * 60
+
+
+def reclaim_abandoned_invocations(
+    *, stale_after_seconds: int = ABANDONED_INVOCATION_SECONDS, limit: int = 100
+) -> int:
+    """Release the concurrency of reservations that no call will ever finish.
+
+    A reservation is abandoned when its task is terminal or gone (the worker was
+    killed mid-call) or when it has no live owner after ``stale_after_seconds``,
+    longer than any call may run. It is finished as failed with
+    AI_INVOCATION_ABANDONED: the slot comes back once and the charged tokens are
+    kept, so the daily budget is never refunded.
+    """
+    with optional_scope(None) as s:
+        ids = (
+            s.execute(
+                text(
+                    """
+                SELECT i.id
+                FROM ai_invocations i
+                LEFT JOIN tasks t ON t.id = i.job_id
+                WHERE i.status = 'reserved'
+                  AND (
+                      (i.job_id IS NOT NULL
+                       AND (t.id IS NULL OR t.status IN ('completed', 'failed', 'cancelled')))
+                      OR i.created_at < NOW() - make_interval(secs => :stale)
+                  )
+                ORDER BY i.created_at
+                LIMIT :limit
+                """
+                ),
+                {
+                    "stale": max(1, int(stale_after_seconds)),
+                    "limit": max(1, int(limit)),
+                },
+            )
+            .scalars()
+            .all()
+        )
+    reclaimed = 0
+    for invocation_id in ids:
+        row = finish_invocation(
+            invocation_id, None, "failed", error_code="AI_INVOCATION_ABANDONED"
+        )
+        reclaimed += int(row.get("error_code") == "AI_INVOCATION_ABANDONED")
+    return reclaimed
+
+
 def list_invocations(filters, limit=50, cursor=None, *, session=None) -> dict:
-    """Keyset page: {items, next_cursor}; filters connection_id/action_id/invocation_kind/status/actor_id.
+    """Keyset page: {items, next_cursor}; filters connection_id/action_id/invocation_kind/status/actor_id/model_id/job_id.
 
     Cursor is opaque JSON [created_at,id] emitted by this repository. Claim tokens
     are omitted. Activity older than 90 days is excluded even before bounded prune.
@@ -363,12 +419,18 @@ def list_invocations(filters, limit=50, cursor=None, *, session=None) -> dict:
         "status",
         "actor_id",
         "model_id",
+        "job_id",
     ):
         if filters.get(key) is not None:
             clauses.append(f"{key}=:{key}")
             params[key] = filters[key]
     if filters.get("provider") is not None:
-        if filters["provider"] not in {"gemini", "deepseek", "ollama"}:
+        if filters["provider"] not in {
+            "gemini",
+            "deepseek",
+            "ollama",
+            "openai_compatible",
+        }:
             _error("AI_USAGE_INVALID", "Unknown provider")
         clauses.append(
             "connection_id IN (SELECT id FROM ai_provider_connections WHERE provider=:provider)"

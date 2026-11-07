@@ -34,11 +34,13 @@ vi.mock("@/lib/api", () => ({
   apiSseUrl: (path: string) => path,
 }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+vi.mock("@/lib/tasks", () => ({ waitForTask: vi.fn() }));
 
 import { useApi } from "@/hooks/use-api";
 import { useActionLLMStatus } from "@/hooks/use-llm";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { waitForTask } from "@/lib/tasks";
 import { PlaylistEditor } from "./PlaylistEditor";
 const mockApi = vi.mocked(api),
   mockUseApi = vi.mocked(useApi);
@@ -87,13 +89,17 @@ beforeEach(() => {
       : path.endsWith("/refine")
         ? fixture.proposal
         : path.endsWith("/ai-description")
-          ? fixture.description
+          ? { task_id: "describe-1" }
           : path.includes("track-search?")
             ? { tracks: fixture.candidates, scope: "rules" }
             : path.endsWith("/duplicate")
               ? { id: 99 }
               : fixture.surface.playlist,
   );
+  vi.mocked(waitForTask).mockResolvedValue({
+    status: "completed",
+    result: { ...fixture.description, applied: false },
+  });
 });
 afterEach(() => {
   cleanup();

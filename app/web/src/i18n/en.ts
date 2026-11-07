@@ -154,11 +154,11 @@ export const en = {
     "Rooms with one shared queue, votes and DJ modes. It stays behind a feature flag until it is finished.",
   "working.jams.facts":
     "rooms · shared queue · votes · DJ modes · behind a flag",
-  "working.vdj.title": "VirtualDJ plugin",
-  "working.vdj.body":
-    "Crate as a VirtualDJ online source: search, folders and load to deck, plus a Compatibles folder ranked by tempo, harmony, energy and sound, with Camelot and energy metadata. Requires VirtualDJ Pro.",
-  "working.vdj.facts":
-    "C++20 · CMake · private VirtualDJ SDK · personal access token",
+  "working.decks.title": "Crate Decks",
+  "working.decks.body":
+    "A DJ app for Linux built on Mixxx. It uses your Crate server as its library: search, the original audio, track analysis and transition plans from Crate's planner. It signs in like Listen, without an access token.",
+  "working.decks.facts":
+    "Mixxx fork · Linux · native sign-in · transition plans",
 } as const;
 
 export type MessageKey = keyof typeof en;

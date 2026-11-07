@@ -2,7 +2,7 @@ import base64
 import io
 import logging
 
-from fastapi import APIRouter, File, Form, Request, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, JSONResponse, Response
 
@@ -15,6 +15,7 @@ from crate.api._deps import (
     library_path,
     safe_path,
 )
+from crate.api.ai_tasks import queue_ai_task
 from crate.api.auth import _require_auth
 from crate.api.artwork_delivery import deliver_original_artwork
 from crate.api.openapi_responses import (
@@ -46,7 +47,8 @@ from crate.api.schemas.common import TaskEnqueueResponse
 from crate.audio import get_audio_files
 from crate.artwork import extract_embedded_cover, save_cover
 from crate.artist_hero_candidates import (
-    analyze_candidate_image,
+    candidate_fingerprint,
+    decode_candidate_token,
     discover_artist_hero_candidates,
     load_candidate_content,
 )
@@ -936,36 +938,52 @@ def api_artist_hero_candidate_preview(request: Request, artist_id: int, candidat
 
 @router.post(
     "/api/artwork/artists/{artist_id}/hero-candidates/analyze",
-    responses=_ARTWORK_RESPONSES,
-    summary="Analyze one artist-hero candidate with the configured vision model",
+    status_code=202,
+    response_model=TaskEnqueueResponse,
+    responses=merge_responses(
+        _ARTWORK_RESPONSES,
+        {503: error_response("The artist-hero analysis action is unavailable.")},
+    ),
+    summary="Queue a vision analysis of one artist-hero candidate",
 )
 def api_analyze_artist_hero_candidate(
     request: Request, artist_id: int, body: ArtistHeroCandidateAnalysisRequest
 ):
+    """Queue the analysis on the ai queue; the task result holds it.
+
+    The model is never called inside the request (SM3-D8). Follow the returned
+    task with /api/events/task/{task_id}; its result is {summary, desktop,
+    mobile}. Only the signed candidate token is checked here: the worker loads
+    the image.
+    """
     actor = _require_artwork_editor(request)
-    artist_name = artist_name_from_id(artist_id)
-    if not artist_name:
-        return JSONResponse({"error": "Artist not found"}, status_code=404)
-    root = library_path().resolve()
-    artist_dir = resolve_artist_dir(
-        root,
-        get_library_artist(artist_name),
-        fallback_name=artist_name,
-        existing_only=True,
-    )
-    if not artist_dir:
-        return JSONResponse({"error": "Artist directory not found"}, status_code=404)
-    loaded = load_candidate_content(
-        body.candidate, artist_id=artist_id, artist_dir=artist_dir
-    )
-    if loaded is None:
-        return JSONResponse({"error": "Candidate not found"}, status_code=404)
-    analysis = analyze_candidate_image(loaded[0], actor_id=actor.get("id"))
-    if analysis is None:
-        return JSONResponse(
-            {"error": "The configured model cannot analyze images"}, status_code=409
-        )
-    return analysis.model_dump()
+    if not artist_name_from_id(artist_id):
+        raise HTTPException(status_code=404, detail="Artist not found")
+    candidate = decode_candidate_token(body.candidate, expected_artist_id=artist_id)
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    from crate.ai.consumers import accept_action
+    from crate.ai.contracts import AIConfigurationError
+
+    try:
+        acceptance = accept_action("artwork.hero.analyze")
+    except AIConfigurationError as error:
+        raise HTTPException(
+            status_code=503,
+            detail=error.message,
+            headers={"X-Crate-Error": error.code},
+        ) from None
+
+    # Each discovery signs a new token; the image identity is what repeats.
+    dedup_key = f"artist-hero-analysis:{artist_id}:{candidate_fingerprint(candidate)}"
+    params = {
+        "artist_id": artist_id,
+        "candidate": body.candidate,
+        "actor_user_id": actor.get("id"),
+        "ai_acceptance": acceptance,
+    }
+    return queue_ai_task("analyze_artist_hero_candidate", params, dedup_key=dedup_key)
 
 
 @router.post(

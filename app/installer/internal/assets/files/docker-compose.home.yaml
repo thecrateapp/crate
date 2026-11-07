@@ -288,6 +288,8 @@ services:
       CRATE_ANDROID_NATIVE_CROSSFADE_ENABLED: ${CRATE_ANDROID_NATIVE_CROSSFADE_ENABLED:-false}
       CRATE_ANDROID_BEATMATCH_ENABLED: ${CRATE_ANDROID_BEATMATCH_ENABLED:-false}
       CRATE_ANDROID_BASS_HANDOFF_ENABLED: ${CRATE_ANDROID_BASS_HANDOFF_ENABLED:-false}
+      CRATE_VDJ_ENABLED: ${CRATE_VDJ_ENABLED:-false}
+      CRATE_VDJ_AUTOMATION_ENABLED: ${CRATE_VDJ_AUTOMATION_ENABLED:-false}
       CRATE_MCP_ALLOWED_ORIGINS: ${CRATE_MCP_ALLOWED_ORIGINS:-}
       CRATE_MCP_ADMIN_ORIGINS: ${CRATE_MCP_ADMIN_ORIGINS:-}
       CRATE_MCP_OPS_FRESH_SECONDS: ${CRATE_MCP_OPS_FRESH_SECONDS:-60}
@@ -444,6 +446,8 @@ services:
       traefik.http.services.crate-readplane.loadbalancer.server.port: 8686
 
   crate-worker:
+    # The pools drain in-flight tasks on SIGTERM (crate.worker POOL_STOP_GRACE_SECONDS).
+    stop_grace_period: 2m
     logging: *default-logging
     image: ${CRATE_WORKER_IMAGE:-${CRATE_IMAGE_REGISTRY:-ghcr.io}/${CRATE_IMAGE_OWNER:-thecrateapp}/crate-worker:${CRATE_IMAGE_TAG:-latest}}
     container_name: crate-worker
@@ -469,6 +473,8 @@ services:
       MAINTENANCE_WORKER_PROCESSES: ${MAINTENANCE_WORKER_PROCESSES:-1}
       ANALYSIS_WORKER_PROCESSES: ${ANALYSIS_WORKER_PROCESSES:-1}
       PLAYBACK_WORKER_PROCESSES: ${PLAYBACK_WORKER_PROCESSES:-1}
+      CRATE_AI_WORKER_THREADS: ${CRATE_AI_WORKER_THREADS:-2}
+      CRATE_AI_BULK_WORKER_THREADS: ${CRATE_AI_BULK_WORKER_THREADS:-1}
       CRATE_LEGACY_POOL_MAXCONN: ${CRATE_WORKER_LEGACY_POOL_MAXCONN:-4}
       CRATE_SQLALCHEMY_POOL_SIZE: ${CRATE_WORKER_SQLALCHEMY_POOL_SIZE:-2}
       CRATE_SQLALCHEMY_MAX_OVERFLOW: ${CRATE_WORKER_SQLALCHEMY_MAX_OVERFLOW:-1}
@@ -487,14 +493,15 @@ services:
         condition: service_healthy
     networks:
       - crate
-    mem_limit: 1536m
+    # Measured: the ai/ai_bulk pools add ~0.7 GB at peak (docs: smart-mix-operations).
+    mem_limit: 2304m
     mem_reservation: 512m
     cpus: "0.75"
     command:
       [
         "worker",
         "--queues",
-        "default",
+        "default,ai,ai_bulk",
         "--processes",
         "${CRATE_WORKER_PROCESSES:-3}",
         "--no-daemons",

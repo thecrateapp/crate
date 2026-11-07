@@ -73,6 +73,28 @@ def test_features_take_their_action_maxima_within_model_bounds():
         assert d.adjustments == ()
 
 
+def test_smart_mix_refinement_defaults_to_low_reasoning():
+    def refine(model, reasoning):
+        return _derived(model, reasoning, "smart_mix.transition.refine")
+
+    preferred = refine(GEMINI_38, PROVIDER_DEFAULT)
+    assert preferred.config is not None
+    assert preferred.config.reasoning == ReasoningConfig(mode="level", level="low")
+    assert (preferred.config.timeout_seconds, preferred.config.max_output_tokens) == (
+        45,
+        1024,
+    )
+    assert preferred.adjustments == ()
+    # An explicit choice wins, and other features keep the provider default.
+    assert refine(GEMINI_38, HIGH).config.reasoning == HIGH
+    assert (
+        _derived(GEMINI_38, PROVIDER_DEFAULT, "genres.eq.propose").config.reasoning
+        == PROVIDER_DEFAULT
+    )
+    # A model without a native low level keeps the requested reasoning.
+    assert refine(OLLAMA_TEXT, PROVIDER_DEFAULT).config.reasoning == PROVIDER_DEFAULT
+
+
 def test_model_output_and_context_bound_the_derived_limits():
     results = {d.action_id: d for d in derive_all(DEEPSEEK_VISION, PROVIDER_DEFAULT)}
 
@@ -84,6 +106,31 @@ def test_model_output_and_context_bound_the_derived_limits():
 
     eq = results["genres.eq.propose"].config
     assert (eq.max_output_tokens, eq.max_input_tokens) == (2048, 129024)
+
+
+def test_error_features_leave_reasoning_models_room_to_think():
+    # Gemini counts thinking against maxOutputTokens: 2,048 cut triage answers off.
+    for model, reasoning in ((GEMINI_38, PROVIDER_DEFAULT), (GEMINI_38, HIGH)):
+        results = {
+            d.action_id: d.config
+            for d in derive_all(
+                model, reasoning, ["ops.error.triage", "ops.error.investigate"]
+            )
+        }
+        triage, investigate = (
+            results["ops.error.triage"],
+            results["ops.error.investigate"],
+        )
+        assert triage is not None and investigate is not None
+        assert (triage.timeout_seconds, triage.max_output_tokens) == (90, 8192)
+        assert (investigate.timeout_seconds, investigate.max_output_tokens) == (
+            90,
+            16000,
+        )
+
+    # A model with a smaller output ceiling keeps its own ceiling.
+    small = _derived(DEEPSEEK_VISION, PROVIDER_DEFAULT, "ops.error.investigate")
+    assert small.config is not None and small.config.max_output_tokens == 8192
 
 
 def test_text_only_models_cannot_take_image_features():

@@ -4,6 +4,7 @@ import importlib
 import time
 
 from crate.ai import configuration as service
+from crate.ai import guard, requeue
 from crate.ai.contracts import AIConfigurationError
 from crate.db.queries.tasks import get_task
 from crate.db.repositories import ai_usage as usage
@@ -62,6 +63,7 @@ def run_probe(context, *, actor_id, job_id, idempotency_key):
     Return {compatible:bool,usage:dict|None,reported_model:str|None}; no source/response.
     This operation owns reservation/finalization; transport must never retry/fallback.
     """
+    guard.require_ai_task("run_probe")
     service.revalidate_context(context)
     try:
         execute_probe = importlib.import_module("crate.ai.runtime").execute_probe
@@ -70,21 +72,27 @@ def run_probe(context, *, actor_id, job_id, idempotency_key):
             "AI_RUNTIME_UNAVAILABLE", "Synthetic transport is not available"
         ) from None
     config = context["config"]
-    invocation = usage.reserve_invocation(
-        context,
-        idempotency_key=f"probe:{actor_id}:{idempotency_key}",
-        input_tokens=config["max_input_tokens"],
-        output_tokens=config["max_output_tokens"],
-        actor_id=actor_id,
-        job_id=job_id,
+    requeue.require_call_budget()
+    invocation = requeue.reserve_with_capacity_wait(
+        lambda: usage.reserve_invocation(
+            context,
+            idempotency_key=f"probe:{actor_id}:{idempotency_key}",
+            input_tokens=config["max_input_tokens"],
+            output_tokens=config["max_output_tokens"],
+            actor_id=actor_id,
+            job_id=job_id,
+            **requeue.reservation_options(),
+        )
     )
     if not invocation["claimed"]:
         return {"status": "duplicate"}
     started = time.monotonic()
     try:
         key = service.load_context_key(context)
+        budget = requeue.require_call_budget()
         result = execute_probe(
             context,
+            **({} if budget is None else {"max_seconds": budget}),
             api_key=key,
             prompt='Return {"ok":true} for this synthetic compatibility check.',
             response_schema={

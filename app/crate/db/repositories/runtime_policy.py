@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import text
 
+from crate.ai.queues import AI_QUEUES
 from crate.db.queries.agent_runtime_policy import (
     read_runtime_policy_state,
     read_schedules_state,
@@ -192,7 +193,7 @@ def admit_task_start(
     if row is None or row["status"] != "pending":
         return False
     pool = row["pool"] or "default"
-    if pool not in POOLS:
+    if pool not in POOLS and pool not in AI_QUEUES:
         return False
     # The policy lock prevents a concurrent reduction from passing old admission.
     current.execute(
@@ -209,6 +210,10 @@ def admit_task_start(
         or expected_hash != state["policy_hash"]
     ):
         return False
+    if pool in AI_QUEUES:
+        # SM3-D8: AI lanes are bounded by their crate-worker threads and by each
+        # provider connection's max_concurrent, not by runtime policy slots.
+        return True
     if row["type"] == "agent_control":
         return (
             current.execute(
@@ -222,8 +227,9 @@ def admit_task_start(
         current.execute(
             text("""SELECT COUNT(*) AS total,
         COUNT(*) FILTER(WHERE COALESCE(NULLIF(pool,''),'default')=:pool) AS in_pool
-        FROM tasks WHERE status='running' AND type<>'agent_control'"""),
-            {"pool": pool},
+        FROM tasks WHERE status='running' AND type<>'agent_control'
+          AND COALESCE(pool,'default') <> ALL(:ai_pools)"""),
+            {"pool": pool, "ai_pools": list(AI_QUEUES)},
         )
         .mappings()
         .one()

@@ -81,6 +81,23 @@ const supportingScope = [
   "app/ui/src/components/admin/QueueLanes.tsx",
   "app/ui/src/components/admin/RelativeTime.tsx",
   "app/ui/src/pages/agents/Agents.tsx",
+  // Error Inbox (E1.PR4): text actions, one Solar refresh glyph.
+  "app/ui/src/pages/Errors.tsx",
+  "app/ui/src/pages/ErrorDetail.tsx",
+  "app/ui/src/components/errors/ConnectionPanel.tsx",
+  "app/ui/src/components/errors/ConnectionSheet.tsx",
+  "app/ui/src/components/errors/IssueStatusActions.tsx",
+  "app/ui/src/components/errors/IssueTable.tsx",
+  "app/ui/src/components/errors/StackFrames.tsx",
+  // Launch fix (E3.PR2): text actions and the shared dialog close control.
+  "app/ui/src/components/errors/LaunchFix.tsx",
+  "app/ui/src/components/errors/FixSettingsForm.tsx",
+  // AI triage (E2.PR2): text actions only.
+  "app/ui/src/components/errors/InvestigateAction.tsx",
+  "app/ui/src/components/errors/TriageBacklog.tsx",
+  "app/ui/src/components/errors/TriagePanel.tsx",
+  "app/ui/src/components/errors/TriageSettingsForm.tsx",
+  "app/ui/src/components/system-health/ErrorsTile.tsx",
 ];
 const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
   .map((name) => `app/ui/src/components/layout/${name}.tsx`)
@@ -122,6 +139,10 @@ const scope = ["Sidebar", "CommandPalette", "Shell", "SearchBar"]
 // Reviewed shared Select contract: disclosure, option selection and search glyphs are UX.
 // The Admin wrapper itself is checked directly; no arbitrary wrapper or icon prop is exempt.
 const approvedControls = new Map([
+  [
+    "app/ui/src/pages/Errors.tsx:@/components/layout/PageHeader",
+    { component: "PageHeaderAction", limit: 1 },
+  ],
   [
     "app/ui/src/pages/Insights.tsx:@/components/layout/PageHeader",
     { component: "PageHeaderAction", limit: 1 },
@@ -350,6 +371,39 @@ const approvedControls = new Map([
 // direct children and icon props remain independently audited, opaque spreads fail,
 // and each exact path/source/export may appear only this many times in source.
 const approvedLibraryControls = new Map<string, number>([
+  // Smart Mix 3 plan, SM1.PR4: the track profile's phrase strip for gate SG1. A
+  // hand-built SVG instrument (rules and an energy lane) with no glyph and no button.
+  [
+    "app/ui/src/components/album/TrackTable.tsx:@/components/SmartMixStructure:SmartMixTrackStructure",
+    1,
+  ],
+  // Audio profile sound spectrum, replacing the nivo radar: a hand-built SVG
+  // instrument (density ridges, fills and marks) with no glyph and no button, reached
+  // through the audio profile card on the album page and in the track dialog.
+  [
+    "app/ui/src/components/album/AudioProfileCard.tsx:./SoundSpectrum:SoundSpectrum",
+    1,
+  ],
+  // The album readings beside it: hand-built SVG strips (an axis, a range, track marks
+  // and the mean) in the spectrum's language, with no glyph and no button.
+  [
+    "app/ui/src/components/album/AudioProfileCard.tsx:./AlbumReadings:AlbumReadings",
+    1,
+  ],
+  // The album's mood rose beside them: a hand-built SVG instrument (rings, petals and
+  // track marks) with no glyph and no button.
+  [
+    "app/ui/src/components/album/AudioProfileCard.tsx:./MoodRose:MoodRose",
+    1,
+  ],
+  [
+    "app/ui/src/components/album/TrackTable.tsx:./AudioProfileCard:AudioProfileCard",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Album.tsx:@/components/album/AudioProfileCard:AudioProfileCard",
+    1,
+  ],
   [
     "app/ui/src/pages/Insights.tsx:@/components/insights/InsightEntityLists:InsightOpportunities",
     1,
@@ -460,6 +514,73 @@ const approvedLibraryControls = new Map<string, number>([
     3,
   ],
   ["app/ui/src/pages/PlaylistEditor.tsx:@crate/ui/shadcn/button:Button", 7],
+  // Error Inbox (E1.PR4): text actions and shared states; each child is audited above.
+  ["app/ui/src/pages/Errors.tsx:@/components/ui/AdminSelect:AdminSelect", 3],
+  ["app/ui/src/pages/Errors.tsx:@crate/ui/primitives/ErrorState:ErrorState", 2],
+  [
+    "app/ui/src/pages/Errors.tsx:@/components/errors/ConnectionSheet:ConnectionSheet",
+    1,
+  ],
+  // The drawer keeps the shared close control (conventional UX glyph).
+  [
+    "app/ui/src/components/errors/ConnectionSheet.tsx:@crate/ui/shadcn/sheet:SheetContent",
+    1,
+  ],
+  [
+    "app/ui/src/components/errors/ConnectionSheet.tsx:./ConnectionPanel:ConnectionPanel",
+    1,
+  ],
+  [
+    "app/ui/src/pages/ErrorDetail.tsx:@crate/ui/domain/navigation/BackLink:BackLink",
+    1,
+  ],
+  [
+    "app/ui/src/pages/ErrorDetail.tsx:@crate/ui/primitives/ErrorState:ErrorState",
+    2,
+  ],
+  [
+    "app/ui/src/pages/ErrorDetail.tsx:@/components/errors/IssueStatusActions:IssueStatusActions",
+    1,
+  ],
+  [
+    "app/ui/src/pages/ErrorDetail.tsx:@/components/admin/TechnicalDetails:TechnicalDetails",
+    1,
+  ],
+  [
+    "app/ui/src/components/errors/ConnectionPanel.tsx:@crate/ui/primitives/ErrorState:ErrorState",
+    1,
+  ],
+  // Launch fix (E3.PR2): text buttons; children audited in the scope above.
+  [
+    "app/ui/src/pages/ErrorDetail.tsx:@/components/errors/LaunchFix:LaunchFix",
+    1,
+  ],
+  [
+    "app/ui/src/components/errors/ConnectionPanel.tsx:./FixSettingsForm:FixSettingsForm",
+    1,
+  ],
+  // The shared confirmation: close control and busy glyph are its own.
+  [
+    "app/ui/src/components/errors/LaunchFix.tsx:@crate/ui/composites/ConfirmDialog:ConfirmDialog",
+    1,
+  ],
+  // AI triage (E2.PR2): text buttons; children audited in the scope above.
+  [
+    "app/ui/src/pages/ErrorDetail.tsx:@/components/errors/InvestigateAction:InvestigateAction",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Errors.tsx:@/components/errors/TriageBacklog:TriageBacklog",
+    1,
+  ],
+  [
+    "app/ui/src/components/errors/ConnectionPanel.tsx:./TriageSettingsForm:TriageSettingsForm",
+    1,
+  ],
+  [
+    "app/ui/src/pages/SystemHealth.tsx:@/components/system-health/ErrorsTile:ErrorsTile",
+    1,
+  ],
   [
     "app/ui/src/pages/PlaylistEditor.tsx:@crate/ui/primitives/SearchInput:SearchInput",
     1,
@@ -1028,6 +1149,7 @@ const approvedLibraryControls = new Map<string, number>([
 ]);
 // Diego's 1W steering explicitly retains UX glyphs. Each concrete site remains bounded.
 const approvedUx = new Map([
+  ["Errors:header-refresh", ["@crate/ui/icons", "RefreshCw"]],
   ["ListPagination:pagination-previous", ["lucide-react", "ChevronLeft"]],
   ["ListPagination:pagination-next", ["lucide-react", "ChevronRight"]],
 
@@ -1040,6 +1162,7 @@ const approvedUx = new Map([
   ["SmartMixCoverage:mix-resume-loading", ["@crate/ui/icons", "Loader2"]],
   ["SmartMixCoverage:mix-pause-loading", ["@crate/ui/icons", "Loader2"]],
   ["SmartMixCoverage:mix-cancel-loading", ["@crate/ui/icons", "Loader2"]],
+  ["SmartMixCoverage:mix-apply-loading", ["@crate/ui/icons", "Loader2"]],
   ["SmartMixTracks:mix-reanalyze-loading", ["@crate/ui/icons", "Loader2"]],
   ["SmartMixTracks:mix-load-more-loading", ["@crate/ui/icons", "Loader2"]],
   ["SystemHealth:system-health-loading", ["lucide-react", "Loader2"]],

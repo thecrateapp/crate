@@ -119,3 +119,38 @@ def create_schema(cur):
     )
 
     create_metric_minute_snapshots_v141_schema(cur)
+    from crate.db.schema_sections.error_inbox_v143 import (
+        create_error_inbox_v143_schema,
+    )
+
+    create_error_inbox_v143_schema(cur)
+    from crate.db.schema_sections.error_inbox_grant_v144 import (
+        create_error_inbox_grant_v144_schema,
+    )
+
+    create_error_inbox_grant_v144_schema(cur)
+    from crate.db.schema_sections.ai_action_error_inbox_v145 import (
+        create_ai_action_error_inbox_v145_schema,
+    )
+
+    create_ai_action_error_inbox_v145_schema(cur)
+    from crate.db.schema_sections.error_inbox_auto_triage_v146 import (
+        create_error_inbox_auto_triage_v146_schema,
+    )
+
+    create_error_inbox_auto_triage_v146_schema(cur)
+    from crate.db.schema_sections.ai_action_smart_mix_refine_v151 import (
+        create_ai_action_smart_mix_refine_v151_schema,
+    )
+
+    create_ai_action_smart_mix_refine_v151_schema(cur)
+    from crate.db.schema_sections.smart_mix_refined_plans_v152 import (
+        create_smart_mix_refined_plans_v152_schema,
+    )
+
+    create_smart_mix_refined_plans_v152_schema(cur)
+    from crate.db.schema_sections.ai_openai_compatible_v153 import (
+        create_ai_openai_compatible_v153_schema,
+    )
+
+    create_ai_openai_compatible_v153_schema(cur)
