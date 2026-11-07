@@ -4,9 +4,9 @@ Error Inbox gate EG2. Each reference issue's stored digest was triaged with `ops
 
 ## Summary
 
-| Model | Sent | Classification | Severity | Critical as noise | High as noise | False critical | Invalid outputs | Duplicates | Tokens in / out | Cost |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| gemini / gemini-3.8-flash | 16/79 | 56.2% | 37.5% | 0 | 0 | 0 | 5 | 1/3 | 45,310 / 21,649 | $0.12 |
+| Model                     |  Sent | Classification | Severity | Critical as noise | High as noise | False critical | Invalid outputs | Duplicates | Tokens in / out |  Cost |
+| ------------------------- | ----: | -------------: | -------: | ----------------: | ------------: | -------------: | --------------: | ---------: | --------------: | ----: |
+| gemini / gemini-3.8-flash | 16/79 |          56.2% |    37.5% |                 0 |             0 |              0 |               5 |        1/3 | 45,310 / 21,649 | $0.12 |
 
 EG2 asks for at least 80% agreement on classification and no critical issue taken for noise. Agreement counts every issue sent: an invalid output or a failed call is a disagreement. gemini / gemini-3.8-flash: classification misses it; no critical issue taken for noise (none labelled critical). Choosing the model and turning on automatic triage is the maintainer's decision.
 
@@ -19,8 +19,8 @@ EG2 asks for at least 80% agreement on classification and no critical issue take
 ### Coverage
 
 | Reference issues | Valid answers | Invalid outputs | Failed calls | Skipped | Not run |
-|---|---:|---:|---:|---:|---:|
-| 79 | 11 | 5 | 0 | 63 | 0 |
+| ---------------- | ------------: | --------------: | -----------: | ------: | ------: |
+| 79               |            11 |               5 |            0 |      63 |       0 |
 
 - Not in the inbox: CRATE-ADMIN-4, CRATE-ADMIN-5, CRATE-ADMIN-8, CRATE-ADMIN-A, CRATE-ADMIN-B, CRATE-ADMIN-C, CRATE-ADMIN-D, CRATE-ADMIN-E, CRATE-ADMIN-G, CRATE-ADMIN-H, CRATE-ADMIN-J, CRATE-ADMIN-K, CRATE-ADMIN-M, CRATE-ADMIN-N, CRATE-ADMIN-P, CRATE-ADMIN-Q, CRATE-ADMIN-R, CRATE-ADMIN-S, CRATE-ADMIN-T, CRATE-ADMIN-V, CRATE-API-7, CRATE-DOCS-1, CRATE-LISTEN-11, CRATE-LISTEN-12, CRATE-LISTEN-13, CRATE-LISTEN-14, CRATE-LISTEN-15, CRATE-LISTEN-17, CRATE-LISTEN-18, CRATE-LISTEN-19, CRATE-LISTEN-1A, CRATE-LISTEN-1D, CRATE-LISTEN-1E, CRATE-LISTEN-1F, CRATE-LISTEN-1G, CRATE-LISTEN-1H, CRATE-LISTEN-1J, CRATE-LISTEN-1K, CRATE-LISTEN-1N, CRATE-LISTEN-5, CRATE-LISTEN-8, CRATE-LISTEN-9, CRATE-LISTEN-A, CRATE-LISTEN-B, CRATE-LISTEN-C, CRATE-LISTEN-D, CRATE-LISTEN-F, CRATE-LISTEN-J, CRATE-LISTEN-K, CRATE-LISTEN-M, CRATE-LISTEN-N, CRATE-LISTEN-P, CRATE-LISTEN-Q, CRATE-LISTEN-S, CRATE-LISTEN-T, CRATE-LISTEN-W, CRATE-LISTEN-X, CRATE-LISTEN-Y, CRATE-LISTEN-Z, CRATE-MEDIA-WORKER-1, CRATE-READPLANE-4, CRATE-READPLANE-5, CRATE-WORKERS-9.
 
@@ -28,23 +28,23 @@ EG2 asks for at least 80% agreement on classification and no critical issue take
 
 Agreement: 9/16 issues sent (56.2%); 9/11 valid answers (81.8%). Rows are the reference label, columns the model's answer.
 
-| Reference | bug | infrastructure | external_dependency | client_environment | noise | Agreed |
-|---|---:|---:|---:|---:|---:|---:|
-| bug | 5 | 0 | 1 | 1 | 0 | 5/10 |
-| infrastructure | 0 | 1 | 0 | 0 | 0 | 1/2 |
-| external_dependency | 0 | 0 | 1 | 0 | 0 | 1/1 |
-| client_environment | 0 | 0 | 0 | 1 | 0 | 1/2 |
-| noise | 0 | 0 | 0 | 0 | 1 | 1/1 |
+| Reference           | bug | infrastructure | external_dependency | client_environment | noise | Agreed |
+| ------------------- | --: | -------------: | ------------------: | -----------------: | ----: | -----: |
+| bug                 |   5 |              0 |                   1 |                  1 |     0 |   5/10 |
+| infrastructure      |   0 |              1 |                   0 |                  0 |     0 |    1/2 |
+| external_dependency |   0 |              0 |                   1 |                  0 |     0 |    1/1 |
+| client_environment  |   0 |              0 |                   0 |                  1 |     0 |    1/2 |
+| noise               |   0 |              0 |                   0 |                  0 |     1 |    1/1 |
 
 ### Severity
 
 Agreement: 6/16 issues sent (37.5%); 6/11 valid answers (54.5%). Rows are the reference label, columns the model's answer.
 
 | Reference | critical | high | medium | low | Agreed |
-|---|---:|---:|---:|---:|---:|
-| high | 0 | 1 | 3 | 0 | 1/4 |
-| medium | 0 | 1 | 2 | 1 | 2/8 |
-| low | 0 | 0 | 0 | 3 | 3/4 |
+| --------- | -------: | ---: | -----: | --: | -----: |
+| high      |        0 |    1 |      3 |   0 |    1/4 |
+| medium    |        0 |    1 |      2 |   1 |    2/8 |
+| low       |        0 |    0 |      0 |   3 |    3/4 |
 
 ### Worst errors
 
@@ -63,19 +63,19 @@ Of 3 answered issues the reference marks as duplicates, 1 named an issue of the 
 
 ### Tokens and cost
 
-| Model | Calls | Usage known | Input | Cached input | Output | Thought | Mean input | Cost |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| gemini-3.8-flash | 16 | 16 | 45,310 | 0 | 2,234 | 19,415 | 2,832 | $0.1152 |
+| Model            | Calls | Usage known |  Input | Cached input | Output | Thought | Mean input |    Cost |
+| ---------------- | ----: | ----------: | -----: | -----------: | -----: | ------: | ---------: | ------: |
+| gemini-3.8-flash |    16 |          16 | 45,310 |            0 |  2,234 |  19,415 |      2,832 | $0.1152 |
 
 Cost uses $0.75 / $3.75 per million input / output tokens for gemini-3.8-flash; thought tokens count as output and cached input at the full input price, so it is an upper bound of the invoice.
 
 ### Disagreements
 
-| Short id | Group | Reference | Model | Confidence |
-|---|---|---|---|---|
-| CRATE-LISTEN-10 | G9 | bug / high | bug / medium | 0.90 |
-| CRATE-LISTEN-1M | G6 | bug / medium | client_environment / low | 0.90 |
-| CRATE-LISTEN-7 | G3 | infrastructure / medium | infrastructure / high | 0.95 |
-| CRATE-WORKERS-B | G8 | bug / low | external_dependency / low | 0.85 |
-| CRATE-WORKERS-C | G8 | bug / high | bug / medium | 0.95 |
-| CRATE-WORKERS-D | G8 | bug / high | bug / medium | 0.95 |
+| Short id        | Group | Reference               | Model                     | Confidence |
+| --------------- | ----- | ----------------------- | ------------------------- | ---------- |
+| CRATE-LISTEN-10 | G9    | bug / high              | bug / medium              | 0.90       |
+| CRATE-LISTEN-1M | G6    | bug / medium            | client_environment / low  | 0.90       |
+| CRATE-LISTEN-7  | G3    | infrastructure / medium | infrastructure / high     | 0.95       |
+| CRATE-WORKERS-B | G8    | bug / low               | external_dependency / low | 0.85       |
+| CRATE-WORKERS-C | G8    | bug / high              | bug / medium              | 0.95       |
+| CRATE-WORKERS-D | G8    | bug / high              | bug / medium              | 0.95       |

@@ -99,10 +99,7 @@
         "other_group": 1,
         "rate": 0.6102,
         "short_ids": {
-          "false_duplicates": [
-            "CRATE-LISTEN-7",
-            "CRATE-READPLANE-4"
-          ],
+          "false_duplicates": ["CRATE-LISTEN-7", "CRATE-READPLANE-4"],
           "missed": [
             "CRATE-ADMIN-4",
             "CRATE-ADMIN-8",
@@ -127,9 +124,7 @@
             "CRATE-READPLANE-5",
             "CRATE-WORKERS-D"
           ],
-          "other_group": [
-            "CRATE-ADMIN-5"
-          ],
+          "other_group": ["CRATE-ADMIN-5"],
           "unreachable": [
             "CRATE-ADMIN-5",
             "CRATE-ADMIN-B",
@@ -159,9 +154,7 @@
       "false_critical": {
         "confidence_threshold": 0.6,
         "count": 1,
-        "short_ids": [
-          "CRATE-READPLANE-5"
-        ]
+        "short_ids": ["CRATE-READPLANE-5"]
       },
       "finished_at": "2026-11-07T09:11:01.923233+00:00",
       "high_as_noise": {
@@ -780,9 +773,7 @@
           "status": "ok"
         },
         {
-          "candidate_ids": [
-            "CRATE-WORKERS-9"
-          ],
+          "candidate_ids": ["CRATE-WORKERS-9"],
           "error_code": null,
           "group": "G1",
           "prediction": {
@@ -1803,10 +1794,7 @@
           "status": "ok"
         },
         {
-          "candidate_ids": [
-            "CRATE-LISTEN-V",
-            "CRATE-LISTEN-H"
-          ],
+          "candidate_ids": ["CRATE-LISTEN-V", "CRATE-LISTEN-H"],
           "error_code": null,
           "group": "G6",
           "prediction": {
@@ -1826,10 +1814,7 @@
           "status": "ok"
         },
         {
-          "candidate_ids": [
-            "CRATE-LISTEN-G",
-            "CRATE-LISTEN-V"
-          ],
+          "candidate_ids": ["CRATE-LISTEN-G", "CRATE-LISTEN-V"],
           "error_code": null,
           "group": "G6",
           "prediction": {
@@ -2128,10 +2113,7 @@
           "status": "ok"
         },
         {
-          "candidate_ids": [
-            "CRATE-LISTEN-G",
-            "CRATE-LISTEN-H"
-          ],
+          "candidate_ids": ["CRATE-LISTEN-G", "CRATE-LISTEN-H"],
           "error_code": null,
           "group": "G6",
           "prediction": {
@@ -2306,9 +2288,7 @@
           "status": "ok"
         },
         {
-          "candidate_ids": [
-            "CRATE-READPLANE-4"
-          ],
+          "candidate_ids": ["CRATE-READPLANE-4"],
           "error_code": null,
           "group": "G8",
           "prediction": {
@@ -2328,9 +2308,7 @@
           "status": "ok"
         },
         {
-          "candidate_ids": [
-            "CRATE-READPLANE-3"
-          ],
+          "candidate_ids": ["CRATE-READPLANE-3"],
           "error_code": null,
           "group": "G8",
           "prediction": {
@@ -2370,9 +2348,7 @@
           "status": "ok"
         },
         {
-          "candidate_ids": [
-            "CRATE-API-7"
-          ],
+          "candidate_ids": ["CRATE-API-7"],
           "error_code": null,
           "group": "G1",
           "prediction": {
@@ -2432,9 +2408,7 @@
           "status": "ok"
         },
         {
-          "candidate_ids": [
-            "CRATE-WORKERS-D"
-          ],
+          "candidate_ids": ["CRATE-WORKERS-D"],
           "error_code": null,
           "group": "G8",
           "prediction": {
@@ -2454,9 +2428,7 @@
           "status": "ok"
         },
         {
-          "candidate_ids": [
-            "CRATE-WORKERS-C"
-          ],
+          "candidate_ids": ["CRATE-WORKERS-C"],
           "error_code": null,
           "group": "G8",
           "prediction": {

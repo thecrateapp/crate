@@ -99,16 +99,9 @@
         "other_group": 0,
         "rate": 0.3333,
         "short_ids": {
-          "false_duplicates": [
-            "CRATE-LISTEN-7"
-          ],
-          "missed": [
-            "CRATE-LISTEN-1M",
-            "CRATE-WORKERS-D"
-          ],
-          "unreachable": [
-            "CRATE-LISTEN-1M"
-          ]
+          "false_duplicates": ["CRATE-LISTEN-7"],
+          "missed": ["CRATE-LISTEN-1M", "CRATE-WORKERS-D"],
+          "unreachable": ["CRATE-LISTEN-1M"]
         },
         "unique_answered": 8,
         "unreachable": 1
@@ -632,10 +625,7 @@
           "status": "skipped"
         },
         {
-          "candidate_ids": [
-            "CRATE-LISTEN-R",
-            "CRATE-ADMIN-W"
-          ],
+          "candidate_ids": ["CRATE-LISTEN-R", "CRATE-ADMIN-W"],
           "error_code": "AI_RESPONSE_INVALID",
           "group": "G2",
           "prediction": null,
@@ -967,10 +957,7 @@
           "status": "skipped"
         },
         {
-          "candidate_ids": [
-            "CRATE-LISTEN-V",
-            "CRATE-LISTEN-H"
-          ],
+          "candidate_ids": ["CRATE-LISTEN-V", "CRATE-LISTEN-H"],
           "error_code": "AI_RESPONSE_INVALID",
           "group": "G6",
           "prediction": null,
@@ -984,10 +971,7 @@
           "status": "invalid_output"
         },
         {
-          "candidate_ids": [
-            "CRATE-LISTEN-G",
-            "CRATE-LISTEN-V"
-          ],
+          "candidate_ids": ["CRATE-LISTEN-G", "CRATE-LISTEN-V"],
           "error_code": "AI_RESPONSE_INVALID",
           "group": "G6",
           "prediction": null,
@@ -1085,10 +1069,7 @@
           "status": "skipped"
         },
         {
-          "candidate_ids": [
-            "CRATE-LISTEN-1B",
-            "CRATE-ADMIN-W"
-          ],
+          "candidate_ids": ["CRATE-LISTEN-1B", "CRATE-ADMIN-W"],
           "error_code": null,
           "group": "G2",
           "prediction": {
@@ -1135,10 +1116,7 @@
           "status": "skipped"
         },
         {
-          "candidate_ids": [
-            "CRATE-LISTEN-G",
-            "CRATE-LISTEN-H"
-          ],
+          "candidate_ids": ["CRATE-LISTEN-G", "CRATE-LISTEN-H"],
           "error_code": "AI_RESPONSE_INVALID",
           "group": "G6",
           "prediction": null,
@@ -1316,9 +1294,7 @@
           "status": "ok"
         },
         {
-          "candidate_ids": [
-            "CRATE-WORKERS-D"
-          ],
+          "candidate_ids": ["CRATE-WORKERS-D"],
           "error_code": null,
           "group": "G8",
           "prediction": {
@@ -1337,9 +1313,7 @@
           "status": "ok"
         },
         {
-          "candidate_ids": [
-            "CRATE-WORKERS-C"
-          ],
+          "candidate_ids": ["CRATE-WORKERS-C"],
           "error_code": null,
           "group": "G8",
           "prediction": {

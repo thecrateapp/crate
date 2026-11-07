@@ -4,9 +4,9 @@ Error Inbox gate EG2. Each reference issue's digest, stored in the inbox or, whe
 
 ## Summary
 
-| Model | Sent | Classification | Severity | Critical as noise | High as noise | False critical | Invalid outputs | Cut off | Duplicates | Tokens in / out | Cost |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| gemini / gemini-3.8-flash | 78/79 | 89.7% | 83.3% | 0 | 0 | 1 | 0 | 0 | 36/59 | 278,724 / 156,137 | $0.79 |
+| Model                     |  Sent | Classification | Severity | Critical as noise | High as noise | False critical | Invalid outputs | Cut off | Duplicates |   Tokens in / out |  Cost |
+| ------------------------- | ----: | -------------: | -------: | ----------------: | ------------: | -------------: | --------------: | ------: | ---------: | ----------------: | ----: |
+| gemini / gemini-3.8-flash | 78/79 |          89.7% |    83.3% |                 0 |             0 |              1 |               0 |       0 |      36/59 | 278,724 / 156,137 | $0.79 |
 
 EG2 asks for at least 80% agreement on classification and no critical issue taken for noise. Agreement counts every issue sent: an invalid output or a failed call is a disagreement. gemini / gemini-3.8-flash: classification meets it; no critical issue taken for noise (none labelled critical). Choosing the model and turning on automatic triage is the maintainer's decision.
 
@@ -19,8 +19,8 @@ EG2 asks for at least 80% agreement on classification and no critical issue take
 ### Coverage
 
 | Reference issues | Valid answers | Invalid outputs | Failed calls | Skipped | Not run |
-|---|---:|---:|---:|---:|---:|
-| 79 | 78 | 0 | 0 | 1 | 0 |
+| ---------------- | ------------: | --------------: | -----------: | ------: | ------: |
+| 79               |            78 |               0 |            0 |       1 |       0 |
 
 Sent from the inbox: 16; read from Sentry and built in memory: 62.
 
@@ -30,23 +30,23 @@ Sent from the inbox: 16; read from Sentry and built in memory: 62.
 
 Agreement: 70/78 issues sent (89.7%); 70/78 valid answers (89.7%). Rows are the reference label, columns the model's answer.
 
-| Reference | bug | infrastructure | external_dependency | client_environment | noise | Agreed |
-|---|---:|---:|---:|---:|---:|---:|
-| bug | 9 | 0 | 1 | 2 | 0 | 9/12 |
-| infrastructure | 0 | 5 | 1 | 0 | 0 | 5/6 |
-| external_dependency | 0 | 0 | 1 | 0 | 0 | 1/1 |
-| client_environment | 0 | 1 | 0 | 51 | 0 | 51/52 |
-| noise | 1 | 2 | 0 | 0 | 4 | 4/7 |
+| Reference           | bug | infrastructure | external_dependency | client_environment | noise | Agreed |
+| ------------------- | --: | -------------: | ------------------: | -----------------: | ----: | -----: |
+| bug                 |   9 |              0 |                   1 |                  2 |     0 |   9/12 |
+| infrastructure      |   0 |              5 |                   1 |                  0 |     0 |    5/6 |
+| external_dependency |   0 |              0 |                   1 |                  0 |     0 |    1/1 |
+| client_environment  |   0 |              1 |                   0 |                 51 |     0 |  51/52 |
+| noise               |   1 |              2 |                   0 |                  0 |     4 |    4/7 |
 
 ### Severity
 
 Agreement: 65/78 issues sent (83.3%); 65/78 valid answers (83.3%). Rows are the reference label, columns the model's answer.
 
 | Reference | critical | high | medium | low | Agreed |
-|---|---:|---:|---:|---:|---:|
-| high | 0 | 1 | 3 | 0 | 1/4 |
-| medium | 0 | 0 | 7 | 7 | 7/14 |
-| low | 1 | 0 | 2 | 57 | 57/60 |
+| --------- | -------: | ---: | -----: | --: | -----: |
+| high      |        0 |    1 |      3 |   0 |    1/4 |
+| medium    |        0 |    0 |      7 |   7 |   7/14 |
+| low       |        1 |    0 |      2 |  57 |  57/60 |
 
 ### Worst errors
 
@@ -66,29 +66,29 @@ Of 59 answered issues the reference marks as duplicates, 36 named an issue of th
 
 ### Tokens and cost
 
-| Model | Calls | Usage known | Input | Cached input | Output | Thought | Mean input | Cost |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| gemini-3.8-flash | 78 | 78 | 278,724 | 0 | 12,481 | 143,656 | 3,573 | $0.7946 |
+| Model            | Calls | Usage known |   Input | Cached input | Output | Thought | Mean input |    Cost |
+| ---------------- | ----: | ----------: | ------: | -----------: | -----: | ------: | ---------: | ------: |
+| gemini-3.8-flash |    78 |          78 | 278,724 |            0 | 12,481 | 143,656 |      3,573 | $0.7946 |
 
 Cost uses $0.75 / $3.75 per million input / output tokens for gemini-3.8-flash; thought tokens count as output and cached input at the full input price, so it is an upper bound of the invoice.
 
 ### Disagreements
 
-| Short id | Group | Reference | Model | Confidence |
-|---|---|---|---|---|
-| CRATE-ADMIN-8 | G3 | infrastructure / medium | external_dependency / medium | 0.85 |
-| CRATE-ADMIN-M | G3 | infrastructure / medium | infrastructure / low | 0.90 |
-| CRATE-ADMIN-N | G3 | infrastructure / medium | infrastructure / low | 0.90 |
-| CRATE-LISTEN-10 | G9 | bug / high | bug / medium | 0.90 |
-| CRATE-LISTEN-11 | G5 | client_environment / low | infrastructure / low | 0.85 |
-| CRATE-LISTEN-1F | G7 | noise / low | bug / low | 0.90 |
-| CRATE-LISTEN-1M | G6 | bug / medium | client_environment / low | 0.90 |
-| CRATE-LISTEN-G | G6 | bug / medium | bug / low | 0.90 |
-| CRATE-LISTEN-H | G6 | bug / medium | client_environment / low | 0.90 |
-| CRATE-LISTEN-V | G6 | bug / medium | bug / low | 0.90 |
-| CRATE-READPLANE-3 | G8 | infrastructure / medium | infrastructure / low | 0.85 |
-| CRATE-READPLANE-4 | G8 | noise / low | infrastructure / medium | 0.80 |
-| CRATE-READPLANE-5 | G1 | noise / low | infrastructure / critical | 0.95 |
-| CRATE-WORKERS-B | G8 | bug / low | external_dependency / medium | 0.90 |
-| CRATE-WORKERS-C | G8 | bug / high | bug / medium | 0.95 |
-| CRATE-WORKERS-D | G8 | bug / high | bug / medium | 0.95 |
+| Short id          | Group | Reference                | Model                        | Confidence |
+| ----------------- | ----- | ------------------------ | ---------------------------- | ---------- |
+| CRATE-ADMIN-8     | G3    | infrastructure / medium  | external_dependency / medium | 0.85       |
+| CRATE-ADMIN-M     | G3    | infrastructure / medium  | infrastructure / low         | 0.90       |
+| CRATE-ADMIN-N     | G3    | infrastructure / medium  | infrastructure / low         | 0.90       |
+| CRATE-LISTEN-10   | G9    | bug / high               | bug / medium                 | 0.90       |
+| CRATE-LISTEN-11   | G5    | client_environment / low | infrastructure / low         | 0.85       |
+| CRATE-LISTEN-1F   | G7    | noise / low              | bug / low                    | 0.90       |
+| CRATE-LISTEN-1M   | G6    | bug / medium             | client_environment / low     | 0.90       |
+| CRATE-LISTEN-G    | G6    | bug / medium             | bug / low                    | 0.90       |
+| CRATE-LISTEN-H    | G6    | bug / medium             | client_environment / low     | 0.90       |
+| CRATE-LISTEN-V    | G6    | bug / medium             | bug / low                    | 0.90       |
+| CRATE-READPLANE-3 | G8    | infrastructure / medium  | infrastructure / low         | 0.85       |
+| CRATE-READPLANE-4 | G8    | noise / low              | infrastructure / medium      | 0.80       |
+| CRATE-READPLANE-5 | G1    | noise / low              | infrastructure / critical    | 0.95       |
+| CRATE-WORKERS-B   | G8    | bug / low                | external_dependency / medium | 0.90       |
+| CRATE-WORKERS-C   | G8    | bug / high               | bug / medium                 | 0.95       |
+| CRATE-WORKERS-D   | G8    | bug / high               | bug / medium                 | 0.95       |
