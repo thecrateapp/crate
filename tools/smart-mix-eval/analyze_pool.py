@@ -106,6 +106,13 @@ def pool_files(
     )
 
 
+def _init_worker() -> None:
+    """A forked worker must not share the parent's pooled connections."""
+    from crate.db.engine import reset_engine
+
+    reset_engine()
+
+
 def _analyze(track_id: int) -> tuple[int, dict[str, Any]]:
     # TEST_GAP: runs the production handler, models and crate-cli on real audio;
     # exercised by running the tool (README), not in unit tests.
@@ -166,7 +173,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     ]
     print(f"{len(tracks)} tracks, {len(todo)} to analyze", file=sys.stderr)
     outcomes: dict[int, dict[str, Any]] = {}
-    with ProcessPoolExecutor(max_workers=max(1, args.jobs)) as pool:
+    # Close the parent's connections before forking: children open their own.
+    _init_worker()
+    with ProcessPoolExecutor(
+        max_workers=max(1, args.jobs), initializer=_init_worker
+    ) as pool:
         for done, (track_id, outcome) in enumerate(pool.map(_analyze, todo), 1):
             outcomes[track_id] = outcome
             if done % 10 == 0:
