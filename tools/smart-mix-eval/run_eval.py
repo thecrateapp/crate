@@ -878,7 +878,8 @@ def _refinement_markdown(
         f" ({_percent(refinement['changedRate'])}) |",
         f"| Accepted, same plan as the planner | {refinement['keptPlannerPlan']} |",
         f"| Candidate chosen (accepted) | {_format_counts(refinement['candidateIndex'])} |",
-        f"| Adjustments (accepted) | {_format_counts(refinement['adjustments'])} |",
+        f"| Adjustments requested, not keep or 0 (accepted) |"
+        f" {_format_counts(refinement['adjustments'])} |",
         f"| Confidence, mean / p50 / p95 | {_triple(refinement['confidence'], 2)} |",
         f"| Latency p50 / p95 / max (ms) | {_cell(latency['p50'])} /"
         f" {_cell(latency['p95'])} / {_cell(latency['max'])} |",
