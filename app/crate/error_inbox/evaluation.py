@@ -4,8 +4,10 @@ The maintainer's tool, `tools/error-inbox-eval/run_eval.py`, never calls a model
 never sees a digest. It runs `crate.error_inbox.evaluation_cli` inside the worker
 container, and that CLI only reads, queues and collects:
 
-1. `plan_evaluation`: which of the given short ids have a stored digest, about how
+1. `plan_evaluation`: which of the given short ids have a stored digest, which the
+   task will fetch from Sentry because the inbox no longer holds them, about how
    large each request is and which model the `ops.error.triage` binding points at.
+   The plan reads the stored settings only: it makes no Sentry request.
 2. `queue_evaluation`: pins the binding the plan showed (`accept_action` plus the
    fingerprint the plan returned) and queues one `evaluate_error_triage` task on the
    `ai_bulk` lane.
@@ -22,6 +24,17 @@ The summary, hypothesis and next step are free text that can echo event content,
 they are dropped. The reference labels never leave the maintainer's machine; only
 short ids reach the server.
 
+Reference issues the inbox does not hold (resolved and purged, or filtered out) are
+fetched first with the stored Sentry connection (`crate.error_inbox.references`):
+the short id is resolved (`shortids`), the issue and its latest event are read, and
+the triage input is built in memory exactly as the sync would store it. Those
+digests live only in the task's memory: they are never written to the inbox, a file
+or the result. Duplicate candidates of every issue come from the inbox and from
+these in-memory issues together, ranked as the inbox ranks them, at most ten. An
+issue Sentry no longer has (`not_found`), one merged into another (`merged`), one
+whose events are gone (`no_event`), a failed read (`fetch_failed`) or the end of
+the time budget (`fetch_budget`) skips that issue only; the run goes on.
+
 Each call has its own idempotency key, `eval:<task id>:<short id>`, so a redelivered
 task never pays twice for an issue. The handler that names the structured executor
 lives in `crate.worker_handlers.error_inbox`; nothing here calls a model on its own.
@@ -29,17 +42,40 @@ lives in `crate.worker_handlers.error_inbox`; nothing here calls a model on its 
 
 from __future__ import annotations
 
+import functools
+import json
 import logging
 import re
+import time
 from collections import Counter
 from collections.abc import Callable, Iterable, Mapping
+from datetime import datetime, timezone
 from typing import Any
 
+from crate.ai.actions import get_action
 from crate.ai.consumers import accept_action, resume_action
 from crate.ai.contracts import AIConfigurationError
 from crate.ai.runtime import action_availability, estimated_input_tokens
-from crate.db.queries.error_issues import get_triage_input, issue_ids_by_short_id
+from crate.db.queries.error_issues import (
+    MAX_DUPLICATE_CANDIDATES,
+    get_triage_input,
+    issue_ids_by_short_id,
+)
+from crate.error_inbox.digest import MAX_DIGEST_BYTES
 from crate.error_inbox.priority import CRITICAL_TRIAGE_CONFIDENCE
+from crate.error_inbox.references import (
+    EVALUATE_PHASE,
+    FETCH_BUDGET_SECONDS,
+    FETCH_FAILED_CODE,
+    FETCH_REQUESTS_PER_ISSUE,
+    Fetched,
+    Progress,
+    SentryFactory,
+    fetch_references,
+    inbox_candidates,
+    sentry_source,
+    with_references,
+)
 from crate.error_inbox.triage import (
     INVALID_OUTPUT_CODE,
     StructuredExecutor,
@@ -53,10 +89,9 @@ EVAL_TASK = "evaluate_error_triage"
 EVAL_ACTION = "ops.error.triage"
 MAX_EVAL_ISSUES = 100
 SHORT_ID = re.compile(r"[A-Z0-9][A-Z0-9_-]{0,62}-[A-Z0-9]+")
+# Why a plan skips an issue (the queue accepts these in `skipped`).
 SKIP_REASONS = frozenset({"not_in_inbox", "no_digest", "over_input_limit"})
 ITEM_FAILED_CODE = "EVAL_ITEM_FAILED"
-
-Progress = Callable[[int, int, str], None]
 
 
 def normalise_short_ids(values: Any) -> list[str]:
@@ -173,21 +208,122 @@ def _input(issue_id: str | None) -> tuple[Mapping | None, str | None]:
     return data, None
 
 
+@functools.cache
+def request_bounds() -> tuple[int, int]:
+    """Crate's input estimate of the largest triage request, and what one candidate adds.
+
+    The largest request has a digest at its byte cap (`MAX_DIGEST_BYTES`), ten
+    candidates and an issue whose text fields are at their caps, all in ASCII. It
+    bounds a request built from Sentry before the task has read it.
+    """
+    frames = [
+        {"module": "m", "function": "f", "filename": "f", "lineno": 1, "context": []}
+        for _ in range(20)
+    ]
+    digest: dict[str, Any] = {
+        "v": 1,
+        "event_id": "e" * 32,
+        "platform": "python",
+        "release": "r" * 300,
+        "message": "",
+        "exceptions": [],
+        "frames": frames,
+        "tags": {},
+        "breadcrumbs": [],
+        "truncated": True,
+    }
+    used = len(json.dumps(digest, ensure_ascii=False, separators=(",", ":")).encode())
+    digest["message"] = "x" * (MAX_DIGEST_BYTES - used)
+    moment = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    issue = {
+        "short_id": "S" * 60 + "-ZZZ",
+        "service": "s" * 100,
+        "level": "warning",
+        "status": "unresolved",
+        "substatus": "s" * 64,
+        "issue_category": "c" * 32,
+        "events_24h": 10**12,
+        "users_24h": 10**12,
+        "events_total": 10**12,
+        "users_total": 10**12,
+        "first_seen": moment,
+        "last_seen": moment,
+        "first_release": "r" * 300,
+        "last_release": "r" * 300,
+    }
+    candidates = [
+        {
+            "short_id": "C" * 120 + f"-{index:03d}",
+            "same_group": True,
+            "service": "s" * 100,
+            "level": "warning",
+            "status": "unresolved",
+            "substatus": "s" * 64,
+            "last_seen": "2026-01-01T00:00:00.000000+00:00",
+            "events_24h": 10**12,
+            "exception": {"type": "t" * 300, "value": "v" * 500},
+            "top_frame": {"module": "m" * 300, "function": "f" * 300},
+        }
+        for index in range(MAX_DUPLICATE_CANDIDATES)
+    ]
+
+    def size(listed: list[dict[str, Any]]) -> int:
+        data = {**issue, "digest": digest, "candidates": listed}
+        system, model, prompt = build_request(
+            "triage", data, candidate_ids(listed), len(frames)
+        )
+        return estimated_input_tokens(prompt, system, model.model_json_schema())
+
+    largest = size(candidates)
+    per_candidate = -(-(largest - size([])) // MAX_DUPLICATE_CANDIDATES)
+    return largest, per_candidate
+
+
 def plan_evaluation(short_ids: Any) -> dict[str, Any]:
     """What an evaluation of these issues would send, without sending anything.
 
-    Each item is `ready` (one call) or `skipped` with a reason: `not_in_inbox`,
-    `no_digest`, or `over_input_limit` when the request is larger than the bound
-    profile accepts (the call would fail before anything is sent). Items carry sizes
-    and counts only, never digest content. `calls` is the number of ready items.
+    Each item is `ready` (one call), from the inbox (`source: inbox`, measured) or
+    to be fetched from Sentry by the task (`source: sentry`, sized at the largest
+    request), or `skipped` with a reason: `not_in_inbox` (and Sentry is not
+    connected), `no_digest`, or `over_input_limit` when the request is larger than
+    the bound profile accepts (the call would fail before anything is sent). Items
+    carry sizes and counts only, never digest content. `calls` is the number of
+    ready items, an upper bound: a fetched issue Sentry no longer has costs
+    nothing. `input_bound` adds, for inbox issues, room for the candidates fetched
+    issues may add. The plan makes no Sentry request.
     """
     ids = normalise_short_ids(short_ids)
     binding = _binding()
     limit = binding["limits"]["max_input_tokens"]
     found = issue_ids_by_short_id(ids)
+    sentry = sentry_source()
+    fetching = bool(sentry["available"]) and any(sid not in found for sid in ids)
+    largest, per_candidate = request_bounds()
+    fetched_size = min(largest, limit) if limit is not None else largest
     items: list[dict[str, Any]] = []
+    input_bound = 0
     for short_id in ids:
-        data, reason = _input(found.get(short_id))
+        if short_id not in found:
+            if not sentry["available"]:
+                items.append(
+                    {
+                        "short_id": short_id,
+                        "status": "skipped",
+                        "reason": "not_in_inbox",
+                    }
+                )
+                continue
+            items.append(
+                {
+                    "short_id": short_id,
+                    "status": "ready",
+                    "source": "sentry",
+                    "estimated_input_tokens": fetched_size,
+                }
+            )
+            input_bound += fetched_size
+            continue
+        data, reason = _input(found[short_id])
         if data is None:
             items.append({"short_id": short_id, "status": "skipped", "reason": reason})
             continue
@@ -202,11 +338,30 @@ def plan_evaluation(short_ids: Any) -> dict[str, Any]:
                 }
             )
             continue
-        items.append({"short_id": short_id, "status": "ready", **size})
+        items.append(
+            {"short_id": short_id, "status": "ready", "source": "inbox", **size}
+        )
+        room = (MAX_DUPLICATE_CANDIDATES - size["candidates"]) * per_candidate
+        estimate = size["estimated_input_tokens"] + (room if fetching else 0)
+        input_bound += min(estimate, limit) if limit is not None else estimate
+    ready = [item for item in items if item["status"] == "ready"]
+    sources = Counter(str(item["source"]) for item in ready)
+    action = get_action(EVAL_ACTION).maxima
     return {
         **binding,
+        "action_limits": {
+            "max_output_tokens": action.max_output_tokens,
+            "timeout_seconds": action.timeout_seconds,
+        },
         "items": items,
-        "calls": sum(item["status"] == "ready" for item in items),
+        "calls": len(ready),
+        "sources": {"inbox": sources["inbox"], "sentry": sources["sentry"]},
+        "input_bound": input_bound,
+        "sentry": {
+            **sentry,
+            "requests": sources["sentry"] * FETCH_REQUESTS_PER_ISSUE,
+            "budget_seconds": FETCH_BUDGET_SECONDS,
+        },
         "max_issues": MAX_EVAL_ISSUES,
     }
 
@@ -265,33 +420,41 @@ def queue_evaluation(
     return {"task_id": task_id, "deduplicated": False, "calls": len(ids)}
 
 
-def evaluate_issue(
+# -- one call per issue ----------------------------------------------------------
+
+
+def _evaluate(
     short_id: str,
-    issue_id: str | None,
+    data: Mapping[str, Any],
+    candidates: list[dict[str, Any]],
     *,
+    source: str,
     execute: StructuredExecutor,
     context: dict,
     job_id: str,
-    actor_id: int | None = None,
+    actor_id: int | None,
 ) -> dict[str, Any]:
-    """Triage one issue's current digest and keep only the closed answer.
-
-    The answer is validated like `triage_issue` validates it and never saved.
-    """
-    data, reason = _input(issue_id)
-    if data is None:
-        return {"short_id": short_id, "status": "skipped", "reason": reason}
     digest = data["digest"]
-    candidates = candidate_ids(data["candidates"])
+    request = {**data, "candidates": candidates}
+    ids = candidate_ids(candidates)
     frame_count = len(digest.get("frames") or [])
     base: dict[str, Any] = {
         "short_id": short_id,
-        "candidate_ids": candidates,
+        "source": source,
+        "candidate_ids": ids,
         "frames": frame_count,
     }
-    system, response_model, prompt = build_request(
-        "triage", data, candidates, frame_count
-    )
+    system, response_model, prompt = build_request("triage", request, ids, frame_count)
+    limit = _limits(context.get("config"))["max_input_tokens"]
+    needed = estimated_input_tokens(prompt, system, response_model.model_json_schema())
+    if limit is not None and needed > limit:
+        # The runtime would refuse it before sending: skipped, like in the plan.
+        return {
+            **base,
+            "status": "skipped",
+            "reason": "over_input_limit",
+            "estimated_input_tokens": needed,
+        }
     try:
         result = execute(
             EVAL_ACTION,
@@ -303,7 +466,7 @@ def evaluate_issue(
             job_id=job_id,
             idempotency_key=f"eval:{job_id}:{short_id}",
         )
-        check_output(result, candidates=candidates, frame_count=frame_count)
+        check_output(result, candidates=ids, frame_count=frame_count)
     except AIConfigurationError as error:
         status = "invalid_output" if error.code == INVALID_OUTPUT_CODE else "failed"
         return {**base, "status": status, "error_code": error.code}
@@ -320,6 +483,66 @@ def evaluate_issue(
         },
         "invocation_id": getattr(result, "_ai_invocation_id", None),
     }
+
+
+def evaluate_issue(
+    short_id: str,
+    issue_id: str | None,
+    *,
+    execute: StructuredExecutor,
+    context: dict,
+    job_id: str,
+    actor_id: int | None = None,
+    references: Mapping[str, Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Triage one inbox issue's current digest and keep only the closed answer.
+
+    Its candidates are the inbox's plus the matching in-memory `references`. The
+    answer is validated like `triage_issue` validates it and never saved.
+    """
+    data, reason = _input(issue_id)
+    if data is None:
+        return {"short_id": short_id, "status": "skipped", "reason": reason}
+    candidates = with_references(data, list(data["candidates"]), references or {})
+    return _evaluate(
+        short_id,
+        data,
+        candidates,
+        source="inbox",
+        execute=execute,
+        context=context,
+        job_id=job_id,
+        actor_id=actor_id,
+    )
+
+
+def evaluate_reference(
+    short_id: str,
+    data: Mapping[str, Any],
+    listed: list[dict[str, Any]],
+    *,
+    references: Mapping[str, Mapping[str, Any]],
+    execute: StructuredExecutor,
+    context: dict,
+    job_id: str,
+    actor_id: int | None = None,
+) -> dict[str, Any]:
+    """Triage one issue built in memory from Sentry, like an inbox issue.
+
+    `listed` are the inbox's candidates of its digest (`inbox_candidates`); the
+    matching in-memory `references` join them.
+    """
+    candidates = with_references(data, listed, references)
+    return _evaluate(
+        short_id,
+        data,
+        candidates,
+        source="sentry",
+        execute=execute,
+        context=context,
+        job_id=job_id,
+        actor_id=actor_id,
+    )
 
 
 def _request(params: Mapping[str, Any]) -> tuple[list[str], list, Mapping, int | None]:
@@ -351,13 +574,17 @@ def run_evaluation(
     execute: StructuredExecutor,
     cancelled: Callable[[], bool] = lambda: False,
     progress: Progress | None = None,
+    sentry_factory: SentryFactory | None = None,
+    clock: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> dict[str, Any]:
     """The `evaluate_error_triage` task: one validated call per issue, nothing saved.
 
-    A cancellation stops before the next issue; the rest are `not_run` and the
-    answers already paid for stay in the result. Per-issue failures (invalid
-    output, provider errors, an exhausted task budget) are recorded on the item and
-    the run goes on.
+    Issues the inbox does not hold are fetched from Sentry first and kept in memory
+    (`fetch_references`). A cancellation stops before the next issue; the rest are
+    `not_run` and the answers already paid for stay in the result. Per-issue
+    failures (a skipped fetch, invalid output, provider errors, an exhausted task
+    budget) are recorded on the item and the run goes on.
     """
     try:
         ids, skipped, acceptance, actor_id = _request(params)
@@ -380,6 +607,26 @@ def run_evaluation(
         }
     context = call["context"]
     found = issue_ids_by_short_id(ids)
+    missing = [short_id for short_id in ids if short_id not in found]
+    try:
+        fetched = fetch_references(
+            missing,
+            client_factory=sentry_factory,
+            cancelled=cancelled,
+            progress=progress,
+            clock=clock,
+            sleep=sleep,
+        )
+    except Exception as error:  # noqa: BLE001 — the inbox issues can still run.
+        log.warning("Reading reference issues failed (%s)", type(error).__name__)
+        fetched = Fetched(
+            skipped={
+                short_id: {"reason": "fetch_failed", "error_code": FETCH_FAILED_CODE}
+                for short_id in missing
+            }
+        )
+    references = fetched.issues
+    candidates_of = inbox_candidates(references)
     items: list[dict[str, Any]] = []
     stopped = False
     for index, short_id in enumerate(ids):
@@ -390,18 +637,46 @@ def run_evaluation(
             )
             continue
         if progress is not None:
-            progress(index, len(ids), short_id)
+            progress(EVALUATE_PHASE, index, len(ids), short_id)
         try:
-            item = evaluate_issue(
-                short_id,
-                found.get(short_id),
-                execute=execute,
-                context=context,
-                job_id=task_id,
-                actor_id=actor_id,
+            if short_id in references:
+                item = evaluate_reference(
+                    short_id,
+                    references[short_id],
+                    candidates_of.get(short_id, []),
+                    references=references,
+                    execute=execute,
+                    context=context,
+                    job_id=task_id,
+                    actor_id=actor_id,
+                )
+            elif short_id in fetched.skipped:
+                reason = fetched.skipped[short_id]
+                item = {
+                    "short_id": short_id,
+                    **(
+                        {}
+                        if reason["reason"] == "not_in_inbox"
+                        else {"source": "sentry"}
+                    ),
+                    "status": "skipped",
+                    **reason,
+                }
+            else:
+                item = evaluate_issue(
+                    short_id,
+                    found.get(short_id),
+                    execute=execute,
+                    context=context,
+                    job_id=task_id,
+                    actor_id=actor_id,
+                    references=references,
+                )
+        except Exception as error:  # noqa: BLE001 — one issue must not discard the paid answers.
+            # Only the type: a message could echo event content.
+            log.warning(
+                "Triage evaluation of %s failed (%s)", short_id, type(error).__name__
             )
-        except Exception:  # noqa: BLE001 — one issue must not discard the paid answers.
-            log.warning("Triage evaluation of %s failed", short_id, exc_info=True)
             item = {
                 "short_id": short_id,
                 "status": "failed",
@@ -409,7 +684,7 @@ def run_evaluation(
             }
         items.append(item)
     if progress is not None:
-        progress(len(ids), len(ids), "")
+        progress(EVALUATE_PHASE, len(ids), len(ids), "")
     return {
         "status": "completed",
         "action_id": EVAL_ACTION,
@@ -418,6 +693,7 @@ def run_evaluation(
         "items": items,
         "skipped": skipped,
         "counts": _counts(items),
+        "fetch": fetched.summary(len(missing)),
         "cancelled": stopped,
     }
 
@@ -476,6 +752,7 @@ def _safe_result(result: Any) -> dict[str, Any] | None:
         "items",
         "skipped",
         "counts",
+        "fetch",
         "cancelled",
     }
     return {key: result[key] for key in allowed if key in result}
@@ -511,9 +788,11 @@ __all__ = [
     "MAX_EVAL_ISSUES",
     "SKIP_REASONS",
     "evaluate_issue",
+    "evaluate_reference",
     "evaluation_result",
     "normalise_short_ids",
     "plan_evaluation",
     "queue_evaluation",
+    "request_bounds",
     "run_evaluation",
 ]

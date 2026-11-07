@@ -5,10 +5,11 @@
 It reads one JSON object from stdin and prints one JSON object:
 
 - `plan` `{"short_ids": [...]}`: the bound model and, per short id, whether it can be
-  evaluated and how large its request is. Reads only.
+  evaluated (from the inbox, or fetched from Sentry by the task when the inbox no
+  longer holds it) and how large its request is. Reads only: no Sentry request.
 - `queue` `{"short_ids": [...], "expected_fingerprint": "...", "skipped": [...]}`:
   queues one `evaluate_error_triage` task on the `ai_bulk` lane. It never calls a
-  model itself; the task does, inside the AI-lane window.
+  model or Sentry itself; the task does, inside the AI-lane window.
 - `result` `{"task_id": "..."}`: the task's state and, once it ended, its answers
   and token usage.
 

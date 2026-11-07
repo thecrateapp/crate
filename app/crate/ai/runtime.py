@@ -287,6 +287,12 @@ def execute_structured(
                         flat[key] = next(iter(item.values()))
                 value = response_model.model_validate(flat)
         except Exception:
+            if result.truncated:
+                # Not a malformed answer: the profile's output limit cut it off.
+                raise AIConfigurationError(
+                    transport.OUTPUT_LIMIT_CODE,
+                    "The answer reached the profile's output limit before it ended",
+                ) from None
             raise AIConfigurationError(
                 "AI_RESPONSE_INVALID", "Provider returned invalid structured data"
             ) from None

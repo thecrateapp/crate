@@ -108,6 +108,31 @@ def test_model_output_and_context_bound_the_derived_limits():
     assert (eq.max_output_tokens, eq.max_input_tokens) == (2048, 129024)
 
 
+def test_error_features_leave_reasoning_models_room_to_think():
+    # Gemini counts thinking against maxOutputTokens: 2,048 cut triage answers off.
+    for model, reasoning in ((GEMINI_38, PROVIDER_DEFAULT), (GEMINI_38, HIGH)):
+        results = {
+            d.action_id: d.config
+            for d in derive_all(
+                model, reasoning, ["ops.error.triage", "ops.error.investigate"]
+            )
+        }
+        triage, investigate = (
+            results["ops.error.triage"],
+            results["ops.error.investigate"],
+        )
+        assert triage is not None and investigate is not None
+        assert (triage.timeout_seconds, triage.max_output_tokens) == (90, 8192)
+        assert (investigate.timeout_seconds, investigate.max_output_tokens) == (
+            90,
+            16000,
+        )
+
+    # A model with a smaller output ceiling keeps its own ceiling.
+    small = _derived(DEEPSEEK_VISION, PROVIDER_DEFAULT, "ops.error.investigate")
+    assert small.config is not None and small.config.max_output_tokens == 8192
+
+
 def test_text_only_models_cannot_take_image_features():
     results = derive_all(OLLAMA_TEXT, PROVIDER_DEFAULT)
     by_id = {d.action_id: d for d in results}

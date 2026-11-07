@@ -430,6 +430,41 @@ def test_triage_input_caps_and_ranks_candidates(pg_db):
     assert data["done_kinds"] == [] and data["current_triage"] is None
 
 
+def test_candidates_of_a_digest_without_a_row_match_the_triage_input(pg_db):
+    from crate.db.queries.error_issues import (
+        duplicate_candidates,
+        get_triage_input,
+    )
+
+    target = _issue(100, _event(), crate_score=200)
+    for external_id in range(101, 113):
+        _issue(external_id, _event(value=f"'{external_id}'"), crate_score=external_id)
+    _issue(114, _event(functions=("other",)), crate_score=999)
+    _issue(115, _event(exception="TimeoutError"), crate_score=999)
+    data = get_triage_input(target)
+    assert data is not None
+    digest = build_digest(_event())
+    key = {"group_key": group_key(digest), "exception_type": "KeyError"}
+
+    as_row, elsewhere, unmatched = duplicate_candidates(
+        [
+            {"external_id": "100", **key},
+            {"external_id": None, **key},
+            {"external_id": None, "group_key": "none", "exception_type": None},
+        ]
+    )
+
+    # The same candidates, order and shape as the triage input of the row.
+    assert as_row == data["candidates"]
+    assert {"crate_score", "same_group", "exception", "top_frame"} <= set(as_row[0])
+    assert "CRATE-API-100" not in {c["short_id"] for c in as_row}
+    # A digest that is not this row also gets the row itself as a candidate.
+    assert [c["short_id"] for c in elsewhere][:2] == ["CRATE-API-100", "CRATE-API-112"]
+    assert len(elsewhere) == 10
+    assert unmatched == []
+    assert duplicate_candidates([]) == []
+
+
 def test_missing_issue_or_digest_makes_no_call(pg_db, monkeypatch):
     _configure(monkeypatch)
     calls = _model(monkeypatch, _output())
@@ -609,7 +644,7 @@ def test_handlers_name_the_executor_and_run_on_the_ai_lane():
     from crate.worker import TASK_HANDLERS
     from crate.worker_handlers import error_inbox
 
-    assert TASK_POOL_CONFIG["triage_error_issue"] == ("ai", 1, 120, 0)
+    assert TASK_POOL_CONFIG["triage_error_issue"] == ("ai", 1, 150, 0)
     assert TASK_POOL_CONFIG["investigate_error_issue"] == ("ai", 0, 180, 0)
     assert TASK_HANDLERS["triage_error_issue"] is (
         error_inbox._handle_triage_error_issue
@@ -768,6 +803,47 @@ def test_input_too_large_says_which_limit_to_raise(pg_db, monkeypatch):
     assert len(result["error"]) <= 200
     # Refused before anything was reserved or sent: the digest's key is not spent.
     assert calls == [] and _invocations() == [] and _triages(target) == []
+
+
+def test_an_answer_cut_off_at_the_output_limit_says_which_limit(issues, monkeypatch):
+    calls: list[dict[str, Any]] = []
+
+    def generate(context, **kwargs):
+        # Production, 2026-11-06: thought plus output tokens equal the limit.
+        calls.append(context["config"])
+        return NativeResponse(
+            '{"classification": "bug", "sev',
+            {"input_tokens": 3000, "output_tokens": 80, "thought_tokens": 1968},
+            "fake-model",
+            1,
+            truncated=True,
+        )
+
+    monkeypatch.setattr(runtime.transport, "generate", generate)
+    target = issues["target"]
+
+    result = _run("triage", target, origin="automatic")
+
+    assert (result["status"], result["error_code"]) == ("failed", "AI_OUTPUT_LIMIT")
+    assert result["output_limit"] == calls[0]["max_output_tokens"] == 2048
+    assert "2,048-token output limit" in result["error"]
+    assert "Triage error issue" in result["error"]
+    assert len(result["error"]) <= 200
+    assert [row["error_code"] for row in _invocations()] == ["AI_OUTPUT_LIMIT"]
+    assert _triages(target) == []
+
+    investigated = _run("investigation", target, actor_id=_operator())
+    assert investigated["error_code"] == "AI_OUTPUT_LIMIT"
+    assert "Investigate error issue" in investigated["error"]
+
+
+def test_output_limit_text_without_a_known_limit():
+    from crate.worker_handlers.error_inbox import ai_problem_text
+
+    text = ai_problem_text("triage", "AI_OUTPUT_LIMIT")
+
+    assert text.startswith("The answer was cut off at the AI profile's output limit")
+    assert "did not match the expected format" not in text
 
 
 def test_input_estimate_is_the_runtime_bound():

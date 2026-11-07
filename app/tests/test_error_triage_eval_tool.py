@@ -706,3 +706,227 @@ def test_the_reference_set_loads():
         sum(label["severity"] == "critical" for label in reference["labels"].values())
         == 0
     )
+
+
+# -- issues read from Sentry and answers cut off at the output limit -------------
+
+
+def _fetched_plan(**overrides) -> dict[str, Any]:
+    items = [
+        {
+            "short_id": short_id,
+            "status": "ready",
+            "source": "inbox",
+            "estimated_input_tokens": 9000,
+        }
+        for short_id in list(LABELS)[:4]
+    ] + [
+        {
+            "short_id": short_id,
+            "status": "ready",
+            "source": "sentry",
+            "estimated_input_tokens": 47889,
+        }
+        for short_id in list(LABELS)[4:9]
+    ]
+    items.append(
+        {"short_id": "CRATE-API-10", "status": "skipped", "reason": "no_digest"}
+    )
+    fields: dict[str, Any] = {
+        "items": items,
+        "calls": 9,
+        "sources": {"inbox": 4, "sentry": 5},
+        "input_bound": 300000,
+        "sentry": {
+            "available": True,
+            "error_code": None,
+            "requests": 15,
+            "budget_seconds": 600.0,
+        },
+        "limits": {
+            "max_input_tokens": 65536,
+            "max_output_tokens": 8192,
+            "timeout_seconds": 90,
+        },
+        "action_limits": {"max_output_tokens": 8192, "timeout_seconds": 90},
+    }
+    return _plan(**{**fields, **overrides})
+
+
+def test_plan_shows_what_the_task_reads_from_sentry(labels_file):
+    fake = FakeCrate(_fetched_plan(), [])
+
+    status, lines = _main(
+        fake, "plan", "--labels", str(labels_file), "--price", "gemini-2.5-flash=1/2"
+    )
+
+    text = "\n".join(lines)
+    assert status == 0 and fake.commands() == ["plan"]
+    assert "ready, one call each: 9" in text
+    assert "from the inbox: 4" in text
+    assert "read from Sentry by the task, kept in memory: 5" in text
+    assert "Sentry: 15 requests at most" in text and "600 s" in text
+    # The server's bound includes the fetched issues at the largest request.
+    assert "Calls: 9 at most. Input bound: 300,000 tokens" in text
+    assert "Output: at most 73,728 tokens, reasoning included" in text
+    # 300,000 x $1/M + 73,728 x $2/M
+    assert "$0.45" in text
+    assert "Warning" not in text
+
+
+def test_plan_warns_when_the_profile_predates_the_new_limits(labels_file):
+    plan = _fetched_plan(
+        limits={
+            "max_input_tokens": 65536,
+            "max_output_tokens": 2048,
+            "timeout_seconds": 45,
+        }
+    )
+
+    _, lines = _main(FakeCrate(plan, []), "plan", "--labels", str(labels_file))
+
+    text = "\n".join(lines)
+    assert "Warning: the bound profile's limits are below the action's" in text
+    assert "output 2,048 tokens (the action allows 8,192 tokens)" in text
+    assert "timeout 45 s (the action allows 90 s)" in text
+    assert "AI_OUTPUT_LIMIT" in text
+
+
+def test_plan_says_when_sentry_is_not_connected(labels_file):
+    plan = _plan(
+        items=[
+            {"short_id": "CRATE-API-1", "status": "ready", "source": "inbox"},
+            {"short_id": "CRATE-API-2", "status": "skipped", "reason": "not_in_inbox"},
+        ],
+        sentry={"available": False, "error_code": "ERROR_TRACKING_NOT_CONFIGURED"},
+    )
+
+    _, lines = _main(FakeCrate(plan, []), "plan", "--labels", str(labels_file))
+
+    text = "\n".join(lines)
+    assert "skipped, not in the inbox and not read from Sentry: 1" in text
+    assert "Sentry is not connected (ERROR_TRACKING_NOT_CONFIGURED)" in text
+
+
+def test_run_queues_issues_read_from_sentry_with_the_inbox_ones(labels_file):
+    fake = FakeCrate(_fetched_plan(), [_record()])
+
+    status, _ = _main(
+        fake,
+        "run",
+        "--execute",
+        "--confirm-calls",
+        "9",
+        "--labels",
+        str(labels_file),
+        "--output",
+        str(labels_file.parent / "report.md"),
+        "--poll-seconds",
+        "0",
+    )
+
+    assert status == 0
+    queue = fake.calls[1][2]
+    assert queue["short_ids"] == list(LABELS)[:9]
+    assert queue["skipped"] == [{"short_id": "CRATE-API-10", "reason": "no_digest"}]
+
+
+def _fetched_result() -> dict[str, Any]:
+    items = _result()["items"]
+    for item in items[:2]:
+        item["source"] = "inbox"
+    for item in items[2:6]:
+        item["source"] = "sentry"
+    # An answer cut off at the output limit: a failed call with its own code.
+    items[7] = {
+        "short_id": "CRATE-API-8",
+        "source": "sentry",
+        "status": "failed",
+        "error_code": "AI_OUTPUT_LIMIT",
+        "candidate_ids": ["CRATE-API-1"],
+        "summary": LEAK,
+    }
+    items.append(
+        {
+            "short_id": "CRATE-API-9",
+            "source": "sentry",
+            "status": "skipped",
+            "reason": "no_event",
+        }
+    )
+    items.append(
+        {
+            "short_id": "CRATE-API-10",
+            "source": "sentry",
+            "status": "skipped",
+            "reason": "fetch_failed",
+            "error_code": "SENTRY_SERVER",
+        }
+    )
+    return {"items": items, "skipped": []}
+
+
+def test_report_names_cut_off_answers_and_issues_read_from_sentry(tmp_path):
+    run = run_eval.score_run(LABELS, _record(**_fetched_result()), PRICES)
+
+    assert run["output_limit"] == {"count": 1, "short_ids": ["CRATE-API-8"]}
+    assert run["failures"]["by_code"] == {"AI_OUTPUT_LIMIT": 1}
+    assert run["sources"] == {"inbox": 2, "sentry": 5}
+    assert {"short_id": "CRATE-API-9", "reason": "no_event"} in run["skipped"]
+    assert {
+        "short_id": "CRATE-API-10",
+        "reason": "fetch_failed",
+        "error_code": "SENTRY_SERVER",
+    } in run["skipped"]
+
+    md, js = run_eval.write_outputs(
+        tmp_path / "report.md",
+        [run],
+        {"path": "labels.json", "version": 1, "labels": len(LABELS)},
+        date="2026-11-07",
+    )
+    report, data = md.read_text(), js.read_text()
+    assert (
+        "Answers cut off at the profile's output limit (`AI_OUTPUT_LIMIT`, reasoning "
+        "included): 1 (CRATE-API-8). The profile allows 2,048 tokens" in report
+    )
+    assert "| Cut off |" in report
+    assert "read from Sentry and built in memory: 5" in report
+    assert "No event left in Sentry: CRATE-API-9." in report
+    assert "Sentry could not be read: CRATE-API-10 (SENTRY_SERVER)." in report
+    assert "built in memory from its latest Sentry event" in report
+    for text in (report, data):
+        assert "LEAKED" not in text and "/music/" not in text
+
+
+def test_reports_written_before_these_fields_still_render(tmp_path):
+    run = run_eval.score_run(LABELS, _record(), PRICES)
+    older = {
+        key: value
+        for key, value in run.items()
+        if key not in {"output_limit", "sources"}
+    }
+
+    report = run_eval.render_report(
+        {
+            "date": "2026-11-06",
+            "reference": {"path": "labels.json", "version": 1, "labels": 10},
+            "runs": [older],
+        }
+    )
+
+    assert "Answers cut off at the profile's output limit" in report
+
+
+def test_progress_names_the_sentry_phase():
+    reading = json.dumps({"phase": "fetch_references", "done": 4, "total": 63})
+    calling = json.dumps({"phase": "evaluate_triage", "done": 3, "total": 79})
+
+    assert (
+        run_eval._progress_text({"status": "running", "progress": reading})
+        == "running: reading from Sentry 4/63"
+    )
+    assert (
+        run_eval._progress_text({"status": "running", "progress": calling})
+        == "running: 3/79"
+    )

@@ -594,6 +594,8 @@ const INVOCATION_ERROR_TEXT: Record<string, string> = {
   AI_PROVIDER_TIMEOUT: "The provider didn't answer in time",
   AI_PROVIDER_FAILED: "The provider couldn't complete the request",
   AI_RESPONSE_INVALID: "The model's answer didn't match the expected format",
+  AI_OUTPUT_LIMIT:
+    "The answer was cut off at the profile's output limit, reasoning included",
   AI_INPUT_TOO_LARGE: "The input was larger than the profile allows",
   AI_PROBE_FAILED: "The test request failed",
 };

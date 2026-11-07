@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 from crate.error_inbox import digest as digest_module
-from crate.error_inbox.digest import build_digest, digest_hash, group_key
+from crate.error_inbox.digest import build_digest, digest_hash, group_key, service_tag
 
 
 def _frame(
@@ -397,3 +397,11 @@ def test_group_key_ignores_bundle_hashes_and_relative_prefixes():
     assert group_key(js_event("../src/App.tsx")) == group_key(
         js_event("../../src/App.tsx")
     )
+
+
+def test_service_tag_is_the_trimmed_service_of_the_event():
+    assert service_tag({"tags": {"service": "  worker-fast "}}) == "worker-fast"
+    assert service_tag({"tags": {"service": "x" * 150}}) == "x" * 100
+    for digest in ({}, {"tags": None}, {"tags": {"service": 7}}, {"tags": {}}):
+        assert service_tag(digest) is None
+    assert service_tag({"tags": {"service": "   "}}) is None

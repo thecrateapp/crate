@@ -546,6 +546,10 @@ describe("invocationErrorText", () => {
       "AI_RESPONSE_INVALID",
       "The model's answer didn't match the expected format",
     ],
+    [
+      "AI_OUTPUT_LIMIT",
+      "The answer was cut off at the profile's output limit, reasoning included",
+    ],
     ["AI_INPUT_TOO_LARGE", "The input was larger than the profile allows"],
     ["AI_PROBE_FAILED", "The test request failed"],
     ["AI_CONTEXT_TOO_SMALL", "The model's context window is too small"],

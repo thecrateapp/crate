@@ -290,8 +290,8 @@ are readable only through their owned domain routes.
 | `playlists.description.generate` | text            |              45 |                  2048 |
 | `music_paths.refine`             | text            |               8 |                  4096 |
 | `i18n.listen.draft`              | text            |              90 |                 16000 |
-| `ops.error.triage`               | error summary   |              45 |                  2048 |
-| `ops.error.investigate`          | error summary   |              90 |                  4096 |
+| `ops.error.triage`               | error summary   |              90 |                  8192 |
+| `ops.error.investigate`          | error summary   |              90 |                 16000 |
 | `smart_mix.transition.refine`    | numbers only    |              45 |                  1024 |
 
 `smart_mix.transition.refine` (permission `smart_mix.ai`, which every role with
@@ -302,7 +302,13 @@ model is applied with the provider's own reasoning, this feature takes the model
 native `low` level if it has one, because its answer is needed before the
 transition plays.
 
-Profiles may lower these maxima; they cannot raise them. Input profiles are bounded
+Profiles may lower these maxima; they cannot raise them. Reasoning models count
+their thinking against the output limit (Gemini's `maxOutputTokens`, DeepSeek's and
+OpenAI-compatible `max_tokens`, Ollama's `num_predict`), so the error inbox actions
+leave room for thousands of reasoning tokens around an answer of a few hundred. A
+profile keeps the limits it was created with: after a maximum is raised, use the
+model again for that feature (**Use a different model**, same model and reasoning)
+to append a profile version with the new limits. Input profiles are bounded
 by the model context and 131072 tokens. Vision admission requires a conservative
 image bound or a sufficient complete model-context reservation; unknown image bounds
 fail closed. Binding an enabled image action to such a profile is rejected up front
@@ -380,6 +386,18 @@ investigation must also return a hypothesis and a next step. Any other output
 fails the invocation with `AI_RESPONSE_INVALID` and nothing is saved. A valid
 result goes to `error_issue_triage` with its invocation ID.
 
+**Output limit.** When the provider stops because the answer reached the profile's
+output limit (Gemini `finishReason: MAX_TOKENS`, DeepSeek `finish_reason: length`,
+Ollama `done_reason: length`) and what it returned is not a valid answer, the
+runtime fails the invocation with `AI_OUTPUT_LIMIT` instead of
+`AI_RESPONSE_INVALID`, for every action. Reasoning counts against that limit, so a
+model can spend it all thinking and return little or nothing. The invocation keeps
+its token usage, AI activity shows «The answer was cut off at the profile's output
+limit, reasoning included», and a triage or investigation task says which limit it
+reached («The answer was cut off at the AI profile's 2,048-token output limit, so
+nothing was saved…»). An answer that is complete and valid when the limit stops it
+is kept.
+
 **One result per issue, kind and digest.** `triage_issue`
 (`crate.error_inbox.triage`) returns an existing result without calling the
 model; only a saved result counts as done. The idempotency key keeps a redelivered
@@ -404,7 +422,7 @@ needs; raise it in AI models for these two actions.
 `execute_structured` themselves, so each is the root of the model-calling chain
 the static check below verifies:
 
-- `triage_error_issue` (priority 1, 120 s): queued by the sync when automatic
+- `triage_error_issue` (priority 1, 150 s): queued by the sync when automatic
   triage is on, or by **Triage backlog**;
 - `investigate_error_issue` (priority 0, 180 s): queued by **Investigate**. It
   first reads the Sentry evidence (one documented Retrieve Tag Details call per
@@ -428,11 +446,29 @@ automatic triage on. `tools/error-inbox-eval/run_eval.py` produces that report
 
 - It never calls a model itself. Through `python -m crate.error_inbox.evaluation_cli`
   inside the worker container it plans (which reference issues have a stored digest,
-  the bound model, the number of calls and their token bound), queues one
-  `evaluate_error_triage` task and reads its result. `plan` is a dry run; `run`
-  sends calls only with `--execute` and a confirmation of the exact number of calls.
-- Only short ids reach the server; the labels stay with the tool. Issues without a
-  stored digest are reported as skipped. Nothing is fetched from Sentry.
+  which ones the task will read from Sentry, the bound model, the number of calls
+  and their token bound), queues one `evaluate_error_triage` task and reads its
+  result. `plan` is a dry run that makes no Sentry request; `run` sends calls only
+  with `--execute` and a confirmation of the exact number of calls. The plan warns
+  when the bound profile's output limit or timeout is below the action's.
+- Only short ids reach the server; the labels stay with the tool. Issues with a row
+  but no stored digest are reported as skipped.
+- Most reference issues have been resolved or filtered out of the inbox since E0.
+  The task reads each one the inbox does not hold with the stored Sentry connection
+  (`crate.error_inbox.references`): Resolve a Short ID
+  (`/organizations/{org}/shortids/{short_id}/`), the issue and its latest event,
+  three organization-scoped requests on the configured host, at most four a second,
+  a 429 waited out once (Retry-After, at most 60 s), all within 600 s. It builds the
+  triage input in memory exactly as the sync would store it (`build_digest`, the
+  same service and score) and never writes it to the inbox, a file, a log line or
+  the result. An issue Sentry no longer has is skipped as `not_found`, one merged
+  into another as `merged`, one whose events are gone as `no_event`, a failed read
+  as `fetch_failed` (with its Sentry code; a rejected token skips the rest without
+  asking again) and the end of the budget as `fetch_budget`; the run goes on.
+  Without a Sentry connection these issues are skipped as `not_in_inbox`.
+- Duplicate candidates come from the inbox and from the issues read from Sentry
+  together, with the triage's rule (same group key or same main exception) and
+  order, at most ten, so duplicate agreement is measured on the whole reference set.
 - `queue` accepts the binding the plan showed and refuses with `AI_CONTEXT_STALE`
   if it changed since. One evaluation runs at a time.
 - The task runs on `ai_bulk` and its handler names `execute_structured`, so the
@@ -446,9 +482,10 @@ automatic triage on. `tools/error-inbox-eval/run_eval.py` produces that report
   with a JSON file next to it, shows per model the agreement on classification and
   severity, critical (and, because the reference has no critical label,
   high-severity) issues taken for noise, confident critical answers on non-critical
-  issues, duplicate agreement, invalid outputs, failed calls and tokens, with the
-  cost at a price passed on the command line. It holds labels, short ids, counts and
-  token figures only.
+  issues, duplicate agreement, invalid outputs, answers cut off at the output limit
+  (`AI_OUTPUT_LIMIT`), failed calls, how many issues were read from Sentry and why
+  others were skipped, and tokens, with the cost at a price passed on the command
+  line. It holds labels, short ids, counts, codes and token figures only.
 
 Running it against production spends the connection's budget and sends the
 reference issues' digests to the bound provider, so it needs the maintainer's
@@ -465,8 +502,8 @@ taxonomy batch never holds the interactive threads.
 
 | Lane      | Work                                                     | Time limit            | Task types (time limit in seconds)                                                                                                                                                                                                                                                                                                                                                                               |
 | --------- | -------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ai`      | One proposal, draft, extraction, analysis or admin probe | at most 300 s         | `ai_catalog_refresh` (180), `ai_profile_test` (180), `propose_genre_eq` (120), `generate_playlist_description` (120), `propose_genre_taxonomy_node` (180), `refine_music_path` (120), `analyze_artist_hero_candidate` (180), `show_extract` (180), `research_artist_bio` (300), `draft_i18n_translation` (300), `triage_error_issue` (120), `investigate_error_issue` (180), `smart_mix_refine_transition` (120) |
-| `ai_bulk` | Long batches                                             | per task, no lane cap | `infer_genre_taxonomy` (3600), `rebuild_genre_taxonomy_proposals` (7200), `evaluate_error_triage` (7200)                                                                                                                                                                                                                                                                                                         |
+| `ai`      | One proposal, draft, extraction, analysis or admin probe | at most 300 s         | `ai_catalog_refresh` (180), `ai_profile_test` (180), `propose_genre_eq` (120), `generate_playlist_description` (120), `propose_genre_taxonomy_node` (180), `refine_music_path` (120), `analyze_artist_hero_candidate` (180), `show_extract` (180), `research_artist_bio` (300), `draft_i18n_translation` (300), `triage_error_issue` (150), `investigate_error_issue` (180), `smart_mix_refine_transition` (120) |
+| `ai_bulk` | Long batches                                             | per task, no lane cap | `infer_genre_taxonomy` (3600), `rebuild_genre_taxonomy_proposals` (7200), `evaluate_error_triage` (10800)                                                                                                                                                                                                                                                                                                        |
 
 Every AI task keeps `max_retries=0`: paid work is never retried.
 `enrich_genre_descriptions` reads Wikidata and Wikipedia only, calls no model

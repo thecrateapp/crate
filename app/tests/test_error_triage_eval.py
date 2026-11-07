@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import io
 import json
+from datetime import datetime, timezone
 from typing import Any
 
+import httpx
 import pytest
 from sqlalchemy import text
 
@@ -23,7 +25,13 @@ from crate.error_inbox.evaluation import (
     queue_evaluation,
     run_evaluation,
 )
-from tests.error_inbox_fakes import configure_ai
+from tests.error_inbox_fakes import (
+    SHORT_IDS_PATH,
+    FakeSentry,
+    configure,
+    configure_ai,
+    raw_issue,
+)
 from tests.test_error_triage import (
     TRIAGE,
     _event,
@@ -439,15 +447,16 @@ def test_handler_names_the_executor_on_the_bulk_lane(monkeypatch):
     from crate.worker import TASK_HANDLERS
     from crate.worker_handlers import error_inbox
 
-    assert TASK_POOL_CONFIG[EVAL_TASK] == ("ai_bulk", 3, 7200, 0)
+    assert TASK_POOL_CONFIG[EVAL_TASK] == ("ai_bulk", 3, 10800, 0)
     assert TASK_HANDLERS[EVAL_TASK] is error_inbox._handle_evaluate_error_triage
     seen: dict[str, Any] = {}
     progress: list[tuple[int, int, str]] = []
 
     def run(task_id, params, *, execute, cancelled, progress):
         seen.update(task_id=task_id, execute=execute, cancelled=cancelled())
-        progress(0, 2, "CRATE-API-1")
-        progress(2, 2, "")
+        progress("fetch", 0, 1, "CRATE-API-9")
+        progress("evaluate", 0, 2, "CRATE-API-1")
+        progress("evaluate", 2, 2, "")
         return {"status": "completed"}
 
     monkeypatch.setattr(error_inbox, "run_evaluation", run)
@@ -456,7 +465,7 @@ def test_handler_names_the_executor_on_the_bulk_lane(monkeypatch):
         error_inbox,
         "emit_progress",
         lambda task_id, value, force=False: progress.append(
-            (value.done, value.total, value.item)
+            (value.phase, value.phase_index, value.done, value.total, value.item)
         ),
     )
 
@@ -468,7 +477,11 @@ def test_handler_names_the_executor_on_the_bulk_lane(monkeypatch):
         "execute": runtime.execute_structured,
         "cancelled": False,
     }
-    assert progress == [(0, 2, "CRATE-API-1"), (2, 2, "")]
+    assert progress == [
+        ("fetch_references", 0, 0, 1, "CRATE-API-9"),
+        ("evaluate_triage", 1, 0, 2, "CRATE-API-1"),
+        ("evaluate_triage", 1, 2, 2, ""),
+    ]
 
 
 def _cli(command: str, payload: Any) -> tuple[int, dict]:
@@ -526,3 +539,486 @@ def test_cli_failures_are_closed_json(inbox, command, payload, code):
 
     assert status == 2
     assert output["error"]["code"] == code
+
+
+# -- reference issues the inbox does not hold: read from Sentry, kept in memory ----
+
+# Event text only Sentry holds: it may reach the model's prompt, nothing else.
+SENTINEL = "SENTINEL-7f3a-fetched-event-text"
+
+
+def _sentry_event(**options) -> dict[str, Any]:
+    event = _event(**options)
+    event["entries"].append(
+        {
+            "type": "breadcrumbs",
+            "data": {"values": [{"category": "query", "message": f"{SENTINEL} b"}]},
+        }
+    )
+    frames = event["entries"][0]["data"]["values"][0]["stacktrace"]["frames"]
+    frames[-1]["context"] = [[12, f"raise KeyError('{SENTINEL}')"]]
+    return event
+
+
+def _sentry_issue(issue_id: int, **overrides) -> dict[str, Any]:
+    return raw_issue(
+        issue_id,
+        title=f"{SENTINEL} title",
+        culprit=f"{SENTINEL} culprit",
+        permalink=f"https://ninja-development.sentry.io/issues/{issue_id}/?q={SENTINEL}",
+        status="resolved",
+        substatus=None,
+        **overrides,
+    )
+
+
+@pytest.fixture
+def sentry(inbox) -> FakeSentry:
+    """Sentry holding six reference issues the inbox does not hold."""
+    configure()
+    fake = FakeSentry()
+    # The same group as CRATE-API-1 (exception type and innermost frame).
+    fake.issues["21"] = _sentry_issue(21)
+    fake.events["21"] = _sentry_event(value=f"'{SENTINEL}'")
+    # The same group as CRATE-API-4.
+    fake.issues["22"] = _sentry_issue(22)
+    fake.events["22"] = _sentry_event(exception="TimeoutError")
+    # Merged into CRATE-API-21: Sentry answers its short id with that issue.
+    fake.merged["CRATE-API-23"] = "21"
+    # CRATE-API-24 was deleted. CRATE-API-25's events are gone.
+    fake.issues["25"] = _sentry_issue(25)
+    # CRATE-API-26's latest event cannot be read.
+    fake.issues["26"] = _sentry_issue(26)
+    fake.events["26"] = _sentry_event()
+    fake.fail = lambda request: (
+        httpx.Response(502)
+        if request.url.path.endswith("/issues/26/events/latest/")
+        else None
+    )
+    return fake
+
+
+REFERENCES = [f"CRATE-API-{n}" for n in range(21, 27)]
+
+
+def _rows_holding(value: str) -> int:
+    with _scope() as session:
+        return session.execute(
+            text(
+                "SELECT (SELECT count(*) FROM error_issues WHERE digest::text LIKE :v"
+                " OR title LIKE :v OR culprit LIKE :v)"
+                " + (SELECT count(*) FROM error_issue_triage)"
+                " + (SELECT count(*) FROM tasks WHERE params_json::text LIKE :v"
+                " OR coalesce(result_json::text, '') LIKE :v)"
+            ),
+            {"v": f"%{value}%"},
+        ).scalar()
+
+
+def test_reference_issues_outside_the_inbox_are_built_in_memory(
+    sentry, monkeypatch, caplog
+):
+    calls = _model(
+        monkeypatch,
+        # CRATE-API-1 names an issue only Sentry holds: the candidates are a union.
+        _output(duplicate_of="CRATE-API-21"),
+        _output(duplicate_of="CRATE-API-1", classification="client_environment"),
+        _output(classification="noise", severity="low"),
+    )
+    task = _queued(["CRATE-API-1", *REFERENCES])
+    assert task["params"]["short_ids"] == ["CRATE-API-1", *REFERENCES]
+
+    result = _run(task, sentry_factory=sentry.factory, sleep=lambda seconds: None)
+
+    items = {item["short_id"]: item for item in result["items"]}
+    assert [(i["short_id"], i["status"]) for i in result["items"]] == [
+        ("CRATE-API-1", "ok"),
+        ("CRATE-API-21", "ok"),
+        ("CRATE-API-22", "ok"),
+        ("CRATE-API-23", "skipped"),
+        ("CRATE-API-24", "skipped"),
+        ("CRATE-API-25", "skipped"),
+        ("CRATE-API-26", "skipped"),
+    ]
+    assert items["CRATE-API-1"]["source"] == "inbox"
+    # Same group first, open issues before resolved ones, then the same exception.
+    assert items["CRATE-API-1"]["candidate_ids"] == [
+        "CRATE-API-2",
+        "CRATE-API-21",
+        "CRATE-API-3",
+    ]
+    assert items["CRATE-API-1"]["prediction"]["duplicate_of"] == "CRATE-API-21"
+    fetched = items["CRATE-API-21"]
+    assert fetched["source"] == "sentry" and fetched["frames"] == 3
+    assert fetched["candidate_ids"] == ["CRATE-API-1", "CRATE-API-2", "CRATE-API-3"]
+    assert fetched["prediction"]["classification"] == "client_environment"
+    assert items["CRATE-API-22"]["candidate_ids"] == ["CRATE-API-4"]
+    assert {
+        short_id: (items[short_id]["reason"], items[short_id].get("error_code"))
+        for short_id in REFERENCES[2:]
+    } == {
+        "CRATE-API-23": ("merged", None),
+        "CRATE-API-24": ("not_found", None),
+        "CRATE-API-25": ("no_event", None),
+        "CRATE-API-26": ("fetch_failed", "SENTRY_SERVER"),
+    }
+    assert result["counts"]["ok"] == 3 and result["counts"]["skipped"] == 4
+    assert result["fetch"] == {
+        "wanted": 6,
+        "built": 2,
+        "skipped": 4,
+        "requests": 14,
+        "budget_exhausted": False,
+    }
+    # Organization-scoped reads on the configured host; the short id is resolved.
+    assert sentry.resolved_short_ids() == REFERENCES
+    assert sentry.paths()[:3] == [
+        f"{SHORT_IDS_PATH}CRATE-API-21/",
+        "/api/0/organizations/ninja-development/issues/21/",
+        "/api/0/organizations/ninja-development/issues/21/events/latest/",
+    ]
+
+    # The fetched event reached the model's prompt, and only the prompt.
+    assert len(calls) == 3
+    prompt = calls[1]["prompt"]
+    assert SENTINEL in prompt
+    assert f"{SENTINEL} title" not in prompt and f"{SENTINEL} culprit" not in prompt
+    assert "sentry.io/issues" not in prompt
+    record = _finished(task, result)
+    for value in (result, record):
+        assert SENTINEL not in json.dumps(value, default=str)
+        _private_free(value)
+    assert SENTINEL not in caplog.text
+    assert _rows_holding(SENTINEL) == 0
+    with _scope() as session:
+        assert session.execute(text("SELECT count(*) FROM error_issues")).scalar() == 5
+
+
+def _finished(task: dict, result: dict) -> dict:
+    _finish(task["id"], result)
+    return evaluation_result(task["id"])
+
+
+def test_fetched_issue_is_triaged_exactly_as_the_sync_would_store_it(
+    sentry, monkeypatch
+):
+    """The in-memory input equals the inbox row the sync builds for that issue."""
+    from crate.db.queries.error_issues import get_triage_input
+    from crate.error_inbox.references import reference_input
+    from crate.error_inbox.sentry_client import normalize_issue
+    from crate.worker_handlers.error_inbox import sync_issues
+
+    issue = normalize_issue(sentry.issues["21"])
+    built = reference_input(issue, sentry.events["21"])
+
+    # Let the sync store the same issue as a resolved one it no longer lists.
+    sentry.issues["21"] = {**sentry.issues["21"], "status": "unresolved"}
+    sentry.full = [sentry.issues["21"]]
+    sentry.fail = None
+    assert sync_issues(client_factory=sentry.factory)["status"] == "ok"
+    from crate.db.queries.error_issues import issue_ids_by_short_id
+
+    stored = get_triage_input(issue_ids_by_short_id(["CRATE-API-21"])["CRATE-API-21"])
+    assert stored is not None
+    for key in ("digest", "digest_hash", "group_key", "service", "level"):
+        assert built[key] == stored[key], key
+    assert "title" not in built and "culprit" not in built and "permalink" not in built
+    assert built["id"] is None and built["candidates"] == []
+
+
+def test_a_rejected_token_stops_the_reads_and_the_rest_is_still_evaluated(
+    sentry, monkeypatch
+):
+    calls = _model(monkeypatch, _output())
+    sentry.fail = lambda request: httpx.Response(401)
+    task = _queued(["CRATE-API-1", *REFERENCES])
+
+    result = _run(task, sentry_factory=sentry.factory, sleep=lambda seconds: None)
+
+    assert [(i["short_id"], i["status"]) for i in result["items"]][:2] == [
+        ("CRATE-API-1", "ok"),
+        ("CRATE-API-21", "skipped"),
+    ]
+    assert {(i.get("reason"), i.get("error_code")) for i in result["items"][1:]} == {
+        ("fetch_failed", "SENTRY_AUTH")
+    }
+    # One request: the token is not tried again for every issue.
+    assert len(sentry.requests) == 1
+    assert len(calls) == 1
+
+
+def test_rate_limits_are_waited_out_and_the_budget_bounds_the_reads(
+    sentry, monkeypatch
+):
+    from crate.error_inbox import references
+
+    _model(monkeypatch, _output(), _output())
+    limited = {"left": 1}
+
+    def throttle(request: httpx.Request):
+        if limited["left"] and request.url.path.endswith("/CRATE-API-21/"):
+            limited["left"] -= 1
+            return httpx.Response(429, headers={"Retry-After": "7"})
+        return None
+
+    sentry.fail = throttle
+    now = {"t": 0.0}
+    slept: list[float] = []
+
+    def sleep(seconds: float) -> None:
+        slept.append(seconds)
+        now["t"] += seconds
+
+    def clock() -> float:
+        # Each read takes 100 s here, so the budget ends after two issues.
+        now["t"] += 100.0
+        return now["t"]
+
+    fetched = references.fetch_references(
+        REFERENCES, client_factory=sentry.factory, clock=clock, sleep=sleep
+    )
+
+    assert 7.0 in slept
+    assert set(fetched.issues) == {"CRATE-API-21"}
+    assert fetched.budget_exhausted is True
+    assert {fetched.skipped[s]["reason"] for s in REFERENCES[2:]} == {"fetch_budget"}
+    # The 429 and its retry, then nothing once the budget is spent.
+    assert sentry.resolved_short_ids() == ["CRATE-API-21", "CRATE-API-21"]
+
+
+def test_a_429_that_persists_skips_that_issue_only(sentry):
+    from crate.error_inbox import references
+
+    sentry.fail = lambda request: (
+        httpx.Response(429, headers={"Retry-After": "2"})
+        if request.url.path.endswith("/CRATE-API-21/")
+        else None
+    )
+
+    fetched = references.fetch_references(
+        REFERENCES[:2], client_factory=sentry.factory, sleep=lambda seconds: None
+    )
+
+    assert fetched.skipped["CRATE-API-21"] == {
+        "reason": "fetch_failed",
+        "error_code": "SENTRY_RATE_LIMITED",
+    }
+    assert set(fetched.issues) == {"CRATE-API-22"}
+    assert sentry.resolved_short_ids().count("CRATE-API-21") == 2
+
+
+def test_cancelling_during_the_reads_runs_nothing(sentry, monkeypatch):
+    calls = _model(monkeypatch, _output())
+    task = _queued(["CRATE-API-1", *REFERENCES])
+    checks = iter([False, True])
+
+    result = _run(
+        task,
+        sentry_factory=sentry.factory,
+        cancelled=lambda: next(checks, True),
+        sleep=lambda seconds: None,
+    )
+
+    assert result["cancelled"] is True
+    assert {item["status"] for item in result["items"]} == {"not_run"}
+    assert calls == []
+    assert sentry.resolved_short_ids() == ["CRATE-API-21"]
+
+
+def test_plan_counts_what_the_task_will_fetch_without_calling_sentry(
+    sentry, monkeypatch
+):
+    from crate.error_inbox import references
+    from crate.error_inbox.evaluation import request_bounds
+
+    monkeypatch.setattr(
+        references, "SentryClient", lambda *args, **kwargs: pytest.fail("Sentry")
+    )
+
+    plan = plan_evaluation(["CRATE-API-1", "CRATE-API-5", *REFERENCES])
+
+    largest, per_candidate = request_bounds()
+    sentry_items = [i for i in plan["items"] if i.get("source") == "sentry"]
+    assert [i["short_id"] for i in sentry_items] == REFERENCES
+    assert {i["estimated_input_tokens"] for i in sentry_items} == {largest}
+    assert plan["sources"] == {"inbox": 1, "sentry": 6}
+    assert plan["calls"] == 7
+    assert plan["sentry"] == {
+        "available": True,
+        "error_code": None,
+        "requests": 18,
+        "budget_seconds": 600.0,
+    }
+    [inbox_item] = [i for i in plan["items"] if i.get("source") == "inbox"]
+    # Room for the candidates fetched issues may add, up to ten.
+    room = (10 - inbox_item["candidates"]) * per_candidate
+    assert plan["input_bound"] == 6 * largest + (
+        inbox_item["estimated_input_tokens"] + room
+    )
+    assert plan["action_limits"] == {"max_output_tokens": 8192, "timeout_seconds": 90}
+    assert sentry.requests == []
+    _private_free(plan)
+
+
+def test_plan_without_sentry_skips_issues_outside_the_inbox(inbox):
+    plan = plan_evaluation(["CRATE-API-1", "CRATE-API-21"])
+
+    assert plan["items"][1] == {
+        "short_id": "CRATE-API-21",
+        "status": "skipped",
+        "reason": "not_in_inbox",
+    }
+    assert plan["sources"] == {"inbox": 1, "sentry": 0}
+    assert plan["sentry"]["available"] is False
+    assert plan["sentry"]["error_code"] == "ERROR_TRACKING_NOT_CONFIGURED"
+    assert plan["input_bound"] == plan["items"][0]["estimated_input_tokens"]
+
+
+def test_the_largest_request_bounds_a_real_one(inbox):
+    from crate.error_inbox.evaluation import request_bounds
+
+    largest, per_candidate = request_bounds()
+    plan = plan_evaluation(["CRATE-API-1"])
+
+    assert 24 * 1024 < largest < 65536
+    assert 0 < per_candidate < 2048
+    assert plan["items"][0]["estimated_input_tokens"] < largest
+
+
+def test_a_fetched_request_over_the_input_limit_is_skipped(pg_db, monkeypatch):
+    configure_ai(monkeypatch, (TRIAGE,), max_input_tokens=4096)
+    configure()
+    fake = FakeSentry()
+    fake.issues["21"] = _sentry_issue(21)
+    fake.events["21"] = _sentry_event()
+    calls = _model(monkeypatch, _output())
+    task = _queued(["CRATE-API-21"])
+
+    result = _run(task, sentry_factory=fake.factory, sleep=lambda seconds: None)
+
+    [item] = result["items"]
+    assert (item["status"], item["reason"]) == ("skipped", "over_input_limit")
+    assert item["estimated_input_tokens"] > 4096
+    assert calls == []
+
+
+def test_candidates_merge_in_the_inbox_order():
+    from crate.error_inbox.references import with_references
+
+    def inbox(short_id, *, same_group, status, score, seen, row):
+        return {
+            "id": f"00000000-0000-4000-8000-{row:012d}",
+            "short_id": short_id,
+            "same_group": same_group,
+            "status": status,
+            "crate_score": score,
+            "last_seen": seen,
+        }
+
+    digest = {"exceptions": [{"type": "KeyError"}], "frames": [{"function": "f"}]}
+    target = {"short_id": "CRATE-API-1", "group_key": "g", "digest": digest}
+    listed = [
+        inbox(
+            "CRATE-API-2",
+            same_group=True,
+            status="unresolved",
+            score=30,
+            seen="2026-11-04T11:00:00+00:00",
+            row=2,
+        ),
+        inbox(
+            "CRATE-API-3",
+            same_group=False,
+            status="unresolved",
+            score=90,
+            seen="2026-11-04T11:00:00+00:00",
+            row=3,
+        ),
+    ]
+
+    def reference(short_id, *, group, kind="KeyError", status="resolved", score=50):
+        return {
+            "short_id": short_id,
+            "group_key": group,
+            "status": status,
+            "crate_score": score,
+            "last_seen": datetime(2026, 11, 5, tzinfo=timezone.utc),
+            "digest": {"exceptions": [{"type": kind}], "frames": [{"function": "g"}]},
+        }
+
+    references = {
+        "CRATE-API-1": reference("CRATE-API-1", group="g"),  # the target itself
+        "CRATE-API-21": reference("CRATE-API-21", group="g", status="unresolved"),
+        "CRATE-API-22": reference("CRATE-API-22", group="other"),  # same type
+        "CRATE-API-23": reference("CRATE-API-23", group="x", kind="TimeoutError"),
+    }
+
+    merged = with_references(target, listed, references)
+
+    assert [c["short_id"] for c in merged] == [
+        # Same group, open: the higher score first.
+        "CRATE-API-21",
+        "CRATE-API-2",
+        # Same exception type: open first.
+        "CRATE-API-3",
+        "CRATE-API-22",
+    ]
+    added = merged[0]
+    assert added["id"] is None and added["same_group"] is True
+    assert added["exception"] == {"type": "KeyError"}
+    assert added["top_frame"] == {"function": "g"}
+    assert with_references(target, listed, {}) == listed
+    many = {
+        f"CRATE-API-{n}": reference(f"CRATE-API-{n}", group="g") for n in range(30, 45)
+    }
+    assert len(with_references(target, listed, many)) == 10
+
+
+def test_a_broken_sentry_connection_still_evaluates_the_inbox(sentry, monkeypatch):
+    from crate.error_inbox import references
+
+    calls = _model(monkeypatch, _output())
+
+    def broken():
+        raise RuntimeError(f"{SENTINEL} in a message")
+
+    task = _queued(["CRATE-API-1", "CRATE-API-21"])
+    monkeypatch.setattr(references, "load_config", broken)
+
+    result = _run(task, sentry_factory=sentry.factory)
+
+    assert [(i["short_id"], i["status"]) for i in result["items"]] == [
+        ("CRATE-API-1", "ok"),
+        ("CRATE-API-21", "skipped"),
+    ]
+    assert result["items"][1]["error_code"] == "EVAL_FETCH_FAILED"
+    assert len(calls) == 1
+    assert SENTINEL not in json.dumps(result)
+
+
+def test_candidate_times_rank_to_the_microsecond():
+    from crate.error_inbox.references import with_references
+
+    digest = {"exceptions": [{"type": "KeyError"}], "frames": []}
+    target = {"short_id": "CRATE-API-1", "group_key": "g", "digest": digest}
+    later = {
+        "id": "00000000-0000-4000-8000-000000000009",
+        "short_id": "CRATE-API-9",
+        "same_group": True,
+        "status": "resolved",
+        "crate_score": 5,
+        "last_seen": "2026-11-05T10:00:00.000001+00:00",
+    }
+    earlier = {
+        "short_id": "CRATE-API-21",
+        "group_key": "g",
+        "status": "resolved",
+        "crate_score": 5,
+        "last_seen": datetime(2026, 11, 5, 10, tzinfo=timezone.utc),
+        "digest": digest,
+    }
+
+    merged = with_references(target, [later], {"CRATE-API-21": earlier})
+
+    # One microsecond later still ranks first, whatever the ids.
+    assert [c["short_id"] for c in merged] == ["CRATE-API-9", "CRATE-API-21"]

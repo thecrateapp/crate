@@ -351,7 +351,10 @@ lane, never inside an Admin request:
 A person's press after a failure is a new attempt; automatic triage never resends
 a digest. When the bound profile's input limit is too small for the digest, the
 task fails before anything is sent and says how many input tokens the call needed
-and what the profile allows. The digest is never trimmed to fit.
+and what the profile allows. The digest is never trimmed to fit. When the model's
+answer is cut off at the profile's output limit (reasoning models spend part of it
+thinking), the task fails with `AI_OUTPUT_LIMIT`, names that limit and saves
+nothing.
 
 #### Evaluating the triage before turning it on
 
@@ -362,17 +365,21 @@ maintainer runs `tools/error-inbox-eval/run_eval.py` with the model bound to
 **Triage error issue**:
 
 1. `plan`, a dry run: which reference issues still have a stored digest in the
-   inbox, how many calls the evaluation makes and their token bound. Issues that
-   were purged or whose latest event was never downloaded are listed as skipped.
+   inbox, which ones the task will read from Sentry because the inbox no longer
+   holds them, how many calls the evaluation makes and their token bound. Issues
+   whose latest event was never downloaded are listed as skipped.
 2. `run --execute`, after typing the number of calls: one `evaluate_error_triage`
-   task on the `ai_bulk` lane triages each issue's stored digest exactly as the
-   inbox would, but saves nothing, so the Errors page does not change.
+   task on the `ai_bulk` lane first reads the issues the inbox does not hold from
+   Sentry and builds their digests in memory, then triages each issue exactly as
+   the inbox would, with duplicate candidates from both, but saves nothing, so the
+   Errors page does not change. Issues Sentry deleted or whose events expired are
+   reported as skipped.
 3. The report, `docs/technical/evidence/observability/error-triage-eval-<date>.md`,
    gives per model
    the agreement on classification and severity, the critical and high-severity
    issues taken for noise, the confident critical answers on issues that are not
    critical (each would raise the critical lane and the alert below), duplicate
-   agreement, invalid outputs and tokens.
+   agreement, invalid outputs, answers cut off at the output limit and tokens.
 
 With at least 80% agreement on classification and no critical issue taken for
 noise, the maintainer chooses the model and decides whether to turn automatic

@@ -98,14 +98,16 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     # Loads one candidate (a fanart download stops within 30s + one 12s read), then one
     # artwork.hero.analyze call (≤ 90s).
     "analyze_artist_hero_candidate": TaskPoolConfig("ai", 0, 180, 0),
-    # Error inbox: one ops.error.triage call (≤ 45s); queued by the sync or a backlog.
-    "triage_error_issue": TaskPoolConfig("ai", 1, 120, 0),
+    # Error inbox: one ops.error.triage call (≤ 90s) plus the 30s call margin; queued
+    # by the sync or a backlog.
+    "triage_error_issue": TaskPoolConfig("ai", 1, 150, 0),
     # A person's Investigate: Sentry evidence reads (≤ 20s), then one
     # ops.error.investigate call (≤ 90s).
     "investigate_error_issue": TaskPoolConfig("ai", 0, 180, 0),
-    # Error triage evaluation (gate EG2): one ops.error.triage call (<= 45s) for each
-    # of at most 100 listed issues, nothing saved; queued by tools/error-inbox-eval.
-    "evaluate_error_triage": TaskPoolConfig("ai_bulk", 3, 7200, 0),
+    # Error triage evaluation (gate EG2): Sentry reads for listed issues the inbox no
+    # longer holds (≤ 600s), then one ops.error.triage call (≤ 90s) for each of at
+    # most 100 issues, nothing saved; queued by tools/error-inbox-eval.
+    "evaluate_error_triage": TaskPoolConfig("ai_bulk", 3, 10800, 0),
     # One smart_mix.transition.refine call (≤ 45 s) for a transition about to
     # play: top priority. 120 s leaves the longest action maximum (90 s) after
     # the call margin, like the other ai tasks.

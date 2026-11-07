@@ -7,7 +7,7 @@ above the threshold, or a confident critical triage of the current digest.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -597,7 +597,52 @@ def auto_triage_plan(
 
 MAX_DUPLICATE_CANDIDATES = 10
 
-_TRIAGE_INPUT_SQL = """
+# One duplicate candidate, reduced to what the prompt may show plus what ranks it.
+_CANDIDATE_OBJECT = """
+    json_build_object(
+        'id', c.id::text,
+        'short_id', c.short_id,
+        'service', c.service,
+        'level', c.level,
+        'status', c.status,
+        'substatus', c.substatus,
+        'last_seen', c.last_seen,
+        'events_24h', c.events_24h,
+        'same_group', c.same_group,
+        'exception', c.exception,
+        'top_frame', c.top_frame,
+        'message', c.message,
+        'crate_score', c.crate_score
+    )
+"""
+# Same group first, then open issues, by score, most recently seen, id.
+_CANDIDATE_ORDER = """
+    COALESCE(c.group_key = t.group_key, FALSE) DESC,
+    (c.status = 'unresolved') DESC,
+    c.crate_score DESC,
+    c.last_seen DESC NULLS LAST,
+    c.id
+"""
+_CANDIDATE_MATCH = """
+    c.digest IS NOT NULL
+    AND (
+        (t.group_key IS NOT NULL AND c.group_key = t.group_key)
+        OR (
+            t.exception_type IS NOT NULL
+            AND c.digest -> 'exceptions' -> -1 ->> 'type' = t.exception_type
+        )
+    )
+"""
+_CANDIDATE_COLUMNS = """
+    c.id, c.short_id, c.service, c.level, c.status, c.substatus,
+    c.last_seen, c.events_24h, c.crate_score,
+    COALESCE(c.group_key = t.group_key, FALSE) AS same_group,
+    c.digest -> 'exceptions' -> -1 AS exception,
+    c.digest -> 'frames' -> -1 AS top_frame,
+    c.digest ->> 'message' AS message
+"""
+
+_TRIAGE_INPUT_SQL = f"""
     WITH target AS (
         SELECT i.id, i.external_id, i.short_id, i.service, i.level, i.status,
                i.substatus,
@@ -609,30 +654,11 @@ _TRIAGE_INPUT_SQL = """
         WHERE i.id = CAST(:id AS uuid)
     ),
     candidates AS (
-        SELECT c.id, c.short_id, c.service, c.level, c.status, c.substatus,
-               c.last_seen, c.events_24h,
-               COALESCE(c.group_key = t.group_key, FALSE) AS same_group,
-               c.digest -> 'exceptions' -> -1 AS exception,
-               c.digest -> 'frames' -> -1 AS top_frame,
-               c.digest ->> 'message' AS message,
-               row_number() OVER (
-                   ORDER BY COALESCE(c.group_key = t.group_key, FALSE) DESC,
-                            (c.status = 'unresolved') DESC,
-                            c.crate_score DESC,
-                            c.last_seen DESC NULLS LAST,
-                            c.id
-               ) AS rank
+        SELECT {_CANDIDATE_COLUMNS},
+               row_number() OVER (ORDER BY {_CANDIDATE_ORDER}) AS rank
         FROM error_issues c
         CROSS JOIN target t
-        WHERE c.id <> t.id
-          AND c.digest IS NOT NULL
-          AND (
-              (t.group_key IS NOT NULL AND c.group_key = t.group_key)
-              OR (
-                  t.exception_type IS NOT NULL
-                  AND c.digest -> 'exceptions' -> -1 ->> 'type' = t.exception_type
-              )
-          )
+        WHERE c.id <> t.id AND {_CANDIDATE_MATCH}
     )
     SELECT t.id::text AS id, t.external_id, t.short_id, t.service, t.level, t.status,
            t.substatus,
@@ -641,23 +667,7 @@ _TRIAGE_INPUT_SQL = """
            t.last_release, t.crate_score, t.group_key, t.digest, t.digest_hash,
            COALESCE(
                (
-                   SELECT json_agg(
-                       json_build_object(
-                           'id', c.id::text,
-                           'short_id', c.short_id,
-                           'service', c.service,
-                           'level', c.level,
-                           'status', c.status,
-                           'substatus', c.substatus,
-                           'last_seen', c.last_seen,
-                           'events_24h', c.events_24h,
-                           'same_group', c.same_group,
-                           'exception', c.exception,
-                           'top_frame', c.top_frame,
-                           'message', c.message
-                       )
-                       ORDER BY c.rank
-                   )
+                   SELECT json_agg({_CANDIDATE_OBJECT} ORDER BY c.rank)
                    FROM candidates c
                    WHERE c.rank <= :candidate_limit
                ),
@@ -726,6 +736,74 @@ def get_triage_input(
         return _impl(current)
 
 
+_DUPLICATE_CANDIDATES_SQL = f"""
+    WITH target AS (
+        SELECT t.position, t.external_id, t.group_key, t.exception_type
+        FROM unnest(
+            CAST(:positions AS integer[]),
+            CAST(:external_ids AS text[]),
+            CAST(:group_keys AS text[]),
+            CAST(:exception_types AS text[])
+        ) AS t(position, external_id, group_key, exception_type)
+    ),
+    candidates AS (
+        SELECT t.position, {_CANDIDATE_COLUMNS},
+               row_number() OVER (
+                   PARTITION BY t.position ORDER BY {_CANDIDATE_ORDER}
+               ) AS rank
+        FROM target t
+        JOIN error_issues c
+          ON c.external_id IS DISTINCT FROM t.external_id AND {_CANDIDATE_MATCH}
+    )
+    SELECT c.position, json_agg({_CANDIDATE_OBJECT} ORDER BY c.rank) AS candidates
+    FROM candidates c
+    WHERE c.rank <= :candidate_limit
+    GROUP BY c.position
+"""
+
+
+def duplicate_candidates(
+    targets: Sequence[Mapping[str, Any]],
+    *,
+    candidate_limit: int = MAX_DUPLICATE_CANDIDATES,
+    session: Session | None = None,
+) -> list[list[dict[str, Any]]]:
+    """The inbox's duplicate candidates of issues that are not rows, in one query.
+
+    Each target is `{"external_id", "group_key", "exception_type"}` of a digest
+    built elsewhere (the triage evaluation builds some from Sentry in memory). The
+    candidates are the ones `get_triage_input` would list for an issue with that
+    digest: same `group_key` or same main exception type, ranked the same way and
+    in the same shape, never the target's own row. One list per target, in order.
+    """
+    if not targets:
+        return []
+    limit = max(0, min(int(candidate_limit), MAX_DUPLICATE_CANDIDATES))
+    params = {
+        "positions": list(range(len(targets))),
+        "external_ids": [_text_or_none(t.get("external_id")) for t in targets],
+        "group_keys": [_text_or_none(t.get("group_key")) for t in targets],
+        "exception_types": [_text_or_none(t.get("exception_type")) for t in targets],
+        "candidate_limit": limit,
+    }
+
+    def _impl(current: Session) -> list[list[dict[str, Any]]]:
+        found: list[list[dict[str, Any]]] = [[] for _ in targets]
+        rows = current.execute(text(_DUPLICATE_CANDIDATES_SQL), params).mappings()
+        for row in rows:
+            found[int(row["position"])] = list(coerce_json(row["candidates"]) or [])
+        return found
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
+def _text_or_none(value: Any) -> str | None:
+    return value if isinstance(value, str) and value else None
+
+
 __all__ = [
     "AUTO_TRIAGE_SUBSTATUSES",
     "AUTO_TRIAGE_WINDOW",
@@ -733,6 +811,7 @@ __all__ = [
     "MAX_DUPLICATE_CANDIDATES",
     "MAX_LIST_LIMIT",
     "auto_triage_plan",
+    "duplicate_candidates",
     "get_issue",
     "get_issue_by_short_id",
     "get_triage_input",

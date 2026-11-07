@@ -15,7 +15,7 @@ ADMIN_APP = Path(__file__).resolve().parents[1] / "ui" / "src" / "App.tsx"
 
 @pytest.mark.parametrize(
     ("action_id", "timeout", "output"),
-    [("ops.error.triage", 45, 2048), ("ops.error.investigate", 90, 4096)],
+    [("ops.error.triage", 90, 8192), ("ops.error.investigate", 90, 16000)],
 )
 def test_error_actions_registered_with_limits(action_id, timeout, output):
     action = get_action(action_id)
@@ -66,3 +66,22 @@ def test_unknown_action_is_a_closed_error():
     with pytest.raises(AIConfigurationError) as error:
         get_action("ops.error.fix")
     assert error.value.code == "AI_ACTION_UNKNOWN"
+
+
+def test_error_tasks_leave_room_for_a_whole_call():
+    from crate.actors import TASK_POOL_CONFIG
+    from crate.ai.requeue import AI_CALL_DEADLINE_MARGIN_SECONDS
+    from crate.error_inbox.evidence import EVIDENCE_BUDGET_SECONDS
+
+    triage = get_action("ops.error.triage").maxima.timeout_seconds
+    investigate = get_action("ops.error.investigate").maxima.timeout_seconds
+
+    # The task deadline caps every call at time limit minus the margin.
+    assert (
+        TASK_POOL_CONFIG["triage_error_issue"].time_limit_seconds
+        >= triage + AI_CALL_DEADLINE_MARGIN_SECONDS
+    )
+    assert (
+        TASK_POOL_CONFIG["investigate_error_issue"].time_limit_seconds
+        >= EVIDENCE_BUDGET_SECONDS + investigate + AI_CALL_DEADLINE_MARGIN_SECONDS
+    )

@@ -45,8 +45,10 @@ the worker does not report them to Sentry.
 
 `evaluate_error_triage` (gate EG2) runs on the `ai_bulk` lane: one triage call per
 issue a maintainer listed, validated like a real triage and never saved
-(`crate.error_inbox.evaluation`). The maintainer queues it with
-`tools/error-inbox-eval/run_eval.py`; no route or schedule does.
+(`crate.error_inbox.evaluation`). Listed issues the inbox no longer holds are first
+read from Sentry and kept in memory (`crate.error_inbox.references`). The
+maintainer queues it with `tools/error-inbox-eval/run_eval.py`; no route or
+schedule does.
 """
 
 from __future__ import annotations
@@ -93,7 +95,7 @@ from crate.error_inbox.config import (
     load_github_token,
     load_sentry_token,
 )
-from crate.error_inbox.digest import build_digest, digest_hash, group_key
+from crate.error_inbox.digest import build_digest, digest_hash, group_key, service_tag
 from crate.error_inbox.evaluation import run_evaluation
 from crate.error_inbox.evidence import fetch_evidence
 from crate.error_inbox.github_client import GitHubAPIError, GitHubClient
@@ -108,6 +110,7 @@ from crate.error_inbox.state import (
 from crate.error_inbox.triage import (
     ACTION_BY_KIND,
     INPUT_TOO_LARGE_CODE,
+    OUTPUT_LIMIT_CODE,
     StructuredExecutor,
     TriageOutcome,
     triage_issue,
@@ -137,7 +140,6 @@ MAX_STATUS_REFRESHES = 50
 # Leaves room under the 120 s task limit to write what was fetched and the state.
 SYNC_BUDGET_SECONDS = 90.0
 ISSUE_STATUSES = frozenset({"resolved", "ignored", "unresolved"})
-MAX_SERVICE_LENGTH = 100
 MAX_EVENT_ID_LENGTH = 64
 _UNKNOWN_ACCESS: dict[str, bool | None] = {"read": None, "write": None}
 
@@ -325,14 +327,6 @@ def _priority(row: Mapping[str, Any]) -> tuple[int, float, str]:
     )
 
 
-def _service_tag(digest: Mapping[str, Any]) -> str | None:
-    tags = digest.get("tags")
-    value = tags.get("service") if isinstance(tags, Mapping) else None
-    if not isinstance(value, str):
-        return None
-    return value.strip()[:MAX_SERVICE_LENGTH] or None
-
-
 def _event_id(digest: Mapping[str, Any]) -> str | None:
     value = digest.get("event_id")
     if not isinstance(value, str) or len(value) > MAX_EVENT_ID_LENGTH:
@@ -440,7 +434,7 @@ class _Pass:
             except SentryAPIError as error:
                 return error.code
             digest = build_digest(event)
-            tag = _service_tag(digest)
+            tag = service_tag(digest)
             score = crate_score({**row, "service": tag or row["service"]})
             set_digest(
                 target["id"],
@@ -881,6 +875,17 @@ def ai_problem_text(
             f"This issue is larger than the AI profile bound to {label} accepts. "
             "Raise its input limit in AI models and try again."
         )
+    if code == OUTPUT_LIMIT_CODE:
+        limit = (
+            f"{outcome.output_limit:,}-token "
+            if outcome is not None and outcome.output_limit
+            else ""
+        )
+        return (
+            f"The answer was cut off at the AI profile's {limit}output limit, so "
+            f"nothing was saved. Raise it for {label} in AI models, or use a model "
+            "that reasons less."
+        )
     if code == "AI_RESPONSE_INVALID":
         return (
             "The model's answer did not match the expected format, so nothing was "
@@ -987,6 +992,7 @@ def run_triage_task(
         digest_hash=outcome.digest_hash,
         input_tokens=outcome.input_tokens,
         input_limit=outcome.input_limit,
+        output_limit=outcome.output_limit,
         **({"evidence": evidence} if evidence else {}),
     )
 
@@ -1024,10 +1030,19 @@ def _handle_investigate_error_issue(task_id: str, params: dict, config: dict) ->
     )
 
 
-def _handle_evaluate_error_triage(task_id: str, params: dict, config: dict) -> dict:
-    progress = TaskProgress(phase="evaluate_triage", phase_count=1)
+# Phases of an evaluation: reading reference issues from Sentry, then the calls.
+EVALUATION_PHASES = {"fetch": "fetch_references", "evaluate": "evaluate_triage"}
 
-    def report(done: int, total: int, short_id: str) -> None:
+
+def _handle_evaluate_error_triage(task_id: str, params: dict, config: dict) -> dict:
+    progress = TaskProgress(
+        phase=EVALUATION_PHASES["evaluate"], phase_count=len(EVALUATION_PHASES)
+    )
+
+    def report(phase: str, done: int, total: int, short_id: str) -> None:
+        phases = list(EVALUATION_PHASES)
+        progress.phase = EVALUATION_PHASES.get(phase, phase)
+        progress.phase_index = phases.index(phase) if phase in phases else 0
         progress.done, progress.total, progress.item = done, total, short_id
         emit_progress(task_id, progress, force=done == total)
 

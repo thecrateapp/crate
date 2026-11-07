@@ -27,6 +27,8 @@ ISSUES_PATH = f"/api/0/organizations/{ORGANIZATION}/issues/"
 _ISSUE = re.compile(rf"^{re.escape(ISSUES_PATH)}(\d+)/$")
 _LATEST = re.compile(rf"^{re.escape(ISSUES_PATH)}(\d+)/events/latest/$")
 _TAG = re.compile(rf"^{re.escape(ISSUES_PATH)}(\d+)/tags/([a-z0-9_.]+)/$")
+SHORT_IDS_PATH = f"/api/0/organizations/{ORGANIZATION}/shortids/"
+_SHORT = re.compile(rf"^{re.escape(SHORT_IDS_PATH)}([^/]+)/$")
 FULL_SCOPES = ("org:read", "project:read", "event:read", "event:write")
 
 
@@ -112,6 +114,8 @@ class FakeSentry:
         self.events: dict[str, dict[str, Any]] = {}
         # Retrieve Tag Details answers by issue id, then tag key.
         self.tags: dict[str, dict[str, dict[str, Any]]] = {}
+        # Short ids of merged issues and the issue id Sentry resolves them to.
+        self.merged: dict[str, str] = {}
         self.scopes: list[str] | None = list(FULL_SCOPES)
         self.page_size = 100
         self.requests: list[httpx.Request] = []
@@ -133,6 +137,36 @@ class FakeSentry:
             for path in self.paths("GET")
             if (match := _LATEST.match(path)) is not None
         ]
+
+    def resolved_short_ids(self) -> list[str]:
+        return [
+            match.group(1)
+            for path in self.paths("GET")
+            if (match := _SHORT.match(path)) is not None
+        ]
+
+    def _short_id(self, short_id: str) -> httpx.Response:
+        issue_id = self.merged.get(short_id) or next(
+            (
+                key
+                for key, issue in self.issues.items()
+                if str(issue.get("shortId", "")).upper() == short_id.upper()
+            ),
+            None,
+        )
+        issue = self.issues.get(issue_id) if issue_id else None
+        if issue is None:
+            return httpx.Response(404, json={"detail": "not found"})
+        return httpx.Response(
+            200,
+            json={
+                "organizationSlug": ORGANIZATION,
+                "projectSlug": issue["project"]["slug"],
+                "groupId": issue["id"],
+                "shortId": issue["shortId"],
+                "group": issue,
+            },
+        )
 
     def tag_keys(self) -> list[str]:
         return [
@@ -173,6 +207,8 @@ class FakeSentry:
             return httpx.Response(200, json={"version": "0", "auth": auth})
         if path == ISSUES_PATH and request.method == "GET":
             return self._listing(request)
+        if match := _SHORT.match(path):
+            return self._short_id(match.group(1))
         if match := _TAG.match(path):
             detail = self.tags.get(match.group(1), {}).get(match.group(2))
             if detail is None:
