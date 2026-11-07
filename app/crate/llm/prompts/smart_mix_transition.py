@@ -28,9 +28,9 @@ from crate.smart_mix.models import (
     TransitionContext,
 )
 from crate.smart_mix.policy import PLANNER_POLICY_V3, PlannerPolicy
-from crate.smart_mix.refinement import phrase_windows
+from crate.smart_mix.refinement import allowed_bass_handoffs, phrase_windows
 
-PROMPT_VERSION = "sm3-refine-1"
+PROMPT_VERSION = "sm3-refine-2"
 _BEATS_PER_BAR = 4
 
 SYSTEM_PROMPT = """\
@@ -43,14 +43,15 @@ Input: "out" (playing) and "in" (next) tracks: bpm, bpmConf, stability, key \
 "out", first of "in"): kind, bars, energy, voice (1 = vocals), curve (energy per \
 bar, 0-9). "history": previous transitions, oldest first. "rules": balanced bass \
 and blends over 12 s allowed, phrase lengths. Candidate "i": phrase indexes \
-"out"/"in", bars (null = preferred), sec, mode, bass, curve, tempo change %, \
-score and parts (alignment, energy, harmony, stability, bass, position, vocal \
-clash; 0-100).
+"out"/"in", bars (null = preferred), sec, mode, bass, bassOk (the bass_handoff \
+answers it accepts), curve, tempo change %, score and parts (alignment, energy, \
+harmony, stability, bass, position, vocal clash; 0-100).
 
 Answer JSON: candidate_index; outgoing_phrase_shift, incoming_phrase_shift \
 (-1/0/1: a phrase earlier or later); length_step (-1/0/1 in "rules" lengths); \
-bass_handoff (keep, none, balanced); reason (one sentence); confidence (0-1, \
-below 0.55 the planner's choice stays); notes (optional).
+bass_handoff (one of the chosen candidate's bassOk; balanced only on a \
+beatmatch); reason (one sentence); confidence (0-1, below 0.55 the planner's \
+choice stays); notes (optional).
 
 Guidance: techno and house like long beatmatched phrase-aligned blends, hip-hop \
 and pop short mixes, drum and bass double drops. Avoid vocals over vocals, \
@@ -129,7 +130,7 @@ def build_refinement_input(
     if history:
         payload["history"] = history
     payload["candidates"] = [
-        _candidate(candidate, outgoing_window, incoming_window)
+        _candidate(candidate, outgoing_window, incoming_window, context)
         for candidate in candidates
     ]
     return payload
@@ -190,7 +191,10 @@ def _phrase(profile: TrackMixProfile, index: int) -> dict[str, Any]:
 
 
 def _candidate(
-    candidate: TransitionCandidate, outgoing_window: range, incoming_window: range
+    candidate: TransitionCandidate,
+    outgoing_window: range,
+    incoming_window: range,
+    context: TransitionContext,
 ) -> dict[str, Any]:
     breakdown = candidate.breakdown
     parts = [
@@ -211,6 +215,7 @@ def _candidate(
         "sec": round(candidate.duration_ms / 1000, 1),
         "mode": str(candidate.mode),
         "bass": candidate.bass_handoff,
+        "bassOk": list(allowed_bass_handoffs(candidate, context)),
         "curve": candidate.curve,
         "tempo": round((candidate.incoming_tempo_ratio - 1.0) * 100, 1),
         "score": _percent(candidate.score),

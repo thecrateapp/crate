@@ -49,7 +49,7 @@ def test_unavailable_when_setting_off(test_app, capabilities_env):
     assert ai["available"] is False
     assert ai["reason"] == "disabled"
     assert ai["provider_kind"] is None and ai["model_label"] is None
-    assert ai["prompt_version"] == "sm3-refine-1"
+    assert ai["prompt_version"] == "sm3-refine-2"
 
 
 def test_unavailable_without_binding(test_app, capabilities_env, monkeypatch):
@@ -64,7 +64,7 @@ def test_unavailable_without_binding(test_app, capabilities_env, monkeypatch):
         "available": False,
         "provider_kind": "local",
         "model_label": "qwen3.8:27b",
-        "prompt_version": "sm3-refine-1",
+        "prompt_version": "sm3-refine-2",
         "typical_latency_ms": None,
         "reason": "budget",
     }

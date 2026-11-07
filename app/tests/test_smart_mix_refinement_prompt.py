@@ -185,7 +185,10 @@ def test_input_size_within_budget():
     assert len(candidates) == POLICY.max_candidates
     assert shown >= 6 * 32
     # The runtime's own admission bound: one token per byte plus 1,024 of framing.
-    assert estimated_input_tokens(prompt, SYSTEM_PROMPT, schema) < 6_000
+    # sm3-refine-2 lists each candidate's accepted bass handoffs (about 300 bytes on
+    # this edge), which takes the bound past 6,000; Gemini counted about 1,700 real
+    # tokens per phrase edge in SM5, a third of the bound.
+    assert estimated_input_tokens(prompt, SYSTEM_PROMPT, schema) < 6_500
 
 
 def test_response_schema_forbids_extra():
@@ -219,3 +222,49 @@ def test_response_schema_forbids_extra():
         with pytest.raises(ValidationError):
             SmartMixRefinementResponse.model_validate({**valid, field: value})
     assert re.fullmatch(r"[0-9a-f]{64}", SCHEMA_FINGERPRINT)
+
+
+def _menu_input(outgoing, incoming, ctx):
+    candidates = plan_transition_candidates(
+        outgoing,
+        incoming,
+        ctx,
+        POLICY,
+        outgoing_track_entity_uid=OUTGOING_UID,
+        incoming_track_entity_uid=INCOMING_UID,
+    )
+    payload = build_refinement_input(
+        outgoing, incoming, candidates, policy=POLICY, context=ctx
+    )
+    return candidates, payload["candidates"]
+
+
+def test_candidates_state_the_bass_handoffs_they_accept():
+    # SM5 revision 1: Gemini asked for a balanced bass handoff on crossfade
+    # candidates, which the validation rejects (77 of Flash's 80 rejections, 41 of
+    # Pro's 48). Every candidate now lists the bass_handoff answers it accepts.
+    outgoing = profile(OUTGOING_UID, layout=OUTGOING_LAYOUT)
+    dj = context()
+
+    fast = profile(INCOMING_UID, layout=INCOMING_LAYOUT, bpm=140.0)
+    crossfades, items = _menu_input(outgoing, fast, dj)
+    assert crossfades and all(item.mode == "adaptive" for item in crossfades)
+    assert [item["bassOk"] for item in items] == [["keep", "none"]] * len(items)
+
+    matched = profile(INCOMING_UID, layout=INCOMING_LAYOUT)
+    beatmatches, items = _menu_input(outgoing, matched, dj)
+    assert any(item.mode == "beatmatch" for item in beatmatches)
+    for candidate, item in zip(beatmatches, items, strict=True):
+        expected = ["keep", "none"] + (
+            ["balanced"] if candidate.mode == "beatmatch" else []
+        )
+        assert item["bassOk"] == expected
+
+    # Without the bass handoff in the context no candidate offers it.
+    _menu, items = _menu_input(outgoing, matched, context(allow_bass_handoff=False))
+    assert all("balanced" not in item["bassOk"] for item in items)
+
+
+def test_system_prompt_ties_bass_handoff_to_the_candidate():
+    assert "bassOk" in SYSTEM_PROMPT
+    assert PROMPT_VERSION == "sm3-refine-2"

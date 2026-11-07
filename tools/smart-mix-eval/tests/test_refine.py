@@ -467,3 +467,22 @@ def test_target_metadata_names_the_price_source() -> None:
         mode="json"
     )
     assert "api_key" not in json.dumps(meta)
+
+
+def test_a_balanced_answer_on_a_crossfade_is_rejected_and_never_offered(
+    tmp_path,
+) -> None:
+    # The answer most of SM5 revision 1's rejections had: balanced bass on a
+    # crossfade candidate. The validation still rejects it; the prompt now lists
+    # only keep and none for every crossfade candidate.
+    job = _job(menu=4, bpm=140.0)
+    assert all(candidate.mode == "adaptive" for candidate in job.candidates)
+    transport = FakeTransport(_answer(candidate_index=1, bass_handoff="balanced"))
+    result = _refiner(tmp_path, transport).refine(job)
+
+    assert (result.status, result.code) == ("rejected", "bass_handoff_not_allowed")
+    offered = [
+        item["bassOk"]
+        for item in json.loads(transport.calls[0]["prompt"])["candidates"]
+    ]
+    assert offered == [["keep", "none"]] * len(job.candidates)

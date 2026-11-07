@@ -43,7 +43,7 @@ def _row(key: str, outgoing: str, incoming: str, **overrides) -> dict:
         "to_profile_revision": "profile-v1",
         "planner_identifier": "smart-mix-v3",
         "rules_revision": 1,
-        "prompt_version": "sm3-refine-1",
+        "prompt_version": "sm3-refine-2",
         "config_fingerprint": "f" * 64,
         "model_label": "qwen3.8:27b",
         "status": "ready",
@@ -123,7 +123,7 @@ def test_get_many_single_query(pg_db):
     assert ready["plan"] == PLAN
     assert ready["candidate_index"] == 2
     assert ready["model_label"] == "qwen3.8:27b"
-    assert ready["prompt_version"] == "sm3-refine-1"
+    assert ready["prompt_version"] == "sm3-refine-2"
     assert ready["confidence"] == 0.8
     assert found[_key(9)]["outcome_code"] == "low_confidence"
     assert found[_key(9)]["plan"] is None
