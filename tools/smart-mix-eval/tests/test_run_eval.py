@@ -531,6 +531,8 @@ def test_refined_report_markdown_has_the_ai_section() -> None:
         "https://example.test/pricing",
     ):
         assert text in markdown
+    # Delta tables keep the edge count unsigned.
+    assert "| all edges | 3 |" in markdown
 
 
 def test_refine_needs_the_v3_planner() -> None:

@@ -1327,7 +1327,8 @@ def _group_table(
 def _group_cell(key: str, value: Any, signed: bool) -> str:
     if value is None:
         return "n/a"
-    sign = "+" if signed and value > 0 else ""
+    # The edge count is a count even in a table of differences.
+    sign = "+" if signed and value > 0 and key != "n" else ""
     if key in _RATE_FIELDS:
         return f"{sign}{value * 100:.1f} %"
     if key == "energyStepMean":
