@@ -1,0 +1,1677 @@
+{
+  "date": "2026-11-06",
+  "generated_at": "2026-11-06T16:16:16+00:00",
+  "reference": {
+    "labels": 79,
+    "path": "app/tests/fixtures/error_inbox/reference_labels.json",
+    "version": 1
+  },
+  "runs": [
+    {
+      "cancelled": false,
+      "classification": {
+        "agreed": 9,
+        "answered": 11,
+        "attempted": 16,
+        "by_reference": {
+          "bug": {
+            "agreed": 5,
+            "attempted": 10
+          },
+          "client_environment": {
+            "agreed": 1,
+            "attempted": 2
+          },
+          "external_dependency": {
+            "agreed": 1,
+            "attempted": 1
+          },
+          "infrastructure": {
+            "agreed": 1,
+            "attempted": 2
+          },
+          "noise": {
+            "agreed": 1,
+            "attempted": 1
+          }
+        },
+        "confusion": {
+          "bug": {
+            "bug": 5,
+            "client_environment": 1,
+            "external_dependency": 1,
+            "infrastructure": 0,
+            "noise": 0
+          },
+          "client_environment": {
+            "bug": 0,
+            "client_environment": 1,
+            "external_dependency": 0,
+            "infrastructure": 0,
+            "noise": 0
+          },
+          "external_dependency": {
+            "bug": 0,
+            "client_environment": 0,
+            "external_dependency": 1,
+            "infrastructure": 0,
+            "noise": 0
+          },
+          "infrastructure": {
+            "bug": 0,
+            "client_environment": 0,
+            "external_dependency": 0,
+            "infrastructure": 1,
+            "noise": 0
+          },
+          "noise": {
+            "bug": 0,
+            "client_environment": 0,
+            "external_dependency": 0,
+            "infrastructure": 0,
+            "noise": 1
+          }
+        },
+        "rate": 0.5625,
+        "rate_answered": 0.8182
+      },
+      "counts": {
+        "failed": 0,
+        "invalid_output": 5,
+        "not_run": 0,
+        "ok": 11,
+        "reference": 79,
+        "skipped": 63
+      },
+      "created_at": "2026-11-06T16:12:08.188973+00:00",
+      "critical_as_noise": {
+        "attempted": 0,
+        "count": 0,
+        "reference_total": 0,
+        "short_ids": []
+      },
+      "duplicates": {
+        "agreed": 1,
+        "exact": 0,
+        "false_duplicates": 1,
+        "labelled": 3,
+        "missed": 2,
+        "other_group": 0,
+        "rate": 0.3333,
+        "short_ids": {
+          "false_duplicates": ["CRATE-LISTEN-7"],
+          "missed": ["CRATE-LISTEN-1M", "CRATE-WORKERS-D"],
+          "unreachable": ["CRATE-LISTEN-1M"]
+        },
+        "unique_answered": 8,
+        "unreachable": 1
+      },
+      "eg2": {
+        "classification_met": false,
+        "classification_threshold": 0.8,
+        "critical_as_noise_met": true,
+        "reference_has_critical": false
+      },
+      "failures": {
+        "by_code": {},
+        "count": 0,
+        "short_ids": []
+      },
+      "false_critical": {
+        "confidence_threshold": 0.6,
+        "count": 0,
+        "short_ids": []
+      },
+      "finished_at": "2026-11-06T16:16:08.812867+00:00",
+      "high_as_noise": {
+        "attempted": 4,
+        "count": 0,
+        "reference_total": 4,
+        "short_ids": []
+      },
+      "invalid_outputs": {
+        "count": 5,
+        "short_ids": [
+          "CRATE-LISTEN-1B",
+          "CRATE-LISTEN-G",
+          "CRATE-LISTEN-H",
+          "CRATE-LISTEN-V",
+          "CRATE-READPLANE-3"
+        ]
+      },
+      "items": [
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G5",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-11",
+            "severity": "low"
+          },
+          "short_id": "CRATE-ADMIN-4",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-ADMIN-R",
+            "severity": "low"
+          },
+          "short_id": "CRATE-ADMIN-5",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G3",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "infrastructure",
+            "duplicate_of": "CRATE-LISTEN-7",
+            "severity": "medium"
+          },
+          "short_id": "CRATE-ADMIN-8",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G4",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "bug",
+            "duplicate_of": null,
+            "severity": "medium"
+          },
+          "short_id": "CRATE-ADMIN-A",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-ADMIN-R",
+            "severity": "low"
+          },
+          "short_id": "CRATE-ADMIN-B",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-ADMIN-R",
+            "severity": "low"
+          },
+          "short_id": "CRATE-ADMIN-C",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-ADMIN-R",
+            "severity": "low"
+          },
+          "short_id": "CRATE-ADMIN-D",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G3",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "infrastructure",
+            "duplicate_of": "CRATE-LISTEN-7",
+            "severity": "medium"
+          },
+          "short_id": "CRATE-ADMIN-E",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-ADMIN-R",
+            "severity": "low"
+          },
+          "short_id": "CRATE-ADMIN-G",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G5",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-11",
+            "severity": "low"
+          },
+          "short_id": "CRATE-ADMIN-H",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-ADMIN-R",
+            "severity": "low"
+          },
+          "short_id": "CRATE-ADMIN-J",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G4",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "bug",
+            "duplicate_of": "CRATE-ADMIN-A",
+            "severity": "medium"
+          },
+          "short_id": "CRATE-ADMIN-K",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G3",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "infrastructure",
+            "duplicate_of": "CRATE-LISTEN-7",
+            "severity": "medium"
+          },
+          "short_id": "CRATE-ADMIN-M",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G3",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "infrastructure",
+            "duplicate_of": "CRATE-LISTEN-7",
+            "severity": "medium"
+          },
+          "short_id": "CRATE-ADMIN-N",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-ADMIN-R",
+            "severity": "low"
+          },
+          "short_id": "CRATE-ADMIN-P",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-ADMIN-R",
+            "severity": "low"
+          },
+          "short_id": "CRATE-ADMIN-Q",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": null,
+            "severity": "low"
+          },
+          "short_id": "CRATE-ADMIN-R",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-ADMIN-R",
+            "severity": "low"
+          },
+          "short_id": "CRATE-ADMIN-S",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-ADMIN-R",
+            "severity": "low"
+          },
+          "short_id": "CRATE-ADMIN-T",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-ADMIN-R",
+            "severity": "low"
+          },
+          "short_id": "CRATE-ADMIN-V",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G1",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "noise",
+            "duplicate_of": null,
+            "severity": "low"
+          },
+          "short_id": "CRATE-API-7",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G8",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": null,
+            "severity": "low"
+          },
+          "short_id": "CRATE-DOCS-1",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [
+            "CRATE-LISTEN-6",
+            "CRATE-LISTEN-1Q",
+            "CRATE-LISTEN-7",
+            "CRATE-LISTEN-1M",
+            "CRATE-LISTEN-16"
+          ],
+          "error_code": null,
+          "group": "G9",
+          "prediction": {
+            "classification": "bug",
+            "confidence": 0.9,
+            "duplicate_of": null,
+            "severity": "medium"
+          },
+          "reason": null,
+          "reference": {
+            "classification": "bug",
+            "duplicate_of": null,
+            "severity": "high"
+          },
+          "short_id": "CRATE-LISTEN-10",
+          "status": "ok"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G5",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": null,
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-11",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-12",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-13",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-14",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-15",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [
+            "CRATE-LISTEN-6",
+            "CRATE-LISTEN-1Q",
+            "CRATE-LISTEN-7",
+            "CRATE-LISTEN-10",
+            "CRATE-LISTEN-1M"
+          ],
+          "error_code": null,
+          "group": "G9",
+          "prediction": {
+            "classification": "bug",
+            "confidence": 0.95,
+            "duplicate_of": null,
+            "severity": "medium"
+          },
+          "reason": null,
+          "reference": {
+            "classification": "bug",
+            "duplicate_of": null,
+            "severity": "medium"
+          },
+          "short_id": "CRATE-LISTEN-16",
+          "status": "ok"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-17",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-18",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-19",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-1A",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": ["CRATE-LISTEN-R", "CRATE-ADMIN-W"],
+          "error_code": "AI_RESPONSE_INVALID",
+          "group": "G2",
+          "prediction": null,
+          "reason": null,
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-1B",
+          "status": "invalid_output"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G9",
+          "prediction": {
+            "classification": "bug",
+            "confidence": 0.9,
+            "duplicate_of": null,
+            "severity": "high"
+          },
+          "reason": null,
+          "reference": {
+            "classification": "bug",
+            "duplicate_of": null,
+            "severity": "high"
+          },
+          "short_id": "CRATE-LISTEN-1C",
+          "status": "ok"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-1D",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-1E",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G7",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "noise",
+            "duplicate_of": null,
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-1F",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-1G",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-1H",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-1J",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-1K",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [
+            "CRATE-LISTEN-6",
+            "CRATE-LISTEN-1Q",
+            "CRATE-LISTEN-7",
+            "CRATE-LISTEN-10",
+            "CRATE-LISTEN-16"
+          ],
+          "error_code": null,
+          "group": "G6",
+          "prediction": {
+            "classification": "client_environment",
+            "confidence": 0.9,
+            "duplicate_of": null,
+            "severity": "low"
+          },
+          "reason": null,
+          "reference": {
+            "classification": "bug",
+            "duplicate_of": "CRATE-LISTEN-G",
+            "severity": "medium"
+          },
+          "short_id": "CRATE-LISTEN-1M",
+          "status": "ok"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-1N",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G5",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-11",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-5",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [
+            "CRATE-LISTEN-1Q",
+            "CRATE-LISTEN-7",
+            "CRATE-LISTEN-10",
+            "CRATE-LISTEN-1M",
+            "CRATE-LISTEN-16"
+          ],
+          "error_code": null,
+          "group": "G7",
+          "prediction": {
+            "classification": "noise",
+            "confidence": 0.9,
+            "duplicate_of": null,
+            "severity": "low"
+          },
+          "reason": null,
+          "reference": {
+            "classification": "noise",
+            "duplicate_of": null,
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-6",
+          "status": "ok"
+        },
+        {
+          "candidate_ids": [
+            "CRATE-LISTEN-6",
+            "CRATE-LISTEN-1Q",
+            "CRATE-LISTEN-10",
+            "CRATE-LISTEN-1M",
+            "CRATE-LISTEN-16"
+          ],
+          "error_code": null,
+          "group": "G3",
+          "prediction": {
+            "classification": "infrastructure",
+            "confidence": 0.95,
+            "duplicate_of": "CRATE-LISTEN-1Q",
+            "severity": "high"
+          },
+          "reason": null,
+          "reference": {
+            "classification": "infrastructure",
+            "duplicate_of": null,
+            "severity": "medium"
+          },
+          "short_id": "CRATE-LISTEN-7",
+          "status": "ok"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": null,
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-8",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-9",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-A",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-B",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-C",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-D",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-F",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": ["CRATE-LISTEN-V", "CRATE-LISTEN-H"],
+          "error_code": "AI_RESPONSE_INVALID",
+          "group": "G6",
+          "prediction": null,
+          "reason": null,
+          "reference": {
+            "classification": "bug",
+            "duplicate_of": null,
+            "severity": "medium"
+          },
+          "short_id": "CRATE-LISTEN-G",
+          "status": "invalid_output"
+        },
+        {
+          "candidate_ids": ["CRATE-LISTEN-G", "CRATE-LISTEN-V"],
+          "error_code": "AI_RESPONSE_INVALID",
+          "group": "G6",
+          "prediction": null,
+          "reason": null,
+          "reference": {
+            "classification": "bug",
+            "duplicate_of": "CRATE-LISTEN-G",
+            "severity": "medium"
+          },
+          "short_id": "CRATE-LISTEN-H",
+          "status": "invalid_output"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-J",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-K",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-M",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-N",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-P",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-Q",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": ["CRATE-LISTEN-1B", "CRATE-ADMIN-W"],
+          "error_code": null,
+          "group": "G2",
+          "prediction": {
+            "classification": "client_environment",
+            "confidence": 0.9,
+            "duplicate_of": "CRATE-LISTEN-1B",
+            "severity": "low"
+          },
+          "reason": null,
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-R",
+          "status": "ok"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-S",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-T",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": ["CRATE-LISTEN-G", "CRATE-LISTEN-H"],
+          "error_code": "AI_RESPONSE_INVALID",
+          "group": "G6",
+          "prediction": null,
+          "reason": null,
+          "reference": {
+            "classification": "bug",
+            "duplicate_of": "CRATE-LISTEN-G",
+            "severity": "medium"
+          },
+          "short_id": "CRATE-LISTEN-V",
+          "status": "invalid_output"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-W",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-X",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G2",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": "CRATE-LISTEN-8",
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-Y",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G9",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "client_environment",
+            "duplicate_of": null,
+            "severity": "low"
+          },
+          "short_id": "CRATE-LISTEN-Z",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G1",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "noise",
+            "duplicate_of": "CRATE-API-7",
+            "severity": "low"
+          },
+          "short_id": "CRATE-MEDIA-WORKER-1",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": "AI_RESPONSE_INVALID",
+          "group": "G8",
+          "prediction": null,
+          "reason": null,
+          "reference": {
+            "classification": "infrastructure",
+            "duplicate_of": null,
+            "severity": "medium"
+          },
+          "short_id": "CRATE-READPLANE-3",
+          "status": "invalid_output"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G8",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "noise",
+            "duplicate_of": null,
+            "severity": "low"
+          },
+          "short_id": "CRATE-READPLANE-4",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G1",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "noise",
+            "duplicate_of": "CRATE-API-7",
+            "severity": "low"
+          },
+          "short_id": "CRATE-READPLANE-5",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G1",
+          "prediction": null,
+          "reason": "not_in_inbox",
+          "reference": {
+            "classification": "noise",
+            "duplicate_of": "CRATE-API-7",
+            "severity": "low"
+          },
+          "short_id": "CRATE-WORKERS-9",
+          "status": "skipped"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G8",
+          "prediction": {
+            "classification": "external_dependency",
+            "confidence": 0.95,
+            "duplicate_of": null,
+            "severity": "medium"
+          },
+          "reason": null,
+          "reference": {
+            "classification": "external_dependency",
+            "duplicate_of": null,
+            "severity": "medium"
+          },
+          "short_id": "CRATE-WORKERS-A",
+          "status": "ok"
+        },
+        {
+          "candidate_ids": [],
+          "error_code": null,
+          "group": "G8",
+          "prediction": {
+            "classification": "external_dependency",
+            "confidence": 0.85,
+            "duplicate_of": null,
+            "severity": "low"
+          },
+          "reason": null,
+          "reference": {
+            "classification": "bug",
+            "duplicate_of": null,
+            "severity": "low"
+          },
+          "short_id": "CRATE-WORKERS-B",
+          "status": "ok"
+        },
+        {
+          "candidate_ids": ["CRATE-WORKERS-D"],
+          "error_code": null,
+          "group": "G8",
+          "prediction": {
+            "classification": "bug",
+            "confidence": 0.95,
+            "duplicate_of": null,
+            "severity": "medium"
+          },
+          "reason": null,
+          "reference": {
+            "classification": "bug",
+            "duplicate_of": null,
+            "severity": "high"
+          },
+          "short_id": "CRATE-WORKERS-C",
+          "status": "ok"
+        },
+        {
+          "candidate_ids": ["CRATE-WORKERS-C"],
+          "error_code": null,
+          "group": "G8",
+          "prediction": {
+            "classification": "bug",
+            "confidence": 0.95,
+            "duplicate_of": null,
+            "severity": "medium"
+          },
+          "reason": null,
+          "reference": {
+            "classification": "bug",
+            "duplicate_of": "CRATE-WORKERS-C",
+            "severity": "high"
+          },
+          "short_id": "CRATE-WORKERS-D",
+          "status": "ok"
+        }
+      ],
+      "model": {
+        "limits": {
+          "max_input_tokens": 131072,
+          "max_output_tokens": 2048,
+          "timeout_seconds": 45
+        },
+        "model_id": "gemini-3.8-flash",
+        "profile_id": "5ce7c73d-4ee7-45f3-81c8-5bd1c4f00e2a",
+        "profile_version": 1,
+        "provider": "gemini"
+      },
+      "severity": {
+        "agreed": 6,
+        "answered": 11,
+        "attempted": 16,
+        "by_reference": {
+          "critical": {
+            "agreed": 0,
+            "attempted": 0
+          },
+          "high": {
+            "agreed": 1,
+            "attempted": 4
+          },
+          "low": {
+            "agreed": 3,
+            "attempted": 4
+          },
+          "medium": {
+            "agreed": 2,
+            "attempted": 8
+          }
+        },
+        "confusion": {
+          "critical": {
+            "critical": 0,
+            "high": 0,
+            "low": 0,
+            "medium": 0
+          },
+          "high": {
+            "critical": 0,
+            "high": 1,
+            "low": 0,
+            "medium": 3
+          },
+          "low": {
+            "critical": 0,
+            "high": 0,
+            "low": 3,
+            "medium": 0
+          },
+          "medium": {
+            "critical": 0,
+            "high": 1,
+            "low": 1,
+            "medium": 2
+          }
+        },
+        "rate": 0.375,
+        "rate_answered": 0.5455
+      },
+      "skipped": [
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-ADMIN-4"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-ADMIN-5"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-ADMIN-8"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-ADMIN-A"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-ADMIN-B"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-ADMIN-C"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-ADMIN-D"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-ADMIN-E"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-ADMIN-G"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-ADMIN-H"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-ADMIN-J"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-ADMIN-K"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-ADMIN-M"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-ADMIN-N"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-ADMIN-P"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-ADMIN-Q"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-ADMIN-R"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-ADMIN-S"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-ADMIN-T"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-ADMIN-V"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-API-7"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-DOCS-1"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-11"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-12"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-13"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-14"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-15"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-17"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-18"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-19"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-1A"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-1D"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-1E"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-1F"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-1G"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-1H"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-1J"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-1K"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-1N"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-5"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-8"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-9"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-A"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-B"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-C"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-D"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-F"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-J"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-K"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-M"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-N"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-P"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-Q"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-S"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-T"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-W"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-X"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-Y"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-LISTEN-Z"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-MEDIA-WORKER-1"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-READPLANE-4"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-READPLANE-5"
+        },
+        {
+          "reason": "not_in_inbox",
+          "short_id": "CRATE-WORKERS-9"
+        }
+      ],
+      "started_at": "2026-11-06T16:12:10.903805+00:00",
+      "task_error_code": null,
+      "task_id": "f61018ddcce2",
+      "task_status": "completed",
+      "usage": {
+        "gemini-3.8-flash": {
+          "cached_input_tokens": 0,
+          "calls": 16,
+          "charged_tokens": 66959,
+          "cost_usd": 0.1152,
+          "duration_ms": 236606,
+          "input_tokens": 45310,
+          "mean_input_tokens": 2832,
+          "output_tokens": 2234,
+          "price": {
+            "input_per_million": 0.75,
+            "model": "gemini-3.8-flash",
+            "output_per_million": 3.75
+          },
+          "thought_tokens": 19415,
+          "usage_known": 16
+        }
+      }
+    }
+  ],
+  "schema_version": 1
+}
