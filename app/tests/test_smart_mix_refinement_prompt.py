@@ -267,4 +267,16 @@ def test_candidates_state_the_bass_handoffs_they_accept():
 
 def test_system_prompt_ties_bass_handoff_to_the_candidate():
     assert "bassOk" in SYSTEM_PROMPT
-    assert PROMPT_VERSION == "sm3-refine-2"
+
+
+def test_guidance_leaves_what_the_score_weighs_to_the_score():
+    # SM5 revision 2: "avoid vocals over vocals" and "mix outros into intros" led the
+    # model to lower-ranked candidates that made energy steps and vocal clash worse,
+    # which the score already weighs. The guidance keeps what the score cannot see.
+    guidance = SYSTEM_PROMPT.split("Guidance:", 1)[1]
+    assert "outros into intros" not in guidance
+    assert "vocals over vocals" not in guidance
+    assert "score already weighs" in guidance
+    assert "techno and house like long beatmatched" in guidance
+    assert "history's energy arc" in guidance
+    assert PROMPT_VERSION == "sm3-refine-3"

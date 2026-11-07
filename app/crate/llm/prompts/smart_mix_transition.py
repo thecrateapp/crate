@@ -30,7 +30,7 @@ from crate.smart_mix.models import (
 from crate.smart_mix.policy import PLANNER_POLICY_V3, PlannerPolicy
 from crate.smart_mix.refinement import allowed_bass_handoffs, phrase_windows
 
-PROMPT_VERSION = "sm3-refine-2"
+PROMPT_VERSION = "sm3-refine-3"
 _BEATS_PER_BAR = 4
 
 SYSTEM_PROMPT = """\
@@ -53,10 +53,11 @@ bass_handoff (one of the chosen candidate's bassOk; balanced only on a \
 beatmatch); reason (one sentence); confidence (0-1, below 0.55 the planner's \
 choice stays); notes (optional).
 
-Guidance: techno and house like long beatmatched phrase-aligned blends, hip-hop \
-and pop short mixes, drum and bass double drops. Avoid vocals over vocals, \
-follow the history's energy arc, mix outros into intros. Keep candidate 0 if it \
-is right.\
+Guidance: the score already weighs phrase alignment, energy continuity, key, \
+stability, bass and vocal overlap, so candidate 0 is the best by those. Choose \
+another only for what the score cannot see: genre conventions (techno and house \
+like long beatmatched phrase-aligned blends, hip-hop and pop short mixes, drum \
+and bass double drops) and the history's energy arc.\
 """
 
 

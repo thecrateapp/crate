@@ -177,7 +177,7 @@ def test_ready_on_valid_response(env):
     assert row["refinement_key"] == key
     assert row["status"] == "ready" and row["outcome_code"] is None
     assert row["planner_identifier"] == "smart-mix-v3"
-    assert row["prompt_version"] == "sm3-refine-2"
+    assert row["prompt_version"] == "sm3-refine-3"
     assert row["config_fingerprint"] == FINGERPRINT
     assert row["model_label"] == "qwen3.8:27b"
     assert row["invocation_id"] == "1b4e28ba-2fa1-11d2-883f-0016d3cca427"

@@ -240,7 +240,7 @@ def test_ready_served_from_cache(env):
         "reason": "Long blend from the outro into the intro.",
         "confidence": 0.82,
         "modelLabel": "qwen3.8:27b",
-        "promptVersion": "sm3-refine-2",
+        "promptVersion": "sm3-refine-3",
     }
     env.table_reads.clear()
 
@@ -253,7 +253,7 @@ def test_ready_served_from_cache(env):
     assert refinement["plan"]["bassHandoff"] == "balanced"
     assert refinement["candidateIndex"] == 2
     assert refinement["modelLabel"] == "qwen3.8:27b"
-    assert refinement["promptVersion"] == "sm3-refine-2"
+    assert refinement["promptVersion"] == "sm3-refine-3"
     assert refinement["confidence"] == 0.82
     assert refinement["reason"].startswith("Long blend")
     assert "reasonCode" not in refinement
@@ -280,7 +280,7 @@ def test_table_serves_refinements_redis_lost(env):
         "reason": None,
         "confidence": None,
         "model_label": "qwen3.8:27b",
-        "prompt_version": "sm3-refine-2",
+        "prompt_version": "sm3-refine-3",
     }
 
     [plan] = _post(env, [_edge(outgoing, incoming)])
@@ -463,7 +463,7 @@ def test_hot_path_query_count(pg_db, test_app, monkeypatch):
             "to_profile_revision": f"profile-{incoming}",
             "planner_identifier": "smart-mix-v3",
             "rules_revision": 1,
-            "prompt_version": "sm3-refine-2",
+            "prompt_version": "sm3-refine-3",
             "config_fingerprint": FINGERPRINT,
             "model_label": "qwen3.8:27b",
             "status": "ready",

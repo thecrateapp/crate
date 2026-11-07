@@ -143,7 +143,7 @@ def test_cache_entry_of_a_stored_row():
         "reason": "Blend.",
         "confidence": 0.8,
         "model_label": "qwen3.8:27b",
-        "prompt_version": "sm3-refine-2",
+        "prompt_version": "sm3-refine-3",
         "outcome_code": None,
     }
 
@@ -154,7 +154,7 @@ def test_cache_entry_of_a_stored_row():
         "reason": "Blend.",
         "confidence": 0.8,
         "modelLabel": "qwen3.8:27b",
-        "promptVersion": "sm3-refine-2",
+        "promptVersion": "sm3-refine-3",
     }
     assert smart_mix_ai.refined_cache_entry(
         {**ready, "status": "rejected", "outcome_code": "low_confidence"}
