@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
+  <title id="title">How Crate's error inbox reads, triages and fixes Sentry issues</title>
+  <desc id="desc">Read path: a sync task reads Sentry every five minutes and stores issues and sanitized digests in PostgreSQL, and Admin's Errors page reads only PostgreSQL. Triage: a task on the AI lane sends the digest to the model as untrusted data and stores the checked answer. Fix: Launch fix dispatches a sandboxed agent in GitHub Actions, which reads the issue with a read-only token; a GitHub App opens a draft pull request, a person merges it and Sentry resolves the issue.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M1 1 L7 4 L1 7" fill="none" stroke="#999ca0" stroke-width="1.2"/>
+    </marker>
+    <marker id="arrow-hi" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M1 1 L7 4 L1 7" fill="none" stroke="#67e8f9" stroke-width="1.2"/>
+    </marker>
+  </defs>
+  <style>
+    .bg { fill: #0a0a0f; }
+    .node { fill: #0d0e14; stroke: rgba(241,245,249,0.22); stroke-width: 1; }
+    .node-hi { fill: #0d0e14; stroke: #67e8f9; stroke-width: 1.4; }
+    .title { font: 500 15px "JetBrains Mono", ui-monospace, Menlo, monospace; letter-spacing: 0.12em; fill: #f1f5f9; }
+    .sub { font: 400 14px "JetBrains Mono", ui-monospace, Menlo, monospace; fill: #999ca0; }
+    .lane { font: 400 13px "JetBrains Mono", ui-monospace, Menlo, monospace; letter-spacing: 0.16em; fill: #67e8f9; }
+    .label { font: 400 13px "JetBrains Mono", ui-monospace, Menlo, monospace; fill: #999ca0; }
+    .rule { stroke: rgba(241,245,249,0.08); stroke-width: 1; }
+    .edge-hi { fill: none; stroke: #67e8f9; stroke-width: 1.5; }
+    .edge { fill: none; stroke: #999ca0; stroke-width: 1; }
+    .async { fill: none; stroke: #999ca0; stroke-width: 1; stroke-dasharray: 9 4; }
+    .notify { fill: none; stroke: #999ca0; stroke-width: 1.4; stroke-dasharray: 1 5; stroke-linecap: round; }
+  </style>
+
+  <rect class="bg" width="1200" height="620"/>
+
+  <text class="lane" x="40" y="40">READ PATH · EVERY 5 MINUTES</text>
+  <line class="rule" x1="40" y1="52" x2="1160" y2="52"/>
+
+  <rect class="node" x="40" y="76" width="220" height="76" rx="4"/>
+  <text class="title" x="56" y="106">SENTRY</text>
+  <text class="sub" x="56" y="130">issues · latest events</text>
+
+  <rect class="node-hi" x="320" y="76" width="260" height="76" rx="4"/>
+  <text class="title" x="336" y="106">SYNC TASK</text>
+  <text class="sub" x="336" y="130">digest under 24 KB</text>
+
+  <rect class="node-hi" x="640" y="76" width="240" height="76" rx="4"/>
+  <text class="title" x="656" y="106">POSTGRESQL</text>
+  <text class="sub" x="656" y="130">issues · digests · triage</text>
+
+  <rect class="node-hi" x="940" y="76" width="220" height="76" rx="4"/>
+  <text class="title" x="956" y="106">ADMIN ERRORS</text>
+  <text class="sub" x="956" y="130">score · critical lane</text>
+
+  <path class="async" d="M260 114 H314" marker-end="url(#arrow)"/>
+  <path class="async" d="M580 114 H634" marker-end="url(#arrow)"/>
+  <path class="edge-hi" d="M940 114 H886" marker-end="url(#arrow-hi)"/>
+  <text class="label" x="896" y="170">reads only</text>
+
+  <text class="lane" x="40" y="212">TRIAGE · AI LANE</text>
+  <line class="rule" x1="40" y1="224" x2="1160" y2="224"/>
+
+  <rect class="node-hi" x="320" y="248" width="260" height="76" rx="4"/>
+  <text class="title" x="336" y="278">TRIAGE TASK</text>
+  <text class="sub" x="336" y="302">digest as untrusted data</text>
+
+  <rect class="node" x="640" y="248" width="240" height="76" rx="4"/>
+  <text class="title" x="656" y="278">MODEL</text>
+  <text class="sub" x="656" y="302">closed schema · checked</text>
+
+  <path class="async" d="M690 152 C690 200 450 196 450 242" marker-end="url(#arrow)"/>
+  <path class="edge-hi" d="M580 286 H634" marker-end="url(#arrow-hi)"/>
+  <path class="async" d="M840 248 V158" marker-end="url(#arrow)"/>
+  <text class="label" x="852" y="206">checked answer</text>
+
+  <text class="lane" x="40" y="404">FIX · A PERSON DECIDES</text>
+  <line class="rule" x1="40" y1="416" x2="1160" y2="416"/>
+
+  <rect class="node-hi" x="40" y="440" width="220" height="76" rx="4"/>
+  <text class="title" x="56" y="470">LAUNCH FIX</text>
+  <text class="sub" x="56" y="494">short id + note</text>
+
+  <rect class="node-hi" x="320" y="440" width="260" height="76" rx="4"/>
+  <text class="title" x="336" y="470">GITHUB ACTIONS</text>
+  <text class="sub" x="336" y="494">sandboxed agent · test first</text>
+
+  <rect class="node-hi" x="640" y="440" width="240" height="76" rx="4"/>
+  <text class="title" x="656" y="470">DRAFT PR</text>
+  <text class="sub" x="656" y="494">GitHub App · CI runs</text>
+
+  <rect class="node" x="940" y="440" width="220" height="76" rx="4"/>
+  <text class="title" x="956" y="470">MERGE</text>
+  <text class="sub" x="956" y="494">Fixes &lt;SHORT-ID&gt;</text>
+
+  <path class="async" d="M230 152 V352 Q230 372 250 372 H430 Q450 372 450 392 V434" marker-end="url(#arrow)"/>
+  <text class="label" x="260" y="362">read-only token, file outside the repo</text>
+  <path class="edge-hi" d="M260 478 H314" marker-end="url(#arrow-hi)"/>
+  <path class="edge-hi" d="M580 478 H634" marker-end="url(#arrow-hi)"/>
+  <path class="edge" d="M880 478 H934" marker-end="url(#arrow)"/>
+
+  <path class="notify" d="M1050 516 V556 H20 V114 H34" marker-end="url(#arrow)"/>
+  <text class="label" x="560" y="584">resolves the issue · a regression if it comes back</text>
+</svg>
