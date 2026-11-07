@@ -17,10 +17,12 @@ Store results by `entity_uid`, edge id or index, never by title or artist. The o
 | `build_dataset.py`                             | Builds the edge set (`dataset.jsonl`) from the compatible-tracks service   |
 | `build_pool_dataset.py`                        | Builds an edge set inside a fixed pool of tracks (the spike tracks)        |
 | `run_eval.py`                                  | Plans the edge set with a planner and writes `report.json` and `report.md` |
+| `refine.py`                                    | AI refinement of each v3 edge with a real model, cached and budgeted (SM5) |
 | `app/crate/smart_mix/evaluation.py`            | The metrics: pure functions over a plan and two profiles                   |
 | `app/crate/db/queries/smart_mix_evaluation.py` | Read-only session guard and seed sampling used by the tools                |
 | `render_pair.py`                               | Renders a plan and its two audio files to a WAV for listening              |
 | `blind_session.py`                             | Blind A/B rating of rendered pairs into `ratings.csv`                      |
+| `listen_metrics.py`                            | Beat, voice and loudness measurements of rendered transitions (SM5)        |
 | `reference/`                                   | Analyzer reference tools (Queen Mary, KeyFinder, kick) used to measure v6  |
 | `structure/`                                   | Beats, downbeats and phrases against All-In-One and madmom (SMB.PR3)       |
 | `tests/`                                       | Unit tests of the tools                                                    |
@@ -209,6 +211,52 @@ p50 and p95 (linear interpolation) where they apply. With `--compare`, it adds c
 baseline overall and per stratum; `report.json` keeps every plan and metric per edge for paired
 analysis.
 
+## AI refinement (SM5)
+
+`run_eval.py --planner smart-mix-v3 --refine <provider>/<model>` refines every edge's v3
+candidate menu with a real model through the SM4 pieces, unchanged: the prompt, system prompt
+and response schema of `crate.llm.prompts.smart_mix_transition`, the native request of
+`crate.ai.transport`, the runtime's JSON parsing and `apply_refinement` with its closed
+rejection codes. Menus with a single candidate are not sent, as in the task. Nothing is written
+to the database: the binding, the invocation ledger, Redis and the refinement table stay out.
+
+```bash
+PYTHONPATH=app .venv/bin/python tools/smart-mix-eval/run_eval.py \
+  --dataset tools/smart-mix-eval/out/dev/dataset.jsonl --planner smart-mix-v3 \
+  --refine gemini/gemini-3.8-flash --refine-connection <ai_provider_connections.id> \
+  --output tools/smart-mix-eval/out/dev/v3-gemini-3.8-flash --max-usd 5 --concurrency 2
+```
+
+- **Model and profile.** With `--refine-connection` the model's capabilities come from that
+  connection's catalog and the profile is the one the admin's default-model flow would bind to
+  `smart_mix.transition.refine` (45 s, 1,024 output tokens, low reasoning where the model has
+  levels). A model Crate has not validated needs `--refine-reasoning` (`low`, `medium`, `high`,
+  `minimal`, `off`, `on`, `default` or `budget:N`) and the report marks its profile as not
+  validated: the admin could not bind it as is.
+- **Key.** Only connections whose key comes from the environment: the tool reads the server's
+  variable (`GEMINI_API_KEY`, `AUDIOMUSE_GEMINI_API_KEY`, `DEEPSEEK_API_KEY`) and hands it to
+  the transport only. Run it where that variable exists, for example a container that receives
+  it on stdin, and never print it.
+- **Spend.** Every answer and every failure is cached in `--refine-cache` (default
+  `out/refine-cache/`) by the hash of the whole request, so a rerun pays nothing. A failed call
+  is not retried unless `--retry-failed`. `--ledger` (default `ledger.jsonl` in the cache) keeps
+  what every run spent; a call whose worst case (the input's byte count as tokens plus every
+  output token) would take it over `--max-usd` is not made, the remaining edges are reported as
+  `unavailable` (`budget`) and the tool exits with 3. `--min-interval` spaces call starts.
+- **Prices** live in `refine.PRICES` with their source and date; update them when they change.
+
+The report serves the model's plan where it was accepted and the deterministic plan otherwise
+(what a client plays), keeps the deterministic plan and metrics of every edge under
+`deterministic`, and adds an `## AI refinement` section: statuses and rejection codes, the
+rejection rate over answers, the failure rate over calls, plans changed, latency p50/p95, tokens
+and cost per transition, the SG3 criteria of design §10 and served-minus-deterministic tables by
+tempo band, genre and stratum. Pool edges are grouped by the root of the genre the prompt sent
+for the outgoing track.
+
+The development database can lag behind the migrations of the branch under test (the ORM then
+selects columns it does not have). Run the tools against a copy migrated to `head` instead of
+migrating the shared development database.
+
 ## Listening: renders and blind sessions
 
 Numbers cannot hear a transition, so SG3 also asks for a blind listening test. Both tools only
@@ -255,6 +303,43 @@ Do not open `ratings.csv` before the end.
   ]
 }
 ```
+
+## Automatic listening metrics
+
+`listen_metrics.py` measures rendered transitions when nobody listens to them. Each plan is
+rendered with `render_pair.py`, once as the mix and once per deck (`stem`: the deck alone, at
+unity gain, on the mix's clock), and the audio around the transition is measured:
+
+| Metric                    | How                                                                                                                           |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `beatClashMs`             | Beat This! on each stem; full-level time (crossfade gain of half or more) while the nearest beats disagree by more than 25 ms |
+| `phaseErrorMsMedian`      | Median phase error of the outgoing beats in the mix against the nearest incoming beat, folded into one beat                   |
+| `lockedShare`             | Share of those beats within 25 ms                                                                                             |
+| `mixIbiCv`                | Beat This! on the mix: variation of the beat intervals inside the mix (flams make them irregular)                             |
+| `voiceOnVoiceMs`          | YAMNet on each stem: full-level time with a voiced patch (byte from `VOCAL_THRESHOLD`) on both decks                          |
+| `levelStepLuAbs`          | EBU R128 short-term loudness of the mix, median over 6 s after the mix minus 6 s before it                                    |
+| `bumpLu`, `dipLu`         | Momentary loudness during the mix above the louder side, and below the quieter side                                           |
+| `maxShortTermSlopeLuPerS` | Steepest change of short-term loudness over one second, from 3 s before to 3 s after the mix                                  |
+
+```bash
+python tools/smart-mix-eval/listen_metrics.py \
+  --plans smart-mix-v2=out/dev/v2/report.json \
+  --plans smart-mix-v3=out/dev/v3-ai/report.json:deterministic \
+  --plans smart-mix-v3+ai=out/dev/v3-ai/report.json \
+  --compare smart-mix-v3+ai:smart-mix-v3 --compare smart-mix-v3:smart-mix-v2 \
+  --output out/dev/listen --jobs 8
+```
+
+`NAME=report.json` takes each edge's served plan; `:deterministic` takes the planner's own plan
+of a refined report. Audio paths come from the database (read-only), `--music-root` maps their
+prefix. It needs FFmpeg, torch and the Beat This! and YAMNet weights: run it in the analysis
+worker image. Identical plans are measured once and cached in `<output>/plans/`; the renders are
+deleted unless `--keep-audio`. `listen.md` gives each variant's metrics (all edges and beatmatch
+only) and, per `--compare`, the mean difference and how many paired edges got better, stayed the
+same (within a per-metric noise floor, `SAME_WITHIN`) or got worse.
+
+These numbers are proxies for a listener, not a replacement: they hear rhythm, voice and level,
+not taste. Beat This! resolves beats to about 20 ms, so the 25 ms tolerance is about one frame.
 
 ## Limits
 
