@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field, fields, replace
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +35,34 @@ SMOOTH_FIT_WEIGHTS = TransitionFitWeights(
     silence=0.12,
     mood=0.20,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class CandidateWeights:
+    """Weights of the v3 candidate score (``crate.smart_mix.candidates``).
+
+    The first six weigh components in [0, 1] and add up to 1. ``vocal`` weighs the
+    penalty for voice over voice, which only applies when both profiles carry the
+    voice per phrase.
+    """
+
+    alignment: float = 0.25
+    energy: float = 0.20
+    harmonic: float = 0.15
+    stability: float = 0.10
+    bass: float = 0.15
+    position: float = 0.15
+    vocal: float = 6.0
+
+    def components(self) -> tuple[tuple[str, float], ...]:
+        return tuple(
+            (item.name, getattr(self, item.name))
+            for item in fields(self)
+            if item.name != "vocal"
+        )
+
+
+CANDIDATE_WEIGHTS = CandidateWeights()
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,14 +116,46 @@ class PlannerPolicy:
     harmonic_incompatible_score: float = 0.3
     harmonic_unknown_score: float = 0.5
     neutral_dimension_score: float = 0.5
+    # Candidate menu (SM3-D3). Only the v3 generator reads these; v2 plans one window.
+    phrase_lengths: tuple[int, ...] = (8, 16, 32)
+    max_candidates: int = 8
+    outgoing_phrase_choices: int = 4
+    incoming_phrase_choices: int = 3
+    # Phrases of a lower structure confidence are ignored (the bar heuristic plans
+    # the edge). 0 uses every stored segmentation: at SG1 the confidence did not
+    # separate good tracks from bad ones, and every phrase starts on a downbeat.
+    minimum_structure_confidence: float = 0.0
+    candidate_weights: CandidateWeights = field(
+        default_factory=lambda: CANDIDATE_WEIGHTS
+    )
+    # Energy step (0-1 profile scale) at the handoff that scores 0.
+    candidate_energy_step_limit: float = 0.3
+    # Music left unplayed (outgoing) or skipped (incoming) that scores 0.
+    candidate_position_limit_ms: int = 60_000
+    # Voice over voice is penalised in proportion to its time at full level, over
+    # the longest blend, so the penalty never saturates: weights.vocal per this.
+    candidate_vocal_reference_ms: int = 48_000
+    # Phase offsets this close to a whole beat start the incoming on the beat
+    # instead of one beat late (grids are rounded to whole milliseconds).
+    candidate_phase_snap_ms: int = 5
 
 
 PLANNER_POLICY = PlannerPolicy()
+# Smart Mix 3 planner: the v2 policy with its own identity and rules revision. The
+# safety limits (tempo, gain, true peak, durations) are v2's and must stay so.
+PLANNER_POLICY_V3 = replace(
+    PLANNER_POLICY,
+    identifier="smart-mix-v3",
+    rules_revision=1,
+)
 
 
 __all__ = [
     "BEATMATCH_FIT_WEIGHTS",
+    "CANDIDATE_WEIGHTS",
+    "CandidateWeights",
     "PLANNER_POLICY",
+    "PLANNER_POLICY_V3",
     "PlannerPolicy",
     "SMOOTH_FIT_WEIGHTS",
     "TransitionFitWeights",

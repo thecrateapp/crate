@@ -18,7 +18,12 @@ from typing import Any
 from pydantic import ValidationError
 
 from crate.ai.actions import get_action
-from crate.ai.contracts import AIConfigurationError, ModelCapabilities, ProfileConfig
+from crate.ai.contracts import (
+    AIConfigurationError,
+    ModelCapabilities,
+    ModelManifestEntry,
+    ProfileConfig,
+)
 
 _GEMINI_MANIFEST: dict[str, dict[str, Any]] = {
     "gemini-3.8-flash": {
@@ -183,6 +188,44 @@ def model_capabilities(
     except (ValueError, TypeError, ValidationError):
         raise AIConfigurationError(
             "AI_CATALOG_INVALID", "Invalid model capability metadata"
+        ) from None
+
+
+# Native controls that switch reasoning on and off rather than pick a level.
+_TOGGLE_CONTROLS = frozenset({"thinking", "enable_thinking", "reasoning"})
+
+
+def manifest_capabilities(entry: Any, *, listed: bool) -> ModelCapabilities:
+    """Capabilities of an openai_compatible model, from the admin's manifest.
+
+    The manifest is the only source of limits, structured output and reasoning
+    controls: every entry declares json_object or json_schema output. A model is
+    validated only while the provider's /models still lists its ID, so a retired
+    ID (Moonshot has no "latest" alias) shows as pending after a refresh instead
+    of failing at call time. Text input only.
+    """
+    try:
+        declared = ModelManifestEntry.model_validate(entry)
+        toggles = declared.reasoning in _TOGGLE_CONTROLS
+        return ModelCapabilities.model_validate(
+            {
+                "provider": "openai_compatible",
+                "model_id": declared.model_id,
+                "label": declared.label or declared.model_id,
+                "input_modalities": ["text"],
+                "structured_output": True,
+                "reasoning_levels": list(declared.reasoning_levels),
+                "reasoning_enabled": toggles,
+                "reasoning_disabled": toggles,
+                "max_output_tokens": declared.max_output_tokens,
+                "context_window": declared.context_window,
+                "validated": listed,
+                "source": "provider+manifest" if listed else "pending",
+            }
+        )
+    except (ValueError, TypeError, ValidationError):
+        raise AIConfigurationError(
+            "AI_CATALOG_INVALID", "Invalid model manifest entry"
         ) from None
 
 

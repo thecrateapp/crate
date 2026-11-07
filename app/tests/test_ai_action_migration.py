@@ -1,5 +1,6 @@
 """Migration 145 admits the error inbox AI actions and keeps the existing ones."""
 
+import re
 from importlib import import_module
 
 import pytest
@@ -9,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from crate.ai.actions import ACTIONS
 from crate.db.schema_bootstrap import create_schema
 from crate.db.schema_sections.ai_action_error_inbox_v145 import (
+    V145_ACTIONS_SQL,
     V145_NEW_ACTIONS,
     create_ai_action_error_inbox_v145_schema,
     drop_ai_action_error_inbox_v145_schema,
@@ -24,6 +26,8 @@ TABLES = (
     "ai_legacy_invocation_receipts",
 )
 EXISTING = sorted(set(ACTIONS) - set(V145_NEW_ACTIONS))
+# The list revision 145 wrote; later revisions widen it (151: Smart Mix refinement).
+V145_ACTIONS = re.findall(r"'([^']+)'", V145_ACTIONS_SQL)
 
 
 def _action_checks(session) -> dict[str, tuple[str, bool]]:
@@ -155,7 +159,7 @@ def test_migration_and_bootstrap_use_the_same_schema(monkeypatch):
     added = [s for s in section.statements if "ADD CONSTRAINT" in s]
     assert len(added) == len(TABLES)
     for statement in added:
-        for action_id in ACTIONS:
+        for action_id in V145_ACTIONS:
             assert f"'{action_id}'" in statement
         assert "NOT VALID" not in statement
 

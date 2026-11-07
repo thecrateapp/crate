@@ -532,6 +532,37 @@ describe("ProvidersPanel", () => {
     );
   });
 
+  it("warns that a new Ollama endpoint removes the saved key", async () => {
+    const user = userEvent.setup();
+    const ollama = {
+      provider: "ollama" as const,
+      endpoint: "http://localhost:11434",
+    };
+    const snapshot = aiSnapshot();
+    snapshot.connections = [
+      storedConnection({ ...ollama, id: "keyed", label: "Keyed" }),
+      storedConnection({
+        ...ollama,
+        id: "keyless",
+        label: "Keyless",
+        source: "none",
+        has_key: false,
+      }),
+    ];
+    renderPanel(snapshot);
+
+    const keyed = await openSettings(user, "Keyed");
+    expect(
+      within(keyed).getByLabelText("Endpoint"),
+    ).toHaveAccessibleDescription(
+      "Changing the endpoint removes the saved key.",
+    );
+    const keyless = await openSettings(user, "Keyless");
+    expect(
+      within(keyless).getByLabelText("Endpoint"),
+    ).not.toHaveAccessibleDescription();
+  });
+
   it("shows a cleared limit as empty and does not save it", async () => {
     const user = userEvent.setup();
     renderPanel(aiSnapshot());
@@ -610,6 +641,34 @@ describe("ProvidersPanel", () => {
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith("That model ID isn't valid."),
     );
+  });
+
+  it("shows an OpenAI-compatible origin and keeps its models in the manifest", async () => {
+    const user = userEvent.setup();
+    renderPanel(
+      withConnection(aiSnapshot(), STUDIO_ID, {
+        provider: "openai_compatible",
+        template: "custom",
+        endpoint: "http://10.0.0.5:8000",
+        path_prefix: "/v1",
+        has_key: false,
+      }),
+    );
+    const card = await openSettings(user, "Studio");
+
+    expect(within(card).getByText("OpenAI-compatible")).toBeVisible();
+    expect(
+      within(card).getByText("Endpoint: http://10.0.0.5:8000/v1"),
+    ).toBeVisible();
+    expect(within(card).queryByText("Needs key")).not.toBeInTheDocument();
+    expect(
+      within(card).queryByRole("button", { name: "Add model" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(card).getByText(
+        "Models come from this connection's manifest and load on refresh.",
+      ),
+    ).toBeVisible();
   });
 
   it("adds hosted and Ollama providers with exactly the fields the API accepts", async () => {

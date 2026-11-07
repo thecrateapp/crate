@@ -160,17 +160,23 @@ def _stop_siblings(
 
 
 def _recover_stale_work() -> None:
-    """Fail zombie tasks, then give their abandoned AI reservations back.
+    """Fail zombie tasks, then give back what they held.
 
     A killed task never reaches finish_invocation, so its provider slot would
-    stay taken; reclaiming keeps the charged tokens (no daily refund).
+    stay taken; reclaiming keeps the charged tokens (no daily refund). A Smart
+    Mix profile task that failed for good leaves its backfill claim behind;
+    releasing it frees the slot even while the backfill is paused.
     """
     cleanup_zombie_tasks(heartbeat_timeout_min=5, no_heartbeat_timeout_min=3)
+    from crate.db.jobs.smart_mix_backfill import release_dead_smart_mix_claims
     from crate.db.repositories.ai_usage import reclaim_abandoned_invocations
 
     reclaimed = reclaim_abandoned_invocations()
     if reclaimed:
         log.warning("Reclaimed %d abandoned AI provider reservation(s)", reclaimed)
+    released = release_dead_smart_mix_claims()
+    if released:
+        log.warning("Released %d dead Smart Mix backfill claim(s)", released)
 
 
 def _env_int(name: str, default: int = 0) -> int:
@@ -737,6 +743,11 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         "crate.worker_handlers.ai_configuration",
         "AI_CONFIGURATION_TASK_HANDLERS",
         ("ai_catalog_refresh", "ai_profile_test"),
+    ),
+    (
+        "crate.worker_handlers.smart_mix_refinement",
+        "SMART_MIX_REFINEMENT_TASK_HANDLERS",
+        ("smart_mix_refine_transition", "cleanup_smart_mix_refinements"),
     ),
     (
         "crate.worker_handlers.ai_proposals",

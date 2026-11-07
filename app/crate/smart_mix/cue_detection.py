@@ -8,6 +8,11 @@ import numpy as np
 MIN_ACTIVE_DBFS = -55.0
 ACTIVE_RANGE_DB = 35.0
 DEFAULT_MIX_WINDOW_MS = 4_000
+# RMS frames of 1/20 s (50 ms) in whole samples, with half a frame of hop. The Rust
+# analyzer uses the same integers, so both read the same frames.
+RMS_FRAMES_PER_SECOND = 20
+RMS_MIN_FRAME_SAMPLES = 256
+RMS_MIN_HOP_SAMPLES = 128
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,10 +23,24 @@ class MixCuePoints:
     active_end_ms: int | None
 
 
+def rms_frame_geometry(sample_rate: int) -> tuple[int, int]:
+    """Length and hop, in samples, of the 50 ms RMS frames with a 25 ms hop."""
+    frame_length = max(RMS_MIN_FRAME_SAMPLES, sample_rate // RMS_FRAMES_PER_SECOND)
+    return frame_length, max(RMS_MIN_HOP_SAMPLES, frame_length // 2)
+
+
+def frame_rms(audio: np.ndarray, sample_rate: int) -> np.ndarray:
+    """RMS of each frame from ``rms_frame_geometry``; frame ``i`` starts at ``i * hop``."""
+    frame_length, hop_length = rms_frame_geometry(sample_rate)
+    return _frame_rms(audio, frame_length, hop_length)
+
+
 def detect_mix_cues(
     audio: np.ndarray,
     sample_rate: int,
     beat_grid_ms: tuple[int, ...] = (),
+    *,
+    rms: np.ndarray | None = None,
 ) -> MixCuePoints:
     """Musical bounds and default cues.
 
@@ -30,14 +49,15 @@ def detect_mix_cues(
     mark where the music is, not where sound stops: a fade or a reverb tail continues
     past ``active_end_ms``, which therefore falls 1-6 s before a -60 dB end of sound
     such as Mixxx's. The intro cue is the first beat at or after the start and the outro
-    cue the last beat ``DEFAULT_MIX_WINDOW_MS`` before the end.
+    cue the last beat ``DEFAULT_MIX_WINDOW_MS`` before the end. ``rms`` takes the frames
+    of ``frame_rms`` when the caller already computed them.
     """
     if sample_rate <= 0 or audio.size == 0:
         return MixCuePoints(None, None, None, None)
 
-    frame_length = max(256, round(sample_rate * 0.05))
-    hop_length = max(128, frame_length // 2)
-    rms = _frame_rms(audio, frame_length, hop_length)
+    frame_length, hop_length = rms_frame_geometry(sample_rate)
+    if rms is None:
+        rms = _frame_rms(audio, frame_length, hop_length)
     if rms.size == 0:
         return MixCuePoints(None, None, None, None)
 

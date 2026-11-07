@@ -1,8 +1,8 @@
 # Analyzer reference tools
 
 Tools used to measure `smart-mix-audio-v6` (Crate Decks S8, Smart Mix 3 SM0.PR0) against
-Mixxx's own analyzers and against the kick in the waveform. They are the starting point for
-the SM0.PR1 evaluation harness, not a finished harness.
+Mixxx's own analyzers and against the kick in the waveform. They measure the analyzer; the
+plan evaluation harness that builds on them is described in [../README.md](../README.md).
 
 Run them only against local audio (a dev library or `test-music/`), never against production.
 Store results by `entity_uid` or by index, never by title.

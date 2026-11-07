@@ -1,3 +1,4 @@
+import { EmptyState } from "@crate/ui/domain/states";
 import { InfoBadge } from "@crate/ui/primitives/InfoBadge";
 import { useApi } from "@/hooks/use-api";
 import { EntityCard } from "@crate/ui/domain/entity/EntityCard";
@@ -34,7 +35,8 @@ export function RelatedAlbums({ albumId }: { albumId?: number }) {
     albumId != null ? albumRelatedApiPath({ albumId }) : null,
   );
 
-  if (!data || data.length === 0) return null;
+  if (!data) return null;
+  if (data.length === 0) return <EmptyState title="No related albums" />;
 
   return (
     <InstrumentPanel

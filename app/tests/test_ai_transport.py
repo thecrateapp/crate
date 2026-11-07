@@ -2,7 +2,7 @@
 
 import pytest
 
-from crate.ai import transport
+from crate.ai import discovery, transport
 from crate.ai.contracts import AIConfigurationError, ProfileConfig
 
 
@@ -196,6 +196,22 @@ def test_a_complete_answer_is_not_truncated(provider, reason, monkeypatch):
     assert (result.text, result.truncated) == ("{}", False)
 
 
+@pytest.mark.parametrize(
+    "provider,data,expected",
+    [
+        ("gemini", {"candidates": [{"finishReason": "MAX_TOKENS"}]}, True),
+        ("deepseek", {"choices": [{"finish_reason": "length"}]}, True),
+        # OpenAI-compatible endpoints answer like DeepSeek, not like Ollama.
+        ("openai_compatible", {"choices": [{"finish_reason": "length"}]}, True),
+        ("openai_compatible", {"choices": [{"finish_reason": "stop"}]}, False),
+        ("ollama", {"done_reason": "length"}, True),
+        ("ollama", {"done_reason": "stop"}, False),
+    ],
+)
+def test_output_limit_stop_is_read_in_each_provider_format(provider, data, expected):
+    assert transport.hit_output_limit(provider, data) is expected
+
+
 def test_reasoning_can_spend_the_whole_output_limit(monkeypatch):
     def request(**kwargs):
         return {
@@ -284,7 +300,7 @@ def test_http_pins_dns_host_sni_and_keys_are_request_local(monkeypatch):
 
     monkeypatch.setattr(transport.httpx, "Client", client)
     monkeypatch.setattr(
-        transport.socket,
+        discovery.socket,
         "getaddrinfo",
         lambda *args, **kwargs: [(2, 1, 6, "", ("10.0.0.5", 11434))],
     )

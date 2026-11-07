@@ -1,0 +1,26 @@
+{
+  "createdAt": "2026-11-06T09:31:58.198328+00:00",
+  "database": {
+    "database": "crate_eval",
+    "host": "localhost",
+    "port": "5432"
+  },
+  "edges": 184,
+  "gitCommit": "c9301fe78a0d1b3f700488adc69e54ed16dd1c58",
+  "pairing": "best score_compatibility partner per tempo band in the pool",
+  "poolProfiles": 80,
+  "poolUids": 80,
+  "poolWithPhrases": 64,
+  "readOnly": true,
+  "requirePhrases": true,
+  "strata": {
+    "0-2": 63,
+    "2-4": 59,
+    "4-6": 62
+  },
+  "tempoBands": [
+    "0-2",
+    "2-4",
+    "4-6"
+  ]
+}

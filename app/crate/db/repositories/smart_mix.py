@@ -17,10 +17,28 @@ from crate.smart_mix.beat_grid import (
     decode_beat_grid,
     encode_beat_grid,
 )
-from crate.smart_mix.models import MixProfileQuality, TrackMixProfile
+from crate.smart_mix.models import MixProfileQuality, Phrase, TrackMixProfile
 
 
 ANY_PROFILE_REVISION = object()
+# Phrases and the energy curve are read only by planners that segment by phrase
+# (``crate.smart_mix.versions.planner_reads_structure``). Other reads never select
+# them, and touching a deferred structure attribute raises instead of lazy-loading.
+_STRUCTURE_COLUMNS = (
+    TrackMixProfileRow.phrases,
+    TrackMixProfileRow.energy_curve,
+    TrackMixProfileRow.vocal_presence,
+    TrackMixProfileRow.vocal_detector,
+    TrackMixProfileRow.beat_tracker,
+    TrackMixProfileRow.structure_confidence,
+)
+# structure_confidence is a REAL: four decimals survive it exactly.
+_STRUCTURE_CONFIDENCE_DIGITS = 4
+
+
+def stored_structure_confidence(value: float | None) -> float | None:
+    """The structure confidence as the profile column stores and reads it back."""
+    return None if value is None else round(float(value), _STRUCTURE_CONFIDENCE_DIGITS)
 
 
 def upsert_track_mix_profile(
@@ -100,11 +118,13 @@ def get_track_mix_profile(
     track_id: int,
     *,
     include_beat_grid: bool = False,
+    include_structure: bool = False,
     session=None,
 ) -> TrackMixProfile | None:
     profiles = get_track_mix_profiles(
         [track_id],
         include_beat_grid=include_beat_grid,
+        include_structure=include_structure,
         session=session,
     )
     return profiles[0]
@@ -114,6 +134,7 @@ def get_track_mix_profiles(
     track_ids: Sequence[int],
     *,
     include_beat_grid: bool = False,
+    include_structure: bool = False,
     session=None,
 ) -> list[TrackMixProfile | None]:
     requested_ids = [int(track_id) for track_id in track_ids]
@@ -132,8 +153,12 @@ def get_track_mix_profiles(
             TrackMixProfileRow.source_stale_at.is_(None),
         )
     )
-    if not include_beat_grid:
-        statement = statement.options(defer(TrackMixProfileRow.beat_grid_data))
+    statement = statement.options(
+        *_load_options(
+            include_beat_grid=include_beat_grid,
+            include_structure=include_structure,
+        )
+    )
 
     manager = nullcontext(session) if session is not None else read_scope()
     with manager as active_session:
@@ -144,6 +169,7 @@ def get_track_mix_profiles(
                 entity_uid,
                 duration,
                 include_beat_grid=include_beat_grid,
+                include_structure=include_structure,
             )
             for row, entity_uid, duration in rows
         }
@@ -154,11 +180,13 @@ def get_track_mix_profile_by_entity_uid(
     entity_uid: str,
     *,
     include_beat_grid: bool = False,
+    include_structure: bool = False,
     session=None,
 ) -> TrackMixProfile | None:
     profiles = get_track_mix_profiles_by_entity_uids(
         [entity_uid],
         include_beat_grid=include_beat_grid,
+        include_structure=include_structure,
         session=session,
     )
     return profiles[0]
@@ -168,6 +196,7 @@ def get_track_mix_profiles_by_entity_uids(
     entity_uids: Sequence[str],
     *,
     include_beat_grid: bool = False,
+    include_structure: bool = False,
     session=None,
 ) -> list[TrackMixProfile | None]:
     requested_uids = [coerce_uuid(entity_uid) for entity_uid in entity_uids]
@@ -186,8 +215,12 @@ def get_track_mix_profiles_by_entity_uids(
             TrackMixProfileRow.source_stale_at.is_(None),
         )
     )
-    if not include_beat_grid:
-        statement = statement.options(defer(TrackMixProfileRow.beat_grid_data))
+    statement = statement.options(
+        *_load_options(
+            include_beat_grid=include_beat_grid,
+            include_structure=include_structure,
+        )
+    )
 
     manager = nullcontext(session) if session is not None else read_scope()
     with manager as active_session:
@@ -198,10 +231,20 @@ def get_track_mix_profiles_by_entity_uids(
                 entity_uid,
                 duration,
                 include_beat_grid=include_beat_grid,
+                include_structure=include_structure,
             )
             for row, entity_uid, duration in rows
         }
     return [by_entity_uid.get(str(entity_uid)) for entity_uid in requested_uids]
+
+
+def _load_options(*, include_beat_grid: bool, include_structure: bool) -> list:
+    options = []
+    if not include_beat_grid:
+        options.append(defer(TrackMixProfileRow.beat_grid_data))
+    if not include_structure:
+        options.extend(defer(column, raiseload=True) for column in _STRUCTURE_COLUMNS)
+    return options
 
 
 def _encode_profile_grid(profile: TrackMixProfile) -> bytes | None:
@@ -265,6 +308,18 @@ def _profile_values(
         "active_end_ms": profile.active_end_ms,
         "integrated_lufs": profile.integrated_lufs,
         "measurement_version": profile.measurement_version,
+        "phrases": (
+            None
+            if profile.phrases is None
+            else [phrase.to_dict() for phrase in profile.phrases]
+        ),
+        "energy_curve": profile.energy_curve,
+        "vocal_presence": profile.vocal_presence,
+        "vocal_detector": profile.vocal_detector,
+        "beat_tracker": profile.beat_tracker,
+        "structure_confidence": stored_structure_confidence(
+            profile.structure_confidence
+        ),
         "source_stale_at": None,
         "analyzed_at": profile.analyzed_at,
     }
@@ -276,6 +331,7 @@ def _row_to_profile(
     duration_seconds: float | None,
     *,
     include_beat_grid: bool,
+    include_structure: bool,
 ) -> TrackMixProfile:
     beat_grid_ms: tuple[int, ...] = ()
     if include_beat_grid and row.beat_grid_data:
@@ -339,4 +395,22 @@ def _row_to_profile(
         measurement_version=row.measurement_version,
         duration_source=duration_source,
         analyzed_at=analyzed_at,
+        **(_row_structure(row) if include_structure else {}),
     )
+
+
+def _row_structure(row: TrackMixProfileRow) -> dict[str, Any]:
+    return {
+        "phrases": (
+            None
+            if row.phrases is None
+            else tuple(Phrase.from_payload(phrase) for phrase in row.phrases)
+        ),
+        "energy_curve": None if row.energy_curve is None else bytes(row.energy_curve),
+        "vocal_presence": (
+            None if row.vocal_presence is None else bytes(row.vocal_presence)
+        ),
+        "vocal_detector": row.vocal_detector,
+        "beat_tracker": row.beat_tracker,
+        "structure_confidence": stored_structure_confidence(row.structure_confidence),
+    }

@@ -89,6 +89,7 @@ describe("FEATURE_AREAS / featureAreaLabel", () => {
       "genres",
       "discovery",
       "translation",
+      "smart_mix",
       "ops",
     ]);
   });
@@ -100,6 +101,7 @@ describe("FEATURE_AREAS / featureAreaLabel", () => {
     expect(featureAreaLabel("genres")).toBe("Genres");
     expect(featureAreaLabel("discovery")).toBe("Discovery");
     expect(featureAreaLabel("translation")).toBe("Translations");
+    expect(featureAreaLabel("smart_mix")).toBe("Smart Mix");
     expect(featureAreaLabel("ops")).toBe("Operations");
   });
 
@@ -146,6 +148,10 @@ describe("featureSends", () => {
     [
       "ops.error.investigate",
       "Sends: the scrubbed error summary, its counts and releases, and similar issues",
+    ],
+    [
+      "smart_mix.transition.refine",
+      "Sends: tempo, key, energy and phrase numbers of two tracks, their genres if allowed, and the candidate transitions",
     ],
   ];
 
@@ -238,6 +244,29 @@ describe("providerStatus", () => {
         catalog_status: "ready",
       }),
     ).toEqual({ label: "Ready", tone: "success" });
+  });
+
+  it("requires a key only for predefined OpenAI-compatible origins", () => {
+    const compatible = {
+      ...base,
+      provider: "openai_compatible",
+      has_key: false,
+      catalog_status: "ready",
+    };
+    expect(providerStatus({ ...compatible, template: "custom" })).toEqual({
+      label: "Ready",
+      tone: "success",
+    });
+    expect(isUsableConnection({ ...compatible, template: "custom" })).toBe(
+      true,
+    );
+    expect(providerStatus({ ...compatible, template: "moonshot" })).toEqual({
+      label: "Needs key",
+      tone: "warning",
+    });
+    expect(isUsableConnection({ ...compatible, template: "moonshot" })).toBe(
+      false,
+    );
   });
 
   it("reports a catalog error", () => {

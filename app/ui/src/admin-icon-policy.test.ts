@@ -371,6 +371,39 @@ const approvedControls = new Map([
 // direct children and icon props remain independently audited, opaque spreads fail,
 // and each exact path/source/export may appear only this many times in source.
 const approvedLibraryControls = new Map<string, number>([
+  // Smart Mix 3 plan, SM1.PR4: the track profile's phrase strip for gate SG1. A
+  // hand-built SVG instrument (rules and an energy lane) with no glyph and no button.
+  [
+    "app/ui/src/components/album/TrackTable.tsx:@/components/SmartMixStructure:SmartMixTrackStructure",
+    1,
+  ],
+  // Audio profile sound spectrum, replacing the nivo radar: a hand-built SVG
+  // instrument (density ridges, fills and marks) with no glyph and no button, reached
+  // through the audio profile card on the album page and in the track dialog.
+  [
+    "app/ui/src/components/album/AudioProfileCard.tsx:./SoundSpectrum:SoundSpectrum",
+    1,
+  ],
+  // The album readings beside it: hand-built SVG strips (an axis, a range, track marks
+  // and the mean) in the spectrum's language, with no glyph and no button.
+  [
+    "app/ui/src/components/album/AudioProfileCard.tsx:./AlbumReadings:AlbumReadings",
+    1,
+  ],
+  // The album's mood rose beside them: a hand-built SVG instrument (rings, petals and
+  // track marks) with no glyph and no button.
+  [
+    "app/ui/src/components/album/AudioProfileCard.tsx:./MoodRose:MoodRose",
+    1,
+  ],
+  [
+    "app/ui/src/components/album/TrackTable.tsx:./AudioProfileCard:AudioProfileCard",
+    1,
+  ],
+  [
+    "app/ui/src/pages/Album.tsx:@/components/album/AudioProfileCard:AudioProfileCard",
+    1,
+  ],
   [
     "app/ui/src/pages/Insights.tsx:@/components/insights/InsightEntityLists:InsightOpportunities",
     1,
@@ -1129,6 +1162,7 @@ const approvedUx = new Map([
   ["SmartMixCoverage:mix-resume-loading", ["@crate/ui/icons", "Loader2"]],
   ["SmartMixCoverage:mix-pause-loading", ["@crate/ui/icons", "Loader2"]],
   ["SmartMixCoverage:mix-cancel-loading", ["@crate/ui/icons", "Loader2"]],
+  ["SmartMixCoverage:mix-apply-loading", ["@crate/ui/icons", "Loader2"]],
   ["SmartMixTracks:mix-reanalyze-loading", ["@crate/ui/icons", "Loader2"]],
   ["SmartMixTracks:mix-load-more-loading", ["@crate/ui/icons", "Loader2"]],
   ["SystemHealth:system-health-loading", ["lucide-react", "Loader2"]],

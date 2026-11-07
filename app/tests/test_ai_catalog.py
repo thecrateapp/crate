@@ -34,6 +34,7 @@ IDS = {
     "i18n.listen.draft",
     "ops.error.triage",
     "ops.error.investigate",
+    "smart_mix.transition.refine",
 }
 
 
@@ -246,6 +247,8 @@ def test_catalog_rejects_malformed_and_stops_at_deadline(monkeypatch):
         "http://169.254.169.254",
         "http://[fe80::1]",
         "http://[::ffff:169.254.169.254]",
+        "http://[fd00:ec2::254]",
+        "http://100.100.100.200",
         "http://metadata.google.internal",
         "http://user:pass@localhost",
         "http://localhost?x=1",

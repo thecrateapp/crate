@@ -3,8 +3,10 @@ use std::fmt::{Display, Formatter};
 
 use serde::Serialize;
 
+use crate::structure::Phrase;
+
 pub const FORMAT_NAME: &str = "delta-ms-v1";
-pub const ANALYZER_VERSION: &str = "smart-mix-audio-v6";
+pub const ANALYZER_VERSION: &str = "smart-mix-audio-v7";
 pub const FORMAT_VERSION: u8 = 1;
 pub const MAX_BEAT_COUNT: usize = 100_000;
 pub const MAX_GRID_DURATION_MS: u64 = 24 * 60 * 60 * 1_000;
@@ -51,6 +53,14 @@ pub struct SmartMixProfileResult {
     pub intro_spectral_density: Option<f32>,
     pub outro_spectral_density: Option<f32>,
     pub global_energy: Option<f32>,
+    pub phrases: Option<Vec<Phrase>>,
+    pub energy_curve: Option<Vec<u8>>,
+    /// One byte per phrase once a vocal detector qualifies (SM1.PR4); absent until then.
+    pub vocal_presence: Option<Vec<u8>>,
+    pub structure_confidence: Option<f32>,
+    /// The model that gave the beats and downbeats (`analyze --beats`, SM3-D14); null
+    /// with the analyzer's own tracker.
+    pub beat_tracker: Option<String>,
 }
 
 impl SmartMixProfileResult {
@@ -94,6 +104,11 @@ impl SmartMixProfileResult {
             intro_spectral_density: None,
             outro_spectral_density: None,
             global_energy: None,
+            phrases: None,
+            energy_curve: None,
+            vocal_presence: None,
+            structure_confidence: None,
+            beat_tracker: None,
         }
     }
 }

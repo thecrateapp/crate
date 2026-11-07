@@ -34,6 +34,7 @@ from crate.db.repositories.library import (
 )
 from crate.provider_rate_limits import wait_for_provider_slot
 from crate.release_dates import normalize_release_date
+from crate.release_track_matching import match_release_track
 from crate.storage_layout import looks_like_entity_uid, resolve_artist_dir
 from crate.task_progress import (
     TaskProgress,
@@ -95,6 +96,9 @@ def _existing_release_is_incompatible(
     album: Mapping[str, Any], release: Mapping[str, Any]
 ) -> bool:
     """Detect a short-form MB match that cannot represent the local album."""
+    expected_group = album.get("expected_release_group_id")
+    if expected_group and release.get("release_group_id") != expected_group:
+        return True
     primary_type = (
         str(
             release.get("release_group_primary_type")
@@ -136,12 +140,14 @@ def _build_album_match_local_info(
             info["artist"] = artist_name
         if not info.get("album"):
             info["album"] = clean_album
+        info["expected_release_group_id"] = album.get("expected_release_group_id")
         return info
 
     return {
         "artist": artist_name,
         "album": clean_album,
         "track_count": len(tracks_db) or album.get("track_count", 0),
+        "expected_release_group_id": album.get("expected_release_group_id"),
         "tracks": [
             {
                 "title": track.get("title", ""),
@@ -162,10 +168,27 @@ def _find_best_album_release(
     local_info: dict,
     max_candidates: int,
 ) -> tuple[dict | None, int]:
+    import musicbrainzngs
+
     from crate.matcher import _get_release_detail, _score_match, _search_musicbrainz
 
     wait_for_provider_slot("musicbrainz", 1.1)
-    candidates = _search_musicbrainz(artist_name, clean_album, track_count)
+    expected_group = local_info.get("expected_release_group_id")
+    if expected_group:
+        try:
+            result = musicbrainzngs.browse_releases(
+                release_group=expected_group, limit=max_candidates
+            )
+            candidates = [
+                {"mbid": release["id"]}
+                for release in result.get("release-list", [])
+                if release.get("id")
+            ]
+        except Exception:
+            log.warning("MusicBrainz album-group lookup failed", exc_info=True)
+            return None, 0
+    else:
+        candidates = _search_musicbrainz(artist_name, clean_album, track_count)
     if not candidates:
         return None, 0
 
@@ -175,6 +198,10 @@ def _find_best_album_release(
         wait_for_provider_slot("musicbrainz", 1.1)
         release = _get_release_detail(candidate["mbid"])
         if not release:
+            continue
+        if _existing_release_is_incompatible(
+            {**local_info, "track_count": track_count}, release
+        ):
             continue
         score = _score_match(local_info, release)
         if score > best_score:
@@ -324,10 +351,10 @@ def _write_album_release_tags(
     release_group_id = release.get("release_group_id", "")
     mb_tracks = release.get("tracks", [])
 
-    for index, db_track in enumerate(tracks_db):
-        if index >= len(mb_tracks):
-            break
-        mb_track = mb_tracks[index]
+    for db_track in tracks_db:
+        mb_track = match_release_track(db_track, mb_tracks)
+        if mb_track is None:
+            continue
         track_mbid = mb_track.get("mbid", "")
         track_path = db_track.get("path", "")
         if not track_path or not Path(track_path).is_file():

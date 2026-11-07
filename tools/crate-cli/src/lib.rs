@@ -17,6 +17,7 @@ pub mod mix_profile;
 pub mod ml;
 pub mod quality;
 pub mod scan;
+pub mod structure;
 pub mod tags;
 #[cfg(feature = "analysis")]
 pub mod tempo_grid;

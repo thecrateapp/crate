@@ -73,3 +73,17 @@ def test_queue_lookup_reports_ai_lanes():
 
     assert get_queue_for_task("show_extract") == "ai"
     assert get_queue_for_task("rebuild_genre_taxonomy_proposals") == "ai_bulk"
+
+
+def test_ai_queue_task_registered():
+    from crate.worker import TASK_HANDLERS
+
+    config = TASK_POOL_CONFIG["smart_mix_refine_transition"]
+    assert config.queue == "ai"
+    # Top priority within the lane: a transition is about to play.
+    assert config.priority == 0
+    assert config.max_retries == 0
+    # The longest action (90 s) plus the 30 s call margin (test_ai_task_deadline).
+    assert config.time_limit_seconds == 120
+    assert "smart_mix_refine_transition" in TASK_HANDLERS
+    assert "smart_mix_refine_transition" in model_calling_task_types()

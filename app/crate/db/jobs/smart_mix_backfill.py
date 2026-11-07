@@ -10,8 +10,10 @@ from typing import Any, Sequence
 
 from sqlalchemy import text
 
+from crate.db.repositories.smart_mix_refinements import refinement_latency_p50_ms
 from crate.db.ops_runtime import get_ops_runtime_state, set_ops_runtime_state
 from crate.db.tx import optional_scope, read_scope
+from crate.smart_mix.backfill_window import merge_backfill_window_settings
 from crate.smart_mix.versions import (
     ANALYZER_VERSION,
     PROFILE_SCHEMA_VERSION,
@@ -24,27 +26,126 @@ SMART_MIX_ANALYZER_VERSION = ANALYZER_VERSION
 MAX_BACKFILL_BATCH_SIZE = 100
 DEFAULT_MAX_ATTEMPTS = 3
 BACKFILL_TASK_TYPE = "backfill_smart_mix_profiles"
+PROFILE_TASK_TYPE = "compute_smart_mix_profile"
 CAMPAIGN_STATE_KEY = "smart_mix:backfill_campaign"
 COVERAGE_STATE_KEY = "smart_mix:coverage"
 LIVE_COVERAGE_MAX_AGE_SECONDS = 10
+# Campaigns saved before the target recorded a profile schema targeted schema 1.
+LEGACY_CAMPAIGN_PROFILE_VERSION = 1
+
+
+def smart_mix_target_generation() -> str:
+    """The claim generation of the current target: analyzer version and schema.
+
+    Schema 1 keeps the bare analyzer version, the generation every existing claim
+    carries. A schema bump on the same analyzer is a new generation, so claims of
+    the previous schema neither count as in flight nor use up the new retry budget.
+    """
+    if PROFILE_SCHEMA_VERSION == 1:
+        return SMART_MIX_ANALYZER_VERSION
+    return f"{SMART_MIX_ANALYZER_VERSION}+schema{PROFILE_SCHEMA_VERSION}"
+
+
+def campaign_targets_current(campaign: dict[str, Any] | None) -> bool:
+    """Whether a saved campaign targets this build's analyzer and profile schema."""
+    return (
+        campaign is not None
+        and campaign.get("target") == SMART_MIX_ANALYZER_VERSION
+        and campaign.get("profile_version", LEGACY_CAMPAIGN_PROFILE_VERSION)
+        == PROFILE_SCHEMA_VERSION
+    )
+
+
+# The coordinator claims a batch and then queues one child task per claim, so a
+# claim has no child for a moment. Past this grace a claim without a child is
+# dead: the coordinator stopped between the two steps.
+UNQUEUED_CLAIM_GRACE_SECONDS = 300
+DEAD_CLAIM_ERROR = "The analysis task ended without settling its claim"
+_PROFILE_DEDUP_PREFIX = "smart-mix-profile:"
+# Serializes counting and claiming between coordinators, so two of them can
+# never both see the same free slots.
+_CLAIM_LOCK_KEY = "smart_mix:backfill_claim"
+
+# A backfill claim is alive while its child task is pending or running, however
+# long the resource governor defers it or its retries take; the task row is the
+# source of truth. A child that failed for good, was cancelled or was lost with
+# its worker (zombie cleanup marks it failed) ends its claim at once. A claim
+# that never had a child counts only during the grace.
+_CHILD_OF_CLAIM_SQL = (
+    "child.type = :profile_task_type"
+    " AND child.dedup_key"
+    " = CAST(:profile_dedup_prefix AS text) || {claim}.track_id::text"
+    " AND child.params_json->>'claim_token' = {claim}.claimed_by"
+)
+_LIVE_CLAIM_SQL = f"""
+    (
+        EXISTS (
+            SELECT 1
+            FROM tasks child
+            WHERE {_CHILD_OF_CLAIM_SQL}
+              AND child.status IN ('pending', 'running')
+        )
+        OR (
+            {{claim}}.claimed_at
+                >= NOW() - make_interval(secs => :unqueued_claim_grace)
+            AND NOT EXISTS (
+                SELECT 1
+                FROM tasks child
+                WHERE child.created_at >= {{claim}}.claimed_at - INTERVAL '1 minute'
+                  AND {_CHILD_OF_CLAIM_SQL}
+            )
+        )
+    )
+"""
+_LIVE_CLAIM_PARAMS = {
+    "profile_task_type": PROFILE_TASK_TYPE,
+    "profile_dedup_prefix": _PROFILE_DEDUP_PREFIX,
+    "unqueued_claim_grace": UNQUEUED_CLAIM_GRACE_SECONDS,
+}
+
+
+def smart_mix_profile_dedup_key(track_id: int) -> str:
+    """Dedup key of a track's profile task; claims find their child through it."""
+    return f"{_PROFILE_DEDUP_PREFIX}{int(track_id)}"
 
 
 def claim_smart_mix_backfill_batch(
     *,
     limit: int,
+    max_in_flight: int | None = None,
     offline_track_ids: Sequence[int] = (),
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
     claimed_by: str | None = None,
     promote_python_profiles: bool = False,
     session=None,
 ) -> list[dict[str, Any]]:
+    """Claim up to ``limit`` tracks for the backfill.
+
+    With ``max_in_flight`` the claim counts what is in flight and takes only the
+    free slots, under a transaction lock, so concurrent coordinators cannot
+    exceed the limit between the count and the claim.
+    """
     batch_size = max(1, min(int(limit), MAX_BACKFILL_BATCH_SIZE))
     retry_limit = max(1, min(int(max_attempts), 10))
     offline_ids = sorted({int(track_id) for track_id in offline_track_ids})
     worker = claimed_by or (
         f"{os.environ.get('CRATE_RUNTIME', 'runtime')}:{socket.gethostname()}"
     )
+    target_generation = smart_mix_target_generation()
     with optional_scope(session) as active_session:
+        if max_in_flight is not None:
+            active_session.execute(
+                text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
+                {"key": _CLAIM_LOCK_KEY},
+            )
+        release_dead_smart_mix_claims(session=active_session)
+        if max_in_flight is not None:
+            free = int(max_in_flight) - count_smart_mix_in_flight(
+                session=active_session
+            )
+            if free <= 0:
+                return []
+            batch_size = min(batch_size, free)
         rows = (
             active_session.execute(
                 text(
@@ -123,7 +224,7 @@ def claim_smart_mix_backfill_batch(
                     WHERE la.quarantined_at IS NULL
                       AND (
                           profile.track_id IS NULL
-                          OR profile.profile_version <> 1
+                          OR profile.profile_version <> :profile_version
                           OR profile.analyzer_version <> :analyzer_version
                           OR profile.quality = 'unavailable'
                           OR profile.source_stale_at IS NOT NULL
@@ -135,14 +236,10 @@ def claim_smart_mix_backfill_batch(
                       AND (
                           processing.track_id IS NULL
                           OR (
-                              (
-                                  processing.state <> 'analyzing'
-                                  OR processing.claimed_at
-                                      < NOW() - INTERVAL '2 hours'
-                              )
+                              processing.state <> 'analyzing'
                               AND (
                                   processing.target_generation
-                                      IS DISTINCT FROM :analyzer_version
+                                      IS DISTINCT FROM :target_generation
                                   OR processing.attempts < :max_attempts
                               )
                           )
@@ -150,7 +247,7 @@ def claim_smart_mix_backfill_batch(
                     ORDER BY
                         COALESCE(
                             profile.analyzer = :python_analyzer
-                            AND profile.profile_version = 1
+                            AND profile.profile_version = :profile_version
                             AND profile.analyzer_version = :analyzer_version
                             AND profile.quality <> 'unavailable'
                             AND profile.source_stale_at IS NULL,
@@ -165,6 +262,8 @@ def claim_smart_mix_backfill_batch(
                 {
                     "pipeline": SMART_MIX_PIPELINE,
                     "analyzer_version": SMART_MIX_ANALYZER_VERSION,
+                    "profile_version": PROFILE_SCHEMA_VERSION,
+                    "target_generation": target_generation,
                     "offline_track_ids": offline_ids,
                     "max_attempts": retry_limit,
                     "limit": batch_size,
@@ -188,7 +287,7 @@ def claim_smart_mix_backfill_batch(
                     )
                     VALUES (
                         :track_id, :pipeline, 'analyzing', :claimed_by, NOW(),
-                        1, :priority, NULL, :analyzer_version, NOW()
+                        1, :priority, NULL, :target_generation, NOW()
                     )
                     ON CONFLICT (track_id, pipeline) DO UPDATE SET
                         state = 'analyzing',
@@ -212,7 +311,7 @@ def claim_smart_mix_backfill_batch(
                     "pipeline": SMART_MIX_PIPELINE,
                     "claimed_by": claim_token,
                     "priority": int(row["priority"]),
-                    "analyzer_version": SMART_MIX_ANALYZER_VERSION,
+                    "target_generation": target_generation,
                 },
             )
             claimed.append({**dict(row), "claim_token": claim_token})
@@ -242,26 +341,91 @@ def release_smart_mix_claims(track_ids: Sequence[int], *, session=None) -> int:
         return int(getattr(result, "rowcount", 0) or 0)
 
 
+def release_dead_smart_mix_claims(*, session=None) -> int:
+    """Settle claims whose child task is gone as failed attempts.
+
+    The attempt was counted when the track was claimed, so a track whose
+    analysis keeps killing its worker still runs out of attempts. The service
+    loop calls this after its zombie cleanup, and every claim starts with it.
+    Rows another transaction holds are skipped: two sweeps at once would
+    otherwise wait on each other, and the claim of a coordinator would fail on
+    the lock timeout. The other sweep settles them.
+    """
+    with optional_scope(session) as active_session:
+        result = active_session.execute(
+            text(
+                f"""
+                WITH dead AS (
+                    SELECT claim.track_id, claim.pipeline
+                    FROM track_processing_state claim
+                    WHERE claim.pipeline = :pipeline
+                      AND claim.state = 'analyzing'
+                      AND NOT {_LIVE_CLAIM_SQL.format(claim="claim")}
+                    FOR UPDATE OF claim SKIP LOCKED
+                )
+                UPDATE track_processing_state settled
+                SET state = 'failed',
+                    claimed_by = NULL,
+                    claimed_at = NULL,
+                    last_error = :reason,
+                    updated_at = NOW()
+                FROM dead
+                WHERE settled.track_id = dead.track_id
+                  AND settled.pipeline = dead.pipeline
+                """
+            ),
+            {
+                "pipeline": SMART_MIX_PIPELINE,
+                "reason": DEAD_CLAIM_ERROR,
+                **_LIVE_CLAIM_PARAMS,
+            },
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
+
+
 def count_smart_mix_in_flight(*, session=None) -> int:
+    """Count the live claims of this backfill for the current target."""
     with optional_scope(session) as active_session:
         return int(
             active_session.execute(
                 text(
-                    """
+                    f"""
                     SELECT COUNT(*)
-                    FROM track_processing_state
-                    WHERE pipeline = :pipeline
-                      AND state = 'analyzing'
-                      AND target_generation = :analyzer_version
-                      AND claimed_at >= NOW() - INTERVAL '2 hours'
+                    FROM track_processing_state claim
+                    WHERE claim.pipeline = :pipeline
+                      AND claim.state = 'analyzing'
+                      AND claim.target_generation = :target_generation
+                      AND {_LIVE_CLAIM_SQL.format(claim="claim")}
                     """
                 ),
                 {
                     "pipeline": SMART_MIX_PIPELINE,
-                    "analyzer_version": SMART_MIX_ANALYZER_VERSION,
+                    "target_generation": smart_mix_target_generation(),
+                    **_LIVE_CLAIM_PARAMS,
                 },
             ).scalar_one()
         )
+
+
+def seconds_since_smart_mix_change(*, session=None) -> float | None:
+    """Seconds since a Smart Mix processing row last changed, or None if none.
+
+    Claims, finished and failed analyses and released claims all touch
+    ``updated_at``, so this is how long the backfill's slots have stayed as
+    they are. An index range on ``(pipeline, updated_at DESC)`` answers it.
+    """
+    with optional_scope(session) as active_session:
+        seconds = active_session.execute(
+            text(
+                """
+                SELECT EXTRACT(EPOCH FROM NOW() - MAX(updated_at))
+                FROM track_processing_state
+                WHERE pipeline = :pipeline
+                """
+            ),
+            {"pipeline": SMART_MIX_PIPELINE},
+        ).scalar_one_or_none()
+    return None if seconds is None else float(seconds)
 
 
 def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> dict:
@@ -306,9 +470,16 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                                 AND profile.quality <> 'unavailable'
                                 AND profile.source_stale_at IS NOT NULL
                                 AS is_source_changed,
+                            -- CASE: AND does not guarantee the order, and
+                            -- jsonb_array_length fails on anything but an array.
+                            CASE
+                                WHEN jsonb_typeof(profile.phrases) = 'array'
+                                THEN jsonb_array_length(profile.phrases) > 0
+                                ELSE false
+                            END AS has_phrases,
                             processing.state,
                             processing.attempts,
-                            processing.target_generation = :analyzer_version
+                            processing.target_generation = :target_generation
                                 AS targets_current
                         FROM eligible
                         LEFT JOIN track_mix_profiles profile
@@ -325,6 +496,9 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                         COUNT(*) FILTER (
                             WHERE is_source_changed
                         )::int AS source_changed_profiles,
+                        COUNT(*) FILTER (
+                            WHERE is_current AND has_phrases
+                        )::int AS structure_profiles,
                         COUNT(*) FILTER (WHERE quality = 'full')::int AS full_profiles,
                         COUNT(*) FILTER (
                             WHERE is_current AND quality = 'full'
@@ -365,6 +539,7 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
                     "pipeline": SMART_MIX_PIPELINE,
                     "profile_version": PROFILE_SCHEMA_VERSION,
                     "analyzer_version": SMART_MIX_ANALYZER_VERSION,
+                    "target_generation": smart_mix_target_generation(),
                     "max_attempts": max(1, int(max_attempts)),
                 },
             )
@@ -390,6 +565,7 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
         )
     total_tracks = int(row["total_tracks"])
     current_profiles = int(row["current_profiles"])
+    structure_profiles = int(row["structure_profiles"])
     snapshot = {
         "profile_version": PROFILE_SCHEMA_VERSION,
         "analyzer_version": SMART_MIX_ANALYZER_VERSION,
@@ -401,6 +577,12 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
         "missing_profiles": max(total_tracks - current_profiles, 0),
         "coverage_percent": (
             round(current_profiles / total_tracks * 100, 1) if total_tracks else 0.0
+        ),
+        # Current profiles with at least one phrase (planner v3 plans on them),
+        # over every track: smart_mix.structure in capabilities reads it.
+        "structure_profiles": structure_profiles,
+        "structure_percent": (
+            round(structure_profiles / total_tracks * 100, 1) if total_tracks else 0.0
         ),
         "quality": {
             "full": int(row["full_profiles"]),
@@ -429,6 +611,8 @@ def refresh_smart_mix_coverage(*, max_attempts: int = DEFAULT_MAX_ATTEMPTS) -> d
             for version in version_rows
         ],
     }
+    # Capabilities announce it as smart_mix.ai_assisted.typical_latency_ms (SM3-D9).
+    snapshot["refinement_latency_p50_ms"] = refinement_latency_p50_ms()
     set_ops_runtime_state(COVERAGE_STATE_KEY, snapshot)
     return snapshot
 
@@ -450,18 +634,40 @@ def get_smart_mix_campaign() -> dict[str, Any] | None:
     return get_ops_runtime_state(CAMPAIGN_STATE_KEY)
 
 
-def start_smart_mix_campaign(*, batch_size: int, max_attempts: int) -> dict[str, Any]:
+def start_smart_mix_campaign(
+    *,
+    batch_size: int,
+    max_attempts: int,
+    night_window: dict[str, str] | None = None,
+    night_concurrency: int | None = None,
+    day_concurrency: int | None = None,
+) -> dict[str, Any]:
+    """Start, resume or reconfigure the campaign.
+
+    The night window settings describe the machine rather than one pass, so an
+    omitted setting keeps the value stored in the previous campaign, even a
+    finished one, and falls back to the default when there is none.
+    """
     current = get_smart_mix_campaign()
-    continues = bool(current) and (
-        current.get("target") == SMART_MIX_ANALYZER_VERSION
+    # Only a running or paused campaign of this target continues with its counters;
+    # anything else (another analyzer or schema, cancelled, completed) starts anew.
+    continues = current is not None and (
+        campaign_targets_current(current)
         and current.get("status") in {"running", "paused"}
     )
     campaign = {
         **(current if continues and current else {}),
         "target": SMART_MIX_ANALYZER_VERSION,
+        "profile_version": PROFILE_SCHEMA_VERSION,
         "status": "running",
         "batch_size": max(1, min(int(batch_size), MAX_BACKFILL_BATCH_SIZE)),
         "max_attempts": max(1, min(int(max_attempts), 10)),
+        **merge_backfill_window_settings(
+            current,
+            night_window=night_window,
+            night_concurrency=night_concurrency,
+            day_concurrency=day_concurrency,
+        ),
     }
     if not continues:
         campaign.update({"batches": 0, "claimed": 0})
@@ -550,14 +756,19 @@ def save_smart_mix_campaign(campaign: dict[str, Any]) -> None:
 __all__ = [
     "CAMPAIGN_STATE_KEY",
     "COVERAGE_STATE_KEY",
+    "campaign_targets_current",
     "claim_smart_mix_backfill_batch",
     "complete_smart_mix_campaign",
     "count_smart_mix_in_flight",
     "get_smart_mix_campaign",
     "queue_next_smart_mix_batch",
     "refresh_smart_mix_coverage",
+    "release_dead_smart_mix_claims",
     "release_smart_mix_claims",
+    "smart_mix_profile_dedup_key",
     "save_smart_mix_campaign",
+    "seconds_since_smart_mix_change",
     "set_smart_mix_campaign_status",
+    "smart_mix_target_generation",
     "start_smart_mix_campaign",
 ]

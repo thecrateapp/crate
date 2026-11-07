@@ -1,0 +1,99 @@
+/* Mood rose (audio analysis, right of the sound spectrum): approved mockup A. Petals use
+   the spectrum's accent and glow; labels of moods under 30% stay muted. */
+.mood-rose {
+  width: 100%;
+  max-width: 22rem;
+  margin: 0 auto;
+}
+
+.mood-rose svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.mood-rose-grid {
+  fill: none;
+  stroke: var(--text-primary);
+  stroke-opacity: 0.08;
+}
+
+.mood-rose-petal-from {
+  stop-color: var(--accent-action);
+  stop-opacity: 0.05;
+}
+
+.mood-rose-petal-to {
+  stop-color: var(--accent-action-hi);
+  stop-opacity: 0.55;
+}
+
+.mood-rose-arc {
+  fill: none;
+  stroke: var(--accent-action-hi);
+  stroke-linecap: round;
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 4px var(--accent-action-hi));
+}
+
+.mood-rose-track {
+  fill: var(--accent-action-hi);
+  fill-opacity: 0.6;
+}
+
+.mood-rose-name {
+  fill: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+.mood-rose-value {
+  fill: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mood-rose-label[data-strong="true"] .mood-rose-name,
+.mood-rose-label[data-strong="true"] .mood-rose-value {
+  fill: var(--text-primary);
+}
+
+.mood-rose-label[data-strong="true"] .mood-rose-value {
+  font-weight: 700;
+}
+
+/* Entrance: petals open from the centre one after another, then the track marks and
+   labels appear. */
+.mood-rose[data-animated="true"] .mood-rose-bloom {
+  transform-box: view-box;
+  transform-origin: 150px 150px;
+  animation: mood-rose-open 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--petal, 0) * 60ms);
+}
+
+.mood-rose[data-animated="true"] .mood-rose-track,
+.mood-rose[data-animated="true"] .mood-rose-label {
+  animation: mood-rose-fade 400ms ease-out both;
+  animation-delay: 550ms;
+}
+
+@keyframes mood-rose-open {
+  from {
+    transform: scale(0);
+  }
+}
+
+@keyframes mood-rose-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mood-rose * {
+    animation: none !important;
+  }
+}

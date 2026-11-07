@@ -32,6 +32,7 @@ DEFAULT_SCHEDULES = {
     "compute_observability_summary": 0,  # opt-in — summary for Admin, MCP and Agent
     "compute_recommendation_skips": 3600,  # 1h — early skips over the last 24h
     "sync_error_issues": 300,  # 5min — Sentry issues into the error inbox
+    "cleanup_smart_mix_refinements": 86400,  # 24h — AI refinements unread for 180 days
 }
 
 SCHEDULED_TASKS = [

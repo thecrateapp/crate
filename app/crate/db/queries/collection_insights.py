@@ -18,7 +18,10 @@ from sqlalchemy.orm import Session
 from crate.db.queries.collection_insights_sql import _REPORT_SQL
 from crate.db.queries.sonic_insights import build_sonic_insights
 from crate.db.tx import read_scope
-from crate.smart_mix.versions import PROFILE_SCHEMA_VERSION, READABLE_ANALYZER_VERSIONS
+from crate.smart_mix.versions import (
+    READABLE_ANALYZER_VERSIONS,
+    READABLE_PROFILE_VERSIONS,
+)
 
 _WINDOWS = {"30d": 30, "90d": 90, "365d": 365}
 
@@ -193,7 +196,7 @@ def build_collection_insights(
         "start": start,
         "previous_start": previous_start,
         "previous_end": previous_end,
-        "profile_version": PROFILE_SCHEMA_VERSION,
+        "profile_versions": list(READABLE_PROFILE_VERSIONS),
         "analyzer_versions": list(READABLE_ANALYZER_VERSIONS),
     }
 

@@ -112,6 +112,7 @@ interface AlbumSearchResult {
 export type { AudioAnalysisTrack } from "./audio-analysis";
 import { analysisForTrack, type AudioAnalysisTrack } from "./audio-analysis";
 import { AudioProfileCard } from "./AudioProfileCard";
+import { SmartMixTrackStructure } from "@/components/SmartMixStructure";
 import { InfoBadge, type InfoBadgeTone } from "@crate/ui/primitives/InfoBadge";
 import { ActionButton, ActionLink } from "@crate/ui/primitives/ActionGroup";
 import { MediaCover } from "@crate/ui/domain/media/MediaCover";
@@ -472,6 +473,8 @@ function TrackAudioInfo({
   title: string;
 }) {
   const [open, setOpen] = useState(false);
+  const { hasCapability } = useAuth();
+  const trackId = track.track_id;
   return (
     <>
       <ActionButton label="Show audio profile" onClick={() => setOpen(true)}>
@@ -484,17 +487,23 @@ function TrackAudioInfo({
         description="Measured audio features, Smart Mix readiness and similarity references for this track."
         closeLabel="Close audio profile"
         size="3xl"
-        panelClassName="max-h-[calc(100dvh-2rem)] min-w-0"
+        // Fixed height: switching tabs must not resize the dialog.
+        panelClassName="h-[min(56rem,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] min-w-0"
         headerClassName="shrink-0"
       >
         <ModalBody
-          className="min-w-0 px-5 py-5"
+          className="min-w-0 px-5 py-5 [scrollbar-gutter:stable]"
           data-slot="audio-profile-scroll"
         >
           <AudioProfileCard
             analysisData={{ track }}
             totalTracks={1}
             presentation="track-dialog"
+            smartMixStructure={
+              trackId != null && hasCapability("library.analysis.manage") ? (
+                <SmartMixTrackStructure trackId={trackId} />
+              ) : null
+            }
           />
         </ModalBody>
       </AppModal>

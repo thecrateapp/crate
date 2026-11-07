@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 import uuid
 
@@ -15,7 +16,8 @@ from crate.db.repositories.library_processing_state import (
 )
 from crate.db.repositories.smart_mix import get_track_mix_profile
 from crate.db.tx import read_scope, transaction_scope
-from crate.smart_mix.models import MixProfileQuality, TrackMixProfileDraft
+from crate.smart_mix.models import MixProfileQuality, Phrase, TrackMixProfileDraft
+from crate.smart_mix.versions import ANALYZER_VERSION
 
 
 def test_smart_mix_storage_upserts_without_mutating_legacy_analysis(
@@ -197,6 +199,261 @@ def test_invalid_embedded_profile_does_not_rollback_legacy_analysis(
     assert row["bpm"] == 123.0
     assert row["quality"] == "unavailable"
     assert row["state"] == "failed"
+
+
+STRUCTURE_PHRASES = (
+    Phrase(
+        start_beat=0,
+        start_ms=500,
+        bars=8,
+        energy=0.61,
+        delta_energy=None,
+        kind="intro",
+    ),
+    Phrase(
+        start_beat=32,
+        start_ms=16_500,
+        bars=16,
+        energy=0.8125,
+        delta_energy=0.2025,
+        kind="peak",
+    ),
+)
+STRUCTURE_CURVE = bytes((0, 12, 200, 255, 128, 64))
+
+
+def test_persists_structure_fields(pg_db, tmp_path: Path) -> None:
+    del pg_db
+    path = tmp_path / "structure.flac"
+    path.write_bytes(b"structured-source")
+    track_id, _track_uid = _create_track(path)
+    draft = replace(
+        _draft(),
+        phrases=STRUCTURE_PHRASES,
+        energy_curve=STRUCTURE_CURVE,
+        vocal_presence=bytes((12, 240)),
+        vocal_detector="yamnet-1",
+        structure_confidence=0.8234,
+    )
+
+    assert store_smart_mix_profile_result(track_id, path, draft) is True
+
+    profile = get_track_mix_profile(track_id, include_structure=True)
+    assert profile is not None
+    assert profile.phrases == STRUCTURE_PHRASES
+    assert profile.energy_curve == STRUCTURE_CURVE
+    assert profile.vocal_presence == bytes((12, 240))
+    assert profile.vocal_detector == "yamnet-1"
+    assert profile.structure_confidence == 0.8234
+    # Readers that do not plan by phrase never load the structure.
+    summary = get_track_mix_profile(track_id)
+    assert summary is not None
+    assert (
+        summary.phrases,
+        summary.energy_curve,
+        summary.vocal_presence,
+        summary.vocal_detector,
+        summary.structure_confidence,
+    ) == (None, None, None, None, None)
+    with read_scope() as session:
+        stored = (
+            session.execute(
+                text(
+                    """
+                    SELECT phrases, energy_curve
+                    FROM track_mix_profiles WHERE track_id = :track_id
+                    """
+                ),
+                {"track_id": track_id},
+            )
+            .mappings()
+            .one()
+        )
+    assert stored["phrases"] == [phrase.to_dict() for phrase in STRUCTURE_PHRASES]
+    assert bytes(stored["energy_curve"]) == STRUCTURE_CURVE
+
+
+def test_persists_beat_tracker(pg_db, tmp_path: Path) -> None:
+    del pg_db
+    path = tmp_path / "tracked.flac"
+    path.write_bytes(b"tracked-source")
+    track_id, _track_uid = _create_track(path)
+    plain = replace(_draft(), analyzer_version=ANALYZER_VERSION)
+    tracked = replace(plain, beat_tracker="beat-this-small0-dbn")
+    assert store_smart_mix_profile_result(track_id, path, plain) is True
+    before = get_track_mix_profile(track_id)
+    assert before is not None
+
+    assert store_smart_mix_profile_result(track_id, path, tracked) is True
+
+    profile = get_track_mix_profile(track_id, include_structure=True)
+    assert profile is not None
+    assert profile.beat_tracker == "beat-this-small0-dbn"
+    # The tracker is part of the revision: the same values from another tracker are
+    # another profile.
+    assert profile.profile_revision != before.profile_revision
+    # Like the voice detector, it is read with the structure, never by plan reads.
+    summary = get_track_mix_profile(track_id)
+    assert summary is not None and summary.beat_tracker is None
+    with read_scope() as session:
+        stored = session.execute(
+            text("SELECT beat_tracker FROM track_mix_profiles WHERE track_id = :id"),
+            {"id": track_id},
+        ).scalar_one()
+    assert stored == "beat-this-small0-dbn"
+
+
+def test_draft_with_tracker_replaces_same_version(pg_db, tmp_path: Path) -> None:
+    # Beat This! ships inside the analyzer version (SM3-D14), like the voice: a draft
+    # that brings a tracker, or another one (the DBN over the first builds' peak
+    # picking), replaces a profile of the same version and quality; a draft without
+    # one never strips it.
+    del pg_db
+    path = tmp_path / "replace.flac"
+    path.write_bytes(b"replace-source")
+    track_id, _track_uid = _create_track(path)
+    own = replace(_draft(), analyzer="crate-python", analyzer_version=ANALYZER_VERSION)
+    small = replace(own, downbeat_anchor_ms=1_000, beat_tracker="beat-this-small0")
+    dbn = replace(small, beat_tracker="beat-this-small0-dbn")
+
+    assert store_smart_mix_profile_result(track_id, path, own) is True
+    assert store_smart_mix_profile_result(track_id, path, small) is True
+    assert store_smart_mix_profile_result(track_id, path, small) is False
+    assert store_smart_mix_profile_result(track_id, path, own) is False
+    # Not even a Rust draft, which otherwise promotes a Python profile.
+    rust_own = replace(own, analyzer="crate-rust")
+    assert store_smart_mix_profile_result(track_id, path, rust_own) is False
+    # A tracker never downgrades a full profile.
+    partial = replace(dbn, quality=MixProfileQuality.PARTIAL)
+    assert store_smart_mix_profile_result(track_id, path, partial) is False
+    assert store_smart_mix_profile_result(track_id, path, dbn) is True
+
+    profile = get_track_mix_profile(track_id, include_structure=True)
+    assert profile is not None
+    assert (profile.beat_tracker, profile.downbeat_anchor_ms) == (
+        "beat-this-small0-dbn",
+        1_000,
+    )
+
+
+def test_unsegmented_structure_stays_distinct_from_no_structure(
+    pg_db, tmp_path: Path
+) -> None:
+    del pg_db
+    path = tmp_path / "unsegmented.flac"
+    path.write_bytes(b"unsegmented-source")
+    track_id, _track_uid = _create_track(path)
+    draft = replace(
+        _draft(), phrases=(), energy_curve=bytes(4), structure_confidence=0.0
+    )
+
+    assert store_smart_mix_profile_result(track_id, path, draft) is True
+
+    profile = get_track_mix_profile(track_id, include_structure=True)
+    assert profile is not None
+    assert profile.phrases == ()
+    assert profile.energy_curve == bytes(4)
+    assert profile.structure_confidence == 0.0
+
+
+def test_v1_profile_reads_with_null_structure(pg_db, tmp_path: Path) -> None:
+    del pg_db
+    path = tmp_path / "schema-one.flac"
+    path.write_bytes(b"schema-one-source")
+    track_id, _track_uid = _create_track(path)
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO track_mix_profiles (
+                    track_id, profile_version, profile_revision, analyzer,
+                    analyzer_version, source_revision, quality, bpm, analyzed_at
+                )
+                VALUES (
+                    :track_id, 1, 'schema-one', 'crate-rust', 'smart-mix-audio-v6',
+                    'source', 'full', 126.0, NOW()
+                )
+                """
+            ),
+            {"track_id": track_id},
+        )
+
+    profile = get_track_mix_profile(track_id, include_structure=True)
+
+    assert profile is not None
+    assert profile.profile_version == 1
+    assert profile.analyzer_version == "smart-mix-audio-v6"
+    assert profile.bpm == 126.0
+    assert (
+        profile.phrases,
+        profile.energy_curve,
+        profile.vocal_presence,
+        profile.structure_confidence,
+    ) == (None, None, None, None)
+
+
+def test_profile_revision_hashes_the_stored_values(pg_db, tmp_path: Path) -> None:
+    del pg_db
+    from crate.db.repositories.library_analysis_writes import (
+        upsert_track_mix_profile_draft,
+    )
+
+    first_path = tmp_path / "first.flac"
+    second_path = tmp_path / "second.flac"
+    first_path.write_bytes(b"first")
+    second_path.write_bytes(b"second")
+    first_id, _ = _create_track(first_path)
+    second_id, _ = _create_track(second_path)
+    structured = replace(
+        _draft(), phrases=STRUCTURE_PHRASES, energy_curve=STRUCTURE_CURVE
+    )
+
+    # The confidence column is a REAL that holds four decimals: both drafts store the
+    # same row, so they must carry the same revision.
+    assert upsert_track_mix_profile_draft(
+        first_id, "same-source", replace(structured, structure_confidence=0.82341234)
+    )
+    assert upsert_track_mix_profile_draft(
+        second_id, "same-source", replace(structured, structure_confidence=0.82341236)
+    )
+
+    first = get_track_mix_profile(first_id, include_structure=True)
+    second = get_track_mix_profile(second_id, include_structure=True)
+    assert first is not None and second is not None
+    assert first.structure_confidence == second.structure_confidence == 0.8234
+    assert first.profile_revision == second.profile_revision
+
+
+def test_draft_upsert_writes_the_current_profile_schema(
+    pg_db, tmp_path: Path, monkeypatch
+) -> None:
+    del pg_db
+    from crate.db.repositories import library_analysis_writes
+
+    current_path = tmp_path / "current-schema.flac"
+    next_path = tmp_path / "next-schema.flac"
+    current_path.write_bytes(b"current")
+    next_path.write_bytes(b"next")
+    current_id, _ = _create_track(current_path)
+    next_id, _ = _create_track(next_path)
+
+    assert library_analysis_writes.upsert_track_mix_profile_draft(
+        current_id, "same-source", _draft()
+    )
+    monkeypatch.setattr(
+        library_analysis_writes,
+        "PROFILE_SCHEMA_VERSION",
+        library_analysis_writes.PROFILE_SCHEMA_VERSION + 1,
+    )
+    assert library_analysis_writes.upsert_track_mix_profile_draft(
+        next_id, "same-source", _draft()
+    )
+
+    current = get_track_mix_profile(current_id)
+    upgraded = get_track_mix_profile(next_id)
+    assert current is not None and upgraded is not None
+    assert upgraded.profile_version == current.profile_version + 1
+    assert upgraded.profile_revision != current.profile_revision
 
 
 def _create_track(path: Path, *, bpm: float | None = None) -> tuple[int, str]:

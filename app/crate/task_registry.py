@@ -45,6 +45,9 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
         "Genre Taxonomy Proposal", "enrichment"
     ),
     "refine_music_path": TaskTypeInfo("Music Path Refinement", "enrichment"),
+    "smart_mix_refine_transition": TaskTypeInfo(
+        "Smart Mix Transition Refinement", "analysis"
+    ),
     "analyze_artist_hero_candidate": TaskTypeInfo(
         "Artist Hero Candidate Analysis", "artwork"
     ),
@@ -223,6 +226,9 @@ TASK_TYPES: dict[str, TaskTypeInfo] = {
         "Smart Mix Profile Backfill", "analysis"
     ),
     "refresh_smart_mix_coverage": TaskTypeInfo("Smart Mix Coverage", "analysis"),
+    "cleanup_smart_mix_refinements": TaskTypeInfo(
+        "Smart Mix Refinement Cleanup", "analysis"
+    ),
     "materialize_artwork_variants": TaskTypeInfo("Artwork Variants", "artwork"),
     "backfill_artwork_variants": TaskTypeInfo("Artwork Variant Backfill", "artwork"),
     "cleanup_artwork_variants": TaskTypeInfo("Artwork Variant Cleanup", "artwork"),

@@ -3,6 +3,9 @@
 Credentials and source travel over a private child stdin, never argv or logs.
 Native request options are pinned by the caller; no environment configuration,
 transport retries, redirects, continuation or provider fallback are used.
+
+An openai_compatible request is shaped only by the admin's manifest: the declared
+structured output mode and the one native reasoning control its template accepts.
 """
 
 from __future__ import annotations
@@ -10,26 +13,26 @@ from __future__ import annotations
 import base64
 import json
 import resource
-import socket
 import subprocess
 import sys
 import tempfile
 import time
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import quote, urlsplit, urlunsplit
+from urllib.parse import quote, urlsplit
 
 import httpx
 
-from crate.ai.contracts import AIConfigurationError, ProfileConfig
-from crate.ai.discovery import _check_address, validate_endpoint
+from crate.ai.contracts import (
+    OPENAI_COMPATIBLE_TEMPLATES,
+    AIConfigurationError,
+    ProfileConfig,
+    ReasoningConfig,
+)
+from crate.ai.discovery import pin_origin, request_target
 
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 MAX_REQUEST_BYTES = 32 * 1024 * 1024
-_BASES = {
-    "gemini": "https://generativelanguage.googleapis.com",
-    "deepseek": "https://api.deepseek.com",
-}
 # The answer stopped at the profile's max_output_tokens before it was complete.
 OUTPUT_LIMIT_CODE = "AI_OUTPUT_LIMIT"
 _CODES = {
@@ -54,14 +57,15 @@ class NativeResponse:
 def hit_output_limit(provider: str, data: Any) -> bool:
     """Whether a native response stopped at the output limit, not at its end.
 
-    Gemini reports `finishReason: MAX_TOKENS`, DeepSeek `finish_reason: length` and
-    Ollama `done_reason: length`. Reasoning tokens count against that limit, so a
-    model that thinks long can stop before, or in the middle of, its answer.
+    Gemini reports `finishReason: MAX_TOKENS`, DeepSeek and OpenAI-compatible
+    providers `finish_reason: length`, and Ollama `done_reason: length`. Reasoning
+    tokens count against that limit, so a model that thinks long can stop before,
+    or in the middle of, its answer.
     """
     try:
         if provider == "gemini":
             return data["candidates"][0].get("finishReason") == "MAX_TOKENS"
-        if provider == "deepseek":
+        if provider in {"deepseek", "openai_compatible"}:
             return data["choices"][0].get("finish_reason") == "length"
         return data.get("done_reason") == "length"
     except (KeyError, IndexError, TypeError, AttributeError):
@@ -72,30 +76,33 @@ def _fail(code="AI_PROVIDER_FAILED"):
     return AIConfigurationError(code, "Provider request could not be completed")
 
 
-def _http_json(provider, endpoint, path, *, api_key, body, timeout_seconds):
-    endpoint = validate_endpoint(provider, endpoint)
-    base = endpoint or _BASES[provider]
+def _http_json(
+    provider,
+    endpoint,
+    path,
+    *,
+    api_key,
+    body,
+    timeout_seconds,
+    template=None,
+    path_prefix=None,
+):
     headers = {"Accept": "application/json"}
     if provider == "gemini":
         headers["x-goog-api-key"] = api_key or ""
     elif api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     extensions: dict[str, Any] = {}
-    if provider == "ollama":
-        parsed = urlsplit(base)
-        hostname = parsed.hostname or ""
-        port = parsed.port or (443 if parsed.scheme == "https" else 80)
-        answers = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
-        addresses = list(
-            dict.fromkeys(_check_address(str(answer[4][0])) for answer in answers)
+    try:
+        base, path, pinned, private_only = request_target(
+            provider, endpoint, path, template=template, path_prefix=path_prefix
         )
-        if not addresses:
-            raise _fail("AI_ENDPOINT_INVALID")
-        address = addresses[0]
-        host = f"[{address}]" if ":" in address else address
-        headers["Host"] = parsed.netloc
-        extensions["sni_hostname"] = hostname
-        base = urlunsplit((parsed.scheme, f"{host}:{port}", "", "", ""))
+        if pinned:
+            base, headers["Host"], extensions["sni_hostname"] = pin_origin(
+                base, private_only=private_only
+            )
+    except AIConfigurationError as error:
+        raise _fail(error.code) from None
     try:
         with httpx.Client(
             timeout=timeout_seconds, follow_redirects=False, trust_env=False
@@ -122,7 +129,17 @@ def _http_json(provider, endpoint, path, *, api_key, body, timeout_seconds):
         raise _fail() from None
 
 
-def _request_json(*, provider, endpoint, path, api_key, body, deadline):
+def _request_json(
+    *,
+    provider,
+    endpoint,
+    path,
+    api_key,
+    body,
+    deadline,
+    template=None,
+    path_prefix=None,
+):
     packet = json.dumps(
         {
             "provider": provider,
@@ -131,6 +148,11 @@ def _request_json(*, provider, endpoint, path, api_key, body, deadline):
             "api_key": api_key,
             "body": body,
             "timeout_seconds": max(0.001, deadline - time.monotonic()),
+            **(
+                {"template": template, "path_prefix": path_prefix}
+                if provider == "openai_compatible"
+                else {}
+            ),
         }
     ).encode()
     if len(packet) > MAX_REQUEST_BYTES:
@@ -207,6 +229,25 @@ def _usage(provider, data):
             "cached_input_tokens": native.get("prompt_cache_hit_tokens"),
             "total_tokens": native.get("total_tokens"),
         }
+    elif provider == "openai_compatible":
+        # Reasoning tokens are part of completion_tokens, as with DeepSeek.
+        native = _object(data.get("usage"))
+        thought = _object(native.get("completion_tokens_details")).get(
+            "reasoning_tokens"
+        )
+        output = native.get("completion_tokens")
+        if type(output) is int and type(thought) is int:
+            output -= thought
+        cached = _object(native.get("prompt_tokens_details")).get(
+            "cached_tokens", native.get("cached_tokens")
+        )
+        usage = {
+            "input_tokens": native.get("prompt_tokens"),
+            "output_tokens": output,
+            "thought_tokens": thought,
+            "cached_input_tokens": cached,
+            "total_tokens": native.get("total_tokens"),
+        }
     else:
         # Ollama eval_count includes reasoning, but exposes no separate token count.
         # Keep the aggregate output count and leave thought_tokens unknown.
@@ -227,6 +268,62 @@ def _usage(provider, data):
     if (usage.get("cached_input_tokens") or 0) > usage["input_tokens"]:
         return None
     return usage
+
+
+def _object(value):
+    return value if isinstance(value, dict) else {}
+
+
+def _openai_compatible_reasoning(control: str, reasoning: ReasoningConfig) -> dict:
+    """The one native reasoning field the manifest declared, or nothing."""
+    mode = reasoning.mode
+    if mode == "provider_default":
+        return {}
+    if mode in {"enabled", "disabled"}:
+        if control == "thinking":
+            return {"thinking": {"type": mode}}
+        if control == "enable_thinking":
+            return {"enable_thinking": mode == "enabled"}
+        if control == "reasoning":
+            return {"reasoning": {"enabled": mode == "enabled"}}
+    if mode == "level":
+        if control == "reasoning_effort":
+            return {"reasoning_effort": reasoning.level}
+        if control == "reasoning":
+            return {"reasoning": {"effort": reasoning.level}}
+    raise _fail("AI_RESPONSE_INVALID")
+
+
+def _openai_compatible_body(context, config, *, prompt, system, response_schema):
+    template = context["template"]
+    control = context["reasoning_control"]
+    if control not in OPENAI_COMPATIBLE_TEMPLATES[template].reasoning:
+        raise _fail("AI_RESPONSE_INVALID")
+    if context["structured_output"] == "json_schema":
+        instruction = (system + "\n\n" if system else "") + "Return only a JSON object."
+        response_format = {
+            "type": "json_schema",
+            "json_schema": {"name": "crate_response", "schema": response_schema},
+        }
+    elif context["structured_output"] == "json_object":
+        instruction = (
+            (system + "\n\n" if system else "")
+            + "Return only a JSON object matching this schema:\n"
+            + json.dumps(response_schema)
+        )
+        response_format = {"type": "json_object"}
+    else:
+        raise _fail("AI_RESPONSE_INVALID")
+    return {
+        "model": context["model_id"],
+        "messages": [
+            {"role": "system", "content": instruction},
+            {"role": "user", "content": prompt},
+        ],
+        "stream": False,
+        "max_tokens": config.max_output_tokens,
+        "response_format": response_format,
+    } | _openai_compatible_reasoning(control, config.reasoning)
 
 
 def generate(
@@ -266,7 +363,27 @@ def generate(
             or media_type not in {"image/png", "image/jpeg", "image/webp", "image/gif"}
         ):
             raise _fail("AI_RESPONSE_INVALID")
-        if provider == "gemini":
+        wire: dict[str, Any] = {}
+        if provider == "openai_compatible":
+            if (
+                image is not None
+                or config.image_detail != "default"
+                or reasoning.mode == "budget"
+            ):
+                raise _fail("AI_RESPONSE_INVALID")
+            body = _openai_compatible_body(
+                context,
+                config,
+                prompt=prompt,
+                system=system,
+                response_schema=response_schema,
+            )
+            path = "/chat/completions"
+            wire = {
+                "template": context["template"],
+                "path_prefix": context["path_prefix"],
+            }
+        elif provider == "gemini":
             parts: list[dict] = [{"text": prompt}]
             if encoded:
                 part: dict[str, Any] = {
@@ -354,6 +471,7 @@ def generate(
             api_key=api_key,
             body=body,
             deadline=deadline,
+            **wire,
         )
         truncated = hit_output_limit(provider, data)
         if provider == "gemini":
@@ -369,7 +487,8 @@ def generate(
                 for part in parts
                 if "text" in part and not part.get("thought")
             )
-        elif provider == "deepseek":
+        elif provider in {"deepseek", "openai_compatible"}:
+            # Reasoning text (reasoning_content, reasoning) is never read.
             text = data["choices"][0]["message"]["content"]
         else:
             text = data["message"]["content"]

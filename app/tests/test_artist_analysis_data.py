@@ -145,18 +145,21 @@ def test_artist_analysis_reads_smart_mix_and_bliss_without_legacy_bpm(pg_db):
 
 
 def test_artist_analysis_marks_only_current_full_profiles(pg_db, monkeypatch):
-    # Advance the schema so a valid stored previous version can be exercised too.
+    # Advance the schema so a stored previous and an unknown next version are both
+    # exercised: a previous schema stays readable, a schema this build does not know
+    # is not.
     current_profile_version = PROFILE_SCHEMA_VERSION + 1
     monkeypatch.setattr(
-        "crate.db.repositories.library_reference_reads.PROFILE_SCHEMA_VERSION",
-        current_profile_version,
+        "crate.db.repositories.library_reference_reads.READABLE_PROFILE_VERSIONS",
+        tuple(range(current_profile_version, 0, -1)),
     )
     cases = {
         "current": {},
+        "previous_schema": {"profile_version": PROFILE_SCHEMA_VERSION},
         "light": {"quality": "partial"},
         "legacy": {"quality": "legacy"},
         "unavailable": {"quality": "unavailable"},
-        "old_schema": {"profile_version": PROFILE_SCHEMA_VERSION},
+        "unknown_schema": {"profile_version": current_profile_version + 1},
         "old_analyzer": {"analyzer_version": "old-analysis"},
         "source_changed": {"source_stale_at": datetime.now(UTC)},
         "missing": None,
@@ -216,7 +219,9 @@ def test_artist_analysis_marks_only_current_full_profiles(pg_db, monkeypatch):
     assert profiles["missing"] is None
     for name, profile in profiles.items():
         if profile is not None:
-            assert profile["is_current_full_profile"] is (name == "current"), name
+            assert profile["is_current_full_profile"] is (
+                name in {"current", "previous_schema"}
+            ), name
 
 
 @pytest.mark.parametrize(

@@ -2,8 +2,9 @@
 
 use crate_cli::analyze::{
     analyze_smart_mix_samples, analyze_smart_mix_samples_with_loudness, analyze_smart_mix_segments,
-    decode_audio_bounded, AudioTail,
+    analyze_smart_mix_segments_with_beats, decode_audio_bounded, AudioTail,
 };
+use crate_cli::beat_tracking::ExternalBeats;
 use crate_cli::loudness::LoudnessMeter;
 
 const SAMPLE_RATE: u32 = 22_050;
@@ -427,7 +428,7 @@ fn rust_profile_serializes_the_shared_camel_case_schema() {
     let payload = serde_json::to_value(profile).unwrap();
 
     assert_eq!(payload["schemaVersion"], 1);
-    assert_eq!(payload["analyzerVersion"], "smart-mix-audio-v6");
+    assert_eq!(payload["analyzerVersion"], "smart-mix-audio-v7");
     assert!(payload.get("measurementVersion").is_some());
     assert!(payload.get("integratedLufs").is_some());
     assert!(payload.get("activeStartMs").is_some());
@@ -857,4 +858,105 @@ fn v6_keeps_tracked_beats_partial_when_the_kick_contests_them() {
         "full profile with the beats {:?} off the kicks",
         &profile.beat_grid_ms[..4]
     );
+}
+
+fn model_beats(phase: usize, first_ms: u64, last_ms: u64) -> ExternalBeats {
+    let beats_ms: Vec<u64> = (first_ms..=last_ms).step_by(500).collect();
+    ExternalBeats {
+        tracker: Some("beat-this-test".to_string()),
+        downbeats_ms: beats_ms.iter().skip(phase).step_by(4).copied().collect(),
+        beats_ms,
+        beats_per_bar: Some(4),
+    }
+}
+
+#[test]
+fn external_beats_replace_tracker() {
+    // Accents every fourth beat from 1 s, which the onset heuristic takes as the bar;
+    // the model hears the bar two beats later and decides it.
+    let samples = click_track(120.0, 120.0, 20.0, 1.0, 0.0);
+    let beats = model_beats(2, 1_000, 19_500);
+
+    let own = analyze_smart_mix_samples(&samples, SAMPLE_RATE);
+    let profile = analyze_smart_mix_segments_with_beats(
+        &samples,
+        None,
+        SAMPLE_RATE,
+        None,
+        None,
+        Some(&beats),
+    );
+
+    let own_anchor = own.downbeat_anchor_ms.expect("heuristic downbeat");
+    assert!(
+        own_anchor.abs_diff(1_000) <= 30,
+        "heuristic anchor {own_anchor}"
+    );
+    assert_eq!(own.beat_tracker, None);
+    assert_eq!(profile.beat_tracker.as_deref(), Some("beat-this-test"));
+    assert_eq!(profile.bpm, Some(120.0));
+    assert_eq!(profile.beat_grid_ms[..3], [1_000, 1_500, 2_000]);
+    assert_eq!(profile.downbeat_anchor_ms, Some(2_000));
+    assert_eq!(profile.time_signature, Some(4));
+    // The cue downbeats come from the same model downbeats.
+    assert_eq!(profile.intro_downbeat_ms, Some(2_000));
+    let outro = profile.outro_downbeat_ms.expect("outro downbeat");
+    assert_eq!((outro - 2_000) % 2_000, 0, "outro downbeat {outro}");
+    assert_eq!(profile.quality, "full");
+}
+
+#[test]
+fn model_downbeats_without_a_clear_bar_leave_no_downbeat() {
+    let samples = click_track(120.0, 120.0, 20.0, 1.0, 0.0);
+    let mut beats = model_beats(0, 1_000, 19_500);
+    // Bars on two phases, half and half: no phase reaches the share.
+    beats.downbeats_ms = beats.beats_ms[0..16]
+        .iter()
+        .step_by(4)
+        .chain(beats.beats_ms[18..].iter().step_by(4))
+        .copied()
+        .collect();
+
+    let profile = analyze_smart_mix_segments_with_beats(
+        &samples,
+        None,
+        SAMPLE_RATE,
+        None,
+        None,
+        Some(&beats),
+    );
+
+    // The onset heuristic, and the intro cue's own phase, would anchor this track; the
+    // model's word is final.
+    assert_eq!(profile.downbeat_anchor_ms, None);
+    assert_eq!(profile.time_signature, None);
+    assert!(profile
+        .phrases
+        .as_ref()
+        .is_some_and(|phrases| phrases.is_empty()));
+    assert_eq!(profile.beat_tracker.as_deref(), Some("beat-this-test"));
+}
+
+#[test]
+fn external_beats_stop_at_the_analysed_head() {
+    let samples = click_track(120.0, 120.0, 40.0, 1.0, 0.0);
+    let head = &samples[..SAMPLE_RATE as usize * 10];
+    let tail = &samples[SAMPLE_RATE as usize * 30..];
+    let beats = model_beats(0, 1_000, 39_000);
+
+    let profile = analyze_smart_mix_segments_with_beats(
+        head,
+        Some(AudioTail {
+            samples: tail,
+            start_ms: 30_000,
+        }),
+        SAMPLE_RATE,
+        Some(40_000),
+        None,
+        Some(&beats),
+    );
+
+    assert_eq!(profile.beat_grid_ms.first(), Some(&1_000));
+    assert!(profile.beat_grid_ms.iter().all(|beat| *beat <= 10_000));
+    assert_eq!(profile.quality, "partial");
 }

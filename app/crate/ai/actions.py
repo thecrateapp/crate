@@ -1,4 +1,4 @@
-"""The thirteen registered operations, independent of provider and persistence."""
+"""The fourteen registered operations, independent of provider and persistence."""
 
 from crate.ai.contracts import AIAction, AIConfigurationError, ActionMaxima
 
@@ -184,6 +184,18 @@ ACTIONS: dict[str, AIAction] = {
             16000,
             "Propose a cause and a concrete next step for one error issue from its "
             "sanitized digest.",
+        ),
+        _action(
+            "smart_mix.transition.refine",
+            "Refine Smart Mix transition",
+            "smart_mix",
+            "text",
+            "smart_mix.ai",
+            "/settings",
+            45,
+            1024,
+            "Pick and adjust one transition from the planner's valid candidates, "
+            "using only tempo, key, energy and phrase numbers.",
         ),
     )
 }

@@ -514,6 +514,7 @@ def search(
                     "cover": _tidal_cover(a.get("cover")),
                     "url": a.get("url") or f"https://tidal.com/album/{a.get('id', '')}",
                     "quality": a.get("mediaMetadata", {}).get("tags", []),
+                    "type": a.get("type", ""),
                 }
                 for a in albums_raw
             ]
