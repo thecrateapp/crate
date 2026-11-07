@@ -8,6 +8,7 @@ from sqlalchemy.exc import DBAPIError
 
 from crate.db.queries.smart_mix_evaluation import (
     enforce_read_only_connections,
+    get_pool_profile_states,
     sample_evaluation_seeds,
     session_is_read_only,
 )
@@ -186,3 +187,58 @@ def _seed_library() -> dict[str, str]:
                 },
             )
     return uids
+
+
+def test_pool_profile_states_report_each_track_once(pg_db) -> None:
+    del pg_db
+    uids = _seed_library()
+    with transaction_scope() as session:
+        ids = dict(
+            session.execute(
+                text(
+                    "SELECT entity_uid::text, id FROM library_tracks"
+                    " WHERE entity_uid = ANY(CAST(:uids AS uuid[]))"
+                ),
+                {"uids": list(uids.values())},
+            ).all()
+        )
+        session.execute(
+            text(
+                "UPDATE track_mix_profiles SET analyzer_version = 'smart-mix-audio-v7',"
+                " phrases = CAST('[]' AS jsonb) WHERE track_id = :track_id"
+            ),
+            {"track_id": ids[uids["track_genre"]]},
+        )
+        orphan = session.execute(
+            text(
+                "INSERT INTO library_tracks (album_id, artist, album, filename, title,"
+                " path, entity_uid, duration) SELECT album_id, artist, album,"
+                " 'orphan.flac', 'orphan', path || '.orphan', CAST(:uid AS uuid), 1.0"
+                " FROM library_tracks WHERE id = :track_id RETURNING id"
+            ),
+            {"uid": str(uuid.uuid4()), "track_id": ids[uids["track_genre"]]},
+        ).scalar_one()
+    wanted = [
+        ids[uids["track_genre"]],
+        ids[uids["stale_profile"]],
+        ids[uids["unavailable_profile"]],
+        orphan,
+        orphan,
+    ]
+
+    rows = {row["track_id"]: row for row in get_pool_profile_states(wanted)}
+
+    assert len(rows) == 4
+    assert rows[ids[uids["track_genre"]]] == {
+        "track_id": ids[uids["track_genre"]],
+        "entity_uid": uids["track_genre"],
+        "analyzer_version": "smart-mix-audio-v7",
+        "quality": "full",
+        "has_phrases": True,
+        "stale": False,
+    }
+    assert rows[ids[uids["stale_profile"]]]["stale"] is True
+    assert rows[ids[uids["unavailable_profile"]]]["quality"] == "unavailable"
+    assert rows[orphan]["analyzer_version"] is None
+    assert rows[orphan]["has_phrases"] is False
+    assert get_pool_profile_states([]) == []
