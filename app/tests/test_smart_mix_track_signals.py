@@ -18,6 +18,7 @@ from crate.db.repositories.smart_mix_signals import (
 )
 from crate.smart_mix.beat_model import BeatTrack, beat_tracker_name
 from crate.smart_mix.models import MixProfileQuality, Phrase, TrackMixProfileDraft
+from crate.smart_mix.versions import ANALYZER_VERSION
 from crate.smart_mix.voice_model import VoiceWindows
 from tests.test_smart_mix_repository import _create_track
 
@@ -433,7 +434,7 @@ def _voice(scores: list[float]) -> VoiceWindows:
 def _draft(*, phrases: bool) -> TrackMixProfileDraft:
     return TrackMixProfileDraft(
         analyzer="crate-rust",
-        analyzer_version="smart-mix-audio-v7",
+        analyzer_version=ANALYZER_VERSION,
         duration_ms=60_000,
         quality=MixProfileQuality.FULL,
         bpm=120.0,
@@ -563,6 +564,96 @@ def test_recomputes_voice_windows_of_another_file(monkeypatch) -> None:
         )
     ]
     assert harness.published[0].vocal_presence == bytes([255, 255, 255])
+
+
+def test_v8_reuses_the_signals_stored_with_a_v7_profile(
+    pg_db, monkeypatch, tmp_path
+) -> None:
+    # v8 changes how the analyzers measure the model's beats, not the models: the beats
+    # and voice windows stored for this file under v7 serve the v8 profile, so a v7
+    # track is recomputed without running Beat This! or YAMNet.
+    del pg_db
+    from sqlalchemy import text
+
+    from crate.db.jobs.analysis_storage import (
+        capture_smart_mix_source,
+        publish_smart_mix_profile,
+    )
+    from crate.db.tx import read_scope
+    from crate.smart_mix import vocals
+    from crate.worker_handlers import analysis
+    from tests.test_smart_mix_backfill import _create_tracks
+
+    [track_id] = _create_tracks(tmp_path, count=1)
+    with read_scope() as session:
+        path = session.execute(
+            text("SELECT path FROM library_tracks WHERE id = :id"), {"id": track_id}
+        ).scalar_one()
+    source = capture_smart_mix_source(track_id, path)
+    previous = replace(_draft(phrases=True), analyzer_version="smart-mix-audio-v7")
+    assert str(publish_smart_mix_profile(source, previous)) == "published"
+    windows = vocals.voice_window_bytes(_voice([1.0] * 34 + [1e-4] * 34 + [1.0] * 34))
+    store_track_mix_beats(
+        track_id,
+        source.source_revision,
+        tracker=beat_tracker_name(),
+        beats_ms=BEATS,
+        downbeats_ms=DOWNBEATS,
+        beats_per_bar=4,
+    )
+    store_track_mix_voice(
+        track_id,
+        source.source_revision,
+        detector=windows.detector,
+        hop_ms=windows.hop_ms,
+        scores=windows.scores,
+    )
+    stored = get_track_mix_signals(track_id)
+
+    def no_beat_model(_path):
+        raise AssertionError("stored beats replace Beat This!")
+
+    def no_voice_model():
+        raise AssertionError("stored voice windows replace YAMNet")
+
+    analysed: list[BeatTrack | None] = []
+    current = _draft(phrases=True)
+    assert current.analyzer_version == ANALYZER_VERSION
+    monkeypatch.setattr("crate.smart_mix.beat_model.track_file_beats", no_beat_model)
+    monkeypatch.setattr(vocals, "load_voice_model", no_voice_model)
+    monkeypatch.setattr(
+        "crate.audio_analysis.analyze_mix_profile",
+        lambda _path, beats=None: analysed.append(beats) or current,
+    )
+    monkeypatch.setattr(analysis, "emit_task_event", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(analysis, "refresh_live_smart_mix_coverage", lambda: None)
+
+    result = analysis._handle_compute_smart_mix_profile(
+        "task-v8", {"track_id": track_id}, {}
+    )
+
+    assert result["stored"] is True
+    assert analysed == [_model_track()]
+    assert get_track_mix_signals(track_id) == stored
+    with read_scope() as session:
+        profile = (
+            session.execute(
+                text(
+                    """
+                    SELECT analyzer_version, source_revision, vocal_detector
+                    FROM track_mix_profiles WHERE track_id = :id
+                    """
+                ),
+                {"id": track_id},
+            )
+            .mappings()
+            .one()
+        )
+    assert dict(profile) == {
+        "analyzer_version": ANALYZER_VERSION,
+        "source_revision": source.source_revision,
+        "vocal_detector": vocals.VOCAL_DETECTOR,
+    }
 
 
 def test_signal_store_failure_keeps_profile(monkeypatch, caplog) -> None:

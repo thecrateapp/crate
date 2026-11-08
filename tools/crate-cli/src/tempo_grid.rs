@@ -65,6 +65,14 @@ const SLIDE_MIN_FRACTION: f64 = 0.4;
 /// ...with the same tempo (within 3 %) over this many intervals before and after it.
 const SLIDE_CONTEXT_BEATS: usize = 8;
 const SLIDE_MAX_TEMPO_CHANGE: f64 = 0.03;
+/// Beat This! predicts at 50 frames per second and its DBN puts each beat on one of those
+/// frames, so an interval between two model beats is only known to a frame.
+pub const MODEL_BEAT_RESOLUTION_MS: f64 = 20.0;
+/// Whole-track stability of model beats reaches 0 at this tempo change between the first
+/// and the last third of the beats, or at this median interval jitter: the limits both
+/// analyzers apply to their tracker's beats.
+const TRACK_DRIFT_LIMIT: f64 = 0.25;
+const TRACK_JITTER_LIMIT: f64 = 0.20;
 
 /// The tempo of the strongest constant pulse, and the grid when the track keeps it.
 #[derive(Debug, Clone, PartialEq)]
@@ -110,7 +118,12 @@ impl ConstantGrid {
 
     /// The grid beat nearest a position.
     pub fn beat_near_ms(&self, position_ms: f64) -> f64 {
-        self.anchor_ms + ((position_ms - self.anchor_ms) / self.period_ms).round() * self.period_ms
+        self.anchor_ms + self.beat_number(position_ms) * self.period_ms
+    }
+
+    /// Number of the grid beat nearest a position, counted from the anchor.
+    pub fn beat_number(&self, position_ms: f64) -> f64 {
+        ((position_ms - self.anchor_ms) / self.period_ms).round()
     }
 }
 
@@ -353,6 +366,89 @@ pub fn fit_tempo(beats_ms: &[u64], features: &FrameFeatures, sample_rate: u32) -
             phase_contested,
         }),
     })
+}
+
+/// (beat number, time) of each model beat: its beat on the constant grid, or its position
+/// in the sequence without one. A beat on the same grid beat as the one before is left
+/// out.
+pub fn model_beat_points(beats_ms: &[u64], grid: Option<&ConstantGrid>) -> Vec<(f64, f64)> {
+    let Some(grid) = grid else {
+        return beats_ms
+            .iter()
+            .enumerate()
+            .map(|(index, beat)| (index as f64, *beat as f64))
+            .collect();
+    };
+    let mut points = Vec::with_capacity(beats_ms.len());
+    let mut previous: Option<f64> = None;
+    for beat in beats_ms {
+        let time = *beat as f64;
+        let number = grid.beat_number(time);
+        if previous.is_none_or(|last| number - last >= 1.0) {
+            points.push((number, time));
+        }
+        previous = Some(number);
+    }
+    points
+}
+
+/// Intervals between consecutive (beat number, time) points, each divided by the beats it
+/// spans: a stretch where the DBN holds half the tempo counts as beats of half its
+/// intervals.
+pub fn step_intervals(points: &[(f64, f64)]) -> Vec<f64> {
+    points
+        .windows(2)
+        .map(|pair| (pair[1].1 - pair[0].1) / (pair[1].0 - pair[0].0))
+        .collect()
+}
+
+/// Least-squares milliseconds per beat number.
+fn least_squares_period(points: &[(f64, f64)]) -> f64 {
+    let count = points.len() as f64;
+    let mean_number = points.iter().map(|(number, _)| number).sum::<f64>() / count;
+    let mean_time = points.iter().map(|(_, time)| time).sum::<f64>() / count;
+    let (covariance, variance) = points.iter().fold(
+        (0.0_f64, 0.0_f64),
+        |(covariance, variance), (number, time)| {
+            let spread = number - mean_number;
+            (
+                covariance + spread * (time - mean_time),
+                variance + spread * spread,
+            )
+        },
+    );
+    covariance / variance
+}
+
+/// Steadiness (0..1) of model beats over the whole track, or None with fewer than six
+/// beats. The analyzers' measure of their tracker's beats, tempo drift between the first
+/// and the last third and median interval jitter, counted in beats of the constant grid,
+/// so a track whose beats stay on its grid is steady wherever the model skipped beats.
+/// Beats on 20 ms frames give intervals only known to a frame (a 470 ms pulse gives 460
+/// and 480 ms), so a frame is forgiven of the jitter, and the tempo of each third is a
+/// regression over its beats, which averages the frames out. Same measure as the Python
+/// analyzer (`crate.smart_mix.tempo_grid.model_beat_stability`).
+pub fn model_beat_stability(beats_ms: &[u64], grid: Option<&ConstantGrid>) -> Option<f32> {
+    let points = model_beat_points(beats_ms, grid);
+    if points.len() < 6 {
+        return None;
+    }
+    let intervals = step_intervals(&points);
+    let median_interval = median(&mut intervals.clone());
+    let period = least_squares_period(&points);
+    if median_interval <= 0.0 || period <= 0.0 {
+        return None;
+    }
+    let third = (points.len() / 3).max(3);
+    let early = least_squares_period(&points[..third]);
+    let late = least_squares_period(&points[points.len() - third..]);
+    let drift = (late - early).abs() / period;
+    let mut residuals: Vec<f64> = intervals
+        .iter()
+        .map(|interval| (interval - median_interval).abs())
+        .collect();
+    let jitter = (median(&mut residuals) - MODEL_BEAT_RESOLUTION_MS).max(0.0) / median_interval;
+    Some((1.0 - drift / TRACK_DRIFT_LIMIT - jitter / TRACK_JITTER_LIMIT).clamp(0.0, 1.0) as f32)
 }
 
 /// Tracked beats published without a constant grid whose phase the bass contests: real
@@ -759,6 +855,86 @@ mod tests {
 
         assert_eq!(
             fit_tempo(&beats, &features(20_000.0, &[], &[]), SAMPLE_RATE),
+            None
+        );
+    }
+
+    /// Beat This! beats: on its 20 ms frames.
+    fn on_model_frames(times: &[f64]) -> Vec<u64> {
+        times
+            .iter()
+            .map(|time| ((time / 20.0).round() * 20.0) as u64)
+            .collect()
+    }
+
+    fn grid_of(period: f64) -> ConstantGrid {
+        ConstantGrid {
+            bpm: 60_000.0 / period,
+            period_ms: period,
+            anchor_ms: 1_000.0,
+            phase_support: 1.0,
+            phase_flipped: false,
+            tempo_deviates: false,
+            phase_contested: false,
+        }
+    }
+
+    #[test]
+    fn model_beat_stability_reads_a_half_tempo_stretch_on_the_grid() {
+        // The DBN can hold half the tempo through an intro: on the track's constant grid
+        // those beats skip a grid beat, they do not change the tempo.
+        let pulse = lattice(60_000.0 / 470.0, 200, 1_000.0);
+        let heard: Vec<f64> = pulse
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| *index >= 80 || index % 2 == 0)
+            .map(|(_, time)| *time)
+            .collect();
+        let beats = on_model_frames(&heard);
+
+        let on_grid = model_beat_stability(&beats, Some(&grid_of(470.0))).unwrap();
+        assert!(on_grid >= 0.99, "stability {on_grid}");
+        // Read one interval after another, the stretch is a doubled interval.
+        assert_eq!(model_beat_stability(&beats, None), Some(0.0));
+    }
+
+    #[test]
+    fn model_beat_stability_forgives_the_model_resolution_only() {
+        // 470 ms falls between two 20 ms frames, so the intervals alternate 460/480 ms:
+        // that is the model's resolution, not jitter. Beats scattered by 80 ms are.
+        let pulse = lattice(60_000.0 / 470.0, 200, 1_000.0);
+        let mut seed = 0x2545_f491_u32;
+        let mut scattered: Vec<u64> = pulse
+            .iter()
+            .map(|time| {
+                seed ^= seed << 13;
+                seed ^= seed >> 17;
+                seed ^= seed << 5;
+                let offset = (f64::from(seed) / f64::from(u32::MAX) * 2.0 - 1.0) * 80.0;
+                (time + offset).round() as u64
+            })
+            .collect();
+        scattered.sort_unstable();
+
+        let steady = model_beat_stability(&on_model_frames(&pulse), Some(&grid_of(470.0)));
+        assert!(steady.unwrap() >= 0.99, "stability {steady:?}");
+        let jittery = model_beat_stability(&scattered, Some(&grid_of(470.0))).unwrap();
+        assert!(jittery < 0.8, "stability {jittery}");
+    }
+
+    #[test]
+    fn model_beat_stability_still_sees_a_drifting_tempo() {
+        let mut times = Vec::new();
+        let mut time = 1_000.0;
+        for index in 0..200 {
+            times.push(time);
+            time += 60_000.0 / (120.0 + 20.0 * index as f64 / 200.0);
+        }
+
+        let drifting = model_beat_stability(&on_model_frames(&times), None).unwrap();
+        assert!(drifting < 0.8, "stability {drifting}");
+        assert_eq!(
+            model_beat_stability(&[1_000, 1_500, 2_000, 2_500, 3_000], None),
             None
         );
     }

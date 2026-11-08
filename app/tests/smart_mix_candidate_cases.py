@@ -17,6 +17,7 @@ from crate.smart_mix.models import (
     TrackMixProfile,
     TransitionContext,
 )
+from crate.smart_mix.versions import ANALYZER_VERSION
 
 OUTGOING_UID = "11111111-1111-4111-8111-111111111111"
 INCOMING_UID = "22222222-2222-4222-8222-222222222222"
@@ -99,7 +100,7 @@ def profile(
         "profile_version": 1,
         "profile_revision": f"profile-{track_uid}",
         "analyzer": "crate-rust",
-        "analyzer_version": "smart-mix-audio-v7",
+        "analyzer_version": ANALYZER_VERSION,
         "source_revision": f"source-{track_uid}",
         "duration_ms": 240_000,
         "quality": MixProfileQuality.FULL,
