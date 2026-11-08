@@ -109,6 +109,230 @@ def smart_mix_profile_dedup_key(track_id: int) -> str:
     return f"{_PROFILE_DEDUP_PREFIX}{int(track_id)}"
 
 
+# Ranking the whole library takes seconds on ~140K tracks, while a pass under the
+# night window claims only its free slots, often one to four tracks. So the claim
+# stores the ranking of the claimable tracks in smart_mix_backfill_candidates;
+# later passes take its head, check each row is still claimable and remove what
+# they claim. The ranking is rebuilt when its inputs change (target, retry budget,
+# Python promotion), when it is older than RANKING_MAX_AGE_SECONDS and when it can
+# no longer fill a pass. Until then, a track that becomes claimable (a failed
+# attempt to retry, an import) or changes tier waits for the next ranking. The
+# play queue and offline IDs change from one pass to the next, so every pass ranks
+# them, first, among the tracks in the stored ranking.
+RANKING_STATE_KEY = "smart_mix:backfill_ranking"
+RANKING_MAX_AGE_SECONDS = 600
+# Play queue and offline tracks checked per statement; a pass claims at most
+# MAX_BACKFILL_BATCH_SIZE tracks.
+_LIVE_CHUNK_SIZE = 200
+
+_CLAIMABLE_JOINS_SQL = """
+    LEFT JOIN library_albums la ON la.id = lt.album_id
+    LEFT JOIN track_mix_profiles profile ON profile.track_id = lt.id
+    LEFT JOIN track_processing_state processing
+        ON processing.track_id = lt.id
+       AND processing.pipeline = :pipeline
+"""
+# Claimable: an album that is not quarantined, a profile that is not at the target
+# analyzer and schema, current and usable (or a Python one to promote), and no
+# claim in flight or retry budget spent for this generation.
+_CLAIMABLE_SQL = """
+    la.quarantined_at IS NULL
+    AND (
+        profile.track_id IS NULL
+        OR profile.profile_version <> :profile_version
+        OR profile.analyzer_version <> :analyzer_version
+        OR profile.quality = 'unavailable'
+        OR profile.source_stale_at IS NOT NULL
+        OR (:promote_python_profiles AND profile.analyzer = :python_analyzer)
+    )
+    AND (
+        processing.track_id IS NULL
+        OR (
+            processing.state <> 'analyzing'
+            AND (
+                processing.target_generation IS DISTINCT FROM :target_generation
+                OR processing.attempts < :max_attempts
+            )
+        )
+    )
+"""
+# A claimable profile that is otherwise current is a Python one to promote; those
+# go after every other track.
+_PROMOTION_SQL = """
+    COALESCE(
+        profile.analyzer = :python_analyzer
+        AND profile.profile_version = :profile_version
+        AND profile.analyzer_version = :analyzer_version
+        AND profile.quality <> 'unavailable'
+        AND profile.source_stale_at IS NULL,
+        FALSE
+    )
+"""
+# Priority 1: the play queue (current track and queued items of every device).
+# Listen stores queue items with track_id and track_entity_uid
+# (sanitize_queue_snapshot); id, trackId, entityUid and trackEntityUid are older
+# names. Only canonical text is cast: the only values that matched when the
+# track id and entity UID were compared as text.
+_PLAY_QUEUE_SQL = """
+    WITH queue_item AS (
+        SELECT
+            CASE WHEN raw.item_id ~ '^(0|[1-9][0-9]{0,17})$'
+                THEN CAST(raw.item_id AS bigint)
+            END AS track_id,
+            CASE WHEN raw.item_uid
+                    ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                THEN CAST(raw.item_uid AS uuid)
+            END AS track_entity_uid
+        FROM (
+            SELECT
+                NULLIF(
+                    COALESCE(item->>'track_id', item->>'id', item->>'trackId'), ''
+                ) AS item_id,
+                NULLIF(
+                    COALESCE(
+                        item->>'track_entity_uid',
+                        item->>'entityUid',
+                        item->>'trackEntityUid'
+                    ),
+                    ''
+                ) AS item_uid
+            FROM user_playback_device_states playback
+            CROSS JOIN LATERAL jsonb_array_elements(
+                CASE WHEN jsonb_typeof(playback.queue_json) = 'array'
+                    THEN playback.queue_json
+                    ELSE '[]'::jsonb
+                END
+            ) item
+        ) raw
+    )
+    SELECT playback.track_id
+    FROM user_playback_device_states playback
+    WHERE playback.track_id IS NOT NULL
+    UNION
+    SELECT track.id
+    FROM user_playback_device_states playback
+    JOIN library_tracks track ON track.entity_uid = playback.track_entity_uid
+    UNION
+    SELECT track.id
+    FROM queue_item
+    JOIN library_tracks track ON track.id = queue_item.track_id
+    UNION
+    SELECT track.id
+    FROM queue_item
+    JOIN library_tracks track ON track.entity_uid = queue_item.track_entity_uid
+"""
+# The play queue (1) and offline IDs (2) in claim order.
+_LIVE_SQL = f"""
+    SELECT live.track_id, MIN(live.priority) AS priority
+    FROM (
+        SELECT queue.track_id, 1 AS priority FROM ({_PLAY_QUEUE_SQL}) queue
+        UNION ALL
+        SELECT offline.track_id, 2
+        FROM unnest(CAST(:offline_track_ids AS integer[])) AS offline(track_id)
+    ) live
+    GROUP BY live.track_id
+    ORDER BY priority, live.track_id
+"""
+# Priorities 3 (favorites and collections) and 4 (listening history), computed
+# as sets once per ranking instead of once per track.
+_STORED_TIERS_SQL = """
+    favorite AS (
+        SELECT liked.track_id FROM user_liked_tracks liked
+        UNION
+        SELECT track.id
+        FROM user_saved_albums saved
+        JOIN library_tracks track ON track.album_id = saved.album_id
+        UNION
+        SELECT playlist_track.track_id FROM playlist_tracks playlist_track
+        UNION
+        SELECT track.id
+        FROM playlist_tracks playlist_track
+        JOIN library_tracks track
+            ON track.entity_uid = playlist_track.track_entity_uid
+        UNION
+        SELECT track.id
+        FROM user_follows followed
+        JOIN library_tracks track ON track.artist = followed.artist_name
+    ),
+    played AS (
+        SELECT played.track_id FROM user_play_events played
+        UNION
+        SELECT track.id
+        FROM user_play_events played
+        JOIN library_tracks track ON track.entity_uid = played.track_entity_uid
+        UNION
+        SELECT history.track_id FROM play_history history
+        UNION
+        SELECT track.id
+        FROM play_history history
+        JOIN library_tracks track ON track.entity_uid = history.track_entity_uid
+    )
+"""
+_STORED_PRIORITY_SQL = """
+    CASE
+        WHEN favorite.track_id IS NOT NULL THEN 3
+        WHEN played.track_id IS NOT NULL THEN 4
+        ELSE 5
+    END
+"""
+_RANKED_FROM_SQL = f"""
+    FROM library_tracks lt
+    {_CLAIMABLE_JOINS_SQL}
+    LEFT JOIN favorite ON favorite.track_id = lt.id
+    LEFT JOIN played ON played.track_id = lt.id
+"""
+_RANK_SQL = f"""
+    INSERT INTO smart_mix_backfill_candidates (track_id, promotion, priority)
+    WITH {_STORED_TIERS_SQL}
+    SELECT lt.id, {_PROMOTION_SQL}, {_STORED_PRIORITY_SQL}
+    {_RANKED_FROM_SQL}
+    WHERE {_CLAIMABLE_SQL}
+"""
+_CLAIMED_COLUMNS_SQL = """
+    lt.id,
+    lt.entity_uid::text AS entity_uid,
+    lt.path,
+    lt.artist,
+    lt.album,
+    lt.title
+"""
+_CLAIM_LIVE_SQL = f"""
+    SELECT {_CLAIMED_COLUMNS_SQL}, live.priority
+    FROM unnest(
+        CAST(:live_track_ids AS integer[]), CAST(:live_priorities AS integer[])
+    ) AS live(track_id, priority)
+    JOIN library_tracks lt ON lt.id = live.track_id
+    {_CLAIMABLE_JOINS_SQL}
+    WHERE {_PROMOTION_SQL} = :promotion
+      AND {_CLAIMABLE_SQL}
+    ORDER BY live.priority, lt.id
+    FOR UPDATE OF lt SKIP LOCKED
+    LIMIT :limit
+"""
+# Walks the ranking index from its head and stops at the limit.
+_CLAIM_STORED_SQL = f"""
+    SELECT {_CLAIMED_COLUMNS_SQL}, candidate.priority
+    FROM smart_mix_backfill_candidates candidate
+    JOIN library_tracks lt ON lt.id = candidate.track_id
+    {_CLAIMABLE_JOINS_SQL}
+    WHERE candidate.promotion = :promotion
+      AND {_CLAIMABLE_SQL}
+    ORDER BY candidate.priority, candidate.track_id
+    FOR UPDATE OF lt SKIP LOCKED
+    LIMIT :limit
+"""
+_CLAIM_RANKED_INLINE_SQL = f"""
+    WITH {_STORED_TIERS_SQL}
+    SELECT {_CLAIMED_COLUMNS_SQL}, {_STORED_PRIORITY_SQL} AS priority
+    {_RANKED_FROM_SQL}
+    WHERE {_PROMOTION_SQL} = :promotion
+      AND {_CLAIMABLE_SQL}
+    ORDER BY {_STORED_PRIORITY_SQL}, lt.id
+    FOR UPDATE OF lt SKIP LOCKED
+    LIMIT :limit
+"""
+
+
 def claim_smart_mix_backfill_batch(
     *,
     limit: int,
@@ -119,11 +343,18 @@ def claim_smart_mix_backfill_batch(
     promote_python_profiles: bool = False,
     session=None,
 ) -> list[dict[str, Any]]:
-    """Claim up to ``limit`` tracks for the backfill.
+    """Claim up to ``limit`` tracks for the backfill, in priority order.
 
     With ``max_in_flight`` the claim counts what is in flight and takes only the
     free slots, under a transaction lock, so concurrent coordinators cannot
     exceed the limit between the count and the claim.
+
+    The order is: no Python promotion before a promotion, then priority (1 play
+    queue, 2 supplied offline IDs, 3 favorites and collections, 4 listening
+    history, 5 the rest), then track id. Priorities 3 to 5 come from the stored
+    ranking, which only the holder of the claim lock reads and rebuilds; a claim
+    without ``max_in_flight`` that finds the lock taken ranks the library inline
+    instead, as every claim did before the ranking was stored.
     """
     batch_size = max(1, min(int(limit), MAX_BACKFILL_BATCH_SIZE))
     retry_limit = max(1, min(int(max_attempts), 10))
@@ -131,13 +362,25 @@ def claim_smart_mix_backfill_batch(
     worker = claimed_by or (
         f"{os.environ.get('CRATE_RUNTIME', 'runtime')}:{socket.gethostname()}"
     )
-    target_generation = smart_mix_target_generation()
+    params = {
+        "pipeline": SMART_MIX_PIPELINE,
+        "analyzer_version": SMART_MIX_ANALYZER_VERSION,
+        "profile_version": PROFILE_SCHEMA_VERSION,
+        "target_generation": smart_mix_target_generation(),
+        "max_attempts": retry_limit,
+        "promote_python_profiles": bool(promote_python_profiles),
+        "python_analyzer": PYTHON_ANALYZER,
+    }
     with optional_scope(session) as active_session:
-        if max_in_flight is not None:
-            active_session.execute(
-                text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
-                {"key": _CLAIM_LOCK_KEY},
-            )
+        lock_sql = (
+            "SELECT pg_advisory_xact_lock(hashtext(:key))"
+            if max_in_flight is not None
+            else "SELECT pg_try_advisory_xact_lock(hashtext(:key))"
+        )
+        locked = active_session.execute(
+            text(lock_sql), {"key": _CLAIM_LOCK_KEY}
+        ).scalar_one()
+        stored = max_in_flight is not None or bool(locked)
         release_dead_smart_mix_claims(session=active_session)
         if max_in_flight is not None:
             free = int(max_in_flight) - count_smart_mix_in_flight(
@@ -146,176 +389,222 @@ def claim_smart_mix_backfill_batch(
             if free <= 0:
                 return []
             batch_size = min(batch_size, free)
-        rows = (
-            active_session.execute(
+        ranked = False
+        if stored and not _stored_ranking_is_current(active_session, params):
+            _rank_backfill_candidates(active_session, params)
+            ranked = True
+        claimed = _claim_in_order(
+            active_session,
+            params,
+            offline_ids=offline_ids,
+            stored=stored,
+            limit=batch_size,
+            worker=worker,
+        )
+        if stored and not ranked and len(claimed) < batch_size:
+            # The ranking ran out or its head stopped being claimable: rank
+            # again before claiming fewer than asked, so a pass that claims
+            # nothing (which completes the campaign when nothing is in flight)
+            # always comes from a fresh ranking.
+            _rank_backfill_candidates(active_session, params)
+            claimed += _claim_in_order(
+                active_session,
+                params,
+                offline_ids=offline_ids,
+                stored=True,
+                limit=batch_size - len(claimed),
+                worker=worker,
+            )
+        return claimed
+
+
+def _stored_ranking_is_current(session, params: dict[str, Any]) -> bool:
+    row = (
+        session.execute(
+            text(
+                """
+                SELECT
+                    payload_json->'inputs' AS inputs,
+                    updated_at >= NOW() - make_interval(secs => :max_age) AS fresh
+                FROM ops_runtime_state
+                WHERE key = :key
+                """
+            ),
+            {"key": RANKING_STATE_KEY, "max_age": RANKING_MAX_AGE_SECONDS},
+        )
+        .mappings()
+        .first()
+    )
+    return row is not None and bool(row["fresh"]) and row["inputs"] == params
+
+
+def _rank_backfill_candidates(session, params: dict[str, Any]) -> int:
+    """Store the claimable tracks with their promotion flag and priority 3-5."""
+    session.execute(text("DELETE FROM smart_mix_backfill_candidates"))
+    result = session.execute(text(_RANK_SQL), params)
+    candidates = int(getattr(result, "rowcount", 0) or 0)
+    session.execute(
+        text(
+            """
+            INSERT INTO ops_runtime_state (key, payload_json, updated_at)
+            VALUES (:key, CAST(:payload_json AS jsonb), NOW())
+            ON CONFLICT (key) DO UPDATE SET
+                payload_json = EXCLUDED.payload_json,
+                updated_at = EXCLUDED.updated_at
+            """
+        ),
+        {
+            "key": RANKING_STATE_KEY,
+            "payload_json": json.dumps({"inputs": params, "candidates": candidates}),
+        },
+    )
+    return candidates
+
+
+def _claim_in_order(
+    session,
+    params: dict[str, Any],
+    *,
+    offline_ids: Sequence[int],
+    stored: bool,
+    limit: int,
+    worker: str,
+) -> list[dict[str, Any]]:
+    """Claim in the order promotion, priority, track id, one source at a time.
+
+    Live rows (priorities 1-2) come before ranked rows (3-5) of the same
+    promotion flag. Each step records its claims before the next one runs, so a
+    track in both sources is claimed once.
+    """
+    live = {
+        int(row.track_id): int(row.priority)
+        for row in session.execute(
+            text(_LIVE_SQL), {"offline_track_ids": list(offline_ids)}
+        )
+    }
+    if stored and live:
+        # Claimed and finished tracks have left the ranking, so a long queue
+        # that is mostly analyzed is not checked again. The ids go as an array
+        # so the planner probes the ranking per track: joined to the queue,
+        # whose size it guesses at 100 items a device, it reads the whole index.
+        ranked = set(
+            session.execute(
                 text(
                     """
-                    SELECT
-                        lt.id,
-                        lt.entity_uid::text AS entity_uid,
-                        lt.path,
-                        lt.artist,
-                        lt.album,
-                        lt.title,
-                        ranked.priority
-                    FROM library_tracks lt
-                    LEFT JOIN library_albums la ON la.id = lt.album_id
-                    LEFT JOIN track_mix_profiles profile
-                        ON profile.track_id = lt.id
-                    LEFT JOIN track_processing_state processing
-                        ON processing.track_id = lt.id
-                       AND processing.pipeline = :pipeline
-                    CROSS JOIN LATERAL (
-                        SELECT CASE
-                            WHEN EXISTS (
-                                SELECT 1
-                                FROM user_playback_device_states playback
-                                WHERE playback.track_id = lt.id
-                                   OR playback.track_entity_uid = lt.entity_uid
-                                   OR EXISTS (
-                                       SELECT 1
-                                       FROM jsonb_array_elements(
-                                           COALESCE(playback.queue_json, '[]'::jsonb)
-                                       ) queue_item
-                                       WHERE NULLIF(
-                                           COALESCE(
-                                               queue_item->>'id',
-                                               queue_item->>'trackId'
-                                           ),
-                                           ''
-                                       ) = lt.id::text
-                                          OR NULLIF(
-                                              COALESCE(
-                                                  queue_item->>'entityUid',
-                                                  queue_item->>'trackEntityUid'
-                                              ),
-                                              ''
-                                          ) = lt.entity_uid::text
-                                   )
-                            ) THEN 1
-                            WHEN lt.id = ANY(CAST(:offline_track_ids AS integer[]))
-                                THEN 2
-                            WHEN EXISTS (
-                                SELECT 1 FROM user_liked_tracks liked
-                                WHERE liked.track_id = lt.id
-                            ) OR EXISTS (
-                                SELECT 1 FROM user_saved_albums saved
-                                WHERE saved.album_id = lt.album_id
-                            ) OR EXISTS (
-                                SELECT 1 FROM playlist_tracks playlist_track
-                                WHERE playlist_track.track_id = lt.id
-                                   OR playlist_track.track_entity_uid = lt.entity_uid
-                            ) OR EXISTS (
-                                SELECT 1 FROM user_follows followed
-                                WHERE followed.artist_name = lt.artist
-                            ) THEN 3
-                            WHEN EXISTS (
-                                SELECT 1 FROM user_play_events played
-                                WHERE played.track_id = lt.id
-                                   OR played.track_entity_uid = lt.entity_uid
-                            ) OR EXISTS (
-                                SELECT 1 FROM play_history history
-                                WHERE history.track_id = lt.id
-                                   OR history.track_entity_uid = lt.entity_uid
-                            ) THEN 4
-                            ELSE 5
-                        END AS priority
-                    ) ranked
-                    WHERE la.quarantined_at IS NULL
-                      AND (
-                          profile.track_id IS NULL
-                          OR profile.profile_version <> :profile_version
-                          OR profile.analyzer_version <> :analyzer_version
-                          OR profile.quality = 'unavailable'
-                          OR profile.source_stale_at IS NOT NULL
-                          OR (
-                              :promote_python_profiles
-                              AND profile.analyzer = :python_analyzer
-                          )
-                      )
-                      AND (
-                          processing.track_id IS NULL
-                          OR (
-                              processing.state <> 'analyzing'
-                              AND (
-                                  processing.target_generation
-                                      IS DISTINCT FROM :target_generation
-                                  OR processing.attempts < :max_attempts
-                              )
-                          )
-                      )
-                    ORDER BY
-                        COALESCE(
-                            profile.analyzer = :python_analyzer
-                            AND profile.profile_version = :profile_version
-                            AND profile.analyzer_version = :analyzer_version
-                            AND profile.quality <> 'unavailable'
-                            AND profile.source_stale_at IS NULL,
-                            FALSE
-                        ),
-                        ranked.priority,
-                        lt.id
-                    FOR UPDATE OF lt SKIP LOCKED
-                    LIMIT :limit
+                    SELECT track_id FROM smart_mix_backfill_candidates
+                    WHERE track_id = ANY(:track_ids)
                     """
                 ),
+                {"track_ids": list(live)},
+            ).scalars()
+        )
+        live = {track_id: live[track_id] for track_id in live if track_id in ranked}
+    live_ids = list(live)
+    ranked_sql = _CLAIM_STORED_SQL if stored else _CLAIM_RANKED_INLINE_SQL
+    claimed: list[dict[str, Any]] = []
+
+    def claim(sql: str, promotion: bool, **source: Any) -> None:
+        rows = (
+            session.execute(
+                text(sql),
                 {
-                    "pipeline": SMART_MIX_PIPELINE,
-                    "analyzer_version": SMART_MIX_ANALYZER_VERSION,
-                    "profile_version": PROFILE_SCHEMA_VERSION,
-                    "target_generation": target_generation,
-                    "offline_track_ids": offline_ids,
-                    "max_attempts": retry_limit,
-                    "limit": batch_size,
-                    "promote_python_profiles": promote_python_profiles,
-                    "python_analyzer": PYTHON_ANALYZER,
+                    **params,
+                    **source,
+                    "promotion": promotion,
+                    "limit": limit - len(claimed),
                 },
             )
             .mappings()
             .all()
         )
-        claimed = []
-        for row in rows:
-            claim_token = f"{worker}:{uuid.uuid4().hex}"
-            active_session.execute(
-                text(
-                    """
-                    INSERT INTO track_processing_state (
-                        track_id, pipeline, state, claimed_by, claimed_at,
-                        attempts, priority, last_error, target_generation,
-                        updated_at
-                    )
-                    VALUES (
-                        :track_id, :pipeline, 'analyzing', :claimed_by, NOW(),
-                        1, :priority, NULL, :target_generation, NOW()
-                    )
-                    ON CONFLICT (track_id, pipeline) DO UPDATE SET
-                        state = 'analyzing',
-                        claimed_by = EXCLUDED.claimed_by,
-                        claimed_at = EXCLUDED.claimed_at,
-                        attempts = CASE
-                            WHEN track_processing_state.target_generation
-                                IS DISTINCT FROM EXCLUDED.target_generation
-                                THEN 1
-                            ELSE track_processing_state.attempts + 1
-                        END,
-                        target_generation = EXCLUDED.target_generation,
-                        priority = EXCLUDED.priority,
-                        last_error = NULL,
-                        completed_at = NULL,
-                        updated_at = NOW()
-                    """
-                ),
-                {
-                    "track_id": int(row["id"]),
-                    "pipeline": SMART_MIX_PIPELINE,
-                    "claimed_by": claim_token,
-                    "priority": int(row["priority"]),
-                    "target_generation": target_generation,
-                },
+        claimed.extend(
+            _record_claims(
+                session,
+                rows,
+                worker=worker,
+                target_generation=params["target_generation"],
+                stored=stored,
             )
-            claimed.append({**dict(row), "claim_token": claim_token})
-        return claimed
+        )
+
+    for promotion in (False, True):
+        # Chunks in claim order keep each step's sort small and stop at the limit.
+        for start in range(0, len(live_ids), _LIVE_CHUNK_SIZE):
+            if len(claimed) >= limit:
+                return claimed
+            chunk = live_ids[start : start + _LIVE_CHUNK_SIZE]
+            claim(
+                _CLAIM_LIVE_SQL,
+                promotion,
+                live_track_ids=chunk,
+                live_priorities=[live[track_id] for track_id in chunk],
+            )
+        if len(claimed) >= limit:
+            return claimed
+        claim(ranked_sql, promotion)
+    return claimed
+
+
+def _record_claims(
+    session,
+    rows: Sequence[Any],
+    *,
+    worker: str,
+    target_generation: str,
+    stored: bool,
+) -> list[dict[str, Any]]:
+    claimed = []
+    for row in rows:
+        claim_token = f"{worker}:{uuid.uuid4().hex}"
+        session.execute(
+            text(
+                """
+                INSERT INTO track_processing_state (
+                    track_id, pipeline, state, claimed_by, claimed_at,
+                    attempts, priority, last_error, target_generation,
+                    updated_at
+                )
+                VALUES (
+                    :track_id, :pipeline, 'analyzing', :claimed_by, NOW(),
+                    1, :priority, NULL, :target_generation, NOW()
+                )
+                ON CONFLICT (track_id, pipeline) DO UPDATE SET
+                    state = 'analyzing',
+                    claimed_by = EXCLUDED.claimed_by,
+                    claimed_at = EXCLUDED.claimed_at,
+                    attempts = CASE
+                        WHEN track_processing_state.target_generation
+                            IS DISTINCT FROM EXCLUDED.target_generation
+                            THEN 1
+                        ELSE track_processing_state.attempts + 1
+                    END,
+                    target_generation = EXCLUDED.target_generation,
+                    priority = EXCLUDED.priority,
+                    last_error = NULL,
+                    completed_at = NULL,
+                    updated_at = NOW()
+                """
+            ),
+            {
+                "track_id": int(row["id"]),
+                "pipeline": SMART_MIX_PIPELINE,
+                "claimed_by": claim_token,
+                "priority": int(row["priority"]),
+                "target_generation": target_generation,
+            },
+        )
+        claimed.append({**dict(row), "claim_token": claim_token})
+    if stored and claimed:
+        session.execute(
+            text(
+                """
+                DELETE FROM smart_mix_backfill_candidates
+                WHERE track_id = ANY(:track_ids)
+                """
+            ),
+            {"track_ids": [int(row["id"]) for row in claimed]},
+        )
+    return claimed
 
 
 def release_smart_mix_claims(track_ids: Sequence[int], *, session=None) -> int:
@@ -630,6 +919,32 @@ def refresh_live_smart_mix_coverage() -> bool:
     return True
 
 
+# A claiming pass refreshes the coverage at most this often. Each refresh
+# aggregates the whole library, about a second on ~140K tracks, and passes come
+# every few seconds while analyses finish.
+PASS_COVERAGE_MAX_AGE_SECONDS = 60
+
+
+def refresh_smart_mix_coverage_after_pass(*, max_attempts: int) -> bool:
+    """Refresh the coverage after a claiming pass unless it is under a minute old.
+
+    Finished analyses refresh it on their own (``refresh_live_smart_mix_coverage``)
+    and the pass that completes the campaign always does, so Admin never waits
+    more than a minute for the claims of a pass.
+    """
+    fresh = get_ops_runtime_state(
+        COVERAGE_STATE_KEY, max_age_seconds=PASS_COVERAGE_MAX_AGE_SECONDS
+    )
+    if (
+        fresh is not None
+        and fresh.get("analyzer_version") == SMART_MIX_ANALYZER_VERSION
+        and fresh.get("profile_version") == PROFILE_SCHEMA_VERSION
+    ):
+        return False
+    refresh_smart_mix_coverage(max_attempts=max_attempts)
+    return True
+
+
 def get_smart_mix_campaign() -> dict[str, Any] | None:
     return get_ops_runtime_state(CAMPAIGN_STATE_KEY)
 
@@ -756,6 +1071,9 @@ def save_smart_mix_campaign(campaign: dict[str, Any]) -> None:
 __all__ = [
     "CAMPAIGN_STATE_KEY",
     "COVERAGE_STATE_KEY",
+    "PASS_COVERAGE_MAX_AGE_SECONDS",
+    "RANKING_MAX_AGE_SECONDS",
+    "RANKING_STATE_KEY",
     "campaign_targets_current",
     "claim_smart_mix_backfill_batch",
     "complete_smart_mix_campaign",
@@ -763,6 +1081,7 @@ __all__ = [
     "get_smart_mix_campaign",
     "queue_next_smart_mix_batch",
     "refresh_smart_mix_coverage",
+    "refresh_smart_mix_coverage_after_pass",
     "release_dead_smart_mix_claims",
     "release_smart_mix_claims",
     "smart_mix_profile_dedup_key",
