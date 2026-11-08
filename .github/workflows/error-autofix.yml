@@ -1,4 +1,6 @@
 name: Error Autofix
+# Crate finds the run a dispatch started by this name (crate.error_inbox.executors).
+run-name: Error Autofix ${{ inputs.sentry_issue }}
 
 # Dispatched by Crate (or by hand) for one Sentry issue. An agent tries to reproduce the bug
 # with a failing test and fix it; a second job publishes its commit as a draft pull request.

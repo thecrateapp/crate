@@ -364,3 +364,277 @@ def configure_ai(
         )
     with transaction_scope() as session:
         session.execute(text("UPDATE ai_configuration_state SET active = TRUE"))
+
+
+FIXER = "crate-error-autofix[bot]"
+REPOSITORY = "thecrateapp/crate"
+_REPO = re.escape(REPOSITORY)
+_DISPATCH = re.compile(rf"^/repos/{_REPO}/actions/workflows/([^/]+)/dispatches$")
+_RUNS = re.compile(rf"^/repos/{_REPO}/actions/workflows/([^/]+)/runs$")
+_RUN = re.compile(rf"^/repos/{_REPO}/actions/runs/(\d+)$")
+_CANCEL = re.compile(rf"^/repos/{_REPO}/actions/runs/(\d+)/cancel$")
+_PULLS = re.compile(rf"^/repos/{_REPO}/pulls$")
+_PULL = re.compile(rf"^/repos/{_REPO}/pulls/(\d+)$")
+_MERGE = re.compile(rf"^/repos/{_REPO}/pulls/(\d+)/merge$")
+_CHECKS = re.compile(rf"^/repos/{_REPO}/commits/([0-9a-f]{{40}})/check-runs$")
+_STATUS = re.compile(rf"^/repos/{_REPO}/commits/([0-9a-f]{{40}})/status$")
+_REF = re.compile(rf"^/repos/{_REPO}/git/refs/heads/(.+)$")
+
+
+def iso(value) -> str:
+    return value.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def sha_for(seed: int | str) -> str:
+    import hashlib
+
+    return hashlib.sha1(str(seed).encode()).hexdigest()
+
+
+class FakeGitHubRepo:
+    """One GitHub repository behind `httpx.MockTransport`: workflow runs, pull
+    requests, checks, the ready-for-review mutation, merges and branches.
+
+    It answers only the endpoints the error fix tasks use and records every request.
+    """
+
+    def __init__(self) -> None:
+        from datetime import datetime, timezone
+
+        self.now = lambda: datetime.now(timezone.utc)
+        self.runs: dict[int, dict[str, Any]] = {}
+        self.pulls: dict[int, dict[str, Any]] = {}
+        self.checks: dict[str, list[dict[str, Any]]] = {}
+        self.statuses: dict[str, dict[str, Any]] = {}
+        self.branches: set[str] = set()
+        self.requests: list[httpx.Request] = []
+        self.tokens: list[str] = []
+        self.dispatch_status = 204
+        self.merge_status: int | None = None
+        self.delete_status: int | None = None
+        self.graphql_errors: list[dict[str, Any]] | None = None
+        self.fail: Callable[[httpx.Request], httpx.Response | None] | None = None
+        self._next_run = 9000
+        self._next_pull = 40
+
+    def factory(self, token: str) -> GitHubClient:
+        self.tokens.append(token)
+        return GitHubClient(token, transport=httpx.MockTransport(self))
+
+    # -- state ----------------------------------------------------------------------
+
+    def add_run(
+        self,
+        short_id: str,
+        *,
+        status: str = "in_progress",
+        conclusion: str | None = None,
+        created_at=None,
+        title: str | None = None,
+    ) -> int:
+        self._next_run += 1
+        run_id = self._next_run
+        self.runs[run_id] = {
+            "id": run_id,
+            "display_title": title or f"Error Autofix {short_id}",
+            "status": status,
+            "conclusion": conclusion,
+            "event": "workflow_dispatch",
+            "created_at": iso(created_at or self.now()),
+            "html_url": f"https://github.com/{REPOSITORY}/actions/runs/{run_id}",
+        }
+        return run_id
+
+    def finish_run(self, run_id: int, conclusion: str = "success") -> None:
+        self.runs[run_id].update(status="completed", conclusion=conclusion)
+
+    def add_pull(
+        self,
+        short_id: str,
+        run_id: int | str,
+        *,
+        draft: bool = True,
+        author: str = FIXER,
+        labels: tuple[str, ...] = ("autofix",),
+        mergeable: bool | None = True,
+        sha: str | None = None,
+        created_at=None,
+        branch: str | None = None,
+        head_repository: str = REPOSITORY,
+    ) -> dict[str, Any]:
+        self._next_pull += 1
+        number = self._next_pull
+        ref = branch or f"autofix/{short_id.lower()}-{run_id}"
+        stamp = iso(created_at or self.now())
+        pull = {
+            "number": number,
+            "node_id": f"PR_kw{number}",
+            "html_url": f"https://github.com/{REPOSITORY}/pull/{number}",
+            "state": "open",
+            "draft": draft,
+            "merged": False,
+            "merged_at": None,
+            "mergeable": mergeable,
+            "mergeable_state": "draft" if draft else "clean",
+            "head": {
+                "sha": sha or sha_for(f"{short_id}-{number}"),
+                "ref": ref,
+                "repo": {"full_name": head_repository},
+            },
+            "user": {"login": author, "type": "Bot"},
+            "labels": [{"name": label} for label in labels],
+            "created_at": stamp,
+            "updated_at": stamp,
+            "body": f"Fix attempt for `{short_id}`.\n\nFixes {short_id}",
+        }
+        self.pulls[number] = pull
+        self.branches.add(ref)
+        return pull
+
+    def set_checks(
+        self, sha: str, *checks: tuple[str, str, str | None], started_at=None
+    ):
+        """Check runs of `sha` as (name, status, conclusion)."""
+        stamp = iso(started_at or self.now())
+        self.checks[sha] = [
+            {
+                "name": name,
+                "status": status,
+                "conclusion": conclusion,
+                "started_at": stamp,
+            }
+            for name, status, conclusion in checks
+        ]
+
+    def paths(self, method: str | None = None) -> list[str]:
+        return [
+            request.url.path
+            for request in self.requests
+            if method is None or request.method == method
+        ]
+
+    # -- transport ------------------------------------------------------------------
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        if self.fail is not None:
+            response = self.fail(request)
+            if response is not None:
+                return response
+        path, method = request.url.path, request.method
+        if method == "POST" and _DISPATCH.match(path):
+            return httpx.Response(self.dispatch_status)
+        if method == "GET" and _RUNS.match(path):
+            return self._list_runs(request)
+        if (match := _RUN.match(path)) and method == "GET":
+            run = self.runs.get(int(match.group(1)))
+            return httpx.Response(200, json=run) if run else self._missing()
+        if (match := _CANCEL.match(path)) and method == "POST":
+            run = self.runs.get(int(match.group(1)))
+            if run is None:
+                return self._missing()
+            if run["status"] == "completed":
+                return httpx.Response(409, json={"message": "finished"})
+            run.update(status="completed", conclusion="cancelled")
+            return httpx.Response(202, json={})
+        if method == "GET" and _PULLS.match(path):
+            return self._list_pulls(request)
+        if match := _PULL.match(path):
+            pull = self.pulls.get(int(match.group(1)))
+            if pull is None:
+                return self._missing()
+            if method == "PATCH":
+                if json.loads(request.content).get("state") == "closed":
+                    pull["state"] = "closed"
+                return httpx.Response(200, json=pull)
+            return httpx.Response(200, json=pull)
+        if (match := _MERGE.match(path)) and method == "PUT":
+            return self._merge(int(match.group(1)), json.loads(request.content))
+        if (match := _CHECKS.match(path)) and method == "GET":
+            runs = self.checks.get(match.group(1), [])
+            return httpx.Response(
+                200, json={"total_count": len(runs), "check_runs": runs}
+            )
+        if (match := _STATUS.match(path)) and method == "GET":
+            status = self.statuses.get(
+                match.group(1), {"state": "pending", "total_count": 0, "statuses": []}
+            )
+            return httpx.Response(200, json=status)
+        if path == "/graphql" and method == "POST":
+            return self._graphql(json.loads(request.content))
+        if (match := _REF.match(path)) and method == "DELETE":
+            if self.delete_status is not None:
+                return httpx.Response(self.delete_status, json={"message": "no"})
+            branch = match.group(1)
+            if branch not in self.branches:
+                return httpx.Response(422, json={"message": "Reference does not exist"})
+            self.branches.discard(branch)
+            return httpx.Response(204)
+        return httpx.Response(404, json={"message": "unknown endpoint"})
+
+    def _missing(self) -> httpx.Response:
+        return httpx.Response(404, json={"message": "Not Found"})
+
+    def _list_runs(self, request: httpx.Request) -> httpx.Response:
+        created = request.url.params.get("created", "")
+        since = created.removeprefix(">=")
+        runs = sorted(
+            self.runs.values(), key=lambda run: run["created_at"], reverse=True
+        )
+        runs = [run for run in runs if not since or run["created_at"] >= since]
+        return httpx.Response(
+            200, json={"total_count": len(runs), "workflow_runs": runs}
+        )
+
+    def _list_pulls(self, request: httpx.Request) -> httpx.Response:
+        pulls = sorted(
+            self.pulls.values(), key=lambda pull: pull["number"], reverse=True
+        )
+        head = request.url.params.get("head")
+        if head:
+            owner, _, branch = head.partition(":")
+            pulls = [
+                pull
+                for pull in pulls
+                if pull["head"]["ref"] == branch
+                and pull["head"]["repo"]["full_name"].split("/")[0] == owner
+            ]
+        return httpx.Response(200, json=pulls)
+
+    def _merge(self, number: int, body: dict[str, Any]) -> httpx.Response:
+        pull = self.pulls.get(number)
+        if pull is None:
+            return self._missing()
+        if self.merge_status is not None:
+            return httpx.Response(self.merge_status, json={"message": "refused"})
+        if body.get("sha") != pull["head"]["sha"]:
+            return httpx.Response(409, json={"message": "Head branch was modified"})
+        if pull["draft"] or pull["state"] != "open":
+            return httpx.Response(405, json={"message": "not mergeable"})
+        pull.update(state="closed", merged=True, merged_at=iso(self.now()))
+        return httpx.Response(
+            200, json={"merged": True, "sha": sha_for(f"merge-{number}")}
+        )
+
+    def _graphql(self, body: dict[str, Any]) -> httpx.Response:
+        if self.graphql_errors is not None:
+            return httpx.Response(
+                200, json={"data": None, "errors": self.graphql_errors}
+            )
+        node_id = body.get("variables", {}).get("id")
+        pull = next(
+            (pull for pull in self.pulls.values() if pull["node_id"] == node_id), None
+        )
+        if pull is None:
+            return httpx.Response(
+                200, json={"data": None, "errors": [{"type": "NOT_FOUND"}]}
+            )
+        pull.update(draft=False, mergeable_state="blocked", updated_at=iso(self.now()))
+        return httpx.Response(
+            200,
+            json={
+                "data": {
+                    "markPullRequestReadyForReview": {"pullRequest": {"isDraft": False}}
+                }
+            },
+        )
