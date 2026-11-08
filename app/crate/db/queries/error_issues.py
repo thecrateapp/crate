@@ -493,6 +493,56 @@ def sync_state(
         return _impl(current)
 
 
+def release_candidates(
+    external_ids: Sequence[str],
+    *,
+    exclude: Sequence[str] = (),
+    limit: int,
+    provider: str = "sentry",
+    session: Session | None = None,
+) -> list[dict[str, str]]:
+    """Listed open issues whose first release is unknown, highest score first.
+
+    Only issues whose latest event carries a release qualify: Sentry knows a first
+    release for those, so one issue detail fills it. `exclude` holds the issues
+    already asked without an answer.
+    """
+    ids = list(dict.fromkeys(str(value) for value in external_ids))
+    if not ids or limit <= 0:
+        return []
+    params = {
+        "ids": ids,
+        "exclude": [str(value) for value in exclude],
+        "provider": provider,
+        "limit": int(limit),
+    }
+
+    def _impl(current: Session) -> list[dict[str, str]]:
+        rows = current.execute(
+            text(
+                """
+                SELECT id::text AS id, external_id
+                FROM error_issues
+                WHERE provider = :provider
+                  AND status = 'unresolved'
+                  AND first_release IS NULL
+                  AND COALESCE(digest ->> 'release', '') <> ''
+                  AND external_id = ANY(CAST(:ids AS text[]))
+                  AND NOT (external_id = ANY(CAST(:exclude AS text[])))
+                ORDER BY crate_score DESC, last_seen DESC NULLS LAST, external_id ASC
+                LIMIT :limit
+                """
+            ),
+            params,
+        ).mappings()
+        return [dict(row) for row in rows]
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
 def untriaged_open(
     *, limit: int, session: Session | None = None
 ) -> list[dict[str, Any]]:
@@ -820,6 +870,7 @@ __all__ = [
     "issue_ids_by_short_id",
     "list_issues",
     "open_ids_not_in",
+    "release_candidates",
     "summary",
     "sync_state",
     "untriaged_open",

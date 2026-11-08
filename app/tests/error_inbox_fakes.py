@@ -30,9 +30,12 @@ _TAG = re.compile(rf"^{re.escape(ISSUES_PATH)}(\d+)/tags/([a-z0-9_.]+)/$")
 SHORT_IDS_PATH = f"/api/0/organizations/{ORGANIZATION}/shortids/"
 _SHORT = re.compile(rf"^{re.escape(SHORT_IDS_PATH)}([^/]+)/$")
 FULL_SCOPES = ("org:read", "project:read", "event:read", "event:write")
+# Retrieve an Issue has these; List an Organization's Issues does not.
+DETAIL_ONLY_FIELDS = ("firstRelease", "lastRelease")
 
 
 def raw_issue(issue_id: int | str, **overrides: Any) -> dict[str, Any]:
+    """An issue as Retrieve an Issue answers it; the fake's listing drops releases."""
     issue: dict[str, Any] = {
         "id": str(issue_id),
         "shortId": f"CRATE-API-{issue_id}",
@@ -104,8 +107,17 @@ def raw_event(
     }
 
 
+def listed_issue(issue: dict[str, Any]) -> dict[str, Any]:
+    """An issue as List an Organization's Issues answers it: without releases."""
+    return {key: value for key, value in issue.items() if key not in DETAIL_ONLY_FIELDS}
+
+
 class FakeSentry:
-    """Answers the endpoints the inbox uses and records every request."""
+    """Answers the endpoints the inbox uses and records every request.
+
+    `issues` holds the issue details; a listed issue missing there is answered from
+    the listing's own entry, releases included, as Sentry would.
+    """
 
     def __init__(self) -> None:
         self.full: list[dict[str, Any]] = []
@@ -187,13 +199,19 @@ class FakeSentry:
         items = self.recent if period == "24h" else self.full
         page = int(request.url.params.get("cursor") or 0)
         start = page * self.page_size
-        chunk = items[start : start + self.page_size]
+        chunk = [listed_issue(item) for item in items[start : start + self.page_size]]
         more = start + self.page_size < len(items)
         link = (
             f'<https://sentry.io{ISSUES_PATH}?cursor={page + 1}>; rel="next"; '
             f'results="{"true" if more else "false"}"; cursor="{page + 1}"'
         )
         return httpx.Response(200, json=chunk, headers={"Link": link})
+
+    def _listed(self, issue_id: str) -> dict[str, Any] | None:
+        return next(
+            (issue for issue in (*self.full, *self.recent) if issue["id"] == issue_id),
+            None,
+        )
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
@@ -221,6 +239,8 @@ class FakeSentry:
             return httpx.Response(200, json=event)
         if match := _ISSUE.match(path):
             issue = self.issues.get(match.group(1))
+            if issue is None and request.method == "GET":
+                issue = self._listed(match.group(1))
             if issue is None:
                 return httpx.Response(404, json={"detail": "not found"})
             if request.method == "PUT":

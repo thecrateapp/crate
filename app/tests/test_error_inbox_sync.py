@@ -108,6 +108,7 @@ def test_first_sync_inserts_and_scores(pg_db):
         "listed_recent": 1,
         "upserted": 2,
         "digests_fetched": 2,
+        "releases_fetched": 2,
         "status_refreshed": 0,
         "purged": 0,
     }
@@ -274,6 +275,186 @@ def test_status_refresh_is_capped(pg_db):
     statuses = [row["status"] for row in _rows().values()]
     assert statuses.count("resolved") == 50
     assert statuses.count("unresolved") == 5
+
+
+# -- releases: the listing has none ------------------------------------------------
+
+
+def _releases() -> dict[str, tuple[str | None, str | None]]:
+    with _scope() as session:
+        rows = session.execute(
+            text("SELECT external_id, first_release, last_release FROM error_issues")
+        ).all()
+    return {row.external_id: (row.first_release, row.last_release) for row in rows}
+
+
+def test_releases_from_the_latest_event_and_the_issue_detail(pg_db):
+    configure()
+    fake = _fake_with(raw_issue(1), raw_issue(2))
+    # The latest event of issue 2 has no release: Sentry knows no first release.
+    del fake.events["2"]["release"]
+
+    result = _sync(fake)
+
+    assert result["status"] == "ok"
+    assert result["counts"]["releases_fetched"] == 1
+    # One issue detail, only for the issue whose events carry a release.
+    assert fake.issue_ids("GET") == ["1"]
+    assert _releases() == {
+        "1": ("crate-8ba478ac", "crate-4ba9e59a"),
+        "2": (None, None),
+    }
+
+    # The next listings still have no releases: nothing is cleared or read again.
+    fake.requests.clear()
+    again = _sync(fake)
+
+    assert again["counts"]["releases_fetched"] == 0
+    assert fake.issue_ids("GET") == []
+    assert _releases()["1"] == ("crate-8ba478ac", "crate-4ba9e59a")
+
+
+def test_a_new_latest_event_moves_the_last_release(pg_db):
+    configure()
+    fake = _fake_with(raw_issue(1))
+    _sync(fake)
+    fake.full = [raw_issue(1, lastSeen="2026-11-04T09:00:00Z")]
+    fake.events["1"] = {**raw_event(1), "release": {"version": "crate-77aa00bb"}}
+    fake.requests.clear()
+
+    _sync(fake)
+
+    assert fake.latest_event_ids() == ["1"]
+    assert fake.issue_ids("GET") == []
+    assert _releases()["1"] == ("crate-8ba478ac", "crate-77aa00bb")
+
+
+def test_rows_synced_before_the_fix_fill_on_the_next_pass(pg_db):
+    configure()
+    fake = _fake_with(*(raw_issue(index) for index in range(1, 21)))
+    _sync(fake)
+    # What production holds: digests stored, no release on any open issue.
+    with _scope() as session:
+        session.execute(
+            text("UPDATE error_issues SET first_release = NULL, last_release = NULL")
+        )
+    fake.requests.clear()
+
+    result = _sync(fake)
+
+    # The stored digests are not downloaded again; one detail per issue fills both.
+    assert fake.latest_event_ids() == []
+    assert len(fake.issue_ids("GET")) == 20
+    assert result["counts"]["releases_fetched"] == 20
+    assert set(_releases().values()) == {("crate-8ba478ac", "crate-4ba9e59a")}
+
+
+def test_release_lookups_are_capped_highest_score_first(pg_db, monkeypatch):
+    from crate.worker_handlers import error_inbox
+
+    assert error_inbox.MAX_RELEASE_LOOKUPS == 25
+    monkeypatch.setattr(error_inbox, "MAX_RELEASE_LOOKUPS", 2)
+    configure()
+    levels = {1: "info", 2: "fatal", 3: "warning", 4: "error", 5: "info"}
+    fake = _fake_with(
+        *(raw_issue(index, level=level) for index, level in levels.items())
+    )
+
+    first = _sync(fake)
+
+    assert first["counts"]["releases_fetched"] == 2
+    assert fake.issue_ids("GET") == ["2", "4"]
+    releases = _releases()
+    assert {key for key, value in releases.items() if value[0]} == {"2", "4"}
+    # The latest event already gave every issue its last release.
+    assert {value[1] for value in releases.values()} == {"crate-4ba9e59a"}
+
+    passes = []
+    for _ in range(3):
+        fake.requests.clear()
+        _sync(fake)
+        passes.append(fake.issue_ids("GET"))
+
+    # Equal scores and last seen: by issue id.
+    assert passes == [["3", "1"], ["5"], []]
+    assert all(value[0] == "crate-8ba478ac" for value in _releases().values())
+
+
+def test_release_lookups_share_the_status_check_budget(pg_db, monkeypatch):
+    from crate.db.repositories.error_issues import upsert_issues
+    from crate.error_inbox.sentry_client import normalize_issue
+    from crate.worker_handlers import error_inbox
+
+    monkeypatch.setattr(error_inbox, "MAX_STATUS_REFRESHES", 3)
+    configure()
+    # Open in Crate, gone from the listing: each needs a status check.
+    upsert_issues([normalize_issue(raw_issue(index)) for index in (7, 8, 9)])
+    fake = _fake_with(raw_issue(1), raw_issue(2))
+    fake.issues = {str(index): raw_issue(index) for index in (7, 8, 9)}
+
+    result = _sync(fake)
+
+    # Release lookups first, then one status check with what is left of the 3.
+    assert fake.issue_ids("GET") == ["1", "2", "7"]
+    assert result["counts"]["releases_fetched"] == 2
+    assert result["counts"]["status_refreshed"] == 1
+
+
+def test_a_detail_without_a_first_release_is_read_once(pg_db):
+    configure()
+    fake = _fake_with(raw_issue(1), raw_issue(2), raw_issue(3))
+    fake.issues = {"1": raw_issue(1, firstRelease=None, lastRelease=None)}
+    fake.fail = lambda request: (
+        httpx.Response(404, json={"detail": "not found"})
+        if request.method == "GET" and request.url.path.endswith("/issues/2/")
+        else None
+    )
+
+    first = _sync(fake)
+
+    assert first["status"] == "ok"
+    assert sorted(fake.issue_ids("GET")) == ["1", "2", "3"]
+    assert first["counts"]["releases_fetched"] == 2
+    assert _state("error_inbox_release_checks")["external_ids"] == ["1", "2"]
+    assert _releases() == {
+        "1": (None, "crate-4ba9e59a"),
+        "2": (None, "crate-4ba9e59a"),
+        "3": ("crate-8ba478ac", "crate-4ba9e59a"),
+    }
+
+    fake.requests.clear()
+    _sync(fake)
+    assert fake.issue_ids("GET") == []
+
+    # An issue that leaves the listing leaves the record too.
+    fake.full = [raw_issue(2), raw_issue(3)]
+    fake.fail = None
+    fake.issues = {}
+    _sync(fake)
+    assert _state("error_inbox_release_checks")["external_ids"] == ["2"]
+
+
+def test_a_refused_release_lookup_stops_the_pass_and_retries_later(pg_db):
+    configure()
+    fake = _fake_with(raw_issue(1), raw_issue(2))
+    fake.fail = lambda request: (
+        httpx.Response(429, headers={"Retry-After": "30"})
+        if request.method == "GET" and request.url.path.endswith(("/1/", "/2/"))
+        else None
+    )
+
+    result = _sync(fake)
+
+    assert result["status"] == "partial"
+    assert result["error_code"] == "SENTRY_RATE_LIMITED"
+    assert len(fake.issue_ids("GET")) == 1
+    assert {value[0] for value in _releases().values()} == {None}
+    assert _state("error_inbox_release_checks") is None
+
+    fake.fail = None
+    fake.requests.clear()
+    assert _sync(fake)["counts"]["releases_fetched"] == 2
+    assert {value[0] for value in _releases().values()} == {"crate-8ba478ac"}
 
 
 def test_truncation_recorded(pg_db, caplog):

@@ -13,11 +13,18 @@ write-access check live in `crate.error_inbox.state`:
 - `error_inbox`, written by every sync pass (see `_SyncReport.state`): `status`
   (`ok`, `partial` or `failed`), `started_at`, `finished_at`, `last_success_at`,
   the typed `error_code` of the pass, `counts` (`listed`, `listed_recent`,
-  `upserted`, `digests_fetched`, `status_refreshed`, `purged`), `pages`,
-  `truncated` (`full`, `recent`), `budget_exhausted` and `cancelled`.
+  `upserted`, `digests_fetched`, `releases_fetched`, `status_refreshed`,
+  `purged`), `pages`, `truncated` (`full`, `recent`), `budget_exhausted` and
+  `cancelled`.
 - `error_inbox_access`: `read` and `write` (true, false or null when unknown),
   `credential` (a hash of the token's secret ref, never the token), `source`
   (`sync` or `connection_test`), `checked_at` and `error_code`.
+
+Releases: Sentry's issues listing carries none. `last_release` comes from the
+latest event the sync already downloads and `first_release` from the issue detail,
+read once per issue (`refresh_releases`); a listing never clears either. Only the
+sync uses a third key, `error_inbox_release_checks`: the listed issues whose detail
+had no first release, so it is not read again.
 
 Write access (EI-D4) comes from `check_scopes`. The connection test records it every
 time it runs; each sync pass records it when the scope check succeeds or the token
@@ -68,6 +75,7 @@ from crate.db.queries.error_issues import (
     auto_triage_plan,
     get_issue,
     open_ids_not_in,
+    release_candidates,
     sync_state,
 )
 from crate.db.repositories.error_issues import (
@@ -80,6 +88,7 @@ from crate.db.repositories.error_issues import (
     record_status_change,
     release_fix_request,
     set_digest,
+    set_releases,
     upsert_issues,
 )
 from crate.error_inbox.autofix import (
@@ -136,7 +145,11 @@ GitHubClientFactory = Callable[[str], GitHubClient]
 
 MAX_LIST_PAGES = 5
 MAX_EVENT_FETCHES = 25
+# Issue details read one by one per pass, release lookups and status checks together.
 MAX_STATUS_REFRESHES = 50
+# The share of those reads release lookups may take; status checks keep the rest.
+MAX_RELEASE_LOOKUPS = 25
+RELEASE_CHECKS_KEY = "error_inbox_release_checks"
 # Leaves room under the 120 s task limit to write what was fetched and the state.
 SYNC_BUDGET_SECONDS = 90.0
 ISSUE_STATUSES = frozenset({"resolved", "ignored", "unresolved"})
@@ -219,6 +232,7 @@ class _SyncReport:
             "listed_recent": 0,
             "upserted": 0,
             "digests_fetched": 0,
+            "releases_fetched": 0,
             "status_refreshed": 0,
             "purged": 0,
         }
@@ -334,6 +348,26 @@ def _event_id(digest: Mapping[str, Any]) -> str | None:
     return value or None
 
 
+def _release_checks() -> set[str]:
+    state = get_ops_runtime_state(RELEASE_CHECKS_KEY) or {}
+    ids = state.get("external_ids")
+    if not isinstance(ids, list):
+        return set()
+    return {value for value in ids if isinstance(value, str)}
+
+
+def _record_release_checks(
+    previous: set[str], answered: set[str], listed: Sequence[str]
+) -> None:
+    # Only listed issues can be looked up again, so the others are dropped.
+    checks = (previous | answered) & set(listed)
+    if checks != previous:
+        set_ops_runtime_state(
+            RELEASE_CHECKS_KEY,
+            {"version": STATE_VERSION, "external_ids": sorted(checks)},
+        )
+
+
 class _Pass:
     def __init__(
         self,
@@ -350,6 +384,7 @@ class _Pass:
         self.cancelled = cancelled
         self.clock = clock
         self.deadline = clock() + SYNC_BUDGET_SECONDS
+        self.issue_reads = 0
 
     def should_stop(self) -> bool:
         if self.cancelled():
@@ -398,9 +433,12 @@ class _Pass:
         rows = _scored(issues, stored)
         report.counts["upserted"] = upsert_issues(rows, synced_at=report.started_at)
 
+        listed = [row["external_id"] for row in rows]
         error_code = self.refresh_digests(rows, stored)
         if error_code is None:
-            error_code = self.refresh_missing([row["external_id"] for row in rows])
+            error_code = self.refresh_releases(listed)
+        if error_code is None:
+            error_code = self.refresh_missing(listed)
         if error_code is not None:
             log.warning("Error inbox sync stopped early: %s", error_code)
             report.interrupt(error_code)
@@ -444,19 +482,62 @@ class _Pass:
                 group_key=group_key(digest),
                 service=tag,
                 crate_score=score,
+                last_release=digest.get("release"),
             )
             self.report.counts["digests_fetched"] += 1
         return None
 
+    def refresh_releases(self, listed: Sequence[str]) -> str | None:
+        """First and last release of listed issues that lack a first one, capped.
+
+        The listing carries no releases; the issue detail does. Candidates are open
+        issues whose latest event has a release, highest score first. A detail read
+        fills the issue for good, so it is read once; one without a first release is
+        remembered and not read again while the issue stays listed.
+        """
+        room = min(MAX_RELEASE_LOOKUPS, MAX_STATUS_REFRESHES - self.issue_reads)
+        checked = _release_checks()
+        candidates = release_candidates(listed, exclude=sorted(checked), limit=room)
+        answered: set[str] = set()
+        error_code: str | None = None
+        for item in candidates:
+            if self.should_stop():
+                break
+            self.issue_reads += 1
+            try:
+                issue = self.client.get_issue(item["external_id"])
+            except SentryNotFoundError:
+                answered.add(item["external_id"])
+                continue
+            except SentryAPIError as error:
+                error_code = error.code
+                break
+            set_releases(
+                item["id"],
+                first_release=issue.get("first_release"),
+                last_release=issue.get("last_release"),
+            )
+            self.report.counts["releases_fetched"] += 1
+            if not issue.get("first_release"):
+                answered.add(item["external_id"])
+        _record_release_checks(checked, answered, listed)
+        return error_code
+
     def refresh_missing(self, listed: Sequence[str]) -> str | None:
-        """Status of open local issues the listing no longer returns, capped."""
-        missing = open_ids_not_in(listed, limit=MAX_STATUS_REFRESHES)
+        """Status of open local issues the listing no longer returns, capped.
+
+        The details read for releases this pass count against the same cap.
+        """
+        missing = open_ids_not_in(
+            listed, limit=max(MAX_STATUS_REFRESHES - self.issue_reads, 0)
+        )
         fetched: list[dict[str, Any]] = []
         gone: list[str] = []
         error_code: str | None = None
         for item in missing:
             if self.should_stop():
                 break
+            self.issue_reads += 1
             try:
                 fetched.append(self.client.get_issue(item["external_id"]))
             except SentryNotFoundError:

@@ -167,7 +167,12 @@ def _release(value: Any) -> str | None:
 
 
 def normalize_issue(raw: Mapping[str, Any]) -> dict[str, Any]:
-    """Map a Sentry issue to the columns of `error_issues`. Raises ValueError if unusable."""
+    """Map a Sentry issue to the columns of `error_issues`. Raises ValueError if unusable.
+
+    Releases are None for a listed issue: List an Organization's Issues has no
+    `firstRelease` or `lastRelease` (no `expand` adds them). Retrieve an Issue
+    (`get_issue`) carries both as release objects.
+    """
     external_id = str(raw.get("id") or "")
     short_id = _text(raw.get("shortId"), 128)
     project = raw.get("project")
@@ -464,6 +469,7 @@ class SentryClient:
         return IssueListing(issues=issues, pages=max_pages, truncated=True)
 
     def get_issue(self, issue_id: str) -> dict[str, Any]:
+        """One issue (Retrieve an Issue), with the releases the listing leaves out."""
         path = self._organization_path(f"issues/{_issue_id(issue_id)}/")
         data, _ = self._request("GET", path)
         try:
