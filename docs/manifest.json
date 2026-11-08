@@ -231,6 +231,22 @@
     "order": 121
   },
   {
+    "sourcePath": "docs/technical/error-fix-executors.md",
+    "route": "/operations/error-fix-executors",
+    "section": "operations",
+    "title": "Error fix executors",
+    "summary": "The contract between Crate and the fixers behind Launch fix, with the executor interface, the bug payload, the fix run lifecycle, pull request conventions, review, cleanup and the rules a fixer follows.",
+    "keywords": [
+      "launch fix",
+      "autofix",
+      "fix run",
+      "pull request",
+      "executor",
+      "factory"
+    ],
+    "order": 121
+  },
+  {
     "sourcePath": "docs/technical/monitoring.md",
     "route": "/operations/monitoring",
     "section": "operations",

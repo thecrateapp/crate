@@ -238,22 +238,39 @@ no release. `--source-sha <sha>` keeps only the images built at that commit.
 ## Launch fix token
 
 [Launch fix](observability.md#launch-fix) dispatches the error autofix workflow
-from a worker. Crate needs one GitHub credential for it, and nothing more:
+from a worker, and [Reviewing a fix](observability.md#reviewing-a-fix) follows and
+merges its pull request. Crate needs one GitHub credential for both, and nothing
+more:
 
 - **A fine-grained personal access token** (GitHub > Settings > Developer
   settings > Fine-grained tokens), owned by an account with write access to the
   repository.
   - _Repository access_: **Only select repositories**, `thecrateapp/crate`.
-  - _Repository permissions_: **Actions: Read and write**. GitHub adds
-    Metadata: Read-only on its own. Leave every other permission at _No access_:
-    the token must not be able to push code, read secrets or change settings.
+  - _Repository permissions_, by what Crate should be able to do. GitHub adds
+    Metadata: Read-only on its own; leave everything else at _No access_, so the
+    token can never read secrets or change settings.
+
+    | To                                          | Permissions                                                          |
+    | ------------------------------------------- | -------------------------------------------------------------------- |
+    | Launch fix (dispatch, find and cancel runs) | **Actions: Read and write**                                          |
+    | Track pull requests and their checks        | **Pull requests: Read**, **Checks: Read**, **Commit statuses: Read** |
+    | Approve & merge, Discard, delete branches   | **Pull requests: Read and write**, **Contents: Read and write**      |
+
+    The token in production today has only Actions read and write. Without the
+    read permissions the tracker fails with `GITHUB_FORBIDDEN` and runs stay
+    `requested`; without the write ones, Approve & merge and Discard fail with
+    `GITHUB_FORBIDDEN` and branches are left for someone to delete on GitHub.
+    Contents write lets the token push code: grant it only when merging from Crate
+    is wanted. GitHub's branch protection still applies to every merge.
+
   - A short expiry. When it expires, dispatches fail with `GITHUB_AUTH`, which
     the person who pressed Launch fix sees; store a new token.
 - Store it in Admin, **Errors > Sentry connection > Launch fix**. It goes to
   `credential_secrets` encrypted (scope `error_tracking_github`), never to
   `settings`, and no API response returns it. Classic tokens (`ghp_`) are refused.
 
-The token only starts runs. What the run can do is decided by the workflow's own
+The token starts runs and reviews their pull requests. What the run can do is
+decided by the workflow's own
 permissions and secrets (`SENTRY_AUTOFIX_TOKEN`, the agent token and the GitHub
 App that publishes the draft pull request), which live in the repository and are
 reviewed separately.
@@ -291,3 +308,5 @@ Any one of these stops new fixes; use all three to retire it:
    `GITHUB_AUTH` and nothing runs.
 
 Runs already started are not affected; cancel them in the repository's Actions tab.
+With Launch fix off, Crate also stops tracking open fix runs; their pull requests
+stay on GitHub for a person to merge or close there.
