@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy import (
     ARRAY,
     BIGINT,
+    Boolean,
     CheckConstraint,
     DateTime,
     Float,
@@ -178,3 +179,75 @@ class TrackStemSignalsRow(Base):
         nullable=False,
         server_default=text("NOW()"),
     )
+
+
+class SmartMixPlaylistRevisionRow(Base):
+    """A user's Smart Mix playlist revision counter, for Decks sync (STEM-D2)."""
+
+    __tablename__ = "smart_mix_playlist_revisions"
+    __table_args__ = (CheckConstraint("revision > 0"),)
+
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    revision: Mapped[int] = mapped_column(BIGINT, nullable=False)
+
+
+class SmartMixPlaylistRow(Base):
+    """A playlist its owner marked for Smart Mix (STEM-D2); off keeps the row."""
+
+    __tablename__ = "smart_mix_playlists"
+    __table_args__ = (
+        CheckConstraint("revision > 0"),
+        CheckConstraint("enabled = (disabled_at IS NULL)"),
+    )
+
+    playlist_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("playlists.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    enabled_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revision: Mapped[int] = mapped_column(BIGINT, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("NOW()"),
+    )
+
+
+class TrackStemJobRow(Base):
+    """The server's stem separation work for one track (STEM-D2)."""
+
+    __tablename__ = "track_stem_jobs"
+    __table_args__ = (
+        CheckConstraint("state IN ('pending', 'analyzing', 'ready', 'failed')"),
+        CheckConstraint("attempts >= 0"),
+    )
+
+    track_id: Mapped[int] = mapped_column(
+        BIGINT,
+        ForeignKey("library_tracks.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    state: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("'pending'")
+    )
+    attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    last_error: Mapped[str | None] = mapped_column(Text)
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("NOW()"),
+    )
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_revision: Mapped[str | None] = mapped_column(Text)

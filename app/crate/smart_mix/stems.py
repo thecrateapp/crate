@@ -58,9 +58,31 @@ MAX_DRUM_BEATS = 100_000
 # to admins by default, and the setting an admin turns uploads off with.
 STEM_CONTRIBUTE_PERMISSION = "smart_mix.stems.contribute"
 STEM_UPLOADS_SETTING = "smart_mix_stem_uploads_enabled"
+# Smart Mix playlists (STEM-D2): admin settings of each instance that cap the tracks the
+# server separates. Each Smart Mix playlist holds at most 300 local tracks by default;
+# the limit across a user's Smart Mix playlists (distinct tracks) is off unless set.
+STEM_MAX_TRACKS_PER_PLAYLIST_SETTING = "smart_mix_stem_max_tracks_per_playlist"
+STEM_MAX_TRACKS_PER_USER_SETTING = "smart_mix_stem_max_tracks_per_user"
+DEFAULT_STEM_MAX_TRACKS_PER_PLAYLIST = 300
+# Until the server has separated tracks, each takes about five minutes: the ST0 spike
+# estimated 3-5 hours per 50 tracks on the i7-7700 with ONNX Runtime CPU.
+ESTIMATED_STEM_SECONDS_PER_TRACK = 300
 
 ProducerKind = Literal["server", "decks"]
 SeparatorModel = Literal["htdemucs", "htdemucs_ft"]
+StemJobState = Literal["pending", "analyzing", "ready", "failed"]
+STEM_JOB_STATES: tuple[StemJobState, ...] = ("pending", "analyzing", "ready", "failed")
+
+
+def stem_track_limit(value: str | None, *, default: int | None) -> int | None:
+    """A stored track limit: a positive integer, else ``default`` (None is no limit)."""
+    try:
+        limit = int(value.strip()) if value is not None else None
+    except ValueError:
+        return default
+    if limit is None or limit < 1:
+        return default
+    return limit
 
 
 def _decode_level_bytes(value: Any) -> Any:
@@ -302,16 +324,22 @@ def _mean_byte(values: bytes) -> int:
 
 
 __all__ = [
+    "DEFAULT_STEM_MAX_TRACKS_PER_PLAYLIST",
+    "ESTIMATED_STEM_SECONDS_PER_TRACK",
     "LEVEL_FLOOR_DB",
     "MAX_DURATION_MISMATCH",
     "SEPARATOR_STRENGTH",
     "STEM_ANALYSIS_SCHEMA",
     "STEM_CONTRIBUTE_PERMISSION",
     "STEM_HOP_MS",
+    "STEM_JOB_STATES",
+    "STEM_MAX_TRACKS_PER_PLAYLIST_SETTING",
+    "STEM_MAX_TRACKS_PER_USER_SETTING",
     "STEM_SOURCES",
     "STEM_UPLOADS_SETTING",
     "ProducerKind",
     "StemAnalysis",
+    "StemJobState",
     "StemLevels",
     "StemPhraseLevels",
     "StemSeparator",
@@ -320,4 +348,5 @@ __all__ = [
     "duration_matches",
     "encode_levels",
     "stem_phrase_layer",
+    "stem_track_limit",
 ]

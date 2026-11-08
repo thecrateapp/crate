@@ -148,7 +148,8 @@ def test_crate_migration_follows_the_current_main_head() -> None:
     assert scripts.get_revision("154").down_revision == "153"
     assert scripts.get_revision("155").down_revision == "154"
     assert scripts.get_revision("156").down_revision == "155"
-    assert scripts.get_heads() == ["156"]
+    assert scripts.get_revision("157").down_revision == "156"
+    assert scripts.get_heads() == ["157"]
 
 
 def test_metric_minute_migration_uses_immutable_schema_definition(monkeypatch):
