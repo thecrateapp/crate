@@ -57,6 +57,7 @@ class SmartMixSettingsUpdateRequest(BaseModel):
 
     ai_enabled: bool | None = None
     ai_send_genre: bool | None = None
+    stem_uploads_enabled: bool | None = None
 
 
 class SoulseekSettingsUpdateRequest(BaseModel):
@@ -96,6 +97,9 @@ class SmartMixSettingsResponse(BaseModel):
     # model only while ai_send_genre is on (SM3-D6).
     ai_enabled: bool
     ai_send_genre: bool
+    # Smart Mix Stems (STEM-D8): Crate Decks users with smart_mix.stems.contribute
+    # may upload stem analyses while this is on (the default).
+    stem_uploads_enabled: bool
 
 
 class ShowsActiveCityResponse(BaseModel):

@@ -54,6 +54,10 @@ MAX_DURATION_MISMATCH = 0.02
 # Upper bounds for untrusted uploads; a track longer than a day is not a track.
 MAX_DURATION_MS = 86_400_000
 MAX_DRUM_BEATS = 100_000
+# Crate Decks uploads (STEM-D8, design §7): the permission an uploader needs, granted
+# to admins by default, and the setting an admin turns uploads off with.
+STEM_CONTRIBUTE_PERMISSION = "smart_mix.stems.contribute"
+STEM_UPLOADS_SETTING = "smart_mix_stem_uploads_enabled"
 
 ProducerKind = Literal["server", "decks"]
 SeparatorModel = Literal["htdemucs", "htdemucs_ft"]
@@ -302,8 +306,10 @@ __all__ = [
     "MAX_DURATION_MISMATCH",
     "SEPARATOR_STRENGTH",
     "STEM_ANALYSIS_SCHEMA",
+    "STEM_CONTRIBUTE_PERMISSION",
     "STEM_HOP_MS",
     "STEM_SOURCES",
+    "STEM_UPLOADS_SETTING",
     "ProducerKind",
     "StemAnalysis",
     "StemLevels",

@@ -44,6 +44,8 @@ sources:
   - app/crate/smart_mix/stems.py
   - app/crate/db/repositories/smart_mix_stems.py
   - app/crate/db/schema_sections/smart_mix_stems_v156.py
+  - app/crate/api/decks_stems.py
+  - app/crate/api/settings.py
   - app/crate/worker_handlers/analysis.py
   - app/crate/actors.py
   - app/crate/ai/queues.py
@@ -566,6 +568,22 @@ D4 and §5); the format and the layer live in `crate/smart_mix/stems.py`.
   (`vocalPresent`, `bassPresent`, `drumsPresent`) need cuts calibrated in ST3: the ST0 spike
   found that an absolute -35 dB cut misreads drums and bass, so the layer only carries levels
   until then.
+- **API.** `GET /api/tracks/by-entity/{uid}/mix-profile?detail=full` carries the layer as
+  an optional `stems` object (`producer`, `separatorModel`, `separatorVersion` and
+  `phrases` with `startMs`, `endMs`, `drums`, `bass`, `other` and `vocals`); the summary
+  never does. Crate Decks reads and uploads analyses through
+  `GET` and `PUT /api/decks/tracks/{uid}/stem-analysis`
+  (`docs/technical/crate-decks.md`, section "Stem analyses"). An upload needs
+  `smart_mix.stems.contribute` (owner and admin roles by default), at most 64 KiB, a
+  `crate-decks/` producer, the track's current source revision (409 otherwise) and its
+  duration within 2 %.
+- **Turning uploads off.** `PUT /api/settings/smart-mix` with
+  `{"stem_uploads_enabled": false}` (setting `smart_mix_stem_uploads_enabled`, on by
+  default) makes uploads answer 403 and drops `stem_upload` from `decks.features`.
+  Stored analyses and reads stay as they are. There is no Admin switch yet.
+- **Capability.** `smart_mix.stems` is `{available, playlists, storage}`. `available`
+  follows `smart_mix.available`; `playlists` (Smart Mix playlists) and `storage` (stem
+  audio kept on the server) stay false until ST2.
 - **What does not change.** The v8 grid, downbeats, phrases and the YAMNet voice bytes stay
   as they are, and no planner reads the layer yet (ST3).
 
@@ -1225,18 +1243,19 @@ deterministic plan.
 These routes describe the application. They are not tools automatically available to
 Crate Agent; an MCP Bearer token is not an Admin session or a VirtualDJ PAT.
 
-| Route                                                                        | Use and relevant effect                                                                                                 |
-| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/capabilities`                                                      | Effective flags and client contract; does not prove their implementation or physical readiness                          |
-| `GET /api/tracks/by-entity/{uid}/mix-profile?detail=summary\|full`           | Profile by UID; `full` includes the beat grid; a 404 can mean missing or invalidated                                    |
-| `GET /api/tracks/by-entity/{uid}/compatible?context=auto\|beatmatch\|smooth` | Local ranking of candidates; does not trigger analysis                                                                  |
-| `POST /api/playback/transition-plans`                                        | Batch planning; uses the cache                                                                                          |
-| `POST /api/playback/continuation-token` and `/api/playback/continuation`     | Contract for continuing planning and the queue in the native runtime                                                    |
-| `GET /api/admin/smart-mix/status`                                            | Coverage, campaign and coordinating task; can enqueue `refresh_smart_mix_coverage` if it is missing or older than 600 s |
-| `GET /api/admin/smart-mix/tracks` and `/activity`                            | Paginated profiles and processing, and task activity                                                                    |
-| `POST /api/admin/smart-mix/backfill` and `/backfill/resume\|pause\|cancel`   | Change campaign control and settings                                                                                    |
-| `POST /api/admin/smart-mix/tracks/{id}/reanalyze`                            | Enqueues analysis for one track, with deduplication                                                                     |
-| `GET /api/admin/smart-mix/tracks/{id}/structure`                             | Stored phrases (with end and voice byte), energy curve and bar starts of one profile, for review in Admin               |
+| Route                                                                        | Use and relevant effect                                                                                                               |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/capabilities`                                                      | Effective flags and client contract; does not prove their implementation or physical readiness                                        |
+| `GET /api/tracks/by-entity/{uid}/mix-profile?detail=summary\|full`           | Profile by UID; `full` includes the beat grid and, when an analysis applies, the `stems` layer; a 404 can mean missing or invalidated |
+| `GET` and `PUT /api/decks/tracks/{uid}/stem-analysis`                        | Crate Decks reads the stem analysis that applies and uploads its own; `PUT` needs `smart_mix.stems.contribute`                        |
+| `GET /api/tracks/by-entity/{uid}/compatible?context=auto\|beatmatch\|smooth` | Local ranking of candidates; does not trigger analysis                                                                                |
+| `POST /api/playback/transition-plans`                                        | Batch planning; uses the cache                                                                                                        |
+| `POST /api/playback/continuation-token` and `/api/playback/continuation`     | Contract for continuing planning and the queue in the native runtime                                                                  |
+| `GET /api/admin/smart-mix/status`                                            | Coverage, campaign and coordinating task; can enqueue `refresh_smart_mix_coverage` if it is missing or older than 600 s               |
+| `GET /api/admin/smart-mix/tracks` and `/activity`                            | Paginated profiles and processing, and task activity                                                                                  |
+| `POST /api/admin/smart-mix/backfill` and `/backfill/resume\|pause\|cancel`   | Change campaign control and settings                                                                                                  |
+| `POST /api/admin/smart-mix/tracks/{id}/reanalyze`                            | Enqueues analysis for one track, with deduplication                                                                                   |
+| `GET /api/admin/smart-mix/tracks/{id}/structure`                             | Stored phrases (with end and voice byte), energy curve and bar starts of one profile, for review in Admin                             |
 
 Admin requires `library.analysis.manage`, even for its reads. The public profile and compatible
 endpoints use session authorization or the PAT scope `vdj.smart_mix.read`, depending on the

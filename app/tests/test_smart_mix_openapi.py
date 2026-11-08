@@ -94,3 +94,51 @@ def test_smart_mix_openapi_offers_ai_refinement(test_app, spec: str) -> None:
     # The refined plan has the plan fields, without a nested refinement.
     refined = components["RefinedTransitionPlanResponse"]["properties"]
     assert "durationMs" in refined and "refinement" not in refined
+
+
+@pytest.mark.parametrize("spec", ["/openapi.json", "/openapi-crate.json"])
+def test_smart_mix_openapi_types_the_decks_stem_analysis_routes(
+    test_app, spec: str
+) -> None:
+    schema = test_app.get(spec).json()
+    components = schema["components"]["schemas"]
+    path = schema["paths"]["/api/decks/tracks/{entity_uid}/stem-analysis"]
+    read, upload = path["get"], path["put"]
+
+    for operation in (read, upload):
+        assert operation["tags"] == ["smart-mix"]
+        assert operation["security"] == [{"cookieAuth": []}, {"bearerAuth": []}]
+    assert read["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/StemAnalysis"
+    }
+    assert upload["requestBody"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/StemAnalysis"
+    }
+    assert upload["requestBody"]["required"] is True
+    assert upload["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/StemAnalysisUploadResponse"
+    }
+    assert {"401", "403", "404", "409", "413", "422"} <= set(upload["responses"])
+
+    analysis = components["StemAnalysis"]
+    assert analysis["additionalProperties"] is False
+    assert set(analysis["required"]) == {
+        "schema",
+        "producer",
+        "separator",
+        "sourceRevision",
+        "hopMs",
+        "levels",
+        "durationMs",
+    }
+    assert components["StemLevels"]["properties"]["drums"]["format"] == "byte"
+    assert components["StemAnalysisUploadResponse"]["properties"]["result"]["enum"] == [
+        "stored",
+        "replaced",
+        "kept_stronger",
+    ]
+    profile = components["MixProfileResponse"]["properties"]
+    assert profile["stems"]["anyOf"][0] == {
+        "$ref": "#/components/schemas/StemsLayerResponse"
+    }
+    assert "stems" not in components["MixProfileResponse"].get("required", [])

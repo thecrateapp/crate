@@ -38,11 +38,13 @@ def test_profile_summary_omits_grid_and_full_detail_decodes_it(
     monkeypatch.setattr(
         smart_mix,
         "get_track_mix_profile_by_entity_uid",
-        lambda _uid, *, include_beat_grid: _profile(
+        lambda _uid, *, include_beat_grid, include_structure: _profile(
             uid,
             include_grid=include_beat_grid,
         ),
     )
+    # Without a stem analysis the full profile has no stems layer.
+    monkeypatch.setattr(smart_mix, "get_stem_track", lambda _uid: None)
     monkeypatch.setattr(
         "crate.db.repositories.tasks.create_task",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(

@@ -30,6 +30,7 @@ from crate.smart_mix_ai import (
     SEND_GENRE_SETTING,
     invalidate_refinement_gate,
 )
+from crate.smart_mix.stems import STEM_UPLOADS_SETTING
 from crate.db.audit import get_db_table_stats
 from crate.db.cache_settings import get_setting, set_setting
 from crate.db.cache_store import (
@@ -134,6 +135,7 @@ def _get_smart_mix_settings() -> dict:
     return {
         "ai_enabled": get_setting(ENABLED_SETTING, "false") == "true",
         "ai_send_genre": get_setting(SEND_GENRE_SETTING, "true") == "true",
+        "stem_uploads_enabled": get_setting(STEM_UPLOADS_SETTING, "true") == "true",
     }
 
 
@@ -366,7 +368,7 @@ def update_paths_settings(request: Request, body: PathsSettingsUpdateRequest):
     "/smart-mix",
     response_model=SettingsUpdateResponse,
     responses=_SETTINGS_RESPONSES,
-    summary="Update Smart Mix AI settings",
+    summary="Update Smart Mix AI and stem upload settings",
 )
 def update_smart_mix_settings(request: Request, body: SmartMixSettingsUpdateRequest):
     _require_settings_manager(request)
@@ -374,6 +376,10 @@ def update_smart_mix_settings(request: Request, body: SmartMixSettingsUpdateRequ
         set_setting(ENABLED_SETTING, "true" if body.ai_enabled else "false")
     if body.ai_send_genre is not None:
         set_setting(SEND_GENRE_SETTING, "true" if body.ai_send_genre else "false")
+    if body.stem_uploads_enabled is not None:
+        set_setting(
+            STEM_UPLOADS_SETTING, "true" if body.stem_uploads_enabled else "false"
+        )
     # Clients see the change on their next request, not after the gate expires.
     invalidate_refinement_gate()
     return {"ok": True}

@@ -10,8 +10,10 @@ from crate.api.schemas.capabilities import (
     DecksFeature,
     SmartMixAiAssistedCapabilities,
     SmartMixCapabilities,
+    SmartMixStemsCapabilities,
     VDJCapabilities,
 )
+from crate.api.permissions import has_capability
 from crate.config import (
     android_bass_handoff_enabled,
     android_beatmatch_enabled,
@@ -24,8 +26,10 @@ from crate.db.queries.smart_mix_admin import (
     get_smart_mix_refinement_latency_ms,
     get_smart_mix_structure_percent,
 )
+from crate.db.repositories.smart_mix_stems import stem_uploads_enabled
 from crate.llm.prompts.smart_mix_transition import PROMPT_VERSION
 from crate.smart_mix_ai import gate_reason, provider_kind, refinement_gate
+from crate.smart_mix.stems import STEM_CONTRIBUTE_PERMISSION
 from crate.smart_mix.versions import (
     API_CONTRACT_VERSION,
     PLANNER_IDENTIFIER,
@@ -75,6 +79,10 @@ def get_capabilities(request: Request) -> CapabilitiesResponse:
             android_bass_handoff=bass_handoff,
             android_long_beatmatch=beatmatch,
             ai_assisted=_ai_assisted(available),
+            # Smart Mix playlists and stored stem audio arrive with ST2.
+            stems=SmartMixStemsCapabilities(
+                available=available, playlists=False, storage=False
+            ),
         ),
         vdj=VDJCapabilities(
             available=vdj_available,
@@ -92,7 +100,7 @@ def get_capabilities(request: Request) -> CapabilitiesResponse:
             available=True,
             min_client_version=DECKS_MIN_CLIENT_VERSION,
             contract_version=DECKS_CONTRACT_VERSION,
-            features=_decks_features(),
+            features=_decks_features(request),
         ),
         access_token=_access_token_capabilities(request, vdj_automation),
     )
@@ -140,11 +148,31 @@ def _ai_assisted(smart_mix_available: bool) -> SmartMixAiAssistedCapabilities:
     )
 
 
-def _decks_features() -> list[DecksFeature]:
-    # None of the Decks-specific contracts (S3 library_cursor, S4
-    # profiles_batch, S5 beatmatch/bass_handoff/long_beatmatch, S7 cues) is
-    # served yet. Do not derive them from the Android Smart Mix flags.
-    return []
+def _decks_features(request: Request) -> list[DecksFeature]:
+    # Each feature is added by the server change that serves its contract: S3
+    # library_cursor, S4 profiles_batch, S5 beatmatch/bass_handoff/long_beatmatch,
+    # S7 cues, Smart Mix Stems ST1 stems/stem_upload and ST3 local_refinement. Do
+    # not derive them from the Android Smart Mix flags.
+    features: list[DecksFeature] = ["stems"]
+    if _may_upload_stems(request):
+        features.append("stem_upload")
+    return features
+
+
+def _may_upload_stems(request: Request) -> bool:
+    """PUT /api/decks/tracks/{uid}/stem-analysis would accept this caller's upload."""
+    user = getattr(request.state, "user", None)
+    # Access tokens never reach /api/decks.
+    if not user or user.get("auth_type") == "access_token":
+        return False
+    if not has_capability(user, STEM_CONTRIBUTE_PERMISSION):
+        return False
+    try:
+        return stem_uploads_enabled()
+    except Exception:
+        # Capabilities bootstrap every client: an unreadable setting hides uploads.
+        log.warning("Smart Mix stem upload setting unreadable", exc_info=True)
+        return False
 
 
 def _listen_url() -> str | None:

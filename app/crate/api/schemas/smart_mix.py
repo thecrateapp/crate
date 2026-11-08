@@ -19,6 +19,42 @@ class SmartMixRequestModel(SmartMixApiModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
 
+class StemPhraseLevelsResponse(SmartMixApiModel):
+    start_ms: int = Field(alias="startMs", ge=0)
+    end_ms: int = Field(alias="endMs", ge=0)
+    drums: int = Field(ge=0, le=255)
+    bass: int = Field(ge=0, le=255)
+    other: int = Field(ge=0, le=255)
+    vocals: int = Field(ge=0, le=255)
+
+
+class StemsLayerResponse(SmartMixApiModel):
+    """Per-phrase stem levels of a profile (Smart Mix Stems, STEM-D4)."""
+
+    producer: str = Field(
+        description="Producer of the analysis: crate-server/<version> or "
+        "crate-decks/<version>."
+    )
+    separator_model: Literal["htdemucs", "htdemucs_ft"] = Field(alias="separatorModel")
+    separator_version: str = Field(alias="separatorVersion")
+    phrases: list[StemPhraseLevelsResponse] = Field(
+        description=(
+            "One entry per phrase of the profile, in order: the mean level byte of each "
+            "stem over the phrase (RMS dBFS, linear from -60 dB at 0 to 0 dB at 255)."
+        )
+    )
+
+
+class StemAnalysisUploadResponse(SmartMixApiModel):
+    result: Literal["stored", "replaced", "kept_stronger"] = Field(
+        description=(
+            "stored or replaced: the upload is the track's Decks analysis. "
+            "kept_stronger: nothing was stored, because the server keeps a stronger "
+            "analysis of the same file, or an equal one of its own."
+        )
+    )
+
+
 class MixProfileResponse(SmartMixApiModel):
     track_entity_uid: UUID = Field(alias="trackEntityUid")
     profile_version: int = Field(alias="profileVersion", ge=1)
@@ -156,6 +192,13 @@ class MixProfileResponse(SmartMixApiModel):
     bliss_vector_revision: str | None = Field(
         default=None,
         alias="blissVectorRevision",
+    )
+    stems: StemsLayerResponse | None = Field(
+        default=None,
+        description=(
+            "Stems layer, with detail=full only, when a stem analysis of the profile's "
+            "file applies: the same source revision and a duration within 2 %."
+        ),
     )
 
 
@@ -495,6 +538,9 @@ __all__ = [
     "MixProfileResponse",
     "PlannerIdentifier",
     "SetHistoryEntryRequest",
+    "StemAnalysisUploadResponse",
+    "StemPhraseLevelsResponse",
+    "StemsLayerResponse",
     "TransitionContextRequest",
     "TransitionEdgeRequest",
     "TransitionPlanBatchRequest",

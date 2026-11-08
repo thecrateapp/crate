@@ -49,6 +49,7 @@ from crate.db.repositories.smart_mix import (
     get_track_mix_profile_by_entity_uid,
     get_track_mix_profiles_by_entity_uids,
 )
+from crate.db.repositories.smart_mix_stems import get_stem_track
 from crate.smart_mix.compatible import rank_compatible_tracks
 from crate.smart_mix.models import (
     MixProfileQuality,
@@ -57,6 +58,7 @@ from crate.smart_mix.models import (
 )
 from crate.smart_mix.planner import plan_transition, plan_transition_v3
 from crate.smart_mix.policy import PLANNER_POLICY, PLANNER_POLICY_V3, PlannerPolicy
+from crate.smart_mix.stems import StemAnalysis, choose_analysis, stem_phrase_layer
 from crate.smart_mix.versions import PLANNER_IDENTIFIER, planner_reads_structure
 
 
@@ -77,14 +79,28 @@ def track_mix_profile(
 ) -> MixProfileResponse:
     _require_vdj_scope(request, "vdj.smart_mix.read")
     include_beat_grid = detail == "full"
+    # The full profile carries the stems layer (STEM-D4), which needs the phrases.
+    analysis = _current_stem_analysis(entity_uid) if include_beat_grid else None
     profile = get_track_mix_profile_by_entity_uid(
         str(entity_uid),
         include_beat_grid=include_beat_grid,
+        include_structure=analysis is not None,
     )
     if profile is None:
         raise HTTPException(status_code=404, detail="Smart Mix profile not found")
     payload = profile.to_full_dict() if include_beat_grid else profile.to_summary_dict()
+    layer = None if analysis is None else stem_phrase_layer(profile, analysis)
+    if layer is not None:
+        payload["stems"] = layer.to_dict()
     return MixProfileResponse.model_validate(payload)
+
+
+def _current_stem_analysis(entity_uid: UUID) -> StemAnalysis | None:
+    """The stem analysis that applies to the track's current file, if any."""
+    track = get_stem_track(str(entity_uid))
+    if track is None or track.source_revision is None:
+        return None
+    return choose_analysis(track.analyses, source_revision=track.source_revision)
 
 
 @router.get(

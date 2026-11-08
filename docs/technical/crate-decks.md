@@ -5,7 +5,7 @@ section: reference
 audience: [developer]
 status: canonical
 order: 35
-verified: 2026-11-03
+verified: 2026-11-08
 sources:
   - app/crate/api/auth.py
   - app/crate/api/native_oauth_auth.py
@@ -14,6 +14,12 @@ sources:
   - app/crate/api/browse_media.py
   - app/crate/api/schemas/media.py
   - app/crate/api/schemas/smart_mix.py
+  - app/crate/api/decks_stems.py
+  - app/crate/api/smart_mix.py
+  - app/crate/api/settings.py
+  - app/crate/api/permissions.py
+  - app/crate/smart_mix/stems.py
+  - app/crate/db/repositories/smart_mix_stems.py
   - app/crate/db/queries/browse_media_search.py
   - app/crate/smart_mix/planner.py
   - app/crate/smart_mix/cue_detection.py
@@ -22,6 +28,8 @@ sources:
   - app/listen/android/app/src/main/java/app/cratemusic/crate/NativeTransitionPlan.java
   - app/tests/test_auth_decks_client.py
   - app/tests/test_capabilities_decks.py
+  - app/tests/test_capabilities_stems.py
+  - app/tests/test_decks_stem_analysis_api.py
   - app/tests/test_search_playable_audio.py
 ---
 
@@ -58,7 +66,7 @@ need them.
     "available": true,
     "min_client_version": "0.1.0",
     "contract_version": 1,
-    "features": []
+    "features": ["stems", "stem_upload"]
   }
 }
 ```
@@ -68,7 +76,7 @@ need them.
 | `available`          | The server accepts the Decks client                                       |
 | `min_client_version` | Oldest Decks version (semver) the server supports                         |
 | `contract_version`   | Integer, bumped on every incompatible change to the Decks server contract |
-| `features`           | Decks server contracts this instance serves                               |
+| `features`           | Decks server contracts this instance serves to this caller                |
 
 Rules:
 
@@ -78,21 +86,75 @@ Rules:
 - Clients ignore unknown `features` values and degrade when one is missing.
 - Each feature is added by the server change that implements it:
 
-  | Feature                                       | Server change                         |
-  | --------------------------------------------- | ------------------------------------- |
-  | `library_cursor`                              | S3, paginated navigation for clients  |
-  | `profiles_batch`                              | S4, batch mix profiles                |
-  | `beatmatch`, `bass_handoff`, `long_beatmatch` | S5, `decks` context in the planner    |
-  | `cues`                                        | S7, synchronised cues and corrections |
+  | Feature                                       | Server change                                                          |
+  | --------------------------------------------- | ---------------------------------------------------------------------- |
+  | `library_cursor`                              | S3, paginated navigation for clients                                   |
+  | `profiles_batch`                              | S4, batch mix profiles                                                 |
+  | `beatmatch`, `bass_handoff`, `long_beatmatch` | S5, `decks` context in the planner                                     |
+  | `cues`                                        | S7, synchronised cues and corrections                                  |
+  | `stems`                                       | Smart Mix Stems ST1, stem analysis reads and the profile stems layer   |
+  | `stem_upload`                                 | Smart Mix Stems ST1, stem analysis uploads (only for a caller who may) |
+  | `local_refinement`                            | Smart Mix Stems ST3, candidate menu for local refinement               |
 
-  None ships yet, so `features` is empty. Decks features never follow the
-  Android Smart Mix flags (`CRATE_ANDROID_*`); `smart_mix.android_*` remains
-  the Android contract.
+  `stems` and `stem_upload` ship so far. `stems` is always present.
+  `stem_upload` is present only when the caller's session holds
+  `smart_mix.stems.contribute` and an admin has not turned uploads off, so it
+  depends on who asks. Decks features never follow the Android Smart Mix flags
+  (`CRATE_ANDROID_*`); `smart_mix.android_*` remains the Android contract.
 
 The constants live in `app/crate/api/capabilities.py`
 (`DECKS_CONTRACT_VERSION`, `DECKS_MIN_CLIENT_VERSION`, `_decks_features`), and
 the allowed feature names in `DecksFeature`
 (`app/crate/api/schemas/capabilities.py`).
+
+## Stem analyses (Smart Mix Stems ST1)
+
+Crate Decks separates tracks into stems on the DJ's machine and shares the
+result as a `stem-analysis/1` document: per-stem level curves, never audio. The
+format, its storage and which analysis applies are in the Smart Mix operations
+doc (`docs/technical/smart-mix-operations.md`, section "Stem analyses").
+
+| Route                                                     | Use                                                                     |
+| --------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `GET /api/decks/tracks/{uid}/stem-analysis`               | The analysis Smart Mix uses for the track's current file, as a document |
+| `PUT /api/decks/tracks/{uid}/stem-analysis`               | Upload Decks' own analysis of the track                                 |
+| `GET /api/tracks/by-entity/{uid}/mix-profile?detail=full` | The profile with its `stems` layer, when an analysis applies            |
+
+Both `/api/decks` routes take a Decks session; `crv_` access tokens do not reach
+them. A UID outside the server's local library answers 404.
+
+**Read.** `GET` answers the analysis of the track's current source revision, the
+stronger separator first and the server's on a tie, in the same JSON an upload
+sends. It answers 404 when the track has no profile, when its file changed since
+its analyses, or when it has none. Decks reads it before separating a track.
+
+**Upload.** An upload is untrusted input. The server checks, in this order:
+
+| Check                                                                                      | Answer |
+| ------------------------------------------------------------------------------------------ | ------ |
+| A session                                                                                  | 401    |
+| The `smart_mix.stems.contribute` permission (owner and admin roles by default)             | 403    |
+| A body of at most 64 KiB, by `Content-Length` and while reading it                         | 413    |
+| Uploads turned on (`stem_uploads_enabled` in `PUT /api/settings/smart-mix`, on by default) | 403    |
+| A valid `stem-analysis/1` document with no unknown fields                                  | 422    |
+| A `crate-decks/<version>` producer: Decks cannot pass its analysis off as the server's     | 422    |
+| A local track with that UID                                                                | 404    |
+| `sourceRevision` equal to the profile's `sourceRevision` of the current file               | 409    |
+| `durationMs` within 2 % of the profile's duration                                          | 422    |
+
+A 409 means the file changed after Decks got the track: the client fetches the
+profile again before it separates or uploads again. When everything passes, the
+answer is `{"result": "stored" | "replaced" | "kept_stronger"}`.
+`kept_stronger` stores nothing, because the server already has an analysis of
+the same file from an equal or stronger separator, so retrying the same upload
+changes nothing. Each stored upload records the uploader in `contributed_by`.
+
+**Profile layer.** With `detail=full`, the profile gains an optional `stems`
+object when an analysis of its current file applies: `producer`,
+`separatorModel`, `separatorVersion` and `phrases`, one entry per phrase with
+`startMs`, `endMs` and the mean level byte of `drums`, `bass`, `other` and
+`vocals`. The summary profile never carries it, because the Go read plane serves
+the summary natively. No planner reads the layer yet (ST3).
 
 ## Audio availability and plan fields (S9)
 

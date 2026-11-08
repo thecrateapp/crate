@@ -29,6 +29,7 @@ from sqlalchemy import BIGINT, and_, any_, bindparam, select, text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Session
 
+from crate.db.cache_settings import get_setting
 from crate.db.orm.library import LibraryTrack
 from crate.db.orm.smart_mix import TrackMixProfileRow, TrackStemSignalsRow
 from crate.db.repositories.library_shared import coerce_uuid
@@ -37,6 +38,7 @@ from crate.smart_mix.stems import (
     SEPARATOR_STRENGTH,
     STEM_ANALYSIS_SCHEMA,
     STEM_SOURCES,
+    STEM_UPLOADS_SETTING,
     ProducerKind,
     StemAnalysis,
 )
@@ -253,6 +255,11 @@ def get_stem_track(
     )
 
 
+def stem_uploads_enabled() -> bool:
+    """Whether Crate Decks may upload stem analyses: on unless an admin turns it off."""
+    return get_setting(STEM_UPLOADS_SETTING, "true") == "true"
+
+
 def _row_to_analysis(row: TrackStemSignalsRow) -> StemAnalysis | None:
     try:
         return StemAnalysis.model_validate(
@@ -289,5 +296,6 @@ __all__ = [
     "StemTrack",
     "get_stem_analyses",
     "get_stem_track",
+    "stem_uploads_enabled",
     "upsert_stem_analysis",
 ]
