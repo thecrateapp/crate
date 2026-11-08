@@ -621,6 +621,9 @@ and whether it is a Python promotion:
   next claim ranks again.
 - **Long play queues.** Every pass reads the play queues: a pass costs about 25 ms with 1,500
   queued items and 120 ms with 10,000.
+- **Coverage.** A pass that claims refreshes the coverage at most once a minute, because the
+  refresh aggregates the whole library (about a second). Finished analyses also refresh it, and
+  the pass that completes the campaign always does.
 
 ### Night window
 

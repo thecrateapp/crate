@@ -36,6 +36,7 @@ from crate.db.jobs.smart_mix_backfill import (
     queue_next_smart_mix_batch,
     refresh_live_smart_mix_coverage,
     refresh_smart_mix_coverage,
+    refresh_smart_mix_coverage_after_pass,
     release_smart_mix_claims,
     seconds_since_smart_mix_change,
     smart_mix_profile_dedup_key,
@@ -1588,7 +1589,7 @@ def _handle_backfill_smart_mix_profiles(
             _smart_mix_backfill_poll_seconds(),
             progress=f"Waiting for the {in_flight} analyses in flight to finish",
         )
-    refresh_smart_mix_coverage(max_attempts=max_attempts)
+    refresh_smart_mix_coverage_after_pass(max_attempts=max_attempts)
     return {
         "claimed": len(claimed),
         "queued": queued,

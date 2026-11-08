@@ -919,6 +919,32 @@ def refresh_live_smart_mix_coverage() -> bool:
     return True
 
 
+# A claiming pass refreshes the coverage at most this often. Each refresh
+# aggregates the whole library, about a second on ~140K tracks, and passes come
+# every few seconds while analyses finish.
+PASS_COVERAGE_MAX_AGE_SECONDS = 60
+
+
+def refresh_smart_mix_coverage_after_pass(*, max_attempts: int) -> bool:
+    """Refresh the coverage after a claiming pass unless it is under a minute old.
+
+    Finished analyses refresh it on their own (``refresh_live_smart_mix_coverage``)
+    and the pass that completes the campaign always does, so Admin never waits
+    more than a minute for the claims of a pass.
+    """
+    fresh = get_ops_runtime_state(
+        COVERAGE_STATE_KEY, max_age_seconds=PASS_COVERAGE_MAX_AGE_SECONDS
+    )
+    if (
+        fresh is not None
+        and fresh.get("analyzer_version") == SMART_MIX_ANALYZER_VERSION
+        and fresh.get("profile_version") == PROFILE_SCHEMA_VERSION
+    ):
+        return False
+    refresh_smart_mix_coverage(max_attempts=max_attempts)
+    return True
+
+
 def get_smart_mix_campaign() -> dict[str, Any] | None:
     return get_ops_runtime_state(CAMPAIGN_STATE_KEY)
 
@@ -1045,6 +1071,7 @@ def save_smart_mix_campaign(campaign: dict[str, Any]) -> None:
 __all__ = [
     "CAMPAIGN_STATE_KEY",
     "COVERAGE_STATE_KEY",
+    "PASS_COVERAGE_MAX_AGE_SECONDS",
     "RANKING_MAX_AGE_SECONDS",
     "RANKING_STATE_KEY",
     "campaign_targets_current",
@@ -1054,6 +1081,7 @@ __all__ = [
     "get_smart_mix_campaign",
     "queue_next_smart_mix_batch",
     "refresh_smart_mix_coverage",
+    "refresh_smart_mix_coverage_after_pass",
     "release_dead_smart_mix_claims",
     "release_smart_mix_claims",
     "smart_mix_profile_dedup_key",

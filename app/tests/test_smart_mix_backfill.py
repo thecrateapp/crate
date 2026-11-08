@@ -818,6 +818,99 @@ def test_live_coverage_refresh_is_throttled_while_work_is_in_flight(
     assert refresh_live_smart_mix_coverage() is True
 
 
+def _coverage_refreshed_at() -> datetime:
+    with read_scope() as session:
+        return session.execute(
+            text("SELECT updated_at FROM ops_runtime_state WHERE key = :key"),
+            {"key": smart_mix_backfill.COVERAGE_STATE_KEY},
+        ).scalar_one()
+
+
+def _age_coverage(*, seconds: int) -> None:
+    with transaction_scope() as session:
+        session.execute(
+            text(
+                """
+                UPDATE ops_runtime_state
+                SET updated_at = updated_at - make_interval(secs => :seconds)
+                WHERE key = :key
+                """
+            ),
+            {"key": smart_mix_backfill.COVERAGE_STATE_KEY, "seconds": seconds},
+        )
+
+
+def _coordinator_on_the_database(monkeypatch):
+    """The coordinator with a real claim and coverage; children are not queued."""
+    from crate.db.jobs.smart_mix_backfill import save_smart_mix_campaign
+    from crate.worker_handlers import analysis
+
+    save_smart_mix_campaign(_running_campaign(batch_size=1))
+    monkeypatch.setattr(analysis, "_now", lambda: DAY)
+    _allow_by_governor(monkeypatch)
+    monkeypatch.setattr(
+        "crate.db.repositories.tasks.create_task_dedup",
+        lambda task_type, params, *, dedup_key: f"child-{params['track_id']}",
+    )
+    monkeypatch.setattr(
+        analysis, "queue_next_smart_mix_batch", lambda **_kwargs: "task-next"
+    )
+    monkeypatch.setattr("crate.crate_cli.is_available", lambda: False)
+    return analysis
+
+
+def test_a_claiming_pass_refreshes_coverage_at_most_once_a_minute(
+    pg_db, tmp_path: Path, monkeypatch
+) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import refresh_smart_mix_coverage
+    from crate.db.queries.smart_mix_admin import get_smart_mix_admin_status
+
+    _create_tracks(tmp_path, count=3)
+    analysis = _coordinator_on_the_database(monkeypatch)
+    refresh_smart_mix_coverage(max_attempts=3)
+    refreshed_at = _coverage_refreshed_at()
+
+    # Right after a refresh, a pass that claims leaves the coverage as it is.
+    assert (
+        analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})["claimed"] == 1
+    )
+    assert _coverage_refreshed_at() == refreshed_at
+    assert get_smart_mix_admin_status()["processing"]["active"] == 0
+
+    # A minute later, the next one refreshes it.
+    _age_coverage(seconds=smart_mix_backfill.PASS_COVERAGE_MAX_AGE_SECONDS + 1)
+    aged_at = _coverage_refreshed_at()
+    assert (
+        analysis._handle_backfill_smart_mix_profiles("task-2", {}, {})["claimed"] == 1
+    )
+    assert _coverage_refreshed_at() > aged_at
+    assert get_smart_mix_admin_status()["processing"]["active"] == 2
+
+
+def test_a_completing_pass_leaves_the_coverage_current(
+    pg_db, tmp_path: Path, monkeypatch
+) -> None:
+    del pg_db
+    from crate.db.jobs.smart_mix_backfill import (
+        get_smart_mix_campaign,
+        refresh_smart_mix_coverage,
+    )
+    from crate.db.queries.smart_mix_admin import get_smart_mix_admin_status
+
+    [track_id] = _create_tracks(tmp_path, count=1)
+    analysis = _coordinator_on_the_database(monkeypatch)
+    refresh_smart_mix_coverage(max_attempts=3)
+    _insert_profile(track_id, analyzer_version=ANALYZER_VERSION)
+
+    # The coverage is seconds old, but the campaign ends on this pass.
+    result = analysis._handle_backfill_smart_mix_profiles("task-1", {}, {})
+
+    assert result == {"claimed": 0, "queued": 0, "completed": True}
+    assert get_smart_mix_campaign()["status"] == "completed"
+    assert get_smart_mix_admin_status()["current_profiles"] == 1
+
+
 def _create_tracks(tmp_path: Path, *, count: int) -> list[int]:
     suffix = uuid.uuid4().hex
     artist = f"Backfill Artist {suffix}"
@@ -1492,6 +1585,9 @@ def _handler_harness(monkeypatch, *, campaigns, in_flight, claimed=(), now=DAY):
     )
     monkeypatch.setattr(
         analysis, "refresh_smart_mix_coverage", lambda **_kwargs: {"total_tracks": 1}
+    )
+    monkeypatch.setattr(
+        analysis, "refresh_smart_mix_coverage_after_pass", lambda **_kwargs: True
     )
     monkeypatch.setattr(
         analysis,
