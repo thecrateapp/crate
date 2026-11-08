@@ -380,8 +380,8 @@ def test_the_play_queue_and_offline_ids_go_first_without_a_new_ranking(
     ]
 
 
-def _queue_items(track_ids: list[int], *, key: str = "id") -> None:
-    """Queue the tracks on a new device, each item naming its track by ``key``."""
+def _queue_items(items: list[dict]) -> None:
+    """Store a play queue of these items on a new device."""
     user_id = _create_user()
     device_id = f"device-{uuid.uuid4().hex}"
     with transaction_scope() as session:
@@ -408,7 +408,7 @@ def _queue_items(track_ids: list[int], *, key: str = "id") -> None:
             {
                 "user_id": user_id,
                 "device_id": device_id,
-                "queue": json.dumps([{key: str(track_id)} for track_id in track_ids]),
+                "queue": json.dumps(items),
             },
         )
 
@@ -421,7 +421,7 @@ def test_a_long_play_queue_is_claimed_in_order_chunk_by_chunk(
     _unqueued, *queued = _create_tracks(tmp_path, count=6)
     for track_id in (queued[0], queued[2]):
         _insert_profile(track_id, analyzer_version=ANALYZER_VERSION)
-    _queue_items(list(reversed(queued)))
+    _queue_items([{"id": str(track_id)} for track_id in reversed(queued)])
 
     claimed = claim_smart_mix_backfill_batch(
         limit=3, max_in_flight=25, claimed_by="task:coordinator"
@@ -431,6 +431,34 @@ def test_a_long_play_queue_is_claimed_in_order_chunk_by_chunk(
         (queued[1], 1),
         (queued[3], 1),
         (queued[4], 1),
+    ]
+
+
+def test_queued_items_as_listen_stores_them_go_first(pg_db, tmp_path: Path) -> None:
+    del pg_db
+    from crate.db.repositories.playback_state import sanitize_queue_snapshot
+
+    _first, by_id, by_uid, _rest = _create_tracks(tmp_path, count=4)
+    with read_scope() as session:
+        uid = session.execute(
+            text("SELECT entity_uid::text FROM library_tracks WHERE id = :id"),
+            {"id": by_uid},
+        ).scalar_one()
+    # Listen keeps track_id and track_entity_uid (libraryTrackId and entity_uid
+    # become those) and drops every other key.
+    queue = sanitize_queue_snapshot(
+        [{"libraryTrackId": by_id, "id": "x"}, {"entity_uid": uid, "id": "y"}]
+    )
+    assert queue == [{"track_id": by_id}, {"track_entity_uid": uid}]
+    _queue_items(queue)
+
+    claimed = claim_smart_mix_backfill_batch(
+        limit=2, max_in_flight=25, claimed_by="task:coordinator"
+    )
+
+    assert [(row["id"], row["priority"]) for row in claimed] == [
+        (by_id, 1),
+        (by_uid, 1),
     ]
 
 

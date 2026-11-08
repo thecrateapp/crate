@@ -169,8 +169,10 @@ _PROMOTION_SQL = """
     )
 """
 # Priority 1: the play queue (current track and queued items of every device).
-# Only canonical text is cast: the only values that matched when the track id
-# and entity UID were compared as text.
+# Listen stores queue items with track_id and track_entity_uid
+# (sanitize_queue_snapshot); id, trackId, entityUid and trackEntityUid are older
+# names. Only canonical text is cast: the only values that matched when the
+# track id and entity UID were compared as text.
 _PLAY_QUEUE_SQL = """
     WITH queue_item AS (
         SELECT
@@ -183,9 +185,16 @@ _PLAY_QUEUE_SQL = """
             END AS track_entity_uid
         FROM (
             SELECT
-                NULLIF(COALESCE(item->>'id', item->>'trackId'), '') AS item_id,
                 NULLIF(
-                    COALESCE(item->>'entityUid', item->>'trackEntityUid'), ''
+                    COALESCE(item->>'track_id', item->>'id', item->>'trackId'), ''
+                ) AS item_id,
+                NULLIF(
+                    COALESCE(
+                        item->>'track_entity_uid',
+                        item->>'entityUid',
+                        item->>'trackEntityUid'
+                    ),
+                    ''
                 ) AS item_uid
             FROM user_playback_device_states playback
             CROSS JOIN LATERAL jsonb_array_elements(
