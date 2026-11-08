@@ -92,6 +92,9 @@ const supportingScope = [
   // Launch fix (E3.PR2): text actions and the shared dialog close control.
   "app/ui/src/components/errors/LaunchFix.tsx",
   "app/ui/src/components/errors/FixSettingsForm.tsx",
+  // Fix runs: text actions (Open PR, Approve & merge, Discard) and the shared
+  // dialog close control.
+  "app/ui/src/components/errors/FixRunPanel.tsx",
   // AI triage (E2.PR2): text actions only.
   "app/ui/src/components/errors/InvestigateAction.tsx",
   "app/ui/src/components/errors/TriageBacklog.tsx",
@@ -392,10 +395,7 @@ const approvedLibraryControls = new Map<string, number>([
   ],
   // The album's mood rose beside them: a hand-built SVG instrument (rings, petals and
   // track marks) with no glyph and no button.
-  [
-    "app/ui/src/components/album/AudioProfileCard.tsx:./MoodRose:MoodRose",
-    1,
-  ],
+  ["app/ui/src/components/album/AudioProfileCard.tsx:./MoodRose:MoodRose", 1],
   [
     "app/ui/src/components/album/TrackTable.tsx:./AudioProfileCard:AudioProfileCard",
     1,
@@ -563,6 +563,15 @@ const approvedLibraryControls = new Map<string, number>([
   [
     "app/ui/src/components/errors/LaunchFix.tsx:@crate/ui/composites/ConfirmDialog:ConfirmDialog",
     1,
+  ],
+  // Fix runs: text buttons; children audited in the scope above.
+  [
+    "app/ui/src/pages/ErrorDetail.tsx:@/components/errors/FixRunPanel:FixRunPanel",
+    1,
+  ],
+  [
+    "app/ui/src/components/errors/FixRunPanel.tsx:@crate/ui/composites/ConfirmDialog:ConfirmDialog",
+    2,
   ],
   // AI triage (E2.PR2): text buttons; children audited in the scope above.
   [

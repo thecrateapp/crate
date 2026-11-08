@@ -28,6 +28,7 @@ import {
   minutesAgo,
   sampleDetail,
   sampleFix,
+  sampleFixRun,
   sampleTriage,
 } from "@/test/error-inbox-fixtures";
 
@@ -329,6 +330,31 @@ describe("ErrorDetail", () => {
         `Launch fix is available again at ${clockText(availableAt)}.`,
       ),
     ).toBeInTheDocument();
+  });
+
+  it("shows the fix run panel and blocks a second launch while it is open", () => {
+    renderDetail(
+      sampleDetail({
+        fix: sampleFix(),
+        fix_runs: [sampleFixRun()],
+        fix_requested_at: minutesAgo(50),
+        fix_requested_by_name: "Diego",
+      }),
+    );
+
+    expect(launchButton()).toBeDisabled();
+    expect(
+      screen.getByText("A fix is in progress. Discard it to launch another."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Approve & merge" }),
+    ).toBeEnabled();
+    expect(screen.getByRole("link", { name: /#412/ })).toHaveAttribute(
+      "href",
+      "https://github.com/thecrateapp/crate/pull/412",
+    );
+    // The panel replaces the older "Fix requested by" line.
+    expect(screen.queryByText(/Fix requested by/)).not.toBeInTheDocument();
   });
 
   it("launch fix explains short ids the workflow refuses", () => {

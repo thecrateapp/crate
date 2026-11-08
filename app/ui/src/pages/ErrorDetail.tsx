@@ -18,6 +18,7 @@ import { RelativeTime } from "@/components/admin/RelativeTime";
 import { SeverityMeter } from "@/components/admin/status-indicators";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { TechnicalDetails } from "@/components/admin/TechnicalDetails";
+import { FixRunPanel } from "@/components/errors/FixRunPanel";
 import { InvestigateAction } from "@/components/errors/InvestigateAction";
 import { IssueStatusActions } from "@/components/errors/IssueStatusActions";
 import { FixRequestState, LaunchFix } from "@/components/errors/LaunchFix";
@@ -209,7 +210,11 @@ function IssueView({
           store a token with that scope.
         </p>
       ) : null}
-      <FixRequestState issue={issue} />
+      {issue.fix_runs?.length ? (
+        <FixRunPanel issue={issue} onChanged={onChanged} />
+      ) : (
+        <FixRequestState issue={issue} />
+      )}
 
       <section
         aria-label="Issue metrics"
