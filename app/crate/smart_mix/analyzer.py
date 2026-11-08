@@ -29,6 +29,7 @@ from crate.smart_mix.tempo_grid import (
     bass_contests_tracked_beats,
     fit_tempo,
     half_beat_slides,
+    model_beat_stability,
 )
 from crate.smart_mix.phrase_grid import BEATS_PER_BAR, downbeat_anchor_from_model
 from crate.smart_mix.versions import ANALYZER_VERSION, PYTHON_ANALYZER
@@ -94,13 +95,20 @@ def analyze_mix_profile(
         tracked_ms, beat_frames = _model_beats(
             beats.beats_ms, audio.size * 1_000 / sample_rate, onset_envelope, frame_ms
         )
+    tempo_fit = fit_tempo(tracked_ms, onset_envelope, low_onsets, frame_ms=frame_ms)
+    constant_grid = tempo_fit.grid if tempo_fit is not None else None
     bpm, bpm_confidence, tempo_stability = _tempo_features(
         tracked_ms,
         onset_envelope,
         beat_frames,
+        # Model beats are measured on the track's constant grid and to the model's
+        # resolution: a half-tempo intro or 20 ms frames are not an unsteady tempo.
+        stability=(
+            None
+            if beats is None
+            else model_beat_stability(tracked_ms, constant_grid) or 0.0
+        ),
     )
-    tempo_fit = fit_tempo(tracked_ms, onset_envelope, low_onsets, frame_ms=frame_ms)
-    constant_grid = tempo_fit.grid if tempo_fit is not None else None
     if constant_grid is not None:
         beat_grid_ms = constant_grid.beats_ms(tracked_ms[0], tracked_ms[-1])
         grid_frames = np.array(
@@ -393,7 +401,11 @@ def _tempo_features(
     beat_grid_ms: tuple[int, ...],
     onset_envelope: np.ndarray,
     beat_frames: np.ndarray,
+    *,
+    stability: float | None = None,
 ) -> tuple[float | None, float, float]:
+    """BPM, confidence and stability of the beats; ``stability`` replaces the measure
+    of the tracker's intervals (model beats bring their own)."""
     if len(beat_grid_ms) < 4:
         return None, 0.0, 0.0
 
@@ -409,9 +421,10 @@ def _tempo_features(
     drift_ratio = abs(late_interval - early_interval) / median_interval
     residual = np.abs(intervals - median_interval)
     jitter_ratio = float(np.median(residual)) / median_interval
-    tempo_stability = max(
-        0.0,
-        min(1.0, 1.0 - drift_ratio / 0.25 - jitter_ratio / 0.20),
+    tempo_stability = (
+        max(0.0, min(1.0, 1.0 - drift_ratio / 0.25 - jitter_ratio / 0.20))
+        if stability is None
+        else stability
     )
 
     valid_frames = beat_frames[(beat_frames >= 0) & (beat_frames < onset_envelope.size)]

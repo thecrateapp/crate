@@ -222,6 +222,69 @@ def test_a_steady_take_or_a_tempo_change_has_no_half_beat_slide() -> None:
         assert half_beat_slides([round(beat) for beat in beats]) == 0
 
 
+def _on_model_frames(times) -> list[int]:
+    """Beat This! beats: on its 20 ms frames."""
+    return [round(time / 20.0) * 20 for time in times]
+
+
+def _grid(period: float, anchor: float = 1_000.0):
+    from crate.smart_mix.tempo_grid import ConstantGrid
+
+    return ConstantGrid(
+        bpm=60_000.0 / period,
+        period_ms=period,
+        anchor_ms=anchor,
+        phase_support=1.0,
+        phase_flipped=False,
+    )
+
+
+def test_model_beat_stability_reads_a_half_tempo_stretch_on_the_grid() -> None:
+    # The DBN can hold half the tempo through an intro: on the track's constant grid
+    # those beats skip a grid beat, they do not change the tempo.
+    from crate.smart_mix.tempo_grid import model_beat_stability
+
+    period = 470.0
+    pulse = [1_000.0 + index * period for index in range(200)]
+    beats = _on_model_frames(
+        time for index, time in enumerate(pulse) if index >= 80 or index % 2 == 0
+    )
+
+    stability = model_beat_stability(beats, _grid(period))
+    assert stability is not None and stability >= 0.99
+    # Read one interval after another, the stretch is a doubled interval.
+    assert model_beat_stability(beats, None) == 0.0
+
+
+def test_model_beat_stability_forgives_the_model_resolution_only() -> None:
+    # 470 ms falls between two 20 ms frames, so the intervals alternate 460/480 ms:
+    # that is the model's resolution, not jitter. Beats scattered by 80 ms are.
+    from crate.smart_mix.tempo_grid import model_beat_stability
+
+    period = 470.0
+    pulse = [1_000.0 + index * period for index in range(200)]
+    rng = np.random.default_rng(3)
+    scattered = sorted(round(time + rng.uniform(-80.0, 80.0)) for time in pulse)
+
+    steady = model_beat_stability(_on_model_frames(pulse), _grid(period))
+    assert steady is not None and steady >= 0.99
+    stability = model_beat_stability(scattered, _grid(period))
+    assert stability is not None and stability < 0.8
+
+
+def test_model_beat_stability_still_sees_a_drifting_tempo() -> None:
+    from crate.smart_mix.tempo_grid import model_beat_stability
+
+    times, time = [], 1_000.0
+    for index in range(200):
+        times.append(time)
+        time += 60_000.0 / (120.0 + 20.0 * index / 200)
+
+    stability = model_beat_stability(_on_model_frames(times), None)
+    assert stability is not None and stability < 0.8
+    assert model_beat_stability([1_000, 1_500, 2_000, 2_500, 3_000], None) is None
+
+
 def test_grid_constants_match_the_rust_analyzer() -> None:
     from crate.smart_mix import tempo_grid
 

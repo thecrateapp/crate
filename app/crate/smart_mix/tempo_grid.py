@@ -52,6 +52,14 @@ SLIDE_WINDOW_BEATS = 6
 SLIDE_MIN_FRACTION = 0.4
 SLIDE_CONTEXT_BEATS = 8
 SLIDE_MAX_TEMPO_CHANGE = 0.03
+# Beat This! predicts at 50 frames per second and its DBN puts each beat on one of those
+# frames, so an interval between two model beats is only known to a frame.
+MODEL_BEAT_RESOLUTION_MS = 20.0
+# Whole-track stability of model beats reaches 0 at this tempo change between the first
+# and the last third of the beats, or at this median interval jitter: the limits both
+# analyzers apply to their tracker's beats.
+_TRACK_DRIFT_LIMIT = 0.25
+_TRACK_JITTER_LIMIT = 0.20
 
 
 @dataclass(frozen=True, slots=True)
@@ -320,10 +328,82 @@ def half_beat_slides(beats_ms) -> int:
     return slides
 
 
+def _model_beat_points(
+    beats_ms, grid: ConstantGrid | None
+) -> tuple[np.ndarray, np.ndarray]:
+    """(beat number, time) of each model beat: its beat on the constant grid, or its
+    position in the sequence without one. A beat on the same grid beat as the one before
+    is left out."""
+    times = np.asarray(beats_ms, dtype=np.float64)
+    if grid is None:
+        return np.arange(times.size, dtype=np.float64), times
+    indices = np.array(
+        [_round_half_away((time - grid.anchor_ms) / grid.period_ms) for time in times]
+    )
+    keep = np.ones(times.size, dtype=bool)
+    keep[1:] = np.diff(indices) >= 1
+    return indices[keep], times[keep]
+
+
+def _period(indices: np.ndarray, times: np.ndarray) -> float:
+    """Least-squares milliseconds per beat number."""
+    spread = indices - indices.mean()
+    return float(np.dot(spread, times - times.mean()) / np.dot(spread, spread))
+
+
+def grid_step_intervals(beats_ms, grid: ConstantGrid | None) -> np.ndarray:
+    """Intervals between consecutive beats (ms), each divided by the grid beats it spans.
+
+    Model beats need not fall on every beat: Beat This!'s DBN can hold half the tempo
+    through an intro, or skip a beat in a break. On a constant grid such an interval
+    spans two grid beats and counts as two beats of half its length, and a beat on the
+    same grid beat as the one before gives no interval. Without a grid each interval is
+    one beat.
+    """
+    indices, times = _model_beat_points(beats_ms, grid)
+    if times.size < 2:
+        return np.zeros(0)
+    return np.diff(times) / np.diff(indices)
+
+
+def model_beat_stability(beats_ms, grid: ConstantGrid | None) -> float | None:
+    """Steadiness (0..1) of model beats over the whole track, or None with fewer than
+    six beats.
+
+    The analyzers' measure of their tracker's beats, tempo drift between the first and
+    the last third and median interval jitter, counted in beats of the constant grid,
+    so a track whose beats stay on its grid is steady wherever the model skipped beats.
+    Beats on 20 ms frames give intervals only known to a frame (a 470 ms pulse gives
+    460 and 480 ms), so a frame is forgiven of the jitter, and the tempo of each third
+    is a regression over its beats, which averages the frames out.
+    """
+    indices, times = _model_beat_points(beats_ms, grid)
+    if times.size < 6:
+        return None
+    intervals = np.diff(times) / np.diff(indices)
+    median = _median(intervals)
+    period = _period(indices, times)
+    if median <= 0 or period <= 0:
+        return None
+    third = max(3, times.size // 3)
+    early = _period(indices[:third], times[:third])
+    late = _period(indices[-third:], times[-third:])
+    drift = abs(late - early) / period
+    residual = _median(np.abs(intervals - median)) - MODEL_BEAT_RESOLUTION_MS
+    jitter = max(0.0, residual) / median
+    return max(
+        0.0,
+        min(1.0, 1.0 - drift / _TRACK_DRIFT_LIMIT - jitter / _TRACK_JITTER_LIMIT),
+    )
+
+
 __all__ = [
+    "MODEL_BEAT_RESOLUTION_MS",
     "ConstantGrid",
     "TempoFit",
     "bass_contests_tracked_beats",
     "fit_tempo",
+    "grid_step_intervals",
     "half_beat_slides",
+    "model_beat_stability",
 ]
