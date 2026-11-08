@@ -17,7 +17,19 @@ from crate.error_inbox.sentry_client import SUBSTATUSES
 
 IssueStatus = Literal["unresolved", "resolved", "ignored"]
 IssueStatusFilter = Literal["unresolved", "resolved", "ignored", "all"]
-IssueLane = Literal["all", "critical"]
+# `review`: issues whose fix pull request is open and waits for a person.
+IssueLane = Literal["all", "critical", "review"]
+FixRunStatus = Literal[
+    "requested",
+    "running",
+    "pr_open",
+    "merged",
+    "closed",
+    "failed",
+    "cancelled",
+    "expired",
+]
+FixExecutorName = Literal["github_actions", "factory"]
 IssueLevel = Literal["fatal", "error", "warning", "info", "debug"]
 SentryPriority = Literal["high", "medium", "low"]
 Classification = Literal[
@@ -55,6 +67,8 @@ class ErrorIssueSummary(BaseModel):
     synced_at: datetime
     classification: Classification | None = None
     severity: Severity | None = None
+    # The status of the issue's latest fix run; `pr_open` means pending review.
+    fix_status: FixRunStatus | None = None
 
 
 class ErrorIssueList(BaseModel):
@@ -120,11 +134,61 @@ class ErrorIssueFix(BaseModel):
 
     repository: str
     workflow: str
+    executor: FixExecutorName = "github_actions"
     actions_url: str
     # The workflow only accepts Crate short ids (`CRATE-API-1F`).
     supported: bool
     # Set while the 24-hour window after the last request is open.
     available_at: datetime | None = None
+
+
+class ErrorFixRunReview(BaseModel):
+    """What a person with `ops.errors.manage` can do with the run now.
+
+    `blockers` are the reasons Approve & merge is unavailable (`PR_NOT_FROM_FIXER`,
+    `PR_NOT_LABELLED`, `PR_CONFLICTS`, `CHECKS_PENDING`, `CHECKS_FAILED`, ...).
+    """
+
+    can_merge: bool
+    blockers: list[str] = Field(default_factory=list)
+    can_discard: bool
+
+
+class ErrorFixRun(BaseModel):
+    """One attempt to fix the issue and its pull request, as last seen on GitHub."""
+
+    id: str
+    executor: FixExecutorName
+    status: FixRunStatus
+    repository: str
+    base_ref: str | None = None
+    external_run_id: str | None = None
+    external_run_url: str | None = None
+    branch: str | None = None
+    pr_number: int | None = None
+    pr_url: str | None = None
+    pr_state: Literal["open", "closed", "merged"] | None = None
+    pr_draft: bool | None = None
+    pr_mergeable: bool | None = None
+    pr_mergeable_state: str | None = None
+    pr_head_sha: str | None = None
+    pr_author: str | None = None
+    pr_labeled: bool | None = None
+    ci_state: Literal["pending", "success", "failure", "none"] | None = None
+    requested_by: int | None = None
+    requested_by_name: str | None = None
+    requested_at: datetime
+    started_at: datetime | None = None
+    pr_opened_at: datetime | None = None
+    merge_requested_by_name: str | None = None
+    merge_requested_at: datetime | None = None
+    ready_at: datetime | None = None
+    finished_at: datetime | None = None
+    checked_at: datetime | None = None
+    error_code: str | None = None
+    summary: str | None = None
+    cleanup_state: Literal["none", "pending", "done", "failed"] = "none"
+    review: ErrorFixRunReview
 
 
 class ErrorIssueDetail(ErrorIssueSummary):
@@ -142,6 +206,8 @@ class ErrorIssueDetail(ErrorIssueSummary):
     auto_triage_queued_at: datetime | None = None
     write_access: bool | None = None
     fix: ErrorIssueFix | None = None
+    # The latest fix runs, newest first (at most five).
+    fix_runs: list[ErrorFixRun] = Field(default_factory=list)
 
 
 class ErrorSyncTruncation(BaseModel):
@@ -200,6 +266,8 @@ class ErrorSummary(BaseModel):
     regressed_24h: int
     # Open issues with an event summary and no triage of it: the triage backlog.
     untriaged: int = 0
+    # Issues whose fix pull request is open and waits for a person.
+    pending_review: int = 0
     last_synced_at: datetime | None = None
     services: list[ErrorServiceCounts] = Field(default_factory=list)
     top_critical: list[ErrorTopCritical] = Field(default_factory=list)
@@ -220,6 +288,7 @@ class ErrorFixConnection(BaseModel):
     repository: str
     workflow: str
     ref: str
+    executor: FixExecutorName = "github_actions"
     has_token: bool
     actions_url: str
 
@@ -258,6 +327,8 @@ class ErrorFixSettingsUpdate(BaseModel):
     repository: str = Field(max_length=201)
     workflow: str = Field(max_length=105)
     ref: str | None = Field(default=None, max_length=100)
+    # Who works on the issue; only `github_actions` is available today.
+    executor: FixExecutorName | None = None
     token: SecretStr | None = Field(default=None, json_schema_extra={"writeOnly": True})
 
     def settings(self) -> dict[str, object]:
@@ -265,6 +336,7 @@ class ErrorFixSettingsUpdate(BaseModel):
             "repository": self.repository,
             "workflow": self.workflow,
             "ref": self.ref,
+            "executor": self.executor,
         }
 
     def new_token(self) -> str | None:
@@ -320,6 +392,15 @@ class ErrorFixRequest(BaseModel):
     note: str = Field(default="", max_length=MAX_NOTE_LENGTH)
 
 
+class ErrorFixMergeRequest(BaseModel):
+    """Approve & merge. `head_sha` is the commit the person reviewed: the merge only
+    goes ahead while the pull request still points at it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    head_sha: str = Field(pattern=r"^[0-9a-f]{40}$")
+
+
 class ErrorIssueStatusChange(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -339,7 +420,10 @@ class ErrorIssueStatusChange(BaseModel):
 __all__ = [
     "Digest",
     "ErrorFixConnection",
+    "ErrorFixMergeRequest",
     "ErrorFixRequest",
+    "ErrorFixRun",
+    "ErrorFixRunReview",
     "ErrorFixSettingsUpdate",
     "ErrorIssueDetail",
     "ErrorIssueFix",

@@ -12,6 +12,7 @@ returned, never logged and never echoed in a validation error.
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timezone
 from typing import NoReturn
 
@@ -29,6 +30,7 @@ from crate.api.permissions import require_permission
 from crate.api.schemas.common import TaskEnqueueResponse
 from crate.api.schemas.error_inbox import (
     Classification,
+    ErrorFixMergeRequest,
     ErrorFixRequest,
     ErrorIssueDetail,
     ErrorIssueList,
@@ -42,6 +44,7 @@ from crate.api.schemas.error_inbox import (
 )
 from crate.ai.consumers import accept_action
 from crate.ai.contracts import AIConfigurationError
+from crate.db.queries.error_fix_runs import fix_runs_for_issue, get_fix_run
 from crate.db.queries.error_issues import (
     MAX_LIST_LIMIT,
     get_issue,
@@ -61,6 +64,7 @@ from crate.db.repositories.tasks import (
 from crate.error_inbox import views
 from crate.error_inbox.autofix import next_request_at, supports_short_id
 from crate.error_inbox.config import ErrorTrackingConfigError, save_config
+from crate.error_inbox.fix_runs import can_discard, is_open, merge_blockers
 from crate.error_inbox.state import record_access, write_access
 
 VIEW = "ops.errors.view"
@@ -70,6 +74,8 @@ STATUS_TASK = "update_error_issue_status"
 CONNECTION_TEST_TASK = "test_error_tracking_connection"
 CONNECTION_TEST_DEDUP_KEY = "error-tracking:connection-test"
 FIX_TASK = "dispatch_error_fix"
+MERGE_TASK = "merge_error_fix"
+DISCARD_TASK = "discard_error_fix"
 TRIAGE_ACTION = "ops.error.triage"
 INVESTIGATE_ACTION = "ops.error.investigate"
 # Design §7.1: one Triage backlog press queues at most this many issues.
@@ -134,7 +140,25 @@ _FIX_CONFLICT: OpenApiResponses = {
     409: error_response(
         "ERROR_FIX_NOT_CONFIGURED; ERROR_FIX_UNSUPPORTED_ISSUE when the workflow does "
         "not accept the short id; ERROR_FIX_RECENTLY_REQUESTED within 24 hours of the "
-        "last request."
+        "last request; ERROR_FIX_IN_PROGRESS while the issue has an open fix run."
+    )
+}
+_RUN_NOT_FOUND: OpenApiResponses = {
+    404: error_response(
+        "ERROR_ISSUE_NOT_FOUND or ERROR_FIX_RUN_NOT_FOUND: no such issue or fix run."
+    )
+}
+_MERGE_CONFLICT: OpenApiResponses = {
+    409: error_response(
+        "ERROR_FIX_NOT_CONFIGURED; ERROR_FIX_HEAD_CHANGED when the pull request no "
+        "longer points at the reviewed commit; ERROR_FIX_NOT_MERGEABLE with the "
+        "blockers in the message (not from the fixer, no autofix label, conflicts, "
+        "checks pending or failed, already approved)."
+    )
+}
+_DISCARD_CONFLICT: OpenApiResponses = {
+    409: error_response(
+        "ERROR_FIX_NOT_CONFIGURED; ERROR_FIX_RUN_CLOSED when the run already ended."
     )
 }
 
@@ -199,6 +223,7 @@ def list_errors(
         return list_issues(
             status=status,
             critical_only=lane == "critical",
+            pending_review=lane == "review",
             service=service or None,
             classification=classification,
             release=release or None,
@@ -412,11 +437,101 @@ def launch_fix(request: Request, issue_id: str, body: ErrorFixRequest):
             "ERROR_FIX_RECENTLY_REQUESTED",
             "A fix for this issue was launched less than 24 hours ago",
         )
+    latest = fix_runs_for_issue(issue["id"], limit=1)
+    if latest and is_open(latest[0]["status"]):
+        _fail(
+            409,
+            "ERROR_FIX_IN_PROGRESS",
+            "This issue already has a fix in progress; discard it first",
+        )
     actor_id = int(actor["id"])
     params = {"issue_id": issue["id"], "note": body.note, "actor_id": actor_id}
     # One pending dispatch per issue; the task enforces the 24-hour window.
     task_id = _enqueue(
         FIX_TASK, params, dedup_key=f"error-fix:{issue['id']}", actor_id=actor_id
+    )
+    return {"task_id": task_id}
+
+
+def _canonical_id(value: str) -> str | None:
+    try:
+        return str(uuid.UUID(value))
+    except ValueError:
+        return None
+
+
+def _fix_run(issue_id: str, run_id: str) -> dict:
+    """The run, which must belong to the issue, and a usable Launch fix setup."""
+    run = get_fix_run(run_id)
+    if run is None or run["issue_id"] != _canonical_id(issue_id):
+        if get_issue(issue_id) is None:
+            _fail(404, "ERROR_ISSUE_NOT_FOUND", "Error issue not found")
+        _fail(404, "ERROR_FIX_RUN_NOT_FOUND", "Fix run not found")
+    config = views.stored_connection().config
+    if config is None or not config.fix_ready:
+        _fail(409, "ERROR_FIX_NOT_CONFIGURED", "Launch fix is not configured")
+    return run
+
+
+@router.post(
+    "/{issue_id}/fix-runs/{run_id}/merge",
+    status_code=202,
+    response_model=TaskEnqueueResponse,
+    response_model_exclude_none=True,
+    responses=merge_responses(
+        AUTH_ERROR_RESPONSES,
+        _RUN_NOT_FOUND,
+        _MERGE_CONFLICT,
+        {422: error_response("head_sha is not a commit sha.")},
+    ),
+    summary="Queue Approve & merge of a fix pull request",
+)
+def approve_fix(
+    request: Request, issue_id: str, run_id: str, body: ErrorFixMergeRequest
+):
+    actor = require_permission(request, MANAGE)
+    run = _fix_run(issue_id, run_id)
+    if run.get("pr_head_sha") != body.head_sha:
+        _fail(
+            409,
+            "ERROR_FIX_HEAD_CHANGED",
+            "The pull request changed since this page loaded; review it again",
+        )
+    blockers = merge_blockers(run)
+    if blockers:
+        _fail(
+            409,
+            "ERROR_FIX_NOT_MERGEABLE",
+            "The pull request cannot be merged from Crate now: " + ", ".join(blockers),
+        )
+    actor_id = int(actor["id"])
+    params = {"run_id": run["id"], "head_sha": body.head_sha, "actor_id": actor_id}
+    task_id = _enqueue(
+        MERGE_TASK, params, dedup_key=f"error-fix-merge:{run['id']}", actor_id=actor_id
+    )
+    return {"task_id": task_id}
+
+
+@router.post(
+    "/{issue_id}/fix-runs/{run_id}/discard",
+    status_code=202,
+    response_model=TaskEnqueueResponse,
+    response_model_exclude_none=True,
+    responses=merge_responses(AUTH_ERROR_RESPONSES, _RUN_NOT_FOUND, _DISCARD_CONFLICT),
+    summary="Queue Discard: close a fix pull request and delete its branch",
+)
+def discard_fix(request: Request, issue_id: str, run_id: str):
+    actor = require_permission(request, MANAGE)
+    run = _fix_run(issue_id, run_id)
+    if not can_discard(run):
+        _fail(409, "ERROR_FIX_RUN_CLOSED", "This fix has already ended")
+    actor_id = int(actor["id"])
+    params = {"run_id": run["id"], "actor_id": actor_id}
+    task_id = _enqueue(
+        DISCARD_TASK,
+        params,
+        dedup_key=f"error-fix-discard:{run['id']}",
+        actor_id=actor_id,
     )
     return {"task_id": task_id}
 

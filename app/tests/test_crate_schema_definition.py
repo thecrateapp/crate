@@ -145,7 +145,8 @@ def test_crate_migration_follows_the_current_main_head() -> None:
     assert scripts.get_revision("151").down_revision == "150"
     assert scripts.get_revision("152").down_revision == "151"
     assert scripts.get_revision("153").down_revision == "152"
-    assert scripts.get_heads() == ["153"]
+    assert scripts.get_revision("154").down_revision == "153"
+    assert scripts.get_heads() == ["154"]
 
 
 def test_metric_minute_migration_uses_immutable_schema_definition(monkeypatch):
@@ -330,6 +331,7 @@ def test_error_inbox_tables_are_part_of_the_bootstrap_schema() -> None:
     assert "create_error_inbox_v143_schema(cur)" in source
     assert "create_error_inbox_grant_v144_schema(cur)" in source
     assert "create_error_inbox_auto_triage_v146_schema(cur)" in source
+    assert "create_error_fix_runs_v154_schema(cur)" in source
 
 
 def test_error_inbox_auto_triage_migration_uses_immutable_schema_definition(
@@ -358,6 +360,37 @@ def test_error_inbox_auto_triage_migration_uses_immutable_schema_definition(
         "ALTER TABLE error_issues DROP COLUMN IF EXISTS auto_triage_at",
         "ALTER TABLE error_issues DROP COLUMN IF EXISTS auto_triage_hash",
     ]
+
+
+def test_error_fix_runs_migration_uses_immutable_schema_definition(monkeypatch):
+    migration = import_module("crate.db.migrations.versions.154_error_fix_runs")
+    schema = import_module("crate.db.schema_sections.error_fix_runs_v154")
+    migration_executor = RecordingExecutor()
+    schema_executor = RecordingExecutor()
+    monkeypatch.setattr(migration, "op", migration_executor)
+
+    migration.upgrade()
+    schema.create_error_fix_runs_v154_schema(schema_executor)
+
+    assert migration_executor.statements == schema_executor.statements
+    statements = "\n".join(migration_executor.statements)
+    assert "CREATE TABLE IF NOT EXISTS error_fix_runs" in statements
+    assert "REFERENCES error_issues(id) ON DELETE CASCADE" in statements
+    assert "CHECK (executor IN ('github_actions', 'factory'))" in statements
+    assert "pr_head_sha ~ '^[0-9a-f]{40}$'" in statements
+    # One open run per issue.
+    assert (
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_error_fix_runs_open_issue "
+        "ON error_fix_runs (issue_id) "
+        "WHERE status IN ('requested', 'running', 'pr_open')"
+    ) in statements
+    for index in ("idx_error_fix_runs_issue", "idx_error_fix_runs_trackable"):
+        assert f"CREATE INDEX IF NOT EXISTS {index}" in statements
+
+    downgrade = RecordingExecutor()
+    monkeypatch.setattr(migration, "op", downgrade)
+    migration.downgrade()
+    assert downgrade.statements == ["DROP TABLE IF EXISTS error_fix_runs"]
 
 
 def test_crate_bootstrap_includes_presentation_settings() -> None:

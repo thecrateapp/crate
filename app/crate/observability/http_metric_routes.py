@@ -77,6 +77,8 @@ HTTP_ROUTES = frozenset(
         "/api/admin/errors",
         "/api/admin/errors/:param",
         "/api/admin/errors/:param/fix",
+        "/api/admin/errors/:param/fix-runs/:param/discard",
+        "/api/admin/errors/:param/fix-runs/:param/merge",
         "/api/admin/errors/:param/investigate",
         "/api/admin/errors/:param/status",
         "/api/admin/errors/connection",

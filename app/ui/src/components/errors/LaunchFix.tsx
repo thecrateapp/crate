@@ -14,6 +14,7 @@ import {
   clockText,
   fixProblemText,
   fixUrl,
+  isOpenFix,
   type EnqueuedTask,
   type ErrorIssueDetail,
   type ErrorIssueFix,
@@ -40,7 +41,8 @@ export function LaunchFix({
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
   const [pending, setPending] = useState(false);
-  const blocked = !fix.supported || fix.available_at !== null;
+  const inProgress = isOpenFix(issue.fix_runs?.[0]?.status);
+  const blocked = !fix.supported || fix.available_at !== null || inProgress;
 
   /** Queues the dispatch; a refusal throws so the dialog stays open. */
   async function launch() {
@@ -78,7 +80,10 @@ export function LaunchFix({
   function refused(caught: unknown) {
     const code = apiErrorCode(caught);
     toast.error(fixProblemText(code));
-    if (code === "ERROR_FIX_RECENTLY_REQUESTED") {
+    if (
+      code === "ERROR_FIX_RECENTLY_REQUESTED" ||
+      code === "ERROR_FIX_IN_PROGRESS"
+    ) {
       setOpen(false);
       onChanged();
     }
@@ -100,9 +105,11 @@ export function LaunchFix({
           ? "Asking GitHub to start the workflow. This can take a few seconds."
           : !fix.supported
             ? "The autofix workflow only accepts Crate short ids such as CRATE-API-1F."
-            : fix.available_at
-              ? `Launch fix is available again at ${clockText(fix.available_at)}.`
-              : null}
+            : inProgress
+              ? "A fix is in progress. Discard it to launch another."
+              : fix.available_at
+                ? `Launch fix is available again at ${clockText(fix.available_at)}.`
+                : null}
       </p>
 
       <ConfirmDialog
@@ -111,7 +118,7 @@ export function LaunchFix({
         onConfirm={launch}
         onError={refused}
         title={`Launch a fix for ${issue.short_id}?`}
-        description={`Crate asks GitHub Actions to run ${fix.workflow} in ${fix.repository}. An agent tries to reproduce the error with a test and, if it can, opens a draft pull request for review. Nothing is merged without a person.`}
+        description={`Crate asks GitHub Actions to run ${fix.workflow} in ${fix.repository}. An agent tries to reproduce the error with a test and, if it can, opens a draft pull request for review. Crate follows it here; nothing is merged unless a person approves it.`}
         body={
           <div className="grid gap-4">
             <p

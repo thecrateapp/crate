@@ -396,6 +396,40 @@ describe("Errors", () => {
     );
   });
 
+  it("shows the pending review lane and marks issues with an open fix PR", async () => {
+    const issues = sampleIssues();
+    issues[1] = { ...issues[1]!, fix_status: "pr_open" };
+    serve({ issues, summary: sampleSummary({}, issues) });
+    renderWithAdminProviders(
+      <>
+        <Errors />
+        <Location />
+      </>,
+      { route: "/errors" },
+    );
+    const table = await issueTable();
+
+    expect(screen.getByText("1 pending review")).toBeInTheDocument();
+    expect(
+      within(table).getByText("Pending review", {
+        selector: '[data-slot="info-badge"]',
+      }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole("radio", { name: "Pending review" }),
+    );
+
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenLastCalledWith(
+        expect.stringContaining("lane=review"),
+      ),
+    );
+    expect(
+      screen.getByRole("status", { name: "Current location" }),
+    ).toHaveTextContent("/errors?lane=review");
+  });
+
   it("filters by class with chips", async () => {
     serve();
     renderWithAdminProviders(

@@ -1838,6 +1838,14 @@ def test_openapi_types_error_inbox_routes_and_marks_them_authenticated(test_app)
             "TaskEnqueueResponse",
         ),
         ("/api/admin/errors/{issue_id}/fix", "post"): ("202", "TaskEnqueueResponse"),
+        ("/api/admin/errors/{issue_id}/fix-runs/{run_id}/merge", "post"): (
+            "202",
+            "TaskEnqueueResponse",
+        ),
+        ("/api/admin/errors/{issue_id}/fix-runs/{run_id}/discard", "post"): (
+            "202",
+            "TaskEnqueueResponse",
+        ),
         ("/api/admin/errors/connection", "get"): ("200", "ErrorTrackingConnection"),
         ("/api/admin/errors/connection", "put"): ("200", "ErrorTrackingConnection"),
         ("/api/admin/errors/connection/test", "post"): ("202", "TaskEnqueueResponse"),
@@ -1874,6 +1882,13 @@ def test_openapi_types_error_inbox_routes_and_marks_them_authenticated(test_app)
     )
     launch = schema["components"]["schemas"]["ErrorFixRequest"]
     assert launch["properties"]["note"]["maxLength"] == 500
+    approve = schema["components"]["schemas"]["ErrorFixMergeRequest"]
+    assert approve["properties"]["head_sha"]["pattern"] == "^[0-9a-f]{40}$"
+    assert approve["additionalProperties"] is False
+    detail = schema["components"]["schemas"]["ErrorIssueDetail"]
+    assert detail["properties"]["fix_runs"]["items"]["$ref"] == (
+        "#/components/schemas/ErrorFixRun"
+    )
     dashboard = schema["components"]["schemas"]["MetricsDashboardResponse"]
     assert "errors" in dashboard["properties"]
     admin = test_app.get("/openapi-admin-system.json").json()
