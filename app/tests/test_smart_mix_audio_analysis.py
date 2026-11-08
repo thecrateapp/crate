@@ -152,7 +152,7 @@ def test_python_fallback_never_publishes_unmeasured_loudness(tmp_path: Path) -> 
 
     profile = analyze_mix_profile(track)
 
-    assert profile.analyzer_version == ANALYZER_VERSION == "smart-mix-audio-v7"
+    assert profile.analyzer_version == ANALYZER_VERSION == "smart-mix-audio-v8"
     assert profile.intro_lufs is None
     assert profile.outro_lufs is None
     assert profile.integrated_lufs is None
@@ -507,6 +507,7 @@ def test_profile_analysis_passes_model_beats_to_rust(
 ) -> None:
     import crate.audio_analysis as audio_analysis
     from crate import crate_cli
+    from crate.smart_mix.versions import ANALYZER_VERSION
 
     beats = _model_beats(2)
     calls: list[dict] = []
@@ -519,7 +520,7 @@ def test_profile_analysis_passes_model_beats_to_rust(
         return {
             "mixProfile": {
                 "analyzer": "crate-rust",
-                "analyzerVersion": "smart-mix-audio-v7",
+                "analyzerVersion": ANALYZER_VERSION,
                 "durationMs": 20_000,
                 "quality": "partial",
                 "beatTracker": "beat-this-test",
