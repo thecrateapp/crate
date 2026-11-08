@@ -1,0 +1,567 @@
+---
+import BlogIcon from "../BlogIcon.astro";
+import { milestones } from "../../data/engineering-timeline";
+
+const systems = [
+  { id: "library", label: "Library repair", detail: "Files, tags and matching" },
+  { id: "catalog", label: "Catalogue", detail: "An index of the collection" },
+  { id: "playback", label: "Playback", detail: "Streams and listening queues" },
+  { id: "workers", label: "Background work", detail: "Jobs that outlive a request" },
+  { id: "snapshots", label: "Read plane", detail: "Prepared views of the library" },
+  { id: "native", label: "Native clients", detail: "Music beyond the browser" },
+  { id: "federation", label: "Federation", detail: "Libraries across servers" },
+  { id: "intelligence", label: "Audio analysis", detail: "Signals for discovery" },
+];
+const first = milestones[0];
+const formatDate = (date: string) =>
+  new Date(`${date}T12:00:00Z`).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+---
+
+<section class="system-timeline" data-timeline-proposal="system-map" aria-label="Crate capability timeline">
+  <div class="map-heading">
+    <p class="map-eyebrow">System map <span aria-hidden="true">/</span> 2026</p>
+    <p class="map-count"><span data-system-count>{first.systems.length}</span><span> of {systems.length} capabilities</span></p>
+  </div>
+
+  <div class="map-content">
+    <figure class="capability-map" aria-label="Capabilities present at the selected milestone">
+      <div class="map-origin">
+        <span class="origin-rule" aria-hidden="true"></span>
+        <div class="origin-label"><span>CRATE</span><small data-map-era>{first.era}</small></div>
+        <span class="origin-rule" aria-hidden="true"></span>
+      </div>
+      <ul class="system-nodes">
+        {systems.map((system, index) => (
+          <li
+            class="system-node"
+            data-system={system.id}
+            data-state={first.systems.includes(system.id) ? "added" : "later"}
+          >
+            <svg class="system-connection" viewBox="0 0 40 20" preserveAspectRatio="none" aria-hidden="true">
+              <path d={index % 2 === 0 ? "M0 10 H40" : "M40 10 H0"} pathLength="1" />
+              <circle cx={index % 2 === 0 ? 4 : 36} cy="10" r="2" />
+            </svg>
+            <div class="node-top"><span class="node-index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span><span class="node-status" data-node-status>{first.systems.includes(system.id) ? "Added" : "Later"}</span></div>
+            <strong>{system.label}</strong>
+            <span class="node-description">{system.detail}</span>
+          </li>
+        ))}
+      </ul>
+      <figcaption>
+        <span class="map-key"><i class="present-key" aria-hidden="true"></i> Present</span>
+        <span class="map-key"><i class="added-key" aria-hidden="true"></i> Added at this step</span>
+        <span class="map-caption">A map of capabilities through the project's history.</span>
+      </figcaption>
+    </figure>
+
+    <div class="milestone-reader" aria-live="polite" aria-atomic="true">
+      {milestones.map((milestone, index) => (
+        <article
+          class="milestone-detail"
+          id={`system-map-${milestone.id}`}
+          data-milestone-id={milestone.id}
+          data-milestone-index={index}
+          data-systems={milestone.systems.join(",")}
+          data-era={milestone.era}
+          data-date-label={formatDate(milestone.date)}
+          data-title={milestone.title}
+          hidden={index !== 0}
+        >
+          <div class="detail-date"><time datetime={milestone.date}>{formatDate(milestone.date)}</time><span>{milestone.era}</span></div>
+          <h3>{milestone.title}</h3>
+          <p class="detail-summary">{milestone.summary}</p>
+          <div class="detail-change"><span class="map-eyebrow">What changed</span><p>{milestone.change}</p></div>
+          <div class="detail-links">
+            {milestone.href ? (
+              <a class="chapter-link" href={milestone.href}>{milestone.status === "draft" ? "Read the draft" : "Read related post"}<BlogIcon name="arrow-right" size={16} /></a>
+            ) : (
+              <span class="chapter-status">{milestone.chapter ? `Chapter ${milestone.chapter} · ` : ""}{milestone.status === "draft" ? "Draft in progress" : "Chapter planned"}</span>
+            )}
+            <a class="source-link" href={milestone.source} data-blog-link="github"><BlogIcon name="github" size={16} /> Historical source</a>
+          </div>
+        </article>
+      ))}
+    </div>
+  </div>
+
+  <div class="map-controls">
+    <div class="milestone-picker">
+      <label for="system-map-select" class="map-eyebrow">Explore a milestone</label>
+      <select id="system-map-select" data-milestone-select>
+        {milestones.map((milestone, index) => <option value={index}>{String(index + 1).padStart(2, "0")} · {milestone.title}</option>)}
+      </select>
+    </div>
+    <div class="map-navigation">
+      <button type="button" class="step-button" data-map-previous aria-label="Previous milestone" disabled><BlogIcon name="arrow-left" /></button>
+      <div class="range-wrap">
+        <label class="sr-only" for="system-map-range">Milestone</label>
+        <input id="system-map-range" data-milestone-range type="range" min="0" max={milestones.length - 1} step="1" value="0" aria-valuetext={`${formatDate(first.date)}: ${first.title}`} />
+        <div class="range-ticks" aria-hidden="true">{milestones.map((_, index) => <span data-map-tick data-passed={index === 0 ? "true" : "false"}></span>)}</div>
+        <div class="range-labels"><span>March</span><span data-map-position>01 / {String(milestones.length).padStart(2, "0")}</span><span>November</span></div>
+      </div>
+      <button type="button" class="step-button" data-map-next aria-label="Next milestone"><BlogIcon name="arrow-right" /></button>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { initSystemMapTimeline } from "../../scripts/blog-timeline/system-map";
+  import { mountOnPage } from "../../scripts/motion/page";
+
+  mountOnPage('[data-timeline-proposal="system-map"]', initSystemMapTimeline);
+</script>
+
+<style>
+  .system-timeline {
+    --map-gap: 44px;
+    overflow: clip;
+    border: 1px solid var(--line);
+    background: rgba(10, 10, 15, 0.9);
+  }
+  .map-heading {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 22px 28px;
+    border-bottom: 1px solid var(--line);
+  }
+  .map-eyebrow {
+    margin: 0;
+    font: 10px/1.5 var(--mono);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+  .map-heading .map-eyebrow {
+    color: var(--fg-2);
+  }
+  .map-heading .map-eyebrow span {
+    margin-inline: 12px;
+    color: var(--cyan);
+  }
+  .map-count {
+    margin: 0;
+    font: 11px/1.5 var(--mono);
+    color: var(--fg-3);
+  }
+  .map-count > span:first-child {
+    color: var(--cyan-hi);
+    font-variant-numeric: tabular-nums;
+  }
+  .map-content {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  }
+  .capability-map {
+    min-width: 0;
+    margin: 0;
+    padding: 32px 28px 26px;
+  }
+  .map-origin {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    min-height: 74px;
+    padding-bottom: 22px;
+  }
+  .origin-rule {
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+  .origin-label {
+    display: grid;
+    gap: 5px;
+    text-align: center;
+  }
+  .origin-label > span {
+    font: 750 26px/1 var(--display);
+    letter-spacing: -0.04em;
+  }
+  .origin-label small {
+    max-width: 150px;
+    font: 10px/1.5 var(--mono);
+    color: var(--fg-3);
+  }
+  .system-nodes {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px var(--map-gap);
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+  .system-nodes::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: -22px;
+    bottom: 52px;
+    width: 1px;
+    background: var(--line);
+  }
+  .system-node {
+    position: relative;
+    min-width: 0;
+    min-height: 106px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    transition:
+      border-color 240ms ease,
+      background-color 240ms ease;
+  }
+  .system-node[data-state="present"] {
+    border-color: rgba(6, 182, 212, 0.38);
+    background: rgba(6, 182, 212, 0.045);
+  }
+  .system-node[data-state="added"] {
+    border-color: rgba(251, 191, 36, 0.55);
+    background: rgba(251, 191, 36, 0.05);
+  }
+  .node-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 5px;
+    margin-bottom: 13px;
+    font: 9px/1 var(--mono);
+  }
+  .node-index {
+    color: var(--fg-3);
+  }
+  .node-status {
+    color: var(--fg-3);
+  }
+  [data-state="present"] .node-status {
+    color: var(--cyan-hi);
+  }
+  [data-state="added"] .node-status {
+    color: var(--amber);
+  }
+  .system-node strong {
+    display: block;
+    font: 650 17px/1.2 var(--display);
+    letter-spacing: -0.025em;
+    color: var(--fg-2);
+  }
+  .system-node[data-state="present"] strong,
+  .system-node[data-state="added"] strong {
+    color: var(--fg);
+  }
+  .node-description {
+    display: block;
+    margin-top: 5px;
+    color: var(--fg-3);
+    font: 11px/1.5 var(--sans);
+  }
+  .system-connection {
+    position: absolute;
+    top: 50%;
+    left: 100%;
+    width: calc(var(--map-gap) / 2);
+    height: 20px;
+    transform: translateY(-50%);
+    overflow: visible;
+  }
+  .system-node:nth-child(even) .system-connection {
+    left: auto;
+    right: 100%;
+  }
+  .system-connection path {
+    fill: none;
+    stroke: var(--line);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+  .system-connection circle {
+    fill: var(--bg);
+    stroke: var(--line);
+    stroke-width: 1;
+  }
+  [data-state="present"] .system-connection path,
+  [data-state="present"] .system-connection circle {
+    stroke: var(--cyan);
+  }
+  [data-state="added"] .system-connection path,
+  [data-state="added"] .system-connection circle {
+    stroke: var(--amber);
+  }
+  figcaption {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    margin-top: 24px;
+    font: 10px/1.6 var(--mono);
+    color: var(--fg-3);
+  }
+  .map-key {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .map-key i {
+    display: block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+  }
+  .present-key {
+    background: var(--cyan);
+  }
+  .added-key {
+    background: var(--amber);
+  }
+  .map-caption {
+    flex-basis: 100%;
+  }
+  .milestone-reader {
+    min-width: 0;
+    padding: 38px 32px;
+    border-left: 1px solid var(--line);
+    background: rgba(241, 245, 249, 0.018);
+  }
+  .milestone-detail[hidden] {
+    display: none;
+  }
+  .detail-date {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    color: var(--fg-3);
+    font: 10px/1.6 var(--mono);
+  }
+  .detail-date time {
+    color: var(--amber);
+  }
+  h3 {
+    margin: 27px 0 18px;
+    font: 700 clamp(1.8rem, 3vw, 2.8rem)/1.03 var(--display);
+    letter-spacing: -0.04em;
+    text-wrap: balance;
+  }
+  .detail-summary {
+    margin: 0;
+    color: var(--fg-2);
+    font: 15px/1.7 var(--sans);
+  }
+  .detail-change {
+    margin-top: 32px;
+    padding-top: 21px;
+    border-top: 1px solid var(--line);
+  }
+  .detail-change p {
+    margin: 10px 0 0;
+    color: var(--fg-2);
+    font: 13px/1.7 var(--sans);
+  }
+  .detail-links {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    margin-top: 24px;
+  }
+  .detail-links a {
+    display: inline-flex;
+    align-items: center;
+    gap: 15px;
+    min-height: 44px;
+    text-decoration: none;
+  }
+  .chapter-link {
+    font: 600 13px/1.4 var(--sans);
+    color: var(--cyan-hi);
+  }
+  .chapter-link span {
+    font: 20px/1 var(--sans);
+  }
+  .source-link {
+    font: 10px/1.5 var(--mono);
+    color: var(--fg-3);
+  }
+  .detail-links a:hover {
+    color: var(--fg);
+  }
+  .chapter-status {
+    display: block;
+    padding-block: 14px;
+    color: var(--fg-3);
+    font: 11px/1.5 var(--mono);
+  }
+  .map-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: end;
+    gap: 40px;
+    padding: 24px 28px;
+    border-top: 1px solid var(--line);
+  }
+  .milestone-picker {
+    min-width: 0;
+    display: grid;
+    gap: 8px;
+  }
+  select {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 10px 28px 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 0;
+    color: var(--fg);
+    background: var(--bg);
+    font: 12px/1.4 var(--sans);
+    color-scheme: dark;
+  }
+  .map-navigation {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .step-button {
+    display: grid;
+    place-items: center;
+    flex: 0 0 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--fg);
+    background: transparent;
+    font: 23px/1 var(--sans);
+    cursor: pointer;
+  }
+  .step-button:hover:not(:disabled) {
+    border-color: var(--cyan);
+    color: var(--cyan-hi);
+  }
+  .step-button:disabled {
+    opacity: 0.32;
+    cursor: default;
+  }
+  .range-wrap {
+    flex: 1;
+    min-width: 0;
+  }
+  input[type="range"] {
+    display: block;
+    width: 100%;
+    height: 44px;
+    margin: 0;
+    padding: 0;
+    accent-color: var(--cyan-hi);
+    cursor: pointer;
+  }
+  .range-ticks {
+    display: flex;
+    justify-content: space-between;
+    padding-inline: 5px;
+  }
+  .range-ticks span {
+    width: 1px;
+    height: 5px;
+    background: var(--line);
+  }
+  .range-ticks span[data-passed="true"] {
+    background: var(--cyan);
+  }
+  .range-labels {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    margin-top: 7px;
+    font: 9px/1.5 var(--mono);
+    color: var(--fg-3);
+  }
+  [data-map-position] {
+    color: var(--fg-2);
+    font-variant-numeric: tabular-nums;
+  }
+  button:focus-visible,
+  select:focus-visible,
+  input:focus-visible,
+  a:focus-visible {
+    outline: 2px solid var(--cyan-hi);
+    outline-offset: 4px;
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  @media (max-width: 900px) {
+    .map-content {
+      grid-template-columns: 1fr;
+    }
+    .milestone-reader {
+      border-left: 0;
+      border-top: 1px solid var(--line);
+      padding: 28px;
+    }
+    h3 {
+      max-width: 22ch;
+      margin-top: 18px;
+    }
+    .detail-summary,
+    .detail-change {
+      max-width: 65ch;
+    }
+    .map-controls {
+      gap: 24px;
+    }
+  }
+  @media (max-width: 540px) {
+    .system-timeline {
+      --map-gap: 30px;
+    }
+    .map-heading {
+      padding: 18px;
+    }
+    .capability-map {
+      padding: 20px 18px;
+    }
+    .system-nodes {
+      row-gap: 14px;
+    }
+    .system-node {
+      min-height: 108px;
+      padding: 12px 10px;
+    }
+    .system-node strong {
+      font-size: 16px;
+    }
+    .node-description {
+      font-size: 11px;
+    }
+    .milestone-reader {
+      padding: 26px 20px;
+    }
+    .map-controls {
+      grid-template-columns: 1fr;
+      gap: 18px;
+      padding: 22px 18px;
+    }
+    .map-navigation {
+      gap: 14px;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .system-node {
+      transition: none;
+    }
+  }
+</style>

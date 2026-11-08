@@ -1,0 +1,140 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 960 990"
+  role="img"
+  aria-labelledby="title desc"
+>
+  <title id="title">The native Listen playback path at11April</title>
+  <desc id="desc">
+    Listen constructs an ID-based or legacy path URL. Crate authenticates,
+    resolves a catalogue ID to a path when needed, normalizes and checks the
+    file and delegates delivery to FileResponse. The browser decodes the
+    original format. Play-event reporting is a separate request. This depicts
+    the historical native route, not the separate initial Subsonic
+    implementation.
+  </desc>
+  <defs>
+    <marker
+      id="arrow"
+      viewBox="0 0 10 10"
+      refX="9"
+      refY="5"
+      markerWidth="6"
+      markerHeight="6"
+      orient="auto"
+    >
+      <path
+        d="M0 0L10 5L0 10"
+        fill="none"
+        stroke="#67e8f9"
+        stroke-width="1.5"
+      />
+    </marker>
+  </defs>
+  <style>
+    text {
+      font-family: Arial, Helvetica, sans-serif;
+      fill: #f1f5f9;
+      font-size: 20px;
+    }
+    .label {
+      font-family: monospace;
+      font-size: 16px;
+      fill: #67e8f9;
+      letter-spacing: 0.6px;
+    }
+    .note {
+      font-size: 17px;
+      fill: #b1b5c0;
+    }
+    .small {
+      font-size: 16px;
+      fill: #b1b5c0;
+    }
+    .box {
+      fill: #11121a;
+      stroke: #353947;
+    }
+    .active {
+      fill: #0c2028;
+      stroke: #278396;
+    }
+    .flow {
+      fill: none;
+      stroke: #67e8f9;
+      stroke-width: 1.5;
+      marker-end: url(#arrow);
+    }
+    .event {
+      fill: none;
+      stroke: #fbbf24;
+      stroke-width: 1.5;
+      stroke-dasharray: 2 5;
+    }
+    .warn {
+      fill: #fbbf24;
+    }
+  </style>
+  <rect width="960" height="990" rx="10" fill="#0a0a0f" />
+  <text x="32" y="42" class="label" text-anchor="start">
+    11 APR · THE NATIVE LISTEN PLAYBACK PATH
+  </text>
+  <rect x="210" y="78" width="540" height="94" rx="5" class="active" />
+  <text x="480.0" y="119.0" class="" text-anchor="middle">
+    Listen builds the media URL
+  </text>
+  <text x="480.0" y="145.0" class="" text-anchor="middle">
+    libraryTrackId preferred; path fallback
+  </text>
+  <path d="M480 172V212" class="flow" />
+  <rect x="210" y="212" width="540" height="92" rx="5" class="box" />
+  <text x="480.0" y="252.0" class="" text-anchor="middle">
+    Authenticate in Crate
+  </text>
+  <text x="480.0" y="278.0" class="" text-anchor="middle">
+    Cookie / bearer / native query token
+  </text>
+  <path d="M480 304V344" class="flow" />
+  <rect x="210" y="344" width="540" height="92" rx="5" class="box" />
+  <text x="480.0" y="384.0" class="" text-anchor="middle">
+    Resolve catalogue ID → path
+  </text>
+  <text x="480.0" y="410.0" class="" text-anchor="middle">
+    SELECT path FROM library_tracks
+  </text>
+  <path d="M480 436V476" class="flow" />
+  <rect x="210" y="476" width="540" height="92" rx="5" class="box" />
+  <text x="480.0" y="516.0" class="" text-anchor="middle">
+    Normalize and check the file
+  </text>
+  <text x="480.0" y="542.0" class="" text-anchor="middle">
+    Historical safe_path + is_file()
+  </text>
+  <path d="M480 568V608" class="flow" />
+  <rect x="210" y="608" width="540" height="92" rx="5" class="active" />
+  <text x="480.0" y="648.0" class="" text-anchor="middle">FileResponse</text>
+  <text x="480.0" y="674.0" class="" text-anchor="middle">
+    Original bytes + MIME + Accept-Ranges
+  </text>
+  <path d="M480 700V740" class="flow" />
+  <rect x="210" y="740" width="540" height="92" rx="5" class="box" />
+  <text x="480.0" y="780.0" class="" text-anchor="middle">
+    Browser decodes and plays
+  </text>
+  <text x="480.0" y="806.0" class="" text-anchor="middle">
+    Successful delivery does not guarantee play
+  </text>
+  <path d="M750 258 H842 V522 H750" class="flow" />
+  <text x="890" y="378" class="label" text-anchor="middle">PATH</text>
+  <text x="890" y="405" class="label" text-anchor="middle">ROUTE</text>
+  <text x="32" y="880" class="note" text-anchor="start">
+    The path route skips the catalogue lookup, not authentication.
+  </text>
+  <path d="M32 917H102" class="event" />
+  <text x="120" y="924" class="note" text-anchor="start">
+    Play events are reported separately from media requests.
+  </text>
+  <text x="32" y="961" class="note" text-anchor="start">
+    No transcoding stage is present in this native endpoint.
+  </text>
+</svg>

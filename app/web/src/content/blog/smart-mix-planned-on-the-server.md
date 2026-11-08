@@ -11,22 +11,22 @@ sources:
   - docs/technical/smart-mix-design.md
 ---
 
-Most music players crossfade blind. A few seconds before a track ends, they turn it down and turn the next one up,
-whatever is playing. If the beats don't line up you get a stumble, and if the next track is quieter it sounds like
-something broke.
+A timed crossfade starts turning one track down and the next one up a few seconds before the first track ends.
+It doesn't know what either track is playing. If the beats don't line up, the rhythm stumbles through the fade.
+If the next track is quieter, the level drops as it takes over.
 
-A DJ does three things a timer can't. They pick where each track should be when the mix starts, usually the end
-of one phrase and the start of the next. They match the tempo so the beats land together. And they swap the bass
-lines so two kick drums never pile up. All of that depends on knowing the music: where every beat is, where the
-intro and outro sit, and how loud each track is.
+For Smart Mix, we use the music to choose the transition. That means picking where each track should be when
+the mix starts, usually the end of one phrase and the start of the next, then matching the tempo so the beats
+land together. A bass swap cuts the low end of one track as the other comes in. Those decisions need a beat grid,
+intro and outro cues, and loudness measurements for both tracks.
 
-That knowledge is expensive to get. A phone could decode two whole tracks and analyse them before every
-transition, but that's a lot of battery for a few seconds of music. What the phone does have is a precise audio
-clock. So Crate splits the job: the server knows the music, the phone keeps time.
+Getting that information requires decoding and analysing the audio. A phone could do that for two whole tracks
+before every transition, but it would repeat work we can do once on the server. We keep the analysis there and
+send the phone a plan. The phone uses its audio clock to play it.
 
 ## Analyse once, plan per pair
 
-Every track gets a mix profile when it's analysed on the server: tempo and its stability, the beat grid, key,
+We build a mix profile when we analyse a track on the server: tempo and its stability, the beat grid, key,
 intro and outro cues, and loudness at both ends measured with BS.1770. The Rust analysis tool does most of this
 work, with a Python fallback, on the worker queue reserved for heavy jobs. It happens once per track.
 
@@ -43,8 +43,8 @@ The planner goes through its options in order. An album played in order stays ga
 350 ms ramp. If either track has no profile yet, it falls back to a plain three-second fade and says why. Only
 then does it try to beatmatch.
 
-Beatmatching has to earn its place. Both tracks need a BPM confidence of at least 0.75, a tempo stability of at
-least 0.80 and the same meter, and the window has to hold at least eight beats. The tempo change can't be bigger
+We only try beatmatching when both tracks have a BPM confidence of at least 0.75, a tempo stability of at
+least 0.80 and the same meter. The window has to hold at least eight beats, and the tempo change can't be bigger
 than 4%:
 
 ```python source="app/crate/smart_mix/planner.py#L307-L316" commit="cacf4b3471371b6cc68c7a3baf2a4a752f74626f" "INCOMPATIBLE_TEMPO"
@@ -60,16 +60,16 @@ if not context.allow_tempo_adjustment and adjustment > 0.001:
 return None
 ```
 
-When a check fails, the planner downgrades to an adaptive crossfade and records the reason
-(`unstable_tempo`, `incompatible_tempo`, `incompatible_meter` and so on), so every downgraded transition says
-why.
+When a check fails, the planner downgrades to an adaptive crossfade and returns the reason:
+`unstable_tempo`, `incompatible_tempo`, `incompatible_meter` and so on. The plan carries both the transition
+it will play and the reason it couldn't beatmatch.
 
 Normal transitions last between one and twelve seconds. Very stable tracks can get a long blend of 32, 16 or 8
 bars, up to 48 seconds. Loudness is levelled by at most 6 dB, and a track is only turned up when both were
 measured with the same method. A ceiling based on each track's true peak keeps the sum from clipping.
 
-The plan validates itself before it leaves the server. A tempo ratio outside 0.94 to 1.06, an unknown curve or an
-unknown bass mode raises an error:
+The plan model validates the result before it leaves the server. A tempo ratio outside 0.94 to 1.06, an unknown
+curve or an unknown bass mode raises an error:
 
 ```python source="app/crate/smart_mix/models.py#L372-L383" commit="cacf4b3471371b6cc68c7a3baf2a4a752f74626f"
 ratio = float(self.incoming_tempo_ratio)
@@ -127,10 +127,10 @@ Smart Mix plays only in the Android app today. The web and desktop apps share th
 mixer, and iOS is an open item. The VirtualDJ plugin uses the same profiles with VirtualDJ's own automix. Every
 feature flag is off by default, and they unlock in order: Smart Mix, native crossfade, beatmatch, then bass swap.
 
-Several targets are written down but not measured yet. Plans should come back in under 50 ms at p95 from cache and
-150 ms without it. Beatmatched phase error should stay under 20 ms at p95, and there's a pending check for
-clipping and buffer underruns on real devices. Until those numbers exist, the 10 ms preroll check is the
-safeguard against a mix that drifts out of phase.
+We haven't measured against our performance targets yet: plans returning in under 50 ms at p95 from cache and
+150 ms without it, and beatmatched phase error below 20 ms at p95. We also need to check clipping and buffer
+underruns on real devices. For now, each transition has the 10 ms preroll check before beatmatching engages.
+That checks the initial alignment; it doesn't measure phase error across the whole mix.
 
 ## Read the code
 

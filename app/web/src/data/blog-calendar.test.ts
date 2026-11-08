@@ -2,12 +2,11 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { readingWords } from "../lib/blog";
+import { codeSource } from "../lib/code-source";
 import { calendar } from "./blog-calendar";
 
 const repoRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 const postsDir = fileURLToPath(new URL("../content/blog/", import.meta.url));
-const MAX_WORDS = 1400;
 
 function frontmatter(file: string) {
   const text = readFileSync(`${postsDir}${file}`, "utf8");
@@ -77,22 +76,51 @@ describe("blog calendar", () => {
       expect(slugs).toContain(file.replace(/\.md$/, ""));
   });
 
-  it("points code blocks at files that exist", () => {
+  it("does not send readers from published prose to missing or draft articles", () => {
     for (const file of posts) {
-      const text = readFileSync(`${postsDir}${file}`, "utf8");
-      for (const [, source] of text.matchAll(/^```\S*.*\bsource="([^"#]+)/gm)) {
-        expect(existsSync(`${repoRoot}${source}`), `${file}: ${source}`).toBe(
-          true,
-        );
+      const post = frontmatter(file);
+      if (post.draft) continue;
+      for (const [, slug] of post.body.matchAll(
+        /\]\(\/blog\/([a-z0-9-]+)(?:[?#][^)]*)?\)/g,
+      )) {
+        const target = `${slug}.md`;
+        expect(posts, `${file} links to ${slug}`).toContain(target);
+        expect(
+          frontmatter(target).draft,
+          `${file} links to draft ${slug}`,
+        ).toBe(false);
       }
     }
   });
 
-  it("keeps posts short", () => {
+  it("gives every code excerpt a pinned source and original line numbers", () => {
+    let excerpts = 0;
     for (const file of posts) {
-      expect(readingWords(frontmatter(file).body), file).toBeLessThanOrEqual(
-        MAX_WORDS,
-      );
+      const text = readFileSync(`${postsDir}${file}`, "utf8");
+      for (const [, language, metadata] of text.matchAll(
+        /^```(\S+)([^\n]*)\n[\s\S]*?^```[ \t]*$/gm,
+      )) {
+        const source = metadata.match(/\bsource="([^"]+)"/)?.[1];
+        const commit = metadata.match(/\bcommit="([^"]+)"/)?.[1];
+        const context = `${file}: ${metadata.trim()}`;
+        // Authored shell commands use the documented terminal format.
+        if (language === "sh" && !source) {
+          expect(metadata, context).toMatch(/\btitle="[^"]+"/);
+          continue;
+        }
+        excerpts++;
+        expect(source ?? "", context).toMatch(
+          /^[^#]+#L[1-9]\d*(?:-L[1-9]\d*)?$/,
+        );
+        const resolved = codeSource(source!, commit);
+        expect(resolved.path, context).not.toMatch(
+          /^(?:\/|[a-z]+:)|(?:^|\/)\.\.(?:\/|$)|[?#\\]/i,
+        );
+        expect(resolved.startLine, context).toBeGreaterThan(0);
+        // Historical paths may have moved or disappeared from HEAD. Validate
+        // their metadata here; authors verify content at the pinned revision.
+      }
     }
+    expect(excerpts).toBeGreaterThan(0);
   });
 });

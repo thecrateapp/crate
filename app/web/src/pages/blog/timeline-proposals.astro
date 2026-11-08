@@ -1,0 +1,115 @@
+---
+import Base from "../../layouts/Base.astro";
+import BlogIcon from "../../components/BlogIcon.astro";
+import BlogIconCredits from "../../components/BlogIconCredits.astro";
+import SignalTrack from "../../components/blog-timeline/SignalTrack.astro";
+import SystemMap from "../../components/blog-timeline/SystemMap.astro";
+import FieldNotes from "../../components/blog-timeline/FieldNotes.astro";
+import { milestones, seriesTitle } from "../../data/engineering-timeline";
+
+if (!import.meta.env.DEV) return Astro.redirect("/blog");
+const proposals = [
+  { id: "signal-track", name: "Signal track", description: "Follow a single track through Crate's history. Select a milestone to read what changed." },
+  { id: "system-map", name: "System map", description: "See the responsibilities Crate takes on as you move through its history." },
+  { id: "field-notes", name: "Field notes", description: "Read the history in sequence, with an index of periods and room for the details." },
+];
+---
+
+<Base title="Three ways through Crate's history · Crate" description="Explore three interactive directions for the engineering series timeline.">
+  <meta slot="head" name="robots" content="noindex, nofollow" />
+  <div class="timeline-lab" data-timeline-lab>
+    <header class="lab-header">
+      <a href="/blog" class="lab-back"><BlogIcon name="arrow-left" size={16} /> Engineering blog</a>
+      <div class="lab-heading"><h1>How to forget Spotify.</h1><p>Building Crate from the ground.</p></div>
+      <div class="lab-context"><span>Timeline studies</span><span>{milestones.length} milestones · March–November 2026</span></div>
+    </header>
+
+    <div class="proposal-tabs" role="tablist" aria-label="Timeline proposals">
+      {proposals.map((proposal,index) => (
+        <button type="button" role="tab" id={`tab-${proposal.id}`} aria-controls={`panel-${proposal.id}`} aria-selected={index === 0} tabindex={index === 0 ? 0 : -1} data-proposal-tab={proposal.id}>
+          <span>{String(index + 1).padStart(2,"0")}</span> {proposal.name}
+        </button>
+      ))}
+    </div>
+
+    {proposals.map((proposal,index) => (
+      <section role="tabpanel" id={`panel-${proposal.id}`} aria-labelledby={`tab-${proposal.id}`} hidden={index !== 0} data-proposal-panel={proposal.id} tabindex="0">
+        <p class="proposal-description">{proposal.description}</p>
+        {proposal.id === "signal-track" && <SignalTrack />}
+        {proposal.id === "system-map" && <SystemMap />}
+        {proposal.id === "field-notes" && <FieldNotes />}
+      </section>
+    ))}
+
+    <footer class="lab-foot"><p>{seriesTitle}</p><p>History as of 7 November 2026. v3.2.4 is the latest version tag; the final milestone records later work in main.</p></footer>
+    <BlogIconCredits />
+  </div>
+</Base>
+
+<script>
+  import { mountOnPage } from "../../scripts/motion/page";
+  mountOnPage("[data-timeline-lab]", () => {
+    const root = document.querySelector<HTMLElement>("[data-timeline-lab]")!;
+    const tabs = [...root.querySelectorAll<HTMLButtonElement>("[data-proposal-tab]")];
+    const panels = [...root.querySelectorAll<HTMLElement>("[data-proposal-panel]")];
+    const controller = new AbortController();
+    let active = 0;
+    const select = (index: number, focus = false) => {
+      active = index;
+      tabs.forEach((tab,i) => {
+        tab.setAttribute("aria-selected",String(i === active));
+        tab.tabIndex = i === active ? 0 : -1;
+        panels[i]!.hidden = i !== active;
+      });
+      const proposal = tabs[index]!.dataset.proposalTab!;
+      const url = new URL(window.location.href);
+      url.searchParams.set("view",proposal);
+      history.replaceState(history.state,"",url);
+      if (focus) tabs[index]!.focus();
+      window.dispatchEvent(new CustomEvent("crate:timeline-proposal",{ detail:{proposal} }));
+    };
+    tabs.forEach((tab,i) => {
+      tab.addEventListener("click",() => select(i),{signal:controller.signal});
+      tab.addEventListener("keydown",event => {
+        const index = event.key === "ArrowRight" ? (active + 1) % tabs.length : event.key === "ArrowLeft" ? (active + tabs.length - 1) % tabs.length : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : undefined;
+        if (index === undefined) return;
+        event.preventDefault();
+        select(index,true);
+      },{signal:controller.signal});
+    });
+    const query = new URLSearchParams(window.location.search).get("view");
+    const initial = tabs.findIndex(tab => tab.dataset.proposalTab === query);
+    if (initial >= 0) select(initial);
+    return () => controller.abort();
+  });
+</script>
+
+<style>
+  .timeline-lab {max-width:1360px;margin:0 auto;padding:130px clamp(20px,5vw,80px) 90px;position:relative;z-index:5;}
+  .lab-header {margin-bottom:32px;}
+  .lab-back {color:var(--fg-3);font:11px var(--mono);text-decoration:none;display:inline-flex;align-items:center;gap:8px;min-height:44px;margin-bottom:26px;}
+  .lab-back:hover {color:var(--cyan-hi)}
+  .lab-back:focus-visible,.proposal-tabs button:focus-visible {outline:2px solid var(--cyan-hi);outline-offset:-2px;}
+  .lab-heading h1 {margin:0;font:700 clamp(2.5rem,5vw,4.5rem)/1 var(--display);letter-spacing:-.045em;text-wrap:balance;}
+  .lab-heading>p {margin:12px 0 0;font:500 clamp(1.2rem,2.3vw,2rem)/1.2 var(--display);letter-spacing:-.02em;color:var(--fg-2);}
+  .lab-context {display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-top:32px;font:10px/1.6 var(--mono);text-transform:uppercase;letter-spacing:.13em;color:var(--fg-3);}
+  .lab-context span:first-child {color:var(--amber)}
+  .proposal-tabs {display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+  .proposal-tabs button {position:relative;display:flex;align-items:center;gap:12px;min-height:72px;padding:18px 20px;background:none;border:0;color:var(--fg-2);font:550 18px var(--display);cursor:pointer;transition:color .2s,background-color .2s;}
+  .proposal-tabs button+button {border-left:1px solid var(--line)}
+  .proposal-tabs button span {font:10px var(--mono);color:var(--fg-3)}
+  .proposal-tabs button[aria-selected="true"] {color:var(--fg);background:rgba(103,232,249,.035);}
+  .proposal-tabs button[aria-selected="true"]::after {content:"";position:absolute;bottom:-1px;left:20px;right:20px;height:2px;background:var(--cyan-hi)}
+  .proposal-tabs button[aria-selected="true"] span {color:var(--cyan-hi)}
+  [role="tabpanel"][hidden] {display:none}
+  .proposal-description {font:14px/1.6 var(--sans);color:var(--fg-2);margin:22px 0 32px;max-width:70ch;}
+  .lab-foot {margin-top:54px;border-top:1px solid var(--line);padding-top:24px;display:grid;grid-template-columns:1fr 1fr;gap:28px;font:11px/1.8 var(--mono);color:var(--fg-3);}
+  .lab-foot p {margin:0;max-width:62ch}
+  .timeline-lab :global(input[type="range"]) {appearance:none;-webkit-appearance:none;background:transparent;}
+  .timeline-lab :global(input[type="range"]::-webkit-slider-runnable-track) {height:2px;background:rgba(241,245,249,.2);border:0;}
+  .timeline-lab :global(input[type="range"]::-webkit-slider-thumb) {appearance:none;-webkit-appearance:none;width:14px;height:14px;margin-top:-6px;border:2px solid var(--bg);border-radius:50%;background:var(--cyan-hi);box-shadow:0 0 0 1px var(--cyan-hi);}
+  .timeline-lab :global(input[type="range"]::-moz-range-track) {height:2px;background:rgba(241,245,249,.2);border:0;}
+  .timeline-lab :global(input[type="range"]::-moz-range-thumb) {width:12px;height:12px;border:2px solid var(--bg);border-radius:50%;background:var(--cyan-hi);box-shadow:0 0 0 1px var(--cyan-hi);}
+  @media(max-width:700px){.timeline-lab{padding-top:100px}.lab-back{margin-bottom:18px}.lab-header{margin-bottom:22px}.lab-context{font-size:9px;letter-spacing:.05em;margin-top:26px}.proposal-tabs button{font-size:15px;gap:8px;padding:14px 10px;min-height:72px;flex-wrap:wrap;align-content:center;line-height:1.15}.proposal-tabs button span{font-size:9px}.proposal-tabs button[aria-selected="true"]::after{left:10px;right:10px}.proposal-description{font-size:13px;margin:20px 0 24px}.lab-foot{grid-template-columns:1fr;gap:12px}}
+  @media(prefers-reduced-motion:reduce){.proposal-tabs button{transition:none}}
+</style>

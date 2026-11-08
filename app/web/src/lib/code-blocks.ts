@@ -1,6 +1,7 @@
 import type { ExpressiveCodePlugin } from "astro-expressive-code";
 import { h, select } from "astro-expressive-code/hast";
 import { codeSource, type CodeSource } from "./code-source";
+import { blogLinkIcon } from "./blog-links";
 
 const sources = new WeakMap<object, CodeSource>();
 
@@ -13,6 +14,9 @@ export function crateSourceLinks(): ExpressiveCodePlugin {
         font-variant-ligatures: none;
       }
       .source-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
         margin-inline-start: auto;
         padding-inline: 1rem;
         align-self: center;
@@ -22,6 +26,7 @@ export function crateSourceLinks(): ExpressiveCodePlugin {
         text-transform: uppercase;
         white-space: nowrap;
       }
+      .source-link svg { flex: none; }
       .source-link:hover,
       .source-link:focus-visible {
         text-decoration: underline;
@@ -55,11 +60,12 @@ export function crateSourceLinks(): ExpressiveCodePlugin {
             "a",
             {
               className: ["source-link"],
+              "data-blog-link": "github",
               href: source.url,
               "aria-label":
                 `View ${source.path} ${source.label} on GitHub`.trim(),
             },
-            text,
+            [blogLinkIcon("github"), text],
           ),
         );
       },

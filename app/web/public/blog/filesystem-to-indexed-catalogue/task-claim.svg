@@ -1,0 +1,175 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 960 730"
+  role="img"
+  aria-labelledby="title desc"
+>
+  <title id="title">
+    Two consumers claim different rows using PostgreSQL SKIP LOCKED
+  </title>
+  <desc id="desc">
+    Consumer A locks pending task one. While that transaction remains open,
+    consumer B skips task one and locks task two. Each consumer sets its
+    selected task to running and commits, releasing its row lock. Task handlers
+    run after the claim transactions have ended. This example does not imply
+    exactly-once execution.
+  </desc>
+  <defs>
+    <marker
+      id="arrow"
+      viewBox="0 0 10 10"
+      refX="9"
+      refY="5"
+      markerWidth="6"
+      markerHeight="6"
+      orient="auto"
+    >
+      <path
+        d="M0 0L10 5L0 10"
+        fill="none"
+        stroke="#67e8f9"
+        stroke-width="1.5"
+      />
+    </marker>
+    <marker
+      id="amberArrow"
+      viewBox="0 0 10 10"
+      refX="9"
+      refY="5"
+      markerWidth="6"
+      markerHeight="6"
+      orient="auto"
+    >
+      <path
+        d="M0 0L10 5L0 10"
+        fill="none"
+        stroke="#fbbf24"
+        stroke-width="1.5"
+      />
+    </marker>
+  </defs>
+  <style>
+    text {
+      font-family: Arial, Helvetica, sans-serif;
+      fill: #f1f5f9;
+      font-size: 17px;
+    }
+    .label {
+      fill: #67e8f9;
+      font-size: 16px;
+      letter-spacing: 0.8px;
+    }
+    .note {
+      fill: #b1b5c0;
+      font-size: 15px;
+    }
+    .small {
+      fill: #b1b5c0;
+      font-size: 14px;
+    }
+    .warn {
+      fill: #fbbf24;
+      font-size: 15px;
+    }
+    .mono {
+      font-family: monospace;
+      font-size: 15px;
+    }
+    .box {
+      fill: #11121a;
+      stroke: #353947;
+      stroke-width: 1;
+    }
+    .focus {
+      fill: #0c2028;
+      stroke: #278396;
+      stroke-width: 1;
+    }
+    .flow {
+      fill: none;
+      stroke: #67e8f9;
+      stroke-width: 1.5;
+      marker-end: url(#arrow);
+    }
+    .secondary {
+      fill: none;
+      stroke: #67e8f9;
+      stroke-width: 1.2;
+      stroke-dasharray: 5 5;
+      marker-end: url(#arrow);
+    }
+    .skip {
+      fill: none;
+      stroke: #fbbf24;
+      stroke-width: 1.5;
+      stroke-dasharray: 5 4;
+      marker-end: url(#amberArrow);
+    }
+  </style>
+  <rect width="960" height="730" rx="8" fill="#0a0a0f" />
+  <text x="32" y="38" class="label">
+    CLAIM TRANSACTIONS FINISH BEFORE TASK HANDLERS RUN
+  </text>
+  <text x="32" y="66" class="note">
+    Illustrative overlap between two consumers of the PostgreSQL task table
+  </text>
+  <rect
+    x="24"
+    y="91"
+    width="430"
+    height="474"
+    rx="6"
+    fill="#0d141d"
+    stroke="#24424f"
+  />
+  <rect
+    x="506"
+    y="91"
+    width="430"
+    height="474"
+    rx="6"
+    fill="#0d141d"
+    stroke="#24424f"
+  />
+  <text x="44" y="124" class="label">CONSUMER A · TRANSACTION</text>
+  <text x="526" y="124" class="label">CONSUMER B · TRANSACTION</text>
+  <text x="44" y="157" class="small">
+    SELECT pending · FOR UPDATE SKIP LOCKED
+  </text>
+  <text x="526" y="157" class="small">
+    SELECT pending · FOR UPDATE SKIP LOCKED
+  </text>
+  <rect x="58" y="190" width="362" height="76" rx="5" class="focus" />
+  <text x="78" y="220">Task 1: pending</text>
+  <text x="78" y="247" class="note">A locks this row</text>
+  <rect x="540" y="190" width="362" height="76" rx="5" class="box" />
+  <text x="560" y="220">Task 1 is locked by A</text>
+  <text x="560" y="247" class="warn">B skips it without waiting</text>
+  <path d="M454 231H496" class="skip" />
+  <rect x="540" y="314" width="362" height="76" rx="5" class="focus" />
+  <text x="560" y="344">Task 2: pending</text>
+  <text x="560" y="371" class="note">B locks this row</text>
+  <path d="M721 266V304" class="flow" />
+  <rect x="58" y="428" width="362" height="68" rx="5" class="box" />
+  <text x="78" y="457">Set task 1 to running</text>
+  <text x="78" y="481" class="mono">UPDATE … WHERE status = 'pending'</text>
+  <rect x="540" y="428" width="362" height="68" rx="5" class="box" />
+  <text x="560" y="457">Set task 2 to running</text>
+  <text x="560" y="481" class="mono">UPDATE … WHERE status = 'pending'</text>
+  <path d="M239 266V418" class="flow" />
+  <path d="M721 390V418" class="flow" />
+  <text x="78" y="539" class="label">COMMIT · RELEASE TASK 1 LOCK</text>
+  <text x="560" y="539" class="label">COMMIT · RELEASE TASK 2 LOCK</text>
+  <path d="M239 551V601" class="flow" />
+  <path d="M721 551V601" class="flow" />
+  <rect x="58" y="611" width="362" height="61" rx="5" class="box" />
+  <text x="78" y="638">Execute task 1 handler</text>
+  <text x="78" y="659" class="note">Claim transaction has ended</text>
+  <rect x="540" y="611" width="362" height="61" rx="5" class="box" />
+  <text x="560" y="638">Execute task 2 handler</text>
+  <text x="560" y="659" class="note">Claim transaction has ended</text>
+  <text x="32" y="708" class="warn">
+    Row claiming coordinates consumers; crash recovery and safe replay remain
+    separate work.
+  </text>
+</svg>

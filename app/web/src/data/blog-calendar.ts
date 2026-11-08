@@ -16,6 +16,18 @@ export interface CalendarEntry {
 
 export const calendar: CalendarEntry[] = [
   {
+    slug: "crate-started-as-a-librarian",
+    title: "Crate started as a librarian",
+    problem:
+      "The first Apply endpoint called a tag writer through the API's read-only music mount. Moving the write to a persisted worker task fixed execution but left partial results and playback-index reconciliation to handle.",
+    publishOn: "2026-11-10",
+    status: "review",
+    sources: [
+      "docs/technical/04-library-storage-sync-and-imports.md",
+      "docs/technical/03-worker-tasks-and-background-services.md",
+    ],
+  },
+  {
     slug: "reads-from-snapshots",
     title: "Serving hot screens from snapshots, not queries",
     problem:
@@ -67,12 +79,24 @@ export const calendar: CalendarEntry[] = [
     ],
   },
   {
+    slug: "filesystem-to-indexed-catalogue",
+    title: "When the filesystem stopped being the catalogue",
+    problem:
+      "Cold artist-page requests rebuilt the library inventory before pagination. A stored catalogue removed that work from browsing, then concurrent writers exposed the limits of the SQLite implementation.",
+    publishOn: "2026-11-17",
+    status: "review",
+    sources: [
+      "docs/technical/04-library-storage-sync-and-imports.md",
+      "docs/technical/02-backend-api-and-data.md",
+    ],
+  },
+  {
     slug: "reading-errors-without-trusting-them",
     title: "Reading production errors in Admin without trusting what they say",
     problem:
       "Sentry held 92 unresolved issues, most of them noise, and the errors that mattered carry library paths and text that a public repository and a model must not trust.",
     publishOn: "2026-11-17",
-    status: "published",
+    status: "review",
     sources: [
       "docs/technical/observability.md",
       "docs/technical/evidence/observability/sentry-triage-2026-11.md",
@@ -82,11 +106,54 @@ export const calendar: CalendarEntry[] = [
     ],
   },
   {
+    slug: "taking-playback-over-from-navidrome",
+    title: "Taking playback over from Navidrome",
+    problem:
+      "Listen inherited local file paths and Navidrome song IDs in the same queue. Removing Navidrome meant giving playback Crate catalogue identities and replacing the media, account and listening-state integrations around them.",
+    publishOn: "2026-11-24",
+    status: "review",
+    sources: [
+      "docs/technical/09-playback-realtime-and-subsonic.md",
+      "docs/technical/08-frontends-admin-and-listen.md",
+      "docs/technical/listen-media-access.md",
+    ],
+  },
+  {
+    slug: "finding-the-one",
+    title: "Finding the one: where every bar starts",
+    problem:
+      "Smart Mix could align two beat grids while putting the transition on the wrong beat of the bar. We needed a better downbeat estimate and a way to reject unreliable anchors.",
+    publishOn: "2026-12-01",
+    status: "review",
+    sources: [
+      "app/crate/smart_mix/beat_model.py",
+      "app/crate/smart_mix/phrase_grid.py",
+      "tools/crate-cli/src/beat_tracking.rs",
+      "docs/technical/smart-mix-operations.md",
+      "tools/smart-mix-eval/structure",
+    ],
+  },
+  {
+    slug: "lyrics-as-labels",
+    title: "Lyrics as labels: calibrating a voice detector without listening",
+    problem:
+      "Smart Mix needed to identify sung phrases before overlapping two tracks. Synced lyrics gave us a reference for comparing voice detectors and choosing a threshold without labelling every phrase by hand.",
+    publishOn: "2026-12-08",
+    status: "review",
+    sources: [
+      "app/crate/smart_mix/vocals.py",
+      "app/crate/smart_mix/voice_model.py",
+      "app/crate/smart_mix/models.py",
+      "docs/technical/smart-mix-operations.md",
+      "tools/smart-mix-eval/vocals",
+    ],
+  },
+  {
     slug: "twenty-numbers-for-a-sound",
     title: "Twenty numbers that describe how a track sounds",
     problem:
       "Tags say what a track is called, not how it sounds, so recommendations built on tags keep suggesting the wrong records.",
-    publishOn: "2026-11-24",
+    publishOn: "2026-12-15",
     status: "planned",
     sources: [
       "docs/technical/06-audio-analysis-similarity-and-discovery.md",
@@ -98,7 +165,7 @@ export const calendar: CalendarEntry[] = [
     title: "Never count the whole library during a request",
     problem:
       "Stats screens that aggregate the whole library on demand turn every page load into a full table scan.",
-    publishOn: "2026-12-01",
+    publishOn: "2027-01-05",
     status: "planned",
     sources: [
       "AGENTS.md",
@@ -111,7 +178,7 @@ export const calendar: CalendarEntry[] = [
     title: "Music Paths: finding a route from one song to another",
     problem:
       "Going from one record to a very different one in ten tracks, without a jarring jump, means searching the library for a route.",
-    publishOn: "2026-12-08",
+    publishOn: "2027-01-12",
     status: "planned",
     sources: ["docs/technical/music-paths.md", "app/crate/music_paths.py"],
   },
@@ -120,7 +187,7 @@ export const calendar: CalendarEntry[] = [
     title: "Federation without a central server",
     problem:
       "Small Crate servers want to share catalogues and stream from each other without anyone running a hub they all trust.",
-    publishOn: "2026-12-15",
+    publishOn: "2027-01-19",
     status: "planned",
     sources: [
       "docs/technical/federation-protocol.md",
@@ -133,7 +200,7 @@ export const calendar: CalendarEntry[] = [
     title: "Writing a threat model for a home server",
     problem:
       "Opening a home server to other servers changes who can reach it, and that calls for a written review of what can go wrong.",
-    publishOn: "2027-01-05",
+    publishOn: "2027-01-26",
     status: "planned",
     sources: ["docs/technical/federation-threat-model.md"],
   },
@@ -142,7 +209,7 @@ export const calendar: CalendarEntry[] = [
     title: "Audio URLs that don't leak your session",
     problem:
       "Audio players and casting devices want a plain URL, and putting a session token in a URL is how sessions leak.",
-    publishOn: "2027-01-12",
+    publishOn: "2027-02-02",
     status: "planned",
     sources: ["docs/technical/listen-media-access.md", "app/crate/api/auth.py"],
   },
@@ -151,7 +218,7 @@ export const calendar: CalendarEntry[] = [
     title: "What Listen keeps offline, and why",
     problem:
       "Phones lose the network on the underground and run out of storage at the worst moment, so Listen needs clear rules for what stays on the device.",
-    publishOn: "2027-01-19",
+    publishOn: "2027-02-09",
     status: "planned",
     sources: ["docs/technical/listen-offline-runtime-policy.md"],
   },
@@ -160,7 +227,7 @@ export const calendar: CalendarEntry[] = [
     title: "An MCP server where the agent proposes and a person approves",
     problem:
       "Letting an AI agent maintain a music library is useful until it deletes the wrong album.",
-    publishOn: "2027-01-26",
+    publishOn: "2027-02-16",
     status: "planned",
     sources: ["docs/technical/11-crate-mcp.md", "app/crate/mcp"],
   },
@@ -169,7 +236,7 @@ export const calendar: CalendarEntry[] = [
     title: "Treating LLMs as a governed resource",
     problem:
       "Model calls are slow, paid and unpredictable, and a self-hosted app has no platform team to keep them in check.",
-    publishOn: "2027-02-02",
+    publishOn: "2027-02-23",
     status: "planned",
     sources: ["docs/technical/ai-agents.md", "app/crate/ai"],
   },
@@ -178,7 +245,7 @@ export const calendar: CalendarEntry[] = [
     title: "One install command",
     problem:
       "Self-hosted software loses most of its users between reading the README and getting the first page to load.",
-    publishOn: "2027-02-09",
+    publishOn: "2027-03-02",
     status: "planned",
     sources: ["docs/technical/00-quickstart.md", "app/installer"],
   },
@@ -187,7 +254,7 @@ export const calendar: CalendarEntry[] = [
     title: "Image-first deploys with automatic rollback",
     problem:
       "Deploying a dozen containers by copying files to a server works until a half-finished deploy takes production down.",
-    publishOn: "2027-02-16",
+    publishOn: "2027-03-09",
     status: "planned",
     sources: ["docs/technical/10-development-deployment-and-operations.md"],
   },
@@ -196,7 +263,7 @@ export const calendar: CalendarEntry[] = [
     title: "Speaking OpenSubsonic",
     problem:
       "People already have favourite Subsonic apps, and a new server that ignores them asks too much.",
-    publishOn: "2027-02-23",
+    publishOn: "2027-03-16",
     status: "planned",
     sources: ["docs/technical/opensubsonic.md", "app/crate/api/subsonic"],
   },
@@ -205,7 +272,7 @@ export const calendar: CalendarEntry[] = [
     title: "Album downloads from a Rust worker",
     problem:
       "Zipping a lossless album in Python blocks a worker for minutes and gives the user no progress and no way to cancel.",
-    publishOn: "2027-03-02",
+    publishOn: "2027-03-23",
     status: "planned",
     sources: ["app/media-worker"],
   },
@@ -214,7 +281,7 @@ export const calendar: CalendarEntry[] = [
     title: "Why Crate Decks is a Mixxx fork",
     problem:
       "A DJ client built as a VirtualDJ plugin hits limits the plugin SDK will never lift.",
-    publishOn: "2027-03-09",
+    publishOn: "2027-03-30",
     status: "planned",
     sources: ["docs/technical/crate-decks.md"],
   },

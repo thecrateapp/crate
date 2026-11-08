@@ -16,6 +16,14 @@ const blog = defineCollection({
     draft: z.boolean().default(false),
     tags: z.array(z.string()).default([]),
     sources: z.array(z.string()).min(1),
+    series: z
+      .object({
+        id: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+        title: z.string().min(1),
+        part: z.number().int().positive(),
+      })
+      .optional(),
+    related: z.array(z.string()).default([]),
   }),
 });
 

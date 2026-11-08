@@ -4,6 +4,7 @@ import { pluginLineNumbers } from "@expressive-code/plugin-line-numbers";
 import expressiveCode, { ExpressiveCodeTheme } from "astro-expressive-code";
 import { defineConfig } from "astro/config";
 import { crateSourceLinks } from "./src/lib/code-blocks.ts";
+import { rehypeBlogLinks } from "./src/lib/blog-links.ts";
 
 const crateTheme = ExpressiveCodeTheme.fromJSONString(
   readFileSync(new URL("./src/lib/code-theme.json", import.meta.url), "utf8"),
@@ -14,6 +15,7 @@ export default defineConfig({
   trailingSlash: "never",
   server: { allowedHosts: [".dev.cratemusic.app"] },
   build: { format: "file" },
+  markdown: { rehypePlugins: [rehypeBlogLinks] },
   integrations: [
     expressiveCode({
       themes: [crateTheme],

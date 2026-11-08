@@ -1,0 +1,103 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 1200 650"
+  role="img"
+  aria-labelledby="title desc"
+>
+  <title id="title">An album moves through two different lookup paths</title>
+  <desc id="desc">
+    In March 2026 the librarian matched local audio tags to MusicBrainz release
+    candidates and used Mutagen to save tags. Playback separately searched
+    Navidrome using artist and album names, fetched its song IDs and proxied the
+    stream. The playback resolver did not use the MusicBrainz IDs written by the
+    tagger.
+  </desc>
+  <defs>
+    <marker
+      id="arrow"
+      viewBox="0 0 10 10"
+      refX="9"
+      refY="5"
+      markerWidth="7"
+      markerHeight="7"
+      orient="auto"
+    >
+      <path
+        d="M0 0L10 5L0 10"
+        fill="none"
+        stroke="#67e8f9"
+        stroke-width="1.5"
+      />
+    </marker>
+  </defs>
+  <style>
+    text {
+      font-family: "JetBrains Mono", monospace;
+      fill: #d6dae3;
+      font-size: 18px;
+    }
+    .label {
+      fill: #67e8f9;
+      letter-spacing: 1.5px;
+      font-size: 17px;
+    }
+    .note {
+      fill: #a1a7b5;
+      font-size: 17px;
+    }
+    .box {
+      fill: #0d0e14;
+      stroke: #353947;
+      stroke-width: 1;
+    }
+    .flow {
+      fill: none;
+      stroke: #67e8f9;
+      stroke-width: 1.5;
+      marker-end: url(#arrow);
+    }
+  </style>
+  <rect width="1200" height="650" rx="6" fill="#0a0a0f" />
+  <text x="40" y="47" class="label">ONE ALBUM / TWO LOOKUP PATHS</text>
+  <text x="40" y="77" class="note">Library workflow, 19–20 March 2026</text>
+  <text x="40" y="127" class="label">METADATA MATCHING</text>
+  <rect x="40" y="150" width="320" height="150" rx="4" class="box" />
+  <text x="60" y="185">LOCAL FILES</text>
+  <text x="60" y="221" class="note">Artist/Album/*.flac</text>
+  <text x="60" y="251" class="note">tags + track durations</text>
+  <text x="60" y="279" class="note">directory order</text>
+  <rect x="440" y="150" width="320" height="150" rx="4" class="box" />
+  <text x="460" y="185">MUSICBRAINZ</text>
+  <text x="460" y="221" class="note">release candidates</text>
+  <text x="460" y="251" class="note">score + tag preview</text>
+  <text x="460" y="279" class="note">operator selects release</text>
+  <rect x="840" y="150" width="320" height="150" rx="4" class="box" />
+  <text x="860" y="185">TAGGER</text>
+  <text x="860" y="221" class="note">Mutagen saves each file</text>
+  <text x="860" y="251" class="note">names + MusicBrainz IDs</text>
+  <text x="860" y="279" class="note">worker from 20 March</text>
+  <path d="M360 225H432" class="flow" />
+  <path d="M760 225H832" class="flow" />
+  <text x="40" y="369" class="label">PLAYBACK RESOLUTION</text>
+  <rect x="40" y="392" width="320" height="137" rx="4" class="box" />
+  <text x="60" y="427">ALBUM LINK REQUEST</text>
+  <text x="60" y="463" class="note">artist name</text>
+  <text x="60" y="493" class="note">album name</text>
+  <rect x="440" y="392" width="320" height="137" rx="4" class="box" />
+  <text x="460" y="427">NAVIDROME SEARCH</text>
+  <text x="460" y="463" class="note">exact names first</text>
+  <text x="460" y="493" class="note">substring fallback</text>
+  <rect x="840" y="392" width="320" height="137" rx="4" class="box" />
+  <text x="860" y="427">NAVIDROME IDS</text>
+  <text x="860" y="463" class="note">album → songs</text>
+  <text x="860" y="493" class="note">song ID → stream proxy</text>
+  <path d="M360 461H432" class="flow" />
+  <path d="M760 461H832" class="flow" />
+  <path d="M40 567H1160" stroke="#353947" />
+  <text x="40" y="601" class="note">
+    The playback lookup did not use the MusicBrainz IDs saved by the tagger.
+  </text>
+  <text x="40" y="628" class="note">
+    Directory listing, saved tags and playable song IDs were separate results.
+  </text>
+</svg>

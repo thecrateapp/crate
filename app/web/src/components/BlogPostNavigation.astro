@@ -1,0 +1,50 @@
+---
+import { postUrl, type BlogEntry } from "../lib/blog";
+import BlogIcon from "./BlogIcon.astro";
+
+interface Props {
+  previous?: BlogEntry;
+  next?: BlogEntry;
+  series?: BlogEntry["data"]["series"];
+}
+
+const { previous, next, series } = Astro.props;
+---
+
+{(previous || next) && (
+  <nav class="post-navigation" aria-label={series ? "Series navigation" : "Post navigation"} data-post-navigation>
+    <p class="navigation-label">{series ? series.title : "Keep reading"}</p>
+    <div class="navigation-links">
+      {previous && (
+        <a class="previous" href={postUrl(previous.id)} rel="prev" data-previous-post>
+          <span class="direction"><BlogIcon name="arrow-left" size={16} /> Previous{series && ` · Part ${previous.data.series!.part}`}{previous.data.draft && <span class="draft">Draft</span>}</span>
+          <span class="post-title">{previous.data.title}</span>
+        </a>
+      )}
+      {next && (
+        <a class="next" href={postUrl(next.id)} rel="next" data-next-post>
+          <span class="direction">Next{series && ` · Part ${next.data.series!.part}`}<BlogIcon name="arrow-right" size={16} />{next.data.draft && <span class="draft">Draft</span>}</span>
+          <span class="post-title">{next.data.title}</span>
+        </a>
+      )}
+    </div>
+  </nav>
+)}
+
+<style>
+  .post-navigation {margin-top:64px;border-top:1px solid var(--line);padding-top:24px;}
+  .navigation-label {margin:0 0 24px;color:var(--fg-3);font:11px/1.65 var(--mono);max-width:65ch;}
+  .navigation-links {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px;}
+  a {display:flex;flex-direction:column;align-items:flex-start;gap:14px;min-height:44px;padding:8px 0 16px;text-decoration:none;color:var(--fg);}
+  .next {grid-column:2;}
+  .direction {display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:var(--cyan-hi);font:10px/1.5 var(--mono);text-transform:uppercase;letter-spacing:.1em;}
+  .draft {color:var(--amber);}
+  .post-title {font:550 clamp(1.25rem,1.7vw,1.6rem)/1.2 var(--display);letter-spacing:-.02em;text-wrap:balance;}
+  a:hover .post-title {color:var(--cyan-hi);}
+  a:focus-visible {outline:2px solid var(--cyan-hi);outline-offset:6px;border-radius:2px;}
+  @media(max-width:700px) {
+    .post-navigation {margin-top:44px;}
+    .navigation-links {grid-template-columns:1fr;gap:20px;}
+    .next {grid-column:auto;}
+  }
+</style>

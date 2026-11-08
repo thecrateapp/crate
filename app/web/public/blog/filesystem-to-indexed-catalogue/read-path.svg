@@ -1,0 +1,177 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 960 638"
+  role="img"
+  aria-labelledby="title desc"
+>
+  <title id="title">
+    Artist browsing moves from a filesystem inventory to an indexed catalogue
+  </title>
+  <desc id="desc">
+    On 19 March a cache miss builds the complete artist inventory by walking
+    files, then paginates in Python. A cache hit reuses the full list. On 20
+    March worker sync populates a SQLite catalogue while the artists request
+    reads a page with SQL. Empty catalogues retain a filesystem fallback.
+  </desc>
+  <defs>
+    <marker
+      id="arrow"
+      viewBox="0 0 10 10"
+      refX="9"
+      refY="5"
+      markerWidth="6"
+      markerHeight="6"
+      orient="auto"
+    >
+      <path
+        d="M0 0L10 5L0 10"
+        fill="none"
+        stroke="#67e8f9"
+        stroke-width="1.5"
+      />
+    </marker>
+    <marker
+      id="amberArrow"
+      viewBox="0 0 10 10"
+      refX="9"
+      refY="5"
+      markerWidth="6"
+      markerHeight="6"
+      orient="auto"
+    >
+      <path
+        d="M0 0L10 5L0 10"
+        fill="none"
+        stroke="#fbbf24"
+        stroke-width="1.5"
+      />
+    </marker>
+  </defs>
+  <style>
+    text {
+      font-family: Arial, Helvetica, sans-serif;
+      fill: #f1f5f9;
+      font-size: 17px;
+    }
+    .label {
+      fill: #67e8f9;
+      font-size: 16px;
+      letter-spacing: 0.8px;
+    }
+    .note {
+      fill: #b1b5c0;
+      font-size: 15px;
+    }
+    .small {
+      fill: #b1b5c0;
+      font-size: 14px;
+    }
+    .warn {
+      fill: #fbbf24;
+      font-size: 15px;
+    }
+    .mono {
+      font-family: monospace;
+      font-size: 15px;
+    }
+    .box {
+      fill: #11121a;
+      stroke: #353947;
+      stroke-width: 1;
+    }
+    .focus {
+      fill: #0c2028;
+      stroke: #278396;
+      stroke-width: 1;
+    }
+    .flow {
+      fill: none;
+      stroke: #67e8f9;
+      stroke-width: 1.5;
+      marker-end: url(#arrow);
+    }
+    .secondary {
+      fill: none;
+      stroke: #67e8f9;
+      stroke-width: 1.2;
+      stroke-dasharray: 5 5;
+      marker-end: url(#arrow);
+    }
+    .skip {
+      fill: none;
+      stroke: #fbbf24;
+      stroke-width: 1.5;
+      stroke-dasharray: 5 4;
+      marker-end: url(#amberArrow);
+    }
+  </style>
+  <rect width="960" height="638" rx="8" fill="#0a0a0f" />
+  <text x="32" y="38" class="label">
+    BROWSING A PAGE WITHOUT REBUILDING THE INVENTORY
+  </text>
+  <rect
+    x="20"
+    y="58"
+    width="920"
+    height="202"
+    rx="6"
+    fill="none"
+    stroke="#292c38"
+  />
+  <text x="38" y="88" class="label">19 MARCH · CACHE MISS</text>
+  <rect x="38" y="112" width="150" height="76" rx="5" class="box" />
+  <text x="53" y="141">Artists request</text>
+  <text x="53" y="168" class="note">60 items wanted</text>
+  <rect x="235" y="112" width="150" height="76" rx="5" class="box" />
+  <text x="250" y="141">List cache</text>
+  <text x="250" y="168" class="note">5-minute expiry</text>
+  <rect x="440" y="112" width="210" height="76" rx="5" class="box" />
+  <text x="455" y="141">Walk the library</text>
+  <text x="455" y="168" class="small">artists → albums → files</text>
+  <rect x="705" y="112" width="215" height="76" rx="5" class="box" />
+  <text x="720" y="141">Build list, then page</text>
+  <text x="720" y="168" class="note">Python filter, sort, slice</text>
+  <path d="M188 150H225" class="flow" />
+  <path d="M385 150H430" class="flow" />
+  <path d="M650 150H695" class="flow" />
+  <path d="M310 188V220H812V198" class="secondary" />
+  <text x="393" y="242" class="note">
+    A cache hit reuses the full list before Python pagination
+  </text>
+  <rect
+    x="20"
+    y="280"
+    width="920"
+    height="337"
+    rx="6"
+    fill="none"
+    stroke="#292c38"
+  />
+  <text x="38" y="312" class="label">
+    20 MARCH · POPULATED SQLITE CATALOGUE
+  </text>
+  <rect x="38" y="346" width="200" height="88" rx="5" class="box" />
+  <text x="55" y="378">Files in /music</text>
+  <text x="55" y="406" class="note">Audio and embedded tags</text>
+  <rect x="331" y="346" width="230" height="88" rx="5" class="box" />
+  <text x="349" y="378">Worker synchronization</text>
+  <text x="349" y="406" class="note">Read files; update rows</text>
+  <rect x="700" y="346" width="220" height="88" rx="5" class="focus" />
+  <text x="718" y="378">Library catalogue</text>
+  <text x="718" y="406" class="note">Rows, counts, metadata</text>
+  <path d="M238 390H321" class="flow" />
+  <path d="M561 390H690" class="flow" />
+  <text x="586" y="375" class="small">upsert</text>
+  <text x="349" y="467" class="note">Startup + filesystem watcher</text>
+  <text x="349" y="491" class="small">30-second debounce per album</text>
+  <text x="349" y="515" class="small">Periodic pass after 30 minutes</text>
+  <rect x="700" y="506" width="220" height="67" rx="5" class="box" />
+  <text x="718" y="534">Artists request</text>
+  <text x="718" y="556" class="note">SQL filtering and pagination</text>
+  <path d="M810 506V444" class="flow" />
+  <text x="824" y="478" class="small">read page</text>
+  <text x="38" y="593" class="warn">
+    An empty catalogue still falls back to files. Indexed results can lag
+    synchronization.
+  </text>
+</svg>

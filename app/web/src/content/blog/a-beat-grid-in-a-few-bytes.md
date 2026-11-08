@@ -10,15 +10,15 @@ sources:
   - app/crate/smart_mix/tempo_grid.py
 ---
 
-To beatmatch two tracks you need to know where every beat falls. Smart Mix, the part of Crate that plans DJ-style
-transitions, stores that as a beat grid: one timestamp per beat, for every analysed track.
+To beatmatch two tracks we need to know where every beat falls. In Smart Mix, the part of Crate that plans
+DJ-style transitions, we keep a beat grid for every analysed track: one timestamp per beat.
 
 A six-minute track at 128 BPM has 767 beats. Written as 64-bit floats that's 6,136 bytes; as a JSON array of
 milliseconds, 5,900. Per track it's nothing. Multiplied by a library it adds up: if all of production's roughly
 138,000 tracks were six minutes at 128 BPM, float grids alone would take about 850 MB.
 
-The timestamps are big numbers, but the gaps between them are small and nearly all the same. At 128 BPM a beat
-lands every 468.75 ms, so the gaps in milliseconds are 469, 468, 469, 469. Crate stores those gaps.
+The gaps between timestamps are much smaller than the timestamps themselves. At 128 BPM a beat lands every
+468.75 ms, so the gaps in milliseconds are 469, 468, 469, 469. We store those gaps.
 
 ## The format
 
@@ -43,9 +43,9 @@ return bytes(encoded)
 
 Each number is written as a varint (unsigned LEB128): seven bits of value per byte, with the top bit saying whether
 another byte follows. Any gap from 128 ms to 16,383 ms fits in exactly two bytes, which covers every tempo from
-about 3.7 to 468 BPM. In practice every beat costs two bytes.
+about 3.7 to 468 BPM. The gaps between beats cost two bytes at those tempos.
 
-Here is the golden fixture both implementations are tested against: five beats in twelve bytes.
+We test both implementations against the same golden fixture: five beats in twelve bytes.
 
 ![Twelve bytes decoded into five beats, with the 469 ms gap broken down into its two varint bytes.](/blog/a-beat-grid-in-a-few-bytes/encoding.svg)
 
@@ -54,9 +54,8 @@ hypothetical library of six-minute tracks it's about 210 MB instead of 850.
 
 ## Where precision goes
 
-Rounding to whole milliseconds loses something, and the question is whether the loss adds up over 767 beats.
-It doesn't, because of how the grid is built. For steady tracks the analyser computes every beat from an anchor
-and a period, then rounds each one on its own:
+We round the beat positions before calculating the gaps. For steady tracks, the analyser computes every beat
+from an anchor and a period, then rounds each position on its own:
 
 ```python source="app/crate/smart_mix/tempo_grid.py#L67-L75" commit="cacf4b3471371b6cc68c7a3baf2a4a752f74626f" "_round_half_away(position)"
 def beats_ms(self, from_ms: float, to_ms: float) -> tuple[int, ...]:
@@ -77,8 +76,8 @@ error never carries over to the next beat. That's why the gaps alternate between
 ## Strict on the way back
 
 The decoder rejects an unknown version byte, a count above 100,000 beats, a zero gap, a grid longer than 24
-hours, a varint cut short or longer than ten bytes, and leftover bytes at the end. A corrupt grid raises an error
-rather than decoding into beats that are slightly off and throw a mix out of phase.
+hours, a varint cut short or longer than ten bytes, and leftover bytes at the end. A grid that fails these checks
+raises an error before it can supply beat positions to a mix.
 
 Python writes the grids into the database. The Rust command-line tool that runs the audio analysis keeps its own
 copy of the codec, and tests hold the two together:
@@ -120,10 +119,10 @@ Steady-tempo grids are very repetitive. The six-minute grid above compresses wit
 a steady grid is already fully described by its anchor and BPM, which the profile also stores. The codec uses
 neither fact and spends two bytes per beat even when every gap is the same.
 
-That's a deliberate choice for now. Per-beat gaps handle tracks whose tempo drifts without any special case, and
-1.5 KB per track is small. PostgreSQL only tries to compress values above roughly 2 KB, so most grids are stored
-as they are. If grids ever matter for storage or for sending to clients, a run-length step for repeated gaps would
-be the next thing to try, and it would get its own version byte.
+We use the same per-beat format for steady tracks and tracks whose tempo drifts. That costs about 1.5 KB for
+the six-minute example, even though its regular grid could be much smaller. PostgreSQL only tries to compress
+values above roughly 2 KB, so most grids are stored as they are. If grid storage or transfer becomes a problem,
+we could try run-length encoding for repeated gaps. That would need its own version byte.
 
 ## Read the code
 

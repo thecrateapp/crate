@@ -6,6 +6,8 @@ export interface BlogData {
   draft: boolean;
   tags: string[];
   sources: string[];
+  series?: { id: string; title: string; part: number };
+  related?: string[];
 }
 
 export interface BlogEntry {
