@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+from crate.smart_mix.versions import ANALYZER_VERSION
+
 from analyze_pool import (
     SHARED_DATABASES,
     pool_files,
@@ -37,7 +39,7 @@ def test_pool_files_keep_tracks_ready_for_v3() -> None:
         {
             "track_id": 1,
             "entity_uid": "u1",
-            "analyzer_version": "smart-mix-audio-v7",
+            "analyzer_version": ANALYZER_VERSION,
             "has_phrases": True,
             "stale": False,
             "quality": "full",
@@ -45,7 +47,7 @@ def test_pool_files_keep_tracks_ready_for_v3() -> None:
         {
             "track_id": 2,
             "entity_uid": "u2",
-            "analyzer_version": "smart-mix-audio-v7",
+            "analyzer_version": ANALYZER_VERSION,
             "has_phrases": False,
             "stale": False,
             "quality": "partial",
@@ -61,7 +63,7 @@ def test_pool_files_keep_tracks_ready_for_v3() -> None:
         {
             "track_id": 4,
             "entity_uid": "u4",
-            "analyzer_version": "smart-mix-audio-v7",
+            "analyzer_version": ANALYZER_VERSION,
             "has_phrases": True,
             "stale": True,
             "quality": "full",
@@ -69,7 +71,7 @@ def test_pool_files_keep_tracks_ready_for_v3() -> None:
         {
             "track_id": 5,
             "entity_uid": "u5",
-            "analyzer_version": "smart-mix-audio-v7",
+            "analyzer_version": ANALYZER_VERSION,
             "has_phrases": True,
             "stale": False,
             "quality": "unavailable",
