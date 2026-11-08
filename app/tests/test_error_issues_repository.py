@@ -136,6 +136,75 @@ def test_upsert_keeps_service_and_digest_from_a_previous_pass(pg_db):
     assert _column(issue_id, "crate_score") == 45
 
 
+def test_upsert_never_clears_a_known_release(pg_db):
+    from crate.db.repositories.error_issues import upsert_issues
+
+    upsert_issues([_row(1)], synced_at=NOW)
+    issue_id = _ids()["1"]
+
+    # The issues listing carries no releases: the stored ones stay.
+    upsert_issues([_row(1, first_release=None, last_release=None)], synced_at=NOW)
+    assert _column(issue_id, "first_release") == "crate-a"
+    assert _column(issue_id, "last_release") == "crate-b"
+
+    # An issue detail that has them still replaces them.
+    upsert_issues([_row(1, last_release="crate-c")], synced_at=NOW)
+    assert _column(issue_id, "first_release") == "crate-a"
+    assert _column(issue_id, "last_release") == "crate-c"
+
+    upsert_issues([_row(2, first_release=None, last_release=None)], synced_at=NOW)
+    assert _column(_ids()["2"], "first_release") is None
+
+
+def test_set_releases_and_the_latest_event_release(pg_db):
+    from crate.db.repositories.error_issues import (
+        set_digest,
+        set_releases,
+        upsert_issues,
+    )
+
+    upsert_issues([_row(1, first_release=None, last_release=None)], synced_at=NOW)
+    issue_id = _ids()["1"]
+
+    def digest(release):
+        return set_digest(
+            issue_id,
+            digest={"v": 1, "release": release},
+            digest_event_id="e" * 32,
+            digest_hash="h1",
+            group_key="g" * 16,
+            last_release=release,
+        )
+
+    # The latest event's release is the last release.
+    assert digest("crate-b") is True
+    assert _column(issue_id, "last_release") == "crate-b"
+    assert _column(issue_id, "first_release") is None
+    # An event without a release keeps it.
+    digest(None)
+    assert _column(issue_id, "last_release") == "crate-b"
+
+    # The issue detail fills the first release; a missing value keeps the stored one.
+    assert set_releases(issue_id, first_release="crate-a", last_release=None) is True
+    assert (_column(issue_id, "first_release"), _column(issue_id, "last_release")) == (
+        "crate-a",
+        "crate-b",
+    )
+    set_releases(issue_id, first_release=None, last_release="crate-c")
+    assert (_column(issue_id, "first_release"), _column(issue_id, "last_release")) == (
+        "crate-a",
+        "crate-c",
+    )
+    assert (
+        set_releases(
+            "00000000-0000-0000-0000-000000000000",
+            first_release="crate-a",
+            last_release="crate-a",
+        )
+        is False
+    )
+
+
 def test_upsert_tracks_when_an_issue_closed(pg_db):
     from crate.db.repositories.error_issues import upsert_issues
 
@@ -320,6 +389,55 @@ def test_open_ids_not_in(pg_db):
     assert set(missing[0]) == {"id", "external_id"}
     assert [row["external_id"] for row in open_ids_not_in(["1"], limit=1)] == ["3"]
     assert [row["external_id"] for row in open_ids_not_in([])] == ["3", "1", "2"]
+
+
+def test_release_candidates(pg_db):
+    from crate.db.queries.error_issues import release_candidates
+    from crate.db.repositories.error_issues import set_digest, upsert_issues
+
+    unknown = {"first_release": None, "last_release": None}
+    upsert_issues(
+        [
+            _row(1, crate_score=40, **unknown),
+            _row(2, crate_score=90, **unknown),
+            _row(3, crate_score=40, last_seen=NOW, **unknown),
+            # Known already.
+            _row(4, crate_score=99),
+            # Closed.
+            _row(5, crate_score=99, status="resolved", **unknown),
+            # Its latest event has no release.
+            _row(6, crate_score=99, **unknown),
+            # No latest event yet.
+            _row(7, crate_score=99, **unknown),
+        ],
+        synced_at=NOW,
+    )
+    ids = _ids()
+    for external_id in ("1", "2", "3", "4", "5", "6"):
+        release = None if external_id == "6" else "crate-b"
+        set_digest(
+            ids[external_id],
+            digest={"v": 1, "release": release},
+            digest_event_id="e" * 32,
+            digest_hash="h1",
+            group_key="g" * 16,
+        )
+    listed = ["1", "2", "3", "4", "5", "6", "7"]
+
+    found = release_candidates(listed, limit=10)
+
+    # Highest score first, then the most recently seen.
+    assert [row["external_id"] for row in found] == ["2", "3", "1"]
+    assert found[0] == {"id": ids["2"], "external_id": "2"}
+    assert [row["external_id"] for row in release_candidates(listed, limit=1)] == ["2"]
+    assert [
+        row["external_id"]
+        for row in release_candidates(listed, exclude=["2"], limit=10)
+    ] == ["3", "1"]
+    # Only listed issues.
+    assert [row["external_id"] for row in release_candidates(["1"], limit=10)] == ["1"]
+    assert release_candidates([], limit=10) == []
+    assert release_candidates(listed, limit=0) == []
 
 
 def _seed_summary_fixture():
