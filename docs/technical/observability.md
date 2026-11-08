@@ -256,10 +256,17 @@ Sentry runs nothing.
 - It lists unresolved issues of the **error** category only, 100 per page and at
   most 5 pages per pass. A truncated pass is recorded and the page says so.
 - It downloads the latest event of at most 25 issues per pass, highest score
-  first, and keeps a sanitized **digest** of it, never the raw event.
+  first, and keeps a sanitized **digest** of it, never the raw event. The event's
+  release becomes the issue's **last release**.
+- Sentry's issues listing carries no releases, so the **first release** comes from
+  the issue detail (Retrieve an Issue), which also refreshes the last release. It
+  is read once per open issue whose latest event has a release: at most 25 per
+  pass, highest score first, so issues without a first release fill in over the
+  next passes. An issue whose detail has no first release is not read again while
+  it stays listed. A listing never clears a release Crate already has.
 - Issues still open in Crate that no longer appear in the listing are checked one
-  by one, at most 50 per pass, so issues resolved or ignored in Sentry close in
-  Crate too.
+  by one, so issues resolved or ignored in Sentry close in Crate too. These checks
+  and the release lookups share 50 issue reads per pass; the lookups go first.
 - Resolved and ignored issues are forgotten 30 days after they close.
 - The result of each pass (status, error code, counts, truncation) is stored in
   the runtime state the page and the tile read.
