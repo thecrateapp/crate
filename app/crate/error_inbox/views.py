@@ -1,8 +1,9 @@
 """Read models of the error inbox for the admin API, System Health and MCP.
 
-Everything comes from PostgreSQL (`error_issues`, `settings`, `ops_runtime_state`):
-no function here calls Sentry, GitHub or a model (EI-D3). The Sentry and GitHub
-tokens never leave `credential_secrets`; these views only say whether one is stored.
+Everything comes from PostgreSQL (`error_issues`, `error_fix_runs`, `settings`,
+`ops_runtime_state`): no function here calls Sentry, GitHub or a model (EI-D3). The
+Sentry and GitHub tokens never leave `credential_secrets`; these views only say
+whether one is stored.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from crate.db.queries import error_issues
+from crate.db.queries.error_fix_runs import fix_runs_for_issue
 from crate.error_inbox.autofix import next_request_at, supports_short_id
 from crate.error_inbox.config import (
     DEFAULT_BASE_URL,
@@ -22,6 +24,7 @@ from crate.error_inbox.config import (
     FixSettings,
     parse_config,
 )
+from crate.error_inbox.fix_runs import can_discard, merge_blockers
 from crate.error_inbox.state import access_view, sync_view, write_access
 
 
@@ -84,6 +87,7 @@ def _fix_connection(fix: FixSettings | None) -> dict[str, Any] | None:
         "repository": fix.repository,
         "workflow": fix.workflow,
         "ref": fix.ref,
+        "executor": fix.executor,
         "has_token": fix.has_token,
         "actions_url": fix.actions_url,
     }
@@ -127,6 +131,7 @@ def inbox_summary(*, now: datetime | None = None, top: int = 3) -> dict[str, Any
         "new_24h": overview["new_24h"],
         "regressed_24h": overview["regressed_24h"],
         "untriaged": overview["untriaged"],
+        "pending_review": overview.get("pending_review", 0),
         "last_synced_at": _iso(overview["last_synced_at"]),
         "services": overview["services"],
         "top_critical": overview["top_critical"],
@@ -146,6 +151,7 @@ def fix_view(
     return {
         "repository": config.fix.repository,
         "workflow": config.fix.workflow,
+        "executor": config.fix.executor,
         "actions_url": config.fix.actions_url,
         "supported": supports_short_id(issue.get("short_id")),
         "available_at": next_request_at(
@@ -154,24 +160,42 @@ def fix_view(
     }
 
 
+def fix_run_view(run: Mapping[str, Any]) -> dict[str, Any]:
+    """`ErrorFixRun`: a fix run and what a person can do with it now."""
+    blockers = merge_blockers(run)
+    return {
+        **run,
+        "review": {
+            "can_merge": not blockers,
+            "blockers": blockers,
+            "can_discard": can_discard(run),
+        },
+    }
+
+
 def issue_detail(issue_id: str) -> dict[str, Any] | None:
-    """`ErrorIssueDetail` with the current token's known write access and Launch fix."""
+    """`ErrorIssueDetail` with the token's known write access, Launch fix and the
+    issue's latest fix runs."""
     issue = error_issues.get_issue(issue_id)
     if issue is None:
         return None
     stored = stored_connection()
+    runs = [fix_run_view(run) for run in fix_runs_for_issue(issue["id"])]
     return {
         **issue,
         "write_access": write_access(stored.config, stored.access_state)
         if stored.configured
         else None,
         "fix": fix_view(stored.config, issue),
+        "fix_status": runs[0]["status"] if runs else None,
+        "fix_runs": runs,
     }
 
 
 __all__ = [
     "StoredConnection",
     "connection_view",
+    "fix_run_view",
     "fix_view",
     "inbox_summary",
     "issue_detail",

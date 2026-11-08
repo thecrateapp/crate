@@ -32,6 +32,7 @@ DEFAULT_SCHEDULES = {
     "compute_observability_summary": 0,  # opt-in — summary for Admin, MCP and Agent
     "compute_recommendation_skips": 3600,  # 1h — early skips over the last 24h
     "sync_error_issues": 300,  # 5min — Sentry issues into the error inbox
+    "track_error_fixes": 300,  # 5min — fix runs and their pull requests
     "cleanup_smart_mix_refinements": 86400,  # 24h — AI refinements unread for 180 days
 }
 
@@ -55,6 +56,10 @@ GLOBAL_CATALOG_SCHEDULED_TASKS = {
 # Only scheduled once `error_tracking` is configured: an install without Sentry
 # creates no tasks.
 ERROR_TRACKING_SCHEDULED_TASKS = {"sync_error_issues"}
+
+# Only scheduled while Launch fix is configured and a fix run is open or has a
+# branch to delete: with Launch fix off, nothing polls GitHub.
+ERROR_FIX_SCHEDULED_TASKS = {"track_error_fixes"}
 
 
 def get_schedules() -> dict[str, int]:
@@ -126,6 +131,9 @@ def _scheduled_task_enabled(task_type: str) -> bool:
     if task_type in ERROR_TRACKING_SCHEDULED_TASKS:
         return _has_error_tracking_config()
 
+    if task_type in ERROR_FIX_SCHEDULED_TASKS:
+        return _has_trackable_error_fixes()
+
     return True
 
 
@@ -151,6 +159,21 @@ def _has_error_tracking_config() -> bool:
         log.debug("Unable to read the error tracking settings", exc_info=True)
         return False
     return config is not None and bool(config.secret_ref)
+
+
+def _has_trackable_error_fixes() -> bool:
+    """Launch fix configured with a token, and a fix run to follow."""
+    try:
+        from crate.db.queries.error_fix_runs import has_trackable_fix_runs
+        from crate.error_inbox.config import load_config
+
+        config = load_config()
+        if config is None or not config.fix_ready:
+            return False
+        return has_trackable_fix_runs()
+    except Exception:
+        log.debug("Unable to inspect the error fix runs", exc_info=True)
+        return False
 
 
 def _has_approved_federation_peers() -> bool:

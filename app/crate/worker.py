@@ -733,10 +733,19 @@ _HANDLER_GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "sync_error_issues",
             "update_error_issue_status",
             "test_error_tracking_connection",
-            "dispatch_error_fix",
             "triage_error_issue",
             "investigate_error_issue",
             "evaluate_error_triage",
+        ),
+    ),
+    (
+        "crate.worker_handlers.error_fixes",
+        "ERROR_FIX_TASK_HANDLERS",
+        (
+            "dispatch_error_fix",
+            "track_error_fixes",
+            "merge_error_fix",
+            "discard_error_fix",
         ),
     ),
     (
