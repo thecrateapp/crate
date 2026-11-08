@@ -44,6 +44,9 @@ sources:
   - app/crate/smart_mix/stems.py
   - app/crate/db/repositories/smart_mix_stems.py
   - app/crate/db/schema_sections/smart_mix_stems_v156.py
+  - app/crate/db/repositories/smart_mix_playlists.py
+  - app/crate/db/schema_sections/smart_mix_playlists_v157.py
+  - app/crate/api/smart_mix_playlists.py
   - app/crate/api/decks_stems.py
   - app/crate/api/settings.py
   - app/crate/worker_handlers/analysis.py
@@ -582,10 +585,79 @@ D4 and §5); the format and the layer live in `crate/smart_mix/stems.py`.
   default) makes uploads answer 403 and drops `stem_upload` from `decks.features`.
   Stored analyses and reads stay as they are. There is no Admin switch yet.
 - **Capability.** `smart_mix.stems` is `{available, playlists, storage}`. `available`
-  follows `smart_mix.available`; `playlists` (Smart Mix playlists) and `storage` (stem
-  audio kept on the server) stay false until ST2.
+  and `playlists` (Smart Mix playlists, next section) follow `smart_mix.available`;
+  `storage` (stem audio kept on the server) stays false until ST2.PR3.
 - **What does not change.** The v8 grid, downbeats, phrases and the YAMNet voice bytes stay
   as they are, and no planner reads the layer yet (ST3).
+
+### Smart Mix playlists
+
+A Smart Mix playlist is a playlist its owner marks for Smart Mix (STEM-D2). While it is
+on, the server separates its local tracks into stems, and Crate Decks keeps it as an
+offline set; every client lists all playlists and marks the Smart Mix ones. The routes
+and the Decks sync are in `docs/technical/crate-decks.md` (section "Smart Mix
+playlists"); the code is in `crate/db/repositories/smart_mix_playlists.py`.
+
+- **Storage.** Migration 157 adds three tables:
+  - `smart_mix_playlists`: one row per playlist ever turned on, deleted with the
+    playlist, with the owner, `enabled`, `enabled_at` (last turned on), `disabled_at`
+    (set only while off), `last_used_at`, `revision` and `updated_at`. Turning it off
+    keeps the row, so clients and the stem-file LRU see the change.
+  - `smart_mix_playlist_revisions`: one counter per user. Every change of one of the
+    user's Smart Mix playlists takes its next value: turned on or off, or tracks added,
+    removed or replaced while on. Decks lists "changes since revision N". The counter
+    row is locked until the change commits, so a user's changes are serial and the
+    per-user limit holds under concurrent requests.
+  - `track_stem_jobs`: one row per track (`pending`, `analyzing`, `ready` or `failed`,
+    `attempts`, `last_error`, `requested_at`, `started_at`, `finished_at` and the
+    `source_revision` it was asked for), deleted with the track. A track in two Smart
+    Mix playlists has one job.
+- **Who.** Only the owner turns a playlist on or off; system playlists have no owner.
+  Admins read any playlist's status but cannot toggle it.
+- **Limits.** Admin settings of each instance, in `PUT /api/settings/smart-mix`:
+
+  | Key                            | Setting                                  | Default  |
+  | ------------------------------ | ---------------------------------------- | -------- |
+  | `stem_max_tracks_per_playlist` | `smart_mix_stem_max_tracks_per_playlist` | 300      |
+  | `stem_max_tracks_per_user`     | `smart_mix_stem_max_tracks_per_user`     | no limit |
+
+  Both count distinct local tracks: a track twice in a playlist, or in two of a user's
+  playlists, counts once, and tracks from other instances do not count. Turning a
+  playlist on, and adding tracks to it while on (Listen, the web app, smart playlist
+  generation, OpenSubsonic), is refused with 409 when the playlist or the user's Smart
+  Mix playlists together would go over; nothing is stored. `null` turns the per-user
+  limit off; the per-playlist limit is always on (at least 1). Lowering a limit leaves
+  playlists that are on as they are, but they cannot grow.
+
+- **Queueing.** A track gets a pending job when one of its Smart Mix playlists turns on
+  or receives it and it has no server analysis of its current file (the profile's
+  source revision). A Decks upload does not count, because the server's separation
+  also produces the stem files (STEM-D6). An existing job:
+
+  - `pending` keeps its place unless the file changed;
+  - `ready` whose analysis no longer applies goes back to `pending`;
+  - `failed` goes back to `pending` only when the file changed since;
+  - `analyzing` is left to the worker.
+
+  Turning a playlist off and removing tracks leave jobs and analyses alone, so the
+  separation task (ST2.PR3) claims a job only while one of the track's Smart Mix
+  playlists is on. `queue_smart_mix_stem_jobs()` queues for every Smart Mix playlist
+  that is on, for that task to run before it claims and catch tracks whose file
+  changed.
+
+- **Status.** A track is `ready` when it has a server analysis of its current file;
+  otherwise it has its job's state, and `pending` with no job. The estimate is the
+  playlist's pending and analysing tracks times the mean time of the latest 20
+  separations (five minutes per track until there is one, from the ST0 estimate of
+  3-5 hours per 50 tracks), without other queued work.
+- **Playlist responses.** `GET /api/playlists`, its detail (owner and collaborators)
+  and `playlists` in `GET /api/me/playlists-page` carry `smartMix`, which is
+  `{enabled, ready, total}`, computed for all of them in one query; `ready` and `total`
+  are 0 while off. The toggle invalidates the `playlists` and `playlist:{id}` client
+  caches.
+- **Not yet.** Nothing separates the queued tracks until ST2.PR2 and ST2.PR3 (the
+  analysis worker and `analyze_playlist_stems`). `last_used_at` is set when a playlist
+  is turned on; marking later use is part of ST2.PR3.
 
 ### Measurement of the structure
 
@@ -1248,6 +1320,7 @@ Crate Agent; an MCP Bearer token is not an Admin session or a VirtualDJ PAT.
 | `GET /api/capabilities`                                                      | Effective flags and client contract; does not prove their implementation or physical readiness                                        |
 | `GET /api/tracks/by-entity/{uid}/mix-profile?detail=summary\|full`           | Profile by UID; `full` includes the beat grid and, when an analysis applies, the `stems` layer; a 404 can mean missing or invalidated |
 | `GET` and `PUT /api/decks/tracks/{uid}/stem-analysis`                        | Crate Decks reads the stem analysis that applies and uploads its own; `PUT` needs `smart_mix.stems.contribute`                        |
+| `GET /api/smart-mix/playlists` and `GET`, `PUT /{id}`                        | Smart Mix playlists: changes since a revision, stem progress of one, turn on or off (owner only, within the limits)                   |
 | `GET /api/tracks/by-entity/{uid}/compatible?context=auto\|beatmatch\|smooth` | Local ranking of candidates; does not trigger analysis                                                                                |
 | `POST /api/playback/transition-plans`                                        | Batch planning; uses the cache                                                                                                        |
 | `POST /api/playback/continuation-token` and `/api/playback/continuation`     | Contract for continuing planning and the queue in the native runtime                                                                  |

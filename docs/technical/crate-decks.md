@@ -5,7 +5,7 @@ section: reference
 audience: [developer]
 status: canonical
 order: 35
-verified: 2026-11-08
+verified: 2026-11-09
 sources:
   - app/crate/api/auth.py
   - app/crate/api/native_oauth_auth.py
@@ -20,6 +20,9 @@ sources:
   - app/crate/api/permissions.py
   - app/crate/smart_mix/stems.py
   - app/crate/db/repositories/smart_mix_stems.py
+  - app/crate/api/smart_mix_playlists.py
+  - app/crate/db/repositories/smart_mix_playlists.py
+  - app/crate/api/schemas/playlists.py
   - app/crate/db/queries/browse_media_search.py
   - app/crate/smart_mix/planner.py
   - app/crate/smart_mix/cue_detection.py
@@ -30,6 +33,7 @@ sources:
   - app/tests/test_capabilities_decks.py
   - app/tests/test_capabilities_stems.py
   - app/tests/test_decks_stem_analysis_api.py
+  - app/tests/test_smart_mix_playlists_api.py
   - app/tests/test_search_playable_audio.py
 ---
 
@@ -155,6 +159,75 @@ object when an analysis of its current file applies: `producer`,
 `startMs`, `endMs` and the mean level byte of `drums`, `bass`, `other` and
 `vocals`. The summary profile never carries it, because the Go read plane serves
 the summary natively. No planner reads the layer yet (ST3).
+
+## Smart Mix playlists (Smart Mix Stems ST2)
+
+A Smart Mix playlist is a playlist its owner marks for Smart Mix. The mark is
+the same for Listen, the web app and Decks: the server separates the
+playlist's tracks into stems, and Decks keeps the playlist as an offline set
+(it replaces Decks' own offline sets). How the server stores the state and
+queues the work is in the Smart Mix operations doc
+(`docs/technical/smart-mix-operations.md`, section "Smart Mix playlists").
+`smart_mix.stems.playlists` in `GET /api/capabilities` says the server offers
+them.
+
+| Route                                              | Use                                                                |
+| -------------------------------------------------- | ------------------------------------------------------------------ |
+| `GET /api/smart-mix/playlists?sinceRevision=N`     | The caller's Smart Mix playlists changed after revision `N`        |
+| `GET /api/smart-mix/playlists/{playlistId}`        | The playlist's state, its tracks' stem progress and an estimate    |
+| `PUT /api/smart-mix/playlists/{playlistId}`        | Turn Smart Mix on or off: `{"enabled": true \| false}`, owner only |
+| `GET /api/playlists`, its detail, `playlists-page` | Each playlist carries `smartMix: {enabled, ready, total}`          |
+
+All of them take a session; `crv_` access tokens do not reach them.
+
+**Sync.** Every change of one of the user's Smart Mix playlists takes the next
+value of a per-user revision: turned on, turned off, or tracks added, removed
+or replaced while it is on. The list answers
+`{"revision": R, "playlists": [...]}`, oldest change first, including
+playlists turned off. Each item has `playlistId`, `enabled`, `enabledAt`,
+`disabledAt`, `lastUsedAt`, `revision` and `updatedAt`. Decks keeps `R` and
+sends it as `sinceRevision` next time; without it, the list has every Smart
+Mix playlist the user ever turned on. A deleted playlist loses its Smart Mix
+row with it and is not listed as a change: Decks drops offline sets whose
+playlist no longer exists in `GET /api/playlists`. A change of tracks comes as
+a new revision of the playlist, so Decks reads its tracks again from
+`GET /api/playlists/{id}`.
+
+**Turning it on or off.** Only the playlist's owner can, and system playlists
+have none: anyone else gets 403, and an unknown playlist 404. Setting the state
+the playlist already has changes nothing (turning on again only queues the
+tracks still missing). Turning it on answers 409 when the playlist, or all of
+the owner's Smart Mix playlists together, would hold more distinct local
+tracks than the instance allows (`stem_max_tracks_per_playlist`, 300 by
+default, and `stem_max_tracks_per_user`, no limit by default, both in
+`PUT /api/settings/smart-mix`). Adding tracks to a Smart Mix playlist past
+those limits answers 409 too, in `POST /api/playlists/{id}/tracks`, in
+`POST /api/playlists/{id}/generate` and in OpenSubsonic. The answer is the
+playlist's state, as in the list; a playlist that was never on answers
+`enabled: false` with null dates and revision.
+
+**Progress.** The status adds `total` (distinct local tracks while it is on),
+`counts` per state and `tracks`, one per local track in playlist order with
+`trackId`, `trackEntityUid`, `state` and `attempts`:
+
+| `state`     | Meaning                                                    |
+| ----------- | ---------------------------------------------------------- |
+| `ready`     | The server has a stem analysis of the track's current file |
+| `pending`   | Waiting for separation                                     |
+| `analyzing` | Being separated                                            |
+| `failed`    | Separation failed for this file                            |
+
+`estimatedSecondsLeft` is the time left for the playlist's pending and
+analysing tracks at the server's recent pace, without other queued work; it is
+null while the playlist is off. The owner, collaborators and admins read the
+status; other users get 403.
+
+**Playlist responses.** `smartMix` is `{enabled, ready, total}`: `ready` of
+`total` local tracks have server stems, both 0 while Smart Mix is off. It is
+computed for all listed playlists in one query. It is reported on the caller's
+own and shared playlists (`GET /api/playlists`, `playlists` in
+`GET /api/me/playlists-page`, and the detail for the owner and collaborators),
+and is null elsewhere. The Go read plane serves none of these routes.
 
 ## Audio availability and plan fields (S9)
 

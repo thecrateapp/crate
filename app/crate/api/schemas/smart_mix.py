@@ -55,6 +55,90 @@ class StemAnalysisUploadResponse(SmartMixApiModel):
     )
 
 
+class SmartMixPlaylistUpdateRequest(SmartMixRequestModel):
+    enabled: bool
+
+
+class SmartMixPlaylistResponse(SmartMixApiModel):
+    """A playlist's Smart Mix state (STEM-D2).
+
+    The dates and the revision are null for a playlist that was never turned on.
+    """
+
+    playlist_id: int = Field(serialization_alias="playlistId")
+    enabled: bool
+    enabled_at: datetime | None = Field(
+        default=None,
+        serialization_alias="enabledAt",
+        description="When it was last turned on.",
+    )
+    disabled_at: datetime | None = Field(
+        default=None,
+        serialization_alias="disabledAt",
+        description="When it was turned off.",
+    )
+    last_used_at: datetime | None = Field(
+        default=None, serialization_alias="lastUsedAt"
+    )
+    revision: int | None = Field(
+        default=None,
+        ge=1,
+        description=(
+            "The owner's Smart Mix playlist revision of its last change: turned on "
+            "or off, or tracks changed while on."
+        ),
+    )
+    updated_at: datetime | None = Field(default=None, serialization_alias="updatedAt")
+
+
+class SmartMixPlaylistsResponse(SmartMixApiModel):
+    revision: int = Field(
+        ge=0,
+        description=(
+            "The revision to send as sinceRevision next time: the latest listed, or "
+            "the one sent when nothing changed since."
+        ),
+    )
+    playlists: list[SmartMixPlaylistResponse]
+
+
+class SmartMixTrackStateResponse(SmartMixApiModel):
+    track_id: int = Field(serialization_alias="trackId")
+    track_entity_uid: str | None = Field(serialization_alias="trackEntityUid")
+    state: Literal["pending", "analyzing", "ready", "failed"] = Field(
+        description=(
+            "ready: a server stem analysis of the track's current file exists. "
+            "pending: waiting for separation. analyzing: being separated. failed: "
+            "the separation failed for this file."
+        )
+    )
+    attempts: int = Field(ge=0)
+
+
+class SmartMixPlaylistStateCounts(SmartMixApiModel):
+    pending: int = Field(ge=0)
+    analyzing: int = Field(ge=0)
+    ready: int = Field(ge=0)
+    failed: int = Field(ge=0)
+
+
+class SmartMixPlaylistStatusResponse(SmartMixPlaylistResponse):
+    """The playlist's Smart Mix state and, while it is on, each local track's state."""
+
+    total: int = Field(ge=0, description="Distinct local tracks, while on.")
+    counts: SmartMixPlaylistStateCounts
+    tracks: list[SmartMixTrackStateResponse]
+    estimated_seconds_left: int | None = Field(
+        default=None,
+        serialization_alias="estimatedSecondsLeft",
+        ge=0,
+        description=(
+            "Time left for this playlist's pending and analysing tracks at the "
+            "server's recent pace, not counting other queued work; null while off."
+        ),
+    )
+
+
 class MixProfileResponse(SmartMixApiModel):
     track_entity_uid: UUID = Field(alias="trackEntityUid")
     profile_version: int = Field(alias="profileVersion", ge=1)

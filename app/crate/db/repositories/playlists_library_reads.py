@@ -15,6 +15,7 @@ from crate.db.repositories.playlists_shared import (
     attach_artwork_tracks,
     playlist_to_dict,
 )
+from crate.db.repositories.smart_mix_playlists import attach_smart_mix_summaries
 from crate.db.tx import read_scope
 
 
@@ -66,6 +67,8 @@ def get_library_playlists_page(user_id: int, *, session: Session | None = None) 
         playlists = get_playlists(user_id=user_id, session=s)
         followed_user = _followed_user_playlists(s, user_id)
         _attach_owners(s, playlists + followed_user)
+        # Owned and shared playlists only: a followed playlist's Smart Mix is its owner's.
+        attach_smart_mix_summaries(playlists, session=s)
         return {
             "playlists": playlists,
             "followed_playlists": followed_user,

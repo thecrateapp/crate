@@ -79,9 +79,10 @@ def get_capabilities(request: Request) -> CapabilitiesResponse:
             android_bass_handoff=bass_handoff,
             android_long_beatmatch=beatmatch,
             ai_assisted=_ai_assisted(available),
-            # Smart Mix playlists and stored stem audio arrive with ST2.
+            # Smart Mix playlists can be turned on (ST2.PR1); stored stem audio
+            # arrives with ST2.PR3.
             stems=SmartMixStemsCapabilities(
-                available=available, playlists=False, storage=False
+                available=available, playlists=available, storage=False
             ),
         ),
         vdj=VDJCapabilities(

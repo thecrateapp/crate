@@ -38,8 +38,9 @@ class SmartMixAiAssistedCapabilities(BaseModel):
 class SmartMixStemsCapabilities(BaseModel):
     """Smart Mix Stems (STEM-D4): stem levels per phrase in full profiles.
 
-    playlists: Smart Mix playlists can be turned on, so the server separates their
-    tracks. storage: the server keeps stem audio for Crate Decks to download.
+    playlists: Smart Mix playlists can be turned on (/api/smart-mix/playlists), so the
+    server queues their tracks for separation, and playlist responses carry smartMix.
+    storage: the server keeps stem audio for Crate Decks to download.
     """
 
     available: bool

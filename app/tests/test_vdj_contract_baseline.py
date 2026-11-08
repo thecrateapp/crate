@@ -26,10 +26,11 @@ def test_capabilities_keep_smart_mix_contract_stable(test_app, monkeypatch):
         "reason",
     }
     assert ai_assisted["available"] is False
-    # Smart Mix Stems adds stems; Smart Mix playlists and stored stem audio come later.
+    # Smart Mix Stems adds stems with Smart Mix playlists; stored stem audio comes
+    # later.
     assert smart_mix.pop("stems") == {
         "available": True,
-        "playlists": False,
+        "playlists": True,
         "storage": False,
     }
     assert smart_mix == {

@@ -57,6 +57,10 @@ from crate.db.repositories.playlists_collaboration import (
 )
 from crate.db.repositories.playlists_follows import follow_playlist, unfollow_playlist
 from crate.db.repositories.playlists_membership_reads import get_playlist_access
+from crate.db.repositories.smart_mix_playlists import (
+    SmartMixPlaylistLimitError,
+    attach_smart_mix_summaries,
+)
 from crate.db.repositories.users import get_user_by_username
 from crate.playlist_covers import delete_playlist_cover, playlist_cover_abspath
 
@@ -68,6 +72,14 @@ _PLAYLIST_RESPONSES = merge_responses(
         400: error_response("The request could not be processed."),
         404: error_response("The requested playlist resource could not be found."),
         422: error_response("The request payload failed validation."),
+    },
+)
+_PLAYLIST_TRACKS_RESPONSES = merge_responses(
+    _PLAYLIST_RESPONSES,
+    {
+        409: error_response(
+            "A Smart Mix playlist would hold more tracks than the instance allows."
+        )
     },
 )
 
@@ -119,7 +131,7 @@ def filter_options():
 def list_playlists(request: Request):
     user = _require_auth(request)
     playlists = get_playlists(user_id=user["id"])
-    return playlists
+    return attach_smart_mix_summaries(playlists)
 
 
 @router.post(
@@ -168,6 +180,9 @@ def get_one(request: Request, playlist_id: int):
     pl["members"] = (
         get_playlist_members(playlist_id) if access in {"owner", "collaborator"} else []
     )
+    # The Smart Mix state is the owner's: reported to whoever edits the playlist.
+    if access in {"owner", "collaborator"}:
+        attach_smart_mix_summaries([pl])
     return pl
 
 
@@ -260,7 +275,7 @@ def get_cover(request: Request, playlist_id: int):
 @router.post(
     "/{playlist_id}/tracks",
     response_model=PlaylistTracksAddedResponse,
-    responses=_PLAYLIST_RESPONSES,
+    responses=_PLAYLIST_TRACKS_RESPONSES,
     summary="Add tracks to a playlist",
 )
 def add_tracks(request: Request, playlist_id: int, body: AddTracksRequest):
@@ -279,7 +294,10 @@ def add_tracks(request: Request, playlist_id: int, body: AddTracksRequest):
         if track.get("global_track_uid") or track.get("globalTrackUid"):
             continue
         deny_remote_for_local_action(track, "add to playlist")
-    added = add_playlist_tracks(playlist_id, tracks)
+    try:
+        added = add_playlist_tracks(playlist_id, tracks)
+    except SmartMixPlaylistLimitError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from None
     return {"ok": True, "added": added}
 
 
@@ -330,7 +348,7 @@ def reorder(request: Request, playlist_id: int, body: ReorderRequest):
 @router.post(
     "/{playlist_id}/generate",
     response_model=PlaylistGenerateResponse,
-    responses=_PLAYLIST_RESPONSES,
+    responses=_PLAYLIST_TRACKS_RESPONSES,
     summary="Generate tracks for a smart playlist",
 )
 def generate_smart(request: Request, playlist_id: int):
@@ -347,11 +365,14 @@ def generate_smart(request: Request, playlist_id: int):
     rules = pl["smart_rules"]
     tracks = execute_smart_rules(rules)
     target_count = int(rules.get("limit") or len(tracks or []) or 50)
-    track_count = regenerate_playlist_tracks(
-        playlist_id,
-        tracks or [],
-        target_count=target_count,
-    )
+    try:
+        track_count = regenerate_playlist_tracks(
+            playlist_id,
+            tracks or [],
+            target_count=target_count,
+        )
+    except SmartMixPlaylistLimitError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from None
 
     return {"ok": True, "track_count": track_count}
 

@@ -53,11 +53,25 @@ class PathsSettingsUpdateRequest(BaseModel):
 
 
 class SmartMixSettingsUpdateRequest(BaseModel):
+    """Only the keys sent change. ``stem_max_tracks_per_user: null`` turns that limit
+    off; the per-playlist limit is always on."""
+
     model_config = ConfigDict(extra="forbid")
 
     ai_enabled: bool | None = None
     ai_send_genre: bool | None = None
     stem_uploads_enabled: bool | None = None
+    stem_max_tracks_per_playlist: int | None = Field(default=None, ge=1)
+    stem_max_tracks_per_user: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def _per_playlist_limit_stays_on(self) -> "SmartMixSettingsUpdateRequest":
+        if (
+            "stem_max_tracks_per_playlist" in self.model_fields_set
+            and self.stem_max_tracks_per_playlist is None
+        ):
+            raise ValueError("stem_max_tracks_per_playlist cannot be turned off")
+        return self
 
 
 class SoulseekSettingsUpdateRequest(BaseModel):
@@ -100,6 +114,11 @@ class SmartMixSettingsResponse(BaseModel):
     # Smart Mix Stems (STEM-D8): Crate Decks users with smart_mix.stems.contribute
     # may upload stem analyses while this is on (the default).
     stem_uploads_enabled: bool
+    # Smart Mix playlists (STEM-D2): distinct local tracks the server separates per
+    # Smart Mix playlist (300 by default) and across a user's Smart Mix playlists
+    # (null: no limit, the default).
+    stem_max_tracks_per_playlist: int
+    stem_max_tracks_per_user: int | None
 
 
 class ShowsActiveCityResponse(BaseModel):

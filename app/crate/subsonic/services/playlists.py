@@ -14,6 +14,7 @@ from crate.db.repositories.playlists_detail_reads import get_playlist_tracks
 from crate.db.repositories.playlists_membership_reads import (
     can_view_playlist,
 )
+from crate.db.repositories.smart_mix_playlists import SmartMixPlaylistLimitError
 from crate.db.repositories.subsonic_playlist_mutations import (
     PlaylistMutationError,
     create_subsonic_playlist,
@@ -98,6 +99,8 @@ def create_playlist(
         )
     except PlaylistMutationError as error:
         _raise_playlist_mutation_error(error)
+    except SmartMixPlaylistLimitError as error:
+        _raise_smart_mix_limit_error(error)
     return get_playlist(user, encode_subsonic_playlist_id(target_id))
 
 
@@ -135,6 +138,8 @@ def update_playlist(
         )
     except PlaylistMutationError as error:
         _raise_playlist_mutation_error(error)
+    except SmartMixPlaylistLimitError as error:
+        _raise_smart_mix_limit_error(error)
 
 
 def delete_playlist(user: dict[str, Any], identifier: str) -> None:
@@ -177,6 +182,11 @@ def _raise_playlist_mutation_error(error: PlaylistMutationError) -> None:
         else "Playlist not found"
     )
     raise OpenSubsonicError(ErrorCode.NOT_FOUND, message)
+
+
+def _raise_smart_mix_limit_error(error: SmartMixPlaylistLimitError) -> None:
+    # A Smart Mix playlist does not grow past the instance's limits (STEM-D2).
+    raise OpenSubsonicError(ErrorCode.GENERIC, str(error)) from None
 
 
 def _can_view(playlist: dict | None, user: dict[str, Any]) -> bool:

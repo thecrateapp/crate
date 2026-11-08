@@ -41,10 +41,11 @@ def _capabilities(test_app) -> dict:
 def test_smart_mix_stems_follows_smart_mix(test_app, monkeypatch, uploads) -> None:
     del uploads
     monkeypatch.setenv("CRATE_SMART_MIX_ENABLED", "true")
-    # Smart Mix playlists and stored stem audio arrive with ST2.
+    # Smart Mix playlists can be turned on (ST2.PR1); stored stem audio comes in
+    # ST2.PR3.
     assert _capabilities(test_app)["smart_mix"]["stems"] == {
         "available": True,
-        "playlists": False,
+        "playlists": True,
         "storage": False,
     }
 

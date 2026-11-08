@@ -151,12 +151,17 @@ def test_settings_switch_the_gate(test_app, monkeypatch):
         "ai_enabled": True,
         "ai_send_genre": False,
         "stem_uploads_enabled": True,
+        "stem_max_tracks_per_playlist": 300,
+        "stem_max_tracks_per_user": None,
     }
     stored.clear()
     # Defaults: off, and the genre goes when it is on (SM3-D6, SM3-D10). Stem
-    # uploads are on (STEM-D8).
+    # uploads are on (STEM-D8); Smart Mix playlists hold 300 tracks each, with no
+    # limit per user (STEM-D2).
     assert settings._get_smart_mix_settings() == {
         "ai_enabled": False,
         "ai_send_genre": True,
         "stem_uploads_enabled": True,
+        "stem_max_tracks_per_playlist": 300,
+        "stem_max_tracks_per_user": None,
     }
