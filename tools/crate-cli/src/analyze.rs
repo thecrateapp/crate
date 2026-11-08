@@ -636,11 +636,29 @@ fn local_beat(
     let nearest = nearest_beat(beat_grid_ms, cue_ms);
     let count = mix_window_beats(beat_grid_ms).min(beat_grid_ms.len());
     let start = window_start(beat_grid_ms.len(), nearest, count);
-    let mut beats: Vec<(f64, f64)> = beat_grid_ms[start..start + count]
+    let beats: Vec<(f64, f64)> = beat_grid_ms[start..start + count]
         .iter()
         .enumerate()
         .map(|(offset, time)| ((start + offset) as f64, *time as f64))
         .collect();
+    let jitter = interval_jitter(&frame_intervals_ms(
+        &beat_frames[start..start + count],
+        sample_rate,
+    ));
+    let half_frame_ms = 0.5 * HOP_SIZE as f64 * 1_000.0 / f64::from(sample_rate);
+    fit_local_beat(beats, nearest as f64, jitter, half_frame_ms)
+}
+
+/// The regression of `local_beat` over the beats of a cue window, given as (beat number,
+/// time in ms) pairs, with the beat reference taken at beat number `nearest`. `jitter`
+/// is the interval jitter of the window's beats, of which `resolution_ms` (half the time
+/// step the beats are quantised to) is forgiven.
+fn fit_local_beat(
+    mut beats: Vec<(f64, f64)>,
+    nearest: f64,
+    jitter: Option<f32>,
+    resolution_ms: f64,
+) -> Option<LocalBeat> {
     let mut fit = fit_beats(&beats)?;
     while beats.len() > LOCAL_TEMPO_MIN_BEATS {
         let residuals: Vec<f64> = beats
@@ -668,17 +686,11 @@ fn local_beat(
         (Some(first), Some(second)) => (first.period - second.period).abs() / fit.period,
         _ => 1.0,
     };
-    let half_frame_ratio = (0.5 * HOP_SIZE as f64 * 1_000.0 / f64::from(sample_rate)) / fit.period;
-    let jitter = (interval_jitter(&frame_intervals_ms(
-        &beat_frames[start..start + count],
-        sample_rate,
-    ))
-    .unwrap_or(1.0)
-        - half_frame_ratio as f32)
-        .max(0.0);
+    let resolution_ratio = resolution_ms / fit.period;
+    let jitter = (jitter.unwrap_or(1.0) - resolution_ratio as f32).max(0.0);
     let stability =
         (1.0 - (drift / LOCAL_DRIFT_LIMIT) as f32 - jitter / LOCAL_JITTER_LIMIT).clamp(0.0, 1.0);
-    let reference = fit.time_at(nearest as f64);
+    let reference = fit.time_at(nearest);
     Some(LocalBeat {
         bpm: (60_000.0 / fit.period) as f32,
         beat_ms: (reference >= 0.0).then(|| reference.round() as u64),
