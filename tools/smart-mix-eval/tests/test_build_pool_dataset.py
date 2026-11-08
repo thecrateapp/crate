@@ -65,3 +65,54 @@ def test_pool_rows_keep_only_uids_and_revisions(tmp_path) -> None:
     assert row["rootGenre"] == row["incomingRootGenre"] == "pool"
     assert row["stratum"] == f"pool/{row['tempoBand']}"
     assert not {"title", "artist", "album", "path"} & set(row)
+
+
+def test_grouped_pool_pairs_within_groups_and_adds_a_few_crossings() -> None:
+    from dataclasses import replace
+
+    from build_pool_dataset import grouped_pool_edges
+
+    base = profile("00000000-0000-4000-8000-000000000000", layout=INCOMING_LAYOUT)
+    tracks = {}
+    for index, (group, bpm) in enumerate(
+        [
+            ("house", 124.0),
+            ("house", 125.0),
+            ("house", 126.0),
+            ("techno", 128.0),
+            ("techno", 130.0),
+            ("techno", 131.0),
+            ("dnb", 172.0),
+            ("dnb", 174.0),
+        ]
+    ):
+        uid = f"00000000-0000-4000-8000-0000000000{index:02d}"
+        tracks[uid] = (
+            group,
+            replace(base, track_entity_uid=uid, profile_revision=f"r{index}", bpm=bpm),
+        )
+    groups = {uid: group for uid, (group, _profile) in tracks.items()}
+    profiles = [item for _group, item in tracks.values()]
+
+    edges = grouped_pool_edges(profiles, groups, per_group=2, cross_group=2)
+
+    within = [edge for edge in edges if edge.root_genre != "cross"]
+    cross = [edge for edge in edges if edge.root_genre == "cross"]
+    for edge in within:
+        assert groups[edge.outgoing.track_entity_uid] == edge.root_genre
+        assert groups[edge.incoming.track_entity_uid] == edge.root_genre
+        assert edge.tempo_band in {"0-2", "2-4", "4-6"}
+    assert {edge.root_genre for edge in within} == {"house", "techno", "dnb"}
+    assert all(
+        sum(1 for edge in within if edge.root_genre == group) <= 2
+        for group in ("house", "techno", "dnb")
+    )
+    assert 1 <= len(cross) <= 2
+    for edge in cross:
+        assert (
+            groups[edge.outgoing.track_entity_uid]
+            != groups[edge.incoming.track_entity_uid]
+        )
+        assert edge.incoming_root_genre == groups[edge.incoming.track_entity_uid]
+    # Deterministic.
+    assert edges == grouped_pool_edges(profiles, groups, per_group=2, cross_group=2)

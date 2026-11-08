@@ -943,9 +943,10 @@ deterministic plan.
   `vdj.smart_mix.ai`. A missing grant is `unavailable` with `permission_denied` or
   `scope_missing`, never a 403.
 - **What leaves the server (SM3-D6).** `llm/prompts/smart_mix_transition.py`
-  (`sm3-refine-1`) sends tempo, Camelot key, energy, danceability, valence, loudness, the last
+  (`sm3-refine-3`) sends tempo, Camelot key, energy, danceability, valence, loudness, the last
   outgoing and first incoming phrases with their energy per bar and voice, the set history,
-  the context rules and the candidates. The genre slug goes only while
+  the context rules and the candidates, each with the bass handoff answers it accepts
+  (`balanced` only on a beatmatch candidate when the context allows it). The genre slug goes only while
   `smart_mix_ai_send_genre` is on (default). Never titles, artists, paths, track or profile
   IDs, the user or an address. The prompt and the answer are neither stored nor logged.
 - **Response.** v3 plans of flagged edges add `refinement`: `ready` with the refined `plan`,
