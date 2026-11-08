@@ -34,6 +34,7 @@ sources:
   - app/crate/db/jobs/analysis_storage.py
   - app/crate/db/jobs/smart_mix_backfill.py
   - app/crate/db/migrations/versions/147_smart_mix_structure.py
+  - app/crate/db/schema_sections/smart_mix_backfill_candidates_v154.py
   - app/crate/smart_mix/backfill_window.py
   - app/ui/src/components/SmartMixBackfillSettings.tsx
   - app/crate/db/queries/smart_mix_admin_tracks.py
@@ -564,8 +565,9 @@ unless its profile is at the target analyzer and profile schema, current and usa
 profile the backfill just wrote is never claimed again. `target_generation` is the analyzer
 version (with `+schemaN` appended for schemas above 1), so a new analyzer version or schema
 makes attempts from the previous generation eligible again. It prioritizes the play queue,
-supplied offline IDs, favorites and collections, and listening history before everything else.
-It can promote Python profiles when the Rust CLI is available, within `maxAttempts`.
+supplied offline IDs, favorites and collections, and listening history before everything else,
+from a stored ranking (see [How a pass claims](#how-a-pass-claims)). It can promote Python
+profiles when the Rust CLI is available, within `maxAttempts`.
 
 The campaign is persisted under `smart_mix:backfill_campaign`, with the states `running`,
 `paused`, `cancelled` and `completed`. `controlState=idle` also covers a missing campaign and
@@ -580,6 +582,45 @@ creates a new campaign for the deployed target with zeroed counters. A campaign 
 completes has exhausted the claimable work in that pass; it can still leave exhausted errors or
 non-current profiles. Check coverage and `processing.exhausted` before treating the backlog as
 resolved. A coordinating task in `done` does not mean all of its children have finished either.
+
+### How a pass claims
+
+Ranking the whole library is expensive, and since the night window a pass only claims its free
+slots, often one to four tracks. The claim used to rank every track on every pass: on a copy of
+the production library (about 136K tracks) that took 4 to 8 s on a development machine, and
+about 13 s in production, holding the claim lock. The claim now keeps the ranking in
+`smart_mix_backfill_candidates` (migration 154), one row per claimable track with its priority
+and whether it is a Python promotion:
+
+| Step  | When it runs                                                                         | Cost (dev machine, ~136K tracks) |
+| ----- | ------------------------------------------------------------------------------------ | -------------------------------- |
+| Rank  | First claim, inputs changed, ranking older than 10 minutes, or it cannot fill a pass | About 1 s                        |
+| Claim | Every pass                                                                           | About 5 ms                       |
+
+- **Order.** The same as before: Python promotions last, then priority, then track id. The
+  priorities are 1 the play queue (the current track and the queued items of every device), 2
+  supplied offline IDs, 3 favorites and collections (liked tracks, saved albums, playlists and
+  followed artists), 4 listening history and 5 the rest. The ranking stores 3 to 5. Every pass
+  looks up 1 and 2 again and claims them first, among the tracks still in the ranking.
+- **Checks.** Each row a pass takes is checked against the claim rules above (target analyzer
+  and schema, quality, `target_generation`, attempts, claims in flight, quarantined albums),
+  under `FOR UPDATE SKIP LOCKED`, and leaves the ranking once claimed. A row that is no longer
+  claimable, for example because a manual reanalysis wrote a current profile, is skipped.
+- **Refresh.** The ranking is rebuilt when its inputs change (analyzer version, schema,
+  `maxAttempts` or Python promotion), when it is older than 10 minutes and when it cannot fill a
+  pass. Because of the last rule, a pass that claims nothing, which completes the campaign if
+  nothing is in flight, always comes from a fresh ranking.
+- **What waits for the next ranking.** A track that becomes claimable between rankings (a failed
+  attempt with retries left, a dead claim settled as failed, an import, a changed source) or
+  changes tier (a new like or play) waits up to 10 minutes, or until the ranking runs out. Before,
+  a failed attempt was retried on the next pass.
+- **Locking.** Counting, ranking and claiming run under the claim lock that every coordinator
+  takes, so two coordinators never rank at once or exceed the window. A claim without a limit,
+  which only tests use, ranks the library inline when another transaction holds the lock.
+- **Crashes.** The table is an unlogged cache of about 130K small rows: a crash empties it and the
+  next claim ranks again.
+- **Long play queues.** Reading the queues costs about 20 ms with 1,500 queued items and 120 ms
+  with 10,000, on every pass.
 
 ### Night window
 
