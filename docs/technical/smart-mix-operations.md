@@ -41,6 +41,9 @@ sources:
   - app/crate/db/queries/smart_mix_compatible.py
   - app/crate/db/repositories/smart_mix.py
   - app/crate/db/repositories/smart_mix_signals.py
+  - app/crate/smart_mix/stems.py
+  - app/crate/db/repositories/smart_mix_stems.py
+  - app/crate/db/schema_sections/smart_mix_stems_v156.py
   - app/crate/worker_handlers/analysis.py
   - app/crate/actors.py
   - app/crate/ai/queues.py
@@ -508,6 +511,63 @@ with its beats stored, a backfill of the library takes about 3 days instead of 1
   only means not keeping their output: the worker logs a warning and the profile goes on.
 - **Size.** 3.4 KB for a 4:21 track and 4.8 KB for a 6:02 one (`pg_column_size` of the
   row; integer arrays are stored uncompressed), so about 0.5 GB for 140,000 tracks.
+
+### Stem analyses
+
+Smart Mix Stems separates a track into drums, bass, other and vocals and keeps what the
+planner needs from the stems, never the audio. Two producers write the same format: the
+server, for the tracks of Smart Mix playlists, and Crate Decks, which separates on the DJ's
+machine and may upload its analysis. The design is
+`docs/plans/2026-11-08-smart-mix-stems-design.md` in the Crate Decks repository (STEM-D1,
+D4 and §5); the format and the layer live in `crate/smart_mix/stems.py`.
+
+- **Format `stem-analysis/1`.** A JSON document (`StemAnalysis`, unknown fields rejected
+  at every level):
+
+  | Field            | Content                                                                                                                                                              |
+  | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `schema`         | `stem-analysis/1`                                                                                                                                                    |
+  | `producer`       | `crate-server/<version>` or `crate-decks/<version>`; the prefix is the producer kind                                                                                 |
+  | `separator`      | `model` (`htdemucs` or `htdemucs_ft`), `version` (the separator identifier, such as `htdemucs-onnx-1`) and `sources`, exactly `["drums", "bass", "other", "vocals"]` |
+  | `sourceRevision` | The profile's `sourceRevision` (64 hex characters) of the file the producer analysed                                                                                 |
+  | `hopMs`          | 250                                                                                                                                                                  |
+  | `levels`         | One base64 string per stem, one byte per 250 ms window: RMS in dBFS, linear from -60 dB (0) to 0 dB (255)                                                            |
+  | `drumBeatsMs`    | Optional beats tracked on the drum stem, strictly increasing and within the analysed audio. Stored and measured; they change no grid                                 |
+  | `durationMs`     | Duration of the analysed audio                                                                                                                                       |
+
+  Every stem has the same number of windows, and they cover `durationMs` to within one
+  window either way. Producers encode a level with `encode_levels`:
+  `floor((dB + 60) × 255 / 60 + 0.5)` after clipping to [-60, 0], so -30 dB is 128,
+  silence is 0 and the server and Decks write the same bytes.
+
+- **Storage.** Migration 156 adds `track_stem_signals`, written by
+  `crate/db/repositories/smart_mix_stems.py`: one row per track and `producer_kind`
+  (`server` or `decks`), deleted with the track. It keeps the producer, the separator
+  model and version, the source revision, `hop_ms`, one `bytea` per stem, `drum_beats_ms`,
+  `duration_ms`, `created_at`, `updated_at` and, for Decks uploads only, `contributed_by`
+  (the user, set to null if the user is deleted). Checks keep a Decks row from naming a
+  `crate-server/` producer and keep the four curves the same length. A five-minute track
+  is about 4.8 KB of levels.
+- **Which rows replace which.** A store replaces the producer's row when the source revision
+  changed, whatever the separator, or when the new separator is at least as strong. A weaker
+  separator never overwrites a stronger analysis of the same file. A Decks upload is not
+  kept when the server already has an analysis of the same file from an equal or stronger
+  separator. The store says which happened: `stored`, `replaced` or `kept_stronger`.
+- **Which analysis applies (`choose_analysis`).** Only analyses of the track's current source
+  revision count: when a file changes, its old analyses stop applying at once, before
+  anything is recomputed. Of those, the stronger separator wins (`htdemucs_ft` over
+  `htdemucs`); on a tie, the server's.
+- **Stems layer (`stem_phrase_layer`).** Derived on read, never stored. For each phrase of the
+  profile, the mean level byte of each stem over the phrase, rounded half up. A window
+  belongs to the phrase that holds its centre; the last phrase ends where the beat grid puts
+  its last bar, capped at the profile's duration. There is no layer when the analysis is of
+  another source revision, when its duration differs from the profile's by more than 2 %,
+  when the profile has no phrases, or when a phrase gets no window. Presence flags
+  (`vocalPresent`, `bassPresent`, `drumsPresent`) need cuts calibrated in ST3: the ST0 spike
+  found that an absolute -35 dB cut misreads drums and bass, so the layer only carries levels
+  until then.
+- **What does not change.** The v8 grid, downbeats, phrases and the YAMNet voice bytes stay
+  as they are, and no planner reads the layer yet (ST3).
 
 ### Measurement of the structure
 

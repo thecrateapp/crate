@@ -130,3 +130,51 @@ class TrackMixSignalsRow(Base):
         nullable=False,
         server_default=text("NOW()"),
     )
+
+
+class TrackStemSignalsRow(Base):
+    """A track's stem analysis by one producer (``stem-analysis/1``, STEM-D1)."""
+
+    __tablename__ = "track_stem_signals"
+    __table_args__ = (
+        CheckConstraint("producer_kind IN ('server', 'decks')"),
+        CheckConstraint("hop_ms > 0"),
+        CheckConstraint("duration_ms > 0"),
+        CheckConstraint("producer LIKE ('crate-' || producer_kind || '/%')"),
+        CheckConstraint("producer_kind = 'decks' OR contributed_by IS NULL"),
+        CheckConstraint("octet_length(drums_levels) > 0"),
+        CheckConstraint("octet_length(bass_levels) = octet_length(drums_levels)"),
+        CheckConstraint("octet_length(other_levels) = octet_length(drums_levels)"),
+        CheckConstraint("octet_length(vocals_levels) = octet_length(drums_levels)"),
+    )
+
+    track_id: Mapped[int] = mapped_column(
+        BIGINT,
+        ForeignKey("library_tracks.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    producer_kind: Mapped[str] = mapped_column(Text, primary_key=True)
+    producer: Mapped[str] = mapped_column(Text, nullable=False)
+    separator_model: Mapped[str] = mapped_column(Text, nullable=False)
+    separator_version: Mapped[str] = mapped_column(Text, nullable=False)
+    source_revision: Mapped[str] = mapped_column(Text, nullable=False)
+    hop_ms: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    drums_levels: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    bass_levels: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    other_levels: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    vocals_levels: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    drum_beats_ms: Mapped[list[int] | None] = mapped_column(ARRAY(Integer))
+    duration_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    contributed_by: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("NOW()"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("NOW()"),
+    )

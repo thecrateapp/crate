@@ -164,3 +164,8 @@ def create_schema(cur):
     )
 
     create_smart_mix_backfill_candidates_v155_schema(cur)
+    from crate.db.schema_sections.smart_mix_stems_v156 import (
+        create_smart_mix_stems_v156_schema,
+    )
+
+    create_smart_mix_stems_v156_schema(cur)
