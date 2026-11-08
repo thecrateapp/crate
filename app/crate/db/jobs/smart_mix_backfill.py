@@ -222,27 +222,14 @@ _PLAY_QUEUE_SQL = """
     JOIN library_tracks track ON track.entity_uid = queue_item.track_entity_uid
 """
 # The play queue (1) and offline IDs (2) in claim order.
-_LIVE_ROWS_SQL = f"""
+_LIVE_SQL = f"""
+    SELECT live.track_id, MIN(live.priority) AS priority
     FROM (
         SELECT queue.track_id, 1 AS priority FROM ({_PLAY_QUEUE_SQL}) queue
         UNION ALL
         SELECT offline.track_id, 2
         FROM unnest(CAST(:offline_track_ids AS integer[])) AS offline(track_id)
     ) live
-"""
-_LIVE_SQL = f"""
-    SELECT live.track_id, MIN(live.priority) AS priority
-    {_LIVE_ROWS_SQL}
-    GROUP BY live.track_id
-    ORDER BY priority, live.track_id
-"""
-# With the stored ranking, only tracks still in it: claimed and finished ones
-# have left it, so a long queue that is mostly analyzed is not checked again.
-_LIVE_RANKED_SQL = f"""
-    SELECT live.track_id, MIN(live.priority) AS priority
-    {_LIVE_ROWS_SQL}
-    JOIN smart_mix_backfill_candidates candidate
-        ON candidate.track_id = live.track_id
     GROUP BY live.track_id
     ORDER BY priority, live.track_id
 """
@@ -492,10 +479,26 @@ def _claim_in_order(
     live = {
         int(row.track_id): int(row.priority)
         for row in session.execute(
-            text(_LIVE_RANKED_SQL if stored else _LIVE_SQL),
-            {"offline_track_ids": list(offline_ids)},
+            text(_LIVE_SQL), {"offline_track_ids": list(offline_ids)}
         )
     }
+    if stored and live:
+        # Claimed and finished tracks have left the ranking, so a long queue
+        # that is mostly analyzed is not checked again. The ids go as an array
+        # so the planner probes the ranking per track: joined to the queue,
+        # whose size it guesses at 100 items a device, it reads the whole index.
+        ranked = set(
+            session.execute(
+                text(
+                    """
+                    SELECT track_id FROM smart_mix_backfill_candidates
+                    WHERE track_id = ANY(:track_ids)
+                    """
+                ),
+                {"track_ids": list(live)},
+            ).scalars()
+        )
+        live = {track_id: live[track_id] for track_id in live if track_id in ranked}
     live_ids = list(live)
     ranked_sql = _CLAIM_STORED_SQL if stored else _CLAIM_RANKED_INLINE_SQL
     claimed: list[dict[str, Any]] = []

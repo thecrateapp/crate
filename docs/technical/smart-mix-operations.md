@@ -619,8 +619,8 @@ and whether it is a Python promotion:
   which only tests use, ranks the library inline when another transaction holds the lock.
 - **Crashes.** The table is an unlogged cache of about 130K small rows: a crash empties it and the
   next claim ranks again.
-- **Long play queues.** Reading the queues costs about 20 ms with 1,500 queued items and 120 ms
-  with 10,000, on every pass.
+- **Long play queues.** Every pass reads the play queues: a pass costs about 25 ms with 1,500
+  queued items and 120 ms with 10,000.
 
 ### Night window
 
