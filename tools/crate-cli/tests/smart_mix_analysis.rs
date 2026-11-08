@@ -960,3 +960,133 @@ fn external_beats_stop_at_the_analysed_head() {
     assert!(profile.beat_grid_ms.iter().all(|beat| *beat <= 10_000));
     assert_eq!(profile.quality, "partial");
 }
+
+/// Beat This! beats on its 20 ms frames, with downbeats on every fourth beat of `pulse`.
+fn on_model_frames(times: &[f64], pulse: &[f64]) -> ExternalBeats {
+    let frames = |values: &mut dyn Iterator<Item = f64>| -> Vec<u64> {
+        let mut positions: Vec<u64> = values
+            .map(|time| ((time / 20.0).round() * 20.0) as u64)
+            .collect();
+        positions.dedup();
+        positions
+    };
+    ExternalBeats {
+        tracker: Some("beat-this-test".to_string()),
+        beats_ms: frames(&mut times.iter().copied()),
+        downbeats_ms: frames(&mut pulse.iter().step_by(4).copied()),
+        beats_per_bar: Some(4),
+    }
+}
+
+#[test]
+fn model_beats_stay_steady_through_a_half_tempo_intro() {
+    // One tempo throughout; Beat This!'s DBN holds half of it for the first 48 beats, and
+    // 470 ms falls between two of its 20 ms frames.
+    let period = 470.0;
+    let bpm = (60_000.0 / period) as f32;
+    let samples = click_track(bpm, bpm, 60.0, 1.0, 0.0);
+    let pulse: Vec<f64> = (0..(58_000.0 / period) as usize)
+        .map(|index| 1_000.0 + index as f64 * period)
+        .collect();
+    let heard: Vec<f64> = pulse
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| *index >= 48 || index % 2 == 0)
+        .map(|(_, time)| *time)
+        .collect();
+
+    let profile = analyze_smart_mix_segments_with_beats(
+        &samples,
+        None,
+        SAMPLE_RATE,
+        None,
+        None,
+        Some(&on_model_frames(&heard, &pulse)),
+    );
+
+    let stability = profile.tempo_stability.unwrap();
+    assert!(stability >= 0.99, "tempo stability {stability}");
+    let intro = profile.intro_tempo_stability.unwrap();
+    assert!(intro >= 0.8, "intro stability {intro}");
+    let grid_bpm = profile.bpm.unwrap();
+    let intro_bpm = profile.intro_bpm.unwrap();
+    assert!(
+        (intro_bpm - grid_bpm).abs() < 0.01,
+        "intro at {intro_bpm} BPM on a {grid_bpm} BPM grid"
+    );
+    assert_eq!(profile.quality, "full");
+}
+
+/// Clicks on a steady 120 BPM pulse from 1 s whose every other attack comes `late_ms`
+/// late, as a loose hand or a flam plays them.
+fn loose_clicks(seconds: f32, late_ms: f32) -> Vec<f32> {
+    let mut samples = vec![0.0_f32; (seconds * SAMPLE_RATE as f32) as usize];
+    let pulse_samples = (0.025 * SAMPLE_RATE as f32) as usize;
+    let mut index = 0;
+    loop {
+        let late = if index % 2 == 1 {
+            late_ms / 1_000.0
+        } else {
+            0.0
+        };
+        let time = 1.0 + index as f32 * 0.5 + late;
+        if time >= seconds {
+            break;
+        }
+        let amplitude = if index % 4 == 0 { 0.9 } else { 0.5 };
+        let start = (time * SAMPLE_RATE as f32) as usize;
+        for offset in 0..pulse_samples {
+            if let Some(sample) = samples.get_mut(start + offset) {
+                *sample += amplitude * (-7.0 * offset as f32 / pulse_samples as f32).exp();
+            }
+        }
+        index += 1;
+    }
+    samples
+}
+
+#[test]
+fn model_cue_stability_reads_the_model_beats_not_the_onsets_near_them() {
+    // The model hears a steady pulse under attacks that scatter 40 ms around it: the
+    // onset peak near each beat moves, the beat does not.
+    let samples = loose_clicks(30.0, 40.0);
+    let beats = model_beats(0, 1_000, 29_000);
+
+    let profile = analyze_smart_mix_segments_with_beats(
+        &samples,
+        None,
+        SAMPLE_RATE,
+        None,
+        None,
+        Some(&beats),
+    );
+
+    for stability in [profile.intro_tempo_stability, profile.outro_tempo_stability] {
+        let stability = stability.unwrap();
+        assert!(stability >= 0.9, "cue stability {stability}");
+    }
+    assert_eq!(profile.quality, "full");
+}
+
+#[test]
+fn model_beats_of_a_drifting_track_stay_partial() {
+    // As rust_marks_drifting_tempo_as_partial, with the beats from the model.
+    let samples = click_track(120.0, 132.0, 24.0, 0.0, 0.0);
+    let times: Vec<f64> = click_times_ms(120.0, 132.0, 24.0)
+        .into_iter()
+        .filter(|time| *time > 0.0)
+        .collect();
+
+    let profile = analyze_smart_mix_segments_with_beats(
+        &samples,
+        None,
+        SAMPLE_RATE,
+        None,
+        None,
+        Some(&on_model_frames(&times, &times)),
+    );
+
+    let stability = profile.tempo_stability.unwrap();
+    assert!(stability < 0.8, "tempo stability {stability}");
+    assert_eq!(profile.quality, "partial");
+}

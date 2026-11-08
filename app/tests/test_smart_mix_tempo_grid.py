@@ -314,6 +314,7 @@ def test_grid_constants_match_the_rust_analyzer() -> None:
         "SLIDE_MIN_FRACTION",
         "SLIDE_CONTEXT_BEATS",
         "SLIDE_MAX_TEMPO_CHANGE",
+        "MODEL_BEAT_RESOLUTION_MS",
     ):
         match = re.search(rf"const {name}: \w+ = ([0-9_.]+);", source)
         assert match is not None, name

@@ -205,6 +205,41 @@ def test_python_and_rust_structure_agree_with_model_beats(tmp_path: Path) -> Non
     assert max(abs(a - b) for a, b in zip(python_curve, rust_curve)) <= 2
 
 
+def test_python_and_rust_read_the_same_model_beat_stability(tmp_path: Path) -> None:
+    # Beat This!'s beats on its 20 ms frames, holding half the tempo for the first 48
+    # beats: both analyzers measure them on the track's grid and to the model's
+    # resolution, and agree.
+    from crate.smart_mix.analyzer import analyze_mix_profile
+    from crate.smart_mix.beat_model import BeatTrack
+
+    period = 470.0
+    track = tmp_path / "model-half-tempo.wav"
+    _write_click_track(
+        track,
+        bpm=60_000.0 / period,
+        duration_seconds=60.0,
+        leading_silence_seconds=1.0,
+        trailing_silence_seconds=0.0,
+    )
+    pulse = [1_000.0 + index * period for index in range(int(58_000 / period))]
+    heard = [time for index, time in enumerate(pulse) if index >= 48 or index % 2 == 0]
+
+    def frames(times) -> tuple[int, ...]:
+        return tuple(sorted({round(time / 20.0) * 20 for time in times}))
+
+    beats = BeatTrack(
+        "beat-this-test", frames(heard), frames(pulse[::4]), beats_per_bar=4
+    )
+
+    python_profile = analyze_mix_profile(track, beats=beats)
+    rust_profile = _rust_profile(track, beats=beats)
+
+    assert python_profile.tempo_stability >= 0.99
+    assert abs(rust_profile["tempoStability"] - python_profile.tempo_stability) <= 1e-3
+    assert rust_profile["introTempoStability"] >= 0.8
+    assert rust_profile["quality"] == python_profile.quality == "full"
+
+
 @pytest.mark.parametrize("beats_per_bar", [3, 4])
 def test_python_and_rust_take_the_same_model_meter(
     tmp_path: Path, beats_per_bar: int
