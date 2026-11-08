@@ -926,6 +926,20 @@ first, and serves the first; the AI refinement (below) picks from the same menu 
 
 ### AI refinement (SM4)
 
+**Status: evaluated and left off.** The SM5 evaluation (2026-11-07) ran Gemini 3.8 Flash and
+3.1 Pro on 184 phrase edges and 112 electronic edges, with automatic listening metrics on the
+rendered transitions. Once the bass handoff menu was fixed (prompt `sm3-refine-2`: each candidate
+lists the bass handoffs it accepts), rejections fell to 0–3 %. The refined plans still improved
+none of the evaluation criteria, and made the electronic transitions measurably worse (5 better,
+16 worse). Gate SG3 closed as no-go:
+
+- `smart_mix_ai_enabled` stays off;
+- the capability reports `ai_assisted` unavailable;
+- no admin panel is built for it.
+
+The action, the prompt and `tools/smart-mix-eval --refine` stay in the tree, so a later
+experiment can rerun the same evaluation.
+
 A model may choose another plan from the v3 menu (SM3-D1). It never writes times, ratios or
 gains: it answers a candidate index, a shift of the outgoing or incoming phrase (-1, 0, 1), a
 step to the previous or next phrase length, the bass handoff, a reason, a confidence and up to

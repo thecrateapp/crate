@@ -300,7 +300,9 @@ tracks, their genre slugs when Settings allow it, and the planner's candidate
 transitions: never titles, artists, paths, track IDs or the user. When a default
 model is applied with the provider's own reasoning, this feature takes the model's
 native `low` level if it has one, because its answer is needed before the
-transition plays.
+transition plays. The feature is off: the SM5 evaluation closed gate SG3 as no-go
+(see "AI refinement (SM4)" in `smart-mix-operations.md`). The action and its
+prompt stay available for later experiments.
 
 Profiles may lower these maxima; they cannot raise them. Reasoning models count
 their thinking against the output limit (Gemini's `maxOutputTokens`, DeepSeek's and
