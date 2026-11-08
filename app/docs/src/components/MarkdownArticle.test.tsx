@@ -56,6 +56,8 @@ describe("MarkdownArticle", () => {
     ]);
   });
 
+  // Renders every published document: its cost grows with the manifest, so it
+  // gets more than the 5 s default (it already took 4.8 s on CI).
   it("matches the table of contents for every published document", async () => {
     for (const doc of docs) {
       const { markdown, headings } = await loadDoc(doc);
@@ -72,7 +74,7 @@ describe("MarkdownArticle", () => {
       );
       unmount();
     }
-  });
+  }, 30_000);
 
   it("renders alert blockquotes as labelled callouts", () => {
     const { container } = renderMarkdown(
