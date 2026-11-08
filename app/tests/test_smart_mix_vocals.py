@@ -17,6 +17,7 @@ import pytest
 
 from crate.smart_mix import vocals
 from crate.smart_mix.models import MixProfileQuality, Phrase, TrackMixProfileDraft
+from crate.smart_mix.versions import ANALYZER_VERSION
 from crate.smart_mix.voice_model import VoiceWindows
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -51,7 +52,7 @@ def _phrases(count: int) -> tuple[Phrase, ...]:
 def _draft(phrases: tuple[Phrase, ...] | None) -> TrackMixProfileDraft:
     return TrackMixProfileDraft(
         analyzer="crate-rust",
-        analyzer_version="smart-mix-audio-v7",
+        analyzer_version=ANALYZER_VERSION,
         duration_ms=60_000,
         quality=MixProfileQuality.FULL,
         bpm=120.0,

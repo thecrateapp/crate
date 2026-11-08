@@ -177,6 +177,18 @@ reference, so these figures measure agreement, not correctness. Models, licences
 stored signals and the measurement are in
 [smart-mix-operations.md](smart-mix-operations.md#models-licences-and-cost).
 
+Since `smart-mix-audio-v8` both analyzers measure the steadiness of those model beats on the
+track's constant grid. In v7 a stretch where the DBN holds half the tempo, Beat This!'s 20 ms
+frames and, at the cues, the scatter of the attacks around a steady pulse all read as an
+unsteady tempo, and lowered `bpmConfidence`, `tempoStability` and the quality of electronic
+tracks above all. On 120 electronic tracks of the SM5 evaluation, v8 marks 47 profiles `full`
+instead of 33 and the planners beatmatch 53 of 112 edges instead of 39; where madmom and Beat
+This! agree, 36 of those `full` grids are right at both cues and 1 is wrong (v7: 27 and 2). On
+145 phrase-mixed tracks `full` goes from 37 to 67, 44 right and 2 wrong where madmom and
+All-In-One agree. The grid, the downbeats and the phrases do not change, and v8 keeps both
+models and their names, so the backfill recomputes v7 tracks from their stored signals.
+Details are in [smart-mix-operations.md](smart-mix-operations.md#analyzer-v8).
+
 Two representations are used for different purposes. The mono/resampled downmix remains valid for onsets, tempo, energy and key. Loudness and true peak are computed over the source channels with a meter that conforms to the declared algorithm; never over the mono average. `introLufs` and `outroLufs` are the loudness of documented windows; `integratedLufs` is the measurement of the whole program if it could be computed. `truePeakDbfs` is the maximum true peak across channels and not the sample peak of the downmix. Silence, a signal that is too short, an unsupported layout or an interrupted analysis produce `null` for the measurement that could not be obtained, not an invented number.
 
 Integrate an existing meter with PCM streaming instead of writing another BS.1770 approximation in each language. Proposal: an adapter over the libebur128 family/a compatible implementation in production; once build and license are verified in the current images, pin the implementation and version in both backends. FFmpeg `ebur128` can act as an independent acceptance oracle and as an explicit fallback if the native dependency is not available. The adapter interface must allow testing the analyzers with a fake meter, but acceptance runs the real one. The choice of binding is an implementation decision within SM02: it does not alter the units, fixtures or gates. Primary references: [ITU-R BS.1770-5](https://www.itu.int/rec/R-REC-BS.1770-5-202311-I/en), [FFmpeg's ebur128 implementation](https://ffmpeg.org/doxygen/8.0/f__ebur128_8c_source.html).

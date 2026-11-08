@@ -119,6 +119,46 @@ def sample_evaluation_seeds(*, sample_size: int, seed: str) -> list[EvaluationSe
     ]
 
 
+_POOL_STATES_SQL = text(
+    """
+    SELECT track.id AS track_id,
+           track.entity_uid::text AS entity_uid,
+           profile.analyzer_version,
+           profile.quality,
+           profile.phrases IS NOT NULL AS has_phrases,
+           profile.source_stale_at IS NOT NULL AS stale
+    FROM library_tracks track
+    LEFT JOIN track_mix_profiles profile ON profile.track_id = track.id
+    WHERE track.id = ANY(CAST(:ids AS bigint[]))
+    ORDER BY track.id
+    """
+)
+
+
+def get_pool_profile_states(track_ids: list[int]) -> list[dict[str, Any]]:
+    """Each track's profile state for building an evaluation pool, in one query.
+
+    ``analyzer_version`` and ``quality`` are None without a profile. No title or
+    path is read.
+    """
+    ids = sorted({int(track_id) for track_id in track_ids})
+    if not ids:
+        return []
+    with read_scope() as session:
+        rows = session.execute(_POOL_STATES_SQL, {"ids": ids}).mappings().all()
+    return [
+        {
+            "track_id": int(row["track_id"]),
+            "entity_uid": str(row["entity_uid"]),
+            "analyzer_version": row["analyzer_version"],
+            "quality": row["quality"],
+            "has_phrases": bool(row["has_phrases"]),
+            "stale": bool(row["stale"]),
+        }
+        for row in rows
+    ]
+
+
 def _make_connection_read_only(dbapi_connection: Any, _connection_record: Any) -> None:
     cursor = dbapi_connection.cursor()
     try:
@@ -131,6 +171,7 @@ def _make_connection_read_only(dbapi_connection: Any, _connection_record: Any) -
 __all__ = [
     "EvaluationSeed",
     "enforce_read_only_connections",
+    "get_pool_profile_states",
     "sample_evaluation_seeds",
     "session_is_read_only",
 ]

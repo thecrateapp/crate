@@ -159,6 +159,20 @@ def phrase_windows(
     return range(outgoing_start, outgoing_count), range(0, incoming_stop)
 
 
+def allowed_bass_handoffs(
+    candidate: TransitionCandidate, context: TransitionContext
+) -> tuple[str, ...]:
+    """The ``bass_handoff`` answers a candidate accepts (design §9.5).
+
+    ``keep`` and ``none`` always; ``balanced`` only on a beatmatch candidate in a
+    context that allows the bass handoff. The prompt lists these per candidate and
+    ``apply_refinement`` rejects anything else.
+    """
+    if context.allow_bass_handoff and candidate.mode == TransitionMode.BEATMATCH:
+        return ("keep", "none", "balanced")
+    return ("keep", "none")
+
+
 def deterministic_plan_hash(candidates: Sequence[TransitionCandidate]) -> str:
     """Hash of the planner's own plan (the first candidate), to measure changes."""
     plan = candidates[0].to_plan().to_dict() if candidates else None
@@ -232,15 +246,13 @@ def apply_refinement(
         if not 0 <= position < len(lengths):
             return outcome("length_not_allowed")
         length_bars = lengths[position]
+    if response.bass_handoff not in allowed_bass_handoffs(candidate, context):
+        return outcome("bass_handoff_not_allowed")
     bass_handoff = (
         candidate.bass_handoff
         if response.bass_handoff == "keep"
         else response.bass_handoff
     )
-    if bass_handoff == "balanced" and (
-        not context.allow_bass_handoff or candidate.mode != TransitionMode.BEATMATCH
-    ):
-        return outcome("bass_handoff_not_allowed")
 
     try:
         if not (outgoing_shift or incoming_shift or length_step) and (
@@ -281,6 +293,7 @@ __all__ = [
     "REJECTION_CODES",
     "RefinementChoice",
     "RefinementOutcome",
+    "allowed_bass_handoffs",
     "apply_refinement",
     "context_from_payload",
     "deterministic_plan_hash",
