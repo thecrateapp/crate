@@ -1,0 +1,499 @@
+---
+import BlogFigure from "./BlogFigure.astro";
+import fixture from "../../data/blog-music-path-fixture.json";
+import {
+  laneY,
+  MUSIC_PATHS_STATES,
+  MUSIC_PATHS_TRACKS,
+  pathLanes,
+  pathsFrame,
+  pathsReadout,
+  slotX,
+  VIEW,
+  X0,
+  X1,
+} from "../../scripts/viz/blog/music-paths";
+
+// The export is read here, on the server; the client receives only the compact lanes.
+const initial = "anchor-first";
+const lanes = pathLanes(fixture);
+// Without JavaScript the figure shows the end of the middle search: every
+// destination still reserved, the live version skipped, the empty steps visible.
+const still = pathsFrame(lanes, MUSIC_PATHS_TRACKS[initial].pins![2]!);
+const readout = pathsReadout(lanes, still);
+const left = (x: number) => `${((x / VIEW.width) * 100).toFixed(2)}%`;
+const top = (y: number) => `${((y / VIEW.height) * 100).toFixed(2)}%`;
+const at = (x: number, y: number) => `left:${left(x)};top:${top(y)}`;
+const inset = left(VIEW.width - X1);
+const destinationText = { pending: "destination", reserved: "reserved", appended: "appended" };
+// Short routes name the track at each step; a twenty-step route keeps only its endpoints.
+const labelled = lanes.map((lane) => lane.requested <= 8);
+---
+
+<BlogFigure
+  viz="blog-music-paths"
+  id="music-path-journey"
+  label="Music Paths"
+  context="origin → destination"
+  states={MUSIC_PATHS_STATES.map((state) => ({ ...state, phases: [...state.phases] }))}
+  initial={initial}
+  qualifier="Regression fixtures"
+  ariaLabel="Three Music Paths regression fixtures on a shared axis of requested steps. Each route appends its origin and reserves its destination before searching the middle steps. The complete route fills all five steps. In the second, the destination's live version is retrieved at every step but skipped because its song family is reserved, so two steps stay empty and three of five tracks are returned. The sparse catalogue holds only the reserved destination, so eighteen of twenty steps stay empty and both endpoints are kept."
+  caption="Rows selected by the pinned Python builder (f602d82d) from the synthetic catalogues of three tests in test_music_paths_fallback.py. Positions are requested steps, not acoustic distance; timing is illustrative."
+>
+  <div class="mp" data-mp-lanes={JSON.stringify(lanes)}>
+    <svg class="mp-svg" viewBox={`0 0 ${VIEW.width} ${VIEW.height}`} preserveAspectRatio="none" aria-hidden="true">
+      {
+        lanes.map((_, i) => (
+          <g>
+            <line class="mp-base" x1={X0} x2={X1} y1={laneY(i, "route")} y2={laneY(i, "route")} />
+            <path class="mp-route" data-mp-route={i} d={still.lanes[i]!.route} />
+            <line
+              class="mp-drop"
+              data-mp-drop={i}
+              x1={X0}
+              x2={X0}
+              y1={laneY(i, "hover") + 11}
+              y2={laneY(i, "route") - 6}
+              style="opacity:0"
+            />
+          </g>
+        ))
+      }
+      <line
+        class="mp-head"
+        data-mp-head
+        x1={X0}
+        x2={X0}
+        y1={laneY(0, "hover") - 14}
+        y2={laneY(lanes.length - 1, "route") + 10}
+        style="opacity:0"
+      />
+    </svg>
+
+    {
+      lanes.map((lane, i) => {
+        const state = still.lanes[i]!;
+        return (
+          <div class="mp-lane" data-mp-lane={i}>
+            <p class="mp-tag" style={at(X0, laneY(i, "tag"))}>
+              <b>{lane.label}</b>
+            </p>
+            <p class="mp-pool" style={`right:${inset};top:${top(laneY(i, "tag"))}`}>
+              <span class="mp-pool-label">Pool</span>
+              {lane.pool.map((row) => (
+                <span class="mp-chip" data-mp-chip={row.id} data-state={state.chips.find((chip) => chip.id === row.id)!.state}>
+                  {row.label}
+                </span>
+              ))}
+            </p>
+
+            <i class="mp-end" data-mp-origin data-state={state.origin} style={at(X0, laneY(i, "route"))} />
+            {state.slots.map((slot, s) => (
+              <i class="mp-dot" data-mp-slot={s} data-state={slot} style={at(slotX(s + 1, lane.requested), laneY(i, "route"))} />
+            ))}
+            <i class="mp-end mp-dest" data-mp-destination data-state={state.destination} style={at(X1, laneY(i, "route"))} />
+
+            <span
+              class="mp-group"
+              data-mp-group
+              style={`${at(state.group?.x ?? X0, laneY(i, "hover"))};--lead:${state.group?.lead ?? 0};opacity:${state.group ? 1 : 0}`}
+            >
+              {lane.pool.map((row) => {
+                const pill = state.pills.find((item) => item.id === row.id)!;
+                return (
+                  <span class="mp-pill" data-mp-pill={row.id} data-state={pill.state} style={`order:${pill.order}`}>
+                    {row.label}
+                  </span>
+                );
+              })}
+            </span>
+
+            <p class="mp-label mp-start" style={at(X0, laneY(i, "label"))}>
+              <b>{lane.names[lane.origin]}</b>
+              <span>origin</span>
+            </p>
+            {labelled[i] &&
+              lane.attempts.map((attempt) =>
+                attempt.selected === null ? null : (
+                  <p
+                    class="mp-label mp-step"
+                    data-mp-step-label={attempt.step - 1}
+                    data-state={state.slots[attempt.step - 1]}
+                    style={at(slotX(attempt.step, lane.requested), laneY(i, "label"))}
+                  >
+                    <b>{lane.names[attempt.selected]}</b>
+                  </p>
+                ),
+              )}
+            <p class="mp-label mp-finish" style={at(X1, laneY(i, "label"))}>
+              <b>{lane.names[lane.destination]}</b>
+              <span data-mp-destination-text data-state={state.destination}>{destinationText[state.destination]}</span>
+            </p>
+          </div>
+        );
+      })
+    }
+
+    <p class="mp-axis" style={`left:calc(${left(X0)} - 10px);right:calc(${inset} - 10px)`}>
+      <span>position = step ÷ (requested − 1)</span>
+      <span>not acoustic distance</span>
+    </p>
+  </div>
+
+  <dl class="bf-readout" slot="readout">
+    {
+      lanes.map((lane, i) => (
+        <div>
+          <dt class="viz-label">{lane.label}</dt>
+          <dd data-mp-ro={lane.id} data-tone={readout.lanes[i]!.tone}>
+            <span data-mp-count>{readout.lanes[i]!.text}</span><small data-mp-empty>{readout.lanes[i]!.empty ? `${readout.lanes[i]!.empty} empty` : ""}</small>
+          </dd>
+        </div>
+      ))
+    }
+    <div>
+      <dt class="viz-label">Destination</dt>
+      <dd data-mp-ro="destination" data-tone={readout.destination.tone}>{readout.destination.text}</dd>
+    </div>
+  </dl>
+</BlogFigure>
+
+<style>
+  .mp {
+    position: relative;
+    height: 380px;
+  }
+
+  .mp-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .mp-base {
+    stroke: rgba(241, 245, 249, 0.16);
+    stroke-width: 1.25;
+    stroke-dasharray: 2 5;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .mp-route {
+    fill: none;
+    stroke: var(--cyan-hi);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+    filter: drop-shadow(0 0 4px rgba(103, 232, 249, 0.45));
+  }
+
+  .mp-drop {
+    stroke: var(--cyan-hi);
+    stroke-width: 1.25;
+    stroke-dasharray: 2 3;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .mp-head {
+    stroke: rgba(241, 245, 249, 0.32);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .mp-lane {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .mp-tag,
+  .mp-pool,
+  .mp-label,
+  .mp-axis {
+    position: absolute;
+    margin: 0;
+    font-family: var(--mono);
+    white-space: nowrap;
+    text-shadow: 0 0 10px var(--bg);
+  }
+
+  .mp-tag {
+    transform: translate(-10px, -50%);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .mp-tag b {
+    font-weight: 400;
+    color: var(--fg);
+  }
+
+  .mp-pool {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transform: translate(10px, -50%);
+    font-size: 10px;
+  }
+
+  .mp-pool-label {
+    margin-right: 2px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  .mp-chip {
+    padding: 1px 6px;
+    border: 1px solid rgba(241, 245, 249, 0.2);
+    border-radius: 3px;
+    color: var(--fg-3);
+    transition:
+      color 0.3s var(--ease-snap),
+      border-color 0.3s var(--ease-snap);
+  }
+
+  .mp-chip[data-state="reserved"] {
+    border-style: dashed;
+    border-color: var(--cyan-hi);
+    color: var(--cyan-hi);
+  }
+
+  .mp-chip[data-state="selected"],
+  .mp-chip[data-state="appended"] {
+    border-color: rgba(103, 232, 249, 0.5);
+    color: var(--cyan-hi);
+  }
+
+  .mp-chip[data-state="excluded"] {
+    border-color: rgba(251, 191, 36, 0.6);
+    color: var(--amber);
+    text-decoration: line-through;
+  }
+
+  .mp-dot,
+  .mp-end {
+    position: absolute;
+    display: block;
+    box-sizing: border-box;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .mp-dot {
+    width: 7px;
+    height: 7px;
+    border: 1px solid rgba(241, 245, 249, 0.32);
+    background: var(--bg);
+    transition:
+      background 0.25s var(--ease-snap),
+      border-color 0.25s var(--ease-snap);
+  }
+
+  .mp-dot[data-state="filled"] {
+    width: 9px;
+    height: 9px;
+    border-color: var(--cyan-hi);
+    background: var(--cyan-hi);
+    box-shadow: 0 0 8px rgba(103, 232, 249, 0.7);
+  }
+
+  .mp-dot[data-state="empty"] {
+    width: 10px;
+    height: 10px;
+    border: 0;
+    background: none;
+  }
+
+  .mp-dot[data-state="empty"]::before,
+  .mp-dot[data-state="empty"]::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 1.5px;
+    background: var(--amber);
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+
+  .mp-dot[data-state="empty"]::after {
+    transform: translate(-50%, -50%) rotate(-45deg);
+  }
+
+  .mp-end {
+    width: 20px;
+    height: 20px;
+    border: 1px solid rgba(241, 245, 249, 0.28);
+    background: radial-gradient(circle, rgba(241, 245, 249, 0.3) 0 3px, var(--bg) 3.5px);
+    transition:
+      border-color 0.35s var(--ease-snap),
+      box-shadow 0.35s var(--ease-snap);
+  }
+
+  .mp-end[data-state="appended"] {
+    border-color: rgba(103, 232, 249, 0.6);
+    background: radial-gradient(circle, var(--cyan-hi) 0 4px, var(--bg) 4.5px);
+    box-shadow: 0 0 14px rgba(6, 182, 212, 0.35);
+  }
+
+  .mp-dest[data-state="reserved"] {
+    border: 1.5px dashed var(--cyan-hi);
+    box-shadow: 0 0 16px rgba(6, 182, 212, 0.28);
+  }
+
+  .mp-group {
+    position: absolute;
+    display: flex;
+    gap: 0.6ch;
+    font-family: var(--mono);
+    font-size: 10px;
+    transform: translate(calc(var(--lead) * -0.5ch), -50%);
+    transition: opacity 0.2s linear;
+  }
+
+  .mp-pill {
+    display: block;
+    padding: 0 1ch;
+    height: 18px;
+    line-height: 16px;
+    border: 1px solid rgba(241, 245, 249, 0.4);
+    border-radius: 9px;
+    background: var(--bg);
+    color: var(--fg);
+    white-space: nowrap;
+    transition:
+      background 0.2s var(--ease-snap),
+      color 0.2s var(--ease-snap),
+      border-color 0.2s var(--ease-snap);
+  }
+
+  .mp-pill[data-state="hidden"] {
+    display: none;
+  }
+
+  .mp-pill[data-state="landed"] {
+    visibility: hidden;
+  }
+
+  .mp-pill[data-state="selected"] {
+    border-color: var(--cyan-hi);
+    background: var(--cyan-hi);
+    color: var(--bg);
+    box-shadow: 0 0 10px rgba(103, 232, 249, 0.45);
+  }
+
+  .mp-pill[data-state="excluded"] {
+    border-color: var(--amber);
+    color: var(--amber);
+    text-decoration: line-through;
+  }
+
+  .mp-label {
+    display: grid;
+    gap: 3px;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+
+  .mp-label b {
+    font-weight: 400;
+    color: var(--fg-2);
+  }
+
+  .mp-label span {
+    color: var(--fg-3);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-size: 9px;
+  }
+
+  .mp-start {
+    transform: translateX(-10px);
+    justify-items: start;
+  }
+
+  .mp-finish {
+    transform: translateX(calc(-100% + 10px));
+    justify-items: end;
+    text-align: right;
+  }
+
+  .mp-step {
+    transform: translateX(-50%);
+  }
+
+  .mp-step[data-state="todo"] {
+    visibility: hidden;
+  }
+
+  .mp-step b {
+    color: var(--cyan-hi);
+  }
+
+  .mp-finish span[data-state="reserved"],
+  .mp-finish span[data-state="appended"] {
+    color: var(--cyan-hi);
+  }
+
+  .mp-axis {
+    bottom: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 2px 16px;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  @media (max-width: 760px) {
+    .mp {
+      height: 432px;
+    }
+    .mp-tag,
+    .mp-pool,
+    .mp-group,
+    .mp-label {
+      font-size: 8.5px;
+    }
+    .mp-tag {
+      letter-spacing: 0.08em;
+    }
+    .mp-pool {
+      gap: 4px;
+    }
+    .mp-pool-label {
+      display: none;
+    }
+    .mp-chip {
+      padding: 1px 4px;
+    }
+    .mp-pill {
+      height: 16px;
+      line-height: 14px;
+    }
+    .mp-label span,
+    .mp-axis {
+      font-size: 8px;
+    }
+    .mp-end {
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mp-chip,
+    .mp-dot,
+    .mp-end,
+    .mp-group,
+    .mp-pill {
+      transition: none;
+    }
+  }
+</style>

@@ -1,0 +1,1053 @@
+{
+  "source": {
+    "commit": "f602d82dd3253380234b68aadc5948b303b6803f",
+    "testFile": "app/tests/test_music_paths_fallback.py",
+    "sha256": {
+      "app/crate/track_versions.py": "61a5cdee7baa6a2eb3a793bd54ab706dedfab52901e7d645626c6d7312bd6632",
+      "app/crate/db/paths_vectors.py": "9d7bd8a925e54833a89d1b86764ee38b84803cf3aef19966c34e80ca062a577f",
+      "app/crate/db/paths_similarity.py": "b786d020d2f9ed222cf0b5568858f58afae145331424e71034bb6afec2d447c4",
+      "app/crate/db/paths_candidates.py": "1db7d260878218b18bd8f7d919b52fa51c8a4e5993c73df3cf24c49ed84ceec5",
+      "app/crate/db/paths_path_builder.py": "d7e906595bf166cdaa28c50fc5a042111af9c74f52141537f9475b4e2c148977",
+      "app/tests/test_music_paths_fallback.py": "f772c410461a86948161b67e4a8cea0b15949e11e3ef74ed74829d3b3378e47b"
+    },
+    "execution": "Pinned Python builder, selector/scorer, interpolation and song identity. Fixed in-memory retrieval, empty relationship/genre graphs and explicit endpoint contexts; no SQL, production music or network."
+  },
+  "cases": [
+    {
+      "id": "complete",
+      "label": "Complete route",
+      "test": "test_destination_is_reserved_before_selecting_middle_tracks",
+      "testStart": 105,
+      "testEnd": 115,
+      "requested": 5,
+      "originId": 1,
+      "destinationId": 2,
+      "resultIds": [
+        1,
+        3,
+        4,
+        5,
+        2
+      ],
+      "resultSteps": [
+        {
+          "id": 1,
+          "step": 0,
+          "progress": 0.0
+        },
+        {
+          "id": 3,
+          "step": 1,
+          "progress": 0.25
+        },
+        {
+          "id": 4,
+          "step": 2,
+          "progress": 0.5
+        },
+        {
+          "id": 5,
+          "step": 3,
+          "progress": 0.75
+        },
+        {
+          "id": 2,
+          "step": 4,
+          "progress": 1.0
+        }
+      ],
+      "catalog": [
+        {
+          "id": 1,
+          "artist": "Artist 1",
+          "title": "Song 1",
+          "family": [
+            "artist 1",
+            "song 1"
+          ]
+        },
+        {
+          "id": 2,
+          "artist": "Artist 2",
+          "title": "Song 2",
+          "family": [
+            "artist 2",
+            "song 2"
+          ]
+        },
+        {
+          "id": 3,
+          "artist": "Artist 3",
+          "title": "Song 3",
+          "family": [
+            "artist 3",
+            "song 3"
+          ]
+        },
+        {
+          "id": 4,
+          "artist": "Artist 4",
+          "title": "Song 4",
+          "family": [
+            "artist 4",
+            "song 4"
+          ]
+        },
+        {
+          "id": 5,
+          "artist": "Artist 5",
+          "title": "Song 5",
+          "family": [
+            "artist 5",
+            "song 5"
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "step": 1,
+          "excludedIds": [
+            1,
+            2
+          ],
+          "retrievedIds": [
+            3,
+            4,
+            5
+          ],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": 3,
+          "selectedDistance": 0.0
+        },
+        {
+          "step": 2,
+          "excludedIds": [
+            1,
+            2,
+            3
+          ],
+          "retrievedIds": [
+            4,
+            5
+          ],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ],
+            [
+              "artist 3",
+              "song 3"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": 4,
+          "selectedDistance": 0.0
+        },
+        {
+          "step": 3,
+          "excludedIds": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "retrievedIds": [
+            5
+          ],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ],
+            [
+              "artist 3",
+              "song 3"
+            ],
+            [
+              "artist 4",
+              "song 4"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": 5,
+          "selectedDistance": 0.0
+        }
+      ],
+      "events": [
+        {
+          "kind": "request",
+          "description": "Request 5 tracks, including the origin and destination.",
+          "selectedIds": [],
+          "reservedIds": [],
+          "focusStep": 0,
+          "attemptCount": 0,
+          "candidates": []
+        },
+        {
+          "kind": "anchors",
+          "description": "Resolve both anchors. Reserve the destination ID, title and song family before selecting any middle track.",
+          "selectedIds": [
+            1
+          ],
+          "reservedIds": [
+            2
+          ],
+          "focusStep": 0,
+          "attemptCount": 0,
+          "candidates": []
+        },
+        {
+          "kind": "selection",
+          "description": "Middle step 1: select track #3 from the fixture pool. The destination stays reserved.",
+          "selectedIds": [
+            1,
+            3
+          ],
+          "reservedIds": [
+            2
+          ],
+          "focusStep": 1,
+          "attemptCount": 1,
+          "candidates": [
+            {
+              "id": 2,
+              "status": "Reserved destination"
+            },
+            {
+              "id": 3,
+              "status": "Selected"
+            },
+            {
+              "id": 4,
+              "status": "Available"
+            },
+            {
+              "id": 5,
+              "status": "Available"
+            }
+          ]
+        },
+        {
+          "kind": "selection",
+          "description": "Middle step 2: select track #4 from the fixture pool. The destination stays reserved.",
+          "selectedIds": [
+            1,
+            3,
+            4
+          ],
+          "reservedIds": [
+            2
+          ],
+          "focusStep": 2,
+          "attemptCount": 1,
+          "candidates": [
+            {
+              "id": 2,
+              "status": "Reserved destination"
+            },
+            {
+              "id": 3,
+              "status": "Already selected"
+            },
+            {
+              "id": 4,
+              "status": "Selected"
+            },
+            {
+              "id": 5,
+              "status": "Available"
+            }
+          ]
+        },
+        {
+          "kind": "selection",
+          "description": "Middle step 3: select track #5 from the fixture pool. The destination stays reserved.",
+          "selectedIds": [
+            1,
+            3,
+            4,
+            5
+          ],
+          "reservedIds": [
+            2
+          ],
+          "focusStep": 3,
+          "attemptCount": 1,
+          "candidates": [
+            {
+              "id": 2,
+              "status": "Reserved destination"
+            },
+            {
+              "id": 3,
+              "status": "Already selected"
+            },
+            {
+              "id": 4,
+              "status": "Already selected"
+            },
+            {
+              "id": 5,
+              "status": "Selected"
+            }
+          ]
+        },
+        {
+          "kind": "finish",
+          "description": "Return 5 of 5 requested tracks, with both endpoints retained. The requested length is complete; this does not judge how the route sounds.",
+          "selectedIds": [
+            1,
+            3,
+            4,
+            5,
+            2
+          ],
+          "reservedIds": [],
+          "focusStep": 4,
+          "attemptCount": 0,
+          "candidates": []
+        }
+      ]
+    },
+    {
+      "id": "family",
+      "label": "Reserved song family",
+      "test": "test_reserved_song_families_cannot_reappear_as_middle_versions[destination]",
+      "testStart": 119,
+      "testEnd": 135,
+      "requested": 5,
+      "originId": 1,
+      "destinationId": 2,
+      "resultIds": [
+        1,
+        4,
+        2
+      ],
+      "resultSteps": [
+        {
+          "id": 1,
+          "step": 0,
+          "progress": 0.0
+        },
+        {
+          "id": 4,
+          "step": 1,
+          "progress": 0.25
+        },
+        {
+          "id": 2,
+          "step": 4,
+          "progress": 1.0
+        }
+      ],
+      "catalog": [
+        {
+          "id": 1,
+          "artist": "Artist 1",
+          "title": "Origin",
+          "family": [
+            "artist 1",
+            "origin"
+          ]
+        },
+        {
+          "id": 2,
+          "artist": "Artist 2",
+          "title": "Destination",
+          "family": [
+            "artist 2",
+            "destination"
+          ]
+        },
+        {
+          "id": 3,
+          "artist": "Artist 2",
+          "title": "Destination (Live)",
+          "family": [
+            "artist 2",
+            "destination"
+          ]
+        },
+        {
+          "id": 4,
+          "artist": "Artist 4",
+          "title": "Song 4",
+          "family": [
+            "artist 4",
+            "song 4"
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "step": 1,
+          "excludedIds": [
+            1,
+            2
+          ],
+          "retrievedIds": [
+            3,
+            4
+          ],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "origin"
+            ],
+            [
+              "artist 2",
+              "destination"
+            ]
+          ],
+          "familyExcludedIds": [
+            3
+          ],
+          "selectedId": 4,
+          "selectedDistance": 2.0
+        },
+        {
+          "step": 2,
+          "excludedIds": [
+            1,
+            2,
+            4
+          ],
+          "retrievedIds": [
+            3
+          ],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "origin"
+            ],
+            [
+              "artist 2",
+              "destination"
+            ],
+            [
+              "artist 4",
+              "song 4"
+            ]
+          ],
+          "familyExcludedIds": [
+            3
+          ],
+          "selectedId": null,
+          "selectedDistance": null
+        },
+        {
+          "step": 3,
+          "excludedIds": [
+            1,
+            2,
+            4
+          ],
+          "retrievedIds": [
+            3
+          ],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "origin"
+            ],
+            [
+              "artist 2",
+              "destination"
+            ],
+            [
+              "artist 4",
+              "song 4"
+            ]
+          ],
+          "familyExcludedIds": [
+            3
+          ],
+          "selectedId": null,
+          "selectedDistance": null
+        }
+      ],
+      "events": [
+        {
+          "kind": "request",
+          "description": "Request 5 tracks, including the origin and destination.",
+          "selectedIds": [],
+          "reservedIds": [],
+          "focusStep": 0,
+          "attemptCount": 0,
+          "candidates": []
+        },
+        {
+          "kind": "anchors",
+          "description": "Resolve both anchors. Reserve the destination ID, title and song family before selecting any middle track.",
+          "selectedIds": [
+            1
+          ],
+          "reservedIds": [
+            2
+          ],
+          "focusStep": 0,
+          "attemptCount": 0,
+          "candidates": []
+        },
+        {
+          "kind": "selection",
+          "description": "Middle step 1: select track #4 from the fixture pool. The destination stays reserved.",
+          "selectedIds": [
+            1,
+            4
+          ],
+          "reservedIds": [
+            2
+          ],
+          "focusStep": 1,
+          "attemptCount": 1,
+          "candidates": [
+            {
+              "id": 3,
+              "status": "Reserved song family"
+            },
+            {
+              "id": 4,
+              "status": "Selected"
+            }
+          ]
+        },
+        {
+          "kind": "exhausted",
+          "description": "2 middle selection attempts returned no track. Reserved or ineligible recordings do not fill the missing steps.",
+          "selectedIds": [
+            1,
+            4
+          ],
+          "reservedIds": [
+            2
+          ],
+          "focusStep": 3,
+          "attemptCount": 2,
+          "candidates": [
+            {
+              "id": 3,
+              "status": "Reserved song family"
+            },
+            {
+              "id": 4,
+              "status": "Already selected"
+            }
+          ]
+        },
+        {
+          "kind": "finish",
+          "description": "Return 3 of 5 requested tracks, with both endpoints retained. The route is shorter than requested; no intermediate songs are invented.",
+          "selectedIds": [
+            1,
+            4,
+            2
+          ],
+          "reservedIds": [],
+          "focusStep": 4,
+          "attemptCount": 0,
+          "candidates": []
+        }
+      ]
+    },
+    {
+      "id": "sparse",
+      "label": "Sparse catalogue",
+      "test": "test_sparse_catalog_keeps_both_endpoints_without_inventing_middle_tracks",
+      "testStart": 205,
+      "testEnd": 214,
+      "requested": 20,
+      "originId": 1,
+      "destinationId": 2,
+      "resultIds": [
+        1,
+        2
+      ],
+      "resultSteps": [
+        {
+          "id": 1,
+          "step": 0,
+          "progress": 0.0
+        },
+        {
+          "id": 2,
+          "step": 19,
+          "progress": 1.0
+        }
+      ],
+      "catalog": [
+        {
+          "id": 1,
+          "artist": "Artist 1",
+          "title": "Song 1",
+          "family": [
+            "artist 1",
+            "song 1"
+          ]
+        },
+        {
+          "id": 2,
+          "artist": "Artist 2",
+          "title": "Song 2",
+          "family": [
+            "artist 2",
+            "song 2"
+          ]
+        }
+      ],
+      "attempts": [
+        {
+          "step": 1,
+          "excludedIds": [
+            1,
+            2
+          ],
+          "retrievedIds": [],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": null,
+          "selectedDistance": null
+        },
+        {
+          "step": 2,
+          "excludedIds": [
+            1,
+            2
+          ],
+          "retrievedIds": [],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": null,
+          "selectedDistance": null
+        },
+        {
+          "step": 3,
+          "excludedIds": [
+            1,
+            2
+          ],
+          "retrievedIds": [],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": null,
+          "selectedDistance": null
+        },
+        {
+          "step": 4,
+          "excludedIds": [
+            1,
+            2
+          ],
+          "retrievedIds": [],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": null,
+          "selectedDistance": null
+        },
+        {
+          "step": 5,
+          "excludedIds": [
+            1,
+            2
+          ],
+          "retrievedIds": [],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": null,
+          "selectedDistance": null
+        },
+        {
+          "step": 6,
+          "excludedIds": [
+            1,
+            2
+          ],
+          "retrievedIds": [],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": null,
+          "selectedDistance": null
+        },
+        {
+          "step": 7,
+          "excludedIds": [
+            1,
+            2
+          ],
+          "retrievedIds": [],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": null,
+          "selectedDistance": null
+        },
+        {
+          "step": 8,
+          "excludedIds": [
+            1,
+            2
+          ],
+          "retrievedIds": [],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": null,
+          "selectedDistance": null
+        },
+        {
+          "step": 9,
+          "excludedIds": [
+            1,
+            2
+          ],
+          "retrievedIds": [],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": null,
+          "selectedDistance": null
+        },
+        {
+          "step": 10,
+          "excludedIds": [
+            1,
+            2
+          ],
+          "retrievedIds": [],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": null,
+          "selectedDistance": null
+        },
+        {
+          "step": 11,
+          "excludedIds": [
+            1,
+            2
+          ],
+          "retrievedIds": [],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": null,
+          "selectedDistance": null
+        },
+        {
+          "step": 12,
+          "excludedIds": [
+            1,
+            2
+          ],
+          "retrievedIds": [],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": null,
+          "selectedDistance": null
+        },
+        {
+          "step": 13,
+          "excludedIds": [
+            1,
+            2
+          ],
+          "retrievedIds": [],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": null,
+          "selectedDistance": null
+        },
+        {
+          "step": 14,
+          "excludedIds": [
+            1,
+            2
+          ],
+          "retrievedIds": [],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": null,
+          "selectedDistance": null
+        },
+        {
+          "step": 15,
+          "excludedIds": [
+            1,
+            2
+          ],
+          "retrievedIds": [],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": null,
+          "selectedDistance": null
+        },
+        {
+          "step": 16,
+          "excludedIds": [
+            1,
+            2
+          ],
+          "retrievedIds": [],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": null,
+          "selectedDistance": null
+        },
+        {
+          "step": 17,
+          "excludedIds": [
+            1,
+            2
+          ],
+          "retrievedIds": [],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": null,
+          "selectedDistance": null
+        },
+        {
+          "step": 18,
+          "excludedIds": [
+            1,
+            2
+          ],
+          "retrievedIds": [],
+          "excludedFamilies": [
+            [
+              "artist 1",
+              "song 1"
+            ],
+            [
+              "artist 2",
+              "song 2"
+            ]
+          ],
+          "familyExcludedIds": [],
+          "selectedId": null,
+          "selectedDistance": null
+        }
+      ],
+      "events": [
+        {
+          "kind": "request",
+          "description": "Request 20 tracks, including the origin and destination.",
+          "selectedIds": [],
+          "reservedIds": [],
+          "focusStep": 0,
+          "attemptCount": 0,
+          "candidates": []
+        },
+        {
+          "kind": "anchors",
+          "description": "Resolve both anchors. Reserve the destination ID, title and song family before selecting any middle track.",
+          "selectedIds": [
+            1
+          ],
+          "reservedIds": [
+            2
+          ],
+          "focusStep": 0,
+          "attemptCount": 0,
+          "candidates": []
+        },
+        {
+          "kind": "exhausted",
+          "description": "18 middle selection attempts returned no track. Reserved or ineligible recordings do not fill the missing steps.",
+          "selectedIds": [
+            1
+          ],
+          "reservedIds": [
+            2
+          ],
+          "focusStep": 18,
+          "attemptCount": 18,
+          "candidates": [
+            {
+              "id": 2,
+              "status": "Reserved destination"
+            }
+          ]
+        },
+        {
+          "kind": "finish",
+          "description": "Return 2 of 20 requested tracks, with both endpoints retained. The route is shorter than requested; no intermediate songs are invented.",
+          "selectedIds": [
+            1,
+            2
+          ],
+          "reservedIds": [],
+          "focusStep": 19,
+          "attemptCount": 0,
+          "candidates": []
+        }
+      ]
+    }
+  ]
+}

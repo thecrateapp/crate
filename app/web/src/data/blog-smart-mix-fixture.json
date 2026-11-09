@@ -1,0 +1,430 @@
+{
+  "schemaVersion": 1,
+  "kind": "synthetic-test-fixture",
+  "label": "Synthetic test tracks \u00b7 real planner output",
+  "fixtureCase": "voiced_dj",
+  "sourceCommit": "6b53412a6602c1d7fb34c1ef14498f8263b11243",
+  "sourceBaseUrl": "https://github.com/thecrateapp/crate/blob/6b53412a6602c1d7fb34c1ef14498f8263b11243/",
+  "sources": [
+    "app/tests/smart_mix_candidate_cases.py",
+    "app/tests/test_smart_mix_candidates.py",
+    "app/crate/smart_mix/candidates.py",
+    "app/crate/smart_mix/planner.py",
+    "app/crate/smart_mix/evaluation.py",
+    "app/crate/smart_mix/models.py",
+    "app/crate/smart_mix/policy.py"
+  ],
+  "units": {
+    "timing": "milliseconds",
+    "energy": "phrase mean RMS on a 0..1 scale (-60 dBFS to 0 dBFS); fixture values, not measurements",
+    "voice": "fixture byte on detector logarithmic scale; >=90 is treated as voiced, not a probability",
+    "vocalClashMs": "10ms-sampled overlap of voiced phrases while both decks crossfade gain >=0.5",
+    "omittedMusic": "actual milliseconds from/to active bounds; does not exempt intro/outro",
+    "score": "intentionally omitted; not a listening-quality measure"
+  },
+  "context": {
+    "source": "playlist",
+    "automatic": true,
+    "preferredDurationMs": 12000,
+    "allowBeatmatch": true,
+    "allowTempoAdjustment": true,
+    "allowLongBeatmatch": true,
+    "allowBassHandoff": true
+  },
+  "tracks": {
+    "outgoing": {
+      "label": "Outgoing test track",
+      "entityUid": "11111111-1111-4111-8111-111111111111",
+      "durationMs": 240000,
+      "activeStartMs": 480,
+      "activeEndMs": 230880,
+      "bpm": 125.0,
+      "beatMs": 480.0,
+      "phrases": [
+        {
+          "index": 0,
+          "kind": "intro",
+          "bars": 16,
+          "startMs": 480,
+          "endMs": 31200,
+          "energy": 0.45,
+          "voiceByte": 20,
+          "hasVoice": false
+        },
+        {
+          "index": 1,
+          "kind": "build",
+          "bars": 8,
+          "startMs": 31200,
+          "endMs": 46560,
+          "energy": 0.6,
+          "voiceByte": 40,
+          "hasVoice": false
+        },
+        {
+          "index": 2,
+          "kind": "peak",
+          "bars": 32,
+          "startMs": 46560,
+          "endMs": 108000,
+          "energy": 0.8,
+          "voiceByte": 160,
+          "hasVoice": true
+        },
+        {
+          "index": 3,
+          "kind": "break",
+          "bars": 16,
+          "startMs": 108000,
+          "endMs": 138720,
+          "energy": 0.5,
+          "voiceByte": 30,
+          "hasVoice": false
+        },
+        {
+          "index": 4,
+          "kind": "peak",
+          "bars": 32,
+          "startMs": 138720,
+          "endMs": 200160,
+          "energy": 0.8,
+          "voiceByte": 170,
+          "hasVoice": true
+        },
+        {
+          "index": 5,
+          "kind": "outro",
+          "bars": 16,
+          "startMs": 200160,
+          "endMs": 230880,
+          "energy": 0.5,
+          "voiceByte": 150,
+          "hasVoice": true
+        }
+      ]
+    },
+    "incoming": {
+      "label": "Incoming test track",
+      "entityUid": "22222222-2222-4222-8222-222222222222",
+      "durationMs": 240000,
+      "activeStartMs": 480,
+      "activeEndMs": 230880,
+      "bpm": 125.0,
+      "beatMs": 480.0,
+      "phrases": [
+        {
+          "index": 0,
+          "kind": "intro",
+          "bars": 16,
+          "startMs": 480,
+          "endMs": 31200,
+          "energy": 0.5,
+          "voiceByte": 140,
+          "hasVoice": true
+        },
+        {
+          "index": 1,
+          "kind": "build",
+          "bars": 8,
+          "startMs": 31200,
+          "endMs": 46560,
+          "energy": 0.65,
+          "voiceByte": 20,
+          "hasVoice": false
+        },
+        {
+          "index": 2,
+          "kind": "peak",
+          "bars": 32,
+          "startMs": 46560,
+          "endMs": 108000,
+          "energy": 0.8,
+          "voiceByte": 180,
+          "hasVoice": true
+        },
+        {
+          "index": 3,
+          "kind": "break",
+          "bars": 16,
+          "startMs": 108000,
+          "endMs": 138720,
+          "energy": 0.5,
+          "voiceByte": 30,
+          "hasVoice": false
+        },
+        {
+          "index": 4,
+          "kind": "peak",
+          "bars": 32,
+          "startMs": 138720,
+          "endMs": 200160,
+          "energy": 0.8,
+          "voiceByte": 160,
+          "hasVoice": true
+        },
+        {
+          "index": 5,
+          "kind": "outro",
+          "bars": 16,
+          "startMs": 200160,
+          "endMs": 230880,
+          "energy": 0.45,
+          "voiceByte": 10,
+          "hasVoice": false
+        }
+      ]
+    }
+  },
+  "choices": [
+    {
+      "id": "v2",
+      "label": "V2 baseline",
+      "rank": null,
+      "structureUsed": false,
+      "outgoingPhrase": null,
+      "incomingPhrase": null,
+      "lengthBars": null,
+      "plan": {
+        "plannerVersion": 2,
+        "outgoingTrackEntityUid": "11111111-1111-4111-8111-111111111111",
+        "incomingTrackEntityUid": "22222222-2222-4222-8222-222222222222",
+        "mode": "beatmatch",
+        "durationMs": 30720,
+        "outgoingCueMs": 200160,
+        "incomingCueMs": 480,
+        "incomingTempoRatio": 1.0,
+        "beatPhaseOffsetMs": 0,
+        "handoffProgress": 0.5,
+        "outgoingGainDb": -4.0103,
+        "incomingGainDb": -4.0103,
+        "curve": "dj-blend",
+        "bassHandoff": "balanced",
+        "confidence": 0.93,
+        "fallbackReason": null
+      },
+      "geometry": {
+        "outgoingStartMs": 200160,
+        "outgoingEndMs": 230880,
+        "incomingStartMs": 480,
+        "incomingEndMs": 31200.0,
+        "incomingPlaybackRate": 1.0
+      },
+      "metrics": {
+        "mode": "beatmatch",
+        "durationMs": 30720,
+        "fallbackReason": null,
+        "curve": "dj-blend",
+        "bassHandoff": true,
+        "policyViolations": [],
+        "phraseAlignment": {
+          "aligned": 4,
+          "checked": 4,
+          "basis": "phrases",
+          "startAligned": true,
+          "endAligned": true
+        },
+        "bassOverlapMs": 0,
+        "harmonicRelationship": "same",
+        "harmonicClashMs": 0,
+        "energyStep": {
+          "value": 0.0,
+          "signed": 0.0,
+          "basis": "phrases"
+        },
+        "vocalClashMs": 19420,
+        "musicLeftOut": {
+          "outgoingUnplayedMs": 0,
+          "incomingSkippedMs": 0
+        }
+      }
+    },
+    {
+      "id": "v3",
+      "label": "V3 first choice",
+      "rank": 0,
+      "structureUsed": true,
+      "outgoingPhrase": 3,
+      "incomingPhrase": 0,
+      "lengthBars": 16,
+      "plan": {
+        "plannerVersion": 2,
+        "outgoingTrackEntityUid": "11111111-1111-4111-8111-111111111111",
+        "incomingTrackEntityUid": "22222222-2222-4222-8222-222222222222",
+        "mode": "beatmatch",
+        "durationMs": 30720,
+        "outgoingCueMs": 108000,
+        "incomingCueMs": 480,
+        "incomingTempoRatio": 1.0,
+        "beatPhaseOffsetMs": 0,
+        "handoffProgress": 0.5,
+        "outgoingGainDb": -4.0103,
+        "incomingGainDb": -4.0103,
+        "curve": "dj-blend",
+        "bassHandoff": "balanced",
+        "confidence": 0.93,
+        "fallbackReason": null
+      },
+      "geometry": {
+        "outgoingStartMs": 108000,
+        "outgoingEndMs": 138720,
+        "incomingStartMs": 480,
+        "incomingEndMs": 31200.0,
+        "incomingPlaybackRate": 1.0
+      },
+      "metrics": {
+        "mode": "beatmatch",
+        "durationMs": 30720,
+        "fallbackReason": null,
+        "curve": "dj-blend",
+        "bassHandoff": true,
+        "policyViolations": [],
+        "phraseAlignment": {
+          "aligned": 4,
+          "checked": 4,
+          "basis": "phrases",
+          "startAligned": true,
+          "endAligned": true
+        },
+        "bassOverlapMs": 0,
+        "harmonicRelationship": "same",
+        "harmonicClashMs": 0,
+        "energyStep": {
+          "value": 0.0,
+          "signed": 0.0,
+          "basis": "phrases"
+        },
+        "vocalClashMs": 0,
+        "musicLeftOut": {
+          "outgoingUnplayedMs": 92160,
+          "incomingSkippedMs": 0
+        }
+      }
+    },
+    {
+      "id": "alternative",
+      "label": "V3 alternative",
+      "rank": 1,
+      "structureUsed": true,
+      "outgoingPhrase": 5,
+      "incomingPhrase": 1,
+      "lengthBars": 8,
+      "plan": {
+        "plannerVersion": 2,
+        "outgoingTrackEntityUid": "11111111-1111-4111-8111-111111111111",
+        "incomingTrackEntityUid": "22222222-2222-4222-8222-222222222222",
+        "mode": "beatmatch",
+        "durationMs": 15360,
+        "outgoingCueMs": 200160,
+        "incomingCueMs": 31200,
+        "incomingTempoRatio": 1.0,
+        "beatPhaseOffsetMs": 0,
+        "handoffProgress": 0.5,
+        "outgoingGainDb": -4.0103,
+        "incomingGainDb": -4.0103,
+        "curve": "dj-blend",
+        "bassHandoff": "balanced",
+        "confidence": 0.93,
+        "fallbackReason": null
+      },
+      "geometry": {
+        "outgoingStartMs": 200160,
+        "outgoingEndMs": 215520,
+        "incomingStartMs": 31200,
+        "incomingEndMs": 46560.0,
+        "incomingPlaybackRate": 1.0
+      },
+      "metrics": {
+        "mode": "beatmatch",
+        "durationMs": 15360,
+        "fallbackReason": null,
+        "curve": "dj-blend",
+        "bassHandoff": true,
+        "policyViolations": [],
+        "phraseAlignment": {
+          "aligned": 3,
+          "checked": 4,
+          "basis": "phrases",
+          "startAligned": true,
+          "endAligned": false
+        },
+        "bassOverlapMs": 0,
+        "harmonicRelationship": "same",
+        "harmonicClashMs": 0,
+        "energyStep": {
+          "value": 0.15,
+          "signed": 0.15,
+          "basis": "phrases"
+        },
+        "vocalClashMs": 0,
+        "musicLeftOut": {
+          "outgoingUnplayedMs": 15360,
+          "incomingSkippedMs": 30720
+        }
+      }
+    }
+  ],
+  "fallback": {
+    "id": "missing-structure",
+    "label": "Without structure",
+    "rank": 0,
+    "structureUsed": false,
+    "outgoingPhrase": null,
+    "incomingPhrase": null,
+    "lengthBars": null,
+    "plan": {
+      "plannerVersion": 2,
+      "outgoingTrackEntityUid": "11111111-1111-4111-8111-111111111111",
+      "incomingTrackEntityUid": "22222222-2222-4222-8222-222222222222",
+      "mode": "beatmatch",
+      "durationMs": 30720,
+      "outgoingCueMs": 200160,
+      "incomingCueMs": 480,
+      "incomingTempoRatio": 1.0,
+      "beatPhaseOffsetMs": 0,
+      "handoffProgress": 0.5,
+      "outgoingGainDb": -4.0103,
+      "incomingGainDb": -4.0103,
+      "curve": "dj-blend",
+      "bassHandoff": "balanced",
+      "confidence": 0.93,
+      "fallbackReason": null
+    },
+    "geometry": {
+      "outgoingStartMs": 200160,
+      "outgoingEndMs": 230880,
+      "incomingStartMs": 480,
+      "incomingEndMs": 31200.0,
+      "incomingPlaybackRate": 1.0
+    },
+    "metrics": {
+      "mode": "beatmatch",
+      "durationMs": 30720,
+      "fallbackReason": null,
+      "curve": "dj-blend",
+      "bassHandoff": true,
+      "policyViolations": [],
+      "phraseAlignment": {
+        "aligned": 4,
+        "checked": 4,
+        "basis": "grid",
+        "startAligned": true,
+        "endAligned": true
+      },
+      "bassOverlapMs": 0,
+      "harmonicRelationship": "same",
+      "harmonicClashMs": 0,
+      "energyStep": {
+        "value": 0.0,
+        "signed": 0.0,
+        "basis": "intro_outro"
+      },
+      "vocalClashMs": null,
+      "musicLeftOut": {
+        "outgoingUnplayedMs": 0,
+        "incomingSkippedMs": 0
+      }
+    }
+  },
+  "fallbackNote": "Remove phrases, energy curve, vocal presence and structure confidence from the same two fixture profiles. The first v3 menu entry equals the unchanged v2 plan; extra heuristic variants may follow. The planner still has tempo, active bounds, intro/outro cues and energy.",
+  "disclaimer": "The tracks and their signals are hand-authored test fixtures. Candidate plans and metrics were generated by the actual Crate planner and evaluator. No audio is played. This illustrates the decision; it is not evidence of listening quality."
+}

@@ -1,0 +1,767 @@
+---
+import BlogFigure from "./BlogFigure.astro";
+import fixture from "../../data/blog-radio-fixture.json";
+import {
+  buildRadioScript,
+  DELIVERED_LIMIT,
+  HISTORY_DAYS,
+  METER_SECONDS,
+  RADIO_STATES,
+  RADIO_TRACKS,
+  radioFrame,
+  radioReadout,
+  ROW_SLOTS,
+  SIGNIFICANT_SECONDS,
+  STATUS_LABEL,
+  type Chip,
+  type Reading,
+} from "../../scripts/viz/blog/radio";
+
+// The fixture stays on the server; the browser gets the compact replay script.
+const script = buildRadioScript(fixture);
+const initial = "selector";
+// Without JavaScript the figure shows the listening case once Fresh is queued.
+const still = radioFrame(script, RADIO_TRACKS.selector.pins![1]!);
+const readout = radioReadout(still);
+const pick = still.rows.find((row) => row.pick);
+const slot = (n: number) => String(n + 1).padStart(2, "0");
+const fixed = (n: number | null) => (n === null ? "—" : n.toFixed(2));
+const flag = (on: boolean) => (on ? "" : undefined);
+const chip = (item: Chip) => ({
+  "data-rr-chip": item.id,
+  "data-on": flag(item.on),
+  "data-tone": item.tone,
+  style: `order:${item.order}`,
+});
+const count = (lane: Chip[]) => lane.filter((item) => item.on).length;
+const poolText = ({ ranked, excluded }: { ranked: number; excluded: number }) =>
+  `end of pool · ${ranked} ranked${excluded ? ` · ${excluded} excluded` : ""}`;
+const poolSize = still.pool.ranked + still.pool.excluded;
+const play = still.play!;
+const tick = (SIGNIFICANT_SECONDS / METER_SECONDS) * 100;
+const readings = [
+  { key: "best", label: "Best score", value: readout.best },
+  { key: "band", label: "Quality band", value: readout.band },
+  { key: "play", label: "Last play", value: readout.play },
+  { key: "queued", label: "Queued", value: readout.queued },
+] satisfies { key: string; label: string; value: Reading }[];
+---
+
+<BlogFigure
+  viz="blog-radio"
+  id="radio-rotation"
+  label="Radio"
+  context="ranked pool → queue"
+  states={RADIO_STATES.map((state) => ({ ...state, phases: [...state.phases] }))}
+  initial={initial}
+  example
+  ariaLabel="Four radio refills replayed from the pinned selector. Candidates are ranked by score, lower is better. A five-second skip enters only the session delivery ledger, so the refill passes over the delivered song without a quality band. A thirty-second play enters the seven-day history for the whole song family, and an unheard song within 0.05 of the best score replaces it. When no unheard song is that close, or nothing undelivered is left, the remembered song is queued again."
+  caption="Synthetic rows from the regression tests, scored by the pinned Python selector at 924b7fb6; not Citizen's pool."
+>
+  <div
+    class="rr"
+    data-rr-script={JSON.stringify(script)}
+    data-band={still.band ? (still.band.applied ? "applied" : "ghost") : "off"}
+    data-scan={flag(still.scan !== null)}
+    data-pick={pick?.pickTone ?? ""}
+    style={`--scan:${still.scan ?? 0};--best:${still.band?.from ?? 0};--limit:${still.band?.to ?? 0}`}
+  >
+    <p class="rr-case" data-rr-case>{still.caseLabel}</p>
+
+    <div class="rr-head" aria-hidden="true">
+      <span class="c-n">#</span>
+      <span class="c-song">Candidate · song key</span>
+      <span class="c-track"><i>0</i><b>score · lower is better</b><i>1</i></span>
+      <span class="c-score">Score</span>
+      <span class="c-check">Check</span>
+    </div>
+
+    <div class="rr-rows">
+      <span class="rr-scan" data-rr-scan aria-hidden="true"></span>
+      <p class="rr-end" data-rr-end data-full={flag(poolSize >= ROW_SLOTS)} style={`--slot:${poolSize}`}>
+        {poolText(still.pool)}
+      </p>
+      {
+        still.rows.map((row) => (
+          <div
+            class="rr-row"
+            data-rr-row={row.id}
+            data-slot={row.slot}
+            data-visible={flag(row.visible)}
+            data-status={row.status ?? ""}
+            data-verdict={flag(row.verdict)}
+            data-best={flag(row.best)}
+            data-pick={row.pick ?? ""}
+            data-pick-tone={row.pickTone ?? ""}
+            style={`--slot:${row.slot};--score:${row.score ?? 0}`}
+          >
+            <span class="c-n" data-rr-n>
+              {slot(row.slot)}
+            </span>
+            <span class="c-song">
+              <b>{row.title}</b>
+              <small>{row.key}</small>
+            </span>
+            <span class="c-track" aria-hidden="true">
+              <i class="band" />
+              <em class="band-label" data-rr-band-label>
+                {still.band?.applied ? `≤ ${fixed(still.band.to)}` : "band not used"}
+              </em>
+              <i class="dot" />
+            </span>
+            <span class="c-score" data-rr-score>
+              {fixed(row.score)}
+            </span>
+            <span class="c-check">
+              <em data-rr-status>{row.status ? STATUS_LABEL[row.status] : ""}</em>
+              <strong data-rr-pick>{row.pick ?? ""}</strong>
+            </span>
+          </div>
+        ))
+      }
+    </div>
+
+    <ol class="rr-lanes">
+      <li class="rr-lane">
+        <p class="rr-meta"><b>Buffer</b><span>hard exclusion · id, title, song</span></p>
+        <div class="rr-track" data-rr-lane="buffer" data-count={count(still.lanes.buffer)}>
+          {still.lanes.buffer.map((item) => <span class="chip title" {...chip(item)}>{item.label}</span>)}
+        </div>
+      </li>
+      <li class="rr-lane">
+        <p class="rr-meta"><b>Session ledger</b><span>cooldown · newest {DELIVERED_LIMIT} songs</span></p>
+        <div class="rr-track" data-rr-lane="delivered" data-count={count(still.lanes.delivered)}>
+          {still.lanes.delivered.map((item) => <span class="chip" {...chip(item)}>{item.label}</span>)}
+          <span class="rr-count" data-rr-count>{count(still.lanes.delivered)} / {DELIVERED_LIMIT}</span>
+        </div>
+      </li>
+      <li class="rr-lane">
+        <p class="rr-meta"><b>Heard · {HISTORY_DAYS} days</b><span>completed, or min({SIGNIFICANT_SECONDS} s, ½ length)</span></p>
+        <div class="rr-track rr-heard">
+          <span class="rr-meter" data-rr-meter data-counted={String(play.counted)}>
+            <span class="bar">
+              <i class="fill" data-rr-fill style={`--fill:${Math.min(1, play.seconds / METER_SECONDS)}`} />
+              <i class="tick" style={`left:${tick}%`} />
+            </span>
+            <span class="value" data-rr-play>{Math.round(play.seconds)} s / {play.threshold} s</span>
+          </span>
+          <span class="rr-chips" data-rr-lane="heard" data-count={count(still.lanes.heard)}>
+            {still.lanes.heard.map((item) => <span class="chip" {...chip(item)}>{item.label}</span>)}
+          </span>
+        </div>
+      </li>
+    </ol>
+  </div>
+
+  <dl class="bf-readout" slot="readout">
+    {
+      readings.map(({ key, label, value }) => (
+        <div>
+          <dt class="viz-label">{label}</dt>
+          <dd data-rr-ro={key} data-tone={value.tone}>
+            <span data-rr-text>{value.text}</span>
+            <small data-rr-note>{value.note}</small>
+          </dd>
+        </div>
+      ))
+    }
+  </dl>
+</BlogFigure>
+
+<style>
+  .rr {
+    --row-h: 42px;
+    --pad: 10px;
+    --cols: 4% 27% 41% 8% 20%;
+    position: relative;
+  }
+
+  /* Figure text sits inside .prose; match the kit's reset specificity. */
+  :global(.prose) .rr :global(p),
+  :global(.prose) .rr :global(ol),
+  :global(.prose) .rr :global(li) {
+    margin: 0;
+  }
+
+  .rr-case {
+    margin: 0 0 16px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--fg);
+  }
+
+  .rr-head,
+  .rr-row {
+    display: grid;
+    grid-template-columns: var(--cols);
+    align-items: center;
+  }
+
+  .rr-head {
+    padding: 0 0 7px;
+    border-bottom: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  .rr-head .c-track {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 var(--pad);
+  }
+
+  .rr-head .c-track i {
+    font-style: normal;
+  }
+
+  .rr-head .c-track b {
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  .rr-head .c-score,
+  .rr-row .c-score {
+    text-align: right;
+    padding-right: 12px;
+  }
+
+  .rr-rows {
+    position: relative;
+    height: calc(var(--row-h) * 4);
+  }
+
+  .rr-scan {
+    position: absolute;
+    inset: 0 0 auto;
+    height: var(--row-h);
+    background: linear-gradient(90deg, rgba(6, 182, 212, 0.1), transparent 70%);
+    opacity: 0;
+    transform: translateY(calc(var(--scan) * var(--row-h)));
+    transition:
+      transform 0.2s var(--ease-snap),
+      opacity 0.2s var(--ease-snap),
+      background 0.3s var(--ease-snap);
+  }
+
+  .rr-scan::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 2px;
+    background: var(--cyan-hi);
+    transition: background 0.3s var(--ease-snap);
+  }
+
+  .rr[data-scan] .rr-scan {
+    opacity: 1;
+  }
+
+  .rr[data-pick="warn"] .rr-scan {
+    background: linear-gradient(90deg, rgba(251, 191, 36, 0.1), transparent 70%);
+  }
+
+  .rr[data-pick="warn"] .rr-scan::before {
+    background: var(--amber);
+  }
+
+  .rr-end {
+    position: absolute;
+    inset: 0 0 auto;
+    display: flex;
+    align-items: center;
+    height: var(--row-h);
+    padding-left: calc(4% + 6px);
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(241, 245, 249, 0.3);
+    transform: translateY(calc(var(--slot) * var(--row-h)));
+    transition:
+      transform 0.35s var(--ease-out),
+      opacity 0.3s var(--ease-snap);
+  }
+
+  .rr-end[data-full] {
+    opacity: 0;
+  }
+
+  .rr-row {
+    position: absolute;
+    inset: 0 0 auto;
+    height: var(--row-h);
+    border-bottom: 1px solid rgba(241, 245, 249, 0.06);
+    transform: translateY(calc(var(--slot) * var(--row-h)));
+    transition:
+      transform 0.35s var(--ease-out),
+      opacity 0.3s var(--ease-snap);
+  }
+
+  .rr-row:not([data-visible]) {
+    opacity: 0;
+  }
+
+  .rr-row[data-status="buffer"],
+  .rr-row[data-status="family"] {
+    opacity: 0.6;
+  }
+
+  .c-n {
+    padding-left: 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--fg-3);
+  }
+
+  .c-song {
+    display: grid;
+    gap: 1px;
+    min-width: 0;
+    padding-left: 6px;
+  }
+
+  .c-song b {
+    overflow: hidden;
+    font-weight: 500;
+    font-size: 13.5px;
+    line-height: 1.2;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--fg);
+  }
+
+  .c-song small {
+    overflow: hidden;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--fg-3);
+  }
+
+  .rr-row .c-track {
+    position: relative;
+    align-self: stretch;
+    margin: 0 var(--pad);
+    background:
+      linear-gradient(90deg, rgba(241, 245, 249, 0.07) 1px, transparent 1px) 0 0 / 25% 100%,
+      linear-gradient(rgba(241, 245, 249, 0.12), rgba(241, 245, 249, 0.12)) 0 50% / 100% 1px no-repeat;
+    box-shadow: inset -1px 0 rgba(241, 245, 249, 0.07);
+  }
+
+  .band {
+    position: absolute;
+    inset: 0 auto;
+    left: calc(var(--best) * 100%);
+    width: calc((var(--limit) - var(--best)) * 100%);
+    max-width: calc((1 - var(--best)) * 100%);
+    opacity: 0;
+    transition: opacity 0.3s var(--ease-snap);
+  }
+
+  .rr[data-band="applied"] .band {
+    opacity: 1;
+    background: rgba(6, 182, 212, 0.16);
+    box-shadow:
+      inset -1px 0 var(--cyan-hi),
+      inset 1px 0 rgba(103, 232, 249, 0.4);
+  }
+
+  .rr[data-band="ghost"] .band {
+    opacity: 1;
+    background: repeating-linear-gradient(180deg, rgba(241, 245, 249, 0.28) 0 3px, transparent 3px 6px) right / 1px 100% no-repeat;
+    box-shadow: inset 1px 0 rgba(241, 245, 249, 0.2);
+  }
+
+  .band-label {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: calc(var(--limit) * 100%);
+    padding: 1px 4px;
+    background: var(--bg);
+    font-family: var(--mono);
+    font-style: normal;
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--cyan-hi);
+    transform: translate(6px, -50%);
+  }
+
+  .rr[data-band="ghost"] .band-label {
+    color: var(--fg-3);
+  }
+
+  .rr:not([data-band="off"]) .rr-row[data-slot="0"] .band-label {
+    display: block;
+  }
+
+  .dot {
+    position: absolute;
+    top: 50%;
+    left: calc(var(--score) * 100%);
+    width: 9px;
+    height: 9px;
+    margin: -4.5px 0 0 -4.5px;
+    border-radius: 50%;
+    background: var(--fg-2);
+    transition:
+      left 0.4s var(--ease-out),
+      background 0.3s var(--ease-snap),
+      box-shadow 0.3s var(--ease-snap);
+  }
+
+  .rr-row[data-status="buffer"] .dot,
+  .rr-row[data-status="family"] .dot {
+    display: none;
+  }
+
+  .rr-row[data-verdict][data-status="heard"] .dot,
+  .rr-row[data-verdict][data-status="delivered"] .dot {
+    background: var(--amber);
+  }
+
+  .rr-row[data-verdict][data-status="outside"] .dot {
+    background: rgba(241, 245, 249, 0.25);
+  }
+
+  .rr-row[data-pick-tone="ok"] .dot {
+    background: var(--cyan-hi);
+    box-shadow: 0 0 10px rgba(103, 232, 249, 0.8);
+  }
+
+  .rr-row[data-pick-tone="warn"] .dot {
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.7);
+  }
+
+  .rr-row .c-score {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--fg);
+  }
+
+  .rr-row[data-pick-tone="ok"] .c-score {
+    color: var(--cyan-hi);
+  }
+
+  .c-check {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    min-width: 0;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .c-check em {
+    font-style: normal;
+    white-space: nowrap;
+    color: var(--fg-2);
+    opacity: 0;
+    transition: opacity 0.25s var(--ease-snap);
+  }
+
+  .rr-row[data-verdict] .c-check em {
+    opacity: 1;
+  }
+
+  .rr-row[data-status="heard"] .c-check em,
+  .rr-row[data-status="delivered"] .c-check em,
+  .rr-row[data-status="buffer"] .c-check em,
+  .rr-row[data-status="family"] .c-check em {
+    color: var(--amber);
+  }
+
+  .rr-row[data-status="outside"] .c-check em {
+    color: var(--fg-3);
+  }
+
+  .c-check strong {
+    display: none;
+    padding: 1px 7px;
+    border: 1px solid rgba(103, 232, 249, 0.55);
+    border-radius: 999px;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+    color: var(--cyan-hi);
+  }
+
+  .rr-row[data-pick-tone="warn"] .c-check strong {
+    border-color: rgba(251, 191, 36, 0.6);
+    color: var(--amber);
+  }
+
+  .rr-row:not([data-pick=""]) .c-check strong {
+    display: inline-block;
+  }
+
+  .rr-lanes {
+    margin-top: 16px;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--line);
+  }
+
+  .rr-lane {
+    display: grid;
+    grid-template-columns: 31% minmax(0, 1fr);
+    gap: 16px;
+    align-items: center;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .rr-meta {
+    display: grid;
+    gap: 3px;
+    padding-left: 8px;
+    font-family: var(--mono);
+  }
+
+  .rr-meta b {
+    font-weight: 400;
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--cyan-hi);
+  }
+
+  .rr-meta span {
+    font-size: 10px;
+    color: var(--fg-3);
+  }
+
+  .rr-track,
+  .rr-chips {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .rr-track {
+    min-height: 32px;
+    padding: 0 8px;
+    overflow: hidden;
+    border-radius: 6px;
+    background: rgba(241, 245, 249, 0.025);
+  }
+
+  .rr-track[data-count="0"]::after,
+  .rr-chips[data-count="0"]::after {
+    content: "empty";
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(241, 245, 249, 0.28);
+  }
+
+  .chip {
+    display: none;
+    align-items: center;
+    height: 21px;
+    padding: 0 9px;
+    border: 1px solid rgba(241, 245, 249, 0.18);
+    border-radius: 999px;
+    background: rgba(10, 10, 15, 0.92);
+    font-family: var(--mono);
+    font-size: 10px;
+    white-space: nowrap;
+    color: var(--fg-2);
+    transition:
+      border-color 0.3s var(--ease-snap),
+      color 0.3s var(--ease-snap),
+      background 0.3s var(--ease-snap);
+  }
+
+  .chip.title {
+    font-family: var(--sans);
+    font-size: 11.5px;
+  }
+
+  .chip[data-on] {
+    display: inline-flex;
+    animation: rr-in 0.35s var(--ease-out);
+  }
+
+  .chip[data-tone="new"] {
+    border-color: rgba(103, 232, 249, 0.6);
+    background: rgba(6, 182, 212, 0.2);
+    color: var(--fg);
+  }
+
+  .chip[data-tone="hit"] {
+    border-color: rgba(251, 191, 36, 0.7);
+    background: rgba(251, 191, 36, 0.08);
+    color: var(--amber);
+  }
+
+  @keyframes rr-in {
+    from {
+      opacity: 0;
+      transform: translateX(-10px);
+    }
+  }
+
+  .rr-count {
+    margin-left: auto;
+    padding-left: 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    color: var(--fg-3);
+    order: 99;
+  }
+
+  .rr-meter {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 9px;
+    margin-right: 4px;
+    padding-right: 12px;
+    border-right: 1px solid var(--line);
+  }
+
+  .rr-meter .bar {
+    position: relative;
+    width: 72px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(241, 245, 249, 0.1);
+  }
+
+  .rr-meter .fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: calc(var(--fill) * 100%);
+    border-radius: inherit;
+    background: var(--fg-2);
+    transition: background 0.3s var(--ease-snap);
+  }
+
+  .rr-meter[data-counted="true"] .fill {
+    background: var(--cyan-hi);
+    box-shadow: 0 0 8px rgba(103, 232, 249, 0.6);
+  }
+
+  .rr-meter .tick {
+    position: absolute;
+    top: -5px;
+    bottom: -5px;
+    width: 1px;
+    background: var(--fg);
+  }
+
+  .rr-meter .value {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    color: var(--fg-2);
+  }
+
+  .rr-meter[data-counted="false"] .value {
+    color: var(--fg-3);
+  }
+
+  .rr-meter[data-counted="none"] .bar {
+    display: none;
+  }
+
+  @media (max-width: 760px) {
+    .rr {
+      --row-h: 60px;
+      --pad: 6px;
+    }
+    .rr-head,
+    .rr-row {
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      grid-template-areas:
+        "song score check"
+        "track track track";
+      column-gap: 10px;
+      row-gap: 6px;
+      align-content: center;
+    }
+    .rr-head {
+      row-gap: 4px;
+    }
+    .c-n {
+      display: none;
+    }
+    .c-song {
+      grid-area: song;
+      padding-left: 8px;
+    }
+    .c-song b {
+      font-size: 13px;
+    }
+    .c-track {
+      grid-area: track;
+    }
+    .rr-row .c-track {
+      height: 14px;
+    }
+    .rr-head .c-score,
+    .rr-row .c-score {
+      grid-area: score;
+      padding-right: 0;
+    }
+    .c-check {
+      grid-area: check;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: center;
+      padding-right: 4px;
+      font-size: 8.5px;
+    }
+    .rr-end {
+      padding-left: 8px;
+    }
+    .rr-head .c-check {
+      align-items: flex-end;
+    }
+    .band-label {
+      font-size: 8.5px;
+    }
+    .rr-lane {
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+    .rr-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 2px 10px;
+    }
+    .rr-meter .bar {
+      width: 52px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rr-row,
+    .rr-scan,
+    .dot,
+    .chip {
+      transition: none;
+      animation: none;
+    }
+  }
+</style>

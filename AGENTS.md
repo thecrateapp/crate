@@ -149,6 +149,8 @@ exist locally.
   change. Complete legacy pending coverage before changing that component; do not refresh
   pending hashes alone. Run `npm run design-system:showcase:check`. See its README and scoped AGENTS.
 
+- Engineering-blog figures: `.agents/skills/crate-blog-figures/SKILL.md` (shared figure kit,
+  contract and recipe; spec in `docs/technical/engineering-blog.md`).
 - Long-form technical docs: `docs/technical/` (rendered by `app/docs`).
 - Backend patterns: `.claude/skills/python-backend.md`.
 - Frontend: `.agents/skills/react-best-practices/AGENTS.md`,

@@ -1,0 +1,324 @@
+---
+import BlogFigure from "./BlogFigure.astro";
+import { CONNECT_STATES, connectFrame, connectReadout, NODES, VIEW } from "../../scripts/viz/blog/connect";
+
+// Without JavaScript the figure shows v2 while the desktop is ready but silent.
+const initial = "v2";
+const still = connectFrame(initial, 3.6);
+const readout = connectReadout(still);
+const labels = [...new Set(CONNECT_STATES.flatMap((state) => (state.id === "v1"
+  ? ["transfer_in", "ack · success", "transfer_out"]
+  : ["transfer_incoming", "transfer_ready", "transfer_committed", "became_inactive"])))];
+const pillWidth = (label: string) => Math.round(label.length * 6.3 + 20);
+const pct = (value: number, total: number) => `${((value / total) * 100).toFixed(2)}%`;
+const at = (node: keyof typeof NODES, dx = 0, dy = 0) =>
+  `left:${pct(NODES[node].x + dx, VIEW.width)};top:${pct(NODES[node].y + dy, VIEW.height)}`;
+const bars = [0, 1, 2, 3, 4];
+const phone = NODES.phone;
+const desktop = NODES.desktop;
+const server = NODES.server;
+---
+
+<BlogFigure
+  viz="blog-connect"
+  id="connect-handoff"
+  label="Connect"
+  context="phone → desktop"
+  states={CONNECT_STATES.map((state) => ({ ...state, phases: [...state.phases] }))}
+  initial={initial}
+  example
+  ariaLabel="Connect handoff from a phone to a desktop. In v1 the desktop starts playing before the phone is told to stop, so both make sound. In v2 the desktop applies the queue silently, the server commits ownership, then the desktop resumes and the phone pauses."
+  caption="Example ordering with compressed timings. Player states are client reports, not sound measured at a speaker."
+>
+  <div class="cn" data-owner={still.owner} data-sound="phone" data-desktop={still.desktop}>
+    <svg class="cn-svg" viewBox={`0 0 ${VIEW.width} ${VIEW.height}`} aria-hidden="true">
+      <line class="cn-edge" x1={phone.x} y1={phone.y - 52} x2={server.x - 26} y2={server.y + 8} />
+      <line class="cn-edge" x1={server.x + 26} y1={server.y + 8} x2={desktop.x} y2={desktop.y - 56} />
+
+      <g class="cn-server" transform={`translate(${server.x} ${server.y})`}>
+        <circle class="cn-deadline" r="34" pathLength="1" data-cn-deadline style="stroke-dashoffset:1" />
+        <circle class="ring" r="22" />
+        <circle class="core" r="7" />
+      </g>
+
+      <g class="cn-device cn-phone" transform={`translate(${phone.x} ${phone.y})`}>
+        <rect class="halo" x="-44" y="-66" width="88" height="132" rx="20" />
+        <rect class="body" x="-27" y="-48" width="54" height="96" rx="9" />
+        <g class="queue on">
+          <rect x="-17" y="-34" width="34" height="3" rx="1.5" />
+          <rect x="-17" y="-25" width="26" height="3" rx="1.5" />
+          <rect x="-17" y="-16" width="30" height="3" rx="1.5" />
+        </g>
+        <g class="bars" data-cn-bars="phone">
+          {bars.map((i) => <rect x={-17 + i * 7.4} y="22" width="4.6" height="12" rx="1" data-bottom="34" data-max="34" />)}
+        </g>
+      </g>
+
+      <g class="cn-device cn-desktop" transform={`translate(${desktop.x} ${desktop.y})`}>
+        <rect class="halo" x="-92" y="-70" width="184" height="148" rx="20" />
+        <rect class="body" x="-72" y="-52" width="144" height="90" rx="6" />
+        <path class="stand" d="M-18 52 H18 M0 38 V52" />
+        <g class="queue" data-cn-queue>
+          <rect x="-58" y="-38" width="62" height="3" rx="1.5" />
+          <rect x="-58" y="-29" width="48" height="3" rx="1.5" />
+          <rect x="-58" y="-20" width="56" height="3" rx="1.5" />
+          <rect x="-58" y="-11" width="40" height="3" rx="1.5" />
+        </g>
+        <g class="bars" data-cn-bars="desktop">
+          {bars.map((i) => <rect x={18 + i * 8} y="16" width="5" height="12" rx="1" data-bottom="28" data-max="40" />)}
+        </g>
+        <g class="cn-guard" transform="translate(84 -60)">
+          <circle class="track" r="9" />
+          <circle class="fill" r="9" pathLength="1" data-cn-guard style="stroke-dashoffset:1" />
+          <path class="tick" d="M-4 0 l3 3 l5 -6" />
+        </g>
+      </g>
+
+      {
+        labels.map((label) => (
+          <g class="cn-packet" data-cn-packet={label} style="opacity:0">
+            <g class="cn-pill">
+              <rect x={-pillWidth(label) / 2} y="-10" width={pillWidth(label)} height="20" rx="10" />
+              <text y="3.5" text-anchor="middle">{label}</text>
+            </g>
+          </g>
+        ))
+      }
+    </svg>
+
+    <p class="cn-label" style={at("server", 0, -46)}>
+      <b>Server</b>
+      <span class="cn-record" data-cn-record>{still.record}</span>
+    </p>
+    <p class="cn-label cn-device-label" style={at("phone", 0, 82)}>
+      <b>Phone</b>
+      <span data-cn-status="phone">Playing · owner</span>
+    </p>
+    <p class="cn-label cn-device-label" style={at("desktop", 0, 84)}>
+      <b>Desktop</b>
+      <span data-cn-status="desktop">Queue applied · paused</span>
+    </p>
+  </div>
+
+  <dl class="bf-readout" slot="readout">
+    <div>
+      <dt class="viz-label">Owner</dt>
+      <dd data-cn-ro="owner">{readout.owner}</dd>
+    </div>
+    <div>
+      <dt class="viz-label">Sound from</dt>
+      <dd data-cn-ro="sound" data-tone={readout.sound.tone}>{readout.sound.text}</dd>
+    </div>
+    <div>
+      <dt class="viz-label">Desktop</dt>
+      <dd data-cn-ro="desktop" data-tone={readout.desktop.tone}>{readout.desktop.text}</dd>
+    </div>
+  </dl>
+</BlogFigure>
+
+<style>
+  .cn {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 720 / 300;
+  }
+
+  .cn-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .cn-edge {
+    stroke: rgba(241, 245, 249, 0.16);
+    stroke-width: 1.25;
+    stroke-dasharray: 2 5;
+  }
+
+  .cn-server .ring {
+    fill: var(--bg);
+    stroke: rgba(103, 232, 249, 0.55);
+    stroke-width: 1.25;
+  }
+
+  .cn-server .core {
+    fill: var(--cyan-hi);
+    filter: drop-shadow(0 0 6px rgba(103, 232, 249, 0.8));
+  }
+
+  .cn-deadline {
+    fill: none;
+    stroke: var(--amber);
+    stroke-width: 1.5;
+    stroke-dasharray: 1;
+    transform: rotate(-90deg);
+    opacity: 0.85;
+  }
+
+  .cn-device .body {
+    fill: var(--bg);
+    stroke: rgba(241, 245, 249, 0.42);
+    stroke-width: 1.25;
+    transition: stroke 0.4s var(--ease-snap);
+  }
+
+  .cn-device .stand {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.42);
+    stroke-width: 1.25;
+  }
+
+  .cn-device .halo {
+    fill: rgba(6, 182, 212, 0.16);
+    stroke: none;
+    filter: blur(18px);
+    opacity: 0;
+    transition: opacity 0.5s var(--ease-snap);
+  }
+
+  .cn[data-owner="phone"] .cn-phone .halo,
+  .cn[data-owner="desktop"] .cn-desktop .halo {
+    opacity: 1;
+  }
+
+  .cn[data-owner="phone"] .cn-phone .body,
+  .cn[data-owner="desktop"] .cn-desktop .body {
+    stroke: var(--cyan-hi);
+    filter: drop-shadow(0 0 8px rgba(103, 232, 249, 0.45));
+  }
+
+  .queue rect {
+    fill: rgba(241, 245, 249, 0.28);
+  }
+
+  .cn-desktop .queue {
+    opacity: 0;
+    transform: translateY(4px);
+    transition:
+      opacity 0.45s var(--ease-snap),
+      transform 0.45s var(--ease-out);
+  }
+
+  .cn:not([data-desktop="empty"]) .cn-desktop .queue {
+    opacity: 1;
+    transform: none;
+  }
+
+  .bars rect {
+    fill: rgba(241, 245, 249, 0.22);
+    transition: fill 0.3s var(--ease-snap);
+  }
+
+  .cn[data-sound="phone"] .cn-phone .bars rect,
+  .cn[data-sound="desktop"] .cn-desktop .bars rect {
+    fill: var(--cyan-hi);
+  }
+
+  .cn[data-sound="both"] .bars rect {
+    fill: var(--amber);
+  }
+
+  .cn-guard {
+    opacity: 0;
+    transition: opacity 0.3s var(--ease-snap);
+  }
+
+  .cn-guard .track {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.18);
+  }
+
+  .cn-guard .fill {
+    fill: none;
+    stroke: var(--cyan-hi);
+    stroke-width: 1.5;
+    stroke-dasharray: 1;
+    transform: rotate(-90deg);
+  }
+
+  .cn-guard .tick {
+    fill: none;
+    stroke: var(--cyan-hi);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0;
+  }
+
+  .cn[data-guard] .cn-guard {
+    opacity: 1;
+  }
+
+  .cn[data-guard="done"] .cn-guard .tick {
+    opacity: 1;
+  }
+
+  .cn-packet {
+    transition: opacity 0.2s linear;
+  }
+
+  .cn-packet rect {
+    fill: var(--cyan-hi);
+    filter: drop-shadow(0 0 10px rgba(103, 232, 249, 0.45));
+  }
+
+  .cn-packet text {
+    fill: var(--bg);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+  }
+
+  .cn-label {
+    position: absolute;
+    display: grid;
+    justify-items: center;
+    gap: 4px;
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    transform: translate(-50%, -50%);
+    text-shadow: 0 0 10px var(--bg);
+    pointer-events: none;
+  }
+
+  .cn-label b {
+    font-weight: 400;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--fg);
+  }
+
+  .cn-label span {
+    color: var(--fg-2);
+  }
+
+  .cn-record {
+    color: var(--cyan-hi) !important;
+  }
+
+  @media (max-width: 760px) {
+    .cn {
+      aspect-ratio: 720 / 420;
+    }
+    .cn-label {
+      font-size: 9px;
+    }
+    /* An absolute label at left: 84% shrinks to the space on its right; fix its width. */
+    .cn-device-label {
+      width: 18ch;
+    }
+    .cn-device-label span {
+      white-space: normal;
+      text-align: center;
+    }
+    /* SVG text scales with the viewBox; enlarge the pills so labels stay readable. */
+    .cn-pill {
+      transform: scale(1.8);
+    }
+  }
+</style>

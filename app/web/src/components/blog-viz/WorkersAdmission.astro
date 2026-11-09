@@ -1,0 +1,978 @@
+---
+import BlogFigure from "./BlogFigure.astro";
+import {
+  ACTIVITY,
+  ANALYSIS_BATCH_SIZE,
+  GAUGES,
+  gaugeText,
+  PLAYS,
+  sceneLabels,
+  WORKERS_STATES,
+  WORKERS_TRACKS,
+  workersFrame,
+  workersReadout,
+  ZONE_X,
+  type JobId,
+  type Lane,
+} from "../../scripts/viz/blog/workers";
+
+// Without JavaScript the figure shows the first deferral: the repair returns
+// to the broker while playback has already been served from its own slot.
+const initial = "admission";
+const still = workersFrame(WORKERS_TRACKS.admission.pins![1]!);
+const readout = workersReadout(still);
+const text = sceneLabels(still);
+const job = (id: JobId) => still.jobs.find((item) => item.id === id)!;
+const play = (id: string) => still.activity.plays.find((item) => item.id === id)!;
+const pct = (value: number, total: number) => `${((value / total) * 100).toFixed(2)}%`;
+const pill = (id: JobId) => {
+  const item = job(id);
+  return `left:${item.x.toFixed(2)}%;opacity:${item.opacity.toFixed(2)};--p:${item.progress.toFixed(3)}`;
+};
+const cells = Array.from({ length: ANALYSIS_BATCH_SIZE }, (_, i) => i);
+const span = ACTIVITY.span;
+const y = (value: number) => pct(value, ACTIVITY.height);
+
+const lanes: {
+  id: Lane;
+  name: string;
+  detail: string;
+  limits: string;
+  gate: string;
+  doneLabel: string;
+}[] = [
+  {
+    id: "maintenance",
+    name: "maintenance-worker",
+    detail: "queue maintenance · 1 slot",
+    limits: "cpus 0.75 · mem 2g",
+    gate: "should_defer_task",
+    doneLabel: "done",
+  },
+  {
+    id: "analysis",
+    name: "analysis-worker",
+    detail: "analysis_daemon · batch 8",
+    limits: "cpus 1.0 · mem 2g",
+    gate: "_should_pause_for_load",
+    doneLabel: "stored",
+  },
+  {
+    id: "playback",
+    name: "playback-worker",
+    detail: "queue playback · 1 slot",
+    limits: "mem 1g",
+    gate: "not governed · priority 0",
+    doneLabel: "ready",
+  },
+];
+const gateOf = (lane: Lane) =>
+  lane === "playback"
+    ? {}
+    : { "data-gate": still.lanes[lane].gate, "data-check": String(still.lanes[lane].checking) };
+const repairNext = job("repair-next");
+---
+
+<BlogFigure
+  viz="blog-workers"
+  id="workers-admission"
+  label="Admission"
+  context="governor → worker slots"
+  states={WORKERS_STATES.map((state) => ({ ...state, phases: [...state.phases] }))}
+  initial={initial}
+  example
+  ariaLabel="One listening session on a host running the maintenance, analysis and playback workers. Playback preparation takes its own slot at once. After a play event ends, the governor defers: the next repair goes back to the broker with the same task ID and a 300-second delay, and the analysis loop sleeps for 60 seconds instead of claiming 8 rows. Running work is not interrupted. When the 3- and 5-minute activity windows are empty, analysis claims its rows and the same repair task runs."
+  caption="Example session, about 15 minutes compressed. Limits, windows, delays and slots from 09da2273 (playback worker from 1b5f36a1); gauge samples are illustrative; the main worker is not shown."
+>
+  <div
+    class="wk"
+    data-verdict={still.decision.allowed ? "allow" : "defer"}
+    data-listening={String(still.activity.listening)}
+  >
+    <div class="wk-gov">
+      <p class="wk-head"><b>Governor</b> <span>evaluate_resources</span></p>
+      <div class="wk-gov-body">
+        <div class="wk-activity">
+          <p class="wk-sub">user_play_events · counted by <span>ended_at</span></p>
+          <div class="wk-plot">
+            <svg viewBox={`0 0 ${span} ${ACTIVITY.height}`} preserveAspectRatio="none" aria-hidden="true">
+              <rect class="window users" x={span - 300} y={ACTIVITY.users} width="300" height={ACTIVITY.axis - ACTIVITY.users} />
+              <rect class="window streams" x={span - 180} y={ACTIVITY.streams} width="180" height={ACTIVITY.axis - ACTIVITY.streams} />
+              <path class="bracket users" d={`M${span - 300} ${ACTIVITY.users + 5}V${ACTIVITY.users}H${span}V${ACTIVITY.users + 5}`} />
+              <path class="bracket streams" d={`M${span - 180} ${ACTIVITY.streams + 5}V${ACTIVITY.streams}H${span}V${ACTIVITY.streams + 5}`} />
+              <line class="axis" x1="0" x2={span} y1={ACTIVITY.axis} y2={ACTIVITY.axis} />
+              <path class="axis" d={`M0 ${ACTIVITY.axis}v4M${span - 300} ${ACTIVITY.axis}v4M${span - 180} ${ACTIVITY.axis}v4`} />
+              {
+                PLAYS.map(({ id }) => {
+                  const item = play(id);
+                  return (
+                    <g class="play" data-wk-play={id} data-recorded={String(item.recorded)} style={item.visible ? undefined : "display:none"}>
+                      <rect x={item.x0.toFixed(1)} y={ACTIVITY.band[0]} width={Math.max(0, item.x1 - item.x0).toFixed(1)} height={ACTIVITY.band[1] - ACTIVITY.band[0]} />
+                      <line x1={item.x1.toFixed(1)} x2={item.x1.toFixed(1)} y1={ACTIVITY.tick[0]} y2={ACTIVITY.tick[1]} />
+                    </g>
+                  );
+                })
+              }
+              <line class="now" x1={span} x2={span} y1="6" y2={ACTIVITY.axis} />
+            </svg>
+            <span class="wk-bracket" style={`left:${pct(span - 300, span)};top:${y(ACTIVITY.users)}`}>
+              active_users <b data-wk-count="users" data-on={String(still.activity.users > 0)}>{text.users}</b> ended &lt; 5 min
+            </span>
+            <span class="wk-bracket" style={`left:${pct(span - 180, span)};top:${y(ACTIVITY.streams)}`}>
+              active_streams <b data-wk-count="streams" data-on={String(still.activity.streams > 0)}>{text.streams}</b> &lt; 3 min
+            </span>
+            <span class="wk-playing" style={`top:${y(ACTIVITY.band[1])}`}>playing · no row yet</span>
+            <span class="wk-axis" style={`left:0;top:${y(ACTIVITY.axis)}`}>−6 min</span>
+            <span class="wk-axis mid" style={`left:${pct(span - 300, span)};top:${y(ACTIVITY.axis)}`}>−5</span>
+            <span class="wk-axis mid" style={`left:${pct(span - 180, span)};top:${y(ACTIVITY.axis)}`}>−3</span>
+            <span class="wk-axis end" style={`top:${y(ACTIVITY.axis)}`}>now</span>
+          </div>
+        </div>
+
+        <div class="wk-gauges">
+          {
+            GAUGES.map((gauge) => {
+              const value = still.gauges[gauge.id];
+              return (
+                <div
+                  class="wk-gauge"
+                  data-wk-gauge={gauge.id}
+                  style={`--v:${Math.min(1, value / gauge.max).toFixed(3)};--limit:${(gauge.limit / gauge.max).toFixed(3)}`}
+                >
+                  <span class="viz-label">{gauge.label}</span>
+                  <output>{gaugeText(gauge, value)}</output>
+                  <i class="track" aria-hidden="true">
+                    <b />
+                    <s />
+                  </i>
+                  <span class="limit">max {gauge.limit}{gauge.unit}</span>
+                </div>
+              );
+            })
+          }
+        </div>
+      </div>
+
+      <div class="wk-decide">
+        <p class="wk-clock"><b data-wk-clock>{text.clock}</b> since Play</p>
+        <p class="wk-decision"><i aria-hidden="true"></i><b data-wk-verdict>{text.verdict}</b> <span data-wk-reason>{text.reason}</span></p>
+      </div>
+    </div>
+
+    <div class="wk-host">
+      <div class="wk-zones" aria-hidden="true">
+        <span style="left:0">waiting</span>
+        <span class="gate" style={`left:${ZONE_X.gate}%`}>gate</span>
+        <span style="left:calc(42% + 6px)">running</span>
+        <span style="left:calc(82% + 6px)">done</span>
+      </div>
+
+      {
+        lanes.map((lane) => (
+          <div class="wk-lane" data-lane={lane.id} data-governed={lane.id === "playback" ? undefined : ""}>
+            <p class="wk-meta">
+              <b>{lane.name}</b>
+              <span>{lane.detail}</span>
+              <span>{lane.limits}</span>
+            </p>
+            <div class="wk-track">
+              {lane.id !== "playback" && (
+                <span class="wk-gate" data-wk-gate={lane.id} {...gateOf(lane.id)} aria-hidden="true" />
+              )}
+              <span class:list={["wk-gate-name", { off: lane.id === "playback" }]}>{lane.gate}</span>
+
+              {lane.id === "maintenance" && (
+                <>
+                  <svg class="wk-arc" data-wk-arc data-on={String(repairNext.state === "deferred")} viewBox="0 0 100 54" preserveAspectRatio="none" aria-hidden="true">
+                    <path d={`M${ZONE_X.gate} 17 C${ZONE_X.gate - 4} 9, ${ZONE_X.waiting + 4} 9, ${ZONE_X.waiting} 17`} />
+                  </svg>
+                  <span class="wk-arc-label" data-wk-arc-label data-on={String(repairNext.state === "deferred")}>{text.arc}</span>
+                  <span class="wk-pill" data-wk-job="repair-running" data-state={job("repair-running").state} style={pill("repair-running")}>
+                    repair
+                  </span>
+                  <span class="wk-pill gov" data-wk-job="repair-next" data-state={repairNext.state} style={pill("repair-next")}>
+                    repair<small data-wk-delay>{text.delay && ` · ${text.delay}`}</small>
+                  </span>
+                </>
+              )}
+
+              {lane.id === "analysis" && (
+                <>
+                  <span class="wk-sleep" data-wk-sleep data-on={String(still.lanes.analysis.sleeping)}>{text.sleep}</span>
+                  {(["batch-claimed", "batch-next"] as const).map((id) => (
+                    <span class="wk-pill wk-batch gov" data-wk-job={id} data-state={job(id).state} style={pill(id)}>
+                      {cells.map((i) => (
+                        <i data-on={String(i < job(id).cells)} />
+                      ))}
+                    </span>
+                  ))}
+                </>
+              )}
+
+              {lane.id === "playback" &&
+                (["variant-a", "variant-b"] as const).map((id) => (
+                  <span class="wk-pill" data-wk-job={id} data-state={job(id).state} style={pill(id)}>
+                    prepare_stream_variant
+                  </span>
+                ))}
+
+              <span class="wk-done">
+                <b data-wk-done={lane.id}>{text.done[lane.id]}</b>
+                {lane.doneLabel}
+              </span>
+            </div>
+          </div>
+        ))
+      }
+      <p class="wk-host-label">one host · CPU, memory, disk shared</p>
+    </div>
+  </div>
+
+  <dl class="bf-readout" slot="readout">
+    <div>
+      <dt class="viz-label">Governor</dt>
+      <dd data-wk-ro="governor" data-tone={readout.governor.tone}><span>{readout.governor.text}</span><small>{readout.governor.note}</small></dd>
+    </div>
+    <div>
+      <dt class="viz-label">Next repair</dt>
+      <dd data-wk-ro="repair" data-tone={readout.repair.tone}><span>{readout.repair.text}</span><small>{readout.repair.note}</small></dd>
+    </div>
+    <div>
+      <dt class="viz-label">Playback slot</dt>
+      <dd data-wk-ro="playback" data-tone={readout.playback.tone}><span>{readout.playback.text}</span><small>{readout.playback.note}</small></dd>
+    </div>
+    <div>
+      <dt class="viz-label">Interrupted</dt>
+      <dd data-wk-ro="interrupted" data-tone={readout.interrupted.tone}><span>{readout.interrupted.text}</span><small>{readout.interrupted.note}</small></dd>
+    </div>
+  </dl>
+</BlogFigure>
+
+<style>
+  .wk {
+    --lead: 188px;
+    --pad: 14px;
+    --g: 0.35;
+    --bus: rgba(103, 232, 249, 0.45);
+    position: relative;
+    display: grid;
+    gap: 16px;
+  }
+
+  .wk[data-verdict="defer"] {
+    --bus: rgba(251, 191, 36, 0.6);
+  }
+
+  /* Governor band */
+
+  .wk-gov {
+    display: grid;
+    gap: 12px;
+  }
+
+  .wk-head,
+  .wk-sub {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    color: var(--fg-3);
+  }
+
+  .wk-head b {
+    margin-right: 8px;
+    font-weight: 400;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--cyan-hi);
+  }
+
+  .wk-head span,
+  .wk-sub span {
+    color: var(--fg-2);
+  }
+
+  .wk-gov-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+    gap: 28px;
+    align-items: end;
+  }
+
+  .wk-activity {
+    display: grid;
+    gap: 6px;
+  }
+
+  .wk-plot {
+    position: relative;
+    height: 100px;
+  }
+
+  .wk-plot svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .window {
+    fill: rgba(241, 245, 249, 0.025);
+  }
+
+  .bracket,
+  .axis {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.28);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .axis {
+    stroke: var(--line);
+  }
+
+  .now {
+    stroke: var(--fg);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .play rect {
+    fill: rgba(241, 245, 249, 0.16);
+    stroke: rgba(241, 245, 249, 0.5);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .play line {
+    stroke: var(--cyan-hi);
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
+    opacity: 0;
+  }
+
+  .play[data-recorded="true"] rect {
+    fill: rgba(103, 232, 249, 0.18);
+    stroke: none;
+  }
+
+  .play[data-recorded="true"] line {
+    opacity: 1;
+  }
+
+  .wk-bracket,
+  .wk-axis,
+  .wk-playing {
+    position: absolute;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    color: var(--fg-3);
+    pointer-events: none;
+    text-shadow: 0 0 8px var(--bg);
+  }
+
+  .wk-bracket {
+    transform: translate(6px, calc(-100% - 3px));
+  }
+
+  .wk-bracket b {
+    margin: 0 4px;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--fg);
+    transition: color 0.3s var(--ease-snap);
+  }
+
+  .wk-bracket b[data-on="true"] {
+    color: var(--amber);
+  }
+
+  .wk-playing {
+    right: 6px;
+    transform: translateY(3px);
+    color: var(--fg-2);
+    opacity: 0;
+    transition: opacity 0.3s var(--ease-snap);
+  }
+
+  .wk[data-listening="true"] .wk-playing {
+    opacity: 1;
+  }
+
+  .wk-axis {
+    font-size: 9px;
+    transform: translateY(5px);
+  }
+
+  .wk-axis.mid {
+    transform: translate(-50%, 5px);
+  }
+
+  .wk-axis.end {
+    right: 0;
+  }
+
+  .wk-gauges {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    padding-bottom: 4px;
+  }
+
+  .wk-gauge {
+    display: grid;
+    gap: 7px;
+  }
+
+  .wk-gauge .viz-label {
+    font-size: 9.5px;
+  }
+
+  .wk-gauge output {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.15rem, 1.6vw, 1.45rem);
+    line-height: 1;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    color: var(--fg);
+  }
+
+  .wk-gauge .track {
+    position: relative;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--line);
+  }
+
+  .wk-gauge .track b {
+    position: absolute;
+    inset: 0;
+    border-radius: 2px;
+    background: var(--cyan-hi);
+    transform-origin: left;
+    transform: scaleX(var(--v));
+    transition: transform 0.35s var(--ease-snap);
+  }
+
+  .wk-gauge .track s {
+    position: absolute;
+    top: -4px;
+    bottom: -4px;
+    left: calc(var(--limit) * 100%);
+    width: 1px;
+    background: var(--fg);
+  }
+
+  .wk-gauge .limit {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.04em;
+    color: var(--fg-3);
+  }
+
+  .wk-decide {
+    position: relative;
+    min-height: 18px;
+  }
+
+  .wk-clock {
+    position: absolute;
+    left: 0;
+    top: 0;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: var(--fg-3);
+  }
+
+  .wk-clock b {
+    margin-right: 4px;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: var(--fg);
+  }
+
+  /* Starts on the gate column so the dot sits on the line down to the gates. */
+  .wk-decision {
+    position: relative;
+    padding-left: calc(1px + var(--lead) + (100% - 2px - var(--lead) - var(--pad)) * var(--g) + 14px);
+    text-indent: -17.5px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    line-height: 1.5;
+    letter-spacing: 0;
+    color: var(--fg-2);
+  }
+
+  .wk-decision i {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-right: 10px;
+    border-radius: 50%;
+    background: var(--cyan-hi);
+    vertical-align: 0;
+    transition: background-color 0.3s var(--ease-snap);
+  }
+
+  .wk-decision b {
+    margin-right: 8px;
+    font-weight: 400;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--cyan-hi);
+  }
+
+  .wk[data-verdict="defer"] .wk-decision i {
+    background: var(--amber);
+  }
+
+  .wk[data-verdict="defer"] .wk-decision b,
+  .wk[data-verdict="defer"] .wk-decision span {
+    color: var(--amber);
+  }
+
+  /* The governor's line down to the two gates. */
+  .wk-decision::before,
+  .wk-zones::before,
+  .wk-lane[data-governed]::before {
+    content: "";
+    position: absolute;
+    width: 0;
+    border-left: 1px dashed var(--bus);
+    transition: border-color 0.3s var(--ease-snap);
+  }
+
+  .wk-decision::before {
+    left: calc(1px + var(--lead) + (100% - 2px - var(--lead) - var(--pad)) * var(--g));
+    top: 12px;
+    bottom: -17px;
+  }
+
+  /* Hosts */
+
+  .wk-host {
+    position: relative;
+    border: 1px solid rgba(241, 245, 249, 0.12);
+    border-radius: 10px;
+  }
+
+  .wk-host-label {
+    position: absolute;
+    left: 12px;
+    bottom: 0;
+    padding: 0 6px;
+    transform: translateY(50%);
+    background: var(--bg);
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  .wk-zones {
+    position: relative;
+    height: 26px;
+    margin: 0 var(--pad) 0 var(--lead);
+  }
+
+  .wk-zones::before {
+    left: calc(var(--g) * 100%);
+    top: 0;
+    bottom: 0;
+  }
+
+  .wk-zones span {
+    position: absolute;
+    top: 10px;
+    font-family: var(--mono);
+    font-size: 8.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(241, 245, 249, 0.34);
+  }
+
+  .wk-zones .gate {
+    z-index: 1;
+    padding: 0 4px;
+    transform: translateX(-50%);
+    background: var(--bg);
+  }
+
+  .wk-lane {
+    position: relative;
+    display: grid;
+    grid-template-columns: var(--lead) minmax(0, 1fr);
+    align-items: center;
+    padding: 8px var(--pad) 8px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .wk-lane:last-of-type {
+    padding-bottom: 14px;
+  }
+
+  .wk-lane[data-governed]::before {
+    left: calc(var(--lead) + (100% - var(--lead) - var(--pad)) * var(--g));
+    top: 0;
+    bottom: 0;
+  }
+
+  .wk-meta {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    gap: 2px;
+    padding: 0 14px 0 12px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    color: var(--fg-3);
+  }
+
+  .wk-meta b {
+    font-weight: 400;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--cyan-hi);
+  }
+
+  .wk-track {
+    position: relative;
+    height: 56px;
+    border-radius: 6px;
+    background:
+      linear-gradient(90deg, transparent 28%, rgba(241, 245, 249, 0.025) 28%, rgba(241, 245, 249, 0.025) 42%, transparent 42%),
+      linear-gradient(90deg, transparent calc(28% - 0.5px), var(--line) calc(28% - 0.5px), var(--line) calc(28% + 0.5px), transparent calc(28% + 0.5px)),
+      linear-gradient(90deg, transparent calc(42% - 0.5px), var(--line) calc(42% - 0.5px), var(--line) calc(42% + 0.5px), transparent calc(42% + 0.5px)),
+      linear-gradient(90deg, transparent calc(82% - 0.5px), var(--line) calc(82% - 0.5px), var(--line) calc(82% + 0.5px), transparent calc(82% + 0.5px)),
+      rgba(241, 245, 249, 0.02);
+  }
+
+  .wk-gate {
+    position: absolute;
+    z-index: 1;
+    left: 35%;
+    top: 14px;
+    width: 3px;
+    height: 28px;
+    border-radius: 2px;
+    transform: translateX(-50%);
+    background: var(--cyan-hi);
+    box-shadow: 0 0 8px rgba(103, 232, 249, 0.5);
+    transition:
+      background-color 0.25s var(--ease-snap),
+      box-shadow 0.25s var(--ease-snap);
+  }
+
+  .wk-gate[data-gate="defer"] {
+    background: var(--amber);
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.45);
+  }
+
+  .wk-gate[data-check="true"] {
+    box-shadow: 0 0 16px 3px rgba(241, 245, 249, 0.55);
+  }
+
+  .wk-gate-name {
+    position: absolute;
+    z-index: 2;
+    left: 35%;
+    bottom: 2px;
+    padding: 0 3px;
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    color: var(--fg-2);
+    text-shadow: 0 0 6px var(--bg);
+  }
+
+  .wk-gate-name.off {
+    color: var(--fg-3);
+  }
+
+  .wk-arc {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .wk-arc path {
+    fill: none;
+    stroke: var(--amber);
+    stroke-width: 1.25;
+    stroke-dasharray: 3 3;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .wk-arc,
+  .wk-arc-label,
+  .wk-sleep {
+    opacity: 0;
+    transition: opacity 0.3s var(--ease-snap);
+  }
+
+  .wk-arc[data-on="true"],
+  .wk-arc-label[data-on="true"],
+  .wk-sleep[data-on="true"] {
+    opacity: 1;
+  }
+
+  .wk-arc-label,
+  .wk-sleep {
+    position: absolute;
+    z-index: 2;
+    top: 1px;
+    padding: 0 4px;
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 9px;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    color: var(--amber);
+    text-shadow: 0 0 6px var(--bg);
+  }
+
+  .wk-arc-label {
+    left: 25%;
+  }
+
+  .wk-sleep {
+    left: 35%;
+  }
+
+  .wk-pill {
+    position: absolute;
+    z-index: 3;
+    top: 18px;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    height: 20px;
+    padding: 0 9px;
+    overflow: hidden;
+    transform: translateX(-50%);
+    border: 1px solid rgba(103, 232, 249, 0.4);
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(6, 182, 212, 0.32) calc(var(--p, 0) * 100%), rgba(10, 10, 15, 0.94) calc(var(--p, 0) * 100%));
+    color: var(--fg);
+    font-family: var(--mono);
+    font-size: 10px;
+    white-space: nowrap;
+    transition:
+      border-color 0.25s var(--ease-snap),
+      color 0.25s var(--ease-snap);
+  }
+
+  .wk-pill.gov {
+    border-style: dashed;
+  }
+
+  .wk-pill small {
+    font-size: 10px;
+    color: inherit;
+  }
+
+  .wk-pill[data-state="queued"],
+  .wk-pill[data-state="pending"] {
+    border-color: rgba(241, 245, 249, 0.32);
+    color: var(--fg-2);
+  }
+
+  .wk-pill[data-state="checking"] {
+    border-color: var(--fg);
+    color: var(--fg);
+  }
+
+  .wk-pill[data-state="deferred"] {
+    border-color: rgba(251, 191, 36, 0.85);
+    background: linear-gradient(90deg, rgba(251, 191, 36, 0.2) calc(var(--p, 0) * 100%), rgba(10, 10, 15, 0.94) calc(var(--p, 0) * 100%));
+    color: var(--amber);
+  }
+
+  .wk-pill[data-state="running"],
+  .wk-pill[data-state="preparing"] {
+    border-color: rgba(103, 232, 249, 0.7);
+    border-style: solid;
+  }
+
+  .wk-pill[data-state="done"] {
+    border-color: var(--line);
+    color: var(--fg-3);
+  }
+
+  .wk-batch {
+    gap: 2px;
+    padding: 0 7px;
+    background: rgba(10, 10, 15, 0.94);
+  }
+
+  .wk-batch i {
+    width: 6px;
+    height: 10px;
+    border-radius: 1.5px;
+    border: 1px solid rgba(241, 245, 249, 0.3);
+    transition:
+      background-color 0.25s var(--ease-snap),
+      border-color 0.25s var(--ease-snap);
+  }
+
+  .wk-batch[data-state="running"] i,
+  .wk-batch[data-state="checking"] i {
+    border-color: rgba(103, 232, 249, 0.55);
+  }
+
+  .wk-batch i[data-on="true"] {
+    border-color: var(--cyan-hi);
+    background: var(--cyan-hi);
+  }
+
+  .wk-done {
+    position: absolute;
+    left: 91%;
+    top: 50%;
+    display: grid;
+    justify-items: center;
+    transform: translate(-50%, -50%);
+    font-family: var(--mono);
+    font-size: 8.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  .wk-done b {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 16px;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 760px) {
+    .wk {
+      --lead: 10px;
+      --pad: 10px;
+      gap: 14px;
+    }
+
+    .wk-gov-body {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 14px;
+    }
+
+    .wk-plot {
+      height: 104px;
+    }
+
+    .wk-bracket,
+    .wk-playing {
+      font-size: 9px;
+    }
+
+    .wk-gauges {
+      gap: 12px;
+    }
+
+    .wk-decision {
+      font-size: 10px;
+    }
+
+    .wk-clock {
+      font-size: 9px;
+      letter-spacing: 0;
+    }
+
+    .wk-clock b {
+      margin-right: 3px;
+      font-size: 12px;
+    }
+
+    .wk-zones {
+      height: 22px;
+    }
+
+    .wk-zones span {
+      top: 8px;
+      font-size: 8px;
+    }
+
+    .wk-lane {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 6px;
+      padding: 8px var(--pad);
+    }
+
+    .wk-meta {
+      display: block;
+      padding: 0;
+      font-size: 9px;
+    }
+
+    /* Masks keep the governor's line from crossing the lane names. */
+    .wk-meta b,
+    .wk-meta span {
+      padding-right: 4px;
+      background: var(--bg);
+    }
+
+    .wk-meta b {
+      display: block;
+      width: max-content;
+      margin-bottom: 2px;
+      font-size: 10px;
+    }
+
+    .wk-meta span + span::before {
+      content: "· ";
+    }
+
+    .wk-gate-name,
+    .wk-arc-label,
+    .wk-sleep {
+      font-size: 8.5px;
+    }
+
+    .wk-pill,
+    .wk-pill small {
+      font-size: 9px;
+    }
+
+    .wk-pill {
+      padding: 0 7px;
+    }
+
+    .wk-batch {
+      padding: 0 5px;
+    }
+
+    .wk-batch i {
+      width: 5px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .wk *,
+    .wk *::before {
+      transition: none !important;
+    }
+  }
+</style>
