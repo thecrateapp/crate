@@ -19,10 +19,22 @@ def test_runtime_no_longer_contains_navidrome_compatibility():
         assert "navidrome" not in path.read_text().lower(), path
 
 
+# The engineering blog tells how Crate replaced Navidrome, so its history may name it.
+BLOG_HISTORY = (
+    PUBLIC_SITE_SOURCES / "content/blog",
+    PUBLIC_SITE_SOURCES / "data/blog-calendar.ts",
+    PUBLIC_SITE_SOURCES / "data/engineering-timeline.ts",
+)
+
+
 def test_public_site_does_not_advertise_navidrome_compatibility():
+    assert all(path.exists() for path in BLOG_HISTORY)
     for path in PUBLIC_SITE_SOURCES.rglob("*"):
-        if path.is_file():
-            assert "navidrome" not in path.read_text().lower(), path
+        if not path.is_file():
+            continue
+        if any(path == history or history in path.parents for history in BLOG_HISTORY):
+            continue
+        assert "navidrome" not in path.read_text().lower(), path
 
 
 def test_migration_removes_deprecated_navidrome_column_conditionally():

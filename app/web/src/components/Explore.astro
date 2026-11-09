@@ -1,16 +1,20 @@
 ---
+import { getCollection } from "astro:content";
 import { t } from "../i18n";
+import { blogHome } from "../lib/blog-home";
 
 interface Props {
   locale?: string;
 }
 
 const { locale = "en" } = Astro.props;
+const chapters = blogHome(await getCollection("blog"), { includeDrafts: import.meta.env.DEV }).chapters.length;
 const links = [
   { href: "/listen", label: t("nav.listen", locale), meta: t("explore.listen", locale) },
   { href: "/admin", label: t("nav.admin", locale), meta: t("explore.admin", locale) },
   { href: "/architecture", label: t("nav.architecture", locale), meta: t("explore.architecture", locale) },
   { href: "/developers", label: t("nav.developers", locale), meta: t("explore.developers", locale) },
+  { href: "/blog", label: t("nav.blog", locale), meta: t("explore.blog", locale, { count: String(chapters) }) },
 ];
 ---
 

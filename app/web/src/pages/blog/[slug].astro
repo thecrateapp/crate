@@ -1,0 +1,439 @@
+---
+import { getCollection, render } from "astro:content";
+import BlogPostNavigation from "../../components/BlogPostNavigation.astro";
+import BlogRelatedPosts from "../../components/BlogRelatedPosts.astro";
+import BlogIcon from "../../components/BlogIcon.astro";
+import BlogIconCredits from "../../components/BlogIconCredits.astro";
+import BlogTags from "../../components/BlogTags.astro";
+import GitHubFilePreview from "../../components/GitHubFilePreview.astro";
+import BlogProse from "../../components/BlogProse.astro";
+import EnrichmentJourney from "../../components/blog-viz/EnrichmentJourney.astro";
+import CrossfadeEngine from "../../components/blog-viz/CrossfadeEngine.astro";
+import SmartMixCandidates from "../../components/blog-viz/SmartMixCandidates.astro";
+import MusicPathJourney from "../../components/blog-viz/MusicPathJourney.astro";
+import RadioRotation from "../../components/blog-viz/RadioRotation.astro";
+import WorkersAdmission from "../../components/blog-viz/WorkersAdmission.astro";
+import ConnectHandoff from "../../components/blog-viz/ConnectHandoff.astro";
+import SignalTrack from "../../components/blog-timeline/SignalTrack.astro";
+import { calendar } from "../../data/blog-calendar";
+import { milestones } from "../../data/engineering-timeline";
+import { t } from "../../i18n";
+import Base from "../../layouts/Base.astro";
+import {
+  formatPostDate,
+  publishedPosts,
+  readingMinutes,
+  sourceUrl,
+} from "../../lib/blog";
+import { postNavigation } from "../../lib/blog-navigation";
+import { prepareTimeline } from "../../lib/engineering-timeline";
+
+export async function getStaticPaths() {
+  const posts = publishedPosts(await getCollection("blog"), {
+    includeDrafts: import.meta.env.DEV,
+  });
+  return posts.map((post) => ({ params: { slug: post.id }, props: { post } }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+const minutes = readingMinutes(post.body ?? "");
+const posts = await getCollection("blog");
+const navigation = postNavigation(post, posts, {
+  includeDrafts: import.meta.env.DEV,
+  order: calendar.map((entry) => entry.slug),
+});
+const timeline = post.data.series?.id === "how-to-forget-spotify"
+  ? prepareTimeline(milestones, posts, { includeDrafts: import.meta.env.DEV })
+  : undefined;
+---
+
+<Base
+  title={`${post.data.title} · Crate`}
+  description={post.data.description}
+  ogType="article"
+>
+  <link
+    slot="head"
+    rel="alternate"
+    type="application/rss+xml"
+    title={t("blog.title")}
+    href="/blog/rss.xml"
+  />
+  <article class="post">
+    <header class="post-head" data-reveal>
+      <a class="u-link mono-link back" href="/blog" data-enter data-hover-scramble>{t("blog.back")}</a>
+      <div class:list={["post-meta-group", { "has-series": Boolean(post.data.series) }]} data-enter style="--d:80ms">
+        {post.data.series && (
+          <p class="post-series" data-post-series>{post.data.series.title}</p>
+        )}
+        <p class="meta">
+        {post.data.series && (
+          <>
+            <span class="series-part" data-series-part>Part {post.data.series.part}</span>
+            <span aria-hidden="true">·</span>
+          </>
+        )}
+        <time datetime={formatPostDate(post.data.date)}>
+          {formatPostDate(post.data.date)}
+        </time>
+        <span aria-hidden="true">·</span>
+        {t("blog.minutes", "en", { minutes: String(minutes) })}
+        {
+          post.data.updated && (
+            <>
+              <span aria-hidden="true">·</span>
+              {t("blog.updated", "en", {
+                date: formatPostDate(post.data.updated),
+              })}
+            </>
+          )
+        }
+        </p>
+      </div>
+      <h1 class="display" data-split style="--d:120ms;--step:40ms">
+        {post.data.title}
+      </h1>
+      <p class="lede" data-enter style="--d:300ms">{post.data.description}</p>
+      <div class="post-topics" data-enter style="--d:340ms">
+        <BlogTags tags={post.data.tags} />
+      </div>
+    </header>
+
+    {timeline && (
+      <details class="series-browser" id="series-timeline" data-series-browser>
+        <summary>
+          <span class="browser-title">Explore the series</span>
+          <span class="browser-meta">Part {post.data.series!.part} · {timeline.length} milestones</span>
+          <span class="browser-toggle" aria-hidden="true"><BlogIcon name="chevron-down" size={20} /></span>
+        </summary>
+        <SignalTrack items={timeline} currentPostHref={`/blog/${post.id}`} />
+      </details>
+    )}
+
+    <div id="post-content" tabindex="-1" class:list={["post-body", { "has-related": navigation.related.length > 0 }]}>
+      <div class="post-reading">
+        <div class="prose">
+          <BlogProse>
+            <Content />
+            <Fragment slot="enrichment">
+              {post.data.visuals.includes("enrichment") && <EnrichmentJourney />}
+            </Fragment>
+            <Fragment slot="crossfade">
+              {post.data.visuals.includes("crossfade") && <CrossfadeEngine />}
+            </Fragment>
+            <Fragment slot="music-paths">
+              {post.data.visuals.includes("music-paths") && <MusicPathJourney />}
+            </Fragment>
+            <Fragment slot="radio-rotation">
+              {post.data.visuals.includes("radio-rotation") && <RadioRotation />}
+            </Fragment>
+            <Fragment slot="workers">
+              {post.data.visuals.includes("workers") && <WorkersAdmission />}
+            </Fragment>
+            <Fragment slot="connect">
+              {post.data.visuals.includes("connect") && <ConnectHandoff />}
+            </Fragment>
+            <Fragment slot="smart-mix">
+              {post.data.visuals.includes("smart-mix") && <SmartMixCandidates />}
+            </Fragment>
+          </BlogProse>
+        </div>
+
+        <footer class="sources">
+          <p class="label">{t("blog.sources")}</p>
+          <ul>
+            {
+              post.data.sources.map((source) => (
+                <li>
+                  <a class="u-link source-entry" href={sourceUrl(source)} data-blog-link="github">
+                    <BlogIcon name="github" size={16} />
+                    <code>{source}</code>
+                  </a>
+                </li>
+              ))
+            }
+          </ul>
+        </footer>
+        <BlogPostNavigation previous={navigation.previous} next={navigation.next} series={post.data.series} />
+      </div>
+      <BlogRelatedPosts posts={navigation.related} />
+    </div>
+    <BlogIconCredits />
+  </article>
+  <GitHubFilePreview post={post} />
+</Base>
+
+<script>
+  import { mountOnPage } from "../../scripts/motion/page";
+  import { initTextMotion } from "../../scripts/motion/text-motion";
+  import { initViz } from "../../scripts/viz";
+
+  mountOnPage(".post", () => {
+    const text = initTextMotion();
+    const figures = initViz();
+    return () => {
+      text();
+      figures();
+    };
+  });
+</script>
+
+<style>
+  .post {
+    --prose-offset: clamp(0px, 10vw, 180px);
+    position: relative;
+    z-index: 5;
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 20vh clamp(20px, 6vw, 96px) 14vh;
+  }
+
+  .post-head {
+    display: grid;
+    gap: 24px;
+    margin-bottom: 9vh;
+  }
+
+  .post-topics :global(.blog-tags) { margin-top:0; }
+
+  .series-browser {margin:0 0 64px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);scroll-margin-top:100px;}
+  .series-browser summary {display:flex;align-items:center;gap:16px;min-height:76px;list-style:none;cursor:pointer;}
+  .series-browser summary::-webkit-details-marker {display:none;}
+  .browser-title {font:550 18px/1.4 var(--display);color:var(--cyan-hi);}
+  .browser-meta {font:10px/1.5 var(--mono);color:var(--fg-3);}
+  .browser-toggle {display:flex;align-items:center;margin-left:auto;color:var(--cyan-hi);transition:transform .2s;}
+  .series-browser[open] .browser-toggle {transform:rotate(180deg);}
+  .series-browser summary:focus-visible {outline:2px solid var(--cyan-hi);outline-offset:4px;}
+  .series-browser :global(.signal-track) {padding-bottom:28px;}
+  #post-content {scroll-margin-top:100px;}
+  @media(max-width:700px) {
+    .series-browser {margin-bottom:40px;}
+    .series-browser summary {display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:14px 0;}
+    .browser-title {font-size:17px;}
+    .browser-meta {grid-column:1;}
+    .browser-toggle {grid-column:2;grid-row:1 / 3;}
+  }
+  @media(prefers-reduced-motion:reduce) {.browser-toggle {transition:none;}}
+
+  .meta,
+  .label {
+    justify-self: start;
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    color: var(--fg-3);
+  }
+  .back {justify-self:start;margin:0;}
+
+  .post-meta-group {display:grid;gap:10px;min-width:0;}
+  .post-meta-group.has-series {border-left:2px solid var(--cyan-hi);padding:2px 0 2px 16px;}
+  .post-series {margin:0;max-width:65ch;color:var(--cyan-hi);font:550 clamp(1rem,1.4vw,1.2rem)/1.4 var(--display);letter-spacing:-.01em;text-wrap:balance;}
+  .series-part {color:var(--cyan-hi);}
+
+  .post-head .display {
+    font-size: clamp(2.6rem, 6.4vw, 6.25rem);
+    max-width: 16ch;
+  }
+
+  .lede {
+    margin: 0;
+    max-width: 44ch;
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: clamp(1.25rem, 1.9vw, 1.75rem);
+    line-height: 1.25;
+    color: var(--fg-2);
+  }
+
+  .prose,
+  .sources {
+    max-width: 70ch;
+    margin-left: var(--prose-offset);
+  }
+
+  .post-reading {min-width:0;}
+
+  @media(min-width:1200px) {
+    .post-body.has-related {
+      --prose-offset: clamp(0px, 4vw, 64px);
+      display:grid;
+      grid-template-columns:minmax(0,1fr) 240px;
+      align-items:start;
+      gap:clamp(36px,4vw,64px);
+    }
+  }
+
+  .prose {
+    font-size: clamp(1.0625rem, 1.15vw, 1.1875rem);
+    line-height: 1.72;
+    color: var(--fg-2);
+  }
+
+  .prose :global(p),
+  .prose :global(ul),
+  .prose :global(ol),
+  .prose :global(blockquote),
+  .prose :global(table) {
+    margin: 0 0 1.4em;
+  }
+
+  .prose :global(.expressive-code) {
+    margin: 2em 0 2em calc(-1 * var(--prose-offset));
+    width: calc(100% + var(--prose-offset));
+  }
+
+  .prose :global(h2) {
+    margin: 2.4em 0 0.8em;
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: clamp(1.6rem, 2.4vw, 2.2rem);
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+    color: var(--fg);
+  }
+
+  .prose :global(h3) {
+    margin: 2em 0 0.6em;
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.3rem;
+    color: var(--fg);
+  }
+
+  .prose :global(strong) {
+    color: var(--fg);
+    font-weight: 600;
+  }
+
+  .prose :global(a) {
+    color: var(--cyan-hi);
+    text-underline-offset: 3px;
+  }
+
+  .prose :global(a[data-blog-link]:not(.source-link)) {
+    text-decoration-thickness: 1px;
+    text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+    text-underline-offset: 4px;
+    overflow-wrap: anywhere;
+  }
+  .prose :global(a[data-blog-link="external"]) {color:var(--amber);}
+  .prose :global(a[data-blog-link]:not(.source-link):hover),
+  .prose :global(a[data-blog-link]:not(.source-link):focus-visible) {text-decoration-color:currentColor;}
+  .prose :global(a[data-blog-link]:focus-visible) {outline:2px solid currentColor;outline-offset:3px;border-radius:2px;}
+  .prose :global(a[data-blog-link]:not(.source-link) > svg) {
+    display:inline-block;
+    width:16px;
+    height:16px;
+    margin-inline-end:0.35em;
+    vertical-align:-0.125em;
+  }
+
+  .prose :global(li) {
+    margin: 0.35em 0;
+  }
+
+  .prose :global(blockquote) {
+    padding-left: 1.2em;
+    border-left: 2px solid var(--cyan-hi);
+    color: var(--fg);
+  }
+
+  .prose :global(:not(pre) > code) {
+    padding: 0.1em 0.35em;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 0.86em;
+    color: var(--fg);
+  }
+
+  .prose :global(img) {
+    display: block;
+    width: calc(100% + var(--prose-offset));
+    max-width: none;
+    height: auto;
+    margin: 2.2em 0 2.2em calc(-1 * var(--prose-offset));
+    border: 1px solid var(--line);
+    border-radius: 6px;
+  }
+
+  .prose :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92em;
+  }
+
+  .prose :global(th),
+  .prose :global(td) {
+    padding: 10px 12px 10px 0;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .prose :global(th) {
+    font-family: var(--mono);
+    font-weight: 400;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  .prose :global(hr) {
+    margin: 3em 0;
+    border: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .sources {
+    margin-top: 8vh;
+    padding-top: 28px;
+    border-top: 1px solid var(--line);
+  }
+
+  .label {
+    color: var(--cyan-hi);
+  }
+
+  .sources ul {
+    display: grid;
+    gap: 10px;
+    margin: 18px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .sources code {
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    overflow-wrap:anywhere;
+  }
+  .source-entry {display:inline-flex;align-items:baseline;gap:8px;max-width:100%;}
+  .source-entry :global(svg) {align-self:flex-start;margin-top:0.25em;}
+  .source-entry code {min-width:0;}
+
+  @media (max-width: 760px) {
+    .post {
+      padding-top: 16vh;
+    }
+    .prose,
+    .sources {
+      margin-left: 0;
+    }
+    .prose :global(img),
+    .prose :global(.expressive-code) {
+      width: 100%;
+      margin-left: 0;
+    }
+  }
+</style>

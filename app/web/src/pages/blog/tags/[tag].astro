@@ -1,0 +1,82 @@
+---
+import { getCollection } from "astro:content";
+import BlogIcon from "../../../components/BlogIcon.astro";
+import BlogIconCredits from "../../../components/BlogIconCredits.astro";
+import BlogTags from "../../../components/BlogTags.astro";
+import { calendar } from "../../../data/blog-calendar";
+import Base from "../../../layouts/Base.astro";
+import { formatPostDate, postUrl, readingMinutes } from "../../../lib/blog";
+import { blogTags, type BlogTagGroup } from "../../../lib/blog-tags";
+
+export async function getStaticPaths() {
+  const groups = blogTags(await getCollection("blog"), {
+    includeDrafts: import.meta.env.DEV,
+    order: calendar.map((entry) => entry.slug),
+  });
+  return groups.map((topic) => ({ params: { tag: topic.slug }, props: { topic } }));
+}
+
+interface Props { topic: BlogTagGroup }
+const { topic } = Astro.props;
+const count = topic.posts.length;
+const description = `${count} ${count === 1 ? "post" : "posts"} about ${topic.label} from the engineers building Crate.`;
+---
+
+<Base title={`${topic.label} · Crate engineering`} description={description}>
+  <div class="tag-page" data-blog-tag-index={topic.slug}>
+    <header>
+      <nav class="back-links" aria-label="Blog navigation">
+        <a class="u-link mono-link" href="/blog" data-hover-scramble>All posts</a>
+        <a class="u-link mono-link" href="/blog/tags" data-hover-scramble>All topics</a>
+      </nav>
+      <p class="eyebrow">Crate engineering · Topic</p>
+      <h1>{topic.label}</h1>
+      <p class="lede">{count} {count === 1 ? "post" : "posts"} from the history and engineering of Crate.</p>
+    </header>
+    <ol class="tag-posts" data-tag-posts>
+      {topic.posts.map((post) => (
+        <li>
+          <div class="post-meta">
+            <time datetime={formatPostDate(post.data.date)}>{formatPostDate(post.data.date)}</time>
+            <span>{readingMinutes(post.body ?? "")} min read</span>
+            {post.data.series && <span>Part {post.data.series.part}</span>}
+            {post.data.draft && <span class="draft">Draft</span>}
+          </div>
+          <div class="post-copy">
+            {post.data.series && <p class="post-series">{post.data.series.title}</p>}
+            <h2><a href={postUrl(post.id)}>{post.data.title}<BlogIcon name="arrow-right" size={20} /></a></h2>
+            <p class="description">{post.data.description}</p>
+            <BlogTags tags={post.data.tags} current={topic.slug} label={`Topics for ${post.data.title}`} />
+          </div>
+        </li>
+      ))}
+    </ol>
+    <BlogIconCredits />
+  </div>
+</Base>
+
+<style>
+  .tag-page { position:relative; z-index:5; max-width:1220px; margin:0 auto; padding:clamp(124px,16vh,180px) clamp(20px,6vw,96px) 12vh; }
+  .back-links { display:flex; justify-content:space-between; gap:20px; margin-bottom:36px; }
+  .eyebrow { margin:0 0 14px; color:var(--cyan-hi); font:11px/1.6 var(--mono); text-transform:uppercase; letter-spacing:.13em; }
+  h1 { margin:0; font:600 clamp(2.4rem,5vw,4rem)/1.05 var(--display); letter-spacing:-.035em; overflow-wrap:anywhere; }
+  .lede { margin:20px 0 44px; max-width:60ch; color:var(--fg-2); font:16px/1.65 var(--sans); }
+  .tag-posts { margin:0; padding:0; list-style:none; border-top:1px solid var(--line); }
+  .tag-posts>li { display:grid; grid-template-columns:130px minmax(0,1fr); gap:32px; padding:34px 0; border-bottom:1px solid var(--line); }
+  .post-meta { display:flex; flex-direction:column; gap:7px; padding-top:4px; color:var(--fg-3); font:10px/1.7 var(--mono); letter-spacing:.06em; text-transform:uppercase; }
+  .draft { color:var(--amber); }
+  .post-series { margin:0 0 12px; color:var(--cyan-hi); font:11px/1.6 var(--mono); }
+  h2 { margin:0 0 12px; font:550 clamp(1.4rem,2.4vw,2rem)/1.15 var(--display); letter-spacing:-.025em; }
+  h2 a { display:flex; align-items:start; gap:24px; justify-content:space-between; color:var(--fg); text-decoration:none; }
+  h2 a :global(svg) { flex-shrink:0; margin-top:4px; color:var(--cyan-hi); }
+  h2 a:hover { color:var(--cyan-hi); }
+  .description { margin:0; max-width:64ch; color:var(--fg-2); font:16px/1.65 var(--sans); }
+  .post-copy :global(.blog-tags) { margin-top:18px; }
+  @media(max-width:650px) {
+    .tag-posts>li { grid-template-columns:1fr; gap:16px; padding:28px 0; }
+    .post-meta { flex-direction:row; flex-wrap:wrap; gap:8px 14px; padding:0; }
+    .tag-page { padding-top:116px; }
+    .back-links { margin-bottom:26px; }
+    .description,.lede { font-size:15px; }
+  }
+</style>

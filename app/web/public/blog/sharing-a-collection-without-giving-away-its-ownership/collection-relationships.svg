@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 620" role="img" aria-labelledby="title desc">
+<title id="title">Ownership, collaboration, following and copying</title>
+<desc id="desc">The owner manages and edits the original collection. An enabled collaborator edits its contents. Following retains a relationship to the original, while Copy makes a private collection with a new owner. Both collections refer to the same underlying music identities; copying a playlist or Crate does not copy audio files.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#67e8f9"/></marker></defs>
+<rect width="1080" height="620" fill="#0a0a0f"/>
+<g font-family="ui-sans-serif,system-ui,sans-serif">
+<text x="38" y="48" fill="#f8fafc" font-size="26" font-weight="650">Four relationships to a collection</text>
+<text x="38" y="80" fill="#94a3b8" font-size="16">An account can read a playlist without owning it or being able to change it.</text>
+<g fill="#1e293b" stroke="#475569"><rect x="40" y="120" width="250" height="105" rx="10"/><rect x="415" y="120" width="250" height="105" rx="10"/><rect x="790" y="120" width="250" height="105" rx="10"/></g>
+<g fill="#f8fafc" font-size="22"><text x="60" y="157">Owner</text><text x="435" y="157">Collaborator</text><text x="810" y="157">Follower</text></g>
+<g fill="#cbd5e1" font-size="16"><text x="60" y="188">Edit + manage access</text><text x="435" y="188">Edit while enabled</text><text x="810" y="188">Keep the original in library</text></g>
+<rect x="295" y="305" width="300" height="100" rx="10" fill="#164e63" stroke="#67e8f9"/>
+<text x="320" y="343" fill="#f8fafc" font-size="23">Original collection</text><text x="320" y="375" fill="#a5f3fc" font-size="16">Its owner stays the same</text>
+<g stroke="#67e8f9" stroke-width="2" fill="none" marker-end="url(#arrow)"><path d="M165 229V271H355V299"/><path d="M540 229V299"/><path d="M915 229V267H580V299"/></g>
+<rect x="740" y="305" width="300" height="100" rx="10" fill="#1e293b" stroke="#475569"/>
+<text x="765" y="343" fill="#f8fafc" font-size="23">Private copy</text><text x="765" y="375" fill="#cbd5e1" font-size="16">New owner, independent edits</text>
+<path d="M600 356H733" stroke="#67e8f9" stroke-width="2" marker-end="url(#arrow)"/><text x="640" y="343" fill="#67e8f9" font-size="16">Copy</text>
+<rect x="295" y="475" width="745" height="75" rx="10" fill="#172033" stroke="#475569"/>
+<text x="320" y="506" fill="#f8fafc" font-size="20">Track or album identities</text><text x="320" y="531" fill="#94a3b8" font-size="16">Copy retains references and order. It does not duplicate the audio.</text>
+<g stroke="#67e8f9" stroke-width="2" fill="none" marker-end="url(#arrow)"><path d="M445 410V468"/><path d="M890 410V468"/></g>
+<text x="40" y="590" fill="#94a3b8" font-size="16">Follow receives later edits to the original. A copy does not.</text>
+</g></svg>

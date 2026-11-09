@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="920" viewBox="0 0 1200 920" role="img" aria-labelledby="title desc">
+<title id="title">Artwork delivery and publication have separate lifecycles</title>
+<desc id="desc">The HTTP request checks the current manifest and returns a variant, local original or fallback. A miss schedules deduplicated work after the response. The worker resolves source bytes, writes a complete revision in temporary storage and then atomically replaces current.json. Later requests see the published revision.</desc>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M1 1L8 5L1 9" fill="none" stroke="#65d5df" stroke-width="1.5"/></marker></defs>
+<style>text{font-family:Inter,Arial,sans-serif;fill:#e5edf3;font-size:22px}.mono{font-family:monospace;font-size:16px;letter-spacing:1px}.muted{fill:#a2adb9;font-size:19px}.accent{fill:#65d5df}.box{fill:#17212b;stroke:#394451;stroke-width:1.5}.line{stroke:#65d5df;stroke-width:2;fill:none;marker-end:url(#arrow)}</style>
+<rect width="1200" height="920" fill="#0a0a0f"/>
+<text x="48" y="48" class="mono accent">CRATE / ARTWORK DELIVERY / JULY 2026</text>
+<text x="48" y="94" style="font-size:31px;font-weight:600">The reader gets a response before preparation begins</text>
+<text x="48" y="154" class="mono accent">HTTP REQUEST</text>
+<rect class="box" x="48" y="180" width="270" height="140" rx="8"/>
+<text x="72" y="223">GET cover</text><text x="72" y="260" class="muted">Asset identity + size</text><text x="72" y="292" class="mono muted">NO IMAGE PROCESSING</text>
+<path class="line" d="M318 248H370"/>
+<rect class="box" x="374" y="180" width="340" height="140" rx="8"/>
+<text x="398" y="223">Resolve current.json</text><text x="398" y="260" class="muted">Pick a prepared size bucket</text><text x="398" y="292" class="mono muted">CHECK LOCAL FILES</text>
+<path class="line" d="M714 248H766"/>
+<rect x="770" y="180" width="382" height="140" rx="8" fill="#14262f" stroke="#65d5df"/>
+<text x="794" y="223" class="accent">Return what is available</text><text x="794" y="260" class="muted">Variant → original → fallback</text><text x="794" y="292" class="mono muted">DO NOT WAIT FOR A WORKER</text>
+<path class="line" stroke-dasharray="6 6" d="M960 320V386H718"/>
+<text x="980" y="358" class="mono muted">ON MISS</text>
+<rect class="box" x="374" y="350" width="340" height="105" rx="8"/>
+<text x="398" y="391">Submit after the response</text><text x="398" y="426" class="muted">Deduplicate by kind + entity</text>
+<text x="48" y="531" class="mono accent">WORKER TASK</text>
+<path class="line" d="M544 455V492H198V568"/>
+<rect class="box" x="48" y="572" width="300" height="170" rx="8"/>
+<text x="72" y="614">Resolve source</text><text x="72" y="652" class="muted">Local / embedded / provider</text><text x="72" y="685" class="muted">Validate image + dimensions</text><text x="72" y="719" class="mono muted">HASH SOURCE BYTES</text>
+<path class="line" d="M348 654H404"/>
+<rect class="box" x="408" y="572" width="360" height="170" rx="8"/>
+<text x="432" y="614">Prepare revision</text><text x="432" y="652" class="muted">Render WebP size buckets</text><text x="432" y="685" class="muted">Temporary → revision directory</text><text x="432" y="719" class="mono muted">OLD POINTER STILL VISIBLE</text>
+<path class="line" d="M768 654H824"/>
+<rect x="828" y="572" width="324" height="170" rx="8" fill="#14262f" stroke="#65d5df"/>
+<text x="852" y="614" class="accent">Publish current.json</text><text x="852" y="652" class="muted">Replace the manifest last</text><text x="852" y="685" class="muted">Files are already in place</text><text x="852" y="719" class="mono accent">LATER GETS SEE REVISION</text>
+<text x="48" y="807" class="muted">No source? Keep the fallback. Rendering failure? Keep the previous manifest.</text>
+<text x="48" y="854" class="mono muted">BACKFILL COMPLETION = ENUMERATION FINISHED, NOT EVERY IMAGE RENDERED</text>
+</svg>

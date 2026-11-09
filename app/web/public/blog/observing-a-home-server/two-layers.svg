@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
+  <title id="title">Crate's two layers of observability</title>
+  <desc id="desc">The built-in layer is always on: services and the Listen apps record readings through a closed metric catalogue, Redis aggregates them per minute, PostgreSQL keeps eight days and Admin reads them. The optional layer, enabled with one installer command, adds a metrics port on an internal network, Prometheus with exporters for the host, database, Redis and containers, Grafana on the loopback address and, separately, Sentry for errors.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M1 1 L7 4 L1 7" fill="none" stroke="#999ca0" stroke-width="1.2"/>
+    </marker>
+    <marker id="arrow-hi" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M1 1 L7 4 L1 7" fill="none" stroke="#67e8f9" stroke-width="1.2"/>
+    </marker>
+  </defs>
+  <style>
+    .bg { fill: #0a0a0f; }
+    .node { fill: #0d0e14; stroke: rgba(241,245,249,0.22); stroke-width: 1; }
+    .node-hi { fill: #0d0e14; stroke: #67e8f9; stroke-width: 1.4; }
+    .title { font: 500 15px "JetBrains Mono", ui-monospace, Menlo, monospace; letter-spacing: 0.12em; fill: #f1f5f9; }
+    .sub { font: 400 14px "JetBrains Mono", ui-monospace, Menlo, monospace; fill: #999ca0; }
+    .lane { font: 400 13px "JetBrains Mono", ui-monospace, Menlo, monospace; letter-spacing: 0.16em; fill: #67e8f9; }
+    .label { font: 400 13px "JetBrains Mono", ui-monospace, Menlo, monospace; fill: #999ca0; }
+    .rule { stroke: rgba(241,245,249,0.08); stroke-width: 1; }
+    .edge-hi { fill: none; stroke: #67e8f9; stroke-width: 1.5; }
+    .edge { fill: none; stroke: #999ca0; stroke-width: 1; stroke-dasharray: 9 4; }
+  </style>
+
+  <rect class="bg" width="1200" height="620"/>
+
+  <text class="lane" x="40" y="40">BUILT IN · ALWAYS ON</text>
+  <line class="rule" x1="40" y1="52" x2="1160" y2="52"/>
+
+  <rect class="node-hi" x="40" y="76" width="250" height="76" rx="4"/>
+  <text class="title" x="56" y="106">SERVICES</text>
+  <text class="sub" x="56" y="130">api · workers · projector</text>
+
+  <rect class="node-hi" x="40" y="176" width="250" height="76" rx="4"/>
+  <text class="title" x="56" y="206">LISTEN APPS</text>
+  <text class="sub" x="56" y="230">playback telemetry</text>
+
+  <rect class="node-hi" x="330" y="76" width="270" height="76" rx="4"/>
+  <text class="title" x="346" y="106">METRIC CATALOGUE</text>
+  <text class="sub" x="346" y="130">closed names and labels</text>
+
+  <rect class="node-hi" x="640" y="76" width="220" height="76" rx="4"/>
+  <text class="title" x="656" y="106">REDIS</text>
+  <text class="sub" x="656" y="130">per-minute buckets</text>
+
+  <rect class="node-hi" x="900" y="76" width="260" height="76" rx="4"/>
+  <text class="title" x="916" y="106">POSTGRESQL</text>
+  <text class="sub" x="916" y="130">kept for 8 days</text>
+
+  <rect class="node-hi" x="900" y="176" width="260" height="76" rx="4"/>
+  <text class="title" x="916" y="206">ADMIN</text>
+  <text class="sub" x="916" y="230">System Health · Stack map</text>
+
+  <path class="edge-hi" d="M290 114 H324" marker-end="url(#arrow-hi)"/>
+  <path class="edge-hi" d="M290 214 C320 214 340 190 360 158" marker-end="url(#arrow-hi)"/>
+  <path class="edge-hi" d="M600 114 H634" marker-end="url(#arrow-hi)"/>
+  <path class="edge-hi" d="M860 114 H894" marker-end="url(#arrow-hi)"/>
+  <path class="edge-hi" d="M1030 152 V170" marker-end="url(#arrow-hi)"/>
+
+  <text class="lane" x="40" y="312">OPT-IN · CRATE OBSERVABILITY ENABLE</text>
+  <line class="rule" x1="40" y1="324" x2="1160" y2="324"/>
+
+  <rect class="node" x="40" y="348" width="250" height="76" rx="4"/>
+  <text class="title" x="56" y="378">PORT 9200</text>
+  <text class="sub" x="56" y="402">internal network only</text>
+
+  <rect class="node" x="330" y="348" width="270" height="76" rx="4"/>
+  <text class="title" x="346" y="378">PROMETHEUS</text>
+  <text class="sub" x="346" y="402">90 days or 10 GB</text>
+
+  <rect class="node" x="330" y="460" width="270" height="76" rx="4"/>
+  <text class="title" x="346" y="490">EXPORTERS</text>
+  <text class="sub" x="346" y="514">host · db · redis · cAdvisor</text>
+
+  <rect class="node" x="640" y="348" width="220" height="76" rx="4"/>
+  <text class="title" x="656" y="378">GRAFANA</text>
+  <text class="sub" x="656" y="402">127.0.0.1 only</text>
+
+  <rect class="node" x="900" y="348" width="260" height="76" rx="4"/>
+  <text class="title" x="916" y="378">SENTRY</text>
+  <text class="sub" x="916" y="402">errors · needs a DSN</text>
+
+  <path class="edge" d="M290 386 H324" marker-end="url(#arrow)"/>
+  <path class="edge" d="M465 460 V430" marker-end="url(#arrow)"/>
+  <path class="edge" d="M600 386 H634" marker-end="url(#arrow)"/>
+  <path class="edge" d="M560 348 C580 290 980 300 1010 258" marker-end="url(#arrow)"/>
+  <text class="label" x="630" y="272">CPU and memory for the Stack map</text>
+
+  <line class="rule" x1="40" y1="570" x2="1160" y2="570"/>
+  <path class="edge-hi" d="M40 596 H84"/>
+  <text class="label" x="94" y="600">always on</text>
+  <path class="edge" d="M220 596 H264"/>
+  <text class="label" x="274" y="600">only when enabled</text>
+</svg>

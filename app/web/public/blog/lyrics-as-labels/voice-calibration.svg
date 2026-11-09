@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1060" role="img" aria-labelledby="title desc">
+  <title id="title">Calibrating a voice threshold against synced lyrics</title>
+  <desc id="desc">Two inputs meet at the phrase level. Synced lyrics supply proxy labels: at least 25 percent coverage means sung, no coverage means instrumental, and intermediate coverage is excluded. YAMNet window scores are mapped to log-scale bytes and averaged within each phrase. Comparing these levels against the lyric labels lets us choose a threshold of 90. This calibrates a decision threshold; it does not train YAMNet.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" orient="auto-start-reverse">
+      <path d="M1 1 L9 5 L1 9" fill="none" stroke="#67e8f9" stroke-width="1.5"/>
+    </marker>
+  </defs>
+  <style>
+    .bg { fill: #0a0a0f; }
+    .panel { fill: #0d0e14; stroke: #39404b; stroke-width: 1; }
+    .label { font: 400 36px "JetBrains Mono", ui-monospace, Menlo, monospace; fill: #67e8f9; }
+    .text { font: 400 40px "JetBrains Mono", ui-monospace, Menlo, monospace; fill: #f1f5f9; }
+    .note { font: 400 36px "JetBrains Mono", ui-monospace, Menlo, monospace; fill: #b4bbc5; }
+    .flow { stroke: #67e8f9; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+    .divider { stroke: #39404b; stroke-width: 1; }
+  </style>
+  <rect class="bg" width="1200" height="1060"/>
+  <text class="label" x="50" y="68">CALIBRATION · SAME PHRASES, TWO INPUTS</text>
+
+  <rect class="panel" x="40" y="105" width="530" height="175" rx="6"/>
+  <text class="label" x="70" y="160">LYRICS</text>
+  <text class="text" x="70" y="230">LRC timestamps</text>
+  <rect class="panel" x="630" y="105" width="530" height="175" rx="6"/>
+  <text class="label" x="660" y="160">AUDIO</text>
+  <text class="text" x="660" y="230">YAMNet windows</text>
+
+  <path class="flow" d="M305 280 V335"/>
+  <path class="flow" d="M895 280 V335"/>
+
+  <rect class="panel" x="40" y="350" width="530" height="245" rx="6"/>
+  <text class="label" x="70" y="410">PROXY LABELS</text>
+  <text class="text" x="70" y="470">≥25% → sung</text>
+  <text class="text" x="70" y="520">0% → instrumental</text>
+  <text class="note" x="70" y="565">Between → excluded</text>
+  <rect class="panel" x="630" y="350" width="530" height="245" rx="6"/>
+  <text class="label" x="660" y="410">PHRASE LEVELS</text>
+  <text class="text" x="660" y="470">Log-scale bytes</text>
+  <text class="text" x="660" y="520">Mean per phrase</text>
+  <text class="note" x="660" y="565">Range: 0–255</text>
+
+  <path class="flow" d="M305 595 V650 H500 V700"/>
+  <path class="flow" d="M895 595 V650 H700 V700"/>
+
+  <rect class="panel" x="40" y="715" width="1120" height="170" rx="6"/>
+  <text class="label" x="70" y="775">COMPARE CANDIDATE THRESHOLDS</text>
+  <text class="text" x="70" y="840">Chosen cut: phrase level ≥ 90 → sung</text>
+  <line class="divider" x1="40" y1="935" x2="1160" y2="935"/>
+  <text class="note" x="50" y="995">Calibrate the cut; keep the model unchanged.</text>
+</svg>

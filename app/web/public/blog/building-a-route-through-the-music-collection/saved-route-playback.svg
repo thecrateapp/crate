@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 734" role="img" aria-labelledby="title desc">
+  <title id="title">Play the saved route with current availability</title>
+  <desc id="desc">Generation saves an ordered track list and generation report. Reading a path adds current playability without selecting replacement tracks. In this example, a saved middle step is unavailable. It remains visible in the path, while the local playback queue skips it and preserves the relative order of the available tracks. A path source has no radio continuation. Separate validated refinement may publish a new saved revision; ordinary reads do not replan.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0L10 5L0 10" fill="none" stroke="#67e8f9" stroke-width="1.5"/>
+    </marker>
+  </defs>
+  <style>
+    text { font-family: "JetBrains Mono", monospace; fill: #d6dae3; font-size: 19px; }
+    .label { fill: #67e8f9; letter-spacing: 1.4px; font-size: 17px; }
+    .note { fill: #a1a7b5; font-size: 17px; }
+    .box { fill: #0d0e14; stroke: #353947; stroke-width: 1; }
+    .flow { fill: none; stroke: #67e8f9; stroke-width: 1.5; marker-end: url(#arrow); }
+  </style>
+  <rect width="1200" height="734" fill="#0a0a0f"/>
+  <text x="40" y="44" class="label">SAVED PATH / LOCAL PLAYBACK</text>
+  <text x="40" y="78" class="note">Generation quality and current audio availability describe different things.</text>
+
+  <rect x="40" y="112" width="340" height="146" rx="4" class="box"/>
+  <text x="64" y="148" class="label">GENERATE</text>
+  <text x="64" y="182">Choose an ordered sequence</text>
+  <text x="64" y="215" class="note">Validate anchors and length</text>
+  <text x="64" y="242" class="note">Attach quality warnings</text>
+
+  <path d="M380 185H422" class="flow"/>
+  <rect x="430" y="112" width="340" height="146" rx="4" class="box"/>
+  <text x="454" y="148" class="label">SAVE</text>
+  <text x="454" y="182">Tracks + generation report</text>
+  <text x="454" y="215" class="note">One stored result</text>
+  <text x="454" y="242" class="note">No reselection during reads</text>
+
+  <path d="M770 185H812" class="flow"/>
+  <rect x="820" y="112" width="340" height="146" rx="4" class="box"/>
+  <text x="844" y="148" class="label">READ</text>
+  <text x="844" y="182">Add current playability</text>
+  <text x="844" y="215" class="note">Keep unavailable steps</text>
+  <text x="844" y="242" class="note">visible in the saved route</text>
+
+  <path d="M990 258V292H600V326" class="flow"/>
+  <text x="40" y="312" class="label">PATH DETAIL / SAVED ORDER</text>
+
+  <rect x="40" y="342" width="200" height="96" rx="4" class="box"/>
+  <text x="140" y="379" text-anchor="middle">01 / ORIGIN</text>
+  <text x="140" y="411" text-anchor="middle" class="note">playable</text>
+  <path d="M240 390H262" class="flow"/>
+  <rect x="270" y="342" width="200" height="96" rx="4" class="box"/>
+  <text x="370" y="379" text-anchor="middle">02 / TRACK B</text>
+  <text x="370" y="411" text-anchor="middle" class="note">playable</text>
+  <path d="M470 390H492" class="flow"/>
+  <rect x="500" y="342" width="200" height="96" rx="4" class="box" stroke-dasharray="9 4"/>
+  <text x="600" y="379" text-anchor="middle">03 / TRACK C</text>
+  <text x="600" y="411" text-anchor="middle" class="note">unavailable</text>
+  <path d="M700 390H722" class="flow"/>
+  <rect x="730" y="342" width="200" height="96" rx="4" class="box"/>
+  <text x="830" y="379" text-anchor="middle">04 / TRACK D</text>
+  <text x="830" y="411" text-anchor="middle" class="note">playable</text>
+  <path d="M930 390H952" class="flow"/>
+  <rect x="960" y="342" width="200" height="96" rx="4" class="box"/>
+  <text x="1060" y="379" text-anchor="middle">05 / DESTINATION</text>
+  <text x="1060" y="411" text-anchor="middle" class="note">playable</text>
+
+  <path d="M600 438V508" class="flow"/>
+  <text x="624" y="477" class="note">skip unavailable steps; preserve order</text>
+  <rect x="40" y="516" width="1120" height="112" rx="4" class="box"/>
+  <text x="64" y="553" class="label">PLAYABLE QUEUE</text>
+  <text x="64" y="593">01 / ORIGIN → 02 / TRACK B → 04 / TRACK D → 05 / DESTINATION</text>
+  <text x="40" y="673" class="note">Local source: path ID + link. No radio continuation after the last available step.</text>
+  <text x="40" y="707" class="note">Explicit repeat remains available. Remote compact queues do not retain path attribution.</text>
+</svg>

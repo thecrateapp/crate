@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">Two analysis paths, two kinds of catalogue data</title>
+  <desc id="desc">Background jobs read library audio. Feature analysis uses the Rust analyser or Python backends, with Python supplementation for missing advanced fields on the single-track route. Bliss runs separately and returns a twenty-number vector. Workers store named features and vectors in PostgreSQL. Display and similarity requests reuse those results. Solid lines show calls; dashed lines show results stored by background work. The diagram describes the late-March design, not the current Smart Mix pipeline.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0L10 5L0 10" fill="none" stroke="#67e8f9" stroke-width="1.5"/>
+    </marker>
+  </defs>
+  <style>
+    text { font-family: "JetBrains Mono", monospace; fill: #d6dae3; font-size: 19px; }
+    .label { fill: #67e8f9; letter-spacing: 1.4px; font-size: 17px; }
+    .note { fill: #a1a7b5; font-size: 17px; }
+    .box { fill: #0d0e14; stroke: #353947; stroke-width: 1; }
+    .flow { fill: none; stroke: #67e8f9; stroke-width: 1.5; marker-end: url(#arrow); }
+    .stored { stroke-dasharray: 9 4; }
+  </style>
+  <rect width="1200" height="800" fill="#0a0a0f"/>
+  <text x="40" y="44" class="label">AUDIO ANALYSIS / LATE MARCH 2026</text>
+  <text x="40" y="77" class="note">Feature extraction and similarity had separate jobs and outputs.</text>
+
+  <rect x="400" y="106" width="400" height="74" rx="4" class="box"/>
+  <text x="600" y="137" text-anchor="middle">LIBRARY AUDIO FILES</text>
+  <text x="600" y="162" text-anchor="middle" class="note">decode audio for each analysis path</text>
+
+  <path d="M500 180V210H300V246" class="flow"/>
+  <path d="M700 180V210H900V246" class="flow"/>
+  <text x="64" y="229" class="label">FEATURE ANALYSIS JOB</text>
+  <text x="664" y="229" class="label">BLISS ANALYSIS JOB</text>
+
+  <rect x="40" y="254" width="520" height="220" rx="4" class="box"/>
+  <text x="64" y="289">crate-cli analyze</text>
+  <text x="64" y="319" class="note">Signal measurements in Rust</text>
+  <path d="M64 340H536" fill="none" stroke="#353947" stroke-width="1"/>
+  <text x="64" y="371">Essentia / librosa + optional PANNs</text>
+  <text x="64" y="402" class="note">Python fallback; single-track supplement</text>
+  <text x="64" y="433" class="note">when the checked advanced fields are absent</text>
+
+  <rect x="640" y="254" width="520" height="220" rx="4" class="box"/>
+  <text x="664" y="289">crate-cli bliss</text>
+  <text x="664" y="319" class="note">Bliss library in a Rust subprocess</text>
+  <path d="M664 340H1136" fill="none" stroke="#353947" stroke-width="1"/>
+  <text x="664" y="371">JSON: path, features, error</text>
+  <text x="664" y="402" class="note">Twenty-number audio representation</text>
+  <text x="664" y="433" class="note">Python stores successful results</text>
+
+  <path d="M300 474V544" class="flow stored"/>
+  <path d="M900 474V544" class="flow stored"/>
+  <text x="323" y="515" class="note">worker writes</text>
+  <text x="923" y="515" class="note">worker writes</text>
+
+  <rect x="40" y="552" width="1120" height="100" rx="4" class="box"/>
+  <line x1="600" y1="568" x2="600" y2="636" stroke="#353947" stroke-width="1"/>
+  <text x="64" y="587" class="label">CATALOGUE / NAMED FIELDS</text>
+  <text x="64" y="622">BPM, key, energy, mood, …</text>
+  <text x="664" y="587" class="label">CATALOGUE / BLISS VECTOR</text>
+  <text x="664" y="622">Stored numbers for distance queries</text>
+
+  <path d="M300 652V694" class="flow"/>
+  <path d="M900 652V694" class="flow"/>
+  <text x="300" y="726" text-anchor="middle">Display / query features</text>
+  <text x="900" y="726" text-anchor="middle">Find acoustic candidates</text>
+  <text x="40" y="774" class="note">A stored result could still be partial. Neither output guaranteed musical agreement.</text>
+</svg>

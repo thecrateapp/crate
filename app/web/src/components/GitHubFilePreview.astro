@@ -1,0 +1,126 @@
+---
+import BlogIcon from "./BlogIcon.astro";
+import type { BlogEntry } from "../lib/blog";
+import { manifestForPost } from "../lib/github-preview-source";
+import { previewTokenCss } from "../lib/github-preview-theme";
+interface Props { post: BlogEntry }
+const { post } = Astro.props;
+const manifest = manifestForPost(post);
+const serialized = JSON.stringify(manifest).replace(/</g, "\\u003c");
+---
+
+<div data-github-preview>
+  <script type="application/json" data-github-preview-manifest set:html={serialized} />
+  <!-- Token colours, generated from the code theme; snapshots only name these classes. -->
+  <style is:inline set:html={previewTokenCss}></style>
+  <dialog class="gfp-dialog" data-github-preview-dialog aria-labelledby="github-preview-title" aria-describedby="github-preview-revision" data-lenis-prevent>
+    <header class="gfp-header">
+      <div class="gfp-heading">
+        <p class="gfp-eyebrow"><BlogIcon name="github" size={16} /> Source preview</p>
+        <h2 id="github-preview-title" data-github-preview-title>GitHub file</h2>
+        <p class="gfp-revision" id="github-preview-revision"><span data-github-preview-revision>Exact revision</span><code data-github-preview-commit></code></p>
+      </div>
+      <button type="button" class="gfp-close" data-github-preview-close aria-label="Close source preview">Close <kbd>Esc</kbd></button>
+    </header>
+    <div class="gfp-toolbar">
+      <div class="gfp-views" role="group" aria-label="File view" data-github-preview-views hidden>
+        <button type="button" data-github-preview-mode="rendered" aria-pressed="false">Document</button>
+        <button type="button" data-github-preview-mode="source" aria-pressed="true">Source</button>
+      </div>
+      <button type="button" data-github-preview-selection hidden>Referenced lines</button>
+      <span class="gfp-file-meta" data-github-preview-meta></span>
+      <a class="gfp-github" data-github-preview-open data-astro-reload href="https://github.com/thecrateapp/crate" target="_blank" rel="noopener noreferrer"><BlogIcon name="github" size={16} /> Open in GitHub <BlogIcon name="external-link" size={16} /></a>
+    </div>
+    <div class="gfp-body" data-github-preview-body data-lenis-prevent tabindex="0" aria-label="File contents">
+      <div class="gfp-content" data-github-preview-content></div>
+    </div>
+    <footer class="gfp-footer">
+      <p role="status" aria-live="polite" data-github-preview-status></p>
+      <button type="button" data-github-preview-copy disabled>Copy source</button>
+    </footer>
+  </dialog>
+</div>
+
+<script>
+  import { mountOnPage } from "../scripts/motion/page";
+  import { mountGitHubPreview } from "../scripts/github-preview";
+  mountOnPage("[data-github-preview]", () => mountGitHubPreview(document.querySelector<HTMLElement>("[data-github-preview]")!));
+</script>
+
+<style is:global>
+  /* Astro rendering of the shared AppModal geometry: 3xl panel, quiet border,
+     opaque popover and one scrolling body. The site does not ship React. */
+  .gfp-dialog {width:calc(100vw - 48px);max-width:1280px;height:92dvh;max-height:92dvh;margin:auto;padding:0;box-sizing:border-box;border:1px solid var(--line);border-radius:14px;background:#111218;color:var(--fg);box-shadow:0 24px 90px #0008;overflow:hidden;font:14px/1.6 var(--sans);}
+  .gfp-dialog[open] {display:flex;flex-direction:column;animation:gfp-enter 180ms var(--ease-snap,ease-out);}
+  .gfp-dialog::backdrop {background:rgba(10,10,15,.78);}
+  .gfp-dialog [hidden] {display:none!important;}
+  .gfp-dialog button,.gfp-dialog a {touch-action:manipulation;}
+  .gfp-dialog button {color:var(--fg-2);font:11px/1.4 var(--mono);border:1px solid var(--line);border-radius:4px;background:transparent;padding:8px 12px;min-height:36px;cursor:pointer;}
+  .gfp-dialog button:hover {color:var(--fg);border-color:var(--fg-3);}
+  .gfp-dialog button:disabled {opacity:.4;cursor:default;}
+  .gfp-dialog :is(button,a,[tabindex]):focus-visible {outline:2px solid var(--cyan-hi);outline-offset:3px;}
+  .gfp-header {display:flex;justify-content:space-between;gap:24px;padding:23px 28px 20px;border-bottom:1px solid var(--line);flex-shrink:0;}
+  .gfp-heading {min-width:0;}
+  .gfp-eyebrow {display:flex;align-items:center;gap:8px;margin:0 0 9px;color:var(--cyan-hi);font:10px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.1em;}
+  .gfp-heading h2 {margin:0;font:500 clamp(17px,2vw,24px)/1.35 var(--display);overflow-wrap:anywhere;letter-spacing:-.025em;}
+  .gfp-revision {display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:9px 0 0;color:var(--fg-3);font:11px/1.5 var(--mono);}
+  .gfp-revision code {color:var(--cyan-hi);font:inherit;word-break:break-all;}
+  .gfp-dialog .gfp-close {flex-shrink:0;align-self:flex-start;display:flex;align-items:center;gap:12px;}
+  .gfp-close kbd {font:9px/1.4 var(--mono);color:var(--fg-3);}
+  .gfp-toolbar {display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px 28px;border-bottom:1px solid var(--line);flex-shrink:0;}
+  .gfp-views {display:flex;gap:2px;padding:3px;border:1px solid var(--line);border-radius:5px;}
+  .gfp-views button {border-color:transparent;padding:5px 12px;min-height:28px;}
+  .gfp-dialog [data-github-preview-mode][aria-pressed="true"] {color:var(--cyan-hi);background:rgba(103,232,249,.08);border-color:rgba(103,232,249,.18);}
+  .gfp-file-meta {color:var(--fg-3);font:10px/1.5 var(--mono);}
+  .gfp-github {display:inline-flex;align-items:center;gap:7px;margin-left:auto;color:var(--cyan-hi);text-decoration:none;font:10px/1.5 var(--mono);white-space:nowrap;}
+  .gfp-github:hover {text-decoration:underline;text-underline-offset:3px;}
+  .gfp-body {flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-color:var(--fg-3) transparent;background:#0d0e14;}
+  .gfp-content {min-height:100%;}
+  .gfp-loading,.gfp-error {max-width:60ch;margin:0;padding:40px 28px;color:var(--fg-2);}
+  .gfp-error strong {display:block;color:var(--fg);margin-bottom:10px;font-weight:500;}
+  .gfp-code {margin:0;padding:22px 0;min-width:100%;width:max-content;box-sizing:border-box;background:transparent;tab-size:4;color:#e2e8f0;font:12px/1.7 var(--mono);font-variant-ligatures:none;}
+  .gfp-code code {font:inherit;}
+  .gfp-code-line {display:flex;min-height:1.7em;border-left:2px solid transparent;}
+  .gfp-line-number {position:sticky;left:0;display:inline-block;width:6ch;min-width:6ch;box-sizing:border-box;padding:0 1.4ch 0 .6ch;margin-right:1.8ch;text-align:right;color:#7e8084;background:#0d0e14;user-select:none;border-right:1px solid var(--line);}
+  .gfp-line-code {display:block;padding-right:28px;white-space:pre;}
+  .gfp-code-line[data-highlighted="true"] {border-left-color:var(--cyan-hi);background:rgba(103,232,249,.08);}
+  .gfp-code-line[data-highlighted="true"] .gfp-line-number {color:var(--cyan-hi);background:#16242c;}
+  .gfp-markdown {max-width:860px;margin:0 auto;padding:30px 36px 50px;overflow-wrap:anywhere;color:var(--fg-2);font:15px/1.85 var(--sans);}
+  .gfp-markdown :is(h1,h2,h3,h4,h5,h6) {font-family:var(--display);color:var(--fg);line-height:1.3;letter-spacing:-.025em;margin:1.6em 0 .7em;}
+  .gfp-markdown h1 {font-size:32px;} .gfp-markdown h2 {font-size:25px;} .gfp-markdown h3 {font-size:21px;}
+  .gfp-markdown > :first-child {margin-top:0;}
+  .gfp-markdown a {color:var(--cyan-hi);text-decoration:underline;text-underline-offset:3px;}
+  .gfp-markdown :is(p,ul,ol,blockquote,pre,table) {margin:0 0 1.2em;}
+  .gfp-markdown ul,.gfp-markdown ol {padding-left:1.5em;}
+  .gfp-markdown blockquote {padding-left:18px;border-left:2px solid var(--cyan);color:var(--fg-3);}
+  .gfp-markdown code {font:12px/1.7 var(--mono);color:var(--fg);}
+  .gfp-markdown pre {padding:18px;overflow:auto;border:1px solid var(--line);border-radius:6px;background:var(--bg);}
+  .gfp-markdown table {border-collapse:collapse;width:100%;font-size:13px;}
+  .gfp-markdown th,.gfp-markdown td {padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;}
+  .gfp-markdown th {color:var(--fg);}
+  .gfp-markdown hr {border:0;border-top:1px solid var(--line);margin:24px 0;}
+  .gfp-markdown [data-highlighted="true"] {background:rgba(103,232,249,.08);box-shadow:-8px 0 0 rgba(103,232,249,.08);}
+  .gfp-footer {display:flex;gap:20px;align-items:center;justify-content:space-between;padding:12px 28px;border-top:1px solid var(--line);flex-shrink:0;}
+  .gfp-footer p {margin:0;color:var(--fg-3);font:10px/1.6 var(--mono);}
+  .gfp-footer button {flex-shrink:0;}
+  @keyframes gfp-enter {from{opacity:0;transform:translateY(8px) scale(.995)}to{opacity:1;transform:none}}
+  @media(max-width:600px){
+    .gfp-dialog {width:100vw;height:96dvh;max-height:96dvh;margin:auto 0 0;border-radius:14px 14px 0 0;border-bottom:0;}
+    .gfp-header {padding:18px 16px 15px;gap:12px;}
+    .gfp-heading h2 {font-size:17px;}
+    .gfp-eyebrow {font-size:9px;}
+    .gfp-close kbd {display:none;}
+    .gfp-dialog .gfp-close {min-height:40px;padding:8px 10px;}
+    .gfp-toolbar {padding:10px 16px;gap:9px;}
+    .gfp-revision {font-size:10px;}
+    .gfp-github {font-size:9px;}
+    .gfp-file-meta {flex-basis:100%;order:3;}
+    .gfp-footer {padding:12px 16px max(12px,env(safe-area-inset-bottom));gap:12px;}
+    .gfp-footer p {font-size:9px;}
+    .gfp-code {font-size:11px;}
+    .gfp-line-number {width:5ch;min-width:5ch;margin-right:1ch;}
+    .gfp-markdown {padding:24px 20px 36px;font-size:14px;}
+    .gfp-markdown h1 {font-size:26px;}
+  }
+  @media(prefers-reduced-motion:reduce){.gfp-dialog[open]{animation:none;}}
+</style>

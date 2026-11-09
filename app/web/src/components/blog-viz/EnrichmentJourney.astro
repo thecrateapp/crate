@@ -1,0 +1,799 @@
+---
+import BlogFigure from "./BlogFigure.astro";
+import {
+  ARTIST,
+  CENTER,
+  CORE_R,
+  ENRICHMENT_STATES,
+  ENRICHMENT_TRACKS,
+  enrichmentFrame,
+  enrichmentReadout,
+  FIELDS,
+  JOBS,
+  NODE_R,
+  PARALLELISM,
+  polar,
+  RING_R,
+  SOURCES,
+  STEPS,
+  VIEW,
+} from "../../scripts/viz/blog/enrichment";
+
+// Without JavaScript the figure shows the written row: every outcome is visible.
+const initial = "run";
+const track = ENRICHMENT_TRACKS.run;
+const still = enrichmentFrame(track.pins![3]!);
+const readout = enrichmentReadout(still);
+const period = track.period;
+const pct = (value: number, total: number) => `${((value / total) * 100).toFixed(2)}%`;
+const span = (start: number, end: number) => `left:${pct(start, period)};width:${pct(end - start, period)}`;
+const fixed = (value: number) => value.toFixed(1);
+const nodeEdge = NODE_R - 16;
+const ringEdge = RING_R + 4;
+const side = (id: (typeof SOURCES)[number]["id"]) => {
+  const { x } = polar(id, NODE_R);
+  return Math.abs(x - CENTER.x) < 1 ? (polar(id, NODE_R).y < CENTER.y ? "top" : "bottom") : x > CENTER.x ? "right" : "left";
+};
+const frameOf = (id: string) => still.sources.find((source) => source.id === id)!;
+const jobOf = (id: string) => still.jobs.find((job) => job.source === id)!;
+const fieldOf = (id: string) => still.fields.find((field) => field.id === id)!;
+const label = (id: string) => SOURCES.find((source) => source.id === id)!.label;
+const SHORT: Record<string, string> = { check: "caches", wait: "wait", assemble: "assemble", write: "write" };
+const outcomeText = (field: ReturnType<typeof fieldOf>) =>
+  field.outcome ?? (field.stage === "proposed" ? "proposed" : "");
+---
+
+<BlogFigure
+  viz="blog-enrichment"
+  id="enrichment-run"
+  label="Enrichment"
+  context="6 sources → 1 artist row"
+  states={ENRICHMENT_STATES.map((state) => ({ ...state, phases: [...state.phases] }))}
+  initial={initial}
+  example
+  ariaLabel={`One refresh of a fictional artist, ${ARTIST}, eight days after its last enrichment. MusicBrainz, Fanart.tv and Discogs come from their source caches. Last.fm, Spotify and Setlist.fm run together in a pool of three workers, and Last.fm fails. Only after the batch does the job assemble the fields. The writer keeps the stored biography because Last.fm sent none, keeps the manually corrected country although MusicBrainz proposes GB, and replaces the tags with Spotify's genres.`}
+  caption="Fictional artist, payloads and timings. TTLs, the pool of three, the tag merge and the write rule follow enrichment.py and library_enrichment_writes.py at 224d3378."
+>
+  <div class="en" data-row={still.row}>
+    <div class="en-orbit">
+      <svg class="en-svg" viewBox={`0 0 ${VIEW.width} ${VIEW.height}`} aria-hidden="true">
+        <circle class="orbit" cx={CENTER.x} cy={CENTER.y} r={NODE_R} />
+        <circle class="buffer" cx={CENTER.x} cy={CENTER.y} r={RING_R} />
+        {
+          SOURCES.map((source) => {
+            const a = polar(source.id, nodeEdge);
+            const b = polar(source.id, ringEdge);
+            const frame = frameOf(source.id);
+            return (
+              <g class="en-link" data-en-link={source.id} data-status={frame.status}>
+                <line class="base" x1={fixed(a.x)} y1={fixed(a.y)} x2={fixed(b.x)} y2={fixed(b.y)} />
+                <line class="fill" x1={fixed(a.x)} y1={fixed(a.y)} x2={fixed(b.x)} y2={fixed(b.y)} pathLength="1" style={`stroke-dashoffset:${(1 - frame.link).toFixed(3)}`} />
+              </g>
+            );
+          })
+        }
+        <g class="core">
+          <circle class="core-halo" cx={CENTER.x} cy={CENTER.y} r={CORE_R + 12} />
+          <circle class="core-body" cx={CENTER.x} cy={CENTER.y} r={CORE_R} />
+          {
+            FIELDS.map((_, i) => (
+              <>
+                <rect class="core-key" x={CENTER.x - 12} y={CENTER.y - 10.5 + i * 6} width="5" height="2.5" rx="1.25" />
+                <rect class="core-bar" x={CENTER.x - 4} y={CENTER.y - 10.5 + i * 6} width={[16, 11, 14, 6][i]} height="2.5" rx="1.25" />
+              </>
+            ))
+          }
+        </g>
+        {
+          SOURCES.map((source) => {
+            const frame = frameOf(source.id);
+            const at = polar(source.id, RING_R);
+            const shown = frame.parked && frame.flow < 1;
+            return (
+              <circle class="en-dot" data-en-dot={source.id} data-row={String(source.row)} r="3.5" cx={fixed(at.x)} cy={fixed(at.y)} style={`opacity:${shown ? 1 : 0}`} />
+            );
+          })
+        }
+        {SOURCES.map((source) => <circle class="en-packet" data-en-packet={source.id} r="3.5" cx={CENTER.x} cy={CENTER.y} style="opacity:0" />)}
+        {
+          SOURCES.map((source) => {
+            const at = polar(source.id, NODE_R);
+            const frame = frameOf(source.id);
+            return (
+              <g class="en-src" data-en-src={source.id} data-status={frame.status} data-expired={String(frame.expired)} transform={`translate(${fixed(at.x)} ${fixed(at.y)})`}>
+                <circle class="pulse" r="15" />
+                <circle class="ttl-track" r="12" />
+                <circle class="ttl" r="12" pathLength="1" transform="rotate(-90)" style={`stroke-dashoffset:${(1 - frame.ttlUsed).toFixed(3)}`} />
+                <circle class="dot" r="5.5" />
+                <path class="cross" d="M-2.6 -2.6 L2.6 2.6 M2.6 -2.6 L-2.6 2.6" />
+              </g>
+            );
+          })
+        }
+      </svg>
+
+      {
+        SOURCES.map((source) => {
+          const at = polar(source.id, NODE_R);
+          return (
+            <p class="en-label" data-side={side(source.id)} style={`left:${pct(at.x, VIEW.width)};top:${pct(at.y, VIEW.height)}`}>
+              <b>{source.label}</b>
+              <span data-en-note={source.id}>{frameOf(source.id).note}</span>
+            </p>
+          );
+        })
+      }
+      <p class="en-label en-ring-label" style={`left:${pct(CENTER.x - RING_R - 8, VIEW.width)};top:${pct(CENTER.y, VIEW.height)}`}>
+        <b>Payloads</b>
+        <span>in memory</span>
+      </p>
+      <p class="en-label en-core-label" style={`left:${pct(CENTER.x + RING_R + 8, VIEW.width)};top:${pct(CENTER.y, VIEW.height)}`}>
+        <b>Artist row</b>
+        <span data-en-rowstate>{still.row}</span>
+      </p>
+    </div>
+
+    <div class="en-record">
+      <div class="en-record-head">
+        <b>{ARTIST}</b>
+        <span>library_artists</span>
+        <span class="en-chip" data-en-chip>{still.row}</span>
+      </div>
+      {
+        FIELDS.map((item) => {
+          const field = fieldOf(item.id);
+          return (
+            <div class="en-field" data-en-field={item.id} data-stage={field.stage} data-outcome={field.outcome ?? ""}>
+              <p class="en-field-head">
+                <span class="en-key">{item.id}</span>
+                <span class="en-from">{item.source}</span>
+                <span class="en-outcome" data-en-outcome>{outcomeText(field)}</span>
+              </p>
+              <p class="en-value" data-en-value>{field.value}</p>
+              <p class="en-note" data-en-fnote>{field.note}</p>
+            </div>
+          );
+        })
+      }
+      <p class="en-stamp">
+        <span class="en-key">enriched_at</span>
+        <span data-en-stamp>{still.stamp}</span>
+      </p>
+    </div>
+
+    <div class="en-pool">
+      <p class="viz-label en-pool-title"><b>Thread pool</b> {PARALLELISM} workers · <span data-en-busy>{still.busy} busy</span></p>
+      <div class="en-lanes">
+        <div class="en-lane">
+          <span class="en-lane-name">job</span>
+          <div class="en-track">
+            {
+              STEPS.map((step) => {
+                const fill = still.steps.find((item) => item.id === step.id)!.fill;
+                return (
+                  <span class="en-pill" data-kind={step.id} data-en-step={step.id} style={`${span(step.start, step.end)};--fill:${(fill * 100).toFixed(1)}%`}>
+                    <span class="long">{step.label}</span>
+                    <span class="short">{SHORT[step.id]}</span>
+                  </span>
+                );
+              })
+            }
+          </div>
+        </div>
+        {
+          Array.from({ length: PARALLELISM }, (_, lane) => (
+            <div class="en-lane">
+              <span class="en-lane-name">worker {lane + 1}</span>
+              <div class="en-track">
+                {JOBS.filter((job) => job.lane === lane).map((job) => {
+                  const frame = jobOf(job.source);
+                  return (
+                    <span class="en-pill" data-kind="fetch" data-en-job={job.source} data-status={frame.status} style={`${span(job.start, job.end)};--fill:${(frame.fill * 100).toFixed(1)}%`}>
+                      {label(job.source)}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          ))
+        }
+        <div class="en-head-track" aria-hidden="true">
+          <i class="en-head" data-en-head style={`left:${(still.head * 100).toFixed(2)}%`} />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <dl class="bf-readout" slot="readout">
+    <div>
+      <dt class="viz-label">Cache hits</dt>
+      <dd data-en-ro="hits" data-tone={readout.hits.tone}>{readout.hits.text}</dd>
+    </div>
+    <div>
+      <dt class="viz-label">Payloads</dt>
+      <dd data-en-ro="payloads" data-tone={readout.payloads.tone}>{readout.payloads.text}</dd>
+    </div>
+    <div>
+      <dt class="viz-label">Artist row</dt>
+      <dd data-en-ro="row" data-tone={readout.row.tone}>{readout.row.text}</dd>
+    </div>
+    <div>
+      <dt class="viz-label">Biography</dt>
+      <dd data-en-ro="bio" data-tone={readout.bio.tone}>{readout.bio.text}</dd>
+    </div>
+  </dl>
+</BlogFigure>
+
+<style>
+  .en {
+    --lane-label: 76px;
+    display: grid;
+    grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+    grid-template-areas:
+      "orbit record"
+      "pool pool";
+    gap: 22px 28px;
+    align-items: center;
+  }
+
+  /* Prose rules outrank scoped element styles; match the kit's reset. */
+  :global(.prose) .bf .en :global(p) {
+    margin: 0;
+  }
+
+  .en-orbit {
+    grid-area: orbit;
+    position: relative;
+    width: 100%;
+    aspect-ratio: 400 / 300;
+  }
+
+  .en-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .orbit {
+    fill: none;
+    stroke: var(--line);
+  }
+
+  .buffer {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.22);
+    stroke-width: 1;
+    stroke-dasharray: 2 4;
+    transition: stroke 0.4s var(--ease-snap);
+  }
+
+  .en[data-row="assembling"] .buffer {
+    stroke: var(--cyan-hi);
+    filter: drop-shadow(0 0 6px rgba(103, 232, 249, 0.5));
+  }
+
+  .en-link .base {
+    stroke: rgba(241, 245, 249, 0.16);
+    stroke-width: 1.25;
+    stroke-dasharray: 2 5;
+  }
+
+  .en-link .fill {
+    stroke: rgba(103, 232, 249, 0.6);
+    stroke-width: 1.25;
+    stroke-dasharray: 1;
+  }
+
+  .en-link[data-status="failed"] .fill {
+    stroke: var(--amber);
+    stroke-dasharray: 0.04 0.04;
+  }
+
+  .core-body {
+    fill: var(--bg);
+    stroke: rgba(241, 245, 249, 0.42);
+    stroke-width: 1.25;
+    transition: stroke 0.4s var(--ease-snap);
+  }
+
+  .core-bar {
+    fill: rgba(241, 245, 249, 0.28);
+    transition: fill 0.4s var(--ease-snap);
+  }
+
+  .core-key {
+    fill: rgba(241, 245, 249, 0.16);
+  }
+
+  .core-halo {
+    fill: rgba(6, 182, 212, 0.12);
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  .en[data-row="written"] .core-body {
+    stroke: var(--cyan-hi);
+    filter: drop-shadow(0 0 8px rgba(103, 232, 249, 0.45));
+  }
+
+  .en[data-row="written"] .core-bar {
+    fill: var(--cyan-hi);
+  }
+
+  .en[data-row="written"] .core-halo {
+    animation: en-halo 0.9s var(--ease-out);
+  }
+
+  @keyframes en-halo {
+    from {
+      transform: scale(0.7);
+      opacity: 1;
+    }
+    to {
+      transform: scale(1.7);
+      opacity: 0;
+    }
+  }
+
+  .en-dot {
+    fill: var(--cyan-hi);
+    filter: drop-shadow(0 0 4px rgba(103, 232, 249, 0.6));
+  }
+
+  .en-dot[data-row="false"] {
+    fill: rgba(241, 245, 249, 0.55);
+    filter: none;
+  }
+
+  .en-packet {
+    fill: var(--cyan-hi);
+    filter: drop-shadow(0 0 6px rgba(103, 232, 249, 0.8));
+  }
+
+  .en-src .ttl-track {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.14);
+    stroke-width: 2;
+  }
+
+  .en-src .ttl {
+    fill: none;
+    stroke: rgba(103, 232, 249, 0.75);
+    stroke-width: 2;
+    stroke-dasharray: 1;
+  }
+
+  .en-src[data-expired="true"] .ttl {
+    stroke: rgba(241, 245, 249, 0.6);
+  }
+
+  .en-src .dot {
+    fill: var(--bg);
+    stroke: rgba(241, 245, 249, 0.45);
+    stroke-width: 1.25;
+    transition:
+      fill 0.3s var(--ease-snap),
+      stroke 0.3s var(--ease-snap);
+  }
+
+  .en-src .pulse {
+    fill: none;
+    stroke: var(--cyan-hi);
+    stroke-width: 1;
+    opacity: 0;
+  }
+
+  .en-src .cross {
+    fill: none;
+    stroke: var(--bg);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    opacity: 0;
+  }
+
+  .en-src[data-status="queued"] .dot {
+    stroke: var(--fg);
+  }
+
+  .en-src[data-status="fetching"] .dot {
+    stroke: var(--cyan-hi);
+  }
+
+  .en-src[data-status="fetching"] .pulse {
+    animation: en-pulse 1.1s var(--ease-out) infinite;
+  }
+
+  .en-src[data-status="hit"] .dot,
+  .en-src[data-status="received"] .dot {
+    fill: var(--cyan-hi);
+    stroke: var(--cyan-hi);
+  }
+
+  .en-src[data-status="failed"] .dot {
+    fill: var(--amber);
+    stroke: var(--amber);
+  }
+
+  .en-src[data-status="failed"] .cross {
+    opacity: 1;
+  }
+
+  @keyframes en-pulse {
+    from {
+      opacity: 0.8;
+      r: 9;
+    }
+    to {
+      opacity: 0;
+      r: 19;
+    }
+  }
+
+  .en-label {
+    position: absolute;
+    display: grid;
+    gap: 3px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    pointer-events: none;
+    text-shadow: 0 0 10px var(--bg);
+  }
+
+  .en-label b {
+    font-weight: 400;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fg);
+  }
+
+  .en-label span {
+    color: var(--fg-2);
+  }
+
+  .en-label[data-side="right"] {
+    transform: translate(20px, -50%);
+  }
+
+  .en-label[data-side="left"] {
+    justify-items: end;
+    text-align: right;
+    transform: translate(calc(-100% - 20px), -50%);
+  }
+
+  .en-label[data-side="top"] {
+    justify-items: center;
+    transform: translate(-50%, calc(-100% - 18px));
+  }
+
+  .en-label[data-side="bottom"] {
+    justify-items: center;
+    transform: translate(-50%, 18px);
+  }
+
+  .en-ring-label {
+    justify-items: end;
+    text-align: right;
+    transform: translate(-100%, -50%);
+  }
+
+  .en-ring-label b,
+  .en-core-label b {
+    color: var(--fg-2);
+  }
+
+  .en-ring-label span,
+  .en-core-label span {
+    color: var(--fg-3);
+  }
+
+  .en-core-label {
+    transform: translateY(-50%);
+  }
+
+  .en[data-row="written"] .en-core-label span {
+    color: var(--cyan-hi);
+  }
+
+  /* Record */
+  .en-record {
+    grid-area: record;
+    display: grid;
+    border-top: 1px solid var(--line);
+  }
+
+  .en-record-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 10px 0 9px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .en-record-head b {
+    font-family: var(--display);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--fg);
+  }
+
+  .en-record-head span,
+  .en-stamp,
+  .en-field-head {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--fg-3);
+  }
+
+  .en-chip {
+    margin-left: auto;
+    text-transform: uppercase;
+    letter-spacing: 0.14em !important;
+  }
+
+  .en[data-row="written"] .en-chip {
+    color: var(--cyan-hi);
+  }
+
+  .en-field {
+    position: relative;
+    display: grid;
+    gap: 3px;
+    padding: 9px 0 9px 12px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .en-field::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 10px;
+    bottom: 10px;
+    width: 2px;
+    border-radius: 1px;
+    background: rgba(241, 245, 249, 0.12);
+    transition: background 0.3s var(--ease-snap);
+  }
+
+  .en-field-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .en-key {
+    color: var(--fg-2);
+  }
+
+  .en-outcome {
+    margin-left: auto;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
+
+  .en-value {
+    font-family: var(--sans);
+    font-size: 13.5px;
+    line-height: 1.35;
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .en-note {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    color: var(--fg-3);
+  }
+
+  .en-field[data-stage="proposed"]::before {
+    background: rgba(241, 245, 249, 0.5);
+  }
+
+  .en-field[data-stage="proposed"] .en-value {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--fg-2);
+  }
+
+  .en-field[data-stage="proposed"] .en-outcome {
+    color: var(--fg-2);
+  }
+
+  .en-field[data-outcome="kept"]::before,
+  .en-field[data-outcome="locked"]::before {
+    background: var(--cyan-hi);
+    box-shadow: 0 0 8px rgba(103, 232, 249, 0.5);
+  }
+
+  .en-field[data-outcome="kept"] .en-outcome,
+  .en-field[data-outcome="locked"] .en-outcome,
+  .en-field[data-outcome="kept"] .en-note,
+  .en-field[data-outcome="locked"] .en-note {
+    color: var(--cyan-hi);
+  }
+
+  .en-field[data-outcome="replaced"]::before {
+    background: var(--amber);
+  }
+
+  .en-field[data-outcome="replaced"] .en-outcome,
+  .en-field[data-outcome="replaced"] .en-note {
+    color: var(--amber);
+  }
+
+  .en-field[data-outcome="set"] .en-outcome {
+    color: var(--fg);
+  }
+
+  .en-stamp {
+    display: flex;
+    justify-content: space-between;
+    padding: 9px 0 0;
+  }
+
+  .en[data-row="written"] [data-en-stamp] {
+    color: var(--cyan-hi);
+  }
+
+  /* Pool */
+  .en-pool {
+    grid-area: pool;
+    display: grid;
+    gap: 10px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+
+  .en-pool-title {
+    font-size: 10px;
+  }
+
+  .en-lanes {
+    position: relative;
+    display: grid;
+    gap: 6px;
+  }
+
+  .en-lane {
+    display: grid;
+    grid-template-columns: var(--lane-label) minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+    white-space: nowrap;
+  }
+
+  .en-track {
+    position: relative;
+    height: 22px;
+    border-radius: 4px;
+    background: rgba(241, 245, 249, 0.03);
+  }
+
+  .en-pill {
+    --fill: 0%;
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    display: flex;
+    align-items: center;
+    padding: 0 7px;
+    overflow: hidden;
+    border: 1px solid rgba(103, 232, 249, 0.3);
+    border-radius: 3px;
+    color: var(--fg-2);
+    font-size: 9.5px;
+    letter-spacing: 0.04em;
+    text-transform: none;
+    white-space: nowrap;
+    background: linear-gradient(90deg, rgba(6, 182, 212, 0.24) var(--fill), transparent var(--fill));
+  }
+
+  .en-pill .short {
+    display: none;
+  }
+
+  .en-pill[data-kind="wait"] {
+    border-style: dashed;
+    border-color: rgba(241, 245, 249, 0.2);
+    color: var(--fg-3);
+    background: linear-gradient(90deg, rgba(241, 245, 249, 0.06) var(--fill), transparent var(--fill));
+  }
+
+  .en-pill[data-status="done"] {
+    color: var(--fg);
+  }
+
+  .en-pill[data-status="failed"] {
+    border-color: rgba(251, 191, 36, 0.65);
+    color: var(--amber);
+    background: linear-gradient(90deg, rgba(251, 191, 36, 0.18) var(--fill), transparent var(--fill));
+  }
+
+  .en-head-track {
+    position: absolute;
+    top: -3px;
+    bottom: -3px;
+    left: calc(var(--lane-label) + 10px);
+    right: 0;
+    pointer-events: none;
+  }
+
+  .en-head {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--fg);
+    opacity: 0.6;
+  }
+
+  @media (max-width: 760px) {
+    .en {
+      --lane-label: 58px;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        "orbit"
+        "record"
+        "pool";
+      gap: 18px;
+    }
+    .en-label {
+      font-size: 9px;
+    }
+    .en-label[data-side="right"] {
+      transform: translate(14px, -50%);
+    }
+    .en-label[data-side="left"] {
+      transform: translate(calc(-100% - 14px), -50%);
+    }
+    /* A label at left: 70% shrinks to the space on its right; fix its width. */
+    .en-label[data-side="right"],
+    .en-label[data-side="left"] {
+      width: 15ch;
+    }
+    .en-label[data-side="right"] span,
+    .en-label[data-side="left"] span {
+      white-space: normal;
+    }
+    .en-label[data-side="top"] {
+      transform: translate(-50%, calc(-100% - 13px));
+    }
+    .en-label[data-side="bottom"] {
+      transform: translate(-50%, 13px);
+    }
+    .en-lane {
+      font-size: 9px;
+      letter-spacing: 0.04em;
+    }
+    .en-pill {
+      padding: 0 3px;
+      font-size: 8.5px;
+      letter-spacing: 0;
+    }
+    .en-pill .long {
+      display: none;
+    }
+    .en-pill .short {
+      display: inline;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .en-src[data-status="fetching"] .pulse,
+    .en[data-row="written"] .core-halo {
+      animation: none;
+    }
+  }
+</style>

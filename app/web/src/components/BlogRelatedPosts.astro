@@ -1,0 +1,41 @@
+---
+import { postUrl, readingMinutes, type BlogEntry } from "../lib/blog";
+import BlogIcon from "./BlogIcon.astro";
+
+interface Props { posts: BlogEntry[] }
+const { posts } = Astro.props;
+---
+
+{posts.length > 0 && (
+  <aside class="related-posts" aria-labelledby="related-posts-title" data-related-posts>
+    <h2 id="related-posts-title">Related reading</h2>
+    <ul>
+      {posts.map(post => (
+        <li>
+          <a href={postUrl(post.id)}>
+            <span class="related-title">{post.data.title}</span>
+            <span class="related-meta">{readingMinutes(post.body ?? "")} min read{post.data.draft && <span class="draft"> · Draft</span>}<span class="related-arrow"><BlogIcon name="arrow-right" size={16} /></span></span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </aside>
+)}
+
+<style>
+  .related-posts {min-width:0;align-self:start;position:sticky;top:120px;padding-top:7px;}
+  h2 {margin:0 0 18px;color:var(--cyan-hi);font:10px/1.5 var(--mono);text-transform:uppercase;letter-spacing:.14em;}
+  ul {margin:0;padding:0;list-style:none;border-top:1px solid var(--line);}
+  li {border-bottom:1px solid var(--line);}
+  a {display:flex;flex-direction:column;gap:12px;min-height:44px;padding:20px 0;color:var(--fg-2);text-decoration:none;}
+  .related-title {font:500 1.1rem/1.35 var(--display);text-wrap:balance;}
+  .related-meta {display:flex;gap:6px;align-items:center;color:var(--fg-3);font:10px/1.5 var(--mono);}
+  .related-meta>span:last-child {margin-left:auto;}
+  .draft {color:var(--amber);}
+  a:hover .related-title {color:var(--cyan-hi);}
+  a:focus-visible {outline:2px solid var(--cyan-hi);outline-offset:4px;}
+  @media(max-width:1199px) {
+    .related-posts {position:static;margin-top:48px;padding-top:0;max-width:70ch;}
+    ul {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:0 28px;}
+  }
+</style>

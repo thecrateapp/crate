@@ -1,0 +1,19 @@
+---
+import { blogIconPaths, type BlogIconName } from "../lib/blog-icons";
+
+interface Props {
+  name: BlogIconName;
+  size?: 16 | 18 | 20;
+}
+
+// Match CRATE_ICON_SIZE.sm/md/lg without importing the React runtime into Astro.
+const { name, size = 18 } = Astro.props;
+---
+
+<svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true" focusable="false" data-blog-icon={name}>
+  {blogIconPaths[name].map(path => <path d={path} fill-rule="evenodd" clip-rule="evenodd" />)}
+</svg>
+
+<style>
+  svg {display:inline-block;flex-shrink:0;vertical-align:middle;}
+</style>

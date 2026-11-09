@@ -406,6 +406,8 @@ jobs:
         with:
           context: .
           file: ./app/web/Dockerfile
+          build-args: |
+            BLOG_SOURCE_COMMIT=${{ github.sha }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">An offline badge depends on bytes, an index and a profile</title>
+  <desc id="desc">The native download path stages and validates a media file, publishes its final path and persists the index. Restart uses the verified offline identity to load the right profile, verifies its assets and resolves local playback.</desc>
+  <defs><marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1 1L7 4L1 7" fill="none" stroke="#67e8f9"/></marker></defs>
+  <rect width="1200" height="760" fill="#0a0a0f"/>
+  <g font-family="JetBrains Mono,monospace" font-size="17" fill="#a9adbb">
+    <text x="40" y="48" fill="#67e8f9" letter-spacing="1">WHEN A NATIVE DOWNLOAD BECOMES AVAILABLE</text>
+    <text x="40" y="80">The file and its persisted index must agree before the app publishes readiness.</text>
+    <text x="40" y="130" fill="#67e8f9" font-size="15">DOWNLOAD / SCOPED TO SERVER + USER</text>
+    <g fill="#0d0e14" stroke="#353947"><rect x="40" y="153" width="250" height="142" rx="4"/><rect x="330" y="153" width="250" height="142" rx="4"/><rect x="620" y="153" width="250" height="142" rx="4"/><rect x="910" y="153" width="250" height="142" rx="4"/></g>
+    <g fill="#e5e7ef"><text x="58" y="189">STAGED FILE</text><text x="348" y="189">SIZE CHECK</text><text x="638" y="189">FINAL ASSET</text><text x="928" y="189">PERSISTED INDEX</text></g>
+    <text x="58" y="227">Temporary .part path</text><text x="58" y="260">Not yet available</text>
+    <text x="348" y="227">Actual size &gt; 0</text><text x="348" y="260">Expected size matches</text>
+    <text x="638" y="227">Rename + recheck</text><text x="638" y="260">Keep prior copy</text>
+    <text x="928" y="227">Await index commit</text><text x="928" y="260">Then expose ready</text>
+    <path d="M290 224H322M580 224H612M870 224H902" fill="none" stroke="#67e8f9" marker-end="url(#arrow)"/>
+    <text x="330" y="327" font-size="14">Size equality applies when an expected length is known.</text>
+    <text x="40" y="401" fill="#67e8f9" font-size="15">RESTART WITHOUT THE SERVER</text>
+    <g fill="#0d0e14" stroke="#353947"><rect x="40" y="425" width="320" height="153" rx="4"/><rect x="440" y="425" width="320" height="153" rx="4"/><rect x="840" y="425" width="320" height="153" rx="4"/></g>
+    <g fill="#e5e7ef"><text x="60" y="462">LOCAL IDENTITY</text><text x="460" y="462">HYDRATE + VERIFY</text><text x="860" y="462">LOCAL PLAYBACK</text></g>
+    <text x="60" y="500">Previously verified user</text><text x="60" y="530">Exact server / profile</text><text x="60" y="559">Revocation respected</text>
+    <text x="460" y="500">Read persisted index</text><text x="460" y="530">Check files in batches</text><text x="460" y="559">Prune invalid entries</text>
+    <text x="860" y="500">Resolve local asset URL</text><text x="860" y="530">Missing copy is an error</text><text x="860" y="559">No remote fallback</text>
+    <path d="M360 499H432M760 499H832" fill="none" stroke="#67e8f9" stroke-dasharray="9 4" marker-end="url(#arrow)"/>
+    <path d="M40 630H1160" stroke="#353947"/>
+    <text x="40" y="667">The browser uses Cache API responses, with different validation and eviction rules.</text>
+    <text x="40" y="700">Size checks detect empty or incomplete copies; they are not an audio checksum.</text>
+  </g>
+</svg>

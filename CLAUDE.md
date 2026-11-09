@@ -14,6 +14,7 @@ read or edit files in that directory.
 | `composition-patterns`   | Component APIs, compound components, context providers         |
 | `react-view-transitions` | Page transitions, shared element and enter/exit animations     |
 | `web-design-guidelines`  | UI, accessibility and UX reviews                               |
+| `crate-blog-figures`     | Interactive figures and animations for engineering-blog posts  |
 
 ### Knowledge graph: graphify
 

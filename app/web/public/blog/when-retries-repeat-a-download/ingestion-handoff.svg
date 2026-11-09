@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1030" role="img" aria-labelledby="title desc">
+  <title id="title">Coordinating acquisition with the library watcher</title>
+  <desc id="desc">Before the change, moving downloaded files into the library triggers the watcher, which schedules folder reorganisation while acquisition still indexes the artist and queues its own follow-up. After the change, acquisition marks staged artists before moving files. The watcher skips scheduling when it sees a processing mark. Acquisition explicitly queues follow-up processing and clears the marks in its cleanup path. The marks request a one-hour TTL and provide cooperative suppression, not a mutex; work already queued can still overlap. Automatic exception retries for the entire tidal_download actor change from two to zero.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M1 1L9 5L1 9" fill="none" stroke="#67e8f9" stroke-width="1.4" />
+    </marker>
+    <marker id="muted-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M1 1L9 5L1 9" fill="none" stroke="#a0a8b8" stroke-width="1.4" />
+    </marker>
+  </defs>
+  <style>
+    text { fill:#f1f5f9; font:20px Arial,Helvetica,sans-serif; }
+    .label { fill:#67e8f9; font:16px "JetBrains Mono",monospace; letter-spacing:.8px; }
+    .note { fill:#aeb5c3; font-size:17px; }
+    .code { fill:#d9e0eb; font:16px "JetBrains Mono",monospace; }
+    .warn { fill:#fbbf24; font-size:18px; }
+    .panel { fill:#0d0e14; stroke:#2c303c; stroke-width:1; }
+    .box { fill:#10131b; stroke:#3b4352; stroke-width:1; }
+    .active { fill:#0d1d25; stroke:#458998; stroke-width:1; }
+    .flow { fill:none; stroke:#67e8f9; stroke-width:1.6; marker-end:url(#arrow); }
+    .async { fill:none; stroke:#67e8f9; stroke-width:1.6; stroke-dasharray:9 4; marker-end:url(#arrow); }
+    .event { fill:none; stroke:#a0a8b8; stroke-width:1.6; stroke-dasharray:1 5; stroke-linecap:round; marker-end:url(#muted-arrow); }
+    .rule { stroke:#2c303c; stroke-width:1; }
+  </style>
+  <rect width="1200" height="1030" fill="#0a0a0f" />
+  <text x="32" y="40" class="label">ONE DOWNLOAD, TWO PROCESSING TRIGGERS</text>
+
+  <rect x="20" y="64" width="1160" height="358" rx="6" class="panel" />
+  <text x="40" y="98" class="label">BEFORE · THE WATCHER REACTS TO OUR OWN WRITES</text>
+  <text x="40" y="132" class="note">Acquisition task</text>
+
+  <rect x="40" y="150" width="235" height="82" rx="5" class="box" />
+  <text x="56" y="181">Download to staging</text>
+  <text x="56" y="208" class="note">Files are already local</text>
+  <rect x="325" y="150" width="235" height="82" rx="5" class="box" />
+  <text x="341" y="181">Move into /music</text>
+  <text x="341" y="208" class="note">New files become visible</text>
+  <rect x="610" y="150" width="235" height="82" rx="5" class="box" />
+  <text x="626" y="181">Index the artist</text>
+  <text x="626" y="208" class="code">sync_artist()</text>
+  <rect x="895" y="150" width="245" height="82" rx="5" class="box" />
+  <text x="911" y="181">Queue follow-up</text>
+  <text x="911" y="208" class="note">Explicit processing request</text>
+  <path d="M275 191H315" class="flow" />
+  <path d="M560 191H600" class="flow" />
+  <path d="M845 191H885" class="async" />
+
+  <text x="40" y="290" class="note">Watcher path</text>
+  <rect x="325" y="278" width="235" height="82" rx="5" class="box" />
+  <text x="341" y="309">New file events</text>
+  <text x="341" y="336" class="note">Detected inside /music</text>
+  <rect x="610" y="278" width="235" height="82" rx="5" class="box" />
+  <text x="626" y="309">Schedule processing</text>
+  <text x="626" y="336" class="note">After the debounce timer</text>
+  <rect x="895" y="278" width="245" height="82" rx="5" class="box" />
+  <text x="911" y="309">Reorganise folders</text>
+  <text x="911" y="336" class="note">A worker moves the files</text>
+  <path d="M442 232V268" class="event" />
+  <path d="M560 319H600" class="flow" />
+  <path d="M845 319H885" class="async" />
+  <text x="40" y="393" class="warn">Both paths can work on the same artist while acquisition is still using its file paths.</text>
+
+  <rect x="20" y="446" width="1160" height="422" rx="6" class="panel" />
+  <text x="40" y="480" class="label">AFTER · MARK THE ARTIST BEFORE MOVING FILES</text>
+  <text x="40" y="514" class="note">Acquisition task · normal handoff</text>
+  <rect x="40" y="532" width="235" height="96" rx="5" class="box" />
+  <text x="56" y="565">Download to staging</text>
+  <text x="56" y="592" class="note">Enumerate staged artists</text>
+  <rect x="325" y="532" width="235" height="96" rx="5" class="active" />
+  <text x="341" y="565">Set processing marks</text>
+  <text x="341" y="592" class="code">processing:&lt;artist&gt;</text>
+  <text x="341" y="614" class="note">Requested TTL: 1h</text>
+  <rect x="610" y="532" width="235" height="96" rx="5" class="active" />
+  <text x="626" y="565">Move + index</text>
+  <text x="626" y="592" class="note">Files, then catalogue rows</text>
+  <rect x="895" y="532" width="245" height="96" rx="5" class="active" />
+  <text x="911" y="565">Queue follow-up</text>
+  <text x="911" y="592" class="code">process_new_content</text>
+  <text x="911" y="614" class="note">Explicit request per artist</text>
+  <path d="M275 580H315" class="flow" />
+  <path d="M560 580H600" class="flow" />
+  <path d="M845 580H885" class="async" />
+
+  <rect x="40" y="724" width="235" height="82" rx="5" class="box" />
+  <text x="56" y="755">Watcher gets an event</text>
+  <text x="56" y="782" class="note">For files moved into /music</text>
+  <rect x="325" y="724" width="235" height="82" rx="5" class="box" />
+  <text x="341" y="755">Check the artist mark</text>
+  <text x="341" y="782" class="note">Before scheduling a timer</text>
+  <rect x="610" y="724" width="235" height="82" rx="5" class="active" />
+  <text x="626" y="755">Mark found: skip event</text>
+  <text x="626" y="782" class="note">No task from this event</text>
+  <rect x="895" y="724" width="245" height="82" rx="5" class="box" />
+  <text x="911" y="755">Clear processing marks</text>
+  <text x="911" y="782" class="code">finally</text>
+  <path d="M727 628V677H157V714" class="event" />
+  <path d="M275 765H315" class="flow" />
+  <path d="M560 765H600" class="flow" />
+  <path d="M1017 628V714" class="flow" />
+  <text x="40" y="842" class="note">Cooperative suppression: work already queued and other writers can still overlap.</text>
+
+  <text x="40" y="908" class="label">RETRY POLICY FOR THE WHOLE DOWNLOAD ACTOR</text>
+  <text x="40" y="940" class="code">max_retries: 2 → 0</text>
+  <text x="305" y="940" class="note">An uncaught exception no longer schedules an automatic replay of the download.</text>
+  <line x1="40" y1="965" x2="1160" y2="965" class="rule" />
+  <path d="M40 994H88" class="flow" />
+  <text x="104" y="1000" class="note">Task sequence</text>
+  <path d="M340 994H388" class="async" />
+  <text x="404" y="1000" class="note">Queue asynchronous work</text>
+  <path d="M730 994H778" class="event" />
+  <text x="794" y="1000" class="note">Filesystem notification</text>
+</svg>

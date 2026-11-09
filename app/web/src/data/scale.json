@@ -1,12 +1,12 @@
 {
   "tracks": "48,213",
   "albums": "4,400",
-  "pytest": 8492,
-  "vitest": 7059,
+  "pytest": 8530,
+  "vitest": 7265,
   "goTests": 435,
-  "rustTests": 361,
+  "rustTests": 367,
   "taskTypes": 161,
-  "migrations": 154,
+  "migrations": 155,
   "taskQueues": {
     "ai": [
       "ai_catalog_refresh",
@@ -180,6 +180,8 @@
       "backfill_smart_mix_profiles",
       "backfill_track_audio_fingerprints"
     ],
-    "playback": ["prepare_stream_variant"]
+    "playback": [
+      "prepare_stream_variant"
+    ]
   }
 }

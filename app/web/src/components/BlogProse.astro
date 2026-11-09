@@ -1,0 +1,14 @@
+---
+import { insertBlogVisuals } from "../lib/blog-visuals";
+
+const prose = await Astro.slots.render("default");
+const figures: Record<string, string> = {};
+for (const name of Object.keys(Astro.slots)) {
+  if (name === "default") continue;
+  const figure = await Astro.slots.render(name);
+  if (figure.trim()) figures[name] = figure;
+}
+const html = insertBlogVisuals(prose, figures);
+---
+
+<Fragment set:html={html} />

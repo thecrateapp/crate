@@ -63,7 +63,11 @@ def test_public_site_image_builds_app_web_without_sentry() -> None:
 
     assert build_step["with"]["file"] == "./app/web/Dockerfile"
     assert "secrets" not in build_step["with"]
-    assert "build-args" not in build_step["with"]
+    # The only build input is the merge commit the blog's source previews resolve `main` to.
+    build_args = build_step["with"].get("build-args", "")
+    assert [line.strip() for line in build_args.splitlines() if line.strip()] == [
+        "BLOG_SOURCE_COMMIT=${{ github.sha }}"
+    ]
     assert "SENTRY" not in dockerfile
 
 

@@ -1,0 +1,167 @@
+---
+import { milestones as history, type EngineeringMilestone } from "../../data/engineering-timeline";
+import { getCollection } from "astro:content";
+import { initialTimelineIndex, prepareTimeline, timelineArticleHref } from "../../lib/engineering-timeline";
+import BlogIcon from "../BlogIcon.astro";
+
+interface Props {
+  items?: EngineeringMilestone[];
+  currentPostHref?: string;
+}
+const { items, currentPostHref } = Astro.props;
+const milestones = items ?? prepareTimeline(history, await getCollection("blog"), { includeDrafts: import.meta.env.DEV });
+const initialIndex = initialTimelineIndex(milestones, currentPostHref);
+const initial = milestones[initialIndex]!;
+const eras = [...new Set(milestones.map((item) => item.era))];
+const dateLabel = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" });
+const monthLabel = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" });
+const periodDates = (era: string) => {
+  const entries = milestones.filter(item => item.era === era);
+  const first = monthLabel(entries[0]!.date);
+  const last = monthLabel(entries.at(-1)!.date);
+  return first === last ? first : `${first} — ${last}`;
+};
+---
+
+<section class="signal-track" data-timeline-proposal="signal-track" data-initial-index={initialIndex} data-current-post-href={currentPostHref} data-selected-milestone={initial.id} aria-label="Crate engineering timeline">
+  <div class="track-meta">
+    <p>March — November <b>2026</b></p>
+    <p>Selected <span data-track-count>{String(initialIndex + 1).padStart(2, "0")}</span> / {String(milestones.length).padStart(2, "0")}</p>
+  </div>
+  <nav class="track-periods" aria-label="Development periods">
+    {eras.map((era, index) => (
+      <button type="button" data-track-period={milestones.findIndex(item => item.era === era)} aria-pressed={era === initial.era} aria-label={`Jump to ${era}`}>
+        <span class="period-meta"><b>{String(index + 1).padStart(2, "0")}</b>{periodDates(era)}</span>
+        <span class="period-name">{era}</span>
+      </button>
+    ))}
+  </nav>
+  <div class="track-toolbar">
+    <p class="track-hint"><span class="hint-pointer">Select a milestone. Drag to explore.</span><span class="hint-touch">Tap a milestone. Swipe to explore.</span></p>
+    <div class="track-transport" aria-label="Milestone navigation">
+      <button type="button" data-track-previous aria-label="Previous milestone" disabled={initialIndex === 0}><BlogIcon name="arrow-left" /> Previous</button>
+      <button type="button" data-track-next aria-label="Next milestone" disabled={initialIndex === milestones.length - 1}>Next <BlogIcon name="arrow-right" /></button>
+    </div>
+  </div>
+
+  <div class="track-viewport" data-track-viewport>
+    <ol class="track-rail" style={`--total:${milestones.length};--selected:${initialIndex};--progress:${initialIndex / Math.max(1, milestones.length - 1)}`}>
+      <li class="track-indicator" data-track-indicator aria-hidden="true" style={`transform:translateX(${initialIndex * 116}px)`}><span /></li>
+      {milestones.map((item, index) => (
+        <li>
+          <button type="button" class:list={["track-stop", { "is-selected": index === initialIndex, "is-past": index < initialIndex }]} data-track-stop={index} data-milestone-id={item.id} data-article-href={item.href} aria-pressed={index === initialIndex} tabindex={index === initialIndex ? 0 : -1} aria-controls={`track-detail-${item.id}`} aria-label={`Milestone ${index + 1}, ${dateLabel(item.date)}: ${item.title}`}>
+            <span class="stop-date"><b>{String(index + 1).padStart(2, "0")}</b>{dateLabel(item.date)}</span>
+            <span class="stop-node" aria-hidden="true"><i /></span>
+            <span class="stop-title">{item.shortTitle ?? item.title}</span>
+          </button>
+        </li>
+      ))}
+    </ol>
+  </div>
+
+  <div class="track-details" aria-live="polite" aria-atomic="true">
+    {milestones.map((item,index) => (
+      <article id={`track-detail-${item.id}`} data-track-detail={index} hidden={index !== initialIndex} aria-labelledby={`track-title-${item.id}`}>
+        <div class="track-story">
+          <p class="track-eyebrow"><span class="track-detail-number">Milestone {String(index + 1).padStart(2, "0")}</span><time datetime={item.date}>{dateLabel(item.date)} 2026</time><span>{item.era}</span></p>
+          <h3 id={`track-title-${item.id}`}>{item.title}</h3>
+          <p class="track-summary">{item.summary}</p>
+        </div>
+        <div class="track-outcome">
+          <p class="track-eyebrow">What changed</p>
+          <p>{item.change}</p>
+          <div class="track-links">
+            {item.href ? <a class="track-read" href={timelineArticleHref(item, currentPostHref)}><span class="track-read-copy"><span class="track-read-label">{item.article?.part ? `Part ${item.article.part} · ` : "Technical article · "}{item.href === currentPostHref ? "Continue reading" : item.status === "draft" ? "Read the draft" : "Read article"}</span><span class="track-read-title">{item.article?.title}</span></span><span class="track-read-icon"><BlogIcon name={item.href === currentPostHref ? "arrow-down" : "arrow-right"} size={16} /></span></a> : <span class="track-planned">Article not available{item.chapter ? ` · Part ${item.chapter}` : ""}</span>}
+            <a class="track-source" href={item.source} target="_blank" rel="noreferrer" data-blog-link="github"><BlogIcon name="github" size={16} /> View historical source</a>
+          </div>
+        </div>
+      </article>
+    ))}
+  </div>
+  <p class="track-footnote">Milestones are evenly spaced. Dates follow development; linked articles may cover a longer period.</p>
+</section>
+
+<script>
+  import { mountOnPage } from "../../scripts/motion/page";
+  import { initSignalTrack } from "../../scripts/blog-timeline/signal-track";
+  mountOnPage('[data-timeline-proposal="signal-track"]', () => initSignalTrack(document.querySelector('[data-timeline-proposal="signal-track"]')!));
+</script>
+
+<style>
+  .signal-track { --track-accent: var(--cyan-hi); padding-top: 26px; border-top: 1px solid var(--line); }
+  .track-meta { display:flex; align-items:center; justify-content:space-between; gap:16px; font:11px var(--mono); text-transform:uppercase; letter-spacing:.12em; color:var(--fg-3); }
+  .track-meta p {margin:0}.track-meta b,.track-meta span {font-weight:400;color:var(--fg)}
+  .track-periods {display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:16px;margin-top:30px;}
+  .track-periods button {display:flex;flex-direction:column;align-items:stretch;gap:10px;min-width:0;min-height:90px;padding:12px 0 10px;border:0;border-top:2px solid var(--line);background:none;color:var(--fg-2);text-align:left;cursor:pointer;transition:border-color .2s,color .2s;}
+  .period-meta {display:flex;gap:10px;align-items:center;flex-wrap:wrap;font:9px/1.4 var(--mono);letter-spacing:.04em;text-transform:uppercase;color:var(--fg-3);}
+  .period-meta b {font-weight:400;}
+  .period-name {font:13px/1.4 var(--sans);max-width:18ch;}
+  .track-periods button[aria-pressed="true"] {border-color:var(--cyan-hi);color:var(--fg);}
+  .track-periods button[aria-pressed="true"] .period-meta b {color:var(--cyan-hi);}
+  .track-periods button:not([aria-pressed="true"]):hover {border-color:var(--fg-2);color:var(--fg);}
+  .track-toolbar {display:flex;align-items:center;justify-content:space-between;gap:24px;margin-top:20px;}
+  .track-transport {display:flex;align-items:center;gap:8px;flex:none;}
+  .track-transport button {display:flex;align-items:center;justify-content:center;gap:10px;min-height:44px;padding:10px 15px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--fg);font:12px var(--mono);cursor:pointer;transition:color .2s,border-color .2s,background-color .2s;}
+  .track-transport button:not(:disabled):hover {border-color:var(--cyan-hi);color:var(--cyan-hi);}
+  .track-transport button:disabled {opacity:.32;cursor:default;}
+  .track-hint {margin:0;color:var(--fg-3);font:11px/1.6 var(--mono);}
+  .hint-touch {display:none;}
+  .track-viewport {overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none;scroll-behavior:auto;cursor:grab;user-select:none;touch-action:auto;}
+  .track-viewport::-webkit-scrollbar {display:none;}
+  .track-viewport[data-dragging="true"],.track-viewport[data-dragging="true"] .track-stop {cursor:grabbing;}
+  .track-rail {position:relative;display:grid;grid-template-columns:repeat(var(--total),minmax(116px,1fr));width:max(100%,calc(var(--total) * 116px));margin:0;padding:22px 0 10px;list-style:none;}
+  .track-rail::before,.track-rail::after {content:"";position:absolute;top:75px;left:58px;right:58px;height:1px;background:var(--line);pointer-events:none;}
+  .track-rail::after {background:var(--cyan-hi);transform:scaleX(var(--progress,0));transform-origin:left;}
+  .track-rail li {min-width:0;position:relative;z-index:1;}
+  .track-rail .track-indicator {position:absolute;top:22px;left:0;width:116px;height:160px;z-index:2;pointer-events:none;border:1px solid color-mix(in srgb,var(--cyan-hi) 35%,transparent);border-radius:6px;background:color-mix(in srgb,var(--cyan-hi) 5%,transparent);will-change:transform;}
+  .track-indicator span {position:absolute;top:54px;left:50%;width:13px;height:13px;transform:translate(-50%,-50%);border-radius:50%;background:var(--cyan-hi);box-shadow:0 0 0 7px rgb(103 232 249 / .1),0 0 20px rgb(103 232 249 / .3);}
+  .track-stop {width:100%;border:1px solid transparent;border-radius:6px;background:none;color:var(--fg-3);cursor:pointer;display:flex;flex-direction:column;align-items:center;min-height:160px;padding:8px 8px 16px;}
+  .stop-date {display:flex;align-items:center;gap:8px;font:10px var(--mono);letter-spacing:.04em;text-transform:uppercase;}
+  .stop-date b {font-weight:400;color:var(--fg-3);}
+  .track-stop.is-selected .stop-date b {color:var(--cyan-hi);}
+  .track-stop:focus-visible,.track-periods button:focus-visible,.track-transport button:focus-visible {outline:2px solid var(--cyan-hi);outline-offset:-2px;}
+  .stop-node {display:grid;place-items:center;width:44px;height:66px;position:relative;}
+  .stop-node i {display:block;width:9px;height:9px;border:1px solid var(--fg-3);background:var(--bg);border-radius:50%;transition:transform .24s var(--ease-out),box-shadow .24s,border-color .24s,background .24s;}
+  .stop-title {font:13px/1.3 var(--sans);max-width:105px;text-wrap:balance;transition:color .2s;}
+  .is-selected .stop-date,.is-selected .stop-title {color:var(--fg)}
+  .track-stop:hover .stop-title {color:var(--cyan-hi)}
+  .track-stop.is-past .stop-node i {border-color:var(--cyan-hi);background:var(--cyan-hi)}
+  .track-details {margin-top:24px;}
+  .track-details article {display:grid;grid-template-columns:1.2fr 1fr;gap:clamp(28px,6vw,100px);min-height:265px;padding:32px 0 10px;border-top:1px solid var(--line);}
+  .track-details article[hidden] {display:none}
+  .track-eyebrow {display:flex;gap:12px;flex-wrap:wrap;margin:0 0 20px;font:10px/1.6 var(--mono);text-transform:uppercase;letter-spacing:.13em;color:var(--fg-3)}
+  .track-eyebrow time,.track-detail-number {color:var(--cyan-hi)}
+  h3 {font:650 clamp(1.9rem,3.6vw,3.25rem)/1.04 var(--display);letter-spacing:-.035em;margin:0 0 22px;text-wrap:balance;max-width:20ch;}
+  .track-summary {font:17px/1.6 var(--sans);color:var(--fg-2);max-width:48ch;margin:0;}
+  .track-outcome>p:not(.track-eyebrow) {margin:0;font:15px/1.75 var(--sans);color:var(--fg-2);}
+  .track-links {display:flex;align-items:flex-start;flex-direction:column;gap:10px;margin-top:22px}
+  .track-read {display:inline-flex;gap:32px;align-items:center;justify-content:space-between;min-height:44px;padding:8px 0;color:var(--fg);font:14px var(--sans);text-decoration:none;border-bottom:1px solid var(--cyan)}
+  .track-read-copy {display:flex;flex-direction:column;gap:6px;min-width:0;}
+  .track-read-label {font:10px/1.5 var(--mono);color:var(--cyan-hi);}
+  .track-read-title {font:14px/1.5 var(--sans);color:var(--fg);text-wrap:balance;}
+  .track-read-icon {color:var(--cyan-hi);flex:none;}
+  .track-source {font:11px/1.5 var(--mono);color:var(--fg-3);text-decoration:none;min-height:44px;display:flex;align-items:center;gap:8px;}
+  .track-source:hover {color:var(--cyan-hi)}
+  .track-read:focus-visible,.track-source:focus-visible {outline:2px solid var(--cyan-hi);outline-offset:4px;}
+  .track-planned {font:11px var(--mono);color:var(--amber);min-height:44px;display:flex;align-items:center;}
+  .track-footnote {font:11px/1.7 var(--mono);color:var(--fg-3);margin:24px 0 0;max-width:80ch}
+  @media(max-width:1000px) {.track-periods {grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 16px;}.track-periods button {min-height:78px;}}
+  @media(max-width:700px) {
+    .track-details article {grid-template-columns:1fr;gap:24px;min-height:0;}
+    .track-meta {font-size:9px;letter-spacing:.05em;}
+    .track-periods {grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 20px;margin-top:24px;}
+    .track-periods button {min-height:70px;gap:6px;padding-top:9px;}
+    .period-name {font-size:12px;max-width:none;}
+    .track-toolbar {flex-direction:column;align-items:stretch;gap:12px;margin-top:18px;}
+    .track-transport {width:100%;justify-content:space-between;}
+    .track-transport button {min-width:110px;}
+    .track-summary {font-size:16px;}
+    .track-eyebrow {margin-bottom:14px;}
+    .track-rail {padding-top:12px;}
+    .track-rail .track-indicator {top:12px;}
+    .track-rail::before,.track-rail::after {top:65px;}
+    .track-details {margin-top:16px;}
+  }
+  @media(pointer:coarse) {.hint-pointer{display:none}.hint-touch{display:inline}}
+  @media(prefers-reduced-motion:reduce) {.track-periods button,.track-transport button,.stop-node i,.stop-title{transition:none}}
+</style>

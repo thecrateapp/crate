@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" role="img" aria-labelledby="title desc">
+  <title id="title">A five-beat grid encoded as delta-ms-v1</title>
+  <desc id="desc">Twelve bytes: a version byte, the beat count, then five gaps in milliseconds, each written as a two-byte varint. Decoding adds the gaps back up to beats at 482, 951, 1419, 1888 and 2357 ms. The gap of 469 ms is stored as 0xD5 0x03: the low seven bits with a continuation flag, then the remaining bits.</desc>
+  <style>
+    .bg { fill: #0a0a0f; }
+    .byte { fill: #0d0e14; stroke: rgba(241,245,249,0.22); stroke-width: 1; }
+    .byte-hi { fill: #0d0e14; stroke: #67e8f9; stroke-width: 1.4; }
+    .hex { font: 500 16px "JetBrains Mono", ui-monospace, Menlo, monospace; fill: #f1f5f9; }
+    .lane { font: 400 13px "JetBrains Mono", ui-monospace, Menlo, monospace; letter-spacing: 0.16em; fill: #67e8f9; }
+    .label { font: 400 13px "JetBrains Mono", ui-monospace, Menlo, monospace; fill: #999ca0; }
+    .label-hi { font: 400 13px "JetBrains Mono", ui-monospace, Menlo, monospace; fill: #67e8f9; }
+    .bits { font: 500 15px "JetBrains Mono", ui-monospace, Menlo, monospace; fill: #f1f5f9; letter-spacing: 0.08em; }
+    .rule { stroke: rgba(241,245,249,0.08); stroke-width: 1; }
+    .axis { stroke: rgba(241,245,249,0.34); stroke-width: 1; }
+    .tick { stroke: #67e8f9; stroke-width: 1.5; }
+    .link { stroke: #999ca0; stroke-width: 1; stroke-dasharray: 1 5; stroke-linecap: round; fill: none; }
+  </style>
+
+  <rect class="bg" width="1200" height="600"/>
+
+  <text class="lane" x="40" y="40">ENCODED · 12 BYTES</text>
+  <line class="rule" x1="40" y1="52" x2="1160" y2="52"/>
+
+  <rect class="byte" x="40" y="74" width="72" height="52" rx="4"/>
+  <text class="hex" x="76" y="106" text-anchor="middle">01</text>
+  <rect class="byte" x="136" y="74" width="72" height="52" rx="4"/>
+  <text class="hex" x="172" y="106" text-anchor="middle">05</text>
+
+  <rect class="byte" x="232" y="74" width="72" height="52" rx="4"/>
+  <text class="hex" x="268" y="106" text-anchor="middle">e2</text>
+  <rect class="byte" x="310" y="74" width="72" height="52" rx="4"/>
+  <text class="hex" x="346" y="106" text-anchor="middle">03</text>
+
+  <rect class="byte-hi" x="406" y="74" width="72" height="52" rx="4"/>
+  <text class="hex" x="442" y="106" text-anchor="middle">d5</text>
+  <rect class="byte-hi" x="484" y="74" width="72" height="52" rx="4"/>
+  <text class="hex" x="520" y="106" text-anchor="middle">03</text>
+
+  <rect class="byte" x="580" y="74" width="72" height="52" rx="4"/>
+  <text class="hex" x="616" y="106" text-anchor="middle">d4</text>
+  <rect class="byte" x="658" y="74" width="72" height="52" rx="4"/>
+  <text class="hex" x="694" y="106" text-anchor="middle">03</text>
+
+  <rect class="byte" x="754" y="74" width="72" height="52" rx="4"/>
+  <text class="hex" x="790" y="106" text-anchor="middle">d5</text>
+  <rect class="byte" x="832" y="74" width="72" height="52" rx="4"/>
+  <text class="hex" x="868" y="106" text-anchor="middle">03</text>
+
+  <rect class="byte" x="928" y="74" width="72" height="52" rx="4"/>
+  <text class="hex" x="964" y="106" text-anchor="middle">d5</text>
+  <rect class="byte" x="1006" y="74" width="72" height="52" rx="4"/>
+  <text class="hex" x="1042" y="106" text-anchor="middle">03</text>
+
+  <text class="label" x="76" y="152" text-anchor="middle">version</text>
+  <text class="label" x="172" y="152" text-anchor="middle">5 beats</text>
+  <text class="label" x="307" y="152" text-anchor="middle">+482</text>
+  <text class="label-hi" x="481" y="152" text-anchor="middle">+469</text>
+  <text class="label" x="655" y="152" text-anchor="middle">+468</text>
+  <text class="label" x="829" y="152" text-anchor="middle">+469</text>
+  <text class="label" x="1003" y="152" text-anchor="middle">+469</text>
+
+  <text class="lane" x="40" y="214">DECODED · BEATS IN MS</text>
+  <line class="rule" x1="40" y1="226" x2="1160" y2="226"/>
+
+  <path class="link" d="M307 162 L265 268"/>
+  <path class="link" d="M481 162 L484 268"/>
+  <path class="link" d="M655 162 L702 268"/>
+  <path class="link" d="M829 162 L921 268"/>
+  <path class="link" d="M1003 162 L1140 268"/>
+
+  <line class="axis" x1="40" y1="290" x2="1160" y2="290"/>
+  <text class="label" x="40" y="318">0</text>
+  <line class="tick" x1="265" y1="272" x2="265" y2="308"/>
+  <line class="tick" x1="484" y1="272" x2="484" y2="308"/>
+  <line class="tick" x1="702" y1="272" x2="702" y2="308"/>
+  <line class="tick" x1="921" y1="272" x2="921" y2="308"/>
+  <line class="tick" x1="1140" y1="272" x2="1140" y2="308"/>
+  <text class="label" x="265" y="330" text-anchor="middle">482</text>
+  <text class="label" x="484" y="330" text-anchor="middle">951</text>
+  <text class="label" x="702" y="330" text-anchor="middle">1419</text>
+  <text class="label" x="921" y="330" text-anchor="middle">1888</text>
+  <text class="label" x="1140" y="330" text-anchor="middle">2357</text>
+
+  <text class="lane" x="40" y="392">ONE GAP · 469 MS AS A VARINT</text>
+  <line class="rule" x1="40" y1="404" x2="1160" y2="404"/>
+
+  <rect class="byte-hi" x="40" y="428" width="240" height="60" rx="4"/>
+  <text class="bits" x="160" y="464" text-anchor="middle">1 · 1010101</text>
+  <text class="label" x="40" y="516">0xd5 · more bytes follow</text>
+  <text class="label" x="40" y="538">low 7 bits = 85</text>
+
+  <rect class="byte-hi" x="320" y="428" width="240" height="60" rx="4"/>
+  <text class="bits" x="440" y="464" text-anchor="middle">0 · 0000011</text>
+  <text class="label" x="320" y="516">0x03 · last byte</text>
+  <text class="label" x="320" y="538">next 7 bits = 3</text>
+
+  <text class="label-hi" x="620" y="466">85 + 3 × 128 = 469 ms</text>
+  <text class="label" x="620" y="516">gaps from 128 to 16,383 ms take two bytes:</text>
+  <text class="label" x="620" y="538">every tempo between about 3.7 and 468 BPM</text>
+</svg>

@@ -1,0 +1,340 @@
+---
+import BlogFigure from "./BlogFigure.astro";
+import {
+  CROSSFADE_STATES,
+  crossfadeReadout,
+  FADE,
+  LANES,
+  scenePaths,
+  STALL,
+  toX,
+  VIEW,
+  WINDOW,
+} from "../../scripts/viz/blog/crossfade";
+
+const initial = "timer";
+const scenes = CROSSFADE_STATES.map((state) => ({ id: state.id, paths: scenePaths(state.id) }));
+const readout = crossfadeReadout(initial, WINDOW.end);
+const x = (s: number) => toX(s).toFixed(1);
+const left = (s: number) => `${((toX(s) / VIEW.width) * 100).toFixed(2)}%`;
+const top = (y: number) => `${((y / VIEW.height) * 100).toFixed(2)}%`;
+const gainTop = LANES.gain.top;
+const gainBottom = LANES.gain.bottom;
+---
+
+<BlogFigure
+  viz="blog-crossfade"
+  id="crossfade-engine"
+  label="Crossfade"
+  context="deck A → deck B"
+  states={CROSSFADE_STATES.map((state) => ({ ...state, phases: [...state.phases] }))}
+  initial={initial}
+  example
+  ariaLabel="One six-second crossfade under three mechanisms. With the UI timer, a busy main thread holds both gains, they jump when it resumes, and the incoming track steps up about 3 dB at the end. With PCM envelopes the gains follow the samples and staging eases back. With the shared bus, deck B starts on a planned frame and its beats line up with deck A."
+  caption="Illustrative fade, stall and start offset. Curves follow the Android code before and after e08714d4; no audio is played."
+>
+  <div class="cf">
+    <svg viewBox={`0 0 ${VIEW.width} ${VIEW.height}`} preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <clipPath id="crossfade-clip">
+          <rect data-cf-clip x="0" y="0" width={VIEW.width} height={VIEW.height} />
+        </clipPath>
+        <pattern id="crossfade-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="6" />
+        </pattern>
+      </defs>
+
+      <rect class="zone" x={x(0)} y={LANES.aWave.top} width={toX(FADE) - toX(0)} height={LANES.bWave.bottom - LANES.aWave.top} />
+      <g class="stall">
+        <rect class="stall-band" x={x(STALL.from)} y={LANES.aWave.top} width={toX(STALL.to) - toX(STALL.from)} height={gainBottom - LANES.aWave.top} />
+        <rect class="stall-bar" x={x(STALL.from)} y={LANES.ui.top} width={toX(STALL.to) - toX(STALL.from)} height={LANES.ui.bottom - LANES.ui.top} />
+      </g>
+      <line class="rule" x1="0" x2={VIEW.width} y1={LANES.ui.bottom + 6} y2={LANES.ui.bottom + 6} />
+      <line class="unity" x1="0" x2={VIEW.width} y1={gainTop} y2={gainTop} />
+      <line class="rule" x1="0" x2={VIEW.width} y1={gainBottom} y2={gainBottom} />
+      <line class="frame" x1={x(0)} x2={x(0)} y1={LANES.aGrid.top - 4} y2={LANES.bWave.bottom} />
+
+      {
+        scenes.map(({ id, paths }) => (
+          <g class="cf-state" data-cf-state={id}>
+            <path class="reference" d={paths.reference} />
+            {paths.offsets && <path class="offset" d={paths.offsets} />}
+            <path class="tick a" d={paths.aTicks.beat} />
+            <path class="tick a down" d={paths.aTicks.down} />
+            <path class="tick b" d={paths.bTicks.beat} />
+            <path class="tick b down" d={paths.bTicks.down} />
+            {paths.bHeld && <path class="wave held" d={paths.bHeld} />}
+            <path class="wave dim" d={paths.aWave} />
+            <path class="wave dim" d={paths.bWave} />
+            {paths.plannedA && <path class="planned" d={paths.plannedA} />}
+            {paths.plannedB && <path class="planned" d={paths.plannedB} />}
+            <path class="gain dim" d={paths.gainA} />
+            <path class="gain dim" d={paths.gainB} />
+            <g clip-path="url(#crossfade-clip)">
+              <path class="wave lit a" d={paths.aWave} />
+              <path class="wave lit b" d={paths.bWave} />
+              <path class="gain lit a" d={paths.gainA} />
+              <path class="gain lit b" d={paths.gainB} />
+            </g>
+          </g>
+        ))
+      }
+      <line class="head" data-cf-head x1={VIEW.width} x2={VIEW.width} y1={LANES.aWave.top - 4} y2={gainBottom} />
+    </svg>
+
+    <span class="tag a" style={`top:${top(LANES.aWave.top)}`}>A · outgoing</span>
+    <span class="tag b" style={`top:${top(LANES.bWave.bottom)}`}>B · incoming</span>
+    <span class="tag gain" style={`top:${top(gainTop)}`}>Gain</span>
+    <span class="tag ui" style={`left:${left(STALL.from)};top:${top(LANES.ui.top)}`}>UI thread busy</span>
+    <span class="tag step" style={`left:${left(FADE)};top:${top(gainTop)}`}>+3 dB step</span>
+    <span class="tag start" style={`left:${left(0)};top:${top(LANES.aGrid.top - 4)}`}>start frame</span>
+  </div>
+
+  <dl class="bf-readout" slot="readout">
+    <div>
+      <dt class="viz-label">Gain A / B</dt>
+      <dd><span data-cf-ro="gainA">{readout.gainA}</span> / <span data-cf-ro="gainB">{readout.gainB}</span><small>dB</small></dd>
+    </div>
+    <div>
+      <dt class="viz-label">UI thread</dt>
+      <dd data-cf-ro="ui" data-tone={readout.ui.tone}>{readout.ui.text}</dd>
+    </div>
+    <div>
+      <dt class="viz-label">Beats</dt>
+      <dd data-cf-ro="beats" data-tone={readout.beats.tone}>{readout.beats.text}</dd>
+    </div>
+    <div>
+      <dt class="viz-label">Output</dt>
+      <dd data-cf-ro="output">{readout.output}</dd>
+    </div>
+  </dl>
+</BlogFigure>
+
+<style>
+  .cf {
+    position: relative;
+    height: clamp(250px, 26vw, 320px);
+  }
+
+  .cf svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .cf-state {
+    display: none;
+  }
+
+  :global(.bf[data-state="timer"]) .cf-state[data-cf-state="timer"],
+  :global(.bf[data-state="pcm"]) .cf-state[data-cf-state="pcm"],
+  :global(.bf[data-state="bus"]) .cf-state[data-cf-state="bus"] {
+    display: inline;
+  }
+
+  .zone {
+    fill: rgba(6, 182, 212, 0.045);
+  }
+
+  #crossfade-hatch line {
+    stroke: rgba(251, 191, 36, 0.35);
+    stroke-width: 2;
+  }
+
+  .stall-band {
+    fill: url(#crossfade-hatch);
+    opacity: 0.35;
+    transition: opacity 0.3s var(--ease-snap);
+  }
+
+  .stall-bar {
+    fill: var(--amber);
+    opacity: 0.55;
+    transition: opacity 0.3s var(--ease-snap);
+  }
+
+  .cf[data-ui="busy"] .stall-band {
+    opacity: 0.9;
+  }
+
+  .cf[data-ui="busy"] .stall-bar {
+    opacity: 1;
+  }
+
+  :global(.bf[data-state="bus"]) .stall,
+  :global(.bf[data-state="bus"]) .tag.ui {
+    display: none;
+  }
+
+  .rule {
+    stroke: var(--line);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .unity {
+    stroke: rgba(241, 245, 249, 0.12);
+    stroke-width: 1;
+    stroke-dasharray: 2 4;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .frame {
+    stroke: var(--cyan-hi);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+    vector-effect: non-scaling-stroke;
+    display: none;
+  }
+
+  :global(.bf[data-state="bus"]) .frame {
+    display: inline;
+  }
+
+  .reference {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.26);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .offset {
+    fill: none;
+    stroke: var(--amber);
+    stroke-width: 3;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .tick {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.3);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .tick.b {
+    stroke: rgba(103, 232, 249, 0.5);
+  }
+
+  .tick.down {
+    stroke-width: 1.75;
+  }
+
+  .tick.b.down {
+    stroke: var(--cyan-hi);
+  }
+
+  .wave.dim {
+    fill: rgba(241, 245, 249, 0.08);
+  }
+
+  .wave.held {
+    fill: none;
+    stroke: rgba(103, 232, 249, 0.35);
+    stroke-width: 0.75;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .wave.lit.a {
+    fill: rgba(241, 245, 249, 0.72);
+  }
+
+  .wave.lit.b {
+    fill: var(--cyan-hi);
+  }
+
+  .planned {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.22);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .gain {
+    fill: none;
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .gain.dim {
+    stroke: rgba(241, 245, 249, 0.12);
+  }
+
+  .gain.lit.a {
+    stroke: rgba(241, 245, 249, 0.8);
+  }
+
+  .gain.lit.b {
+    stroke: var(--cyan-hi);
+    filter: drop-shadow(0 0 4px rgba(103, 232, 249, 0.5));
+  }
+
+  .head {
+    stroke: var(--fg);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .tag {
+    position: absolute;
+    left: 0;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--fg-2);
+    pointer-events: none;
+    transform: translateY(-100%);
+    text-shadow: 0 0 8px var(--bg);
+  }
+
+  .tag.b {
+    transform: translateY(4px);
+    color: var(--cyan-hi);
+  }
+
+  .tag.gain {
+    transform: translateY(4px);
+    color: var(--fg-3);
+  }
+
+  .tag.ui {
+    transform: translate(0, calc(-100% - 3px));
+    color: var(--amber);
+  }
+
+  .tag.step {
+    display: none;
+    transform: translate(calc(-100% - 6px), 4px);
+    color: var(--amber);
+  }
+
+  :global(.bf[data-state="timer"]) .tag.step {
+    display: block;
+  }
+
+  .tag.start {
+    display: none;
+    transform: translate(6px, -100%);
+    color: var(--cyan-hi);
+  }
+
+  :global(.bf[data-state="bus"]) .tag.start {
+    display: block;
+  }
+
+  @media (max-width: 760px) {
+    .cf {
+      height: 230px;
+    }
+    .tag {
+      font-size: 8.5px;
+    }
+  }
+</style>

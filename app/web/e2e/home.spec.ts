@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { historicalChapters } from "./blog-content";
 
 test.describe("hero", () => {
   test("never shows the static mark before the particle field", async ({
@@ -208,4 +209,16 @@ test.describe("hero", () => {
     await page.waitForTimeout(500);
     await expect(button.locator(".pill")).toHaveText("Copy");
   });
+});
+
+test("the hero and Explore announce the engineering blog", async ({ page }) => {
+  const chapters = historicalChapters.filter((post) => !post.draft).length;
+  await page.goto("/");
+  const announcement = page.locator("[data-hero-blog]");
+  await expect(announcement).toBeVisible();
+  await expect(announcement).toHaveAttribute("href", "/blog");
+  await expect(announcement).toContainText(`in ${chapters} chapters`);
+  const explore = page.locator('nav.explore a[href="/blog"]');
+  await expect(explore).toContainText("Blog");
+  await expect(explore).toContainText(`${chapters}-chapter history`);
 });

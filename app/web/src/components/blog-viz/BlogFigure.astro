@@ -1,0 +1,396 @@
+---
+/**
+ * Shared frame for engineering-blog figures. A figure explains one mechanism:
+ * a label bar, the scene (default slot), optional readouts and a numbered
+ * phase list that doubles as the control. With several states, a switch in the
+ * bar compares versions of the same mechanism. The view registered under
+ * `viz` in scripts/viz/index.ts animates it through scripts/viz/blog/phase-loop.
+ */
+export interface FigurePhase {
+  title: string;
+  body: string;
+}
+
+export interface FigureState {
+  id: string;
+  label: string;
+  phases: FigurePhase[];
+}
+
+interface Props {
+  viz: string;
+  label: string;
+  context: string;
+  states: FigureState[];
+  ariaLabel: string;
+  initial?: string;
+  qualifier?: string;
+  example?: boolean;
+  caption?: string;
+  id?: string;
+}
+
+const { viz, label, context, states, ariaLabel, qualifier, example = false, caption, id } = Astro.props;
+const initial = Astro.props.initial ?? states[0]!.id;
+const pad = (index: number) => String(index + 1).padStart(2, "0");
+// Phase copy marks identifiers with backticks: `transfer_ready`.
+const parts = (text: string) => text.split("`").map((value, i) => ({ value, code: i % 2 === 1 }));
+---
+
+<figure class="bf" id={id} data-viz={viz} data-state={initial} aria-label={ariaLabel}>
+  <header class="bf-bar">
+    <p class="viz-label bf-title"><b>{label}</b> {context}</p>
+    <div class="bf-meta">
+      {
+        states.length > 1 && (
+          <div class="bf-switch" role="group" aria-label="Compare versions">
+            {states.map((state) => (
+              <button type="button" data-bf-state={state.id} aria-pressed={state.id === initial ? "true" : "false"}>
+                <i aria-hidden="true" />
+                {state.label}
+              </button>
+            ))}
+          </div>
+        )
+      }
+      {qualifier && <p class="viz-label bf-qualifier">{qualifier}</p>}
+      {example && <p class="viz-label bf-example">Example</p>}
+    </div>
+  </header>
+
+  <div class="bf-stage">
+    <slot />
+  </div>
+
+  <slot name="readout" />
+
+  {
+    states.map((state) => (
+      <ol
+        class="bf-phases"
+        data-bf-phases={state.id}
+        hidden={state.id !== initial}
+        style={`--bf-count:${state.phases.length}`}
+        aria-label={states.length > 1 ? `${state.label}: steps` : "Steps"}
+      >
+        {state.phases.map((phase, index) => (
+          <li>
+            <button type="button" data-bf-phase={index} aria-pressed="false">
+              <span class="viz-label">
+                <b>{pad(index)}</b>
+                {phase.title}
+              </span>
+              <span class="bf-body">{parts(phase.body).map((part) => (part.code ? <code>{part.value}</code> : part.value))}</span>
+            </button>
+          </li>
+        ))}
+      </ol>
+    ))
+  }
+
+  {caption && <figcaption class="bf-caption">{caption}</figcaption>}
+</figure>
+
+<style>
+  .bf {
+    --bf-offset: var(--prose-offset, 0px);
+    position: relative;
+    display: grid;
+    gap: 18px;
+    width: calc(100% + var(--bf-offset));
+    margin: 3.2em 0 3.2em calc(-1 * var(--bf-offset));
+    padding: 18px 0 0;
+    border-top: 1px solid var(--line);
+    color: var(--fg);
+    font: 14px/1.5 var(--sans);
+    scroll-margin-top: 96px;
+  }
+
+  /* Figures sit inside .prose; these resets must outrank its element rules. */
+  :global(.prose) .bf :global(p),
+  :global(.prose) .bf :global(ol),
+  :global(.prose) .bf :global(li),
+  :global(.prose) .bf :global(dl),
+  :global(.prose) .bf :global(dd) {
+    margin: 0;
+  }
+
+  .bf-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 24px;
+  }
+
+  .bf-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 18px;
+  }
+
+  .bf-example {
+    color: var(--amber);
+  }
+
+  .bf-switch {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+  }
+
+  .bf-switch button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    border: 0;
+    background: none;
+    color: var(--fg-3);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 0.3s var(--ease-snap);
+  }
+
+  .bf-switch button:hover,
+  .bf-switch button[aria-pressed="true"] {
+    color: var(--fg);
+  }
+
+  .bf-switch i {
+    position: relative;
+    width: 22px;
+    height: 12px;
+    border: 1px solid rgba(241, 245, 249, 0.25);
+    border-radius: 999px;
+    transition: border-color 0.3s var(--ease-snap);
+  }
+
+  .bf-switch i::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(241, 245, 249, 0.4);
+    transition:
+      left 0.35s var(--spring-snappy),
+      background 0.3s var(--ease-snap),
+      box-shadow 0.3s var(--ease-snap);
+  }
+
+  .bf-switch button[aria-pressed="true"] i {
+    border-color: rgba(103, 232, 249, 0.55);
+  }
+
+  .bf-switch button[aria-pressed="true"] i::after {
+    left: 12px;
+    background: var(--cyan-hi);
+    box-shadow: 0 0 8px rgba(103, 232, 249, 0.7);
+  }
+
+  .bf-stage {
+    position: relative;
+  }
+
+  .bf :global(.bf-readout) {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    grid-auto-flow: column;
+    border-top: 1px solid var(--line);
+  }
+
+  .bf :global(.bf-readout > div) {
+    display: grid;
+    align-content: start;
+    gap: 7px;
+    padding: 12px 12px 0 0;
+    min-width: 0;
+  }
+
+  .bf :global(.bf-readout > div + div) {
+    padding-left: 12px;
+    border-left: 1px solid var(--line);
+  }
+
+  .bf :global(.bf-readout dt) {
+    font-size: 9.5px;
+  }
+
+  .bf :global(.bf-readout dd) {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.05rem, 1.5vw, 1.4rem);
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+    color: var(--fg);
+    transition: color 0.3s var(--ease-snap);
+  }
+
+  .bf :global(.bf-readout dd small) {
+    margin-left: 4px;
+    font-family: var(--mono);
+    font-weight: 400;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--fg-3);
+  }
+
+  .bf :global(.bf-readout dd[data-tone="warn"]) {
+    color: var(--amber);
+  }
+
+  .bf :global(.bf-readout dd[data-tone="ok"]) {
+    color: var(--cyan-hi);
+  }
+
+  .bf-phases {
+    display: grid;
+    grid-template-columns: repeat(var(--bf-count), minmax(0, 1fr));
+    gap: 18px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .bf-phases[hidden] {
+    display: none;
+  }
+
+  .bf-phases li {
+    position: relative;
+    margin: 0;
+    opacity: 0.42;
+    transition: opacity 0.45s var(--ease-snap);
+  }
+
+  .bf:not([data-ready]) .bf-phases li,
+  .bf-phases li:global(.is-active),
+  .bf-phases li:global(.is-done) {
+    opacity: 1;
+  }
+
+  .bf-phases li::before,
+  .bf-phases li::after {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 1px;
+  }
+
+  .bf-phases li::before {
+    background: var(--line);
+  }
+
+  .bf-phases li::after {
+    background: var(--cyan-hi);
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+
+  .bf-phases li:global(.is-done)::after {
+    transform: scaleX(1);
+  }
+
+  .bf-phases li:global(.is-active)::after {
+    transform: scaleX(var(--bf-progress, 0));
+  }
+
+  .bf-phases button {
+    display: grid;
+    align-content: start;
+    gap: 8px;
+    width: 100%;
+    padding: 14px 0 4px;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .bf-phases button:focus-visible {
+    outline: 2px solid var(--cyan-hi);
+    outline-offset: 4px;
+    border-radius: 2px;
+  }
+
+  .bf-phases .viz-label {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    color: var(--fg-2);
+  }
+
+  .bf-phases li:global(.is-active) .viz-label {
+    color: var(--fg);
+  }
+
+  .bf-phases button[aria-pressed="true"] .viz-label::after {
+    content: "";
+    width: 7px;
+    height: 8px;
+    margin-left: 10px;
+    border-inline: 2px solid var(--cyan-hi);
+  }
+
+  .bf-body {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--fg-2);
+  }
+
+  :global(.prose) .bf .bf-body :global(code) {
+    padding: 0;
+    border: 0;
+    background: none;
+    font-family: var(--mono);
+    font-size: 0.9em;
+    color: var(--fg);
+  }
+
+  .bf-caption {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+    color: var(--fg-3);
+  }
+
+  @media (max-width: 760px) {
+    .bf {
+      width: 100%;
+      margin-left: 0;
+    }
+    .bf-phases {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 4px 16px;
+    }
+    .bf :global(.bf-readout) {
+      grid-auto-flow: row;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .bf :global(.bf-readout > div:nth-child(odd)) {
+      padding-left: 0;
+      border-left: 0;
+    }
+    .bf :global(.bf-readout > div:nth-child(n + 3)) {
+      margin-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bf-phases li,
+    .bf-switch i::after {
+      transition: none;
+    }
+  }
+</style>

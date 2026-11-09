@@ -1,0 +1,146 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 960 890"
+  role="img"
+  aria-labelledby="title desc"
+>
+  <title id="title">Playback ownership changes in three stages</title>
+  <desc id="desc">
+    The early Admin player uses Crate as a proxy to Navidrome. The first Listen
+    has both local-file and Navidrome routes. By11April Listen prefers Crate
+    catalogue IDs and Navidrome leaves the runtime. All stages access the same
+    audio collection; the diagram shows media request paths, not a deployment
+    topology.
+  </desc>
+  <defs>
+    <marker
+      id="arrow"
+      viewBox="0 0 10 10"
+      refX="9"
+      refY="5"
+      markerWidth="6"
+      markerHeight="6"
+      orient="auto"
+    >
+      <path
+        d="M0 0L10 5L0 10"
+        fill="none"
+        stroke="#67e8f9"
+        stroke-width="1.5"
+      />
+    </marker>
+  </defs>
+  <style>
+    text {
+      font-family: Arial, Helvetica, sans-serif;
+      fill: #f1f5f9;
+      font-size: 20px;
+    }
+    .label {
+      font-family: monospace;
+      font-size: 16px;
+      fill: #67e8f9;
+      letter-spacing: 0.6px;
+    }
+    .note {
+      font-size: 17px;
+      fill: #b1b5c0;
+    }
+    .small {
+      font-size: 16px;
+      fill: #b1b5c0;
+    }
+    .box {
+      fill: #11121a;
+      stroke: #353947;
+    }
+    .active {
+      fill: #0c2028;
+      stroke: #278396;
+    }
+    .flow {
+      fill: none;
+      stroke: #67e8f9;
+      stroke-width: 1.5;
+      marker-end: url(#arrow);
+    }
+    .event {
+      fill: none;
+      stroke: #fbbf24;
+      stroke-width: 1.5;
+      stroke-dasharray: 2 5;
+    }
+    .warn {
+      fill: #fbbf24;
+    }
+  </style>
+  <rect width="960" height="890" fill="#0a0a0f" />
+  <text x="32" y="40" class="label" text-anchor="start">
+    THREE STAGES OF PLAYBACK OWNERSHIP
+  </text>
+  <text x="32" y="83" class="label" text-anchor="start">
+    19–20 MAR · ADMIN USES THE NAVIDROME STREAM
+  </text>
+  <rect x="32" y="112" width="176" height="86" rx="5" class="box" />
+  <text x="120.0" y="162.0" class="" text-anchor="middle">Admin player</text>
+  <rect x="270" y="112" width="176" height="86" rx="5" class="box" />
+  <text x="358.0" y="162.0" class="" text-anchor="middle">Crate proxy</text>
+  <rect x="508" y="112" width="176" height="86" rx="5" class="box" />
+  <text x="596.0" y="162.0" class="" text-anchor="middle">Navidrome</text>
+  <rect x="746" y="112" width="182" height="86" rx="5" class="box" />
+  <text x="837.0" y="162.0" class="" text-anchor="middle">Audio files</text>
+  <path d="M208 155 H270" class="flow" />
+  <path d="M446 155 H508" class="flow" />
+  <path d="M684 155 H746" class="flow" />
+  <text x="32" y="238" class="note" text-anchor="start">
+    The catalogues need matching; the proxy must preserve HTTP range metadata.
+  </text>
+  <path d="M32 273H928" stroke="#353947" />
+  <text x="32" y="313" class="label" text-anchor="start">
+    28 MAR · LISTEN CAN USE EITHER ROUTE
+  </text>
+  <rect x="32" y="403" width="176" height="86" rx="5" class="box" />
+  <text x="120.0" y="453.0" class="" text-anchor="middle">Listen</text>
+  <rect x="302" y="354" width="286" height="78" rx="5" class="active" />
+  <text x="445.0" y="400.0" class="" text-anchor="middle">
+    Crate file route
+  </text>
+  <rect x="302" y="488" width="286" height="78" rx="5" class="box" />
+  <text x="445.0" y="534.0" class="" text-anchor="middle">Navidrome proxy</text>
+  <rect x="670" y="354" width="258" height="78" rx="5" class="box" />
+  <text x="799.0" y="400.0" class="" text-anchor="middle">Audio files</text>
+  <rect x="670" y="488" width="258" height="78" rx="5" class="box" />
+  <text x="799.0" y="534.0" class="" text-anchor="middle">Navidrome</text>
+  <path d="M208 446 H254 V393 H302" class="flow" />
+  <path d="M254 446 V527 H302" class="flow" />
+  <path d="M588 393 H670" class="flow" />
+  <path d="M588 527 H670" class="flow" />
+  <path d="M800 488 V432" class="flow" />
+  <text x="310" y="344" class="label" text-anchor="start">LOCAL PATH</text>
+  <text x="310" y="478" class="label" text-anchor="start">OPAQUE SONG ID</text>
+  <text x="32" y="610" class="note" text-anchor="start">
+    PlayerProvider keeps the queue and audio element above Listen’s routed
+    pages.
+  </text>
+  <path d="M32 646H928" stroke="#353947" />
+  <text x="32" y="686" class="label" text-anchor="start">
+    11 APR · LISTEN USES CRATE’S CATALOGUE AND MEDIA API
+  </text>
+  <rect x="32" y="716" width="176" height="86" rx="5" class="box" />
+  <text x="120.0" y="766.0" class="" text-anchor="middle">Listen</text>
+  <rect x="302" y="716" width="366" height="86" rx="5" class="active" />
+  <text x="485.0" y="753.0" class="" text-anchor="middle">
+    Crate track ID → file
+  </text>
+  <text x="485.0" y="779.0" class="" text-anchor="middle">
+    Authenticated media route
+  </text>
+  <rect x="762" y="716" width="166" height="86" rx="5" class="box" />
+  <text x="845.0" y="766.0" class="" text-anchor="middle">Audio files</text>
+  <path d="M208 759H302" class="flow" />
+  <path d="M668 759H762" class="flow" />
+  <text x="32" y="844" class="note" text-anchor="start">
+    The local-path fallback remains. These endpoints serve the original audio
+    format.
+  </text>
+</svg>

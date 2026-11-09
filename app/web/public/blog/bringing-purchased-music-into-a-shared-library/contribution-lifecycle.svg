@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="810" viewBox="0 0 1200 810" role="img" aria-labelledby="title desc">
+  <title id="title">Purchases become contributions to a shared album</title>
+  <desc id="desc">A connected Bandcamp collection supplies owned downloadable purchases. A worker downloads an archive to staging and passes it to the shared importer, which installs music and records a contribution. Two active contributions can point to one album. After contribution A is withdrawn, contribution B remains active and the worker keeps the album. With no active contributions left, the worker requests full album deletion.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10" fill="none" stroke="#67e8f9" stroke-width="1"/></marker>
+    <style>
+      .label { font-family: 'JetBrains Mono', monospace; font-size: 16px; letter-spacing: 1px; fill: #67e8f9; }
+      .body { font-family: Inter, Arial, sans-serif; font-size: 19px; fill: #e7e9f0; }
+      .note { font-family: Inter, Arial, sans-serif; font-size: 16px; fill: #a2a8b8; }
+      .panel { fill: #0d0e14; stroke: #343744; stroke-width: 1; }
+      .edge { fill: none; stroke: #67e8f9; stroke-width: 1; marker-end: url(#arrow); }
+      .async { stroke-dasharray: 9 4; }
+    </style>
+  </defs>
+  <rect width="1200" height="810" fill="#0a0a0f"/>
+  <text x="40" y="48" class="label">FROM A PURCHASE TO A SHARED ALBUM</text>
+  <text x="40" y="82" class="note">May 2026 · The source and contributing user travel with the archive.</text>
+
+  <rect x="40" y="120" width="240" height="158" rx="8" class="panel"/>
+  <text x="60" y="152" class="label">BANDCAMP</text>
+  <text x="60" y="188" class="body">Connected collection</text>
+  <text x="60" y="218" class="note">Owned + downloadable</text>
+  <text x="60" y="244" class="note">User relationship stored</text>
+
+  <rect x="328" y="120" width="240" height="158" rx="8" class="panel"/>
+  <text x="348" y="152" class="label">IMPORT WORKER</text>
+  <text x="348" y="188" class="body">Check shared library</text>
+  <text x="348" y="218" class="note">Skip visible duplicates</text>
+  <text x="348" y="244" class="note">Download missing music</text>
+
+  <rect x="616" y="120" width="240" height="158" rx="8" class="panel"/>
+  <text x="636" y="152" class="label">STAGING</text>
+  <text x="636" y="188" class="body">Archive + source</text>
+  <text x="636" y="218" class="note">Existing upload handler</text>
+  <text x="636" y="244" class="note">Unpack → import → sync</text>
+
+  <rect x="904" y="120" width="256" height="158" rx="8" class="panel"/>
+  <text x="924" y="152" class="label">SHARED LIBRARY</text>
+  <text x="924" y="188" class="body">Album + contribution</text>
+  <text x="924" y="218" class="note">Catalogue and audio</text>
+  <text x="924" y="244" class="note">User / source / album IDs</text>
+  <path d="M280 199 H328" class="edge async"/>
+  <path d="M568 199 H616" class="edge"/>
+  <path d="M856 199 H904" class="edge"/>
+
+  <text x="40" y="339" class="label">WITHDRAWAL CHECKS THE REMAINING CONTRIBUTIONS</text>
+  <rect x="40" y="371" width="544" height="294" rx="8" class="panel"/>
+  <text x="64" y="405" class="label">BEFORE</text>
+  <text x="64" y="436" class="note">Two recorded contributions point to one album.</text>
+  <rect x="64" y="462" width="222" height="62" rx="6" fill="#101a21" stroke="#67e8f9" stroke-width="1"/>
+  <text x="82" y="487" class="body">Contribution A</text>
+  <text x="82" y="510" class="note">Active · Bandcamp</text>
+  <rect x="64" y="552" width="222" height="62" rx="6" fill="#101a21" stroke="#67e8f9" stroke-width="1"/>
+  <text x="82" y="577" class="body">Contribution B</text>
+  <text x="82" y="600" class="note">Active · upload</text>
+  <rect x="364" y="509" width="194" height="72" rx="6" fill="#101a21" stroke="#67e8f9" stroke-width="1"/>
+  <text x="384" y="540" class="body">Shared album</text>
+  <text x="384" y="563" class="note">Files + catalogue</text>
+  <path d="M286 493 H320 V532 H364" class="edge"/>
+  <path d="M286 583 H320 V558 H364" class="edge"/>
+
+  <rect x="608" y="371" width="552" height="294" rx="8" class="panel"/>
+  <text x="632" y="405" class="label">AFTER A WITHDRAWS</text>
+  <text x="632" y="436" class="note">B is still active. The worker keeps the album.</text>
+  <rect x="632" y="462" width="222" height="62" rx="6" fill="#0d0e14" stroke="#343744" stroke-width="1"/>
+  <text x="650" y="487" class="body" fill-opacity="0.6">Contribution A</text>
+  <text x="650" y="510" class="note">Withdrawn</text>
+  <rect x="632" y="552" width="222" height="62" rx="6" fill="#101a21" stroke="#67e8f9" stroke-width="1"/>
+  <text x="650" y="577" class="body">Contribution B</text>
+  <text x="650" y="600" class="note">Active · upload</text>
+  <rect x="932" y="509" width="202" height="72" rx="6" fill="#101a21" stroke="#67e8f9" stroke-width="1"/>
+  <text x="950" y="540" class="body">Same album</text>
+  <text x="950" y="563" class="note">Files stay available</text>
+  <path d="M854 583 H889 V558 H932" class="edge"/>
+
+  <text x="40" y="708" class="note">No active contributions remain → ask the album deletion worker for full removal.</text>
+  <text x="40" y="738" class="note">Owning the same purchase does not automatically create another contribution.</text>
+  <path d="M40 776 H82" class="edge async"/>
+  <text x="96" y="782" class="note">Queued work</text>
+  <path d="M280 776 H322" class="edge"/>
+  <text x="336" y="782" class="note">Processing or stored relationship</text>
+</svg>

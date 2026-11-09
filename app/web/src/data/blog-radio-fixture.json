@@ -1,0 +1,1560 @@
+{
+  "version": 1,
+  "source": {
+    "commit": "924b7fb6d08e0a9a80a8241ed41786aa7a770824",
+    "selectorFile": "app/crate/radio_engine.py",
+    "selectorLines": {
+      "start": 1547,
+      "end": 1731
+    },
+    "regressionFile": "app/tests/test_radio_final_rotation.py",
+    "regressionLines": {
+      "start": 48,
+      "end": 62
+    },
+    "sha256": {
+      "app/crate/radio_engine.py": "82a9f124034ff31f967509527e5590446cc35c5cf01c4f2ad36444ea9f88f8f1",
+      "app/crate/track_versions.py": "61a5cdee7baa6a2eb3a793bd54ab706dedfab52901e7d645626c6d7312bd6632",
+      "app/crate/queue_engine.py": "4bf3f3a8e08ac33ecb0b5f387559a2f1dbaddca6cc2a4011644fa904ef3cfdea",
+      "app/crate/recommendation_policy.py": "ccac8fbbb352656ca9fdaf9cd4a65f9f3508da27d75c8684fcc700dc5b6794c9",
+      "app/crate/db/paths_candidates.py": "95c9d3c2508832814203bc965bdebf061cd961e476b00fc158ea76aecdee38ee",
+      "app/crate/db/paths_similarity.py": "b916a1df23d0eb3671cbb017ef328d918490a5a56a63a1c6f42ebd459213830f",
+      "app/tests/test_radio_delivery_memory.py": "2aa987199b82373f3e38e246eb4dd698293eadff94a0fda94ef4ece7f9844223",
+      "app/tests/test_radio_final_rotation.py": "842821583ccae9e756a8302878818d4279ab28c101e418fba9d0e21c1086f204"
+    },
+    "adapters": "Synthetic catalogue, fixed distances, acoustic-only weights, empty graphs and no artist counts; no batch generator, SQL, Redis, production audio or timing measurements."
+  },
+  "cases": [
+    {
+      "id": "skip",
+      "label": "Short skip",
+      "catalog": [
+        {
+          "id": 1,
+          "track_id": 1,
+          "artist": "A",
+          "title": "Delivered X",
+          "album": "Album",
+          "bliss_vector": null,
+          "radio_source": "similar",
+          "distance": 0.1,
+          "duration": 180
+        },
+        {
+          "id": 2,
+          "track_id": 2,
+          "artist": "B",
+          "title": "Fresh",
+          "album": "Album",
+          "bliss_vector": null,
+          "radio_source": "similar",
+          "distance": 0.4,
+          "duration": 180
+        },
+        {
+          "id": 3,
+          "track_id": 3,
+          "artist": "C",
+          "title": "Far",
+          "album": "Album",
+          "bliss_vector": null,
+          "radio_source": "similar",
+          "distance": 1.0,
+          "duration": 180
+        }
+      ],
+      "events": [
+        {
+          "kind": "rank",
+          "title": "Rank the first refill",
+          "description": "The synthetic pool scores 0.10, 0.40 and 1.00. Lower scores are better; the three memories are empty.",
+          "bufferIds": [],
+          "deliveredKeys": [],
+          "historyKeys": [],
+          "play": null,
+          "selectedId": null,
+          "originalWinnerId": 1,
+          "qualityLimit": null,
+          "reason": "ranking",
+          "candidates": [
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Delivered X",
+              "key": [
+                "a",
+                "delivered x"
+              ],
+              "score": 0.1,
+              "status": "Fresh"
+            },
+            {
+              "id": 2,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": 0.4,
+              "status": "Fresh"
+            },
+            {
+              "id": 3,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Fresh"
+            }
+          ]
+        },
+        {
+          "kind": "choose",
+          "title": "Choose the best score",
+          "description": "Delivered X wins the first refill at 0.10.",
+          "bufferIds": [],
+          "deliveredKeys": [],
+          "historyKeys": [],
+          "play": null,
+          "selectedId": 1,
+          "originalWinnerId": 1,
+          "qualityLimit": null,
+          "reason": "ranking",
+          "candidates": [
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Delivered X",
+              "key": [
+                "a",
+                "delivered x"
+              ],
+              "score": 0.1,
+              "status": "Fresh"
+            },
+            {
+              "id": 2,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": 0.4,
+              "status": "Fresh"
+            },
+            {
+              "id": 3,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Fresh"
+            }
+          ]
+        },
+        {
+          "kind": "deliver",
+          "title": "Delivered to the queue",
+          "description": "The song is in the active buffer and the session delivery ledger. Delivery alone is not a listen.",
+          "bufferIds": [
+            1
+          ],
+          "deliveredKeys": [
+            [
+              "a",
+              "delivered x"
+            ]
+          ],
+          "historyKeys": [],
+          "play": null,
+          "selectedId": null,
+          "originalWinnerId": 2,
+          "qualityLimit": null,
+          "reason": "ranking",
+          "candidates": [
+            {
+              "id": 2,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": 0.4,
+              "status": "Fresh"
+            },
+            {
+              "id": 3,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Fresh"
+            },
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Delivered X",
+              "key": [
+                "a",
+                "delivered x"
+              ],
+              "score": null,
+              "status": "In buffer"
+            }
+          ]
+        },
+        {
+          "kind": "play",
+          "title": "Skipped after 5 seconds",
+          "description": "Five seconds is below this track's 30-second threshold. Delivery is remembered; significant history stays empty.",
+          "bufferIds": [
+            1
+          ],
+          "deliveredKeys": [
+            [
+              "a",
+              "delivered x"
+            ]
+          ],
+          "historyKeys": [],
+          "play": {
+            "seconds": 5,
+            "duration": 180,
+            "threshold": 30.0,
+            "significant": false
+          },
+          "selectedId": null,
+          "originalWinnerId": 2,
+          "qualityLimit": null,
+          "reason": "ranking",
+          "candidates": [
+            {
+              "id": 2,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": 0.4,
+              "status": "Fresh"
+            },
+            {
+              "id": 3,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Fresh"
+            },
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Delivered X",
+              "key": [
+                "a",
+                "delivered x"
+              ],
+              "score": null,
+              "status": "In buffer"
+            }
+          ]
+        },
+        {
+          "kind": "rank",
+          "title": "Refill an empty buffer",
+          "description": "The buffer is empty but the session remembers Delivered X. Fresh is outside a 0.05 band; delivery uses a separate check.",
+          "bufferIds": [],
+          "deliveredKeys": [
+            [
+              "a",
+              "delivered x"
+            ]
+          ],
+          "historyKeys": [],
+          "play": {
+            "seconds": 5,
+            "duration": 180,
+            "threshold": 30.0,
+            "significant": false
+          },
+          "selectedId": null,
+          "originalWinnerId": 1,
+          "qualityLimit": null,
+          "reason": "delivery",
+          "candidates": [
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Delivered X",
+              "key": [
+                "a",
+                "delivered x"
+              ],
+              "score": 0.1,
+              "status": "Delivered this session"
+            },
+            {
+              "id": 2,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": 0.4,
+              "status": "Fresh"
+            },
+            {
+              "id": 3,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Fresh"
+            }
+          ]
+        },
+        {
+          "kind": "choose",
+          "title": "Choose an undelivered song",
+          "description": "The delivery check chooses Fresh at 0.40. It does not apply the listening-history quality band.",
+          "bufferIds": [],
+          "deliveredKeys": [
+            [
+              "a",
+              "delivered x"
+            ]
+          ],
+          "historyKeys": [],
+          "play": {
+            "seconds": 5,
+            "duration": 180,
+            "threshold": 30.0,
+            "significant": false
+          },
+          "selectedId": 2,
+          "originalWinnerId": 1,
+          "qualityLimit": null,
+          "reason": "delivery",
+          "candidates": [
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Delivered X",
+              "key": [
+                "a",
+                "delivered x"
+              ],
+              "score": 0.1,
+              "status": "Delivered this session"
+            },
+            {
+              "id": 2,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": 0.4,
+              "status": "Fresh"
+            },
+            {
+              "id": 3,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Fresh"
+            }
+          ]
+        },
+        {
+          "kind": "deliver",
+          "title": "Delivered to the queue",
+          "description": "The latest returned song updates delivery order. Neither this refill nor the earlier skip creates a significant listen.",
+          "bufferIds": [
+            2
+          ],
+          "deliveredKeys": [
+            [
+              "a",
+              "delivered x"
+            ],
+            [
+              "b",
+              "fresh"
+            ]
+          ],
+          "historyKeys": [],
+          "play": {
+            "seconds": 5,
+            "duration": 180,
+            "threshold": 30.0,
+            "significant": false
+          },
+          "selectedId": null,
+          "originalWinnerId": 1,
+          "qualityLimit": null,
+          "reason": "delivery",
+          "candidates": [
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Delivered X",
+              "key": [
+                "a",
+                "delivered x"
+              ],
+              "score": 0.1,
+              "status": "Delivered this session"
+            },
+            {
+              "id": 3,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Fresh"
+            },
+            {
+              "id": 2,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": null,
+              "status": "In buffer"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "listen",
+      "label": "Significant listen",
+      "catalog": [
+        {
+          "id": 1,
+          "track_id": 1,
+          "artist": "A",
+          "title": "Song",
+          "album": "Album",
+          "bliss_vector": null,
+          "radio_source": "similar",
+          "distance": 0.1,
+          "duration": 180
+        },
+        {
+          "id": 2,
+          "track_id": 2,
+          "artist": "A",
+          "title": "Song (Live)",
+          "album": "Album",
+          "bliss_vector": null,
+          "radio_source": "similar",
+          "distance": 0.12,
+          "duration": 180
+        },
+        {
+          "id": 3,
+          "track_id": 3,
+          "artist": "B",
+          "title": "Fresh",
+          "album": "Album",
+          "bliss_vector": null,
+          "radio_source": "similar",
+          "distance": 0.14,
+          "duration": 180
+        },
+        {
+          "id": 4,
+          "track_id": 4,
+          "artist": "C",
+          "title": "Far",
+          "album": "Album",
+          "bliss_vector": null,
+          "radio_source": "similar",
+          "distance": 1.0,
+          "duration": 180
+        }
+      ],
+      "events": [
+        {
+          "kind": "buffer",
+          "title": "Already in the buffer",
+          "description": "The queued recording and its live version are hard exclusions while this song remains in the buffer.",
+          "bufferIds": [
+            1
+          ],
+          "deliveredKeys": [
+            [
+              "a",
+              "song"
+            ]
+          ],
+          "historyKeys": [],
+          "play": null,
+          "selectedId": null,
+          "originalWinnerId": 3,
+          "qualityLimit": null,
+          "reason": "ranking",
+          "candidates": [
+            {
+              "id": 3,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": 0.14,
+              "status": "Fresh"
+            },
+            {
+              "id": 4,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Fresh"
+            },
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Song",
+              "key": [
+                "a",
+                "song"
+              ],
+              "score": null,
+              "status": "In buffer"
+            },
+            {
+              "id": 2,
+              "artist": "A",
+              "title": "Song (Live)",
+              "key": [
+                "a",
+                "song"
+              ],
+              "score": null,
+              "status": "Buffered song family"
+            }
+          ]
+        },
+        {
+          "kind": "play",
+          "title": "30 seconds played",
+          "description": "The play qualifies for the seven-day history, including this song's live version.",
+          "bufferIds": [
+            1
+          ],
+          "deliveredKeys": [
+            [
+              "a",
+              "song"
+            ]
+          ],
+          "historyKeys": [
+            [
+              "a",
+              "song"
+            ]
+          ],
+          "play": {
+            "seconds": 30,
+            "duration": 180,
+            "threshold": 30.0,
+            "significant": true
+          },
+          "selectedId": null,
+          "originalWinnerId": 3,
+          "qualityLimit": null,
+          "reason": "ranking",
+          "candidates": [
+            {
+              "id": 3,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": 0.14,
+              "status": "Fresh"
+            },
+            {
+              "id": 4,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Fresh"
+            },
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Song",
+              "key": [
+                "a",
+                "song"
+              ],
+              "score": null,
+              "status": "In buffer"
+            },
+            {
+              "id": 2,
+              "artist": "A",
+              "title": "Song (Live)",
+              "key": [
+                "a",
+                "song"
+              ],
+              "score": null,
+              "status": "Buffered song family"
+            }
+          ]
+        },
+        {
+          "kind": "new-session",
+          "title": "A new session",
+          "description": "The session ledger is empty. The qualifying listen remains in the seven-day history under one canonical song identity.",
+          "bufferIds": [],
+          "deliveredKeys": [],
+          "historyKeys": [
+            [
+              "a",
+              "song"
+            ]
+          ],
+          "play": {
+            "seconds": 30,
+            "duration": 180,
+            "threshold": 30.0,
+            "significant": true
+          },
+          "selectedId": null,
+          "originalWinnerId": 1,
+          "qualityLimit": 0.15,
+          "reason": "history",
+          "candidates": [
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Song",
+              "key": [
+                "a",
+                "song"
+              ],
+              "score": 0.1,
+              "status": "Heard recently"
+            },
+            {
+              "id": 3,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": 0.14,
+              "status": "Fresh"
+            },
+            {
+              "id": 2,
+              "artist": "A",
+              "title": "Song (Live)",
+              "key": [
+                "a",
+                "song"
+              ],
+              "score": 0.38,
+              "status": "Heard recently"
+            },
+            {
+              "id": 4,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Outside quality band"
+            }
+          ]
+        },
+        {
+          "kind": "rank",
+          "title": "Rank the candidates",
+          "description": "The best score is 0.10. A fresh candidate at 0.14 fits within the 0.15 limit; the live version shares the recent song identity.",
+          "bufferIds": [],
+          "deliveredKeys": [],
+          "historyKeys": [
+            [
+              "a",
+              "song"
+            ]
+          ],
+          "play": {
+            "seconds": 30,
+            "duration": 180,
+            "threshold": 30.0,
+            "significant": true
+          },
+          "selectedId": null,
+          "originalWinnerId": 1,
+          "qualityLimit": 0.15,
+          "reason": "history",
+          "candidates": [
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Song",
+              "key": [
+                "a",
+                "song"
+              ],
+              "score": 0.1,
+              "status": "Heard recently"
+            },
+            {
+              "id": 3,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": 0.14,
+              "status": "Fresh"
+            },
+            {
+              "id": 2,
+              "artist": "A",
+              "title": "Song (Live)",
+              "key": [
+                "a",
+                "song"
+              ],
+              "score": 0.38,
+              "status": "Heard recently"
+            },
+            {
+              "id": 4,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Outside quality band"
+            }
+          ]
+        },
+        {
+          "kind": "choose",
+          "title": "Rotate within 0.05",
+          "description": "Choose Fresh at 0.14 instead of the recently heard song at 0.10.",
+          "bufferIds": [],
+          "deliveredKeys": [],
+          "historyKeys": [
+            [
+              "a",
+              "song"
+            ]
+          ],
+          "play": {
+            "seconds": 30,
+            "duration": 180,
+            "threshold": 30.0,
+            "significant": true
+          },
+          "selectedId": 3,
+          "originalWinnerId": 1,
+          "qualityLimit": 0.15,
+          "reason": "history",
+          "candidates": [
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Song",
+              "key": [
+                "a",
+                "song"
+              ],
+              "score": 0.1,
+              "status": "Heard recently"
+            },
+            {
+              "id": 3,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": 0.14,
+              "status": "Fresh"
+            },
+            {
+              "id": 2,
+              "artist": "A",
+              "title": "Song (Live)",
+              "key": [
+                "a",
+                "song"
+              ],
+              "score": 0.38,
+              "status": "Heard recently"
+            },
+            {
+              "id": 4,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Outside quality band"
+            }
+          ]
+        },
+        {
+          "kind": "deliver",
+          "title": "Delivered to the queue",
+          "description": "Only Fresh enters this session's delivery ledger. Generating it does not add another significant listen.",
+          "bufferIds": [
+            3
+          ],
+          "deliveredKeys": [
+            [
+              "b",
+              "fresh"
+            ]
+          ],
+          "historyKeys": [
+            [
+              "a",
+              "song"
+            ]
+          ],
+          "play": {
+            "seconds": 30,
+            "duration": 180,
+            "threshold": 30.0,
+            "significant": true
+          },
+          "selectedId": null,
+          "originalWinnerId": 1,
+          "qualityLimit": 0.15,
+          "reason": "quality-fallback",
+          "candidates": [
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Song",
+              "key": [
+                "a",
+                "song"
+              ],
+              "score": 0.1,
+              "status": "Heard recently"
+            },
+            {
+              "id": 2,
+              "artist": "A",
+              "title": "Song (Live)",
+              "key": [
+                "a",
+                "song"
+              ],
+              "score": 0.38,
+              "status": "Heard recently"
+            },
+            {
+              "id": 4,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Outside quality band"
+            },
+            {
+              "id": 3,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": null,
+              "status": "In buffer"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "quality",
+      "label": "Quality limit",
+      "catalog": [
+        {
+          "id": 1,
+          "track_id": 1,
+          "artist": "A",
+          "title": "Delivered X",
+          "album": "Album",
+          "bliss_vector": null,
+          "radio_source": "similar",
+          "distance": 0.1,
+          "duration": 180
+        },
+        {
+          "id": 2,
+          "track_id": 2,
+          "artist": "B",
+          "title": "Fresh",
+          "album": "Album",
+          "bliss_vector": null,
+          "radio_source": "similar",
+          "distance": 0.4,
+          "duration": 180
+        },
+        {
+          "id": 3,
+          "track_id": 3,
+          "artist": "C",
+          "title": "Far",
+          "album": "Album",
+          "bliss_vector": null,
+          "radio_source": "similar",
+          "distance": 1.0,
+          "duration": 180
+        }
+      ],
+      "events": [
+        {
+          "kind": "history",
+          "title": "A qualifying listen exists",
+          "description": "The active buffer and session ledger are empty. Delivered X has a qualifying play within the last seven days.",
+          "bufferIds": [],
+          "deliveredKeys": [],
+          "historyKeys": [
+            [
+              "a",
+              "delivered x"
+            ]
+          ],
+          "play": null,
+          "selectedId": null,
+          "originalWinnerId": 1,
+          "qualityLimit": 0.15,
+          "reason": "quality-fallback",
+          "candidates": [
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Delivered X",
+              "key": [
+                "a",
+                "delivered x"
+              ],
+              "score": 0.1,
+              "status": "Heard recently"
+            },
+            {
+              "id": 2,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": 0.4,
+              "status": "Outside quality band"
+            },
+            {
+              "id": 3,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Outside quality band"
+            }
+          ]
+        },
+        {
+          "kind": "rank",
+          "title": "Keep the quality limit",
+          "description": "The best score is 0.10, so an unheard replacement must score at most 0.15. The fresh candidates score 0.40 and 1.00.",
+          "bufferIds": [],
+          "deliveredKeys": [],
+          "historyKeys": [
+            [
+              "a",
+              "delivered x"
+            ]
+          ],
+          "play": null,
+          "selectedId": null,
+          "originalWinnerId": 1,
+          "qualityLimit": 0.15,
+          "reason": "quality-fallback",
+          "candidates": [
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Delivered X",
+              "key": [
+                "a",
+                "delivered x"
+              ],
+              "score": 0.1,
+              "status": "Heard recently"
+            },
+            {
+              "id": 2,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": 0.4,
+              "status": "Outside quality band"
+            },
+            {
+              "id": 3,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Outside quality band"
+            }
+          ]
+        },
+        {
+          "kind": "choose",
+          "title": "Keep the recent candidate",
+          "description": "No fresh candidate fits the quality band. The recent song stays available instead of forcing a weaker replacement.",
+          "bufferIds": [],
+          "deliveredKeys": [],
+          "historyKeys": [
+            [
+              "a",
+              "delivered x"
+            ]
+          ],
+          "play": null,
+          "selectedId": 1,
+          "originalWinnerId": 1,
+          "qualityLimit": 0.15,
+          "reason": "quality-fallback",
+          "candidates": [
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Delivered X",
+              "key": [
+                "a",
+                "delivered x"
+              ],
+              "score": 0.1,
+              "status": "Heard recently"
+            },
+            {
+              "id": 2,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": 0.4,
+              "status": "Outside quality band"
+            },
+            {
+              "id": 3,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Outside quality band"
+            }
+          ]
+        },
+        {
+          "kind": "deliver",
+          "title": "Delivered to the queue",
+          "description": "The repeated song is delivered again. The original qualifying listen remains unchanged.",
+          "bufferIds": [
+            1
+          ],
+          "deliveredKeys": [
+            [
+              "a",
+              "delivered x"
+            ]
+          ],
+          "historyKeys": [
+            [
+              "a",
+              "delivered x"
+            ]
+          ],
+          "play": null,
+          "selectedId": null,
+          "originalWinnerId": 2,
+          "qualityLimit": null,
+          "reason": "ranking",
+          "candidates": [
+            {
+              "id": 2,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": 0.4,
+              "status": "Fresh"
+            },
+            {
+              "id": 3,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Fresh"
+            },
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Delivered X",
+              "key": [
+                "a",
+                "delivered x"
+              ],
+              "score": null,
+              "status": "In buffer"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "limited",
+      "label": "Small catalogue",
+      "catalog": [
+        {
+          "id": 1,
+          "track_id": 1,
+          "artist": "A",
+          "title": "Delivered X",
+          "album": "Album",
+          "bliss_vector": null,
+          "radio_source": "similar",
+          "distance": 0.1,
+          "duration": 180
+        },
+        {
+          "id": 2,
+          "track_id": 2,
+          "artist": "B",
+          "title": "Fresh",
+          "album": "Album",
+          "bliss_vector": null,
+          "radio_source": "similar",
+          "distance": 0.4,
+          "duration": 180
+        },
+        {
+          "id": 3,
+          "track_id": 3,
+          "artist": "C",
+          "title": "Far",
+          "album": "Album",
+          "bliss_vector": null,
+          "radio_source": "similar",
+          "distance": 1.0,
+          "duration": 180
+        }
+      ],
+      "events": [
+        {
+          "kind": "rank",
+          "title": "Rank the first refill",
+          "description": "The synthetic pool scores 0.10, 0.40 and 1.00. Lower scores are better; the three memories are empty.",
+          "bufferIds": [],
+          "deliveredKeys": [],
+          "historyKeys": [],
+          "play": null,
+          "selectedId": null,
+          "originalWinnerId": 1,
+          "qualityLimit": null,
+          "reason": "ranking",
+          "candidates": [
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Delivered X",
+              "key": [
+                "a",
+                "delivered x"
+              ],
+              "score": 0.1,
+              "status": "Fresh"
+            },
+            {
+              "id": 2,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": 0.4,
+              "status": "Fresh"
+            },
+            {
+              "id": 3,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Fresh"
+            }
+          ]
+        },
+        {
+          "kind": "choose",
+          "title": "Choose the best score",
+          "description": "Delivered X wins the first refill at 0.10.",
+          "bufferIds": [],
+          "deliveredKeys": [],
+          "historyKeys": [],
+          "play": null,
+          "selectedId": 1,
+          "originalWinnerId": 1,
+          "qualityLimit": null,
+          "reason": "ranking",
+          "candidates": [
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Delivered X",
+              "key": [
+                "a",
+                "delivered x"
+              ],
+              "score": 0.1,
+              "status": "Fresh"
+            },
+            {
+              "id": 2,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": 0.4,
+              "status": "Fresh"
+            },
+            {
+              "id": 3,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Fresh"
+            }
+          ]
+        },
+        {
+          "kind": "deliver",
+          "title": "Delivered to the queue",
+          "description": "The song is in the active buffer and the session delivery ledger. Delivery alone is not a listen.",
+          "bufferIds": [
+            1
+          ],
+          "deliveredKeys": [
+            [
+              "a",
+              "delivered x"
+            ]
+          ],
+          "historyKeys": [],
+          "play": null,
+          "selectedId": null,
+          "originalWinnerId": 2,
+          "qualityLimit": null,
+          "reason": "ranking",
+          "candidates": [
+            {
+              "id": 2,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": 0.4,
+              "status": "Fresh"
+            },
+            {
+              "id": 3,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Fresh"
+            },
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Delivered X",
+              "key": [
+                "a",
+                "delivered x"
+              ],
+              "score": null,
+              "status": "In buffer"
+            }
+          ]
+        },
+        {
+          "kind": "play",
+          "title": "Skipped after 5 seconds",
+          "description": "Five seconds is below this track's 30-second threshold. Delivery is remembered; significant history stays empty.",
+          "bufferIds": [
+            1
+          ],
+          "deliveredKeys": [
+            [
+              "a",
+              "delivered x"
+            ]
+          ],
+          "historyKeys": [],
+          "play": {
+            "seconds": 5,
+            "duration": 180,
+            "threshold": 30.0,
+            "significant": false
+          },
+          "selectedId": null,
+          "originalWinnerId": 2,
+          "qualityLimit": null,
+          "reason": "ranking",
+          "candidates": [
+            {
+              "id": 2,
+              "artist": "B",
+              "title": "Fresh",
+              "key": [
+                "b",
+                "fresh"
+              ],
+              "score": 0.4,
+              "status": "Fresh"
+            },
+            {
+              "id": 3,
+              "artist": "C",
+              "title": "Far",
+              "key": [
+                "c",
+                "far"
+              ],
+              "score": 1.0,
+              "status": "Fresh"
+            },
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Delivered X",
+              "key": [
+                "a",
+                "delivered x"
+              ],
+              "score": null,
+              "status": "In buffer"
+            }
+          ]
+        },
+        {
+          "kind": "rank",
+          "title": "Refill an empty buffer",
+          "description": "Only the delivered song remains in this fixture's eligible pool. Its normalized score is now 1.00.",
+          "bufferIds": [],
+          "deliveredKeys": [
+            [
+              "a",
+              "delivered x"
+            ]
+          ],
+          "historyKeys": [],
+          "play": {
+            "seconds": 5,
+            "duration": 180,
+            "threshold": 30.0,
+            "significant": false
+          },
+          "selectedId": null,
+          "originalWinnerId": 1,
+          "qualityLimit": null,
+          "reason": "delivery-fallback",
+          "candidates": [
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Delivered X",
+              "key": [
+                "a",
+                "delivered x"
+              ],
+              "score": 1.0,
+              "status": "Delivered this session"
+            }
+          ]
+        },
+        {
+          "kind": "choose",
+          "title": "Recover the delivered song",
+          "description": "There is no truly fresh candidate in this pool. Delivery cooldown allows the song to return.",
+          "bufferIds": [],
+          "deliveredKeys": [
+            [
+              "a",
+              "delivered x"
+            ]
+          ],
+          "historyKeys": [],
+          "play": {
+            "seconds": 5,
+            "duration": 180,
+            "threshold": 30.0,
+            "significant": false
+          },
+          "selectedId": 1,
+          "originalWinnerId": 1,
+          "qualityLimit": null,
+          "reason": "delivery-fallback",
+          "candidates": [
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Delivered X",
+              "key": [
+                "a",
+                "delivered x"
+              ],
+              "score": 1.0,
+              "status": "Delivered this session"
+            }
+          ]
+        },
+        {
+          "kind": "deliver",
+          "title": "Delivered to the queue",
+          "description": "The latest returned song updates delivery order. Neither this refill nor the earlier skip creates a significant listen.",
+          "bufferIds": [
+            1
+          ],
+          "deliveredKeys": [
+            [
+              "a",
+              "delivered x"
+            ]
+          ],
+          "historyKeys": [],
+          "play": {
+            "seconds": 5,
+            "duration": 180,
+            "threshold": 30.0,
+            "significant": false
+          },
+          "selectedId": null,
+          "originalWinnerId": null,
+          "qualityLimit": null,
+          "reason": "ranking",
+          "candidates": [
+            {
+              "id": 1,
+              "artist": "A",
+              "title": "Delivered X",
+              "key": [
+                "a",
+                "delivered x"
+              ],
+              "score": null,
+              "status": "In buffer"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

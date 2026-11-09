@@ -1,0 +1,211 @@
+---
+import { getCollection } from "astro:content";
+import BlogIcon from "../../components/BlogIcon.astro";
+import BlogIconCredits from "../../components/BlogIconCredits.astro";
+import SignalTrack from "../../components/blog-timeline/SignalTrack.astro";
+import { calendar } from "../../data/blog-calendar";
+import { milestones } from "../../data/engineering-timeline";
+import { t } from "../../i18n";
+import Base from "../../layouts/Base.astro";
+import { formatPostDate, postUrl, readingMinutes } from "../../lib/blog";
+import { blogHome, SERIES_TITLE } from "../../lib/blog-home";
+import { prepareTimeline } from "../../lib/engineering-timeline";
+
+const entries = await getCollection("blog");
+const visibility = { includeDrafts: import.meta.env.DEV };
+const { chapters, articles } = blogHome(entries, {
+  ...visibility,
+  order: calendar.map((entry) => entry.slug),
+});
+const firstChapter = chapters[0];
+const timeline = prepareTimeline(milestones, entries, visibility);
+const minutes = (body = "") => t("blog.minutes", "en", {
+  minutes: String(readingMinutes(body)),
+});
+---
+
+<Base title={t("blog.title") + " · Crate"} description={t("blog.lede")}>
+  <link slot="head" rel="alternate" type="application/rss+xml" title={t("blog.title")} href="/blog/rss.xml" />
+
+  <div class="blog-home" data-blog-home>
+    <header class="page-header blog-header" data-reveal>
+      <div>
+        <p class="eyebrow" data-enter>{t("blog.eyebrow")}</p>
+        <h1 data-enter style="--d:80ms">{t("blog.title")}</h1>
+        <p class="intro" data-enter style="--d:140ms">{t("blog.lede")}</p>
+      </div>
+      <nav class="blog-actions" aria-label="Browse the blog">
+        <a class="u-link mono-link" href="/blog/tags" data-hover-scramble>Explore topics</a>
+        <a class="u-link mono-link" href="/blog/rss.xml" data-hover-scramble>{t("blog.rss")}</a>
+      </nav>
+    </header>
+
+    {firstChapter && (
+      <section class="series" data-blog-series aria-labelledby="series-title">
+        <div class="series-intro">
+          <p class="section-label">The story of Crate</p>
+          <h2 id="series-title" aria-label={SERIES_TITLE}>
+            <span>How to dismantle Spotify.</span>{" "}
+            <span>Building Crate from the ground.</span>
+          </h2>
+          <p class="series-description">From a tool that organised music files to a platform that plays them. Follow the problems we hit and the systems we built to solve them.</p>
+          <a class="start-series" data-start-series href={postUrl(firstChapter.id)}>
+            <span>{firstChapter.data.series!.part === 1 ? "Start reading" : "Read part " + firstChapter.data.series!.part}</span>
+            <BlogIcon name="arrow-right" size={20} />
+          </a>
+          <a class="article-jump" href="#technical-articles">Browse technical articles <BlogIcon name="arrow-down" size={16} /></a>
+        </div>
+
+        <div class="chapters">
+          <p class="section-label chapter-heading">Read in order <span>{chapters.length} {chapters.length === 1 ? "chapter" : "chapters"}</span></p>
+          <ol data-blog-chapters>
+            {chapters.map((post) => (
+              <li>
+                <a class="chapter-link" href={postUrl(post.id)}>
+                  <span class="chapter-number" aria-hidden="true">{String(post.data.series!.part).padStart(2, "0")}</span>
+                  <div>
+                    <p class="meta"><span>Part {post.data.series!.part}</span><span>{minutes(post.body)}</span>{post.data.draft && <span class="draft">Draft</span>}</p>
+                    <h3>{post.data.title}</h3>
+                  </div>
+                  <BlogIcon name="arrow-right" size={18} />
+                </a>
+              </li>
+            ))}
+          </ol>
+          <p class="series-note">Each chapter follows Crate from one working version to the next.</p>
+        </div>
+      </section>
+    )}
+
+    {firstChapter && (
+      <div id="development-timeline" class="history">
+        <details>
+          <summary id="series-history">
+            <span>Explore the development timeline</span>
+            <span class="history-meta"><span>{timeline.length} milestones</span><BlogIcon name="chevron-down" size={20} /></span>
+          </summary>
+          <div class="history-track"><SignalTrack items={timeline} /></div>
+        </details>
+      </div>
+    )}
+
+    <section id="technical-articles" class="posts" aria-labelledby="articles-title">
+      <div class="articles-heading">
+        <div>
+          <p class="section-label">Inside the implementation</p>
+          <h2 id="articles-title">Technical articles</h2>
+        </div>
+        <p class="article-count">{articles.length} {articles.length === 1 ? "article" : "articles"}</p>
+      </div>
+      {articles.length === 0 ? (
+        <p class="empty">{t("blog.empty")}</p>
+      ) : (
+        <ol data-blog-articles>
+          {articles.map((post) => (
+            <li data-reveal>
+              <a class="article-link" href={postUrl(post.id)}>
+                <div class="article-meta meta">
+                  <time datetime={formatPostDate(post.data.date)}>{formatPostDate(post.data.date)}</time>
+                  <span>{minutes(post.body)}</span>
+                  {post.data.draft && <span class="draft">Draft</span>}
+                </div>
+                <div class="article-content">
+                  <h3>{post.data.title}</h3>
+                  <p class="description">{post.data.description}</p>
+                  <p class="tags">{post.data.tags.join(" / ")}</p>
+                </div>
+                <BlogIcon name="arrow-right" size={20} />
+              </a>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+    <BlogIconCredits />
+  </div>
+</Base>
+
+<script>
+  import { mountOnPage } from "../../scripts/motion/page";
+  import { initTextMotion } from "../../scripts/motion/text-motion";
+  mountOnPage("[data-blog-home]", () => initTextMotion());
+</script>
+
+<style>
+  .blog-home { position:relative; z-index:5; max-width:1320px; margin:0 auto; padding:0 clamp(20px,6vw,96px) 12vh; }
+  .blog-header { display:flex; align-items:flex-end; justify-content:space-between; gap:32px; padding:clamp(130px,16vh,190px) 0 48px; }
+  .blog-header .eyebrow { margin:0 0 16px; }
+  h1 { margin:0 0 16px; font:600 clamp(2.2rem,4.3vw,3.5rem)/1.06 var(--display); letter-spacing:-.035em; }
+  .intro { max-width:58ch; margin:0; color:var(--fg-2); font:16px/1.65 var(--sans); }
+  .blog-actions { display:flex; align-items:center; flex-shrink:0; gap:clamp(20px,2vw,30px); }
+  .section-label { margin:0; font:11px/1.6 var(--mono); text-transform:uppercase; letter-spacing:.13em; color:var(--fg-3); }
+  .series { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:clamp(32px,6vw,88px); padding:44px 0 38px; border-top:1px solid var(--line); }
+  .series-intro>.section-label { color:var(--cyan-hi); margin-bottom:22px; }
+  .series h2 { margin:0; max-width:19ch; font:600 clamp(2.5rem,4.8vw,4.25rem)/1.02 var(--display); letter-spacing:-.04em; }
+  .series h2 span { display:block; }
+  .series h2 span:first-child { color:var(--cyan-hi); }
+  .series h2 span+span { margin-top:12px; font-size:.77em; line-height:1.08; letter-spacing:-.025em; }
+  .series-description { max-width:46ch; margin:24px 0; font:16px/1.7 var(--sans); color:var(--fg-2); }
+  .start-series { display:inline-flex; align-items:center; justify-content:space-between; gap:46px; min-height:48px; padding:12px 18px; border:1px solid var(--cyan-hi); border-radius:6px; color:var(--bg); background:var(--cyan-hi); font:500 14px/1.5 var(--sans); text-decoration:none; transition:background .2s,color .2s; }
+  .start-series:hover { background:var(--fg); border-color:var(--fg); }
+  .article-jump { display:flex; align-items:center; gap:12px; width:fit-content; min-height:44px; margin-top:12px; color:var(--fg-2); font:12px/1.6 var(--mono); text-decoration:none; }
+  .article-jump:hover { color:var(--cyan-hi); }
+  .chapters { min-width:0; padding-top:3px; }
+  .chapter-heading { display:flex; justify-content:space-between; gap:16px; padding-bottom:20px; border-bottom:1px solid var(--line); }
+  .chapter-heading span { color:var(--fg-3); letter-spacing:.02em; text-transform:none; }
+  ol { list-style:none; padding:0; margin:0; }
+  .chapter-link { display:grid; grid-template-columns:28px minmax(0,1fr) 18px; align-items:start; gap:16px; padding:26px 0; border-bottom:1px solid var(--line); color:inherit; text-decoration:none; }
+  .chapter-number { margin-top:2px; font:12px/1.7 var(--mono); color:var(--cyan-hi); }
+  .chapter-link> :global(svg) { margin-top:2px; color:var(--fg-3); }
+  .meta { display:flex; gap:12px; flex-wrap:wrap; margin:0; font:10px/1.7 var(--mono); text-transform:uppercase; letter-spacing:.06em; color:var(--fg-3); }
+  .draft { color:var(--amber); }
+  .chapter-link h3 { margin:10px 0 0; font:550 clamp(1.2rem,1.8vw,1.6rem)/1.2 var(--display); letter-spacing:-.02em; color:var(--fg); }
+  .chapter-link:hover h3,.chapter-link:focus-visible h3,.article-link:hover h3,.article-link:focus-visible h3 { color:var(--cyan-hi); }
+  .series-note { margin:20px 0 0 44px; max-width:36ch; color:var(--fg-3); font:12px/1.7 var(--sans); }
+  .history { scroll-margin-top:100px; border-block:1px solid var(--line); }
+  summary { display:flex; justify-content:space-between; align-items:center; gap:24px; min-height:72px; padding:16px 0; list-style:none; cursor:pointer; color:var(--fg); font:14px/1.5 var(--sans); }
+  summary::-webkit-details-marker { display:none; }
+  summary:hover { color:var(--cyan-hi); }
+  .history-meta { display:flex; align-items:center; gap:24px; flex:none; color:var(--fg-3); font:10px var(--mono); }
+  .history-meta :global(svg) { color:var(--cyan-hi); transition:transform .22s var(--ease-out); }
+  details[open] .history-meta :global(svg) { transform:rotate(180deg); }
+  .history-track { padding:0 0 32px; }
+  .history-track :global(.signal-track) { border-top:0; padding-top:12px; }
+  .posts { padding-top:80px; scroll-margin-top:100px; }
+  .articles-heading { display:flex; justify-content:space-between; align-items:end; gap:24px; padding-bottom:30px; border-bottom:1px solid var(--line); }
+  .articles-heading .section-label { margin-bottom:12px; }
+  .articles-heading h2 { margin:0; font:600 clamp(1.9rem,3.4vw,3rem)/1.08 var(--display); letter-spacing:-.03em; }
+  .article-count { margin:0 0 3px; flex:none; color:var(--fg-3); font:11px/1.5 var(--mono); }
+  .article-link { display:grid; grid-template-columns:135px minmax(0,1fr) 24px; align-items:start; gap:28px; padding:32px 0; color:inherit; text-decoration:none; border-bottom:1px solid var(--line); }
+  .article-meta { flex-direction:column; align-items:start; gap:7px; padding-top:3px; }
+  .article-link> :global(svg) { margin-top:6px; color:var(--cyan-hi); }
+  .article-content h3 { margin:0 0 12px; font:550 clamp(1.4rem,2.3vw,2rem)/1.13 var(--display); letter-spacing:-.025em; color:var(--fg); }
+  .description { margin:0; max-width:64ch; font:16px/1.65 var(--sans); color:var(--fg-2); }
+  .tags { margin:16px 0 0; font:10px/1.7 var(--mono); text-transform:uppercase; letter-spacing:.06em; color:var(--fg-3); }
+  .empty { padding:40px 0; color:var(--fg-2); }
+  .blog-home :global(a:focus-visible),summary:focus-visible { outline:2px solid var(--cyan-hi); outline-offset:5px; border-radius:3px; }
+  @media(max-width:800px) {
+    .blog-header { align-items:start; flex-direction:column; gap:16px; padding:128px 0 32px; }
+    .series { grid-template-columns:1fr; gap:36px; padding-top:32px; }
+    .series h2 { max-width:21ch; font-size:clamp(2.5rem,7vw,3.6rem); }
+    .series-description { max-width:54ch; }
+    .chapter-link { padding:22px 0; }
+    .series-note { margin-left:44px; }
+    .posts { padding-top:56px; }
+    .article-link { grid-template-columns:minmax(0,1fr) 20px; gap:14px; padding:28px 0; }
+    .article-meta { grid-column:1 / -1; flex-direction:row; gap:14px; padding:0; }
+    .article-content h3 { font-size:1.5rem; }
+    .history-meta { gap:12px; }
+  }
+  @media(max-width:450px) {
+    .blog-header { padding-top:116px; }
+    .intro { font-size:15px; }
+    .series h2 { font-size:2.55rem; }
+    .series-description { font-size:15px; }
+    summary { gap:14px; font-size:13px; }
+    .history-meta>span { display:none; }
+    .chapter-link { grid-template-columns:24px minmax(0,1fr) 18px; gap:12px; }
+    .series-note { margin-left:36px; }
+  }
+  @media(prefers-reduced-motion:reduce) { .start-series,.history-meta :global(svg) { transition:none; } }
+</style>

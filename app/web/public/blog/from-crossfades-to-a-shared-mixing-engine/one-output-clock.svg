@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 780" role="img" aria-labelledby="title desc">
+  <title id="title">Two decoding decks, one mixed PCM output</title>
+  <desc id="desc">The initial Android mixer used two Media3 decks with separate outputs and tried to align them using reported positions. The replacement keeps the decks but writes each into a PCM ring. One mixer schedules both on a common 48 kHz frame count and sends their sum to a single AudioTrack. Internal capture observes this mixed PCM, while Android's system mixer and the physical output remain downstream.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10" fill="none" stroke="#67e8f9" stroke-width="1.5"/></marker></defs>
+  <style>
+    text { font-family: "JetBrains Mono", monospace; fill: #d6dae3; font-size: 19px; }
+    .label { fill: #67e8f9; letter-spacing: 1.4px; font-size: 17px; }
+    .note { fill: #a1a7b5; font-size: 17px; }
+    .box { fill: #0d0e14; stroke: #353947; stroke-width: 1; }
+    .flow { fill: none; stroke: #67e8f9; stroke-width: 1.5; marker-end: url(#arrow); }
+  </style>
+  <rect width="1200" height="780" fill="#0a0a0f"/>
+  <text x="40" y="44" class="label">ANDROID / CHANGING THE OUTPUT BOUNDARY</text>
+  <text x="40" y="80" class="note">Moving the envelope into PCM fixed gain timing. Aligning decks needed a common frame count.</text>
+  <text x="40" y="127" class="label">BEFORE / SEPARATE OUTPUTS</text>
+  <rect x="40" y="154" width="420" height="66" rx="4" class="box"/>
+  <text x="250" y="195" text-anchor="middle">MEDIA3 DECK A + ENVELOPE</text>
+  <path d="M460 187H652" class="flow"/>
+  <rect x="660" y="154" width="500" height="66" rx="4" class="box"/>
+  <text x="910" y="195" text-anchor="middle">OUTPUT A</text>
+  <rect x="40" y="246" width="420" height="66" rx="4" class="box"/>
+  <text x="250" y="287" text-anchor="middle">MEDIA3 DECK B + ENVELOPE</text>
+  <path d="M460 279H652" class="flow"/>
+  <rect x="660" y="246" width="500" height="66" rx="4" class="box"/>
+  <text x="910" y="287" text-anchor="middle">OUTPUT B</text>
+  <text x="40" y="350" class="note">Reported player positions did not reliably describe their audible alignment.</text>
+  <line x1="40" y1="380" x2="1160" y2="380" stroke="#353947" stroke-width="1"/>
+  <text x="40" y="422" class="label">AFTER / SHARED PCM BUS</text>
+  <rect x="40" y="450" width="300" height="66" rx="4" class="box"/>
+  <text x="190" y="491" text-anchor="middle">DECK A → PCM RING A</text>
+  <rect x="40" y="550" width="300" height="66" rx="4" class="box"/>
+  <text x="190" y="591" text-anchor="middle">DECK B → PCM RING B</text>
+  <path d="M340 483H412V508H452" class="flow"/>
+  <path d="M340 583H412V558H452" class="flow"/>
+  <rect x="460" y="460" width="320" height="146" rx="4" class="box"/>
+  <text x="620" y="498" text-anchor="middle" class="label">PCM MIXER</text>
+  <text x="620" y="535" text-anchor="middle">One 48 kHz frame count</text>
+  <text x="620" y="571" text-anchor="middle" class="note">Schedule the held deck</text>
+  <path d="M780 533H852" class="flow"/>
+  <rect x="860" y="490" width="300" height="86" rx="4" class="box"/>
+  <text x="1010" y="527" text-anchor="middle">SINGLE AUDIOTRACK</text>
+  <text x="1010" y="556" text-anchor="middle" class="note">One mixed stream</text>
+  <path d="M1010 576V644" class="flow"/>
+  <text x="1010" y="677" text-anchor="middle" class="note">System mixer / hardware</text>
+  <text x="40" y="664" class="note">Internal capture measures the bus output.</text>
+  <text x="40" y="695" class="note">It does not measure the DAC or speakers.</text>
+  <text x="40" y="752" class="note">The MediaSession and queue remain above this change; loading and decoding still use Media3.</text>
+</svg>

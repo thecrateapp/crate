@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
+  <title id="title">From two mix profiles to a transition played on the phone</title>
+  <desc id="desc">On the server, the planner reads the outgoing and incoming tracks' mix profiles and returns a transition plan with the mode, duration, cue points, tempo ratio, gains, curve and bass handoff. On the phone, both decks play on one audio clock: the outgoing track fades out, the incoming one starts at its cue and fades in, and the bass swaps halfway through the transition.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M1 1 L7 4 L1 7" fill="none" stroke="#999ca0" stroke-width="1.2"/>
+    </marker>
+  </defs>
+  <style>
+    .bg { fill: #0a0a0f; }
+    .node { fill: #0d0e14; stroke: rgba(241,245,249,0.22); stroke-width: 1; }
+    .node-hi { fill: #0d0e14; stroke: #67e8f9; stroke-width: 1.4; }
+    .title { font: 500 15px "JetBrains Mono", ui-monospace, Menlo, monospace; letter-spacing: 0.12em; fill: #f1f5f9; }
+    .sub { font: 400 14px "JetBrains Mono", ui-monospace, Menlo, monospace; fill: #999ca0; }
+    .field { font: 400 14px "JetBrains Mono", ui-monospace, Menlo, monospace; fill: #e2e8f0; }
+    .lane { font: 400 13px "JetBrains Mono", ui-monospace, Menlo, monospace; letter-spacing: 0.16em; fill: #67e8f9; }
+    .label { font: 400 13px "JetBrains Mono", ui-monospace, Menlo, monospace; fill: #999ca0; }
+    .label-hi { font: 400 13px "JetBrains Mono", ui-monospace, Menlo, monospace; fill: #67e8f9; }
+    .edge { fill: none; stroke: #999ca0; stroke-width: 1; stroke-dasharray: 9 4; }
+    .rule { stroke: rgba(241,245,249,0.08); stroke-width: 1; }
+    .axis { stroke: rgba(241,245,249,0.34); stroke-width: 1; }
+    .out { fill: none; stroke: #f1f5f9; stroke-width: 1.5; }
+    .in { fill: none; stroke: #67e8f9; stroke-width: 1.5; }
+    .mark { stroke: #999ca0; stroke-width: 1; stroke-dasharray: 3 4; }
+    .swap { stroke: #67e8f9; stroke-width: 1; stroke-dasharray: 1 5; stroke-linecap: round; }
+  </style>
+
+  <rect class="bg" width="1200" height="620"/>
+
+  <text class="lane" x="40" y="40">SERVER · ONCE PER PAIR OF TRACKS</text>
+  <line class="rule" x1="40" y1="52" x2="1160" y2="52"/>
+
+  <rect class="node" x="40" y="76" width="250" height="70" rx="4"/>
+  <text class="title" x="56" y="104">PROFILE · OUTGOING</text>
+  <text class="sub" x="56" y="128">outro cue · grid · LUFS</text>
+
+  <rect class="node" x="40" y="166" width="250" height="70" rx="4"/>
+  <text class="title" x="56" y="194">PROFILE · INCOMING</text>
+  <text class="sub" x="56" y="218">intro cue · grid · key</text>
+
+  <rect class="node" x="350" y="121" width="210" height="70" rx="4"/>
+  <text class="title" x="366" y="149">PLANNER</text>
+  <text class="sub" x="366" y="173">smart-mix-v2</text>
+
+  <path class="edge" d="M290 111 C320 111 320 146 344 146" marker-end="url(#arrow)"/>
+  <path class="edge" d="M290 201 C320 201 320 166 344 166" marker-end="url(#arrow)"/>
+  <path class="edge" d="M560 156 H614" marker-end="url(#arrow)"/>
+
+  <rect class="node-hi" x="620" y="76" width="540" height="160" rx="4"/>
+  <text class="title" x="636" y="104">TRANSITION PLAN</text>
+  <text class="field" x="636" y="132">mode · durationMs · confidence</text>
+  <text class="field" x="636" y="156">outgoingCueMs · incomingCueMs</text>
+  <text class="field" x="636" y="180">incomingTempoRatio  0.94 to 1.06</text>
+  <text class="field" x="636" y="204">gains in dB · curve · bassHandoff</text>
+  <text class="field" x="636" y="228">fallbackReason when a mode is downgraded</text>
+
+  <text class="lane" x="40" y="296">PHONE · BOTH DECKS ON ONE 48 KHZ AUDIO CLOCK</text>
+  <line class="rule" x1="40" y1="308" x2="1160" y2="308"/>
+
+  <text class="label" x="40" y="352">volume</text>
+  <path class="out" d="M40 380 H300 C500 380 800 440 900 520"/>
+  <path class="in" d="M300 520 C400 440 700 380 900 380 H1160"/>
+  <text class="label" x="60" y="372">OUTGOING TRACK</text>
+  <text class="label-hi" x="960" y="372">INCOMING TRACK</text>
+
+  <line class="axis" x1="40" y1="520" x2="1160" y2="520"/>
+  <line class="mark" x1="300" y1="340" x2="300" y2="532"/>
+  <line class="mark" x1="900" y1="340" x2="900" y2="532"/>
+  <line class="swap" x1="600" y1="340" x2="600" y2="532"/>
+
+  <text class="label" x="300" y="556" text-anchor="middle">outgoingCueMs</text>
+  <text class="label" x="300" y="576" text-anchor="middle">incoming starts at incomingCueMs</text>
+  <text class="label-hi" x="600" y="556" text-anchor="middle">bass swap</text>
+  <text class="label-hi" x="600" y="576" text-anchor="middle">handoffProgress 0.5</text>
+  <text class="label" x="900" y="556" text-anchor="middle">+ durationMs</text>
+  <text class="label" x="600" y="604" text-anchor="middle">equal-power or dj-blend curve · gains never above 0 dB on the phone</text>
+</svg>

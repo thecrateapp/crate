@@ -1,0 +1,37 @@
+---
+import { getCollection } from "astro:content";
+import BlogIconCredits from "../../../components/BlogIconCredits.astro";
+import BlogTags from "../../../components/BlogTags.astro";
+import Base from "../../../layouts/Base.astro";
+import { blogTags } from "../../../lib/blog-tags";
+
+const topics = blogTags(await getCollection("blog"), { includeDrafts: import.meta.env.DEV });
+const counts = Object.fromEntries(topics.map((topic) => [topic.key, topic.posts.length]));
+---
+
+<Base title="Topics · Crate engineering" description="Browse Crate's engineering articles by topic, from audio and playback to storage, architecture and operations.">
+  <div class="topics-page" data-blog-topics>
+    <header>
+      <a class="u-link mono-link back" href="/blog" data-hover-scramble>All posts</a>
+      <p class="eyebrow">Crate engineering</p>
+      <h1>Explore by topic</h1>
+      <p class="lede">Follow a problem across the history of Crate and the engineering behind it.</p>
+    </header>
+    <section aria-label="All blog topics">
+      <p class="topic-count">{topics.length} topics</p>
+      <BlogTags tags={topics.map((topic) => topic.label)} counts={counts} label="All blog topics" />
+    </section>
+    <BlogIconCredits />
+  </div>
+</Base>
+
+<style>
+  .topics-page { position:relative; z-index:5; max-width:1150px; margin:0 auto; padding:clamp(124px,16vh,180px) clamp(20px,6vw,96px) 12vh; min-height:70vh; }
+  .back { margin-bottom:36px; }
+  .eyebrow { margin:0 0 14px; color:var(--cyan-hi); font:11px/1.6 var(--mono); text-transform:uppercase; letter-spacing:.13em; }
+  h1 { margin:0; font:600 clamp(2.4rem,5vw,4rem)/1.05 var(--display); letter-spacing:-.035em; }
+  .lede { margin:20px 0 44px; max-width:52ch; color:var(--fg-2); font:16px/1.65 var(--sans); }
+  section { padding-top:25px; border-top:1px solid var(--line); }
+  .topic-count { margin:0; color:var(--fg-3); font:11px/1.6 var(--mono); text-transform:uppercase; letter-spacing:.1em; }
+  @media(max-width:650px) { .topics-page { padding-top:116px; } .lede { font-size:15px; } }
+</style>

@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1000" role="img" aria-labelledby="title desc">
+  <title id="title">Separating catalogue identity from file location</title>
+  <desc id="desc">Before Storage V2, metadata determines readable paths and old playlist entries remember those paths. Managed storage introduces opaque identifiers while preserving numeric track references. A worker moves the bytes, then updates the path on the same row. These are separate operations: a retry can repair a stale row if it finds the expected destination, and verification checks for missing and unindexed files. Later in April, entity UIDs replace random storage IDs for new paths, with the original IDs retained as legacy aliases.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1L9 5L1 9" fill="none" stroke="#67e8f9" stroke-width="1.4"/></marker></defs>
+  <style>
+    text {fill:#f1f5f9;font:22px Arial,Helvetica,sans-serif}
+    .label {fill:#67e8f9;font:16px "JetBrains Mono",monospace;letter-spacing:.8px}
+    .note {fill:#aeb5c3;font-size:19px}
+    .code {fill:#d9e0eb;font:18px "JetBrains Mono",monospace}
+    .warn {fill:#fbbf24;font-size:19px}
+    .panel {fill:#0d0e14;stroke:#2c303c;stroke-width:1}
+    .box {fill:#10131b;stroke:#3b4352;stroke-width:1}
+    .active {fill:#0d1d25;stroke:#458998;stroke-width:1}
+    .flow {fill:none;stroke:#67e8f9;stroke-width:1.6;marker-end:url(#arrow)}
+  </style>
+  <rect width="1200" height="1000" fill="#0a0a0f"/>
+  <text x="32" y="42" class="label">CATALOGUE REFERENCES AND PHYSICAL ADDRESSES</text>
+  <rect x="20" y="66" width="1160" height="218" rx="6" class="panel"/>
+  <text x="42" y="102" class="label">BEFORE · NAMES SUPPLY THE ADDRESS</text>
+  <rect x="42" y="126" width="260" height="94" rx="5" class="box"/>
+  <text x="60" y="163">Artist / album / title</text>
+  <text x="60" y="195" class="note">Readable metadata</text>
+  <rect x="359" y="126" width="400" height="94" rx="5" class="box"/>
+  <text x="377" y="163" class="code">Artist/Album/01 - Title.flac</text>
+  <text x="377" y="195" class="note">Catalogue file location</text>
+  <rect x="816" y="126" width="322" height="94" rx="5" class="box"/>
+  <text x="834" y="163">Playlist keeps the path</text>
+  <text x="834" y="195" class="note">Rename can leave it behind</text>
+  <path d="M302 173H347" class="flow"/><path d="M759 173H804" class="flow"/>
+  <text x="42" y="256" class="note">Changing metadata can change the address that saved references depend on.</text>
+  <rect x="20" y="306" width="1160" height="268" rx="6" class="panel"/>
+  <text x="42" y="342" class="label">MANAGED STORAGE · KEEP THE ROW, UPDATE ITS LOCATION</text>
+  <rect x="42" y="368" width="260" height="110" rx="5" class="box"/>
+  <text x="60" y="406">Playlist reference</text>
+  <text x="60" y="442" class="code">track_id</text>
+  <rect x="359" y="368" width="340" height="110" rx="5" class="active"/>
+  <text x="377" y="406">Existing catalogue row</text>
+  <text x="377" y="442" class="note">ID · display names · path</text>
+  <rect x="756" y="368" width="382" height="110" rx="5" class="box"/>
+  <text x="774" y="406">Opaque physical address</text>
+  <text x="774" y="442" class="code">artist-id/album-id/track-id</text>
+  <path d="M302 423H347" class="flow"/><path d="M699 423H744" class="flow"/>
+  <text x="42" y="518" class="note">First: random storage_id. Later: entity_uid for new paths, with legacy aliases retained.</text>
+  <text x="42" y="548" class="note">The readable name can change without rebuilding the managed path from that name.</text>
+  <rect x="20" y="596" width="1160" height="380" rx="6" class="panel"/>
+  <text x="42" y="632" class="label">MIGRATION · TWO WRITES, WITH A FAILURE WINDOW BETWEEN THEM</text>
+  <rect x="42" y="660" width="310" height="92" rx="5" class="box"/>
+  <text x="60" y="698">Rename the audio file</text>
+  <text x="60" y="730" class="note">Worker owns the filesystem write</text>
+  <rect x="446" y="660" width="310" height="92" rx="5" class="active"/>
+  <text x="464" y="698">Update the track path</text>
+  <text x="464" y="730" class="note">Preserve its database ID</text>
+  <rect x="850" y="660" width="288" height="92" rx="5" class="box"/>
+  <text x="868" y="698">Verify both directions</text>
+  <text x="868" y="730" class="note">Rows → files; files → rows</text>
+  <path d="M352 706H434" class="flow"/><path d="M756 706H838" class="flow"/>
+  <path d="M398 708V797H170V828" class="flow"/>
+  <text x="419" y="800" class="warn">A crash can leave moved bytes and an old database path.</text>
+  <rect x="42" y="840" width="1096" height="100" rx="5" class="box"/>
+  <text x="60" y="877">Retry: old path missing, expected destination present → repair the row.</text>
+  <text x="60" y="912" class="note">Verification reports missing and unindexed files; existence alone does not verify audio integrity.</text>
+</svg>

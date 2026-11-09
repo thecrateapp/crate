@@ -1,0 +1,710 @@
+---
+import BlogFigure from "./BlogFigure.astro";
+import fixture from "../../data/blog-smart-mix-fixture.json";
+import { restTime } from "../../scripts/viz/blog/phase-clock";
+import {
+  candidateStarts,
+  gainPath,
+  gridPaths,
+  halfGainY,
+  LANES,
+  phraseEdges,
+  sceneGeometry,
+  SMART_MIX_STATES,
+  SMART_MIX_TRACKS,
+  smartMixData,
+  smartMixFrame,
+  smartMixReadout,
+  spansPath,
+  toMixX,
+  toSourceX,
+  VIEW,
+  voicedSpans,
+  wavePath,
+  type PlanId,
+} from "../../scripts/viz/blog/smart-mix";
+
+// Without JavaScript the figure shows v3's first choice after its mix is evaluated.
+const initial = "v3";
+const data = smartMixData(fixture);
+const track = SMART_MIX_TRACKS[initial];
+const still = smartMixFrame(data, initial, restTime(track, track.starts.length - 1));
+const geo = sceneGeometry(data, still);
+const readout = smartMixReadout(data, still);
+const { outgoing, incoming } = fixture.tracks;
+const ax = (ms: number) => toSourceX(ms, outgoing.durationMs);
+const bx = (ms: number) => toSourceX(ms, incoming.durationMs);
+const pct = (value: number, total: number) => `${((value / total) * 100).toFixed(2)}%`;
+const left = (x: number) => pct(x, VIEW.width);
+const top = (y: number) => pct(y, VIEW.height);
+const f = (value: number) => value.toFixed(1);
+const plans = Object.values(data.plans);
+const v2 = data.plans.v2;
+const starts = candidateStarts(fixture);
+const gridA = gridPaths(outgoing, LANES.aGrid);
+const gridB = gridPaths(incoming, LANES.bGrid);
+const half = halfGainY(LANES.gain);
+const aBand = { top: LANES.aWave.top, bottom: LANES.aGrid.bottom };
+const bBand = { top: LANES.bGrid.top, bottom: LANES.bWave.bottom };
+const label = (plan: PlanId) => (plan === "missing-structure" ? "unknown" : "known");
+const mixLane = LANES.mix;
+const rangeStyle = (tag: typeof geo.ranges.a, y: number) => `left:${tag.left.toFixed(2)}%;top:${top(y)}`;
+---
+
+<BlogFigure
+  viz="blog-smart-mix"
+  id="smart-mix-structure"
+  label="Smart Mix"
+  context="A → B · source time"
+  states={SMART_MIX_STATES.map((state) => ({ ...state, phases: [...state.phases] }))}
+  initial={initial}
+  example
+  ariaLabel="Two synthetic 125 BPM tracks on their own time axes with phrases, energy and voice, and the mix between them. The default v2 planner mixes A's outro into B's intro: both are voiced, with 19.42 seconds of clash, and no music is left out. v3 with structure compares phrase-start candidates; its runner-up skips B's intro, and its first choice exits from A's break with no clash but leaves 92.16 seconds of A unplayed. With structure removed, v3's first candidate is exactly v2's plan and the clash is unknown."
+  caption="Synthetic voiced_dj test tracks; windows, clash and omitted music are planner and evaluator output at 6b53412a. Waveform drawn from phrase energy; no audio."
+>
+  <div
+    class="sm"
+    data-sm-data={JSON.stringify(data)}
+    data-plan={still.plan.id}
+    data-structure={still.structure ? "on" : "off"}
+    data-voice={still.voiceKnown ? "known" : "unknown"}
+    data-candidates={still.candidates ? "on" : "off"}
+    data-grid={still.grid ? "on" : "off"}
+    data-cues={still.cues ? "on" : "off"}
+    data-ghost={still.ghost ? "on" : "off"}
+    data-bounds={still.bounds ? "on" : "off"}
+    data-sweep="off"
+    data-clash={geo.clash ? "on" : "off"}
+  >
+    <svg viewBox={`0 0 ${VIEW.width} ${VIEW.height}`} preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <path id="sm-wave-a" d={wavePath(outgoing, LANES.aWave, 4)} />
+        <path id="sm-wave-b" d={wavePath(incoming, LANES.bWave, 11)} />
+        <clipPath id="sm-clip-a-play"><rect data-sm-clip="aPlay" x={f(geo.aPlay.x)} width={f(geo.aPlay.width)} y="0" height={VIEW.height} /></clipPath>
+        <clipPath id="sm-clip-a-win"><rect data-sm-clip="aWin" x={f(geo.aWin.x)} width={f(geo.aWin.width)} y="0" height={VIEW.height} /></clipPath>
+        <clipPath id="sm-clip-b-play"><rect data-sm-clip="bPlay" x={f(geo.bPlay.x)} width={f(geo.bPlay.width)} y="0" height={VIEW.height} /></clipPath>
+        <clipPath id="sm-clip-b-win"><rect data-sm-clip="bWin" x={f(geo.bWin.x)} width={f(geo.bWin.width)} y="0" height={VIEW.height} /></clipPath>
+        <clipPath id="sm-clip-extent"><rect data-sm-clip="extent" x="0" width={f(geo.extent)} y="0" height={VIEW.height} /></clipPath>
+        <clipPath id="sm-clip-lit"><rect data-sm-clip="lit" x="0" width={f(geo.lit)} y="0" height={VIEW.height} /></clipPath>
+        <pattern id="sm-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="6" />
+        </pattern>
+      </defs>
+
+      <!-- A · outgoing, on its own source time -->
+      <rect class="zone" data-sm-zone="a" x={f(geo.aWin.x)} width={f(geo.aWin.width)} y={aBand.top} height={aBand.bottom - aBand.top} />
+      <use href="#sm-wave-a" class="wave dim" />
+      <use href="#sm-wave-a" class="wave played a" clip-path="url(#sm-clip-a-play)" />
+      <use href="#sm-wave-a" class="wave lit a" clip-path="url(#sm-clip-a-win)" />
+      <path class="voice a" d={spansPath(voicedSpans(outgoing), LANES.aVoice, ax)} />
+      <rect class="voice-unknown" x={f(ax(outgoing.activeStartMs))} width={f(ax(outgoing.activeEndMs) - ax(outgoing.activeStartMs))} y={LANES.aVoice.top} height={LANES.aVoice.bottom - LANES.aVoice.top} />
+      <path class="bars" d={gridA.bars} />
+      <path class="eights" d={gridA.eights} />
+      <path class="bars lit" d={gridA.bars + gridA.eights} clip-path="url(#sm-clip-a-win)" />
+      <path class="phrase-edge" d={phraseEdges(outgoing, LANES.aPhrase.top + 2, LANES.aGrid.bottom)} />
+      <rect class="omit" data-sm-omit="a" x={f(geo.aOmit.x)} width={f(geo.aOmit.width)} y={aBand.top} height={aBand.bottom - aBand.top} />
+      <line class="bound" data-sm-bound="a" x1={f(ax(outgoing.activeEndMs))} x2={f(ax(outgoing.activeEndMs))} y1={aBand.top} y2={aBand.bottom} />
+      <line class="cue" x1={f(ax(v2.aStart))} x2={f(ax(v2.aStart))} y1={LANES.aPhrase.bottom} y2={aBand.bottom} />
+      <rect class="ghost" x={f(ax(v2.aStart))} width={f(ax(v2.aEnd) - ax(v2.aStart))} y={aBand.top - 2} height={aBand.bottom - aBand.top + 4} />
+      <g class="cands">
+        {starts.outgoing.map((ms, i) => <rect style={`--i:${i}`} x={f(ax(ms) - 1.6)} width="3.2" y={LANES.aVoice.top - 1} height={LANES.aGrid.bottom - LANES.aVoice.top + 5} />)}
+      </g>
+
+      <!-- B · incoming -->
+      <rect class="zone" data-sm-zone="b" x={f(geo.bWin.x)} width={f(geo.bWin.width)} y={bBand.top} height={bBand.bottom - bBand.top} />
+      <use href="#sm-wave-b" class="wave dim" />
+      <use href="#sm-wave-b" class="wave played b" clip-path="url(#sm-clip-b-play)" />
+      <use href="#sm-wave-b" class="wave lit b" clip-path="url(#sm-clip-b-win)" />
+      <path class="voice b" d={spansPath(voicedSpans(incoming), LANES.bVoice, bx)} />
+      <rect class="voice-unknown" x={f(bx(incoming.activeStartMs))} width={f(bx(incoming.activeEndMs) - bx(incoming.activeStartMs))} y={LANES.bVoice.top} height={LANES.bVoice.bottom - LANES.bVoice.top} />
+      <path class="bars" d={gridB.bars} />
+      <path class="eights" d={gridB.eights} />
+      <path class="bars lit b" d={gridB.bars + gridB.eights} clip-path="url(#sm-clip-b-win)" />
+      <path class="phrase-edge" d={phraseEdges(incoming, LANES.bGrid.top, LANES.bPhrase.bottom - 2)} />
+      <rect class="omit" data-sm-omit="b" x={f(geo.bOmit.x)} width={f(geo.bOmit.width)} y={bBand.top} height={bBand.bottom - bBand.top} />
+      <line class="bound" data-sm-bound="b" x1={f(bx(incoming.activeStartMs))} x2={f(bx(incoming.activeStartMs))} y1={bBand.top} y2={bBand.bottom} />
+      <line class="cue" x1={f(bx(v2.bStart))} x2={f(bx(v2.bStart))} y1={bBand.top} y2={LANES.bPhrase.top} />
+      <rect class="ghost" x={f(bx(v2.bStart))} width={f(bx(v2.bEnd) - bx(v2.bStart))} y={bBand.top - 2} height={bBand.bottom - bBand.top + 4} />
+      <g class="cands">
+        {starts.incoming.map((ms, i) => <rect style={`--i:${i + 4}`} x={f(bx(ms) - 1.6)} width="3.2" y={LANES.bGrid.top - 4} height={LANES.bVoice.bottom - LANES.bGrid.top + 5} />)}
+      </g>
+
+      <!-- What plays together: each source window opens onto the mix lane. -->
+      <path class="lens" data-sm-lens="a" d={geo.lensA} />
+      <path class="lens" data-sm-lens="b" d={geo.lensB} />
+
+      <!-- The mix, on mix time -->
+      <rect class="mix-zone" data-sm-zone="mix" x="0" width={f(geo.extent)} y={mixLane.top} height={mixLane.bottom - mixLane.top} />
+      <line class="rule" x1="0" x2={VIEW.width} y1={mixLane.top} y2={mixLane.top} />
+      <line class="rule" x1="0" x2={VIEW.width} y1={mixLane.bottom} y2={mixLane.bottom} />
+      <line class="half" x1="0" x2={VIEW.width} y1={f(half)} y2={f(half)} />
+      <g clip-path="url(#sm-clip-extent)">
+        {
+          plans.map((plan) => (
+            <g class="mix-plan" data-sm-mix={plan.id} data-voice={label(plan.id)}>
+              <rect class="full" x={f(toMixX(plan.fullLevel[0]))} width={f(toMixX(plan.fullLevel[1]) - toMixX(plan.fullLevel[0]))} y={LANES.gain.top} height={LANES.gain.bottom - LANES.gain.top} />
+              {plan.voice ? (
+                <>
+                  <path class="mvoice dim" d={spansPath(plan.voice.a, LANES.mixAVoice, toMixX)} />
+                  <path class="mvoice dim" d={spansPath(plan.voice.b, LANES.mixBVoice, toMixX)} />
+                </>
+              ) : (
+                <>
+                  <rect class="mvoice-unknown" x="0" width={f(toMixX(plan.durationMs))} y={LANES.mixAVoice.top} height={LANES.mixAVoice.bottom - LANES.mixAVoice.top} />
+                  <rect class="mvoice-unknown" x="0" width={f(toMixX(plan.durationMs))} y={LANES.mixBVoice.top} height={LANES.mixBVoice.bottom - LANES.mixBVoice.top} />
+                </>
+              )}
+              <path class="gain dim" d={gainPath(plan, "a", LANES.gain)} />
+              <path class="gain dim" d={gainPath(plan, "b", LANES.gain)} />
+              <g clip-path="url(#sm-clip-lit)">
+                {plan.clash && <path class="clash" d={spansPath(plan.clash, mixLane, toMixX)} />}
+                {plan.voice && <path class="mvoice a" d={spansPath(plan.voice.a, LANES.mixAVoice, toMixX)} />}
+                {plan.voice && <path class="mvoice b" d={spansPath(plan.voice.b, LANES.mixBVoice, toMixX)} />}
+                <path class="gain a" d={gainPath(plan, "a", LANES.gain)} />
+                <path class="gain b" d={gainPath(plan, "b", LANES.gain)} />
+              </g>
+            </g>
+          ))
+        }
+      </g>
+
+      {
+        geo.edges.map((edge, i) => {
+          const lane = i < 2 ? LANES.aGrid : LANES.bGrid;
+          return <line class="edge" data-sm-edge={i} data-aligned={String(edge.aligned)} x1={f(edge.x)} x2={f(edge.x)} y1={i < 2 ? lane.top - 6 : lane.top - 2} y2={i < 2 ? lane.bottom + 2 : lane.bottom + 6} />;
+        })
+      }
+      <line class="head" data-sm-head="a" x1="0" x2="0" y1={LANES.aWave.top} y2={LANES.aGrid.bottom} />
+      <line class="head" data-sm-head="b" x1="0" x2="0" y1={LANES.bGrid.top} y2={LANES.bWave.bottom} />
+      <line class="head" data-sm-head="mix" x1="0" x2="0" y1={mixLane.top} y2={mixLane.bottom} />
+    </svg>
+
+    <span class="tag lane" style={`top:${top(LANES.aTag.top)}`}><b>A</b> outgoing · {outgoing.bpm} BPM</span>
+    <span class="tag voice-key" style={`top:${top((LANES.aVoice.top + LANES.aVoice.bottom) / 2)}`}>voice</span>
+    <span class="tag ghost-tag" style={`left:${left(ax(v2.aEnd))};top:${top(LANES.aTag.top)}`}>v2 plan</span>
+    {
+      outgoing.phrases.map((phrase) => (
+        <span class="phrase a" style={`left:${left(ax((phrase.startMs + phrase.endMs) / 2))};top:${top(LANES.aPhrase.top)}`}>
+          {phrase.kind}<small>{phrase.bars}</small>
+        </span>
+      ))
+    }
+    <span class="tag cue-tag a" style={`left:${left(ax(v2.aStart))};top:${top(LANES.aPhrase.top)}`}>outro cue</span>
+    <span class="tag grid-tag" style={`top:${top(LANES.aPhrase.top)}`}>8-bar grid from the downbeat</span>
+
+    <span class="tag cand-tag" style={`left:${left(ax(starts.outgoing[0]!))};top:${top(LANES.aGrid.bottom + 7)}`}>candidate starts</span>
+    <span class="tag range" data-sm-range="a" data-anchor={geo.ranges.a.anchor} style={rangeStyle(geo.ranges.a, LANES.aGrid.bottom + 7)}>{geo.ranges.a.text}</span>
+    <span class="tag range b" data-sm-range="b" data-anchor={geo.ranges.b.anchor} style={rangeStyle(geo.ranges.b, LANES.bGrid.top - 7)}>{geo.ranges.b.text}</span>
+
+    <span class="tag mix-tag" style={`top:${top(mixLane.bottom + 3)}`}><b data-sm-mix-name>{geo.mix.name}</b> <span data-sm-mix-detail>{geo.mix.detail}</span></span>
+    <span class="tag half-tag" style={`top:${top(half - 2)}`}>both ≥ ½ gain</span>
+    <span class="tag voice-tag" style={`top:${top((mixLane.top + mixLane.bottom) / 2)}`}>voice unknown</span>
+    <span class="tag clash-tag" style={`left:${left(toMixX(v2.clash ? (v2.clash[0]![0] + v2.clash[0]![1]) / 2 : 0))};top:${top(mixLane.top + 2)}`}>clash</span>
+
+    {
+      incoming.phrases.map((phrase) => (
+        <span class="phrase b" style={`left:${left(bx((phrase.startMs + phrase.endMs) / 2))};top:${top(LANES.bPhrase.top)}`}>
+          {phrase.kind}<small>{phrase.bars}</small>
+        </span>
+      ))
+    }
+    <span class="tag cue-tag b" style={`left:${left(bx(v2.bStart))};top:${top(LANES.bPhrase.top)}`}>intro cue</span>
+    <span class="tag lane b" style={`top:${top(LANES.bTag.top)}`}><b>B</b> incoming · {incoming.bpm} BPM</span>
+    <span class="tag axis" style={`top:${top(LANES.bTag.top)}`}>source time 0:00–4:00</span>
+  </div>
+
+  <dl class="bf-readout" slot="readout">
+    <div>
+      <dt class="viz-label">Aligned</dt>
+      <dd data-sm-dd="aligned" data-tone={readout.aligned.tone}><span data-sm-ro="aligned">{readout.aligned.value}</span><small data-sm-unit="aligned">{readout.aligned.unit}</small></dd>
+    </div>
+    <div>
+      <dt class="viz-label">Vocal clash</dt>
+      <dd data-sm-dd="clash" data-tone={readout.clash.tone}><span data-sm-ro="clash">{readout.clash.value}</span><small data-sm-unit="clash">{readout.clash.unit}</small></dd>
+    </div>
+    <div>
+      <dt class="viz-label">A left unplayed</dt>
+      <dd data-sm-dd="aUnplayed" data-tone={readout.aUnplayed.tone}><span data-sm-ro="aUnplayed">{readout.aUnplayed.value}</span><small data-sm-unit="aUnplayed">{readout.aUnplayed.unit}</small></dd>
+    </div>
+    <div>
+      <dt class="viz-label">B skipped</dt>
+      <dd data-sm-dd="bSkipped" data-tone={readout.bSkipped.tone}><span data-sm-ro="bSkipped">{readout.bSkipped.value}</span><small data-sm-unit="bSkipped">{readout.bSkipped.unit}</small></dd>
+    </div>
+  </dl>
+</BlogFigure>
+
+<style>
+  .sm {
+    position: relative;
+    height: 330px;
+  }
+
+  .sm svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  /* Source lanes */
+  .zone {
+    fill: rgba(6, 182, 212, 0.07);
+  }
+
+  .wave.dim {
+    fill: rgba(241, 245, 249, 0.09);
+  }
+
+  .wave.played.a {
+    fill: rgba(241, 245, 249, 0.34);
+  }
+
+  .wave.played.b {
+    fill: rgba(103, 232, 249, 0.36);
+  }
+
+  .wave.lit.a {
+    fill: rgba(241, 245, 249, 0.85);
+  }
+
+  .wave.lit.b {
+    fill: var(--cyan-hi);
+  }
+
+  .voice {
+    transition: opacity 0.5s var(--ease-snap);
+  }
+
+  .voice.a {
+    fill: rgba(241, 245, 249, 0.62);
+  }
+
+  .voice.b {
+    fill: rgba(103, 232, 249, 0.75);
+  }
+
+  .voice-unknown,
+  .mvoice-unknown {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.38);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+    vector-effect: non-scaling-stroke;
+    opacity: 0;
+    transition: opacity 0.5s var(--ease-snap);
+  }
+
+  .sm[data-voice="unknown"] .voice {
+    opacity: 0;
+  }
+
+  .sm[data-voice="unknown"] .voice-unknown,
+  .mvoice-unknown {
+    opacity: 1;
+  }
+
+  .bars,
+  .eights {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.2);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+    transition: stroke 0.4s var(--ease-snap);
+  }
+
+  .eights {
+    stroke: rgba(241, 245, 249, 0.32);
+  }
+
+  .bars.lit {
+    stroke: rgba(241, 245, 249, 0.75);
+  }
+
+  .bars.lit.b {
+    stroke: rgba(103, 232, 249, 0.85);
+  }
+
+  .sm[data-grid="on"] .eights {
+    stroke: var(--cyan-hi);
+    stroke-width: 1.75;
+  }
+
+  .phrase-edge {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.34);
+    stroke-width: 1;
+    stroke-dasharray: 2 2;
+    vector-effect: non-scaling-stroke;
+    opacity: 0;
+    transition: opacity 0.5s var(--ease-snap);
+  }
+
+  .sm[data-structure="on"] .phrase-edge {
+    opacity: 1;
+  }
+
+  #sm-hatch line {
+    stroke: rgba(251, 191, 36, 0.55);
+    stroke-width: 2;
+  }
+
+  .omit {
+    fill: url(#sm-hatch);
+    stroke: rgba(251, 191, 36, 0.5);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .bound {
+    stroke: rgba(241, 245, 249, 0.25);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+    transition: stroke 0.4s var(--ease-snap);
+  }
+
+  .sm[data-bounds="on"] .bound {
+    stroke: var(--cyan-hi);
+    stroke-width: 1.75;
+  }
+
+  .cue {
+    stroke: var(--fg);
+    stroke-width: 1;
+    stroke-dasharray: 1 2;
+    vector-effect: non-scaling-stroke;
+    opacity: 0;
+    transition: opacity 0.4s var(--ease-snap);
+  }
+
+  .sm[data-cues="on"] .cue {
+    opacity: 0.8;
+  }
+
+  .ghost {
+    fill: none;
+    stroke: rgba(241, 245, 249, 0.5);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+    vector-effect: non-scaling-stroke;
+    opacity: 0;
+    transition: opacity 0.4s var(--ease-snap);
+  }
+
+  .sm[data-ghost="on"] .ghost {
+    opacity: 1;
+  }
+
+  .cands rect {
+    fill: var(--cyan-hi);
+    opacity: 0;
+    transition: opacity 0.3s var(--ease-snap) calc(var(--i) * 90ms);
+  }
+
+  .sm[data-candidates="on"] .cands rect {
+    opacity: 1;
+    filter: drop-shadow(0 0 3px rgba(103, 232, 249, 0.7));
+  }
+
+  .lens {
+    fill: rgba(6, 182, 212, 0.06);
+    stroke: rgba(103, 232, 249, 0.3);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .edge {
+    stroke: var(--cyan-hi);
+    stroke-width: 2.5;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .edge[data-aligned="false"] {
+    stroke: var(--amber);
+  }
+
+  /* Mix lane */
+  .mix-zone {
+    fill: rgba(6, 182, 212, 0.045);
+  }
+
+  .rule {
+    stroke: var(--line);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .half {
+    stroke: rgba(241, 245, 249, 0.16);
+    stroke-width: 1;
+    stroke-dasharray: 2 4;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .mix-plan {
+    display: none;
+  }
+
+  .sm[data-plan="v2"] .mix-plan[data-sm-mix="v2"],
+  .sm[data-plan="v3"] .mix-plan[data-sm-mix="v3"],
+  .sm[data-plan="alternative"] .mix-plan[data-sm-mix="alternative"],
+  .sm[data-plan="missing-structure"] .mix-plan[data-sm-mix="missing-structure"] {
+    display: inline;
+  }
+
+  .full {
+    fill: rgba(241, 245, 249, 0.05);
+  }
+
+  .clash {
+    fill: url(#sm-hatch);
+    stroke: rgba(251, 191, 36, 0.7);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .mvoice.dim {
+    fill: rgba(241, 245, 249, 0.12);
+  }
+
+  .mvoice.a {
+    fill: rgba(241, 245, 249, 0.75);
+  }
+
+  .mvoice.b {
+    fill: var(--cyan-hi);
+  }
+
+  .gain {
+    fill: none;
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .gain.dim {
+    stroke: rgba(241, 245, 249, 0.14);
+  }
+
+  .gain.a {
+    stroke: rgba(241, 245, 249, 0.8);
+  }
+
+  .gain.b {
+    stroke: var(--cyan-hi);
+    filter: drop-shadow(0 0 4px rgba(103, 232, 249, 0.5));
+  }
+
+  .head {
+    stroke: var(--fg);
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+    opacity: 0;
+  }
+
+  .sm[data-sweep="on"] .head {
+    opacity: 1;
+  }
+
+  /* HTML labels */
+  .tag,
+  .phrase {
+    position: absolute;
+    left: 0;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    line-height: 1.2;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--fg-3);
+    pointer-events: none;
+    text-shadow: 0 0 8px var(--bg), 0 0 3px var(--bg);
+  }
+
+  .tag.lane {
+    color: var(--fg-2);
+  }
+
+  .tag.lane b {
+    margin-right: 6px;
+    font-weight: 400;
+    color: var(--fg);
+  }
+
+  .tag.lane.b b {
+    color: var(--cyan-hi);
+  }
+
+  .tag.axis {
+    left: auto;
+    right: 0;
+  }
+
+  .voice-key {
+    transform: translateY(-50%);
+    color: var(--fg-2);
+  }
+
+  .phrase {
+    transform: translateX(-50%);
+    color: var(--fg-2);
+    opacity: 0;
+    transition: opacity 0.5s var(--ease-snap);
+  }
+
+  .phrase small {
+    margin-left: 5px;
+    font-size: 8.5px;
+    color: var(--fg-3);
+  }
+
+  .sm[data-structure="on"] .phrase {
+    opacity: 1;
+  }
+
+  .phrase.b {
+    color: rgba(103, 232, 249, 0.85);
+  }
+
+  .ghost-tag {
+    transform: translateX(-100%);
+    opacity: 0;
+    transition: opacity 0.4s var(--ease-snap);
+  }
+
+  .sm[data-ghost="on"] .ghost-tag {
+    opacity: 1;
+  }
+
+  .cue-tag {
+    padding-left: 4px;
+    color: var(--fg);
+    opacity: 0;
+    transition: opacity 0.4s var(--ease-snap);
+  }
+
+  .sm[data-cues="on"] .cue-tag {
+    opacity: 1;
+  }
+
+  .cand-tag {
+    color: var(--cyan-hi);
+    opacity: 0;
+    transition: opacity 0.4s var(--ease-snap);
+  }
+
+  /* Named only in the Menu phase; later range tags take its place. */
+  :global(.bf[data-phase="0"]) .sm[data-candidates="on"] .cand-tag {
+    opacity: 1;
+  }
+
+  .grid-tag {
+    color: var(--cyan-hi);
+    opacity: 0;
+    transition: opacity 0.4s var(--ease-snap);
+  }
+
+  .sm[data-grid="on"] .grid-tag {
+    opacity: 1;
+  }
+
+  .range {
+    color: var(--fg);
+    transform: translate(-50%, 0);
+  }
+
+  .range.b {
+    color: var(--cyan-hi);
+    transform: translate(-50%, -100%);
+  }
+
+  .range[data-anchor="start"] {
+    transform: translate(0, 0);
+  }
+
+  .range[data-anchor="end"] {
+    transform: translate(-100%, 0);
+  }
+
+  .range.b[data-anchor="start"] {
+    transform: translate(0, -100%);
+  }
+
+  .range.b[data-anchor="end"] {
+    transform: translate(-100%, -100%);
+  }
+
+  .mix-tag {
+    left: auto;
+    right: 0;
+  }
+
+  .mix-tag b {
+    margin-right: 6px;
+    font-weight: 400;
+    color: var(--fg);
+  }
+
+  .half-tag {
+    transform: translateY(-100%);
+  }
+
+  .voice-tag {
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--fg-2);
+    display: none;
+  }
+
+  .sm[data-plan="missing-structure"] .voice-tag {
+    display: block;
+  }
+
+  .clash-tag {
+    color: var(--amber);
+    transform: translate(-50%, 0);
+    opacity: 0;
+    transition: opacity 0.3s var(--ease-snap);
+  }
+
+  .sm[data-plan="v2"][data-clash="on"] .clash-tag {
+    opacity: 1;
+  }
+
+  @media (max-width: 760px) {
+    .sm {
+      height: 320px;
+    }
+    .tag,
+    .phrase {
+      font-size: 8px;
+      letter-spacing: 0.06em;
+    }
+    .phrase {
+      font-size: 7.5px;
+      letter-spacing: 0;
+    }
+    .phrase small {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .phrase,
+    .voice,
+    .voice-unknown,
+    .phrase-edge,
+    .cands rect,
+    .cue,
+    .cue-tag,
+    .ghost,
+    .ghost-tag,
+    .cand-tag,
+    .grid-tag,
+    .clash-tag {
+      transition: none;
+    }
+  }
+</style>

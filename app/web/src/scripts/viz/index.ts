@@ -37,6 +37,20 @@ const views: Record<string, () => Promise<View>> = {
   agent: () => import("./agent-view").then((module) => module.initAgent),
   "stack-map": () =>
     import("./stack-map-view").then((module) => module.initStackMap),
+  "blog-connect": () =>
+    import("./blog/connect-view").then((module) => module.initConnect),
+  "blog-crossfade": () =>
+    import("./blog/crossfade-view").then((module) => module.initCrossfade),
+  "blog-workers": () =>
+    import("./blog/workers-view").then((module) => module.initWorkers),
+  "blog-enrichment": () =>
+    import("./blog/enrichment-view").then((module) => module.initEnrichment),
+  "blog-smart-mix": () =>
+    import("./blog/smart-mix-view").then((module) => module.initSmartMix),
+  "blog-music-paths": () =>
+    import("./blog/music-paths-view").then((module) => module.initMusicPaths),
+  "blog-radio": () =>
+    import("./blog/radio-view").then((module) => module.initRadio),
 };
 
 export function initViz(root: ParentNode = document): Cleanup {

@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Listen's API destination before and after native packaging</title>
+  <desc id="desc">Web and PWA Listen load from a Crate deployment and send relative API requests with cookies through its proxy. The installed Capacitor client loads its React bundle from the package. Its API adapter reads a selected server URL and that server's token before sending absolute requests with a bearer header. The native package contains the interface, not the music server.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10" fill="none" stroke="#67e8f9" stroke-width="1.5"/></marker>
+  </defs>
+  <style>
+    text { font-family: "JetBrains Mono", monospace; fill: #d6dae3; font-size: 18px; }
+    .label { fill: #67e8f9; letter-spacing: 1.5px; font-size: 17px; }
+    .note { fill: #a1a7b5; font-size: 17px; }
+    .box { fill: #0d0e14; stroke: #353947; stroke-width: 1; }
+    .flow { fill: none; stroke: #67e8f9; stroke-width: 1.5; marker-end: url(#arrow); }
+  </style>
+  <rect width="1200" height="720" fill="#0a0a0f"/>
+  <text x="40" y="47" class="label">ONE UI / TWO NETWORK CONTEXTS</text>
+  <text x="40" y="77" class="note">Web deployment and the first configurable-server native client</text>
+
+  <text x="40" y="128" class="label">WEB / PWA</text>
+  <rect x="40" y="150" width="320" height="150" rx="4" class="box"/>
+  <text x="60" y="185">LISTEN IN THE BROWSER</text>
+  <text x="60" y="222" class="note">Loaded from the instance</text>
+  <text x="60" y="252" class="note">Relative /api requests</text>
+  <text x="60" y="280" class="note">Browser attaches cookie</text>
+
+  <rect x="440" y="150" width="320" height="150" rx="4" class="box"/>
+  <text x="460" y="185">SAME-ORIGIN PROXY</text>
+  <text x="460" y="222" class="note">Vite during development</text>
+  <text x="460" y="252" class="note">Reverse proxy deployed</text>
+  <text x="460" y="280" class="note">Routes /api to backend</text>
+
+  <rect x="840" y="150" width="320" height="150" rx="4" class="box"/>
+  <text x="860" y="185">CRATE API</text>
+  <text x="860" y="222" class="note">Instance chosen by host</text>
+  <text x="860" y="252" class="note">Cookie authentication</text>
+  <path d="M360 225H432" class="flow"/>
+  <path d="M760 225H832" class="flow"/>
+
+  <text x="40" y="373" class="label">INSTALLED CAPACITOR CLIENT</text>
+  <rect x="40" y="395" width="320" height="150" rx="4" class="box"/>
+  <text x="60" y="430">LOCAL LISTEN BUNDLE</text>
+  <text x="60" y="467" class="note">React UI inside WebView</text>
+  <text x="60" y="497" class="note">Assets from the package</text>
+  <text x="60" y="525" class="note">No implicit API host</text>
+
+  <rect x="440" y="395" width="320" height="150" rx="4" class="box"/>
+  <text x="460" y="430">CLIENT API ADAPTER</text>
+  <text x="460" y="467" class="note">getApiBase() → server URL</text>
+  <text x="460" y="497" class="note">authHeaders() → token</text>
+  <text x="460" y="525" class="note">Absolute API requests</text>
+
+  <rect x="840" y="395" width="320" height="150" rx="4" class="box"/>
+  <text x="860" y="430">SELECTED CRATE API</text>
+  <text x="860" y="467" class="note">Chosen during setup</text>
+  <text x="860" y="497" class="note">Bearer authentication</text>
+  <path d="M360 470H432" class="flow"/>
+  <path d="M760 470H832" class="flow"/>
+
+  <path d="M40 560V577H760V560" fill="none" stroke="#353947"/>
+  <text x="245" y="606" class="note">These parts run on the phone.</text>
+  <path d="M40 637H1160" stroke="#353947"/>
+  <text x="40" y="675" class="note">Images and audio need resolved URLs too: they do not call the JSON API adapter.</text>
+</svg>

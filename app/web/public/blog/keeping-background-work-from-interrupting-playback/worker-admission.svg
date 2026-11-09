@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1020" viewBox="0 0 1200 1020" role="img" aria-labelledby="title desc">
+<title id="title">Separate worker capacity, then decide when background work can run</title>
+<desc id="desc">May 2026 worker split. General, maintenance, analysis and playback workers consume separate lanes. The governor checks scheduled background work against its window, scope, listening activity and sampled host pressure. Deferral returns the same task ID to the broker with a delay. Workers still share the host.</desc>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M1 1L8 5L1 9" fill="none" stroke="#65d5df" stroke-width="1.5"/></marker></defs>
+<style>
+text{font-family:Inter,Arial,sans-serif;fill:#e5edf3;font-size:22px}.mono{font-family:monospace;font-size:16px;letter-spacing:1.5px}.muted{fill:#a2adb9;font-size:19px}.accent{fill:#65d5df}.box{fill:#17212b;stroke:#394451;stroke-width:1.5}.line{stroke:#65d5df;stroke-width:2;fill:none;marker-end:url(#arrow)}
+</style>
+<rect width="1200" height="1020" fill="#0a0a0f"/>
+<text x="48" y="50" class="mono accent">CRATE / WORKER EVOLUTION / MAY 2026</text>
+<text x="48" y="96" font-size="32" font-weight="600">A repair backlog should not occupy playback's workers</text>
+<text x="48" y="132" class="muted">Separate consumers and budgets on one shared host</text>
+<rect x="48" y="172" width="1104" height="330" rx="12" fill="#101923" stroke="#394451"/>
+<text x="72" y="206" class="mono muted">WORKER CAPACITY</text>
+<rect class="box" x="72" y="228" width="246" height="246" rx="8"/>
+<text x="94" y="265" class="accent">General</text><text x="94" y="299" class="mono">fast + default</text>
+<text x="94" y="342" class="muted">Scheduler / watcher</text><text x="94" y="372" class="muted">Imports / operations</text><text x="94" y="430" class="mono muted">NO DAEMONS</text>
+<rect class="box" x="342" y="228" width="246" height="246" rx="8"/>
+<text x="364" y="265" class="accent">Maintenance</text><text x="364" y="299" class="mono">maintenance</text>
+<text x="364" y="342" class="muted">Repair / full sync</text><text x="364" y="372" class="muted">Exports / batch work</text><text x="364" y="430" class="mono muted">CAN WAIT</text>
+<rect class="box" x="612" y="228" width="246" height="246" rx="8"/>
+<text x="634" y="265" class="accent">Analysis</text><text x="634" y="299" class="mono">heavy + daemons</text>
+<text x="634" y="342" class="muted">Audio / fingerprints</text><text x="634" y="372" class="muted">Reusable model state</text><text x="634" y="430" class="mono muted">BATCH CHECKPOINTS</text>
+<rect x="882" y="228" width="246" height="246" rx="8" fill="#14262f" stroke="#65d5df"/>
+<text x="904" y="265" class="accent">Playback</text><text x="904" y="299" class="mono">playback</text>
+<text x="904" y="342" class="muted">Prepare / transcode</text><text x="904" y="372" class="muted">Own worker capacity</text><text x="904" y="430" class="mono accent">PLAYBACK ONLY</text>
+<text x="48" y="554" class="mono accent">ADMISSION FOR A GOVERNED BACKGROUND TASK</text>
+<rect class="box" x="48" y="588" width="280" height="130" rx="8"/>
+<text x="70" y="625">Pending task</text><text x="70" y="659" class="muted">Stable ID + parameters</text><text x="70" y="692" class="mono muted">HANDLER NOT STARTED</text>
+<path class="line" d="M328 652H388"/>
+<rect class="box" x="392" y="588" width="386" height="170" rx="8"/>
+<text x="414" y="625" class="accent">Governor decision</text>
+<text x="414" y="659" class="muted">Maintenance window + task scope</text>
+<text x="414" y="691" class="muted">Listeners / streams + host samples</text>
+<text x="414" y="731" class="mono muted">ALLOW / DEFER</text>
+<path class="line" d="M778 630H850"/><text x="796" y="610" class="mono accent">YES</text>
+<rect x="854" y="588" width="298" height="98" rx="8" fill="#14262f" stroke="#65d5df"/>
+<text x="876" y="625">Continue task admission</text><text x="876" y="660" class="muted">Other locks still apply</text>
+<path class="line" d="M585 758V809"/><text x="603" y="790" class="mono accent">WAIT</text>
+<rect class="box" x="392" y="814" width="386" height="102" rx="8"/>
+<text x="414" y="851">Requeue the same task ID</text><text x="414" y="887" class="muted">Delay + visible reason; release worker</text>
+<path class="line" d="M392 866H188V720"/>
+<text x="48" y="970" class="muted">Capacity isolation and admission checks. No preemption of a decoder already running.</text>
+</svg>

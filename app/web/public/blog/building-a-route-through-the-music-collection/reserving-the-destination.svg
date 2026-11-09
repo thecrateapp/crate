@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 774" role="img" aria-labelledby="title desc">
+  <title id="title">Reserve the endpoints before selecting the middle</title>
+  <desc id="desc">The acoustic path builder resolves the origin and destination anchors before it selects intermediate tracks. It reserves the destination track ID, title key and song family so a middle step cannot consume the endpoint. Waypoints guide intermediate search targets without requiring a specific recording. The final route appends the reserved destination. Sparse catalogues can produce fewer intermediate tracks.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0L10 5L0 10" fill="none" stroke="#67e8f9" stroke-width="1.5"/>
+    </marker>
+  </defs>
+  <style>
+    text { font-family: "JetBrains Mono", monospace; fill: #d6dae3; font-size: 19px; }
+    .label { fill: #67e8f9; letter-spacing: 1.4px; font-size: 17px; }
+    .note { fill: #a1a7b5; font-size: 17px; }
+    .box { fill: #0d0e14; stroke: #353947; stroke-width: 1; }
+    .flow { fill: none; stroke: #67e8f9; stroke-width: 1.5; marker-end: url(#arrow); }
+  </style>
+  <rect width="1200" height="774" fill="#0a0a0f"/>
+  <text x="40" y="44" class="label">ACOUSTIC PATH / RESERVING THE ENDPOINTS</text>
+  <text x="40" y="78" class="note">The destination must survive every intermediate selection.</text>
+
+  <rect x="40" y="112" width="510" height="130" rx="4" class="box"/>
+  <text x="64" y="148" class="label">ORIGIN ANCHOR</text>
+  <text x="64" y="182">Resolve an eligible recording</text>
+  <text x="64" y="215" class="note">Explicit track or flexible endpoint</text>
+
+  <rect x="650" y="112" width="510" height="130" rx="4" class="box"/>
+  <text x="674" y="148" class="label">DESTINATION ANCHOR</text>
+  <text x="674" y="182">Resolve it before the middle</text>
+  <text x="674" y="215" class="note">Pair anchors with distinct song families</text>
+
+  <path d="M295 242V286" class="flow"/>
+  <path d="M905 242V286" class="flow"/>
+  <rect x="40" y="294" width="510" height="138" rx="4" class="box"/>
+  <text x="64" y="331" class="label">START THE ROUTE</text>
+  <text x="64" y="365">Append the origin recording</text>
+  <text x="64" y="400" class="note">Use its actual vector for the next search</text>
+
+  <rect x="650" y="294" width="510" height="138" rx="4" class="box"/>
+  <text x="674" y="331" class="label">RESERVE THE DESTINATION</text>
+  <text x="674" y="365">Track ID + title key + song family</text>
+  <text x="674" y="400" class="note">Exclude them from intermediate candidates</text>
+
+  <path d="M295 432V472H420V506" class="flow"/>
+  <path d="M905 432V472H780V506" class="flow"/>
+  <rect x="220" y="514" width="760" height="118" rx="4" class="box"/>
+  <text x="244" y="550" class="label">FILL THE INTERMEDIATE STEPS</text>
+  <text x="244" y="583">Previous recording + progress through the waypoint chain</text>
+  <text x="244" y="613" class="note">Rank eligible candidates; a waypoint guides rather than pins a track.</text>
+
+  <path d="M600 632V666" class="flow"/>
+  <text x="600" y="700" text-anchor="middle">ORIGIN → SELECTED INTERMEDIATE TRACKS → RESERVED DESTINATION</text>
+  <text x="600" y="742" text-anchor="middle" class="note">A sparse catalogue can leave fewer middle tracks. The report records the shortfall.</text>
+</svg>

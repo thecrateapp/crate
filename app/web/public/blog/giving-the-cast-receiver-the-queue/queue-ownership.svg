@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 805" role="img" aria-labelledby="title desc">
+  <title id="title">Cast separates queue edits from receiver playback state</title>
+  <desc id="desc">The sender makes authenticated, revision-checked queue edits and loads CAF's queue. The receiver owns item and position, reports state with an independent sequence and fetches session-scoped media. A returning sender adopts the receiver snapshot.</desc>
+  <defs><marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M1 1L7 4L1 7" fill="none" stroke="#67e8f9"/></marker></defs>
+  <rect width="1200" height="805" fill="#0a0a0f"/>
+  <g font-family="JetBrains Mono,monospace" font-size="17" fill="#a9adbb">
+    <text x="40" y="48" fill="#67e8f9" letter-spacing="1">THE PHONE CAN LEAVE THE LOADED QUEUE BEHIND</text>
+    <text x="40" y="79">Queue revision and playback sequence describe different changes.</text>
+    <g fill="#0d0e14" stroke="#353947"><rect x="40" y="132" width="320" height="175" rx="4"/><rect x="840" y="132" width="320" height="175" rx="4"/><rect x="40" y="417" width="320" height="177" rx="4"/><rect x="840" y="417" width="320" height="177" rx="4"/></g>
+    <g fill="#e5e7ef"><text x="60" y="168">LISTEN SENDER</text><text x="860" y="168">CRATE SESSION API</text><text x="60" y="453">CUSTOM RECEIVER + CAF</text><text x="860" y="453">SCOPED MEDIA</text></g>
+    <text x="60" y="207">Edits and transport UI</text><text x="60" y="239">Expected queue revision</text><text x="60" y="271">Stable mutation ID</text>
+    <text x="860" y="207">Stored queue + cursor</text><text x="860" y="239">Owner-checked mutations</text><text x="860" y="271">Lease hash + expiry</text>
+    <text x="60" y="492">Loaded queue advances here</text><text x="60" y="524">Current item + position</text><text x="60" y="556">Monotonic stateSeq</text>
+    <text x="860" y="492">Queue-member stream URLs</text><text x="860" y="524">Artwork / metadata</text><text x="860" y="556">No user refresh token</text>
+    <path d="M360 200H832" fill="none" stroke="#67e8f9" marker-end="url(#arrow)"/>
+    <text x="460" y="188" font-size="15">Authenticated queue edit</text>
+    <path d="M840 263H368" fill="none" stroke="#67e8f9" stroke-dasharray="9 4" marker-end="url(#arrow)"/>
+    <text x="460" y="251" font-size="15">Revision / conflict snapshot</text>
+    <path d="M105 307V409" fill="none" stroke="#67e8f9" marker-end="url(#arrow)"/>
+    <text x="119" y="354" font-size="14">Load / synchronize queue</text>
+    <path d="M60 417V315" fill="none" stroke="#67e8f9" stroke-dasharray="1 5" marker-end="url(#arrow)"/>
+    <path d="M360 469H600V333H1015V315" fill="none" stroke="#67e8f9" stroke-dasharray="9 4" marker-end="url(#arrow)"/>
+    <text x="620" y="365" font-size="15">Receiver cursor updates</text>
+    <path d="M360 552H832" fill="none" stroke="#67e8f9" marker-end="url(#arrow)"/>
+    <text x="450" y="540" font-size="15">HTTP media requests using lease</text>
+    <path d="M40 642H1160" stroke="#353947"/>
+    <text x="40" y="681" fill="#e5e7ef">DISCONNECT</text><text x="230" y="681">Sender leaves; loaded receiver queue can keep playing.</text>
+    <text x="40" y="719" fill="#e5e7ef">RECONNECT</text><text x="230" y="719">Adopt receiver item and time; do not restore a stale cursor.</text>
+    <text x="40" y="757" fill="#e5e7ef">STOP CAST</text><text x="230" y="757">Stop playback, revoke the lease and end the Cast session.</text>
+  </g>
+</svg>
