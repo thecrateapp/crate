@@ -274,7 +274,7 @@ def test_v3_plans_the_edge_set_as_the_api_does() -> None:
     assert records[1]["structureUsed"] is False
     assert records[1]["plan"] == v2[1]["plan"]
     assert summary["structureUsed"] == {"edges": 1, "rate": 0.5}
-    assert PLANNER_RULES["smart-mix-v3"] == 3
+    assert PLANNER_RULES["smart-mix-v3"] == 4
     json.dumps(records)
 
 
@@ -722,15 +722,20 @@ def test_v3_keeps_the_stems_layer_to_the_beatmatch_family(priors) -> None:
     assert summarize(gated)["stems"]["edgesInFamily"] == 0
 
 
-def test_genre_priors_come_from_the_album_genres(monkeypatch) -> None:
+def test_genre_priors_come_from_the_album_and_artist_genres(monkeypatch) -> None:
     import crate.db.queries.smart_mix_genres as genres_module
+    from crate.db.queries.smart_mix_genres import TrackGenres
 
     from run_eval import load_genre_priors
 
     monkeypatch.setattr(
         genres_module,
-        "get_track_album_genres",
-        lambda uids: {OUT: {"techno": 1.0}, IN: {"rock": 0.5, "punk": 0.5}},
+        "get_track_genres",
+        lambda uids: {
+            OUT: TrackGenres(album={"techno": 1.0}),
+            IN: TrackGenres(album={"rock": 0.5, "punk": 0.5}),
+            OTHER: TrackGenres(artist={"industrial metal": 1.0, "metal": 0.88}),
+        },
     )
 
-    assert load_genre_priors([OUT, IN, OTHER]) == {OUT: 0.95, IN: 0.15, OTHER: None}
+    assert load_genre_priors([OUT, IN, OTHER]) == {OUT: 0.95, IN: 0.15, OTHER: 1.0}

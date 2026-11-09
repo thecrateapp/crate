@@ -18,6 +18,7 @@ import pytest
 
 from crate.api import smart_mix
 from crate.api.schemas.smart_mix import TransitionEdgeRequest
+from crate.db.queries.smart_mix_genres import TrackGenres
 from crate.smart_mix.models import TrackMixProfile
 from crate.smart_mix.phrase_grid import phrase_spans_ms
 from crate.smart_mix.policy import PLANNER_POLICY, PLANNER_POLICY_V3
@@ -152,11 +153,15 @@ def batch(test_app, monkeypatch):
 
     def genres(entity_uids):
         state["genre_reads"].append(list(entity_uids))
-        return {
+        found = {
             uid: state["genres"][uid] for uid in entity_uids if uid in state["genres"]
         }
+        return {
+            uid: value if isinstance(value, TrackGenres) else TrackGenres(album=value)
+            for uid, value in found.items()
+        }
 
-    monkeypatch.setattr(smart_mix, "get_track_album_genres", genres)
+    monkeypatch.setattr(smart_mix, "get_track_genres", genres)
     monkeypatch.setattr(
         smart_mix,
         "get_smart_mix_plan_caches",
@@ -359,3 +364,35 @@ def test_the_cache_key_follows_the_gate() -> None:
     assert key(IN_FAMILY, both) != key()
     # A track whose genre moves into the family changes the key.
     assert key(rock, both) != key(IN_FAMILY, both)
+
+
+def test_machine_drum_industrial_artists_get_the_stems_layer(batch) -> None:
+    # Rules revision 4: industrial by the artist's genres, without album genres
+    # (Author & Punisher) or with an album split with death metal (Fear Factory).
+    batch["analyses"] = {uid: [_analysis(uid)] for uid in REVISIONS}
+    batch["genres"] = {
+        OUTGOING_UID: TrackGenres(artist={"industrial": 1.0, "drone": 0.88}),
+        INCOMING_UID: TrackGenres(
+            album={"death metal": 0.5, "industrial metal": 0.5},
+            artist={"industrial metal": 1.0, "death metal": 0.88},
+        ),
+    }
+
+    plan = batch["post"]()
+
+    assert plan["stemsUsed"] is True
+
+
+def test_live_drum_extreme_metal_stays_out(batch) -> None:
+    plain = batch["post"]()
+    batch["plans"].clear()
+    batch["analyses"] = {uid: [_analysis(uid)] for uid in REVISIONS}
+    batch["genres"] = {
+        OUTGOING_UID: TrackGenres(artist={"industrial metal": 1.0}),
+        INCOMING_UID: TrackGenres(
+            album={"black metal": 0.6, "industrial": 0.4},
+            artist={"black metal": 1.0, "norwegian black metal": 0.88},
+        ),
+    }
+
+    assert batch["post"]() == plain

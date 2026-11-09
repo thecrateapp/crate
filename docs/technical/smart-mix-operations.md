@@ -137,7 +137,7 @@ These values come from the reviewed code; they were not discovered from a live i
 | `PLANNER_POLICY_VERSION`           | `2`                  | Numeric version of each individual plan               |
 | `PLANNER_POLICY.rules_revision`    | `7`                  | Internal rules revision included in the cache key     |
 | `PLANNER_POLICY_V3.identifier`     | `smart-mix-v3`       | Planner on the stored phrases (SM3-D3)                |
-| `PLANNER_POLICY_V3.rules_revision` | `3`                  | Rules revision of v3, in its cache key                |
+| `PLANNER_POLICY_V3.rules_revision` | `4`                  | Rules revision of v3, in its cache key                |
 
 Changing the rules does not necessarily change the public planner identifier: the cache key
 includes both. `PLANNER_IDENTIFIER` is the default: plan batches without `plannerVersion`,
@@ -1433,7 +1433,7 @@ first, and serves the first; the AI refinement (below) picks from the same menu 
 - **Safety**: every candidate goes through `TransitionPlan` and the planner policy
   (`evaluation.policy_violations`); v3 copies v2's limits on tempo, gain, true peak and
   durations.
-- **Stems layer** (Smart Mix Stems ST3, rules revision 3, STEM-D5 and STEM-G1). When both
+- **Stems layer** (Smart Mix Stems ST3, rules revision 4, STEM-D5 and STEM-G1). When both
   tracks have a stem analysis of their current file (Smart Mix playlists, or a Crate Decks
   upload), the policy's `stems_layer` is on and the edge belongs to the beatmatch family, the
   phrase menu is scored with the stems layer:
@@ -1448,21 +1448,31 @@ first, and serves the first; the AI refinement (below) picks from the same menu 
     without vocals.
 
   The terms are in the breakdown's `stems`. **The beatmatch family** (`stems_layer_applies`):
-  both tracks' genre beatmatch priors (`transition_fit.genre_beatmatch_prior` of their album
-  genres, weighted) are known and at least `stems_layer_min_genre_prior` (0.5, where the prior
-  table turns from rock, punk, metal, indie, pop and soul to dub, hip-hop, synthwave and
-  dance). Tracks without album genres keep the layer off. Outside the family, or without stems
-  on both tracks, every candidate and score is revision 1's (golden test
-  `app/tests/fixtures/smart_mix/candidates_v3_rules1.json`); revision 3's menus with stems have
-  their own (`candidates_v3_rules3.json`). Revision 2 (stem vocals instead of YAMNet's, on every
-  edge) was never released; the ST3 evaluation in the Crate Decks repository
-  (`docs/plans/2026-11-09-smart-mix-stems-evaluation.md`) has the measurements behind STEM-G1.
+  both tracks' gate priors are known and at least `stems_layer_min_genre_prior` (0.5). A
+  track's gate prior (`candidates.stems_gate_prior`) is 1.0 when its top artist genre or top
+  album genre (ties included) is of the machine-drum industrial family (`MACHINE_DRUM_GENRES`:
+  industrial, industrial metal and rock, EBM, electro-industrial, aggrotech, dark electro, Neue
+  Deutsche Härte), and otherwise the beatmatch prior of its album genres
+  (`transition_fit.genre_beatmatch_prior`, weighted). 0.5 is where the prior table turns from
+  rock, punk, metal, indie, pop and soul to dub, hip-hop, synthwave and dance. The industrial
+  family (rules revision 4) is a list of the gate's own: the shared prior table does not change,
+  so compatible tracks and radio keep their priors. Its drums are programmed or played to a grid:
+  on the development library 75 % of its tracks have a steady tempo, like electronic dance music
+  (80 %), against 32 % for extreme metal and 56-57 % for punk and rock; the rule lets in all of
+  Godflesh, Ministry, Fear Factory and Author & Punisher, 0.5 % of extreme metal, 1.0 % of punk
+  and hardcore and 1.1 % of rock (albums tagged industrial), and no other metal. Tracks without
+  genres keep the layer off. Outside the family, or without stems on both tracks, every candidate
+  and score is revision 1's (golden test `app/tests/fixtures/smart_mix/candidates_v3_rules1.json`);
+  the menus with stems have their own (`candidates_v3_rules3.json`, unchanged by revision 4).
+  Revision 2 (stem vocals instead of YAMNet's, on every edge) was never released; the ST3
+  evaluation in the Crate Decks repository (`docs/plans/2026-11-09-smart-mix-stems-evaluation.md`)
+  has the measurements behind STEM-G1.
 
 - **Response**: each v3 plan adds `structureUsed`, whether the menu came from the phrases, and
   `stemsUsed: true` when the stems layer scored it (absent otherwise). The batch reads
   profiles without structure and the stem analyses of its tracks (one bounded `ANY` query),
-  then, only when some edge has an analysis on both tracks, those tracks' album genres (one more
-  bounded query, `get_track_album_genres`), to build the cache keys: an edge the layer scores
+  then, only when some edge has an analysis on both tracks, those tracks' album and artist genres
+  (one more bounded query, `get_track_genres`), to build the cache keys: an edge the layer scores
   keys on both analyses too, so a genre that moves an edge into or out of the family changes
   its key. It reads the structure only for the edges it has to plan, with the beat grid when a
   layer applies (the grid places the end of the outro for the layer; the planner does not read

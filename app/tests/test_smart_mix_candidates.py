@@ -74,8 +74,9 @@ def _v2(
 def test_v3_policy_copies_the_v2_safety_limits() -> None:
     assert PLANNER_POLICY_V3.identifier == "smart-mix-v3"
     # Revision 2 added the stems layer (Smart Mix Stems, ST3); revision 3 keeps it to
-    # the beatmatch family with voice from either detector (STEM-G1).
-    assert PLANNER_POLICY_V3.rules_revision == 3
+    # the beatmatch family with voice from either detector (STEM-G1); revision 4 lets
+    # the machine-drum industrial family in.
+    assert PLANNER_POLICY_V3.rules_revision == 4
     assert PLANNER_POLICY_V3.phrase_lengths == (8, 16, 32)
     assert PLANNER_POLICY_V3.max_candidates == 8
     for name in (

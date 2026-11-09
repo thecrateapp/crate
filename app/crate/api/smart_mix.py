@@ -43,7 +43,7 @@ from crate.db.cache_store import (
     set_smart_mix_plan_caches,
 )
 from crate.db.queries.smart_mix_compatible import get_compatible_track_inputs
-from crate.db.queries.smart_mix_genres import get_track_album_genres
+from crate.db.queries.smart_mix_genres import get_track_genres
 from crate.db.repositories.access_tokens import (
     get_continuation_descriptor,
     issue_playback_continuation_token,
@@ -63,10 +63,9 @@ from crate.smart_mix.models import (
     TransitionContext,
 )
 from crate.smart_mix.evaluation import policy_limits
-from crate.smart_mix.candidates import stems_layer_applies
+from crate.smart_mix.candidates import stems_gate_prior, stems_layer_applies
 from crate.smart_mix.planner import plan_transition, plan_transition_v3
 from crate.smart_mix.policy import PLANNER_POLICY, PLANNER_POLICY_V3, PlannerPolicy
-from crate.smart_mix.transition_fit import genre_beatmatch_prior
 from crate.smart_mix.stems import (
     StemAnalysis,
     choose_analysis,
@@ -512,14 +511,18 @@ def _stems_of_edges(
 def _genre_priors(
     edges: list[TransitionEdgeRequest], stems: Mapping[str, StemAnalysis]
 ) -> dict[str, float | None]:
-    """The genre beatmatch prior of the tracks of edges with stems on both, which
-    gates the stems layer to the beatmatch family (STEM-G1): one bounded query of
-    their album genres, none when no edge has stems on both."""
+    """The gate prior (``stems_gate_prior``) of the tracks of edges with stems on
+    both, which keeps the stems layer to the beatmatch family (STEM-G1): one bounded
+    query of their album and artist genres, none when no edge has stems on both."""
     uids = list(_stems_of_edges(edges, stems))
     if not uids:
         return {}
-    genres = get_track_album_genres(uids)
-    return {uid: genre_beatmatch_prior(genres.get(uid)) for uid in uids}
+    genres = get_track_genres(uids)
+    return {
+        uid: stems_gate_prior(track.album, track.artist) if track else None
+        for uid in uids
+        for track in (genres.get(uid),)
+    }
 
 
 def _structured_profiles(

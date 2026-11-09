@@ -24,6 +24,7 @@ import pytest
 
 from crate.smart_mix.candidates import (
     plan_transition_candidates,
+    stems_gate_prior,
     stems_layer_applies,
 )
 from crate.smart_mix.evaluation import stem_bass_clash_ms, stem_vocal_clash_ms
@@ -209,8 +210,10 @@ def _picked(
 # --- golden -----------------------------------------------------------------------
 
 
-def test_rules_revision_3_gates_the_stems_layer_by_mix_type() -> None:
-    assert PLANNER_POLICY_V3.rules_revision == 3
+def test_rules_revision_4_gates_the_stems_layer_by_mix_type() -> None:
+    # Revision 3 gated the layer by genre and took voice from either detector;
+    # revision 4 lets the machine-drum industrial family in (STEM-G1).
+    assert PLANNER_POLICY_V3.rules_revision == 4
     assert PLANNER_POLICY_V3.stems_layer is True
     assert PLANNER_POLICY_V3.stems_layer_min_genre_prior == 0.5
     assert GOLDEN["rulesRevision"] == 1
@@ -380,7 +383,9 @@ def _rules3_menus() -> dict[str, list[dict]]:
 def test_rules_revision_3_menus_with_stems_match_their_golden() -> None:
     golden = json.loads(GOLDEN_RULES3.read_text())
 
-    assert golden["rulesRevision"] == PLANNER_POLICY_V3.rules_revision
+    # Recorded at revision 3; revision 4 changes which tracks are in the family,
+    # not the menu of an edge that is.
+    assert golden["rulesRevision"] == 3
     assert golden["priors"] == list(IN_FAMILY)
     assert _rules3_menus() == golden["cases"]
     # Gapless albums and manual skips keep v2's single plan; every menu uses stems.
@@ -548,3 +553,137 @@ def test_a_stems_layer_needs_one_entry_per_phrase() -> None:
     with pytest.raises(ValueError, match="one entry per phrase"):
         replace(profile(OUTGOING_UID), stems=layer)
     assert phrases(OUT_LAYOUT)
+
+
+# --- the machine-drum industrial family (STEM-G1, rules revision 4) -------------------
+
+# Artist and album genres as the development library has them (weights as stored).
+GENRES = {
+    "Godflesh": (
+        "industrial metal=1;industrial=0.88;experimental=0.76;doom metal=0.64;metal=0.52",
+        "industrial metal=0.2632;industrial=0.2316;experimental=0.2;doom metal=0.1684;"
+        "metal=0.1368",
+    ),
+    "Fear Factory": (
+        "industrial metal=1;death metal=0.88;metal=0.76;industrial=0.64;thrash metal=0.52",
+        "death metal=0.5;industrial metal=0.5",
+    ),
+    "Ministry": (
+        "industrial metal=1;industrial=0.88;industrial rock=0.76;metal=0.64;"
+        "electronic=0.52",
+        "industrial metal=0.2632;industrial=0.2316;industrial rock=0.2;metal=0.1684;"
+        "electronic=0.1368",
+    ),
+    "Author & Punisher": (
+        "industrial=1;drone=0.88;noise=0.76;experimental=0.64;doom metal=0.52",
+        "",
+    ),
+    "Front 242": (
+        "ebm=1;industrial=0.88;electronic=0.76;electro=0.64;electronica=0.52",
+        "",
+    ),
+    "Nitzer Ebb": (
+        "ebm=1;industrial=0.88;electronic=0.76;old school ebm=0.64;electro=0.52",
+        "ebm=0.2632;industrial=0.2316;electronic=0.2;old school ebm=0.1684;electro=0.1368",
+    ),
+    "Darkthrone": (
+        "black metal=1;norwegian black metal=0.88;death metal=0.76;norwegian=0.64;"
+        "metal=0.52",
+        "black metal=0.2632;norwegian black metal=0.2316;death metal=0.2;metal=0.1368",
+    ),
+    "Cannibal Corpse": (
+        "death metal=1;brutal death metal=0.88;grindcore=0.76;metal=0.64;american=0.52",
+        "brutal death metal=0.5;death metal=0.5",
+    ),
+    "Slayer": (
+        "thrash metal=1;metal=0.88;speed metal=0.76;heavy metal=0.64;thrash=0.52",
+        "metal=0.5;thrash metal=0.5",
+    ),
+    "Pig Destroyer": (
+        "grindcore=1;death metal=0.88;grind=0.76;hardcore=0.64;metal=0.52",
+        "death metal=1;grindcore=1",
+    ),
+    "Electric Wizard": (
+        "doom metal=1;stoner metal=0.88;sludge=0.76;stoner doom=0.64;stoner rock=0.52",
+        "",
+    ),
+    "Black Flag": (
+        "hardcore punk=1;punk=0.88;hardcore=0.76;punk rock=0.64;rock=0.52",
+        "hardcore punk=0.5;post-hardcore=0.5",
+    ),
+    "Minor Threat": (
+        "hardcore punk=1;hardcore=0.88;straight edge=0.76;punk=0.64;punk rock=0.52",
+        "hardcore punk=0.5;straight edge=0.5",
+    ),
+    "Discharge": ("d-beat=1;hardcore punk=0.88;punk=0.76;crust=0.64;hardcore=0.52", ""),
+    "Converge": (
+        "hardcore=1;mathcore=0.88;metalcore=0.76;chaotic hardcore=0.64;noisecore=0.52",
+        "mathcore=0.5;metalcore=0.5",
+    ),
+    "The Clash": (
+        "punk=1;punk rock=0.88;british=0.76;rock=0.64;classic rock=0.52",
+        "new wave=1;post-punk=1",
+    ),
+}
+MACHINE_DRUMS = (
+    "Godflesh",
+    "Fear Factory",
+    "Ministry",
+    "Author & Punisher",
+    "Front 242",
+    "Nitzer Ebb",
+)
+LIVE_DRUMS = tuple(name for name in GENRES if name not in MACHINE_DRUMS)
+
+
+def _genres(text: str) -> dict[str, float]:
+    result = {}
+    for item in filter(None, text.split(";")):
+        name, _, weight = item.rpartition("=")
+        result[name] = float(weight)
+    return result
+
+
+def _gate_prior(name: str) -> float | None:
+    artist, album = GENRES[name]
+    return stems_gate_prior(_genres(album), _genres(artist))
+
+
+@pytest.mark.parametrize("name", MACHINE_DRUMS)
+def test_machine_drum_industrial_is_in_the_beatmatch_family(name) -> None:
+    prior = _gate_prior(name)
+
+    assert prior is not None
+    assert prior >= PLANNER_POLICY_V3.stems_layer_min_genre_prior
+
+
+@pytest.mark.parametrize("name", LIVE_DRUMS)
+def test_live_drum_metal_punk_and_rock_stay_out(name) -> None:
+    prior = _gate_prior(name)
+
+    assert prior is None or prior < PLANNER_POLICY_V3.stems_layer_min_genre_prior
+
+
+def test_other_tracks_keep_their_album_genres_prior() -> None:
+    assert stems_gate_prior({"techno": 1.0}, {}) == 0.95
+    assert stems_gate_prior({"house": 0.5, "rock": 0.5}, {"house": 1.0}) == 0.55
+    # Without album genres a track outside the family stays unknown.
+    assert stems_gate_prior({}, {"techno": 1.0}) is None
+    assert stems_gate_prior({}, {}) is None
+    # Only the top genre counts: an industrial side tag does not let a track in.
+    assert stems_gate_prior({"metal": 0.8, "industrial metal": 0.2}, {}) == 0.1
+    assert stems_gate_prior({"industrial": 1.0}, {}) == 1.0
+    assert stems_gate_prior({"electro-industrial": 1.0}, {}) == 1.0
+
+
+def test_a_pair_needs_both_tracks_in_the_family() -> None:
+    def applies(left: str, right: str) -> bool:
+        return stems_layer_applies(
+            PLANNER_POLICY_V3, _gate_prior(left), _gate_prior(right)
+        )
+
+    assert applies("Godflesh", "Ministry")
+    assert applies("Author & Punisher", "Fear Factory")
+    assert applies("Front 242", "Godflesh")
+    assert not applies("Godflesh", "Darkthrone")
+    assert not applies("Black Flag", "Ministry")

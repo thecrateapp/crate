@@ -165,12 +165,13 @@ PLANNER_POLICY = PlannerPolicy()
 # Smart Mix 3 planner: the v2 policy with its own identity and rules revision. The
 # safety limits (tempo, gain, true peak, durations) are v2's and must stay so.
 # Revision 2 added the stems layer (Smart Mix Stems, ST3); revision 3 (STEM-G1) keeps
-# it to the beatmatch family and takes voice from the vocal stem or YAMNet. Without
+# it to the beatmatch family and takes voice from the vocal stem or YAMNet; revision 4
+# lets the machine-drum industrial family in (candidates.stems_gate_prior). Without
 # stems on both tracks, or outside the family, its menus are revision 1's.
 PLANNER_POLICY_V3 = replace(
     PLANNER_POLICY,
     identifier="smart-mix-v3",
-    rules_revision=3,
+    rules_revision=4,
     stems_layer=True,
 )
 

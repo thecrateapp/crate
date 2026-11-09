@@ -1412,13 +1412,17 @@ def _refiner(args: argparse.Namespace) -> tuple[Refiner, dict[str, Any]]:
 
 
 def load_genre_priors(uids: Sequence[str]) -> dict[str, float | None]:
-    """Each track's genre beatmatch prior from its album genres, as the plan API
-    reads them to gate the stems layer (STEM-G1); None when unknown."""
+    """Each track's stems gate prior from its album and artist genres, as the plan
+    API reads them (STEM-G1, ``stems_gate_prior``); None when unknown."""
     from crate.db.queries import smart_mix_genres
-    from crate.smart_mix.transition_fit import genre_beatmatch_prior
+    from crate.smart_mix.candidates import stems_gate_prior
 
-    genres = smart_mix_genres.get_track_album_genres(list(uids))
-    return {uid: genre_beatmatch_prior(genres.get(uid)) for uid in uids}
+    genres = smart_mix_genres.get_track_genres(list(uids))
+    return {
+        uid: stems_gate_prior(track.album, track.artist) if track else None
+        for uid in uids
+        for track in (genres.get(uid),)
+    }
 
 
 def load_prompt_genres(uids: Sequence[str]) -> dict[str, str | None]:

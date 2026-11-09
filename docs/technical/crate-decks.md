@@ -167,8 +167,9 @@ vocals, bass and drums (`vocalPresent`, `bassPresent`, `drumsPresent`; cuts in
 `docs/technical/smart-mix-operations.md`, "Stem analyses"). The summary profile
 never carries it, because the Go read plane serves the summary natively.
 `smart-mix-v3` scores with the layer when both tracks of an edge have one and
-the edge belongs to the beatmatch family (both tracks' genre beatmatch priors at
-least 0.5, STEM-G1), and says so with `stemsUsed: true` on the plan.
+the edge belongs to the beatmatch family (both tracks' genre priors at least 0.5,
+with the machine-drum industrial family in, STEM-G1), and says so with
+`stemsUsed: true` on the plan.
 
 **Stem files.** For the tracks of Smart Mix playlists the server also keeps
 the separated audio, when `smart_mix.stems.storage` is true in

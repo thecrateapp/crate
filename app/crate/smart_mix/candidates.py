@@ -76,8 +76,9 @@ alike. Every function is pure and deterministic.
 from __future__ import annotations
 
 import math
+import re
 from bisect import bisect_left, bisect_right
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from functools import cache
 
@@ -119,6 +120,7 @@ from crate.smart_mix.planner import (
     score_compatibility,
 )
 from crate.smart_mix.policy import PLANNER_POLICY_V3, PlannerPolicy
+from crate.smart_mix.transition_fit import genre_beatmatch_prior
 
 _BEATS_PER_BAR = 4
 _HANDOFF_PROGRESS = 0.5
@@ -382,6 +384,58 @@ def recompose_candidate(
 
 
 # --- phrases ---------------------------------------------------------------
+
+
+# STEM-G1, rules revision 4: genres of the machine-drum industrial family. Their drums
+# are programmed or played to a grid (Godflesh, Ministry, Fear Factory, Author &
+# Punisher, EBM): on the development library 75 % of their tracks have a steady tempo
+# (stability >= 0.9), like electronic dance music (80 %), against 32 % for extreme
+# metal and 56-57 % for punk and rock. Matched at the start of a word, like the
+# genre beatmatch priors, so "electro-industrial" and "old school ebm" count.
+MACHINE_DRUM_GENRES = (
+    "industrial",
+    "ebm",
+    "aggrotech",
+    "dark electro",
+    "neue deutsche h",
+)
+# The gate prior of a track of that family: in, whatever its other genres say.
+MACHINE_DRUM_PRIOR = 1.0
+
+
+def stems_gate_prior(
+    album_genres: Mapping[str, float] | None,
+    artist_genres: Mapping[str, float] | None,
+) -> float | None:
+    """The genre prior the stems gate reads for a track (STEM-G1).
+
+    ``MACHINE_DRUM_PRIOR`` when the track's top artist genre or top album genre (ties
+    included) is of the machine-drum industrial family (``MACHINE_DRUM_GENRES``);
+    otherwise the album genres' ``genre_beatmatch_prior``, None without album genres.
+    The shared prior table is not changed: compatible tracks and radio keep their
+    priors."""
+    if any(
+        _machine_drums(genre)
+        for genre in (*_top_genres(artist_genres), *_top_genres(album_genres))
+    ):
+        return MACHINE_DRUM_PRIOR
+    return genre_beatmatch_prior(album_genres) if album_genres else None
+
+
+def _top_genres(genres: Mapping[str, float] | None) -> list[str]:
+    if not genres:
+        return []
+    weights = {name: float(weight or 0.0) for name, weight in genres.items()}
+    best = max(weights.values())
+    return [name for name, weight in weights.items() if weight == best]
+
+
+def _machine_drums(genre: str) -> bool:
+    normalized = " ".join(genre.casefold().replace("_", " ").split())
+    return any(
+        re.search(rf"(?<![a-z]){re.escape(keyword)}", normalized)
+        for keyword in MACHINE_DRUM_GENRES
+    )
 
 
 def stems_layer_applies(
@@ -1376,7 +1430,9 @@ def _is_short_cut(plan: TransitionPlan, policy: PlannerPolicy) -> bool:
 
 
 __all__ = [
+    "MACHINE_DRUM_GENRES",
     "plan_transition_candidates",
     "recompose_candidate",
+    "stems_gate_prior",
     "stems_layer_applies",
 ]
