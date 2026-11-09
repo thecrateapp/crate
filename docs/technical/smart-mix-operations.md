@@ -137,7 +137,7 @@ These values come from the reviewed code; they were not discovered from a live i
 | `PLANNER_POLICY_VERSION`           | `2`                  | Numeric version of each individual plan               |
 | `PLANNER_POLICY.rules_revision`    | `7`                  | Internal rules revision included in the cache key     |
 | `PLANNER_POLICY_V3.identifier`     | `smart-mix-v3`       | Planner on the stored phrases (SM3-D3)                |
-| `PLANNER_POLICY_V3.rules_revision` | `1`                  | Rules revision of v3, in its cache key                |
+| `PLANNER_POLICY_V3.rules_revision` | `2`                  | Rules revision of v3, in its cache key                |
 
 Changing the rules does not necessarily change the public planner identifier: the cache key
 includes both. `PLANNER_IDENTIFIER` is the default: plan batches without `plannerVersion`,
@@ -583,14 +583,20 @@ D4 and §5); the format and the layer live in `crate/smart_mix/stems.py`.
   belongs to the phrase that holds its centre; the last phrase ends where the beat grid puts
   its last bar, capped at the profile's duration. There is no layer when the analysis is of
   another source revision, when its duration differs from the profile's by more than 2 %,
-  when the profile has no phrases, or when a phrase gets no window. Presence flags
-  (`vocalPresent`, `bassPresent`, `drumsPresent`) need cuts calibrated in ST3: the ST0 spike
-  found that an absolute -35 dB cut misreads drums and bass, so the layer only carries levels
-  until then.
+  when the profile has no phrases, or when a phrase gets no window.
+- **Presence per phrase** (`vocalPresent`, `bassPresent`, `drumsPresent`). A phrase has a
+  stem when its mean byte is at least the stem's floor and within the stem's drop of the
+  track's loudest phrase of that stem (`STEM_PRESENCE_CUTS` in `crate/smart_mix/stems.py`,
+  4.25 bytes per dB). The floor rejects separation leakage in tracks without the stem; the
+  drop follows the level each track mixes the stem at, which the absolute -35 dB cut of the
+  ST0 spike could not. The cuts are provisional (-40 dBFS and 12 dB for every stem) until the ST3 evaluation calibrates them. The vocal
+  presence is detector `stem-vocals-1` (`vocalDetector`), which replaces YAMNet's voice where
+  both tracks of an edge have a layer (STEM-D4). Changing a cut changes plans: it bumps
+  `PLANNER_POLICY_V3.rules_revision`.
 - **API.** `GET /api/tracks/by-entity/{uid}/mix-profile?detail=full` carries the layer as
-  an optional `stems` object (`producer`, `separatorModel`, `separatorVersion` and
-  `phrases` with `startMs`, `endMs`, `drums`, `bass`, `other` and `vocals`); the summary
-  never does. Crate Decks reads and uploads analyses through
+  an optional `stems` object (`producer`, `separatorModel`, `separatorVersion`,
+  `vocalDetector` and `phrases` with `startMs`, `endMs`, `drums`, `bass`, `other`, `vocals`,
+  `vocalPresent`, `bassPresent` and `drumsPresent`); the summary never does. Crate Decks reads and uploads analyses through
   `GET` and `PUT /api/decks/tracks/{uid}/stem-analysis`
   (`docs/technical/crate-decks.md`, section "Stem analyses"). An upload needs
   `smart_mix.stems.contribute` (owner and admin roles by default), at most 64 KiB, a
@@ -606,7 +612,8 @@ D4 and §5); the format and the layer live in `crate/smart_mix/stems.py`.
   a stems directory in the API (`CRATE_STEMS_DIR`) and a stem quota above 0 (see
   "Separation task and stem files").
 - **What does not change.** The v8 grid, downbeats, phrases and the YAMNet voice bytes stay
-  as they are, and no planner reads the layer yet (ST3).
+  as they are. `smart-mix-v3` scores with the layer (see "Planner smart-mix-v3"); v2 never
+  reads it.
 
 ### Smart Mix playlists
 
@@ -1420,12 +1427,24 @@ first, and serves the first; the AI refinement (below) picks from the same menu 
 - **Safety**: every candidate goes through `TransitionPlan` and the planner policy
   (`evaluation.policy_violations`); v3 copies v2's limits on tempo, gain, true peak and
   durations.
-- **Response**: each v3 plan adds `structureUsed`, whether the menu came from the phrases. The
-  batch reads profiles without structure to build the cache keys and reads the structure only
-  for the edges it has to plan.
-- **Capability**: `smart_mix.structure` is true when at least half the library's tracks have a
-  current profile with phrases, read from the coverage snapshot (`structure_percent`, counted by
-  `refresh_smart_mix_coverage`). It is never computed in the request.
+- **Stems layer** (Smart Mix Stems ST3, rules revision 2, STEM-D5). When both tracks have a
+  stem analysis of their current file (Smart Mix playlists, or a Crate Decks upload) and the
+  policy's `stems_layer` is on, the phrase menu is scored with the stems layer: the vocal
+  penalty counts the phrases the vocal stem has instead of YAMNet's; the bass component is
+  one minus the share of the mix with both basses at full level (crossfade and handoff shelf)
+  while both phrases have a bassline, so a mix where one side has none scores like a handoff;
+  and two bonuses are added, 0.05 × the share of the mix before the handoff with the incoming
+  on drums without bass or vocals, and 0.05 × the share of the mix with the outgoing on a
+  phrase without vocals. The terms are in the breakdown's `stems`. Without stems on both
+  tracks every candidate and score is revision 1's (golden test
+  `app/tests/fixtures/smart_mix/candidates_v3_rules1.json`). Gate STEM-G1 decides whether the
+  layer stays on by default (`PLANNER_POLICY_V3.stems_layer`).
+- **Response**: each v3 plan adds `structureUsed`, whether the menu came from the phrases, and
+  `stemsUsed: true` when the stems layer scored it (absent otherwise). The batch reads
+  profiles without structure and the stem analyses of its tracks (one bounded `ANY` query) to
+  build the cache keys: an edge with an analysis on both tracks keys on both analyses too. It
+  reads the structure only for the edges it has to plan, with the beat grid when a layer
+  applies (the grid places the end of the outro for the layer; the planner does not read it).
 
 ### AI refinement (SM4)
 

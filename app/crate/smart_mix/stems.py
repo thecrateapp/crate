@@ -8,8 +8,9 @@ drum stem, the separator, the producer and the server source revision the produc
 analysed. It never holds audio.
 
 The stems layer is derived on read, never stored: the mean level byte of each stem over
-each phrase of the profile (STEM-D4). It only exists when the analysis describes the
-profile's file: the same source revision and a duration within 2 %.
+each phrase of the profile, and whether the phrase has vocals, bass and drums
+(STEM-D4, design section 5). It only exists when the analysis describes the profile's
+file: the same source revision and a duration within 2 %.
 
 The API imports this module and the API image has no numpy, so only
 :func:`encode_levels`, which producers call, imports it.
@@ -33,7 +34,12 @@ from pydantic import (
     model_validator,
 )
 
-from crate.smart_mix.models import TrackMixProfile
+from crate.smart_mix.models import (
+    STEM_VOCAL_DETECTOR,
+    StemPhraseLevels,
+    StemsLayer,
+    TrackMixProfile,
+)
 from crate.smart_mix.phrase_grid import phrase_spans_ms
 
 if TYPE_CHECKING:
@@ -51,6 +57,27 @@ _BYTES_PER_DB = 255.0 / -LEVEL_FLOOR_DB
 SEPARATOR_STRENGTH = {"htdemucs": 1, "htdemucs_ft": 2}
 # An analysis applies to a profile whose duration is within this share of its own.
 MAX_DURATION_MISMATCH = 0.02
+
+
+@dataclass(frozen=True, slots=True)
+class PresenceCut:
+    """When a phrase has a stem: its mean level byte is at least ``floor`` and at most
+    ``drop`` bytes below the track's loudest phrase of that stem (4.25 bytes per dB).
+
+    The floor rejects separation leakage in tracks without the stem; the drop follows
+    the level each track mixes the stem at, which an absolute cut cannot (ST0).
+    """
+
+    floor: int
+    drop: int
+
+
+# Provisional, until ST3 calibrates them: a floor of -40 dBFS and a drop of 12 dB.
+STEM_PRESENCE_CUTS = {
+    "vocals": PresenceCut(floor=85, drop=51),
+    "bass": PresenceCut(floor=85, drop=51),
+    "drums": PresenceCut(floor=85, drop=51),
+}
 # Upper bounds for untrusted uploads; a track longer than a day is not a track.
 MAX_DURATION_MS = 86_400_000
 MAX_DRUM_BEATS = 100_000
@@ -205,46 +232,6 @@ class StemAnalysis(_StemModel):
         return "server" if self.producer.startswith("crate-server/") else "decks"
 
 
-@dataclass(frozen=True, slots=True)
-class StemPhraseLevels:
-    """Mean level byte of each stem over one phrase of the profile."""
-
-    start_ms: int
-    end_ms: int
-    drums: int
-    bass: int
-    other: int
-    vocals: int
-
-    def to_dict(self) -> dict[str, int]:
-        return {
-            "startMs": self.start_ms,
-            "endMs": self.end_ms,
-            "drums": self.drums,
-            "bass": self.bass,
-            "other": self.other,
-            "vocals": self.vocals,
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class StemsLayer:
-    """The stems layer of a profile: per-phrase levels and where they came from."""
-
-    producer: str
-    separator_model: str
-    separator_version: str
-    phrases: tuple[StemPhraseLevels, ...]
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "producer": self.producer,
-            "separatorModel": self.separator_model,
-            "separatorVersion": self.separator_version,
-            "phrases": [phrase.to_dict() for phrase in self.phrases],
-        }
-
-
 def encode_levels(rms_db: np.ndarray) -> bytes:
     """One byte per window: -60 dBFS or less is 0 and 0 dBFS or more is 255.
 
@@ -294,13 +281,15 @@ def choose_analysis(
 def stem_phrase_layer(
     profile: TrackMixProfile, analysis: StemAnalysis
 ) -> StemsLayer | None:
-    """Mean stem levels per phrase, or None when the analysis does not apply.
+    """Mean stem levels and presence per phrase, or None when the analysis does not
+    apply.
 
     It does not apply to another source revision, to a duration that differs by more
     than 2 %, or to a profile without phrases. A window belongs to the phrase that
     holds its centre. The last phrase ends where the beat grid puts its last bar,
     capped at the profile's duration (or at the duration without a grid); a phrase
-    with no window at all leaves the profile without a layer.
+    with no window at all leaves the profile without a layer. Presence follows
+    ``STEM_PRESENCE_CUTS``.
     """
     if analysis.source_revision != profile.source_revision:
         return None
@@ -309,27 +298,61 @@ def stem_phrase_layer(
     if not profile.phrases:
         return None
     levels = {stem: getattr(analysis.levels, stem) for stem in STEM_SOURCES}
-    windows = len(levels["drums"])
     hop = analysis.hop_ms
-    phrases: list[StemPhraseLevels] = []
+    spans: list[tuple[int, int, dict[str, int]]] = []
     for start_ms, end_ms in phrase_spans_ms(profile.phrases, profile.beat_grid_ms):
         end_ms = min(end_ms, profile.duration_ms)
         if end_ms <= start_ms:
             end_ms = profile.duration_ms
-        first = max(0, _first_window_from(start_ms, hop))
-        stop = min(windows, _first_window_from(end_ms, hop))
-        if stop <= first:
+        if span_mean_byte(levels["drums"], start_ms, end_ms, hop) is None:
             return None
         means = {
-            stem: _mean_byte(values[first:stop]) for stem, values in levels.items()
+            stem: span_mean_byte(values, start_ms, end_ms, hop) or 0
+            for stem, values in levels.items()
         }
-        phrases.append(StemPhraseLevels(start_ms=start_ms, end_ms=end_ms, **means))
+        spans.append((start_ms, end_ms, means))
+    loudest = {
+        stem: max(means[stem] for _start, _end, means in spans)
+        for stem in STEM_PRESENCE_CUTS
+    }
     return StemsLayer(
         producer=analysis.producer,
         separator_model=analysis.separator.model,
         separator_version=analysis.separator.version,
-        phrases=tuple(phrases),
+        phrases=tuple(
+            StemPhraseLevels(
+                start_ms=start_ms,
+                end_ms=end_ms,
+                **means,
+                vocal_present=_present("vocals", means, loudest),
+                bass_present=_present("bass", means, loudest),
+                drums_present=_present("drums", means, loudest),
+            )
+            for start_ms, end_ms, means in spans
+        ),
+        vocal_detector=STEM_VOCAL_DETECTOR,
     )
+
+
+def span_mean_byte(
+    levels: bytes, start_ms: int, end_ms: int, hop_ms: int
+) -> int | None:
+    """Mean byte of the windows whose centre lies in [start, end), rounded half up;
+    None when no window does."""
+    first = max(0, _first_window_from(start_ms, hop_ms))
+    stop = min(len(levels), _first_window_from(end_ms, hop_ms))
+    if stop <= first:
+        return None
+    return _mean_byte(levels[first:stop])
+
+
+def stem_present(level: int, loudest: int, cut: PresenceCut) -> bool:
+    """Whether a phrase whose mean byte is ``level`` has the stem (``PresenceCut``)."""
+    return level >= cut.floor and level >= loudest - cut.drop
+
+
+def _present(stem: str, means: dict[str, int], loudest: dict[str, int]) -> bool:
+    return stem_present(means[stem], loudest[stem], STEM_PRESENCE_CUTS[stem])
 
 
 def _first_window_from(time_ms: int, hop_ms: int) -> int:
@@ -351,6 +374,7 @@ __all__ = [
     "ESTIMATED_STEM_SECONDS_PER_TRACK",
     "LEVEL_FLOOR_DB",
     "MAX_DURATION_MISMATCH",
+    "PresenceCut",
     "SEPARATOR_STRENGTH",
     "STEM_ANALYSIS_SCHEMA",
     "STEM_CONTRIBUTE_PERMISSION",
@@ -358,8 +382,10 @@ __all__ = [
     "STEM_JOB_STATES",
     "STEM_MAX_TRACKS_PER_PLAYLIST_SETTING",
     "STEM_MAX_TRACKS_PER_USER_SETTING",
+    "STEM_PRESENCE_CUTS",
     "STEM_SOURCES",
     "STEM_UPLOADS_SETTING",
+    "STEM_VOCAL_DETECTOR",
     "ProducerKind",
     "StemAnalysis",
     "StemJobState",
@@ -370,7 +396,9 @@ __all__ = [
     "choose_analysis",
     "duration_matches",
     "encode_levels",
+    "span_mean_byte",
     "stem_phrase_layer",
+    "stem_present",
     "stem_quota_gib",
     "stem_track_limit",
 ]

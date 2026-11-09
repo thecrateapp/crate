@@ -159,10 +159,14 @@ changes nothing. Each stored upload records the uploader in `contributed_by`.
 
 **Profile layer.** With `detail=full`, the profile gains an optional `stems`
 object when an analysis of its current file applies: `producer`,
-`separatorModel`, `separatorVersion` and `phrases`, one entry per phrase with
-`startMs`, `endMs` and the mean level byte of `drums`, `bass`, `other` and
-`vocals`. The summary profile never carries it, because the Go read plane serves
-the summary natively. No planner reads the layer yet (ST3).
+`separatorModel`, `separatorVersion`, `vocalDetector` (`stem-vocals-1`) and
+`phrases`, one entry per phrase with `startMs`, `endMs`, the mean level byte of
+`drums`, `bass`, `other` and `vocals`, and whether the phrase has each of
+vocals, bass and drums (`vocalPresent`, `bassPresent`, `drumsPresent`; cuts in
+`docs/technical/smart-mix-operations.md`, "Stem analyses"). The summary profile
+never carries it, because the Go read plane serves the summary natively.
+`smart-mix-v3` scores with the layer when both tracks of an edge have one and
+says so with `stemsUsed: true` on the plan.
 
 **Stem files.** For the tracks of Smart Mix playlists the server also keeps
 the separated audio, when `smart_mix.stems.storage` is true in

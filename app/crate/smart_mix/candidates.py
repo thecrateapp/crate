@@ -44,6 +44,21 @@ phrase has voice from ``VOCAL_THRESHOLD``). Candidates are ranked on that score
 before it is clamped to [0, 1]; ties keep the later outgoing phrase, the earlier
 incoming phrase, the longer mix, the bass handoff and v2's curve.
 
+With ``policy.stems_layer`` and a stems layer on both profiles (Smart Mix Stems,
+STEM-D5), on the phrase menu:
+
+- the vocal penalty counts the phrases the vocal stem has, instead of YAMNet's;
+- the bass component is one minus the share of the mix with both basses at full
+  level (crossfade and bass handoff) while both phrases have a bassline, so a mix
+  where one side has none scores like a handoff;
+- ``weights.drums_only_entry`` times the share of the mix before the handoff where
+  the incoming plays a phrase with drums and neither bass nor vocals is added;
+- ``weights.vocal_free_exit`` times the share of the mix where the outgoing plays a
+  phrase without vocals is added.
+
+The terms go in ``CandidateScore.stems``. Without stems on both tracks, every
+candidate and score is the one of rules revision 1.
+
 Without phrases on both tracks (profiles before v7, tracks the analyzer could not
 segment, segmentations under ``minimum_structure_confidence``) the menu is the bar
 heuristic of v2: its own plan first, then the other phrase-length windows it would
@@ -64,14 +79,18 @@ from functools import cache
 
 from crate.smart_mix.camelot import CamelotRelationship, camelot_relationship
 from crate.smart_mix.evaluation import (
+    OVERLAP_FLOOR_DB,
     OVERLAP_FLOOR_GAIN,
     PHRASE_TOLERANCE_BEATS,
+    bass_cut_db,
     crossfade_gains,
     policy_violations,
 )
 from crate.smart_mix.models import (
     VOCAL_THRESHOLD,
     CandidateScore,
+    StemScore,
+    StemsLayer,
     TrackMixProfile,
     TransitionCandidate,
     TransitionContext,
@@ -103,6 +122,19 @@ _CURVES = ("equal-power", "dj-blend")
 _DIGITS = 6
 
 
+Span = tuple[float, float]
+
+
+@dataclass(frozen=True, slots=True)
+class _StemSpans:
+    """Where a profile's stems layer says each stem plays, on its phrases' spans."""
+
+    vocals: tuple[Span, ...]
+    bass: tuple[Span, ...]
+    drums_only: tuple[Span, ...]
+    vocal_free: tuple[Span, ...]
+
+
 @dataclass(frozen=True, slots=True)
 class _Timeline:
     """A profile's phrases on its own time axis, in milliseconds.
@@ -122,6 +154,8 @@ class _Timeline:
     skip_lengths: tuple[float, ...]
     cut_suffix: tuple[float, ...]
     skip_prefix: tuple[float, ...]
+    # Only with policy.stems_layer and a stems layer on the profile.
+    stems: _StemSpans | None = None
 
     def is_boundary(self, position_ms: float) -> bool:
         index = bisect_left(self.boundaries, position_ms - self.tolerance_ms)
@@ -224,6 +258,7 @@ class _Option:
     raw_score: float
     structure_used: bool
     plan: TransitionPlan | None = None
+    stems: StemScore | None = None
 
 
 def plan_transition_candidates(
@@ -393,6 +428,28 @@ def _timeline(profile: TrackMixProfile, policy: PlannerPolicy) -> _Timeline | No
         skip_lengths=skip_lengths,
         cut_suffix=tuple(cut_suffix),
         skip_prefix=tuple(skip_prefix),
+        stems=(
+            _stem_spans(profile.stems, starts, ends)
+            if policy.stems_layer and profile.stems is not None
+            else None
+        ),
+    )
+
+
+def _stem_spans(
+    layer: StemsLayer, starts: tuple[float, ...], ends: tuple[float, ...]
+) -> _StemSpans:
+    """The layer's presence on the phrases' own spans (the ones every term uses)."""
+    entries = list(zip(starts, ends, layer.phrases, strict=True))
+    return _StemSpans(
+        vocals=tuple((a, b) for a, b, stem in entries if stem.vocal_present),
+        bass=tuple((a, b) for a, b, stem in entries if stem.bass_present),
+        drums_only=tuple(
+            (a, b)
+            for a, b, stem in entries
+            if stem.drums_present and not stem.bass_present and not stem.vocal_present
+        ),
+        vocal_free=tuple((a, b) for a, b, stem in entries if not stem.vocal_present),
     )
 
 
@@ -679,6 +736,7 @@ def _fixed_option(
         raw_score=option.raw_score,
         structure_used=False,
         plan=plan,
+        stems=option.stems,
     )
 
 
@@ -777,23 +835,40 @@ def _curve_options(
 ) -> list[_Option]:
     """A geometry on one curve, once per bass handoff: only the bass term differs."""
     policy = edge.policy
+    weights = policy.candidate_weights
     alignment, energy, position, stability = terms
     duration = geometry.duration_ms
     # The engines apply the DJ blend and the bass handoff only in beatmatch.
     effective_curve = curve if geometry.beatmatch else "equal-power"
     window_start, window_end = _full_level_window(effective_curve)
     full_share = window_end - window_start
-    vocal_ms = (
-        _vocal_overlap_ms(
+    stems = (
+        (outgoing_phrases.stems, incoming_phrases.stems)
+        if outgoing_phrases is not None
+        and incoming_phrases is not None
+        and outgoing_phrases.stems is not None
+        and incoming_phrases.stems is not None
+        else None
+    )
+    if stems is not None:
+        # The vocal stem replaces YAMNet's voice (STEM-D4).
+        vocal_ms: float | None = _span_overlap_ms(
+            stems[0].vocals,
+            stems[1].vocals,
+            geometry,
+            window_start * duration,
+            window_end * duration,
+        )
+    elif outgoing_phrases is not None and incoming_phrases is not None:
+        vocal_ms = _vocal_overlap_ms(
             outgoing_phrases,
             incoming_phrases,
             geometry,
             window_start * duration,
             window_end * duration,
         )
-        if outgoing_phrases is not None and incoming_phrases is not None
-        else None
-    )
+    else:
+        vocal_ms = None
     vocal = (
         None
         if vocal_ms is None
@@ -806,18 +881,36 @@ def _curve_options(
         _component(stability),
     )
     position_component = _component(position)
-    penalty = policy.candidate_weights.vocal * (vocal or 0.0)
+    penalty = weights.vocal * (vocal or 0.0)
+    bonus = 0.0
+    entry = exit_ = 0.0
+    if stems is not None:
+        entry = _drums_only_entry(stems[1], geometry)
+        exit_ = _vocal_free_exit(stems[0], geometry)
+        bonus = weights.drums_only_entry * entry + weights.vocal_free_exit * exit_
     options = []
     for bass_handoff in bass_handoffs:
-        components = (
-            *shared,
-            _component(
-                1.0
-                if geometry.beatmatch and bass_handoff == "balanced"
-                else 1.0 - full_share
-            ),
-            position_component,
-        )
+        handoff = geometry.beatmatch and bass_handoff == "balanced"
+        stem_score = None
+        if stems is None:
+            bass = 1.0 if handoff else 1.0 - full_share
+        else:
+            bass_start, bass_end = _bass_full_level_window(effective_curve, handoff)
+            bass_ms = _span_overlap_ms(
+                stems[0].bass,
+                stems[1].bass,
+                geometry,
+                bass_start * duration,
+                bass_end * duration,
+            )
+            bass = 1.0 - bass_ms / duration
+            stem_score = StemScore(
+                vocal_overlap_ms=round(vocal_ms or 0.0),
+                bass_overlap_ms=round(bass_ms),
+                drums_only_entry=entry,
+                vocal_free_exit=exit_,
+            )
+        components = (*shared, _component(bass), position_component)
         raw = (
             sum(
                 component * weight
@@ -825,6 +918,8 @@ def _curve_options(
             )
             - penalty
         )
+        if stems is not None:
+            raw += bonus
         options.append(
             _Option(
                 geometry=geometry,
@@ -834,6 +929,7 @@ def _curve_options(
                 vocal=vocal,
                 raw_score=round(raw, _DIGITS),
                 structure_used=structure_used,
+                stems=stem_score,
             )
         )
     return options
@@ -884,32 +980,79 @@ def _vocal_overlap_ms(
     """Mix time within the full-level window with voice on both decks."""
     if outgoing_phrases.voiced_spans is None or incoming_phrases.voiced_spans is None:
         return None
-    outgoing_cue = geometry.outgoing_cue_ms
-    incoming_start = geometry.incoming_start_ms
-    rate = geometry.playback_rate
-    outgoing_spans = _clipped(
-        (
-            (start - outgoing_cue, end - outgoing_cue)
-            for start, end in outgoing_phrases.voiced_spans
-        ),
+    return _span_overlap_ms(
+        outgoing_phrases.voiced_spans,
+        incoming_phrases.voiced_spans,
+        geometry,
         window_start,
         window_end,
+    )
+
+
+def _span_overlap_ms(
+    outgoing: Iterable[Span],
+    incoming: Iterable[Span],
+    geometry: _Geometry,
+    window_start: float,
+    window_end: float,
+) -> float:
+    """Mix time within a window where both decks play one of their spans."""
+    if window_end <= window_start:
+        return 0.0
+    outgoing_spans = _clipped(
+        _outgoing_mix_time(outgoing, geometry), window_start, window_end
     )
     if not outgoing_spans:
         return 0.0
     incoming_spans = _clipped(
-        (
-            ((start - incoming_start) / rate, (end - incoming_start) / rate)
-            for start, end in incoming_phrases.voiced_spans
-        ),
-        window_start,
-        window_end,
+        _incoming_mix_time(incoming, geometry), window_start, window_end
     )
     return sum(
         max(0.0, min(out_end, in_end) - max(out_start, in_start))
         for out_start, out_end in outgoing_spans
         for in_start, in_end in incoming_spans
     )
+
+
+def _outgoing_mix_time(spans: Iterable[Span], geometry: _Geometry) -> Iterable[Span]:
+    cue = geometry.outgoing_cue_ms
+    return ((start - cue, end - cue) for start, end in spans)
+
+
+def _incoming_mix_time(spans: Iterable[Span], geometry: _Geometry) -> Iterable[Span]:
+    start_ms = geometry.incoming_start_ms
+    rate = geometry.playback_rate
+    return (
+        ((start - start_ms) / rate, (end - start_ms) / rate) for start, end in spans
+    )
+
+
+def _drums_only_entry(incoming: _StemSpans, geometry: _Geometry) -> float:
+    """Share of the mix before the handoff with the incoming on drums only."""
+    handoff_ms = _HANDOFF_PROGRESS * geometry.duration_ms
+    if handoff_ms <= 0:
+        return 0.0
+    covered = sum(
+        end - start
+        for start, end in _clipped(
+            _incoming_mix_time(incoming.drums_only, geometry), 0.0, handoff_ms
+        )
+    )
+    return covered / handoff_ms
+
+
+def _vocal_free_exit(outgoing: _StemSpans, geometry: _Geometry) -> float:
+    """Share of the mix with the outgoing on a phrase without vocals."""
+    duration = geometry.duration_ms
+    if duration <= 0:
+        return 0.0
+    covered = sum(
+        end - start
+        for start, end in _clipped(
+            _outgoing_mix_time(outgoing.vocal_free, geometry), 0.0, float(duration)
+        )
+    )
+    return covered / duration
 
 
 def _clipped(
@@ -930,24 +1073,55 @@ def _full_level_window(curve: str) -> tuple[float, float]:
     ``OVERLAP_FLOOR_GAIN``. The incoming gain only rises and the outgoing gain only
     falls, so each edge is found by bisection.
     """
-
-    def first_progress(condition) -> float:
-        low, high = 0.0, 1.0
-        for _ in range(60):
-            middle = (low + high) / 2.0
-            if condition(middle):
-                high = middle
-            else:
-                low = middle
-        return high
-
-    start = first_progress(
+    start = _first_progress(
         lambda progress: crossfade_gains(progress, curve)[1] >= OVERLAP_FLOOR_GAIN
     )
-    end = first_progress(
+    end = _first_progress(
         lambda progress: crossfade_gains(progress, curve)[0] < OVERLAP_FLOOR_GAIN
     )
     return start, max(start, end)
+
+
+@cache
+def _bass_full_level_window(curve: str, handoff: bool) -> tuple[float, float]:
+    """Mix progress during which both basses are at full level on ``curve``.
+
+    A bass is at full level when its crossfade gain plus the bass handoff shelf (with
+    the handoff at ``_HANDOFF_PROGRESS``) is at least ``OVERLAP_FLOOR_DB``, as in
+    ``crate.smart_mix.evaluation.bass_overlap_ms``. The incoming bass only rises and
+    the outgoing bass only falls, so the window is an interval, empty with the
+    handoff.
+    """
+    if not handoff:
+        return _full_level_window(curve)
+
+    def levels(progress: float) -> tuple[float, float]:
+        outgoing_gain, incoming_gain = crossfade_gains(progress, curve)
+        outgoing_cut, incoming_cut = bass_cut_db(progress, _HANDOFF_PROGRESS)
+        return (
+            _gain_db(outgoing_gain) + outgoing_cut,
+            _gain_db(incoming_gain) + incoming_cut,
+        )
+
+    start = _first_progress(lambda progress: levels(progress)[1] >= OVERLAP_FLOOR_DB)
+    end = _first_progress(lambda progress: levels(progress)[0] < OVERLAP_FLOOR_DB)
+    return start, max(start, end)
+
+
+def _first_progress(condition) -> float:
+    """The first mix progress where a condition that stays true once true holds."""
+    low, high = 0.0, 1.0
+    for _ in range(60):
+        middle = (low + high) / 2.0
+        if condition(middle):
+            high = middle
+        else:
+            low = middle
+    return high
+
+
+def _gain_db(gain: float) -> float:
+    return -math.inf if gain <= 0.0 else 20.0 * math.log10(gain)
 
 
 def _unit(value: float) -> float:
@@ -1097,6 +1271,7 @@ def _menu(edge: _Edge, options: list[_Option]) -> list[TransitionCandidate]:
                     bass=bass,
                     position=position,
                     vocal=option.vocal,
+                    stems=option.stems,
                 ),
                 structure_used=option.structure_used,
                 outgoing_phrase=geometry.outgoing_phrase,

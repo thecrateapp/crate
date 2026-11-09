@@ -37,13 +37,26 @@ SMOOTH_FIT_WEIGHTS = TransitionFitWeights(
 )
 
 
+# The six components of the v3 candidate score, in ``CandidateScore`` order.
+CANDIDATE_COMPONENTS = (
+    "alignment",
+    "energy",
+    "harmonic",
+    "stability",
+    "bass",
+    "position",
+)
+
+
 @dataclass(frozen=True, slots=True)
 class CandidateWeights:
     """Weights of the v3 candidate score (``crate.smart_mix.candidates``).
 
     The first six weigh components in [0, 1] and add up to 1. ``vocal`` weighs the
     penalty for voice over voice, which only applies when both profiles carry the
-    voice per phrase.
+    voice per phrase. ``drums_only_entry`` and ``vocal_free_exit`` weigh two bonuses
+    of the stems layer (Smart Mix Stems, STEM-D5), which only apply when both
+    profiles carry one.
     """
 
     alignment: float = 0.25
@@ -53,13 +66,12 @@ class CandidateWeights:
     bass: float = 0.15
     position: float = 0.15
     vocal: float = 6.0
+    drums_only_entry: float = 0.05
+    vocal_free_exit: float = 0.05
 
     def components(self) -> tuple[tuple[str, float], ...]:
-        return tuple(
-            (item.name, getattr(self, item.name))
-            for item in fields(self)
-            if item.name != "vocal"
-        )
+        """The six component weights, in ``CandidateScore`` order."""
+        return tuple((name, getattr(self, name)) for name in CANDIDATE_COMPONENTS)
 
 
 CANDIDATE_WEIGHTS = CandidateWeights()
@@ -138,20 +150,27 @@ class PlannerPolicy:
     # Phase offsets this close to a whole beat start the incoming on the beat
     # instead of one beat late (grids are rounded to whole milliseconds).
     candidate_phase_snap_ms: int = 5
+    # Smart Mix Stems (STEM-D5): score v3 candidates with the stems layer when both
+    # profiles of an edge carry one. Gate STEM-G1 decides whether it stays on.
+    stems_layer: bool = False
 
 
 PLANNER_POLICY = PlannerPolicy()
 # Smart Mix 3 planner: the v2 policy with its own identity and rules revision. The
 # safety limits (tempo, gain, true peak, durations) are v2's and must stay so.
+# Revision 2 adds the stems layer (Smart Mix Stems, ST3); without stems on both
+# tracks its menus are revision 1's.
 PLANNER_POLICY_V3 = replace(
     PLANNER_POLICY,
     identifier="smart-mix-v3",
-    rules_revision=1,
+    rules_revision=2,
+    stems_layer=True,
 )
 
 
 __all__ = [
     "BEATMATCH_FIT_WEIGHTS",
+    "CANDIDATE_COMPONENTS",
     "CANDIDATE_WEIGHTS",
     "CandidateWeights",
     "PLANNER_POLICY",

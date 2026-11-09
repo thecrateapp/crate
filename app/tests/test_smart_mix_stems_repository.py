@@ -13,6 +13,7 @@ from crate.db.repositories.smart_mix import (
 )
 from crate.db.repositories.smart_mix_stems import (
     get_stem_analyses,
+    get_stem_analyses_by_entity_uids,
     get_stem_track,
     upsert_stem_analysis,
 )
@@ -197,6 +198,43 @@ def test_reads_many_tracks_in_one_query(pg_db) -> None:
     assert [len(analyses[track_id]) for track_id in tracks] == [2, 1, 1]
     assert analyses[empty_id] == []
     assert get_stem_analyses([]) == {}
+
+
+def test_reads_many_tracks_by_entity_uid_in_one_query(pg_db) -> None:
+    del pg_db
+    from crate.db.engine import get_engine
+
+    tracks = [_create_track(f"stems-uids-{index}") for index in range(2)]
+    _empty_id, empty_uid = _create_track("stems-uids-empty")
+    for index, (track_id, _uid) in enumerate(tracks):
+        upsert_stem_analysis(
+            track_id, _analysis(level=10 * index), producer_kind="server"
+        )
+    first_id, first_uid = tracks[0]
+    upsert_stem_analysis(
+        first_id, _analysis(producer=DECKS, model="htdemucs_ft"), producer_kind="decks"
+    )
+    statements: list[str] = []
+
+    def capture(_conn, _cursor, statement, *_args) -> None:
+        if "track_stem_signals" in statement:
+            statements.append(statement)
+
+    engine = get_engine()
+    event.listen(engine, "before_cursor_execute", capture)
+    try:
+        analyses = get_stem_analyses_by_entity_uids(
+            [first_uid, tracks[1][1], empty_uid, first_uid.upper()]
+        )
+    finally:
+        event.remove(engine, "before_cursor_execute", capture)
+
+    assert len(statements) == 1
+    assert "ANY" in statements[0]
+    assert set(analyses) == {first_uid, tracks[1][1]}
+    assert [a.producer_kind for a in analyses[first_uid]] == ["decks", "server"]
+    assert analyses[tracks[1][1]] == [_analysis(level=10)]
+    assert get_stem_analyses_by_entity_uids([]) == {}
 
 
 def test_the_producer_kind_must_match_the_producer(pg_db) -> None:

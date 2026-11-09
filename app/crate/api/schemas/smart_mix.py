@@ -26,6 +26,16 @@ class StemPhraseLevelsResponse(SmartMixApiModel):
     bass: int = Field(ge=0, le=255)
     other: int = Field(ge=0, le=255)
     vocals: int = Field(ge=0, le=255)
+    vocal_present: bool = Field(
+        alias="vocalPresent",
+        description="The vocal stem says the phrase has vocals (detector stem-vocals-1).",
+    )
+    bass_present: bool = Field(
+        alias="bassPresent", description="The phrase has a bassline."
+    )
+    drums_present: bool = Field(
+        alias="drumsPresent", description="The phrase has drums."
+    )
 
 
 class StemsLayerResponse(SmartMixApiModel):
@@ -37,6 +47,14 @@ class StemsLayerResponse(SmartMixApiModel):
     )
     separator_model: Literal["htdemucs", "htdemucs_ft"] = Field(alias="separatorModel")
     separator_version: str = Field(alias="separatorVersion")
+    vocal_detector: str = Field(
+        alias="vocalDetector",
+        description=(
+            "Detector of the per-phrase vocal presence: stem-vocals-1, the vocal stem. "
+            "It replaces the profile's YAMNet voice where both tracks of an edge "
+            "have a stems layer."
+        ),
+    )
     phrases: list[StemPhraseLevelsResponse] = Field(
         description=(
             "One entry per phrase of the profile, in order: the mean level byte of each "
@@ -470,6 +488,15 @@ class TransitionPlanResponse(_TransitionPlanFields):
             "smart-mix-v3 only: whether the plan was chosen on the stored phrases of "
             "both tracks. False when either track has none and the bar heuristic "
             "planned the edge. Absent from smart-mix-v2 plans."
+        ),
+    )
+    stems_used: bool | None = Field(
+        default=None,
+        alias="stemsUsed",
+        description=(
+            "smart-mix-v3 only, and only true: the stems layer of both tracks (stem "
+            "analyses of Smart Mix playlists or Crate Decks) scored the plan. Absent "
+            "otherwise."
         ),
     )
 

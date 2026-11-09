@@ -54,6 +54,8 @@ def test_smart_mix_openapi_offers_planner_v3(test_app, spec: str) -> None:
     ]
     plan = components["TransitionPlanResponse"]["properties"]
     assert "structureUsed" in plan
+    # Smart Mix Stems ST3: optional, absent unless the stems layer scored the plan.
+    assert "stemsUsed" in plan
     context = components["TransitionContextRequest"]["properties"]
     history = context["setHistory"]["anyOf"][0]
     assert history["maxItems"] == 3

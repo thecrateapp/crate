@@ -4,7 +4,17 @@ from datetime import UTC, datetime
 from unittest.mock import patch
 import uuid
 
+import pytest
+
 from crate.smart_mix.models import MixProfileQuality, TrackMixProfile
+
+
+@pytest.fixture(autouse=True)
+def _no_stem_analyses(monkeypatch):
+    """These plans have no stem analyses (``test_smart_mix_api_stems`` covers them)."""
+    from crate.api import smart_mix
+
+    monkeypatch.setattr(smart_mix, "get_stem_analyses_by_entity_uids", lambda _uids: {})
 
 
 async def _unauthenticated(self, request):

@@ -262,6 +262,10 @@ def bass_overlap_ms(
     do not count. Time where a track is outside its active range (silence)
     does not count either.
     """
+    return _overlap_ms(plan, outgoing, incoming, _both_basses_check(plan))
+
+
+def _both_basses_check(plan: TransitionPlan) -> Callable[[float, float, float], bool]:
     handoff = bass_handoff_engaged(plan)
 
     def both_basses(progress: float, outgoing_db: float, incoming_db: float) -> bool:
@@ -273,7 +277,7 @@ def bass_overlap_ms(
             and incoming_db + incoming_cut >= OVERLAP_FLOOR_DB
         )
 
-    return _overlap_ms(plan, outgoing, incoming, both_basses)
+    return both_basses
 
 
 def harmonic_clash_ms(
@@ -366,6 +370,75 @@ def vocal_clash_ms(
         _both_full_level,
         position_filter=both_vocals,
     )
+
+
+def stem_vocal_clash_ms(
+    plan: TransitionPlan,
+    outgoing: TrackMixProfile | None,
+    incoming: TrackMixProfile | None,
+) -> int | None:
+    """Milliseconds of full-level overlap with stem vocals on both decks.
+
+    ``vocal_clash_ms`` on the vocal presence of the profiles' stems layers
+    (Smart Mix Stems, STEM-D4) instead of YAMNet's voice. ``None`` unless both
+    profiles carry phrases and a stems layer.
+    """
+    both = _both_stems_present(plan, outgoing, incoming, "vocal_present")
+    if both is None:
+        return None
+    return _overlap_ms(plan, outgoing, incoming, _both_full_level, position_filter=both)
+
+
+def stem_bass_clash_ms(
+    plan: TransitionPlan,
+    outgoing: TrackMixProfile | None,
+    incoming: TrackMixProfile | None,
+) -> int | None:
+    """Milliseconds with both basses at full level while both play a bassline.
+
+    ``bass_overlap_ms`` (crossfade gain plus the bass handoff shelf) on the time
+    where the stems layers of both profiles have bass. ``None`` unless both
+    profiles carry phrases and a stems layer.
+    """
+    both = _both_stems_present(plan, outgoing, incoming, "bass_present")
+    if both is None:
+        return None
+    return _overlap_ms(
+        plan, outgoing, incoming, _both_basses_check(plan), position_filter=both
+    )
+
+
+def _both_stems_present(
+    plan: TransitionPlan,
+    outgoing: TrackMixProfile | None,
+    incoming: TrackMixProfile | None,
+    attribute: str,
+) -> Callable[[float], bool] | None:
+    """A mix-time filter: both decks on a phrase whose stems entry has the stem."""
+    if outgoing is None or incoming is None:
+        return None
+    outgoing_phrases = _stored_phrases(outgoing)
+    incoming_phrases = _stored_phrases(incoming)
+    outgoing_flags = _stem_presence(outgoing, attribute)
+    incoming_flags = _stem_presence(incoming, attribute)
+    if (
+        outgoing_phrases is None
+        or incoming_phrases is None
+        or outgoing_flags is None
+        or incoming_flags is None
+    ):
+        return None
+    ratio = incoming_tempo(plan)
+    incoming_start = incoming_start_ms(plan)
+
+    def both(position_ms: float) -> bool:
+        return _flag_at(
+            outgoing_phrases, outgoing_flags, plan.outgoing_cue_ms + position_ms
+        ) and _flag_at(
+            incoming_phrases, incoming_flags, incoming_start + position_ms * ratio
+        )
+
+    return both
 
 
 def music_left_out(
@@ -819,6 +892,20 @@ def _has_vocals(
     return presence[index] >= VOCAL_PRESENCE_THRESHOLD
 
 
+def _stem_presence(profile: TrackMixProfile, attribute: str) -> tuple[bool, ...] | None:
+    layer = getattr(profile, "stems", None)
+    if layer is None:
+        return None
+    return tuple(bool(getattr(entry, attribute)) for entry in layer.phrases)
+
+
+def _flag_at(
+    phrases: _StoredPhrases, flags: tuple[bool, ...], position_ms: float
+) -> bool:
+    index = phrases.index_at(position_ms)
+    return index is not None and index < len(flags) and flags[index]
+
+
 def _phrase_tolerance_ms(profile: TrackMixProfile, tolerance_beats: float) -> float:
     if not profile.bpm:
         return float(DEFAULT_PHRASE_TOLERANCE_MS)
@@ -1009,5 +1096,7 @@ __all__ = [
     "phrase_alignment",
     "policy_violations",
     "staging_gains",
+    "stem_bass_clash_ms",
+    "stem_vocal_clash_ms",
     "vocal_clash_ms",
 ]

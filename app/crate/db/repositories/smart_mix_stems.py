@@ -27,7 +27,7 @@ from typing import Literal
 
 from pydantic import ValidationError
 from sqlalchemy import BIGINT, and_, any_, bindparam, select, text
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Session
 
 from crate.db.cache_settings import get_setting
@@ -206,6 +206,48 @@ def get_stem_analyses(
         return _impl(current)
 
 
+def get_stem_analyses_by_entity_uids(
+    entity_uids: Sequence[str], *, session: Session | None = None
+) -> dict[str, list[StemAnalysis]]:
+    """Every stored analysis of each local track, by entity UID, in one query.
+
+    The transition-plan batch reads this for its tracks and keeps, per track, the
+    analysis that applies to the profile it plans with (``choose_analysis`` on the
+    profile's source revision). Tracks without analyses are absent.
+    """
+    requested = list(dict.fromkeys(str(coerce_uuid(uid)) for uid in entity_uids))
+    if not requested:
+        return {}
+
+    def _impl(current: Session) -> dict[str, list[StemAnalysis]]:
+        rows = current.execute(
+            select(LibraryTrack.entity_uid, TrackStemSignalsRow)
+            .join(LibraryTrack, LibraryTrack.id == TrackStemSignalsRow.track_id)
+            .where(
+                LibraryTrack.entity_uid
+                == any_(
+                    bindparam(
+                        "entity_uids",
+                        value=requested,
+                        type_=ARRAY(UUID(as_uuid=False)),
+                    )
+                )
+            )
+            .order_by(TrackStemSignalsRow.track_id, TrackStemSignalsRow.producer_kind)
+        ).all()
+        analyses: dict[str, list[StemAnalysis]] = {}
+        for entity_uid, row in rows:
+            analysis = _row_to_analysis(row)
+            if analysis is not None:
+                analyses.setdefault(str(entity_uid), []).append(analysis)
+        return analyses
+
+    if session is not None:
+        return _impl(session)
+    with read_scope() as current:
+        return _impl(current)
+
+
 def get_stem_track(
     entity_uid: str, *, session: Session | None = None
 ) -> StemTrack | None:
@@ -346,6 +388,7 @@ __all__ = [
     "StemTrack",
     "StoredStemAnalysis",
     "get_stem_analyses",
+    "get_stem_analyses_by_entity_uids",
     "get_stem_track",
     "get_stored_stem_analyses",
     "stem_uploads_enabled",

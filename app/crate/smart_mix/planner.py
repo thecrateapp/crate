@@ -711,12 +711,14 @@ def _round_score(value: float) -> float:
 
 @dataclass(frozen=True, slots=True)
 class PlannedTransition:
-    """A v3 plan: the first candidate of the menu, the menu itself (for SM4) and
-    whether the menu came from the stored phrases (``structureUsed`` in the API)."""
+    """A v3 plan: the first candidate of the menu, the menu itself (for SM4),
+    whether the menu came from the stored phrases (``structureUsed`` in the API) and
+    whether the stems layer of both tracks scored it (``stemsUsed``, STEM-D5)."""
 
     plan: TransitionPlan
     candidates: tuple[TransitionCandidate, ...]
     structure_used: bool
+    stems_used: bool = False
 
 
 def plan_transition_v3(
@@ -746,6 +748,7 @@ def plan_transition_v3(
         # The menu was placed and ranked on the stored phrases, even when v2's own
         # window (also on the menu) wins on them.
         structure_used=any(candidate.structure_used for candidate in candidates),
+        stems_used=any(candidate.stems_used for candidate in candidates),
     )
 
 

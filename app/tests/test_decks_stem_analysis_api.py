@@ -20,7 +20,12 @@ from crate.db.repositories.smart_mix_stems import (
 )
 from crate.db.tx import read_scope
 from crate.smart_mix.models import Phrase
-from crate.smart_mix.stems import STEM_SOURCES, StemAnalysis
+from crate.smart_mix.stems import (
+    STEM_PRESENCE_CUTS,
+    STEM_SOURCES,
+    StemAnalysis,
+    stem_present,
+)
 from tests.test_smart_mix_repository import _create_track, _profile
 
 REVISION = "e" * 64
@@ -298,10 +303,14 @@ def test_the_full_profile_carries_the_stems_layer(pg_db, test_app) -> None:
     full = test_app.get(profile_url, params={"detail": "full"}).json()
     summary = test_app.get(profile_url).json()
 
+    def present(stem: str, level: int, loudest: int) -> bool:
+        return stem_present(level, loudest, STEM_PRESENCE_CUTS[stem])
+
     assert full["stems"] == {
         "producer": "crate-decks/0.4.0",
         "separatorModel": "htdemucs",
         "separatorVersion": "htdemucs-onnx-1",
+        "vocalDetector": "stem-vocals-1",
         "phrases": [
             {
                 "startMs": 500,
@@ -310,6 +319,9 @@ def test_the_full_profile_carries_the_stems_layer(pg_db, test_app) -> None:
                 "bass": 20,
                 "other": 30,
                 "vocals": 0,
+                "vocalPresent": present("vocals", 0, 180),
+                "bassPresent": present("bass", 20, 120),
+                "drumsPresent": present("drums", 200, 200),
             },
             {
                 "startMs": 16_500,
@@ -318,6 +330,9 @@ def test_the_full_profile_carries_the_stems_layer(pg_db, test_app) -> None:
                 "bass": 120,
                 "other": 30,
                 "vocals": 180,
+                "vocalPresent": present("vocals", 180, 180),
+                "bassPresent": present("bass", 120, 120),
+                "drumsPresent": present("drums", 200, 200),
             },
         ],
     }
