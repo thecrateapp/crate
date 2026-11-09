@@ -9,6 +9,9 @@ import { renderWithAdminProviders } from "@/test/render-with-admin-providers";
 import { Analysis } from "./Analysis";
 vi.mock("@/contexts/OpsSnapshotContext", () => ({ useOpsSnapshot: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api: vi.fn() }));
+vi.mock("@/components/SmartMixPlaylists", () => ({
+  SmartMixPlaylists: () => <div>Smart Mix playlists sample</div>,
+}));
 vi.mock("@/components/SmartMixCoverage", () => ({
   SmartMixCoverage: () => <div>Smart Mix coverage sample</div>,
 }));
@@ -196,6 +199,21 @@ describe("Analysis typographic controls", () => {
     await user.click(screen.getByRole("button", { name: "Retry" }));
     expect(refresh).toHaveBeenCalledWith(true);
   });
+  it("puts the Smart Mix playlists panel right after the Smart Mix panel", () => {
+    renderWithAdminProviders(<Analysis />);
+    const coverage = screen.getByText("Smart Mix coverage sample");
+    const playlists = screen.getByText("Smart Mix playlists sample");
+    expect(
+      coverage.compareDocumentPosition(playlists) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      playlists.compareDocumentPosition(
+        screen.getByText("Portable library state"),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("keeps named header actions and text coverage, sections and recent outputs", () => {
     const { container } = renderWithAdminProviders(<Analysis />);
     expect(screen.getByRole("heading", { name: "Analysis" })).toBeVisible();

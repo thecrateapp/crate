@@ -41,6 +41,22 @@ sources:
   - app/crate/db/queries/smart_mix_compatible.py
   - app/crate/db/repositories/smart_mix.py
   - app/crate/db/repositories/smart_mix_signals.py
+  - app/crate/smart_mix/stems.py
+  - app/crate/db/repositories/smart_mix_stems.py
+  - app/crate/db/schema_sections/smart_mix_stems_v156.py
+  - app/crate/db/repositories/smart_mix_playlists.py
+  - app/crate/smart_mix/separation.py
+  - app/crate/smart_mix/stem_storage.py
+  - app/crate/smart_mix/stem_files.py
+  - app/crate/worker_handlers/smart_mix_stems.py
+  - app/crate/db/jobs/smart_mix_stems.py
+  - app/crate/db/repositories/smart_mix_stem_files.py
+  - app/crate/db/schema_sections/smart_mix_stem_files_v158.py
+  - app/Dockerfile
+  - app/crate/db/schema_sections/smart_mix_playlists_v157.py
+  - app/crate/api/smart_mix_playlists.py
+  - app/crate/api/decks_stems.py
+  - app/crate/api/settings.py
   - app/crate/worker_handlers/analysis.py
   - app/crate/actors.py
   - app/crate/ai/queues.py
@@ -121,7 +137,7 @@ These values come from the reviewed code; they were not discovered from a live i
 | `PLANNER_POLICY_VERSION`           | `2`                  | Numeric version of each individual plan               |
 | `PLANNER_POLICY.rules_revision`    | `7`                  | Internal rules revision included in the cache key     |
 | `PLANNER_POLICY_V3.identifier`     | `smart-mix-v3`       | Planner on the stored phrases (SM3-D3)                |
-| `PLANNER_POLICY_V3.rules_revision` | `1`                  | Rules revision of v3, in its cache key                |
+| `PLANNER_POLICY_V3.rules_revision` | `5`                  | Rules revision of v3, in its cache key                |
 
 Changing the rules does not necessarily change the public planner identifier: the cache key
 includes both. `PLANNER_IDENTIFIER` is the default: plan batches without `plannerVersion`,
@@ -317,6 +333,14 @@ signals" below).
 | YAMNet, Google's weights in a PyTorch port (SM3-D13)      | Apache-2.0                                         | Voice per 0.48 s patch and per phrase; `vocal_detector` = `yamnet-2`        | About 0.7 s per minute of audio                                            |
 | None: harmony and timbre novelty of the phrases (SM3-D17) | —                                                  | Phrase boundaries, since `analyzerVersion` `smart-mix-audio-v7`             | About 6 ms (Python) and 4 ms (Rust)                                        |
 
+Smart Mix playlists add a third model, run only on their tracks (see "Server separation"
+below): `htdemucs-onnx-1`, Demucs v4 `htdemucs` exported to ONNX, on ONNX Runtime CPU.
+Demucs' code is MIT; the weights state no licence of their own and were trained partly on
+research-only data (MUSDB18-HQ), which Diego accepted at STEM-G0 for a free,
+non-commercial project. The image ships them with `htdemucs-onnx-1.NOTICE`, the
+attribution. A five-minute track takes about two to three minutes with four threads on a
+development laptop, plus the drum beats.
+
 Two more models serve only the offline measurement and never run in the worker: All-In-One
 (MIT), the reference for sections and downbeats, and madmom's downbeat networks (CC
 BY-NC-SA 4.0), the arbiter. madmom's package in the analysis image ships those network
@@ -509,6 +533,334 @@ with its beats stored, a backfill of the library takes about 3 days instead of 1
 - **Size.** 3.4 KB for a 4:21 track and 4.8 KB for a 6:02 one (`pg_column_size` of the
   row; integer arrays are stored uncompressed), so about 0.5 GB for 140,000 tracks.
 
+### Stem analyses
+
+Smart Mix Stems separates a track into drums, bass, other and vocals and keeps what the
+planner needs from the stems, never the audio. Two producers write the same format: the
+server, for the tracks of Smart Mix playlists, and Crate Decks, which separates on the DJ's
+machine and may upload its analysis. The design is
+`docs/plans/2026-11-08-smart-mix-stems-design.md` in the Crate Decks repository (STEM-D1,
+D4 and §5); the format and the layer live in `crate/smart_mix/stems.py`.
+
+- **Format `stem-analysis/1`.** A JSON document (`StemAnalysis`, unknown fields rejected
+  at every level):
+
+  | Field            | Content                                                                                                                                                              |
+  | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `schema`         | `stem-analysis/1`                                                                                                                                                    |
+  | `producer`       | `crate-server/<version>` or `crate-decks/<version>`; the prefix is the producer kind                                                                                 |
+  | `separator`      | `model` (`htdemucs` or `htdemucs_ft`), `version` (the separator identifier, such as `htdemucs-onnx-1`) and `sources`, exactly `["drums", "bass", "other", "vocals"]` |
+  | `sourceRevision` | The profile's `sourceRevision` (64 hex characters) of the file the producer analysed                                                                                 |
+  | `hopMs`          | 250                                                                                                                                                                  |
+  | `levels`         | One base64 string per stem, one byte per 250 ms window: RMS in dBFS, linear from -60 dB (0) to 0 dB (255)                                                            |
+  | `drumBeatsMs`    | Optional beats tracked on the drum stem, strictly increasing and within the analysed audio. Stored and measured; they change no grid                                 |
+  | `durationMs`     | Duration of the analysed audio                                                                                                                                       |
+
+  Every stem has the same number of windows, and they cover `durationMs` to within one
+  window either way. Producers encode a level with `encode_levels`:
+  `floor((dB + 60) × 255 / 60 + 0.5)` after clipping to [-60, 0], so -30 dB is 128,
+  silence is 0 and the server and Decks write the same bytes.
+
+- **Storage.** Migration 156 adds `track_stem_signals`, written by
+  `crate/db/repositories/smart_mix_stems.py`: one row per track and `producer_kind`
+  (`server` or `decks`), deleted with the track. It keeps the producer, the separator
+  model and version, the source revision, `hop_ms`, one `bytea` per stem, `drum_beats_ms`,
+  `duration_ms`, `created_at`, `updated_at` and, for Decks uploads only, `contributed_by`
+  (the user, set to null if the user is deleted). Checks keep a Decks row from naming a
+  `crate-server/` producer and keep the four curves the same length. A five-minute track
+  is about 4.8 KB of levels.
+- **Which rows replace which.** A store replaces the producer's row when the source revision
+  changed, whatever the separator, or when the new separator is at least as strong. A weaker
+  separator never overwrites a stronger analysis of the same file. A Decks upload is not
+  kept when the server already has an analysis of the same file from an equal or stronger
+  separator. The store says which happened: `stored`, `replaced` or `kept_stronger`.
+- **Which analysis applies (`choose_analysis`).** Only analyses of the track's current source
+  revision count: when a file changes, its old analyses stop applying at once, before
+  anything is recomputed. Of those, the stronger separator wins (`htdemucs_ft` over
+  `htdemucs`); on a tie, the server's.
+- **Stems layer (`stem_phrase_layer`).** Derived on read, never stored. For each phrase of the
+  profile, the mean level byte of each stem over the phrase, rounded half up. A window
+  belongs to the phrase that holds its centre; the last phrase ends where the beat grid puts
+  its last bar, capped at the profile's duration. There is no layer when the analysis is of
+  another source revision, when its duration differs from the profile's by more than 2 %,
+  when the profile has no phrases, or when a phrase gets no window.
+- **Presence per phrase** (`vocalPresent`, `bassPresent`, `drumsPresent`). A phrase has a
+  stem when its mean byte is at least the stem's floor and within the stem's drop of the
+  track's loudest phrase of that stem (`STEM_PRESENCE_CUTS` in `crate/smart_mix/stems.py`,
+  4.25 bytes per dB). The floor rejects separation leakage in tracks without the stem; the
+  drop follows the level each track mixes the stem at, which the absolute -35 dB cut of the
+  ST0 spike could not. ST3 calibrated them (`tools/smart-mix-eval/calibrate_stems.py`): vocals
+  -45 dBFS and 18 dB against the SG1b lyrics labels (balanced accuracy 0.82 on folds by
+  track, YAMNet's byte 0.74 on the same phrases); bass -40 dBFS and 17 dB, drums -40 dBFS and
+  14 dB, from the valley of each phrase's level below its track's loudest phrase, which has no
+  labels to check it against (the evaluation report in the Crate Decks repository,
+  `docs/plans/2026-11-09-smart-mix-stems-evaluation.md`, has the figures). The vocal
+  presence is detector `stem-vocals-1` (`vocalDetector`). The layer's `vocalPresent` is the
+  stem's alone; the v3 planner joins it with YAMNet's byte, a phrase being voiced when either
+  says so (STEM-G1, rules revision 3), because the stem misses voice YAMNet hears about half the
+  time they disagree. Changing a cut changes plans: it bumps `PLANNER_POLICY_V3.rules_revision`.
+- **API.** `GET /api/tracks/by-entity/{uid}/mix-profile?detail=full` carries the layer as
+  an optional `stems` object (`producer`, `separatorModel`, `separatorVersion`,
+  `vocalDetector` and `phrases` with `startMs`, `endMs`, `drums`, `bass`, `other`, `vocals`,
+  `vocalPresent`, `bassPresent` and `drumsPresent`); the summary never does. Crate Decks reads and uploads analyses through
+  `GET` and `PUT /api/decks/tracks/{uid}/stem-analysis`
+  (`docs/technical/crate-decks.md`, section "Stem analyses"). An upload needs
+  `smart_mix.stems.contribute` (owner and admin roles by default), at most 64 KiB, a
+  `crate-decks/` producer, the track's current source revision (409 otherwise) and its
+  duration within 2 %.
+- **Turning uploads off.** `PUT /api/settings/smart-mix` with
+  `{"stem_uploads_enabled": false}` (setting `smart_mix_stem_uploads_enabled`, on by
+  default) makes uploads answer 403 and drops `stem_upload` from `decks.features`.
+  Stored analyses and reads stay as they are. There is no Admin switch yet.
+- **Capability.** `smart_mix.stems` is `{available, playlists, storage}`. `available`
+  and `playlists` (Smart Mix playlists, next section) follow `smart_mix.available`;
+  `storage` says the server keeps stem files for Decks: on with `smart_mix.available`,
+  a stems directory in the API (`CRATE_STEMS_DIR`) and a stem quota above 0 (see
+  "Separation task and stem files").
+- **What does not change.** The v8 grid, downbeats, phrases and the YAMNet voice bytes stay
+  as they are. `smart-mix-v3` scores with the layer (see "Planner smart-mix-v3"); v2 never
+  reads it.
+
+### Smart Mix playlists
+
+A Smart Mix playlist is a playlist its owner marks for Smart Mix (STEM-D2). While it is
+on, the server separates its local tracks into stems, and Crate Decks keeps it as an
+offline set; every client lists all playlists and marks the Smart Mix ones. The routes
+and the Decks sync are in `docs/technical/crate-decks.md` (section "Smart Mix
+playlists"); the code is in `crate/db/repositories/smart_mix_playlists.py`.
+
+- **Storage.** Migration 157 adds three tables:
+  - `smart_mix_playlists`: one row per playlist ever turned on, deleted with the
+    playlist, with the owner, `enabled`, `enabled_at` (last turned on), `disabled_at`
+    (set only while off), `last_used_at`, `revision` and `updated_at`. Turning it off
+    keeps the row, so clients and the stem-file LRU see the change.
+  - `smart_mix_playlist_revisions`: one counter per user. Every change of one of the
+    user's Smart Mix playlists takes its next value: turned on or off, or tracks added,
+    removed or replaced while on. Decks lists "changes since revision N". The counter
+    row is locked until the change commits, so a user's changes are serial and the
+    per-user limit holds under concurrent requests.
+  - `track_stem_jobs`: one row per track (`pending`, `analyzing`, `ready` or `failed`,
+    `attempts`, `last_error`, `requested_at`, `started_at`, `finished_at` and the
+    `source_revision` it was asked for), deleted with the track. A track in two Smart
+    Mix playlists has one job.
+- **Who.** Only the owner turns a playlist on or off; system playlists have no owner.
+  Admins read any playlist's status but cannot toggle it.
+- **Limits.** Admin settings of each instance, in `PUT /api/settings/smart-mix`:
+
+  | Key                            | Setting                                  | Default  |
+  | ------------------------------ | ---------------------------------------- | -------- |
+  | `stem_max_tracks_per_playlist` | `smart_mix_stem_max_tracks_per_playlist` | 300      |
+  | `stem_max_tracks_per_user`     | `smart_mix_stem_max_tracks_per_user`     | no limit |
+
+  Both count distinct local tracks: a track twice in a playlist, or in two of a user's
+  playlists, counts once, and tracks from other instances do not count. Turning a
+  playlist on, and adding tracks to it while on (Listen, the web app, smart playlist
+  generation, OpenSubsonic), is refused with 409 when the playlist or the user's Smart
+  Mix playlists together would go over; nothing is stored. `null` turns the per-user
+  limit off; the per-playlist limit is always on (at least 1). Lowering a limit leaves
+  playlists that are on as they are, but they cannot grow.
+
+- **Queueing.** A track gets a pending job when one of its Smart Mix playlists turns on
+  or receives it and it has no server analysis of its current file (the profile's
+  source revision). A Decks upload does not count, because the server's separation
+  also produces the stem files (STEM-D6). An existing job:
+
+  - `pending` keeps its place unless the file changed;
+  - `ready` whose analysis no longer applies goes back to `pending`;
+  - `failed` goes back to `pending` only when the file changed since;
+  - `analyzing` is left to the worker.
+
+  Turning a playlist off and removing tracks leave jobs and analyses alone, so the
+  separation task (ST2.PR3) claims a job only while one of the track's Smart Mix
+  playlists is on. `queue_smart_mix_stem_jobs()` queues for every Smart Mix playlist
+  that is on, for that task to run before it claims and catch tracks whose file
+  changed.
+
+- **Status.** A track is `ready` when it has a server analysis of its current file;
+  otherwise it has its job's state, and `pending` with no job. The estimate is the
+  playlist's pending and analysing tracks times the mean time of the latest 20
+  separations (four minutes per track until there is one, from the ST2.PR2
+  measurements below), without other queued work.
+- **Playlist responses.** `GET /api/playlists`, its detail (owner and collaborators)
+  and `playlists` in `GET /api/me/playlists-page` carry `smartMix`, which is
+  `{enabled, ready, total}`, computed for all of them in one query; `ready` and `total`
+  are 0 while off. The toggle invalidates the `playlists` and `playlist:{id}` client
+  caches.
+- **Work.** The task `analyze_playlist_stems` separates the queued tracks; the
+  separation is in "Server separation" and the task in "Separation task and stem
+  files". `last_used_at` is set when a playlist is turned on and when its owner
+  downloads one of its stem files.
+
+### Server separation
+
+The analysis worker separates the tracks of Smart Mix playlists with `htdemucs-onnx-1`:
+Demucs v4 `htdemucs` exported to ONNX by Crate Decks, the network only, run on ONNX
+Runtime CPU (STEM-D3). There is no PyTorch in the separation. The code is
+`crate/smart_mix/separation.py`; where its audio goes is `crate/smart_mix/stem_storage.py`.
+
+- **One separator for both producers.** The DSP around the graph is numpy, ported from
+  Crate Decks' reference (`tools/crate-stems/stems_dsp.py`) with the parameters of the
+  ST0 spike report (section 5): normalisation of the whole track by its mono mix,
+  segments of 343,980 samples every 257,985, STFT and iSTFT with n_fft 4096 and hop 1024
+  (periodic Hann, normalised, reflect padding, centred), triangular overlap-add,
+  `shifts=0`. `tests/test_smart_mix_separation_dsp.py` checks it against Crate Decks'
+  fixtures within 1e-5, and `tests/test_smart_mix_separation_onnx.py` checks the whole
+  separation against the golden stems PyTorch computed (at least 60 dB SDR per stem).
+  The server's analyses say `producer` `crate-server/stems-1` and `separator`
+  `{model: htdemucs, version: htdemucs-onnx-1}`, the identifier Decks uses for the same
+  graph.
+- **The graph in the image.** The analysis image downloads `htdemucs-onnx-1.onnx`
+  (174 MB) at build time from the Crate Decks release asset
+  `models-htdemucs-onnx-1/htdemucs-onnx-1.onnx` and checks its SHA-256
+  (`808790c0…6a08`), like the Beat This! checkpoint; the worker never downloads it. It
+  lands in `/app/models` with `htdemucs-onnx-1.NOTICE`, the attribution and the note on
+  the training data (design section 7). The release asset is published in
+  `thecrateapp/crate-decks` (release `models-htdemucs-onnx-1`); an image cannot build from
+  the default without it. Local and dev builds can take the file from a named build
+  context instead, with the same check:
+
+  ```bash
+  docker build --target worker-analysis --build-arg PANNS=on \
+    --build-arg HTDEMUCS_ONNX_SOURCE=context \
+    --build-context htdemucs-onnx=<directory holding htdemucs-onnx-1.onnx> app
+  ```
+
+  `HTDEMUCS_ONNX_URL` points the download elsewhere, and `CRATE_HTDEMUCS_ONNX` the
+  worker at another file. Images built with `PANNS=off` separate too; they only lack
+  the drum beats.
+
+- **Disk.** Separation writes only to `CRATE_STEMS_DIR` (`/stems` in the Compose files,
+  `${MEDIA_DIR}/smart-mix-stems` on the host), and only after checking that it is on the
+  library's filesystem: the music volume, never `/tmp`, a `tmpfs` or the container's
+  disk. Create the host directory, owned by `PUID:PGID`, before deploying: Docker
+  would create a missing one owned by root. Scratch goes to `.scratch` inside it: ffmpeg
+  decodes the track to float32 (about 106 MB for five minutes), the overlap-add writes
+  one float32 file per stem (four times that), and the directory is removed when the
+  stems are no longer needed, on success and on failure.
+- **Memory.** Nothing holds a whole track: the normalisation reads the decoded file in
+  blocks, and the overlap-add streams, writing each segment's final samples as soon as no
+  later segment can touch them. What stays in memory is ONNX Runtime with the graph and a
+  few segments of arrays, whatever the track's length. ONNX Runtime's default
+  (sequential) executor reuses buffers across the encoder and the decoder and held
+  3.8-3.9 GB, above the 1.5 GB at which the worker recycles a process and the 2 GB of the
+  default analysis container. The worker runs it without that reuse
+  (`SESSION_CONFIG` in `separation.py`, `enable_mem_reuse=False`). Measured in the
+  analysis image with 4 threads on a development laptop (Core Ultra 9 185H, shared with
+  other work):
+
+  | Session                           | Peak RSS   | Graph per segment | CPU per segment |
+  | --------------------------------- | ---------- | ----------------- | --------------- |
+  | Sequential (ONNX Runtime default) | 3.8-3.9 GB | 3.0-3.4 s         | 9.7-11.2 s      |
+  | Parallel, 2 inter-op threads      | 0.8 GB     | 3.3-4.0 s         | 13.6-16.6 s     |
+  | No memory reuse (used)            | 1.0 GB     | 2.4-3.0 s         | 8.0-10.0 s      |
+
+  The three give the same stems: 87.7-101.3 dB SDR against PyTorch on the golden track.
+  The parallel executor peaks lowest but spends 40-60 % more CPU per segment, the
+  scarcer resource on the server. Once the stems are written the session is dropped and
+  the freed heap goes back to the system (`malloc_trim`), so Beat This! afterwards adds
+  nothing to the peak: 1.0 GB for the whole separation of three tracks of 300-314 s, each
+  in a container limited to 2 GB (its cgroup, page cache included, peaked at 1.4-2.0 GB).
+
+- **Threads.** `CRATE_STEMS_THREADS` (4 by default, 1-64) sets ONNX Runtime's intra-op
+  threads and ffmpeg's. Idle threads sleep instead of spinning, so a waiting separation
+  does not raise the load the resource governor reads. On the same laptop, with 4
+  threads and a one-minute load of 3.6-9, a five-minute track took 122-173 s to separate
+  (54 segments, nine tenths of it in the graph), 15-20 s for the drum beats and 2 s for
+  the levels: 380-560 s of CPU. One segment of the graph by threads, at a load of about 3:
+
+  | Threads                 | 1   | 2   | 4   | 8   |
+  | ----------------------- | --- | --- | --- | --- |
+  | Seconds per segment     | 4.4 | 2.7 | 2.2 | 1.7 |
+  | CPU seconds per segment | 4.4 | 5.1 | 7.4 | 9.7 |
+
+  Threads past two buy less and less. On the default analysis container
+  (`cpus: "0.75"`) set `CRATE_STEMS_THREADS=1`; on the project server (`cpus: "7.0"`)
+  the default 4 leaves CPUs to Postgres and the API. The i7-7700 is slower per thread
+  than this laptop: **timing a 50-track Smart Mix playlist on the server is still to do
+  after the deploy** (ST2.PR2), and its result belongs here.
+
+- **Levels.** The level of a stem is the RMS of its mono mix (the mean of both channels)
+  over windows of 11,025 samples (250 ms at 44.1 kHz) from the start of the track; the
+  last window may be short and covers the samples it has. `durationMs` is the decoded
+  length, rounded to the millisecond. Crate Decks must compute them the same way (ST5).
+- **Drum beats.** Beat This! with its DBN, the profiles' beat tracker, runs on the drum
+  stem's mono mix at 22,050 Hz and fills `drumBeatsMs`. They are stored and measured,
+  never used for the grid (STEM-D4). Tracks over ten minutes, images without torch and
+  a model failure leave them out.
+
+### Separation task and stem files
+
+`analyze_playlist_stems` (`crate/worker_handlers/smart_mix_stems.py`) separates the
+tracks of Smart Mix playlists in `crate-analysis-worker`. Its queries are in
+`crate/db/jobs/smart_mix_stems.py`; the stem files in `crate/smart_mix/stem_files.py`.
+
+- **Queue and order.** `heavy`, priority 2: above the backfill coordinator (3), below
+  interactive work. One runs at a time: turning a Smart Mix playlist on, adding tracks
+  that need stems and the backfill all queue it with the scheduler's dedup key
+  (`schedule:analyze_playlist_stems`), and the scheduler queues it every 30 minutes, which
+  picks up retries and changed files. The resource governor applies; the night window
+  does not. Its time limit is two hours, for one track.
+- **A run.** It fails jobs a dead separation left `analyzing` for over two hours (the
+  attempt counts), queues the tracks whose file changed (`queue_smart_mix_stem_jobs()`),
+  asks for the profiles of up to ten waiting tracks that have none (the analysis is
+  stored under the profile's source revision, so a track waits for its profile), then
+  claims one job and separates its track. It runs again a second later while there is
+  more to claim, two minutes later while tracks wait for profiles, and otherwise ends
+  (`{"status": "idle"}`) after sweeping the stems directory. Without onnxruntime, the
+  graph or a stems directory on the music volume it ends as `skipped` with the reason,
+  and jobs stay `pending`.
+- **Claims.** A job is claimed while one of its track's Smart Mix playlists is on and its
+  track has a current profile of the job's revision: `pending` jobs, oldest request
+  first, then `failed` ones with attempts left once 15 minutes times their attempts have
+  passed. `FOR UPDATE SKIP LOCKED`, like the other claims.
+- **Outcome.** The task checks the file's revision when separation starts and again
+  before storing: a file that changed in between stores nothing. The `stem-analysis/1`
+  (`crate-server/stems-1`), the stem file's row and `ready` are written in one
+  transaction. Any failure ends `failed` with one more attempt and `last_error`; a track
+  gets three attempts, and one over 20 minutes fails for good at once.
+- **The backfill waits.** While a job can be claimed, the backfill coordinator claims
+  nothing, queues the task and comes back a minute later with the progress `Waiting for
+the stems of Smart Mix playlists`; analyses it already queued finish. Once the
+  playlists' work is done (nothing claimable, which includes failed tracks waiting to
+  retry), it resumes where it was. A playlist of 300 tracks therefore holds the backfill
+  for as long as it takes to separate them, about 20 hours at four minutes per track.
+- **Stem files** (STEM-D6). One MP4 per track with three AAC streams at 256 kbps:
+  drums, bass and vocals, in that order, each named in its handler (`handler_name`).
+  `other` is not stored: Decks rebuilds it as the residual against its own decode. A
+  five-minute track is about 29 MB. They live in `CRATE_STEMS_DIR` at
+  `<track id mod 256, hex>/<track id>-<revision prefix>.mp4`; ffmpeg writes each one in
+  the separation's scratch and it is renamed into place, and the writer refuses any
+  path outside that directory or inside its scratch. Migration 158 adds
+  `track_stem_files`: one row per track (deleted with it) with the relative `path`,
+  `bytes`, the separator, the `source_revision` and `last_used_at`. A new separation of
+  the track replaces its file.
+- **Quota.** `PUT /api/settings/smart-mix` with `stem_quota_gib` (setting
+  `smart_mix_stem_quota_gib`, 50 by default, 0 to 100,000): the total size of the stem
+  files, in GiB. After each separation the task evicts until the files fit: first the
+  files of tracks in no Smart Mix playlist that is on, then the rest, each least recently
+  used first. A file's last use is the later of its last download and the last use of the
+  Smart Mix playlists that hold it. 0 keeps no stem files; separation and analyses go
+  on. Evicting a file does not queue the track again: its analysis stays, and Decks
+  separates the track itself.
+- **Sweep.** When it has nothing to claim, the task deletes files of the directory no row
+  refers to and scratch left by a separation that died, once they are over two hours
+  old.
+- **Download.** `GET /api/decks/tracks/{uid}/stems` serves the file with Range support
+  (`audio/mp4`), only while it was separated from the track's current file; 404
+  otherwise, and when the API has no stems directory. The API mounts it read-only. A
+  download marks the file, and the downloader's Smart Mix playlists that are on and hold
+  the track, as used now (at most once an hour each): that is the use the LRU reads.
+  Details for clients are in `docs/technical/crate-decks.md` ("Stem files").
+- **Cost per track.** On the laptop of "Server separation", with 4 threads at a load of
+  3.7, the whole task for a 312 s track took 163 s: 131 s to separate, 15 s for the drum
+  beats, 1 s for the levels and 16 s for the stem file (30 MB). The status estimate uses
+  four minutes per track until real separations exist, since the i7-7700 is slower per
+  thread.
+- **After the deploy.** Before integration, the Crate Decks release asset
+  `models-htdemucs-onnx-1/htdemucs-onnx-1.onnx` must exist (the analysis image downloads
+  it), and `${MEDIA_DIR}/smart-mix-stems` must exist on the host, owned by `PUID:PGID`.
+  Then time a 50-track Smart Mix playlist on the server and record it here.
+
 ### Measurement of the structure
 
 SMB.PR3 measured the v7 bar and phrase structure offline with
@@ -668,6 +1020,7 @@ structure; check `refreshedAt` before reading zeros as a library with nothing pe
 | `backfill_smart_mix_profiles` | `heavy`       | Coordinates batches and enqueues children |
 | `compute_smart_mix_profile`   | `heavy`       | Analysis and publication per track        |
 | `refresh_smart_mix_coverage`  | `maintenance` | Aggregates coverage outside the request   |
+| `analyze_playlist_stems`      | `heavy`       | Stems of Smart Mix playlists, one at once |
 
 The backfill applies resource pressure and limits the work in flight to the limit of the
 [night window](#night-window): 8 at night and 4 by day by default. Its Admin settings accept
@@ -1081,9 +1434,56 @@ first, and serves the first; the AI refinement (below) picks from the same menu 
 - **Safety**: every candidate goes through `TransitionPlan` and the planner policy
   (`evaluation.policy_violations`); v3 copies v2's limits on tempo, gain, true peak and
   durations.
-- **Response**: each v3 plan adds `structureUsed`, whether the menu came from the phrases. The
-  batch reads profiles without structure to build the cache keys and reads the structure only
-  for the edges it has to plan.
+- **Stems layer** (Smart Mix Stems ST3, rules revision 5, STEM-D5 and STEM-G1). When the
+  request comes from Crate Decks (`context.source = "decks"`, `stems_layer_sources`), both
+  tracks have a stem analysis of their current file (Smart Mix playlists, or a Crate Decks
+  upload), the policy's `stems_layer` is on and the edge belongs to the beatmatch family, the
+  phrase menu is scored with the stems layer. Listen, Android, VirtualDJ and every other source
+  get revision 1's menu (Diego, revision 5: Listen's short blends measured worse with the layer
+  on the industrial set):
+
+  - a phrase has voice when the vocal stem or YAMNet's stored byte (`VOCAL_THRESHOLD`) says so;
+    the vocal penalty counts those phrases, and so do the two bonuses below;
+  - the bass component is one minus the share of the mix with both basses at full level
+    (crossfade and handoff shelf) while both phrases have a bassline, so a mix where one side
+    has none scores like a handoff;
+  - two bonuses are added, 0.05 × the share of the mix before the handoff with the incoming on
+    drums without bass or vocals, and 0.05 × the share of the mix with the outgoing on a phrase
+    without vocals.
+
+  The terms are in the breakdown's `stems`. **The beatmatch family** (`stems_layer_applies`):
+  both tracks' gate priors are known and at least `stems_layer_min_genre_prior` (0.5). A
+  track's gate prior (`candidates.stems_gate_prior`) is 1.0 when its top artist genre or top
+  album genre (ties included) is of the machine-drum industrial family (`MACHINE_DRUM_GENRES`:
+  industrial, industrial metal and rock, EBM, electro-industrial, aggrotech, dark electro, Neue
+  Deutsche Härte), and otherwise the beatmatch prior of its album genres
+  (`transition_fit.genre_beatmatch_prior`, weighted). 0.5 is where the prior table turns from
+  rock, punk, metal, indie, pop and soul to dub, hip-hop, synthwave and dance. The industrial
+  family (rules revision 4) is a list of the gate's own: the shared prior table does not change,
+  so compatible tracks and radio keep their priors. Its drums are programmed or played to a grid:
+  on the development library 75 % of its tracks have a steady tempo, like electronic dance music
+  (80 %), against 32 % for extreme metal and 56-57 % for punk and rock; the rule lets in all of
+  Godflesh, Ministry, Fear Factory and Author & Punisher, 0.5 % of extreme metal, 1.0 % of punk
+  and hardcore and 1.1 % of rock (albums tagged industrial), and no other metal. Tracks without
+  genres keep the layer off. For another client, outside the family or without stems on both
+  tracks, every candidate and score is revision 1's (golden test
+  `app/tests/fixtures/smart_mix/candidates_v3_rules1.json`); Crate Decks' menus with stems have
+  their own (`candidates_v3_rules5.json`).
+  Revision 2 (stem vocals instead of YAMNet's, on every edge) was never released; the ST3
+  evaluation in the Crate Decks repository (`docs/plans/2026-11-09-smart-mix-stems-evaluation.md`)
+  has the measurements behind STEM-G1.
+
+- **Response**: each v3 plan adds `structureUsed`, whether the menu came from the phrases, and
+  `stemsUsed: true` when the stems layer scored it (absent otherwise). The batch reads
+  profiles without structure and the stem analyses of its tracks (one bounded `ANY` query),
+  then, only when some Crate Decks edge has an analysis on both tracks, those tracks' album and artist genres
+  (one more bounded query, `get_track_genres`), to build the cache keys: an edge the layer scores
+  keys on both analyses too, so a genre that moves an edge into or out of the family changes
+  its key. It reads the structure only for the edges it has to plan, with the beat grid when a
+  layer applies (the grid places the end of the outro for the layer; the planner does not read
+  it).
+- **Crate Decks** (`context.source = "decks"` with `localRefinement`) also gets the menu and
+  the policy limits; see `docs/technical/crate-decks.md`, "Local refinement".
 - **Capability**: `smart_mix.structure` is true when at least half the library's tracks have a
   current profile with phrases, read from the coverage snapshot (`structure_percent`, counted by
   `refresh_smart_mix_coverage`). It is never computed in the request.
@@ -1165,18 +1565,20 @@ deterministic plan.
 These routes describe the application. They are not tools automatically available to
 Crate Agent; an MCP Bearer token is not an Admin session or a VirtualDJ PAT.
 
-| Route                                                                        | Use and relevant effect                                                                                                 |
-| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/capabilities`                                                      | Effective flags and client contract; does not prove their implementation or physical readiness                          |
-| `GET /api/tracks/by-entity/{uid}/mix-profile?detail=summary\|full`           | Profile by UID; `full` includes the beat grid; a 404 can mean missing or invalidated                                    |
-| `GET /api/tracks/by-entity/{uid}/compatible?context=auto\|beatmatch\|smooth` | Local ranking of candidates; does not trigger analysis                                                                  |
-| `POST /api/playback/transition-plans`                                        | Batch planning; uses the cache                                                                                          |
-| `POST /api/playback/continuation-token` and `/api/playback/continuation`     | Contract for continuing planning and the queue in the native runtime                                                    |
-| `GET /api/admin/smart-mix/status`                                            | Coverage, campaign and coordinating task; can enqueue `refresh_smart_mix_coverage` if it is missing or older than 600 s |
-| `GET /api/admin/smart-mix/tracks` and `/activity`                            | Paginated profiles and processing, and task activity                                                                    |
-| `POST /api/admin/smart-mix/backfill` and `/backfill/resume\|pause\|cancel`   | Change campaign control and settings                                                                                    |
-| `POST /api/admin/smart-mix/tracks/{id}/reanalyze`                            | Enqueues analysis for one track, with deduplication                                                                     |
-| `GET /api/admin/smart-mix/tracks/{id}/structure`                             | Stored phrases (with end and voice byte), energy curve and bar starts of one profile, for review in Admin               |
+| Route                                                                        | Use and relevant effect                                                                                                               |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/capabilities`                                                      | Effective flags and client contract; does not prove their implementation or physical readiness                                        |
+| `GET /api/tracks/by-entity/{uid}/mix-profile?detail=summary\|full`           | Profile by UID; `full` includes the beat grid and, when an analysis applies, the `stems` layer; a 404 can mean missing or invalidated |
+| `GET` and `PUT /api/decks/tracks/{uid}/stem-analysis`                        | Crate Decks reads the stem analysis that applies and uploads its own; `PUT` needs `smart_mix.stems.contribute`                        |
+| `GET /api/smart-mix/playlists` and `GET`, `PUT /{id}`                        | Smart Mix playlists: changes since a revision, stem progress of one, turn on or off (owner only, within the limits)                   |
+| `GET /api/tracks/by-entity/{uid}/compatible?context=auto\|beatmatch\|smooth` | Local ranking of candidates; does not trigger analysis                                                                                |
+| `POST /api/playback/transition-plans`                                        | Batch planning; uses the cache                                                                                                        |
+| `POST /api/playback/continuation-token` and `/api/playback/continuation`     | Contract for continuing planning and the queue in the native runtime                                                                  |
+| `GET /api/admin/smart-mix/status`                                            | Coverage, campaign and coordinating task; can enqueue `refresh_smart_mix_coverage` if it is missing or older than 600 s               |
+| `GET /api/admin/smart-mix/tracks` and `/activity`                            | Paginated profiles and processing, and task activity                                                                                  |
+| `POST /api/admin/smart-mix/backfill` and `/backfill/resume\|pause\|cancel`   | Change campaign control and settings                                                                                                  |
+| `POST /api/admin/smart-mix/tracks/{id}/reanalyze`                            | Enqueues analysis for one track, with deduplication                                                                                   |
+| `GET /api/admin/smart-mix/tracks/{id}/structure`                             | Stored phrases (with end and voice byte), energy curve and bar starts of one profile, for review in Admin                             |
 
 Admin requires `library.analysis.manage`, even for its reads. The public profile and compatible
 endpoints use session authorization or the PAT scope `vdj.smart_mix.read`, depending on the
@@ -1262,6 +1664,13 @@ the blind listening test.
   (the development library's spike tracks) with itself.
 - `music_left_out` reports the outgoing music after the mix and the incoming music before it,
   without a target: v3 often ends the mix at a phrase boundary before the outgoing music ends.
+- Stems (ST3): `separate_pool.py` separates a pool of local files with the server's own
+  separation code (CPU, or the same graph on ONNX Runtime CUDA) and writes one
+  `stem-analysis/1` per track; `run_eval.py --stems` attaches their layer to the profiles and
+  reports the stem vocal and bass clashes, `--planner smart-mix-v3-nostems` plans the same
+  profiles without the layer; `calibrate_stems.py` calibrates the presence cuts; and
+  `listen_metrics.py` adds `bassOnBassMs`, low end on both decks at full level in the rendered
+  audio.
 
 The analyzer's structure is measured apart, on audio files rather than plans:
 `tools/smart-mix-eval/structure/` scores beats, downbeats and phrases against All-In-One

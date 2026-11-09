@@ -239,6 +239,9 @@ TASK_POOL_CONFIG: dict[str, TaskPoolConfig] = {
     ),  # just resets state for background daemon
     "compute_smart_mix_profile": TaskPoolConfig("heavy", 2, 900, 2),
     "backfill_smart_mix_profiles": TaskPoolConfig("heavy", 3, 1800, 0),
+    # Smart Mix playlists' stems (Smart Mix Stems ST2.PR3): one track per run, ahead
+    # of the backfill (3) and behind interactive work; the handler retries tracks.
+    "analyze_playlist_stems": TaskPoolConfig("heavy", 2, 7200, 0),
     "refresh_smart_mix_coverage": TaskPoolConfig("maintenance", 3, 300, 0),
     # Daily retention of AI refinements (SM3-D5): records queued reads, then
     # deletes rows unread for 180 days. No model call.

@@ -4,6 +4,7 @@ import { EyeIcon as SolarEyeOutline } from "@solar-icons/react/outline/eye";
 import { ArchiveDownIcon as SolarArchiveDownOutline } from "@solar-icons/react/outline/archive-down";
 import { Cassette2Icon as SolarCassette2Outline } from "@solar-icons/react/outline/cassette-2";
 import { HeartIcon as SolarHeartOutline } from "@solar-icons/react/outline/heart";
+import { LayersMinimalisticIcon as SolarLayersMinimalisticOutline } from "@solar-icons/react/outline/layers-minimalistic";
 import { MicrophoneIcon as SolarMicrophoneOutline } from "@solar-icons/react/outline/microphone";
 import { MinusSquareIcon as SolarMinusSquareOutline } from "@solar-icons/react/outline/minus-square";
 import { PulseIcon as SolarPulseOutline } from "@solar-icons/react/outline/pulse";
@@ -22,6 +23,7 @@ import {
   Collection,
   Heart,
   HeartBold,
+  Layers,
   Loader2,
   Minus,
   Pause,
@@ -38,6 +40,11 @@ function renderSvgInner(ui: React.ReactElement) {
 describe("@crate/ui/icons", () => {
   it("exports the Solar Eye outline for preview actions", () => {
     expect(renderSvgInner(<Eye />)).toBe(renderSvgInner(<SolarEyeOutline />));
+  });
+  it("exports the Solar Layers Minimalistic outline for stems and Smart Mix", () => {
+    expect(renderSvgInner(<Layers />)).toBe(
+      renderSvgInner(<SolarLayersMinimalisticOutline />),
+    );
   });
   it("renders the official Bot Outline paths with the normal icon contract", () => {
     const { container } = render(

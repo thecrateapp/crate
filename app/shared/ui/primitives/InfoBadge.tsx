@@ -127,7 +127,9 @@ export interface InfoBadgeProps extends ComponentProps<"span"> {
   /** Visual emphasis only; static information never becomes a toggle. */
   active?: boolean;
   surface?: InfoBadgeSurface;
-  variant?: "label" | "counter";
+  /** ``icon``: only the icon, in a circle as wide as the badge is high; name it with
+   * ``aria-label``. */
+  variant?: "label" | "counter" | "icon";
   iconClassName?: string;
 }
 
@@ -147,6 +149,7 @@ export const InfoBadge = memo(function InfoBadge({
   return (
     <TooltipHint content={title ?? (infoBadgeText(children) || undefined)}>
       <span
+        role={variant === "icon" && props["aria-label"] ? "img" : undefined}
         {...props}
         data-slot="info-badge"
         data-variant={variant}
@@ -171,7 +174,7 @@ export const InfoBadge = memo(function InfoBadge({
             aria-hidden="true"
           />
         ) : null}
-        {infoBadgeContent(children, Boolean(Icon))}
+        {variant === "icon" ? null : infoBadgeContent(children, Boolean(Icon))}
       </span>
     </TooltipHint>
   );

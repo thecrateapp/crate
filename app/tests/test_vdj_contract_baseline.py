@@ -12,7 +12,8 @@ def test_capabilities_keep_smart_mix_contract_stable(test_app, monkeypatch):
 
     assert response.status_code == 200
     smart_mix = response.json()["smart_mix"]
-    # Smart Mix 3 adds planner_versions, structure and ai_assisted; the plugin reads
+    # Smart Mix 3 adds planner_versions, structure and ai_assisted, and Smart Mix
+    # Stems adds stems; the plugin reads
     # none of the smart_mix object, and every earlier field keeps its value. AI
     # Assisted Mixing stays off until an admin enables the refinement.
     ai_assisted = smart_mix.pop("ai_assisted")
@@ -25,6 +26,13 @@ def test_capabilities_keep_smart_mix_contract_stable(test_app, monkeypatch):
         "reason",
     }
     assert ai_assisted["available"] is False
+    # Smart Mix Stems adds stems with Smart Mix playlists; stored stem audio comes
+    # later.
+    assert smart_mix.pop("stems") == {
+        "available": True,
+        "playlists": True,
+        "storage": False,
+    }
     assert smart_mix == {
         "available": True,
         "planner_version": "smart-mix-v2",

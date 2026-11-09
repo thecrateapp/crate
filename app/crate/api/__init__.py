@@ -537,8 +537,12 @@ def create_app() -> FastAPI:
     from crate.api.internal_federation import router as internal_federation_router
     from crate.api.catalog import router as catalog_router
     from crate.api.capabilities import router as capabilities_router
+    from crate.api.decks_stems import router as decks_stems_router
     from crate.api.smart_mix import router as smart_mix_router
     from crate.api.smart_mix_admin import router as smart_mix_admin_router
+    from crate.api.smart_mix_playlists import router as smart_mix_playlists_router
+    from crate.api.smart_mix_stems import admin_router as smart_mix_stems_admin_router
+    from crate.api.smart_mix_stems import router as smart_mix_stems_router
     from crate.api.vdj_catalog import router as vdj_catalog_router
 
     # Public well-known (no auth required)
@@ -590,6 +594,10 @@ def create_app() -> FastAPI:
     app.include_router(federation_remote_router)
     app.include_router(smart_mix_router)
     app.include_router(smart_mix_admin_router)
+    app.include_router(decks_stems_router)
+    app.include_router(smart_mix_playlists_router)
+    app.include_router(smart_mix_stems_router)
+    app.include_router(smart_mix_stems_admin_router)
     app.include_router(vdj_catalog_router)
     app.include_router(catalog_router)
     app.include_router(artist_research_router)

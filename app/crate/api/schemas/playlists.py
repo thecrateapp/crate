@@ -134,6 +134,15 @@ class PlaylistMemberResponse(BaseModel):
     avatar: str | None = None
 
 
+class PlaylistSmartMixResponse(BaseModel):
+    """Smart Mix playlist state (STEM-D2): ``ready`` of ``total`` local tracks have
+    server stems while it is on; both are 0 when it is off."""
+
+    enabled: bool
+    ready: int = Field(ge=0)
+    total: int = Field(ge=0)
+
+
 class PlaylistSummaryResponse(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -163,6 +172,9 @@ class PlaylistSummaryResponse(BaseModel):
     track_count: int | None = None
     total_duration: float | int | None = None
     artwork_tracks: list[PlaylistArtworkTrackResponse] = Field(default_factory=list)
+    # Reported for the caller's own and shared playlists (GET /api/playlists, its
+    # detail and /api/me/playlists-page); null where a response does not report it.
+    smartMix: PlaylistSmartMixResponse | None = None
 
 
 class PlaylistDetailResponse(PlaylistSummaryResponse):

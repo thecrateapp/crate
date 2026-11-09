@@ -12,8 +12,11 @@ import { IMAGE_SAMPLES } from "../fixtures/image-identity";
 
 export function ContextMenuExamples({
   longLabels = false,
+  status,
 }: {
   longLabels?: boolean;
+  /** The header's status line, such as a Smart Mix playlist's progress. */
+  status?: string;
 }) {
   const [event, setEvent] = useState("No action yet");
   const [expanded, setExpanded] = useState(false);
@@ -96,6 +99,7 @@ export function ContextMenuExamples({
           type: "media",
           title: "Talk For Hours",
           subtitle: "High Vis",
+          status,
           detail: "Blending",
           imageUrl: IMAGE_SAMPLES[0],
           imageAlt: "Blending cover",

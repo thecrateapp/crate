@@ -12,6 +12,9 @@ from crate.db.repositories.library_track_reads import (
     resolve_library_track_reference,
 )
 from crate.db.repositories.playlists_shared import emit_playlist_domain_event
+from crate.db.repositories.smart_mix_playlists import (
+    smart_mix_playlist_tracks_changed,
+)
 from crate.db.tx import optional_scope
 
 
@@ -211,6 +214,9 @@ def add_playlist_tracks(
                 or 0
             )
             playlist.updated_at = now
+        if added:
+            # Refuses tracks over the Smart Mix limits and queues their stems.
+            smart_mix_playlist_tracks_changed(playlist_id, added=True, session=s)
         emit_playlist_domain_event(
             s,
             playlist_id=playlist_id,
@@ -289,6 +295,7 @@ def remove_playlist_track(
                 or 0
             )
             playlist.updated_at = now
+        smart_mix_playlist_tracks_changed(playlist_id, added=False, session=s)
         emit_playlist_domain_event(
             s,
             playlist_id=playlist_id,
@@ -388,6 +395,7 @@ def replace_playlist_tracks(
             playlist.track_count = position
             playlist.total_duration = total_duration
             playlist.updated_at = now
+        smart_mix_playlist_tracks_changed(playlist_id, added=True, session=s)
         emit_playlist_domain_event(
             s,
             playlist_id=playlist_id,

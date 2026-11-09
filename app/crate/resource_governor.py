@@ -24,6 +24,7 @@ RESOURCE_GOVERNED_TASK_TYPES = frozenset(
         "refresh_collection_insights",
         "backfill_track_audio_fingerprints",
         "backfill_smart_mix_profiles",
+        "analyze_playlist_stems",
         "backfill_artwork_variants",
         "cleanup_artwork_variants",
         "batch_covers",

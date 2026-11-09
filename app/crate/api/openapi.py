@@ -352,6 +352,8 @@ _AUTH_REQUIRED_PREFIXES = frozenset(
         "/api/admin/system-playlists",
         "/api/admin",
         "/api/me",
+        "/api/decks",
+        "/api/smart-mix",
         "/api/offline",
         "/api/users",
         "/api/jam",

@@ -167,6 +167,39 @@ describe("ContextMenu", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it.each([true, false])(
+    "puts the header status as an accent MonoLabel between subtitle and detail in desktop=%s",
+    (desktop) => {
+      isDesktop = desktop;
+      canHover = desktop;
+      render(
+        <ContextMenu
+          header={{ ...header, status: "Smart Mix · 41 of 48 ready" }}
+          items={actions()}
+          menuRef={createRef<HTMLDivElement>()}
+          onClose={vi.fn()}
+          open
+          position={{ x: 40, y: 64 }}
+        />,
+      );
+
+      const status = screen.getByText("Smart Mix · 41 of 48 ready");
+      expect(status).toHaveClass("crate-mono-label", "text-accent-action-hi");
+      // The approved mockup wraps a long status onto a second line.
+      expect(status).not.toHaveClass("truncate");
+      const subtitle = screen.getByText("Dredg");
+      const detail = screen.getByText("Progressive rock");
+      expect(
+        subtitle.compareDocumentPosition(status) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        status.compareDocumentPosition(detail) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    },
+  );
+
   it("does not bubble clicks or pointer downs on the desktop menu to the parent row", () => {
     const onRowClick = vi.fn();
     const onRowPointerDown = vi.fn();
