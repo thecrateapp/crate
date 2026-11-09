@@ -1,5 +1,7 @@
 ---
+import { getCollection } from "astro:content";
 import { t } from "../i18n";
+import { blogHome } from "../lib/blog-home";
 import InstallCommand from "./InstallCommand.astro";
 
 interface Props {
@@ -7,6 +9,7 @@ interface Props {
 }
 
 const { locale = "en" } = Astro.props;
+const chapters = blogHome(await getCollection("blog"), { includeDrafts: import.meta.env.DEV }).chapters.length;
 ---
 
 <canvas id="field" aria-hidden="true"></canvas>
@@ -30,6 +33,12 @@ const { locale = "en" } = Astro.props;
       <h1 class="display" data-split style="--d:90ms;--step:55ms">{t("hero.title", locale)}</h1>
       <p class="sub" data-split style="--d:300ms;--step:40ms">{t("hero.subline", locale)}</p>
       <InstallCommand locale={locale} delay="440ms" />
+      <a class="hero-blog" href="/blog" data-enter data-hero-blog style="--d:620ms">
+        <span class="dot" aria-hidden="true"></span>
+        <span class="kicker">{t("hero.blog", locale)}</span>
+        <span class="line">{t("hero.blogLine", locale, { count: String(chapters) })}</span>
+        <span class="arrow" aria-hidden="true">&rarr;</span>
+      </a>
     </div>
   </div>
 </section>
@@ -210,6 +219,71 @@ const { locale = "en" } = Astro.props;
 
   .hero-copy :global(.cta) {
     margin-top: 8px;
+  }
+
+  .hero-blog {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px 12px;
+    margin-top: 2px;
+    padding: 8px 4px;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: var(--fg-2);
+    text-decoration: none;
+    transition: color 0.3s var(--ease-snap);
+  }
+
+  .hero-blog .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--cyan-hi);
+    box-shadow: 0 0 10px rgba(103, 232, 249, 0.8);
+    animation: hero-blog-pulse 2.8s ease-in-out infinite;
+  }
+
+  .hero-blog .kicker {
+    color: var(--cyan-hi);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .hero-blog .arrow {
+    font-family: var(--sans);
+    transition: transform 0.3s var(--ease-snap);
+  }
+
+  .hero-blog:hover,
+  .hero-blog:focus-visible {
+    color: var(--fg);
+  }
+
+  .hero-blog:hover .arrow,
+  .hero-blog:focus-visible .arrow {
+    transform: translateX(4px);
+  }
+
+  .hero-blog:focus-visible {
+    outline: 2px solid var(--cyan-hi);
+    outline-offset: 4px;
+    border-radius: 4px;
+  }
+
+  @keyframes hero-blog-pulse {
+    50% {
+      opacity: 0.45;
+      box-shadow: 0 0 4px rgba(103, 232, 249, 0.4);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero-blog .dot {
+      animation: none;
+    }
   }
 
   @media (max-width: 760px) {
