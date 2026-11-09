@@ -43,6 +43,7 @@ from crate.db.cache_store import (
     set_smart_mix_plan_caches,
 )
 from crate.db.queries.smart_mix_compatible import get_compatible_track_inputs
+from crate.db.queries.smart_mix_genres import get_track_album_genres
 from crate.db.repositories.access_tokens import (
     get_continuation_descriptor,
     issue_playback_continuation_token,
@@ -62,8 +63,10 @@ from crate.smart_mix.models import (
     TransitionContext,
 )
 from crate.smart_mix.evaluation import policy_limits
+from crate.smart_mix.candidates import stems_layer_applies
 from crate.smart_mix.planner import plan_transition, plan_transition_v3
 from crate.smart_mix.policy import PLANNER_POLICY, PLANNER_POLICY_V3, PlannerPolicy
+from crate.smart_mix.transition_fit import genre_beatmatch_prior
 from crate.smart_mix.stems import (
     StemAnalysis,
     choose_analysis,
@@ -391,9 +394,12 @@ def _plan_transition_edges(
         entity_uids, include_structure=False
     )
     stems = _applicable_stem_analyses(entity_uids, profiles, policy)
+    genre_priors = _genre_priors(unique_edges, stems)
     edge_profiles = _edge_profiles(unique_edges, entity_uids, profiles)
     cache_keys = [
-        _plan_cache_key(edge, outgoing, incoming, policy, stems=stems)
+        _plan_cache_key(
+            edge, outgoing, incoming, policy, stems=stems, genre_priors=genre_priors
+        )
         for edge, outgoing, incoming in edge_profiles
     ]
     refinements = (
@@ -414,16 +420,17 @@ def _plan_transition_edges(
     if missed and planner_reads_structure(policy.identifier):
         missed_edges = [unique_edges[index] for index in missed]
         missed_uids = _ordered_entity_uids(missed_edges)
+        layered = _stems_of_edges(
+            missed_edges, stems, genre_priors=genre_priors, policy=policy
+        )
         structured = _edge_profiles(
-            missed_edges,
-            missed_uids,
-            _structured_profiles(missed_uids, _stems_of_edges(missed_edges, stems)),
+            missed_edges, missed_uids, _structured_profiles(missed_uids, layered)
         )
         for index, (edge, outgoing, incoming) in zip(missed, structured, strict=True):
             edge_profiles[index] = (edge, outgoing, incoming)
             # A profile republished between the two reads keys its new plan.
             cache_keys[index] = _plan_cache_key(
-                edge, outgoing, incoming, policy, stems=stems
+                edge, outgoing, incoming, policy, stems=stems, genre_priors=genre_priors
             )
     computed: dict[str, dict] = {}
     plans = []
@@ -434,7 +441,11 @@ def _plan_transition_edges(
         serialized = cached.get(cache_key)
         if serialized is None:
             serialized = _plan_edge(
-                edge, outgoing=outgoing, incoming=incoming, policy=policy
+                edge,
+                outgoing=outgoing,
+                incoming=incoming,
+                policy=policy,
+                genre_priors=genre_priors,
             )
             computed[cache_key] = serialized
         if index in statuses:
@@ -474,19 +485,41 @@ def _applicable_stem_analyses(
 
 
 def _stems_of_edges(
-    edges: list[TransitionEdgeRequest], stems: Mapping[str, StemAnalysis]
+    edges: list[TransitionEdgeRequest],
+    stems: Mapping[str, StemAnalysis],
+    *,
+    genre_priors: Mapping[str, float | None] | None = None,
+    policy: PlannerPolicy | None = None,
 ) -> dict[str, StemAnalysis]:
-    """The analyses of the tracks of edges where both tracks have one: only those
-    edges score with the stems layer."""
+    """The analyses of the tracks of edges where both tracks have one; with a policy,
+    only of the edges the stems layer scores (STEM-G1: the beatmatch family)."""
     result: dict[str, StemAnalysis] = {}
     for edge in edges:
         pair = (
             str(edge.outgoing_track_entity_uid),
             str(edge.incoming_track_entity_uid),
         )
-        if all(uid in stems for uid in pair):
-            result.update((uid, stems[uid]) for uid in pair)
+        if not all(uid in stems for uid in pair):
+            continue
+        if policy is not None and not stems_layer_applies(
+            policy, *((genre_priors or {}).get(uid) for uid in pair)
+        ):
+            continue
+        result.update((uid, stems[uid]) for uid in pair)
     return result
+
+
+def _genre_priors(
+    edges: list[TransitionEdgeRequest], stems: Mapping[str, StemAnalysis]
+) -> dict[str, float | None]:
+    """The genre beatmatch prior of the tracks of edges with stems on both, which
+    gates the stems layer to the beatmatch family (STEM-G1): one bounded query of
+    their album genres, none when no edge has stems on both."""
+    uids = list(_stems_of_edges(edges, stems))
+    if not uids:
+        return {}
+    genres = get_track_album_genres(uids)
+    return {uid: genre_beatmatch_prior(genres.get(uid)) for uid in uids}
 
 
 def _structured_profiles(
@@ -651,12 +684,14 @@ def _plan_edge(
     outgoing: TrackMixProfile | None,
     incoming: TrackMixProfile | None,
     policy: PlannerPolicy | None = None,
+    genre_priors: Mapping[str, float | None] | None = None,
 ) -> dict:
     policy = policy or PLANNER_POLICY
     context = _transition_context(edge.context)
     outgoing_uid = str(edge.outgoing_track_entity_uid)
     incoming_uid = str(edge.incoming_track_entity_uid)
     if planner_reads_structure(policy.identifier):
+        priors = genre_priors or {}
         planned = plan_transition_v3(
             outgoing,
             incoming,
@@ -664,6 +699,8 @@ def _plan_edge(
             outgoing_track_entity_uid=outgoing_uid,
             incoming_track_entity_uid=incoming_uid,
             policy=policy,
+            outgoing_genre_prior=priors.get(outgoing_uid),
+            incoming_genre_prior=priors.get(incoming_uid),
         )
         serialized = {
             **planned.plan.to_dict(),
@@ -742,6 +779,7 @@ def _plan_cache_key(
     policy: PlannerPolicy | None = None,
     *,
     stems: Mapping[str, StemAnalysis] | None = None,
+    genre_priors: Mapping[str, float | None] | None = None,
 ) -> str:
     policy = policy or PLANNER_POLICY
     cache_identity: dict[str, object] = {
@@ -758,11 +796,21 @@ def _plan_cache_key(
         "context": _cache_context(edge.context),
     }
     stems = stems if stems and policy.stems_layer else {}
-    outgoing_stems = stems.get(str(edge.outgoing_track_entity_uid))
-    incoming_stems = stems.get(str(edge.incoming_track_entity_uid))
-    if outgoing_stems is not None and incoming_stems is not None:
+    outgoing_uid = str(edge.outgoing_track_entity_uid)
+    incoming_uid = str(edge.incoming_track_entity_uid)
+    outgoing_stems = stems.get(outgoing_uid)
+    incoming_stems = stems.get(incoming_uid)
+    priors = genre_priors or {}
+    if (
+        outgoing_stems is not None
+        and incoming_stems is not None
+        and stems_layer_applies(
+            policy, priors.get(outgoing_uid), priors.get(incoming_uid)
+        )
+    ):
         # Only edges the stems layer scores carry these, so other keys keep their
-        # shape.
+        # shape; the genres gate it (STEM-G1), so a genre that moves an edge into
+        # or out of the beatmatch family changes its key.
         cache_identity["outgoingStems"] = _stem_identity(outgoing_stems)
         cache_identity["incomingStems"] = _stem_identity(incoming_stems)
     canonical = json.dumps(

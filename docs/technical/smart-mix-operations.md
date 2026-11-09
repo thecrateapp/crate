@@ -137,7 +137,7 @@ These values come from the reviewed code; they were not discovered from a live i
 | `PLANNER_POLICY_VERSION`           | `2`                  | Numeric version of each individual plan               |
 | `PLANNER_POLICY.rules_revision`    | `7`                  | Internal rules revision included in the cache key     |
 | `PLANNER_POLICY_V3.identifier`     | `smart-mix-v3`       | Planner on the stored phrases (SM3-D3)                |
-| `PLANNER_POLICY_V3.rules_revision` | `2`                  | Rules revision of v3, in its cache key                |
+| `PLANNER_POLICY_V3.rules_revision` | `3`                  | Rules revision of v3, in its cache key                |
 
 Changing the rules does not necessarily change the public planner identifier: the cache key
 includes both. `PLANNER_IDENTIFIER` is the default: plan batches without `plannerVersion`,
@@ -595,9 +595,10 @@ D4 and §5); the format and the layer live in `crate/smart_mix/stems.py`.
   14 dB, from the valley of each phrase's level below its track's loudest phrase, which has no
   labels to check it against (the evaluation report in the Crate Decks repository,
   `docs/plans/2026-11-09-smart-mix-stems-evaluation.md`, has the figures). The vocal
-  presence is detector `stem-vocals-1` (`vocalDetector`), which replaces YAMNet's voice where
-  both tracks of an edge have a layer (STEM-D4). Changing a cut changes plans: it bumps
-  `PLANNER_POLICY_V3.rules_revision`.
+  presence is detector `stem-vocals-1` (`vocalDetector`). The layer's `vocalPresent` is the
+  stem's alone; the v3 planner joins it with YAMNet's byte, a phrase being voiced when either
+  says so (STEM-G1, rules revision 3), because the stem misses voice YAMNet hears about half the
+  time they disagree. Changing a cut changes plans: it bumps `PLANNER_POLICY_V3.rules_revision`.
 - **API.** `GET /api/tracks/by-entity/{uid}/mix-profile?detail=full` carries the layer as
   an optional `stems` object (`producer`, `separatorModel`, `separatorVersion`,
   `vocalDetector` and `phrases` with `startMs`, `endMs`, `drums`, `bass`, `other`, `vocals`,
@@ -1432,24 +1433,40 @@ first, and serves the first; the AI refinement (below) picks from the same menu 
 - **Safety**: every candidate goes through `TransitionPlan` and the planner policy
   (`evaluation.policy_violations`); v3 copies v2's limits on tempo, gain, true peak and
   durations.
-- **Stems layer** (Smart Mix Stems ST3, rules revision 2, STEM-D5). When both tracks have a
-  stem analysis of their current file (Smart Mix playlists, or a Crate Decks upload) and the
-  policy's `stems_layer` is on, the phrase menu is scored with the stems layer: the vocal
-  penalty counts the phrases the vocal stem has instead of YAMNet's; the bass component is
-  one minus the share of the mix with both basses at full level (crossfade and handoff shelf)
-  while both phrases have a bassline, so a mix where one side has none scores like a handoff;
-  and two bonuses are added, 0.05 × the share of the mix before the handoff with the incoming
-  on drums without bass or vocals, and 0.05 × the share of the mix with the outgoing on a
-  phrase without vocals. The terms are in the breakdown's `stems`. Without stems on both
-  tracks every candidate and score is revision 1's (golden test
-  `app/tests/fixtures/smart_mix/candidates_v3_rules1.json`). Gate STEM-G1 decides whether the
-  layer stays on by default (`PLANNER_POLICY_V3.stems_layer`).
+- **Stems layer** (Smart Mix Stems ST3, rules revision 3, STEM-D5 and STEM-G1). When both
+  tracks have a stem analysis of their current file (Smart Mix playlists, or a Crate Decks
+  upload), the policy's `stems_layer` is on and the edge belongs to the beatmatch family, the
+  phrase menu is scored with the stems layer:
+
+  - a phrase has voice when the vocal stem or YAMNet's stored byte (`VOCAL_THRESHOLD`) says so;
+    the vocal penalty counts those phrases, and so do the two bonuses below;
+  - the bass component is one minus the share of the mix with both basses at full level
+    (crossfade and handoff shelf) while both phrases have a bassline, so a mix where one side
+    has none scores like a handoff;
+  - two bonuses are added, 0.05 × the share of the mix before the handoff with the incoming on
+    drums without bass or vocals, and 0.05 × the share of the mix with the outgoing on a phrase
+    without vocals.
+
+  The terms are in the breakdown's `stems`. **The beatmatch family** (`stems_layer_applies`):
+  both tracks' genre beatmatch priors (`transition_fit.genre_beatmatch_prior` of their album
+  genres, weighted) are known and at least `stems_layer_min_genre_prior` (0.5, where the prior
+  table turns from rock, punk, metal, indie, pop and soul to dub, hip-hop, synthwave and
+  dance). Tracks without album genres keep the layer off. Outside the family, or without stems
+  on both tracks, every candidate and score is revision 1's (golden test
+  `app/tests/fixtures/smart_mix/candidates_v3_rules1.json`); revision 3's menus with stems have
+  their own (`candidates_v3_rules3.json`). Revision 2 (stem vocals instead of YAMNet's, on every
+  edge) was never released; the ST3 evaluation in the Crate Decks repository
+  (`docs/plans/2026-11-09-smart-mix-stems-evaluation.md`) has the measurements behind STEM-G1.
+
 - **Response**: each v3 plan adds `structureUsed`, whether the menu came from the phrases, and
   `stemsUsed: true` when the stems layer scored it (absent otherwise). The batch reads
-  profiles without structure and the stem analyses of its tracks (one bounded `ANY` query) to
-  build the cache keys: an edge with an analysis on both tracks keys on both analyses too. It
-  reads the structure only for the edges it has to plan, with the beat grid when a layer
-  applies (the grid places the end of the outro for the layer; the planner does not read it).
+  profiles without structure and the stem analyses of its tracks (one bounded `ANY` query),
+  then, only when some edge has an analysis on both tracks, those tracks' album genres (one more
+  bounded query, `get_track_album_genres`), to build the cache keys: an edge the layer scores
+  keys on both analyses too, so a genre that moves an edge into or out of the family changes
+  its key. It reads the structure only for the edges it has to plan, with the beat grid when a
+  layer applies (the grid places the end of the outro for the layer; the planner does not read
+  it).
 - **Crate Decks** (`context.source = "decks"` with `localRefinement`) also gets the menu and
   the policy limits; see `docs/technical/crate-decks.md`, "Local refinement".
 - **Capability**: `smart_mix.structure` is true when at least half the library's tracks have a

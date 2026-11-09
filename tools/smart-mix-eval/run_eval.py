@@ -25,8 +25,10 @@ differences and the SG3 criteria of the design (§10).
 ``--stems <folder>`` (Smart Mix Stems, ST3) attaches the stems layer of the
 ``stem-analysis/1`` files ``separate_pool.py`` wrote to the profiles: every planner
 is then scored on the stem vocal and bass clashes too, and ``smart-mix-v3`` plans
-with the layer, while ``smart-mix-v3-nostems`` plans the same profiles without it
-(rules revision 1's menus).
+with the layer where it applies, while ``smart-mix-v3-nostems`` plans the same
+profiles without it (rules revision 1's menus). As in the API, the layer applies only
+to edges of the beatmatch family (STEM-G1): the tracks' genre beatmatch priors come
+from their album genres, read like the API reads them.
 """
 
 from __future__ import annotations
@@ -69,6 +71,7 @@ from crate.smart_mix.planner import (  # noqa: E402
     plan_transition,
     plan_transition_v3,
 )
+from crate.smart_mix.candidates import stems_layer_applies  # noqa: E402
 from crate.smart_mix.policy import PLANNER_POLICY, PLANNER_POLICY_V3  # noqa: E402
 from crate.smart_mix.stems import (  # noqa: E402
     StemAnalysis,
@@ -87,11 +90,12 @@ from refine import (  # noqa: E402
     resolve_target,
 )
 
-# A planner returns a plan, or a v3 PlannedTransition (its plan plus the menu).
-Planner = Callable[
-    [TrackMixProfile | None, TrackMixProfile | None, TransitionContext, str, str],
-    TransitionPlan | PlannedTransition,
-]
+# A planner returns a plan, or a v3 PlannedTransition (its plan plus the menu). It takes
+# the two profiles, the context, the two entity UIDs and, as ``genre_priors``, the two
+# tracks' genre beatmatch priors (v3 gates the stems layer on them, STEM-G1).
+Planner = Callable[..., TransitionPlan | PlannedTransition]
+GenrePriors = tuple[float | None, float | None]
+NO_PRIORS: GenrePriors = (None, None)
 
 
 def _plan_smart_mix_v2(
@@ -100,8 +104,10 @@ def _plan_smart_mix_v2(
     context: TransitionContext,
     outgoing_uid: str,
     incoming_uid: str,
+    genre_priors: GenrePriors = NO_PRIORS,
 ) -> TransitionPlan:
     # The pure planner: no API, no plan cache, no database.
+    del genre_priors
     return plan_transition(
         outgoing,
         incoming,
@@ -118,6 +124,7 @@ def _plan_smart_mix_v3(
     context: TransitionContext,
     outgoing_uid: str,
     incoming_uid: str,
+    genre_priors: GenrePriors = NO_PRIORS,
 ) -> PlannedTransition:
     # The API's v3 path: candidates on the stored phrases, v2's bar heuristic
     # without them. It reads no beat grid, as the API does not load it.
@@ -128,6 +135,8 @@ def _plan_smart_mix_v3(
         outgoing_track_entity_uid=outgoing_uid,
         incoming_track_entity_uid=incoming_uid,
         policy=PLANNER_POLICY_V3,
+        outgoing_genre_prior=genre_priors[0],
+        incoming_genre_prior=genre_priors[1],
     )
 
 
@@ -142,6 +151,7 @@ def _plan_smart_mix_v3_no_stems(
     context: TransitionContext,
     outgoing_uid: str,
     incoming_uid: str,
+    genre_priors: GenrePriors = NO_PRIORS,
 ) -> PlannedTransition:
     return plan_transition_v3(
         outgoing,
@@ -150,6 +160,8 @@ def _plan_smart_mix_v3_no_stems(
         outgoing_track_entity_uid=outgoing_uid,
         incoming_track_entity_uid=incoming_uid,
         policy=PLANNER_POLICY_V3_NO_STEMS,
+        outgoing_genre_prior=genre_priors[0],
+        incoming_genre_prior=genre_priors[1],
     )
 
 
@@ -249,6 +261,7 @@ def evaluate_dataset(
     genres: Mapping[str, str | None] | None = None,
     genre_root: Callable[[str | None], str] | None = None,
     concurrency: int = 1,
+    genre_priors: Mapping[str, float | None] | None = None,
 ) -> list[dict[str, Any]]:
     """Plan and score every edge; with ``refiner``, refine the v3 menus too.
 
@@ -256,6 +269,8 @@ def evaluate_dataset(
     ``metrics`` are what the client plays) and keeps the planner's own plan and
     metrics under ``deterministic``. ``genres`` maps a track to the genre slug the
     prompt sends; ``genre_root`` resolves it to a root genre for pool edges.
+    ``genre_priors`` maps a track to its genre beatmatch prior (unknown when absent),
+    which keeps v3's stems layer to the beatmatch family.
     """
     plan_edge = PLANNERS[planner]
     records = []
@@ -265,7 +280,18 @@ def evaluate_dataset(
         incoming_uid = str(row["incomingTrackEntityUid"])
         outgoing = profiles.get(outgoing_uid)
         incoming = profiles.get(incoming_uid)
-        planned = plan_edge(outgoing, incoming, context, outgoing_uid, incoming_uid)
+        priors = (
+            (genre_priors or {}).get(outgoing_uid),
+            (genre_priors or {}).get(incoming_uid),
+        )
+        planned = plan_edge(
+            outgoing,
+            incoming,
+            context,
+            outgoing_uid,
+            incoming_uid,
+            genre_priors=priors,
+        )
         plan = planned.plan if isinstance(planned, PlannedTransition) else planned
         evaluation = evaluate_transition(plan, outgoing, incoming, context=context)
         menu = (
@@ -301,6 +327,8 @@ def evaluate_dataset(
         stem_metrics = _stem_metrics(plan, outgoing, incoming)
         if stem_metrics is not None:
             record["stemMetrics"] = stem_metrics
+            # Whether the edge is of the beatmatch family the layer applies to.
+            record["stemsGate"] = stems_layer_applies(PLANNER_POLICY_V3, *priors)
         if refiner is not None and isinstance(planned, PlannedTransition):
             prompt_genres = (
                 (genres or {}).get(outgoing_uid),
@@ -523,6 +551,9 @@ def summarize(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "stems": (
             {
                 "edgesWithLayers": len(stem_metrics),
+                "edgesInFamily": sum(
+                    1 for record in records if record.get("stemsGate")
+                ),
                 "stemsUsed": sum(1 for record in records if record.get("stemsUsed")),
                 "vocalClashMs": _stats(item["vocalClashMs"] for item in stem_metrics),
                 "bassClashMs": _stats(item["bassClashMs"] for item in stem_metrics),
@@ -977,9 +1008,10 @@ def _stems_markdown(report: Mapping[str, Any]) -> list[str]:
         "## Stems layer",
         "",
         f"{stems['edgesWithLayers']} edges have a stems layer on both tracks"
-        f" (profiles: {_format_counts(attached)}); {stems['stemsUsed']} were planned"
-        " with it. Stem clashes count full-level time (bass: with the handoff shelf)"
-        " while both phrases have the stem.",
+        f" (profiles: {_format_counts(attached)}), {stems.get('edgesInFamily', 0)} of"
+        " them in the beatmatch family (genre priors, STEM-G1);"
+        f" {stems['stemsUsed']} were planned with it. Stem clashes count full-level"
+        " time (bass: with the handoff shelf) while both phrases have the stem.",
         "",
         "| Metric | n | mean | p50 | p95 |",
         "| --- | ---: | ---: | ---: | ---: |",
@@ -1265,6 +1297,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     profiles = load_profiles(uids)
     stems_meta: dict[str, Any] | None = None
+    genre_priors: dict[str, float | None] | None = None
     if args.stems:
         from separate_pool import load_stem_analyses
 
@@ -1272,10 +1305,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         for folder in args.stems:
             analyses.update(load_stem_analyses(folder))
         profiles, attached = attach_stem_layers(profiles, analyses)
+        genre_priors = load_genre_priors(uids)
         stems_meta = {
             "folders": [display_path(folder) for folder in args.stems],
             "analyses": len(analyses),
             "profiles": attached,
+            "genrePriors": {
+                "tracks": len(genre_priors),
+                "known": sum(1 for prior in genre_priors.values() if prior is not None),
+            },
         }
     context = CONTEXTS[args.context]
     refiner = None
@@ -1291,7 +1329,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             "concurrency": args.concurrency,
         }
     records = evaluate_dataset(
-        rows, profiles, planner=args.planner, context=context, **options
+        rows,
+        profiles,
+        planner=args.planner,
+        context=context,
+        genre_priors=genre_priors,
+        **options,
     )
     baseline = json.loads(args.compare.read_text()) if args.compare else None
     report = build_report(
@@ -1366,6 +1409,16 @@ def _refiner(args: argparse.Namespace) -> tuple[Refiner, dict[str, Any]]:
         "concurrency": args.concurrency,
         "minIntervalSeconds": args.min_interval,
     }
+
+
+def load_genre_priors(uids: Sequence[str]) -> dict[str, float | None]:
+    """Each track's genre beatmatch prior from its album genres, as the plan API
+    reads them to gate the stems layer (STEM-G1); None when unknown."""
+    from crate.db.queries import smart_mix_genres
+    from crate.smart_mix.transition_fit import genre_beatmatch_prior
+
+    genres = smart_mix_genres.get_track_album_genres(list(uids))
+    return {uid: genre_beatmatch_prior(genres.get(uid)) for uid in uids}
 
 
 def load_prompt_genres(uids: Sequence[str]) -> dict[str, str | None]:

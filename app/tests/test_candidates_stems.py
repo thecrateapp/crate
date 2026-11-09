@@ -1,8 +1,11 @@
 """The stems layer in the smart-mix-v3 candidate score (Smart Mix Stems, ST3.PR1).
 
-The stem terms apply only when both profiles carry a stems layer (STEM-D5). Without
-it, the menu of rules revision 2 is the menu of revision 1, recorded in
-``fixtures/smart_mix/candidates_v3_rules1.json`` before the stems layer existed.
+The stem terms apply only when both profiles carry a stems layer (STEM-D5) and, since
+STEM-G1 (rules revision 3), only on edges of the beatmatch family: both tracks' genre
+beatmatch priors known and at least ``stems_layer_min_genre_prior``. Elsewhere the
+menu is the menu of revision 1, recorded in
+``fixtures/smart_mix/candidates_v3_rules1.json`` before the stems layer existed. A
+phrase has voice when the vocal stem or YAMNet's stored byte says so.
 
 The edges below make two candidates tie without stems: an 8-bar blend from the
 outgoing outro into the incoming intro, or into the build that follows it. Both are
@@ -19,7 +22,10 @@ from pathlib import Path
 
 import pytest
 
-from crate.smart_mix.candidates import plan_transition_candidates
+from crate.smart_mix.candidates import (
+    plan_transition_candidates,
+    stems_layer_applies,
+)
 from crate.smart_mix.evaluation import stem_bass_clash_ms, stem_vocal_clash_ms
 from crate.smart_mix.models import (
     StemPhraseLevels,
@@ -42,11 +48,12 @@ from tests.smart_mix_candidate_cases import (
     profile,
 )
 
-GOLDEN = json.loads(
-    (
-        Path(__file__).resolve().parent / "fixtures/smart_mix/candidates_v3_rules1.json"
-    ).read_text()
-)
+FIXTURES = Path(__file__).resolve().parent / "fixtures/smart_mix"
+GOLDEN = json.loads((FIXTURES / "candidates_v3_rules1.json").read_text())
+GOLDEN_RULES3 = FIXTURES / "candidates_v3_rules3.json"
+# Genre beatmatch priors (crate.smart_mix.transition_fit): house and techno are 0.95,
+# rock 0.15. The layer needs both tracks in the beatmatch family.
+IN_FAMILY = (0.95, 0.95)
 # The two extra edges of the golden file, next to edge_cases().
 EXTRA_LAYOUTS = {
     "voiced_listen": (
@@ -100,6 +107,7 @@ def _menu(
     incoming: TrackMixProfile | None,
     ctx: TransitionContext,
     policy=PLANNER_POLICY_V3,
+    priors: tuple[float | None, float | None] = IN_FAMILY,
 ) -> list[TransitionCandidate]:
     return plan_transition_candidates(
         outgoing,
@@ -108,6 +116,8 @@ def _menu(
         policy,
         outgoing_track_entity_uid=OUTGOING_UID,
         incoming_track_entity_uid=INCOMING_UID,
+        outgoing_genre_prior=priors[0],
+        incoming_genre_prior=priors[1],
     )
 
 
@@ -153,6 +163,30 @@ def _with_stems(track: TrackMixProfile, **presence: set[int]) -> TrackMixProfile
     return replace(track, stems=_layer(track, **presence))
 
 
+def _patterned(track: TrackMixProfile) -> TrackMixProfile:
+    """A fixed layer for any track with phrases: vocals on odd phrases, bass from the
+    second phrase on, drums everywhere but the first."""
+    assert track.phrases is not None
+    count = len(track.phrases)
+    return _with_stems(
+        track,
+        vocals={index for index in range(count) if index % 2},
+        bass=set(range(1, count)),
+        drums=set(range(1, count)),
+    )
+
+
+def _phrased_golden_cases():
+    return [
+        case
+        for case in _golden_cases()
+        if case[1] is not None
+        and case[1].phrases
+        and case[2] is not None
+        and case[2].phrases
+    ]
+
+
 def _pair(
     *,
     out_vocals: tuple[int, ...] | None = None,
@@ -175,9 +209,10 @@ def _picked(
 # --- golden -----------------------------------------------------------------------
 
 
-def test_rules_revision_2_is_the_stems_layer() -> None:
-    assert PLANNER_POLICY_V3.rules_revision == 2
+def test_rules_revision_3_gates_the_stems_layer_by_mix_type() -> None:
+    assert PLANNER_POLICY_V3.rules_revision == 3
     assert PLANNER_POLICY_V3.stems_layer is True
+    assert PLANNER_POLICY_V3.stems_layer_min_genre_prior == 0.5
     assert GOLDEN["rulesRevision"] == 1
 
 
@@ -225,10 +260,10 @@ def test_no_stem_terms_when_the_policy_turns_the_layer_off() -> None:
 
 
 def test_prefers_an_overlap_where_the_stem_vocals_do_not_collide() -> None:
-    # YAMNet hears voice on the incoming build and none on its intro; the vocal stem
-    # says the opposite, as in genres where YAMNet fails (SG1b).
+    # YAMNet hears no voice on the incoming intro or build; the vocal stem hears it on
+    # the intro, as in genres where YAMNet misses voice (SG1b).
     yamnet_out = (20, 160, 20, 160, 170)
-    yamnet_in = (20, 170, 160, 20, 160, 10)
+    yamnet_in = (20, 20, 160, 20, 160, 10)
     outgoing, incoming = _pair(out_vocals=yamnet_out, in_vocals=yamnet_in)
     ctx = context()
 
@@ -241,6 +276,8 @@ def test_prefers_an_overlap_where_the_stem_vocals_do_not_collide() -> None:
         ctx,
         outgoing_track_entity_uid=OUTGOING_UID,
         incoming_track_entity_uid=INCOMING_UID,
+        outgoing_genre_prior=IN_FAMILY[0],
+        incoming_genre_prior=IN_FAMILY[1],
     )
     with_stems = list(planned.candidates)
 
@@ -248,12 +285,108 @@ def test_prefers_an_overlap_where_the_stem_vocals_do_not_collide() -> None:
     assert _picked(with_stems) == (OUTRO, BUILD, 8)
     assert planned.stems_used is True
     assert all(candidate.stems_used for candidate in with_stems)
-    # The stem vocals replace YAMNet's in the penalty: none left on the plan picked.
     best = with_stems[0]
     assert best.breakdown.stems is not None
     assert best.breakdown.stems.vocal_overlap_ms == 0
     assert stem_vocal_clash_ms(best.to_plan(), stems_out, stems_in) == 0
     assert stem_vocal_clash_ms(without[0].to_plan(), stems_out, stems_in) > 0
+
+
+def test_yamnet_voice_still_counts_where_the_stem_misses_it() -> None:
+    # Rules revision 3 (STEM-G1): a phrase has voice when either detector says so.
+    # The vocal stem hears none on the incoming intro, YAMNet does: the intro still
+    # collides with the voiced outro, so the build wins.
+    yamnet_out = (20, 20, 20, 20, 170)
+    yamnet_in = (170, 20, 20, 20, 20, 10)
+    outgoing, incoming = _pair(out_vocals=yamnet_out, in_vocals=yamnet_in)
+    stems_out = _with_stems(outgoing, vocals={OUTRO})
+    stems_in = _with_stems(incoming)
+
+    menu = _menu(
+        stems_out, stems_in, context(), replace(PLANNER_POLICY_V3, max_candidates=1_000)
+    )
+
+    assert _picked(menu) == (OUTRO, BUILD, 8)
+    into_intro = next(
+        candidate
+        for candidate in menu
+        if (candidate.outgoing_phrase, candidate.incoming_phrase, candidate.length_bars)
+        == (OUTRO, INTRO, 8)
+    )
+    assert into_intro.breakdown.stems is not None
+    assert into_intro.breakdown.stems.vocal_overlap_ms > 0
+    assert into_intro.breakdown.stems.vocal_free_exit == 0.0
+
+
+def test_without_yamnet_bytes_the_stem_alone_says_where_voice_is() -> None:
+    outgoing, incoming = _pair()
+    stems_out = _with_stems(outgoing, vocals={OUTRO})
+    stems_in = _with_stems(incoming)
+
+    best = _menu(stems_out, stems_in, context())[0]
+
+    assert _picked([best]) == (OUTRO, INTRO, 8)
+    assert best.breakdown.stems is not None
+    assert best.breakdown.stems.vocal_overlap_ms == 0
+
+
+# --- the mix-type gate (STEM-G1) -----------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("outgoing", "incoming", "applies"),
+    [
+        (0.95, 0.95, True),
+        (0.5, 0.95, True),
+        (0.95, 0.4999, False),
+        (0.15, 0.95, False),
+        (0.95, None, False),
+        (None, None, False),
+    ],
+)
+def test_the_layer_applies_only_to_the_beatmatch_family(
+    outgoing, incoming, applies
+) -> None:
+    assert stems_layer_applies(PLANNER_POLICY_V3, outgoing, incoming) is applies
+    off = replace(PLANNER_POLICY_V3, stems_layer=False)
+    assert stems_layer_applies(off, outgoing, incoming) is False
+
+
+@pytest.mark.parametrize(
+    "priors", [(0.95, 0.15), (0.15, 0.15), (None, 0.95), (None, None)]
+)
+@pytest.mark.parametrize(
+    "case", _phrased_golden_cases(), ids=[case[0] for case in _phrased_golden_cases()]
+)
+def test_outside_the_family_the_menu_is_revision_1s(case, priors) -> None:
+    name, outgoing, incoming, ctx = case
+
+    menu = _menu(_patterned(outgoing), _patterned(incoming), ctx, priors=priors)
+
+    assert [candidate.to_dict() for candidate in menu] == GOLDEN["cases"][name]
+    assert not any(candidate.stems_used for candidate in menu)
+
+
+def _rules3_menus() -> dict[str, list[dict]]:
+    return {
+        name: [
+            candidate.to_dict()
+            for candidate in _menu(_patterned(outgoing), _patterned(incoming), ctx)
+        ]
+        for name, outgoing, incoming, ctx in _phrased_golden_cases()
+    }
+
+
+def test_rules_revision_3_menus_with_stems_match_their_golden() -> None:
+    golden = json.loads(GOLDEN_RULES3.read_text())
+
+    assert golden["rulesRevision"] == PLANNER_POLICY_V3.rules_revision
+    assert golden["priors"] == list(IN_FAMILY)
+    assert _rules3_menus() == golden["cases"]
+    # Gapless albums and manual skips keep v2's single plan; every menu uses stems.
+    menus = [menu for menu in golden["cases"].values() if len(menu) > 1]
+    assert len(menus) == 8
+    assert all(candidate.get("stemsUsed") for menu in menus for candidate in menu)
 
 
 # --- bass ---------------------------------------------------------------------------

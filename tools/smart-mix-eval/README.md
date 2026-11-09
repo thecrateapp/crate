@@ -323,8 +323,10 @@ out/<dir>` measures where the presence cuts go: vocals against the SG1b lyrics l
    those analyses to the profiles (by entity UID and duration within 2 %: the analysis was made
    from a local copy, so its source revision is that file's) and adds, per edge, `stemsUsed`
    and the stem vocal and bass clashes, and a `## Stems layer` section to `report.md`.
-   `--planner smart-mix-v3` plans with the layer, `--planner smart-mix-v3-nostems` plans the
-   same profiles without it (rules revision 1's menus), so the two reports pair edge by edge.
+   `--planner smart-mix-v3` plans with the layer where it applies (the beatmatch family: the
+   tracks' genre beatmatch priors come from their album genres, read like the API reads them,
+   and each record says `stemsGate`), `--planner smart-mix-v3-nostems` plans the same profiles
+   without it (rules revision 1's menus), so the two reports pair edge by edge.
    `listen_metrics.py` then measures both, with `bassOnBassMs` (low end below 150 Hz on both
    decks at full level, crossfade and bass handoff applied) next to the other metrics.
 

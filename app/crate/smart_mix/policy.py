@@ -151,19 +151,26 @@ class PlannerPolicy:
     # instead of one beat late (grids are rounded to whole milliseconds).
     candidate_phase_snap_ms: int = 5
     # Smart Mix Stems (STEM-D5): score v3 candidates with the stems layer when both
-    # profiles of an edge carry one. Gate STEM-G1 decides whether it stays on.
+    # profiles of an edge carry one and the edge is of the beatmatch family (STEM-G1).
     stems_layer: bool = False
+    # STEM-G1: the layer scores an edge only when both tracks' genre beatmatch priors
+    # (crate.smart_mix.transition_fit) are known and at least this. 0.5 is where the
+    # prior table turns from the smooth genres (rock, punk and metal 0.1-0.15, indie
+    # and ambient 0.2, pop and soul 0.4, trip-hop and IDM 0.45) to the beatmatch ones
+    # (dub 0.5, hip-hop and synthwave 0.6, dance 0.75 and up).
+    stems_layer_min_genre_prior: float = 0.5
 
 
 PLANNER_POLICY = PlannerPolicy()
 # Smart Mix 3 planner: the v2 policy with its own identity and rules revision. The
 # safety limits (tempo, gain, true peak, durations) are v2's and must stay so.
-# Revision 2 adds the stems layer (Smart Mix Stems, ST3); without stems on both
-# tracks its menus are revision 1's.
+# Revision 2 added the stems layer (Smart Mix Stems, ST3); revision 3 (STEM-G1) keeps
+# it to the beatmatch family and takes voice from the vocal stem or YAMNet. Without
+# stems on both tracks, or outside the family, its menus are revision 1's.
 PLANNER_POLICY_V3 = replace(
     PLANNER_POLICY,
     identifier="smart-mix-v3",
-    rules_revision=2,
+    rules_revision=3,
     stems_layer=True,
 )
 

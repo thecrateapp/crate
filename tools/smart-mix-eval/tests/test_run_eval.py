@@ -274,7 +274,7 @@ def test_v3_plans_the_edge_set_as_the_api_does() -> None:
     assert records[1]["structureUsed"] is False
     assert records[1]["plan"] == v2[1]["plan"]
     assert summary["structureUsed"] == {"edges": 1, "rate": 0.5}
-    assert PLANNER_RULES["smart-mix-v3"] == 2
+    assert PLANNER_RULES["smart-mix-v3"] == 3
     json.dumps(records)
 
 
@@ -641,12 +641,21 @@ def test_v3_plans_with_the_stems_layer_and_nostems_without_it() -> None:
         {uid: _stem_analysis(p) for uid, p in _structured_pair().items()},
     )
     rows = [_row("e0001", OUT, IN, "electronic/0-2")]
+    techno = {OUT: 0.95, IN: 0.95}
 
     with_stems = evaluate_dataset(
-        rows, profiles, planner="smart-mix-v3", context=CONTEXTS["dj"]
+        rows,
+        profiles,
+        planner="smart-mix-v3",
+        context=CONTEXTS["dj"],
+        genre_priors=techno,
     )
     without = evaluate_dataset(
-        rows, profiles, planner="smart-mix-v3-nostems", context=CONTEXTS["dj"]
+        rows,
+        profiles,
+        planner="smart-mix-v3-nostems",
+        context=CONTEXTS["dj"],
+        genre_priors=techno,
     )
     plain = evaluate_dataset(
         rows, _structured_pair(), planner="smart-mix-v3", context=CONTEXTS["dj"]
@@ -654,6 +663,7 @@ def test_v3_plans_with_the_stems_layer_and_nostems_without_it() -> None:
 
     assert counts["attached"] == 2
     assert with_stems[0]["stemsUsed"] is True
+    assert with_stems[0]["stemsGate"] is True
     assert without[0]["stemsUsed"] is False
     # Without the layer, v3 plans the profiles as if they had none.
     assert without[0]["plan"] == plain[0]["plan"]
@@ -669,6 +679,7 @@ def test_v3_plans_with_the_stems_layer_and_nostems_without_it() -> None:
     )
     stems = report["summary"]["stems"]
     assert stems["edgesWithLayers"] == 1 and stems["stemsUsed"] == 1
+    assert stems["edgesInFamily"] == 1
     assert report["overall"]["stemsUsedRate"] == 1.0
     assert report["comparison"]["overall"]["stemsUsedRate"] == 1.0
     markdown = render_markdown(report)
@@ -678,3 +689,48 @@ def test_v3_plans_with_the_stems_layer_and_nostems_without_it() -> None:
     # Reports without stems keep their shape.
     assert summarize(plain)["stems"] is None
     assert "## Stems layer" not in render_markdown(build_report(plain, meta={}))
+
+
+@pytest.mark.parametrize(
+    "priors",
+    [{OUT: 0.95, IN: 0.15}, {OUT: 0.95}, None],
+    ids=["rock", "unknown", "none"],
+)
+def test_v3_keeps_the_stems_layer_to_the_beatmatch_family(priors) -> None:
+    from run_eval import attach_stem_layers
+
+    profiles, _counts = attach_stem_layers(
+        _structured_pair(),
+        {uid: _stem_analysis(p) for uid, p in _structured_pair().items()},
+    )
+    rows = [_row("e0001", OUT, IN, "electronic/0-2")]
+
+    gated = evaluate_dataset(
+        rows,
+        profiles,
+        planner="smart-mix-v3",
+        context=CONTEXTS["dj"],
+        genre_priors=priors,
+    )
+    plain = evaluate_dataset(
+        rows, _structured_pair(), planner="smart-mix-v3", context=CONTEXTS["dj"]
+    )
+
+    assert gated[0]["stemsUsed"] is False
+    assert gated[0]["stemsGate"] is False
+    assert gated[0]["plan"] == plain[0]["plan"]
+    assert summarize(gated)["stems"]["edgesInFamily"] == 0
+
+
+def test_genre_priors_come_from_the_album_genres(monkeypatch) -> None:
+    import crate.db.queries.smart_mix_genres as genres_module
+
+    from run_eval import load_genre_priors
+
+    monkeypatch.setattr(
+        genres_module,
+        "get_track_album_genres",
+        lambda uids: {OUT: {"techno": 1.0}, IN: {"rock": 0.5, "punk": 0.5}},
+    )
+
+    assert load_genre_priors([OUT, IN, OTHER]) == {OUT: 0.95, IN: 0.15, OTHER: None}

@@ -729,8 +729,13 @@ def plan_transition_v3(
     outgoing_track_entity_uid: str | None = None,
     incoming_track_entity_uid: str | None = None,
     policy: PlannerPolicy = PLANNER_POLICY_V3,
+    outgoing_genre_prior: float | None = None,
+    incoming_genre_prior: float | None = None,
 ) -> PlannedTransition:
-    """Plan an edge with ``smart-mix-v3`` (SM3-D3). ``plan_transition`` is v2."""
+    """Plan an edge with ``smart-mix-v3`` (SM3-D3). ``plan_transition`` is v2.
+
+    The genre priors (``genre_beatmatch_prior`` of each track) gate the stems layer
+    to the beatmatch family (STEM-G1); unknown keeps it off."""
     # The candidate generator builds on this module's v2 helpers.
     from crate.smart_mix.candidates import plan_transition_candidates
 
@@ -741,6 +746,8 @@ def plan_transition_v3(
         policy,
         outgoing_track_entity_uid=outgoing_track_entity_uid,
         incoming_track_entity_uid=incoming_track_entity_uid,
+        outgoing_genre_prior=outgoing_genre_prior,
+        incoming_genre_prior=incoming_genre_prior,
     )
     return PlannedTransition(
         plan=candidates[0].to_plan(),

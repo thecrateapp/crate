@@ -4,6 +4,10 @@ smart-mix-v3 reads the stem analyses of the batch's tracks once, keys each plan 
 analyses that apply to both tracks of its edge, and attaches the stems layer to the
 profiles it plans with. ``stemsUsed`` appears only when the layer scored a plan, so v3
 plans without stems and every smart-mix-v2 plan keep their shape.
+
+Since STEM-G1 (rules revision 3) the layer scores only edges of the beatmatch family:
+the batch reads the album genres of the tracks of edges with stems on both, once, and
+both tracks' genre beatmatch priors must be at least 0.5.
 """
 
 from __future__ import annotations
@@ -25,7 +29,7 @@ OUTGOING_UID = "33333333-3333-4333-8333-333333333333"
 INCOMING_UID = "44444444-4444-4444-8444-444444444444"
 REVISIONS = {OUTGOING_UID: "a" * 64, INCOMING_UID: "b" * 64}
 # The tie of test_candidates_stems: from the outgoing outro into the incoming intro or
-# its build. YAMNet hears voice on the build; the vocal stem on the intro.
+# its build. YAMNet hears no voice on either; the vocal stem hears it on the intro.
 OUT_LAYOUT = (
     ("intro", 16, 0.5),
     ("peak", 32, 0.8),
@@ -43,8 +47,10 @@ IN_LAYOUT = (
 )
 YAMNET = {
     OUTGOING_UID: (20, 160, 20, 160, 170),
-    INCOMING_UID: (20, 170, 160, 20, 160, 10),
+    INCOMING_UID: (20, 20, 160, 20, 160, 10),
 }
+TECHNO = {"techno": 1.0}
+IN_FAMILY = {OUTGOING_UID: 0.95, INCOMING_UID: 0.95}
 STEM_VOCALS = {OUTGOING_UID: {1, 3, 4}, INCOMING_UID: {0, 2, 4}}
 
 
@@ -119,7 +125,14 @@ def _edge(planner_context: dict | None = None) -> dict:
 @pytest.fixture
 def batch(test_app, monkeypatch):
     """The plan batch over fake reads: profiles, stem analyses and the plan cache."""
-    state = {"analyses": {}, "reads": [], "stem_reads": [], "plans": {}}
+    state = {
+        "analyses": {},
+        "reads": [],
+        "stem_reads": [],
+        "plans": {},
+        "genres": {uid: TECHNO for uid in REVISIONS},
+        "genre_reads": [],
+    }
     tracks = _profiles()
 
     def profiles(entity_uids, **kwargs):
@@ -136,6 +149,14 @@ def batch(test_app, monkeypatch):
 
     monkeypatch.setattr(smart_mix, "get_track_mix_profiles_by_entity_uids", profiles)
     monkeypatch.setattr(smart_mix, "get_stem_analyses_by_entity_uids", analyses)
+
+    def genres(entity_uids):
+        state["genre_reads"].append(list(entity_uids))
+        return {
+            uid: state["genres"][uid] for uid in entity_uids if uid in state["genres"]
+        }
+
+    monkeypatch.setattr(smart_mix, "get_track_album_genres", genres)
     monkeypatch.setattr(
         smart_mix,
         "get_smart_mix_plan_caches",
@@ -239,7 +260,9 @@ def test_the_cache_key_carries_stems_only_when_both_tracks_have_them() -> None:
     other = {**both, INCOMING_UID: _analysis(INCOMING_UID, level=200)}
 
     def key(policy, stems=None) -> str:
-        return smart_mix._plan_cache_key(edge, outgoing, incoming, policy, stems=stems)
+        return smart_mix._plan_cache_key(
+            edge, outgoing, incoming, policy, stems=stems, genre_priors=IN_FAMILY
+        )
 
     assert key(PLANNER_POLICY_V3, one) == key(PLANNER_POLICY_V3)
     assert key(PLANNER_POLICY_V3, both) != key(PLANNER_POLICY_V3)
@@ -259,7 +282,80 @@ def test_v2_never_reads_stems_and_keeps_its_cache_key(batch) -> None:
     plan = batch["post"]("smart-mix-v2")
 
     assert batch["stem_reads"] == []
+    assert batch["genre_reads"] == []
     assert "stemsUsed" not in plan and "structureUsed" not in plan
     assert smart_mix._plan_cache_key(
         edge, outgoing, incoming, PLANNER_POLICY, stems=both
     ) == smart_mix._plan_cache_key(edge, outgoing, incoming, PLANNER_POLICY)
+
+
+# --- the mix-type gate (STEM-G1) -----------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "genres",
+    [
+        {OUTGOING_UID: TECHNO, INCOMING_UID: {"rock": 1.0}},
+        {OUTGOING_UID: {"punk": 0.6, "hardcore": 0.4}, INCOMING_UID: TECHNO},
+        {OUTGOING_UID: TECHNO},
+        {},
+    ],
+    ids=["rock", "punk", "unknown", "none"],
+)
+def test_outside_the_beatmatch_family_the_plan_ignores_stems(batch, genres) -> None:
+    plain = batch["post"]()
+    batch["plans"].clear()
+    batch["analyses"] = {uid: [_analysis(uid)] for uid in REVISIONS}
+    batch["genres"] = genres
+
+    gated = batch["post"]()
+
+    assert gated == plain
+    assert "stemsUsed" not in gated
+    assert batch["genre_reads"] == [[OUTGOING_UID, INCOMING_UID]]
+
+
+def test_in_the_family_the_stems_layer_scores_the_plan(batch) -> None:
+    batch["analyses"] = {uid: [_analysis(uid)] for uid in REVISIONS}
+    batch["genres"] = {
+        OUTGOING_UID: {"house": 0.7, "disco": 0.3},
+        INCOMING_UID: {"drum and bass": 1.0},
+    }
+
+    plan = batch["post"]()
+
+    assert plan["stemsUsed"] is True
+    assert plan["incomingCueMs"] == _incoming_phrase_starts()[1]
+
+
+def test_genres_are_read_only_for_edges_with_stems_on_both_tracks(batch) -> None:
+    batch["post"]()
+    batch["plans"].clear()
+    batch["analyses"] = {OUTGOING_UID: [_analysis(OUTGOING_UID)]}
+    batch["post"]()
+
+    assert batch["genre_reads"] == []
+
+
+def test_the_cache_key_follows_the_gate() -> None:
+    edge = TransitionEdgeRequest.model_validate(_edge())
+    tracks = _profiles()
+    outgoing, incoming = tracks[OUTGOING_UID], tracks[INCOMING_UID]
+    both = {uid: _analysis(uid) for uid in REVISIONS}
+
+    def key(priors=None, stems=None) -> str:
+        return smart_mix._plan_cache_key(
+            edge,
+            outgoing,
+            incoming,
+            PLANNER_POLICY_V3,
+            stems=stems,
+            genre_priors=priors,
+        )
+
+    rock = {OUTGOING_UID: 0.95, INCOMING_UID: 0.15}
+    # Outside the family the key is the key without stems, as the plan is.
+    assert key(rock, both) == key() == key(None, both)
+    assert key(IN_FAMILY, both) != key()
+    # A track whose genre moves into the family changes the key.
+    assert key(rock, both) != key(IN_FAMILY, both)

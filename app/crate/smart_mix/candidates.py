@@ -44,10 +44,13 @@ phrase has voice from ``VOCAL_THRESHOLD``). Candidates are ranked on that score
 before it is clamped to [0, 1]; ties keep the later outgoing phrase, the earlier
 incoming phrase, the longer mix, the bass handoff and v2's curve.
 
-With ``policy.stems_layer`` and a stems layer on both profiles (Smart Mix Stems,
-STEM-D5), on the phrase menu:
+With ``policy.stems_layer``, a stems layer on both profiles (Smart Mix Stems,
+STEM-D5) and an edge of the beatmatch family (``stems_layer_applies``: both tracks'
+genre beatmatch priors known and at least ``policy.stems_layer_min_genre_prior``,
+STEM-G1), on the phrase menu:
 
-- the vocal penalty counts the phrases the vocal stem has, instead of YAMNet's;
+- the vocal penalty counts the phrases where the vocal stem or YAMNet's stored byte
+  hears voice (rules revision 3; the stem alone without YAMNet's bytes);
 - the bass component is one minus the share of the mix with both basses at full
   level (crossfade and bass handoff) while both phrases have a bassline, so a mix
   where one side has none scores like a handoff;
@@ -56,8 +59,9 @@ STEM-D5), on the phrase menu:
 - ``weights.vocal_free_exit`` times the share of the mix where the outgoing plays a
   phrase without vocals is added.
 
-The terms go in ``CandidateScore.stems``. Without stems on both tracks, every
-candidate and score is the one of rules revision 1.
+Vocals in the last two terms follow the same either-detector rule. The terms go in
+``CandidateScore.stems``. Without stems on both tracks, or outside the beatmatch
+family, every candidate and score is the one of rules revision 1.
 
 Without phrases on both tracks (profiles before v7, tracks the analyzer could not
 segment, segmentations under ``minimum_structure_confidence``) the menu is the bar
@@ -154,7 +158,7 @@ class _Timeline:
     skip_lengths: tuple[float, ...]
     cut_suffix: tuple[float, ...]
     skip_prefix: tuple[float, ...]
-    # Only with policy.stems_layer and a stems layer on the profile.
+    # Only when the stems layer applies to the edge and the profile carries one.
     stems: _StemSpans | None = None
 
     def is_boundary(self, position_ms: float) -> bool:
@@ -269,8 +273,13 @@ def plan_transition_candidates(
     *,
     outgoing_track_entity_uid: str | None = None,
     incoming_track_entity_uid: str | None = None,
+    outgoing_genre_prior: float | None = None,
+    incoming_genre_prior: float | None = None,
 ) -> list[TransitionCandidate]:
-    """The candidate menu of one edge, best first (see the module docstring)."""
+    """The candidate menu of one edge, best first (see the module docstring).
+
+    The genre priors are each track's ``genre_beatmatch_prior``; unknown keeps the
+    stems layer off (STEM-G1)."""
     baseline = plan_transition(
         outgoing,
         incoming,
@@ -288,8 +297,9 @@ def plan_transition_candidates(
     ):
         return [_single(baseline, policy)]
     edge = _edge(outgoing, incoming, context, policy, baseline)
-    outgoing_phrases = _timeline(outgoing, policy)
-    incoming_phrases = _timeline(incoming, policy)
+    stems = stems_layer_applies(policy, outgoing_genre_prior, incoming_genre_prior)
+    outgoing_phrases = _timeline(outgoing, policy, stems=stems)
+    incoming_phrases = _timeline(incoming, policy, stems=stems)
     if outgoing_phrases is not None and incoming_phrases is not None:
         options = _phrase_options(edge, outgoing_phrases, incoming_phrases)
         if options:
@@ -374,7 +384,27 @@ def recompose_candidate(
 # --- phrases ---------------------------------------------------------------
 
 
-def _timeline(profile: TrackMixProfile, policy: PlannerPolicy) -> _Timeline | None:
+def stems_layer_applies(
+    policy: PlannerPolicy,
+    outgoing_genre_prior: float | None,
+    incoming_genre_prior: float | None,
+) -> bool:
+    """Whether the stems layer scores an edge (STEM-G1): the policy has it and both
+    tracks belong to the beatmatch family, their genre beatmatch priors known and at
+    least ``policy.stems_layer_min_genre_prior``. Rock, metal and punk (0.1-0.15) and
+    tracks without a known genre stay on rules revision 1's menu."""
+    if not policy.stems_layer:
+        return False
+    floor = policy.stems_layer_min_genre_prior
+    return all(
+        prior is not None and prior >= floor
+        for prior in (outgoing_genre_prior, incoming_genre_prior)
+    )
+
+
+def _timeline(
+    profile: TrackMixProfile, policy: PlannerPolicy, *, stems: bool = False
+) -> _Timeline | None:
     phrases = profile.phrases
     if not phrases or not profile.bpm:
         return None
@@ -408,13 +438,18 @@ def _timeline(profile: TrackMixProfile, policy: PlannerPolicy) -> _Timeline | No
     for index, length in enumerate(skip_lengths):
         skip_prefix[index + 1] = skip_prefix[index] + length
     voices = profile.vocal_presence
+    voiced = (
+        tuple(value >= VOCAL_THRESHOLD for value in voices)
+        if voices is not None and len(voices) == len(phrases)
+        else None
+    )
     voiced_spans = (
         tuple(
             (start, end)
-            for start, end, value in zip(starts, ends, voices, strict=True)
-            if value >= VOCAL_THRESHOLD
+            for start, end, flag in zip(starts, ends, voiced, strict=True)
+            if flag
         )
-        if voices is not None and len(voices) == len(phrases)
+        if voiced is not None
         else None
     )
     return _Timeline(
@@ -429,27 +464,38 @@ def _timeline(profile: TrackMixProfile, policy: PlannerPolicy) -> _Timeline | No
         cut_suffix=tuple(cut_suffix),
         skip_prefix=tuple(skip_prefix),
         stems=(
-            _stem_spans(profile.stems, starts, ends)
-            if policy.stems_layer and profile.stems is not None
+            _stem_spans(profile.stems, starts, ends, voiced)
+            if stems and profile.stems is not None
             else None
         ),
     )
 
 
 def _stem_spans(
-    layer: StemsLayer, starts: tuple[float, ...], ends: tuple[float, ...]
+    layer: StemsLayer,
+    starts: tuple[float, ...],
+    ends: tuple[float, ...],
+    yamnet_voiced: tuple[bool, ...] | None,
 ) -> _StemSpans:
-    """The layer's presence on the phrases' own spans (the ones every term uses)."""
-    entries = list(zip(starts, ends, layer.phrases, strict=True))
+    """The layer's presence on the phrases' own spans (the ones every term uses).
+
+    A phrase has voice when the vocal stem or YAMNet's stored byte says so (rules
+    revision 3): the stem misses about half the voice YAMNet hears where they
+    disagree (ST3 report, held-out lyrics labels)."""
+    heard = yamnet_voiced or (False,) * len(layer.phrases)
+    entries = [
+        (a, b, stem, stem.vocal_present or yamnet)
+        for a, b, stem, yamnet in zip(starts, ends, layer.phrases, heard, strict=True)
+    ]
     return _StemSpans(
-        vocals=tuple((a, b) for a, b, stem in entries if stem.vocal_present),
-        bass=tuple((a, b) for a, b, stem in entries if stem.bass_present),
+        vocals=tuple((a, b) for a, b, _, voice in entries if voice),
+        bass=tuple((a, b) for a, b, stem, _ in entries if stem.bass_present),
         drums_only=tuple(
             (a, b)
-            for a, b, stem in entries
-            if stem.drums_present and not stem.bass_present and not stem.vocal_present
+            for a, b, stem, voice in entries
+            if stem.drums_present and not stem.bass_present and not voice
         ),
-        vocal_free=tuple((a, b) for a, b, stem in entries if not stem.vocal_present),
+        vocal_free=tuple((a, b) for a, b, _, voice in entries if not voice),
     )
 
 
@@ -1329,4 +1375,8 @@ def _is_short_cut(plan: TransitionPlan, policy: PlannerPolicy) -> bool:
     )
 
 
-__all__ = ["plan_transition_candidates", "recompose_candidate"]
+__all__ = [
+    "plan_transition_candidates",
+    "recompose_candidate",
+    "stems_layer_applies",
+]
