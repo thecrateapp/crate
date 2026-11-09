@@ -285,6 +285,12 @@ Icons draw at 1em and take their size through font-size, so caller `size-*` clas
 Six glyphs differ from the previous release: Share, ArchiveDown (Bold), VolumeCross,
 HamburgerMenu, Ticket and MagicStick (now Solar Magic Wand).
 
+Layers icon (2026-11-09): `Layers` is the Solar Layers Minimalistic Outline. Stems are layers
+of a track, so it marks Smart Mix playlists in Listen (chip and menu toggle) and the stems of a
+track; the Icons story renders it beside Bot, ArrowLeft and Play. The same change adds the
+`.crate-info-badge[data-variant="icon"]` recipe to `recipes.css`: a 24 px circle without padding
+for InfoBadge's icon-only variant (see InfoBadge).
+
 Empty states (2026-10-26): `crate-empty-state` centres its content (items and text) with 24px inline
 padding inside any container, and keeps its 32px block padding and 160px minimum. The recipe is
 unlayered, so caller `py-*`, `min-h-*` or alignment utilities have no effect.

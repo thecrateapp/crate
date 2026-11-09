@@ -332,6 +332,11 @@ function ContextMenuMediaHeaderView({
             {header.subtitle}
           </div>
         ) : null}
+        {header.status ? (
+          <MonoLabel as="span" tone="accent" className="mt-1 block">
+            {header.status}
+          </MonoLabel>
+        ) : null}
         {header.detail ? (
           <div className="truncate text-xs text-text-primary/55">
             {header.detail}
