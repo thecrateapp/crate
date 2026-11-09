@@ -1627,6 +1627,13 @@ the blind listening test.
   (the development library's spike tracks) with itself.
 - `music_left_out` reports the outgoing music after the mix and the incoming music before it,
   without a target: v3 often ends the mix at a phrase boundary before the outgoing music ends.
+- Stems (ST3): `separate_pool.py` separates a pool of local files with the server's own
+  separation code (CPU, or the same graph on ONNX Runtime CUDA) and writes one
+  `stem-analysis/1` per track; `run_eval.py --stems` attaches their layer to the profiles and
+  reports the stem vocal and bass clashes, `--planner smart-mix-v3-nostems` plans the same
+  profiles without the layer; `calibrate_stems.py` calibrates the presence cuts; and
+  `listen_metrics.py` adds `bassOnBassMs`, low end on both decks at full level in the rendered
+  audio.
 
 The analyzer's structure is measured apart, on audio files rather than plans:
 `tools/smart-mix-eval/structure/` scores beats, downbeats and phrases against All-In-One
