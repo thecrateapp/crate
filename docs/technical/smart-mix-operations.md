@@ -712,11 +712,12 @@ Runtime CPU (STEM-D3). There is no PyTorch in the separation. The code is
 - **The graph in the image.** The analysis image downloads `htdemucs-onnx-1.onnx`
   (174 MB) at build time from the Crate Decks release asset
   `models-htdemucs-onnx-1/htdemucs-onnx-1.onnx` and checks its SHA-256
-  (`808790c0…6d08`), like the Beat This! checkpoint; the worker never downloads it. It
+  (`808790c0…6a08`), like the Beat This! checkpoint; the worker never downloads it. It
   lands in `/app/models` with `htdemucs-onnx-1.NOTICE`, the attribution and the note on
-  the training data (design section 7). **That release asset does not exist yet: it must
-  be published before any image builds from the default.** Until then, and for local
-  and dev builds, the file comes from a named build context with the same check:
+  the training data (design section 7). The release asset is published in
+  `thecrateapp/crate-decks` (release `models-htdemucs-onnx-1`); an image cannot build from
+  the default without it. Local and dev builds can take the file from a named build
+  context instead, with the same check:
 
   ```bash
   docker build --target worker-analysis --build-arg PANNS=on \
