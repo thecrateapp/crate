@@ -72,11 +72,18 @@ class PresenceCut:
     drop: int
 
 
-# Provisional, until ST3 calibrates them: a floor of -40 dBFS and a drop of 12 dB.
+# Calibrated in ST3 (tools/smart-mix-eval/calibrate_stems.py) on the SM5 electronic and
+# phrase sets and 97 tracks of the SG1b lyrics set:
+# - vocals: -45 dBFS and 18 dB, against the lyrics labels (balanced accuracy 0.82 on
+#   folds by track, YAMNet's byte 0.74 on the same phrases); the highest floor within
+#   0.01 of the best fit, since the labels hardly hold instrumentals;
+# - bass and drums have no labels: -40 dBFS, and the median over a track bootstrap of
+#   the valley in the level below the loudest phrase, 17 dB for bass (an unstable
+#   valley) and 14 dB for drums (the same valley in every set).
 STEM_PRESENCE_CUTS = {
-    "vocals": PresenceCut(floor=85, drop=51),
-    "bass": PresenceCut(floor=85, drop=51),
-    "drums": PresenceCut(floor=85, drop=51),
+    "vocals": PresenceCut(floor=64, drop=76),
+    "bass": PresenceCut(floor=85, drop=72),
+    "drums": PresenceCut(floor=85, drop=60),
 }
 # Upper bounds for untrusted uploads; a track longer than a day is not a track.
 MAX_DURATION_MS = 86_400_000

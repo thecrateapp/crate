@@ -589,7 +589,12 @@ D4 and §5); the format and the layer live in `crate/smart_mix/stems.py`.
   track's loudest phrase of that stem (`STEM_PRESENCE_CUTS` in `crate/smart_mix/stems.py`,
   4.25 bytes per dB). The floor rejects separation leakage in tracks without the stem; the
   drop follows the level each track mixes the stem at, which the absolute -35 dB cut of the
-  ST0 spike could not. The cuts are provisional (-40 dBFS and 12 dB for every stem) until the ST3 evaluation calibrates them. The vocal
+  ST0 spike could not. ST3 calibrated them (`tools/smart-mix-eval/calibrate_stems.py`): vocals
+  -45 dBFS and 18 dB against the SG1b lyrics labels (balanced accuracy 0.82 on folds by
+  track, YAMNet's byte 0.74 on the same phrases); bass -40 dBFS and 17 dB, drums -40 dBFS and
+  14 dB, from the valley of each phrase's level below its track's loudest phrase, which has no
+  labels to check it against (the evaluation report in the Crate Decks repository,
+  `docs/plans/2026-11-09-smart-mix-stems-evaluation.md`, has the figures). The vocal
   presence is detector `stem-vocals-1` (`vocalDetector`), which replaces YAMNet's voice where
   both tracks of an edge have a layer (STEM-D4). Changing a cut changes plans: it bumps
   `PLANNER_POLICY_V3.rules_revision`.
