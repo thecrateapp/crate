@@ -679,6 +679,16 @@ def _replaces_current_profile(
         and draft.beat_tracker is None
     ):
         return False
+    # The other way round, the model's beats replace the analyzer's own for the same
+    # file whatever the quality: the backfill's upgrade of a new import or a library
+    # reanalysis would otherwise fail on every track its own tracker rated higher.
+    if (
+        current.source_revision == source_revision
+        and current.beat_tracker is None
+        and draft.beat_tracker is not None
+        and draft.quality != MixProfileQuality.UNAVAILABLE
+    ):
+        return True
     if (
         current.profile_version != PROFILE_SCHEMA_VERSION
         or current.source_revision != source_revision

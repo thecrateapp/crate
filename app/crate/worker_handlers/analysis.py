@@ -1478,6 +1478,12 @@ def _smart_mix_beats(
     return beats
 
 
+def _beat_model_available() -> bool:
+    from crate.smart_mix import beat_model
+
+    return beat_model.beat_model_available()
+
+
 def _stored_voice(signals: TrackMixSignals | None):
     """The voice windows stored for this file, whatever their detector, or None."""
     from crate.smart_mix.vocals import VoiceWindowBytes
@@ -1572,6 +1578,9 @@ def _handle_backfill_smart_mix_profiles(
         max_attempts=max_attempts,
         claimed_by=f"task:{task_id}",
         promote_python_profiles=is_available() and has_subcommands(),
+        # Profiles at the target on the analyzer's own beats (new imports, library
+        # reanalyses) get Beat This!'s when this worker can run it.
+        upgrade_own_tracker=_beat_model_available(),
     )
     queued = 0
     released: list[int] = []

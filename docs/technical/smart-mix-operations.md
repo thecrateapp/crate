@@ -1045,13 +1045,13 @@ profile. A task that finishes without publishing does not account for a new prof
 `quality` accepts `full`, `partial`, `legacy` and `unavailable`. The Admin track table also
 exposes this profile status, in the implemented order of precedence:
 
-| Profile status   | Meaning                                                             |
-| ---------------- | ------------------------------------------------------------------- |
-| `missing`        | The track has no profile row                                        |
-| `unavailable`    | A profile exists and its quality is `unavailable`                   |
-| `source_changed` | Profile flagged by a source change                                  |
-| `outdated`       | Analyzer or schema version differs from the target                  |
-| `current`        | Profile not flagged stale, with current versions and usable quality |
+| Profile status   | Meaning                                                                                                                                                                             |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `missing`        | The track has no profile row                                                                                                                                                        |
+| `unavailable`    | A profile exists and its quality is `unavailable`                                                                                                                                   |
+| `source_changed` | Profile flagged by a source change                                                                                                                                                  |
+| `outdated`       | Analyzer or schema version differs from the target, or the profile is at the target but on the analyzer's own beats (no `beat_tracker`) on a track Beat This! runs on (up to 600 s) |
+| `current`        | Profile not flagged stale, with current versions and usable quality, on Beat This!'s beats or on a track over 600 s                                                                 |
 
 `failed` is a filter on `processingState`, not a sixth profile status. A track can keep a
 usable profile and still record a failed processing attempt. Read `processingAttempts`,
@@ -1125,8 +1125,16 @@ and whether it is a Python promotion:
   and schema, quality, `target_generation`, attempts, claims in flight, quarantined albums),
   under `FOR UPDATE SKIP LOCKED`, and leaves the ranking once claimed. A row that is no longer
   claimable, for example because a manual reanalysis wrote a current profile, is skipped.
+- **Own-tracker profiles at the target.** Since `smart-mix-audio-v10`, when the coordinator's
+  worker can run Beat This! (torch, `beat_this`, madmom and the weights installed), a profile at
+  the target analyzer and schema without a `beat_tracker` is claimable too, on tracks of 600 s or
+  less. The analysis daemon writes such profiles for new imports and library reanalyses
+  (`crate-cli analyze` runs without the model); the claim gives them Beat This!'s beats. They
+  take the same tiers and order as every other claimable track, and the same retry budget: a
+  file Beat This! fails on is claimed once per pass, up to `maxAttempts`, then counted as
+  `exhausted`. A model draft replaces the own-tracker profile whatever its quality.
 - **Refresh.** The ranking is rebuilt when its inputs change (analyzer version, schema,
-  `maxAttempts` or Python promotion), when it is older than 10 minutes and when it cannot fill a
+  `maxAttempts`, Python promotion or own-tracker upgrades), when it is older than 10 minutes and when it cannot fill a
   pass. Because of the last rule, a pass that claims nothing, which completes the campaign if
   nothing is in flight, always comes from a fresh ranking.
 - **What waits for the next ranking.** A track that becomes claimable between rankings (a failed
@@ -1245,26 +1253,34 @@ without claiming.
 2. **Start the campaign** with **Start backfill** (batch size 25, 3 attempts) or
    `POST /api/admin/smart-mix/backfill`. It opens a v10 campaign whose `sequence`
    continues the v9 one; the night window settings carry over.
-3. **What each row costs.**
-   - **Rewritten by v9, four beats to the bar:** about 97.5 % of them. The stored
-     beats stay valid, so only decoding, `crate-cli` (about 2 s of CPU) and the phrase
-     voice from the stored bytes run, as for the v8 rows under v9 (about 31 tracks a
-     minute by day with four in flight).
-   - **Rewritten by v9, three beats to the bar:** about 2.5 %. Their stored beats
+3. **What the campaign claims.** Every profile not at v10 (the v9, v8, v7, v6 and v5
+   ones, `unavailable` and source-changed ones, tracks without a profile) and, with
+   Beat This! available in the analysis worker, every v10 profile on the analyzer's own
+   beats of a track up to 600 s: new imports and library reanalyses during the campaign.
+   On 2026-11-09 production held no v9 profile without model beats under 600 s (74 over
+   it), so that class starts empty and grows only with imports and reanalyses.
+4. **What each row costs.**
+   - **Rewritten by v9, four beats to the bar:** about 95.6 % of them in production
+     (11,732 of the 12,278 stored signals on 2026-11-09). The stored beats stay valid,
+     so only decoding, `crate-cli` (about 2 s of CPU) and the phrase voice from the
+     stored bytes run, as for the v8 rows under v9 (about 31-41 tracks a minute by day
+     with four in flight).
+   - **Rewritten by v9, three beats to the bar:** about 4.4 % (537). Their stored beats
      predate the arbiter, so Beat This! runs again (15-25 s) and madmom's network after
      it (50-60 s).
    - **Not yet reached by v9** (v5 and v6 profiles): a whole profile, as under v9, plus
-     the arbiter on the 2.5 % that the DBN hears in three.
-   - In all, v10 adds about 4 s of CPU per row v9 has already rewritten, and about
-     2 s per row it has not, over what v9 would have cost.
-4. **Library reanalyses during the campaign.** A reanalysis of BPM, key and loudness
-   (Admin, or the `.m4a` one of the v9 runbook) never replaces a profile with Beat This!'s
-   beats by its own-tracker draft, of any version: the track keeps its v9 profile, and the
-   campaign still claims and recomputes it. A track whose profile has no model beats
-   (v5, v6, or v8 `.m4a`) still takes the reanalysis' own-tracker v10 profile, which the
-   campaign then counts as current and never recomputes with Beat This!: recompute its
-   Smart Mix profile first (**Reanalyze track**).
-5. **Watch, pause, resume, cancel and close it** as for v9 below. Once it has finished,
+     the arbiter on the 4.4 % that the DBN hears in three.
+   - **Own-tracker v10 profiles:** a whole profile each, which the campaign would have
+     paid for the same track anyway if the reanalysis had not come first.
+   - In all, v10 adds about 5 s of CPU per row v9 has already rewritten, and about
+     2.5 s per row it has not, over what v9 would have cost.
+5. **Library reanalyses during the campaign are safe.** A reanalysis of BPM, key and
+   loudness (Admin, or the `.m4a` one of the v9 runbook) never replaces a profile with
+   Beat This!'s beats by its own-tracker draft, of any version: the track keeps its v9
+   profile, and the campaign claims and recomputes it. A track whose profile has no
+   model beats (v5, v6, or v8 `.m4a`) takes the reanalysis' own-tracker v10 profile, and
+   the campaign then upgrades it with Beat This!.
+6. **Watch, pause, resume, cancel and close it** as for v9 below. Once it has finished,
    a later release can drop v9 and older versions from `READABLE_ANALYZER_VERSIONS`.
 
 ### Running the v9 backfill
@@ -1324,11 +1340,12 @@ The queues do not change: the coordinator and each analysis run on `heavy`.
    finished, a later release can drop v8, v7, v6 and v5 from `READABLE_ANALYZER_VERSIONS`.
 8. **The library analysis of the `.m4a`.** The v9 profiles fix the Smart Mix side only. The
    BPM, key, loudness and mood the library analysis stored for the AAC `.m4a` came from the
-   same slowed audio; their reanalysis runs apart, on the library analysis tasks, once
-   the track's profile carries Beat This!'s beats. The library analysis would otherwise
-   publish its own current profile first, and the backfill would never claim the track.
-   From v10 on, a profile with the model's beats of any version (v9 or v10) is enough;
-   before, it had to be of the current version.
+   same slowed audio; their reanalysis runs apart, on the library analysis tasks. Under
+   v9 it had to wait until the track's profile carried Beat This!'s beats: the library
+   analysis would otherwise publish its own current profile first, and the backfill would
+   never claim the track. From v10 on it can run first on every `.m4a`: a profile with
+   the model's beats keeps them, and a profile without them takes the own-tracker v10
+   draft, which the running campaign upgrades with Beat This!.
 
 ### Running the v8 backfill
 

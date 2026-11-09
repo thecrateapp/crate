@@ -37,10 +37,12 @@ from typing import Any, Protocol
 
 import numpy as np
 
+from crate.smart_mix.versions import MODEL_BEATS_MAX_SECONDS
+
 log = logging.getLogger(__name__)
 
 # A DJ set or a long live recording would cost minutes of CPU per track.
-BEAT_MODEL_MAX_SECONDS = 600
+BEAT_MODEL_MAX_SECONDS = MODEL_BEATS_MAX_SECONDS
 MODEL_SAMPLE_RATE = 22_050
 CHECKPOINT_ENV = "CRATE_BEAT_THIS_CHECKPOINT"
 WEIGHTS_ENV = "CRATE_BEAT_THIS_WEIGHTS"
@@ -327,6 +329,14 @@ def load_beat_model() -> BeatModel | None:
         return None
 
 
+def beat_model_available() -> bool:
+    """Whether this process could run Beat This!: torch, ``beat_this``, madmom and the
+    weights are installed. Nothing is imported or loaded."""
+    return all(_installed(module) for module in ("torch", *_MODEL_MODULES)) and (
+        weights_path().is_file()
+    )
+
+
 def _installed(module: str) -> bool:
     """Whether ``module`` can be imported, without importing it."""
     try:
@@ -582,6 +592,7 @@ __all__ = [
     "BeatModel",
     "BeatThisModel",
     "BeatTrack",
+    "beat_model_available",
     "beat_tracker_name",
     "beats_per_bar_from_downbeats",
     "checkpoint_name",

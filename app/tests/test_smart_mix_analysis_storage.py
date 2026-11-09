@@ -504,6 +504,35 @@ def test_model_draft_of_a_newer_version_replaces_older_model_beats(
     )
 
 
+def test_model_draft_replaces_own_tracker_beats_of_the_same_version_rated_higher(
+    pg_db, tmp_path: Path
+) -> None:
+    # The backfill's upgrade of an own-tracker profile: Beat This!'s beats win over
+    # the analyzer's own whatever the quality, as the other way round they never lose.
+    del pg_db
+    path = tmp_path / "upgrade.flac"
+    path.write_bytes(b"upgrade-source")
+    track_id, _track_uid = _create_track(path)
+    own_full = replace(
+        _model_profile(ANALYZER_VERSION),
+        quality=MixProfileQuality.FULL,
+        beat_tracker=None,
+    )
+    model_partial = replace(
+        own_full, quality=MixProfileQuality.PARTIAL, beat_tracker="beat-this-small0-dbn"
+    )
+
+    assert store_smart_mix_profile_result(track_id, path, own_full) is True
+    assert store_smart_mix_profile_result(track_id, path, model_partial) is True
+
+    profile = get_track_mix_profile(track_id, include_structure=True)
+    assert profile is not None
+    assert (profile.beat_tracker, profile.quality) == (
+        "beat-this-small0-dbn",
+        MixProfileQuality.PARTIAL,
+    )
+
+
 def test_a_changed_file_still_takes_a_draft_without_tracker(
     pg_db, tmp_path: Path
 ) -> None:

@@ -6,7 +6,11 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from crate.db.tx import read_scope
-from crate.smart_mix.versions import ANALYZER_VERSION, PROFILE_SCHEMA_VERSION
+from crate.smart_mix.versions import (
+    ANALYZER_VERSION,
+    MODEL_BEATS_MAX_SECONDS,
+    PROFILE_SCHEMA_VERSION,
+)
 
 
 SMART_MIX_ANALYZER_VERSION = ANALYZER_VERSION
@@ -21,22 +25,32 @@ SMART_MIX_TRACK_STATUSES = (
     "missing",
     "failed",
 )
+# At the target but on the analyzer's own beats, within the length Beat This! runs
+# on: the backfill still owes the track the model's beats, so it is outdated.
+_AWAITS_MODEL_BEATS = """
+    (
+        profile.beat_tracker IS NULL
+        AND COALESCE(track.duration, 0) <= :model_beats_max_seconds
+    )
+"""
 _STATUS_PREDICATES = {
     "all": "TRUE",
-    "current": """
+    "current": f"""
         profile.track_id IS NOT NULL
         AND profile.quality <> 'unavailable'
         AND profile.profile_version = :profile_version
         AND profile.analyzer_version = :analyzer_version
         AND profile.source_stale_at IS NULL
+        AND NOT {_AWAITS_MODEL_BEATS}
     """,
-    "outdated": """
+    "outdated": f"""
         profile.track_id IS NOT NULL
         AND profile.quality <> 'unavailable'
         AND profile.source_stale_at IS NULL
         AND (
             profile.profile_version <> :profile_version
             OR profile.analyzer_version <> :analyzer_version
+            OR {_AWAITS_MODEL_BEATS}
         )
     """,
     "source_changed": """
@@ -66,6 +80,7 @@ def list_smart_mix_tracks(
         "analyzer_version": SMART_MIX_ANALYZER_VERSION,
         "pipeline": SMART_MIX_PIPELINE,
         "limit": int(limit),
+        "model_beats_max_seconds": MODEL_BEATS_MAX_SECONDS,
     }
     predicates = [_STATUS_PREDICATES[status]]
     if before_track_id is not None:
@@ -104,6 +119,8 @@ def list_smart_mix_tracks(
                         profile.outro_bpm,
                         profile.analyzed_at,
                         profile.source_stale_at,
+                        profile.beat_tracker,
+                        track.duration,
                         processing.state AS processing_state,
                         processing.attempts AS processing_attempts,
                         processing.last_error AS processing_error
@@ -142,10 +159,19 @@ def _track_status(row: dict) -> dict:
     elif (
         row["analyzer_version"] != SMART_MIX_ANALYZER_VERSION
         or row["profile_version"] != SMART_MIX_PROFILE_VERSION
+        or (
+            row.get("beat_tracker") is None
+            and (row.get("duration") or 0) <= MODEL_BEATS_MAX_SECONDS
+        )
     ):
         status = "outdated"
     else:
         status = "current"
+    row = {
+        key: value
+        for key, value in row.items()
+        if key not in ("beat_tracker", "duration")
+    }
     return {**row, "status": status}
 
 
