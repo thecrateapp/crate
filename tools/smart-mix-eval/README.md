@@ -313,9 +313,12 @@ The stems layer is evaluated on the same edge sets. Three tools add it:
 2. **Calibration.** `calibrate_stems.py --stems <folder> --labels labels.csv [--yamnet
 phrase_windows.csv] [--dataset <set>/dataset.jsonl --groups <set>/groups.tsv] --output
 out/<dir>` measures where the presence cuts go: vocals against the SG1b lyrics labels (5
-   folds by track, balanced accuracy, compared per genre with YAMNet's stored byte), bass and
-   drums from the distribution of each phrase's level below its track's loudest phrase and the
-   share of phrases marked present by phrase kind.
+   folds by track, balanced accuracy, compared per genre with YAMNet's stored byte), and each
+   vocal floor against YAMNet on the evaluation sets, since songs with synced lyrics are rarely
+   instrumental; bass and drums from the distribution of each phrase's level below its track's
+   loudest phrase (its valley and a two-component mixture cut, each with a bootstrap over
+   tracks and per set, both also tried on the labelled vocals) and the share of phrases marked
+   present by phrase kind.
 3. **Planning.** `run_eval.py --stems <folder> [--stems <folder>]` attaches the layer of
    those analyses to the profiles (by entity UID and duration within 2 %: the analysis was made
    from a local copy, so its source revision is that file's) and adds, per edge, `stemsUsed`
