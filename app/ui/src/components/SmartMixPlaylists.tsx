@@ -339,7 +339,7 @@ function StemSettingsForm({
             }
           />
         </FormField>
-        <div className="crate-form-field min-w-0">
+        <div data-slot="form-field" className="crate-form-field min-w-0">
           <MonoLabel as="span" id="smart-mix-stem-uploads">
             Crate Decks uploads
           </MonoLabel>
