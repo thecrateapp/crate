@@ -68,7 +68,12 @@ def test_decks_reads_stems_and_a_contributor_may_upload(
 
     features = _capabilities(test_app)["decks"]["features"]
 
-    assert features == ["stems", "stem_upload", "local_refinement"]
+    assert features == [
+        "library_cursor",
+        "stems",
+        "stem_upload",
+        "local_refinement",
+    ]
     assert uploads["reads"] == 1
 
 
@@ -79,6 +84,7 @@ def test_no_stem_upload_without_the_contribute_permission(
     _as_role(monkeypatch, role)
 
     assert _capabilities(test_app)["decks"]["features"] == [
+        "library_cursor",
         "stems",
         "local_refinement",
     ]
@@ -90,6 +96,7 @@ def test_no_stem_upload_while_uploads_are_off(test_app, uploads) -> None:
     uploads["enabled"] = False
 
     assert _capabilities(test_app)["decks"]["features"] == [
+        "library_cursor",
         "stems",
         "local_refinement",
     ]
@@ -99,6 +106,7 @@ def test_an_unreadable_setting_hides_stem_upload(test_app, uploads) -> None:
     uploads["enabled"] = RuntimeError("database unavailable")
 
     assert _capabilities(test_app)["decks"]["features"] == [
+        "library_cursor",
         "stems",
         "local_refinement",
     ]

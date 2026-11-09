@@ -5,7 +5,7 @@ _DECKS_CAPABILITIES = {
     "available": True,
     "min_client_version": "0.1.0",
     "contract_version": 1,
-    "features": ["stems", "stem_upload", "local_refinement"],
+    "features": ["library_cursor", "stems", "stem_upload", "local_refinement"],
 }
 
 
