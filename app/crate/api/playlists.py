@@ -57,6 +57,10 @@ from crate.db.repositories.playlists_collaboration import (
 )
 from crate.db.repositories.playlists_follows import follow_playlist, unfollow_playlist
 from crate.db.repositories.playlists_membership_reads import get_playlist_access
+from crate.api.smart_mix_playlists import (
+    SMART_MIX_LIMIT_RESPONSES,
+    smart_mix_limit_response,
+)
 from crate.db.repositories.smart_mix_playlists import (
     SmartMixPlaylistLimitError,
     attach_smart_mix_summaries,
@@ -75,12 +79,7 @@ _PLAYLIST_RESPONSES = merge_responses(
     },
 )
 _PLAYLIST_TRACKS_RESPONSES = merge_responses(
-    _PLAYLIST_RESPONSES,
-    {
-        409: error_response(
-            "A Smart Mix playlist would hold more tracks than the instance allows."
-        )
-    },
+    _PLAYLIST_RESPONSES, SMART_MIX_LIMIT_RESPONSES
 )
 
 _PLAYLIST_COVER_RESPONSES = merge_responses(
@@ -297,7 +296,7 @@ def add_tracks(request: Request, playlist_id: int, body: AddTracksRequest):
     try:
         added = add_playlist_tracks(playlist_id, tracks)
     except SmartMixPlaylistLimitError as error:
-        raise HTTPException(status_code=409, detail=str(error)) from None
+        return smart_mix_limit_response(error)
     return {"ok": True, "added": added}
 
 
@@ -372,7 +371,7 @@ def generate_smart(request: Request, playlist_id: int):
             target_count=target_count,
         )
     except SmartMixPlaylistLimitError as error:
-        raise HTTPException(status_code=409, detail=str(error)) from None
+        return smart_mix_limit_response(error)
 
     return {"ok": True, "track_count": track_count}
 

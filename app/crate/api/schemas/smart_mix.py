@@ -105,6 +105,8 @@ class SmartMixPlaylistsResponse(SmartMixApiModel):
 class SmartMixTrackStateResponse(SmartMixApiModel):
     track_id: int = Field(serialization_alias="trackId")
     track_entity_uid: str | None = Field(serialization_alias="trackEntityUid")
+    title: str | None = None
+    artist: str | None = None
     state: Literal["pending", "analyzing", "ready", "failed"] = Field(
         description=(
             "ready: a server stem analysis of the track's current file exists. "
@@ -113,6 +115,21 @@ class SmartMixTrackStateResponse(SmartMixApiModel):
         )
     )
     attempts: int = Field(ge=0)
+    started_at: datetime | None = Field(
+        default=None,
+        serialization_alias="startedAt",
+        description="When its latest separation started.",
+    )
+    finished_at: datetime | None = Field(
+        default=None,
+        serialization_alias="finishedAt",
+        description="When its latest separation ended.",
+    )
+    last_error: str | None = Field(
+        default=None,
+        serialization_alias="lastError",
+        description="Why the last attempt failed; only for library.analysis.manage.",
+    )
 
 
 class SmartMixPlaylistStateCounts(SmartMixApiModel):

@@ -10,13 +10,16 @@ playlist's per-track progress here. Playlist responses carry a ``smartMix`` summ
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 
 from crate.api.auth import _require_auth
 from crate.api.openapi_responses import (
     AUTH_ERROR_RESPONSES,
+    OpenApiResponses,
     error_response,
     merge_responses,
 )
+from crate.api.permissions import has_capability
 from crate.api.schemas.smart_mix import (
     SmartMixPlaylistResponse,
     SmartMixPlaylistsResponse,
@@ -25,6 +28,7 @@ from crate.api.schemas.smart_mix import (
     SmartMixPlaylistUpdateRequest,
     SmartMixTrackStateResponse,
 )
+from crate.api.schemas.smart_mix_stems import SmartMixLimitErrorResponse
 from crate.db.repositories.playlists_membership_reads import get_playlist_access
 from crate.db.repositories.smart_mix_playlists import (
     SmartMixPlaylistLimitError,
@@ -37,6 +41,29 @@ from crate.db.repositories.smart_mix_playlists import (
 )
 
 router = APIRouter(prefix="/api/smart-mix/playlists", tags=["smart-mix"])
+
+# A 409 for a Smart Mix limit, structured so clients translate it.
+SMART_MIX_LIMIT_RESPONSES: OpenApiResponses = {
+    409: {
+        "model": SmartMixLimitErrorResponse,
+        "description": (
+            "The playlist, or all of the owner's Smart Mix playlists, would hold more "
+            "tracks than the instance allows."
+        ),
+    }
+}
+
+
+def smart_mix_limit_response(error: SmartMixPlaylistLimitError) -> JSONResponse:
+    """The 409 for a refused Smart Mix change: the English ``detail`` and the limit."""
+    body = SmartMixLimitErrorResponse(
+        detail=str(error),
+        limit=error.limit,
+        max_tracks=error.max_tracks,
+        tracks=error.tracks,
+    )
+    return JSONResponse(status_code=409, content=body.model_dump(by_alias=True))
+
 
 _LIST_RESPONSES = merge_responses(
     AUTH_ERROR_RESPONSES,
@@ -54,12 +81,9 @@ _UPDATE_RESPONSES = merge_responses(
     {
         403: error_response("Only the playlist's owner turns Smart Mix on or off."),
         404: error_response("No playlist with this ID."),
-        409: error_response(
-            "The playlist, or all of the owner's Smart Mix playlists, would hold "
-            "more tracks than the instance allows."
-        ),
         422: error_response("The body is not {enabled: boolean}."),
     },
+    SMART_MIX_LIMIT_RESPONSES,
 )
 
 
@@ -100,9 +124,11 @@ def playlist_status(
     status = smart_mix_playlist_status(playlist_id)
     if status is None:
         raise HTTPException(status_code=404, detail="Playlist not found")
-    if user.get("role") != "admin" and get_playlist_access(
-        status.playlist, int(user["id"])
-    ) not in {"owner", "collaborator"}:
+    manager = has_capability(user, "library.analysis.manage")
+    if not manager and get_playlist_access(status.playlist, int(user["id"])) not in {
+        "owner",
+        "collaborator",
+    }:
         raise HTTPException(
             status_code=403,
             detail="Only the playlist's owner and collaborators read its Smart Mix state",
@@ -116,8 +142,13 @@ def playlist_status(
             SmartMixTrackStateResponse(
                 track_id=track.track_id,
                 track_entity_uid=track.entity_uid,
+                title=track.title,
+                artist=track.artist,
                 state=track.state,
                 attempts=track.attempts,
+                started_at=track.started_at,
+                finished_at=track.finished_at,
+                last_error=track.last_error if manager else None,
             )
             for track in status.tracks
         ],
@@ -133,7 +164,7 @@ def playlist_status(
 )
 def update_playlist(
     request: Request, playlist_id: int, body: SmartMixPlaylistUpdateRequest
-) -> SmartMixPlaylistResponse:
+) -> SmartMixPlaylistResponse | JSONResponse:
     user = _require_auth(request)
     try:
         state = set_smart_mix_playlist(
@@ -144,7 +175,7 @@ def update_playlist(
     except SmartMixPlaylistOwnerError as error:
         raise HTTPException(status_code=403, detail=str(error)) from None
     except SmartMixPlaylistLimitError as error:
-        raise HTTPException(status_code=409, detail=str(error)) from None
+        return smart_mix_limit_response(error)
     return _state_response(playlist_id, state)
 
 
@@ -164,4 +195,4 @@ def _state_response(
     )
 
 
-__all__ = ["router"]
+__all__ = ["SMART_MIX_LIMIT_RESPONSES", "router", "smart_mix_limit_response"]

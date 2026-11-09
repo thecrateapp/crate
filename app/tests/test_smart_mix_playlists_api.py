@@ -13,6 +13,7 @@ from crate.db.tx import read_scope, transaction_scope
 from crate.smart_mix.stems import (
     ESTIMATED_STEM_SECONDS_PER_TRACK,
     STEM_MAX_TRACKS_PER_PLAYLIST_SETTING,
+    STEM_MAX_TRACKS_PER_USER_SETTING,
 )
 from tests.test_smart_mix_playlists_repository import (
     _analysed,
@@ -91,8 +92,22 @@ def test_put_answers_409_over_a_limit(pg_db, test_app) -> None:
     response = test_app.put(_url(playlist_id), json={"enabled": True})
 
     assert response.status_code == 409
-    assert "2" in response.json()["detail"]
+    body = response.json()
+    assert "2" in body["detail"]
+    # Structured, so clients translate it.
+    assert (body["limit"], body["maxTracks"], body["tracks"]) == ("playlist", 2, 3)
     assert _jobs() == {}
+
+    set_setting(STEM_MAX_TRACKS_PER_PLAYLIST_SETTING, "300")
+    set_setting(STEM_MAX_TRACKS_PER_USER_SETTING, "4")
+    other = _playlist(ME, _tracks("api-limit-user", 2), name="Other")
+    assert test_app.put(_url(other), json={"enabled": True}).status_code == 200
+    over_user = test_app.put(_url(playlist_id), json={"enabled": True}).json()
+    assert (over_user["limit"], over_user["maxTracks"], over_user["tracks"]) == (
+        "user",
+        4,
+        5,
+    )
 
 
 def _tracks_of(playlist_id: int) -> list[int]:
@@ -132,11 +147,21 @@ def test_status_lists_per_track_states(pg_db, test_app, monkeypatch) -> None:
                 UPDATE track_stem_jobs
                 SET state = CASE track_id WHEN :running THEN 'analyzing'
                                           ELSE 'failed' END,
-                    attempts = CASE track_id WHEN :running THEN 1 ELSE 3 END
+                    attempts = CASE track_id WHEN :running THEN 1 ELSE 3 END,
+                    started_at = CAST(:started AS TIMESTAMPTZ),
+                    finished_at = CASE track_id WHEN :running THEN NULL
+                                  ELSE CAST(:finished AS TIMESTAMPTZ) END,
+                    last_error = CASE track_id WHEN :running THEN NULL
+                                 ELSE 'ffmpeg could not decode the file' END
                 WHERE track_id IN (:running, :failed)
                 """
             ),
-            {"running": running, "failed": failed},
+            {
+                "running": running,
+                "failed": failed,
+                "started": "2026-11-09T01:44:00+00:00",
+                "finished": "2026-11-09T01:47:00+00:00",
+            },
         )
 
     status = test_app.get(_url(playlist_id))
@@ -146,31 +171,54 @@ def test_status_lists_per_track_states(pg_db, test_app, monkeypatch) -> None:
     assert body["playlistId"] == playlist_id and body["enabled"] is True
     assert body["total"] == 4
     assert body["counts"] == {"pending": 1, "analyzing": 1, "ready": 1, "failed": 1}
-    assert body["tracks"] == [
+    started, finished = "2026-11-09T01:44:00Z", "2026-11-09T01:47:00Z"
+    artist = "Stems Artist api-status"
+    assert [_normalised(track) for track in body["tracks"]] == [
         # Separated before the playlist was turned on: no job, nothing attempted.
         {
             "trackId": ready,
             "trackEntityUid": _uid(ready),
+            "title": "Track 1",
+            "artist": artist,
             "state": "ready",
             "attempts": 0,
+            "startedAt": None,
+            "finishedAt": None,
+            "lastError": None,
         },
         {
             "trackId": running,
             "trackEntityUid": _uid(running),
+            "title": "Track 2",
+            "artist": artist,
             "state": "analyzing",
             "attempts": 1,
+            "startedAt": started,
+            "finishedAt": None,
+            "lastError": None,
         },
         {
             "trackId": failed,
             "trackEntityUid": _uid(failed),
+            "title": "Track 3",
+            "artist": artist,
             "state": "failed",
             "attempts": 3,
+            "startedAt": started,
+            "finishedAt": finished,
+            # Analysis managers read why it failed.
+            "lastError": "ffmpeg could not decode the file",
         },
         {
             "trackId": waiting,
             "trackEntityUid": _uid(waiting),
+            "title": "Track 4",
+            "artist": artist,
             "state": "pending",
             "attempts": 0,
+            "startedAt": None,
+            "finishedAt": None,
+            "lastError": None,
         },
     ]
     # No separation measured yet: the estimate per track (four minutes, ST2.PR2).
@@ -204,10 +252,42 @@ def test_status_lists_per_track_states(pg_db, test_app, monkeypatch) -> None:
     assert off["enabled"] is False and off["revision"] is None
     assert (off["total"], off["tracks"], off["estimatedSecondsLeft"]) == (0, [], None)
 
-    # Its owner and collaborators read it; others do not.
+    # Its owner and collaborators read it, without the errors; others do not.
     assert test_app.get(_url(999_999)).status_code == 404
+    collaborator = _user("api-status-collaborator")
+    with transaction_scope() as session:
+        session.execute(
+            text("UPDATE playlists SET is_collaborative = TRUE WHERE id = :id"),
+            {"id": playlist_id},
+        )
+        session.execute(
+            text(
+                "INSERT INTO playlist_members (playlist_id, user_id, role, created_at) "
+                "VALUES (:id, :user_id, 'collab', NOW())"
+            ),
+            {"id": playlist_id, "user_id": collaborator},
+        )
+    _as_user(monkeypatch, collaborator)
+    shared = test_app.get(_url(playlist_id))
+    assert shared.status_code == 200
+    assert {track["lastError"] for track in shared.json()["tracks"]} == {None}
     _as_user(monkeypatch, _user("api-status-other"))
     assert test_app.get(_url(playlist_id)).status_code == 403
+    # Analysis managers read every playlist, not by their role's name.
+    _as_user(monkeypatch, _user("api-status-librarian"), role="librarian")
+    managed = test_app.get(_url(playlist_id))
+    assert managed.status_code == 200
+    assert "ffmpeg could not decode the file" in {
+        track["lastError"] for track in managed.json()["tracks"]
+    }
+
+
+def _normalised(track: dict) -> dict:
+    """Timestamps in UTC with a Z, as the assertions write them."""
+    return {
+        key: value.replace("+00:00", "Z") if key.endswith("At") and value else value
+        for key, value in track.items()
+    }
 
 
 def test_status_reads_stay_bounded(pg_db, test_app) -> None:
@@ -342,6 +422,11 @@ def test_adding_tracks_to_an_enabled_playlist_queues_them(pg_db, test_app) -> No
         f"/api/playlists/{smart}/tracks", json={"tracks": [{"track_id": extra}]}
     )
     assert refused.status_code == 409
+    assert {key: refused.json()[key] for key in ("limit", "maxTracks", "tracks")} == {
+        "limit": "playlist",
+        "maxTracks": 2,
+        "tracks": 3,
+    }
     assert _tracks_of(smart) == [first, added]
 
 
@@ -372,6 +457,12 @@ def test_openapi_types_the_smart_mix_playlist_routes(test_app, spec: str) -> Non
         "$ref": "#/components/schemas/SmartMixPlaylistResponse"
     }
     assert {"401", "403", "404", "409", "422"} <= set(toggle["responses"])
+    assert toggle["responses"]["409"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/SmartMixLimitErrorResponse"
+    }
+    limit_error = components["SmartMixLimitErrorResponse"]
+    assert set(limit_error["required"]) == {"detail", "limit", "maxTracks", "tracks"}
+    assert limit_error["properties"]["limit"]["enum"] == ["playlist", "user"]
     states = components["SmartMixTrackStateResponse"]["properties"]["state"]["enum"]
     assert states == ["pending", "analyzing", "ready", "failed"]
     if spec == "/openapi.json":

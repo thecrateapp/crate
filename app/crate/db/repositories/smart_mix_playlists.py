@@ -75,7 +75,7 @@ class SmartMixPlaylistLimitError(SmartMixPlaylistError):
     """The playlist, or all of the owner's Smart Mix playlists, would hold too many tracks."""
 
     def __init__(self, limit: LimitKind, *, max_tracks: int, tracks: int) -> None:
-        self.limit = limit
+        self.limit: LimitKind = limit
         self.max_tracks = max_tracks
         self.tracks = tracks
         if limit == "playlist":
@@ -126,10 +126,17 @@ SMART_MIX_OFF = SmartMixSummary(enabled=False, ready=0, total=0)
 
 @dataclass(frozen=True, slots=True)
 class SmartMixTrackState:
+    """A track's stem work. ``last_error`` is the job's, for analysis managers only."""
+
     track_id: int
     entity_uid: str | None
     state: StemJobState
     attempts: int
+    title: str | None = None
+    artist: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    last_error: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,6 +267,26 @@ _CURRENT_ANALYSIS_JOINS = """
           AND analysis.source_revision = profile.source_revision
 """
 
+# The mean time of the latest separations, or NULL before the first one.
+_PACE = f"""
+    pace AS (
+        SELECT EXTRACT(EPOCH FROM AVG(recent.finished_at - recent.started_at))
+            AS seconds
+        FROM (
+            SELECT started_at, finished_at
+            FROM track_stem_jobs
+            WHERE state = 'ready'
+              AND started_at IS NOT NULL
+              AND finished_at IS NOT NULL
+            ORDER BY finished_at DESC
+            LIMIT {_PACE_WINDOW}
+        ) recent
+    )
+"""
+# For the read queries in crate.db.queries.smart_mix_stems.
+PACE_CTE = _PACE
+CURRENT_ANALYSIS_JOINS = _CURRENT_ANALYSIS_JOINS
+
 _QUEUE = f"""
     INSERT INTO track_stem_jobs AS job (track_id, state, source_revision)
     SELECT DISTINCT pt.track_id, 'pending', profile.source_revision
@@ -326,22 +353,11 @@ _STATUS = text(
         WHERE pt.playlist_id = :playlist_id AND pt.track_id IS NOT NULL
         GROUP BY pt.track_id
     ),
-    pace AS (
-        SELECT EXTRACT(EPOCH FROM AVG(recent.finished_at - recent.started_at))
-            AS seconds
-        FROM (
-            SELECT started_at, finished_at
-            FROM track_stem_jobs
-            WHERE state = 'ready'
-              AND started_at IS NOT NULL
-              AND finished_at IS NOT NULL
-            ORDER BY finished_at DESC
-            LIMIT {_PACE_WINDOW}
-        ) recent
-    )
+    {_PACE}
     SELECT playlist.*, pace.seconds AS seconds_per_track, tracks.track_id,
-           lt.entity_uid::text AS entity_uid, job.state AS job_state,
-           COALESCE(job.attempts, 0) AS attempts,
+           lt.entity_uid::text AS entity_uid, lt.title, lt.artist,
+           job.state AS job_state, COALESCE(job.attempts, 0) AS attempts,
+           job.started_at, job.finished_at, job.last_error,
            analysis.track_id IS NOT NULL AS analysed
     FROM playlist
     CROSS JOIN pace
@@ -545,6 +561,11 @@ def smart_mix_playlist_status(
                 entity_uid=row["entity_uid"],
                 state=_track_state(row),
                 attempts=int(row["attempts"]),
+                title=row["title"],
+                artist=row["artist"],
+                started_at=row["started_at"],
+                finished_at=row["finished_at"],
+                last_error=row["last_error"],
             )
             for row in rows
             if row["track_id"] is not None
@@ -601,6 +622,11 @@ def _state(row: Any) -> SmartMixPlaylistState:
         revision=int(row["revision"]),
         updated_at=row["updated_at"],
     )
+
+
+def track_state(row: Any) -> StemJobState:
+    """A track's state from a row with ``analysed`` and ``job_state``."""
+    return _track_state(row)
 
 
 def _track_state(row: Any) -> StemJobState:
@@ -680,6 +706,8 @@ def _queue(session: Session, playlist_ids: Sequence[int] | None) -> int:
 
 
 __all__ = [
+    "CURRENT_ANALYSIS_JOINS",
+    "PACE_CTE",
     "SMART_MIX_OFF",
     "SmartMixPlaylistError",
     "SmartMixPlaylistLimitError",
@@ -698,4 +726,5 @@ __all__ = [
     "smart_mix_playlist_status",
     "smart_mix_playlist_tracks_changed",
     "smart_mix_summaries",
+    "track_state",
 ]

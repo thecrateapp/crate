@@ -22,6 +22,7 @@ import logging
 from collections.abc import Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Literal
 
 from pydantic import ValidationError
@@ -32,6 +33,7 @@ from sqlalchemy.orm import Session
 from crate.db.cache_settings import get_setting
 from crate.db.orm.library import LibraryTrack
 from crate.db.orm.smart_mix import TrackMixProfileRow, TrackStemSignalsRow
+from crate.db.orm.user import User
 from crate.db.repositories.library_shared import coerce_uuid
 from crate.db.tx import optional_scope, read_scope
 from crate.smart_mix.stems import (
@@ -255,6 +257,54 @@ def get_stem_track(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class StoredStemAnalysis:
+    """A stored analysis with its row's dates and, for a Decks upload, its contributor."""
+
+    producer_kind: ProducerKind
+    analysis: StemAnalysis
+    created_at: datetime
+    updated_at: datetime
+    contributed_by: int | None
+    contributor_username: str | None
+
+
+def get_stored_stem_analyses(
+    track_id: int, *, session: Session | None = None
+) -> list[StoredStemAnalysis]:
+    """Every stored analysis of the track, whatever its source revision, in one query.
+
+    Server first, then Decks; unreadable rows are left out.
+    """
+    statement = (
+        select(TrackStemSignalsRow, User.username)
+        .outerjoin(User, User.id == TrackStemSignalsRow.contributed_by)
+        .where(TrackStemSignalsRow.track_id == int(track_id))
+        .order_by(TrackStemSignalsRow.producer_kind.desc())
+    )
+    manager = nullcontext(session) if session is not None else read_scope()
+    with manager as current:
+        rows = current.execute(statement).all()
+        stored: list[StoredStemAnalysis] = []
+        for row, username in rows:
+            analysis = _row_to_analysis(row)
+            if analysis is None:
+                continue
+            stored.append(
+                StoredStemAnalysis(
+                    producer_kind="server"
+                    if row.producer_kind == "server"
+                    else "decks",
+                    analysis=analysis,
+                    created_at=row.created_at,
+                    updated_at=row.updated_at,
+                    contributed_by=row.contributed_by,
+                    contributor_username=username,
+                )
+            )
+    return stored
+
+
 def stem_uploads_enabled() -> bool:
     """Whether Crate Decks may upload stem analyses: on unless an admin turns it off."""
     return get_setting(STEM_UPLOADS_SETTING, "true") == "true"
@@ -294,8 +344,10 @@ def _row_to_analysis(row: TrackStemSignalsRow) -> StemAnalysis | None:
 __all__ = [
     "StemStoreResult",
     "StemTrack",
+    "StoredStemAnalysis",
     "get_stem_analyses",
     "get_stem_track",
+    "get_stored_stem_analyses",
     "stem_uploads_enabled",
     "upsert_stem_analysis",
 ]
